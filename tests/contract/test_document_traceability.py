@@ -182,13 +182,14 @@ class DocumentTraceabilityTests(unittest.TestCase):
             if gate_path is not None:
                 self.assertTrue((root / gate_path.strip("`")).is_file(), gate_path)
 
-    def test_stock_stage_draft_cannot_claim_delivery_authority(self) -> None:
+    def test_stock_stage_flat_state_machine_is_superseded_without_delivery_authority(self) -> None:
         root = find_project_root()
         fields = _header_fields(root / "docs" / "design" / "stock-stage-state-machine.md")
 
-        self.assertEqual(fields["Design status"], "draft")
-        self.assertEqual(fields["Delivery gate"], "blocked")
-        self.assertIn("Non-governing", fields["Authority"])
+        self.assertEqual(fields["Design status"], "superseded")
+        self.assertIn("not-applicable", fields["Delivery gate"])
+        self.assertIn("Historical vocabulary", fields["Authority"])
+        self.assertIn("stock-stage-vocabulary-portfolio.md", fields["Successor architecture"])
 
     def test_platform_kernel_boundary_is_machine_readable_and_bounded(self) -> None:
         root = find_project_root()
@@ -1644,7 +1645,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            set(),
+            {"P3-STAGE-028"},
         )
         p012_closeout = json.loads(
             (root / "config/stage-learning/stage-atomic-proposition-p012-closeout.v1.json")

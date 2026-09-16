@@ -1,0 +1,214 @@
+{
+  "schema_version": "quanthus.stage-whole-vocabulary-portfolio-synthesis.v1",
+  "work_item": "P3-STAGE-027",
+  "state": "PASS_LAYERED_VOCABULARY_PORTFOLIO_SYNTHESIS",
+  "effective_date": "2026-09-16",
+  "purpose": "Integrate the frozen first-, second- and third-group stage-learning evidence into one portfolio architecture without forcing the historical 1-12 directional vocabulary plus neutral 0 into peer primary stages. Preserve useful contexts, event/nested conditions and modifiers, park insufficient codes, and keep continuous Facts authoritative.",
+  "bindings": {
+    "first_group_development_candidate": {
+      "path": "config/stage-learning/development-candidate.v1.json",
+      "sha256": "sha256:678c93e9f4e1a3545f5b51279ceaa4dddf32b0a05e5bbd94a2fe73f4f6f4a479"
+    },
+    "first_group_external_closeout": {
+      "path": "docs/acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md",
+      "sha256": "sha256:ca83aec94d41e7d670adff275a41b53de56256435f1f88026289c8f0899d766d"
+    },
+    "second_group_closeout": {
+      "path": "config/stage-learning/second-group-development-closeout.v1.json",
+      "sha256": "sha256:a871767aaa68c80f23b2767c97d8c61506906f3f95ed62272da998f72eed304b"
+    },
+    "stage_10_11_projection": {
+      "path": "config/stage-10-11-projection.v1.json",
+      "sha256": "sha256:1c9e6e39f77a3391524b9034946b6caf84aa4abe36d5331a1751b7168302406a"
+    },
+    "third_group_rebaseline": {
+      "path": "config/stage-learning/stage-third-group-portfolio-rebaseline.v1.json",
+      "sha256": "sha256:76f1808042779523c6008046cfc1bfd57572a0331caf7fe47e1cd2fa4b5b572a"
+    },
+    "downside_lifecycle_closeout": {
+      "path": "config/stage-learning/stage-downside-lifecycle-reference-result.v1.json",
+      "sha256": "sha256:dbf8ad057d7fae7a716f7e57ce984644684d2ed4630f2ec892cefa408c741ef6"
+    },
+    "high_side_modifier_closeout": {
+      "path": "config/stage-learning/stage-high-side-modifier-reference-result.v1.json",
+      "sha256": "sha256:37ac8e863b2b987f0dbc34377e70ae6f27252feaacfde20c237ec213ebf5b089"
+    }
+  },
+  "vocabulary_accounting": {
+    "directional_lifecycle_codes": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "directional_lifecycle_code_count": 12,
+    "neutral_market_code": 0,
+    "market_code_count_including_neutral": 13,
+    "control_sentinel": "X",
+    "epistemic_outcome": "ABSTAIN",
+    "control_sentinel_is_market_stage": false,
+    "abstain_is_market_stage": false,
+    "historical_numbering_implies_peer_dimension": false,
+    "flat_single_valued_peer_stage_model": false,
+    "primary_stage_compression_authorized": false
+  },
+  "architecture": {
+    "continuous_facts_are_authoritative_substrate": true,
+    "assertion_layers": [
+      "context_or_structural_state",
+      "event_or_nested_condition",
+      "modifier"
+    ],
+    "coexistence_across_layers_is_legal": true,
+    "same_layer_ambiguity_must_be_preserved": true,
+    "unsupported_code_may_remain_parked": true,
+    "historical_codes_retained_for_traceability": true,
+    "official_peer_primary_stage_count": 0,
+    "flat_fsm_disposition": "SUPERSEDED_AS_IMPLEMENTATION_ARCHITECTURE_RETAINED_AS_HISTORICAL_VOCABULARY_GRAPH"
+  },
+  "code_matrix": {
+    "0": {
+      "historical_name": "unordered oscillation",
+      "synthesized_role": "neutral_structural_context_hypothesis",
+      "layer": "context_or_structural_state",
+      "disposition": "PARK_PRIMARY_STAGE_QUALIFICATION_RETAIN_RESEARCH_MECHANISM",
+      "evidence_grade": "research_only",
+      "peer_primary_stage_authorized": false,
+      "reason": "P019 parks Stage0 parent qualification after repeated no-eligible-candidate results; the clean expansion-disorder child remains research-only while broad-only eligibility is rejected."
+    },
+    "1": {
+      "historical_name": "stabilizing after decline",
+      "synthesized_role": "downside_deceleration_stabilization",
+      "layer": "event_or_nested_condition",
+      "parent_context_code": 12,
+      "disposition": "RETAIN_SUPPORTED_NESTED_CONDITION_NOT_STANDALONE_QUALIFIED",
+      "evidence_grade": "research_supported_parent_context_not_qualified",
+      "peer_primary_stage_authorized": false,
+      "reason": "P020-C Stage1 nested sufficiency gates pass inside resolved downside contexts, but the Stage12 parent context fails its frozen unjudgeable-rate gate."
+    },
+    "2": {
+      "historical_name": "accumulation/consolidation",
+      "synthesized_role": "orderly_consolidation_proposition",
+      "layer": "event_or_nested_condition",
+      "disposition": "RETAIN_STRONG_EXPLORATORY_PROPOSITION_NOT_OFFICIAL",
+      "evidence_grade": "strong_exploratory",
+      "peer_primary_stage_authorized": false,
+      "reason": "P019 retains the Stage2/order proposition as strong exploratory evidence; no LabelCard, preserved validation or primary-stage promotion is opened."
+    },
+    "3": {
+      "historical_name": "breakout probe",
+      "synthesized_role": "breakout_probe_event",
+      "layer": "event_or_nested_condition",
+      "disposition": "RETAIN_FROZEN_DEVELOPMENT_CANDIDATE_EXTERNAL_QUALIFICATION_INCONCLUSIVE",
+      "evidence_grade": "development_candidate",
+      "peer_primary_stage_authorized": false,
+      "reason": "The first-group R1 candidate has strong development evidence, but the sole 2022-2024 external run ended at preregistered sample-feasibility before semantic scoring."
+    },
+    "4": {
+      "historical_name": "breakout acceptance",
+      "synthesized_role": "breakout_acceptance_condition",
+      "layer": "event_or_nested_condition",
+      "parent_relation": "prior_same_anchor_stage_3_episode",
+      "disposition": "RETAIN_FROZEN_DEVELOPMENT_CANDIDATE_EXTERNAL_QUALIFICATION_INCONCLUSIVE",
+      "evidence_grade": "development_candidate",
+      "peer_primary_stage_authorized": false,
+      "reason": "Stage4 is explicitly a temporal hold/acceptance condition after a prior same-anchor Stage3 episode; development candidate frozen, external qualification not reached."
+    },
+    "5": {
+      "historical_name": "advancing trend",
+      "synthesized_role": "advancing_context_hypothesis",
+      "layer": "context_or_structural_state",
+      "disposition": "INCONCLUSIVE_PARKED_CONTINUOUS_FACTS_ONLY",
+      "evidence_grade": "parked",
+      "peer_primary_stage_authorized": false,
+      "reason": "The unchanged Stage5/6 joint grid produced no hard-gate-eligible candidate after reference repair; continuous facts remain the authority."
+    },
+    "6": {
+      "historical_name": "pullback test",
+      "synthesized_role": "pullback_condition_hypothesis",
+      "layer": "event_or_nested_condition",
+      "parent_context_code": 5,
+      "disposition": "INCONCLUSIVE_PARKED_CONTINUOUS_FACTS_ONLY",
+      "evidence_grade": "parked",
+      "peer_primary_stage_authorized": false,
+      "reason": "Stage6 reference ambiguity was improved but the unchanged joint Stage5/6 grid still produced no eligible candidate."
+    },
+    "7": {
+      "historical_name": "structural rebuild",
+      "synthesized_role": "repair_rebuild_condition_hypothesis",
+      "layer": "event_or_nested_condition",
+      "disposition": "INCONCLUSIVE_PARKED_CONTINUOUS_FACTS_ONLY",
+      "evidence_grade": "parked",
+      "peer_primary_stage_authorized": false,
+      "reason": "Reference corpus was sufficient, but every frozen Stage7 candidate failed at least one preregistered gate; no grid expansion was authorized."
+    },
+    "8": {
+      "historical_name": "accelerating top",
+      "synthesized_role": "upside_acceleration_extension_modifier",
+      "layer": "modifier",
+      "disposition": "RETAIN_RESEARCH_ONLY_MODIFIER_RESOURCE_QUALIFICATION_NOT_OPEN",
+      "evidence_grade": "research_only_resource_no_pass",
+      "peer_primary_stage_authorized": false,
+      "reason": "P026 freezes observable acceleration/extension semantics but its only P020-disjoint resource route fails before reviewer packets, with both STAR cells below the coverage floor."
+    },
+    "9": {
+      "historical_name": "high-level divergence/distribution",
+      "synthesized_role": "high_level_price_volume_divergence_modifier",
+      "layer": "modifier",
+      "disposition": "PARKED_PENDING_MINIMAL_ACTIVITY_RELATION",
+      "evidence_grade": "parked_missing_fact_relation",
+      "peer_primary_stage_authorized": false,
+      "reason": "P3-STAGE-003/P026 reject price-only Stage9; the required high-side activity relation has not been separately justified and qualified."
+    },
+    "10": {
+      "historical_name": "structural failure",
+      "synthesized_role": "persistent_structural_failure_context",
+      "layer": "context_or_structural_state",
+      "disposition": "RETAIN_ACCEPTED_DEVELOPMENT_PROJECTION_CONTEXT",
+      "evidence_grade": "accepted_development_projection",
+      "peer_primary_stage_authorized": false,
+      "reason": "P3-STAGE-002 formalizes and qualifies the Stage10/11 projection over accepted Support Evolution Facts; primary_stage remains null."
+    },
+    "11": {
+      "historical_name": "post-break rebound",
+      "synthesized_role": "nested_rebound_condition_within_confirmed_failure_context",
+      "layer": "event_or_nested_condition",
+      "parent_context_code": 10,
+      "disposition": "RETAIN_ACCEPTED_DEVELOPMENT_NESTED_PROJECTION",
+      "evidence_grade": "accepted_development_projection",
+      "peer_primary_stage_authorized": false,
+      "reason": "P3-STAGE-002 explicitly permits {10,11} coexistence: Stage11 is a current rebound condition under an immutable prior Stage10 confirmation."
+    },
+    "12": {
+      "historical_name": "declining trend",
+      "synthesized_role": "persistent_downside_context",
+      "layer": "context_or_structural_state",
+      "disposition": "RETAIN_RESEARCH_CONTEXT_NOT_QUALIFIED",
+      "evidence_grade": "research_reference_no_pass",
+      "peer_primary_stage_authorized": false,
+      "reason": "P020-C produces balanced definite evidence across all eight cells but 30/179 clusters remain unjudgeable, exceeding the frozen 15% ceiling."
+    }
+  },
+  "portfolio_conclusions": {
+    "all_directional_codes_accounted_for": true,
+    "neutral_code_accounted_for": true,
+    "no_official_peer_primary_stage_is_currently_qualified": true,
+    "useful_vocabulary_survives_without_flat_classifier": true,
+    "facts_should_feed_proposition_bundle_before_any_future_primary_compression": true,
+    "historical_transition_graph_may_remain_explanatory_not_executable": true,
+    "further_per_code_resource_repair_not_selected": true
+  },
+  "successor": {
+    "work_item": "P3-STAGE-028",
+    "name": "Layered Stage Proposition Bundle Contract",
+    "scope": "Freeze a schema/governance contract that represents contexts, event/nested conditions, modifiers, evidence grade, ambiguity/abstention and control sentinel separately over accepted continuous Facts. It must keep primary_stage absent/null in v1 and must not activate parked/research propositions merely by representing them."
+  },
+  "authority": {
+    "portfolio_governance": true,
+    "new_market_read": false,
+    "new_reference_opinion": false,
+    "holdout_read": false,
+    "candidate_or_threshold_search": false,
+    "primary_stage_compression": false,
+    "labelcard_publication": false,
+    "daily_inference": false,
+    "strategy_consumption": false,
+    "trading": false
+  },
+  "claim_ceiling": "P027 synthesizes already-frozen evidence and supersedes the flat single-valued FSM as an implementation architecture. It preserves historical codes for traceability and does not qualify any new Stage, reopen any parked route, authorize primary-stage compression, read new data, or create production/strategy/trading authority."
+}

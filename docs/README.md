@@ -541,7 +541,15 @@ nodes.
   gates, dropping/merging STAR, reusing P020 exact windows or opening another resource repair. Stage8
   remains research-only; Stage9 remains parked pending an activity relation; P026-D is not opened. The
   next route is a separate governance-only P3-STAGE-027 whole-vocabulary portfolio synthesis over the
-  already frozen evidence. Preserved 2021/2022-2024/2025 remain unopened.
+  already frozen evidence. P027 is now closed `PASS_LAYERED_VOCABULARY_PORTFOLIO_SYNTHESIS`: it
+  accounts for neutral `0` plus directional codes `1..12` without forcing dimensional equivalence,
+  preserves accepted/research/parked evidence grades, and supersedes the flat single-valued FSM as the
+  implementation architecture. Stage10/11 remain the strongest accepted context+nested projection;
+  3/4 remain development event-phase candidates with external qualification inconclusive; 5/6/7 stay
+  parked on continuous Facts; 2 remains strong exploratory; 1/12 remain layered research semantics;
+  8/9 remain modifiers. No historical code is currently an official peer primary stage. The only ready
+  successor is P3-STAGE-028, a schema/governance-only Layered Stage Proposition Bundle whose v1 keeps
+  `primary_stage` absent/null. Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -564,6 +572,10 @@ nodes.
   `acceptance/stage-high-side-modifier-reference-engineering-20260916.md`,
   `reviews/stage-p026c-pre-read-technical-recovery-review-20260916.md`,
   `reviews/stage-p026c-stage8-resource-shortfall-four-party-review-20260916.md`,
+  `design/stock-stage-vocabulary-portfolio.md`,
+  `work-items/stage-whole-vocabulary-portfolio-synthesis.md`,
+  `reviews/stage-p027-whole-vocabulary-portfolio-review-20260916.md`,
+  `work-items/stage-layered-proposition-bundle.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,
@@ -575,10 +587,13 @@ nodes.
   `acceptance/stage-downside-lifecycle-review-packet-engineering-20260916.md`,
   `reviews/stage-p024-clustered-identity-admission-review-20260916.md`, and
   `reviews/stage-p018-channel-decomposition-four-party-review-20260915.md`.
-- The stock-stage vocabulary remains a draft. Its new non-governing qualification and field-dependency
-  proposals are `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`;
-  proposed work is `work-items/stock-stage-qualification-proposal.md`. These documents do not activate
-  twelve-state labels, B6/B7 implementation, new result-bearing research, or daily/strategy Shadow.
+- The historical stock-stage vocabulary remains traceable, but P3-STAGE-027 now supersedes the flat
+  single-valued FSM as the implementation architecture. The accepted architecture is
+  `design/stock-stage-vocabulary-portfolio.md`: contexts/structural states, event/nested conditions and
+  modifiers are separate proposition layers over continuous Facts; `X` stays control flow and
+  `ABSTAIN` stays epistemic. The qualification and field-dependency proposals remain
+  `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`; they do not
+  activate peer primary labels, new result-bearing research, or daily/strategy Shadow.
   The concrete CPU-first historical-learning plan is `design/stock-stage-historical-learning.md`,
   with device assessment in `design/stock-stage-training-compute.md`, three-perspective review in
   `reviews/stock-stage-learning-review-20260908.md`, and issue-managed steps in

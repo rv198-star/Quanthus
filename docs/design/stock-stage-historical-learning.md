@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。H第二组development milestone已mixed closeout，Stage 10/11保留development candidate，Stage 5/6/7为INCONCLUSIVE_PARKED。Route A `P3-STRUCT-005` 已正式化**演化支撑事实族 / Support Evolution Fact Family**，`P3-STAGE-002` 已正式化10/11可重叠Projection Contract并关闭。第三组 `P3-STAGE-003` 已完成512只 morphology profile；`P3-STRUCT-006` 与 `P3-STRUCT-007` 已分别接受**趋势演化事实族 / Trend Evolution Fact Family**和**结构秩序事实族 / Structure Order Fact Family**。Structure Order资格只重放两份immutable F9 source artifacts，174个观察生成1,218个typed measurements，DWD/provider新读取均为0。`P3-STAGE-004` 已以 INCONCLUSIVE_REFERENCE_SUFFICIENCY 关闭：唯一技术重试执行成功，224,346个观察中抽取160个参考，Stage 2明确正例仅9个、低于冻结最低20个，触发两项搜索共用门槛；0/2均未冻结候选，pair overlap为null而非0。完成实验不等于证明0/2不可区分；全量trial细节未单独读回，结论限于终态摘要和冻结必要门槛。当前无active 0/2搜索或重试权限，正式LabelCard、primary-stage、外样本、日更/消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。第二组已mixed closeout：Stage 10/11随后由`P3-STAGE-002`正式化为可重叠的development Projection Contract，Stage 5/6/7为INCONCLUSIVE_PARKED。第三组已完整走完P003-P026：Stage0 primary资格park、Stage2/order保留strong exploratory；P020把12/1验证为downside context + nested stabilization结构但Stage12 reference gate no-pass；P026把8/9确认为modifier方向，Stage8唯一资源路线no-pass且Stage9继续blocked于activity relation。`P3-STAGE-027`现已完成全词汇portfolio synthesis：历史方向码1..12加neutral 0全部保留追溯，但flat single-valued FSM不再是实现架构；当前没有任何official peer primary stage。下一步仅`P3-STAGE-028`分层Proposition Bundle schema/governance可ready，`primary_stage`继续null/absent。正式LabelCard、外样本、日更/消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
 
 ## 1. 决策摘要与继承关系
 
@@ -143,7 +143,7 @@ A须把数字、分母、区间算法、bootstrap块长/聚类、损失优先次
 
 ## 9. 实施顺序与扩展
 
-第一组：3/4与2整理、5背景上行、失效突破的负例/混淆；先解“事件 vs 已保持”，不训练独立盈利策略。第二组：5/6/7/10/11，先补主次支撑和失效过程再学回踩/修复。第三组：0/1/2/8/9/12 已完成`P3-STAGE-003`连续profile；趋势演化与结构秩序事实族已分别由`P3-STRUCT-006/007`正式化并接受。0/2随后经历P004-P018的有限参考、边界、原子命题、资源治理与候选诊断路线。P019按本文件原有的portfolio原则正式收口：Stage0 parent资格在本序列park，Expansion子机制仅保留research，Broad当前eligibility拒绝，Stage2/order保留strong exploratory但不晋级；不再为Stage0继续扩参或追加新语义实验。第三组主线恢复到此前保留的1/12 downside lifecycle，P020以Stage12 downside context + Stage1 nested deceleration/stabilization为下一bounded route；8/9继续作为modifier假设且9的活动关系后置。
+第一组3/4保留为有质量的breakout event-phase development candidates，但唯一2022-2024外样本运行在语义评分前因sample-feasibility关闭，因此没有official资格。第二组5/6/7/10/11已mixed closeout：5/6/7保持INCONCLUSIVE_PARKED并继续消费连续Facts；10/11由`P3-STAGE-002`正式化为persistent structural-failure context + nested rebound condition，可共同成立且`primary_stage=null`。第三组0/1/2/8/9/12已完成P003-P026：0 primary资格park、2/order strong exploratory、12/1形成downside context + nested stabilization但parent reference no-pass、8为research-only acceleration/extension modifier且资源路线no-pass、9为等待activity relation的modifier hypothesis。`P3-STAGE-027`随后将三组合并为分层vocabulary portfolio：历史编号继续追溯，但不再视作互斥同层状态；contexts、event/nested conditions、modifiers与continuous Facts分层，`X`与`ABSTAIN`分别保留control/epistemic语义。下一步P028只冻结Layered Stage Proposition Bundle契约，不重开逐code补样或primary-stage压缩。
 
 每组都走相同的局部学习+全体系冲突审计；不得独立优化12个标签后直接拼接。每组输出保留/合并/改维度/拒绝决定。第三组尤其禁止把`0`做成“其他都不满足”的剩余类，禁止把`8/9`的“赶顶/派发”当可观测事实；若难以辨识则停在观察性描述/修饰命题，不能迫使B6/B7无限扩张。
 

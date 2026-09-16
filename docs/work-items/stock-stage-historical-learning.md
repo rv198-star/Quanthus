@@ -11,7 +11,7 @@
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Machine plan | `../../config/stock-stage-learning-delivery.v1.json` |
 | GitHub | 父工单 #246；A #238、B #239、C #240、D #241、E #242、F #243、G #244、H #245、I #247、J #248；A-F/I closed，G/H/J及父工单open/blocked |
-| Current scope | A-F已关闭，F为sample-feasibility INCONCLUSIVE；I已关闭；J真实holdout继续blocked。H第二组development milestone已mixed closeout并完成量化/短线/基金三视角评审：Stage 10/11冻结development candidate；Stage 5/6/7保持独立编号但INCONCLUSIVE_PARKED。当前版本development search已关闭，下一步无ready child；2025、正式QUALIFIED、日更、消费者和策略权限仍关闭 |
+| Current scope | A-F/I已关闭，F为sample-feasibility INCONCLUSIVE；J真实holdout继续blocked。后续分组研究现已由P027统一收口：10/11为accepted development context+nested projection，3/4为frozen development event candidates且外样本qualification inconclusive，5/6/7 parked，0 primary资格park、2 strong exploratory、12/1 layered research no-pass、8 research modifier资源no-pass、9 activity-blocked modifier。flat single-valued FSM已被supersede为分层vocabulary portfolio；当前唯一ready child为P3-STAGE-028 schema/governance contract，primary_stage继续null/absent；2025、正式QUALIFIED、日更、消费者和策略权限仍关闭 |
 
 ## 1. 逐步执行路线
 
@@ -28,7 +28,7 @@
 | I | P3-STAGE-001-I | closed / #247 / protocol repair | 后继外样本采样控制协议 | `qualification-protocol.v2.json`保留F原target caps（mature-held仍80），但exact quota不足不再process crash；实际样本量进入冻结semantic hard gates，无跨层结果依赖回填；不读任何新holdout |
 | J | P3-STAGE-001-J | blocked / #248 / successor holdout | development容量普查已反推并冻结未来cohort size=512；后续在未消费holdout上执行一次评价 | 2020-2021 census：64不够、128首次满足、256/512均满足；选择512是基于实测算力余量增加稀有样本储备，640个semantic contexts上限不变。结果见 `../acceptance/stock-stage-learning-j-development-capacity-census-result-20260909.md`。真实评价仍需预先冻结具体证券/seed/partition并独立授权；2022-2024禁止fresh reuse，2025仍`unopened_unselected` |
 
-每项精确inputs/deliverables/acceptance/blocked_on由机器计划登记并同步到GitHub。A-F已关闭，其中F是**sample-feasibility INCONCLUSIVE**而不是模型REJECT：2022-2024 arbitration的一次预算已经消耗，不能修sample后重跑并称fresh holdout。I只修复未来协议；J保持holdout blocked。H第二组development已完成mixed closeout，当前无ready child、无active search；下一步必须新开明确scope。2025 permanent-blind保持未触碰。
+每项精确inputs/deliverables/acceptance/blocked_on由机器计划登记并同步到GitHub。A-F已关闭，其中F是**sample-feasibility INCONCLUSIVE**而不是模型REJECT：2022-2024 arbitration的一次预算已经消耗，不能修sample后重跑并称fresh holdout。I只修复未来协议；J保持holdout blocked。后续分组实验已按各自冻结gate完成或park，并由P027统一为分层portfolio；当前无active逐code搜索，唯一ready scope是P028 representation schema/governance，不需要新市场读取。2025 permanent-blind保持未触碰。
 
 ## 2. 谁负责什么
 
@@ -38,9 +38,9 @@
 
 ## 3. 当前下一步
 
-当前不消耗新的holdout。H的两个development profile均已完成。repair profile进一步证明：acceptance anchor在20/60尺度约77%/74%的路径会被跌破，更像局部突破接受边界；更深的initial-low support仅约29%/13%被跌破，且首次跌破中位在26/28个交易日，更适合作为Stage-10主支撑候选。即便如此其跌破仍约80%/77%最终收回，因此10必须同时要求持续未收复和足够跌破深度。7则用damage与T-only repair fraction分离“深跌”与“正在修复”；11只能在冻结10之后、同一失败支撑仍未收复时评估反抽。
+当前不消耗新的holdout，也不再逐code追参。P027已经把历史码1..12与neutral 0的证据等级和语义角色统一到`stock-stage-vocabulary-portfolio.md`：连续Facts是权威底座，context/structural state、event/nested condition、modifier分层表示；`X`是control，`ABSTAIN`是epistemic outcome。没有任何历史码当前被授权为official peer primary stage。
 
-首轮与supplement都已执行完毕。Supplement 将Stage 6 ambiguous references从9补到19、Stage 11从7补到11，排除了corpus-sufficiency blocker；Stage 11因此冻结5%未收复反抽candidate，而Stage-5/6联合原网格仍无eligible candidate。Stage 7维持42 positive / 58 negative / 20 ambiguous下的真实INCONCLUSIVE，Stage 10维持5-session+2% candidate。三视角评审给出`PASS_WITH_SCOPE_REDUCTION`：停止当前版本追参，10/11保留development candidate，5/6/7标记INCONCLUSIVE_PARKED。J真实holdout、G日更、第三组和消费者继续blocked；2025不动。
+下一步P3-STAGE-028只冻结Layered Stage Proposition Bundle的schema与治理：stable proposition id、historical code traceability、evidence grade、coexistence/ambiguity、Fact references、ABSTAIN/X边界以及哪些accepted development projection可进入governed shadow surface。v1必须保持`primary_stage` absent/null，representation不能自动晋级research/parked proposition。J真实holdout、G日更、正式LabelCard/消费者/策略继续blocked；2025不动。
 
 ## 4. 原提案迁移
 
@@ -48,4 +48,4 @@
 
 ## 5. 本轮验证
 
-计划校验包括：稳定ID集合、依赖无环、先决项顺序、文档路径、P0分区一致以及每项显式权限。GitHub同步P3-STAGE-001和A-J，不能改动旧P3 fixture、Facts验收、Catalog或P6工单。原始规划收尾见 `../acceptance/stock-stage-learning-planning-closeout-20260908.md`；当前执行状态以上表及各 acceptance 为准。A-F与I关闭，G/H/J及父工单blocked，当前无ready任务。首组开发候选继续冻结，第二组search authority已关闭；2022-2024 fresh holdout已消耗，2025/其他新holdout、正式QUALIFIED、日更与策略消费权限仍保持关闭。
+计划校验包括：稳定ID集合、依赖无环、先决项顺序、文档路径、P0分区一致以及每项显式权限。GitHub同步P3-STAGE-001和A-J，不能改动旧P3 fixture、Facts验收、Catalog或P6工单。原始规划收尾见 `../acceptance/stock-stage-learning-planning-closeout-20260908.md`；当前执行状态以上表及各 acceptance 为准。A-F/I关闭，G/J及父工单仍受原外样本/日更gate约束；H后继的分组研究已由P027完成portfolio synthesis。当前唯一ready任务是P028 schema/governance；2022-2024 fresh holdout已消耗，2025/其他新holdout、正式QUALIFIED、日更与策略消费权限仍保持关闭。

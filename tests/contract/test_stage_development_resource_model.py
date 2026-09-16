@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 
 from quanthus.policy import find_project_root
@@ -140,6 +141,11 @@ P026_CLOSEOUT_REVIEW = (
     ROOT / "docs/reviews/stage-p026c-stage8-resource-shortfall-four-party-review-20260916.md"
 )
 P026_WORK = ROOT / "docs/work-items/stage-high-side-modifier-proposition.md"
+P027_SYNTHESIS = ROOT / "config/stage-learning/stage-whole-vocabulary-portfolio-synthesis.v1.json"
+P027_DESIGN = ROOT / "docs/design/stock-stage-vocabulary-portfolio.md"
+P027_REVIEW = ROOT / "docs/reviews/stage-p027-whole-vocabulary-portfolio-review-20260916.md"
+P027_WORK = ROOT / "docs/work-items/stage-whole-vocabulary-portfolio-synthesis.md"
+P028_WORK = ROOT / "docs/work-items/stage-layered-proposition-bundle.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -2250,6 +2256,72 @@ def test_p026c_closes_resource_shortfall_without_semantic_or_repair_authority() 
     assert disposition["next_route"] == "WHOLE_VOCABULARY_PORTFOLIO_SYNTHESIS"
     assert disposition["successor_work_item"] == "P3-STAGE-027"
     assert P026_CLOSEOUT_REVIEW.is_file()
+
+
+def test_p027_synthesizes_full_historical_vocabulary_as_layered_portfolio() -> None:
+    value = json.loads(P027_SYNTHESIS.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-027"
+    assert value["state"] == "PASS_LAYERED_VOCABULARY_PORTFOLIO_SYNTHESIS"
+    for binding in value["bindings"].values():
+        path = ROOT / binding["path"]
+        observed = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        assert observed == binding["sha256"]
+    accounting = value["vocabulary_accounting"]
+    assert accounting["directional_lifecycle_codes"] == list(range(1, 13))
+    assert accounting["directional_lifecycle_code_count"] == 12
+    assert accounting["neutral_market_code"] == 0
+    assert accounting["market_code_count_including_neutral"] == 13
+    assert accounting["control_sentinel"] == "X"
+    assert accounting["epistemic_outcome"] == "ABSTAIN"
+    assert accounting["flat_single_valued_peer_stage_model"] is False
+    assert accounting["primary_stage_compression_authorized"] is False
+    architecture = value["architecture"]
+    assert architecture["continuous_facts_are_authoritative_substrate"] is True
+    assert architecture["coexistence_across_layers_is_legal"] is True
+    assert architecture["same_layer_ambiguity_must_be_preserved"] is True
+    assert architecture["official_peer_primary_stage_count"] == 0
+    matrix = value["code_matrix"]
+    assert set(matrix) == {str(code) for code in range(13)}
+    assert matrix["0"]["disposition"] == (
+        "PARK_PRIMARY_STAGE_QUALIFICATION_RETAIN_RESEARCH_MECHANISM"
+    )
+    assert matrix["1"]["parent_context_code"] == 12
+    assert matrix["1"]["layer"] == "event_or_nested_condition"
+    assert matrix["2"]["disposition"] == "RETAIN_STRONG_EXPLORATORY_PROPOSITION_NOT_OFFICIAL"
+    assert matrix["3"]["evidence_grade"] == "development_candidate"
+    assert matrix["4"]["parent_relation"] == "prior_same_anchor_stage_3_episode"
+    for code in (5, 6, 7):
+        assert matrix[str(code)]["evidence_grade"] == "parked"
+    assert matrix["8"]["layer"] == "modifier"
+    assert matrix["9"]["disposition"] == "PARKED_PENDING_MINIMAL_ACTIVITY_RELATION"
+    assert matrix["10"]["disposition"] == "RETAIN_ACCEPTED_DEVELOPMENT_PROJECTION_CONTEXT"
+    assert matrix["11"]["parent_context_code"] == 10
+    assert matrix["12"]["disposition"] == "RETAIN_RESEARCH_CONTEXT_NOT_QUALIFIED"
+    assert all(entry["peer_primary_stage_authorized"] is False for entry in matrix.values())
+    conclusions = value["portfolio_conclusions"]
+    assert conclusions["all_directional_codes_accounted_for"] is True
+    assert conclusions["neutral_code_accounted_for"] is True
+    assert conclusions["no_official_peer_primary_stage_is_currently_qualified"] is True
+    assert conclusions["facts_should_feed_proposition_bundle_before_any_future_primary_compression"] is True
+    assert value["successor"]["work_item"] == "P3-STAGE-028"
+    authority = value["authority"]
+    assert authority["portfolio_governance"] is True
+    for key in (
+        "new_market_read",
+        "new_reference_opinion",
+        "holdout_read",
+        "candidate_or_threshold_search",
+        "primary_stage_compression",
+        "labelcard_publication",
+        "daily_inference",
+        "strategy_consumption",
+        "trading",
+    ):
+        assert authority[key] is False
+    assert P027_DESIGN.is_file()
+    assert P027_REVIEW.is_file()
+    assert P027_WORK.is_file()
+    assert P028_WORK.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

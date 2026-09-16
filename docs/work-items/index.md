@@ -390,6 +390,8 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-026-C-R1 | One pre-read technical contract-mapping recovery | P3-STAGE-026-C | closed; exact failed parent recovered once under frozen P026-A/B contract; no further retry authority; docs/reviews/stage-p026c-pre-read-technical-recovery-review-20260916.md |
 | P3-STAGE-026-D | Gate finite Stage8 candidate topology | P3-STAGE-026-C | closed not opened; resource gate failed before semantic reference collection |
 | P3-STAGE-026-E | Four-party high-side portfolio closeout / Stage9 activity decision | P3-STAGE-026-D or earlier fail-close | closed; no repair/gate lowering, Stage8 research-only, Stage9 parked; P3-STAGE-027 selected as separate governance-only successor |
+| P3-STAGE-027 | Whole vocabulary portfolio synthesis | P3-STAGE-001, P3-STAGE-002, P3-STAGE-019, P3-STAGE-020-C, P3-STAGE-026 | closed `PASS_LAYERED_VOCABULARY_PORTFOLIO_SYNTHESIS`; 0 plus 1..12 accounted for across context/condition/modifier/parked roles, flat single-valued FSM superseded as implementation architecture; docs/work-items/stage-whole-vocabulary-portfolio-synthesis.md |
+| P3-STAGE-028 | Layered Stage Proposition Bundle Contract | P3-STAGE-027 | ready for schema/governance preregistration only; v1 must keep primary_stage null/absent and representation cannot promote research/parked propositions; docs/work-items/stage-layered-proposition-bundle.md |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |
 | P3-AGG-001 | Implement veto precedence and constraint merge | P3-EXP-001 | closed |
 | P3-AGG-002 | Implement score and action mapping | P3-AGG-001 | closed for fixture scope |

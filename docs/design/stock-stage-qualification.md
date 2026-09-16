@@ -4,9 +4,9 @@
 | --- | --- |
 | Design status | draft |
 | Delivery gate | blocked |
-| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。第二组已mixed closeout，Route A `P3-STRUCT-005` 与 `P3-STAGE-002` 已分别正式化演化支撑事实族和10/11 Projection Contract。第三组 `P3-STAGE-003` 已完成512只 morphology profile；`P3-STRUCT-006/007` 已分别接受**趋势演化事实族 / Trend Evolution Fact Family**和**结构秩序事实族 / Structure Order Fact Family**。后者174个bounded观察生成1,218个typed measurements，A/B immutable-source事实完全一致且DWD/provider新读取为0。`P3-STAGE-004` 已以 INCONCLUSIVE_REFERENCE_SUFFICIENCY 关闭：技术重试成功，224,346观察、160参考，Stage 2明确正例9个低于冻结最低20个，触发两项搜索共用门槛，0/2均无候选。结论不等于0/2不可区分或全市场样本不足；全量trial明细未单独读回，证据限于Worker终态摘要和冻结门槛。无active搜索、补样或重试权限，2022-2024不重读，2025、QUALIFIED、primary-stage、日更、消费者或交易仍未开放 |
+| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。第二组mixed closeout后，10/11由`P3-STAGE-002`正式化为可重叠context+nested development Projection Contract，5/6/7保持INCONCLUSIVE_PARKED。第三组P003-P026已完成并关闭：0 primary资格park、2 strong exploratory、12/1 layered downside reference no-pass、8 research modifier资源no-pass、9 activity-blocked modifier。`P3-STAGE-027`现已接受分层vocabulary portfolio：历史码1..12加neutral 0全部保留追溯，但flat single-valued FSM被supersede为historical vocabulary graph；当前无official peer primary stage。下一ready scope仅P028分层Proposition Bundle schema/governance，primary_stage继续null/absent。无active逐code补样/搜索权限，2022-2024不重读，2025、QUALIFIED、LabelCard、日更、消费者或交易仍未开放 |
 | Version | 0.1 |
-| Parent | `stock-stage-state-machine.md`; `lld/03-label-feature-system.md` |
+| Parent | `stock-stage-vocabulary-portfolio.md`; `lld/03-label-feature-system.md`（`stock-stage-state-machine.md`仅保留历史词汇/转移图） |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |
 | Dependency contract | `stock-stage-data-dependencies.md` |
 | Proposed delivery | `../work-items/stock-stage-historical-learning.md`; 原STAGE-A/F提案保留为历史 |
@@ -20,11 +20,11 @@ Shadow 是运行方式，Qualified 是一个需要证据支撑的资格结论；
 
 本提案把“12 状态”视为待检验的市场描述体系，而不是已经存在标准答案、只差编程的十三分类任务。既要验证算法是否遵守规则，也要验证规则是否能区分用户关心的情形，进一步验证其市场假设与策略用途。允许结果是保留、合并、改为修饰维度、降为展示或拒绝某个状态，而不是为了凑足十二个编号提高规则复杂度。
 
-当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变正式B6-B11/P6权限。第二组和10/11 Projection Contract均已关闭，primary-stage仲裁继续延后。第三组 `P3-STAGE-003` 的225,246观察profile已经关闭；趋势演化与结构秩序事实族已由`P3-STRUCT-006/007`正式接受。结构秩序Facts正式包含10/20/60区间宽度、10/20相对前一等长非重叠窗口的宽度变化与中心移动，并复用既有方向效率；收缩不自动叫蓄势，中心稳定也不自动叫Stage 2。资格只消费两份既有immutable F9 artifacts，无DWD/provider新读取。`P3-STAGE-004` 的冻结0/2实验已完成并关闭为 INCONCLUSIVE_REFERENCE_SUFFICIENCY：160个参考中Stage 2仅9个，低于20个的共用门槛，故两项均无候选，pair overlap仍为null。81+27网格、门槛、Facts和候选名称不变；本轮不再补样、调参或重试。只接受完成执行和保守无候选结案，不宣称全量trial独立复核或语义不可区分。证据见 `../acceptance/stage-0-2-order-proposition-result-20260910.md`；新参考协议须单独决策。正式Projection/LabelCard仍须新scope；1/12和8/9也继续关闭。阈值外样本、HUMAN_EXPERT_REFERENCE、primary-stage仲裁和产品资格仍未验证；2022-2024不重读，2025 permanent-blind保持未触碰。
+当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变正式P6权限。第二组和10/11 Projection Contract均已关闭，primary-stage仲裁继续延后。第三组P003-P026也已完整关闭：Stage0/2的有限路线最终由P019按portfolio原则收口；P020保留Stage12 context + Stage1 nested condition但reference gate no-pass；P026保留Stage8 acceleration/extension modifier并在唯一资源路线上no-pass，Stage9继续等待activity relation。P027进一步确认这些结果不是要重新压回一个互斥槽，而应分层表示。正式Projection/LabelCard仍须新scope；P028只允许schema/governance，不授权任何research-only/parked proposition升级。阈值外样本、HUMAN_EXPERT_REFERENCE、primary-stage仲裁和产品资格仍未验证；2022-2024不重读，2025 permanent-blind保持未触碰。
 
 ## 2. 仓库核查与需要纠正的前提
 
-1. `stock-stage-state-machine.md` v0.3 仍为 draft：1-12 是方向性阶段，0 是有证据的无序震荡，X 是暂停判断控制，ABSTAIN 是认识上的不确定；精确规则和转移判定尚未批准。现有 `P3-LABEL-002` closed 仅指旧 capability fixture，不能算作十二状态验收。
+1. `stock-stage-state-machine.md` v0.3 现已被P3-STAGE-027标记为**superseded flat architecture**：1-12的历史方向码、neutral 0、X与ABSTAIN的词义/转移图仍保留追溯，但实现权威转到`stock-stage-vocabulary-portfolio.md`。这不是十二状态验收；恰恰说明编号不再代表同层互斥输出。
 2. Facts V2 B1-B5 只在固定 development/retrospective 切片接受了 20/60 参照、距离、同参照交互和最小过程。`structure_v2_inputs.py` 的 `DailyInput` 有 volume，并单独记录 missing_volume；但 `structure_v2.py` 的结果对象没有已验收的量比/活动 Fact 家族。旧版 `structure_facts.py`、`baseline_research.py` 存在相关计算，不等于已经完成 V2 B7 集成或坐标对齐。
 3. 当前 V2 过程是每证券/窗口一个高点突破—失守—收复过程，不是完整支撑破坏、低点抬升、趋势结束识别器。跌回突破位以下不自动等于状态10的关键支撑失效。
 4. 已完成的 `P3-STRUCT-002` 受限实验选择 `prefer_continuous_structure_facts`。其 C2 粗状态相对 C1 连续事实收益更低、回撤更大，区间证据没有证明前向优势。证据在 `../acceptance/structure-intelligence-economic-final-acceptance-20260906.md` §3、§6。它不是对所有十二状态的否定，但要求后续始终保留同信息集连续事实基线。

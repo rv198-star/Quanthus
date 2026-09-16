@@ -2,19 +2,26 @@
 
 | Field | Value |
 | --- | --- |
-| Phase | P3 candidate label model |
-| Design status | draft |
-| Delivery gate | blocked |
-| Authority | Non-governing concept; not active in research, backtest, simulation, or trading |
+| Phase | P3 historical candidate vocabulary |
+| Design status | superseded |
+| Delivery gate | not-applicable as flat implementation architecture |
+| Authority | Historical vocabulary/transition provenance only; not active in research, backtest, simulation, or trading |
 | Version | 0.3 |
-| Governing work item | `P3-LABEL-002` (historical vocabulary owner; fixture acceptance does not activate this draft) |
+| Governing work item | `P3-LABEL-002` historical vocabulary owner; P3-STAGE-027 supersedes the flat implementation interpretation |
+| Successor architecture | `stock-stage-vocabulary-portfolio.md` / `P3-STAGE-027` |
 | Qualification proposal | `stock-stage-qualification.md`; `stock-stage-data-dependencies.md` |
 
 ## 1. Purpose and boundary
 
-This model describes the primary price/volume stage of one security. It is a candidate
-single-valued label for the P3 feature and label system; it is not the position lifecycle state
-machine and has no direct authority to create orders, force an exit, or bypass expert/veto logic.
+> **Superseded architecture notice.** P3-STAGE-027 preserves the code names and this transition graph
+> as historical vocabulary/provenance, but later evidence shows the codes occupy different semantic
+> layers: contexts, event/nested conditions and modifiers can coexist. The current implementation
+> architecture is `stock-stage-vocabulary-portfolio.md`; this document no longer proposes a flat
+> single-valued runtime label.
+
+This model records the historical primary-stage hypothesis for one security. It is not the position
+lifecycle state machine and has no direct authority to create orders, force an exit, or bypass
+expert/veto logic.
 
 The name "12-state model" refers to the twelve directional lifecycle states `1` through `12`.
 The stage vocabulary also contains neutral state `0`, and the evaluator has freeze sentinel `X`,

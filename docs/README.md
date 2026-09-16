@@ -570,9 +570,15 @@ nodes.
   official historical EOD archive family and closed `NO_PASS_OFFICIAL_EXCHANGE_EVIDENCE_INSUFFICIENT`:
   exchange authority and historical coverage were established, but exact original-version/correction
   lineage and public-availability evidence precise enough for T=15:30 were not. Four independent
-  closeout reviews accepted that no-pass 4/4 and allow only a still smaller two-product/three-date
-  official Level-1 intraday/realtime evidence feasibility successor; success there may produce a
-  source candidate only. Preserved 2021/2022-2024/2025 remain unopened.
+  closeout reviews accepted that no-pass 4/4 and allowed only a still smaller two-product/three-date
+  official Level-1 intraday/realtime evidence feasibility successor. P3-STAGE-032 then closed
+  `NO_PASS_LEVEL1_HISTORICAL_DISSEMINATION_EVIDENCE_INSUFFICIENT`: SSE historical snapshots are a
+  sampled/deduplicated/cleaned archive representation, while SZSE snapshot `OrigTime` is generation
+  time and snapshots cannot be retransmitted; neither route proves exact historical retained-version
+  to contemporaneous T=15:30 dissemination binding. Four independent phase reviews accepted the
+  no-pass 4/4 and stop the current Stage historical PIT source-evidence hunt. P029 is preserved only
+  as retrospective development-shadow semantics; no commercial archive search or PIT-lite is
+  authorized. Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -612,6 +618,9 @@ nodes.
   `work-items/stage-official-exchange-eod-evidence-feasibility.md`,
   `acceptance/stage-p031-official-exchange-eod-evidence-feasibility-20260916.md`,
   `reviews/stage-p031-official-eod-evidence-four-party-review-20260916.md`,
+  `work-items/stage-level1-historical-realtime-evidence-feasibility.md`,
+  `acceptance/stage-p032-level1-historical-realtime-evidence-feasibility-20260916.md`,
+  `reviews/stage-p032-level1-evidence-four-party-review-20260916.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,
@@ -634,9 +643,11 @@ nodes.
   accepted real-history retrospective F9 observations without new DWD/market reads; this closes the
   synthetic-to-real development-consumer gap. P3-STAGE-030 then froze strict historical public
   reconstruction and failed closed at the daily-bar revision/publication lineage gate before any PIT
-  Stage predicate ran. The Stage claim remains unchanged; a separate bounded source-evidence
-  feasibility route is the only reviewed next step and cannot auto-integrate a source or restart PIT
-  replay. The qualification and field-dependency proposals remain
+  Stage predicate ran. P3-STAGE-031 and P3-STAGE-032 then exhausted the only reviewed bounded official
+  source-evidence routes (EOD archive, then Level-1 historical/realtime evidence) without establishing
+  exact historical version-to-dissemination binding. The Stage claim remains unchanged and the current
+  historical PIT source-evidence hunt is now closed by 4/4 phase review; no commercial archive search,
+  source integration or weaker PIT proxy is authorized. The qualification and field-dependency proposals remain
   `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`; they do not
   activate peer primary labels, new result-bearing research, or daily/strategy Shadow.
   The concrete CPU-first historical-learning plan is `design/stock-stage-historical-learning.md`,

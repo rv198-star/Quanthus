@@ -1,0 +1,136 @@
+{
+  "schema_version": "quanthus.stage-level1-historical-realtime-evidence-feasibility-result.v1",
+  "work_item": "P3-STAGE-032",
+  "version": "1.0.0",
+  "state": "NO_PASS_LEVEL1_HISTORICAL_DISSEMINATION_EVIDENCE_INSUFFICIENT",
+  "evaluated_at": "2026-09-16",
+  "contract": {
+    "path": "config/stage-learning/stage-level1-historical-realtime-evidence-feasibility.v1.json"
+  },
+  "scope": {
+    "products": [
+      "SSE_LEVEL1_INTRADAY_SNAPSHOT_HISTORICAL_CHAIN",
+      "SZSE_LEVEL1_REALTIME_HISTORICAL_RETENTION_CHAIN"
+    ],
+    "probe_dates": ["2019-10-08", "2020-01-02", "2020-03-31"],
+    "sse_security_codes": ["600519"],
+    "szse_security_codes": ["000001", "300750"],
+    "decision_cutoff": "15:30:00 Asia/Shanghai",
+    "stage_predicates_executed": false,
+    "daily_bar_aggregation_performed": false,
+    "source_integration_performed": false,
+    "bulk_download_performed": false,
+    "purchase_or_subscription": false,
+    "provider_contact": false,
+    "commercial_source_opened": false,
+    "protected_2022_2024_access": false,
+    "permanent_blind_2025_access": false
+  },
+  "official_evidence": {
+    "SSE": {
+      "sources": [
+        "https://www.ciis.com.hk/hongkong/en/historicaldata1/his_introduction/index.shtml",
+        "https://www.ciis.com.hk/hongkong/en/historicaldata1/sampledata/index.shtml",
+        "https://www.ciis.com.hk/hongkong/en/doc/2020/09/14/2590.shtml",
+        "https://www.ciis.com.hk/hongkong/en/uploadfiles/202503/05/2025030513483357244800.pdf"
+      ],
+      "observed_claims": [
+        "SSE Level-1 intraday snapshot historical data has a first issue date of 2 January 2014 and covers the frozen period.",
+        "The historical product manual defines snapshots at 3-second or 5-second intervals and states that when adjacent snapshots are identical only the first one is retained.",
+        "CIIS exposes official SSE Level-1 historical snapshot sample files.",
+        "The 2020 launch notice states that historical data is cleaned and published by SSE."
+      ]
+    },
+    "SZSE": {
+      "sources": [
+        "https://investor.szse.cn/marketServices/technicalservice/interface/P020240531618144293021.pdf",
+        "https://investor.szse.cn/English/services/dataServices/index.html"
+      ],
+      "observed_claims": [
+        "The STEP market-data specification has documented interface revisions during 2019 and 2020 and defines a real-time market-data session.",
+        "Network market-data gateways provide a retransmission service for missing supported data, but the specification states that snapshot market data is periodically published and cannot be retransmitted.",
+        "Snapshot messages contain OrigTime, which the specification defines as data generation time rather than an official dissemination timestamp.",
+        "SZSE/SSIC Level-1 is an officially distributed real-time market-data product."
+      ]
+    }
+  },
+  "evidence_matrix": {
+    "SSE": {
+      "official_product_authority": "PASS",
+      "historical_window_applicability": "PASS",
+      "historical_snapshot_archive_exists": "PASS",
+      "exact_original_message_or_snapshot_identity": "UNPROVEN",
+      "sequence_or_version_identity": "UNPROVEN",
+      "contemporaneous_official_dissemination_binding": "UNPROVEN",
+      "correction_or_replacement_completeness": "UNPROVEN",
+      "retainable_audit_provenance": "PARTIAL",
+      "decisive_reason": "The official historical Level-1 snapshot product is a sampled and deduplicated historical representation, and the historical product is described as cleaned. Public evidence does not bind retained historical rows to the exact original real-time messages or a complete replacement/correction lineage."
+    },
+    "SZSE": {
+      "official_product_authority": "PASS",
+      "historical_schema_family_applicability": "PASS",
+      "realtime_session_semantics": "PASS",
+      "exact_historical_retained_snapshot_identity": "UNPROVEN",
+      "origtime_generation_time_available": "PASS_NOT_DISSEMINATION_PROOF",
+      "contemporaneous_official_dissemination_binding": "UNPROVEN",
+      "snapshot_retransmission_or_recovery_completeness": "FAIL_AS_GENERAL_COMPLETENESS_PROOF",
+      "official_historical_retention_binding": "UNPROVEN",
+      "retainable_audit_provenance": "UNPROVEN",
+      "decisive_reason": "The official protocol proves real-time publication and historical schema lineage, but snapshot OrigTime is generation time and snapshots are explicitly non-retransmittable. Bounded official evidence does not identify an official historical retention archive that binds exact retained snapshots to originally disseminated versions and correction/replacement completeness."
+    }
+  },
+  "fixed_probe_matrix": [
+    {
+      "trade_date": "2019-10-08",
+      "SSE_600519": "NOT_EVALUABLE_AT_EXACT_VERSION_LEVEL",
+      "SZSE_000001": "NOT_EVALUABLE_AT_EXACT_VERSION_LEVEL",
+      "SZSE_300750": "NOT_EVALUABLE_AT_EXACT_VERSION_LEVEL",
+      "reason": "Product-level exact-version/dissemination evidence gate is not satisfied; downloading current historical values cannot repair it."
+    },
+    {
+      "trade_date": "2020-01-02",
+      "SSE_600519": "NOT_EVALUABLE_AT_EXACT_VERSION_LEVEL",
+      "SZSE_000001": "NOT_EVALUABLE_AT_EXACT_VERSION_LEVEL",
+      "SZSE_300750": "NOT_EVALUABLE_AT_EXACT_VERSION_LEVEL",
+      "reason": "Product-level exact-version/dissemination evidence gate is not satisfied; downloading current historical values cannot repair it."
+    },
+    {
+      "trade_date": "2020-03-31",
+      "SSE_600519": "NOT_EVALUABLE_AT_EXACT_VERSION_LEVEL",
+      "SZSE_000001": "NOT_EVALUABLE_AT_EXACT_VERSION_LEVEL",
+      "SZSE_300750": "NOT_EVALUABLE_AT_EXACT_VERSION_LEVEL",
+      "reason": "Product-level exact-version/dissemination evidence gate is not satisfied; downloading current historical values cannot repair it."
+    }
+  ],
+  "bounded_execution": {
+    "primary_evidence_pass_completed": true,
+    "targeted_gap_pass_used": true,
+    "targeted_gap_focus": "SZSE snapshot time/retransmission semantics and SSE historical snapshot retention semantics",
+    "additional_product_search": false,
+    "fixed_probe_current_value_download": false,
+    "early_stop": true,
+    "early_stop_reason": "Both products fail to prove the required exact historical version-to-dissemination binding at product level. Date-specific current values cannot close that evidence defect."
+  },
+  "acceptance": {
+    "both_venues_pass": false,
+    "all_fixed_probe_units_supported": false,
+    "product_level_full_window_applicability_evidence": false,
+    "source_candidate": false,
+    "automatic_source_integration": false,
+    "automatic_pit_replay": false
+  },
+  "four_party_phase_review": {
+    "review_path": "docs/reviews/stage-p032-level1-evidence-four-party-review-20260916.md",
+    "reviewer_count": 4,
+    "no_pass_accepted_count": 4,
+    "selected_route": "STOP_CURRENT_STAGE_HISTORICAL_PIT_SOURCE_EVIDENCE_HUNT",
+    "selected_route_count": 4,
+    "commercial_archive_search_selected_count": 0,
+    "weaken_strict_pit_selected_count": 0,
+    "stage_10_11_semantic_failure_claim_count": 0,
+    "p029_retrospective_asset_preserved": true,
+    "strict_pit_reopen_requires_new_independent_evidence": true,
+    "automatic_successor": false
+  },
+  "claim_ceiling": "P032 establishes only that the two preregistered official Level-1 historical/realtime evidence chains did not prove exact historical message/snapshot version-to-dissemination binding under the frozen public evidence standard. It does not prove the original real-time feeds were incorrect or unavailable, does not prove no private licensed receipt archive exists, and does not establish any Stage10/11 point-in-time result. Four-party phase review closes the current Stage historical PIT source-evidence search and preserves P029 as retrospective development-shadow only."
+}

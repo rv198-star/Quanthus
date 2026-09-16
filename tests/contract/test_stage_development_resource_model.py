@@ -179,6 +179,18 @@ P031_ACCEPTANCE = (
 )
 P031_REVIEW = ROOT / "docs/reviews/stage-p031-official-eod-evidence-four-party-review-20260916.md"
 P031_WORK = ROOT / "docs/work-items/stage-official-exchange-eod-evidence-feasibility.md"
+P032_CONTRACT = (
+    ROOT / "config/stage-learning/stage-level1-historical-realtime-evidence-feasibility.v1.json"
+)
+P032_RESULT = (
+    ROOT
+    / "config/stage-learning/stage-level1-historical-realtime-evidence-feasibility-result.v1.json"
+)
+P032_ACCEPTANCE = (
+    ROOT / "docs/acceptance/stage-p032-level1-historical-realtime-evidence-feasibility-20260916.md"
+)
+P032_REVIEW = ROOT / "docs/reviews/stage-p032-level1-evidence-four-party-review-20260916.md"
+P032_WORK = ROOT / "docs/work-items/stage-level1-historical-realtime-evidence-feasibility.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -2621,6 +2633,57 @@ def test_p031_closes_official_eod_family_without_silent_pit_promotion() -> None:
     assert P031_ACCEPTANCE.is_file()
     assert P031_REVIEW.is_file()
     assert P031_WORK.is_file()
+
+
+def test_p032_stops_stage_pit_source_search_after_bounded_level1_no_pass() -> None:
+    contract = json.loads(P032_CONTRACT.read_text(encoding="utf-8"))
+    assert contract["work_item"] == "P3-STAGE-032"
+    assert contract["state"] == "FROZEN_TWO_PRODUCT_THREE_DATE_EVIDENCE_ONLY"
+    assert len(contract["products"]) == 2
+    assert contract["probe"]["dates"] == ["2019-10-08", "2020-01-02", "2020-03-31"]
+    assert contract["probe"]["result_aware_replacement_allowed"] is False
+    assert contract["authority"]["stage_predicate_execution"] is False
+    assert contract["authority"]["daily_bar_aggregation"] is False
+    assert contract["authority"]["commercial_source"] is False
+    result = json.loads(P032_RESULT.read_text(encoding="utf-8"))
+    assert result["state"] == "NO_PASS_LEVEL1_HISTORICAL_DISSEMINATION_EVIDENCE_INSUFFICIENT"
+    scope = result["scope"]
+    assert scope["stage_predicates_executed"] is False
+    assert scope["daily_bar_aggregation_performed"] is False
+    assert scope["source_integration_performed"] is False
+    assert scope["commercial_source_opened"] is False
+    assert scope["protected_2022_2024_access"] is False
+    assert scope["permanent_blind_2025_access"] is False
+    assert result["evidence_matrix"]["SSE"]["official_product_authority"] == "PASS"
+    assert result["evidence_matrix"]["SSE"]["exact_original_message_or_snapshot_identity"] == (
+        "UNPROVEN"
+    )
+    assert result["evidence_matrix"]["SZSE"]["origtime_generation_time_available"] == (
+        "PASS_NOT_DISSEMINATION_PROOF"
+    )
+    assert result["evidence_matrix"]["SZSE"]["contemporaneous_official_dissemination_binding"] == (
+        "UNPROVEN"
+    )
+    assert all(
+        value == "NOT_EVALUABLE_AT_EXACT_VERSION_LEVEL"
+        for row in result["fixed_probe_matrix"]
+        for key, value in row.items()
+        if key.startswith(("SSE_", "SZSE_"))
+    )
+    review = result["four_party_phase_review"]
+    assert review["reviewer_count"] == 4
+    assert review["no_pass_accepted_count"] == 4
+    assert review["selected_route_count"] == 4
+    assert review["selected_route"] == "STOP_CURRENT_STAGE_HISTORICAL_PIT_SOURCE_EVIDENCE_HUNT"
+    assert review["commercial_archive_search_selected_count"] == 0
+    assert review["weaken_strict_pit_selected_count"] == 0
+    assert review["stage_10_11_semantic_failure_claim_count"] == 0
+    assert review["p029_retrospective_asset_preserved"] is True
+    assert review["strict_pit_reopen_requires_new_independent_evidence"] is True
+    assert review["automatic_successor"] is False
+    assert P032_ACCEPTANCE.is_file()
+    assert P032_REVIEW.is_file()
+    assert P032_WORK.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

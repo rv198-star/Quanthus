@@ -1,0 +1,93 @@
+{
+  "schema_version": "quanthus.stage-level1-historical-realtime-evidence-feasibility.v1",
+  "work_item": "P3-STAGE-032",
+  "version": "1.0.0",
+  "state": "FROZEN_TWO_PRODUCT_THREE_DATE_EVIDENCE_ONLY",
+  "parent": {
+    "work_item": "P3-STAGE-031",
+    "required_state": "NO_PASS_OFFICIAL_EXCHANGE_EVIDENCE_INSUFFICIENT"
+  },
+  "objective": "Determine whether exact historical Level-1 message/snapshot versions can be audibly bound to contemporaneous official dissemination at or before T=15:30 for the frozen Stage10/11 daily dependency need. This is source-evidence feasibility only.",
+  "products": [
+    {
+      "product_id": "SSE_LEVEL1_INTRADAY_SNAPSHOT_HISTORICAL_CHAIN",
+      "venue": "SSE",
+      "securities": ["600519"],
+      "scope": "official Level-1 intraday snapshot historical product plus contemporaneous Level-1 dissemination semantics",
+      "level2_allowed": false,
+      "tick_allowed": false
+    },
+    {
+      "product_id": "SZSE_LEVEL1_REALTIME_HISTORICAL_RETENTION_CHAIN",
+      "venue": "SZSE",
+      "securities": ["000001", "300750"],
+      "scope": "official Level-1 real-time dissemination plus corresponding official historical-retention evidence",
+      "level2_allowed": false,
+      "tick_allowed": false
+    }
+  ],
+  "probe": {
+    "dates": ["2019-10-08", "2020-01-02", "2020-03-31"],
+    "decision_cutoff": "15:30:00 Asia/Shanghai",
+    "full_window_start": "2019-10-08",
+    "full_window_end": "2020-03-31",
+    "result_aware_replacement_allowed": false,
+    "primary_evidence_pass_count": 1,
+    "targeted_gap_pass_max_count": 1
+  },
+  "passing_evidence_unit": {
+    "identity": "official_product_schema_x_security_x_trade_date_x_exact_message_or_snapshot_version",
+    "requires": [
+      "official product and historically applicable schema identity",
+      "exact original message/snapshot or immutable batch identity",
+      "sequence/version identity sufficient to distinguish retransmission/replacement/correction",
+      "official dissemination/publication evidence with time semantics precise enough to decide T=15:30",
+      "complete correction/replacement lineage or independently justified original-message immutability",
+      "retainable raw/audit provenance and deterministic field interpretation"
+    ],
+    "market_event_time_alone_sufficient": false,
+    "current_archive_hash_alone_sufficient": false,
+    "marketing_realtime_label_sufficient": false
+  },
+  "phase_pass": {
+    "requires_both_venues": true,
+    "requires_all_fixed_probe_units_supported": true,
+    "requires_product_level_full_window_applicability_evidence": true,
+    "sample_success_alone_proves_full_window": false,
+    "pass_state": "PASS_LEVEL1_HISTORICAL_DISSEMINATION_SOURCE_CANDIDATE_FEASIBILITY",
+    "no_pass_state": "NO_PASS_LEVEL1_HISTORICAL_DISSEMINATION_EVIDENCE_INSUFFICIENT"
+  },
+  "authority": {
+    "stage_predicate_execution": false,
+    "daily_bar_aggregation": false,
+    "source_integration": false,
+    "bulk_download": false,
+    "purchase_or_subscription": false,
+    "provider_contact": false,
+    "commercial_source": false,
+    "protected_2022_2024_access": false,
+    "permanent_blind_2025_access": false,
+    "prediction_or_economics": false,
+    "automatic_pit_replay": false
+  },
+  "stop_conditions": [
+    "official evidence cannot link retained historical record to exact originally disseminated version",
+    "only event/generation timestamps exist and official dissemination time cannot be proven",
+    "correction/replacement completeness or equivalent original-message immutability is unproven",
+    "historical product/schema cannot be proven applicable to the frozen window",
+    "closing the evidence gap would require Level-2/tick, commercial source, purchase/contact, bulk data or source integration",
+    "either venue remains unproven after the one primary pass plus at most one targeted gap pass"
+  ],
+  "change_control": {
+    "four_party_review_required_if": [
+      "add or substitute a product",
+      "add Level-2, tick or a commercial source",
+      "replace a probe date or security",
+      "change T=15:30 or public-availability semantics",
+      "aggregate intraday data into a new daily bar as part of feasibility",
+      "weaken version/correction/dissemination evidence requirements",
+      "purchase, subscribe, contact provider, integrate source or run Stage/PIT predicates"
+    ]
+  },
+  "claim_ceiling": "A PASS would establish only a candidate evidence mechanism for a future source-integration review. It would not establish P030 strict PIT, daily-bar equivalence, Stage validity, prediction, economics, source admission, production authority or trading authority."
+}

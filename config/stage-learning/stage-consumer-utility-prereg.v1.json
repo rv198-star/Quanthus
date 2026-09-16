@@ -1,0 +1,182 @@
+{
+  "schema_version": "quanthus.stage-consumer-utility-prereg.v1",
+  "work_item": "P3-STAGE-033",
+  "state": "PREREGISTERED_CONSUMER_UTILITY_ONLY",
+  "effective_date": "2026-09-16",
+  "question": "Does adding the validated Layered Stage10/11 semantic overlay to identical Continuous Facts materially reduce consumer interpretation error or review cost relative to Facts-only?",
+  "bindings": {
+    "continuous_facts_preference": {
+      "path": "docs/acceptance/structure-intelligence-economic-final-acceptance-20260906.md",
+      "sha256": "sha256:381e4e29499bbc6b38326e4a9f01e1fd997d18cff457f1f8425ba10ef7302cde"
+    },
+    "p029_result": {
+      "path": "config/stage-learning/stage-proposition-bundle-real-data-replay-result.v1.json",
+      "sha256": "sha256:83b6e7ddd1ccb31a83b4bb19698b8eeee1ff10d56169a4feaae3eec9388f3ed0"
+    },
+    "p032_stop_review": {
+      "path": "docs/reviews/stage-p032-level1-evidence-four-party-review-20260916.md",
+      "sha256": "sha256:aedef5c3ab9a12375a0472dac039cb5128ef047ffd36ca7b4077f59060e3f17c"
+    },
+    "p033_route_review": {
+      "path": "docs/reviews/stage-p033-value-route-review-20260916.md",
+      "sha256": "sha256:62808affd03902c4955d29d504cc51ad24cd1819b770e4bbf59daee1ce9c562a"
+    }
+  },
+  "population": {
+    "authority": "exact_p029_population",
+    "selection": "all_formal_stage_10_context_true_observations_from_p029",
+    "observation_count": 10,
+    "stage_10_only_count": 4,
+    "stage_10_and_11_count": 6,
+    "sampling": false,
+    "replacement": false,
+    "protected_2022_2024_access": false,
+    "permanent_blind_2025_access": false,
+    "new_market_or_dwd_read": false
+  },
+  "frozen_semantics": {
+    "stage_10_persistence_sessions": 5,
+    "stage_10_failure_depth_abs_min": "0.02",
+    "stage_11_requires_prior_stage_10_reference": true,
+    "stage_11_same_support_must_remain_unreclaimed": true,
+    "stage_11_rebound_min": "0.05",
+    "primary_stage": null,
+    "development_shadow_only": true
+  },
+  "arms": {
+    "facts_only": {
+      "content": [
+        "identical_continuous_support_evolution_facts",
+        "identical_stage_10_11_semantic_definitions",
+        "identical_question_set"
+      ],
+      "stage_proposition_overlay": false
+    },
+    "facts_plus_layered": {
+      "content": [
+        "identical_continuous_support_evolution_facts",
+        "identical_stage_10_11_semantic_definitions",
+        "identical_question_set",
+        "validated_p028_layered_stage_10_11_development_shadow_overlay"
+      ],
+      "stage_proposition_overlay": true
+    }
+  },
+  "consumer_roles": [
+    "short_term_event_driven",
+    "fund_midterm_risk",
+    "quant_research",
+    "data_governance"
+  ],
+  "assignment": {
+    "observation_order": "canonical_observation_identity_ascending",
+    "role_order": [
+      "short_term_event_driven",
+      "fund_midterm_risk",
+      "quant_research",
+      "data_governance"
+    ],
+    "rule": "facts_only when (observation_index + role_index) % 2 == 0, facts_plus_layered otherwise",
+    "properties": {
+      "evaluations_total": 40,
+      "evaluations_per_arm": 20,
+      "evaluations_per_role": 10,
+      "evaluations_per_role_per_arm": 5,
+      "evaluations_per_observation_per_arm": 2,
+      "same_role_sees_same_observation_in_both_arms": false
+    }
+  },
+  "evaluator_contract": {
+    "isolated_session_per_role": true,
+    "same_exact_model_and_provider_across_roles": true,
+    "model_provider_identity_recorded_before_packet_access": true,
+    "no_cross_role_opinion_visibility": true,
+    "no_result_aware_prompt_change": true,
+    "packet_order": "deterministic_role_specific_hash_order",
+    "arm_label_hidden_from_evaluator": true,
+    "answer_key_hidden_until_all_role_outputs_are_sealed": true,
+    "evaluator_unavailable_behavior": "BLOCK_BEFORE_EXPERIMENT_NO_HOST_SUBSTITUTION"
+  },
+  "questions": [
+    {
+      "id": "Q1_PARENT_ACTIVE",
+      "response": "true_false_abstain",
+      "meaning": "Is the Stage10 structural-failure context still active at this observation?"
+    },
+    {
+      "id": "Q2_NESTED_REBOUND_ACTIVE",
+      "response": "true_false_abstain",
+      "meaning": "Is the Stage11 nested rebound condition active at this observation?"
+    },
+    {
+      "id": "Q3_PARENT_RESOLVED_BY_REBOUND",
+      "response": "true_false_abstain",
+      "meaning": "Does the rebound condition mean the Stage10 parent context has been resolved?"
+    },
+    {
+      "id": "Q4_CANONICAL_INTERPRETATION",
+      "response": "structural_failure_only_or_structural_failure_with_nested_rebound_or_abstain",
+      "meaning": "Choose the canonical interpretation of the current structure."
+    }
+  ],
+  "answer_key_authority": "deterministic_p029_stage_10_11_projection_over_exact_population",
+  "critical_error_definition": [
+    "Q1_PARENT_ACTIVE is not true",
+    "Q2_NESTED_REBOUND_ACTIVE differs from frozen P029 projection",
+    "Q3_PARENT_RESOLVED_BY_REBOUND is not false",
+    "Q4_CANONICAL_INTERPRETATION differs from frozen P029 parent+nested truth"
+  ],
+  "metrics": {
+    "primary": [
+      "packet_with_any_critical_interpretation_error_count_by_arm",
+      "all_four_answers_correct_count_by_arm"
+    ],
+    "secondary": [
+      "abstain_count_by_arm",
+      "role_level_critical_error_count",
+      "median_elapsed_seconds_by_arm",
+      "median_response_token_count_by_arm"
+    ],
+    "not_metrics": [
+      "future_return",
+      "profit",
+      "drawdown",
+      "hit_rate",
+      "trading_action_quality",
+      "strict_pit_accuracy"
+    ]
+  },
+  "decision_rule": {
+    "pass_accuracy_path": {
+      "layered_critical_error_reduction_min_packets_out_of_20": 4,
+      "maximum_role_level_layered_error_worsening": 1,
+      "maximum_layered_median_elapsed_ratio_vs_facts_only": "1.25"
+    },
+    "pass_efficiency_path": {
+      "layered_critical_error_count_must_not_exceed_facts_only": true,
+      "maximum_layered_median_elapsed_ratio_vs_facts_only": "0.75",
+      "maximum_layered_median_response_token_ratio_vs_facts_only": "0.85"
+    },
+    "pass": "PASS_CONSUMER_UTILITY_INCREMENT if either preregistered pass path is satisfied",
+    "no_pass": "NO_PASS_NO_MATERIAL_CONSUMER_UTILITY if layered critical-error reduction is at most 1 packet and the efficiency path is not satisfied",
+    "inconclusive": "INCONCLUSIVE_CONSUMER_UTILITY for all other valid completed outcomes",
+    "invalid_or_blocked": "BLOCKED_BEFORE_EXPERIMENT if evaluator identity/session isolation cannot be established; INVALID_EXPERIMENT if packets, assignments, prompts, answer-key sealing, population or metrics drift after exposure"
+  },
+  "resource_budget": {
+    "role_sessions": 4,
+    "packets_per_role": 10,
+    "total_evaluations": 40,
+    "retries_per_role": 0,
+    "alternate_model_after_result_access": false,
+    "new_market_data_reads": 0,
+    "new_dwd_provider_opens": 0,
+    "future_waiting_required": false
+  },
+  "stop_conditions": [
+    "Stop and re-review before changing the population, Stage semantics, source authority, metrics or claim ceiling.",
+    "Stop blocked before packet exposure if the four isolated evaluator sessions cannot be established under one exact provider/model identity.",
+    "Do not retry failed evaluator sessions with a different model or provider after any result is visible.",
+    "Do not expand to prospective shadow, economics or protected partitions inside P033."
+  ],
+  "claim_ceiling": "P033 can establish only bounded consumer/explanation utility of a Layered Stage10/11 overlay relative to Facts-only on the exact retrospective P029 population. It cannot establish prediction, economics, strict PIT, out-of-sample value, production expert authority, strategy authority or trading authority."
+}

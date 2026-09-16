@@ -24,6 +24,7 @@ from typing import Any
 from quanthus.platform.jobs import P4_EVENT_SCAN_JOB, STRUCTURE_MVP_JOB, DurableJobQueue
 from quanthus.platform.persistence import PlatformStore, PostgresPlatformStore
 from quanthus.policy import find_project_root
+from quanthus.stage_consumer_utility import verify_consumer_packet_artifact
 from quanthus.stage_learning.order_reference_feasibility import (
     CONFIG as _REFERENCE_FEASIBILITY_CONFIG,
 )
@@ -56,6 +57,7 @@ _STAGE_10_11_PROJECTION_RUN_CONFIG = "config/stage-10-11-projection-qualificatio
 _STAGE_PROPOSITION_REPLAY_RUN_CONFIG = (
     "config/stage-learning/stage-proposition-bundle-real-data-replay.v1.json"
 )
+_STAGE_CONSUMER_UTILITY_RUN_CONFIG = "config/stage-learning/stage-consumer-utility-prereg.v1.json"
 _STRUCTURE_F9_RUN_CONFIG = "config/structure-f9-run.development.v1.json"
 _TREND_EVOLUTION_RUN_CONFIG = "config/structure-trend-evolution-qualification.v1.json"
 _STRUCTURE_ORDER_RUN_CONFIG = "config/structure-order-qualification.v1.json"
@@ -67,6 +69,7 @@ _STRUCTURE_RUN_CONFIGS = frozenset(
         _STRUCTURE_V2_RUN_CONFIG,
         _STAGE_10_11_PROJECTION_RUN_CONFIG,
         _STAGE_PROPOSITION_REPLAY_RUN_CONFIG,
+        _STAGE_CONSUMER_UTILITY_RUN_CONFIG,
         _STRUCTURE_F9_RUN_CONFIG,
         _TREND_EVOLUTION_RUN_CONFIG,
         _STRUCTURE_ORDER_RUN_CONFIG,
@@ -429,6 +432,7 @@ def _structure_request_digest(run_config: str) -> str:
         _STAGE_PROPOSITION_REPLAY_RUN_CONFIG: (
             "quanthus.stage-proposition-bundle-real-data-replay.v1"
         ),
+        _STAGE_CONSUMER_UTILITY_RUN_CONFIG: "quanthus.stage-consumer-utility-prereg.v1",
         _STRUCTURE_F9_RUN_CONFIG: "quanthus.structure-f9-run.v1",
         _TREND_EVOLUTION_RUN_CONFIG: "quanthus.trend-evolution-qualification.v1",
         _STRUCTURE_ORDER_RUN_CONFIG: "quanthus.structure-order-qualification.v1",
@@ -1345,6 +1349,13 @@ class EventWorker:
             running_stage = "running-stage-proposition-bundle-replay"
             validating_stage = "validating-stage-proposition-bundle-replay"
             recovering_stage = "recovering-sealed-stage-proposition-bundle-replay"
+        elif run_config == _STAGE_CONSUMER_UTILITY_RUN_CONFIG:
+            verifier = verify_consumer_packet_artifact
+            module = "quanthus.stage_consumer_utility"
+            artifact_name = "stage-consumer-utility-packets"
+            running_stage = "running-stage-consumer-utility-packet-preparation"
+            validating_stage = "validating-stage-consumer-utility-packets"
+            recovering_stage = "recovering-sealed-stage-consumer-utility-packets"
         elif run_config == _STRUCTURE_V2_RUN_CONFIG:
             verifier = verify_structure_v2_artifact
             module = "quanthus.structure_v2_run"

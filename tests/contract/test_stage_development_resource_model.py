@@ -191,6 +191,9 @@ P032_ACCEPTANCE = (
 )
 P032_REVIEW = ROOT / "docs/reviews/stage-p032-level1-evidence-four-party-review-20260916.md"
 P032_WORK = ROOT / "docs/work-items/stage-level1-historical-realtime-evidence-feasibility.md"
+P033_PREREG = ROOT / "config/stage-learning/stage-consumer-utility-prereg.v1.json"
+P033_ROUTE_REVIEW = ROOT / "docs/reviews/stage-p033-value-route-review-20260916.md"
+P033_WORK = ROOT / "docs/work-items/stage-consumer-utility.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -2684,6 +2687,43 @@ def test_p032_stops_stage_pit_source_search_after_bounded_level1_no_pass() -> No
     assert P032_ACCEPTANCE.is_file()
     assert P032_REVIEW.is_file()
     assert P032_WORK.is_file()
+
+
+def test_p033_preregisters_layered_overlay_consumer_utility_over_facts_only() -> None:
+    value = json.loads(P033_PREREG.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-033"
+    assert value["state"] == "PREREGISTERED_CONSUMER_UTILITY_ONLY"
+    for binding in value["bindings"].values():
+        path = ROOT / binding["path"]
+        observed = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        assert observed == binding["sha256"]
+    population = value["population"]
+    assert population["authority"] == "exact_p029_population"
+    assert population["observation_count"] == 10
+    assert population["sampling"] is False
+    assert population["new_market_or_dwd_read"] is False
+    assert population["protected_2022_2024_access"] is False
+    assert population["permanent_blind_2025_access"] is False
+    assert set(value["arms"]) == {"facts_only", "facts_plus_layered"}
+    assert value["arms"]["facts_only"]["stage_proposition_overlay"] is False
+    assert value["arms"]["facts_plus_layered"]["stage_proposition_overlay"] is True
+    assignment = value["assignment"]["properties"]
+    assert assignment["evaluations_total"] == 40
+    assert assignment["evaluations_per_arm"] == 20
+    assert assignment["same_role_sees_same_observation_in_both_arms"] is False
+    evaluator = value["evaluator_contract"]
+    assert evaluator["isolated_session_per_role"] is True
+    assert evaluator["arm_label_hidden_from_evaluator"] is True
+    assert evaluator["answer_key_hidden_until_all_role_outputs_are_sealed"] is True
+    assert evaluator["evaluator_unavailable_behavior"] == (
+        "BLOCK_BEFORE_EXPERIMENT_NO_HOST_SUBSTITUTION"
+    )
+    assert value["frozen_semantics"]["primary_stage"] is None
+    assert "future_return" in value["metrics"]["not_metrics"]
+    assert value["resource_budget"]["new_market_data_reads"] == 0
+    assert value["resource_budget"]["new_dwd_provider_opens"] == 0
+    assert P033_ROUTE_REVIEW.is_file()
+    assert P033_WORK.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

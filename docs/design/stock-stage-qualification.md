@@ -4,7 +4,7 @@
 | --- | --- |
 | Design status | draft |
 | Delivery gate | blocked |
-| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。第二组mixed closeout后，10/11由`P3-STAGE-002`正式化为可重叠context+nested development Projection Contract，5/6/7保持INCONCLUSIVE_PARKED。第三组P003-P026与P027 synthesis均已关闭；`P3-STAGE-028`已接受Layered Stage Proposition Bundle第一阶段MVP：历史码1..12加neutral 0保留追溯但不再是peer primary stages，accepted 10/11可在non-production development-shadow共同表示，research/parked项保持audit-only，`primary_stage=null`。当前无ready successor、无active逐code补样/搜索权限；2022-2024不重读，2025、QUALIFIED、LabelCard、日更、生产消费者或交易仍未开放 |
+| Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。第二组mixed closeout后，10/11由`P3-STAGE-002`正式化为可重叠context+nested development Projection Contract，5/6/7保持INCONCLUSIVE_PARKED。第三组P003-P026与P027 synthesis均已关闭；`P3-STAGE-028`已接受Layered Stage Proposition Bundle第一阶段MVP；`P3-STAGE-029`又在全部10条已接受真实历史Stage10-active retrospective观察上验证 layered development-shadow 对 parent+nested 语义的显式保留（16/16），comparison-only单码只保留10/16并在6/6 nested rows省略Stage10父背景。P029不改变10/11资格等级：source仍为retrospective，strict PIT/as-known、预测、经济和外样本资格均未建立。当前无ready successor、无active逐code补样/搜索权限；2022-2024不重读，2025、QUALIFIED、LabelCard、日更、生产消费者或交易仍未开放 |
 | Version | 0.1 |
 | Parent | `stock-stage-vocabulary-portfolio.md`; `lld/03-label-feature-system.md`（`stock-stage-state-machine.md`仅保留历史词汇/转移图） |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |

@@ -1,0 +1,145 @@
+{
+  "schema_version": "quanthus.stage-proposition-bundle-real-data-replay-result.v1",
+  "work_item": "P3-STAGE-029",
+  "state": "PASS_REAL_HISTORY_LAYERED_INTERPRETATION_REPLAY_PIT_STILL_BLOCKED",
+  "effective_date": "2026-09-16",
+  "protocol": {
+    "path": "config/stage-learning/stage-proposition-bundle-real-data-replay.v1.json",
+    "sha256": "sha256:8093fec3a1f6a458074f04b254adc14120dd6d3c892ee0dc822bcea20a2118af",
+    "canonical_request_digest": "sha256:b40932fdc23a43835d1cc227852c9a458dff9dfbe2096f39fe53eb8d9dff91c4"
+  },
+  "execution": {
+    "code_revision": "2f3785a241703d8c86f3d7729bb0e6a08ef68fec",
+    "job_id": "job_c7f1203e5d8c4dc6a6e5884858bf8e72",
+    "run_id": "run_c7f1203e5d8c4dc6a6e5884858bf8e72",
+    "artifact_ref": "/data/event-runs/structure-runs/run_c7f1203e5d8c4dc6a6e5884858bf8e72",
+    "manifest_sha256": "sha256:0afdf451286bdd26d70f56ad6ba745eb160c9e9ebafa9779b4a645355112f0c4",
+    "result_digest": "sha256:d95bc3dd3ea3cd4a0541b5948e3499278d14d5b5ce91d1fd73738bc2212adb77",
+    "job_input_digest": "sha256:500cb6a529b6744808b68feba2d9e3c554222bb19ed0d41ea080f94df6405b46",
+    "state": "succeeded",
+    "attempt": 1
+  },
+  "source": {
+    "kind": "accepted_immutable_f9_real_dwd_development",
+    "run_ids": [
+      "run_237a3e986b49490381f380a7ed5d4d14",
+      "run_f371d3f2cb0440aea2c49ceaad1c237b"
+    ],
+    "support_facts_digest": "sha256:6abbd976591739ede4451fd15ad2a11e8dd98519cc8039c2374f575c0035aff8",
+    "formal_projection_digest": "sha256:47797766b987d7886de2be86587c7cbd4d7af8d9551d4dc38cd96eb3c6f8a221",
+    "knowledge_view": "retrospective",
+    "strict_point_in_time": false,
+    "market_data_reads": 0,
+    "dwd_provider_opens": 0,
+    "future_outcome_reads": 0,
+    "consumed_2022_2024_partition_accessed": false,
+    "preserved_2025_partition_accessed": false
+  },
+  "population": {
+    "selection": "all_formal_stage_10_context_true_observations",
+    "sampling": false,
+    "observation_count": 10,
+    "stage_10_only_count": 4,
+    "stage_10_and_11_count": 6,
+    "explicit_target_proposition_opportunity_count": 16
+  },
+  "comparison": {
+    "facts_only": {
+      "stage_proposition_emitted_count": 0,
+      "purpose": "continuous accepted Support Evolution facts without Stage proposition compression"
+    },
+    "counterfactual_single_code": {
+      "policy": "child_precedence_stage_11_else_stage_10",
+      "comparison_only": true,
+      "historical_or_production_policy_claimed": false,
+      "explicit_target_proposition_retained_count": 10,
+      "nested_rows_with_stage_10_parent_elided_count": 6
+    },
+    "layered_bundle_development_shadow": {
+      "explicit_target_proposition_retained_count": 16,
+      "nested_rows_with_explicit_stage_10_parent_count": 6,
+      "nested_rows_with_stage_10_parent_elided_count": 0,
+      "semantic_mismatch_count": 0,
+      "primary_stage_non_null_count": 0
+    }
+  },
+  "deterministic_review_examples": [
+    {
+      "security_code": "000001",
+      "market_date": "2020-02-10",
+      "scale": 20,
+      "unreclaimed_age_sessions": 5,
+      "support_distance_value": "-0.0491803278688524590163934426",
+      "post_break_rebound_value": "0.036454610436025732666190136",
+      "counterfactual_single_code": 10,
+      "layered_visible_codes": [10],
+      "layered_primary_stage": null
+    },
+    {
+      "security_code": "000001",
+      "market_date": "2020-02-11",
+      "scale": 20,
+      "unreclaimed_age_sessions": 6,
+      "support_distance_value": "-0.0301639344262295081967213115",
+      "post_break_rebound_value": "0.057183702644746247319513939",
+      "counterfactual_single_code": 11,
+      "layered_visible_codes": [10, 11],
+      "layered_primary_stage": null
+    }
+  ],
+  "interpretation": {
+    "preregistered_target": "explicit_structural_context_retention_under_nested_rebound",
+    "result": "PASS_LAYERED_REPRESENTATION_PRESERVES_EXPLICIT_PARENT_AND_NESTED_SEMANTICS",
+    "supported_claim": "Within the frozen ten-observation real-history population, the layered P028 representation preserves the explicit Stage10 structural-failure parent context whenever the Stage11 nested rebound condition is true; the comparison-only child-precedence single-code view does not explicitly retain that parent context.",
+    "not_supported": [
+      "information_theoretic superiority over a consumer that can infer Stage10 from Stage11",
+      "improved human or model decision quality relative to continuous Facts",
+      "strict point-in-time or as-known availability",
+      "predictive utility",
+      "economic utility",
+      "out-of-sample performance",
+      "production expert, strategy, or trading authority"
+    ]
+  },
+  "knowledge_boundary": {
+    "strict_pit_gate": "BLOCKED_BY_RETROSPECTIVE_SOURCE_RECORD_VIEW",
+    "strict_pit_claim": false,
+    "reason": "The accepted source F9 artifacts use retrospective_dwd_record_view; T-only semantic construction does not establish publication-time availability."
+  },
+  "four_party_review": {
+    "review_kind": "four_independent_same-origin_model_product_reviews_over_frozen_dossier",
+    "roles": {
+      "short_term_event_driven": {
+        "disposition": "CONTINUE_BOUNDED_VALIDATION",
+        "next_phase_priority": "STRICT_PIT_AS_KNOWN_STAGE_10_11_REPLAY",
+        "key_point": "Layered preserves the structural-failure context while the rebound condition appears, but only explicit representation value is proven."
+      },
+      "fund_midterm_risk": {
+        "disposition": "CONTINUE_BOUNDED_VALIDATION",
+        "next_phase_priority": "STRICT_PIT_AS_KNOWN_STAGE_10_11_REPLAY",
+        "key_point": "The representation reduces the risk of reading a rebound as removal of the parent risk context, but does not support position or risk-allocation actions."
+      },
+      "quant_research": {
+        "disposition": "CONTINUE_BOUNDED_VALIDATION",
+        "next_phase_priority": "STRICT_PIT_AS_KNOWN_STAGE_10_11_REPLAY",
+        "key_point": "Explicit parent retention is proven for the frozen population; this is not independent statistical evidence, and Stage10 may be inferable from Stage11 under a known hierarchy."
+      },
+      "data_governance": {
+        "disposition": "CONTINUE_BOUNDED_VALIDATION",
+        "next_phase_priority": "STRICT_PIT_AS_KNOWN_STAGE_10_11_LINEAGE_REPLAY",
+        "key_point": "The replay closes the synthetic-to-real-consumable gap for development use, while historical knowability and revision lineage remain the largest governance gap."
+      }
+    },
+    "unanimous_next_priority": "STRICT_PIT_AS_KNOWN_STAGE_10_11_REPLAY",
+    "automatic_successor_opened": false
+  },
+  "authority": {
+    "development_shadow_consumption": true,
+    "production_expert_consumption": false,
+    "primary_stage_publication": false,
+    "strategy_consumption": false,
+    "trading": false,
+    "vocabulary_expansion": false
+  },
+  "claim_ceiling": "P029 proves deterministic real-history representation and development-shadow consumer semantics for the accepted Stage10/11 projection over the frozen retrospective F9 population. It does not prove PIT availability, prediction, economics, out-of-sample performance, or production/strategy/trading authority."
+}

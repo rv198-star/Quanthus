@@ -10,7 +10,7 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
-| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。第二组已mixed closeout：Stage 10/11随后由`P3-STAGE-002`正式化为可重叠的development Projection Contract，Stage 5/6/7为INCONCLUSIVE_PARKED。第三组P003-P026与P027 portfolio synthesis均已关闭：历史方向码1..12加neutral 0全部保留追溯，但flat single-valued FSM不再是实现架构；当前没有任何official peer primary stage。`P3-STAGE-028`现已完成第一阶段MVP收口：Layered Stage Proposition Bundle、strict validator、deterministic serialization与非生产Stage10/11 development-shadow view已接受，`primary_stage=null`，research/parked proposition只能audit。当前阶段目标已取得，不自动开启P029；下一步是对成品做价值评审，再单独批准后续阶段。正式LabelCard、外样本、日更/生产消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
+| Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。第二组已mixed closeout：Stage 10/11随后由`P3-STAGE-002`正式化为可重叠的development Projection Contract，Stage 5/6/7为INCONCLUSIVE_PARKED。第三组P003-P026与P027 portfolio synthesis均已关闭：历史方向码1..12加neutral 0全部保留追溯，但flat single-valued FSM不再是实现架构；当前没有任何official peer primary stage。`P3-STAGE-028`完成Layered Stage Proposition Bundle第一阶段MVP；`P3-STAGE-029`进一步用全部10条已接受的真实历史Stage10-active retrospective观察完成Facts-only / comparison-single-code / layered replay：layered保留16/16显式parent+nested命题，single-code仅保留10/16且在6/6 nested rows省略Stage10父背景。该结果只证明真实历史表达/消费保真；源为retrospective，strict PIT/as-known仍blocked。四方评审一致把strict PIT/as-known 10/11 replay列为唯一下一验证优先项，但未自动开启后续任务。正式LabelCard、外样本、日更/生产消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
 
 ## 1. 决策摘要与继承关系
 
@@ -143,7 +143,7 @@ A须把数字、分母、区间算法、bootstrap块长/聚类、损失优先次
 
 ## 9. 实施顺序与扩展
 
-第一组3/4保留为有质量的breakout event-phase development candidates，但唯一2022-2024外样本运行在语义评分前因sample-feasibility关闭，因此没有official资格。第二组5/6/7/10/11已mixed closeout：5/6/7保持INCONCLUSIVE_PARKED并继续消费连续Facts；10/11由`P3-STAGE-002`正式化为persistent structural-failure context + nested rebound condition，可共同成立且`primary_stage=null`。第三组0/1/2/8/9/12已完成P003-P026：0 primary资格park、2/order strong exploratory、12/1形成downside context + nested stabilization但parent reference no-pass、8为research-only acceleration/extension modifier且资源路线no-pass、9为等待activity relation的modifier hypothesis。`P3-STAGE-027`随后将三组合并为分层vocabulary portfolio；`P3-STAGE-028`进一步把该结构落实为可执行Bundle契约和non-production development-shadow view。当前阶段到此停止：不重开逐code补样、不做primary-stage压缩，也不自动创建后续P0XX研究任务；先评审阶段成果价值。
+第一组3/4保留为有质量的breakout event-phase development candidates，但唯一2022-2024外样本运行在语义评分前因sample-feasibility关闭，因此没有official资格。第二组5/6/7/10/11已mixed closeout：5/6/7保持INCONCLUSIVE_PARKED并继续消费连续Facts；10/11由`P3-STAGE-002`正式化为persistent structural-failure context + nested rebound condition，可共同成立且`primary_stage=null`。第三组0/1/2/8/9/12已完成P003-P026：0 primary资格park、2/order strong exploratory、12/1形成downside context + nested stabilization但parent reference no-pass、8为research-only acceleration/extension modifier且资源路线no-pass、9为等待activity relation的modifier hypothesis。`P3-STAGE-027`将三组合并为分层vocabulary portfolio；`P3-STAGE-028`把该结构落实为可执行Bundle契约和non-production development-shadow view；`P3-STAGE-029`再用已接受真实历史F9产物完成受限replay，证明layered在6/6 nested观察中显式保留Stage10父背景，而comparison-only单码会省略该父背景。P029源仍是retrospective，因此strict PIT/as-known未建立。当前阶段再次停止：不重开逐code补样、不做primary-stage压缩，也不自动创建后续P0XX；strict PIT/as-known 10/11 replay仅作为四方一致推荐的下一决策选项。
 
 每组都走相同的局部学习+全体系冲突审计；不得独立优化12个标签后直接拼接。每组输出保留/合并/改维度/拒绝决定。第三组尤其禁止把`0`做成“其他都不满足”的剩余类，禁止把`8/9`的“赶顶/派发”当可观测事实；若难以辨识则停在观察性描述/修饰命题，不能迫使B6/B7无限扩张。
 

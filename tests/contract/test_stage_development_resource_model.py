@@ -152,6 +152,13 @@ P028_DESIGN = ROOT / "docs/design/stage-proposition-bundle.md"
 P028_ACCEPTANCE = ROOT / "docs/acceptance/stage-proposition-bundle-mvp-20260916.md"
 P028_REVIEW = ROOT / "docs/reviews/stage-p028-layered-bundle-four-party-review-20260916.md"
 P028_WORK = ROOT / "docs/work-items/stage-layered-proposition-bundle.md"
+P029_PROTOCOL = ROOT / "config/stage-learning/stage-proposition-bundle-real-data-replay.v1.json"
+P029_RESULT = (
+    ROOT / "config/stage-learning/stage-proposition-bundle-real-data-replay-result.v1.json"
+)
+P029_ACCEPTANCE = ROOT / "docs/acceptance/stage-proposition-bundle-real-data-replay-20260916.md"
+P029_REVIEW = ROOT / "docs/reviews/stage-p029-real-data-bundle-four-party-review-20260916.md"
+P029_WORK = ROOT / "docs/work-items/stage-proposition-bundle-real-data-replay.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -2442,6 +2449,59 @@ def test_p028_closes_first_stage_proposition_mvp_without_automatic_successor() -
     assert P028_EXAMPLES.is_file()
     assert P028_ACCEPTANCE.is_file()
     assert P028_REVIEW.is_file()
+
+
+def test_p029_closes_real_history_interpretation_replay_without_pit_overclaim() -> None:
+    value = json.loads(P029_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-029"
+    assert value["state"] == "PASS_REAL_HISTORY_LAYERED_INTERPRETATION_REPLAY_PIT_STILL_BLOCKED"
+    protocol = value["protocol"]
+    assert ROOT / protocol["path"] == P029_PROTOCOL
+    observed = "sha256:" + hashlib.sha256(P029_PROTOCOL.read_bytes()).hexdigest()
+    assert observed == protocol["sha256"]
+    execution = value["execution"]
+    assert execution["code_revision"] == "2f3785a241703d8c86f3d7729bb0e6a08ef68fec"
+    assert execution["job_id"] == "job_c7f1203e5d8c4dc6a6e5884858bf8e72"
+    assert execution["state"] == "succeeded"
+    source = value["source"]
+    assert source["knowledge_view"] == "retrospective"
+    assert source["strict_point_in_time"] is False
+    assert source["market_data_reads"] == 0
+    assert source["dwd_provider_opens"] == 0
+    assert source["consumed_2022_2024_partition_accessed"] is False
+    assert source["preserved_2025_partition_accessed"] is False
+    population = value["population"]
+    assert population["sampling"] is False
+    assert population["observation_count"] == 10
+    assert population["stage_10_only_count"] == 4
+    assert population["stage_10_and_11_count"] == 6
+    assert population["explicit_target_proposition_opportunity_count"] == 16
+    comparison = value["comparison"]
+    single = comparison["counterfactual_single_code"]
+    assert single["explicit_target_proposition_retained_count"] == 10
+    assert single["nested_rows_with_stage_10_parent_elided_count"] == 6
+    layered = comparison["layered_bundle_development_shadow"]
+    assert layered["explicit_target_proposition_retained_count"] == 16
+    assert layered["nested_rows_with_explicit_stage_10_parent_count"] == 6
+    assert layered["nested_rows_with_stage_10_parent_elided_count"] == 0
+    assert layered["semantic_mismatch_count"] == 0
+    assert layered["primary_stage_non_null_count"] == 0
+    boundary = value["knowledge_boundary"]
+    assert boundary["strict_pit_gate"] == "BLOCKED_BY_RETROSPECTIVE_SOURCE_RECORD_VIEW"
+    assert boundary["strict_pit_claim"] is False
+    review = value["four_party_review"]
+    assert review["unanimous_next_priority"] == "STRICT_PIT_AS_KNOWN_STAGE_10_11_REPLAY"
+    assert review["automatic_successor_opened"] is False
+    assert all(
+        role["disposition"] == "CONTINUE_BOUNDED_VALIDATION"
+        for role in review["roles"].values()
+    )
+    assert value["authority"]["production_expert_consumption"] is False
+    assert value["authority"]["strategy_consumption"] is False
+    assert value["authority"]["trading"] is False
+    assert P029_ACCEPTANCE.is_file()
+    assert P029_REVIEW.is_file()
+    assert P029_WORK.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

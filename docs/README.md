@@ -553,8 +553,16 @@ nodes.
   and a non-production `development_shadow` consumer view are accepted. Stage10 context + Stage11
   nested rebound can be consumed together without Top-1 compression; research/parked assertions remain
   audit-only and are filtered rather than promoted. `primary_stage` remains null. This closes the
-  current large iteration at an explicit phase boundary: no P029 is automatically opened; the next
-  action is value review of the delivered MVP. Preserved 2021/2022-2024/2025 remain unopened.
+  current large iteration at an explicit phase boundary. A separately approved P3-STAGE-029 value
+  replay has since closed over the existing accepted 2020Q1 retrospective F9 artifacts: all 10 real
+  Stage10-active observations were rendered as Facts-only, comparison-only single-code and layered
+  Bundle views. The comparison single-code retained 10/16 explicit parent+nested propositions and
+  omitted Stage10 parent context on all 6 nested rows; the layered development-shadow retained 16/16,
+  with parent context explicit on 6/6 nested rows, zero semantic mismatches and `primary_stage=null`.
+  This is a real-history representation/consumer result only: the source record view is retrospective,
+  so strict PIT/as-known, prediction and economics remain unproven. Four independent product reviews
+  unanimously selected strict PIT/as-known Stage10/11 replay as the one next validation priority, but
+  no successor is automatically opened. Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -584,6 +592,9 @@ nodes.
   `work-items/stage-layered-proposition-bundle.md`,
   `acceptance/stage-proposition-bundle-mvp-20260916.md`,
   `reviews/stage-p028-layered-bundle-four-party-review-20260916.md`,
+  `work-items/stage-proposition-bundle-real-data-replay.md`,
+  `acceptance/stage-proposition-bundle-real-data-replay-20260916.md`,
+  `reviews/stage-p029-real-data-bundle-four-party-review-20260916.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,
@@ -602,8 +613,10 @@ nodes.
   `ABSTAIN` stays epistemic. P3-STAGE-028 has now implemented that architecture as the versioned
   `design/stage-proposition-bundle.md` contract. Only accepted Stage10/11 development projections may
   enter the non-production development-shadow consumer view; all other historical codes remain at their
-  P027 evidence grade. The phase is intentionally paused here for value review, with no automatic
-  successor. The qualification and field-dependency proposals remain
+  P027 evidence grade. P3-STAGE-029 has now validated those Stage10/11 semantics on the existing
+  accepted real-history retrospective F9 observations without new DWD/market reads; this closes the
+  synthetic-to-real development-consumer gap but leaves strict PIT/as-known blocked. The phase is
+  intentionally paused again with no automatic successor. The qualification and field-dependency proposals remain
   `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`; they do not
   activate peer primary labels, new result-bearing research, or daily/strategy Shadow.
   The concrete CPU-first historical-learning plan is `design/stock-stage-historical-learning.md`,

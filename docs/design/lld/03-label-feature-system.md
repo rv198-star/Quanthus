@@ -533,7 +533,8 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-026-D | Gate finite Stage8 candidate topology | P3-STAGE-026-C | closed not opened; resource failure occurred before semantic reference collection |
 | P3-STAGE-026-E | Four-party high-side portfolio closeout / Stage9 activity decision | P3-STAGE-026-D or earlier fail-close | closed; no gate lowering/resource repair; separate P3-STAGE-027 whole-vocabulary synthesis selected |
 | P3-STAGE-027 | Whole vocabulary portfolio synthesis | P3-STAGE-001, P3-STAGE-002, P3-STAGE-019, P3-STAGE-020-C, P3-STAGE-026 | closed `PASS_LAYERED_VOCABULARY_PORTFOLIO_SYNTHESIS`; flat peer-stage architecture superseded, all historical codes retained by evidence-bound role |
-| P3-STAGE-028 | Layered Stage Proposition Bundle Contract | P3-STAGE-027 | closed `PASS_FIRST_MILESTONE_STAGE_PROPOSITION_MVP`; layered context/condition/modifier Bundle, evidence authority, ABSTAIN/X separation, deterministic validator/serialization and bounded Stage10/11 development-shadow consumer view accepted; `primary_stage=null`, no automatic successor |
+| P3-STAGE-028 | Layered Stage Proposition Bundle Contract | P3-STAGE-027 | closed `PASS_FIRST_MILESTONE_STAGE_PROPOSITION_MVP`; layered context/condition/modifier Bundle, evidence authority, ABSTAIN/X separation, deterministic validator/serialization and bounded Stage10/11 development-shadow consumer view accepted; `primary_stage=null` |
+| P3-STAGE-029 | Real-History Stage Proposition Bundle Replay | P3-STAGE-028, P3-STAGE-002 | closed `PASS_REAL_HISTORY_LAYERED_INTERPRETATION_REPLAY_PIT_STILL_BLOCKED`; real accepted retrospective Stage10/11 observations replayed over Facts-only/comparison-single-code/layered views, explicit parent+nested semantics preserved 16/16 by layered output, strict PIT remains blocked and no successor is automatically opened |
 
 ## 7. Acceptance
 

@@ -40,7 +40,7 @@
 
 当前不消耗新的holdout，也不再逐code追参。P027已经把历史码1..12与neutral 0的证据等级和语义角色统一到`stock-stage-vocabulary-portfolio.md`：连续Facts是权威底座，context/structural state、event/nested condition、modifier分层表示；`X`是control，`ABSTAIN`是epistemic outcome。没有任何历史码当前被授权为official peer primary stage。
 
-P3-STAGE-028已完成Layered Stage Proposition Bundle的schema、governance与最小实现：stable proposition id、historical code traceability、evidence grade、coexistence/ambiguity、Fact references、ABSTAIN/X边界、strict validator、deterministic serialization，以及accepted Stage10/11的non-production development-shadow consumer view均已落地。v1保持`primary_stage=null`，representation不能自动晋级research/parked proposition。当前不继续生成新P0XX；J真实holdout、G日更、正式LabelCard/生产消费者/策略继续blocked，2025不动。下一步是由负责人评审这个阶段性MVP是否值得进入下一阶段。
+P3-STAGE-028已完成Layered Stage Proposition Bundle的schema、governance与最小实现：stable proposition id、historical code traceability、evidence grade、coexistence/ambiguity、Fact references、ABSTAIN/X边界、strict validator、deterministic serialization，以及accepted Stage10/11的non-production development-shadow consumer view均已落地。随后P3-STAGE-029按单目标价值验证完成真实历史replay：只复用两份accepted immutable 2020Q1 F9 artifacts，不新读DWD/market；全部10条Stage10-active观察中，4条10-only、6条10+11，layered显式保留16/16 parent+nested命题，comparison-only单码仅保留10/16并在6/6 nested rows省略Stage10父背景。source仍为retrospective，因此strict PIT/as-known、预测与经济效用均未建立。四方评审一致推荐strict PIT/as-known 10/11 replay作为唯一下一验证优先项，但当前不自动创建新P0XX；J真实holdout、G日更、正式LabelCard/生产消费者/策略继续blocked，2025不动。
 
 ## 4. 原提案迁移
 

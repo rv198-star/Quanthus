@@ -5,6 +5,7 @@
 | Design status | draft |
 | Delivery gate | blocked |
 | Authority | 验证/不确定性设计权威；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE，remaining budget=0；I冻结 `../../config/stage-learning/qualification-protocol.v2.json`，J真实holdout继续blocked。第二组mixed closeout后，10/11由`P3-STAGE-002`正式化为可重叠context+nested development Projection Contract，5/6/7保持INCONCLUSIVE_PARKED。第三组P003-P026与P027 synthesis均已关闭；`P3-STAGE-028`已接受Layered Stage Proposition Bundle第一阶段MVP；`P3-STAGE-029`又在全部10条已接受真实历史Stage10-active retrospective观察上验证 layered development-shadow 对 parent+nested 语义的显式保留（16/16），comparison-only单码只保留10/16并在6/6 nested rows省略Stage10父背景。`P3-STAGE-030`随后冻结strict `PUBLIC_RECONSTRUCTION`/T=15:30/10-of-10 gate，但在任何PIT Stage predicate运行前因现有ODS/DWD缺完整2020日线source-version/public-availability family而关闭为`BLOCKED_SOURCE_VERSION_OR_AVAILABILITY_LINEAGE`。P030不改变10/11资格等级；四方4/4仅批准另开隔离的历史source-version evidence feasibility。`P3-STAGE-031`已对SSE/SZSE官方historical EOD archive family关闭`NO_PASS_OFFICIAL_EXCHANGE_EVIDENCE_INSUFFICIENT`：source authority/coverage不足以替代exact version/correction lineage和T=15:30 public-availability proof。四方4/4仅允许一个更小的官方Level-1 intraday/realtime evidence feasibility。`P3-STAGE-032`已关闭`NO_PASS_LEVEL1_HISTORICAL_DISSEMINATION_EVIDENCE_INSUFFICIENT`：SSE历史Level-1 snapshot的采样/去重/cleaned归档和SZSE snapshot的生成时间/不可重传语义均不足以证明exact retained historical version在T=15:30的contemporaneous dissemination。阶段级四方评审4/4决定停止当前Stage historical PIT source-evidence hunt；不打开商业source或PIT-lite。`P3-STAGE-033`随后只验证consumer/explanation utility：机械预登记门槛强通过（Facts-only关键错误12/20，Facts+Layered 0/20），但4/4结果审计认定information equivalence未建立，因而研究结论关闭`INCONCLUSIVE_CONSUMER_UTILITY_ATTRIBUTION_MECHANICAL_GATE_PASS`。这只支持当前Layered包更可靠地传达已推导10/11语义，不授权把差异归因于纯Layered表达。Stage10/11继续保持accepted development projection + P029 retrospective development-shadow，strict PIT未检验；Continuous Facts继续为权威底座。当前无active逐code补样/搜索权限；2022-2024不重读，2025、QUALIFIED、LabelCard、日更、生产消费者或交易仍未开放 |
+| Research phase | `stock-stage-research-phase-1` 已关闭为 `CLOSED_CONVERGED_NO_AUTOMATIC_SUCCESSOR`；Continuous Facts 保持权威底座，Layered Stage Proposition 仅保留development语义/沟通层；taxonomy completeness不构成重开理由 |
 | Version | 0.1 |
 | Parent | `stock-stage-vocabulary-portfolio.md`; `lld/03-label-feature-system.md`（`stock-stage-state-machine.md`仅保留历史词汇/转移图） |
 | Facts boundary | `structure-facts-v2.md`; `../../config/structure-facts-v2-blueprint.v1.json` |
@@ -19,6 +20,8 @@
 Shadow 是运行方式，Qualified 是一个需要证据支撑的资格结论；两者之间必须有可执行的判定机制，不能因为定时任务稳定、图表看起来合理或运行了一段时间就升级。
 
 本提案把“12 状态”视为待检验的市场描述体系，而不是已经存在标准答案、只差编程的十三分类任务。既要验证算法是否遵守规则，也要验证规则是否能区分用户关心的情形，进一步验证其市场假设与策略用途。允许结果是保留、合并、改为修饰维度、降为展示或拒绝某个状态，而不是为了凑足十二个编号提高规则复杂度。
+
+第一研究阶段已经在这一原则上收敛：Continuous Facts 保持权威事实/计算底座，Layered Stage Proposition 仅作为已推导语义的governed development communication surface；历史码完整性不是资格目标，也不能单独触发后继研究。未来任何Stage-specific reopen都必须绑定具体下游消费问题或新的独立证据，并重新冻结验证边界。
 
 当前仍不注册新的QUALIFIED LabelCard、不启用日更，也不改变正式P6权限。第二组和10/11 Projection Contract均已关闭，primary-stage仲裁继续延后。第三组P003-P026也已完整关闭：Stage0/2的有限路线最终由P019按portfolio原则收口；P020保留Stage12 context + Stage1 nested condition但reference gate no-pass；P026保留Stage8 acceleration/extension modifier并在唯一资源路线上no-pass，Stage9继续等待activity relation。P027进一步确认这些结果不是要重新压回一个互斥槽，而应分层表示。正式Projection/LabelCard仍须新scope；P028只允许schema/governance，不授权任何research-only/parked proposition升级。阈值外样本、HUMAN_EXPERT_REFERENCE、primary-stage仲裁和产品资格仍未验证；2022-2024不重读，2025 permanent-blind保持未触碰。
 

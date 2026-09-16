@@ -540,6 +540,12 @@ market-read / Job / threshold-search authority is now closed. Machine design:
 | P3-STAGE-032 | Official Level-1 historical realtime evidence feasibility | P3-STAGE-031 | closed `NO_PASS_LEVEL1_HISTORICAL_DISSEMINATION_EVIDENCE_INSUFFICIENT`; SSE historical snapshots are sampled/deduplicated/cleaned archive data and SZSE snapshot `OrigTime` is generation time while snapshots cannot be retransmitted, so exact retained-version -> contemporaneous dissemination evidence remains unproven; 4/4 phase review stops further Stage historical PIT source search and preserves P029 as retrospective development-shadow only |
 | P3-STAGE-033 | Layered Stage consumer utility | P3-STAGE-029, P3-STAGE-032, P3-STRUCT-002 | closed `INCONCLUSIVE_CONSUMER_UTILITY_ATTRIBUTION_MECHANICAL_GATE_PASS`; mechanical gate passed (Facts-only 12/20 critical-error packets vs Layered 0/20) but information-equivalent control was not established, so Layered retains bounded development communication value over authoritative Facts without prediction/PIT/economic/production authority |
 
+The owner-approved phase closeout `config/stage-learning/stock-stage-research-phase1-closeout.v1.json`
+now freezes the first stock-stage research phase as `CLOSED_CONVERGED_NO_AUTOMATIC_SUCCESSOR`.
+Continuous Facts are the authoritative computational substrate; the Layered Stage Proposition Bundle
+is an optional governed development semantic/communication surface. The flat mutually exclusive FSM
+and `primary_stage`/top-1 compression are not implementation requirements. P034 is not opened.
+
 ## 7. Acceptance
 
 Active cards have no subjective conditions, a repeat run is identical, invalid combinations

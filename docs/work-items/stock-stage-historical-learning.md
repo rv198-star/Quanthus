@@ -11,7 +11,7 @@
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Machine plan | `../../config/stock-stage-learning-delivery.v1.json` |
 | GitHub | 父工单 #246；A #238、B #239、C #240、D #241、E #242、F #243、G #244、H #245、I #247、J #248；A-F/I closed，G/H/J及父工单open/blocked |
-| Current scope | A-F/I已关闭，F为sample-feasibility INCONCLUSIVE；J真实holdout继续blocked。P027已统一收口全部历史stage vocabulary；P028现已完成Layered Stage Proposition Bundle第一阶段MVP：13个历史market code映射到stable proposition ids，context/condition/modifier分层，neutral 0/ABSTAIN/X分离，`primary_stage=null`，accepted 10/11可进入non-production development-shadow，research/parked项保持audit-only。当前阶段目标已取得且无ready successor；下一步先评审MVP价值，不自动开启P029。2025、正式QUALIFIED、日更、生产消费者和策略权限仍关闭 |
+| Current scope | `stock-stage-research-phase-1` 已正式收敛关闭；P027-P033已回答当前阶段架构、真实表达、PIT边界与consumer-value问题。Continuous Facts为权威计算底座，Layered Stage Proposition为bounded development语义/沟通层，flat互斥FSM与`primary_stage`/Top-1不再是实现目标。P034未创建、当前无ready Stage successor；只有真实下游专家/多专家消费缺口或独立新增可审计证据才允许新scope。2022-2024不重读，2025、正式QUALIFIED、日更、生产消费者、策略和交易权限仍关闭 |
 
 ## 1. 逐步执行路线
 
@@ -36,7 +36,7 @@
 
 本次早期三视角评审由单一助手分别执行，不是真人签字。D/E采用版本化 `SYNTHETIC_EXPERT_CONSENSUS`：不同风格原型互不可见地评审同一T-only证据，且明确不等同真人独立金标准；F继续沿用同一证据层级，因此即使外样本硬门槛通过，也只形成bounded SHADOW external-semantic evidence。未来如获得真实A股专业交易者/基金经理参考，可升级或对照为 `HUMAN_EXPERT_REFERENCE`。不能让用户因不懂算法而被迫审批任意阈值。
 
-## 3. 当前下一步
+## 3. 阶段收敛与后续边界
 
 当前不消耗新的holdout，也不再逐code追参。P027已经把历史码1..12与neutral 0的证据等级和语义角色统一到`stock-stage-vocabulary-portfolio.md`：连续Facts是权威底座，context/structural state、event/nested condition、modifier分层表示；`X`是control，`ABSTAIN`是epistemic outcome。没有任何历史码当前被授权为official peer primary stage。
 
@@ -48,4 +48,4 @@ P3-STAGE-028已完成Layered Stage Proposition Bundle的schema、governance与�
 
 ## 5. 本轮验证
 
-计划校验包括：稳定ID集合、依赖无环、先决项顺序、文档路径、P0分区一致以及每项显式权限。GitHub同步P3-STAGE-001和A-J，不能改动旧P3 fixture、Facts验收、Catalog或P6工单。原始规划收尾见 `../acceptance/stock-stage-learning-planning-closeout-20260908.md`；当前执行状态以上表及各 acceptance 为准。A-F/I关闭，G/J及父工单仍受原外样本/日更gate约束；H后继的分组研究已由P027完成portfolio synthesis。当前无ready Stage successor；P033的信息等价补证问题仅作为下一决策选项，不自动创建。2022-2024 fresh holdout已消耗，2025/其他新holdout、正式QUALIFIED、日更与策略消费权限仍保持关闭。
+计划校验包括：稳定ID集合、依赖无环、先决项顺序、文档路径、P0分区一致以及每项显式权限。GitHub同步P3-STAGE-001和A-J，不能改动旧P3 fixture、Facts验收、Catalog或P6工单。原始规划收尾见 `../acceptance/stock-stage-learning-planning-closeout-20260908.md`；当前执行状态以上表及各 acceptance 为准。A-F/I关闭，G/J及父工单仍受原外样本/日更gate约束；H后继的分组研究已由P027完成portfolio synthesis。当前无ready Stage successor，且第一研究阶段已由 `../../config/stage-learning/stock-stage-research-phase1-closeout.v1.json` 正式关闭。P033的信息等价补证问题只保留为潜在研究问题，不自动创建；“把0..12补齐/全部QUALIFIED”不是重开理由。只有下游专家或多专家系统暴露明确、可界定的语义/沟通缺口，或独立出现能改变既有claim boundary的新证据，才允许另行预注册新scope。2022-2024 fresh holdout已消耗，2025/其他新holdout、正式QUALIFIED、日更与策略消费权限仍保持关闭。

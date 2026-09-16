@@ -197,6 +197,12 @@ P033_ROUTE_REVIEW = ROOT / "docs/reviews/stage-p033-value-route-review-20260916.
 P033_RESULT_REVIEW = ROOT / "docs/reviews/stage-p033-consumer-utility-four-party-review-20260916.md"
 P033_ACCEPTANCE = ROOT / "docs/acceptance/stage-p033-consumer-utility-20260916.md"
 P033_WORK = ROOT / "docs/work-items/stage-consumer-utility.md"
+STAGE_PHASE1_CLOSEOUT = (
+    ROOT / "config/stage-learning/stock-stage-research-phase1-closeout.v1.json"
+)
+STAGE_PHASE1_ACCEPTANCE = (
+    ROOT / "docs/acceptance/stock-stage-research-phase1-convergence-20260916.md"
+)
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -2776,6 +2782,40 @@ def test_p033_preserves_mechanical_pass_but_closes_attribution_inconclusive() ->
     assert P033_RESULT_REVIEW.is_file()
     assert P033_ACCEPTANCE.is_file()
     assert P033_WORK.is_file()
+
+
+def test_stock_stage_phase1_converges_without_p034_or_authority_promotion() -> None:
+    value = json.loads(STAGE_PHASE1_CLOSEOUT.read_text(encoding="utf-8"))
+    assert value["schema_version"] == "quanthus.stock-stage-research-phase-closeout.v1"
+    assert value["phase_id"] == "stock-stage-research-phase-1"
+    assert value["state"] == "CLOSED_CONVERGED_NO_AUTOMATIC_SUCCESSOR"
+    for binding in value["bindings"].values():
+        path = ROOT / binding["path"]
+        observed = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        assert observed == binding["sha256"]
+    architecture = value["final_architecture"]
+    assert architecture["authoritative_computational_substrate"] == "continuous_facts"
+    assert architecture["governed_semantic_surface"] == "layered_stage_proposition_bundle"
+    assert architecture["flat_single_valued_stage_fsm"] == (
+        "SUPERSEDED_AS_IMPLEMENTATION_ARCHITECTURE"
+    )
+    assert architecture["primary_stage_top1"] == "NOT_REQUIRED_AND_NOT_AUTHORIZED"
+    assert architecture["all_codes_must_qualify"] is False
+    authority = value["authority"]
+    assert authority["new_stage_experiment_authorized"] is False
+    assert authority["p034_open"] is False
+    assert authority["historical_pit_source_search_authorized"] is False
+    assert authority["protected_2022_2024_reopen_authorized"] is False
+    assert authority["blind_2025_access_authorized"] is False
+    assert authority["production_expert_consumption_authorized"] is False
+    assert authority["strategy_consumption_authorized"] is False
+    assert authority["trading_authorized"] is False
+    assert authority["automatic_successor"] is None
+    reopen = value["reopen_policy"]
+    assert any("downstream" in item for item in reopen["allowed_triggers"])
+    assert any("taxonomy" in item for item in reopen["insufficient_triggers"])
+    assert value["program_handoff"]["implementation_authority_granted_by_this_closeout"] is False
+    assert STAGE_PHASE1_ACCEPTANCE.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

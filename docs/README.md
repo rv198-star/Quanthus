@@ -586,8 +586,11 @@ nodes.
   Layered arm directly exposes the derived state. P033 therefore closes
   `INCONCLUSIVE_CONSUMER_UTILITY_ATTRIBUTION_MECHANICAL_GATE_PASS`: the current Layered packet has
   bounded communication value for already-derived Stage10/11 semantics, while Continuous Facts remain
-  authoritative and pure layered-expression causality is unproven. No successor is automatically
-  opened. Preserved 2021/2022-2024/2025 remain unopened.
+  authoritative and pure layered-expression causality is unproven. The owner then approved formal
+  convergence of `stock-stage-research-phase-1`: the phase is now
+  `CLOSED_CONVERGED_NO_AUTOMATIC_SUCCESSOR`, P034 is not opened, taxonomy completion is not a valid
+  reopen trigger, and future Stage-specific work requires a concrete downstream consumer gap or
+  independently new admissible evidence. Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -633,6 +636,7 @@ nodes.
   `work-items/stage-consumer-utility.md`,
   `acceptance/stage-p033-consumer-utility-20260916.md`,
   `reviews/stage-p033-consumer-utility-four-party-review-20260916.md`,
+  `acceptance/stock-stage-research-phase1-convergence-20260916.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,
@@ -663,7 +667,9 @@ nodes.
   bounded product question and closed attribution-inconclusive despite a strong mechanical packet-level
   PASS: the current Layered surface improves communication of already-derived Stage10/11 semantics, but
   an information-equivalent Facts control was not established. Continuous Facts therefore remain the
-  authoritative substrate and no automatic Stage successor is open. The qualification and field-dependency proposals remain
+  authoritative substrate and no automatic Stage successor is open. The first stock-stage research
+  phase is now formally converged by `config/stage-learning/stock-stage-research-phase1-closeout.v1.json`;
+  no P034 or taxonomy-completion program is authorized. The qualification and field-dependency proposals remain
   `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`; they do not
   activate peer primary labels, new result-bearing research, or daily/strategy Shadow.
   The concrete CPU-first historical-learning plan is `design/stock-stage-historical-learning.md`,

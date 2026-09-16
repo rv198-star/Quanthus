@@ -421,6 +421,12 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-EXPERT-005 | Accept the development MVP and resolve forward-Shadow disposition | P3-EXPERT-004, P3-ATTR-001, P3-SHADOW-001 | closed by `docs/acceptance/p3-expert-mvp-shadow-handoff-20260823.md`; decision inconclusive, Shadow disabled |
 | P3-ACCEPT-001 | Execute multi-year vertical-slice acceptance | All P3 release blockers | closed |
 
+**Stock-stage research phase 1 is formally converged and closed.** Machine authority:
+`config/stage-learning/stock-stage-research-phase1-closeout.v1.json`; acceptance:
+`docs/acceptance/stock-stage-research-phase1-convergence-20260916.md`. No P034 is opened. Historical
+0..12 completeness is not a delivery requirement; reopening requires a concrete downstream consumer
+need or independently new admissible evidence.
+
 ## P4-P7
 
 | ID | Title | Phase | Disposition |

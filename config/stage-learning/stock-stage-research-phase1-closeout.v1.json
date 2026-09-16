@@ -1,0 +1,97 @@
+{
+  "schema_version": "quanthus.stock-stage-research-phase-closeout.v1",
+  "phase_id": "stock-stage-research-phase-1",
+  "effective_date": "2026-09-16",
+  "state": "CLOSED_CONVERGED_NO_AUTOMATIC_SUCCESSOR",
+  "owner_decision": "CONVERGE_APPROVED",
+  "evidence_baseline_revision": "db903bd4f9b98244f31c6e05a5b17194f38cb080",
+  "bindings": {
+    "continuous_facts_economic_disposition": {
+      "path": "docs/acceptance/structure-intelligence-economic-final-acceptance-20260906.md",
+      "sha256": "sha256:381e4e29499bbc6b38326e4a9f01e1fd997d18cff457f1f8425ba10ef7302cde"
+    },
+    "whole_vocabulary_synthesis": {
+      "path": "config/stage-learning/stage-whole-vocabulary-portfolio-synthesis.v1.json",
+      "sha256": "sha256:d71aac7893611f62b3ebc58df81f395b5d7b7c88a1dc255840f502c3e3638fe5"
+    },
+    "layered_bundle_mvp": {
+      "path": "config/stage-learning/stage-proposition-bundle-result.v1.json",
+      "sha256": "sha256:b3df20543c07ca68b1eba5064d8542f57f32a44b50605291e5777a6c474fa9f9"
+    },
+    "real_history_layered_replay": {
+      "path": "config/stage-learning/stage-proposition-bundle-real-data-replay-result.v1.json",
+      "sha256": "sha256:83b6e7ddd1ccb31a83b4bb19698b8eeee1ff10d56169a4feaae3eec9388f3ed0"
+    },
+    "historical_pit_source_search_stop": {
+      "path": "config/stage-learning/stage-level1-historical-realtime-evidence-feasibility-result.v1.json",
+      "sha256": "sha256:5670c86ced678aba79460da5c4f6de950f8e3c3b10bb7b94641dfb561a96e7e2"
+    },
+    "consumer_utility_result": {
+      "path": "config/stage-learning/stage-consumer-utility-result.v1.json",
+      "sha256": "sha256:880e2e1b32ea92955fec2f03f6c9f0bbfc3a7272d1288a45ae3ee22d17315358"
+    }
+  },
+  "final_architecture": {
+    "authoritative_computational_substrate": "continuous_facts",
+    "governed_semantic_surface": "layered_stage_proposition_bundle",
+    "current_mature_demonstration": [
+      "stage_10_structural_failure_context",
+      "stage_11_nested_rebound_condition"
+    ],
+    "flat_single_valued_stage_fsm": "SUPERSEDED_AS_IMPLEMENTATION_ARCHITECTURE",
+    "primary_stage_top1": "NOT_REQUIRED_AND_NOT_AUTHORIZED",
+    "historical_stage_vocabulary": "RETAIN_FOR_RESEARCH_AND_TRACEABILITY",
+    "all_codes_must_qualify": false
+  },
+  "evidence_conclusions": {
+    "supported": [
+      "Continuous structural Facts remain preferable to coarse state compression as the computational representation under the accepted development evidence.",
+      "Layered Stage propositions preserve explicit parent-context plus nested-condition semantics that forced single-code compression can elide.",
+      "The current Facts-plus-Layered product packet communicates already-derived Stage10/11 state more reliably than the current Facts-only packet on the frozen P033 consumer task."
+    ],
+    "not_supported": [
+      "Pure layered-presentation causality under information-equivalent Facts inputs.",
+      "Strict historical point-in-time or as-known validity for the 2020 retrospective evidence.",
+      "Predictive utility, economic superiority, out-of-sample performance, production expert authority, strategy authority or trading authority.",
+      "A requirement that every historical stage code be qualified or promoted."
+    ]
+  },
+  "authority": {
+    "new_stage_experiment_authorized": false,
+    "p034_open": false,
+    "historical_pit_source_search_authorized": false,
+    "protected_2022_2024_reopen_authorized": false,
+    "blind_2025_access_authorized": false,
+    "stage_threshold_tuning_authorized": false,
+    "vocabulary_completion_program_authorized": false,
+    "production_expert_consumption_authorized": false,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false,
+    "automatic_successor": null
+  },
+  "reopen_policy": {
+    "allowed_triggers": [
+      "A concrete downstream expert or multi-expert consumer exposes a bounded semantic/communication gap that cannot be addressed by the existing Continuous Facts plus Layered Proposition contract.",
+      "Independently obtained admissible evidence appears that materially changes a previously blocked claim boundary, with a new preregistered review before any result-bearing execution.",
+      "A prospective auditable workflow creates a new business need for Stage semantics and defines its own point-in-time evidence from collection start onward."
+    ],
+    "insufficient_triggers": [
+      "Completing or beautifying the historical 0-12 taxonomy.",
+      "Qualifying every historical stage code for symmetry or completeness.",
+      "Re-running consumed partitions or searching more historical data sources solely to rescue a blocked Stage claim.",
+      "Improving a metric after observing a prior result without a separately preregistered business question."
+    ],
+    "required_before_reopen": [
+      "One explicit downstream value question.",
+      "Frozen evidence population and knowledge-time semantics.",
+      "Preregistered success, no-pass and stop conditions.",
+      "Independent review when the new question changes an existing claim boundary."
+    ]
+  },
+  "program_handoff": {
+    "stage_specific_research": "STOPPED_AT_PHASE_BOUNDARY",
+    "recommended_parent_focus": "RETURN_TO_QUANTHUS_MULTI_EXPERT_DECISION_SYSTEM_WITH_CONTINUOUS_FACTS_PLUS_OPTIONAL_LAYERED_SEMANTIC_SURFACE",
+    "implementation_authority_granted_by_this_closeout": false
+  },
+  "claim_ceiling": "Stock-stage research phase 1 is closed as a converged architecture and evidence boundary. Continuous Facts remain authoritative; Layered Stage propositions remain a governed development semantic/communication surface. No new Stage experiment, P034, qualification, PIT, prediction, economics, production, strategy or trading authority is created by this closeout."
+}

@@ -10,11 +10,14 @@
 | Compute plan | `stock-stage-training-compute.md` |
 | Review | `../reviews/stock-stage-learning-review-20260908.md` |
 | Work items | `../work-items/stock-stage-historical-learning.md`; `../../config/stock-stage-learning-delivery.v1.json` |
+| Research phase | `stock-stage-research-phase-1` 已正式关闭为 `CLOSED_CONVERGED_NO_AUTOMATIC_SUCCESSOR`；机器收口见 `../../config/stage-learning/stock-stage-research-phase1-closeout.v1.json`，验收见 `../acceptance/stock-stage-research-phase1-convergence-20260916.md`。不创建P034；只有真实下游消费缺口或独立新增可审计证据才允许另开新scope |
 | Authorization | P3-STAGE-001 A-F与I已关闭；F唯一2022-2024 arbitration预算已消耗并INCONCLUSIVE；J真实holdout继续blocked。第二组已mixed closeout：Stage 10/11随后由`P3-STAGE-002`正式化为可重叠的development Projection Contract，Stage 5/6/7为INCONCLUSIVE_PARKED。第三组P003-P026与P027 portfolio synthesis均已关闭：历史方向码1..12加neutral 0全部保留追溯，但flat single-valued FSM不再是实现架构；当前没有任何official peer primary stage。`P3-STAGE-028`完成Layered Stage Proposition Bundle第一阶段MVP；`P3-STAGE-029`进一步用全部10条已接受的真实历史Stage10-active retrospective观察完成Facts-only / comparison-single-code / layered replay：layered保留16/16显式parent+nested命题，single-code仅保留10/16且在6/6 nested rows省略Stage10父背景。`P3-STAGE-030`随后按四方推荐冻结strict `PUBLIC_RECONSTRUCTION`，但在任何PIT Stage predicate运行前被`BLOCKED_SOURCE_VERSION_OR_AVAILABILITY_LINEAGE`关闭：现有ODS/DWD没有证明完整的2020日线source-version/public-availability family，session-close仅是经济完成下界。四方blocker复审4/4只允许另开独立、受限的历史source-version evidence feasibility，不允许降级成PIT-lite。`P3-STAGE-031`随后只审SSE/SZSE官方historical EOD archive family：官方权威与历史覆盖成立，但exact original-version/correction lineage和T=15:30 publication evidence不足，关闭`NO_PASS_OFFICIAL_EXCHANGE_EVIDENCE_INSUFFICIENT`。四方4/4仅批准一个更小的官方Level-1 intraday/realtime evidence feasibility successor。`P3-STAGE-032`随后只审两个Level-1产品×三个固定日期并再次关闭`NO_PASS_LEVEL1_HISTORICAL_DISSEMINATION_EVIDENCE_INSUFFICIENT`：SSE历史snapshot为采样/去重/cleaned归档，SZSE snapshot `OrigTime`是生成时间且snapshot不能重传，均未建立exact historical retained-version到T=15:30 contemporaneous dissemination的审计绑定。阶段级四方评审4/4决定停止当前Stage historical PIT source-evidence hunt；P029只保留retrospective development-shadow语义资产。随后`P3-STAGE-033`转回价值验证：在exact P029十条观察上，Facts-only vs Facts+Layered的40个盲评包机械门槛强通过（关键错误12/20→0/20），但结果后4/4评审发现Facts-only没有证明包含唯一重建Stage10/11所需的完整历史状态信息，因此阶段关闭`INCONCLUSIVE_CONSUMER_UTILITY_ATTRIBUTION_MECHANICAL_GATE_PASS`。Layered保留“传达已推导状态”的bounded development communication value，Continuous Facts仍是权威底座；不自动开后继。正式LabelCard、外样本、日更/生产消费者/策略/交易仍关闭；2022-2024不重读，2025继续未触碰 |
 
 ## 1. 决策摘要与继承关系
 
 采用“专家语义约束 + 历史参数学习 + 独立验证”，不是让无监督算法随意聚出十二组再贴名字。十二状态是待验证的业务词汇，不是必须凑齐的模型输出。先做3/4突破尝试—接受及其相邻反例，随后按依赖扩展，允许合并、改为不同维度或仅保留连续事实。
+
+第一研究阶段现已正式收敛：Continuous Facts 是权威计算/审计底座，Layered Stage Proposition Bundle 是可选的governed development语义/沟通层；flat互斥FSM与`primary_stage`/Top-1不再是实现目标。历史0..12词汇继续用于研究和追溯，但“把所有码补齐或全部资格化”不再是交付目标。阶段重开只允许由真实下游消费缺口或独立新增可审计证据触发。
 
 本文件拥有历史学习、选参和定稿协议；`stock-stage-qualification.md` 继续拥有真值、歧义、验证分层和数据/消费边界；`stock-stage-data-dependencies.md` 继续拥有源字段及F1-F9缺口。不得用本方案改写已经接受的Facts或指标公式。
 

@@ -232,6 +232,8 @@ def test_event_worker_stays_a_control_plane_supervisor() -> None:
         "structure-intelligence-economic-final-acceptance-20260906.md",
         "stage-p032-level1-evidence-four-party-review-20260916.md",
         "stage-p033-value-route-review-20260916.md",
+        "p3-expert-stage-consumption-direction-review-20260917.md",
+        "expert-strategy-layer.md",
     ):
         assert required in builder
     assert "COPY docs ./docs" in dockerfile

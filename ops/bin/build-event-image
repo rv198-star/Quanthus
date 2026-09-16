@@ -26,7 +26,9 @@ cp "$REPOSITORY_ROOT/pyproject.toml" "$REPOSITORY_ROOT/README.md" "$BUILD_CONTEX
 for relative in \
     docs/acceptance/structure-intelligence-economic-final-acceptance-20260906.md \
     docs/reviews/stage-p032-level1-evidence-four-party-review-20260916.md \
-    docs/reviews/stage-p033-value-route-review-20260916.md; do
+    docs/reviews/stage-p033-value-route-review-20260916.md \
+    docs/reviews/p3-expert-stage-consumption-direction-review-20260917.md \
+    docs/design/lld/04-experts-aggregator/expert-strategy-layer.md; do
     install -D -m 0644 "$REPOSITORY_ROOT/$relative" "$BUILD_CONTEXT/$relative"
 done
 

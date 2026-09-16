@@ -21,6 +21,9 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+from quanthus.expert_strategy.stage_semantic_consumption import (
+    verify_stage_expert_consumption_artifact,
+)
 from quanthus.platform.jobs import P4_EVENT_SCAN_JOB, STRUCTURE_MVP_JOB, DurableJobQueue
 from quanthus.platform.persistence import PlatformStore, PostgresPlatformStore
 from quanthus.policy import find_project_root
@@ -58,6 +61,9 @@ _STAGE_PROPOSITION_REPLAY_RUN_CONFIG = (
     "config/stage-learning/stage-proposition-bundle-real-data-replay.v1.json"
 )
 _STAGE_CONSUMER_UTILITY_RUN_CONFIG = "config/stage-learning/stage-consumer-utility-prereg.v1.json"
+_STAGE_EXPERT_CONSUMPTION_RUN_CONFIG = (
+    "config/expert-strategies/stage10-11-consumption-discovery.v1.json"
+)
 _STRUCTURE_F9_RUN_CONFIG = "config/structure-f9-run.development.v1.json"
 _TREND_EVOLUTION_RUN_CONFIG = "config/structure-trend-evolution-qualification.v1.json"
 _STRUCTURE_ORDER_RUN_CONFIG = "config/structure-order-qualification.v1.json"
@@ -70,6 +76,7 @@ _STRUCTURE_RUN_CONFIGS = frozenset(
         _STAGE_10_11_PROJECTION_RUN_CONFIG,
         _STAGE_PROPOSITION_REPLAY_RUN_CONFIG,
         _STAGE_CONSUMER_UTILITY_RUN_CONFIG,
+        _STAGE_EXPERT_CONSUMPTION_RUN_CONFIG,
         _STRUCTURE_F9_RUN_CONFIG,
         _TREND_EVOLUTION_RUN_CONFIG,
         _STRUCTURE_ORDER_RUN_CONFIG,
@@ -433,6 +440,9 @@ def _structure_request_digest(run_config: str) -> str:
             "quanthus.stage-proposition-bundle-real-data-replay.v1"
         ),
         _STAGE_CONSUMER_UTILITY_RUN_CONFIG: "quanthus.stage-consumer-utility-prereg.v1",
+        _STAGE_EXPERT_CONSUMPTION_RUN_CONFIG: (
+            "quanthus.stage-expert-consumption-discovery-prereg.v1"
+        ),
         _STRUCTURE_F9_RUN_CONFIG: "quanthus.structure-f9-run.v1",
         _TREND_EVOLUTION_RUN_CONFIG: "quanthus.trend-evolution-qualification.v1",
         _STRUCTURE_ORDER_RUN_CONFIG: "quanthus.structure-order-qualification.v1",
@@ -1356,6 +1366,13 @@ class EventWorker:
             running_stage = "running-stage-consumer-utility-packet-preparation"
             validating_stage = "validating-stage-consumer-utility-packets"
             recovering_stage = "recovering-sealed-stage-consumer-utility-packets"
+        elif run_config == _STAGE_EXPERT_CONSUMPTION_RUN_CONFIG:
+            verifier = verify_stage_expert_consumption_artifact
+            module = "quanthus.expert_strategy.stage_semantic_consumption"
+            artifact_name = "stage-expert-consumption-packets"
+            running_stage = "running-stage-expert-consumption-packet-preparation"
+            validating_stage = "validating-stage-expert-consumption-packets"
+            recovering_stage = "recovering-sealed-stage-expert-consumption-packets"
         elif run_config == _STRUCTURE_V2_RUN_CONFIG:
             verifier = verify_structure_v2_artifact
             module = "quanthus.structure_v2_run"
@@ -1403,6 +1420,17 @@ class EventWorker:
             progress_detail: dict[str, Any] = {"run_id": run_id}
             if economic:
                 progress_detail["lifecycle_decision"] = result_ref["lifecycle_decision"]
+            elif run_config == _STAGE_CONSUMER_UTILITY_RUN_CONFIG:
+                progress_detail["packet_count"] = result_ref["packet_count"]
+            elif run_config == _STAGE_EXPERT_CONSUMPTION_RUN_CONFIG:
+                progress_detail.update(
+                    {
+                        "role_packet_count": result_ref["role_packet_count"],
+                        "role_observation_evaluation_count": result_ref[
+                            "role_observation_evaluation_count"
+                        ],
+                    }
+                )
             else:
                 progress_detail.update(
                     {

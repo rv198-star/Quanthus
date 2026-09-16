@@ -140,6 +140,7 @@ score, proposed/final action, rejected action when applicable, and reason codes.
 | P3-STRAT-002 | Freeze and implement the first formal two-expert strategy topology | P3-EXPERT-002, P3-EXPERT-003, P3-POS-003 | Approved strategy card, executable two-expert binding, expected changes, controls, and legal interventions |
 | P3-EXPERT-004 | Add read-only expert evidence and research decisions to candidate detail | P3-ATTR-001, P3-EXPERT-002 | Digest-resolved API/Web contracts with no calculation, approval, or execution authority |
 | P3-EXPERT-005 | Accept the development MVP and resolve forward-Shadow disposition | P3-EXPERT-004, P3-ATTR-001, P3-SHADOW-001 | Deterministic acceptance packet, lifecycle decision, enabled/disabled Shadow proof, cost report, rollback, and zero sealed-partition access |
+| P3-EXPERT-006 | Consume existing Stage10/11 semantic surface before vocabulary expansion | accepted Expert Strategy Layer MVP; closed stock-stage phase 1 | open bounded research-only sidecar; exact P029 population, four expert roles, zero action authority; `expert-strategy-layer/stage-semantic-consumption.md` |
 
 ## 7. Acceptance
 

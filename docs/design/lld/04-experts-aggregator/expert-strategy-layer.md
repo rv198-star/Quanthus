@@ -61,6 +61,13 @@ contracts, failure behavior, verification, human decisions, and rollback. The re
 that directory narrows the first formal topology to exactly two active strategy experts so every
 action-changing expert is covered by the bounded attribution budget.
 
+After the original MVP closed, `P3-EXPERT-006` was separately owner-authorized as a bounded
+research-only consumer increment. It does not reopen the seven-child MVP epic or change the formal
+two-expert topology. It only tests whether the already accepted Stage10/11 development semantic
+surface can be consumed as optional advisory context over authoritative Continuous Facts and whether
+that consumption exposes a concrete downstream semantic gap. Governing child:
+`expert-strategy-layer/stage-semantic-consumption.md`.
+
 ## 3. Authority and expert classes
 
 ### 3.1 Strategy experts

@@ -1,0 +1,163 @@
+{
+  "schema_version": "quanthus.stage-expert-consumption-discovery-prereg.v1",
+  "work_item": "P3-EXPERT-006",
+  "state": "PREREGISTERED_STAGE10_11_CONSUMPTION_DISCOVERY",
+  "effective_date": "2026-09-17",
+  "question": "When four Quanthus expert roles consume the accepted Stage10/11 development semantic surface over the exact P029 Continuous Facts population, is the surface sufficient for bounded advisory interpretation and what recurring downstream semantic gap, if any, is exposed?",
+  "bindings": {
+    "direction_review": {
+      "path": "docs/reviews/p3-expert-stage-consumption-direction-review-20260917.md",
+      "sha256": "sha256:40353668a81494cbff797e2fada7123ef320f2d40f7ad4f38447076a67a108f6"
+    },
+    "phase1_closeout": {
+      "path": "config/stage-learning/stock-stage-research-phase1-closeout.v1.json",
+      "sha256": "sha256:f5c66c5071cfdc3c4a75e6ebcc8c936dead6401a5025f4c43fdaea22eca36268"
+    },
+    "p029_result": {
+      "path": "config/stage-learning/stage-proposition-bundle-real-data-replay-result.v1.json",
+      "sha256": "sha256:83b6e7ddd1ccb31a83b4bb19698b8eeee1ff10d56169a4feaae3eec9388f3ed0"
+    },
+    "p033_result": {
+      "path": "config/stage-learning/stage-consumer-utility-result.v1.json",
+      "sha256": "sha256:880e2e1b32ea92955fec2f03f6c9f0bbfc3a7272d1288a45ae3ee22d17315358"
+    },
+    "expert_layer_design": {
+      "path": "docs/design/lld/04-experts-aggregator/expert-strategy-layer.md",
+      "sha256": "sha256:eb07d5ab3f37dfd7cf4349b0f3dc4aac7c400e1c4a12d2405d03ea9aed2b1a31"
+    }
+  },
+  "population": {
+    "authority": "exact_p029_population",
+    "observation_count": 10,
+    "stage_10_only_count": 4,
+    "stage_10_and_11_count": 6,
+    "sampling": false,
+    "replacement": false,
+    "new_market_or_dwd_read": false,
+    "protected_2022_2024_access": false,
+    "permanent_blind_2025_access": false,
+    "future_outcome_read": false,
+    "knowledge_view": "retrospective"
+  },
+  "semantic_surface": {
+    "facts_authority": "authoritative_substrate",
+    "surface": "development_shadow",
+    "accepted_historical_stage_codes": [10, 11],
+    "stage_10_meaning": "persistent structural-failure context",
+    "stage_11_meaning": "nested rebound condition inside confirmed Stage10 context",
+    "stage_11_requires_prior_stage_10_reference": true,
+    "primary_stage": null,
+    "advisory_only": true,
+    "action_authority": false,
+    "score_authority": false,
+    "veto_authority": false,
+    "constraint_authority": false,
+    "strategy_authority": false,
+    "trading_authority": false
+  },
+  "consumer_roles": [
+    "short_term_event_driven",
+    "fund_midterm_risk",
+    "quant_research",
+    "data_governance"
+  ],
+  "packet_contract": {
+    "one_packet_per_role": true,
+    "observations_per_packet": 10,
+    "role_packet_count": 4,
+    "same_observation_set_for_all_roles": true,
+    "facts_and_layered_surface_visible": true,
+    "stage_code_expansion_forbidden": true,
+    "buy_sell_or_position_recommendation_forbidden": true
+  },
+  "evaluator_contract": {
+    "isolated_session_per_role": true,
+    "same_exact_model_and_provider_across_roles": true,
+    "other_role_outputs_hidden_until_all_outputs_sealed": true,
+    "semantic_key_hidden_until_all_outputs_sealed": true,
+    "result_retries_per_role": 0,
+    "model_or_provider_change_after_first_result": "INVALID_EXPERIMENT"
+  },
+  "response_contract": {
+    "per_observation_fields": [
+      "observation_index",
+      "parent_context_active",
+      "nested_rebound_active",
+      "surface_sufficient_for_bounded_role_interpretation",
+      "primary_advisory_use",
+      "missing_semantic_family",
+      "boundary_safe_as_development_advisory",
+      "gap_note"
+    ],
+    "parent_context_active_values": [true, false, "ABSTAIN"],
+    "nested_rebound_active_values": [true, false, "ABSTAIN"],
+    "surface_sufficient_values": [true, false, "ABSTAIN"],
+    "primary_advisory_use_values": [
+      "risk_context",
+      "timing_context",
+      "data_quality_audit",
+      "no_incremental_use",
+      "ABSTAIN"
+    ],
+    "missing_semantic_family_values": [
+      "none",
+      "breakout_lifecycle",
+      "downside_persistence_stabilization",
+      "orderly_consolidation_structure",
+      "high_side_activity_divergence",
+      "other",
+      "ABSTAIN"
+    ],
+    "boundary_safe_values": [true, false, "ABSTAIN"],
+    "gap_note_max_chars": 240
+  },
+  "metrics": {
+    "semantic_understanding_error_count": "count rows where parent_context_active or nested_rebound_active differs from the sealed P029 semantic key or is ABSTAIN",
+    "surface_sufficient_yes_count": "count rows with surface_sufficient_for_bounded_role_interpretation=true",
+    "boundary_unsafe_count": "count rows with boundary_safe_as_development_advisory=false or ABSTAIN",
+    "gap_support": "for each non-none/non-ABSTAIN family, count unique roles and unique observation identities selecting it",
+    "role_level_gap_summary": "per-role counts by missing_semantic_family and primary_advisory_use"
+  },
+  "decision_rule": {
+    "SUFFICIENT_FOR_BOUNDED_CONSUMPTION_NO_STAGE_REOPEN": {
+      "semantic_understanding_error_count_max": 2,
+      "surface_sufficient_yes_count_min": 32,
+      "boundary_unsafe_count_max": 2,
+      "specific_gap_triggered": false
+    },
+    "SPECIFIC_DOWNSTREAM_SEMANTIC_GAP_IDENTIFIED": {
+      "semantic_understanding_error_count_max": 2,
+      "boundary_unsafe_count_max": 2,
+      "gap_min_unique_roles": 2,
+      "gap_min_unique_observations": 3,
+      "eligible_gap_families": [
+        "breakout_lifecycle",
+        "downside_persistence_stabilization",
+        "orderly_consolidation_structure",
+        "high_side_activity_divergence"
+      ],
+      "other_requires_manual_review": true
+    },
+    "otherwise": "INCONCLUSIVE_CONSUMPTION_GAP_DISCOVERY"
+  },
+  "resource_budget": {
+    "new_market_data_reads": 0,
+    "new_dwd_provider_opens": 0,
+    "role_sessions": 4,
+    "role_packets": 4,
+    "total_role_observation_evaluations": 40,
+    "protected_partition_reads": 0,
+    "result_bearing_retries": 0
+  },
+  "stop_conditions": [
+    "Stage10/11 semantics, thresholds, hierarchy, evidence grade, or primary_stage would change",
+    "new Stage code or taxonomy-completion work becomes necessary",
+    "market/DWD read or protected 2022-2024/2025 access becomes necessary",
+    "historical PIT or source-version archaeology becomes necessary",
+    "score, veto, constraint, aggregation, position, P2, strategy, or trading behavior would change",
+    "prediction, economics, OOS, production, Shadow, notification, or trading claim becomes necessary",
+    "evaluator model/provider must change after any role result is visible"
+  ],
+  "automatic_successor": null,
+  "claim_ceiling": "P3-EXPERT-006 can establish only whether the accepted retrospective Stage10/11 development semantic surface is understandable, boundedly useful, and sufficient for four simulated Quanthus expert-consumer roles on the exact P029 population, and can identify a recurring downstream semantic-gap family under the frozen trigger. It cannot establish prediction, economics, strict PIT, out-of-sample validity, production expert authority, strategy value, execution or trading authority, and no outcome automatically reopens Stage research."
+}

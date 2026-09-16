@@ -419,6 +419,7 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-DASH-001 | Produce monitoring report | Funnel and attribution | deferred pending recurring formal strategy |
 | P3-EXPERT-004 | Add read-only expert evidence and research decisions to candidate detail | P3-ATTR-001, P3-EXPERT-002 | closed by `docs/acceptance/p3-expert-candidate-detail-evidence-20260823.md` |
 | P3-EXPERT-005 | Accept the development MVP and resolve forward-Shadow disposition | P3-EXPERT-004, P3-ATTR-001, P3-SHADOW-001 | closed by `docs/acceptance/p3-expert-mvp-shadow-handoff-20260823.md`; decision inconclusive, Shadow disabled |
+| P3-EXPERT-006 | Consume Stage10/11 semantics through four expert roles before vocabulary expansion | closed stock-stage phase 1, P029, P033 | ready; one frozen research-only consumption-discovery run, exact P029 population, zero action authority; `docs/work-items/expert-stage-semantic-consumption.md` |
 | P3-ACCEPT-001 | Execute multi-year vertical-slice acceptance | All P3 release blockers | closed |
 
 **Stock-stage research phase 1 is formally converged and closed.** Machine authority:

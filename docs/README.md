@@ -566,8 +566,13 @@ nodes.
   ODS/DWD authority does not prove a complete authenticated 2020 daily-bar source-version/public-
   availability family, and session close is only an economic-availability lower bound. A four-role
   blocker review accepted this 4/4 and permits only one separately governed bounded historical
-  source-version evidence feasibility successor; success there may produce a source candidate only.
-  Preserved 2021/2022-2024/2025 remain unopened.
+  source-version evidence feasibility successor. P3-STAGE-031 then evaluated only the SSE/SZSE
+  official historical EOD archive family and closed `NO_PASS_OFFICIAL_EXCHANGE_EVIDENCE_INSUFFICIENT`:
+  exchange authority and historical coverage were established, but exact original-version/correction
+  lineage and public-availability evidence precise enough for T=15:30 were not. Four independent
+  closeout reviews accepted that no-pass 4/4 and allow only a still smaller two-product/three-date
+  official Level-1 intraday/realtime evidence feasibility successor; success there may produce a
+  source candidate only. Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -604,6 +609,9 @@ nodes.
   `acceptance/stage-p030-strict-pit-capability-blocked-20260916.md`,
   `reviews/stage-p030-pit-route-four-party-review-20260916.md`,
   `reviews/stage-p030b-pit-capability-blocker-four-party-review-20260916.md`,
+  `work-items/stage-official-exchange-eod-evidence-feasibility.md`,
+  `acceptance/stage-p031-official-exchange-eod-evidence-feasibility-20260916.md`,
+  `reviews/stage-p031-official-eod-evidence-four-party-review-20260916.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,

@@ -1,0 +1,114 @@
+{
+  "schema_version": "quanthus.stage-official-exchange-eod-evidence-feasibility-result.v1",
+  "work_item": "P3-STAGE-031",
+  "version": "1.0.0",
+  "state": "NO_PASS_OFFICIAL_EXCHANGE_EVIDENCE_INSUFFICIENT",
+  "evaluated_at": "2026-09-16",
+  "source_family": "CN_PRIMARY_LISTING_EXCHANGE_OFFICIAL_EOD_ARCHIVE",
+  "scope": {
+    "security_codes": ["000001", "300750", "600519"],
+    "date_start": "2019-10-08",
+    "date_end": "2020-03-31",
+    "decision_cutoff": "15:30:00 Asia/Shanghai",
+    "required_fields": ["security_code", "trade_date", "open", "high", "low", "close", "volume", "amount"],
+    "stage_predicates_executed": false,
+    "source_integration_performed": false,
+    "protected_2022_2024_access": false,
+    "permanent_blind_2025_access": false
+  },
+  "official_evidence": {
+    "sse_ciis_historical_product": {
+      "authority": "Shanghai Stock Exchange official historical data distributed through China Investment Information Services Limited",
+      "urls": [
+        "https://www.ciis.com.hk/hongkong/en/historicaldata1/index.shtml",
+        "https://www.ciis.com.hk/hongkong/en/doc/2020/09/14/2590.shtml"
+      ],
+      "observed_claims": [
+        "SSE historical data products are official products directly provided by SSE.",
+        "SSE and China Indices End of Day Historical Data covers Security Code, Security Name, Open Price, Close Price, High Price, Low Price, Trade Volume and Trade Amount from 19 December 1990.",
+        "The SSE historical-data product family was launched on 3 September 2020 and the launch notice states that historical data is cleaned and published by SSE.",
+        "Current ongoing delivery schedule for SSE/China Indices EOD Historical Data is every month.",
+        "The current public cloud historical-data service is updated on trading days before 9pm and retains the current two weeks."
+      ]
+    },
+    "szse_ssic_data_service": {
+      "authority": "Shenzhen Securities Information Co., Ltd. is exclusively authorized to manage and distribute SZSE securities information",
+      "urls": [
+        "https://investor.szse.cn/English/services/dataServices/index.html",
+        "https://www.szse.cn/market/trend/index.html"
+      ],
+      "observed_claims": [
+        "SZSE Level-1 market data includes security code, high/low, open/close, transaction volume and transaction value among other fields.",
+        "SZSE provides end-of-day data at the end of the trading day.",
+        "The official SZSE market site exposes daily/weekly/monthly historical-quote lookup."
+      ]
+    }
+  },
+  "evidence_matrix": {
+    "SSE": {
+      "authority": "PASS",
+      "field_and_history_coverage": "PASS",
+      "historical_version_identity": "UNPROVEN",
+      "revision_family_completeness": "UNPROVEN",
+      "public_availability_time": "FAIL_FOR_FROZEN_15_30_GATE",
+      "audit_retention": "PARTIAL",
+      "reason": "The official historical EOD product is clearly authoritative and field-complete, but its historical product launched in September 2020, its current EOD archive delivery is monthly, current cloud history updates before 9pm, and the official description says historical data is cleaned before publication. Public documentation does not prove that the retained historical value is the exact first-disseminated 2020 version or provide a complete correction/revision family."
+    },
+    "SZSE": {
+      "authority": "PASS",
+      "field_and_history_coverage": "PARTIAL_PASS",
+      "historical_version_identity": "UNPROVEN",
+      "revision_family_completeness": "UNPROVEN",
+      "public_availability_time": "UNPROVEN_FOR_FROZEN_15_30_GATE",
+      "audit_retention": "UNPROVEN",
+      "reason": "Official documentation proves SSIC/SZSE authority, Level-1 field content, EOD availability at the end of the trading day, and official historical quote lookup. Public documentation found in the bounded probe does not bind an exact per-session historical value version, a complete data correction family, or publication semantics precise enough to prove the exact version was public by 15:30."
+    }
+  },
+  "bounded_probe": {
+    "source_family_count": 1,
+    "commercial_sources_opened": 0,
+    "bulk_data_purchase": false,
+    "provider_contact": false,
+    "historical_value_download_required_after_early_stop": false,
+    "early_stop_reason": "Required version-family and public-availability gates already fail or remain unproven at official documentation level. Downloading current historical values cannot cure those evidence defects."
+  },
+  "decisive_failures": [
+    {
+      "id": "P031-SSE-PUBLICATION-001",
+      "gate": "public_availability_time",
+      "reason": "Official SSE historical EOD archive delivery/publication semantics do not establish the exact retained daily version as public by T=15:30 for the frozen 2019-2020 dates."
+    },
+    {
+      "id": "P031-VERSION-FAMILY-002",
+      "gate": "revision_family_completeness",
+      "reason": "Neither venue's bounded public EOD documentation establishes the complete historical initial/correction/revision family required to distinguish the exact value visible at T from later cleaned/corrected history."
+    }
+  ],
+  "acceptance": {
+    "all_required_evidence_dimensions_pass": false,
+    "partial_coverage_pass_allowed": false,
+    "source_candidate": false,
+    "source_candidate_auto_integration": false,
+    "pit_replay_auto_reopen": false,
+    "stage_semantic_change": false
+  },
+  "newly_observed_adjacent_route": {
+    "description": "SSE/CIIS also publishes official historical intraday Level-1/Level-2 snapshot and tick products, and SZSE documents contemporaneous real-time Level-1 dissemination. Those are different product/evidence routes from the frozen EOD archive experiment.",
+    "may_be_pursued_inside_p031": false,
+    "four_party_review_required_before_new_route": true,
+    "why": "Switching from official EOD archive evidence to historical intraday/real-time feed evidence changes the source product, temporal evidence model and reconstruction method even if the venue authority is unchanged."
+  },
+  "four_party_review": {
+    "review_path": "docs/reviews/stage-p031-official-eod-evidence-four-party-review-20260916.md",
+    "reviewer_count": 4,
+    "no_pass_accepted_count": 4,
+    "selected_next_route": "SEPARATE_BOUNDED_OFFICIAL_LEVEL1_INTRADAY_REALTIME_EVIDENCE_FEASIBILITY",
+    "selected_next_route_count": 4,
+    "session_close_as_strict_pit_selected_count": 0,
+    "frozen_successor_product_count": 2,
+    "frozen_successor_probe_dates": ["2019-10-08", "2020-01-02", "2020-03-31"],
+    "automatic_source_integration": false,
+    "automatic_pit_replay": false
+  },
+  "claim_ceiling": "P031 proves only that the single preregistered official-exchange historical EOD archive family did not satisfy the frozen strict source-version/public-availability evidence contract using bounded public official evidence. It does not prove official real-time/intraday historical evidence is insufficient, does not prove no commercial source could work, and does not establish any Stage10/11 PIT result."
+}

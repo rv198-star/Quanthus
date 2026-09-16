@@ -1,0 +1,106 @@
+{
+  "schema_version": "quanthus.stage-official-exchange-eod-evidence-feasibility.v1",
+  "work_item": "P3-STAGE-031",
+  "version": "1.0.0",
+  "state": "FROZEN_ONE_SOURCE_FAMILY_FEASIBILITY_ONLY",
+  "parent": {
+    "work_item": "P3-STAGE-030",
+    "result_path": "config/stage-learning/stage-pit-public-reconstruction-result.v1.json",
+    "required_state": "BLOCKED_SOURCE_VERSION_OR_AVAILABILITY_LINEAGE"
+  },
+  "objective": "Determine whether the primary listing-exchange official historical EOD archive family can prove the historical source-version and public-availability evidence required to become a candidate authority for a future strict PUBLIC_RECONSTRUCTION replay. This phase does not integrate data or execute Stage predicates.",
+  "source_family": {
+    "id": "CN_PRIMARY_LISTING_EXCHANGE_OFFICIAL_EOD_ARCHIVE",
+    "family_count": 1,
+    "venue_authorities": [
+      {
+        "venue": "SSE",
+        "securities": ["600519"],
+        "allowed_authority_names": ["Shanghai Stock Exchange", "SSE InfoNet Ltd.", "China Investment Information Services Limited"],
+        "allowed_domains": ["sse.com.cn", "english.sse.com.cn", "sseinfo.com", "ciis.com.hk"]
+      },
+      {
+        "venue": "SZSE",
+        "securities": ["000001", "300750"],
+        "allowed_authority_names": ["Shenzhen Stock Exchange", "Shenzhen Securities Information Co., Ltd."],
+        "allowed_domains": ["szse.cn", "cninfo.com.cn"]
+      }
+    ],
+    "second_source_family_allowed": false,
+    "commercial_aggregator_allowed": false,
+    "row_by_row_cross_source_selection_allowed": false
+  },
+  "frozen_dependency_scope": {
+    "security_codes": ["000001", "300750", "600519"],
+    "date_start": "2019-10-08",
+    "date_end": "2020-03-31",
+    "rationale": "This is the fixed F9 source scan envelope containing the causal daily-bar closure for the exact P029 Stage10-active population.",
+    "required_price_coordinate": "unadjusted/raw daily market coordinate, with any corporate-action coordinate reset governed separately",
+    "required_daily_fields": ["security_code", "trade_date", "open", "high", "low", "close", "volume", "amount"],
+    "decision_cutoff": "15:30:00 Asia/Shanghai on each represented trade date",
+    "p029_observation_population_count": 10,
+    "population_change_allowed": false,
+    "protected_2022_2024_access": false,
+    "permanent_blind_2025_access": false
+  },
+  "evidence_dimensions": {
+    "authority": {
+      "required": true,
+      "pass": "The exchange or its exclusively/officially authorized market-data operator is demonstrably the source authority for the relevant EOD product."
+    },
+    "field_and_history_coverage": {
+      "required": true,
+      "pass": "The source family covers the frozen securities/date envelope and the required unadjusted EOD fields or an exact lossless official equivalent."
+    },
+    "historical_version_identity": {
+      "required": true,
+      "pass": "The historical value has a stable version/revision identity or another auditable property that distinguishes the exact value version visible at a historical cutoff from later corrections."
+    },
+    "revision_family_completeness": {
+      "required": true,
+      "pass": "The source proves a complete initial/revision/correction family, or an independently justified immutability/completeness property strong enough to establish that the archived value is exactly the value originally disseminated."
+    },
+    "public_availability_time": {
+      "required": true,
+      "pass": "Authenticated publication/dissemination semantics are precise enough to decide whether the exact version was public by T=15:30 Asia/Shanghai; vague daily/end-of-day cadence alone is insufficient."
+    },
+    "audit_retention": {
+      "required": true,
+      "pass": "Raw evidence or official artifacts can be retained/referenced with stable identity, checksum or equivalent audit binding and mapped reproducibly to Quanthus fields."
+    }
+  },
+  "public_documentation_probe": {
+    "allowed": true,
+    "bulk_subscription_or_purchase": false,
+    "contacting_or_contracting_provider": false,
+    "stage_execution": false,
+    "predictive_or_economic_scoring": false,
+    "success_requires_more_than_authority_or_current_historical_values": true
+  },
+  "acceptance": {
+    "pass_state": "PASS_OFFICIAL_EXCHANGE_SOURCE_CANDIDATE_FEASIBILITY",
+    "no_pass_state": "NO_PASS_OFFICIAL_EXCHANGE_EVIDENCE_INSUFFICIENT",
+    "all_required_evidence_dimensions_must_pass": true,
+    "partial_coverage_pass_allowed": false,
+    "source_candidate_auto_integration": false,
+    "pit_replay_auto_reopen": false,
+    "stage_semantic_change": false,
+    "claim_ceiling": "A PASS means only that the official-exchange family is sufficiently evidenced to be proposed as a candidate historical input authority in a new review. It does not establish P030 strict PIT, Stage validity, prediction, economics, source integration, or production authority."
+  },
+  "early_stop": {
+    "if_version_or_publication_semantics_unverifiable_after_official_family_audit": "Close NO_PASS without searching a second source family.",
+    "if_only_current_corrected_history_is_observable": "Close NO_PASS.",
+    "if_only_session_close_or_daily_issue_cadence_is_available": "Close NO_PASS.",
+    "if_source_integration_is_needed_to_answer_feasibility": "Stop and four-party review before any integration."
+  },
+  "change_control": {
+    "four_party_review_required_if": [
+      "add another source family or commercial aggregator",
+      "change the frozen securities/date envelope or required fields",
+      "move the T=15:30 cutoff",
+      "weaken version-family or publication-time evidence",
+      "execute Stage predicates or inspect predictive/economic outcomes",
+      "move from source feasibility to source integration or PIT replay"
+    ]
+  }
+}

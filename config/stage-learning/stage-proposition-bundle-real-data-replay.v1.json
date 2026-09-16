@@ -1,0 +1,135 @@
+{
+  "schema_version": "quanthus.stage-proposition-bundle-real-data-replay.v1",
+  "replay_id": "stock-stage-10-11-real-history-consumer-replay-v1",
+  "work_item": "P3-STAGE-029",
+  "state": "FROZEN_BOUNDED_REAL_HISTORY_REPLAY_RETROSPECTIVE_NOT_PIT",
+  "bindings": {
+    "p028_bundle_contract": {
+      "path": "config/stage-learning/stage-proposition-bundle.v1.json",
+      "sha256": "sha256:652cddb4be100a2990b47cf8946112de3b5ddadb284ea6d63df2da981440a07b"
+    },
+    "stage_10_11_projection_qualification": {
+      "path": "config/stage-10-11-projection-qualification.v1.json",
+      "sha256": "sha256:a3c756bbca4f97e91d5a6e7f0a2dbad6f24f142ae801a18c629110fafa566894"
+    },
+    "stage_10_11_projection_contract": {
+      "path": "config/stage-10-11-projection.v1.json",
+      "sha256": "sha256:1c9e6e39f77a3391524b9034946b6caf84aa4abe36d5331a1751b7168302406a"
+    }
+  },
+  "source_f9": {
+    "code_revision": "44571610b1da1792a80bbd45ee7f180d59e8495a",
+    "request_digest": "sha256:33ae7300f6b4ab61e32d0f84bbf94739c7f78f220bd424bed945c888aaa88849",
+    "support_facts_digest": "sha256:6abbd976591739ede4451fd15ad2a11e8dd98519cc8039c2374f575c0035aff8",
+    "legacy_projection_digest": "sha256:191afc216c4f4abb829a572b26eb08a0afcad216100a1eb2afe1dca621c6bded",
+    "run_ids": [
+      "run_237a3e986b49490381f380a7ed5d4d14",
+      "run_f371d3f2cb0440aea2c49ceaad1c237b"
+    ],
+    "knowledge_view": "retrospective",
+    "source_kind": "accepted_immutable_f9_real_dwd_development",
+    "expected_projection_counts": {
+      "support_process_observation_count": 241,
+      "stage_10_context_count": 10,
+      "stage_11_rebound_condition_count": 6,
+      "context_only_count": 4
+    }
+  },
+  "population": {
+    "selection": "all_formal_stage_10_context_true_observations",
+    "sampling": false,
+    "expected_row_count": 10,
+    "same_observation_identity_across_all_views": true,
+    "future_outcome_selection": false
+  },
+  "views": {
+    "facts_only": {
+      "purpose": "Expose only accepted Support Evolution continuous facts and immutable references required to interpret the observation.",
+      "stage_code_emitted": false,
+      "stage_truth_emitted": false,
+      "fields": [
+        "process_id",
+        "security_id",
+        "security_code",
+        "market_date",
+        "scale",
+        "phase",
+        "unreclaimed_age_sessions",
+        "support_process_revision_ref",
+        "support_distance_revision_ref",
+        "support_distance_value",
+        "post_break_rebound_revision_ref",
+        "post_break_rebound_value"
+      ]
+    },
+    "counterfactual_single_code": {
+      "purpose": "Measure information loss caused by forcing the already-derived Stage10/11 propositions into one displayed historical code.",
+      "policy": "child_precedence_stage_11_else_stage_10",
+      "historical_or_production_policy_claimed": false,
+      "authority": "comparison_only",
+      "primary_stage_authorized": false
+    },
+    "layered_bundle": {
+      "purpose": "Render the same accepted Stage10/11 proposition truth into the frozen P028 Layered Stage Proposition Bundle.",
+      "surface": "development_shadow",
+      "allowed_codes": [10, 11],
+      "primary_stage_must_be_null": true,
+      "evidence_grade_must_equal": "accepted_development_projection"
+    }
+  },
+  "interpretation_target": {
+    "name": "explicit_structural_context_retention_under_nested_rebound",
+    "question": "When Stage11 rebound is true inside Stage10 structural-failure context, does the representation keep both the parent structural context and the current nested condition explicitly available to the downstream consumer?",
+    "unit": "one real Stage10-active observation identity",
+    "target_propositions": [
+      "stock_stage.context.structural_failure",
+      "stock_stage.condition.post_break_rebound"
+    ],
+    "metrics": [
+      "explicit_target_proposition_opportunity_count",
+      "explicit_target_proposition_retained_count",
+      "nested_rows_with_explicit_parent_context_count",
+      "nested_rows_with_parent_context_elided_count",
+      "development_shadow_semantic_mismatch_count",
+      "primary_stage_non_null_count"
+    ],
+    "predictive_target": null,
+    "economic_target": null
+  },
+  "knowledge_boundary": {
+    "strict_point_in_time_claim_authorized": false,
+    "strict_pit_gate": "BLOCKED_BY_RETROSPECTIVE_SOURCE_RECORD_VIEW",
+    "retrospective_real_history_replay_authorized": true,
+    "reason": "The accepted F9 source contract explicitly uses knowledge_view=retrospective and retrospective_dwd_record_view; T-only semantic construction does not prove publication-time availability.",
+    "claim_ceiling": "P029 may establish deterministic real-history representation and consumer-semantics differences only. It may not establish forward validity, predictive utility, economic utility, or out-of-sample performance."
+  },
+  "authority": {
+    "immutable_f9_artifact_read_authorized": true,
+    "new_market_data_read_authorized": false,
+    "dwd_provider_open_authorized": false,
+    "future_outcome_access_authorized": false,
+    "consumed_2022_2024_partition_access_authorized": false,
+    "preserved_2025_partition_access_authorized": false,
+    "new_reference_opinion_authorized": false,
+    "candidate_or_threshold_search_authorized": false,
+    "vocabulary_expansion_authorized": false,
+    "primary_stage_publication_authorized": false,
+    "production_expert_consumption_authorized": false,
+    "development_shadow_consumption_authorized": true,
+    "strategy_consumption_authorized": false,
+    "trading_authorized": false
+  },
+  "acceptance": {
+    "both_source_f9_artifacts_pass_original_deep_verifier": true,
+    "source_f9_semantics_equal_across_cold_runs": true,
+    "formal_stage_10_11_predicates_unchanged": true,
+    "all_stage_10_active_observations_included": true,
+    "same_identity_used_across_three_views": true,
+    "layered_stage_11_requires_explicit_stage_10_parent": true,
+    "development_shadow_preserves_all_layered_true_assertions": true,
+    "primary_stage_null_for_all_layered_rows": true,
+    "market_data_reads_equal_zero": true,
+    "dwd_provider_opens_equal_zero": true,
+    "strict_pit_claim_equal_false": true
+  }
+}

@@ -34,6 +34,9 @@ from quanthus.stage_learning.order_reference_feasibility import (
     verify_feasibility_artifact,
 )
 from quanthus.stage_projection_artifact import verify_stage_projection_artifact
+from quanthus.stage_proposition_bundle_replay import (
+    verify_stage_proposition_bundle_replay_artifact,
+)
 from quanthus.structure_f9_artifact import verify_structure_f9_artifact
 from quanthus.structure_order_artifact import verify_structure_order_artifact
 from quanthus.structure_trend_evolution_artifact import verify_trend_evolution_artifact
@@ -50,6 +53,9 @@ _STRUCTURE_ECONOMIC_RUN_CONFIG = "config/structure-economic-run.development.v1.j
 _STRUCTURE_FACTS_RUN_CONFIG = "config/structure-facts-run.development.v1.json"
 _STRUCTURE_V2_RUN_CONFIG = "config/structure-facts-v2-run.development.v1.json"
 _STAGE_10_11_PROJECTION_RUN_CONFIG = "config/stage-10-11-projection-qualification.v1.json"
+_STAGE_PROPOSITION_REPLAY_RUN_CONFIG = (
+    "config/stage-learning/stage-proposition-bundle-real-data-replay.v1.json"
+)
 _STRUCTURE_F9_RUN_CONFIG = "config/structure-f9-run.development.v1.json"
 _TREND_EVOLUTION_RUN_CONFIG = "config/structure-trend-evolution-qualification.v1.json"
 _STRUCTURE_ORDER_RUN_CONFIG = "config/structure-order-qualification.v1.json"
@@ -60,6 +66,7 @@ _STRUCTURE_RUN_CONFIGS = frozenset(
         _STRUCTURE_FACTS_RUN_CONFIG,
         _STRUCTURE_V2_RUN_CONFIG,
         _STAGE_10_11_PROJECTION_RUN_CONFIG,
+        _STAGE_PROPOSITION_REPLAY_RUN_CONFIG,
         _STRUCTURE_F9_RUN_CONFIG,
         _TREND_EVOLUTION_RUN_CONFIG,
         _STRUCTURE_ORDER_RUN_CONFIG,
@@ -419,6 +426,9 @@ def _structure_request_digest(run_config: str) -> str:
         _STRUCTURE_FACTS_RUN_CONFIG: "quanthus.structure-facts-run.v1",
         _STRUCTURE_V2_RUN_CONFIG: "quanthus.structure-facts-v2-run.v1",
         _STAGE_10_11_PROJECTION_RUN_CONFIG: "quanthus.stock-stage-projection-qualification.v1",
+        _STAGE_PROPOSITION_REPLAY_RUN_CONFIG: (
+            "quanthus.stage-proposition-bundle-real-data-replay.v1"
+        ),
         _STRUCTURE_F9_RUN_CONFIG: "quanthus.structure-f9-run.v1",
         _TREND_EVOLUTION_RUN_CONFIG: "quanthus.trend-evolution-qualification.v1",
         _STRUCTURE_ORDER_RUN_CONFIG: "quanthus.structure-order-qualification.v1",
@@ -1328,6 +1338,13 @@ class EventWorker:
             running_stage = "running-stage-10-11-projection"
             validating_stage = "validating-stage-10-11-projection"
             recovering_stage = "recovering-sealed-stage-10-11-projection"
+        elif run_config == _STAGE_PROPOSITION_REPLAY_RUN_CONFIG:
+            verifier = verify_stage_proposition_bundle_replay_artifact
+            module = "quanthus.stage_proposition_bundle_replay"
+            artifact_name = "stage-proposition-bundle-replay"
+            running_stage = "running-stage-proposition-bundle-replay"
+            validating_stage = "validating-stage-proposition-bundle-replay"
+            recovering_stage = "recovering-sealed-stage-proposition-bundle-replay"
         elif run_config == _STRUCTURE_V2_RUN_CONFIG:
             verifier = verify_structure_v2_artifact
             module = "quanthus.structure_v2_run"

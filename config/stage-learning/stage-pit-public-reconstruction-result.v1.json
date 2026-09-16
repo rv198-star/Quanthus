@@ -1,0 +1,68 @@
+{
+  "schema_version": "quanthus.stage-pit-public-reconstruction-result.v1",
+  "work_item": "P3-STAGE-030",
+  "state": "BLOCKED_SOURCE_VERSION_OR_AVAILABILITY_LINEAGE",
+  "phase_target": "strict PUBLIC_RECONSTRUCTION / counterfactual recomputation for the exact P029 Stage10/11 population at T 15:30 Asia/Shanghai",
+  "bindings": {
+    "preregistration": {
+      "path": "config/stage-learning/stage-pit-public-reconstruction-prereg.v1.json",
+      "sha256": "sha256:b847e4c7a8a04e97e211d971bc4f602159148be846a881d15bbffabde56bf6c4"
+    },
+    "capability_audit": {
+      "path": "config/stage-learning/stage-pit-capability-audit-result.v1.json",
+      "sha256": "sha256:a68a44a7ccba8e78eb450637e7867d95bf1f068105573e36ea1bcd52e0de6ce3"
+    },
+    "route_review": {
+      "path": "docs/reviews/stage-p030-pit-route-four-party-review-20260916.md",
+      "sha256": "sha256:256d884102a63e1137df4d98def1862c1486d4f5a7bc4b512a606262155e91a9"
+    },
+    "blocker_review": {
+      "path": "docs/reviews/stage-p030b-pit-capability-blocker-four-party-review-20260916.md",
+      "sha256": "sha256:fac0c4116593a71d18ae79da25be38b879d5e8a594191123a5512323895b272f"
+    }
+  },
+  "execution": {
+    "capability_audit_completed": true,
+    "result_bearing_pit_replay_started": false,
+    "stage_10_pit_predicate_count": 0,
+    "stage_11_pit_predicate_count": 0,
+    "market_data_read_for_pit_result": false,
+    "protected_2022_2024_access": false,
+    "permanent_blind_2025_access": false
+  },
+  "blocker": {
+    "id": "P030-B-BAR-REVISION-FAMILY-001",
+    "dependency": "historical daily bar source-version/public-availability family",
+    "reason": "Current governed ODS/DWD authority preserves historical daily values and session-completion business time but does not prove the complete 2020 source revision family or authenticated public availability of the exact retained value by each T cutoff.",
+    "session_close_is_strict_pit_proof": false,
+    "retrospective_dwd_knowledge_from_is_strict_pit_proof": false
+  },
+  "frozen_semantics_preserved": {
+    "stage_10_persistence_sessions": 5,
+    "stage_10_failure_depth_abs_min": "0.02",
+    "stage_11_rebound_min": "0.05",
+    "parent_relation_unchanged": true,
+    "primary_stage": null,
+    "development_shadow_only": true,
+    "population_observation_count": 10,
+    "complete_population_pass_required": true
+  },
+  "four_party_blocker_review": {
+    "reviewer_count": 4,
+    "blocker_accepted_count": 4,
+    "selected_route": "OPEN_SEPARATE_BOUNDED_HISTORICAL_SOURCE_VERSION_EVIDENCE_FEASIBILITY",
+    "selected_route_count": 4,
+    "session_close_as_strict_pit_selected_count": 0,
+    "stage_failure_claim_selected_count": 0
+  },
+  "phase_disposition": {
+    "p030_closed": true,
+    "strict_pit_claim_preserved": true,
+    "stage_10_11_failed": false,
+    "stage_10_11_passed_pit": false,
+    "automatic_pit_replay_successor": false,
+    "separate_source_feasibility_successor_authorized": true,
+    "source_feasibility_successor_claim_ceiling": "source evidence candidate feasibility only; no Stage execution or automatic source integration"
+  },
+  "claim_ceiling": "P030 identified and review-confirmed a source-version/public-availability lineage blocker before any strict PIT Stage10/11 predicate was run. It does not establish that Stage10/11 is wrong, that strict PIT is impossible in principle, or that any external source family is sufficient."
+}

@@ -560,9 +560,14 @@ nodes.
   omitted Stage10 parent context on all 6 nested rows; the layered development-shadow retained 16/16,
   with parent context explicit on 6/6 nested rows, zero semantic mismatches and `primary_stage=null`.
   This is a real-history representation/consumer result only: the source record view is retrospective,
-  so strict PIT/as-known, prediction and economics remain unproven. Four independent product reviews
-  unanimously selected strict PIT/as-known Stage10/11 replay as the one next validation priority, but
-  no successor is automatically opened. Preserved 2021/2022-2024/2025 remain unopened.
+  so strict PIT/as-known, prediction and economics remain unproven. P3-STAGE-030 then froze strict
+  `PUBLIC_RECONSTRUCTION` at T=15:30 for the exact same 10-observation population, but closed
+  `BLOCKED_SOURCE_VERSION_OR_AVAILABILITY_LINEAGE` before any PIT Stage predicate ran: current governed
+  ODS/DWD authority does not prove a complete authenticated 2020 daily-bar source-version/public-
+  availability family, and session close is only an economic-availability lower bound. A four-role
+  blocker review accepted this 4/4 and permits only one separately governed bounded historical
+  source-version evidence feasibility successor; success there may produce a source candidate only.
+  Preserved 2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -595,6 +600,10 @@ nodes.
   `work-items/stage-proposition-bundle-real-data-replay.md`,
   `acceptance/stage-proposition-bundle-real-data-replay-20260916.md`,
   `reviews/stage-p029-real-data-bundle-four-party-review-20260916.md`,
+  `work-items/stage-pit-public-reconstruction.md`,
+  `acceptance/stage-p030-strict-pit-capability-blocked-20260916.md`,
+  `reviews/stage-p030-pit-route-four-party-review-20260916.md`,
+  `reviews/stage-p030b-pit-capability-blocker-four-party-review-20260916.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,
@@ -615,8 +624,11 @@ nodes.
   enter the non-production development-shadow consumer view; all other historical codes remain at their
   P027 evidence grade. P3-STAGE-029 has now validated those Stage10/11 semantics on the existing
   accepted real-history retrospective F9 observations without new DWD/market reads; this closes the
-  synthetic-to-real development-consumer gap but leaves strict PIT/as-known blocked. The phase is
-  intentionally paused again with no automatic successor. The qualification and field-dependency proposals remain
+  synthetic-to-real development-consumer gap. P3-STAGE-030 then froze strict historical public
+  reconstruction and failed closed at the daily-bar revision/publication lineage gate before any PIT
+  Stage predicate ran. The Stage claim remains unchanged; a separate bounded source-evidence
+  feasibility route is the only reviewed next step and cannot auto-integrate a source or restart PIT
+  replay. The qualification and field-dependency proposals remain
   `design/stock-stage-qualification.md` and `design/stock-stage-data-dependencies.md`; they do not
   activate peer primary labels, new result-bearing research, or daily/strategy Shadow.
   The concrete CPU-first historical-learning plan is `design/stock-stage-historical-learning.md`,

@@ -1,0 +1,151 @@
+{
+  "schema_version": "quanthus.stage-pit-public-reconstruction-prereg.v1",
+  "work_item": "P3-STAGE-030",
+  "version": "1.0.0",
+  "state": "FROZEN_STRICT_PUBLIC_RECONSTRUCTION_CAPABILITY_AUDIT_FIRST",
+  "goal": "Determine whether the exact P029 Stage10/11 real-history population can be recomputed from information defensibly available by each historical decision cutoff, without substituting retrospective DWD reconstruction time or final-state data for historical availability.",
+  "bindings": {
+    "p029_result": {
+      "path": "config/stage-learning/stage-proposition-bundle-real-data-replay-result.v1.json",
+      "sha256": "sha256:83b6e7ddd1ccb31a83b4bb19698b8eeee1ff10d56169a4feaae3eec9388f3ed0"
+    },
+    "stage_10_11_projection": {
+      "path": "config/stage-10-11-projection.v1.json",
+      "sha256": "sha256:1c9e6e39f77a3391524b9034946b6caf84aa4abe36d5331a1751b7168302406a"
+    },
+    "temporal_contracts": {
+      "path": "src/quanthus/temporal_contracts.py",
+      "sha256": "sha256:cea792364be203ae78108a912d5e572adbf9175317bba9aa0043650beb5fa7b4"
+    },
+    "ods_pit_sufficiency": {
+      "path": "config/audits/ods-pit-sufficiency.v1.json",
+      "sha256": "sha256:170f4557c43202e82c6951f6a1516b2fee228b38b4b94766495ac1a232fafa4d"
+    },
+    "p4_pit_blocker_precedent": {
+      "path": "docs/acceptance/p4-event-dwd-pit-source-audit-20260806.md",
+      "sha256": "sha256:2a1ba29a61ae02511c5733b2a0bb04813be44f56e8cfde9ee3a43345ca62fa07"
+    },
+    "p4_retrospective_projection_precedent": {
+      "path": "config/p4-event-scan-source.research.v1.json",
+      "sha256": "sha256:2dff1d26b5ba3ea7b73f3511f73663150326c08314cfbc6d81618b01227b7e57"
+    }
+  },
+  "target_clock": {
+    "view": "public_reconstruction",
+    "purpose": "counterfactual_recomputation",
+    "decision_cutoff": "15:30:00 Asia/Shanghai on each represented market date",
+    "cutoff_rationale": "Preserve the existing bounded Stage/F9 daily decision cutoff after the T close and before earliest T+1-open execution.",
+    "platform_as_known_claim": false,
+    "platform_as_known_reason": "Quanthus did not historically consume the 2020 observations and no contemporaneous platform receipt family exists; actual historical platform knowledge must not be reconstructed from present-day ingestion metadata."
+  },
+  "frozen_population": {
+    "source": "P029 exact real-history Stage10-active observation population",
+    "observation_count": 10,
+    "stage_10_only_count": 4,
+    "stage_10_plus_11_count": 6,
+    "selection_rule": "all P029 Stage10-active observation identities; no resampling or replacement",
+    "causal_dependency_scope": "the exact warm-up and same-process daily dependency closure required to recompute each selected observation",
+    "protected_2022_2024_access": false,
+    "permanent_blind_2025_access": false
+  },
+  "strict_evidence_rules": {
+    "retrospective_dwd_knowledge_from_is_historical_availability": false,
+    "dwd_known_from_can_be_relabelled_as_public_arrival": false,
+    "observation_date_can_be_used_as_generic_publication_time": false,
+    "current_file_existence_can_prove_historical_version_visibility": false,
+    "synthetic_or_inferred_arrival_time_allowed": false,
+    "unknown_version_fallback_allowed": false,
+    "future_quality_or_correction_evidence_can_delete_historical_rows": false,
+    "source_revision_family_must_be_complete_or_fail_closed": true,
+    "availability_evidence_must_be_bound_to_exact_source_or_governed_economic_rule": true,
+    "cutoff_inside_coarse_time_evidence_bounds_fails_closed": true
+  },
+  "dependency_gates": {
+    "daily_bar": {
+      "required": true,
+      "candidate_authority": "governed session-completion economic-availability rule plus exact source-version evidence",
+      "current_dwd_builder_cutoff_is_not_sufficient": true
+    },
+    "realized_trading_calendar": {
+      "required": true,
+      "candidate_authority": "conservative realized-session/date completion only",
+      "future_schedule_authority": false
+    },
+    "security_listing_identity": {
+      "required": true,
+      "candidate_authority": "stable identity/effective-interval evidence only",
+      "unevidenced_historical_display_attributes_required": false
+    },
+    "corporate_action_coordinate_epoch": {
+      "required_if_action_affects_dependency_closure": true,
+      "candidate_authority": "announcement/availability evidence no later than cutoff plus effective-date semantics",
+      "future_action_backfill_allowed": false
+    },
+    "quality_and_source_revision": {
+      "required": true,
+      "candidate_authority": "exact source_record_id/source_revision/source_artifact binding and contemporaneously admissible quality evidence",
+      "later_detected_quality_can_rewrite_history": false
+    }
+  },
+  "stage_semantics": {
+    "stage_10_persistence_sessions": 5,
+    "stage_10_failure_depth_abs_min": "0.02",
+    "stage_11_rebound_min": "0.05",
+    "parent_relation": "Stage11 requires a prior immutable Stage10 confirmation on the same support process and does not replace the Stage10 context while the support remains unreclaimed.",
+    "semantic_change_authorized": false,
+    "threshold_change_authorized": false,
+    "primary_stage": null,
+    "development_shadow_only": true
+  },
+  "capability_audit": {
+    "must_precede_replay_protocol": true,
+    "questions": [
+      "Can every exact source member required by the 10-observation causal closure be assigned a non-retrospective historical availability rule with authenticated evidence?",
+      "Can the complete relevant source revision family at each cutoff be proved rather than assumed from the present-day final file?",
+      "Can realized-session, identity and action-epoch dependencies be reconstructed without future-informed state?",
+      "Can unavailable dependencies be represented as unavailable without silently removing or replacing P029 observations?"
+    ],
+    "early_stop": "If any required evidence class is structurally unavailable for the frozen population and cannot be established from already governed historical evidence, stop before result-bearing Stage replay and convene four-party scope review."
+  },
+  "replay_acceptance": {
+    "pass_requires_reconstructable_observations": 10,
+    "partial_population_pass_allowed": false,
+    "retrospective_predicate_match_required": false,
+    "reason_retrospective_match_not_required": "A valid PIT result may legitimately differ from the retrospective result; divergence is evidence, not an implementation failure.",
+    "required_metrics": [
+      "reconstructable_observation_count",
+      "unavailable_observation_count_by_reason",
+      "stage_10_pit_true_count",
+      "stage_11_pit_true_count",
+      "retrospective_to_pit_stage_10_change_count",
+      "retrospective_to_pit_stage_11_change_count",
+      "dependency_availability_lag_summary",
+      "source_revision_family_proof_count",
+      "primary_stage_non_null_count"
+    ],
+    "pass_state": "PASS_STRICT_PUBLIC_RECONSTRUCTION_STAGE10_11",
+    "partial_state": "INCONCLUSIVE_PARTIAL_PIT_COVERAGE",
+    "lineage_block_state": "BLOCKED_SOURCE_VERSION_OR_AVAILABILITY_LINEAGE"
+  },
+  "authority": {
+    "new_stage_vocabulary": false,
+    "new_stage_threshold_search": false,
+    "stage_semantic_repair": false,
+    "official_label_card_publication": false,
+    "production_expert_consumption": false,
+    "strategy_consumption": false,
+    "trading": false,
+    "automatic_successor": false
+  },
+  "change_control": {
+    "four_party_review_required_before_continuing_if": [
+      "target clock view or purpose changes",
+      "decision cutoff changes",
+      "source authority expands or substitutes a new historical dataset",
+      "any strict evidence rule is weakened",
+      "frozen population changes",
+      "Stage10/11 semantics or thresholds change",
+      "pass criterion changes from complete 10/10 reconstruction"
+    ]
+  }
+}

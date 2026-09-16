@@ -1,0 +1,106 @@
+{
+  "schema_version": "quanthus.stage-pit-capability-audit-result.v1",
+  "work_item": "P3-STAGE-030-B",
+  "version": "1.0.0",
+  "state": "BLOCKED_SOURCE_VERSION_OR_AVAILABILITY_LINEAGE",
+  "preregistration": {
+    "path": "config/stage-learning/stage-pit-public-reconstruction-prereg.v1.json",
+    "sha256": "sha256:b847e4c7a8a04e97e211d971bc4f602159148be846a881d15bbffabde56bf6c4"
+  },
+  "target": {
+    "clock_view": "public_reconstruction",
+    "query_purpose": "counterfactual_recomputation",
+    "decision_cutoff": "15:30:00 Asia/Shanghai on T",
+    "population_observation_count": 10,
+    "complete_population_pass_required": true
+  },
+  "evidence_bindings": {
+    "ods_pit_sufficiency": {
+      "path": "config/audits/ods-pit-sufficiency.v1.json",
+      "sha256": "sha256:170f4557c43202e82c6951f6a1516b2fee228b38b4b94766495ac1a232fafa4d"
+    },
+    "ods_base_final_contract": {
+      "path": "config/pipelines/ods-base-final-through-20260731.v2.json",
+      "sha256": "sha256:f61b5f7f06e587f59cf78ce9ad3d38a9e0b09923161bd11a458b421e04c61588"
+    },
+    "structure_v2_retrospective_adapter": {
+      "path": "src/quanthus/structure_v2_inputs.py",
+      "sha256": "sha256:b336e3ee48889ca7ccb9903c0d2ddf55e84e9b9fe56472cc34b7e640339e2275"
+    },
+    "facts_v2_b2_acceptance": {
+      "path": "docs/acceptance/structure-facts-v2-b2-input-readiness-20260907.md",
+      "sha256": "sha256:dcf318fbba3d8f584e1f1dba2d98e9032c612baecc84dc180aac89df8505656d"
+    },
+    "p4_retrospective_economic_availability_projection": {
+      "path": "config/p4-event-scan-source.research.v1.json",
+      "sha256": "sha256:2dff1d26b5ba3ea7b73f3511f73663150326c08314cfbc6d81618b01227b7e57"
+    },
+    "temporal_contracts": {
+      "path": "src/quanthus/temporal_contracts.py",
+      "sha256": "sha256:cea792364be203ae78108a912d5e572adbf9175317bba9aa0043650beb5fa7b4"
+    }
+  },
+  "capability_matrix": {
+    "daily_bar_business_observation_time": {
+      "status": "AVAILABLE",
+      "evidence": "Daily bar trade date/session completion is intrinsic business-time evidence; the accepted ODS PIT audit allows a governed session-completion lower bound for economic availability."
+    },
+    "daily_bar_historical_acquisition_time": {
+      "status": "ABSENT",
+      "evidence": "The accepted ODS PIT audit states that historical acquisition time is absent for security_market_bars; daily built_at values belong to the 2026 package construction period."
+    },
+    "daily_bar_complete_historical_revision_family": {
+      "status": "UNPROVEN",
+      "evidence": "The ODS final contract publishes one canonical daily_ohlcv_unadjusted historical dataset plus later 2026 increment/source-evidence families, but does not bind a complete 2020 per-session source-version/receipt family proving which bar revision was uniquely visible at each T cutoff."
+    },
+    "dwd_knowledge_from_as_public_arrival": {
+      "status": "FORBIDDEN",
+      "evidence": "The accepted Stage/Facts adapter declares dwd_known_from to be source metadata rather than public arrival or historical platform use, and the B2 lane explicitly admits retrospective view only."
+    },
+    "p4_session_close_projection_as_strict_pit": {
+      "status": "INSUFFICIENT",
+      "evidence": "The P4 development projection uses table-specific economic availability including session_close but remains approved_development_retrospective with per_decision_publication_proven=false; it cannot be promoted into strict public-reconstruction authority."
+    },
+    "realized_calendar": {
+      "status": "CONDITIONALLY_MODELABLE",
+      "evidence": "Accepted ODS rules allow conservative realized-session/date completion without future-schedule authority."
+    },
+    "security_listing_identity": {
+      "status": "CONDITIONALLY_MODELABLE",
+      "evidence": "Stable identity/effective interval reconstruction is allowed only under the conservative identity contract; unevidenced historical display/reference attributes stay unavailable."
+    },
+    "corporate_action_coordinate_epoch": {
+      "status": "REQUIRES_PER_MEMBER_HISTORICAL_AVAILABILITY",
+      "evidence": "The Stage route uses action-epoch reset. Any action affecting an observation dependency closure would require announcement/availability evidence no later than the historical cutoff; future-known actions cannot be backfilled."
+    },
+    "source_version_selector_requirement": {
+      "status": "NOT_SATISFIED_FOR_DAILY_BARS",
+      "evidence": "The frozen temporal selector requires a complete revision family and authenticated availability evidence for historical public reconstruction. Current daily-bar authority does not prove that family."
+    }
+  },
+  "decisive_blocker": {
+    "id": "P030-B-BAR-REVISION-FAMILY-001",
+    "dependency": "daily_bar",
+    "reason": "Strict public reconstruction needs the exact historical bar version family or independently authenticated equivalent source-version evidence. Current governed ODS/DWD authority proves the historical values and a session-completion lower bound, but not which unique value revision was publicly available by each 2020 T cutoff.",
+    "why_session_close_alone_is_insufficient": "Session close answers when a completed daily bar could become knowable in principle; it does not prove that the present-day retained value is the unique version that was then available or that no later correction/revision altered it.",
+    "affected_population": "all P029 observations because Stage10/11 causal closure depends on historical daily bars",
+    "replay_result_authorized": false
+  },
+  "not_attempted_after_decisive_blocker": [
+    "No Stage10/11 PIT predicates were recomputed.",
+    "No retrospective observation was dropped or replaced.",
+    "No new historical data source was introduced.",
+    "No 2022-2024 or 2025 partition was accessed.",
+    "No threshold, parent relation, evidence grade, primary_stage policy, or consumer authority was changed."
+  ],
+  "required_decision": {
+    "four_party_review_before_continuing": true,
+    "allowed_choices": [
+      "CLOSE_P030_BLOCKED_AND_PRESERVE_STRICT_CLAIM",
+      "OPEN_SEPARATE_HISTORICAL_SOURCE_VERSION_EVIDENCE_FEASIBILITY_ROUTE_AFTER_REVIEW",
+      "REVISE_P030_CLOCK_OR_EVIDENCE_STANDARD_ONLY_AFTER_EXPLICIT_REVIEW"
+    ],
+    "silent_pit_lite_downgrade_allowed": false
+  },
+  "claim_ceiling": "P030-B proves a repository-level capability blocker for strict Stage10/11 PUBLIC_RECONSTRUCTION under the frozen evidence standard. It does not prove that the retrospective Stage10/11 predicates are wrong, nor that a strict PIT reconstruction is impossible in principle if new independently governed historical source-version evidence is later admitted."
+}

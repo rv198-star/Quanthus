@@ -159,6 +159,15 @@ P029_RESULT = (
 P029_ACCEPTANCE = ROOT / "docs/acceptance/stage-proposition-bundle-real-data-replay-20260916.md"
 P029_REVIEW = ROOT / "docs/reviews/stage-p029-real-data-bundle-four-party-review-20260916.md"
 P029_WORK = ROOT / "docs/work-items/stage-proposition-bundle-real-data-replay.md"
+P030_PREREG = ROOT / "config/stage-learning/stage-pit-public-reconstruction-prereg.v1.json"
+P030_AUDIT = ROOT / "config/stage-learning/stage-pit-capability-audit-result.v1.json"
+P030_RESULT = ROOT / "config/stage-learning/stage-pit-public-reconstruction-result.v1.json"
+P030_ROUTE_REVIEW = ROOT / "docs/reviews/stage-p030-pit-route-four-party-review-20260916.md"
+P030_BLOCKER_REVIEW = (
+    ROOT / "docs/reviews/stage-p030b-pit-capability-blocker-four-party-review-20260916.md"
+)
+P030_ACCEPTANCE = ROOT / "docs/acceptance/stage-p030-strict-pit-capability-blocked-20260916.md"
+P030_WORK = ROOT / "docs/work-items/stage-pit-public-reconstruction.md"
 P015_WORK = ROOT / "docs/work-items/stage-complete-reserve-reference.md"
 P014D_REVIEW = ROOT / "docs/reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md"
 P013D_PREREG_R1 = (
@@ -2502,6 +2511,58 @@ def test_p029_closes_real_history_interpretation_replay_without_pit_overclaim() 
     assert P029_ACCEPTANCE.is_file()
     assert P029_REVIEW.is_file()
     assert P029_WORK.is_file()
+
+
+def test_p030_fails_closed_before_stage_replay_on_source_version_lineage_blocker() -> None:
+    value = json.loads(P030_RESULT.read_text(encoding="utf-8"))
+    assert value["work_item"] == "P3-STAGE-030"
+    assert value["state"] == "BLOCKED_SOURCE_VERSION_OR_AVAILABILITY_LINEAGE"
+    for binding in value["bindings"].values():
+        path = ROOT / binding["path"]
+        observed = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        assert observed == binding["sha256"]
+    execution = value["execution"]
+    assert execution["capability_audit_completed"] is True
+    assert execution["result_bearing_pit_replay_started"] is False
+    assert execution["stage_10_pit_predicate_count"] == 0
+    assert execution["stage_11_pit_predicate_count"] == 0
+    assert execution["protected_2022_2024_access"] is False
+    assert execution["permanent_blind_2025_access"] is False
+    blocker = value["blocker"]
+    assert blocker["id"] == "P030-B-BAR-REVISION-FAMILY-001"
+    assert blocker["session_close_is_strict_pit_proof"] is False
+    assert blocker["retrospective_dwd_knowledge_from_is_strict_pit_proof"] is False
+    frozen = value["frozen_semantics_preserved"]
+    assert frozen["stage_10_persistence_sessions"] == 5
+    assert frozen["stage_10_failure_depth_abs_min"] == "0.02"
+    assert frozen["stage_11_rebound_min"] == "0.05"
+    assert frozen["parent_relation_unchanged"] is True
+    assert frozen["primary_stage"] is None
+    assert frozen["population_observation_count"] == 10
+    assert frozen["complete_population_pass_required"] is True
+    review = value["four_party_blocker_review"]
+    assert review["reviewer_count"] == 4
+    assert review["blocker_accepted_count"] == 4
+    assert review["selected_route_count"] == 4
+    assert review["selected_route"] == (
+        "OPEN_SEPARATE_BOUNDED_HISTORICAL_SOURCE_VERSION_EVIDENCE_FEASIBILITY"
+    )
+    assert review["session_close_as_strict_pit_selected_count"] == 0
+    disposition = value["phase_disposition"]
+    assert disposition["p030_closed"] is True
+    assert disposition["strict_pit_claim_preserved"] is True
+    assert disposition["stage_10_11_failed"] is False
+    assert disposition["stage_10_11_passed_pit"] is False
+    assert disposition["automatic_pit_replay_successor"] is False
+    assert disposition["separate_source_feasibility_successor_authorized"] is True
+    audit = json.loads(P030_AUDIT.read_text(encoding="utf-8"))
+    assert audit["state"] == "BLOCKED_SOURCE_VERSION_OR_AVAILABILITY_LINEAGE"
+    assert audit["decisive_blocker"]["replay_result_authorized"] is False
+    assert P030_PREREG.is_file()
+    assert P030_ROUTE_REVIEW.is_file()
+    assert P030_BLOCKER_REVIEW.is_file()
+    assert P030_ACCEPTANCE.is_file()
+    assert P030_WORK.is_file()
 
 
 def test_stage013_does_not_reopen_p012_or_result_bearing_authority() -> None:

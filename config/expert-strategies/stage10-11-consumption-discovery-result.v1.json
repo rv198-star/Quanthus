@@ -1,0 +1,223 @@
+{
+  "schema_version": "quanthus.stage-expert-consumption-discovery-result.v1",
+  "work_item": "P3-EXPERT-006",
+  "state": "SUFFICIENT_FOR_BOUNDED_CONSUMPTION_NO_STAGE_REOPEN",
+  "effective_date": "2026-09-17",
+  "bindings": {
+    "preregistration": {
+      "path": "config/expert-strategies/stage10-11-consumption-discovery.v1.json",
+      "sha256": "sha256:c4aba4493d2daecdabc54417370062ff549b5f5b4cfa05297fd1edec09c4c2e9"
+    },
+    "direction_review": {
+      "path": "docs/reviews/p3-expert-stage-consumption-direction-review-20260917.md",
+      "sha256": "sha256:40353668a81494cbff797e2fada7123ef320f2d40f7ad4f38447076a67a108f6"
+    }
+  },
+  "packet_preparation": {
+    "pre_result_revision": "7731df60a624d5fa01c7b8cae661b387cf5c45c4",
+    "initial_job_id": "job_c0002aa264474d3b91b1a7591ca75595",
+    "initial_state": "failed_before_packet_publication",
+    "initial_error_class": "missing_preregistered_runtime_document_binding",
+    "technical_recovery_revision": "594845fa4882c9ed5107be9859ceabfc52356c56",
+    "recovery_job_id": "job_5620dc5f46054e1ab5d861df386daafc",
+    "recovery_run_id": "run_5620dc5f46054e1ab5d861df386daafc",
+    "recovery_state": "succeeded",
+    "manifest_sha256": "sha256:b1785f201a7ed2022d718c37bd2e1ad0fed46f9c8721ffa69676eefb4c5cd83e",
+    "request_digest": "sha256:af5e49bc6c1d50ddbf79e7cbfd19b61a3313859ebb6244ae34cf5859557fa6d9",
+    "role_packets_sha256": "sha256:5ef01b992fe9d97fbd3d1b3048caefb6eb02b2688fec568858c39a63aebc6442",
+    "semantic_key_sha256": "sha256:274dba7ddbfb7308d034ba57254ba0345f30090b6bcb288257356f89b86a4106",
+    "summary_sha256": "sha256:e923f91776c4703c69af6b29b7910b9def4a47660e0a17b3c023d5fc94a8f913",
+    "role_packet_count": 4,
+    "observation_count": 10,
+    "role_observation_evaluation_count": 40,
+    "market_data_reads": 0,
+    "dwd_provider_opens": 0,
+    "future_outcome_reads": 0,
+    "protected_partition_reads": 0,
+    "knowledge_view": "retrospective",
+    "strict_pit_claim": false,
+    "execution_authorized": false
+  },
+  "evaluator_delivery": {
+    "production_named_volume_directly_mounted_by_evaluator": false,
+    "governed_worker_status_visible_payload_used": true,
+    "semantic_key_exposed_to_evaluator": false,
+    "local_visible_projection_sha256": "sha256:ee0091d53c129af423adb53ab092898396e9d86047e0a6697ad29bbe482d4560",
+    "byte_identical_to_role_packets_artifact": false,
+    "answer_relevant_information_preserved": true,
+    "omitted_control_metadata": [
+      "production_packet_id",
+      "literal_response_contract_object",
+      "literal_gap_trigger_object",
+      "literal_claim_ceiling_object"
+    ],
+    "constraint_delivery": "equivalent_role_prompt_and_output_schema",
+    "transport_review_disposition": "ACCEPT_TRANSPORT_EQUIVALENT_WITH_AUDIT_NOTE",
+    "transport_review_accept_count": 4,
+    "transport_review_rerun_required_count": 0
+  },
+  "evaluation": {
+    "model": "gpt-6-astra",
+    "provider": "sub2api",
+    "reasoning_effort": "low",
+    "role_session_count": 4,
+    "same_model_provider_effort_across_roles": true,
+    "result_bearing_retries": 0,
+    "other_role_outputs_hidden_until_all_outputs_sealed": true,
+    "semantic_key_hidden_until_all_outputs_sealed": true,
+    "pre_result_configuration_probe": {
+      "unsupported_reasoning_effort": "none",
+      "agent_message_produced": false,
+      "result_bearing": false,
+      "accepted_reasoning_effort_after_no_packet_probe": "low"
+    },
+    "roles": {
+      "short_term_event_driven": {
+        "thread_id": "01a0ab8d-423c-7b61-9806-84edfb4a7efc",
+        "response_sha256": "sha256:100d0a62a8265e55056ba19e07575a96e5279551264d21eb6cbecf68c370f3a8"
+      },
+      "fund_midterm_risk": {
+        "thread_id": "01a0ab8e-0de7-7c31-8b84-b51ad198b4cc",
+        "response_sha256": "sha256:07c7b61741d792ef447eb9225d986748800874ddb7c770c1b9010528fb6ad4b6"
+      },
+      "quant_research": {
+        "thread_id": "01a0ab8e-cd33-7ba1-8e71-6190effd3e5b",
+        "response_sha256": "sha256:51cf6ed40ad89ec90430ca1179743a32455940c122a6c47f27de24f121c03e1f"
+      },
+      "data_governance": {
+        "thread_id": "01a0ab90-8b4f-7922-90c1-245f0017b88d",
+        "response_sha256": "sha256:8d92a28dd605fdbbf3ab6f277bc268191c9a73c01ed897548bf2f03f3ca50aa7"
+      }
+    }
+  },
+  "mechanical_metrics": {
+    "evaluation_count": 40,
+    "semantic_understanding_error_count": 0,
+    "surface_sufficient_yes_count": 40,
+    "boundary_unsafe_count": 0,
+    "gap_support": {
+      "breakout_lifecycle": {
+        "evaluation_count": 0,
+        "unique_roles": 0,
+        "unique_observations": 0
+      },
+      "downside_persistence_stabilization": {
+        "evaluation_count": 0,
+        "unique_roles": 0,
+        "unique_observations": 0
+      },
+      "orderly_consolidation_structure": {
+        "evaluation_count": 0,
+        "unique_roles": 0,
+        "unique_observations": 0
+      },
+      "high_side_activity_divergence": {
+        "evaluation_count": 0,
+        "unique_roles": 0,
+        "unique_observations": 0
+      }
+    },
+    "other_gap_count": 0,
+    "triggered_gap_families": [],
+    "role_summary": {
+      "short_term_event_driven": {
+        "semantic_errors": 0,
+        "surface_sufficient_yes": 10,
+        "boundary_unsafe": 0,
+        "missing_semantic_family_none": 10,
+        "risk_context_count": 4,
+        "timing_context_count": 6
+      },
+      "fund_midterm_risk": {
+        "semantic_errors": 0,
+        "surface_sufficient_yes": 10,
+        "boundary_unsafe": 0,
+        "missing_semantic_family_none": 10,
+        "risk_context_count": 10
+      },
+      "quant_research": {
+        "semantic_errors": 0,
+        "surface_sufficient_yes": 10,
+        "boundary_unsafe": 0,
+        "missing_semantic_family_none": 10,
+        "risk_context_count": 10
+      },
+      "data_governance": {
+        "semantic_errors": 0,
+        "surface_sufficient_yes": 10,
+        "boundary_unsafe": 0,
+        "missing_semantic_family_none": 10,
+        "data_quality_audit_count": 10
+      }
+    },
+    "frozen_decision": "SUFFICIENT_FOR_BOUNDED_CONSUMPTION_NO_STAGE_REOPEN"
+  },
+  "post_result_review": {
+    "reviewer_count": 4,
+    "mechanical_result_accept_count": 4,
+    "no_gap_trigger_accept_count": 4,
+    "phase1_remain_closed_count": 4,
+    "disposition": "ACCEPT_SUFFICIENT_CLOSE_NO_STAGE_REOPEN",
+    "review_sessions": {
+      "short_term_event_driven": {
+        "thread_id": "01a0ab91-e184-7950-8217-efe1caccdad8",
+        "response_sha256": "sha256:868a3962d38044c9f52b3b837751f603e8cf53f7429b293f9659ad5da2ed0e1a"
+      },
+      "fund_midterm_risk": {
+        "thread_id": "01a0ab92-51ac-7582-8be6-b833b5b6fc04",
+        "response_sha256": "sha256:c2f40ba37ddea9d251428ec2ecffc98d28e3c49693973b2cb16e83b8568a54da"
+      },
+      "quant_research": {
+        "thread_id": "01a0ab92-e820-7ee2-a6e9-9fe03eec0ded",
+        "response_sha256": "sha256:7ecb56ff31eaa67493764004d7e2fd8d1f523a29459b1413d097748757271579"
+      },
+      "data_governance": {
+        "thread_id": "01a0ab93-4df9-7560-8553-ff8ae603e111",
+        "response_sha256": "sha256:7df4e900e00d6be26f181f9e55f010e5249bd07d9bd33d052277d5b8127d5464"
+      }
+    },
+    "claim_boundary": [
+      "ten retrospective Stage10-active observations from one historical security only",
+      "forty role-observation evaluations are not forty independent market observations",
+      "bounded interpretation and traceability only",
+      "no claim that other Stage semantics will never be useful",
+      "no prediction, economics, strict PIT, OOS, production, strategy, execution or trading authority"
+    ]
+  },
+  "transport_review": {
+    "reviewer_count": 4,
+    "accept_equivalent_count": 4,
+    "semantic_key_hidden_count": 4,
+    "rerun_required_count": 0,
+    "disposition": "ACCEPT_TRANSPORT_EQUIVALENT_WITH_AUDIT_NOTE",
+    "review_sessions": {
+      "short_term_event_driven": {
+        "thread_id": "01a0ab94-0e98-7e43-a58f-c0d3d34be1e3",
+        "response_sha256": "sha256:c9ca082e6530a236a35e5ee9eb67fe4fa4d3555817cb649267d86c7d1121cbf8"
+      },
+      "fund_midterm_risk": {
+        "thread_id": "01a0ab94-6487-7431-9054-f5cb5eff0c4e",
+        "response_sha256": "sha256:22226d59682ba0a9c1b30014a1ab6a0ca56d885bb44fe762c079e6bf8f7706c7"
+      },
+      "quant_research": {
+        "thread_id": "01a0ab94-cf8f-7f30-8a06-b40c2444ee8e",
+        "response_sha256": "sha256:d6c2a4a56029c798dae410ed4978a1776a89c7a9fc656c54d49850e750e267bb"
+      },
+      "data_governance": {
+        "thread_id": "01a0ab95-324d-7022-8c65-8c619882b08a",
+        "response_sha256": "sha256:f5a75465e13caf53dda026b408b260c69543a748131277772c6c17bf55c940fd"
+      }
+    }
+  },
+  "phase_disposition": {
+    "stage10_11_sufficient_for_tested_bounded_consumption": true,
+    "specific_downstream_stage_gap_identified": false,
+    "stock_stage_phase1_remains_closed": true,
+    "stage_research_reopened": false,
+    "new_stage_code_authorized": false,
+    "automatic_successor": null,
+    "continuous_facts_remain_authoritative": true,
+    "stage10_11_remain_development_advisory": true
+  },
+  "claim_ceiling": "P3-EXPERT-006 establishes only that, on the exact retrospective P029 ten-observation Stage10-active population, four simulated Quanthus expert-consumer roles correctly interpreted the accepted Stage10/11 development semantic surface, judged it sufficient and boundary-safe for the frozen bounded advisory/traceability task, and exposed no recurring missing Stage semantic-family gap under the preregistered trigger. It does not show that other Stage semantics will never be useful and does not establish prediction, economics, strict PIT, out-of-sample generalization, human-expert agreement, production expert authority, strategy value, execution or trading authority. Stock-stage research phase 1 remains closed and no successor is automatically opened."
+}

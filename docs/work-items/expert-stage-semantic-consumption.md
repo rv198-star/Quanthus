@@ -3,11 +3,15 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | open |
+| Delivery gate | accepted / closed |
 | Parent | Expert Strategy Layer post-MVP increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer/stage-semantic-consumption.md` |
 | Preregistration | `../../config/expert-strategies/stage10-11-consumption-discovery.v1.json` |
 | Direction review | `../reviews/p3-expert-stage-consumption-direction-review-20260917.md` |
+| Result review | `../reviews/p3-expert-stage-consumption-result-review-20260917.md` |
+| Acceptance | `../acceptance/p3-expert-stage-consumption-20260917.md` |
+| Machine result | `../../config/expert-strategies/stage10-11-consumption-discovery-result.v1.json` |
+| Result | `SUFFICIENT_FOR_BOUNDED_CONSUMPTION_NO_STAGE_REOPEN` |
 | Authority | development-only semantic consumption discovery; no action authority |
 
 ## Goal
@@ -52,9 +56,22 @@ changes, historical PIT archaeology, protected data, action-changing expert mapp
 changes, or prediction/economic/production/trading claims. After the first result is visible, the
 model/provider, questions, metrics, thresholds and claim ceiling are immutable.
 
-## Verification
+## Verification and closeout
 
-The pre-result revision must pass deterministic packet tests, fixed Event Worker dispatch tests,
-Ruff and full `make check`. The final closeout must bind the exact Worker run, four evaluator session
-identities, frozen result metrics, four-role result review and an explicit no-automatic-successor
-boundary.
+The pre-result revision passed deterministic packet tests, fixed Event Worker dispatch tests, Ruff
+and full `make check`. The exact final packet-preparation run produced four role packets over the ten
+frozen observations with zero new market/DWD/future/protected reads.
+
+Four isolated consumer sessions produced 0/40 semantic errors, 40/40 bounded-sufficiency yes, 0/40
+boundary-unsafe judgments and zero missing-semantic-family selections. No preregistered gap trigger
+fired. Four independent result reviews accepted `ACCEPT_SUFFICIENT_CLOSE_NO_STAGE_REOPEN` 4/4.
+
+Because the evaluator host consumed an information-equivalent local projection of the governed
+Worker-status visible payload rather than byte-mounting the production role-packet file, a separate
+four-role methodology review was performed. It accepted
+`ACCEPT_TRANSPORT_EQUIVALENT_WITH_AUDIT_NOTE` 4/4; the semantic key remained hidden and no rerun was
+required.
+
+P3-EXPERT-006 is therefore closed. Stage10/11 remain optional development advisory semantics over
+authoritative Continuous Facts. `stock-stage-research-phase-1` remains closed and no Stage successor
+is automatically opened.

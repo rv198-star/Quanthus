@@ -4,10 +4,14 @@
 | --- | --- |
 | Work item | `P3-EXPERT-006` |
 | Design status | approved |
-| Delivery gate | open; one frozen research-only run |
+| Delivery gate | accepted / closed after one frozen research-only run |
 | Parent | `../expert-strategy-layer.md` |
 | Direction review | `../../../../reviews/p3-expert-stage-consumption-direction-review-20260917.md` |
 | Governing preregistration | `../../../../../config/expert-strategies/stage10-11-consumption-discovery.v1.json` |
+| Machine result | `../../../../../config/expert-strategies/stage10-11-consumption-discovery-result.v1.json` |
+| Acceptance | `../../../../acceptance/p3-expert-stage-consumption-20260917.md` |
+| Result review | `../../../../reviews/p3-expert-stage-consumption-result-review-20260917.md` |
+| Result | `SUFFICIENT_FOR_BOUNDED_CONSUMPTION_NO_STAGE_REOPEN` |
 | Stage authority | existing accepted development Stage10/11 projection only |
 | Data authority | exact P029 retrospective population; no new market/DWD/protected reads |
 
@@ -92,6 +96,19 @@ Run acceptance requires exactly four role packets, ten observations per role, 40
 evaluations, one provider/model identity, no result-bearing retry, zero new market/DWD/future/protected
 reads, and a result disposition computed from the frozen rule. No acceptance outcome grants action or
 production authority.
+
+## Result
+
+The frozen run produced 40 role-observation evaluations with 0 semantic-understanding errors, 40/40
+bounded-sufficiency yes, 0 boundary-unsafe judgments and no eligible missing-semantic-family
+selection. The preregistered decision is therefore
+`SUFFICIENT_FOR_BOUNDED_CONSUMPTION_NO_STAGE_REOPEN`.
+
+Four independent post-result role reviews accepted the result and recommended keeping the stock-stage
+phase-1 closed. A separate four-role transport-equivalence audit accepted the evaluator delivery as
+information-equivalent with an explicit audit note; it did not claim byte-identical artifact
+transport. No production, PIT, prediction, economic, strategy, execution or trading authority was
+created.
 
 ## Rollback
 

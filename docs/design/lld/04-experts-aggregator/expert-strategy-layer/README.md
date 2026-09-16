@@ -70,7 +70,7 @@ predecessors are accepted and its own human decision gate has a recorded, digest
 | `P3-ATTR-001` | Bounded formal-strategy counterfactual evidence | `../../10-monitoring-attribution/formal-strategy-attribution.md` | accepted; evidence: `docs/acceptance/p3-attr-formal-production-20260823.md` |
 | `P3-EXPERT-004` | Read-only candidate-detail evidence projection | `candidate-detail-evidence.md` | accepted; `docs/acceptance/p3-expert-candidate-detail-evidence-20260823.md` |
 | `P3-EXPERT-005` | Development acceptance and forward-Shadow disposition | `mvp-shadow-handoff.md` | accepted; inconclusive decision and Shadow disabled |
-| `P3-EXPERT-006` | Post-MVP Stage10/11 expert-consumption discovery sidecar | `stage-semantic-consumption.md` | open; one frozen research-only run, zero action authority |
+| `P3-EXPERT-006` | Post-MVP Stage10/11 expert-consumption discovery sidecar | `stage-semantic-consumption.md` | accepted/closed; `SUFFICIENT_FOR_BOUNDED_CONSUMPTION_NO_STAGE_REOPEN`, zero action authority |
 
 ## 5. Human authority
 

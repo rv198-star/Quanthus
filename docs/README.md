@@ -518,10 +518,16 @@ nodes.
   `advancing_context` is an auxiliary context, Stage8 becomes an `upside_acceleration_extension`
   modifier using accepted Trend Evolution facts, and Stage9 remains a
   `high_level_price_volume_divergence` hypothesis blocked on a separately justified activity relation.
-  Price-only Stage9, future-top wording and distribution/fund-intent semantics are forbidden. The only
-  ready next action is one P020-disjoint exposure-aware Stage8 resource/reference preregistration;
-  resource shortfall returns to portfolio review rather than another repair sequence. Preserved
-  2021/2022-2024/2025 remain unopened.
+  Price-only Stage9, future-top wording and distribution/fund-intent semantics are forbidden. P026-B
+  then freezes the sole P020-disjoint exposure-aware Stage8 resource/reference route before any new
+  read. It targets 20 technically ready rows per Era × Board cell but requires only coverage floors:
+  >=16 per cell, >=144 rows total and >=128 unique economic-identity clusters. At most 64 identities
+  per cell and two precommitted windows per identity may be attempted; exact P013/P014/P020 semantic
+  windows are excluded, P014 L2A technical-only windows remain provenance-reusable, and cross-era
+  repeated identities never inflate independent evidence. Resource shortfall returns directly to
+  four-party portfolio review rather than another repair sequence. The only ready next action is
+  Stage8 packet/runtime engineering under this frozen one-route contract. Preserved 2021/2022-2024/2025
+  remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -540,6 +546,7 @@ nodes.
   `work-items/stage-downside-lifecycle-blind-reference.md`,
   `reviews/stage-p020c-blind-reference-four-party-review-20260916.md`,
   `work-items/stage-high-side-modifier-proposition.md`,
+  `reviews/stage-p026b-resource-contract-four-party-review-20260916.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,

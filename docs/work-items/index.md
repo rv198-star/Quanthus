@@ -385,8 +385,8 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STAGE-024-D | Review/close and gate P020-C preregistration | P3-STAGE-024-C | closed four-party portfolio review; preserve P024 no-pass, freeze exact 187/179 panel as final resource ceiling, open only separate P020-C preregistration |
 | P3-STAGE-026 | High-side modifier proposition route | P3-STAGE-020-C, P3-STAGE-003, P3-STRUCT-006 | ready; P020-C portfolio closeout moves on to 8/9 modifiers, with Stage8 active and Stage9 activity-blocked; docs/work-items/stage-high-side-modifier-proposition.md |
 | P3-STAGE-026-A | Freeze advancing-context / Stage8 modifier semantics and Stage9 activity gap | P3-STAGE-026 | closed preregistration; Stage8 uses accepted Trend Evolution facts, Stage9 price-only route forbidden; config/stage-learning/stage-high-side-modifier-concept.v1.json |
-| P3-STAGE-026-B | Freeze one P020-disjoint exposure-aware Stage8 resource/reference contract | P3-STAGE-026-A | ready; one bounded route only, no automatic P027/P028 resource repair |
-| P3-STAGE-026-C | Prepare T-only Stage8 packets and seal blind references | P3-STAGE-026-B | blocked until exact resource/reference preregistration passes |
+| P3-STAGE-026-B | Freeze one P020-disjoint exposure-aware Stage8 resource/reference contract | P3-STAGE-026-A | closed preregistration; target 20/cell, hard floors >=16/cell, >=144 rows, >=128 identity clusters; one bounded route only, no P027/P028 repair |
+| P3-STAGE-026-C | Prepare T-only Stage8 packets and seal blind references | P3-STAGE-026-B | ready for engineering; sole resource/admission/T-only packet route, runtime blocked until engineering acceptance |
 | P3-STAGE-026-D | Gate finite Stage8 candidate topology | P3-STAGE-026-C | blocked; opens only on blind-reference sufficiency PASS |
 | P3-STAGE-026-E | Four-party high-side portfolio closeout / Stage9 activity decision | P3-STAGE-026-D or earlier fail-close | blocked; no protected/strategy/trading implication |
 | P3-EXP-001 | Define expert protocols and abstention | P3 labels | closed |

@@ -1,0 +1,252 @@
+{
+  "schema_version": "quanthus.stage-high-side-modifier-blind-reference.v1",
+  "work_item": "P3-STAGE-026-B",
+  "state": "PREREGISTERED_STAGE8_CAPACITY_LIMITED_BLIND_REFERENCE_BEFORE_NEW_MARKET_READ",
+  "effective_date": "2026-09-16",
+  "purpose": "Freeze one and only one exposure-aware Stage8 development-resource and blind-reference route before any new admission/T-only fact read. The route excludes every exact identity-window already consumed by the prior semantic programs, permits only provenance-preserving technical-read reuse, targets broad Era x Board coverage without requiring an artificial square panel, and fail-closes directly to portfolio review on resource or reference insufficiency.",
+  "bindings": {
+    "p026_semantics": {
+      "path": "config/stage-learning/stage-high-side-modifier-concept.v1.json",
+      "sha256": "sha256:12af38d25d7246f1cce83d2a690de4cf94917af09339497ac31288f87d5b5f96"
+    },
+    "resource_model": {
+      "path": "config/stage-learning/stage-development-resource-model.v1.json",
+      "sha256": "sha256:9808993271b7378c452787d8cf481fe8cca5371cde1c316623eec1a55bc67d2b"
+    },
+    "exposure_taxonomy": {
+      "path": "config/stage-learning/stage-admission-exposure-taxonomy.v1.json",
+      "sha256": "sha256:e39584f4985168d73f01b9bb86df17fb1c2f0b947a4c3452d634b3b52b6a4620"
+    },
+    "capacity_census_contract": {
+      "path": "config/stage-learning/stage-development-resource-capacity-census.v1.json",
+      "sha256": "sha256:fbeefb8b4cbce35aa1f8c715b8e61dfa857e4ba0b72fe047c5c5d24d59629e25"
+    },
+    "training_node": {
+      "path": "config/stage-learning/training-node.v1.json",
+      "sha256": "sha256:1f05dab2d655d89df20e7eebc4a30377578aa45ee67d79dcc11504a182704f69"
+    },
+    "p013_exact_plan_result": {
+      "path": "config/stage-learning/stage-development-resource-plan-result.v1.json",
+      "sha256": "sha256:1729ce20bf1ddf6c330025d70d96b046964e7d0b552755834afaa68d3aa20828"
+    },
+    "p013_exact_plan_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_060f6edc80774b6b802e56b6c21025bc/stage-development-resource-plan-20260914T095217Z",
+      "job_id": "stage_060f6edc80774b6b802e56b6c21025bc",
+      "code_revision": "2cd26b00a90402c7be3256dfb3d341dc3b9abe18",
+      "manifest_sha256": "sha256:853ade679e1107db238ec68daa8a26755e1d48ef334b9b85d525a8fcd0a3adef",
+      "plan_digest": "sha256:2aff2d250cb58baae9775b23cc53d2f0ac073f3408af577e17102f67cb54f371"
+    },
+    "p014_admission_result": {
+      "path": "config/stage-learning/stage-development-resource-admission-result.v1.json",
+      "sha256": "sha256:16f58ce61e4fd8cec8f50496d4b7fcad4b8680d153f73c540a354e1e3c8ae928"
+    },
+    "p014_admission_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_bcaf8263cb724a2798d250909c42331f/stage-development-resource-admission-20260914T114854Z",
+      "job_id": "stage_bcaf8263cb724a2798d250909c42331f",
+      "code_revision": "99b1e25f1dde36ec68d31bdcfffc61d39acf3ce0",
+      "manifest_sha256": "sha256:c21cb8ff0c5340d6afb22942f30f1845bfb3c2371b6b9b79e1baff8f4f3004db"
+    },
+    "p014_qualified_plan_result": {
+      "path": "config/stage-learning/stage-development-resource-qualified-plan-result.v1.json",
+      "sha256": "sha256:ee7bbe9ea643284198340a0d57a1380c65b50651d5f0969ed066fbd5cb98675b"
+    },
+    "p014_qualified_plan_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_9dbc57be4839405790be0e021d8271ba/stage-development-resource-qualified-plan-20260914T120249Z",
+      "job_id": "stage_9dbc57be4839405790be0e021d8271ba",
+      "code_revision": "fd2bf808b9a3a3e1fdd5e786c968db70f17b10b2",
+      "manifest_sha256": "sha256:f14c065d0bf18b6491b9220132d1be3c10e608fb9a69f4141c576e351aa7a173",
+      "plan_digest": "sha256:206ed58e8349de59efd52caad958f7bd0f2f9d79f1ee0199eea6a079b6c14829"
+    },
+    "p015_additional_review_result": {
+      "path": "config/stage-learning/stage-complete-reserve-additional-review-set-result.v1.json",
+      "sha256": "sha256:24dd4dc3f12fe2610bb4bf55792de2f8105093cd0079999faf8076c535f43614"
+    },
+    "p015_additional_review_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_ac0fb812b46e4ae5bfe57d7b2dc82aee/stage-complete-reserve-additional-review-set-20260914T161521Z",
+      "job_id": "stage_ac0fb812b46e4ae5bfe57d7b2dc82aee",
+      "code_revision": "1cfa9a4bc49e748311a02a65e98ca66f564b2f87",
+      "manifest_sha256": "sha256:fb86cf33a2542aa91eff17d7e4faea963e44e0210f9d5f7d7f8dc87da92b5a76",
+      "set_digest": "sha256:e9960db222cdb8bdd2bdffb02ddea1351b9b7610616392d9daaa751a7d879358"
+    },
+    "p020_reference_result": {
+      "path": "config/stage-learning/stage-downside-lifecycle-reference-result.v1.json",
+      "sha256": "sha256:dbf8ad057d7fae7a716f7e57ce984644684d2ed4630f2ec892cefa408c741ef6"
+    },
+    "p020_packet_artifact": {
+      "artifact_relative_path": "runs/stage-worker/stage_ced93968af3c4aa38af9a49250ab6dc0/stage-downside-lifecycle-review-packets-20260915T211009Z",
+      "job_id": "stage_ced93968af3c4aa38af9a49250ab6dc0",
+      "code_revision": "3edd50caf51b0386b0545ee9cd930235bde20528",
+      "manifest_sha256": "sha256:e89833f5714d0bdead981bd3895483e5f2196a48dc846f429ca9ff04245f7e3d",
+      "case_map_digest": "sha256:6a554b9b3a7312022dcc58e6ec19d9560c41e291cbe02d1cec6011676de896ef",
+      "review_packet_sha256": "sha256:b683b0fc7d5db6f48b9c31c0a54c8113a98c1ce64ac12bd44d352b5973aedf9d"
+    },
+    "trend_fact_contract": {
+      "path": "config/structure-trend-evolution.v1.json",
+      "sha256": "sha256:1e859d371329cc4c97ab8abd4605bd491535d58e1761e066ce497641d5764c33"
+    }
+  },
+  "exposure_contract": {
+    "exact_window_consumed_sources": [
+      "P013_EXACT_PLAN_256",
+      "P014_QUALIFIED_SEMANTIC_PLAN_256",
+      "P020_BLIND_REFERENCE_CASE_MAP_187"
+    ],
+    "p015_additional_60_must_verify_subset_of_p014_qualified_plan": true,
+    "p014_admission_only_l2a_exact_window_reuse_allowed": true,
+    "p014_admission_only_l2a_reuse_requires_provenance": true,
+    "l2b_l3_l4_same_exact_window_reuse": false,
+    "l2b_l3_l4_same_identity_disjoint_window_reuse": true,
+    "preserved_2021_identity_global_exclusion": true,
+    "2022_2024_closed": true,
+    "2025_permanent_blind_closed": true,
+    "p020_exact_row_or_identity_window_reuse_as_fresh_stage8_evidence": false,
+    "whole_identity_burn_down": false
+  },
+  "resource_selection": {
+    "cell_order": [
+      "STAR_PRE_CHINEXT_20PCT/STAR",
+      "STAR_AND_CHINEXT_20PCT/STAR",
+      "STAR_PRE_CHINEXT_20PCT/CHINEXT",
+      "STAR_AND_CHINEXT_20PCT/CHINEXT",
+      "PRE_STAR/CHINEXT",
+      "STAR_PRE_CHINEXT_20PCT/MAIN",
+      "STAR_AND_CHINEXT_20PCT/MAIN",
+      "PRE_STAR/MAIN"
+    ],
+    "target_admission_ready_rows_per_cell": 20,
+    "minimum_admission_ready_rows_per_cell": 16,
+    "maximum_candidate_identities_per_cell": 64,
+    "maximum_precommitted_windows_per_identity": 2,
+    "maximum_selected_rows": 160,
+    "minimum_selected_rows": 144,
+    "minimum_unique_economic_identity_clusters": 128,
+    "one_selected_row_per_identity_within_cell": true,
+    "cross_cell_repeat_identity_allowed_only_for_non_overlapping_windows": true,
+    "repeated_identity_rows_are_one_independent_cluster": true,
+    "identity_allocation_preference": "unused_global_identity_first_then_explicit_nonoverlap_cluster_repeat",
+    "identity_seed": "p026-stage8-reference-v1|identity",
+    "window_seed": "p026-stage8-reference-v1|window",
+    "selection_uses_semantic_values": false,
+    "selection_uses_reference_values": false,
+    "selection_uses_candidate_or_threshold_values": false,
+    "selection_uses_future_outcomes": false,
+    "technical_fallback_trigger": "61_SESSION_INPUT_READINESS_FAILURE_ONLY",
+    "technical_fallback_order_frozen_before_read": true,
+    "stop_rule": "stop_each_cell_at_target_or_after_64_precommitted_identities_exhausted",
+    "no_post_result_replacement": true
+  },
+  "resource_gate": {
+    "all_selected_rows_admission_ready": true,
+    "minimum_rows_per_cell": 16,
+    "minimum_total_rows": 144,
+    "minimum_unique_identity_clusters": 128,
+    "p013_p014_p020_exact_consumed_window_overlap_count": 0,
+    "p015_subset_verification_required": true,
+    "same_identity_selected_window_overlap_count": 0,
+    "packet_failure_replacement_allowed": false,
+    "on_fail": "CLOSED_STAGE8_RESOURCE_CAPACITY_SHORTFALL_NO_REPAIR_FOUR_PARTY_REVIEW"
+  },
+  "packet_contract": {
+    "build_only_for_exact_selected_admission_ready_rows": true,
+    "knowledge_cutoff": "exact_selected_window_end_T",
+    "allowed_fact_concepts": [
+      "structure.geometry.window-return",
+      "structure.geometry.directional-efficiency",
+      "structure.geometry.return-velocity",
+      "structure.geometry.velocity-delta",
+      "structure.geometry.range-position",
+      "structure.geometry.drawdown-from-window-high",
+      "structure.geometry.rebound-from-window-low"
+    ],
+    "raw_ohlc_published_or_retained": false,
+    "security_identity_visible_to_reviewer": false,
+    "identity_cluster_visible_to_reviewer": false,
+    "candidate_output_visible": false,
+    "threshold_values_visible": false,
+    "future_rows_visible": false,
+    "stage9_activity_or_opinion_visible": false,
+    "packet_failure_disposition": "UNAVAILABLE_NO_REPLACEMENT"
+  },
+  "review_protocol": {
+    "roles": ["short_term", "fund"],
+    "same_origin_simulation": true,
+    "same_origin_must_be_disclosed": true,
+    "roles_isolated_until_immutable_seal": true,
+    "advancing_context_question_first": true,
+    "advancing_context_values": ["TRUE", "FALSE", "UNKNOWN"],
+    "stage8_values": ["TRUE", "FALSE", "UNKNOWN", "NOT_APPLICABLE"],
+    "stage8_requires_reviewer_advancing_context_true": true,
+    "reason_required": true,
+    "candidate_blind": true,
+    "threshold_blind": true,
+    "future_blind": true,
+    "stage9_opinion_collection": false,
+    "no_top1_primary_stage": true
+  },
+  "resolution_contract": {
+    "context_true": "both_roles_TRUE",
+    "context_false": "both_roles_FALSE",
+    "context_other": "AMBIGUOUS",
+    "stage8_when_resolved_context_false": "NOT_APPLICABLE",
+    "stage8_when_resolved_context_ambiguous": "AMBIGUOUS",
+    "stage8_true_when_resolved_context_true": "both_roles_TRUE",
+    "stage8_false_when_resolved_context_true": "both_roles_FALSE",
+    "stage8_other_when_resolved_context_true": "AMBIGUOUS",
+    "unknown_is_not_negative": true
+  },
+  "reference_sufficiency_gate": {
+    "independence_unit": "economic_identity_cluster",
+    "row_count_is_descriptive_not_independent": true,
+    "minimum_context_definite_clusters": 80,
+    "minimum_context_positive_clusters": 20,
+    "minimum_context_negative_clusters": 20,
+    "maximum_context_unavailable_or_unjudgeable_cluster_rate": 0.15,
+    "require_context_definite_reference_in_all_eight_cells": true,
+    "minimum_stage8_applicable_definite_clusters": 40,
+    "minimum_stage8_positive_clusters": 20,
+    "minimum_stage8_negative_clusters": 20,
+    "maximum_stage8_unavailable_or_unjudgeable_applicable_cluster_rate": 0.15,
+    "gate_basis": "reuse_preopinion_cluster_aware_reference_floors_already_used_by_second_group_and_P020C",
+    "gate_change_after_opinions": false,
+    "post_opinion_resource_replacement": false,
+    "pass_disposition": "PASS_STAGE8_CAPACITY_LIMITED_BLIND_REFERENCE_SUFFICIENCY",
+    "fail_disposition": "CLOSED_STAGE8_BLIND_REFERENCE_INSUFFICIENT_NO_REPAIR"
+  },
+  "runtime": {
+    "maximum_resource_packet_jobs": 1,
+    "automatic_retries": 0,
+    "worker_wall_seconds": 3600,
+    "single_job_scope": "freeze_candidate_order_then_read_technical_readiness_then_select_exact_rows_then_build_T_only_packets"
+  },
+  "successor_if_reference_pass": {
+    "work_item": "P3-STAGE-026-D",
+    "scope": "Separately freeze a finite Stage8 candidate topology after the immutable blind-reference ledger passes. Stage9 remains blocked."
+  },
+  "authority": {
+    "listing_calendar_metadata_read": true,
+    "prior_artifact_metadata_read": true,
+    "bounded_exact_candidate_admission_market_read": true,
+    "exact_selected_T_only_trend_fact_packet_read": true,
+    "blind_review_after_packet_freeze": true,
+    "candidate_or_threshold_read": false,
+    "candidate_scoring": false,
+    "stage9_activity_fact_implementation": false,
+    "stage9_reference_opinion": false,
+    "primary_stage_output": false,
+    "labelcard_registration": false,
+    "preserved_2021_read": false,
+    "2022_2024_read": false,
+    "2025_read": false,
+    "daily_or_strategy": false,
+    "trading": false
+  },
+  "output": {
+    "resource_plan_schema": "quanthus.stage-high-side-modifier-resource-plan.v1",
+    "review_packet_schema": "quanthus.stage-high-side-modifier-review-packet.v1",
+    "case_map_schema": "quanthus.stage-high-side-modifier-review-case-map.v1",
+    "artifact_schema": "quanthus.stage-high-side-modifier-reference-prepare-artifact.v1",
+    "role_ledger_schema": "quanthus.stage-high-side-modifier-review-role-ledger.v1",
+    "reference_result_schema": "quanthus.stage-high-side-modifier-reference-result.v1"
+  },
+  "claim_ceiling": "P026-B freezes one bounded Stage8 resource/reference route. Its resource minima are coverage/admission guardrails rather than market-prevalence or statistical-power claims. A resource pass only permits the already-frozen blind semantic review; a reference pass only permits a separately frozen Stage8 candidate topology. Stage9, protected evaluation, strategy and trading remain closed."
+}

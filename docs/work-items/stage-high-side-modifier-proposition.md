@@ -1,12 +1,14 @@
 # P3-STAGE-026 — High-Side Modifier Proposition Route
 
-Design status: approved semantic preregistration  
-Delivery gate: P026-A semantic/fact-readiness freeze only; no result-bearing read
+Design status: approved semantic/resource preregistration
+Delivery gate: P026-B frozen; packet/runtime engineering ready, no result-bearing read yet
 
-Parent: `stage-third-group-portfolio-rebaseline.md`  
-Predecessor closeout: `stage-downside-lifecycle-proposition.md`  
-Machine concept: `../../config/stage-learning/stage-high-side-modifier-concept.v1.json`  
-Fact substrate: `../design/structure-trend-evolution-facts.md`  
+Parent: `stage-third-group-portfolio-rebaseline.md`
+Predecessor closeout: `stage-downside-lifecycle-proposition.md`
+Machine concept: `../../config/stage-learning/stage-high-side-modifier-concept.v1.json`
+Resource/reference contract: `../../config/stage-learning/stage-high-side-modifier-blind-reference.v1.json`
+P026-B pre-result review: `../reviews/stage-p026b-resource-contract-four-party-review-20260916.md`
+Fact substrate: `../design/structure-trend-evolution-facts.md`
 Historical evidence: `../reviews/stock-stage-third-group-profile-result-review-20260910.md`
 
 ## Goal
@@ -75,32 +77,55 @@ slowing-price × elevated-activity relation. A future Stage9 prerequisite, if st
 Stage8 route, must remain minimal: current/recent activity relative to a causal admitted baseline,
 jointly bound to high-side price context, with no distribution/fund-flow intent.
 
-## Resource discipline
+## Frozen resource/reference contract
 
-P026 must not solve Stage8 by silently reusing the P020 semantic panel:
+P026-B keeps resource machinery subordinate to the vocabulary question. It freezes one deterministic
+resource/admission/packet route before any new market read.
 
-- P020 rows and identity-windows are not fresh Stage8 evidence;
-- one separately frozen exposure-aware resource route is allowed;
-- Era × Board diagnostics remain mandatory;
-- complete Trend Evolution packets require 61 contiguous admitted sessions;
-- any capacity/admission shortfall returns directly to four-party portfolio review;
-- no automatic P027/P028 resource-repair sequence is allowed.
+Exact semantic-consumed identity-windows are excluded from P013, the P014 qualified semantic plan and
+the P020 blind-reference case map. P015's 60 additional review rows must verify as a subset of the
+already excluded P014 qualified plan. P014 L2A technical-admission-only exact windows remain reusable
+with provenance because they never entered semantic/model/review consumption. Whole identities are not
+burned globally: a disjoint later window may be used, but repeated identities remain a single economic
+cluster.
 
-This is the explicit lesson carried forward from P020-P024: resource machinery must remain subordinate
-to the vocabulary question.
+Resource collection is capacity-limited rather than square-panel qualified:
+
+- target 20 admission-ready rows in each of the eight cells, maximum 160 rows;
+- hard floor 16 rows in every cell;
+- hard floor 144 realized rows overall;
+- hard floor 128 unique economic-identity clusters;
+- at most 64 precommitted candidate identities per cell;
+- at most two deterministically precommitted windows per identity;
+- one selected row per identity inside a cell;
+- cross-cell identity reuse only on non-overlapping exact windows and never as extra independent
+  evidence;
+- technical fallback only after 61-session input-readiness failure, in a pre-frozen order;
+- no result-aware replacement or second resource route.
+
+If any resource floor fails, P026 returns directly to four-party portfolio review under
+`CLOSED_STAGE8_RESOURCE_CAPACITY_SHORTFALL_NO_REPAIR`. There is no automatic P027/P028 resource-repair
+sequence.
+
+If resource coverage passes, the same sole Job may build reviewer-visible T-only Trend Evolution
+packets for the exact selected rows. Stage8 reference sufficiency is then judged independently on
+identity clusters using the already established pre-opinion floors: context >=80 definite clusters
+with >=20 positive and >=20 negative, Stage8 >=40 definite applicable clusters with >=20 positive and
+>=20 negative, and <=15% unjudgeable rates. A resource pass therefore does not imply a semantic pass.
 
 ## Work sequence
 
 | ID | Work | Dependency | Exit |
 | --- | --- | --- | --- |
-| P3-STAGE-026-A | Freeze high-side semantic architecture and fact-readiness split | P3-STAGE-020-C, P3-STAGE-003, P3-STRUCT-006 | current preregistration; zero new market/result/opinion reads |
-| P3-STAGE-026-B | Freeze one P020-disjoint exposure-aware Stage8 resource/reference contract | P3-STAGE-026-A | blocked until separate preregistration; no Stage9 route |
-| P3-STAGE-026-C | Prepare exact T-only Stage8 review packets and seal blind references | P3-STAGE-026-B | blocked; candidate/threshold outputs remain hidden |
+| P3-STAGE-026-A | Freeze high-side semantic architecture and fact-readiness split | P3-STAGE-020-C, P3-STAGE-003, P3-STRUCT-006 | closed preregistration; zero new market/result/opinion reads |
+| P3-STAGE-026-B | Freeze one P020-disjoint exposure-aware Stage8 resource/reference contract | P3-STAGE-026-A | closed preregistration; one 20-target/16-floor per-cell route, >=144 rows / >=128 clusters, no Stage9 route |
+| P3-STAGE-026-C | Prepare exact T-only Stage8 review packets and seal blind references | P3-STAGE-026-B | ready for engineering only; candidate/threshold outputs remain hidden and runtime stays closed until acceptance |
 | P3-STAGE-026-D | Gate any finite Stage8 candidate topology | P3-STAGE-026-C | blocked; opens only if blind reference sufficiency passes |
 | P3-STAGE-026-E | Four-party portfolio closeout and decide whether Stage9 activity work remains justified | P3-STAGE-026-D or earlier fail-close | blocked; no protected/strategy/trading implication |
 
 ## Boundaries
 
-P026-A authorizes semantics and fact-readiness audit only. It does not authorize a new market read,
-review opinion, threshold search, candidate score, Stage9 activity implementation, primary-stage
-compression, LabelCard, preserved 2021, 2022-2024, 2025, daily/strategy output or trading.
+P026-B authorizes only implementation and later execution of its single exact resource/admission/T-only
+packet route after engineering acceptance. It does not authorize a second resource route, Stage8
+candidate or threshold search, Stage9 activity implementation/opinion, primary-stage compression,
+LabelCard, preserved 2021, 2022-2024, 2025, daily/strategy output or trading.

@@ -84,6 +84,16 @@ Stop before continuing and reconvene the four-role review if any implementation 
 - prospective shadow collection, economics, future outcomes or protected partitions;
 - a different model/provider after any evaluator result is visible.
 
+## Pre-experiment technical recovery
+
+The first packet-preparation Job on revision `1e50c544c89807a3aea46b33be0d85375f9cf2df`
+failed at 5% before any packet publication or evaluator exposure because the Event Worker image did
+not include the three repository documents whose exact SHA bindings are part of this preregistration.
+This is a packaging defect, not an experiment result. One exact technical recovery is allowed only
+to include those already-bound documents in the Event Worker build context/image; the population,
+arms, assignments, questions, metrics, gates, model contract and claim ceiling remain unchanged.
+No further retry is authorized without review if the recovery fails for a different reason.
+
 ## Completion
 
 P033 closes only after deterministic packet/assignment generation, sealed four-role evaluator

@@ -228,6 +228,13 @@ def test_event_worker_stays_a_control_plane_supervisor() -> None:
     )
     assert 'find "$REPOSITORY_ROOT/src/quanthus" -type f' in builder
     assert "event_library" not in builder.split("find", 1)[1].split("cp", 1)[0]
+    for required in (
+        "structure-intelligence-economic-final-acceptance-20260906.md",
+        "stage-p032-level1-evidence-four-party-review-20260916.md",
+        "stage-p033-value-route-review-20260916.md",
+    ):
+        assert required in builder
+    assert "COPY docs ./docs" in dockerfile
     assert 'CODE_REVISION=$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)' in builder
     assert 'git -C "$REPOSITORY_ROOT" status --porcelain' in builder
     assert '--build-arg "QUANTHUS_CODE_REVISION=$CODE_REVISION"' in builder

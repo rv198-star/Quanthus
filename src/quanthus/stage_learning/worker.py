@@ -105,6 +105,9 @@ STAGE_REALIZED_IDENTITY_ADMISSION_JOB = (
 STAGE_CLUSTERED_IDENTITY_ADMISSION_JOB = (
     "quanthus.stage-clustered-identity-admission.v1"
 )
+STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB = (
+    "quanthus.stage-high-side-modifier-reference-prepare.v1"
+)
 STAGE_QUALIFICATION_ID = "stock-stage-first-group-3-4-arbitration-shadow-v1"
 QUALIFICATION_BUDGET_SCHEMA = "quanthus.stage-qualification-budget.v1"
 ORDER_RULE_PREPARE_BUDGET_SCHEMA = "quanthus.stage-order-rule-prepare-budget.v1"
@@ -178,6 +181,9 @@ DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_RECOVERY_BUDGET_SCHEMA = (
 )
 DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_BUDGET_SCHEMA = (
     "quanthus.stage-downside-lifecycle-reference-prepare-budget.v1"
+)
+HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_BUDGET_SCHEMA = (
+    "quanthus.stage-high-side-modifier-reference-prepare-budget.v1"
 )
 ADMISSION_EXPOSURE_CAPACITY_BUDGET_SCHEMA = (
     "quanthus.stage-admission-exposure-capacity-budget.v1"
@@ -478,6 +484,13 @@ _JOB_SPECS: dict[str, dict[str, Any]] = {
         "process_error": "stage_clustered_identity_admission_process_failed",
         "wall_seconds": 1800,
     },
+    STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB: {
+        "config": "config/stage-learning/stage-high-side-modifier-blind-reference.v1.json",
+        "module": "quanthus.stage_learning.high_side_modifier_reference_prepare",
+        "artifact_glob": "stage-high-side-modifier-reference-*",
+        "process_error": "stage_high_side_modifier_reference_prepare_process_failed",
+        "wall_seconds": 3600,
+    },
 }
 
 
@@ -756,6 +769,10 @@ class StageWorkerPaths:
         return self.control_root / "downside-lifecycle-reference-prepare-budget.json"
 
     @property
+    def high_side_modifier_reference_prepare_budget(self) -> Path:
+        return self.control_root / "high-side-modifier-reference-prepare-budget.json"
+
+    @property
     def admission_exposure_capacity_budget(self) -> Path:
         return self.control_root / "admission-exposure-capacity-budget.json"
 
@@ -780,6 +797,16 @@ class StageWorkerPaths:
         if not _JOB_ID.fullmatch(job_id):
             raise StageWorkerError("P020-C reference result requires a valid parent job id")
         return self.control_root / "downside-lifecycle-reference-ledgers" / f"{job_id}-result.json"
+
+    def high_side_modifier_reference_role_ledger(self, job_id: str, role: str) -> Path:
+        if not _JOB_ID.fullmatch(job_id) or role not in {"short_term", "fund"}:
+            raise StageWorkerError("P026 role ledger requires valid parent job and role")
+        return self.control_root / "high-side-modifier-reference-ledgers" / f"{job_id}-{role}.json"
+
+    def high_side_modifier_reference_result(self, job_id: str) -> Path:
+        if not _JOB_ID.fullmatch(job_id):
+            raise StageWorkerError("P026 reference result requires a valid parent job id")
+        return self.control_root / "high-side-modifier-reference-ledgers" / f"{job_id}-result.json"
 
     def complete_reserve_additional_review_ledger(self, job_id: str) -> Path:
         if not _JOB_ID.fullmatch(job_id):
@@ -2592,6 +2619,43 @@ def _existing_downside_lifecycle_reference_prepare_submission(
     return _idempotent_stage_submission(paths, job)
 
 
+def _high_side_modifier_reference_prepare_budget_value(job: StageJob) -> dict[str, Any]:
+    return {
+        "schema_version": HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_BUDGET_SCHEMA,
+        "work_item": "P3-STAGE-026-C",
+        "phase": "BOUNDED_STAGE8_RESOURCE_AND_T_ONLY_PACKET_PREPARATION",
+        "job": job.to_dict(),
+        "input_digest": job.input_digest,
+    }
+
+
+def _existing_high_side_modifier_reference_prepare_submission(
+    paths: StageWorkerPaths, *, code_revision: str,
+) -> dict[str, Any] | None:
+    marker_path = paths.high_side_modifier_reference_prepare_budget
+    if not marker_path.exists():
+        return None
+    marker = _object(marker_path, "high-side modifier reference prepare budget")
+    if (
+        marker.get("schema_version") != HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_BUDGET_SCHEMA
+        or marker.get("work_item") != "P3-STAGE-026-C"
+        or marker.get("phase") != "BOUNDED_STAGE8_RESOURCE_AND_T_ONLY_PACKET_PREPARATION"
+        or not isinstance(marker.get("job"), Mapping)
+    ):
+        raise StageWorkerError("high-side modifier reference prepare budget marker differs")
+    job = StageJob.from_dict(marker["job"])
+    if (
+        job.kind != STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB
+        or marker.get("input_digest") != job.input_digest
+    ):
+        raise StageWorkerError("high-side modifier reference prepare budget marker differs")
+    if job.code_revision != code_revision:
+        raise StageWorkerError(
+            "high-side modifier reference prepare has no retry or replacement authority"
+        )
+    return _idempotent_stage_submission(paths, job)
+
+
 def _positive_instability_quantitative_d1_budget_value(job: StageJob) -> dict[str, Any]:
     return {
         "schema_version": POSITIVE_INSTABILITY_QUANTITATIVE_D1_BUDGET_SCHEMA,
@@ -3831,6 +3895,27 @@ class StageWorker:
                 "2022_2024_read": verified.get("2022_2024_read"),
                 "2025_read": verified.get("2025_read"),
             }
+        if job.kind == STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB:
+            result["high_side_modifier_reference_prepare"] = {
+                "resource_gate_passed": verified.get("resource_gate_passed"),
+                "resource_disposition": verified.get("resource_disposition"),
+                "selected_row_count": verified.get("selected_row_count"),
+                "selected_unique_identity_cluster_count": verified.get(
+                    "selected_unique_identity_cluster_count"
+                ),
+                "selected_cell_counts": verified.get("selected_cell_counts"),
+                "resource_plan_digest": verified.get("resource_plan_digest"),
+                "packet_count": verified.get("packet_count"),
+                "available_packet_count": verified.get("available_packet_count"),
+                "unavailable_packet_count": verified.get("unavailable_packet_count"),
+                "review_packet_sha256": verified.get("review_packet_sha256"),
+                "case_map_digest": verified.get("case_map_digest"),
+                "ready_for_blind_review": verified.get("ready_for_blind_review"),
+                "review_opinion_count": verified.get("review_opinion_count"),
+                "preserved_2021_read": verified.get("preserved_2021_read"),
+                "2022_2024_read": verified.get("2022_2024_read"),
+                "2025_read": verified.get("2025_read"),
+            }
         if job.kind == STAGE_DOWNSIDE_LIFECYCLE_RESOURCE_PLAN_JOB:
             result["downside_lifecycle_resource_plan"] = {
                 "disposition": verified.get("disposition"),
@@ -4332,6 +4417,12 @@ def submit_job(
         )
         if existing is not None:
             return existing
+    if kind == STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB:
+        existing = _existing_high_side_modifier_reference_prepare_submission(
+            paths, code_revision=code_revision,
+        )
+        if existing is not None:
+            return existing
     job = StageJob(
         job_id="stage_" + uuid.uuid4().hex,
         kind=kind,
@@ -4440,6 +4531,9 @@ def submit_job(
     )
     downside_lifecycle_reference_prepare_reserved = (
         job.kind == STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB
+    )
+    high_side_modifier_reference_prepare_reserved = (
+        job.kind == STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB
     )
     if qualification_reserved:
         _reserve_qualification_budget(paths, job)
@@ -4624,6 +4718,11 @@ def submit_job(
             paths.downside_lifecycle_reference_prepare_budget,
             _downside_lifecycle_reference_prepare_budget_value(job),
         )
+    if high_side_modifier_reference_prepare_reserved:
+        _exclusive_json(
+            paths.high_side_modifier_reference_prepare_budget,
+            _high_side_modifier_reference_prepare_budget_value(job),
+        )
     try:
         with path.open("xb") as stream:
             payload = json.dumps(job.to_dict(), sort_keys=True, indent=2).encode("utf-8") + b"\n"
@@ -4702,6 +4801,8 @@ def submit_job(
             paths.clustered_identity_admission_budget.unlink(missing_ok=True)
         if downside_lifecycle_reference_prepare_reserved:
             paths.downside_lifecycle_reference_prepare_budget.unlink(missing_ok=True)
+        if high_side_modifier_reference_prepare_reserved:
+            paths.high_side_modifier_reference_prepare_budget.unlink(missing_ok=True)
         raise StageWorkerError("generated duplicate stage job id") from exc
     except Exception:
         if qualification_reserved:
@@ -4775,6 +4876,8 @@ def submit_job(
             paths.clustered_identity_admission_budget.unlink(missing_ok=True)
         if downside_lifecycle_reference_prepare_reserved:
             paths.downside_lifecycle_reference_prepare_budget.unlink(missing_ok=True)
+        if high_side_modifier_reference_prepare_reserved:
+            paths.high_side_modifier_reference_prepare_budget.unlink(missing_ok=True)
         raise
     result = {**job.to_dict(), "input_digest": job.input_digest, "state": "queued"}
     if prepare_retry_of is not None:
@@ -7657,6 +7760,72 @@ def export_p020c_review_packets(paths: StageWorkerPaths, job_id: str) -> bytes:
     return raw
 
 
+def export_p026_review_packets(paths: StageWorkerPaths, job_id: str) -> bytes:
+    """Return only the deep-verified reviewer-visible P026 Stage8 packet transport."""
+    if not _JOB_ID.fullmatch(job_id):
+        raise StageWorkerError("P026 packet export requires a valid stage job id")
+    status_path = paths.status / f"{job_id}.json"
+    if not status_path.is_file() or status_path.is_symlink():
+        raise StageWorkerError("P026 packet export requires an existing terminal status")
+    observed = _object(status_path, "P026 packet job status")
+    if (
+        observed.get("job_id") != job_id
+        or observed.get("kind") != STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB
+        or observed.get("state") != "succeeded"
+        or observed.get("exit_code") != 0
+    ):
+        raise StageWorkerError("P026 packet export requires the succeeded packet job")
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("P026 packet export result reference is missing")
+    artifact_value = result_ref.get("artifact_root")
+    if not isinstance(artifact_value, str) or not artifact_value:
+        raise StageWorkerError("P026 packet export artifact root is missing")
+    artifact = Path(artifact_value).resolve()
+    job_root = (paths.runs / job_id).resolve()
+    if artifact.parent != job_root or not artifact.name.startswith(
+        "stage-high-side-modifier-reference-"
+    ):
+        raise StageWorkerError("P026 packet export artifact root is outside the exact job")
+    try:
+        from quanthus.stage_learning.high_side_modifier_reference_prepare import verify_artifact
+
+        verified = verify_artifact(
+            artifact,
+            code_revision=str(observed.get("code_revision") or ""),
+        )
+    except (OSError, ValueError) as exc:
+        raise StageWorkerError("P026 packet export artifact verification failed") from exc
+    bounded = result_ref.get("high_side_modifier_reference_prepare")
+    if not isinstance(bounded, Mapping):
+        raise StageWorkerError("P026 packet export bounded result is missing")
+    if (
+        verified.get("manifest_sha256") != result_ref.get("manifest_sha256")
+        or verified.get("review_packet_sha256") != bounded.get("review_packet_sha256")
+        or verified.get("resource_gate_passed") is not True
+        or verified.get("ready_for_blind_review") is not True
+        or verified.get("packet_count") != bounded.get("packet_count")
+        or verified.get("review_opinion_count") != 0
+    ):
+        raise StageWorkerError("P026 packet export result binding differs")
+    packet_path = artifact / "review-packets.jsonl"
+    if not packet_path.is_file() or packet_path.is_symlink():
+        raise StageWorkerError("P026 reviewer packet transport is missing")
+    raw = packet_path.read_bytes()
+    observed_sha = "sha256:" + hashlib.sha256(raw).hexdigest()
+    if observed_sha != bounded.get("review_packet_sha256"):
+        raise StageWorkerError("P026 reviewer packet digest differs")
+    packet_count = int(bounded.get("packet_count") or 0)
+    if (
+        len(raw) > 2 * 1024 * 1024
+        or packet_count < 144
+        or packet_count > 160
+        or len(raw.splitlines()) != packet_count
+    ):
+        raise StageWorkerError("P026 reviewer packet transport exceeds bounded shape")
+    return raw
+
+
 _P020C_ROLE_SUBMISSION_SCHEMA = "quanthus.stage-downside-lifecycle-review-role-submission.v1"
 _P020C_ROLE_LEDGER_SCHEMA = "quanthus.stage-downside-lifecycle-review-role-ledger.v1"
 _P020C_REFERENCE_RESULT_SCHEMA = "quanthus.stage-downside-lifecycle-reference-result.v1"
@@ -7987,6 +8156,368 @@ def finalize_p020c_review(paths: StageWorkerPaths, job_id: str) -> dict[str, Any
     }
 
 
+_P026_ROLE_SUBMISSION_SCHEMA = "quanthus.stage-high-side-modifier-review-role-submission.v1"
+_P026_CONTEXT_VALUES = {"TRUE", "FALSE", "UNKNOWN"}
+_P026_STAGE8_VALUES = {"TRUE", "FALSE", "UNKNOWN", "NOT_APPLICABLE"}
+
+
+def _p026_packet_evidence(
+    paths: StageWorkerPaths, job_id: str
+) -> tuple[
+    dict[str, Any],
+    Path,
+    dict[str, Any],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
+    if not _JOB_ID.fullmatch(job_id):
+        raise StageWorkerError("P026 packet evidence requires a valid stage job id")
+    contract_path = (
+        paths.control_repo
+        / "config/stage-learning/stage-high-side-modifier-blind-reference.v1.json"
+    )
+    contract = _object(contract_path, "P026 blind-reference contract")
+    if (
+        contract.get("schema_version")
+        != "quanthus.stage-high-side-modifier-blind-reference.v1"
+        or contract.get("work_item") != "P3-STAGE-026-B"
+        or contract.get("state")
+        != "PREREGISTERED_STAGE8_CAPACITY_LIMITED_BLIND_REFERENCE_BEFORE_NEW_MARKET_READ"
+    ):
+        raise StageWorkerError("P026 blind-reference contract differs")
+    status_path = paths.status / f"{job_id}.json"
+    if not status_path.is_file() or status_path.is_symlink():
+        raise StageWorkerError("P026 packet job status missing")
+    observed = _object(status_path, "P026 packet job status")
+    if (
+        observed.get("job_id") != job_id
+        or observed.get("kind") != STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB
+        or observed.get("state") != "succeeded"
+        or observed.get("exit_code") != 0
+    ):
+        raise StageWorkerError("P026 packet job status differs")
+    result_ref = observed.get("result_ref")
+    if not isinstance(result_ref, Mapping):
+        raise StageWorkerError("P026 packet result missing")
+    artifact = Path(str(result_ref.get("artifact_root") or "")).resolve()
+    job_root = (paths.runs / job_id).resolve()
+    if artifact.parent != job_root or not artifact.name.startswith(
+        "stage-high-side-modifier-reference-"
+    ):
+        raise StageWorkerError("P026 packet artifact path differs")
+    try:
+        from quanthus.stage_learning.high_side_modifier_reference_prepare import verify_artifact
+
+        verified = verify_artifact(
+            artifact,
+            code_revision=str(observed.get("code_revision") or ""),
+        )
+    except (OSError, ValueError) as exc:
+        raise StageWorkerError("P026 packet artifact deep verification failed") from exc
+    bounded = result_ref.get("high_side_modifier_reference_prepare")
+    if not isinstance(bounded, Mapping):
+        raise StageWorkerError("P026 bounded packet result missing")
+    if (
+        verified.get("manifest_sha256") != result_ref.get("manifest_sha256")
+        or verified.get("config_digest") != _digest(contract)
+        or verified.get("resource_gate_passed") is not True
+        or verified.get("ready_for_blind_review") is not True
+        or verified.get("review_packet_sha256") != bounded.get("review_packet_sha256")
+        or verified.get("resource_plan_digest") != bounded.get("resource_plan_digest")
+        or verified.get("case_map_digest") != bounded.get("case_map_digest")
+        or verified.get("packet_count") != bounded.get("packet_count")
+        or verified.get("review_opinion_count") != 0
+    ):
+        raise StageWorkerError("P026 packet result binding differs")
+    packet_count = int(verified.get("packet_count") or 0)
+    if packet_count < 144 or packet_count > 160:
+        raise StageWorkerError("P026 packet denominator outside frozen resource bound")
+    try:
+        packets = [
+            json.loads(line)
+            for line in (artifact / "review-packets.jsonl").read_bytes().splitlines()
+        ]
+        case_map_value = json.loads(
+            (artifact / "case-map.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise StageWorkerError("P026 packet evidence cannot be read") from exc
+    case_map_rows = case_map_value.get("rows") if isinstance(case_map_value, Mapping) else None
+    if (
+        not isinstance(case_map_rows, list)
+        or len(packets) != packet_count
+        or len(case_map_rows) != packet_count
+    ):
+        raise StageWorkerError("P026 packet evidence denominator differs")
+    return (
+        observed,
+        artifact,
+        contract,
+        [dict(row) for row in packets],
+        [dict(row) for row in case_map_rows],
+    )
+
+
+def _validate_p026_role_submission(
+    paths: StageWorkerPaths,
+    job_id: str,
+    role: str,
+    submission: Mapping[str, Any],
+) -> dict[str, Any]:
+    observed, _artifact, contract, packets, _case_map = _p026_packet_evidence(paths, job_id)
+    if role not in {"short_term", "fund"}:
+        raise StageWorkerError("P026 review role differs")
+    bounded = observed["result_ref"]["high_side_modifier_reference_prepare"]
+    expected_fields = {
+        "schema_version",
+        "work_item",
+        "parent_job_id",
+        "role",
+        "source_manifest_sha256",
+        "review_packet_sha256",
+        "resource_plan_digest",
+        "provenance",
+        "candidate_seen",
+        "threshold_seen",
+        "future_seen",
+        "security_identity_seen",
+        "cluster_identity_seen",
+        "stage9_seen",
+        "protected_partition_seen",
+        "opinions",
+    }
+    if set(submission) != expected_fields:
+        raise StageWorkerError("P026 role submission fields differ")
+    if (
+        submission.get("schema_version") != _P026_ROLE_SUBMISSION_SCHEMA
+        or submission.get("work_item") != "P3-STAGE-026"
+        or submission.get("parent_job_id") != job_id
+        or submission.get("role") != role
+        or submission.get("source_manifest_sha256")
+        != observed["result_ref"].get("manifest_sha256")
+        or submission.get("review_packet_sha256") != bounded.get("review_packet_sha256")
+        or submission.get("resource_plan_digest") != bounded.get("resource_plan_digest")
+    ):
+        raise StageWorkerError("P026 role submission binding differs")
+    for key in (
+        "candidate_seen",
+        "threshold_seen",
+        "future_seen",
+        "security_identity_seen",
+        "cluster_identity_seen",
+        "stage9_seen",
+        "protected_partition_seen",
+    ):
+        if submission.get(key) is not False:
+            raise StageWorkerError("P026 role blinding declaration differs")
+    provenance = submission.get("provenance")
+    if (
+        not isinstance(provenance, Mapping)
+        or set(provenance) != {"kind", "origin_id", "session_id", "model_id"}
+        or provenance.get("kind") != "self_simulated"
+        or not all(
+            str(provenance.get(key) or "").strip()
+            for key in ("origin_id", "session_id", "model_id")
+        )
+    ):
+        raise StageWorkerError("P026 role provenance differs")
+    opinions = submission.get("opinions")
+    if not isinstance(opinions, list) or len(opinions) != len(packets):
+        raise StageWorkerError("P026 role opinion denominator differs")
+    normalized: list[dict[str, Any]] = []
+    for index, (raw, packet) in enumerate(zip(opinions, packets, strict=True)):
+        if not isinstance(raw, Mapping) or not isinstance(packet, Mapping):
+            raise StageWorkerError("P026 role opinion shape differs")
+        if set(raw) != {
+            "index",
+            "case_id",
+            "advancing_context",
+            "upside_acceleration_extension",
+            "reason",
+        }:
+            raise StageWorkerError("P026 role opinion fields differ")
+        case_id = str(packet.get("case_id") or "")
+        if raw.get("index") != index or raw.get("case_id") != case_id:
+            raise StageWorkerError("P026 role opinion order differs")
+        context = str(raw.get("advancing_context") or "")
+        stage8 = str(raw.get("upside_acceleration_extension") or "")
+        if context not in _P026_CONTEXT_VALUES or stage8 not in _P026_STAGE8_VALUES:
+            raise StageWorkerError("P026 role opinion truth differs")
+        if packet.get("status") != "AVAILABLE":
+            if context != "UNKNOWN" or stage8 != "NOT_APPLICABLE":
+                raise StageWorkerError("P026 unavailable packet must remain unknown")
+        elif context == "TRUE":
+            if stage8 == "NOT_APPLICABLE":
+                raise StageWorkerError("P026 Stage8 must be judged in advancing context")
+        elif stage8 != "NOT_APPLICABLE":
+            raise StageWorkerError(
+                "P026 Stage8 must be NOT_APPLICABLE unless advancing context is TRUE"
+            )
+        reason = str(raw.get("reason") or "").strip()
+        if not reason or len(reason) > 2000:
+            raise StageWorkerError("P026 role opinion reason differs")
+        normalized.append(
+            {
+                "index": index,
+                "case_id": case_id,
+                "advancing_context": context,
+                "upside_acceleration_extension": stage8,
+                "reason": reason,
+            }
+        )
+    return {
+        "schema_version": contract["output"]["role_ledger_schema"],
+        "work_item": "P3-STAGE-026",
+        "parent_job_id": job_id,
+        "role": role,
+        "source_manifest_sha256": observed["result_ref"]["manifest_sha256"],
+        "review_packet_sha256": bounded["review_packet_sha256"],
+        "resource_plan_digest": bounded["resource_plan_digest"],
+        "case_count": len(packets),
+        "provenance": dict(provenance),
+        "candidate_seen": False,
+        "threshold_seen": False,
+        "future_seen": False,
+        "security_identity_seen": False,
+        "cluster_identity_seen": False,
+        "stage9_seen": False,
+        "protected_partition_seen": False,
+        "opinions": normalized,
+        "submission_digest": _digest(dict(submission)),
+    }
+
+
+def seal_p026_review_role(
+    paths: StageWorkerPaths,
+    job_id: str,
+    role: str,
+    submission: Mapping[str, Any],
+) -> dict[str, Any]:
+    ledger = _validate_p026_role_submission(paths, job_id, role, submission)
+    other_role = "fund" if role == "short_term" else "short_term"
+    path = paths.high_side_modifier_reference_role_ledger(job_id, role)
+    if path.exists():
+        existing = _object(path, f"P026 {role} role ledger")
+        if existing != ledger:
+            raise StageWorkerError("P026 role ledger already sealed with different content")
+    else:
+        _exclusive_json(path, ledger)
+    other_path = paths.high_side_modifier_reference_role_ledger(job_id, other_role)
+    return {
+        "schema_version": "quanthus.stage-high-side-modifier-review-role-seal-receipt.v1",
+        "parent_job_id": job_id,
+        "role": role,
+        "sealed": True,
+        "ledger_sha256": _file_sha256(path),
+        "case_count": ledger["case_count"],
+        "other_role_ledger_visible_to_submission": False,
+        "other_role": other_role,
+        "finalization_ready": other_path.is_file(),
+    }
+
+
+def finalize_p026_review(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
+    observed, _artifact, contract, _packets, case_map_rows = _p026_packet_evidence(
+        paths, job_id
+    )
+    ledgers: dict[str, dict[str, Any]] = {}
+    ledger_shas: dict[str, str] = {}
+    for role in ("short_term", "fund"):
+        path = paths.high_side_modifier_reference_role_ledger(job_id, role)
+        if not path.is_file():
+            raise StageWorkerError(
+                "P026 both isolated role ledgers must be sealed before finalization"
+            )
+        ledger = _object(path, f"P026 {role} role ledger")
+        submission = {
+            "schema_version": _P026_ROLE_SUBMISSION_SCHEMA,
+            "work_item": ledger["work_item"],
+            "parent_job_id": ledger["parent_job_id"],
+            "role": ledger["role"],
+            "source_manifest_sha256": ledger["source_manifest_sha256"],
+            "review_packet_sha256": ledger["review_packet_sha256"],
+            "resource_plan_digest": ledger["resource_plan_digest"],
+            "provenance": ledger["provenance"],
+            "candidate_seen": ledger["candidate_seen"],
+            "threshold_seen": ledger["threshold_seen"],
+            "future_seen": ledger["future_seen"],
+            "security_identity_seen": ledger["security_identity_seen"],
+            "cluster_identity_seen": ledger["cluster_identity_seen"],
+            "stage9_seen": ledger["stage9_seen"],
+            "protected_partition_seen": ledger["protected_partition_seen"],
+            "opinions": ledger["opinions"],
+        }
+        expected = _validate_p026_role_submission(paths, job_id, role, submission)
+        if ledger != expected:
+            raise StageWorkerError("P026 sealed role ledger validation differs")
+        ledgers[role] = ledger
+        ledger_shas[role] = _file_sha256(path)
+    from quanthus.stage_learning.high_side_modifier_reference_seal import resolve_rows, summarize
+
+    rows = resolve_rows(
+        ledgers["short_term"]["opinions"],
+        ledgers["fund"]["opinions"],
+        case_map_rows,
+    )
+    summary = summarize(rows, case_map_rows, contract["reference_sufficiency_gate"])
+    bounded = observed["result_ref"]["high_side_modifier_reference_prepare"]
+    result = {
+        "schema_version": contract["output"]["reference_result_schema"],
+        "work_item": "P3-STAGE-026",
+        "parent_job_id": job_id,
+        "source_manifest_sha256": observed["result_ref"]["manifest_sha256"],
+        "review_packet_sha256": bounded["review_packet_sha256"],
+        "resource_plan_digest": bounded["resource_plan_digest"],
+        "case_map_digest": bounded["case_map_digest"],
+        "role_ledgers": {
+            role: {
+                "ledger_sha256": ledger_shas[role],
+                "provenance": ledgers[role]["provenance"],
+                "case_count": ledgers[role]["case_count"],
+            }
+            for role in ("short_term", "fund")
+        },
+        "same_origin_simulation": True,
+        "roles_isolated_during_opinion_collection": True,
+        "stage9_opinion_collected": False,
+        "row_resolutions": rows,
+        "reference_summary": summary,
+        "disposition": summary["disposition"],
+        "p026_d_preregistration_authorized": summary[
+            "p026_d_preregistration_authorized"
+        ],
+        "candidate_scoring_authorized": False,
+        "stage9_authorized": False,
+        "resource_reopen_authorized": False,
+        "preserved_2021_read_authorized": False,
+        "2022_2024_read_authorized": False,
+        "2025_read_authorized": False,
+    }
+    path = paths.high_side_modifier_reference_result(job_id)
+    if path.exists():
+        existing = _object(path, "P026 reference result")
+        if existing != result:
+            raise StageWorkerError(
+                "P026 reference result already finalized with different content"
+            )
+    else:
+        _exclusive_json(path, result)
+    return {
+        "schema_version": "quanthus.stage-high-side-modifier-reference-finalize-receipt.v1",
+        "parent_job_id": job_id,
+        "finalized": True,
+        "result_sha256": _file_sha256(path),
+        "disposition": summary["disposition"],
+        "reference_summary": summary,
+        "p026_d_preregistration_authorized": summary[
+            "p026_d_preregistration_authorized"
+        ],
+        "candidate_scoring_authorized": False,
+        "stage9_authorized": False,
+        "resource_reopen_authorized": False,
+    }
+
+
 def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     if not _JOB_ID.fullmatch(job_id):
         raise StageWorkerError("status requires a valid stage job id")
@@ -8072,6 +8603,39 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
                     reference_result.get("disposition") if reference_result is not None else None
                 ),
                 "p020c_reference_summary": (
+                    reference_result.get("reference_summary")
+                    if reference_result is not None
+                    else None
+                ),
+            }
+        if observed.get("kind") == STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB:
+            p026_job_id = str(observed["job_id"])
+            p026_role_seals = {}
+            for role in ("short_term", "fund"):
+                role_path = paths.high_side_modifier_reference_role_ledger(
+                    p026_job_id, role
+                )
+                p026_role_seals[role] = {
+                    "sealed": role_path.is_file(),
+                    "ledger_sha256": _file_sha256(role_path) if role_path.is_file() else None,
+                }
+            reference_path = paths.high_side_modifier_reference_result(p026_job_id)
+            reference_result = (
+                _object(reference_path, "P026 reference result")
+                if reference_path.is_file()
+                else None
+            )
+            result = {
+                **result,
+                "p026_role_seals": p026_role_seals,
+                "p026_reference_finalized": reference_result is not None,
+                "p026_reference_result_sha256": (
+                    _file_sha256(reference_path) if reference_result is not None else None
+                ),
+                "p026_reference_disposition": (
+                    reference_result.get("disposition") if reference_result is not None else None
+                ),
+                "p026_reference_summary": (
                     reference_result.get("reference_summary")
                     if reference_result is not None
                     else None
@@ -8301,6 +8865,9 @@ def doctor(paths: StageWorkerPaths) -> dict[str, Any]:
         "recent_p020c_packet_failure": _recent_stage_job_failure(
             paths, kind=STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB,
         ),
+        "recent_p026c_packet_failure": _recent_stage_job_failure(
+            paths, kind=STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB,
+        ),
     }
 
 
@@ -8330,6 +8897,13 @@ def _parser() -> argparse.ArgumentParser:
     status.add_argument("--job-id", required=True)
     export_p020c = sub.add_parser("export-p020-c-packets")
     export_p020c.add_argument("--job-id", required=True)
+    export_p026 = sub.add_parser("export-p026-packets")
+    export_p026.add_argument("--job-id", required=True)
+    seal_p026_role = sub.add_parser("seal-p026-review-role")
+    seal_p026_role.add_argument("--job-id", required=True)
+    seal_p026_role.add_argument("--role", choices=("short_term", "fund"), required=True)
+    finalize_p026 = sub.add_parser("finalize-p026-review")
+    finalize_p026.add_argument("--job-id", required=True)
     seal_p020c_role = sub.add_parser("seal-p020-c-review-role")
     seal_p020c_role.add_argument("--job-id", required=True)
     seal_p020c_role.add_argument("--role", choices=("short_term", "fund"), required=True)
@@ -8374,6 +8948,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "export-p020-c-packets":
             sys.stdout.buffer.write(export_p020c_review_packets(paths, args.job_id))
             return 0
+        elif args.command == "export-p026-packets":
+            sys.stdout.buffer.write(export_p026_review_packets(paths, args.job_id))
+            return 0
+        elif args.command == "seal-p026-review-role":
+            try:
+                submission = json.load(sys.stdin)
+            except (OSError, json.JSONDecodeError) as exc:
+                raise StageWorkerError(
+                    "P026 role submission must be one JSON object on stdin"
+                ) from exc
+            if not isinstance(submission, Mapping):
+                raise StageWorkerError("P026 role submission must be one JSON object on stdin")
+            result = seal_p026_review_role(paths, args.job_id, args.role, submission)
+        elif args.command == "finalize-p026-review":
+            result = finalize_p026_review(paths, args.job_id)
         elif args.command == "seal-p020-c-review-role":
             try:
                 submission = json.load(sys.stdin)

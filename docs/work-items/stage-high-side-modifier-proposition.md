@@ -1,13 +1,14 @@
 # P3-STAGE-026 — High-Side Modifier Proposition Route
 
 Design status: approved semantic/resource preregistration
-Delivery gate: P026-B frozen; packet/runtime engineering ready, no result-bearing read yet
+Delivery gate: P026-C engineering accepted; sole exact-revision resource/packet Job ready, not executed
 
 Parent: `stage-third-group-portfolio-rebaseline.md`
 Predecessor closeout: `stage-downside-lifecycle-proposition.md`
 Machine concept: `../../config/stage-learning/stage-high-side-modifier-concept.v1.json`
 Resource/reference contract: `../../config/stage-learning/stage-high-side-modifier-blind-reference.v1.json`
 P026-B pre-result review: `../reviews/stage-p026b-resource-contract-four-party-review-20260916.md`
+P026-C engineering acceptance: `../acceptance/stage-high-side-modifier-reference-engineering-20260916.md`
 Fact substrate: `../design/structure-trend-evolution-facts.md`
 Historical evidence: `../reviews/stock-stage-third-group-profile-result-review-20260910.md`
 
@@ -119,13 +120,13 @@ with >=20 positive and >=20 negative, Stage8 >=40 definite applicable clusters w
 | --- | --- | --- | --- |
 | P3-STAGE-026-A | Freeze high-side semantic architecture and fact-readiness split | P3-STAGE-020-C, P3-STAGE-003, P3-STRUCT-006 | closed preregistration; zero new market/result/opinion reads |
 | P3-STAGE-026-B | Freeze one P020-disjoint exposure-aware Stage8 resource/reference contract | P3-STAGE-026-A | closed preregistration; one 20-target/16-floor per-cell route, >=144 rows / >=128 clusters, no Stage9 route |
-| P3-STAGE-026-C | Prepare exact T-only Stage8 review packets and seal blind references | P3-STAGE-026-B | ready for engineering only; candidate/threshold outputs remain hidden and runtime stays closed until acceptance |
+| P3-STAGE-026-C | Prepare exact T-only Stage8 review packets and seal blind references | P3-STAGE-026-B | engineering accepted; sole exact-revision resource/packet Job ready, reviewer opinions remain blocked until immutable artifact pass |
 | P3-STAGE-026-D | Gate any finite Stage8 candidate topology | P3-STAGE-026-C | blocked; opens only if blind reference sufficiency passes |
 | P3-STAGE-026-E | Four-party portfolio closeout and decide whether Stage9 activity work remains justified | P3-STAGE-026-D or earlier fail-close | blocked; no protected/strategy/trading implication |
 
 ## Boundaries
 
-P026-B authorizes only implementation and later execution of its single exact resource/admission/T-only
-packet route after engineering acceptance. It does not authorize a second resource route, Stage8
+P026-C engineering is now accepted without executing the Job. The next authority is limited to deployment
+of the exact accepted revision and one resource/admission/T-only packet Job. It does not authorize a second resource route, Stage8
 candidate or threshold search, Stage9 activity implementation/opinion, primary-stage compression,
 LabelCard, preserved 2021, 2022-2024, 2025, daily/strategy output or trading.

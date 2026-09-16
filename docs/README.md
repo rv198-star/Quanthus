@@ -525,9 +525,13 @@ nodes.
   per cell and two precommitted windows per identity may be attempted; exact P013/P014/P020 semantic
   windows are excluded, P014 L2A technical-only windows remain provenance-reusable, and cross-era
   repeated identities never inflate independent evidence. Resource shortfall returns directly to
-  four-party portfolio review rather than another repair sequence. The only ready next action is
-  Stage8 packet/runtime engineering under this frozen one-route contract. Preserved 2021/2022-2024/2025
-  remain unopened.
+  four-party portfolio review rather than another repair sequence. P026-C engineering is now accepted
+  without a result-bearing run: candidate order is frozen before input reads, each candidate window is
+  read at most once and reused in-memory for readiness plus any Trend packet, resource failure builds no
+  semantic packets, reviewer transport is identity/Stage9/candidate/future blind, and short-term/fund
+  opinions have separate immutable seals before cluster-aware finalization. The only ready next action
+  is deployment of the exact accepted revision and the sole P026-C resource/packet Job. Preserved
+  2021/2022-2024/2025 remain unopened.
   Evidence and route:
   `work-items/stage-development-resource-admission-qualified.md`,
   `reviews/stage-p014d-reference-sufficiency-four-party-review-20260914.md`,
@@ -547,6 +551,7 @@ nodes.
   `reviews/stage-p020c-blind-reference-four-party-review-20260916.md`,
   `work-items/stage-high-side-modifier-proposition.md`,
   `reviews/stage-p026b-resource-contract-four-party-review-20260916.md`,
+  `acceptance/stage-high-side-modifier-reference-engineering-20260916.md`,
   `work-items/stage-admission-exposure-taxonomy.md`,
   `acceptance/stage-admission-exposure-capacity-engineering-20260915.md`,
   `reviews/stage-p021-admission-exposure-capacity-review-20260915.md`,

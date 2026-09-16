@@ -35,7 +35,12 @@ def test_control_surface_is_bounded_to_rx6800_qiuyu_and_exact_commands() -> None
         "submit-p022-b)",
         "submit-p023)",
         "submit-p024)",
+        "submit-p026-c-packets)",
         "export-p020-c-packets)",
+        "export-p026-packets)",
+        "seal-p026-short-term)",
+        "seal-p026-fund)",
+        "finalize-p026-review)",
         "seal-p020-c-short-term)",
         "seal-p020-c-fund)",
         "finalize-p020-c-review)",
@@ -82,6 +87,10 @@ def test_submit_is_hard_bound_to_named_stage_kinds_and_runtime_revision() -> Non
     assert 'p022_b_kind="quanthus.stage-primary-unique-contingent-fallback.v1"' in text
     assert 'p023_kind="quanthus.stage-realized-identity-admission.v1"' in text
     assert 'p024_kind="quanthus.stage-clustered-identity-admission.v1"' in text
+    assert (
+        'p026_c_packet_kind="quanthus.stage-high-side-modifier-reference-prepare.v1"'
+        in text
+    )
     assert '[[ "$(service_revision)" == "${target}" ]]' in text
     assert 'bash "${worker}" submit --kind "${p011_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p012_g1_kind}" --code-revision "${target}"' in text
@@ -106,16 +115,24 @@ def test_submit_is_hard_bound_to_named_stage_kinds_and_runtime_revision() -> Non
     assert 'bash "${worker}" submit --kind "${p022_b_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p023_kind}" --code-revision "${target}"' in text
     assert 'bash "${worker}" submit --kind "${p024_kind}" --code-revision "${target}"' in text
+    assert (
+        'bash "${worker}" submit --kind "${p026_c_packet_kind}" --code-revision "${target}"'
+        in text
+    )
     assert 'bash "${worker}" seal-p014-review --job-id "$2"' in text
     assert 'bash "${worker}" seal-p015-review --job-id "$2"' in text
     assert 'bash "${worker}" seal-p020-c-review-role' in text
+    assert 'bash "${worker}" seal-p026-review-role' in text
     assert '--job-id "$2" --role short_term' in text
     assert '--job-id "$2" --role fund' in text
     assert 'bash "${worker}" finalize-p020-c-review --job-id "$2"' in text
+    assert 'bash "${worker}" finalize-p026-review --job-id "$2"' in text
     assert 'p014_review_submission="/tmp/quanthus-p014-review-submission.json"' in text
     assert 'p015_review_submission="/tmp/quanthus-p015-review-submission.json"' in text
     assert 'p020c_short_review_submission="/tmp/quanthus-p020c-short-term-review.json"' in text
     assert 'p020c_fund_review_submission="/tmp/quanthus-p020c-fund-review.json"' in text
+    assert 'p026_short_review_submission="/tmp/quanthus-p026-short-term-review.json"' in text
+    assert 'p026_fund_review_submission="/tmp/quanthus-p026-fund-review.json"' in text
     assert '== "agentdock:agentdock"' in text
     assert '== "644"' in text
     assert "524288" in text
@@ -127,6 +144,7 @@ def test_status_accepts_only_stage_job_ids() -> None:
     assert '[[ "$2" =~ ^stage_[0-9a-f]{32}$ ]]' in text
     assert 'bash "${worker}" status --job-id "$2"' in text
     assert 'bash "${worker}" export-p020-c-packets --job-id "$2"' in text
+    assert 'bash "${worker}" export-p026-packets --job-id "$2"' in text
 
 
 def test_control_script_has_no_generic_file_or_shell_forwarding() -> None:

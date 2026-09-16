@@ -113,3 +113,13 @@ def test_p5_is_deferred_without_becoming_a_p6_predecessor() -> None:
 
     assert p5_items and all(item.status == "blocked" for item in p5_items)
     assert all("P5-" not in item.dependencies for item in p6_items)
+
+
+def test_multi_expert_successor_review_selects_only_the_p6_entry_gate() -> None:
+    review_path = ROOT / "docs/reviews/quanthus-multi-expert-successor-route-review-20260917.md"
+    review = review_path.read_text(encoding="utf-8")
+    assert "SELECT_P6_GOV001_AS_NEXT_PHASE_NO_AUTOMATIC_DOWNSTREAM" in review
+    assert "Immediate phase target | `P6-GOV-001` only" in review
+    assert "stop and reassess value before opening `P6-DATA-001`" in review
+    assert "single-assistant four-perspective simulation" in review
+    assert "Automatic continuation | forbidden" in review

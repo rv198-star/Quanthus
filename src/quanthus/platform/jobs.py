@@ -19,6 +19,7 @@ from quanthus.platform.ports import AttributionVerificationPort
 ATTRIBUTION_VERIFICATION_JOB = "quanthus.attribution.verify.v1"
 CANDIDATE_REPLAY_JOB = "quanthus.candidate-replay.v1"
 EXPERT_EVALUATION_JOB = "quanthus.expert-evaluation.v1"
+P6_FORWARD_CYCLE_JOB = "quanthus.p6-forward-cycle.v1"
 P4_EVENT_SCAN_JOB = "quanthus.p4-event-scan.v1"
 STRUCTURE_MVP_JOB = "quanthus.structure-mvp.v1"
 EVENT_RUN_ROOT = Path("/data/event-runs")
@@ -54,6 +55,19 @@ def input_digest(input_ref: Mapping[str, Any]) -> str:
         input_ref, ensure_ascii=True, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def p6_forward_rehearsal_submission(
+    input_ref: Mapping[str, Any],
+) -> tuple[dict[str, Any], str, str]:
+    """Validate the only pre-activation P6 job shape admitted by P6-GOV-002."""
+    from quanthus.forward_validation.runner import ForwardCycleJobInput
+
+    parsed = ForwardCycleJobInput.from_dict(input_ref)
+    canonical = parsed.to_dict()
+    if input_digest(canonical) != parsed.input_digest:
+        raise RuntimeError("P6 forward input digest implementations differ")
+    return canonical, parsed.idempotency_key, parsed.concurrency_key
 
 
 def expert_evaluation_submission(

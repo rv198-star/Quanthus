@@ -200,9 +200,16 @@ gate. The separate two-expert strategy MVP is also accepted for development evid
 lifecycle decision is `inconclusive` and its forward-Shadow disposition is disabled. None of these
 acceptances activates the target intraday profile or opens the 2022-2025 partitions. `P6-GOV-001`
 has accepted one finite prospective-mechanism-MVP entry proposal under the daily
-`close-to-next-open-v1` profile, but `P6-DATA-001` remains blocked until an explicit owner value
-review opens it. P5 model research is optional, deferred, and not a P6 dependency. Official
-prospective evidence begins only after a separate immutable activation decision and cannot be
+`close-to-next-open-v1` profile. The mandatory owner value checkpoint subsequently opened and closed
+`P6-DATA-001`, which now supplies the prospective DWD identity/visibility, access-ledger, and
+correction-disposition boundary. `P6-SCORE-001` subsequently froze role-specific forward scorecards
+and material-loss attribution before results. `P6-GOV-002` then admitted the existing Replay Worker
+P6 job kind and passed disabled-state sealing/recovery/fencing with zero prospective side effects.
+`P6-PAPER-001` subsequently accepted the isolated five-unit fixed-notional P2 paper lane without
+actual execution authority. `P6-WEB-001` then accepted the read-only Forward/Paper candidate-detail
+projection with no activation or mutation controls; `P6-ACTIVATE-001` is now the pre-activation
+integration/deployment/rollback gate. P5 model research is optional, deferred, and not a P6 dependency. Official prospective evidence begins only
+after a separate immutable activation decision and cannot be
 backfilled from earlier 2026 history. The next executable work is listed in
 `docs/work-items/index.md`. The approved
 near-term operating direction is `operator-assisted-two-window-v1`: exactly two versioned action

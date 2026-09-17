@@ -1,0 +1,82 @@
+{
+  "schema_version": "quanthus.p6-forward-worker.v1",
+  "work_item": "P6-GOV-002",
+  "state": "FROZEN_DISABLED_REHEARSAL_ONLY",
+  "entry_proposal": {
+    "path": "config/forward-validation/entry/p6-prospective-mvp-entry.v1.json",
+    "proposal_digest": "sha256:3c9356e49dbdd6356754b42cfd34af11949289121454a05bdbf0c0ff2aebaa18",
+    "file_sha256": "sha256:1e081004243d74047991f3963a9173dc008bcfad2bc8cca8200cf7186cd79c7b"
+  },
+  "data_boundary": {
+    "path": "config/forward-validation/data/p6-prospective-data-boundary.v1.json",
+    "file_sha256": "sha256:2bb30bb47c0283cd0b2a51455518f7d0a956c817320116b5b7861b689a927c73"
+  },
+  "scorecard_policy": {
+    "path": "config/forward-validation/scorecards/p6-role-scorecards.v1.json",
+    "file_sha256": "sha256:49b91d1295717f4d21b58558d356da5846f74dbebbe9d565b9a05b24117d0fe0"
+  },
+  "job": {
+    "kind": "quanthus.p6-forward-cycle.v1",
+    "queue": "replay",
+    "existing_replay_worker": true,
+    "new_queue_authorized": false,
+    "new_transport_authorized": false,
+    "worker_registry_authorized": false,
+    "redis_celery_rabbitmq_authorized": false,
+    "concurrency": 1
+  },
+  "stage_graph": [
+    "verify_frozen_bindings_and_activation",
+    "verify_and_bind_one_dwd_release",
+    "build_one_shared_effective_view_projection",
+    "settle_eligible_prior_paper_intents",
+    "produce_outcome_blind_expert_observations_and_aggregate_decision",
+    "append_shadow_record_without_execution_edge",
+    "project_aggregate_decision_to_isolated_paper_intent",
+    "settle_matured_forecast_targets",
+    "build_role_specific_scorecards_and_loss_attribution",
+    "seal_immutable_forward_run"
+  ],
+  "rehearsal": {
+    "mode": "disabled_rehearsal",
+    "allowed": true,
+    "requires_dwd_read": false,
+    "official_evidence": false,
+    "shadow_side_effect": false,
+    "paper_side_effect": false,
+    "settlement_side_effect": false,
+    "scorecard_side_effect": false,
+    "purpose": "Exercise the real Replay Worker child/seal/recovery/fencing path while admission remains disabled."
+  },
+  "official_cycle": {
+    "implemented_by_this_work_item": false,
+    "requires_enabled_activation_decision": true,
+    "activation_owner": "P6-ACTIVATE-001",
+    "paper_runtime_predecessor": "P6-PAPER-001",
+    "web_predecessor": "P6-WEB-001",
+    "historical_backfill_as_official": false
+  },
+  "recovery": {
+    "sealed_run_reuse_required": true,
+    "partial_final_artifact_fails_closed": true,
+    "stale_claim_generation_fails_closed": true,
+    "lease_loss_must_not_publish": true,
+    "cancel_must_not_publish": true,
+    "memory_guard_reuses_existing_replay_worker_policy": true
+  },
+  "authority": {
+    "forward_worker_implementation_authorized": true,
+    "disabled_rehearsal_authorized": true,
+    "official_prospective_cycle_authorized": false,
+    "paper_runtime_authorized": false,
+    "web_projection_authorized": false,
+    "notification_authorized": false,
+    "broker_authorized": false,
+    "live_capital_authorized": false,
+    "stage_action_authority": false,
+    "new_expert_authorized": false,
+    "aggregator_change_authorized": false,
+    "arbitration_2022_2024_access_authorized": false,
+    "permanent_blind_2025_access_authorized": false
+  }
+}

@@ -1674,21 +1674,26 @@ class DocumentTraceabilityTests(unittest.TestCase):
         p6_items = [item for item in items if item.phase == "P6"]
         self.assertEqual(
             {item.stable_id for item in p6_items if item.status == "ready"},
-            {"P6-000"},
+            {"P6-000", "P6-ACTIVATE-001"},
         )
         self.assertEqual(
-            next(item for item in p6_items if item.stable_id == "P6-GOV-001").status,
-            "closed",
-        )
-        self.assertEqual(
-            {item.stable_id for item in p6_items if item.status == "blocked"},
             {
+                item.stable_id
+                for item in p6_items
+                if item.status == "closed"
+            },
+            {
+                "P6-GOV-001",
                 "P6-DATA-001",
                 "P6-SCORE-001",
                 "P6-GOV-002",
                 "P6-PAPER-001",
                 "P6-WEB-001",
-                "P6-ACTIVATE-001",
+            },
+        )
+        self.assertEqual(
+            {item.stable_id for item in p6_items if item.status == "blocked"},
+            {
                 "P6-REVIEW-001",
             },
         )

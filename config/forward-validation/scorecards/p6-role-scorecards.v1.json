@@ -1,0 +1,94 @@
+{
+  "schema_version": "quanthus.p6-role-scorecard-policy.v1",
+  "work_item": "P6-SCORE-001",
+  "state": "FROZEN_PRE_RESULT_NO_ACTIVATION",
+  "entry_proposal_digest": "sha256:3c9356e49dbdd6356754b42cfd34af11949289121454a05bdbf0c0ff2aebaa18",
+  "data_boundary_acceptance": "docs/acceptance/p6-data001-prospective-boundary-20260917.md",
+  "principles": {
+    "universal_expert_score_authorized": false,
+    "profitability_primary_gate": false,
+    "coverage_always_reported_with_quality": true,
+    "dependence_aware_block_reporting_required": true,
+    "material_loss_must_be_classified": true,
+    "result_driven_metric_edit_authorized": false
+  },
+  "material_loss": {
+    "fixed_unit_notional_cny": "100000.00",
+    "absolute_fraction_of_one_unit": "0.01",
+    "absolute_threshold_cny": "1000.00",
+    "mechanism_integrity_breach_always_material": true,
+    "allowed_classes": [
+      "trend_assessment_error",
+      "position_risk_missed_veto",
+      "position_risk_false_veto",
+      "position_risk_constraint_error",
+      "aggregation_action_mapping_error",
+      "execution_assumption",
+      "data_quality_incident"
+    ],
+    "unclassified_material_loss_blocks_review": true
+  },
+  "common_slices": [
+    "collection_block_22_sessions",
+    "calendar_month",
+    "market_breadth_regime",
+    "decision_action",
+    "settlement_state"
+  ],
+  "roles": {
+    "trend_assessment": {
+      "source": "existing_expert_scorecard_v2",
+      "primary_metrics": ["trend_maoe", "trend_maoe_vs_always_neutral"],
+      "guardrails": ["coverage", "abstention_rate", "effective_block_count", "regime_stability"],
+      "forbidden_substitutions": ["paper_return_as_accuracy", "raw_row_count_as_independent_sample"]
+    },
+    "position_risk": {
+      "source": "policy_effect_and_counterfactual_ledger",
+      "primary_metrics": ["policy_activation_rate", "decision_change_rate"],
+      "guardrails": ["veto_recall", "veto_precision", "false_veto_opportunity_cost", "matched_risk_change", "return_cost", "drawdown_effect", "concentration_effect", "abstention_rate"],
+      "forbidden_substitutions": ["positive_entry_score", "profit_as_veto_accuracy"]
+    },
+    "aggregator": {
+      "source": "sealed_decision_and_settlement_ledger",
+      "primary_metrics": ["agreement_state_distribution", "final_action_distribution"],
+      "guardrails": ["consensus_outcome", "disagreement_outcome", "blocked_new_outcome", "system_veto_frequency", "strategy_veto_frequency", "constraint_conflict_count"],
+      "forbidden_substitutions": ["single_expert_quality_as_aggregator_quality"]
+    },
+    "complete_strategy": {
+      "source": "fixed_unit_p2_paper_ledger",
+      "primary_metrics": ["net_total_return", "maximum_drawdown"],
+      "guardrails": ["turnover", "time_in_market", "average_exposure", "fill_rate", "reject_rate", "carry_rate", "honest_replay_divergence"],
+      "forbidden_substitutions": ["compounded_capital_return", "full_capital_opportunity_cost_as_primary_gate"]
+    },
+    "paper_operation": {
+      "source": "balanced_append_only_paper_ledger",
+      "primary_metrics": ["cash_position_reconciliation_break_count", "pending_intent_count"],
+      "guardrails": ["fill_count", "cost_total", "cash_balance", "position_market_value", "fixed_unit_equity", "unsettled_intent_age"],
+      "forbidden_substitutions": ["paper_fill_as_live_fill", "paper_authority_as_execution_authority"]
+    }
+  },
+  "review_readiness": {
+    "requires_all_role_cards_present": true,
+    "requires_closed_sample_ledger_where_mature": true,
+    "requires_zero_unclassified_material_loss": true,
+    "requires_zero_mechanism_integrity_breach": true,
+    "low_activity_can_close_inconclusive": true,
+    "weak_or_negative_economics_can_close": true
+  },
+  "authority": {
+    "p6_score_implementation_authorized": true,
+    "forward_worker_authorized": false,
+    "paper_runtime_authorized": false,
+    "web_projection_authorized": false,
+    "official_prospective_cycle_authorized": false,
+    "notification_authorized": false,
+    "broker_authorized": false,
+    "live_capital_authorized": false,
+    "new_expert_authorized": false,
+    "stage_action_authority": false,
+    "aggregator_change_authorized": false,
+    "arbitration_2022_2024_access_authorized": false,
+    "permanent_blind_2025_access_authorized": false
+  },
+  "claim_ceiling": "This policy freezes role-specific forward scorecard semantics and material-loss attribution before any official prospective observation. It does not generate evidence, activate P6, change experts/aggregator, or authorize Worker, paper, Web, sealed partitions, notification, broker or live capital."
+}

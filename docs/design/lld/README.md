@@ -52,7 +52,7 @@ module internals unless a named application port crosses that boundary.
 | `05-position-execution.md` | P3 | Accepted capability substrate | Strategy position lifecycle, sizing, exits, or cooldown |
 | `06-event-library.md` | P4 | Event, label, report, job-local reuse, exact scan, set-based T+1 binding, and bounded-memory execution accepted | Event cohorts, outcomes, event-window definitions, or Event batch performance |
 | `07-research-scoring.md` | P5 | Optional research deferred; not a P6 dependency | Statistical/ML research and promotion |
-| `08-validation-governance.md` | P6 | `P6-GOV-001` accepted; `P6-DATA-001` blocked pending owner value review | Prospective evidence, paper operation, partitions, change budgets, or review |
+| `08-validation-governance.md` | P6 | GOV/DATA/SCORE/Forward Worker/Paper/Web accepted; `P6-ACTIVATE-001` pre-activation gate ready | Prospective evidence, paper operation, partitions, change budgets, or review |
 | `09-roadmap.md` | All | Delivery sequence | Phase gates, milestones, or stop rules |
 | `10-monitoring-attribution.md` | P2+ | Accepted event/funnel contracts, synthetic attribution closure, and first formal-strategy attribution release; recurring reports remain proposal-triggered | Decision or notification logs, hypothetical paths, funnels, or attribution |
 | `11-platform-kernel.md` | PK, orthogonal | PK1-PK4, Replay Worker, P4 Event Worker, and PK6 accepted; first-cutover Authoring not applicable | Authentication, API composition, jobs/workers, platform persistence, Web shell, QuantDinger extraction, or module recovery |

@@ -32,7 +32,13 @@ def test_p6_is_one_execution_epic_with_eight_dependency_gated_children() -> None
     assert items["P6-000"].issue_type == "epic"
     assert items["P6-000"].status == "ready"
     assert items["P6-GOV-001"].status == "closed"
-    assert all(items[item_id].status == "blocked" for item_id in P6_CHILD_IDS[1:])
+    assert items["P6-DATA-001"].status == "closed"
+    assert items["P6-SCORE-001"].status == "closed"
+    assert items["P6-GOV-002"].status == "closed"
+    assert items["P6-PAPER-001"].status == "closed"
+    assert items["P6-WEB-001"].status == "closed"
+    assert items["P6-ACTIVATE-001"].status == "ready"
+    assert all(items[item_id].status == "blocked" for item_id in P6_CHILD_IDS[7:])
     assert all(items[item_id].phase == "P6" for item_id in P6_IDS)
     assert next(chapter for chapter in CHAPTERS if chapter.number == "08").status == "ready"
 

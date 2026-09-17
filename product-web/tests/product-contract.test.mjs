@@ -97,6 +97,25 @@ test('catalog exposes candidates without implicit admission or execution authori
   assert.equal(expert.execution_authorized, false)
 })
 
+test('candidate forward validation is read-only and activation-safe', () => {
+  for (const field of [
+    'forward_validation',
+    'waiting_activation',
+    'official_collection_sessions_completed',
+    'unit_notional_cny',
+    'source_digests'
+  ]) {
+    assert.match(candidateDetail, new RegExp(field))
+  }
+  assert.match(candidateDetail, /Forward Validation/)
+  assert.match(candidateDetail, /未激活/)
+  assert.match(candidateDetail, /官方 Prospective Evidence 尚未激活/)
+  assert.match(candidateDetail, /Broker \/ Live/)
+  assert.match(candidateDetail, /未授权 \/ 未授权/)
+  assert.doesNotMatch(api, /forward[^'"\n]*(activate|broker|notify|execute|promote|update)/i)
+  assert.doesNotMatch(candidateDetail, /triggerAction\(['"]forward/)
+})
+
 test('candidate expert evidence remains digest-bound and read-only', () => {
   for (const field of [
     'expert_evidence',

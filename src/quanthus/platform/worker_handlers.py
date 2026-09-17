@@ -12,6 +12,11 @@ from quanthus.expert_evaluation.runner import (
     ExpertEvaluationRun,
     verify_expert_evaluation_run,
 )
+from quanthus.forward_validation.runner import (
+    ForwardRun,
+    find_forward_run_for_input,
+    verify_forward_run,
+)
 
 EXPERT_STAGE_PROGRESS = {
     "binding-inputs": 5,
@@ -24,6 +29,11 @@ EXPERT_STAGE_PROGRESS = {
     "publishing-run": 98,
 }
 
+P6_FORWARD_STAGE_PROGRESS = {
+    "binding-inputs": 10,
+    "rehearsal-sealed": 98,
+}
+
 
 @dataclass(frozen=True)
 class ExpertChildResult:
@@ -31,6 +41,61 @@ class ExpertChildResult:
     evaluation_identities: tuple[dict[str, Any], ...]
     strategy_identity: dict[str, Any] | None
     summary: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class P6ForwardChildResult:
+    run: ForwardRun
+    summary: dict[str, Any]
+
+
+def p6_forward_child_command(
+    *, input_path: Path, config_path: Path, staging: Path, run_root: Path
+) -> tuple[str, ...]:
+    return (
+        sys.executable,
+        "-m",
+        "quanthus.forward_validation.cli",
+        "--input",
+        str(input_path),
+        "--config",
+        str(config_path),
+        "--staging",
+        str(staging),
+        "--run-root",
+        str(run_root),
+    )
+
+
+def validate_p6_forward_child_result(payload: object, run_root: Path) -> P6ForwardChildResult:
+    if not isinstance(payload, dict) or set(payload) != {
+        "run_id",
+        "artifact_ref",
+        "manifest_digest",
+        "input_digest",
+        "summary",
+    }:
+        raise RuntimeError("p6_forward_child_result_invalid")
+    if any(not isinstance(payload[name], str) for name in ("run_id", "artifact_ref", "manifest_digest", "input_digest")):
+        raise RuntimeError("p6_forward_child_result_invalid")
+    configured_root = run_root.resolve()
+    artifact = Path(str(payload["artifact_ref"])).resolve()
+    if artifact.parent != configured_root:
+        raise RuntimeError("p6_forward_child_artifact_path_escape")
+    run = verify_forward_run(artifact, expected_input_digest=str(payload["input_digest"]))
+    if run.run_id != payload["run_id"] or run.manifest_digest != payload["manifest_digest"]:
+        raise RuntimeError("p6_forward_child_manifest_mismatch")
+    summary = payload["summary"]
+    if not isinstance(summary, dict) or dict(run.summary) != summary:
+        raise RuntimeError("p6_forward_child_manifest_mismatch")
+    return P6ForwardChildResult(run, summary)
+
+
+def find_p6_forward_run_for_input(run_root: Path, input_digest: str) -> P6ForwardChildResult | None:
+    run = find_forward_run_for_input(run_root, input_digest)
+    if run is None:
+        return None
+    return P6ForwardChildResult(run, dict(run.summary))
 
 
 def expert_child_command(

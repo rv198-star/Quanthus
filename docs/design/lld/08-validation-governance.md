@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Phase | P6 prospective-MVP governance checkpoint; P5 optional research deferred |
-| Status | `P6-GOV-001` accepted; `P6-DATA-001` blocked pending explicit owner value review |
+| Phase | P6 prospective-MVP implementation; P5 optional research deferred |
+| Status | GOV/DATA/SCORE/Forward Worker/Paper/Web accepted; `P6-ACTIVATE-001` pre-activation gate ready |
 | Governing requirements | FR-GOV-001/002, NFR-004 |
 | Detailed design | `08-validation-governance/p6-forward-validation.md` |
 
@@ -57,11 +57,11 @@ emergency fix. Exceeding the budget downgrades that period's research credibilit
 | --- | --- | --- | --- |
 | P6-000 | Coordinate the bounded P6 prospective-validation program | META-DOC-001, accepted P3/P4 and Expert Strategy MVP | All eight children accepted |
 | P6-GOV-001 | Freeze entry proposal, observation budget, stop rules, and rollback | P6-000 entry authority | `docs/acceptance/p6-gov001-prospective-mvp-entry-20260917.md` |
-| P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6-GOV-001 plus explicit post-entry owner value review | Boundary and access-control audit |
-| P6-SCORE-001 | Freeze role-specific expert, aggregator, strategy, and paper scorecards | P6-DATA-001, P3-ATTR-001 | Outcome-blind scorecard cards |
-| P6-GOV-002 | Implement the composite Forward Worker and disabled-state lifecycle rehearsal | P6-SCORE-001, PK-WORKER-000 | Recovery and rollback rehearsal |
-| P6-PAPER-001 | Implement the isolated P2 paper lane and fixed-unit ledger | P6-GOV-002, P2-ACCEPT-001 | Balanced paper-account fixture |
-| P6-WEB-001 | Project forward and paper evidence in candidate detail | P6-PAPER-001 | Read-only product acceptance |
+| P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6-GOV-001 plus explicit post-entry owner value review | `docs/acceptance/p6-data001-prospective-boundary-20260917.md` |
+| P6-SCORE-001 | Freeze role-specific expert, aggregator, strategy, and paper scorecards | P6-DATA-001, P3-ATTR-001 | `docs/acceptance/p6-score001-forward-scorecards-20260917.md` |
+| P6-GOV-002 | Implement the composite Forward Worker and disabled-state lifecycle rehearsal | P6-SCORE-001, PK-WORKER-000 | `docs/acceptance/p6-gov002-forward-worker-20260917.md` |
+| P6-PAPER-001 | Implement the isolated P2 paper lane and fixed-unit ledger | P6-GOV-002, P2-ACCEPT-001 | `docs/acceptance/p6-paper001-paper-lane-20260917.md` |
+| P6-WEB-001 | Project forward and paper evidence in candidate detail | P6-PAPER-001 | `docs/acceptance/p6-web001-forward-paper-product-view-20260917.md` |
 | P6-ACTIVATE-001 | Authorize and run the first official post-activation forward cycle | P6-WEB-001 | Signed activation and reproduced first cycle |
 | P6-REVIEW-001 | Complete the time-matured simulation review and any authorized reveal | P6-ACTIVATE-001 plus closed budget | Signed review package and closed ledger |
 

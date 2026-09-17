@@ -1,0 +1,98 @@
+{
+  "schema_version": "quanthus.p6-prospective-data-boundary.v1",
+  "work_item": "P6-DATA-001",
+  "state": "FROZEN_IMPLEMENTATION_ONLY_NO_ACTIVATION",
+  "entry_proposal": {
+    "path": "config/forward-validation/entry/p6-prospective-mvp-entry.v1.json",
+    "proposal_digest": "sha256:3c9356e49dbdd6356754b42cfd34af11949289121454a05bdbf0c0ff2aebaa18"
+  },
+  "owner_value_decision": {
+    "path": "config/forward-validation/entry/p6-data-001-owner-value-decision.v1.json",
+    "sha256": "sha256:43302286655036c220086b1fa9a6da2741ef4cccbe6807d0c0da809ea9563e99",
+    "decision": "OPEN_P6_DATA_001_ONLY"
+  },
+  "daily_dwd_release": {
+    "kind": "cn01_daily_dwd_domain_increment",
+    "verification": "verify_daily_domain_increment",
+    "required_identity_fields": [
+      "package_id",
+      "market_date",
+      "manifest_sha256",
+      "content_digest",
+      "code_revision"
+    ],
+    "required_state": "READY_AND_DEEPLY_VERIFIABLE",
+    "semantic_identity_includes_visibility_time": false
+  },
+  "visibility_receipt": {
+    "schema_version": "quanthus.p6-dwd-visibility-receipt.v1",
+    "required_fields": [
+      "package_id",
+      "market_date",
+      "manifest_sha256",
+      "content_digest",
+      "ready_observed_at",
+      "consumer_visible_at",
+      "source_node",
+      "receipt_digest"
+    ],
+    "time_rule": "ready_observed_at<=consumer_visible_at",
+    "timezone": "UTC",
+    "receipt_is_business_fact": false,
+    "receipt_is_operational_evidence": true
+  },
+  "activation_rule": {
+    "activation_owner": "P6-ACTIVATE-001",
+    "official_requires_enabled_activation": true,
+    "first_official_market_date_rule": "market_date_strictly_after_activation_market_date",
+    "pre_activation_or_same_date_disposition": "engineering_rehearsal_only_not_budget",
+    "historical_2026_backfill_as_official": false
+  },
+  "access_ledger": {
+    "schema_version": "quanthus.p6-forward-access-ledger-entry.v1",
+    "allowed_partition": "prospective_daily_dwd",
+    "append_only": true,
+    "required_fields": [
+      "access_id",
+      "purpose",
+      "package_id",
+      "market_date",
+      "manifest_sha256",
+      "content_digest",
+      "decision_knowledge_cutoff",
+      "consumed_at",
+      "entry_proposal_digest",
+      "activation_decision_digest",
+      "official_evidence",
+      "partition"
+    ],
+    "sealed_partitions_forbidden": [
+      "arbitration_2022_2024",
+      "permanent_blind_2025"
+    ]
+  },
+  "correction_disposition": {
+    "schema_version": "quanthus.p6-correction-disposition.v1",
+    "allowed": ["preserve", "degrade", "censor"],
+    "rewrite_prior_evidence": false,
+    "requires_new_release_identity": true,
+    "append_only": true
+  },
+  "authority": {
+    "p6_data_implementation_authorized": true,
+    "p6_score_implementation_authorized": false,
+    "forward_worker_authorized": false,
+    "paper_runtime_authorized": false,
+    "web_projection_authorized": false,
+    "official_prospective_cycle_authorized": false,
+    "notification_authorized": false,
+    "broker_authorized": false,
+    "live_capital_authorized": false,
+    "new_expert_authorized": false,
+    "stage_action_authority": false,
+    "aggregator_change_authorized": false,
+    "arbitration_2022_2024_access_authorized": false,
+    "permanent_blind_2025_access_authorized": false
+  },
+  "claim_ceiling": "P6-DATA-001 may define and verify prospective daily-DWD identity, operational visibility evidence, append-only input-access ledger records and append-only correction dispositions. It does not activate P6 or authorize scorecards, Worker execution, paper, Web, Stage actions, P5, sealed partitions, notification, broker or live capital."
+}

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from quanthus.data_catalog import DataIndicatorCatalog
 from quanthus.expert_evaluation.product_view import ProductExpertEvidence
+from quanthus.forward_validation.product_view import ForwardValidationProductView
 from quanthus.platform.adapters.quanthus import (
     QuanthusAttributionVerificationAdapter,
     QuanthusGateQueryAdapter,
@@ -19,6 +20,7 @@ from quanthus.platform.jobs import (
     ATTRIBUTION_VERIFICATION_JOB,
     CANDIDATE_REPLAY_JOB,
     EXPERT_EVALUATION_JOB,
+    P6_FORWARD_CYCLE_JOB,
     DurableJobQueue,
     LocalJobRunner,
     attribution_verification_handler,
@@ -47,6 +49,7 @@ class PlatformKernel:
     product_catalog: ProductResearchCatalog
     candidate_evidence: ProductCandidateEvidence
     expert_evidence: ProductExpertEvidence
+    forward_validation: ForwardValidationProductView
     data_catalog: DataIndicatorCatalog
     candidate_approvals: CandidateApprovalService
     metrics: Metrics
@@ -118,6 +121,7 @@ def create_platform_kernel(
         root,
         expert_run_root,
     )
+    forward_validation = ForwardValidationProductView(root, store)
     data_catalog = DataIndicatorCatalog(
         data_catalog_sources_path,
         data_catalog_snapshot_path,
@@ -140,6 +144,7 @@ def create_platform_kernel(
         {
             CANDIDATE_REPLAY_JOB: "replay",
             EXPERT_EVALUATION_JOB: "replay",
+            P6_FORWARD_CYCLE_JOB: "replay",
         },
     )
     metrics = Metrics()
@@ -153,6 +158,7 @@ def create_platform_kernel(
         product_catalog=product_catalog,
         candidate_evidence=candidate_evidence,
         expert_evidence=expert_evidence,
+        forward_validation=forward_validation,
         data_catalog=data_catalog,
         candidate_approvals=candidate_approvals,
         metrics=metrics,
@@ -168,6 +174,7 @@ def create_platform_kernel(
         product_catalog=product_catalog,
         candidate_evidence=candidate_evidence,
         expert_evidence=expert_evidence,
+        forward_validation=forward_validation,
         data_catalog=data_catalog,
         candidate_approvals=candidate_approvals,
         metrics=metrics,

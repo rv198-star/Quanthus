@@ -16,14 +16,19 @@ from pathlib import Path
 from typing import Any
 
 from quanthus.expert_evaluation.runner import ExpertEvaluationJobInput
-from quanthus.platform.jobs import CANDIDATE_REPLAY_JOB, EXPERT_EVALUATION_JOB
+from quanthus.forward_validation.runner import ForwardCycleJobInput
+from quanthus.platform.jobs import CANDIDATE_REPLAY_JOB, EXPERT_EVALUATION_JOB, P6_FORWARD_CYCLE_JOB
 from quanthus.platform.persistence import PostgresPlatformStore
 from quanthus.platform.worker_handlers import (
     EXPERT_STAGE_PROGRESS,
+    P6_FORWARD_STAGE_PROGRESS,
     ExpertChildResult,
     expert_child_command,
     find_expert_run_for_input,
+    find_p6_forward_run_for_input,
+    p6_forward_child_command,
     validate_expert_child_result,
+    validate_p6_forward_child_result,
 )
 
 STAGE_PROGRESS = {
@@ -183,6 +188,8 @@ class ReplayWorker:
         terminate_seconds: float,
         expert_run_root: Path | None = None,
         expert_registry_root: Path | None = None,
+        p6_forward_run_root: Path | None = None,
+        p6_forward_config_path: Path | None = None,
         memory_current_path: Path | None = None,
         memory_stat_path: Path | None = None,
         memory_stop_bytes: int = DEFAULT_MEMORY_STOP_BYTES,
@@ -198,6 +205,13 @@ class ReplayWorker:
         self.expert_run_root = (expert_run_root or self.run_root / "expert-evaluations").resolve()
         self.expert_registry_root = (
             expert_registry_root or Path("config/expert-evaluations")
+        ).resolve()
+        self.p6_forward_run_root = (
+            p6_forward_run_root or self.run_root / "p6-forward"
+        ).resolve()
+        self.p6_forward_config_path = (
+            p6_forward_config_path
+            or Path("config/forward-validation/runtime/p6-forward-worker.v1.json")
         ).resolve()
         self.memory_current_path = memory_current_path
         self.memory_stat_path = memory_stat_path
@@ -294,6 +308,7 @@ class ReplayWorker:
         handlers = {
             CANDIDATE_REPLAY_JOB: self._execute,
             EXPERT_EVALUATION_JOB: self._execute_expert,
+            P6_FORWARD_CYCLE_JOB: self._execute_p6_forward,
         }
         handler = handlers.get(job.kind)
         if handler is None:
@@ -321,6 +336,169 @@ class ReplayWorker:
                 if str(stale) != "stale_claim_generation":
                     raise
         return True
+
+    def _p6_forward_result_ref(self, child: Any) -> dict[str, Any]:
+        return {
+            "run_id": child.run.run_id,
+            "artifact_ref": str(child.run.root),
+            "manifest_digest": child.run.manifest_digest,
+            "input_digest": child.run.input_digest,
+            "summary": child.summary,
+        }
+
+    def _execute_p6_forward(
+        self, job_id: str, generation: int, input_ref: dict[str, Any]
+    ) -> None:
+        observed = self.store.get_job(job_id)
+        if observed is None or observed.claim_generation != generation:
+            return
+        job_input = ForwardCycleJobInput.from_dict(input_ref)
+        if job_input.input_digest != observed.input_digest:
+            raise RuntimeError("p6_forward_input_digest_mismatch")
+        run_root = self.p6_forward_run_root / "runs"
+        recovered = find_p6_forward_run_for_input(run_root, observed.input_digest)
+        if recovered is not None:
+            self.store.update_claimed_job(
+                job_id,
+                generation,
+                stage="recovering-sealed-run",
+                progress=98,
+                progress_detail={"run_id": recovered.run.run_id},
+            )
+            self.store.finish_claimed_job(
+                job_id,
+                generation,
+                state="succeeded",
+                result_ref=self._p6_forward_result_ref(recovered),
+                error_reason=None,
+            )
+            return
+        attempt = self.p6_forward_run_root / ".staging" / job_id / str(generation)
+        if attempt.exists():
+            shutil.rmtree(attempt)
+        attempt.mkdir(parents=True)
+        input_path = attempt / "input.json"
+        input_path.write_bytes(json.dumps(job_input.to_dict(), sort_keys=True).encode("utf-8") + b"\n")
+        stdout_path = attempt / "result.json"
+        stderr_path = attempt / "progress.log"
+        command = p6_forward_child_command(
+            input_path=input_path,
+            config_path=self.p6_forward_config_path,
+            staging=attempt / "work",
+            run_root=run_root,
+        )
+        with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
+            process = subprocess.Popen(command, stdout=stdout, stderr=stderr)  # noqa: S603
+        last_renewal = time.monotonic()
+        progress_offset = 0
+        canceled = False
+        lost_lease = False
+        memory_failure: tuple[str, dict[str, Any]] | None = None
+        while process.poll() is None:
+            memory_failure = self._memory_guard_failure()
+            if memory_failure is not None:
+                if not self._record_memory_failure(job_id, generation, memory_failure):
+                    lost_lease = True
+                _terminate(process, self.terminate_seconds)
+                break
+            time.sleep(0.1)
+            progress_offset = self._publish_p6_forward_progress(
+                stderr_path, progress_offset, job_id, generation
+            )
+            current = self.store.get_job(job_id)
+            if current is None or current.claim_generation != generation:
+                lost_lease = True
+                _terminate(process, self.terminate_seconds)
+                break
+            if current.cancel_requested:
+                canceled = True
+                _terminate(process, self.terminate_seconds)
+                break
+            if self.stopping:
+                lost_lease = True
+                _terminate(process, self.terminate_seconds)
+                break
+            if time.monotonic() - last_renewal >= self.renew_seconds:
+                if not self.store.renew_job_lease(
+                    job_id, generation, self.worker_id, self.lease_seconds
+                ):
+                    lost_lease = True
+                    _terminate(process, self.terminate_seconds)
+                    break
+                last_renewal = time.monotonic()
+        if lost_lease:
+            return
+        if memory_failure is not None:
+            self._finish_memory_failure(job_id, generation, memory_failure)
+            return
+        self._publish_p6_forward_progress(stderr_path, progress_offset, job_id, generation)
+        if canceled:
+            self.store.finish_claimed_job(
+                job_id, generation, state="canceled", result_ref=None, error_reason=None
+            )
+            return
+        if process.returncode != 0 or not stdout_path.is_file():
+            self.store.finish_claimed_job(
+                job_id,
+                generation,
+                state="failed",
+                result_ref=None,
+                error_reason=f"p6_forward_child_exit_{process.returncode}",
+            )
+            return
+        try:
+            payload = json.loads(stdout_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError("p6_forward_child_result_unreadable") from exc
+        child = validate_p6_forward_child_result(payload, run_root)
+        if child.run.input_digest != observed.input_digest:
+            raise RuntimeError("p6_forward_run_input_mismatch")
+        self.store.update_claimed_job(
+            job_id,
+            generation,
+            stage="publishing-run",
+            progress=99,
+            progress_detail={"run_id": child.run.run_id},
+        )
+        self.store.finish_claimed_job(
+            job_id,
+            generation,
+            state="succeeded",
+            result_ref=self._p6_forward_result_ref(child),
+            error_reason=None,
+        )
+
+    def _publish_p6_forward_progress(
+        self, path: Path, offset: int, job_id: str, generation: int
+    ) -> int:
+        with path.open("rb") as stream:
+            stream.seek(offset)
+            lines = stream.readlines()
+            next_offset = stream.tell()
+        for raw_line in lines:
+            try:
+                event = json.loads(raw_line.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if event.get("event") != "p6-forward-progress":
+                continue
+            stage = str(event.get("stage", "running"))
+            detail = event.get("detail")
+            if not isinstance(detail, dict):
+                detail = {}
+            try:
+                self.store.update_claimed_job(
+                    job_id,
+                    generation,
+                    stage=stage,
+                    progress=P6_FORWARD_STAGE_PROGRESS.get(stage, 5),
+                    progress_detail=detail,
+                )
+            except RuntimeError as exc:
+                if str(exc) == "stale_claim_generation":
+                    return next_offset
+                raise
+        return next_offset
 
     def _execute_expert(
         self, job_id: str, generation: int, input_ref: dict[str, Any]
@@ -715,6 +893,15 @@ def main(argv: list[str] | None = None) -> int:
     expert_registry_root = Path(
         os.environ.get("QUANTHUS_EXPERT_REGISTRY_ROOT", "/app/config/expert-evaluations")
     )
+    p6_forward_run_root = Path(
+        os.environ.get("QUANTHUS_P6_FORWARD_RUN_ROOT", "/data/p6-forward-runs")
+    )
+    p6_forward_config_path = Path(
+        os.environ.get(
+            "QUANTHUS_P6_FORWARD_CONFIG",
+            "/app/config/forward-validation/runtime/p6-forward-worker.v1.json",
+        )
+    )
     worker = ReplayWorker(
         PostgresPlatformStore(dsn),
         worker_id=worker_id,
@@ -724,6 +911,8 @@ def main(argv: list[str] | None = None) -> int:
         terminate_seconds=args.terminate_seconds,
         expert_run_root=expert_run_root,
         expert_registry_root=expert_registry_root,
+        p6_forward_run_root=p6_forward_run_root,
+        p6_forward_config_path=p6_forward_config_path,
         memory_current_path=args.memory_current_path,
         memory_stat_path=args.memory_stat_path,
         memory_stop_bytes=args.memory_stop_bytes,

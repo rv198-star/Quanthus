@@ -20,6 +20,7 @@ from quanthus.expert_evaluation.product_view import (
     ProductExpertEvidence,
     ProductExpertEvidenceError,
 )
+from quanthus.forward_validation.product_view import ForwardValidationProductView
 from quanthus.platform.candidate_approval import (
     CandidateApprovalService,
     public_candidate_approval_event,
@@ -363,6 +364,7 @@ class PlatformHttpApp:
         product_catalog: ProductResearchCatalog,
         candidate_evidence: ProductCandidateEvidence,
         expert_evidence: ProductExpertEvidence,
+        forward_validation: ForwardValidationProductView,
         data_catalog: DataIndicatorCatalog,
         candidate_approvals: CandidateApprovalService,
         metrics: Metrics,
@@ -376,6 +378,7 @@ class PlatformHttpApp:
         self._product_catalog = product_catalog
         self._candidate_evidence = candidate_evidence
         self._expert_evidence = expert_evidence
+        self._forward_validation = forward_validation
         self._data_catalog = data_catalog
         self._candidate_approvals = candidate_approvals
         self._metrics = metrics
@@ -1087,11 +1090,15 @@ class PlatformHttpApp:
             )
         except ProductExpertEvidenceError as exc:
             return _error(exc.reason_code, 503, observed_request.request_id)
+        forward_validation = self._forward_validation.candidate(
+            strategy_id, str(candidate["version"])
+        )
         return _json_response(
             {
                 "candidate": candidate,
                 "evidence": evidence,
                 "expert_evidence": expert_evidence,
+                "forward_validation": forward_validation,
                 "approval": approval,
                 "run_history": run_history,
             }
@@ -1247,6 +1254,7 @@ def create_http_app(
     product_catalog: ProductResearchCatalog,
     candidate_evidence: ProductCandidateEvidence,
     expert_evidence: ProductExpertEvidence,
+    forward_validation: ForwardValidationProductView,
     data_catalog: DataIndicatorCatalog,
     candidate_approvals: CandidateApprovalService,
     metrics: Metrics,
@@ -1261,6 +1269,7 @@ def create_http_app(
         product_catalog=product_catalog,
         candidate_evidence=candidate_evidence,
         expert_evidence=expert_evidence,
+        forward_validation=forward_validation,
         data_catalog=data_catalog,
         candidate_approvals=candidate_approvals,
         metrics=metrics,

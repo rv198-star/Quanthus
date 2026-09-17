@@ -778,13 +778,24 @@ nodes.
   label review, and any enabled forward Shadow remain separately proposal- and evidence-gated.
 - The operator-assisted two-window profile remains blocked by intraday-input and matching-policy
   evidence. It and forward email transport are outside the initial P6 daily-profile scope.
-- P6 is one bounded prospective-validation program. `P6-GOV-001` has frozen the first
+- P6 is one bounded prospective-validation program. `P6-GOV-001` froze the first
   prospective-mechanism-MVP entry proposal at three non-overlapping 22-session collection blocks,
-  a 20-session maturity tail, and a 150-calendar-day ceiling. This is not a claim that the current
-  two experts or Stage vocabulary are complete. `P6-DATA-001` remains blocked until a fresh owner
-  value review explicitly opens it; no official prospective cycle, paper runtime, notification,
-  broker, or live-capital authority is active. P5 remains optional deferred research and is not a
-  predecessor.
+  a 20-session maturity tail, and a 150-calendar-day ceiling. The mandatory post-entry owner value
+  checkpoint has now accepted that bounded mechanism-validation cost, and `P6-DATA-001` is closed
+  with an explicit daily-DWD identity/visibility boundary, append-only access ledger, and immutable
+  correction disposition under `acceptance/p6-data001-prospective-boundary-20260917.md`.
+  `P6-SCORE-001` then froze separate Trend, Position Risk, Aggregator, complete-strategy and paper
+  scorecard semantics plus mandatory material-loss attribution before any official observation.
+  `P6-GOV-002` now admits exactly one additive `quanthus.p6-forward-cycle.v1` kind on the existing
+  Replay Worker/queue and has passed the disabled-state child/seal/recovery/fencing rehearsal with
+  zero DWD/Shadow/Paper/settlement/scorecard side effects. `P6-PAPER-001` then closed the isolated
+  five-unit fixed-notional paper lane by reusing the accepted P2 matcher/cost/ledger semantics; gains
+  remain non-redeployable and paper artifacts have no actual-execution authority. `P6-WEB-001` then
+  accepted a digest-bound read-only Forward/Paper projection in the existing candidate detail, with
+  explicit disabled admission and zero official budget progress before activation. This still does
+  not claim the current two experts or Stage vocabulary are complete. `P6-ACTIVATE-001` is now the
+  pre-activation integration/deployment/rollback gate; no official prospective cycle, notification,
+  broker, or live-capital authority is active. P5 remains optional deferred research and is not a predecessor.
 - ADR 0007 defines the current data operating path. CN01 and Hermes each run one 18:30
   `Asia/Shanghai` four-lane ODS controller, gate DWD on four verified READY releases, and emit
   node-specific success or failure notifications. OCI mirrors CN01's verified immutable DWD

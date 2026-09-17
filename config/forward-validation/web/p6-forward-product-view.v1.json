@@ -1,0 +1,84 @@
+{
+  "schema_version": "quanthus.p6-forward-product-view.v1",
+  "work_item": "P6-WEB-001",
+  "state": "FROZEN_READ_ONLY_PRE_ACTIVATION",
+  "candidate": {
+    "strategy_id": "candidate.p4-trend-risk",
+    "strategy_version": "1.0.1",
+    "strategy_semantic_digest": "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c",
+    "strategy_card": {
+      "path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+      "sha256": "sha256:7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664"
+    }
+  },
+  "bindings": {
+    "entry_proposal": {
+      "path": "config/forward-validation/entry/p6-prospective-mvp-entry.v1.json",
+      "sha256": "sha256:1e081004243d74047991f3963a9173dc008bcfad2bc8cca8200cf7186cd79c7b"
+    },
+    "data_boundary": {
+      "path": "config/forward-validation/data/p6-prospective-data-boundary.v1.json",
+      "sha256": "sha256:2bb30bb47c0283cd0b2a51455518f7d0a956c817320116b5b7861b689a927c73"
+    },
+    "scorecards": {
+      "path": "config/forward-validation/scorecards/p6-role-scorecards.v1.json",
+      "sha256": "sha256:49b91d1295717f4d21b58558d356da5846f74dbebbe9d565b9a05b24117d0fe0"
+    },
+    "forward_worker": {
+      "path": "config/forward-validation/runtime/p6-forward-worker.v1.json",
+      "sha256": "sha256:7a9875fe94cb781095077518b74ffc1f22c614ad9b67e72f67f27e250536a393"
+    },
+    "paper_lane": {
+      "path": "config/forward-validation/paper/p6-paper-lane.v1.json",
+      "sha256": "sha256:50fc7745570814ae927252469e11fe038c7a1b25f0f0bb8e3ce9e911d9eac0d8"
+    }
+  },
+  "accepted_predecessors": {
+    "P6-GOV-001": {
+      "path": "docs/acceptance/p6-gov001-prospective-mvp-entry-20260917.md",
+      "sha256": "sha256:b2bb02493e1ff9dc5dd03d852758412000cadc63bca5fc2bade6052a0adedbac"
+    },
+    "P6-DATA-001": {
+      "path": "docs/acceptance/p6-data001-prospective-boundary-20260917.md",
+      "sha256": "sha256:7b4c35235ffe6b5c42ee265ab393e71c5bfe7fd5eba479fe0ba48ef683dfb0a1"
+    },
+    "P6-SCORE-001": {
+      "path": "docs/acceptance/p6-score001-forward-scorecards-20260917.md",
+      "sha256": "sha256:c8f77b573ac57b1a99a0a28cfd2b79f2226d8452cd07a99581e46ccb19f953bc"
+    },
+    "P6-GOV-002": {
+      "path": "docs/acceptance/p6-gov002-forward-worker-20260917.md",
+      "sha256": "sha256:7ce457f62cc3ba8e2e2609655605350f431f8fad6c0dc0da31ee6676e384b950"
+    },
+    "P6-PAPER-001": {
+      "path": "docs/acceptance/p6-paper001-paper-lane-20260917.md",
+      "sha256": "sha256:a186392fab356216aa794ff7097451f53b48476f149daafd9d5abc9a35b4a666"
+    }
+  },
+  "projection": {
+    "candidate_detail_only": true,
+    "read_only": true,
+    "show_admission_state": true,
+    "show_evidence_state": true,
+    "show_budget": true,
+    "show_latest_forward_job": true,
+    "show_scorecard_contracts": true,
+    "show_paper_policy": true,
+    "show_source_digests": true,
+    "show_activation_boundary": true,
+    "show_notification_or_broker_controls": false,
+    "show_parameter_edit_controls": false,
+    "show_activation_control": false
+  },
+  "authority": {
+    "web_projection_implementation_authorized": true,
+    "p6_activation_authorized": false,
+    "official_prospective_cycle_authorized": false,
+    "paper_actual_execution_authorized": false,
+    "notification_authorized": false,
+    "broker_authorized": false,
+    "live_capital_authorized": false,
+    "parameter_edit_authorized": false,
+    "sealed_partition_access_authorized": false
+  }
+}

@@ -377,6 +377,7 @@ def test_unknown_manifest_route_fails_composition(kernel) -> None:
             product_catalog=kernel.product_catalog,
             candidate_evidence=kernel.candidate_evidence,
             expert_evidence=kernel.expert_evidence,
+            forward_validation=kernel.forward_validation,
             data_catalog=kernel.data_catalog,
             candidate_approvals=kernel.candidate_approvals,
             metrics=kernel.metrics,

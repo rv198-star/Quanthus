@@ -1,0 +1,44 @@
+{
+  "schema_version": "quanthus.p6-owner-value-decision.v1",
+  "decision_id": "p6-data-001-owner-value-open-v1",
+  "work_item": "P6-DATA-001",
+  "effective_date": "2026-09-17",
+  "parent_entry_proposal_id": "p6-prospective-mechanism-mvp-entry-v1",
+  "parent_entry_proposal_digest": "sha256:3c9356e49dbdd6356754b42cfd34af11949289121454a05bdbf0c0ff2aebaa18",
+  "decision": "OPEN_P6_DATA_001_ONLY",
+  "value_review": {
+    "accepted_calendar_budget": {
+      "collection_trading_sessions": 66,
+      "target_maturity_tail_trading_sessions": 20,
+      "maximum_calendar_days": 150
+    },
+    "accepted_cost_reason": "The prospective mechanism MVP answers a project-critical question that historical replay cannot answer: whether the frozen DWD-to-expert-to-aggregator-to-paper chain remains outcome-blind, reproducible and authority-safe under real future information arrival. The bounded calendar cost is accepted because no P5 or Stage expansion is required and weak or negative strategy results remain valid evidence.",
+    "implementation_value": "Build the minimum reusable prospective data boundary first; do not pre-authorize scorecards, worker, paper, Web or activation until their dependency gates are separately accepted.",
+    "low_activity_policy_accepted": true,
+    "post_result_budget_extension_authorized": false
+  },
+  "authority": {
+    "p6_data_implementation_authorized": true,
+    "p6_score_implementation_authorized": false,
+    "forward_worker_authorized": false,
+    "paper_runtime_authorized": false,
+    "web_projection_authorized": false,
+    "official_prospective_cycle_authorized": false,
+    "notification_authorized": false,
+    "broker_authorized": false,
+    "live_capital_authorized": false,
+    "p5_authorized": false,
+    "new_expert_authorized": false,
+    "stage_action_authority": false,
+    "aggregator_change_authorized": false,
+    "arbitration_2022_2024_access_authorized": false,
+    "permanent_blind_2025_access_authorized": false
+  },
+  "owner_directive": {
+    "authority": "human_owner",
+    "mode": "interactive_delegation",
+    "scope": "implementation_details_and_dependency_order_within_existing_frozen_P6_boundaries",
+    "automatic_successor_after_p6_data_001": false
+  },
+  "claim_ceiling": "This decision opens P6-DATA-001 implementation only. It does not activate P6, admit prospective evidence, authorize scorecards, Forward Worker, paper, Web, notification, broker, live capital, new experts, Stage action semantics, P5, arbitration 2022-2024 or permanent-blind 2025."
+}

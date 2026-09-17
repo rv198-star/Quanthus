@@ -1,0 +1,70 @@
+{
+  "schema_version": "quanthus.p6-paper-lane.v1",
+  "work_item": "P6-PAPER-001",
+  "state": "FROZEN_ENGINEERING_ONLY_NO_ACTIVATION",
+  "bindings": {
+    "strategy_card": {
+      "path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+      "sha256": "sha256:7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664",
+      "semantic_digest": "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c"
+    },
+    "p2_execution_policy": {
+      "path": "config/p2-execution-policy.research.v1.json",
+      "sha256": "sha256:e2ee55ea09682eeb775b9acfcfc4bbba0908ddd4157705cd81fd8f050097c816",
+      "semantic_digest": "sha256:7617a62ceb5baf549c69525222d67503289f5cfdecc2c3e62151b220a90904c3"
+    },
+    "forward_worker_config": {
+      "path": "config/forward-validation/runtime/p6-forward-worker.v1.json",
+      "sha256": "sha256:7a9875fe94cb781095077518b74ffc1f22c614ad9b67e72f67f27e250536a393"
+    }
+  },
+  "execution": {
+    "profile_id": "close-to-next-open-v1",
+    "paper_authority_marker": "paper",
+    "actual_execution_authority": false,
+    "unit_count": 5,
+    "unit_notional_cny": "100000.00",
+    "base_trial_position_fraction": "0.30",
+    "entry_lot_size": 100,
+    "maximum_active_units": 5,
+    "adds_enabled": false,
+    "reductions_enabled": true,
+    "compound_capital": false,
+    "profit_redeployment": false,
+    "funding_policy": "finite_total_budget_fixed_unit_no_profit_redeployment",
+    "buy_unfilled_policy": "cancel_after_open_attempt",
+    "sell_unfilled_policy": "carry_until_tradable"
+  },
+  "projection": {
+    "source": "exact_sealed_aggregate_decision_with_preallocated_unit",
+    "allocation_policy_change_authorized": false,
+    "trial_entry_quantity": "floor(unit_notional*target_fraction/decision_close/entry_lot_size)*entry_lot_size",
+    "full_exit_quantity": "all_settled_quantity",
+    "reduce_quantity": "max(0,current_settled_quantity-floor(unit_notional*target_fraction/decision_close/entry_lot_size)*entry_lot_size)",
+    "no_action_creates_intent": false,
+    "missing_decision_close_blocks_new_entry": true,
+    "missing_or_invalid_execution_evidence_forces_sale": false
+  },
+  "ledger": {
+    "balanced_postings_required": true,
+    "pending_intents_immutable": true,
+    "fills_reuse_p2_engine": true,
+    "costs_reuse_p2_policy": true,
+    "paper_ids_distinct_from_actual_execution_ids": true,
+    "target_notional_remains_fixed_after_profit_or_loss": true,
+    "external_pool_is_non_redeployable": true
+  },
+  "authority": {
+    "paper_runtime_implementation_authorized": true,
+    "official_prospective_cycle_authorized": false,
+    "web_projection_authorized": false,
+    "notification_authorized": false,
+    "broker_authorized": false,
+    "live_capital_authorized": false,
+    "stage_action_authority": false,
+    "new_expert_authorized": false,
+    "aggregator_change_authorized": false,
+    "arbitration_2022_2024_access_authorized": false,
+    "permanent_blind_2025_access_authorized": false
+  }
+}

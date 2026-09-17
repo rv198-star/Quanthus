@@ -447,12 +447,12 @@ need or independently new admissible evidence.
 | P5-PROMOTE-001 | Implement model promotion/shadow gate | P5 | deferred; optional research |
 | P6-000 | Coordinate the bounded P6 prospective-validation program | P6 | open epic |
 | P6-GOV-001 | Freeze entry proposal, observation budget, stop rules, and rollback | P6 | closed by `docs/acceptance/p6-gov001-prospective-mvp-entry-20260917.md`; proposal is entry-only and grants no activation/downstream authority |
-| P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6 | blocked pending explicit owner value review after P6-GOV-001 |
-| P6-SCORE-001 | Freeze role-specific forward scorecards and loss attribution | P6 | blocked by P6-DATA-001 |
-| P6-GOV-002 | Implement composite Forward Worker and disabled-state rehearsal | P6 | blocked by P6-SCORE-001 |
-| P6-PAPER-001 | Implement isolated P2 paper lane and fixed-unit ledger | P6 | blocked by P6-GOV-002 |
-| P6-WEB-001 | Project forward and paper evidence in candidate detail | P6 | blocked by P6-PAPER-001 |
-| P6-ACTIVATE-001 | Authorize and run the first official prospective cycle | P6 | blocked by P6-WEB-001 |
+| P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6 | closed by `docs/acceptance/p6-data001-prospective-boundary-20260917.md`; owner value checkpoint accepted, no activation/prospective read |
+| P6-SCORE-001 | Freeze role-specific forward scorecards and loss attribution | P6 | closed by `docs/acceptance/p6-score001-forward-scorecards-20260917.md`; pre-result role cards and material-loss attribution frozen |
+| P6-GOV-002 | Implement composite Forward Worker and disabled-state rehearsal | P6 | closed by `docs/acceptance/p6-gov002-forward-worker-20260917.md`; existing replay queue/worker only, disabled rehearsal sealed/recoverable, official cycles still blocked |
+| P6-PAPER-001 | Implement isolated P2 paper lane and fixed-unit ledger | P6 | closed by `docs/acceptance/p6-paper001-paper-lane-20260917.md`; exact P2 reuse, fixed-unit/non-compounding paper authority, balanced ledger |
+| P6-WEB-001 | Project forward and paper evidence in candidate detail | P6 | closed by `docs/acceptance/p6-web001-forward-paper-product-view-20260917.md`; digest-bound read-only candidate detail projection, no activation/write authority |
+| P6-ACTIVATE-001 | Authorize and run the first official prospective cycle | P6 | ready |
 | P6-REVIEW-001 | Complete the time-matured simulation review | P6 | blocked by P6-ACTIVATE-001 and closed budget |
 | P7-LIVE-001 | Define email-advice and actual-operation reporting boundary; defer broker adapter | P7 | blocked by P6 review |
 | P7-RECON-001 | Reconcile advice with operator-reported fills, changes, or no action | P7 | blocked by P7-LIVE-001 |

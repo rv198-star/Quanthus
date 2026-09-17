@@ -778,11 +778,13 @@ nodes.
   label review, and any enabled forward Shadow remain separately proposal- and evidence-gated.
 - The operator-assisted two-window profile remains blocked by intraday-input and matching-policy
   evidence. It and forward email transport are outside the initial P6 daily-profile scope.
-- P6 is now one bounded prospective-validation program: freeze entry/budget, enforce the
-  post-activation DWD boundary, freeze scorecards, add one composite Replay Worker cycle, maintain
-  separate Shadow and fixed-unit paper lanes, project read-only evidence, activate explicitly, and
-  wait for the real-calendar budget before review. Only `P6-GOV-001` is initially ready; P5 remains
-  optional deferred research and is not a predecessor.
+- P6 is one bounded prospective-validation program. `P6-GOV-001` has frozen the first
+  prospective-mechanism-MVP entry proposal at three non-overlapping 22-session collection blocks,
+  a 20-session maturity tail, and a 150-calendar-day ceiling. This is not a claim that the current
+  two experts or Stage vocabulary are complete. `P6-DATA-001` remains blocked until a fresh owner
+  value review explicitly opens it; no official prospective cycle, paper runtime, notification,
+  broker, or live-capital authority is active. P5 remains optional deferred research and is not a
+  predecessor.
 - ADR 0007 defines the current data operating path. CN01 and Hermes each run one 18:30
   `Asia/Shanghai` four-lane ODS controller, gate DWD on four verified READY releases, and emit
   node-specific success or failure notifications. OCI mirrors CN01's verified immutable DWD

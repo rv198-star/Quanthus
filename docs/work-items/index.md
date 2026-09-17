@@ -446,8 +446,8 @@ need or independently new admissible evidence.
 | P5-GBDT-001 | Train constrained GBDT research pipeline | P5 | deferred; optional research |
 | P5-PROMOTE-001 | Implement model promotion/shadow gate | P5 | deferred; optional research |
 | P6-000 | Coordinate the bounded P6 prospective-validation program | P6 | open epic |
-| P6-GOV-001 | Freeze entry proposal, observation budget, stop rules, and rollback | P6 | ready |
-| P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6 | blocked by P6-GOV-001 |
+| P6-GOV-001 | Freeze entry proposal, observation budget, stop rules, and rollback | P6 | closed by `docs/acceptance/p6-gov001-prospective-mvp-entry-20260917.md`; proposal is entry-only and grants no activation/downstream authority |
+| P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6 | blocked pending explicit owner value review after P6-GOV-001 |
 | P6-SCORE-001 | Freeze role-specific forward scorecards and loss attribution | P6 | blocked by P6-DATA-001 |
 | P6-GOV-002 | Implement composite Forward Worker and disabled-state rehearsal | P6 | blocked by P6-SCORE-001 |
 | P6-PAPER-001 | Implement isolated P2 paper lane and fixed-unit ledger | P6 | blocked by P6-GOV-002 |

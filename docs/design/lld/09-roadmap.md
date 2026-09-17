@@ -31,9 +31,10 @@ Current state: P2 remains conditionally accepted for the active daily research p
 replay, rule contracts, position/risk path, audit funnel, and one frozen capability fixture prove
 the multi-year closed loop. That fixture is not a formal strategy lineage and cannot be tuned or
 promoted. The P4 Event Library, Label Corpus, Comparison Report, and bounded Worker execution are
-accepted. P6 implementation is open at `P6-GOV-001`; later P6 work remains dependency-gated. P5
-is optional research and remains deferred. Target two-window activation and forward notification
-retain their separate blockers and are outside the initial P6 profile.
+accepted. `P6-GOV-001` is accepted with one frozen prospective-mechanism-MVP entry proposal; the
+next child `P6-DATA-001` remains blocked behind an explicit owner value checkpoint rather than
+opening automatically. P5 is optional research and remains deferred. Target two-window activation
+and forward notification retain their separate blockers and are outside the initial P6 profile.
 
 ## 3. Milestones
 

@@ -198,11 +198,13 @@ low-memory Worker execution are accepted by their production evidence. The froze
 an acceptance fixture, not an approved strategy lineage; it cannot be tuned or promoted by that
 gate. The separate two-expert strategy MVP is also accepted for development evidence, but its
 lifecycle decision is `inconclusive` and its forward-Shadow disposition is disabled. None of these
-acceptances activates the target intraday profile or opens the 2022-2025 partitions. P6
-implementation is open at `P6-GOV-001` under the daily `close-to-next-open-v1` profile; P5 model
-research is optional, deferred, and not a P6 dependency. Official prospective evidence begins
-only after a separate immutable activation decision and cannot be backfilled from earlier 2026
-history. The next executable work is listed in `docs/work-items/index.md`. The approved
+acceptances activates the target intraday profile or opens the 2022-2025 partitions. `P6-GOV-001`
+has accepted one finite prospective-mechanism-MVP entry proposal under the daily
+`close-to-next-open-v1` profile, but `P6-DATA-001` remains blocked until an explicit owner value
+review opens it. P5 model research is optional, deferred, and not a P6 dependency. Official
+prospective evidence begins only after a separate immutable activation decision and cannot be
+backfilled from earlier 2026 history. The next executable work is listed in
+`docs/work-items/index.md`. The approved
 near-term operating direction is `operator-assisted-two-window-v1`: exactly two versioned action
 windows at `09:45-10:15` and `14:15-session close` in `Asia/Shanghai`, email notification, manual
 operator action, and no broker connection. This later direction is outside the initial P6 scope.

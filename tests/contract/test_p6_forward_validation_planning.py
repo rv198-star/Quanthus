@@ -31,7 +31,7 @@ def test_p6_is_one_execution_epic_with_eight_dependency_gated_children() -> None
     assert {"P6-000", *P6_CHILD_IDS} == P6_IDS
     assert items["P6-000"].issue_type == "epic"
     assert items["P6-000"].status == "ready"
-    assert items["P6-GOV-001"].status == "ready"
+    assert items["P6-GOV-001"].status == "closed"
     assert all(items[item_id].status == "blocked" for item_id in P6_CHILD_IDS[1:])
     assert all(items[item_id].phase == "P6" for item_id in P6_IDS)
     assert next(chapter for chapter in CHAPTERS if chapter.number == "08").status == "ready"
@@ -43,7 +43,7 @@ def test_p6_reuses_old_stable_ids_and_encodes_the_exact_dependency_chain() -> No
     assert {"P6-GOV-001", "P6-GOV-002", "P6-SCORE-001", "P6-DATA-001", "P6-REVIEW-001"} <= P6_IDS
     expected_predecessors = {
         "P6-GOV-001": "P6-000 entry authority",
-        "P6-DATA-001": "P6-GOV-001",
+        "P6-DATA-001": "P6-GOV-001 plus explicit post-entry owner value review",
         "P6-SCORE-001": "P6-DATA-001",
         "P6-GOV-002": "P6-SCORE-001",
         "P6-PAPER-001": "P6-GOV-002",
@@ -67,6 +67,10 @@ def test_p6_design_and_issue_contracts_freeze_authority_and_runtime_boundaries()
     assert "Forward Shadow and paper operation are sibling evidence lanes" in design
     assert "P5 deferred; not a P6 predecessor" in design
     assert "zero notification/broker/live-capital authority" in design
+    assert "prospective mechanism MVP" in design
+    assert "non-overlapping 22-trading-session market blocks" in design
+    assert "`P6-DATA-001`" in design
+    assert "remains blocked until an explicit post-entry owner review" in design
     assert all(
         f"P6-{suffix}" in design
         for suffix in (

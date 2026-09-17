@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Phase | P6 implementation open; P5 optional research deferred |
-| Status | Approved; execution opens at `P6-GOV-001` |
+| Phase | P6 prospective-MVP governance checkpoint; P5 optional research deferred |
+| Status | `P6-GOV-001` accepted; `P6-DATA-001` blocked pending explicit owner value review |
 | Governing requirements | FR-GOV-001/002, NFR-004 |
 | Detailed design | `08-validation-governance/p6-forward-validation.md` |
 
@@ -56,8 +56,8 @@ emergency fix. Exceeding the budget downgrades that period's research credibilit
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
 | P6-000 | Coordinate the bounded P6 prospective-validation program | META-DOC-001, accepted P3/P4 and Expert Strategy MVP | All eight children accepted |
-| P6-GOV-001 | Freeze entry proposal, observation budget, stop rules, and rollback | P6-000 entry authority | Immutable entry proposal |
-| P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6-GOV-001 | Boundary and access-control audit |
+| P6-GOV-001 | Freeze entry proposal, observation budget, stop rules, and rollback | P6-000 entry authority | `docs/acceptance/p6-gov001-prospective-mvp-entry-20260917.md` |
+| P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6-GOV-001 plus explicit post-entry owner value review | Boundary and access-control audit |
 | P6-SCORE-001 | Freeze role-specific expert, aggregator, strategy, and paper scorecards | P6-DATA-001, P3-ATTR-001 | Outcome-blind scorecard cards |
 | P6-GOV-002 | Implement the composite Forward Worker and disabled-state lifecycle rehearsal | P6-SCORE-001, PK-WORKER-000 | Recovery and rollback rehearsal |
 | P6-PAPER-001 | Implement the isolated P2 paper lane and fixed-unit ledger | P6-GOV-002, P2-ACCEPT-001 | Balanced paper-account fixture |

@@ -4,8 +4,9 @@
 | --- | --- |
 | Parent | `../08-validation-governance.md` |
 | Design status | approved |
-| Delivery gate | open at `P6-GOV-001`; later children remain dependency-gated |
+| Delivery gate | `P6-GOV-001` accepted; `P6-DATA-001` held blocked pending explicit owner value review |
 | Governing work | `P6-000` |
+| Accepted entry proposal | `config/forward-validation/entry/p6-prospective-mvp-entry.v1.json` |
 | Initial execution profile | `close-to-next-open-v1` only |
 | Research-model dependency | P5 deferred; not a P6 predecessor |
 | Execution authority | paper only; no notification, broker, or live capital |
@@ -28,6 +29,12 @@ The first P6 program remains deliberately narrow:
 - one PostgreSQL Replay Worker at concurrency one until measured queue delay justifies expansion;
 - one read-only product projection for forward evidence and paper-account state.
 
+The first program is a **prospective mechanism MVP**, not a claim that the current two-expert
+catalogue or the current Stage vocabulary is complete. Its primary question is whether the frozen
+DWD -> expert -> aggregator -> Shadow/paper -> settlement chain remains outcome-blind, auditable,
+reproducible and authority-safe under real future information arrival. Expert quality and economic
+results are still recorded, but favorable return is not the primary mechanism-acceptance gate.
+
 P6 does not train a model, search parameters, reopen P3/P4 acceptance, label already-known 2026
 history as prospective, reveal the permanent blind partition, send advice, connect a broker, or
 authorize real capital. P5 may resume later as an optional research track, but no P5 work item is a
@@ -47,7 +54,9 @@ without inventing a generic Worker registry or another transport.
 
 ## 3. Entry decision
 
-`P6-GOV-001` publishes one immutable `P6EntryProposal` before any result-bearing P6 read. It binds:
+`P6-GOV-001` publishes one immutable `P6EntryProposal` before any result-bearing P6 read. The first
+accepted proposal is `config/forward-validation/entry/p6-prospective-mvp-entry.v1.json`; its
+acceptance grants no activation or downstream implementation authority. It binds:
 
 - candidate, strategy, expert, policy, target, resolver, scorecard, P2 profile, code, and DWD
   authority identities;
@@ -60,9 +69,17 @@ without inventing a generic Worker registry or another transport.
 - explicit exclusions for P5, arbitration, permanent blind, notification, broker, and live capital.
 
 The observation budget is not a raw row count. A cross-section containing correlated securities
-cannot manufacture independent evidence. The first proposal should normally cover about one
-quarter of eligible sessions plus the longest target-maturity tail, but the exact value and trigger
-definition are a human decision recorded before activation.
+cannot manufacture independent evidence. The owner-approved first proposal uses three
+non-overlapping 22-trading-session market blocks, or 66 collection sessions, followed by the frozen
+20-session target-maturity tail. Cross-sectional securities, candidates, observations, decisions
+and fills do not increase independent-budget progress. The maximum wall-calendar duration from the
+first official market date is 150 calendar days. Low activity closes as an honest inconclusive
+result; the budget cannot be extended after result exposure merely to obtain more cases.
+
+The first official market date is not created by `P6-GOV-001`. A later `P6-ACTIVATE-001` decision
+must be published first; only the first complete trading session strictly after that decision's
+Asia/Shanghai market date whose DWD release is READY and deeply verifiable may enter the official
+budget. Earlier 2026 data remains rehearsal-only.
 
 The accepted P3 lifecycle record stays immutable. P6 publishes a new package and append-only entry
 decision; it never edits the prior `inconclusive + disabled` bytes or silently changes the strategy
@@ -190,7 +207,7 @@ performed. Permanent blind remains sealed. No outcome authorizes P7 automaticall
 | --- | --- | --- | --- |
 | P6-000 | new | Coordinate the bounded P6 program and close only after every child | META-DOC-001, accepted P3/P4 and Expert Strategy MVP |
 | P6-GOV-001 | #116 | Freeze entry proposal, expectations, budget, stop rules, and rollback | P6-000 entry authority |
-| P6-DATA-001 | #119 | Enforce prospective boundary, DWD identity, access ledger, and correction disposition | P6-GOV-001 |
+| P6-DATA-001 | #119 | Enforce prospective boundary, DWD identity, access ledger, and correction disposition | P6-GOV-001 plus explicit post-entry owner value review |
 | P6-SCORE-001 | #118 | Freeze role-specific scorecards and loss attribution before results | P6-DATA-001, P3-ATTR-001 |
 | P6-GOV-002 | #117 | Implement the composite Forward Worker and disabled-state lifecycle rehearsal | P6-SCORE-001, PK-WORKER-000 |
 | P6-PAPER-001 | new | Add the isolated P2 paper lane and balanced fixed-unit ledger | P6-GOV-002, P2-ACCEPT-001 |
@@ -198,8 +215,10 @@ performed. Permanent blind remains sealed. No outcome authorizes P7 automaticall
 | P6-ACTIVATE-001 | new | Authorize and run the first official post-activation forward cycle | P6-WEB-001 |
 | P6-REVIEW-001 | #120 | Complete the time-matured simulation review and any authorized arbitration reveal | P6-ACTIVATE-001 plus closed budget |
 
-Only `P6-GOV-001` is implementation-ready when this design is admitted. Every later child remains
-blocked until its exact predecessor acceptance evidence exists.
+Only `P6-GOV-001` is implementation-ready at the initial P6 gate. Acceptance of `P6-GOV-001`
+creates a mandatory value checkpoint rather than automatic downstream authority: `P6-DATA-001`
+remains blocked until an explicit post-entry owner review accepts the frozen prospective-MVP cost,
+calendar budget and boundaries. Every later child remains dependency-gated after that decision.
 
 ## 12. Failure semantics and rollback
 

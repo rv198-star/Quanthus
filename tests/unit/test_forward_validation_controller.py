@@ -16,6 +16,7 @@ from quanthus.forward_validation.activation import (
     make_activation_decision_payload,
 )
 from quanthus.platform.jobs import P6_FORWARD_CYCLE_JOB
+from quanthus.platform.models import UserRecord
 from quanthus.platform.persistence import InMemoryPlatformStore
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -42,6 +43,23 @@ def test_owner_mandate_is_digest_bound_to_runtime_and_expected_predecessor() -> 
     assert "disabled_rehearsal_succeeds_through_real_replay_worker" in (
         mandate.activation_conditions
     )
+
+
+def test_fixed_mcp_service_identity_can_attribute_jobs_when_interactive_login_is_inactive() -> None:
+    store = InMemoryPlatformStore()
+    store.create_user(
+        UserRecord(
+            user_id=controller._EXTERNAL_MCP_ACTOR_USER_ID,
+            username="mcp-service",
+            password_hash="disabled",
+            role="viewer",
+            active=False,
+            mfa_secret_ciphertext=None,
+            mfa_enabled=False,
+            created_at=datetime(2026, 9, 18, 1, tzinfo=UTC),
+        )
+    )
+    assert controller._actor_user_id(store) == controller._EXTERNAL_MCP_ACTOR_USER_ID
 
 
 def test_controller_error_is_persisted_as_non_executable_diagnostic_job(

@@ -81,7 +81,11 @@ def _write_pointer(path: Path, payload: dict[str, object]) -> None:
 
 def _actor_user_id(store: PlatformStore) -> str:
     mcp_actor = store.get_user(_EXTERNAL_MCP_ACTOR_USER_ID)
-    if mcp_actor is not None and mcp_actor.active:
+    # This is a fixed service identity, not an interactive operator session. Match the
+    # production event-worker contract: existence is sufficient for durable Job attribution even
+    # when interactive login for that identity has been disabled. Fallback human identities still
+    # require an active operator/admin record below.
+    if mcp_actor is not None:
         return mcp_actor.user_id
     eligible = tuple(
         sorted(

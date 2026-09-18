@@ -25,7 +25,7 @@ _LANE_IDS = {
 _CORRECTION_CLASSES = {"same", "missing_in_daily", "changed_upstream", "conflict"}
 _MARKET_PROFILES: dict[str, dict[str, str]] = {
     "hermes-ods-schedule-v1": {
-        "contract_revision": "hermes-full-ods-scope-cn01-throughput-20260731",
+        "contract_revision": "hermes-cninfo-missing-set-20260918",
         "trigger_time": "17:30:00",
         "experiment_id": "baostock-load-window-20260731-v3",
         "hermes_timer_start": "17:30:00",
@@ -33,7 +33,7 @@ _MARKET_PROFILES: dict[str, dict[str, str]] = {
         "completion_deadline": "19:46:00",
     },
     "hermes-ods-schedule-late-v1": {
-        "contract_revision": "hermes-late-window-cn01-throughput-20260814",
+        "contract_revision": "hermes-late-cninfo-missing-set-20260918",
         "trigger_time": "19:30:00",
         "experiment_id": "baostock-load-window-20260814-v4",
         "hermes_timer_start": "19:30:00",
@@ -301,6 +301,14 @@ def _validate_calendar_events(lane: Mapping[str, Any]) -> None:
         raise ScheduleContractError("calendar events must collect on every natural day")
     if lane.get("can_create_market_session") is not False:
         raise ScheduleContractError("event acquisition must not create a market session")
+    provider_retry = _mapping(
+        lane.get("provider_retry"), field="calendar-daily-events.provider_retry"
+    )
+    if provider_retry != {
+        "missing_set_retry_rounds": 1,
+        "missing_set_retry_delay_seconds": 30,
+    }:
+        raise ScheduleContractError("calendar events must retain the bounded provider retry policy")
 
 
 def _validate_intraday(lane: Mapping[str, Any]) -> None:

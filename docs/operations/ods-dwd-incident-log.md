@@ -84,3 +84,52 @@ on the node.
 
 Remaining follow-up: Hermes must obtain the shared change through its node-local GitHub
 fast-forward deployment. OCI has read-only Hermes authority and must not perform that deployment.
+
+## 2026-09-18 CN01 and Hermes daily DWD failures
+
+| Field | Value |
+| --- | --- |
+| Incident id | `ODS-DWD-20260918-DUAL-001` |
+| Market date | `2026-09-18` |
+| Nodes / units | `CN01` and `Hermes` / daily ODS-to-DWD orchestrators |
+| Detection | Failure email from both nodes on `2026-09-18` |
+| Status | `recovering`; CN01 attribution confirmed, Hermes attribution pending node-local evidence |
+| Failed stage | CN01: `calendar-daily-events`; Hermes: pending attribution |
+| Impact | CN01 did not publish the same-date DWD package, so OCI remained on its preceding verified package while waiting for a same-date READY source. Hermes also reported a DWD failure. No partial DWD package was accepted. |
+
+### CN01 attribution and evidence
+
+CN01's market, 1m, and 5m lanes all published verified READY releases. The first
+`calendar-daily-events` attempt queried CNInfo for all 4,992 in-scope securities, but `000703` and
+`000712` each exhausted three attempts with a 30-second read timeout. The orchestrator retry again
+queried the full universe; this time `002284` and `002297` each exhausted three attempts with HTTP
+502 responses. Both attempts therefore recorded
+`cninfo acquisition incomplete: 2/4992 requests failed`, withheld the event watermark and READY,
+and correctly blocked catalog and DWD publication.
+
+- First orchestrator run:
+  `/root/work/astock/data/shadow/cn01-ods-v1/orchestrator/daily/2026-09-18/20260918T103001443866Z`.
+- Retry orchestrator run:
+  `/root/work/astock/data/shadow/cn01-ods-v1/orchestrator/daily/2026-09-18/20260918T120459664223Z`.
+- First event attempt:
+  `/root/work/astock/data/shadow/cn01-ods-v1/attempts/calendar-daily-events/2026-09-18/20260918-20260918T103002449638Z`.
+- Retry event attempt:
+  `/root/work/astock/data/shadow/cn01-ods-v1/attempts/calendar-daily-events/2026-09-18/20260918-20260918T120500547014Z`.
+
+The changing securities and error modes exclude a fixed unsupported security as the cause. The
+direct cause was transient CNInfo transport failure. The software cause was that each security had
+three immediate attempts, but the collector did not perform a delayed missing-set pass after the
+full-universe scan. Two residual transient failures therefore invalidated an otherwise complete
+event acquisition on both orchestrator attempts.
+
+### Corrective action and remaining recovery
+
+Issue `#312` tracks the repair. The collector now performs one delayed, bounded pass over only the
+residual failed security set. Its final acquisition log keeps exactly one row per security and
+records the scan round, cumulative attempts, and prior-round error. Any residual failure still
+withholds the event release, watermark, catalog, and DWD.
+
+CN01 must obtain the merged revision through its node-local GitHub fast-forward deployment, rerun
+the same date while reusing only verified READY lanes, and record the recovered event manifest and
+DWD package digests here. Hermes must perform the same node-local deployment and return its exact
+attempt evidence; OCI's Hermes access is read-only and does not authorize deployment or recovery.

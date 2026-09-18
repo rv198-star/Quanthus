@@ -1983,8 +1983,15 @@ def _cninfo_fetch_announcements(
     codes: Sequence[str],
     start: date,
     end: date,
+    missing_set_retry_rounds: int = 1,
+    missing_set_retry_delay_seconds: float = 30,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Live cninfo hisAnnouncement pull for disclose-date window."""
+
+    if missing_set_retry_rounds < 0:
+        raise LaneRunError("missing_set_retry_rounds must be non-negative")
+    if missing_set_retry_delay_seconds < 0:
+        raise LaneRunError("missing_set_retry_delay_seconds must be non-negative")
 
     try:
         import requests
@@ -2012,113 +2019,141 @@ def _cninfo_fetch_announcements(
         ),
     }
     session = requests.Session()
-    rows: list[dict[str, Any]] = []
-    logs: list[dict[str, Any]] = []
+    rows_by_code: dict[str, list[dict[str, Any]]] = {}
+    logs_by_code: dict[str, dict[str, Any]] = {}
     acquired_at = _now_sh_iso()
     se = f"{start.isoformat()}~{end.isoformat()}"
-    for code in codes:
-        org_id = org_map.get(code) or org_map.get(_code6(code)) or ""
-        stock = f"{code},{org_id}" if org_id else code
-        request = {
-            "provider": "cninfo",
-            "api": "hisAnnouncement/query",
-            "code": code,
-            "org_id": org_id,
-            "seDate": se,
-            "pageSize": 30,
-        }
-        got_total = 0
-        err = "0"
-        msg = "ok"
-        attempt = 0
-        for attempt in range(1, 4):
-            page = 1
+    pending = list(codes)
+    for scan_round in range(1, missing_set_retry_rounds + 2):
+        if scan_round > 1 and missing_set_retry_delay_seconds:
+            time.sleep(missing_set_retry_delay_seconds)
+        next_pending: list[str] = []
+        for code in pending:
+            org_id = org_map.get(code) or org_map.get(_code6(code)) or ""
+            stock = f"{code},{org_id}" if org_id else code
+            request = {
+                "provider": "cninfo",
+                "api": "hisAnnouncement/query",
+                "code": code,
+                "org_id": org_id,
+                "seDate": se,
+                "pageSize": 30,
+            }
+            got_total = 0
+            err = "0"
+            msg = "ok"
+            attempt = 0
             code_rows: list[dict[str, Any]] = []
-            try:
-                while page <= 40:
-                    payload = {
-                        "pageNum": str(page),
-                        "pageSize": "30",
-                        "column": "szse",
-                        "tabName": "fulltext",
-                        "plate": "",
-                        "stock": stock,
-                        "searchkey": "",
-                        "secid": "",
-                        "category": "",
-                        "trade": "",
-                        "seDate": se,
-                        "sortName": "",
-                        "sortType": "",
-                        "isHLtitle": "false",
-                    }
-                    resp = session.post(url, data=payload, headers=headers, timeout=30)
-                    if resp.status_code != 200:
-                        raise RuntimeError(f"HTTP {resp.status_code}")
-                    body = resp.json()
-                    batch = body.get("announcements") or []
-                    for item in batch:
-                        ann_id = str(item.get("announcementId") or "")
-                        title = (item.get("announcementTitle") or "").strip()
-                        if not ann_id or not title:
-                            continue
-                        ts_ms = item.get("announcementTime")
-                        try:
-                            from datetime import datetime as _dt
+            for attempt in range(1, 4):
+                page = 1
+                code_rows = []
+                try:
+                    while page <= 40:
+                        payload = {
+                            "pageNum": str(page),
+                            "pageSize": "30",
+                            "column": "szse",
+                            "tabName": "fulltext",
+                            "plate": "",
+                            "stock": stock,
+                            "searchkey": "",
+                            "secid": "",
+                            "category": "",
+                            "trade": "",
+                            "seDate": se,
+                            "sortName": "",
+                            "sortType": "",
+                            "isHLtitle": "false",
+                        }
+                        resp = session.post(url, data=payload, headers=headers, timeout=30)
+                        if resp.status_code != 200:
+                            raise RuntimeError(f"HTTP {resp.status_code}")
+                        body = resp.json()
+                        batch = body.get("announcements") or []
+                        for item in batch:
+                            ann_id = str(item.get("announcementId") or "")
+                            title = (item.get("announcementTitle") or "").strip()
+                            if not ann_id or not title:
+                                continue
+                            ts_ms = item.get("announcementTime")
+                            try:
+                                from datetime import datetime as _dt
 
-                            pub = _dt.fromtimestamp(int(ts_ms) / 1000).strftime(
-                                "%Y-%m-%d %H:%M:%S"
+                                pub = _dt.fromtimestamp(int(ts_ms) / 1000).strftime(
+                                    "%Y-%m-%d %H:%M:%S"
+                                )
+                            except Exception:
+                                continue
+                            code_rows.append(
+                                {
+                                    "security_id": code,
+                                    "stock_code": code,
+                                    "ann_id": ann_id,
+                                    "title": title,
+                                    "publish_time": pub,
+                                    "announce_date": pub[:10],
+                                    "name": item.get("secName") or "",
+                                    "url": (
+                                        f"http://www.cninfo.com.cn/new/disclosure/detail?"
+                                        f"stockCode={code}&announcementId={ann_id}"
+                                    ),
+                                    "source": "cninfo.hisAnnouncement",
+                                    "acquired_at": acquired_at,
+                                }
                             )
-                        except Exception:
-                            continue
-                        code_rows.append(
-                            {
-                                "security_id": code,
-                                "stock_code": code,
-                                "ann_id": ann_id,
-                                "title": title,
-                                "publish_time": pub,
-                                "announce_date": pub[:10],
-                                "name": item.get("secName") or "",
-                                "url": (
-                                    f"http://www.cninfo.com.cn/new/disclosure/detail?"
-                                    f"stockCode={code}&announcementId={ann_id}"
-                                ),
-                                "source": "cninfo.hisAnnouncement",
-                                "acquired_at": acquired_at,
-                            }
-                        )
-                    has_more = bool(body.get("hasMore"))
-                    if has_more and page == 40:
-                        raise RuntimeError("pagination limit reached with hasMore=true")
-                    if not has_more or not batch:
-                        break
-                    page += 1
-            except Exception as exc:  # noqa: BLE001
-                err = "1"
-                msg = str(exc)
-                if attempt < 3:
-                    session.close()
-                    session = requests.Session()
-                    time.sleep(0.2 * attempt)
-                    continue
-            else:
-                rows.extend(code_rows)
-                got_total = len(code_rows)
-                err = "0"
-                msg = "ok"
-            break
-        logs.append(
-            {
+                        has_more = bool(body.get("hasMore"))
+                        if has_more and page == 40:
+                            raise RuntimeError("pagination limit reached with hasMore=true")
+                        if not has_more or not batch:
+                            break
+                        page += 1
+                except Exception as exc:  # noqa: BLE001
+                    err = "1"
+                    msg = str(exc)
+                    if attempt < 3:
+                        session.close()
+                        session = requests.Session()
+                        time.sleep(0.2 * attempt)
+                        continue
+                else:
+                    got_total = len(code_rows)
+                    err = "0"
+                    msg = "ok"
+                break
+
+            previous = logs_by_code.get(code)
+            retry_errors = list(previous.get("missing_set_retry_errors", [])) if previous else []
+            total_attempts = int(previous.get("attempts", 0)) + attempt if previous else attempt
+            if previous and str(previous.get("response_error_code")) != "0":
+                retry_errors.append(
+                    {
+                        "scan_round": int(previous["scan_round"]),
+                        "response_error_code": str(previous["response_error_code"]),
+                        "response_error_msg": str(previous["response_error_msg"]),
+                    }
+                )
+            logs_by_code[code] = {
                 "security_id": code,
                 "request": request,
-                "attempts": attempt,
+                "attempts": total_attempts,
+                "scan_round": scan_round,
+                "missing_set_retry_errors": retry_errors,
                 "response_error_code": err,
                 "response_error_msg": msg,
                 "response_rows": got_total,
                 "acquired_at": acquired_at,
             }
-        )
+            if err == "0":
+                rows_by_code[code] = code_rows
+            else:
+                next_pending.append(code)
+        pending = next_pending
+        if not pending:
+            break
+
+    session.close()
+    rows = [row for code in codes for row in rows_by_code.get(code, [])]
+    logs = [logs_by_code[code] for code in codes]
     return rows, logs
 
 
@@ -2145,6 +2180,7 @@ def _build_calendar_events(
     landing: Path,
     knowledge_cutoff: str,
     attempt_id: str | None = None,
+    provider_retry: Mapping[str, Any] | None = None,
 ) -> list[DatasetStatus]:
     rev = f"calendar-events-{market_date.strftime('%Y%m%d')}-v3"
     lookback = _event_lookback_days()
@@ -2168,8 +2204,15 @@ def _build_calendar_events(
     if mode == "provider":
         codes = _universe_from_stock_list(paths.home)
         if codes:
+            retry = provider_retry or {}
             ann_rows, ann_logs = _cninfo_fetch_announcements(
-                codes=codes, start=start, end=market_date
+                codes=codes,
+                start=start,
+                end=market_date,
+                missing_set_retry_rounds=int(retry.get("missing_set_retry_rounds", 1)),
+                missing_set_retry_delay_seconds=float(
+                    retry.get("missing_set_retry_delay_seconds", 30)
+                ),
             )
         else:
             ann_rows = []
@@ -4725,6 +4768,7 @@ def run_lane(
                 landing=landing,
                 knowledge_cutoff=knowledge_cutoff,
                 attempt_id=attempt_id,
+                provider_retry=lane.get("provider_retry"),
             )
             result.datasets = datasets
             _inject_failure(failure_injection_stage, "pre_seal")

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "schedule_id": "hermes-ods-schedule-v1",
-  "contract_revision": "hermes-full-ods-scope-cn01-throughput-20260731",
+  "contract_revision": "hermes-cninfo-missing-set-20260918",
   "timezone": "Asia/Shanghai",
   "ownership": {
     "hermes": "immutable_ods_and_standby_dwd_dws_candidate",
@@ -126,6 +126,10 @@
       "trigger": {"kind": "timer", "days": "every_natural_day", "time": "19:30:00"},
       "resource_group": "pve_event_api",
       "can_create_market_session": false,
+      "provider_retry": {
+        "missing_set_retry_rounds": 1,
+        "missing_set_retry_delay_seconds": 30
+      },
       "datasets": [
         "announcements_delta",
         "suspensions_delta",

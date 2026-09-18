@@ -26,7 +26,7 @@ UTC = timezone.utc
 
 def test_production_compose_arms_conditional_controller_and_mounts_p6_dwd_read_only() -> None:
     compose = (ROOT / "ops/platform/compose.yaml").read_text(encoding="utf-8")
-    assert 'QUANTHUS_P6_CONTROLLER_ENABLED: "${QUANTHUS_P6_CONTROLLER_ENABLED:-1}"' in compose
+    assert 'QUANTHUS_P6_CONTROLLER_ENABLED: "1"' in compose
     assert "/home/ubuntu/data/quanthus/dwd-daily:/data/dwd-daily:ro" in compose
     assert "/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1:/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1:ro" in compose
     assert "/srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001:/srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001:ro" in compose

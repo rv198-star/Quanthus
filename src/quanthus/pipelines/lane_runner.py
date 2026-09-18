@@ -2180,7 +2180,6 @@ def _build_calendar_events(
     landing: Path,
     knowledge_cutoff: str,
     attempt_id: str | None = None,
-    provider_retry: Mapping[str, Any] | None = None,
 ) -> list[DatasetStatus]:
     rev = f"calendar-events-{market_date.strftime('%Y%m%d')}-v3"
     lookback = _event_lookback_days()
@@ -2204,15 +2203,10 @@ def _build_calendar_events(
     if mode == "provider":
         codes = _universe_from_stock_list(paths.home)
         if codes:
-            retry = provider_retry or {}
             ann_rows, ann_logs = _cninfo_fetch_announcements(
                 codes=codes,
                 start=start,
                 end=market_date,
-                missing_set_retry_rounds=int(retry.get("missing_set_retry_rounds", 1)),
-                missing_set_retry_delay_seconds=float(
-                    retry.get("missing_set_retry_delay_seconds", 30)
-                ),
             )
         else:
             ann_rows = []
@@ -4768,7 +4762,6 @@ def run_lane(
                 landing=landing,
                 knowledge_cutoff=knowledge_cutoff,
                 attempt_id=attempt_id,
-                provider_retry=lane.get("provider_retry"),
             )
             result.datasets = datasets
             _inject_failure(failure_injection_stage, "pre_seal")

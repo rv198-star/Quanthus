@@ -68,7 +68,7 @@ services:
       QUANTHUS_EXPERT_RUN_ROOT: /data/expert-evaluation-runs
       QUANTHUS_P6_FORWARD_RUN_ROOT: /data/candidate-runs/p6-forward
       QUANTHUS_P6_DWD_DAILY_ROOT: /data/dwd-daily
-      QUANTHUS_P6_CONTROLLER_ENABLED: "${QUANTHUS_P6_CONTROLLER_ENABLED:-0}"
+      QUANTHUS_P6_CONTROLLER_ENABLED: "${QUANTHUS_P6_CONTROLLER_ENABLED:-1}"
       QUANTHUS_P6_RUNTIME_CONFIG: /app/config/forward-validation/activation/p6-prospective-runtime.v1.json
       QUANTHUS_P6_ACTIVATION_MANDATE: /app/config/forward-validation/activation/p6-owner-activation-mandate.v1.json
       QUANTHUS_REPLAY_MEMORY_CURRENT_PATH: /sys/fs/cgroup/memory.current

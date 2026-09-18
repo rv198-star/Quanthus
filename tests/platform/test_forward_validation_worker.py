@@ -111,6 +111,23 @@ def _worker(tmp_path: Path, store: _Store, **changes: object) -> ReplayWorker:
     return ReplayWorker(store, **kwargs)  # type: ignore[arg-type]
 
 
+def test_controller_auto_arms_only_when_production_mandate_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mandate = tmp_path / "p6-owner-mandate.json"
+    monkeypatch.delenv("QUANTHUS_P6_CONTROLLER_ENABLED", raising=False)
+    assert worker_module._p6_controller_enabled(mandate) is False
+    mandate.write_text("{}\n", encoding="utf-8")
+    assert worker_module._p6_controller_enabled(mandate) is True
+    monkeypatch.setenv("QUANTHUS_P6_CONTROLLER_ENABLED", "0")
+    assert worker_module._p6_controller_enabled(mandate) is False
+    monkeypatch.setenv("QUANTHUS_P6_CONTROLLER_ENABLED", "1")
+    assert worker_module._p6_controller_enabled(tmp_path / "missing.json") is True
+    monkeypatch.setenv("QUANTHUS_P6_CONTROLLER_ENABLED", "yes")
+    with pytest.raises(RuntimeError, match="QUANTHUS_P6_CONTROLLER_ENABLED"):
+        worker_module._p6_controller_enabled(mandate)
+
+
 def test_disabled_rehearsal_contract_has_zero_runtime_side_effects(tmp_path: Path) -> None:
     config = load_forward_worker_config(CONFIG, root=ROOT)
     value = _input()

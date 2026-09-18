@@ -897,6 +897,19 @@ class ReplayWorker:
         return next_offset
 
 
+def _p6_controller_enabled(mandate_path: Path) -> bool:
+    raw = os.environ.get("QUANTHUS_P6_CONTROLLER_ENABLED")
+    if raw is None:
+        # Production replay images carry the immutable owner mandate.  Treat that bounded mandate
+        # as the safe default arming signal when an external fixed Compose project omits the newer
+        # environment variable.  Local/dev workers without the production /app mandate stay off.
+        return mandate_path.is_file()
+    normalized = raw.strip()
+    if normalized not in {"0", "1"}:
+        raise RuntimeError("QUANTHUS_P6_CONTROLLER_ENABLED must be 0 or 1")
+    return normalized == "1"
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     dsn = os.environ.get("QUANTHUS_PLATFORM_DATABASE_URL", "").strip()
@@ -948,18 +961,16 @@ def main(argv: list[str] | None = None) -> int:
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    controller_enabled = os.environ.get("QUANTHUS_P6_CONTROLLER_ENABLED", "0").strip()
-    if controller_enabled not in {"0", "1"}:
-        raise RuntimeError("QUANTHUS_P6_CONTROLLER_ENABLED must be 0 or 1")
     mandate_path = Path(
         os.environ.get(
             "QUANTHUS_P6_ACTIVATION_MANDATE",
             "/app/config/forward-validation/activation/p6-owner-activation-mandate.v1.json",
         )
     )
-    code_revision = runtime_code_revision() if controller_enabled == "1" else None
+    controller_enabled = _p6_controller_enabled(mandate_path)
+    code_revision = runtime_code_revision() if controller_enabled else None
     while not worker.stopping:
-        if controller_enabled == "1":
+        if controller_enabled:
             try:
                 if code_revision is None:
                     raise RuntimeError("P6 controller requires an exact runtime code revision")

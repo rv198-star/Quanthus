@@ -154,6 +154,10 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     assert "config/product-research-catalog.v1.json" in dockerfile
     assert "config/product-candidate-evidence.v1.json" in dockerfile
     assert "config/product-expert-evidence.v1.json" in dockerfile
+    assert "config/forward-validation" in dockerfile
+    assert "config/forward-validation" in builder
+    assert "src/quanthus/forward_validation/product_view.py" in dockerfile
+    assert "src/quanthus/forward_validation/product_view.py" in builder
     assert "config/expert-strategies/p4-trend-risk.v1.0.1.json" in dockerfile
     assert "candidate-p4-trend-risk-1.0.1.inconclusive.v1.json" in dockerfile
     assert "find ./config -type d -exec chmod 0555" in dockerfile

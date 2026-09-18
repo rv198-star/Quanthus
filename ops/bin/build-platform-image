@@ -14,9 +14,11 @@ trap cleanup EXIT INT TERM
 install -d \
     "$BUILD_CONTEXT/config/expert-evaluations/lifecycle" \
     "$BUILD_CONTEXT/config/expert-strategies" \
+    "$BUILD_CONTEXT/config/forward-validation" \
     "$BUILD_CONTEXT/config/pipelines" \
     "$BUILD_CONTEXT/config/releases" \
-    "$BUILD_CONTEXT/src/quanthus/expert_evaluation"
+    "$BUILD_CONTEXT/src/quanthus/expert_evaluation" \
+    "$BUILD_CONTEXT/src/quanthus/forward_validation"
 cp "$REPOSITORY_ROOT/.dockerignore" \
     "$REPOSITORY_ROOT/pyproject.toml" \
     "$REPOSITORY_ROOT/README.md" \
@@ -46,6 +48,8 @@ cp "$REPOSITORY_ROOT/config/pipelines/ods-base-final-through-20260731.v2.json" \
     "$REPOSITORY_ROOT/config/pipelines/dwd-domain-model.v1.json" \
     "$REPOSITORY_ROOT/config/pipelines/dwd-domain-model.v1.1-extension.json" \
     "$BUILD_CONTEXT/config/pipelines/"
+cp -a "$REPOSITORY_ROOT/config/forward-validation/." \
+    "$BUILD_CONTEXT/config/forward-validation/"
 cp "$REPOSITORY_ROOT/config/releases/v2-build202607.json" \
     "$BUILD_CONTEXT/config/releases/"
 cp "$REPOSITORY_ROOT/config/expert-strategies/p4-trend-risk.v1.0.1.json" \
@@ -71,6 +75,9 @@ cp "$REPOSITORY_ROOT/src/quanthus/expert_evaluation/__init__.py" \
     "$REPOSITORY_ROOT/src/quanthus/expert_evaluation/runner.py" \
     "$REPOSITORY_ROOT/src/quanthus/expert_evaluation/serialization.py" \
     "$BUILD_CONTEXT/src/quanthus/expert_evaluation/"
+cp "$REPOSITORY_ROOT/src/quanthus/forward_validation/__init__.py" \
+    "$REPOSITORY_ROOT/src/quanthus/forward_validation/product_view.py" \
+    "$BUILD_CONTEXT/src/quanthus/forward_validation/"
 cp -a "$REPOSITORY_ROOT/src/quanthus/platform" "$BUILD_CONTEXT/src/quanthus/"
 
 docker build \

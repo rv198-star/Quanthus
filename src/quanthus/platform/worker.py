@@ -17,7 +17,7 @@ from typing import Any
 
 from quanthus.expert_evaluation.runner import ExpertEvaluationJobInput
 from quanthus.forward_validation.activation import runtime_code_revision
-from quanthus.forward_validation.controller import controller_tick
+from quanthus.forward_validation.controller import controller_tick, record_controller_error
 from quanthus.forward_validation.official_cycle import OfficialCycleJobInput
 from quanthus.forward_validation.runner import ForwardCycleJobInput
 from quanthus.platform.jobs import CANDIDATE_REPLAY_JOB, EXPERT_EVALUATION_JOB, P6_FORWARD_CYCLE_JOB
@@ -958,18 +958,18 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     code_revision = runtime_code_revision() if controller_enabled == "1" else None
-    if controller_enabled == "1" and code_revision is None:
-        raise RuntimeError("P6 controller requires an exact runtime code revision")
     while not worker.stopping:
         if controller_enabled == "1":
             try:
+                if code_revision is None:
+                    raise RuntimeError("P6 controller requires an exact runtime code revision")
                 controller_state = controller_tick(
                     store,
                     repository_root=Path("/app"),
                     p6_forward_run_root=p6_forward_run_root,
                     runtime_path=p6_runtime_path,
                     mandate_path=mandate_path,
-                    code_revision=str(code_revision),
+                    code_revision=code_revision,
                 )
                 print(
                     json.dumps(
@@ -980,12 +980,18 @@ def main(argv: list[str] | None = None) -> int:
                     flush=True,
                 )
             except Exception as exc:
+                diagnostic_job_id = record_controller_error(
+                    store,
+                    code_revision=code_revision,
+                    error=exc,
+                )
                 print(
                     json.dumps(
                         {
                             "event": "p6-controller-error",
                             "error_type": type(exc).__name__,
                             "reason": str(exc)[:500],
+                            "diagnostic_job_id": diagnostic_job_id,
                         },
                         sort_keys=True,
                     ),

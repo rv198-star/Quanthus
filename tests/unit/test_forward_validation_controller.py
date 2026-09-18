@@ -44,6 +44,27 @@ def test_owner_mandate_is_digest_bound_to_runtime_and_expected_predecessor() -> 
     )
 
 
+def test_controller_error_is_persisted_as_non_executable_diagnostic_job(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = InMemoryPlatformStore()
+    monkeypatch.setattr(controller, "_actor_user_id", lambda _store: "usr_test")
+    job_id = controller.record_controller_error(
+        store,
+        code_revision="a" * 40,
+        error=RuntimeError("synthetic-controller-failure"),
+    )
+    assert job_id is not None
+    job = store.get_job(job_id)
+    assert job is not None
+    assert job.kind == controller.P6_CONTROLLER_DIAGNOSTIC_JOB
+    assert job.state == "failed"
+    assert job.queue == "controller"
+    assert job.stage == "controller-error"
+    assert job.error_reason == "RuntimeError:synthetic-controller-failure"
+    assert job.result_ref == {"error_type": "RuntimeError"}
+
+
 def test_controller_seeds_real_disabled_rehearsal_before_activation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

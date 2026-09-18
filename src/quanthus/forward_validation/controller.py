@@ -33,10 +33,12 @@ from quanthus.forward_validation.runner import (
     verify_forward_run,
 )
 from quanthus.forward_validation.serialization import canonical_json_bytes, digest_value
-from quanthus.platform.jobs import P6_FORWARD_CYCLE_JOB, DurableJobQueue
+from quanthus.platform.jobs import P6_FORWARD_CYCLE_JOB, DurableJobQueue, input_digest
+from quanthus.platform.models import JobRecord
 from quanthus.platform.persistence import PlatformStore
 
 _EXTERNAL_MCP_ACTOR_USER_ID = "usr_18c14af81a06cf878f177579efec3727"
+P6_CONTROLLER_DIAGNOSTIC_JOB = "quanthus.p6-controller-diagnostic.v1"
 _MARKET_TZ = ZoneInfo("Asia/Shanghai")
 
 
@@ -98,6 +100,53 @@ def _actor_user_id(store: PlatformStore) -> str:
     if not eligible:
         raise RuntimeError("p6_controller_actor_unavailable")
     return eligible[0].user_id
+
+
+def record_controller_error(
+    store: PlatformStore,
+    *,
+    code_revision: str | None,
+    error: Exception,
+) -> str | None:
+    """Persist the first controller error for one runtime revision without entering a worker queue."""
+
+    identity = code_revision or "missing-runtime-revision"
+    job_id = "job_" + hashlib.sha256(
+        f"p6-controller-diagnostic:{identity}".encode()
+    ).hexdigest()[:32]
+    now = datetime.now(timezone.utc)
+    input_ref = {
+        "controller": "p6",
+        "code_revision": code_revision,
+    }
+    try:
+        store.create_job(
+            JobRecord(
+                job_id=job_id,
+                kind=P6_CONTROLLER_DIAGNOSTIC_JOB,
+                actor_user_id=_actor_user_id(store),
+                idempotency_key=f"p6-controller-diagnostic-{identity[:32]}",
+                input_ref=input_ref,
+                state="failed",
+                progress=100,
+                cancel_requested=False,
+                attempt=0,
+                result_ref={"error_type": type(error).__name__},
+                error_reason=f"{type(error).__name__}:{error}"[:500],
+                created_at=now,
+                updated_at=now,
+                completed_at=now,
+                queue="controller",
+                input_digest=input_digest(input_ref),
+                concurrency_key=f"p6-controller-diagnostic:{identity}",
+                available_at=now,
+                stage="controller-error",
+                progress_detail={"terminal": True},
+            )
+        )
+    except Exception:
+        return None
+    return job_id
 
 
 def _platform_green() -> bool:

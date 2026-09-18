@@ -52,7 +52,10 @@ lanes pass. The former four daily lane timers are rendered with
 be enabled alongside the controller. Weekly corrections retain their independent Saturday timer.
 Do not hand-edit installed timers.
 
-4. Start timers without manually starting services. The market service first runs
+4. While timers are still stopped, clear any retained failed state for their services. Only then
+   start timers, without manually starting services. Do not run `systemctl reset-failed` on a
+   timer-triggered service after its timer is active: clearing that state can release a pending
+   trigger immediately and create an out-of-window attempt. The market service first runs
    `check-ods-collection-window`; an elapsed same-day event presented after a timer restart is
    condition-skipped outside the node's contract-defined five-minute grace and creates no attempt.
    Do not bypass that gate with `systemctl start` on the service. Record the deployed commit,

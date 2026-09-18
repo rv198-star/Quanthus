@@ -93,7 +93,7 @@ fast-forward deployment. OCI has read-only Hermes authority and must not perform
 | Market date | `2026-09-18` |
 | Nodes / units | `CN01` and `Hermes` / daily ODS-to-DWD orchestrators |
 | Detection | Failure email from both nodes on `2026-09-18` |
-| Status | `recovering`; CN01 attribution confirmed, Hermes attribution pending node-local evidence |
+| Status | CN01 `resolved`; Hermes attribution and recovery pending node-local evidence |
 | Failed stage | CN01: `calendar-daily-events`; Hermes: pending attribution |
 | Impact | CN01 did not publish the same-date DWD package, so OCI remained on its preceding verified package while waiting for a same-date READY source. Hermes also reported a DWD failure. No partial DWD package was accepted. |
 
@@ -122,14 +122,38 @@ three immediate attempts, but the collector did not perform a delayed missing-se
 full-universe scan. Two residual transient failures therefore invalidated an otherwise complete
 event acquisition on both orchestrator attempts.
 
-### Corrective action and remaining recovery
+### Corrective action and CN01 recovery
 
 Issue `#312` tracks the repair. The collector now performs one delayed, bounded pass over only the
 residual failed security set. Its final acquisition log keeps exactly one row per security and
 records the scan round, cumulative attempts, and prior-round error. Any residual failure still
 withholds the event release, watermark, catalog, and DWD.
 
-CN01 must obtain the merged revision through its node-local GitHub fast-forward deployment, rerun
-the same date while reusing only verified READY lanes, and record the recovered event manifest and
-DWD package digests here. Hermes must perform the same node-local deployment and return its exact
-attempt evidence; OCI's Hermes access is read-only and does not authorize deployment or recovery.
+PR `#313` delivered the collector repair. Its first CN01 recovery event release was READY, but that
+PR also changed the schedule contract revision and config digest. The daily catalog correctly
+rejected combining that release with the three same-day releases sealed under the preceding
+contract. No catalog or DWD was published. PR `#314` restored the exact preceding schedule bytes
+and revision while retaining the bounded collector implementation; both schedule config SHA-256
+values matched their pre-incident values before deployment.
+
+CN01 deployed merge revision `36c06d69c8f33a0b40bb41b72aad483cecfbdbf1` through its node-local
+GitHub fast-forward path. The compatible event recovery queried all 4,992 securities with zero
+residual failures and published release `hermes-calendar-daily-events-20260918-8179844Z-v2`,
+manifest `sha256:ebcc55936076cd1bc34ecee71b991a1960ea20548ff0f65849de2136efe35a25`.
+The final orchestrator reused all four verified READY lanes, sealed catalog
+`20260918T153258546555Z`, and completed DWD at `2026-09-18 23:33:06 Asia/Shanghai`.
+
+OCI independently installed and verified package `dwd-daily-20260918-5d789c21aac8-36c06d6` at
+`23:35:12 Asia/Shanghai`. Its manifest SHA-256 is
+`sha256:c0599b680e89007f9818a59caf5db7e62a3d606fa9f51ddb980b6b0ee37b410c`, content digest is
+`sha256:16c707e2dd643dc8ed9a8307eea9e6a08808f57e67475e357d47ade74dfdb39b`, and
+`dwd_security_bar` contains 1,442,688 rows. The receipt is
+`/home/ubuntu/data/quanthus/dwd-daily/receipts/2026-09-18/dwd-daily-20260918-5d789c21aac8-36c06d6.json`.
+Both CN01 orchestration and OCI synchronization triggered their success notification units.
+
+### Remaining Hermes recovery
+
+Hermes must perform the same node-local GitHub deployment and return its exact failed attempt,
+recovered event release, DWD package, timer state, and notification evidence. OCI's Hermes access
+is read-only and does not authorize deployment or recovery. Do not infer Hermes attribution from
+CN01 merely because both nodes sent failure email on the same date.

@@ -22,6 +22,14 @@ def test_health_openapi_request_id_and_removed_routes(kernel) -> None:
     )
     assert status == 200
     assert payload["status"] == "healthy"
+    assert payload["forward_validation"] == {
+        "state": "engineering_ready_activation_disabled",
+        "admission_state": "disabled",
+        "official_collection_sessions_completed": 0,
+        "independent_blocks_completed": 0,
+        "first_official_market_date": None,
+        "last_admitted_dwd_release": None,
+    }
     assert headers["X-Request-ID"] == "platform-acceptance-42"
 
     status, _, document = wsgi_request(kernel, "GET", "/openapi.json")

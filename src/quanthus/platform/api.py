@@ -20,7 +20,10 @@ from quanthus.expert_evaluation.product_view import (
     ProductExpertEvidence,
     ProductExpertEvidenceError,
 )
-from quanthus.forward_validation.product_view import ForwardValidationProductView
+from quanthus.forward_validation.product_view import (
+    ForwardProductViewError,
+    ForwardValidationProductView,
+)
 from quanthus.platform.candidate_approval import (
     CandidateApprovalService,
     public_candidate_approval_event,
@@ -809,6 +812,13 @@ class PlatformHttpApp:
         facts_qualification = self._structure_facts_qualification_health()
         if facts_qualification is not None:
             payload["structure_facts_qualification"] = facts_qualification
+        try:
+            payload["forward_validation"] = self._forward_validation.health_summary()
+        except ForwardProductViewError as exc:
+            payload["forward_validation"] = {
+                "state": "projection_unavailable",
+                "reason": exc.reason_code,
+            }
         return _json_response(payload)
 
     def _ready(self, _request: HttpRequest, _params: Mapping[str, str]) -> HttpResponse:
@@ -981,7 +991,9 @@ class PlatformHttpApp:
         _principal(self._identity, observed_request, "catalog:read")
         entry_id = urllib.parse.unquote(params["entry_id"])
         query = urllib.parse.parse_qs(observed_request.query_string, keep_blank_values=True)
-        if set(query) - {"depth", "limit", "asset_scope"} or any(len(value) != 1 for value in query.values()):
+        if set(query) - {"depth", "limit", "asset_scope"} or any(
+            len(value) != 1 for value in query.values()
+        ):
             raise ValueError("catalog_query_parameters_invalid")
         try:
             depth = int(query.get("depth", ["2"])[0])

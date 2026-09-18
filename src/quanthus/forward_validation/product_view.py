@@ -376,6 +376,21 @@ class ForwardValidationProductView:
             "last_admitted_dwd_release": latest["market_date"],
         }
 
+    def health_summary(self) -> dict[str, object]:
+        observed = self.candidate(_TARGET_STRATEGY, _TARGET_VERSION)
+        admission = observed["admission"]
+        evidence = observed["evidence"]
+        return {
+            "state": observed["state"],
+            "admission_state": admission["state"],
+            "official_collection_sessions_completed": evidence[
+                "official_collection_sessions_completed"
+            ],
+            "independent_blocks_completed": evidence["independent_blocks_completed"],
+            "first_official_market_date": evidence["first_official_market_date"],
+            "last_admitted_dwd_release": evidence["last_admitted_dwd_release"],
+        }
+
     def candidate(self, strategy_id: str, strategy_version: str) -> dict[str, object]:
         if (strategy_id, strategy_version) != (_TARGET_STRATEGY, _TARGET_VERSION):
             return {"state": "not_applicable", "read_only": True}

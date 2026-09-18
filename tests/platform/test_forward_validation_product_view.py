@@ -99,6 +99,14 @@ def test_target_candidate_projects_frozen_pre_activation_state() -> None:
     assert observed["paper"]["configured_total_notional_cny"] == "500000.00"
     assert observed["paper"]["actual_execution_authorized"] is False
     assert observed["paper"]["ledger_head"] is None
+    assert view.health_summary() == {
+        "state": "engineering_ready_activation_disabled",
+        "admission_state": "disabled",
+        "official_collection_sessions_completed": 0,
+        "independent_blocks_completed": 0,
+        "first_official_market_date": None,
+        "last_admitted_dwd_release": None,
+    }
     assert observed["authority"] == {
         "notification_authorized": False,
         "broker_authorized": False,
@@ -145,6 +153,14 @@ def test_enabled_activation_is_projected_read_only(tmp_path: Path) -> None:
     assert observed["authority"]["broker_authorized"] is False
     assert observed["authority"]["live_capital_authorized"] is False
     assert observed["source_digests"]["activation_decision"] == decision["decision_digest"]
+    assert view.health_summary() == {
+        "state": "prospective_activation_enabled",
+        "admission_state": "enabled",
+        "official_collection_sessions_completed": 0,
+        "independent_blocks_completed": 0,
+        "first_official_market_date": None,
+        "last_admitted_dwd_release": None,
+    }
 
 
 def test_enabled_activation_projects_official_session_progress(tmp_path: Path) -> None:

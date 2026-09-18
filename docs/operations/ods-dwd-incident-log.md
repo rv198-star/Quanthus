@@ -184,3 +184,12 @@ Hermes published DWD package `dwd-daily-20260918-11ad4ed40401-3657bb5`, manifest
 `dwd_security_bar` contains 1,442,688 rows. The node-local DWD `CURRENT.json` points to market date
 2026-09-18, and the success notification unit exited zero. Recovery evidence is retained at
 `/root/work/astock/data/shadow/hermes-ods-v1/evidence/incident-312-hermes-20260918T2350CST`.
+
+After recovery, operators started the timers before clearing the services' retained failed state.
+Clearing that state released pending daily and weekly timer triggers at `2026-09-19 00:12
+Asia/Shanghai`, outside both contract windows. The out-of-window services were stopped and exposed
+no catalog or DWD package, but the orchestrator's expected `TERM` result invoked `OnFailure` and
+sent a `2026-09-19` failure email at `00:15:20`. This was a recovery-operation false alert, not a
+regression of the verified 2026-09-18 package. The services are inactive, all three timers are
+active with their next contract-defined triggers, and the runbook now requires failed-state reset
+while timers remain stopped.

@@ -14,11 +14,13 @@ from quanthus.forward_validation.contracts import ForwardValidationContractError
 from quanthus.forward_validation.paper_ledger import (
     initial_paper_ledger,
     load_paper_policy,
+    paper_ledger_from_dict,
     reconcile_paper_ledger,
     verify_p2_ledger_entries,
 )
 from quanthus.forward_validation.paper_projection import (
     SealedAggregateDecision,
+    paper_pending_intent_from_dict,
     project_paper_intent,
     settle_paper_intent,
 )
@@ -276,6 +278,24 @@ def test_paper_target_notional_cannot_be_mutated_or_redeployed() -> None:
 
     with pytest.raises(ForwardValidationContractError, match="paper_funding_drift"):
         replace_paper_unit(ledger, mutated, policy=policy)
+
+
+def test_paper_state_and_pending_intent_round_trip_for_cross_day_forward_state() -> None:
+    policy = _policy()
+    ledger = initial_paper_ledger(policy)
+    restored = paper_ledger_from_dict(ledger.to_dict())
+    assert restored.to_dict() == ledger.to_dict()
+    assert restored.digest == ledger.digest
+
+    intent = project_paper_intent(
+        policy=policy,
+        ledger=ledger,
+        decision=_decision(market_date=date(2026, 9, 14), action="trial_entry"),
+    )
+    assert intent is not None
+    restored_intent = paper_pending_intent_from_dict(intent.to_dict())
+    assert restored_intent.to_dict() == intent.to_dict()
+    assert restored_intent.actual_execution_authorized is False
 
 
 def test_missing_decision_close_blocks_new_entry_without_inventing_quantity() -> None:

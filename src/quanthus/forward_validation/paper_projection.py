@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import ROUND_DOWN, Decimal
-from typing import Any, Sequence
 
 from quanthus.backtest.contracts import (
     BacktestRunSpec,
@@ -113,6 +113,76 @@ class PaperPendingIntent:
         }
 
 
+def paper_pending_intent_from_dict(value: Mapping[str, object]) -> PaperPendingIntent:
+    expected = {
+        "schema_version",
+        "paper_intent_id",
+        "decision_digest",
+        "authority",
+        "actual_execution_authorized",
+        "signal",
+    }
+    if (
+        set(value) != expected
+        or value.get("schema_version") != "quanthus.p6-paper-pending-intent.v1"
+    ):
+        fail("paper_intent_invalid", "paper intent fields differ")
+    if value.get("authority") != "paper" or value.get("actual_execution_authorized") is not False:
+        fail("paper_authority_drift", "paper intent authority differs")
+    raw = value.get("signal")
+    signal_fields = {
+        "signal_id",
+        "market_date",
+        "knowledge_cutoff",
+        "snapshot_id",
+        "source_revision",
+        "decision_at",
+        "profile_id",
+        "window_id",
+        "security_code",
+        "side",
+        "unit_id",
+        "quantity",
+        "aggregate_score",
+        "reason_code",
+        "decision_version",
+    }
+    if not isinstance(raw, dict) or set(raw) != signal_fields:
+        fail("paper_intent_invalid", "paper signal fields differ")
+    try:
+        snapshot = SnapshotRef(
+            market_date=date.fromisoformat(str(raw["market_date"])),
+            knowledge_cutoff=datetime.fromisoformat(str(raw["knowledge_cutoff"])),
+            source_revision=str(raw["source_revision"]),
+            snapshot_id=str(raw["snapshot_id"]),
+        )
+        signal = BacktestSignal(
+            signal_id=str(raw["signal_id"]),
+            snapshot=snapshot,
+            decision_at=datetime.fromisoformat(str(raw["decision_at"])),
+            profile_id=str(raw["profile_id"]),
+            window_id=None if raw["window_id"] is None else str(raw["window_id"]),
+            security_code=str(raw["security_code"]),
+            side=OrderSide(str(raw["side"])),
+            unit_id=str(raw["unit_id"]),
+            quantity=int(raw["quantity"]),
+            aggregate_score=Decimal(str(raw["aggregate_score"])),
+            reason_code=str(raw["reason_code"]),
+            decision_version=str(raw["decision_version"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("paper intent signal values are invalid") from exc
+    decision_digest = str(value.get("decision_digest"))
+    paper_intent_id = str(value.get("paper_intent_id"))
+    if (
+        not decision_digest.startswith("sha256:")
+        or len(decision_digest) != 71
+        or not paper_intent_id
+    ):
+        fail("paper_intent_invalid", "paper intent identity differs")
+    return PaperPendingIntent(paper_intent_id, decision_digest, signal)
+
+
 @dataclass(frozen=True)
 class PaperSettlement:
     paper_intent_id: str
@@ -164,7 +234,11 @@ def project_paper_intent(
         if decision.decision_close is None:
             fail("paper_decision_close_missing", "new paper entry requires decision close")
         target = decision.target_maximum_position or policy.base_trial_fraction
-        quantity = _quantity(policy=policy, notional_fraction=target, decision_close=decision.decision_close)
+        quantity = _quantity(
+            policy=policy,
+            notional_fraction=target,
+            decision_close=decision.decision_close,
+        )
         if quantity <= 0:
             fail("paper_entry_quantity_zero", "frozen paper sizing produced zero shares")
         side = OrderSide.BUY

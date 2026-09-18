@@ -91,6 +91,7 @@ class SplitAssignment(str, Enum):
     DEVELOPMENT = "development"
     ARBITRATION = "arbitration"
     PERMANENT_BLIND = "permanent_blind"
+    PROSPECTIVE = "prospective"
 
 
 @dataclass(frozen=True)

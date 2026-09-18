@@ -60,7 +60,7 @@ def input_digest(input_ref: Mapping[str, Any]) -> str:
 def p6_forward_rehearsal_submission(
     input_ref: Mapping[str, Any],
 ) -> tuple[dict[str, Any], str, str]:
-    """Validate the only pre-activation P6 job shape admitted by P6-GOV-002."""
+    """Validate the zero-side-effect pre-activation P6 rehearsal shape."""
     from quanthus.forward_validation.runner import ForwardCycleJobInput
 
     parsed = ForwardCycleJobInput.from_dict(input_ref)
@@ -68,6 +68,24 @@ def p6_forward_rehearsal_submission(
     if input_digest(canonical) != parsed.input_digest:
         raise RuntimeError("P6 forward input digest implementations differ")
     return canonical, parsed.idempotency_key, parsed.concurrency_key
+
+
+def p6_forward_submission(
+    input_ref: Mapping[str, Any],
+) -> tuple[dict[str, Any], str, str]:
+    """Validate either admitted P6 mode without adding a second queue or transport."""
+    mode = input_ref.get("mode")
+    if mode == "disabled_rehearsal":
+        return p6_forward_rehearsal_submission(input_ref)
+    if mode == "official_cycle":
+        from quanthus.forward_validation.official_cycle import OfficialCycleJobInput
+
+        parsed = OfficialCycleJobInput.from_dict(input_ref)
+        canonical = parsed.to_dict()
+        if input_digest(canonical) != parsed.input_digest:
+            raise RuntimeError("P6 official input digest implementations differ")
+        return canonical, parsed.idempotency_key, parsed.concurrency_key
+    raise ValueError("P6 forward mode is not admitted")
 
 
 def expert_evaluation_submission(

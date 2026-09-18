@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 from quanthus.backtest.contracts import EngineEvent, EventType, UnitState
 from quanthus.backtest.policy import ExecutionPolicy, load_execution_policy
@@ -187,7 +187,10 @@ def load_paper_policy(path: Path, *, root: Path) -> P6PaperPolicy:
     ):
         fail("paper_authority_drift", "paper execution authority/funding differs")
     authority = raw.get("authority")
-    if not isinstance(authority, dict) or authority.get("paper_runtime_implementation_authorized") is not True:
+    if (
+        not isinstance(authority, dict)
+        or authority.get("paper_runtime_implementation_authorized") is not True
+    ):
         fail("authority_drift", "paper implementation authority missing")
     if any(
         value is not False
@@ -206,7 +209,9 @@ def load_paper_policy(path: Path, *, root: Path) -> P6PaperPolicy:
     )
 
 
-def initial_paper_ledger(policy: P6PaperPolicy, *, ledger_id: str = "p6-paper-ledger-v1") -> PaperLedgerState:
+def initial_paper_ledger(
+    policy: P6PaperPolicy, *, ledger_id: str = "p6-paper-ledger-v1"
+) -> PaperLedgerState:
     return PaperLedgerState(
         ledger_id=ledger_id,
         version=0,
@@ -215,6 +220,84 @@ def initial_paper_ledger(policy: P6PaperPolicy, *, ledger_id: str = "p6-paper-le
             for index in range(1, policy.unit_count + 1)
         ),
     )
+
+
+def paper_ledger_from_dict(value: Mapping[str, object]) -> PaperLedgerState:
+    expected = {
+        "schema_version",
+        "ledger_id",
+        "version",
+        "authority",
+        "actual_execution_authorized",
+        "units",
+    }
+    if set(value) != expected or value.get("schema_version") != "quanthus.p6-paper-ledger.v1":
+        fail("paper_ledger_invalid", "paper ledger fields differ")
+    if value.get("authority") != "paper" or value.get("actual_execution_authorized") is not False:
+        fail("paper_authority_drift", "paper ledger authority differs")
+    raw_units = value.get("units")
+    if not isinstance(raw_units, list) or not raw_units:
+        fail("paper_ledger_invalid", "paper ledger units are missing")
+    units: list[UnitState] = []
+    unit_fields = {
+        "unit_id",
+        "target_notional",
+        "cash",
+        "security_code",
+        "settled_quantity",
+        "position_cost",
+        "commission_expense",
+        "stamp_duty_expense",
+        "transfer_fee_expense",
+        "realized_pnl",
+        "dividend_income",
+        "external_pool",
+        "last_mark_price",
+        "last_mark_snapshot_id",
+    }
+    for raw in raw_units:
+        if not isinstance(raw, dict) or set(raw) != unit_fields:
+            fail("paper_ledger_invalid", "paper unit fields differ")
+        try:
+            units.append(
+                UnitState(
+                    unit_id=str(raw["unit_id"]),
+                    target_notional=Decimal(str(raw["target_notional"])),
+                    cash=Decimal(str(raw["cash"])),
+                    security_code=(
+                        None if raw["security_code"] is None else str(raw["security_code"])
+                    ),
+                    settled_quantity=int(raw["settled_quantity"]),
+                    position_cost=Decimal(str(raw["position_cost"])),
+                    commission_expense=Decimal(str(raw["commission_expense"])),
+                    stamp_duty_expense=Decimal(str(raw["stamp_duty_expense"])),
+                    transfer_fee_expense=Decimal(str(raw["transfer_fee_expense"])),
+                    realized_pnl=Decimal(str(raw["realized_pnl"])),
+                    dividend_income=Decimal(str(raw["dividend_income"])),
+                    external_pool=Decimal(str(raw["external_pool"])),
+                    last_mark_price=(
+                        None
+                        if raw["last_mark_price"] is None
+                        else Decimal(str(raw["last_mark_price"]))
+                    ),
+                    last_mark_snapshot_id=(
+                        None
+                        if raw["last_mark_snapshot_id"] is None
+                        else str(raw["last_mark_snapshot_id"])
+                    ),
+                )
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ForwardValidationContractError(
+                "paper_ledger_invalid", "paper unit value invalid"
+            ) from exc
+    try:
+        version = int(value["version"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ForwardValidationContractError(
+            "paper_ledger_invalid", "paper version invalid"
+        ) from exc
+    return PaperLedgerState(str(value["ledger_id"]), version, tuple(units))
 
 
 def replace_paper_unit(
@@ -253,7 +336,9 @@ def state_from_p2_snapshot(event: EngineEvent, *, target_notional: Decimal) -> U
     )
 
 
-def reconcile_paper_ledger(ledger: PaperLedgerState, *, policy: P6PaperPolicy) -> PaperLedgerReconciliation:
+def reconcile_paper_ledger(
+    ledger: PaperLedgerState, *, policy: P6PaperPolicy
+) -> PaperLedgerReconciliation:
     if len(ledger.units) != policy.unit_count:
         fail("paper_ledger_reconciliation_break", "paper unit count differs")
     total_target = Decimal("0")

@@ -23,6 +23,7 @@ from quanthus.backtest.inputs import (
 from quanthus.event_library.contracts import (
     EventIdentity,
     EventRecord,
+    SplitAssignment,
     require_sha256_digest,
     sha256_digest,
 )
@@ -799,6 +800,57 @@ def _triggered(features: CandidateFeatureEvidence, card: CandidateRuleCard) -> b
     )
 
 
+def _require_source_scan_date(source_policy: object, value: date) -> None:
+    method = getattr(source_policy, "require_scan_date", None)
+    if callable(method):
+        method(value)
+        return
+    legacy = getattr(source_policy, "require_development_date", None)
+    if not callable(legacy):
+        raise CandidateScanError("candidate source policy does not authorize scan dates")
+    legacy(value)
+
+
+def _candidate_signal_date_allowed(source_policy: object, value: date) -> bool:
+    method = getattr(source_policy, "candidate_signal_date_allowed", None)
+    if method is None:
+        return True
+    if not callable(method):
+        raise CandidateScanError("candidate source signal-date policy is invalid")
+    allowed = method(value)
+    if not isinstance(allowed, bool):
+        raise CandidateScanError("candidate source signal-date policy must return boolean")
+    return allowed
+
+
+def _assign_candidate_split(
+    split_policy: object,
+    *,
+    signal_date: date,
+    feature_start: date,
+    outcome_end: date,
+    trading_dates: Sequence[date],
+) -> SplitAssignment:
+    method = getattr(split_policy, "assign_event_split", None)
+    if callable(method):
+        assignment = method(
+            signal_date=signal_date,
+            feature_start=feature_start,
+            outcome_end=outcome_end,
+            trading_dates=trading_dates,
+        )
+        if not isinstance(assignment, SplitAssignment):
+            raise CandidateScanError("candidate split policy returned invalid assignment")
+        return assignment
+    return assign_event_split(
+        split_policy,
+        signal_date=signal_date,
+        feature_start=feature_start,
+        outcome_end=outcome_end,
+        trading_dates=trading_dates,
+    )
+
+
 def _scan_context(
     *,
     trading_dates: Sequence[date],
@@ -816,7 +868,7 @@ def _scan_context(
     if not ordered_dates or tuple(sorted(set(ordered_dates))) != ordered_dates:
         raise CandidateScanError("trading_dates must be sorted and unique")
     for value in ordered_dates:
-        source_policy.require_development_date(value)
+        _require_source_scan_date(source_policy, value)
     history_sessions = card.eligibility.minimum_history_sessions
     if history_sessions != 22:
         raise CandidateScanError("approved candidate implementation requires 22-session history")
@@ -850,7 +902,7 @@ def _scan_security_series(
     if len(session_dates) != len(set(session_dates)):
         raise CandidateScanError("candidate input contains duplicate security-date rows")
     for row in rows:
-        source_policy.require_development_date(row.session_date)
+        _require_source_scan_date(source_policy, row.session_date)
     series_identities = {(item.listing_id, item.listing_code, item.company_id) for item in rows}
     if len(series_identities) != 1:
         raise CandidateScanError("one scan series must retain one listing/company identity")
@@ -869,6 +921,8 @@ def _scan_security_series(
     thresholds = {item.threshold_id: Fraction(item.value) for item in card.thresholds}
     for local_index in range(history_sessions - 1, len(rows)):
         current = rows[local_index]
+        if not _candidate_signal_date_allowed(source_policy, current.session_date):
+            continue
         evaluated += 1
         trading_index = date_index.get(current.session_date)
         if trading_index is None or trading_index < history_sessions - 1:
@@ -1055,7 +1109,7 @@ def _finalize_raw_candidates(
     events: list[ScannedCandidate] = []
     for candidate in retained:
         try:
-            assignment = assign_event_split(
+            assignment = _assign_candidate_split(
                 split_policy,
                 signal_date=candidate.signal_date,
                 feature_start=candidate.feature_start,

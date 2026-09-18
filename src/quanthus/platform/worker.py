@@ -16,6 +16,9 @@ from pathlib import Path
 from typing import Any
 
 from quanthus.expert_evaluation.runner import ExpertEvaluationJobInput
+from quanthus.forward_validation.activation import runtime_code_revision
+from quanthus.forward_validation.controller import controller_tick
+from quanthus.forward_validation.official_cycle import OfficialCycleJobInput
 from quanthus.forward_validation.runner import ForwardCycleJobInput
 from quanthus.platform.jobs import CANDIDATE_REPLAY_JOB, EXPERT_EVALUATION_JOB, P6_FORWARD_CYCLE_JOB
 from quanthus.platform.persistence import PostgresPlatformStore
@@ -190,6 +193,7 @@ class ReplayWorker:
         expert_registry_root: Path | None = None,
         p6_forward_run_root: Path | None = None,
         p6_forward_config_path: Path | None = None,
+        p6_prospective_runtime_path: Path | None = None,
         memory_current_path: Path | None = None,
         memory_stat_path: Path | None = None,
         memory_stop_bytes: int = DEFAULT_MEMORY_STOP_BYTES,
@@ -212,6 +216,10 @@ class ReplayWorker:
         self.p6_forward_config_path = (
             p6_forward_config_path
             or Path("config/forward-validation/runtime/p6-forward-worker.v1.json")
+        ).resolve()
+        self.p6_prospective_runtime_path = (
+            p6_prospective_runtime_path
+            or Path("config/forward-validation/activation/p6-prospective-runtime.v1.json")
         ).resolve()
         self.memory_current_path = memory_current_path
         self.memory_stat_path = memory_stat_path
@@ -352,7 +360,13 @@ class ReplayWorker:
         observed = self.store.get_job(job_id)
         if observed is None or observed.claim_generation != generation:
             return
-        job_input = ForwardCycleJobInput.from_dict(input_ref)
+        mode = input_ref.get("mode")
+        if mode == "disabled_rehearsal":
+            job_input = ForwardCycleJobInput.from_dict(input_ref)
+        elif mode == "official_cycle":
+            job_input = OfficialCycleJobInput.from_dict(input_ref)
+        else:
+            raise RuntimeError("p6_forward_mode_not_admitted")
         if job_input.input_digest != observed.input_digest:
             raise RuntimeError("p6_forward_input_digest_mismatch")
         run_root = self.p6_forward_run_root / "runs"
@@ -378,12 +392,15 @@ class ReplayWorker:
             shutil.rmtree(attempt)
         attempt.mkdir(parents=True)
         input_path = attempt / "input.json"
-        input_path.write_bytes(json.dumps(job_input.to_dict(), sort_keys=True).encode("utf-8") + b"\n")
+        input_path.write_bytes(
+            json.dumps(job_input.to_dict(), sort_keys=True).encode("utf-8") + b"\n"
+        )
         stdout_path = attempt / "result.json"
         stderr_path = attempt / "progress.log"
         command = p6_forward_child_command(
             input_path=input_path,
             config_path=self.p6_forward_config_path,
+            runtime_path=self.p6_prospective_runtime_path,
             staging=attempt / "work",
             run_root=run_root,
         )
@@ -902,8 +919,15 @@ def main(argv: list[str] | None = None) -> int:
             "/app/config/forward-validation/runtime/p6-forward-worker.v1.json",
         )
     )
+    store = PostgresPlatformStore(dsn)
+    p6_runtime_path = Path(
+        os.environ.get(
+            "QUANTHUS_P6_RUNTIME_CONFIG",
+            "/app/config/forward-validation/activation/p6-prospective-runtime.v1.json",
+        )
+    )
     worker = ReplayWorker(
-        PostgresPlatformStore(dsn),
+        store,
         worker_id=worker_id,
         run_root=run_root,
         lease_seconds=args.lease_seconds,
@@ -913,6 +937,7 @@ def main(argv: list[str] | None = None) -> int:
         expert_registry_root=expert_registry_root,
         p6_forward_run_root=p6_forward_run_root,
         p6_forward_config_path=p6_forward_config_path,
+        p6_prospective_runtime_path=p6_runtime_path,
         memory_current_path=args.memory_current_path,
         memory_stat_path=args.memory_stat_path,
         memory_stop_bytes=args.memory_stop_bytes,
@@ -923,7 +948,50 @@ def main(argv: list[str] | None = None) -> int:
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    controller_enabled = os.environ.get("QUANTHUS_P6_CONTROLLER_ENABLED", "0").strip()
+    if controller_enabled not in {"0", "1"}:
+        raise RuntimeError("QUANTHUS_P6_CONTROLLER_ENABLED must be 0 or 1")
+    mandate_path = Path(
+        os.environ.get(
+            "QUANTHUS_P6_ACTIVATION_MANDATE",
+            "/app/config/forward-validation/activation/p6-owner-activation-mandate.v1.json",
+        )
+    )
+    code_revision = runtime_code_revision() if controller_enabled == "1" else None
+    if controller_enabled == "1" and code_revision is None:
+        raise RuntimeError("P6 controller requires an exact runtime code revision")
     while not worker.stopping:
+        if controller_enabled == "1":
+            try:
+                controller_state = controller_tick(
+                    store,
+                    repository_root=Path("/app"),
+                    p6_forward_run_root=p6_forward_run_root,
+                    runtime_path=p6_runtime_path,
+                    mandate_path=mandate_path,
+                    code_revision=str(code_revision),
+                )
+                print(
+                    json.dumps(
+                        {"event": "p6-controller", **controller_state},
+                        sort_keys=True,
+                    ),
+                    file=sys.stderr,
+                    flush=True,
+                )
+            except Exception as exc:
+                print(
+                    json.dumps(
+                        {
+                            "event": "p6-controller-error",
+                            "error_type": type(exc).__name__,
+                            "reason": str(exc)[:500],
+                        },
+                        sort_keys=True,
+                    ),
+                    file=sys.stderr,
+                    flush=True,
+                )
         worked = worker.run_once()
         if args.once:
             return 0

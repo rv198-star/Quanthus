@@ -13,6 +13,8 @@ trap cleanup EXIT INT TERM
 
 install -d "$BUILD_CONTEXT/config" "$BUILD_CONTEXT/src/quanthus"
 cp "$REPOSITORY_ROOT/pyproject.toml" "$REPOSITORY_ROOT/README.md" "$BUILD_CONTEXT/"
+printf '%s\n' "$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)" > \
+    "$BUILD_CONTEXT/config/runtime-code-revision.txt"
 
 while IFS= read -r source; do
     relative=${source#"$REPOSITORY_ROOT/"}

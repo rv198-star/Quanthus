@@ -31,6 +31,10 @@ EXPERT_STAGE_PROGRESS = {
 
 P6_FORWARD_STAGE_PROGRESS = {
     "binding-inputs": 10,
+    "building-prospective-projection": 30,
+    "producing-official-decisions": 55,
+    "projecting-paper-intents": 75,
+    "official-cycle-sealed": 98,
     "rehearsal-sealed": 98,
 }
 
@@ -50,7 +54,12 @@ class P6ForwardChildResult:
 
 
 def p6_forward_child_command(
-    *, input_path: Path, config_path: Path, staging: Path, run_root: Path
+    *,
+    input_path: Path,
+    config_path: Path,
+    runtime_path: Path,
+    staging: Path,
+    run_root: Path,
 ) -> tuple[str, ...]:
     return (
         sys.executable,
@@ -60,6 +69,8 @@ def p6_forward_child_command(
         str(input_path),
         "--config",
         str(config_path),
+        "--runtime-config",
+        str(runtime_path),
         "--staging",
         str(staging),
         "--run-root",
@@ -76,7 +87,10 @@ def validate_p6_forward_child_result(payload: object, run_root: Path) -> P6Forwa
         "summary",
     }:
         raise RuntimeError("p6_forward_child_result_invalid")
-    if any(not isinstance(payload[name], str) for name in ("run_id", "artifact_ref", "manifest_digest", "input_digest")):
+    if any(
+        not isinstance(payload[name], str)
+        for name in ("run_id", "artifact_ref", "manifest_digest", "input_digest")
+    ):
         raise RuntimeError("p6_forward_child_result_invalid")
     configured_root = run_root.resolve()
     artifact = Path(str(payload["artifact_ref"])).resolve()

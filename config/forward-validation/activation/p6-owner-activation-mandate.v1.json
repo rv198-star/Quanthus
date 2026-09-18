@@ -1,0 +1,27 @@
+{
+  "schema_version": "quanthus.p6-owner-activation-mandate.v1",
+  "work_item": "P6-ACTIVATE-001",
+  "mandate_id": "p6-owner-conditional-activation-20260918-v1",
+  "state": "OWNER_AUTHORIZED_CONDITIONAL",
+  "entry_proposal_digest": "sha256:3c9356e49dbdd6356754b42cfd34af11949289121454a05bdbf0c0ff2aebaa18",
+  "runtime_sha256": "sha256:b8935da7f639d67632de3aef66be50082b59dc3a1d0281f694ea121954d919ce",
+  "expected_previous_production_revision": "594845fa4882c9ed5107be9859ceabfc52356c56",
+  "activation_mode": "automatic_after_all_predeclared_gates",
+  "activation_conditions": [
+    "exact_origin_main_deployment_revision_is_running",
+    "disabled_rehearsal_succeeds_through_real_replay_worker",
+    "disabled_rehearsal_has_zero_dwd_shadow_paper_settlement_scorecard_notification_broker_live_side_effects",
+    "rollback_drill_proves_disabled_admission_seeds_zero_official_jobs",
+    "production_health_and_ready_are_green",
+    "replay_worker_dwd_mounts_are_read_only",
+    "official_authority_remains_paper_only"
+  ],
+  "approval_authority": "human",
+  "paper_authority_only": true,
+  "notification_authorized": false,
+  "broker_authorized": false,
+  "live_capital_authorized": false,
+  "arbitration_2022_2024_access_authorized": false,
+  "permanent_blind_2025_access_authorized": false,
+  "mandate_digest": "sha256:ec06b30eefd5b1a42f68038cc9fcd98a95983fd717244872a2a4cdd9d37f7798"
+}

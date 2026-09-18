@@ -11,13 +11,14 @@ import hashlib
 import json
 import os
 import shutil
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 from quanthus.forward_validation.contracts import ForwardValidationContractError, fail
-from quanthus.forward_validation.serialization import canonical_json_bytes, digest_value
+from quanthus.forward_validation.serialization import canonical_json_bytes
 from quanthus.platform.jobs import input_digest
 
 _CONFIG_SCHEMA = "quanthus.p6-forward-worker.v1"
@@ -55,7 +56,12 @@ def _load(path: Path) -> dict[str, Any]:
 
 
 def _repo_binding(root: Path, value: object, expected_sha: object, field: str) -> Path:
-    if not isinstance(value, str) or not value or Path(value).is_absolute() or ".." in Path(value).parts:
+    if (
+        not isinstance(value, str)
+        or not value
+        or Path(value).is_absolute()
+        or ".." in Path(value).parts
+    ):
         fail("path_escape", f"{field}.path must be repository relative")
     path = (root / value).resolve()
     if root.resolve() not in path.parents or not path.is_file():
@@ -127,9 +133,16 @@ class ForwardCycleJobInput:
         if any(value.get(name) is not None for name in (
             "activation_decision", "dwd_release", "prior_paper_ledger_head"
         )):
-            fail("rehearsal_side_effect_input_forbidden", "disabled rehearsal cannot carry runtime inputs")
+            fail(
+                "rehearsal_side_effect_input_forbidden",
+                "disabled rehearsal cannot carry runtime inputs",
+            )
         rehearsal_id = value.get("rehearsal_id")
-        if not isinstance(rehearsal_id, str) or not rehearsal_id or rehearsal_id.strip() != rehearsal_id:
+        if (
+            not isinstance(rehearsal_id, str)
+            or not rehearsal_id
+            or rehearsal_id.strip() != rehearsal_id
+        ):
             fail("field_mismatch", "rehearsal_id must be canonical text")
         entry = value.get("entry_proposal_digest")
         data = value.get("data_policy_sha256")
@@ -190,7 +203,10 @@ def load_forward_worker_config(path: Path, *, root: Path) -> P6ForwardWorkerConf
         "paper_side_effect": False,
         "settlement_side_effect": False,
         "scorecard_side_effect": False,
-        "purpose": "Exercise the real Replay Worker child/seal/recovery/fencing path while admission remains disabled.",
+        "purpose": (
+            "Exercise the real Replay Worker child/seal/recovery/fencing path while "
+            "admission remains disabled."
+        ),
     }:
         fail("forward_worker_config_drift", "disabled rehearsal semantics differ")
     official = raw.get("official_cycle")
@@ -263,33 +279,82 @@ def verify_forward_run(
 ) -> ForwardRun:
     try:
         manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
-        rehearsal = json.loads((path / "rehearsal.json").read_text(encoding="utf-8"))
         ready = (path / "READY").read_text(encoding="ascii").strip()
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("forward_run_unreadable") from exc
     if not isinstance(manifest, dict) or manifest.get("schema_version") != _RUN_SCHEMA:
         raise RuntimeError("forward_run_manifest_mismatch")
-    if not isinstance(rehearsal, dict) or rehearsal.get("schema_version") != _REHEARSAL_SCHEMA:
-        raise RuntimeError("forward_run_rehearsal_mismatch")
     if ready != _sha(path / "manifest.json"):
         raise RuntimeError("forward_run_ready_mismatch")
-    if manifest.get("rehearsal_sha256") != _sha(path / "rehearsal.json"):
-        raise RuntimeError("forward_run_rehearsal_checksum_mismatch")
     if expected_input_digest is not None and manifest.get("input_digest") != expected_input_digest:
         raise RuntimeError("forward_run_input_mismatch")
     summary = manifest.get("summary")
-    if not isinstance(summary, dict) or summary != rehearsal.get("summary"):
+    if not isinstance(summary, dict):
         raise RuntimeError("forward_run_summary_mismatch")
-    if (
-        summary.get("mode") != "disabled_rehearsal"
-        or summary.get("official_evidence") is not False
-        or summary.get("dwd_read_count") != 0
-        or summary.get("shadow_write_count") != 0
-        or summary.get("paper_write_count") != 0
-        or summary.get("settlement_write_count") != 0
-        or summary.get("scorecard_write_count") != 0
-    ):
-        raise RuntimeError("forward_run_authority_leak")
+    mode = summary.get("mode")
+    if mode == "disabled_rehearsal":
+        try:
+            rehearsal = json.loads((path / "rehearsal.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError("forward_run_rehearsal_mismatch") from exc
+        if not isinstance(rehearsal, dict) or rehearsal.get("schema_version") != _REHEARSAL_SCHEMA:
+            raise RuntimeError("forward_run_rehearsal_mismatch")
+        if manifest.get("rehearsal_sha256") != _sha(path / "rehearsal.json"):
+            raise RuntimeError("forward_run_rehearsal_checksum_mismatch")
+        if summary != rehearsal.get("summary"):
+            raise RuntimeError("forward_run_summary_mismatch")
+        if (
+            summary.get("official_evidence") is not False
+            or summary.get("dwd_read_count") != 0
+            or summary.get("shadow_write_count") != 0
+            or summary.get("paper_write_count") != 0
+            or summary.get("settlement_write_count") != 0
+            or summary.get("scorecard_write_count") != 0
+        ):
+            raise RuntimeError("forward_run_authority_leak")
+    elif mode == "official_cycle":
+        try:
+            official = json.loads((path / "official.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError("forward_run_official_mismatch") from exc
+        if (
+            manifest.get("mode") != "official_cycle"
+            or not isinstance(official, dict)
+            or official.get("schema_version") != "quanthus.p6-official-cycle.v1"
+            or manifest.get("official_sha256") != _sha(path / "official.json")
+        ):
+            raise RuntimeError("forward_run_official_mismatch")
+        projection = official.get("projection")
+        authority = official.get("authority")
+        official_input = official.get("input")
+        if (
+            not isinstance(projection, dict)
+            or projection.get("artifact_ref") != "projection"
+            or projection.get("manifest_sha256") != manifest.get("projection_manifest_sha256")
+            or not (path / "projection" / "manifest.json").is_file()
+            or _sha(path / "projection" / "manifest.json") != projection.get("manifest_sha256")
+            or not isinstance(authority, dict)
+            or authority.get("official_prospective_evidence") is not True
+            or authority.get("paper_only") is not True
+            or authority.get("notification_authorized") is not False
+            or authority.get("broker_authorized") is not False
+            or authority.get("live_capital_authorized") is not False
+            or authority.get("arbitration_2022_2024_access") is not False
+            or authority.get("permanent_blind_2025_access") is not False
+            or not isinstance(official_input, dict)
+            or official_input.get("mode") != "official_cycle"
+        ):
+            raise RuntimeError("forward_run_authority_leak")
+        if (
+            summary.get("official_evidence") is not True
+            or summary.get("shared_projection_build_count") != 1
+            or summary.get("notification_count") != 0
+            or summary.get("broker_action_count") != 0
+            or summary.get("live_capital_action_count") != 0
+        ):
+            raise RuntimeError("forward_run_authority_leak")
+    else:
+        raise RuntimeError("forward_run_mode_mismatch")
     return ForwardRun(
         path.resolve(),
         str(manifest.get("run_id")),

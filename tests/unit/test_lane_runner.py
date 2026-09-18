@@ -1421,14 +1421,14 @@ def test_intraday_watermark_only_on_ready(fixture_home: Path, tmp_path: Path) ->
     assert attempt["schedule_id"] == "hermes-ods-schedule-v1"
     assert (
         attempt["schedule_contract_revision"]
-        == "hermes-full-ods-scope-cn01-throughput-20260731"
+        == "hermes-cninfo-missing-set-20260918"
     )
     assert attempt["schedule_config_sha256"] == expected_schedule_sha
     release = json.loads((result.release_dir / "release.json").read_text(encoding="utf-8"))
     assert release["schedule_contract_id"] == "hermes-ods-schedule-v1"
     assert (
         release["schedule_contract_revision"]
-        == "hermes-full-ods-scope-cn01-throughput-20260731"
+        == "hermes-cninfo-missing-set-20260918"
     )
     assert release["schedule_config_sha256"] == expected_schedule_sha
     meta_dataset = next(item for item in result.datasets if item.name == "intraday_meta")
@@ -1887,6 +1887,99 @@ def test_cninfo_retries_one_security_without_duplicate_rows(
     assert logs[0]["attempts"] == 2
     assert logs[0]["response_error_code"] == "0"
     assert logs[0]["response_rows"] == 1
+
+
+def test_cninfo_missing_set_retry_repairs_only_failed_security(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    class FakeResponse:
+        status_code = 200
+
+        def __init__(self, code: str) -> None:
+            self.code = code
+
+        def json(self) -> dict[str, object]:
+            return {
+                "announcements": [
+                    {
+                        "announcementId": f"notice-{self.code}",
+                        "announcementTitle": "Notice",
+                        "announcementTime": 1786406400000,
+                        "secName": "Example",
+                    }
+                ],
+                "hasMore": False,
+            }
+
+    class FakeSession:
+        def post(self, *_args: object, **kwargs: object) -> FakeResponse:
+            code = str(kwargs["data"]["stock"]).split(",", 1)[0]
+            calls.append(code)
+            if code == "000002" and calls.count(code) <= 3:
+                raise TimeoutError("injected timeout")
+            return FakeResponse(code)
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setenv("ASTOCK_HOME", str(tmp_path))
+    monkeypatch.setitem(sys.modules, "requests", SimpleNamespace(Session=FakeSession))
+
+    rows, logs = lane_runner._cninfo_fetch_announcements(
+        codes=["000001", "000002"],
+        start=date(2026, 9, 18),
+        end=date(2026, 9, 18),
+        missing_set_retry_delay_seconds=0,
+    )
+
+    assert calls == ["000001", "000002", "000002", "000002", "000002"]
+    assert [row["ann_id"] for row in rows] == ["notice-000001", "notice-000002"]
+    assert len(logs) == 2
+    repaired = logs[1]
+    assert repaired["response_error_code"] == "0"
+    assert repaired["attempts"] == 4
+    assert repaired["scan_round"] == 2
+    assert repaired["missing_set_retry_errors"] == [
+        {
+            "scan_round": 1,
+            "response_error_code": "1",
+            "response_error_msg": "injected timeout",
+        }
+    ]
+
+
+def test_cninfo_missing_set_retry_exhaustion_remains_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = 0
+
+    class FakeSession:
+        def post(self, *_args: object, **_kwargs: object) -> None:
+            nonlocal calls
+            calls += 1
+            raise TimeoutError("persistent timeout")
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setenv("ASTOCK_HOME", str(tmp_path))
+    monkeypatch.setitem(sys.modules, "requests", SimpleNamespace(Session=FakeSession))
+
+    rows, logs = lane_runner._cninfo_fetch_announcements(
+        codes=["000001"],
+        start=date(2026, 9, 18),
+        end=date(2026, 9, 18),
+        missing_set_retry_delay_seconds=0,
+    )
+
+    assert rows == []
+    assert calls == 6
+    assert len(logs) == 1
+    assert logs[0]["response_error_code"] == "1"
+    assert logs[0]["attempts"] == 6
+    assert logs[0]["scan_round"] == 2
 
 
 def test_weekly_provider_error_is_not_a_business_conflict(

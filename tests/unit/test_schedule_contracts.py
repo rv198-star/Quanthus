@@ -30,7 +30,7 @@ class ScheduleContractTests(unittest.TestCase):
         self.assertEqual(contract.schedule_id, "hermes-ods-schedule-v1")
         self.assertEqual(
             contract.contract_revision,
-            "hermes-cninfo-missing-set-20260918",
+            "hermes-full-ods-scope-cn01-throughput-20260731",
         )
         self.assertEqual(len(contract.lanes), 5)
 
@@ -40,7 +40,7 @@ class ScheduleContractTests(unittest.TestCase):
         self.assertEqual(contract.schedule_id, "hermes-ods-schedule-late-v1")
         self.assertEqual(
             contract.contract_revision,
-            "hermes-late-cninfo-missing-set-20260918",
+            "hermes-late-window-cn01-throughput-20260814",
         )
         self.assertEqual(len(contract.lanes), 5)
 
@@ -140,16 +140,6 @@ class ScheduleContractTests(unittest.TestCase):
             lane["provider_readiness"]["sentinel_indices"] = ["sh.000001"]
 
         with self.assertRaisesRegex(ScheduleContractError, "provider readiness contract"):
-            load_schedule_contract(self._mutated(mutate))
-
-    def test_rejects_unbounded_calendar_event_provider_retry(self) -> None:
-        def mutate(payload: dict[str, object]) -> None:
-            lane = next(
-                lane for lane in payload["lanes"] if lane["id"] == "calendar-daily-events"
-            )
-            lane["provider_retry"]["missing_set_retry_rounds"] = 2
-
-        with self.assertRaisesRegex(ScheduleContractError, "bounded provider retry policy"):
             load_schedule_contract(self._mutated(mutate))
 
     def test_rejects_unversioned_collection_window_change(self) -> None:

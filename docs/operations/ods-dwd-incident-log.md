@@ -93,8 +93,8 @@ fast-forward deployment. OCI has read-only Hermes authority and must not perform
 | Market date | `2026-09-18` |
 | Nodes / units | `CN01` and `Hermes` / daily ODS-to-DWD orchestrators |
 | Detection | Failure email from both nodes on `2026-09-18` |
-| Status | CN01 `resolved`; Hermes attribution and recovery pending node-local evidence |
-| Failed stage | CN01: `calendar-daily-events`; Hermes: pending attribution |
+| Status | `resolved` on both CN01 and Hermes |
+| Failed stage | CN01: `calendar-daily-events`; Hermes: `market-daily-core` |
 | Impact | CN01 did not publish the same-date DWD package, so OCI remained on its preceding verified package while waiting for a same-date READY source. Hermes also reported a DWD failure. No partial DWD package was accepted. |
 
 ### CN01 attribution and evidence
@@ -151,9 +151,36 @@ OCI independently installed and verified package `dwd-daily-20260918-5d789c21aac
 `/home/ubuntu/data/quanthus/dwd-daily/receipts/2026-09-18/dwd-daily-20260918-5d789c21aac8-36c06d6.json`.
 Both CN01 orchestration and OCI synchronization triggered their success notification units.
 
-### Remaining Hermes recovery
+### Hermes attribution and recovery
 
-Hermes must perform the same node-local GitHub deployment and return its exact failed attempt,
-recovered event release, DWD package, timer state, and notification evidence. OCI's Hermes access
-is read-only and does not authorize deployment or recovery. Do not infer Hermes attribution from
-CN01 merely because both nodes sent failure email on the same date.
+Hermes had a different direct failure. Its event lane published READY successfully. The first
+`market-daily-core` attempt returned daily bars for 3,912 of 4,992 securities, leaving 1,080
+mandatory status observations missing; fail-closed validation withheld the market release. The
+outer retry later received zero daily rows, so the market, status, and valuation datasets all
+failed. The first 90-minute orchestration window also expired while the 1m and 5m lanes were still
+running. A second orchestration completed both minute lanes but remained blocked by the market
+failure. No incomplete catalog or DWD package was published.
+
+Hermes was still on revision `9810d3a955232d25327e9a015d551fe801f109fd`, which lacked the
+retry recovery-window fix and 540-minute controller bound delivered after the 2026-09-11
+incident. Through the approved management channel, operators preserved the pre-deployment HEAD,
+unit checksums, and timer state, stopped timers, fetched `origin/main` from GitHub with the
+node-specific deploy key, and fast-forwarded the clean checkout to
+`3657bb5d50d51d55eecad9291537d8644089fda8`. Both schedule contracts and 24 focused node-local
+tests passed. Repository-rendered units replaced the installed units; the daily orchestrator now
+has `TimeoutStartSec=540min` and a 14,760-second retry recovery window.
+
+The explicit 2026-09-18 recovery reused the already verified event, 1m, and 5m releases and ran
+only the missing market lane. It collected 4,992 daily bars, 4,992 status observations, and 4,992
+valuation observations with no residual gap, publishing market release
+`20260918-20260918T155233390804Z`; its `release.json` SHA-256 is
+`fd3458411ab2dfd2c825bfbae115f05c7b66c050103c5fa450cb48fecc97bff1`. Catalog
+`20260918T155231888498Z` contains four lanes and 32 artifacts with digest
+`sha256:11ad4ed404017ef77f0ffd08ff06fdb35f332c475226984a11081d50d4ef2b52`.
+
+Hermes published DWD package `dwd-daily-20260918-11ad4ed40401-3657bb5`, manifest
+`sha256:9995bec3d04417cac5e661a51f57e00fd4976b29efe0242d32272fce5c131654`, and content digest
+`sha256:51200ba732e390616bf6224ea604d6b77f37c50471e39a7d2c9da502fc0e96d4`.
+`dwd_security_bar` contains 1,442,688 rows. The node-local DWD `CURRENT.json` points to market date
+2026-09-18, and the success notification unit exited zero. Recovery evidence is retained at
+`/root/work/astock/data/shadow/hermes-ods-v1/evidence/incident-312-hermes-20260918T2350CST`.

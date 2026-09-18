@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Phase | P6 prospective-MVP implementation; P5 optional research deferred |
-| Status | GOV/DATA/SCORE/Forward Worker/Paper/Web accepted; `P6-ACTIVATE-001` pre-activation gate ready |
+| Status | Production activation enabled; `P6-ACTIVATE-001` waits only for first legal official-cycle reproduction; review budget remains open |
 | Governing requirements | FR-GOV-001/002, NFR-004 |
 | Detailed design | `08-validation-governance/p6-forward-validation.md` |
 
@@ -62,13 +62,14 @@ emergency fix. Exceeding the budget downgrades that period's research credibilit
 | P6-GOV-002 | Implement the composite Forward Worker and disabled-state lifecycle rehearsal | P6-SCORE-001, PK-WORKER-000 | `docs/acceptance/p6-gov002-forward-worker-20260917.md` |
 | P6-PAPER-001 | Implement the isolated P2 paper lane and fixed-unit ledger | P6-GOV-002, P2-ACCEPT-001 | `docs/acceptance/p6-paper001-paper-lane-20260917.md` |
 | P6-WEB-001 | Project forward and paper evidence in candidate detail | P6-PAPER-001 | `docs/acceptance/p6-web001-forward-paper-product-view-20260917.md` |
-| P6-ACTIVATE-001 | Authorize and run the first official post-activation forward cycle | P6-WEB-001 | Signed activation and reproduced first cycle |
-| P6-REVIEW-001 | Complete the time-matured simulation review and any authorized reveal | P6-ACTIVATE-001 plus closed budget | Signed review package and closed ledger |
+| P6-ACTIVATE-001 | Authorize and run the first official post-activation forward cycle | P6-WEB-001 | `docs/acceptance/p6-activate001-production-activation-status-20260919.md`; signed activation enabled, first legal official-cycle reproduction pending |
+| P6-REVIEW-001 | Complete the time-matured simulation review and any authorized reveal | P6-ACTIVATE-001 plus closed budget | GitHub #120; signed review package and closed ledger after the real-calendar budget matures |
 
 ## 7. Acceptance
 
-The engineering checkpoint requires an authorized first prospective cycle and independent
-reproduction. Full P6 acceptance additionally waits for the predeclared real-calendar observation
-budget and target-maturity tail, closes and reconciles the paper ledger, records a signed human
-review, and proves zero notification, broker, or live-capital authority. A negative or
-inconclusive result may close P6 honestly; missing prospective time may not.
+Production activation is now enabled, but the engineering checkpoint still requires the first
+legal post-activation prospective cycle and independent reproduction. Full P6 acceptance
+additionally waits for the predeclared real-calendar observation budget and target-maturity tail,
+closes and reconciles the paper ledger, records a signed human review, and proves zero notification,
+broker, or live-capital authority. A negative or inconclusive result may close P6 honestly;
+missing prospective time may not.

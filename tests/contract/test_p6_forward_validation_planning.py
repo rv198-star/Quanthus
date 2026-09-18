@@ -116,6 +116,23 @@ def test_p6_issue_bodies_are_construction_ready_and_epic_links_all_children() ->
         assert "live capital" in body
 
 
+def test_p6_production_activation_closeout_preserves_the_frozen_acceptance_gate() -> None:
+    status = (
+        ROOT / "docs/acceptance/p6-activate001-production-activation-status-20260919.md"
+    ).read_text(encoding="utf-8")
+    design = (ROOT / P6_DESIGN_PATH).read_text(encoding="utf-8")
+    index = (ROOT / "docs/work-items/index.md").read_text(encoding="utf-8")
+
+    assert "production activation enabled" in status
+    assert "`0 / 66`" in status
+    assert "does **not** mark `P6-ACTIVATE-001` accepted early" in status
+    assert "first legal post-activation official cycle" in status
+    assert "GitHub #120" in status
+    assert "`P6-REVIEW-001` already" in design
+    assert "exists as GitHub #120" in design
+    assert "`P6-REVIEW-001` already exists as GitHub #120 and must not be duplicated" in index
+
+
 def test_p5_is_deferred_without_becoming_a_p6_predecessor() -> None:
     items = work_items(ROOT)
     p5_items = [item for item in items if item.phase == "P5"]

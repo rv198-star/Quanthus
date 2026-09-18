@@ -37,8 +37,11 @@ then froze role-specific forward scorecards and material-loss attribution. `P6-G
 disabled composite-Worker lifecycle on the existing replay queue with immutable recovery and zero
 prospective side effects. `P6-PAPER-001` then accepted the isolated five-unit fixed-notional P2
 paper lane, and `P6-WEB-001` accepted the digest-bound read-only candidate-detail projection.
-`P6-ACTIVATE-001` is now the pre-activation integration, exact deployment, rollback and signed
-activation-decision gate. P5 is optional research and remains deferred. Target two-window activation
+`P6-ACTIVATE-001` has crossed the production activation boundary: the signed activation is enabled,
+production health projects `prospective_activation_enabled`, and official collection remains `0 / 66`
+until the first legal post-activation READY trading-session release. The work item closes only after
+that first official cycle and independent reproduction; `P6-REVIEW-001` is the existing GitHub #120
+and waits for the frozen real-calendar budget. P5 is optional research and remains deferred. Target two-window activation
 and forward notification retain their separate blockers and are outside the initial P6 profile.
 
 ## 3. Milestones

@@ -192,10 +192,15 @@ an exact production deployment, a signed entry decision, a finite budget, a clea
 rehearsal, and a rollback drill. It then publishes a new enabled binding and accepts only the first
 post-activation DWD release as official prospective evidence.
 
-The engineering checkpoint closes when the first official cycle and its independent reproduction
-pass. The P6 Epic remains open while the budget accumulates. `P6-REVIEW-001` cannot be accelerated
-with a historical rerun: it waits for the declared sessions/triggers and maturity tail, a closed
-ledger, and a complete paper reconciliation.
+Production activation was enabled on 2026-09-19 and is recorded by
+`docs/acceptance/p6-activate001-production-activation-status-20260919.md`. At that closeout point,
+o legal post-activation trading-session release existed, so official collection correctly remained
+`0 / 66` with zero official-cycle Jobs. Historical 2026 data remains ineligible for backfill.
+
+The engineering checkpoint closes only when the first legal official cycle and its independent
+reproduction pass. The P6 Epic remains open while the budget accumulates. `P6-REVIEW-001` already
+exists as GitHub #120 and cannot be accelerated with a historical rerun: it waits for the declared
+sessions/triggers and maturity tail, a closed ledger, and a complete paper reconciliation.
 
 At review, a human may continue, narrow with a new version, remap, retire, or remain inconclusive.
 An arbitration reveal requires a separate decision inside the review packet and is immutable once
@@ -212,8 +217,8 @@ performed. Permanent blind remains sealed. No outcome authorizes P7 automaticall
 | P6-GOV-002 | #117 | Implement the composite Forward Worker and disabled-state lifecycle rehearsal | P6-SCORE-001, PK-WORKER-000 |
 | P6-PAPER-001 | new | Add the isolated P2 paper lane and balanced fixed-unit ledger | P6-GOV-002, P2-ACCEPT-001 |
 | P6-WEB-001 | new | Project forward and paper evidence in candidate detail | P6-PAPER-001 |
-| P6-ACTIVATE-001 | new | Authorize and run the first official post-activation forward cycle | P6-WEB-001 |
-| P6-REVIEW-001 | #120 | Complete the time-matured simulation review and any authorized arbitration reveal | P6-ACTIVATE-001 plus closed budget |
+| P6-ACTIVATE-001 | new | Production activation enabled; complete the first legal official post-activation cycle and independent reproduction | P6-WEB-001 |
+| P6-REVIEW-001 | #120 | Complete the time-matured simulation review and any authorized arbitration reveal after the frozen real-calendar budget closes | P6-ACTIVATE-001 plus closed budget |
 
 Only `P6-GOV-001` is implementation-ready at the initial P6 gate. Acceptance of `P6-GOV-001`
 creates a mandatory value checkpoint rather than automatic downstream authority: `P6-DATA-001`

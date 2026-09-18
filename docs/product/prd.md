@@ -207,8 +207,12 @@ and material-loss attribution before results. `P6-GOV-002` then admitted the exi
 P6 job kind and passed disabled-state sealing/recovery/fencing with zero prospective side effects.
 `P6-PAPER-001` subsequently accepted the isolated five-unit fixed-notional P2 paper lane without
 actual execution authority. `P6-WEB-001` then accepted the read-only Forward/Paper candidate-detail
-projection with no activation or mutation controls; `P6-ACTIVATE-001` is now the pre-activation
-integration/deployment/rollback gate. P5 model research is optional, deferred, and not a P6 dependency. Official prospective evidence begins only
+projection with no activation or mutation controls. Production activation is now enabled under
+`P6-ACTIVATE-001`, while official prospective collection remains `0 / 66` until the first legal
+post-activation READY trading-session release; the frozen gate still requires that first official
+cycle and independent reproduction before the work item closes. `P6-REVIEW-001` already exists as
+GitHub #120 and waits for the closed real-calendar budget. P5 model research is optional, deferred,
+and not a P6 dependency. Official prospective evidence begins only
 after a separate immutable activation decision and cannot be
 backfilled from earlier 2026 history. The next executable work is listed in
 `docs/work-items/index.md`. The approved

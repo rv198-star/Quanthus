@@ -121,7 +121,11 @@ def create_platform_kernel(
         root,
         expert_run_root,
     )
-    forward_validation = ForwardValidationProductView(root, store)
+    forward_validation = ForwardValidationProductView(
+        root,
+        store,
+        candidate_run_root=candidate_run_root,
+    )
     data_catalog = DataIndicatorCatalog(
         data_catalog_sources_path,
         data_catalog_snapshot_path,

@@ -11,10 +11,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from quanthus.platform.jobs import P6_FORWARD_CYCLE_JOB
 from quanthus.platform.persistence import PlatformStore
@@ -130,7 +131,11 @@ def load_forward_product_view_config(path: Path, *, root: Path) -> P6ForwardProd
         or candidate.get("strategy_semantic_digest") != _TARGET_DIGEST
     ):
         _fail("forward_product_view_drift", "candidate binding differs")
-    card_path, card = _runtime_binding(root, candidate.get("strategy_card"), "candidate.strategy_card")
+    card_path, card = _runtime_binding(
+        root,
+        candidate.get("strategy_card"),
+        "candidate.strategy_card",
+    )
     if card.get("semantic_digest") != _TARGET_DIGEST:
         _fail("forward_product_view_drift", "strategy semantic digest differs")
 
@@ -139,10 +144,18 @@ def load_forward_product_view_config(path: Path, *, root: Path) -> P6ForwardProd
         "entry_proposal", "data_boundary", "scorecards", "forward_worker", "paper_lane"
     }:
         _fail("field_mismatch", "forward product bindings differ")
-    entry_path, entry = _runtime_binding(root, bindings["entry_proposal"], "bindings.entry_proposal")
+    entry_path, entry = _runtime_binding(
+        root,
+        bindings["entry_proposal"],
+        "bindings.entry_proposal",
+    )
     data_path, data = _runtime_binding(root, bindings["data_boundary"], "bindings.data_boundary")
     score_path, score = _runtime_binding(root, bindings["scorecards"], "bindings.scorecards")
-    worker_path, worker = _runtime_binding(root, bindings["forward_worker"], "bindings.forward_worker")
+    worker_path, worker = _runtime_binding(
+        root,
+        bindings["forward_worker"],
+        "bindings.forward_worker",
+    )
     paper_path, paper = _runtime_binding(root, bindings["paper_lane"], "bindings.paper_lane")
 
     if (
@@ -182,9 +195,16 @@ def load_forward_product_view_config(path: Path, *, root: Path) -> P6ForwardProd
     }:
         _fail("forward_product_view_drift", "read-only projection contract differs")
     authority = raw.get("authority")
-    if not isinstance(authority, dict) or authority.get("web_projection_implementation_authorized") is not True:
+    if (
+        not isinstance(authority, dict)
+        or authority.get("web_projection_implementation_authorized") is not True
+    ):
         _fail("authority_drift", "P6 Web implementation authority missing")
-    if any(value is not False for key, value in authority.items() if key != "web_projection_implementation_authorized"):
+    if any(
+        value is not False
+        for key, value in authority.items()
+        if key != "web_projection_implementation_authorized"
+    ):
         _fail("authority_drift", "P6 Web view grants downstream authority")
 
     predecessor = raw.get("accepted_predecessors")
@@ -216,13 +236,72 @@ def load_forward_product_view_config(path: Path, *, root: Path) -> P6ForwardProd
 
 
 class ForwardValidationProductView:
-    def __init__(self, root: Path, store: PlatformStore, config_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        root: Path,
+        store: PlatformStore,
+        config_path: Path | None = None,
+        candidate_run_root: Path | None = None,
+    ) -> None:
         self.root = root.resolve()
         self.store = store
+        self.candidate_run_root = (
+            None if candidate_run_root is None else candidate_run_root.resolve()
+        )
         self.config = load_forward_product_view_config(
-            config_path or self.root / "config/forward-validation/web/p6-forward-product-view.v1.json",
+            config_path
+            or self.root / "config/forward-validation/web/p6-forward-product-view.v1.json",
             root=self.root,
         )
+
+    def _activation_decision(self) -> dict[str, object] | None:
+        if self.candidate_run_root is None:
+            return None
+        activation_root = (self.candidate_run_root / "p6-forward/activation").resolve()
+        pointer_path = activation_root / "CURRENT.json"
+        if not pointer_path.is_file():
+            return None
+        pointer = _load(pointer_path)
+        if (
+            set(pointer) != {"schema_version", "decision_path", "decision_sha256"}
+            or pointer.get("schema_version") != "quanthus.p6-activation-current.v1"
+        ):
+            _fail("activation_projection_drift", "activation pointer differs")
+        relative = Path(str(pointer["decision_path"]))
+        if relative.is_absolute() or ".." in relative.parts:
+            _fail("path_escape", "activation decision path")
+        decision_path = (activation_root / relative).resolve()
+        if activation_root not in decision_path.parents or not decision_path.is_file():
+            _fail("activation_projection_drift", "activation decision is missing")
+        if _sha(decision_path) != _digest(pointer["decision_sha256"], "decision_sha256"):
+            _fail("activation_projection_drift", "activation pointer digest differs")
+        decision = _load(decision_path)
+        if (
+            decision.get("schema_version") != "quanthus.p6-activation-decision.v1"
+            or decision.get("work_item") != "P6-ACTIVATE-001"
+            or decision.get("state") != "enabled"
+            or decision.get("entry_proposal_digest") != _ENTRY_PROPOSAL_DIGEST
+            or decision.get("approval_authority") != "human"
+            or decision.get("official_prospective_cycle_authorized") is not True
+            or decision.get("paper_authority_only") is not True
+        ):
+            _fail("activation_projection_drift", "enabled activation decision differs")
+        for name in (
+            "notification_authorized",
+            "broker_authorized",
+            "live_capital_authorized",
+            "arbitration_2022_2024_access_authorized",
+            "permanent_blind_2025_access_authorized",
+        ):
+            if decision.get(name) is not False:
+                _fail("activation_projection_drift", f"activation unexpectedly enables {name}")
+        return {
+            "decision_id": str(decision.get("decision_id")),
+            "decision_at": str(decision.get("decision_at")),
+            "activation_market_date": str(decision.get("activation_market_date")),
+            "decision_digest": _digest(decision.get("decision_digest"), "decision_digest"),
+            "deployment_revision": str(decision.get("deployment_revision")),
+        }
 
     def _latest_job(self) -> dict[str, object] | None:
         jobs = self.store.list_jobs(P6_FORWARD_CYCLE_JOB, 1)
@@ -230,7 +309,9 @@ class ForwardValidationProductView:
             return None
         job = jobs[0]
         summary = None
-        if isinstance(job.result_ref, Mapping) and isinstance(job.result_ref.get("summary"), Mapping):
+        if isinstance(job.result_ref, Mapping) and isinstance(
+            job.result_ref.get("summary"), Mapping
+        ):
             summary = dict(job.result_ref["summary"])
         return {
             "job_id": job.job_id,
@@ -240,8 +321,59 @@ class ForwardValidationProductView:
             "created_at": job.created_at.isoformat(),
             "updated_at": job.updated_at.isoformat(),
             "completed_at": None if job.completed_at is None else job.completed_at.isoformat(),
-            "run_id": None if not isinstance(job.result_ref, Mapping) else job.result_ref.get("run_id"),
+            "run_id": (
+                None
+                if not isinstance(job.result_ref, Mapping)
+                else job.result_ref.get("run_id")
+            ),
             "summary": summary,
+        }
+
+    def _official_evidence(self, sessions_per_block: int) -> dict[str, object]:
+        official: list[dict[str, object]] = []
+        for job in self.store.list_jobs(P6_FORWARD_CYCLE_JOB, 100):
+            if job.state != "succeeded" or not isinstance(job.result_ref, Mapping):
+                continue
+            raw = job.result_ref.get("summary")
+            if not isinstance(raw, Mapping):
+                continue
+            summary = dict(raw)
+            if (
+                summary.get("mode") != "official_cycle"
+                or summary.get("official_evidence") is not True
+            ):
+                continue
+            if not isinstance(summary.get("market_date"), str):
+                continue
+            official.append(summary)
+        if not official:
+            return {
+                "state": "activated_waiting_first_release",
+                "official_collection_sessions_completed": 0,
+                "independent_blocks_completed": 0,
+                "settled_target_count": 0,
+                "censored_target_count": 0,
+                "first_official_market_date": None,
+                "last_admitted_dwd_release": None,
+            }
+        official.sort(key=lambda value: str(value["market_date"]))
+        latest = official[-1]
+        collection_count = int(latest.get("collection_session_count", 0))
+        tail_count = int(latest.get("tail_session_count", 0))
+        if collection_count < 66:
+            state = "collecting"
+        elif tail_count < 20:
+            state = "maturity_tail"
+        else:
+            state = "budget_complete"
+        return {
+            "state": state,
+            "official_collection_sessions_completed": collection_count,
+            "independent_blocks_completed": min(3, collection_count // sessions_per_block),
+            "settled_target_count": 0,
+            "censored_target_count": 0,
+            "first_official_market_date": official[0]["market_date"],
+            "last_admitted_dwd_release": latest["market_date"],
         }
 
     def candidate(self, strategy_id: str, strategy_version: str) -> dict[str, object]:
@@ -250,11 +382,12 @@ class ForwardValidationProductView:
         entry = self.config.entry
         budget = entry["observation_budget"]
         activation = entry["activation_boundary"]
-        authority = entry["authority"]
         paper = self.config.paper
         score = self.config.score
         paper_runtime = paper["execution"]
         roles = score["roles"]
+        activation_decision = self._activation_decision()
+        activated = activation_decision is not None
         source_digests = {
             "web_projection": self.config.config_sha256,
             "strategy_card": self.config.strategy_card_sha256,
@@ -268,22 +401,12 @@ class ForwardValidationProductView:
                 for key, value in sorted(self.config.predecessor_acceptance.items())
             },
         }
-        return {
-            "state": "engineering_ready_activation_disabled",
-            "read_only": True,
-            "strategy_binding": {
-                "strategy_id": _TARGET_STRATEGY,
-                "strategy_version": _TARGET_VERSION,
-                "strategy_semantic_digest": _TARGET_DIGEST,
-            },
-            "admission": {
-                "state": "disabled",
-                "activation_owner": activation["activation_owner"],
-                "first_official_market_date_rule": activation["first_official_market_date_rule"],
-                "required_release_state": activation["required_release_state"],
-                "official_prospective_cycle_authorized": bool(authority["official_prospective_cycle_authorized"]),
-            },
-            "evidence": {
+        if activation_decision is not None:
+            source_digests["activation_decision"] = str(activation_decision["decision_digest"])
+        evidence = (
+            self._official_evidence(int(budget["sessions_per_block"]))
+            if activated
+            else {
                 "state": "waiting_activation",
                 "official_collection_sessions_completed": 0,
                 "independent_blocks_completed": 0,
@@ -291,19 +414,45 @@ class ForwardValidationProductView:
                 "censored_target_count": 0,
                 "first_official_market_date": None,
                 "last_admitted_dwd_release": None,
+            }
+        )
+        return {
+            "state": (
+                "prospective_activation_enabled"
+                if activated
+                else "engineering_ready_activation_disabled"
+            ),
+            "read_only": True,
+            "strategy_binding": {
+                "strategy_id": _TARGET_STRATEGY,
+                "strategy_version": _TARGET_VERSION,
+                "strategy_semantic_digest": _TARGET_DIGEST,
             },
+            "admission": {
+                "state": "enabled" if activated else "disabled",
+                "activation_owner": activation["activation_owner"],
+                "first_official_market_date_rule": activation["first_official_market_date_rule"],
+                "required_release_state": activation["required_release_state"],
+                "official_prospective_cycle_authorized": activated,
+                "activation_decision": activation_decision,
+            },
+            "evidence": evidence,
             "budget": {
                 "independent_unit": budget["independent_unit"],
                 "collection_block_count": budget["collection_block_count"],
                 "sessions_per_block": budget["sessions_per_block"],
                 "collection_trading_sessions": budget["collection_trading_sessions"],
-                "target_maturity_tail_trading_sessions": budget["target_maturity_tail_trading_sessions"],
+                "target_maturity_tail_trading_sessions": budget[
+                    "target_maturity_tail_trading_sessions"
+                ],
                 "maximum_calendar_days": budget["maximum_calendar_days"],
-                "cross_section_increases_independent_progress": budget["cross_section_increases_independent_progress"],
+                "cross_section_increases_independent_progress": budget[
+                    "cross_section_increases_independent_progress"
+                ],
             },
             "latest_forward_job": self._latest_job(),
             "scorecards": {
-                "state": "frozen_pre_result",
+                "state": "active_prospective" if activated else "frozen_pre_result",
                 "roles": {
                     role: {
                         "source": value["source"],
@@ -312,11 +461,13 @@ class ForwardValidationProductView:
                     }
                     for role, value in sorted(roles.items())
                 },
-                "material_loss_threshold_cny": str(score["material_loss"]["absolute_threshold_cny"]),
+                "material_loss_threshold_cny": str(
+                    score["material_loss"]["absolute_threshold_cny"]
+                ),
                 "observed_scorecards": [],
             },
             "paper": {
-                "state": "engineering_ready_not_active",
+                "state": "paper_authority_active" if activated else "engineering_ready_not_active",
                 "authority": "paper",
                 "actual_execution_authorized": False,
                 "execution_profile": paper_runtime["profile_id"],
@@ -346,9 +497,18 @@ class ForwardValidationProductView:
             },
             "source_digests": source_digests,
             "limitations": [
-                "No official prospective observation exists before a separate P6-ACTIVATE-001 decision.",
-                "Pre-activation 2026 history is engineering rehearsal only and cannot increase budget progress.",
+                *(
+                    []
+                    if activated
+                    else [
+                        "No official prospective observation exists before a separate "
+                        "P6-ACTIVATE-001 decision."
+                    ]
+                ),
+                "Pre-activation 2026 history is engineering rehearsal only and cannot "
+                "increase budget progress.",
                 "Arbitration 2022-2024 and permanent blind 2025 remain sealed.",
-                "The current page is read-only and exposes no activation, broker, notification, live-capital or parameter-edit authority.",
+                "The current page is read-only and exposes no activation, broker, "
+                "notification, live-capital or parameter-edit authority.",
             ],
         }

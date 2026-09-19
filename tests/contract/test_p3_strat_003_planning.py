@@ -42,7 +42,7 @@ def test_p3_strat_003_is_one_epic_with_dependency_gated_children() -> None:
     assert items["P3-STRAT-003-A"].status == "closed"
     assert items["P3-STRAT-003-B"].status == "ready"
     assert items["P3-STRAT-003-C"].status == "closed"
-    assert items["P3-STRAT-003-C-R1"].status == "ready"
+    assert items["P3-STRAT-003-C-R1"].status == "closed"
     assert items["P3-STRAT-003-D"].status == "blocked"
     assert items["P3-STRAT-003-E"].status == "blocked"
     assert "P3-STRAT-003-A" in items["P3-STRAT-003-B"].dependencies

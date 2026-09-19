@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | A and C accepted; B / #319 and C-R1 / #385 active result-blind prerequisites; D blocked by both; E blocked by D |
+| Delivery gate | A, C and C-R1 accepted; B / #319 ready; D blocked by B; E blocked by D |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |

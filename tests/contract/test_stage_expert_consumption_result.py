@@ -109,5 +109,5 @@ def test_p3_expert_006_stays_closed_when_strategy_research_resumes() -> None:
         for item in items.values()
         if item.phase == "P3" and item.status == "ready"
     }
-    assert ready_p3 == {"P3-STRAT-003", "P3-STRAT-003-B", "P3-STRAT-003-C-R1"}
+    assert ready_p3 == {"P3-STRAT-003", "P3-STRAT-003-B"}
     assert all(not stable_id.startswith("P3-STAGE-") for stable_id in ready_p3)

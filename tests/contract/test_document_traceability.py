@@ -1650,7 +1650,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            {"P3-STRAT-003", "P3-STRAT-003-B", "P3-STRAT-003-C-R1"},
+            {"P3-STRAT-003", "P3-STRAT-003-B"},
         )
         p012_closeout = json.loads(
             (root / "config/stage-learning/stage-atomic-proposition-p012-closeout.v1.json")

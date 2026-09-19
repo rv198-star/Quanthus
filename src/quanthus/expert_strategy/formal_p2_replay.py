@@ -237,7 +237,7 @@ class FormalP2ReplayRuntime:
         decision_start: date = DECISION_START,
         decision_end: date = DECISION_END,
         execution_end: date = EXECUTION_END,
-        parent_event_run_digest: str = PARENT_EVENT_RUN_DIGEST,
+        parent_event_run_digest: str | None = PARENT_EVENT_RUN_DIGEST,
         provider_config: str = "config/replay-data-provider.development.v2.json",
         allowed_provider_partitions: frozenset[str] = frozenset({"development"}),
     ) -> None:
@@ -258,8 +258,7 @@ class FormalP2ReplayRuntime:
         self.temporary = tempfile.TemporaryDirectory(prefix="quanthus-formal-p2-")
         self.stack.callback(self.temporary.cleanup)
         event_root = Path(os.environ.get("QUANTHUS_EVENT_RUN_ROOT", "/data/event-runs"))
-        event_library, _ = _find_parent_package(event_root, (self.parent_event_run_digest,))
-        self.events = _load_events(event_library, self.decision_start, self.decision_end)
+        self.events, self.industry = self._load_event_population(event_root)
         if not self.events:
             raise ExpertEvaluationError(
                 "formal_attribution_population_empty", "formal event population is empty"
@@ -275,7 +274,6 @@ class FormalP2ReplayRuntime:
                 "formal_attribution_population_duplicate",
                 "formal event population duplicates a security-date",
             )
-        self.industry = _load_parent_industry_mapping(event_library, self.events)
         provider_config = load_replay_data_provider_config(
             self.repository_root / self.provider_config,
             allowed_partitions=self.allowed_provider_partitions,
@@ -330,6 +328,23 @@ class FormalP2ReplayRuntime:
         self.trend_config = load_trend_stability_config(
             self.repository_root / "config/expert-evaluations/experts/trend-stability.v1.json"
         )
+
+    def _load_event_population(
+        self,
+        event_root: Path,
+    ) -> tuple[tuple[_EventInput, ...], StaticIndustryMapping]:
+        if self.parent_event_run_digest is None:
+            raise ExpertEvaluationError(
+                "parent_run_binding_invalid",
+                "formal replay requires one parent P4 Run unless a bounded subclass "
+                "overrides the population source",
+            )
+        event_library, _ = _find_parent_package(event_root, (self.parent_event_run_digest,))
+        events = _load_events(event_library, self.decision_start, self.decision_end)
+        return events, _load_parent_industry_mapping(event_library, events)
+
+    def _population_manifest_fields(self) -> dict[str, Any]:
+        return {"parent_event_run_digest": self.parent_event_run_digest}
 
     def _provider_scope_start(self) -> date:
         return self.decision_start
@@ -536,7 +551,7 @@ class FormalP2ReplayRuntime:
                 "intervention_id": intervention_id,
                 "strategy_card_digest": self.registry.card.semantic_digest,
                 "topology_manifest_digest": topology.digest,
-                "parent_event_run_digest": self.parent_event_run_digest,
+                **self._population_manifest_fields(),
                 "scope": {
                     "decision_start": self.decision_start.isoformat(),
                     "decision_end": self.decision_end.isoformat(),

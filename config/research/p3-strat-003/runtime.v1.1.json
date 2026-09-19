@@ -1,0 +1,56 @@
+{
+  "schema_version": "quanthus.p3-strat-003-runtime.v1.1",
+  "work_item": "P3-STRAT-003-C-R1",
+  "runtime_id": "p3-strat-003-four-variant-composite-v1.1",
+  "state": "RESULT_BLIND_ENGINEERING",
+  "supersedes": {
+    "path": "config/research/p3-strat-003/runtime.v1.json",
+    "semantic_digest": "sha256:5d5223138fbe8187e78c755aa2e45d758a7a803e37f8624df5f4f689fffd9185"
+  },
+  "request": {
+    "path": "config/research/p3-strat-003/request.v1.json",
+    "sha256": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde"
+  },
+  "input_contract": {
+    "manifest_path": "config/research/p3-strat-003/input-manifest.v1.json",
+    "manifest_digest_binding": "required_at_D_admission_after_B_acceptance",
+    "candidate_input_manifest_binding": "required_at_D_admission_after_B_acceptance",
+    "outcome_label_binding": "forbidden_before_D_result_gate",
+    "legacy_event_run_binding": "compatibility_only_not_used_by_recent_history_D",
+    "provider_config_binding": "required_at_D_admission_after_B_acceptance",
+    "provider_schema": "quanthus.replay-data-provider.v3",
+    "provider_partition": "p3-strat-003-recent-history",
+    "dates_binding": "required_at_D_admission_after_B_acceptance",
+    "batch_input_identity_required": true
+  },
+  "entrypoint": {
+    "module": "quanthus.expert_strategy.p3_strat_003_cli",
+    "command": "python -m quanthus.expert_strategy.p3_strat_003_cli",
+    "population_argument": "--candidate-input-manifest",
+    "legacy_population_argument": "--event-run-digest",
+    "population_arguments_mutually_exclusive": true,
+    "variants": ["B", "T", "R", "TR"],
+    "variant_order_fixed": true
+  },
+  "execution": {
+    "worker_concurrency": 1,
+    "provider_builds_per_batch": 1,
+    "feature_panel_builds_per_batch": 1,
+    "cross_batch_cache_for_independent_reproduction": false,
+    "execution_authorized": false,
+    "broker_authorized": false,
+    "live_capital_authorized": false,
+    "p6_mutation_authorized": false
+  },
+  "engineering_evidence": {
+    "recent_history_result_read_authorized": false,
+    "allowed": ["synthetic", "already_consumed_golden"],
+    "forbidden": [
+      "2025_strategy_results",
+      "2026_strategy_results",
+      "2025_2026_outcome_labels_before_D",
+      "p6_forward_evidence"
+    ]
+  },
+  "semantic_digest": "sha256:bd9422c5dcc2dbb0cb989fdea3075a76eafcbb75f4e6527b0c1d762efae49238"
+}

@@ -16,7 +16,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--repository-root", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--provider-config", required=True)
-    parser.add_argument("--event-run-digest", required=True)
+    population = parser.add_mutually_exclusive_group(required=True)
+    population.add_argument("--event-run-digest")
+    population.add_argument("--candidate-input-manifest")
     parser.add_argument("--decision-start", required=True)
     parser.add_argument("--decision-end", required=True)
     parser.add_argument("--execution-end", required=True)
@@ -31,8 +33,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         decision_start=date.fromisoformat(args.decision_start),
         decision_end=date.fromisoformat(args.decision_end),
         execution_end=date.fromisoformat(args.execution_end),
-        parent_event_run_digest=args.event_run_digest,
         provider_config=args.provider_config,
+        parent_event_run_digest=args.event_run_digest,
+        candidate_input_manifest=args.candidate_input_manifest,
     ) as backend:
         result = backend.execute_all()
     print(

@@ -315,6 +315,7 @@ P3_STRAT_003_CHILD_IDS = (
     "P3-STRAT-003-A",
     "P3-STRAT-003-B",
     "P3-STRAT-003-C",
+    "P3-STRAT-003-C-R1",
     "P3-STRAT-003-D",
     "P3-STRAT-003-E",
 )
@@ -338,7 +339,7 @@ P3_STRAT_003_IMPLEMENTATION_SPECS = {
             "P6-v1 is parallel evidence and is not a predecessor or mutable input.",
         ),
         verification=(
-            "A-E close in dependency order with immutable evidence and no silent "
+            "All declared children close in dependency order with immutable evidence and no silent "
             "window roll-forward.",
             "Negative, harmful or inconclusive economics remain terminally reviewable outcomes.",
         ),
@@ -418,10 +419,34 @@ P3_STRAT_003_IMPLEMENTATION_SPECS = {
             "reports stage telemetry.",
         ),
     ),
+    "P3-STRAT-003-C-R1": IssueImplementationSpec(
+        design_path=P3_STRAT_003_DESIGN_PATH,
+        approach=(
+            "Decouple the recent-history population from the legacy P4 Event+Outcome-Label outer "
+            "Run by binding B's outcome-blind candidate manifest, while preserving the accepted "
+            "P3-ATTR-001 parent-Run path unchanged."
+        ),
+        owned_paths=(
+            "src/quanthus/expert_strategy/formal_p2_replay.py",
+            "src/quanthus/expert_strategy/p3_strat_003.py",
+            "src/quanthus/expert_strategy/p3_strat_003_cli.py",
+            "config/research/p3-strat-003/runtime.v1.1.json",
+            "tests/unit/test_p3_strat_003_candidate_input.py",
+        ),
+        decision_gates=(
+            "Exactly one population source is allowed: legacy Event Run for compatibility or "
+            "B's candidate input manifest for recent-history D.",
+            "No 2025/2026 outcome label may be read before D.",
+        ),
+        verification=(
+            "Candidate input checksum, scope, industry mapping and replay-bundle identity fail closed.",
+            "Existing formal attribution and C runner regressions remain green with no P6 mutation.",
+        ),
+    ),
     "P3-STRAT-003-D": IssueImplementationSpec(
         design_path=P3_STRAT_003_DESIGN_PATH,
         approach=(
-            "Bind exact A request + B input manifest + C code revision, then run one primary "
+            "Bind exact A request + B input/candidate manifest + C-R1 code revision, then run one primary "
             "four-variant composite batch and one independent cold reproduction with no "
             "cross-batch intermediate reuse."
         ),

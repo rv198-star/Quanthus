@@ -15,7 +15,7 @@ from scripts.sync_github_planning import (
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_p3_strat_003_is_one_epic_with_five_dependency_gated_children() -> None:
+def test_p3_strat_003_is_one_epic_with_dependency_gated_children() -> None:
     items = {item.stable_id: item for item in work_items(ROOT)}
 
     assert P3_STRAT_003_MILESTONE in MILESTONES
@@ -24,6 +24,7 @@ def test_p3_strat_003_is_one_epic_with_five_dependency_gated_children() -> None:
         "P3-STRAT-003-A",
         "P3-STRAT-003-B",
         "P3-STRAT-003-C",
+        "P3-STRAT-003-C-R1",
         "P3-STRAT-003-D",
         "P3-STRAT-003-E",
     } == P3_STRAT_003_IDS
@@ -31,6 +32,7 @@ def test_p3_strat_003_is_one_epic_with_five_dependency_gated_children() -> None:
         "P3-STRAT-003-A",
         "P3-STRAT-003-B",
         "P3-STRAT-003-C",
+        "P3-STRAT-003-C-R1",
         "P3-STRAT-003-D",
         "P3-STRAT-003-E",
     )
@@ -40,12 +42,14 @@ def test_p3_strat_003_is_one_epic_with_five_dependency_gated_children() -> None:
     assert items["P3-STRAT-003-A"].status == "closed"
     assert items["P3-STRAT-003-B"].status == "ready"
     assert items["P3-STRAT-003-C"].status == "closed"
+    assert items["P3-STRAT-003-C-R1"].status == "closed"
     assert items["P3-STRAT-003-D"].status == "blocked"
     assert items["P3-STRAT-003-E"].status == "blocked"
     assert "P3-STRAT-003-A" in items["P3-STRAT-003-B"].dependencies
     assert "P3-STRAT-003-A" in items["P3-STRAT-003-C"].dependencies
+    assert "P3-STRAT-003-C" in items["P3-STRAT-003-C-R1"].dependencies
     assert "P3-STRAT-003-B" in items["P3-STRAT-003-D"].dependencies
-    assert "P3-STRAT-003-C" in items["P3-STRAT-003-D"].dependencies
+    assert "P3-STRAT-003-C-R1" in items["P3-STRAT-003-D"].dependencies
     assert "P3-STRAT-003-D" in items["P3-STRAT-003-E"].dependencies
     assert "P6" not in items["P3-STRAT-003"].dependencies
 

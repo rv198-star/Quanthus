@@ -228,17 +228,38 @@ class _EntryCandidate:
 
 
 class FormalP2ReplayRuntime:
-    """Keep the expensive direct-DWD projection open across the four variants."""
+    """Keep one expensive data projection open across strategy variants."""
 
-    def __init__(self, repository_root: Path) -> None:
+    def __init__(
+        self,
+        repository_root: Path,
+        *,
+        decision_start: date = DECISION_START,
+        decision_end: date = DECISION_END,
+        execution_end: date = EXECUTION_END,
+        parent_event_run_digest: str = PARENT_EVENT_RUN_DIGEST,
+        provider_config: str = "config/replay-data-provider.development.v2.json",
+        allowed_provider_partitions: frozenset[str] = frozenset({"development"}),
+    ) -> None:
+        if not decision_start <= decision_end < execution_end:
+            raise ExpertEvaluationError(
+                "formal_attribution_scope_mismatch",
+                "decision scope must end before the final execution date",
+            )
         self.repository_root = repository_root.resolve()
+        self.decision_start = decision_start
+        self.decision_end = decision_end
+        self.execution_end = execution_end
+        self.parent_event_run_digest = parent_event_run_digest
+        self.provider_config = provider_config
+        self.allowed_provider_partitions = allowed_provider_partitions
         self.registry = ExpertStrategyRegistry(self.repository_root)
         self.stack = ExitStack()
         self.temporary = tempfile.TemporaryDirectory(prefix="quanthus-formal-p2-")
         self.stack.callback(self.temporary.cleanup)
         event_root = Path(os.environ.get("QUANTHUS_EVENT_RUN_ROOT", "/data/event-runs"))
-        event_library, _ = _find_parent_package(event_root, (PARENT_EVENT_RUN_DIGEST,))
-        self.events = _load_events(event_library, DECISION_START, DECISION_END)
+        event_library, _ = _find_parent_package(event_root, (self.parent_event_run_digest,))
+        self.events = _load_events(event_library, self.decision_start, self.decision_end)
         if not self.events:
             raise ExpertEvaluationError(
                 "formal_attribution_population_empty", "formal event population is empty"
@@ -256,16 +277,21 @@ class FormalP2ReplayRuntime:
             )
         self.industry = _load_parent_industry_mapping(event_library, self.events)
         provider_config = load_replay_data_provider_config(
-            self.repository_root / "config/replay-data-provider.development.v2.json"
+            self.repository_root / self.provider_config,
+            allowed_partitions=self.allowed_provider_partitions,
         )
         provider = ReplayDataProvider(provider_config)
         self.session = self.stack.enter_context(
-            provider.open(scope_start=self._provider_scope_start(), scope_end=DECISION_END)
+            provider.open(
+                scope_start=self._provider_scope_start(),
+                scope_end=self.decision_end,
+            )
         )
-        self.frames = self.session.reader.frames(DECISION_START, DECISION_END)
-        if self.frames[-1].execution_date != EXECUTION_END:
+        self.frames = self.session.reader.frames(self.decision_start, self.decision_end)
+        if self.frames[-1].execution_date != self.execution_end:
             raise ExpertEvaluationError(
-                "formal_attribution_scope_mismatch", "replay does not end at 2021-12-31"
+                "formal_attribution_scope_mismatch",
+                f"replay does not end at {self.execution_end.isoformat()}",
             )
         self.feature_registry = load_feature_registry(
             self.repository_root / "config/p3-baseline-features.research.v1.json"
@@ -276,8 +302,8 @@ class FormalP2ReplayRuntime:
             BaselineFeaturePanel.build(
                 self.session.reader.bundle,
                 self.feature_registry,
-                scope_start=DECISION_START,
-                scope_end=EXECUTION_END,
+                scope_start=self.decision_start,
+                scope_end=self.execution_end,
                 output=panel_path,
                 data_content_digest=self.session.reader.data_content_digest,
                 data_manifest_sha256=self.session.reader.data_manifest_sha256,
@@ -306,7 +332,7 @@ class FormalP2ReplayRuntime:
         )
 
     def _provider_scope_start(self) -> date:
-        return DECISION_START
+        return self.decision_start
 
     def close(self) -> None:
         self.stack.close()
@@ -322,6 +348,19 @@ class FormalP2ReplayRuntime:
             raise ExpertEvaluationError(
                 "formal_intervention_not_admitted", "formal intervention is not admitted"
             )
+
+    def _code_version(self) -> str:
+        return "formal-p2-attribution-replay-1.0.0"
+
+    def _parameter_payload(self, intervention_id: str | None) -> dict[str, Any]:
+        return {
+            "strategy": self.registry.card.semantic_digest,
+            "intervention": intervention_id,
+        }
+
+    def _manifest_metadata(self, intervention_id: str | None) -> dict[str, Any]:
+        del intervention_id
+        return {}
 
     def _held_intervention_id(self, intervention_id: str | None) -> str | None:
         return intervention_id
@@ -360,13 +399,8 @@ class FormalP2ReplayRuntime:
                 ),
             )
         run = BacktestRunSpec(
-            code_version="formal-p2-attribution-replay-1.0.0",
-            parameter_hash=digest_value(
-                {
-                    "strategy": self.registry.card.semantic_digest,
-                    "intervention": intervention_id,
-                }
-            ),
+            code_version=self._code_version(),
+            parameter_hash=digest_value(self._parameter_payload(intervention_id)),
             data_snapshot_id=self.session.reader.bundle.snapshot.snapshot_id,
             feature_version=self.panel.report.digest,
             rule_version=self.registry.card.strategy_version,
@@ -437,7 +471,13 @@ class FormalP2ReplayRuntime:
             )
 
         metrics, daily_returns = self._metrics(
-            initial_equity, equity, events, decisions, output_root, intervention_id
+            initial_equity,
+            equity,
+            events,
+            decisions,
+            output_root,
+            self._metrics_intervention_id(intervention_id),
+            baseline_variant_directory=self._baseline_variant_directory(),
         )
         ordered_events = tuple(sorted(events, key=lambda item: (item.event_time, item.event_id)))
         ordered_decisions = tuple(
@@ -496,16 +536,17 @@ class FormalP2ReplayRuntime:
                 "intervention_id": intervention_id,
                 "strategy_card_digest": self.registry.card.semantic_digest,
                 "topology_manifest_digest": topology.digest,
-                "parent_event_run_digest": PARENT_EVENT_RUN_DIGEST,
+                "parent_event_run_digest": self.parent_event_run_digest,
                 "scope": {
-                    "decision_start": DECISION_START.isoformat(),
-                    "decision_end": DECISION_END.isoformat(),
-                    "execution_end": EXECUTION_END.isoformat(),
+                    "decision_start": self.decision_start.isoformat(),
+                    "decision_end": self.decision_end.isoformat(),
+                    "execution_end": self.execution_end.isoformat(),
                 },
                 "metrics": {key: str(value) for key, value in sorted(metrics.items())},
                 "replay_digest": replay_digest,
                 "sealed_partition_access": False,
                 "execution_authorized": False,
+                **self._manifest_metadata(intervention_id),
             }
         )
         return evidence, artifacts
@@ -541,7 +582,8 @@ class FormalP2ReplayRuntime:
                 position_state="empty",
                 trend_observation_digest=observation.digest,
             )
-            decision = runner.evaluate_entry(
+            decision = self._evaluate_entry_decision(
+                runner,
                 event_id=item.record.event_id,
                 context=context,
                 trend_state=(None if observation.raw_value is None else str(observation.raw_value)),
@@ -557,6 +599,24 @@ class FormalP2ReplayRuntime:
                 )
             )
         return tuple(output)
+
+    def _evaluate_entry_decision(
+        self,
+        runner: FormalStrategyRunner,
+        *,
+        event_id: str,
+        context: Any,
+        trend_state: str | None,
+        entry_evidence_ready: bool,
+        intervention_id: str | None,
+    ) -> Any:
+        return runner.evaluate_entry(
+            event_id=event_id,
+            context=context,
+            trend_state=trend_state,
+            entry_evidence_ready=entry_evidence_ready,
+            intervention_id=intervention_id,
+        )
 
     def _review_positions(
         self,
@@ -1223,6 +1283,12 @@ class FormalP2ReplayRuntime:
             "filled": filled,
         }
 
+    def _baseline_variant_directory(self) -> str:
+        return "variant.native-baseline"
+
+    def _metrics_intervention_id(self, intervention_id: str | None) -> str | None:
+        return intervention_id
+
     @staticmethod
     def _metrics(
         initial_equity: Decimal,
@@ -1231,6 +1297,7 @@ class FormalP2ReplayRuntime:
         decisions: list[dict[str, Any]],
         output_root: Path,
         intervention_id: str | None,
+        baseline_variant_directory: str = "variant.native-baseline",
     ) -> tuple[dict[str, Decimal], list[dict[str, str]]]:
         values = [Decimal(item["system_equity"]) for item in equity]
         returns = [
@@ -1250,7 +1317,7 @@ class FormalP2ReplayRuntime:
         replay_points = equity[1:]
         native: dict[tuple[str, str], str] = {}
         if intervention_id is not None:
-            native_path = output_root.parent / "variant.native-baseline" / "decisions.json"
+            native_path = output_root.parent / baseline_variant_directory / "decisions.json"
             if not native_path.is_file():
                 raise ExpertEvaluationError(
                     "formal_baseline_missing", "intervention requires native decisions"

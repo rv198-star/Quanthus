@@ -52,6 +52,35 @@ def test_direct_provider_materializes_one_job_local_projection_from_dwd() -> Non
     assert config.materialization["per_decision_publication_proven"] is False
 
 
+def test_recent_history_partition_requires_explicit_opt_in(
+    tmp_path: Path,
+) -> None:
+    payload = json.loads(DIRECT_CONFIG.read_text(encoding="utf-8"))
+    payload["schema_version"] = "quanthus.replay-data-provider.v3"
+    payload["scope"] = {
+        "partition": "p3-strat-003-recent-history",
+        "decision_start": "2025-01-01",
+        "decision_end": "2026-09-17",
+        "execution_end": "2026-09-18",
+        "reader_role": "p3_strat_003_recent_history",
+    }
+    payload["materialization"]["history_start"] = "2024-10-01"
+    candidate = tmp_path / "recent-provider.json"
+    candidate.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ConfigurationError, match="development only"):
+        load_replay_data_provider_config(candidate)
+
+    admitted = load_replay_data_provider_config(
+        candidate,
+        allowed_partitions=frozenset({"p3-strat-003-recent-history"}),
+    )
+    assert admitted.scope.partition == "p3-strat-003-recent-history"
+    assert admitted.scope.reader_role == "p3_strat_003_recent_history"
+    assert admitted.scope.decision_start == date(2025, 1, 1)
+    assert admitted.scope.execution_end == date(2026, 9, 18)
+
+
 @pytest.mark.parametrize(
     ("path", "value", "message"),
     [

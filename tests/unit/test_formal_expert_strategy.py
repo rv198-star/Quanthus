@@ -114,6 +114,60 @@ def _held_facts(
     return HeldPositionFacts(sessions, marked_return, reductions, evidence)
 
 
+def test_p3_strat_003_candidate_control_keeps_nonempty_entry_path(
+    runner: FormalStrategyRunner,
+) -> None:
+    baseline = runner.evaluate_entry_control(
+        event_id=EVENT_ID,
+        context=_context(),
+        entry_evidence_ready=True,
+        position_risk_enabled=False,
+    )
+    risk = runner.evaluate_entry_control(
+        event_id=EVENT_ID,
+        context=_context(),
+        entry_evidence_ready=True,
+        position_risk_enabled=True,
+    )
+
+    assert baseline.action.final_action is GovernedAction.TRIAL_ENTRY
+    assert baseline.action.aggregate_score == Decimal("1")
+    assert baseline.target_maximum_position == Decimal("0.30")
+    assert baseline.action.scoring_outputs[0].expert_id == "control.p4-candidate-pass-through"
+    assert risk.action.final_action is GovernedAction.TRIAL_ENTRY
+    assert risk.target_maximum_position == Decimal("0.20")
+
+
+def test_p3_strat_003_candidate_control_preserves_risk_and_missing_data_guards(
+    runner: FormalStrategyRunner,
+) -> None:
+    risk_blocked = runner.evaluate_entry_control(
+        event_id=EVENT_ID,
+        context=_context(volatility=Decimal("0.51")),
+        entry_evidence_ready=True,
+        position_risk_enabled=True,
+    )
+    missing = runner.evaluate_entry_control(
+        event_id=EVENT_ID,
+        context=_context(rsi=None),
+        entry_evidence_ready=True,
+        position_risk_enabled=False,
+    )
+    ineligible = runner.evaluate_entry_control(
+        event_id=EVENT_ID,
+        context=_context(),
+        entry_evidence_ready=False,
+        position_risk_enabled=False,
+    )
+
+    assert risk_blocked.action.final_action is GovernedAction.NO_ACTION
+    assert "expert.position-risk-review" in risk_blocked.governance.terminating_veto_ids
+    assert missing.action.final_action is GovernedAction.NO_ACTION
+    assert missing.governance.required_action.value == "block_new"
+    assert ineligible.action.final_action is GovernedAction.NO_ACTION
+    assert ineligible.action.reason_codes == ("all_scoring_abstained_block_new",)
+
+
 def test_stable_entry_is_scored_once_and_capped_by_position_risk(
     runner: FormalStrategyRunner,
 ) -> None:

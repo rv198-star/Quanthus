@@ -1,0 +1,42 @@
+{
+  "schema_version": "quanthus.p3-strat-003-runtime.v1",
+  "work_item": "P3-STRAT-003-C",
+  "runtime_id": "p3-strat-003-four-variant-composite-v1",
+  "state": "RESULT_BLIND_ENGINEERING",
+  "request": {
+    "path": "config/research/p3-strat-003/request.v1.json",
+    "sha256": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde"
+  },
+  "input_contract": {
+    "manifest_path": "config/research/p3-strat-003/input-manifest.v1.json",
+    "manifest_digest_binding": "required_at_D_admission_after_B_acceptance",
+    "event_run_digest_binding": "required_at_D_admission_after_B_acceptance",
+    "provider_config_binding": "required_at_D_admission_after_B_acceptance",
+    "provider_schema": "quanthus.replay-data-provider.v3",
+    "provider_partition": "p3-strat-003-recent-history",
+    "dates_binding": "required_at_D_admission_after_B_acceptance",
+    "batch_input_identity_required": true
+  },
+  "entrypoint": {
+    "module": "quanthus.expert_strategy.p3_strat_003_cli",
+    "command": "python -m quanthus.expert_strategy.p3_strat_003_cli",
+    "variants": ["B", "T", "R", "TR"],
+    "variant_order_fixed": true
+  },
+  "execution": {
+    "worker_concurrency": 1,
+    "provider_builds_per_batch": 1,
+    "feature_panel_builds_per_batch": 1,
+    "cross_batch_cache_for_independent_reproduction": false,
+    "execution_authorized": false,
+    "broker_authorized": false,
+    "live_capital_authorized": false,
+    "p6_mutation_authorized": false
+  },
+  "engineering_evidence": {
+    "recent_history_result_read_authorized": false,
+    "allowed": ["synthetic", "already_consumed_golden"],
+    "forbidden": ["2025_strategy_results", "2026_strategy_results", "p6_forward_evidence"]
+  },
+  "semantic_digest": "sha256:5d5223138fbe8187e78c755aa2e45d758a7a803e37f8624df5f4f689fffd9185"
+}

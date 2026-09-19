@@ -25,7 +25,9 @@ from quanthus.strategy_replay_ads import (
 REPLAY_DATA_PROVIDER_SCHEMAS = {
     "quanthus.replay-data-provider.v1",
     "quanthus.replay-data-provider.v2",
+    "quanthus.replay-data-provider.v3",
 }
+DEFAULT_REPLAY_PROVIDER_PARTITIONS = frozenset({"development"})
 
 
 def _load_object(path: Path, label: str) -> dict[str, Any]:
@@ -129,7 +131,11 @@ class ReplayDataProviderConfig:
         return f"sha256:{hashlib.sha256(payload).hexdigest()}"
 
 
-def load_replay_data_provider_config(path: Path) -> ReplayDataProviderConfig:
+def load_replay_data_provider_config(
+    path: Path,
+    *,
+    allowed_partitions: frozenset[str] = DEFAULT_REPLAY_PROVIDER_PARTITIONS,
+) -> ReplayDataProviderConfig:
     resolved = path.resolve()
     raw = _load_object(resolved, "replay provider configuration")
     if raw.get("schema_version") not in REPLAY_DATA_PROVIDER_SCHEMAS:
@@ -153,11 +159,14 @@ def load_replay_data_provider_config(path: Path) -> ReplayDataProviderConfig:
         execution_end=_date(scope_raw.get("execution_end"), "scope.execution_end"),
         reader_role=_text(scope_raw.get("reader_role"), "scope.reader_role"),
     )
-    if (
-        scope.partition != "development"
-        or not scope.decision_start <= scope.decision_end < scope.execution_end
-    ):
-        raise ConfigurationError("the default replay provider may open development only")
+    if not scope.decision_start <= scope.decision_end < scope.execution_end:
+        raise ConfigurationError("replay provider scope dates are invalid")
+    if scope.partition not in allowed_partitions:
+        if allowed_partitions == DEFAULT_REPLAY_PROVIDER_PARTITIONS:
+            raise ConfigurationError("the default replay provider may open development only")
+        raise ConfigurationError(
+            "replay provider partition is outside the explicitly admitted partition set"
+        )
     project_root = find_project_root(resolved)
     replay_root = Path("/")
     policy = project_root / "config/strategy-replay-ads.v1.json"

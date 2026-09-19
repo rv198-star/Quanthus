@@ -41,6 +41,8 @@ from quanthus.label_registry import FeatureFact
 
 TREND_EXPERT_ID = "expert.trend-stability"
 TREND_EXPERT_VERSION = "1.0.0"
+P3_STRAT_003_CONTROL_ID = "control.p4-candidate-pass-through"
+P3_STRAT_003_CONTROL_VERSION = "1.0.0"
 SYSTEM_ENTRY_GUARDIAN_ID = "system.formal-entry-guardian"
 SYSTEM_BASE_POSITION_ID = "system.base-position-management"
 
@@ -192,6 +194,39 @@ class _BasePositionConstraint:
             stop_rule="base_constraint_stop_preserved",
             hold_rule="base_holding_policy_preserved",
             scope=ConstraintScope.UNIT,
+        )
+
+
+class _CandidatePassThroughScorer:
+    expert_id = P3_STRAT_003_CONTROL_ID
+    expert_version = P3_STRAT_003_CONTROL_VERSION
+
+    def __init__(self, event_id: str, *, evidence_ready: bool) -> None:
+        self.event_id = event_id
+        self.evidence_ready = evidence_ready
+
+    def evaluate(self, context: ExpertContext) -> ScoringOutput:
+        evidence = (_context_ref(context, self.event_id),)
+        if not self.evidence_ready:
+            return ScoringOutput(
+                self.expert_id,
+                self.expert_version,
+                ExpertApplicability.ABSTAINED,
+                "candidate_control_evidence_missing",
+                "candidate_control_abstained",
+                evidence,
+                None,
+                None,
+            )
+        return ScoringOutput(
+            self.expert_id,
+            self.expert_version,
+            ExpertApplicability.APPLICABLE,
+            "candidate_control_eligible",
+            "candidate_control_pass_through",
+            evidence,
+            Decimal("1.00"),
+            Decimal("1.00"),
         )
 
 
@@ -356,6 +391,85 @@ class FormalStrategyRunner:
     ) -> ScoringOutput:
         mapping = {**self.trend_mapping, "event_id": event_id}
         return run_scoring_expert(_TrendPolicyScorer(trend_state, mapping, fallback), context)
+
+    @staticmethod
+    def _candidate_control_score(
+        context: ExpertContext,
+        event_id: str,
+        *,
+        evidence_ready: bool,
+    ) -> ScoringOutput:
+        return run_scoring_expert(
+            _CandidatePassThroughScorer(event_id, evidence_ready=evidence_ready),
+            context,
+        )
+
+    def evaluate_entry_control(
+        self,
+        *,
+        event_id: str,
+        context: ExpertContext,
+        entry_evidence_ready: bool,
+        position_risk_enabled: bool,
+    ) -> FormalStrategyDecision:
+        """Run the frozen P3-STRAT-003 non-empty research control.
+
+        This is additive research-only behavior. It never alters the accepted Trend mapping and it
+        keeps the existing Position Risk implementation, aggregator, system guardian and base
+        position constraint unchanged.
+        """
+
+        score = self._candidate_control_score(
+            context,
+            event_id,
+            evidence_ready=entry_evidence_ready,
+        )
+        position = self.position_policy.evaluate_entry(
+            context,
+            fallback=not position_risk_enabled,
+        )
+        risk_values_ready = all(item.value is not None for item in context.feature_facts)
+        scoring_ready = score.applicability is ExpertApplicability.APPLICABLE
+        system_ready = entry_evidence_ready and risk_values_ready and scoring_ready
+        system = run_veto_expert(
+            _SystemGuardian(
+                allow=system_ready,
+                required_action=(RequiredAction.NONE if system_ready else RequiredAction.BLOCK_NEW),
+                reason_code=(
+                    "entry_guardians_clear" if system_ready else "entry_guardian_blocked"
+                ),
+                evidence_id=event_id,
+            ),
+            context,
+        )
+        base = run_constraint_expert(
+            _BasePositionConstraint(self.base_maximum_position),
+            context,
+        )
+        governance = aggregate_governance(
+            context,
+            (system, position.veto),
+            (base, position.constraint),
+        )
+        action = self._map_action(context, governance, (score,))
+        target = (
+            None
+            if governance.merged_constraints is None
+            else governance.merged_constraints.maximum_position
+        )
+        return FormalStrategyDecision(
+            event_id,
+            (
+                "research.control.p4-candidate-pass-through+risk"
+                if position_risk_enabled
+                else "research.control.p4-candidate-pass-through"
+            ),
+            self.topology_digest,
+            None,
+            governance,
+            action,
+            target,
+        )
 
     def evaluate_entry(
         self,

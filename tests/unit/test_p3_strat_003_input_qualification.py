@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -24,6 +24,7 @@ from quanthus.expert_strategy.p3_strat_003_input_qualification import (
     _request,
     _scope,
     _verify_replay_bundle,
+    _warmup_dates,
 )
 from quanthus.platform.event_worker import _structure_input, _structure_request_digest
 
@@ -265,3 +266,49 @@ def test_event_worker_bound_prior_transport_is_read_only_and_not_p6_authority() 
     ) in event_block
     assert "QUANTHUS_P6_CONTROLLER_ENABLED" not in event_block
     assert "QUANTHUS_P6_ACTIVATION_MANDATE" not in event_block
+
+
+
+def test_warmup_dates_resolve_exact_sse_szse_shared_sessions(tmp_path: Path) -> None:
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    start = date(2024, 10, 1)
+    dates = [start + timedelta(days=index) for index in range(70)]
+    rows = {
+        "venue_id": [],
+        "trade_date": [],
+        "knowledge_to": [],
+        "is_open": [],
+    }
+    for market_date in dates:
+        for venue_id in (
+            "venue_bec59e31eb6bb28111a10d7e6d2c689f",
+            "venue_8c0bd9088a0dc88f28e5e7fa8efdce87",
+        ):
+            rows["venue_id"].append(venue_id)
+            rows["trade_date"].append(market_date)
+            rows["knowledge_to"].append(None)
+            rows["is_open"].append(True)
+
+    target = (
+        tmp_path
+        / "payload/tradability_state/dwd_trading_calendar/trade_date_year=2024/part-00000.parquet"
+    )
+    target.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "venue_id": pa.array(rows["venue_id"], type=pa.string()),
+                "trade_date": pa.array(rows["trade_date"], type=pa.date32()),
+                "knowledge_to": pa.array(rows["knowledge_to"], type=pa.timestamp("us", tz="UTC")),
+                "is_open": pa.array(rows["is_open"], type=pa.bool_()),
+            }
+        ),
+        target,
+    )
+
+    observed = _warmup_dates(tmp_path, date(2025, 1, 1), 60)
+
+    assert len(observed) == 60
+    assert observed == tuple(dates[-60:])

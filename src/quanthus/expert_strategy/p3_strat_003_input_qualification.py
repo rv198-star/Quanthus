@@ -68,7 +68,7 @@ BUNDLE_SCHEMA = "quanthus.p3-strat-003-sealed-replay-bundle.v1"
 CANDIDATE_SCHEMA = "quanthus.p3-strat-003-candidate-input.v1"
 PARTITION = "p3-strat-003-recent-history"
 _SSE_VENUE = "venue_bec59e31eb6bb28111a10d7e6d2c689f"
-_SZSE_VENUE = "venue_8c0bd9088f28e5e7fa8efdce87"
+_SZSE_VENUE = "venue_8c0bd9088a0dc88f28e5e7fa8efdce87"
 
 
 def _sha256(path: Path) -> str:

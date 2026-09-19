@@ -41,9 +41,17 @@ done < <(
 )
 
 cp "$REPOSITORY_ROOT/ops/event/Dockerfile" "$BUILD_CONTEXT/Dockerfile"
-docker build \
+if ! docker build \
     --build-arg "QUANTHUS_CODE_REVISION=$CODE_REVISION" \
     --tag "$IMAGE_TAG" \
-    "$BUILD_CONTEXT"
+    "$BUILD_CONTEXT"; then
+    echo "event image cached build failed; retrying one clean pull/no-cache build" >&2
+    docker build \
+        --pull \
+        --no-cache \
+        --build-arg "QUANTHUS_CODE_REVISION=$CODE_REVISION" \
+        --tag "$IMAGE_TAG" \
+        "$BUILD_CONTEXT"
+fi
 
 printf 'Event image built: %s\n' "$IMAGE_TAG"

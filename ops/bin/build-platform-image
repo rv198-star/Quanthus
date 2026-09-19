@@ -12,7 +12,9 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 install -d \
+    "$BUILD_CONTEXT/config/expert-evaluations/experts" \
     "$BUILD_CONTEXT/config/expert-evaluations/lifecycle" \
+    "$BUILD_CONTEXT/config/expert-evaluations/specs" \
     "$BUILD_CONTEXT/config/expert-strategies" \
     "$BUILD_CONTEXT/config/forward-validation" \
     "$BUILD_CONTEXT/config/pipelines" \
@@ -52,8 +54,14 @@ cp -a "$REPOSITORY_ROOT/config/forward-validation/." \
     "$BUILD_CONTEXT/config/forward-validation/"
 cp "$REPOSITORY_ROOT/config/releases/v2-build202607.json" \
     "$BUILD_CONTEXT/config/releases/"
+cp "$REPOSITORY_ROOT/config/p4-candidate-price-volume-transition.research.v1.json" \
+    "$BUILD_CONTEXT/config/"
 cp "$REPOSITORY_ROOT/config/expert-strategies/p4-trend-risk.v1.0.1.json" \
     "$BUILD_CONTEXT/config/expert-strategies/"
+cp "$REPOSITORY_ROOT/config/expert-evaluations/experts/trend-stability.v1.json" \
+    "$BUILD_CONTEXT/config/expert-evaluations/experts/"
+cp "$REPOSITORY_ROOT/config/expert-evaluations/specs/trend-stability-p4-first-passage.evaluation.v1.json" \
+    "$BUILD_CONTEXT/config/expert-evaluations/specs/"
 cp "$REPOSITORY_ROOT/config/expert-evaluations/lifecycle/candidate-p4-trend-risk-1.0.1.inconclusive.v1.json" \
     "$BUILD_CONTEXT/config/expert-evaluations/lifecycle/"
 cp "$REPOSITORY_ROOT/src/quanthus/__init__.py" \

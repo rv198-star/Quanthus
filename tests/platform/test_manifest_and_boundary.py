@@ -164,7 +164,13 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     ):
         assert required in dockerfile
         assert required in builder
+    assert "config/p4-candidate-price-volume-transition.research.v1.json" in dockerfile
     assert "config/expert-strategies/p4-trend-risk.v1.0.1.json" in dockerfile
+    assert "config/expert-evaluations/experts/trend-stability.v1.json" in dockerfile
+    assert (
+        "config/expert-evaluations/specs/"
+        "trend-stability-p4-first-passage.evaluation.v1.json" in dockerfile
+    )
     assert "candidate-p4-trend-risk-1.0.1.inconclusive.v1.json" in dockerfile
     assert "find ./config -type d -exec chmod 0555" in dockerfile
     assert "find ./config -type f -exec chmod 0444" in dockerfile
@@ -187,7 +193,19 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     assert '"$REPOSITORY_ROOT/config/product-research-catalog.v1.json"' in builder
     assert '"$REPOSITORY_ROOT/config/product-candidate-evidence.v1.json"' in builder
     assert '"$REPOSITORY_ROOT/config/product-expert-evidence.v1.json"' in builder
+    assert (
+        '"$REPOSITORY_ROOT/config/p4-candidate-price-volume-transition.research.v1.json"'
+        in builder
+    )
     assert '"$REPOSITORY_ROOT/config/expert-strategies/p4-trend-risk.v1.0.1.json"' in builder
+    assert (
+        '"$REPOSITORY_ROOT/config/expert-evaluations/experts/trend-stability.v1.json"'
+        in builder
+    )
+    assert (
+        '"$REPOSITORY_ROOT/config/expert-evaluations/specs/'
+        'trend-stability-p4-first-passage.evaluation.v1.json"' in builder
+    )
     assert (
         '"$REPOSITORY_ROOT/config/expert-evaluations/lifecycle/'
         'candidate-p4-trend-risk-1.0.1.inconclusive.v1.json"' in builder

@@ -19,6 +19,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from quanthus.event_library.contracts import event_record_from_dict
+from quanthus.expert_evaluation.production import _EventInput
 from quanthus.expert_evaluation.serialization import (
     ExpertEvaluationError,
     canonical_json_bytes,
@@ -27,12 +29,14 @@ from quanthus.expert_evaluation.serialization import (
 from quanthus.expert_strategy.formal_attribution import FormalReplayEvidence
 from quanthus.expert_strategy.formal_p2_replay import FormalP2ReplayRuntime
 from quanthus.expert_strategy.runner import FormalStrategyRunner
+from quanthus.industry_mapping import StaticIndustryMapping, load_static_industry_mapping
 
 REQUEST_PATH = "config/research/p3-strat-003/request.v1.json"
 REQUEST_SCHEMA = "quanthus.p3-strat-003-research-request.v1"
 REQUEST_DIGEST = "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde"
 VARIANT_IDS = ("B", "T", "R", "TR")
 RECENT_HISTORY_PARTITION = "p3-strat-003-recent-history"
+CANDIDATE_INPUT_SCHEMA = "quanthus.p3-strat-003-candidate-input.v1"
 _TOKEN_BY_VARIANT = {
     "B": "research.p3-strat-003.B",
     "T": "research.p3-strat-003.T",
@@ -99,6 +103,194 @@ class P3Strat003Request:
         )
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        raise ExpertEvaluationError(
+            "p3_strat_003_candidate_input_unreadable",
+            f"candidate input file is unreadable: {path.name}",
+        ) from exc
+    return "sha256:" + digest.hexdigest()
+
+
+def _bound_child(root: Path, relative: object, label: str) -> Path:
+    if not isinstance(relative, str) or not relative or relative.startswith("/"):
+        raise ExpertEvaluationError(
+            "p3_strat_003_candidate_input_invalid",
+            f"{label} path must be relative",
+        )
+    path = (root / relative).resolve()
+    if not path.is_relative_to(root.resolve()):
+        raise ExpertEvaluationError(
+            "p3_strat_003_candidate_input_invalid",
+            f"{label} path escapes candidate input root",
+        )
+    return path
+
+
+@dataclass(frozen=True)
+class P3Strat003CandidateInput:
+    manifest_path: Path
+    manifest_digest: str
+    events: tuple[_EventInput, ...]
+    industry: StaticIndustryMapping
+    scope: Mapping[str, str]
+    replay_bundle_digest: str
+
+    @classmethod
+    def load(
+        cls,
+        manifest_path: Path,
+        *,
+        request_digest: str,
+        decision_start: date,
+        decision_end: date,
+        execution_end: date,
+    ) -> P3Strat003CandidateInput:
+        resolved = manifest_path.resolve()
+        try:
+            raw = json.loads(resolved.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ExpertEvaluationError(
+                "p3_strat_003_candidate_input_unreadable",
+                "P3-STRAT-003 candidate manifest is unreadable",
+            ) from exc
+        if (
+            not isinstance(raw, dict)
+            or raw.get("schema_version") != CANDIDATE_INPUT_SCHEMA
+            or raw.get("work_item") != "P3-STRAT-003-B"
+            or raw.get("request_digest") != request_digest
+        ):
+            raise ExpertEvaluationError(
+                "p3_strat_003_candidate_input_invalid",
+                "P3-STRAT-003 candidate manifest identity differs",
+            )
+        declared = raw.get("semantic_digest")
+        payload = {key: value for key, value in raw.items() if key != "semantic_digest"}
+        computed = digest_value(payload)
+        if declared != computed:
+            raise ExpertEvaluationError(
+                "p3_strat_003_candidate_input_drift",
+                "P3-STRAT-003 candidate manifest digest differs",
+            )
+        expected_scope = {
+            "decision_start": decision_start.isoformat(),
+            "decision_end": decision_end.isoformat(),
+            "execution_end": execution_end.isoformat(),
+        }
+        scope = raw.get("scope")
+        if scope != expected_scope:
+            raise ExpertEvaluationError(
+                "p3_strat_003_candidate_scope_mismatch",
+                "candidate input scope differs from replay scope",
+            )
+        event_binding = raw.get("events")
+        industry_binding = raw.get("industry_mapping")
+        if not isinstance(event_binding, dict) or not isinstance(industry_binding, dict):
+            raise ExpertEvaluationError(
+                "p3_strat_003_candidate_input_invalid",
+                "candidate input bindings are incomplete",
+            )
+        root = resolved.parent
+        events_path = _bound_child(root, event_binding.get("path"), "events")
+        industry_path = _bound_child(root, industry_binding.get("path"), "industry_mapping")
+        if _sha256_file(events_path) != event_binding.get("sha256"):
+            raise ExpertEvaluationError(
+                "p3_strat_003_candidate_input_drift",
+                "candidate events checksum differs",
+            )
+        if _sha256_file(industry_path) != industry_binding.get("sha256"):
+            raise ExpertEvaluationError(
+                "p3_strat_003_candidate_input_drift",
+                "candidate industry mapping checksum differs",
+            )
+        industry = load_static_industry_mapping(
+            industry_path,
+            expected_version="static-level1-concentration-research-v1",
+        )
+        events: list[_EventInput] = []
+        try:
+            lines = events_path.read_text(encoding="utf-8").splitlines()
+        except OSError as exc:
+            raise ExpertEvaluationError(
+                "p3_strat_003_candidate_input_unreadable",
+                "candidate events are unreadable",
+            ) from exc
+        for line in lines:
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ExpertEvaluationError(
+                    "p3_strat_003_candidate_input_invalid",
+                    "candidate event JSON is invalid",
+                ) from exc
+            if not isinstance(value, dict):
+                raise ExpertEvaluationError(
+                    "p3_strat_003_candidate_input_invalid",
+                    "candidate event row must be an object",
+                )
+            record = event_record_from_dict(value.get("event"))
+            if not decision_start <= record.identity.signal_date <= decision_end:
+                raise ExpertEvaluationError(
+                    "p3_strat_003_candidate_scope_mismatch",
+                    "candidate event falls outside frozen decision scope",
+                )
+            listing_code = value.get("listing_code")
+            static_industry_id = value.get("static_level1_industry_id")
+            if not isinstance(listing_code, str) or not listing_code:
+                raise ExpertEvaluationError(
+                    "p3_strat_003_candidate_input_invalid",
+                    "candidate listing_code is missing",
+                )
+            expected_membership = industry.by_security_id.get(record.identity.security_id)
+            if (
+                expected_membership is None
+                or static_industry_id != expected_membership.level1_industry_id
+            ):
+                raise ExpertEvaluationError(
+                    "p3_strat_003_candidate_industry_mismatch",
+                    "candidate industry differs from bound mapping",
+                )
+            events.append(
+                _EventInput(
+                    record,
+                    str(static_industry_id),
+                    listing_code,
+                )
+            )
+        events.sort(key=lambda item: item.record.event_id)
+        if len(events) != event_binding.get("count") or not events:
+            raise ExpertEvaluationError(
+                "p3_strat_003_candidate_input_invalid",
+                "candidate event count differs or is empty",
+            )
+        if len({item.record.event_id for item in events}) != len(events):
+            raise ExpertEvaluationError(
+                "p3_strat_003_candidate_input_invalid",
+                "candidate event identities are not unique",
+            )
+        replay_bundle_digest = raw.get("replay_bundle_digest")
+        if not isinstance(replay_bundle_digest, str) or not replay_bundle_digest.startswith(
+            "sha256:"
+        ):
+            raise ExpertEvaluationError(
+                "p3_strat_003_candidate_input_invalid",
+                "replay bundle digest is invalid",
+            )
+        return cls(
+            resolved,
+            computed,
+            tuple(events),
+            industry,
+            expected_scope,
+            replay_bundle_digest,
+        )
+
+
 class P3Strat003ReplayRuntime(FormalP2ReplayRuntime):
     """Run the frozen B/T/R/TR factorial through one shared replay prerequisite."""
 
@@ -109,10 +301,22 @@ class P3Strat003ReplayRuntime(FormalP2ReplayRuntime):
         decision_start: date,
         decision_end: date,
         execution_end: date,
-        parent_event_run_digest: str,
         provider_config: str,
+        parent_event_run_digest: str | None = None,
+        candidate_input_manifest: str | None = None,
     ) -> None:
+        if (parent_event_run_digest is None) == (candidate_input_manifest is None):
+            raise ExpertEvaluationError(
+                "p3_strat_003_population_binding_invalid",
+                "exactly one parent Event Run or outcome-blind candidate input must be bound",
+            )
         self.request = P3Strat003Request.load(repository_root)
+        self.candidate_input_manifest = (
+            None
+            if candidate_input_manifest is None
+            else (repository_root.resolve() / candidate_input_manifest).resolve()
+        )
+        self.candidate_input: P3Strat003CandidateInput | None = None
         super().__init__(
             repository_root,
             decision_start=decision_start,
@@ -122,6 +326,38 @@ class P3Strat003ReplayRuntime(FormalP2ReplayRuntime):
             provider_config=provider_config,
             allowed_provider_partitions=frozenset({RECENT_HISTORY_PARTITION}),
         )
+        if (
+            self.candidate_input is not None
+            and self.session.reader.bundle.digest != self.candidate_input.replay_bundle_digest
+        ):
+            raise ExpertEvaluationError(
+                "p3_strat_003_candidate_bundle_mismatch",
+                "candidate input binds a different replay bundle",
+            )
+
+    def _load_event_population(
+        self,
+        event_root: Path,
+    ) -> tuple[tuple[_EventInput, ...], StaticIndustryMapping]:
+        if self.candidate_input_manifest is None:
+            return super()._load_event_population(event_root)
+        self.candidate_input = P3Strat003CandidateInput.load(
+            self.candidate_input_manifest,
+            request_digest=self.request.digest,
+            decision_start=self.decision_start,
+            decision_end=self.decision_end,
+            execution_end=self.execution_end,
+        )
+        return self.candidate_input.events, self.candidate_input.industry
+
+    def _population_manifest_fields(self) -> dict[str, Any]:
+        if self.candidate_input is None:
+            return super()._population_manifest_fields()
+        return {
+            "parent_event_run_digest": None,
+            "candidate_input_manifest_digest": self.candidate_input.manifest_digest,
+            "candidate_input_replay_bundle_digest": self.candidate_input.replay_bundle_digest,
+        }
 
     @staticmethod
     def token_for(variant_id: str) -> str:
@@ -176,7 +412,7 @@ class P3Strat003ReplayRuntime(FormalP2ReplayRuntime):
                 "decision_end": self.decision_end.isoformat(),
                 "execution_end": self.execution_end.isoformat(),
             },
-            "parent_event_run_digest": self.parent_event_run_digest,
+            "population": self._population_manifest_fields(),
             "provider_config": self.provider_config,
         }
 
@@ -190,7 +426,7 @@ class P3Strat003ReplayRuntime(FormalP2ReplayRuntime):
                 "decision_end": self.decision_end.isoformat(),
                 "execution_end": self.execution_end.isoformat(),
             },
-            "parent_event_run_digest": self.parent_event_run_digest,
+            "population": self._population_manifest_fields(),
             "provider_config_path": self.provider_config,
             "provider_config_digest": self.session.config.digest,
             "provider_partition": self.session.config.scope.partition,
@@ -283,8 +519,9 @@ class P3Strat003CompositeBackend:
         decision_start: date,
         decision_end: date,
         execution_end: date,
-        parent_event_run_digest: str,
         provider_config: str,
+        parent_event_run_digest: str | None = None,
+        candidate_input_manifest: str | None = None,
     ) -> None:
         self.repository_root = repository_root.resolve()
         self.workspace_root = workspace_root.resolve()
@@ -297,8 +534,9 @@ class P3Strat003CompositeBackend:
             decision_start=decision_start,
             decision_end=decision_end,
             execution_end=execution_end,
-            parent_event_run_digest=parent_event_run_digest,
             provider_config=provider_config,
+            parent_event_run_digest=parent_event_run_digest,
+            candidate_input_manifest=candidate_input_manifest,
         )
         self._shared_prerequisite_elapsed = time.perf_counter() - runtime_started
         self._variant_elapsed: dict[str, float] = {}

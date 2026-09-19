@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | A and C accepted; B / #319 ready; D blocked by B; E blocked by D |
+| Delivery gate | A and C accepted; B / #319 and C-R1 / #385 active result-blind prerequisites; D blocked by both; E blocked by D |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |
@@ -93,11 +93,11 @@ and do not authorize threshold search.
 | P3-STRAT-003-A / #318 | freeze request, authority, comparisons, metrics and budget | none | no |
 | P3-STRAT-003-B / #319 | qualify immutable recent-history inputs and isolation | A | no strategy result |
 | P3-STRAT-003-C / #320 | implement the four-variant research control and exact runner | A | synthetic / consumed only |
-| P3-STRAT-003-D / #321 | run primary and independent cold-reproduction batches | B + C | yes |
+| P3-STRAT-003-C-R1 / #385 | bind recent-history D to B's outcome-blind candidate manifest instead of a legacy Event+Label outer Run | C | no |
+| P3-STRAT-003-D / #321 | run primary and independent cold-reproduction batches | B + C-R1 | yes |
 | P3-STRAT-003-E / #322 | read-only evidence review and one bounded successor decision | D | review only |
 
-A closes the design gate. B and C then proceed in parallel. D may start only when its exact request,
-input manifest and code revision are all sealed.
+A closes the design gate. B and C then proceed in parallel. B's input review exposed one legacy population-binding seam, so C-R1 closes that result-blind integration boundary. D may start only when its exact request, B input/candidate manifest and C-R1 code revision are all sealed.
 
 ## Resource and reproduction budget
 

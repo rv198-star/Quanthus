@@ -312,3 +312,47 @@ def test_warmup_dates_resolve_exact_sse_szse_shared_sessions(tmp_path: Path) -> 
 
     assert len(observed) == 60
     assert observed == tuple(dates[-60:])
+
+
+
+def test_bound_prior_fetch_preserves_multiline_transport_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quanthus.warehouse_sync import WarehouseSyncError
+
+    monkeypatch.setenv("QUANTHUS_CN01_DWD_HOST", "cn01.example")
+    monkeypatch.setattr(
+        input_qualification,
+        "_warehouse_ssh_command",
+        lambda: (
+            "cn01.example",
+            "22",
+            "quanthus-dwd-ro",
+            "/run/secrets/key",
+            "/run/secrets/known-hosts",
+            "ssh fixture",
+        ),
+    )
+    monkeypatch.setattr(
+        input_qualification,
+        "_warehouse_remote_path",
+        lambda relative: relative,
+    )
+
+    def fail_rsync(**_kwargs: object) -> None:
+        raise WarehouseSyncError(
+            "rsync failed with exit code 23:\nremote package missing\nreceiver broken pipe"
+        )
+
+    monkeypatch.setattr(input_qualification, "_warehouse_rsync", fail_rsync)
+
+    with pytest.raises(
+        ExpertEvaluationError,
+        match="remote package missing receiver broken pipe",
+    ):
+        _fetch_bound_prior_package(
+            cache_root=tmp_path / "cache",
+            market_date=date(2026, 9, 17),
+            package_id="dwd-daily-20260917-fixture",
+            manifest_sha256="sha256:" + "1" * 64,
+        )

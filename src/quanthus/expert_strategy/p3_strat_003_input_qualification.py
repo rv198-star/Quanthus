@@ -58,6 +58,7 @@ from quanthus.pipelines.securities_warehouse.daily_domain import (
     verify_daily_domain_increment,
 )
 from quanthus.policy import find_project_root
+from quanthus.warehouse_sync import WarehouseSyncError
 from quanthus.warehouse_sync import _remote_path as _warehouse_remote_path
 from quanthus.warehouse_sync import _run_rsync as _warehouse_rsync
 from quanthus.warehouse_sync import _ssh_command as _warehouse_ssh_command
@@ -266,17 +267,24 @@ def _fetch_bound_prior_package(
         remote_package = (
             f"{remote_user}@{remote_host}:{_warehouse_remote_path(relative)}/"
         )
-        _warehouse_rsync(
-            source=remote_package,
-            destination=staging,
-            ssh=ssh,
-            extra=("--exclude=READY",),
-        )
-        _warehouse_rsync(
-            source=f"{remote_package}READY",
-            destination=staging / "READY",
-            ssh=ssh,
-        )
+        try:
+            _warehouse_rsync(
+                source=remote_package,
+                destination=staging,
+                ssh=ssh,
+                extra=("--exclude=READY",),
+            )
+            _warehouse_rsync(
+                source=f"{remote_package}READY",
+                destination=staging / "READY",
+                ssh=ssh,
+            )
+        except WarehouseSyncError as exc:
+            detail = " ".join(str(exc).split())
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_fetch_failed",
+                detail[:1200],
+            ) from exc
         try:
             verified = verify_daily_domain_increment(staging)
         except DailyDomainBuildError as exc:

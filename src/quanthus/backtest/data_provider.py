@@ -8,14 +8,20 @@ import os
 import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from quanthus.backtest.historical_bundle import (
+    REQUIRED_HISTORICAL_REPLAY_DATASETS,
+    HistoricalReplayBundle,
+)
 from quanthus.backtest.historical_frames import HistoricalReplayFrameReader
+from quanthus.contracts import SnapshotRef
 from quanthus.corporate_action_normalization import (
     load_corporate_action_normalization_policy,
 )
+from quanthus.data_foundation import DatasetManifest
 from quanthus.policy import ConfigurationError, find_project_root
 from quanthus.strategy_replay_ads import (
     load_strategy_replay_ads_policy,
@@ -142,7 +148,11 @@ def load_replay_data_provider_config(
         raise ConfigurationError("unsupported replay data provider schema")
     mode = str(raw.get("mode", ""))
     if (
-        mode not in {"shared-replay-projection", "direct-dwd-job-local"}
+        mode not in {
+            "shared-replay-projection",
+            "direct-dwd-job-local",
+            "sealed-historical-bundle",
+        }
         or raw.get("research_only") is not True
         or raw.get("execution_authorized") is not False
     ):
@@ -189,6 +199,15 @@ def load_replay_data_provider_config(
                 "source_manifest_sha256",
             )
         }
+    elif mode == "sealed-historical-bundle":
+        replay = _mapping(raw.get("replay_source"), "replay_source")
+        if materialization.get("sealed_bundle_reused") is not True:
+            raise ConfigurationError("sealed replay mode must reuse one immutable bundle")
+        replay_root = _configured_root(replay, "replay_source")
+        replay_identity = {
+            key: _text(replay.get(key), f"replay_source.{key}")
+            for key in ("bundle_manifest_sha256", "bundle_digest")
+        }
     dwd_identity = {
         key: _text(dwd.get(key), f"dwd_authority.{key}")
         for key in (
@@ -199,11 +218,11 @@ def load_replay_data_provider_config(
             "relationship_to_replay_source",
         )
     }
-    expected_relationship = (
-        "authority-baseline-not-direct-replay-parent"
-        if mode == "shared-replay-projection"
-        else "direct-job-local-source"
-    )
+    expected_relationship = {
+        "shared-replay-projection": "authority-baseline-not-direct-replay-parent",
+        "direct-dwd-job-local": "direct-job-local-source",
+        "sealed-historical-bundle": "sealed-bundle-derived-from-governed-dwd-chain",
+    }[mode]
     if dwd_identity["relationship_to_replay_source"] != expected_relationship:
         raise ConfigurationError("DWD relationship does not match the replay provider mode")
     correction_root = None
@@ -256,6 +275,77 @@ def load_replay_data_provider_config(
     )
 
 
+def _load_sealed_historical_bundle(
+    config: ReplayDataProviderConfig,
+) -> tuple[HistoricalReplayBundle, dict[str, str]]:
+    manifest_path = config.replay_root / "bundle.json"
+    manifest = _load_object(manifest_path, "sealed replay bundle manifest")
+    observed_manifest_sha256 = _sha256(manifest_path)
+    expected_manifest_sha256 = config.replay_identity.get("bundle_manifest_sha256")
+    if observed_manifest_sha256 != expected_manifest_sha256:
+        raise ConfigurationError("sealed replay bundle manifest checksum differs")
+    if (
+        manifest.get("schema_version") != "quanthus.p3-strat-003-sealed-replay-bundle.v1"
+        or manifest.get("work_item") != "P3-STRAT-003-B"
+        or manifest.get("partition") != config.scope.partition
+    ):
+        raise ConfigurationError("sealed replay bundle identity differs")
+    snapshot = _mapping(manifest.get("snapshot"), "sealed replay bundle snapshot")
+    try:
+        snapshot_ref = SnapshotRef(
+            market_date=date.fromisoformat(
+                _text(snapshot.get("market_date"), "snapshot.market_date")
+            ),
+            knowledge_cutoff=datetime.fromisoformat(
+                _text(snapshot.get("knowledge_cutoff"), "snapshot.knowledge_cutoff")
+            ),
+            source_revision=_text(
+                snapshot.get("source_revision"), "snapshot.source_revision"
+            ),
+            snapshot_id=_text(snapshot.get("snapshot_id"), "snapshot.snapshot_id"),
+        )
+        datasets_raw = manifest.get("datasets")
+        if not isinstance(datasets_raw, list):
+            raise ValueError("datasets must be an array")
+        datasets = tuple(DatasetManifest.from_dict(item) for item in datasets_raw)
+    except (TypeError, KeyError, ValueError) as exc:
+        raise ConfigurationError("sealed replay bundle manifest is invalid") from exc
+    names = {item.dataset for item in datasets}
+    if names != REQUIRED_HISTORICAL_REPLAY_DATASETS:
+        raise ConfigurationError("sealed replay bundle dataset closure differs")
+    for dataset in datasets:
+        if set(dataset.partitions) != set(dataset.content_checksums):
+            raise ConfigurationError(
+                f"sealed replay bundle partition bindings differ: {dataset.dataset}"
+            )
+        for relative, expected in dataset.content_checksums.items():
+            path = (config.replay_root / relative).resolve()
+            if not path.is_relative_to(config.replay_root):
+                raise ConfigurationError("sealed replay bundle partition escapes root")
+            if not path.is_file() or _sha256(path) != expected:
+                raise ConfigurationError(
+                    f"sealed replay bundle partition checksum differs: {dataset.dataset}"
+                )
+    bundle = HistoricalReplayBundle(
+        root=config.replay_root,
+        snapshot=snapshot_ref,
+        universe_policy_version=_text(
+            manifest.get("universe_policy_version"), "universe_policy_version"
+        ),
+        datasets=datasets,
+    )
+    expected_bundle_digest = config.replay_identity.get("bundle_digest")
+    if (
+        manifest.get("bundle_digest") != bundle.digest
+        or bundle.digest != expected_bundle_digest
+    ):
+        raise ConfigurationError("sealed replay bundle semantic digest differs")
+    return bundle, {
+        "bundle_manifest_sha256": observed_manifest_sha256,
+        "bundle_digest": bundle.digest,
+    }
+
+
 class ReplayDataSession:
     def __init__(
         self,
@@ -302,6 +392,38 @@ class ReplayDataProvider:
                 scope_end=scope_end,
                 progress=progress,
             )
+        if self.config.mode == "sealed-historical-bundle":
+            bundle, actual_replay = _load_sealed_historical_bundle(self.config)
+            dwd_manifest = _load_object(
+                self.config.dwd_root / "manifest.json", "DWD authority manifest"
+            )
+            actual_dwd = {
+                "package_id": dwd_manifest.get("package_id"),
+                "through_date": dwd_manifest.get("through_date"),
+                "content_digest": dwd_manifest.get("content_digest"),
+                "manifest_sha256": _sha256(self.config.dwd_root / "manifest.json"),
+                "relationship_to_replay_source": (
+                    "sealed-bundle-derived-from-governed-dwd-chain"
+                ),
+            }
+            if actual_dwd != dict(self.config.dwd_identity):
+                raise ConfigurationError(
+                    "DWD authority identity differs from sealed provider configuration"
+                )
+            reader = HistoricalReplayFrameReader(bundle)
+            identity = {
+                "provider_id": self.config.provider_id,
+                "provider_version": self.config.provider_version,
+                "provider_config_digest": self.config.digest,
+                "scope": self.config.scope.to_dict(),
+                "replay_source": actual_replay,
+                "dwd_authority": actual_dwd,
+                "point_in_time": True,
+                "decision_at_close_execution_at_next_open": True,
+                "dedicated_ads_required": False,
+                "shared_session": True,
+            }
+            return ReplayDataSession(self.config, reader, identity)
         replay_manifest = _load_object(
             self.config.replay_root / "manifest.json", "shared replay manifest"
         )

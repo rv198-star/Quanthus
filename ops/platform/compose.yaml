@@ -98,6 +98,7 @@ services:
       QUANTHUS_PLATFORM_DATABASE_URL: postgresql://quanthus_platform@postgres:5432/quanthus_platform
       QUANTHUS_WORKER_ID: oci-event-1
       QUANTHUS_EVENT_RUN_ROOT: /data/event-runs
+      QUANTHUS_P6_DWD_DAILY_ROOT: /data/dwd-daily
       QUANTHUS_EVENT_SHARD_TARGET: ${QUANTHUS_EVENT_SHARD_TARGET:-0}
       QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED: "0"
       QUANTHUS_STRUCTURE_ECONOMIC_QUALIFICATION_SEED: "0"
@@ -119,6 +120,7 @@ services:
       - /srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001:/srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001:ro
       - /srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:/srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:ro
       - /srv/quanthus/reference-data/p4/historical-industry-source-20b51d52070b.json:/srv/quanthus/reference-data/p4/historical-industry-source-20b51d52070b.json:ro
+      - /home/ubuntu/data/quanthus/dwd-daily:/data/dwd-daily:ro
       - quanthus-event-runs:/data/event-runs
 
   event-shard-worker:

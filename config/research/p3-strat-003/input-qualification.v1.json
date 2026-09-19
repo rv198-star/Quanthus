@@ -1,0 +1,42 @@
+{
+  "schema_version": "quanthus.p3-strat-003-input-qualification.v1",
+  "work_item": "P3-STRAT-003-B",
+  "state": "FROZEN_INPUT_ONLY",
+  "request": {
+    "path": "config/research/p3-strat-003/request.v1.json",
+    "semantic_digest": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde",
+    "file_sha256": "sha256:e1234e80857e012e2d125babba15fd4d0985cd0b38402d5737db0470d6be7c3b"
+  },
+  "source_runtime": {
+    "path": "config/forward-validation/activation/p6-prospective-runtime.v1.json",
+    "file_sha256": "sha256:b8935da7f639d67632de3aef66be50082b59dc3a1d0281f694ea121954d919ce",
+    "usage": "read_only_data_identity_and_effective_view_builder_reuse",
+    "p6_authority_inherited": false
+  },
+  "scope": {
+    "warmup_open_sessions": 60,
+    "decision_start": "2025-01-01",
+    "decision_end": "2026-09-17",
+    "execution_end": "2026-09-18",
+    "target_daily_market_date": "2026-09-18",
+    "roll_forward_authorized": false
+  },
+  "partition": "p3-strat-003-recent-history",
+  "outputs": {
+    "strategy_or_economic_results": false,
+    "target_outcome_labels": false,
+    "historical_replay_bundle": true,
+    "outcome_blind_candidate_input": true,
+    "coverage_and_pit_audit": true
+  },
+  "authority": {
+    "general_2022_2024_result_access": false,
+    "2024_warmup_calendar_and_input_rows_only": true,
+    "2025_candidate_and_input_read_authorized": true,
+    "2025_outcome_read_authorized": false,
+    "2026_candidate_and_input_read_authorized": true,
+    "2026_strategy_result_read_authorized": false,
+    "p6_mutation_authorized": false,
+    "broker_or_live_capital_authorized": false
+  }
+}

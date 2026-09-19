@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
 import sys
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -149,7 +149,11 @@ def test_disabled_rehearsal_contract_has_zero_runtime_side_effects(tmp_path: Pat
     assert summary["notification_count"] == 0
     assert summary["broker_action_count"] == 0
     assert summary["live_capital_action_count"] == 0
-    assert verify_forward_run(run.root, expected_input_digest=value.input_digest).manifest_digest == run.manifest_digest
+    verified = verify_forward_run(
+        run.root,
+        expected_input_digest=value.input_digest,
+    )
+    assert verified.manifest_digest == run.manifest_digest
 
 
 def test_pre_activation_submission_rejects_official_shape() -> None:
@@ -185,6 +189,85 @@ def test_replay_worker_executes_and_seals_disabled_rehearsal(tmp_path: Path) -> 
     assert summary["official_evidence"] is False
     assert summary["dwd_read_count"] == 0
     assert any(update[2] == "publishing-run" for update in store.updates)
+
+
+def test_replay_worker_routes_official_reproduction_to_independent_inventory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw = {
+        "mode": "official_reproduction",
+        "synthetic": "worker-routing-only",
+    }
+    digest = input_digest(raw)
+    now = datetime.now(timezone.utc)
+    job = JobRecord(
+        job_id="job_" + "5" * 32,
+        kind=P6_FORWARD_CYCLE_JOB,
+        actor_user_id="usr_p6_test",
+        idempotency_key="p6-official-reproduction-worker-routing",
+        input_ref=raw,
+        state="running",
+        progress=1,
+        cancel_requested=False,
+        attempt=1,
+        result_ref=None,
+        error_reason=None,
+        created_at=now,
+        updated_at=now,
+        queue="replay",
+        input_digest=digest,
+        concurrency_key="p6-forward-cycle:official-reproduction",
+        available_at=now,
+        stage="starting",
+        claimed_by="worker-test",
+        claim_generation=1,
+    )
+    store = _Store(job)
+    worker = _worker(tmp_path, store)
+    fake_input = SimpleNamespace(input_digest=digest)
+    monkeypatch.setattr(
+        worker_module.OfficialCycleReproductionJobInput,
+        "from_dict",
+        lambda _raw: fake_input,
+    )
+    fake_run = SimpleNamespace(
+        run_id="p6_repro_test",
+        root=tmp_path / "p6/reproductions/p6_repro_test",
+        manifest_digest="sha256:" + "1" * 64,
+        input_digest=digest,
+    )
+    fake_child = SimpleNamespace(
+        run=fake_run,
+        summary={
+            "mode": "official_reproduction",
+            "official_evidence": False,
+            "semantic_match": True,
+        },
+    )
+    observed_roots: list[Path] = []
+
+    def fake_find(run_root: Path, input_digest_value: str):
+        observed_roots.append(run_root)
+        assert input_digest_value == digest
+        return fake_child
+
+    monkeypatch.setattr(
+        worker_module,
+        "find_p6_forward_reproduction_for_input",
+        fake_find,
+    )
+    monkeypatch.setattr(
+        worker_module,
+        "p6_forward_child_command",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("child must not rerun")),
+    )
+
+    assert worker.run_once() is True
+    assert observed_roots == [tmp_path / "p6/reproductions"]
+    assert store.terminal is not None
+    _args, kwargs = store.terminal
+    assert kwargs["state"] == "succeeded"
+    assert kwargs["result_ref"]["summary"]["mode"] == "official_reproduction"
 
 
 def test_second_claim_recovers_same_sealed_run_without_child_reexecution(
@@ -255,7 +338,9 @@ def test_cancel_and_lease_loss_do_not_publish_forward_run(
     assert lease_store.terminal is None
 
 
-def test_memory_guard_is_reused_by_p6_worker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_memory_guard_is_reused_by_p6_worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     sleeper = (sys.executable, "-c", "import time; time.sleep(10)")
     monkeypatch.setattr(worker_module, "p6_forward_child_command", lambda **_kwargs: sleeper)
     memory_current = tmp_path / "memory.current"

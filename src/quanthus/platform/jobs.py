@@ -85,6 +85,16 @@ def p6_forward_submission(
         if input_digest(canonical) != parsed.input_digest:
             raise RuntimeError("P6 official input digest implementations differ")
         return canonical, parsed.idempotency_key, parsed.concurrency_key
+    if mode == "official_reproduction":
+        from quanthus.forward_validation.reproduction import (
+            OfficialCycleReproductionJobInput,
+        )
+
+        parsed = OfficialCycleReproductionJobInput.from_dict(input_ref)
+        canonical = parsed.to_dict()
+        if input_digest(canonical) != parsed.input_digest:
+            raise RuntimeError("P6 reproduction input digest implementations differ")
+        return canonical, parsed.idempotency_key, parsed.concurrency_key
     raise ValueError("P6 forward mode is not admitted")
 
 

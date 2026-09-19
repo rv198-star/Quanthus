@@ -1,0 +1,28 @@
+[Unit]
+Description=Restricted Quanthus production capability for DevSpace MCP
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+SupplementaryGroups=devspace docker
+UMask=0007
+ExecStart=/usr/local/libexec/quanthus-mcp-production
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/services/quanthus-platform /home/ubuntu/.config/quanthus /run/quanthus-mcp-production /var/log/quanthus-mcp-production
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictRealtime=yes
+
+[Install]
+WantedBy=multi-user.target

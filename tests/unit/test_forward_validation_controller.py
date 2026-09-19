@@ -15,14 +15,84 @@ from quanthus.forward_validation.activation import (
     load_prospective_runtime_config,
     make_activation_decision_payload,
 )
+from quanthus.forward_validation.official_cycle import OfficialCycleJobInput
+from quanthus.forward_validation.serialization import digest_value
 from quanthus.platform.jobs import P6_FORWARD_CYCLE_JOB
-from quanthus.platform.models import UserRecord
+from quanthus.platform.models import JobRecord, UserRecord
 from quanthus.platform.persistence import InMemoryPlatformStore
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = ROOT / "config/forward-validation/activation/p6-prospective-runtime.v1.json"
 MANDATE = ROOT / "config/forward-validation/activation/p6-owner-activation-mandate.v1.json"
 UTC = timezone.utc
+
+
+def _official_input(runtime, activation: dict[str, object]) -> OfficialCycleJobInput:
+    semantic = {
+        "schema_version": "quanthus.p6-dwd-visibility-receipt.v1",
+        "package_id": "dwd-daily-20260921-test",
+        "market_date": "2026-09-21",
+        "manifest_sha256": "sha256:" + "4" * 64,
+        "content_digest": "sha256:" + "5" * 64,
+        "ready_observed_at": "2026-09-21T12:00:00+00:00",
+        "consumer_visible_at": "2026-09-21T12:01:00+00:00",
+        "source_node": "test",
+    }
+    visibility = {**semantic, "receipt_digest": digest_value(semantic)}
+    return OfficialCycleJobInput(
+        cycle_id="p6-official-2026-09-21",
+        runtime_sha256=runtime.config_sha256,
+        activation_decision=activation,
+        market_date=datetime.fromisoformat("2026-09-21T00:00:00+08:00").date(),
+        package_id="dwd-daily-20260921-test",
+        manifest_sha256="sha256:" + "4" * 64,
+        content_digest="sha256:" + "5" * 64,
+        visibility_receipt=visibility,
+        consumed_at=datetime(2026, 9, 21, 12, 2, tzinfo=UTC),
+    )
+
+
+def _store_succeeded_first_official(
+    store: InMemoryPlatformStore,
+    value: OfficialCycleJobInput,
+) -> JobRecord:
+    now = datetime(2026, 9, 21, 12, 3, tzinfo=UTC)
+    job = JobRecord(
+        job_id="job_" + "9" * 32,
+        kind=P6_FORWARD_CYCLE_JOB,
+        actor_user_id="usr_test",
+        idempotency_key=value.idempotency_key,
+        input_ref=value.to_dict(),
+        state="succeeded",
+        progress=100,
+        cancel_requested=False,
+        attempt=1,
+        result_ref={
+            "run_id": "p6_run_" + value.input_digest[7:31],
+            "manifest_digest": "sha256:" + "6" * 64,
+            "summary": {
+                "mode": "official_cycle",
+                "official_evidence": True,
+                "market_date": "2026-09-21",
+                "collection_session_count": 1,
+                "tail_session_count": 0,
+            },
+        },
+        error_reason=None,
+        created_at=now,
+        updated_at=now,
+        completed_at=now,
+        queue="replay",
+        input_digest=value.input_digest,
+        concurrency_key=value.concurrency_key,
+        available_at=now,
+        stage="succeeded",
+        started_at=now,
+        claimed_by="worker-test",
+        claim_generation=1,
+    )
+    store.create_job(job)
+    return job
 
 
 def test_production_compose_arms_conditional_controller_and_mounts_p6_dwd_read_only() -> None:
@@ -171,6 +241,200 @@ def test_controller_publishes_immutable_enabled_decision_only_after_all_gates(
     assert decision["official_prospective_cycle_authorized"] is True
     assert decision["broker_authorized"] is False
     assert decision["live_capital_authorized"] is False
+
+
+def test_controller_rebinds_activation_for_maintenance_revision_only_before_official_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime = load_prospective_runtime_config(RUNTIME, root=ROOT)
+    mandate = load_owner_activation_mandate(MANDATE, runtime=runtime)
+    activation_root = tmp_path / "p6-forward/activation"
+    controller._publish_enabled_decision(
+        activation_root=activation_root,
+        runtime=runtime,
+        mandate=mandate,
+        code_revision="a" * 40,
+        rehearsal_manifest_digest="sha256:" + "2" * 64,
+        rollback_drill_digest="sha256:" + "3" * 64,
+        now=datetime(2026, 9, 19, 1, tzinfo=UTC),
+    )
+    fake_rehearsal = SimpleNamespace(job_id="job_" + "1" * 32, state="succeeded")
+    monkeypatch.setattr(controller, "_disabled_rehearsal_job", lambda *_a, **_k: fake_rehearsal)
+    monkeypatch.setattr(
+        controller,
+        "_verified_rehearsal_manifest",
+        lambda *_a, **_k: "sha256:" + "4" * 64,
+    )
+    monkeypatch.setattr(controller, "_platform_green", lambda: True)
+    monkeypatch.setattr(controller, "_dwd_mounts_read_only", lambda _runtime: True)
+    monkeypatch.setattr(controller, "_submit_current_official", lambda *_a, **_k: None)
+
+    result = controller.controller_tick(
+        InMemoryPlatformStore(),
+        repository_root=ROOT,
+        p6_forward_run_root=tmp_path / "p6-forward",
+        runtime_path=RUNTIME,
+        mandate_path=MANDATE,
+        code_revision="b" * 40,
+        now=datetime(2026, 9, 19, 2, tzinfo=UTC),
+    )
+
+    assert result["state"] == "enabled"
+    pointer = json.loads(
+        (activation_root / "CURRENT.json").read_text(encoding="utf-8")
+    )
+    rebound = json.loads(
+        (activation_root / str(pointer["decision_path"])).read_text(encoding="utf-8")
+    )
+    assert rebound["deployment_revision"] == "b" * 40
+    assert (
+        activation_root / f"decisions/p6-activation-20260919-{'a' * 12}.json"
+    ).is_file()
+    assert (
+        activation_root / f"decisions/p6-activation-20260919-{'b' * 12}.json"
+    ).is_file()
+
+
+def test_controller_refuses_maintenance_rebind_after_any_official_job(
+    tmp_path: Path,
+) -> None:
+    runtime = load_prospective_runtime_config(RUNTIME, root=ROOT)
+    mandate = load_owner_activation_mandate(MANDATE, runtime=runtime)
+    activation_root = tmp_path / "p6-forward/activation"
+    activation, _digest = controller._publish_enabled_decision(
+        activation_root=activation_root,
+        runtime=runtime,
+        mandate=mandate,
+        code_revision="a" * 40,
+        rehearsal_manifest_digest="sha256:" + "2" * 64,
+        rollback_drill_digest="sha256:" + "3" * 64,
+        now=datetime(2026, 9, 19, 1, tzinfo=UTC),
+    )
+    store = InMemoryPlatformStore()
+    _store_succeeded_first_official(store, _official_input(runtime, activation))
+
+    with pytest.raises(RuntimeError, match="p6_post_evidence_revision_drift"):
+        controller.controller_tick(
+            store,
+            repository_root=ROOT,
+            p6_forward_run_root=tmp_path / "p6-forward",
+            runtime_path=RUNTIME,
+            mandate_path=MANDATE,
+            code_revision="b" * 40,
+            now=datetime(2026, 9, 22, 2, tzinfo=UTC),
+        )
+
+
+def test_controller_blocks_second_official_until_first_reproduction_succeeds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime = load_prospective_runtime_config(RUNTIME, root=ROOT)
+    mandate = load_owner_activation_mandate(MANDATE, runtime=runtime)
+    activation = make_activation_decision_payload(
+        runtime=runtime,
+        mandate=mandate,
+        decision_id="p6-activation-test",
+        state="enabled",
+        decision_at=datetime.fromisoformat("2026-09-19T09:00:00+08:00"),
+        deployment_revision="a" * 40,
+        disabled_rehearsal_manifest_digest="sha256:" + "2" * 64,
+        rollback_drill_digest="sha256:" + "3" * 64,
+    )
+    store = InMemoryPlatformStore()
+    primary = _store_succeeded_first_official(store, _official_input(runtime, activation))
+    monkeypatch.setattr(controller, "_actor_user_id", lambda _store: "usr_test")
+    monkeypatch.setattr(
+        controller,
+        "_activation_current",
+        lambda *_a, **_k: (activation, str(activation["decision_digest"])),
+    )
+    monkeypatch.setattr(
+        controller,
+        "_submit_current_official",
+        lambda *_a, **_k: (_ for _ in ()).throw(
+            AssertionError("second official must wait for reproduction")
+        ),
+    )
+
+    result = controller.controller_tick(
+        store,
+        repository_root=ROOT,
+        p6_forward_run_root=tmp_path / "p6-forward",
+        runtime_path=RUNTIME,
+        mandate_path=MANDATE,
+        code_revision="a" * 40,
+        now=datetime(2026, 9, 21, 12, 4, tzinfo=UTC),
+    )
+
+    assert result["state"] == "waiting_first_official_reproduction"
+    assert result["job_id"] == primary.job_id
+    reproduction_jobs = [
+        job
+        for job in store.list_jobs(P6_FORWARD_CYCLE_JOB, 10)
+        if job.input_ref.get("mode") == "official_reproduction"
+    ]
+    assert len(reproduction_jobs) == 1
+    assert reproduction_jobs[0].state == "queued"
+
+
+def test_controller_allows_collection_after_first_reproduction_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime = load_prospective_runtime_config(RUNTIME, root=ROOT)
+    mandate = load_owner_activation_mandate(MANDATE, runtime=runtime)
+    activation = make_activation_decision_payload(
+        runtime=runtime,
+        mandate=mandate,
+        decision_id="p6-activation-test",
+        state="enabled",
+        decision_at=datetime.fromisoformat("2026-09-19T09:00:00+08:00"),
+        deployment_revision="a" * 40,
+        disabled_rehearsal_manifest_digest="sha256:" + "2" * 64,
+        rollback_drill_digest="sha256:" + "3" * 64,
+    )
+    store = InMemoryPlatformStore()
+    primary = _store_succeeded_first_official(store, _official_input(runtime, activation))
+    primary_result = primary.result_ref
+    assert isinstance(primary_result, dict)
+    reproduction_job = SimpleNamespace(
+        job_id="job_" + "7" * 32,
+        state="succeeded",
+        result_ref={
+            "summary": {
+                "mode": "official_reproduction",
+                "official_evidence": False,
+                "semantic_match": True,
+                "primary_run_id": primary_result["run_id"],
+                "primary_manifest_digest": primary_result["manifest_digest"],
+                "reproduced_manifest_digest": primary_result["manifest_digest"],
+            }
+        },
+    )
+    monkeypatch.setattr(
+        controller,
+        "_activation_current",
+        lambda *_a, **_k: (activation, str(activation["decision_digest"])),
+    )
+    monkeypatch.setattr(
+        controller,
+        "_first_official_reproduction_job",
+        lambda *_a, **_k: reproduction_job,
+    )
+    monkeypatch.setattr(controller, "_submit_current_official", lambda *_a, **_k: None)
+
+    result = controller.controller_tick(
+        store,
+        repository_root=ROOT,
+        p6_forward_run_root=tmp_path / "p6-forward",
+        runtime_path=RUNTIME,
+        mandate_path=MANDATE,
+        code_revision="a" * 40,
+        now=datetime(2026, 9, 21, 12, 4, tzinfo=UTC),
+    )
+
+    assert result["state"] == "enabled"
+    assert result["first_official_reproduction_complete"] is True
+    assert result["reproduction_job_id"] == reproduction_job.job_id
 
 
 def test_controller_submits_current_ready_package_only_after_enabled_decision(

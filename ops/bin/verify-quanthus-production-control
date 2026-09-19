@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SOURCE="$ROOT/ops/production-control"
+SOURCE_ONLY=0
+if [[ "${1:-}" == "--source-only" ]]; then
+  SOURCE_ONLY=1
+elif [[ $# -ne 0 ]]; then
+  echo "usage: $0 [--source-only]" >&2
+  exit 2
+fi
+
+python3 - "$SOURCE/quanthus-mcp-production.py" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+compile(path.read_text(encoding="utf-8"), str(path), "exec")
+PY
+
+grep -Fq 'QUANTHUS_P6_CONTROLLER_ENABLED: "1"' "$SOURCE/compose.override.yaml"
+grep -Fq '/home/ubuntu/data/quanthus/dwd-daily:/data/dwd-daily:ro' "$SOURCE/compose.override.yaml"
+grep -Fq 'strategy-replay-development-1f1ea4d-v1' "$SOURCE/compose.override.yaml"
+grep -Fq 'p6_forward = "quanthus.p6-forward-cycle.v1"' "$SOURCE/quanthus-mcp-production.py"
+grep -Fq 'P6_REPLAY' "$SOURCE/quanthus-mcp-production.py" ||   grep -Fq 'DWD_READ_ONLY_ROOTS' "$SOURCE/quanthus-mcp-production.py"
+
+if [[ $SOURCE_ONLY -eq 1 ]]; then
+  echo "quanthus production control source: PASS"
+  exit 0
+fi
+
+cmp -s "$SOURCE/quanthus-mcp-production.py" /usr/local/libexec/quanthus-mcp-production
+cmp -s "$SOURCE/compose.override.yaml" /etc/quanthus-mcp-production/compose.override.yaml
+cmp -s "$SOURCE/quanthus-mcp-production.service" /etc/systemd/system/quanthus-mcp-production.service
+
+echo "quanthus production control installed drift: PASS"

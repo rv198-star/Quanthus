@@ -12,6 +12,11 @@ from quanthus.expert_evaluation.runner import (
     ExpertEvaluationRun,
     verify_expert_evaluation_run,
 )
+from quanthus.forward_validation.reproduction import (
+    OfficialCycleReproductionRun,
+    find_official_reproduction_for_input,
+    verify_official_reproduction,
+)
 from quanthus.forward_validation.runner import (
     ForwardRun,
     find_forward_run_for_input,
@@ -35,6 +40,7 @@ P6_FORWARD_STAGE_PROGRESS = {
     "producing-official-decisions": 55,
     "projecting-paper-intents": 75,
     "official-cycle-sealed": 98,
+    "official-reproduction-sealed": 98,
     "rehearsal-sealed": 98,
 }
 
@@ -49,7 +55,7 @@ class ExpertChildResult:
 
 @dataclass(frozen=True)
 class P6ForwardChildResult:
-    run: ForwardRun
+    run: ForwardRun | OfficialCycleReproductionRun
     summary: dict[str, Any]
 
 
@@ -96,17 +102,37 @@ def validate_p6_forward_child_result(payload: object, run_root: Path) -> P6Forwa
     artifact = Path(str(payload["artifact_ref"])).resolve()
     if artifact.parent != configured_root:
         raise RuntimeError("p6_forward_child_artifact_path_escape")
-    run = verify_forward_run(artifact, expected_input_digest=str(payload["input_digest"]))
+    summary = payload["summary"]
+    if not isinstance(summary, dict):
+        raise RuntimeError("p6_forward_child_manifest_mismatch")
+    if summary.get("mode") == "official_reproduction":
+        run = verify_official_reproduction(
+            artifact,
+            expected_input_digest=str(payload["input_digest"]),
+        )
+    else:
+        run = verify_forward_run(
+            artifact,
+            expected_input_digest=str(payload["input_digest"]),
+        )
     if run.run_id != payload["run_id"] or run.manifest_digest != payload["manifest_digest"]:
         raise RuntimeError("p6_forward_child_manifest_mismatch")
-    summary = payload["summary"]
-    if not isinstance(summary, dict) or dict(run.summary) != summary:
+    if dict(run.summary) != summary:
         raise RuntimeError("p6_forward_child_manifest_mismatch")
     return P6ForwardChildResult(run, summary)
 
 
 def find_p6_forward_run_for_input(run_root: Path, input_digest: str) -> P6ForwardChildResult | None:
     run = find_forward_run_for_input(run_root, input_digest)
+    if run is None:
+        return None
+    return P6ForwardChildResult(run, dict(run.summary))
+
+
+def find_p6_forward_reproduction_for_input(
+    run_root: Path, input_digest: str
+) -> P6ForwardChildResult | None:
+    run = find_official_reproduction_for_input(run_root, input_digest)
     if run is None:
         return None
     return P6ForwardChildResult(run, dict(run.summary))

@@ -5,7 +5,17 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from quanthus.forward_validation.product_view import ForwardValidationProductView
+import pytest
+
+from quanthus.forward_validation.activation import (
+    load_owner_activation_mandate,
+    load_prospective_runtime_config,
+    make_activation_decision_payload,
+)
+from quanthus.forward_validation.product_view import (
+    ForwardProductViewError,
+    ForwardValidationProductView,
+)
 from quanthus.forward_validation.runner import (
     load_forward_worker_config,
     make_disabled_rehearsal_input,
@@ -22,32 +32,24 @@ def _write_enabled_activation(candidate_run_root: Path) -> dict[str, object]:
     activation_root = candidate_run_root / "p6-forward/activation"
     decision_path = activation_root / "decisions/p6-activation-20260919-test.json"
     decision_path.parent.mkdir(parents=True)
-    decision: dict[str, object] = {
-        "schema_version": "quanthus.p6-activation-decision.v1",
-        "work_item": "P6-ACTIVATE-001",
-        "decision_id": "p6-activation-20260919-test",
-        "state": "enabled",
-        "decision_at": "2026-09-18T16:30:00+00:00",
-        "activation_market_date": "2026-09-19",
-        "entry_proposal_digest": (
-            "sha256:3c9356e49dbdd6356754b42cfd34af11949289121454a05bdbf0c0ff2aebaa18"
-        ),
-        "runtime_sha256": "sha256:" + "1" * 64,
-        "deployment_revision": "2" * 40,
-        "previous_production_revision": "3" * 40,
-        "disabled_rehearsal_manifest_digest": "sha256:" + "4" * 64,
-        "rollback_drill_digest": "sha256:" + "5" * 64,
-        "activation_mandate_digest": "sha256:" + "6" * 64,
-        "approval_authority": "human",
-        "official_prospective_cycle_authorized": True,
-        "paper_authority_only": True,
-        "notification_authorized": False,
-        "broker_authorized": False,
-        "live_capital_authorized": False,
-        "arbitration_2022_2024_access_authorized": False,
-        "permanent_blind_2025_access_authorized": False,
-        "decision_digest": "sha256:" + "7" * 64,
-    }
+    runtime = load_prospective_runtime_config(
+        ROOT / "config/forward-validation/activation/p6-prospective-runtime.v1.json",
+        root=ROOT,
+    )
+    mandate = load_owner_activation_mandate(
+        ROOT / "config/forward-validation/activation/p6-owner-activation-mandate.v1.json",
+        runtime=runtime,
+    )
+    decision = make_activation_decision_payload(
+        runtime=runtime,
+        mandate=mandate,
+        decision_id="p6-activation-20260919-test",
+        state="enabled",
+        decision_at=datetime.fromisoformat("2026-09-19T00:30:00+08:00"),
+        deployment_revision="2" * 40,
+        disabled_rehearsal_manifest_digest="sha256:" + "4" * 64,
+        rollback_drill_digest="sha256:" + "5" * 64,
+    )
     decision_bytes = json.dumps(decision, sort_keys=True, separators=(",", ":")).encode() + b"\n"
     decision_path.write_bytes(decision_bytes)
     pointer = {
@@ -161,6 +163,34 @@ def test_enabled_activation_is_projected_read_only(tmp_path: Path) -> None:
         "first_official_market_date": None,
         "last_admitted_dwd_release": None,
     }
+
+
+def test_enabled_activation_rejects_noncanonical_decision_binding(tmp_path: Path) -> None:
+    candidate_run_root = tmp_path / "candidate-runs"
+    _write_enabled_activation(candidate_run_root)
+    activation_root = candidate_run_root / "p6-forward/activation"
+    decision_path = activation_root / "decisions/p6-activation-20260919-test.json"
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    decision["runtime_sha256"] = "sha256:" + "9" * 64
+    decision_bytes = json.dumps(
+        decision, sort_keys=True, separators=(",", ":")
+    ).encode() + b"\n"
+    decision_path.write_bytes(decision_bytes)
+    pointer_path = activation_root / "CURRENT.json"
+    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+    pointer["decision_sha256"] = "sha256:" + hashlib.sha256(decision_bytes).hexdigest()
+    pointer_path.write_text(
+        json.dumps(pointer, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    view = ForwardValidationProductView(
+        ROOT,
+        InMemoryPlatformStore(),
+        candidate_run_root=candidate_run_root,
+    )
+
+    with pytest.raises(ForwardProductViewError, match="activation_projection_drift"):
+        view.candidate("candidate.p4-trend-risk", "1.0.1")
 
 
 def test_enabled_activation_projects_official_session_progress(tmp_path: Path) -> None:

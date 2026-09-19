@@ -1,0 +1,14 @@
+services:
+  replay-worker:
+    environment:
+      QUANTHUS_P6_CONTROLLER_ENABLED: "1"
+      QUANTHUS_P6_FORWARD_RUN_ROOT: /data/candidate-runs/p6-forward
+      QUANTHUS_P6_DWD_DAILY_ROOT: /data/dwd-daily
+      QUANTHUS_P6_RUNTIME_CONFIG: /app/config/forward-validation/activation/p6-prospective-runtime.v1.json
+      QUANTHUS_P6_ACTIVATION_MANDATE: /app/config/forward-validation/activation/p6-owner-activation-mandate.v1.json
+    volumes: !override
+      - /srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1:/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1:ro
+      - /srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001:/srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001:ro
+      - /srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:/srv/quanthus/research-bundles/development/strategy-replay-development-1f1ea4d-v1:ro
+      - /home/ubuntu/data/quanthus/dwd-daily:/data/dwd-daily:ro
+      - quanthus-candidate-runs:/data/candidate-runs

@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 from scripts.sync_github_planning import (
@@ -120,16 +121,21 @@ def test_p6_production_activation_closeout_preserves_the_frozen_acceptance_gate(
     status = (
         ROOT / "docs/acceptance/p6-activate001-production-activation-status-20260919.md"
     ).read_text(encoding="utf-8")
-    design = (ROOT / P6_DESIGN_PATH).read_text(encoding="utf-8")
+    design_path = ROOT / P6_DESIGN_PATH
+    design = design_path.read_text(encoding="utf-8")
     index = (ROOT / "docs/work-items/index.md").read_text(encoding="utf-8")
 
+    assert (
+        "sha256:" + hashlib.sha256(design_path.read_bytes()).hexdigest()
+        == "sha256:2336837cd5023f2aec475b8185df6a824566a9f1a779d13c477c6b0309cc3f67"
+    )
+    assert "Production activation was enabled on 2026-09-19" not in design
     assert "production activation enabled" in status
     assert "`0 / 66`" in status
     assert "does **not** mark `P6-ACTIVATE-001` accepted early" in status
     assert "first legal post-activation official cycle" in status
     assert "GitHub #120" in status
-    assert "`P6-REVIEW-001` already" in design
-    assert "exists as GitHub #120" in design
+    assert "| P6-REVIEW-001 | #120 |" in design
     assert "`P6-REVIEW-001` already exists as GitHub #120 and must not be duplicated" in index
 
 

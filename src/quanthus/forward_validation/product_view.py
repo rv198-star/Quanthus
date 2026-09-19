@@ -17,6 +17,12 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from quanthus.forward_validation.activation import (
+    load_activation_decision,
+    load_owner_activation_mandate,
+    load_prospective_runtime_config,
+)
+from quanthus.forward_validation.contracts import ForwardValidationContractError
 from quanthus.platform.jobs import P6_FORWARD_CYCLE_JOB
 from quanthus.platform.persistence import PlatformStore
 
@@ -275,32 +281,32 @@ class ForwardValidationProductView:
             _fail("activation_projection_drift", "activation decision is missing")
         if _sha(decision_path) != _digest(pointer["decision_sha256"], "decision_sha256"):
             _fail("activation_projection_drift", "activation pointer digest differs")
-        decision = _load(decision_path)
-        if (
-            decision.get("schema_version") != "quanthus.p6-activation-decision.v1"
-            or decision.get("work_item") != "P6-ACTIVATE-001"
-            or decision.get("state") != "enabled"
-            or decision.get("entry_proposal_digest") != _ENTRY_PROPOSAL_DIGEST
-            or decision.get("approval_authority") != "human"
-            or decision.get("official_prospective_cycle_authorized") is not True
-            or decision.get("paper_authority_only") is not True
-        ):
-            _fail("activation_projection_drift", "enabled activation decision differs")
-        for name in (
-            "notification_authorized",
-            "broker_authorized",
-            "live_capital_authorized",
-            "arbitration_2022_2024_access_authorized",
-            "permanent_blind_2025_access_authorized",
-        ):
-            if decision.get(name) is not False:
-                _fail("activation_projection_drift", f"activation unexpectedly enables {name}")
+        try:
+            runtime = load_prospective_runtime_config(
+                self.root
+                / "config/forward-validation/activation/p6-prospective-runtime.v1.json",
+                root=self.root,
+            )
+            mandate = load_owner_activation_mandate(
+                self.root
+                / "config/forward-validation/activation/p6-owner-activation-mandate.v1.json",
+                runtime=runtime,
+            )
+            decision = load_activation_decision(
+                decision_path,
+                runtime=runtime,
+                expected_mandate_digest=mandate.mandate_digest,
+            )
+        except ForwardValidationContractError as exc:
+            _fail("activation_projection_drift", str(exc))
+        if not decision.enabled:
+            _fail("activation_projection_drift", "activation decision is not enabled")
         return {
-            "decision_id": str(decision.get("decision_id")),
-            "decision_at": str(decision.get("decision_at")),
-            "activation_market_date": str(decision.get("activation_market_date")),
-            "decision_digest": _digest(decision.get("decision_digest"), "decision_digest"),
-            "deployment_revision": str(decision.get("deployment_revision")),
+            "decision_id": decision.decision_id,
+            "decision_at": decision.decision_at.isoformat(),
+            "activation_market_date": decision.activation_market_date.isoformat(),
+            "decision_digest": decision.decision_digest,
+            "deployment_revision": decision.deployment_revision,
         }
 
     def _latest_job(self) -> dict[str, object] | None:
@@ -332,7 +338,11 @@ class ForwardValidationProductView:
     def _official_evidence(self, sessions_per_block: int) -> dict[str, object]:
         official: list[dict[str, object]] = []
         for job in self.store.list_jobs(P6_FORWARD_CYCLE_JOB, 100):
-            if job.state != "succeeded" or not isinstance(job.result_ref, Mapping):
+            if (
+                job.state != "succeeded"
+                or job.input_ref.get("mode") != "official_cycle"
+                or not isinstance(job.result_ref, Mapping)
+            ):
                 continue
             raw = job.result_ref.get("summary")
             if not isinstance(raw, Mapping):

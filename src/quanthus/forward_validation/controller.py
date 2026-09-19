@@ -27,6 +27,9 @@ from quanthus.forward_validation.activation import (
     make_activation_decision_payload,
 )
 from quanthus.forward_validation.official_cycle import OfficialCycleJobInput
+from quanthus.forward_validation.reproduction import (
+    OfficialCycleReproductionJobInput,
+)
 from quanthus.forward_validation.runner import (
     load_forward_worker_config,
     make_disabled_rehearsal_input,
@@ -414,16 +417,88 @@ def _visibility_from_sync_receipt(
     return {**semantic, "receipt_digest": digest_value(semantic)}
 
 
-def _latest_official_success(store: PlatformStore):
-    candidates = [
+def _official_jobs(store: PlatformStore) -> list[Any]:
+    return [
         job
         for job in store.list_jobs(P6_FORWARD_CYCLE_JOB, 100)
         if isinstance(job.input_ref, dict)
         and job.input_ref.get("mode") == "official_cycle"
-        and job.state == "succeeded"
-        and isinstance(job.result_ref, dict)
+    ]
+
+
+def _latest_official_success(store: PlatformStore):
+    candidates = [
+        job
+        for job in _official_jobs(store)
+        if job.state == "succeeded" and isinstance(job.result_ref, dict)
     ]
     return max(candidates, key=lambda item: item.completed_at or item.updated_at) if candidates else None
+
+
+def _first_official_success(store: PlatformStore):
+    candidates = [
+        job
+        for job in _official_jobs(store)
+        if job.state == "succeeded" and isinstance(job.result_ref, dict)
+    ]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda item: str(item.input_ref.get("market_date")))
+
+
+def _first_official_reproduction_job(store: PlatformStore, primary: Any):
+    result = primary.result_ref
+    if not isinstance(result, dict):
+        raise RuntimeError("p6_first_official_result_missing")
+    primary_run_id = result.get("run_id")
+    primary_manifest = result.get("manifest_digest")
+    if not isinstance(primary_run_id, str) or not isinstance(primary_manifest, str):
+        raise RuntimeError("p6_first_official_result_invalid")
+    source = OfficialCycleJobInput.from_dict(primary.input_ref)
+    if source.prior_run_id is not None:
+        raise RuntimeError("p6_first_official_identity_invalid")
+    value = OfficialCycleReproductionJobInput(
+        source_input=source,
+        primary_run_id=primary_run_id,
+        primary_manifest_digest=primary_manifest,
+    )
+    queue = DurableJobQueue(store, {P6_FORWARD_CYCLE_JOB: "replay"})
+    stable_job_id = "job_" + hashlib.sha256(
+        f"p6-official-reproduction:{value.input_digest}".encode()
+    ).hexdigest()[:32]
+    return queue.submit(
+        kind=P6_FORWARD_CYCLE_JOB,
+        actor_user_id=_actor_user_id(store),
+        idempotency_key=value.idempotency_key,
+        input_ref=value.to_dict(),
+        concurrency_key=value.concurrency_key,
+        requested_job_id=stable_job_id,
+    )[0]
+
+
+def _first_official_reproduction_complete(job: Any, primary: Any) -> bool:
+    if job.state in {"failed", "canceled"}:
+        raise RuntimeError("p6_first_official_reproduction_failed")
+    if job.state != "succeeded":
+        return False
+    result = job.result_ref
+    primary_result = primary.result_ref
+    if not isinstance(result, dict) or not isinstance(primary_result, dict):
+        raise RuntimeError("p6_first_official_reproduction_result_missing")
+    summary = result.get("summary")
+    if (
+        not isinstance(summary, dict)
+        or summary.get("mode") != "official_reproduction"
+        or summary.get("official_evidence") is not False
+        or summary.get("semantic_match") is not True
+        or summary.get("primary_run_id") != primary_result.get("run_id")
+        or summary.get("primary_manifest_digest")
+        != primary_result.get("manifest_digest")
+        or summary.get("reproduced_manifest_digest")
+        != primary_result.get("manifest_digest")
+    ):
+        raise RuntimeError("p6_first_official_reproduction_semantic_mismatch")
+    return True
 
 
 def _official_active(store: PlatformStore) -> bool:
@@ -525,6 +600,13 @@ def controller_tick(
         runtime=runtime,
         mandate_digest=mandate.mandate_digest,
     )
+    if active is not None and active[0].get("deployment_revision") != code_revision:
+        if _official_jobs(store):
+            raise RuntimeError("p6_post_evidence_revision_drift")
+        # Before the first official observation, a maintenance revision may rebind activation only
+        # by replaying every predeclared gate. The prior decision remains immutable and CURRENT
+        # advances append-only to the new revision-specific decision.
+        active = None
     if active is None:
         rehearsal = _disabled_rehearsal_job(
             store,
@@ -560,6 +642,19 @@ def controller_tick(
             now=instant,
         )
     payload, decision_digest = active
+    first_official = _first_official_success(store)
+    reproduction = None
+    if first_official is not None:
+        reproduction = _first_official_reproduction_job(store, first_official)
+        if not _first_official_reproduction_complete(reproduction, first_official):
+            return {
+                "state": "waiting_first_official_reproduction",
+                "activation_decision_digest": decision_digest,
+                "job_id": first_official.job_id,
+                "job_state": first_official.state,
+                "reproduction_job_id": reproduction.job_id,
+                "reproduction_job_state": reproduction.state,
+            }
     job = _submit_current_official(
         store,
         runtime=runtime,
@@ -571,4 +666,6 @@ def controller_tick(
         "activation_decision_digest": decision_digest,
         "job_id": None if job is None else job.job_id,
         "job_state": None if job is None else job.state,
+        "first_official_reproduction_complete": first_official is not None,
+        "reproduction_job_id": None if reproduction is None else reproduction.job_id,
     }

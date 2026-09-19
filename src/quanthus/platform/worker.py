@@ -19,6 +19,7 @@ from quanthus.expert_evaluation.runner import ExpertEvaluationJobInput
 from quanthus.forward_validation.activation import runtime_code_revision
 from quanthus.forward_validation.controller import controller_tick, record_controller_error
 from quanthus.forward_validation.official_cycle import OfficialCycleJobInput
+from quanthus.forward_validation.reproduction import OfficialCycleReproductionJobInput
 from quanthus.forward_validation.runner import ForwardCycleJobInput
 from quanthus.platform.jobs import CANDIDATE_REPLAY_JOB, EXPERT_EVALUATION_JOB, P6_FORWARD_CYCLE_JOB
 from quanthus.platform.persistence import PostgresPlatformStore
@@ -28,6 +29,7 @@ from quanthus.platform.worker_handlers import (
     ExpertChildResult,
     expert_child_command,
     find_expert_run_for_input,
+    find_p6_forward_reproduction_for_input,
     find_p6_forward_run_for_input,
     p6_forward_child_command,
     validate_expert_child_result,
@@ -363,14 +365,22 @@ class ReplayWorker:
         mode = input_ref.get("mode")
         if mode == "disabled_rehearsal":
             job_input = ForwardCycleJobInput.from_dict(input_ref)
+            run_root = self.p6_forward_run_root / "runs"
+            recovered = find_p6_forward_run_for_input(run_root, observed.input_digest)
         elif mode == "official_cycle":
             job_input = OfficialCycleJobInput.from_dict(input_ref)
+            run_root = self.p6_forward_run_root / "runs"
+            recovered = find_p6_forward_run_for_input(run_root, observed.input_digest)
+        elif mode == "official_reproduction":
+            job_input = OfficialCycleReproductionJobInput.from_dict(input_ref)
+            run_root = self.p6_forward_run_root / "reproductions"
+            recovered = find_p6_forward_reproduction_for_input(
+                run_root, observed.input_digest
+            )
         else:
             raise RuntimeError("p6_forward_mode_not_admitted")
         if job_input.input_digest != observed.input_digest:
             raise RuntimeError("p6_forward_input_digest_mismatch")
-        run_root = self.p6_forward_run_root / "runs"
-        recovered = find_p6_forward_run_for_input(run_root, observed.input_digest)
         if recovered is not None:
             self.store.update_claimed_job(
                 job_id,

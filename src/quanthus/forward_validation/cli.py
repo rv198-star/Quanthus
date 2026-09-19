@@ -9,6 +9,10 @@ from pathlib import Path
 
 from quanthus.forward_validation.activation import load_prospective_runtime_config
 from quanthus.forward_validation.official_cycle import OfficialCycleJobInput, run_official_cycle
+from quanthus.forward_validation.reproduction import (
+    OfficialCycleReproductionJobInput,
+    run_official_reproduction,
+)
 from quanthus.forward_validation.runner import (
     ForwardCycleJobInput,
     load_forward_worker_config,
@@ -92,6 +96,34 @@ def main(argv: list[str] | None = None) -> int:
             run_root=args.run_root,
         )
         terminal_stage = "official-cycle-sealed"
+    elif mode == "official_reproduction":
+        job_input = OfficialCycleReproductionJobInput.from_dict(raw)
+        runtime = load_prospective_runtime_config(args.runtime_config, root=root)
+        if runtime.bindings["forward_worker"] != config.path:
+            raise RuntimeError("prospective runtime does not bind the loaded P6 Forward Worker")
+        print(
+            json.dumps(
+                {
+                    "event": "p6-forward-progress",
+                    "stage": "building-prospective-projection",
+                    "detail": {
+                        "mode": mode,
+                        "market_date": job_input.source_input.market_date.isoformat(),
+                    },
+                },
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+            flush=True,
+        )
+        run = run_official_reproduction(
+            job_input=job_input,
+            runtime=runtime,
+            staging=args.staging,
+            primary_run_root=args.run_root.parent / "runs",
+            reproduction_root=args.run_root,
+        )
+        terminal_stage = "official-reproduction-sealed"
     else:
         raise RuntimeError("P6 forward mode is not admitted")
     print(

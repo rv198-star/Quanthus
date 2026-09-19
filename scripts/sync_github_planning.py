@@ -308,6 +308,165 @@ EXPERT_STRATEGY_IMPLEMENTATION_SPECS = {
         ),
     ),
 }
+
+P3_STRAT_003_MILESTONE = "P3-STRAT-003 | 多专家策略增量价值与近期历史验证"
+P3_STRAT_003_DESIGN_PATH = "docs/work-items/p3-strat-003.md"
+P3_STRAT_003_CHILD_IDS = (
+    "P3-STRAT-003-A",
+    "P3-STRAT-003-B",
+    "P3-STRAT-003-C",
+    "P3-STRAT-003-D",
+    "P3-STRAT-003-E",
+)
+P3_STRAT_003_IDS = frozenset({"P3-STRAT-003", *P3_STRAT_003_CHILD_IDS})
+P3_STRAT_003_IMPLEMENTATION_SPECS = {
+    "P3-STRAT-003": IssueImplementationSpec(
+        design_path=P3_STRAT_003_DESIGN_PATH,
+        approach=(
+            "Coordinate one bounded recent-history factorial study that compares the existing "
+            "Trend and Position Risk effects with a non-empty deterministic candidate baseline "
+            "while P6-v1 continues independently."
+        ),
+        owned_paths=(
+            P3_STRAT_003_DESIGN_PATH,
+            "config/research/p3-strat-003/",
+            "docs/acceptance/p3-strat-003-*.md",
+        ),
+        decision_gates=(
+            "A freezes result-independent data authority, variants, metrics, thresholds and "
+            "resource limits before B/C or any result-bearing access.",
+            "P6-v1 is parallel evidence and is not a predecessor or mutable input.",
+        ),
+        verification=(
+            "A-E close in dependency order with immutable evidence and no silent "
+            "window roll-forward.",
+            "Negative, harmful or inconclusive economics remain terminally reviewable outcomes.",
+        ),
+    ),
+    "P3-STRAT-003-A": IssueImplementationSpec(
+        design_path=P3_STRAT_003_DESIGN_PATH,
+        approach=(
+            "Freeze B/T/R/TR, the deterministic pass-through control, 2025 one-time validation "
+            "authority, the fixed 2026 cutoff, headline/diagnostic comparisons, uncertainty, "
+            "resource budget and stop conditions before recent-history strategy results are read."
+        ),
+        owned_paths=(
+            "config/research/p3-strat-003/request.v1.json",
+            P3_STRAT_003_DESIGN_PATH,
+            "docs/acceptance/p3-strat-003-a-preregistration-20260920.md",
+            "tests/contract/test_p3_strat_003_preregistration.py",
+        ),
+        decision_gates=(
+            "The human owner authorizes 2025 only for this bounded major-strategy validation; "
+            "first D result access consumes its untouched status for successor research.",
+            "General 2022-2024 result access stays closed; warm-up is input-only and "
+            "exactly bounded.",
+            "No 2025/2026 strategy result is read before A acceptance.",
+        ),
+        verification=(
+            "Request digest, frozen source bindings, variants, data roles, metrics, thresholds, "
+            "resource limits and P6 non-mutation are contract-tested.",
+            "Planning sync recognizes the parent/children without overwriting the "
+            "detailed v2 issue bodies.",
+        ),
+    ),
+    "P3-STRAT-003-B": IssueImplementationSpec(
+        design_path=P3_STRAT_003_DESIGN_PATH,
+        approach=(
+            "Resolve the exact warm-up dates and fixed 2025-2026 input closure, verify PIT, "
+            "coverage, corporate-action/tradability requirements and immutable run isolation, "
+            "then publish one input manifest without producing strategy economics."
+        ),
+        owned_paths=(
+            "config/research/p3-strat-003/input-manifest.v1.json",
+            "docs/acceptance/p3-strat-003-b-input-qualification-*.md",
+        ),
+        decision_gates=(
+            "Input gaps block or are explicitly ledgered; the window may not shrink "
+            "based on results.",
+            "No strategy/economic result production is authorized in B.",
+        ),
+        verification=(
+            "Every input identity, cutoff, exception, missing count, warm-up row and "
+            "output root is auditable.",
+            "P6 Worker, ledger, budget and mutable pointers remain untouched.",
+        ),
+    ),
+    "P3-STRAT-003-C": IssueImplementationSpec(
+        design_path=P3_STRAT_003_DESIGN_PATH,
+        approach=(
+            "Add the deterministic pass-through research control and four-variant composite runner "
+            "as an additive path over the accepted expert/aggregator/P2 interfaces, using only "
+            "synthetic or already-consumed golden evidence before D."
+        ),
+        owned_paths=(
+            "src/quanthus/expert_strategy/",
+            "config/research/p3-strat-003/",
+            "tests/unit/",
+            "tests/contract/",
+        ),
+        decision_gates=(
+            "No new alpha expert, threshold search, alternate matcher or weakened "
+            "guardian is admitted.",
+            "TR must preserve the accepted v1 strategy semantics on applicable "
+            "consumed-golden scope.",
+        ),
+        verification=(
+            "B/T/R/TR differ only on the two declared factors and all share one "
+            "data/capital/P2 closure.",
+            "One composite Job builds expensive deterministic prerequisites once and "
+            "reports stage telemetry.",
+        ),
+    ),
+    "P3-STRAT-003-D": IssueImplementationSpec(
+        design_path=P3_STRAT_003_DESIGN_PATH,
+        approach=(
+            "Bind exact A request + B input manifest + C code revision, then run one primary "
+            "four-variant composite batch and one independent cold reproduction with no "
+            "cross-batch intermediate reuse."
+        ),
+        owned_paths=(
+            "immutable P3-STRAT-003 run roots",
+            "docs/acceptance/p3-strat-003-d-recent-history-*.md",
+        ),
+        decision_gates=(
+            "D is the first result-bearing gate and may not alter the frozen request "
+            "after any result is visible.",
+            "Unmatured targets and open terminal positions are reported honestly "
+            "rather than waiting for future data.",
+        ),
+        verification=(
+            "Complete decisions/orders/fills/costs/equity/ledger and preregistered "
+            "comparisons are published.",
+            "The second batch independently rebuilds semantic artifacts and matches "
+            "the declared reproduction contract.",
+        ),
+    ),
+    "P3-STRAT-003-E": IssueImplementationSpec(
+        design_path=P3_STRAT_003_DESIGN_PATH,
+        approach=(
+            "Read the frozen D evidence without rerunning or tuning, classify return/risk "
+            "increment, factor diagnostics and regime slices, and select at most one bounded "
+            "successor question."
+        ),
+        owned_paths=(
+            "docs/reviews/p3-strat-003-*.md",
+            "docs/acceptance/p3-strat-003-e-*.md",
+        ),
+        decision_gates=(
+            "Support, harm, no support and inconclusive are all valid terminal research "
+            "dispositions.",
+            "No review result automatically adds an expert, changes P6, promotes to P7 "
+            "or opens live authority.",
+        ),
+        verification=(
+            "Every conclusion links to the frozen request and immutable D artifacts.",
+            "Review provenance distinguishes self-review, simulation, cold reproduction "
+            "and genuinely independent review.",
+        ),
+    ),
+}
+
 P6_DESIGN_PATH = "docs/design/lld/08-validation-governance/p6-forward-validation.md"
 P6_CHILD_IDS = (
     "P6-GOV-001",
@@ -521,11 +680,12 @@ P6_IMPLEMENTATION_SPECS = {
 }
 IMPLEMENTATION_SPECS = {
     **EXPERT_STRATEGY_IMPLEMENTATION_SPECS,
+    **P3_STRAT_003_IMPLEMENTATION_SPECS,
     **P6_IMPLEMENTATION_SPECS,
 }
 PROGRAM_EPIC_IDS = frozenset({
-    "PK-WORKER-000", "P3-EXPERT-000", "P3-STRUCT-004", "P3-DICT-002", "P6-000",
-    "P3-STAGE-001",
+    "PK-WORKER-000", "P3-EXPERT-000", "P3-STRAT-003", "P3-STRUCT-004", "P3-DICT-002",
+    "P6-000", "P3-STAGE-001",
 })
 
 MILESTONES = (
@@ -539,6 +699,7 @@ MILESTONES = (
     PLATFORM_KERNEL_MILESTONE,
     WORKER_RUNTIME_MILESTONE,
     EXPERT_STRATEGY_MILESTONE,
+    P3_STRAT_003_MILESTONE,
 )
 
 CHAPTERS = (
@@ -638,6 +799,8 @@ HIGH_IDS = {
     "P3-EXPERT-000",
     "P3-EXPERT-001",
     "P3-STRAT-002",
+    "P3-STRAT-003",
+    "P3-STRAT-003-A",
     "P6-000",
     "P6-GOV-001",
 }
@@ -774,6 +937,8 @@ def work_items(root: Path) -> list[WorkItem]:
             priority = "normal"
         if phase == "meta":
             milestone = None
+        elif stable_id in P3_STRAT_003_IDS:
+            milestone = P3_STRAT_003_MILESTONE
         elif stable_id in EXPERT_STRATEGY_IDS:
             milestone = EXPERT_STRATEGY_MILESTONE
         elif phase == "PK":
@@ -909,6 +1074,17 @@ def task_body(item: WorkItem, repository: str) -> str:
 def expert_strategy_epic_body(item: WorkItem, repository: str, task_urls: dict[str, str]) -> str:
     checklist = "\n".join(
         f"- [ ] [{stable_id}]({task_urls[stable_id]})" for stable_id in EXPERT_STRATEGY_CHILD_IDS
+    )
+    return task_body(item, repository).replace(
+        "## Acceptance evidence\n",
+        f"## Blocking work items\n\n{checklist}\n\n## Acceptance evidence\n",
+        1,
+    )
+
+
+def p3_strat_003_epic_body(item: WorkItem, repository: str, task_urls: dict[str, str]) -> str:
+    checklist = "\n".join(
+        f"- [ ] [{stable_id}]({task_urls[stable_id]})" for stable_id in P3_STRAT_003_CHILD_IDS
     )
     return task_body(item, repository).replace(
         "## Acceptance evidence\n",
@@ -1169,7 +1345,7 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
 
     task_results = {"created": 0, "updated": 0, "reused": 0}
     task_urls: dict[str, str] = {}
-    deferred_epics = {"P3-EXPERT-000", "P6-000"}
+    deferred_epics = {"P3-EXPERT-000", "P3-STRAT-003", "P6-000"}
     ordered_items = [item for item in items if item.stable_id not in deferred_epics]
     ordered_items.extend(item for item in items if item.stable_id in deferred_epics)
     for item in ordered_items:
@@ -1183,6 +1359,8 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
         milestone = None if item.milestone is None else milestone_numbers[item.milestone]
         if item.stable_id == "P3-EXPERT-000":
             body = expert_strategy_epic_body(item, repository, task_urls)
+        elif item.stable_id == "P3-STRAT-003":
+            body = p3_strat_003_epic_body(item, repository, task_urls)
         elif item.stable_id == "P6-000":
             body = p6_epic_body(item, repository, task_urls)
         else:

@@ -407,6 +407,12 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-EXPERT-002 | Run expert evaluation through the PostgreSQL Worker and immutable artifacts | P3-EXPERT-001, PK-WORKER-000 | closed by `docs/acceptance/p3-expert-evaluation-worker-20260820.md` |
 | P3-EXPERT-003 | Freeze the first target/resolver and implement one market-data technical expert | P3-EXPERT-001, P3-EXPERT-002, P3-FEAT-001, P3-REPLAY-001, P4-LABEL-001 | closed by `docs/acceptance/p3-expert-first-target-production-20260821.md` |
 | P3-STRAT-002 | Freeze and implement the first formal two-expert strategy topology | P3-EXPERT-002, P3-EXPERT-003, P3-POS-003 | closed by `docs/acceptance/p3-strat-first-formal-topology-production-20260822.md` |
+| P3-STRAT-003 | Validate multi-expert incremental value on fixed recent history | P3-STRAT-002, P3-ATTR-001 | open epic; #317; A → B/C in parallel → D → E; P6-v1 observation remains parallel and is not a predecessor; `docs/work-items/p3-strat-003.md` |
+| P3-STRAT-003-A | Freeze research request, four-way factorial, data authority and result rules | P3-STRAT-002, P3-ATTR-001 | closed by `docs/acceptance/p3-strat-003-a-preregistration-20260920.md`; #318; no 2025/2026 strategy-result read occurred |
+| P3-STRAT-003-B | Qualify immutable 2025-2026 inputs, PIT boundary and run isolation | P3-STRAT-003-A | ready; #319; input qualification only, no strategy-result production |
+| P3-STRAT-003-C | Implement B/T/R/TR research control and exact four-variant runner | P3-STRAT-003-A | ready; #320; synthetic/already-consumed evidence only |
+| P3-STRAT-003-D | Execute primary recent-history batch and independent cold reproduction | P3-STRAT-003-B, P3-STRAT-003-C | blocked by B/C; #321; first result-bearing gate |
+| P3-STRAT-003-E | Review evidence and select at most one bounded successor question | P3-STRAT-003-D | blocked by D; #322; no automatic promotion, extra expert or P6 mutation |
 | P3-POS-001 | Implement unit/position state machine | P2 ledger | closed |
 | P3-POLICY-001 | Freeze trial/add/hold/cooldown parameters | P2 acceptance | closed for fixture scope |
 | P3-RISK-001 | Implement concentration caps | P3-POS-001 | closed |

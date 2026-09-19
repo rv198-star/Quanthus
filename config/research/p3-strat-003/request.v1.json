@@ -1,0 +1,282 @@
+{
+  "schema_version": "quanthus.p3-strat-003-research-request.v1",
+  "work_item": "P3-STRAT-003-A",
+  "request_id": "p3-strat-003-recent-history-incremental-value-v1",
+  "state": "FROZEN_PRE_RESULT",
+  "planning_anchor": {
+    "parent_issue": 317,
+    "parent_issue_created_at_utc": "2026-09-19T16:35:56Z",
+    "planning_timezone": "Asia/Shanghai",
+    "latest_allowed_evaluation_market_date": "2026-09-18",
+    "roll_forward_authorized": false
+  },
+  "research_question": {
+    "primary": "Relative to a non-empty deterministic P4 candidate baseline that still passes the accepted aggregator, guardians, capital and P2 execution path, what incremental economic value is associated with the existing Trend and Position Risk strategy effects over fixed recent historical windows?",
+    "claim_ceiling": [
+      "historical incremental-value evidence only",
+      "no live-performance claim",
+      "no causal profit ownership",
+      "no automatic expert promotion",
+      "no P6 mutation or replacement"
+    ]
+  },
+  "bindings": {
+    "baseline_source_revision": "b0956a80f4ac48798ea891f36b07868a921fd74d",
+    "p0_policy": {
+      "path": "config/p0-policy.v1.json",
+      "sha256": "sha256:b5d6ae725e9ce8d9e4b936d2324458c341c9fabc4a3a33e15671d84ff4df4338"
+    },
+    "formal_strategy_card": {
+      "path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+      "sha256": "sha256:7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664"
+    },
+    "prior_attribution_preregistration": {
+      "path": "config/expert-strategies/p4-trend-risk-attribution.v1.json",
+      "sha256": "sha256:d56a1abbb2f31054d0b4f5a0af3067a78ea3597f1bbe4332047179b5ace97f22"
+    },
+    "candidate_rule": {
+      "path": "config/p4-candidate-price-volume-transition.research.v1.json",
+      "sha256": "sha256:04207eabf00a1f4898f28918e4f846cdd91b12f23a906e574306581e471c271c"
+    },
+    "p2_execution_policy": {
+      "path": "config/p2-execution-policy.research.v1.json",
+      "sha256": "sha256:e2ee55ea09682eeb775b9acfcfc4bbba0908ddd4157705cd81fd8f050097c816"
+    },
+    "expert_strategy_design": {
+      "path": "docs/design/lld/04-experts-aggregator/expert-strategy-layer.md",
+      "sha256": "sha256:eb07d5ab3f37dfd7cf4349b0f3dc4aac7c400e1c4a12d2405d03ea9aed2b1a31"
+    },
+    "prior_attribution_acceptance": {
+      "path": "docs/acceptance/p3-attr-formal-production-20260823.md",
+      "sha256": "sha256:800ad9f38dba15bf95a7936b815ba88229f1b9926d6524f0846b5772356184cc"
+    },
+    "p6_design": {
+      "path": "docs/design/lld/08-validation-governance/p6-forward-validation.md",
+      "sha256": "sha256:2336837cd5023f2aec475b8185df6a824566a9f1a779d13c477c6b0309cc3f67"
+    },
+    "p6_entry": {
+      "path": "config/forward-validation/entry/p6-prospective-mvp-entry.v1.json",
+      "sha256": "sha256:1e081004243d74047991f3963a9173dc008bcfad2bc8cca8200cf7186cd79c7b"
+    }
+  },
+  "authority": {
+    "owner_direction": "Keep the existing P6 long-running observation intact; solve historically answerable strategy questions now; advance P3-STRAT-003 with 2025 through the fixed recent-history cutoff as bounded validation evidence.",
+    "owner_direction_observed_in_active_session": "2026-09-20",
+    "p6_is_predecessor": false,
+    "p6_mutation_authorized": false,
+    "broker_or_live_capital_authorized": false,
+    "new_expert_authorized": false,
+    "aggregator_search_authorized": false,
+    "result_read_before_a_acceptance": false
+  },
+  "data_use": {
+    "development_reference": {
+      "range": "2012-01-01..2021-12-31",
+      "purpose": "existing development/golden evidence only unless a later issue explicitly requests a bounded diagnostic",
+      "rerun_required_for_A": false
+    },
+    "arbitration_2022_2024": {
+      "general_result_access": false,
+      "warmup_exception": {
+        "authorized": true,
+        "purpose": "feature and candidate warmup only for the first 2025 decision",
+        "range_rule": "exactly the 60 SSE/SZSE trading sessions immediately preceding 2025-01-01, resolved by B from authoritative trading-calendar metadata",
+        "maximum_sessions": 60,
+        "result_labels_or_strategy_outcomes_forbidden": true
+      }
+    },
+    "validation_2025": {
+      "market_date_start": "2025-01-01",
+      "market_date_end": "2025-12-31",
+      "prior_policy_role": "permanent_blind",
+      "authorized_role_for_this_request": "one_time_bounded_major_strategy_validation",
+      "consume_blind_status_at": "first_result_bearing_D_read",
+      "post_consumption_status": "exposed_for_successor_research_not_claimable_as_untouched",
+      "parameter_search_authorized": false
+    },
+    "validation_2026": {
+      "market_date_start": "2026-01-01",
+      "market_date_end": "2026-09-18",
+      "cutoff_basis": "latest complete exchange session before the P3-STRAT-003 parent planning anchor",
+      "roll_forward_authorized": false,
+      "parameter_search_authorized": false
+    },
+    "terminal_handling": {
+      "open_positions": "mark_to_market_at_last_admitted_close_without_forced_liquidation",
+      "unmatured_targets": "report_pending_and_exclude_from_settled_expert_quality_denominators",
+      "wait_for_future_maturity_before_D_close": false
+    }
+  },
+  "common_input_rules": {
+    "candidate_source": "exact accepted P4 price-volume transition rule",
+    "shared_entry_complete_case_mask": "union of candidate, Trend and Position Risk entry evidence required by the four variants",
+    "minimum_feature_warmup_sessions": 60,
+    "candidate_minimum_history_sessions": 22,
+    "candidate_minimum_listing_sessions": 120,
+    "first_execution_profile": "close-to-next-open-v1",
+    "missing_new_entry": "block_and_count",
+    "missing_held_evidence": "preserve base position management and count the missing expert evidence",
+    "same_initial_capital_and_positions": true,
+    "same_cost_matching_funding_concentration_and_base_exit_rules": true
+  },
+  "variants": [
+    {
+      "variant_id": "B",
+      "label": "simple_candidate_baseline",
+      "entry_scorer": {
+        "kind": "deterministic_research_control",
+        "control_id": "control.p4-candidate-pass-through",
+        "control_version": "1.0.0",
+        "applicable_signal": "1.00",
+        "confidence": "1.00",
+        "abstain_when_shared_entry_evidence_missing": true
+      },
+      "trend_policy_effect": "disabled",
+      "position_risk_strategy_effect": "disabled",
+      "system_guardians": "unchanged"
+    },
+    {
+      "variant_id": "T",
+      "label": "trend_only",
+      "entry_scorer": "existing expert.trend-stability@1.0.0 mapping",
+      "trend_policy_effect": "enabled_exact_v1",
+      "position_risk_strategy_effect": "disabled",
+      "system_guardians": "unchanged"
+    },
+    {
+      "variant_id": "R",
+      "label": "risk_only_with_simple_entry",
+      "entry_scorer": "control.p4-candidate-pass-through@1.0.0",
+      "trend_policy_effect": "disabled",
+      "position_risk_strategy_effect": "enabled_exact_v1",
+      "system_guardians": "unchanged"
+    },
+    {
+      "variant_id": "TR",
+      "label": "existing_trend_plus_position_risk",
+      "entry_scorer": "existing expert.trend-stability@1.0.0 mapping",
+      "trend_policy_effect": "enabled_exact_v1",
+      "position_risk_strategy_effect": "enabled_exact_v1",
+      "system_guardians": "unchanged"
+    }
+  ],
+  "comparisons": {
+    "headline": "TR-B",
+    "factorial_diagnostics": [
+      "T-B",
+      "R-B",
+      "TR-R",
+      "TR-T",
+      "TR-T-R+B"
+    ],
+    "headline_claim_only_from": "combined_2025_2026_TR_minus_B",
+    "year_slices_are": "diagnostic_robustness_slices_not_separate_promotion_claims"
+  },
+  "metrics": {
+    "expert_quality": [
+      "eligible_count",
+      "applicable_count",
+      "abstained_count",
+      "settled_count",
+      "unavailable_count",
+      "not_executable_count",
+      "trend_maoe",
+      "trend_maoe_vs_always_neutral"
+    ],
+    "economic": [
+      "net_total_return",
+      "maximum_drawdown",
+      "tail_loss",
+      "average_invested_capital",
+      "time_in_market",
+      "turnover",
+      "fee_total",
+      "missed_opportunity_count",
+      "decision_change_count",
+      "action_change_rate"
+    ],
+    "operational_integrity": [
+      "cash_position_reconciliation_break_count",
+      "duplicate_decision_count",
+      "pit_violation_count",
+      "unauthorized_partition_read_count"
+    ]
+  },
+  "decision_rules": {
+    "materiality": {
+      "net_total_return_delta": "0.01",
+      "maximum_drawdown_delta": "0.01",
+      "action_change_rate": "0.02"
+    },
+    "headline_return_increment_supported": "TR-B net_total_return_delta >= 0.01 and its paired-block 95% interval lower bound > 0 and TR-B maximum_drawdown_delta <= 0.01",
+    "headline_drawdown_increment_supported": "TR-B maximum_drawdown_delta <= -0.01 and its paired-block 95% interval upper bound < 0 and TR-B net_total_return_delta >= -0.01",
+    "headline_material_harm": "TR-B net_total_return_delta <= -0.01 with interval upper bound < 0, or maximum_drawdown_delta >= 0.01 with interval lower bound > 0",
+    "otherwise": "inconclusive_or_economically_negligible",
+    "negative_or_inconclusive_result_closes_honestly": true,
+    "profitability_required_for_engineering_acceptance": false
+  },
+  "uncertainty": {
+    "method": "paired_nonoverlap_22_session_block_bootstrap",
+    "block_sessions": 22,
+    "resamples": 2000,
+    "confidence_level": "0.95",
+    "seed_rule": "sha256(request_id + ':' + comparison_id)",
+    "dependence_disclosure": "Rows sharing market dates, securities, event windows or capital units are dependent; a 22-session block is a dependence-aware resampling unit, not proof of real-world independence."
+  },
+  "report_slices": [
+    "combined_2025_2026",
+    "calendar_year_2025",
+    "calendar_year_2026"
+  ],
+  "multiple_comparison_policy": {
+    "single_headline_claim": "TR-B combined window",
+    "other_contrasts": "diagnostic_only",
+    "result_driven_selection_or_ranking": false
+  },
+  "resource_budget": {
+    "result_bearing_composite_batches": 2,
+    "batch_roles": [
+      "primary",
+      "independent_cold_reproduction"
+    ],
+    "variants_per_batch": 4,
+    "worker_concurrency": 1,
+    "provider_builds_per_batch": 1,
+    "proactive_working_set_gib": 14,
+    "hard_container_gib": 16,
+    "maximum_wall_minutes_per_batch": 60,
+    "maximum_published_artifact_gib_per_batch": 2,
+    "cross_batch_cache_for_independent_reproduction": false,
+    "technical_recovery": "at_most_one_pre_result_transport_or_environment_recovery_per_batch_with_identical_semantic_inputs; no post-result retry under this request"
+  },
+  "phase_permissions": {
+    "A": "metadata/config/design only; no 2025/2026 strategy result read",
+    "B": "input qualification and immutable manifest only; no strategy/economic result production",
+    "C": "synthetic and already-consumed golden evidence only",
+    "D": "first result-bearing access under exact A+B+C bindings",
+    "E": "read-only result review and one bounded successor decision"
+  },
+  "stop_conditions": [
+    "binding_or_request_digest_drift",
+    "result_read_before_A_acceptance",
+    "2022_2024_non_warmup_result_access",
+    "2025_access_outside_the_declared_D_batch",
+    "roll_forward_beyond_2026_09_18",
+    "P6_worker_ledger_budget_or_pointer_mutation",
+    "candidate_or_original_expert_threshold_search",
+    "shared_guardian_or_P2_semantic_drift",
+    "cash_position_reconciliation_break",
+    "pit_violation",
+    "independent_reproduction_reuses_primary_batch_intermediates",
+    "resource_boundary_exceeded"
+  ],
+  "closeout_outcomes": [
+    "return_increment_supported",
+    "drawdown_increment_supported",
+    "mixed_tradeoff",
+    "not_supported_or_material_harm",
+    "inconclusive",
+    "invalid_execution_evidence"
+  ],
+  "semantic_digest": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde"
+}

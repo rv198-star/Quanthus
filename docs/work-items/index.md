@@ -456,10 +456,13 @@ need or independently new admissible evidence.
 | P6-REVIEW-001 | Complete the time-matured simulation review | P6 | blocked by P6-ACTIVATE-001 and closed budget |
 
 P6 runtime closeout on 2026-09-19 is recorded in
-`docs/acceptance/p6-activate001-production-activation-status-20260919.md`. Production activation is
-enabled and official collection is `0 / 66`; `P6-ACTIVATE-001` remains open only because its frozen
-acceptance requires the first legal post-activation official cycle plus independent reproduction.
+`docs/acceptance/p6-activate001-production-activation-status-20260919.md`. The independent closeout
+review and repair are recorded append-only in
+`docs/acceptance/p6-activate001-closeout-repair-20260919.md`. Production activation is enabled and
+official collection is `0 / 66`; `P6-ACTIVATE-001` remains open only because its frozen acceptance
+requires the first legal post-activation official cycle plus independent reproduction.
 `P6-REVIEW-001` already exists as GitHub #120 and must not be duplicated.
+
 | P7-LIVE-001 | Define email-advice and actual-operation reporting boundary; defer broker adapter | P7 | blocked by P6 review |
 | P7-RECON-001 | Reconcile advice with operator-reported fills, changes, or no action | P7 | blocked by P7-LIVE-001 |
 | P7-SCALE-001 | Implement explicit unit expansion decision | P7 | blocked by P7 reconciliation |

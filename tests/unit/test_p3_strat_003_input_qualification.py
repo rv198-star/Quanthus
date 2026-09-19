@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -14,10 +15,12 @@ from quanthus.backtest.historical_bundle import (
 from quanthus.contracts import SnapshotRef
 from quanthus.data_foundation import DatasetManifest
 from quanthus.expert_evaluation.serialization import ExpertEvaluationError, digest_value
+from quanthus.expert_strategy import p3_strat_003_input_qualification as input_qualification
 from quanthus.expert_strategy.p3_strat_003_input_qualification import (
     BUNDLE_SCHEMA,
     PARTITION,
     REQUEST_DIGEST,
+    _fetch_bound_prior_package,
     _request,
     _scope,
     _verify_replay_bundle,
@@ -141,3 +144,124 @@ def test_event_worker_daily_mount_is_read_only_and_does_not_enable_p6_controller
     assert "QUANTHUS_P6_CONTROLLER_ENABLED" not in event_block
     assert "QUANTHUS_P6_ACTIVATION_MANDATE" not in event_block
     assert "QUANTHUS_P6_FORWARD_RUN_ROOT" not in event_block
+
+
+
+def _daily_package(root: Path, market_date: str, package_id: str) -> str:
+    package = root / "packages" / market_date / package_id
+    package.mkdir(parents=True)
+    files: list[object] = []
+    manifest = {
+        "schema_version": 1,
+        "kind": "cn01_daily_dwd_domain_increment",
+        "package_id": package_id,
+        "market_date": market_date,
+        "files": files,
+        "content_digest": "sha256:" + hashlib.sha256(
+            json.dumps(files, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode(
+                "ascii"
+            )
+        ).hexdigest(),
+        "row_counts": {},
+    }
+    manifest_path = package / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=True, separators=(",", ":"), sort_keys=True) + "\n",
+        encoding="ascii",
+    )
+    manifest_sha = _sha(manifest_path)
+    (package / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    return manifest_sha
+
+
+def test_bound_prior_fetch_uses_exact_child_identity_and_job_local_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    remote = tmp_path / "remote"
+    package_id = "dwd-daily-20260917-fixture"
+    manifest_sha = _daily_package(remote, "2026-09-17", package_id)
+    monkeypatch.setenv("QUANTHUS_CN01_DWD_HOST", "cn01.example")
+
+    monkeypatch.setattr(
+        input_qualification,
+        "_warehouse_ssh_command",
+        lambda: (
+            "cn01.example",
+            "22",
+            "quanthus-dwd-ro",
+            "/run/secrets/key",
+            "/run/secrets/known-hosts",
+            "ssh fixture",
+        ),
+    )
+    monkeypatch.setattr(
+        input_qualification,
+        "_warehouse_remote_path",
+        lambda relative: relative,
+    )
+
+    def fake_rsync(*, source: str, destination: Path, ssh: str, extra=()) -> None:
+        del ssh, extra
+        relative = source.split(":", 1)[1]
+        source_path = remote / relative.rstrip("/")
+        destination = Path(destination)
+        if source_path.is_dir():
+            destination.mkdir(parents=True, exist_ok=True)
+            for child in source_path.iterdir():
+                if child.name == "READY":
+                    continue
+                if child.is_dir():
+                    shutil.copytree(child, destination / child.name)
+                else:
+                    shutil.copy2(child, destination / child.name)
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, destination)
+
+    monkeypatch.setattr(input_qualification, "_warehouse_rsync", fake_rsync)
+    cache = tmp_path / "cache"
+
+    package, receipt = _fetch_bound_prior_package(
+        cache_root=cache,
+        market_date=date(2026, 9, 17),
+        package_id=package_id,
+        manifest_sha256=manifest_sha,
+    )
+
+    assert package == cache / "packages/2026-09-17" / package_id
+    assert receipt["disposition"] == "fetched_exact_child_binding"
+    assert _sha(package / "manifest.json") == manifest_sha
+
+    second, second_receipt = _fetch_bound_prior_package(
+        cache_root=cache,
+        market_date=date(2026, 9, 17),
+        package_id=package_id,
+        manifest_sha256=manifest_sha,
+    )
+    assert second == package
+    assert second_receipt["disposition"] == "reused_job_local"
+
+    with pytest.raises(ExpertEvaluationError, match="differs"):
+        _fetch_bound_prior_package(
+            cache_root=cache,
+            market_date=date(2026, 9, 17),
+            package_id=package_id,
+            manifest_sha256="sha256:" + "0" * 64,
+        )
+
+
+def test_event_worker_bound_prior_transport_is_read_only_and_not_p6_authority() -> None:
+    compose = (ROOT / "ops/platform/compose.yaml").read_text(encoding="utf-8")
+    event_block = compose.split("  event-worker:", 1)[1].split("  event-shard-worker:", 1)[0]
+    dockerfile = (ROOT / "ops/event/Dockerfile").read_text(encoding="utf-8")
+
+    assert "openssh-client rsync" in dockerfile
+    assert "QUANTHUS_CN01_DWD_USER: quanthus-dwd-ro" in event_block
+    assert "QUANTHUS_CN01_DWD_KEY: /run/secrets/quanthus-cn01-dwd-ro" in event_block
+    assert "/home/ubuntu/.ssh/cn01_candidate_ro:/run/secrets/quanthus-cn01-dwd-ro:ro" in event_block
+    assert (
+        "/home/ubuntu/.ssh/known_hosts_cn01_dual_lane:"
+        "/run/secrets/quanthus-cn01-known-hosts:ro"
+    ) in event_block
+    assert "QUANTHUS_P6_CONTROLLER_ENABLED" not in event_block
+    assert "QUANTHUS_P6_ACTIVATION_MANDATE" not in event_block

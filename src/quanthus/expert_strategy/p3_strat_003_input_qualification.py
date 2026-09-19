@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import re
 import shutil
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -44,16 +47,20 @@ from quanthus.forward_validation.data_boundary import (
     verify_prospective_dwd_release,
 )
 from quanthus.forward_validation.prospective_source import (
+    P6DailyChainPackage,
     P6ProspectiveVisibility,
     _build_bundle,
     _build_candidate_projection,
-    load_daily_chain,
+    _verify_seed,
 )
 from quanthus.pipelines.securities_warehouse.daily_domain import (
     DailyDomainBuildError,
     verify_daily_domain_increment,
 )
 from quanthus.policy import find_project_root
+from quanthus.warehouse_sync import _remote_path as _warehouse_remote_path
+from quanthus.warehouse_sync import _run_rsync as _warehouse_rsync
+from quanthus.warehouse_sync import _ssh_command as _warehouse_ssh_command
 
 REQUEST_SCHEMA = "quanthus.p3-strat-003-input-qualification.v1"
 ARTIFACT_SCHEMA = "quanthus.p3-strat-003-input-artifact.v1"
@@ -198,6 +205,257 @@ def _target_release(daily_root: Path, market_date: date) -> ProspectiveDwdReleas
             f"expected one verified {market_date.isoformat()} daily release, got {len(candidates)}",
         )
     return candidates[0]
+
+
+def _fetch_bound_prior_package(
+    *,
+    cache_root: Path,
+    market_date: date,
+    package_id: str,
+    manifest_sha256: str,
+) -> tuple[Path, dict[str, str]]:
+    """Fetch one exact child-bound prior package into job-local scratch only."""
+
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,191}", package_id):
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_package_invalid",
+            "bound prior package id is unsafe",
+        )
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", manifest_sha256):
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_package_invalid",
+            "bound prior manifest digest is invalid",
+        )
+    cache_root = cache_root.resolve()
+    target = (cache_root / "packages" / market_date.isoformat() / package_id).resolve()
+    if not target.is_relative_to(cache_root):
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_package_invalid",
+            "bound prior package escapes the job-local cache",
+        )
+    if target.exists():
+        try:
+            verified = verify_daily_domain_increment(target)
+        except DailyDomainBuildError as exc:
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_package_invalid",
+                "existing job-local prior package is invalid",
+            ) from exc
+        if (
+            verified.market_date != market_date
+            or verified.package_id != package_id
+            or verified.manifest_sha256 != manifest_sha256
+        ):
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_package_drift",
+                "existing job-local prior package differs from its child binding",
+            )
+        return target, {
+            "market_date": market_date.isoformat(),
+            "package_id": package_id,
+            "manifest_sha256": manifest_sha256,
+            "disposition": "reused_job_local",
+        }
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{package_id}.", dir=target.parent))
+    try:
+        _, _, remote_user, _, _, ssh = _warehouse_ssh_command()
+        remote_host = os.environ["QUANTHUS_CN01_DWD_HOST"]
+        relative = f"packages/{market_date.isoformat()}/{package_id}"
+        remote_package = (
+            f"{remote_user}@{remote_host}:{_warehouse_remote_path(relative)}/"
+        )
+        _warehouse_rsync(
+            source=remote_package,
+            destination=staging,
+            ssh=ssh,
+            extra=("--exclude=READY",),
+        )
+        _warehouse_rsync(
+            source=f"{remote_package}READY",
+            destination=staging / "READY",
+            ssh=ssh,
+        )
+        try:
+            verified = verify_daily_domain_increment(staging)
+        except DailyDomainBuildError as exc:
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_package_verification_failed",
+                f"{market_date.isoformat()}:{package_id}",
+            ) from exc
+        if (
+            verified.market_date != market_date
+            or verified.package_id != package_id
+            or verified.manifest_sha256 != manifest_sha256
+        ):
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_package_drift",
+                "fetched prior package differs from its child binding",
+            )
+        os.replace(staging, target)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return target, {
+        "market_date": market_date.isoformat(),
+        "package_id": package_id,
+        "manifest_sha256": manifest_sha256,
+        "disposition": "fetched_exact_child_binding",
+    }
+
+
+def _load_bound_daily_chain(
+    *,
+    config: Any,
+    target: ProspectiveDwdRelease,
+    cache_root: Path,
+) -> tuple[tuple[P6DailyChainPackage, ...], tuple[dict[str, str], ...]]:
+    """Resolve one complete immutable chain without mutating the local daily root."""
+
+    _verify_seed(config)
+    daily_root = config.daily_root.resolve()
+    if daily_root not in target.package_root.resolve().parents:
+        raise ExpertEvaluationError(
+            "p3_strat_003_target_release_invalid",
+            "target release is outside the governed daily root",
+        )
+    cursor = target.package_root.resolve()
+    observed: list[P6DailyChainPackage] = []
+    recovered: list[dict[str, str]] = []
+    seen: set[tuple[date, str]] = set()
+
+    while True:
+        try:
+            verified = verify_daily_domain_increment(cursor)
+        except DailyDomainBuildError as exc:
+            raise ExpertEvaluationError(
+                "p3_strat_003_daily_chain_invalid",
+                f"daily package failed verification: {cursor.name}",
+            ) from exc
+        raw = _object(cursor / "manifest.json", "daily DWD manifest")
+        key = (verified.market_date, verified.package_id)
+        if key in seen:
+            raise ExpertEvaluationError(
+                "p3_strat_003_daily_chain_cycle",
+                verified.package_id,
+            )
+        seen.add(key)
+        base = raw.get("base")
+        if not isinstance(base, dict) or (
+            base.get("package_id") != "dwd-base-202607-v2.1"
+            or base.get("manifest_sha256") != config.historical_base_manifest_sha256
+            or base.get("content_digest") != config.historical_base_content_digest
+        ):
+            raise ExpertEvaluationError(
+                "p3_strat_003_daily_chain_base_drift",
+                verified.package_id,
+            )
+        code_revision = raw.get("code_revision")
+        if not isinstance(code_revision, str) or not re.fullmatch(
+            r"[0-9a-f]{40}", code_revision
+        ):
+            raise ExpertEvaluationError(
+                "p3_strat_003_daily_chain_invalid",
+                "daily package code revision is invalid",
+            )
+        try:
+            covered_after = date.fromisoformat(str(raw.get("covered_after_date")))
+        except ValueError as exc:
+            raise ExpertEvaluationError(
+                "p3_strat_003_daily_chain_invalid",
+                "daily covered-after date is invalid",
+            ) from exc
+
+        prior = raw.get("prior")
+        prior_id: str | None = None
+        prior_sha: str | None = None
+        prior_date: date | None = None
+        if prior is not None:
+            if not isinstance(prior, dict):
+                raise ExpertEvaluationError(
+                    "p3_strat_003_daily_chain_invalid",
+                    "daily prior binding must be an object",
+                )
+            prior_id = str(prior.get("package_id") or "")
+            prior_sha = str(prior.get("manifest_sha256") or "")
+            try:
+                prior_date = date.fromisoformat(str(prior.get("market_date")))
+            except ValueError as exc:
+                raise ExpertEvaluationError(
+                    "p3_strat_003_daily_chain_invalid",
+                    "daily prior market date is invalid",
+                ) from exc
+            if prior_date >= verified.market_date:
+                raise ExpertEvaluationError(
+                    "p3_strat_003_daily_chain_invalid",
+                    "daily prior date does not precede its child",
+                )
+
+        observed.append(
+            P6DailyChainPackage(
+                root=cursor,
+                package_id=verified.package_id,
+                market_date=verified.market_date,
+                manifest_sha256=verified.manifest_sha256,
+                content_digest=verified.content_digest,
+                code_revision=code_revision,
+                covered_after_date=covered_after,
+                prior_package_id=prior_id,
+                prior_manifest_sha256=prior_sha,
+            )
+        )
+        if prior is None:
+            if covered_after != config.historical_base_through_date:
+                raise ExpertEvaluationError(
+                    "p3_strat_003_daily_chain_gap",
+                    "first daily package does not advance the governed Base",
+                )
+            break
+
+        assert prior_date is not None and prior_id is not None and prior_sha is not None
+        local_prior = (
+            daily_root / "packages" / prior_date.isoformat() / prior_id
+        ).resolve()
+        if daily_root not in local_prior.parents:
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_package_invalid",
+                "local prior package escapes the governed daily root",
+            )
+        if local_prior.is_dir():
+            if _sha256(local_prior / "manifest.json") != prior_sha:
+                raise ExpertEvaluationError(
+                    "p3_strat_003_prior_package_drift",
+                    "existing OCI prior package differs from its child binding",
+                )
+            cursor = local_prior
+            continue
+
+        cursor, recovery = _fetch_bound_prior_package(
+            cache_root=cache_root,
+            market_date=prior_date,
+            package_id=prior_id,
+            manifest_sha256=prior_sha,
+        )
+        recovered.append(recovery)
+
+    ordered = tuple(reversed(observed))
+    if not ordered or ordered[-1].manifest_sha256 != target.manifest_sha256:
+        raise ExpertEvaluationError(
+            "p3_strat_003_daily_chain_invalid",
+            "target package identity differs after chain resolution",
+        )
+    for left, right in zip(ordered, ordered[1:], strict=False):
+        if (
+            right.prior_package_id != left.package_id
+            or right.prior_manifest_sha256 != left.manifest_sha256
+            or right.covered_after_date != left.market_date
+        ):
+            raise ExpertEvaluationError(
+                "p3_strat_003_daily_chain_gap",
+                f"{left.package_id}->{right.package_id}",
+            )
+    return ordered, tuple(recovered)
 
 
 def _warmup_dates(base_root: Path, before: date, count: int) -> tuple[date, ...]:
@@ -410,26 +668,35 @@ def build_input_artifact(
                 "p3_strat_003_input_isolation_invalid",
                 "qualification output must be outside every read-only input root",
             )
-    target = _target_release(runtime.daily_root, target_date)
-    chain = load_daily_chain(config=runtime, target=target)
-    warmup_dates = _warmup_dates(runtime.historical_base_root, decision_start, warmup_count)
-    history_start = warmup_dates[0]
-
     if output.exists():
         return verify_p3_strat_003_input_artifact(
             output,
             code_revision=code_revision,
             request_digest=digest_value(raw),
         )
-    output.mkdir(parents=True)
-    replay_root = output / "replay"
-    bundle = _build_bundle(
-        config=runtime,
-        target=target,
-        chain=chain,
-        history_start=history_start,
-        output_root=replay_root,
-    )
+
+    target = _target_release(runtime.daily_root, target_date)
+    warmup_dates = _warmup_dates(runtime.historical_base_root, decision_start, warmup_count)
+    history_start = warmup_dates[0]
+    chain_cache = output.parent / f".{output.name}.prior-chain"
+    shutil.rmtree(chain_cache, ignore_errors=True)
+    try:
+        chain, recovered_prior_packages = _load_bound_daily_chain(
+            config=runtime,
+            target=target,
+            cache_root=chain_cache,
+        )
+        output.mkdir(parents=True)
+        replay_root = output / "replay"
+        bundle = _build_bundle(
+            config=runtime,
+            target=target,
+            chain=chain,
+            history_start=history_start,
+            output_root=replay_root,
+        )
+    finally:
+        shutil.rmtree(chain_cache, ignore_errors=True)
     bundle_manifest = _bundle_manifest(bundle, request_digest=REQUEST_DIGEST)
     (replay_root / "bundle.json").write_bytes(canonical_json_bytes(bundle_manifest) + b"\n")
 
@@ -565,6 +832,12 @@ def build_input_artifact(
             }
             for item in chain
         ],
+        "prior_chain_recovery": {
+            "mutated_local_daily_root": False,
+            "remote_source_authority": "cn01_rrsync_forced_read_only",
+            "recovered_package_count": len(recovered_prior_packages),
+            "recovered_packages": list(recovered_prior_packages),
+        },
         "deferred_daily_artifact_contract": {
             "successful_ready_package_requires_deferred_daily_artifacts_empty": True,
             "daily_package_count": len(chain),

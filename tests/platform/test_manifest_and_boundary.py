@@ -156,8 +156,14 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     assert "config/product-expert-evidence.v1.json" in dockerfile
     assert "config/forward-validation" in dockerfile
     assert "config/forward-validation" in builder
-    assert "src/quanthus/forward_validation/product_view.py" in dockerfile
-    assert "src/quanthus/forward_validation/product_view.py" in builder
+    for required in (
+        "src/quanthus/forward_validation/activation.py",
+        "src/quanthus/forward_validation/contracts.py",
+        "src/quanthus/forward_validation/serialization.py",
+        "src/quanthus/forward_validation/product_view.py",
+    ):
+        assert required in dockerfile
+        assert required in builder
     assert "config/expert-strategies/p4-trend-risk.v1.0.1.json" in dockerfile
     assert "candidate-p4-trend-risk-1.0.1.inconclusive.v1.json" in dockerfile
     assert "find ./config -type d -exec chmod 0555" in dockerfile
@@ -168,7 +174,13 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     assert "src/quanthus/expert_evaluation/release_verification.py" in dockerfile
     assert all(
         forbidden not in dockerfile
-        for forbidden in ("src/quanthus/providers", "src/quanthus/backtest", "event_library")
+        for forbidden in (
+            "src/quanthus/providers",
+            "src/quanthus/backtest",
+            "event_library",
+            "src/quanthus/forward_validation/official_cycle.py",
+            "src/quanthus/forward_validation/reproduction.py",
+        )
     )
     assert "mktemp -d /tmp/quanthus-platform-image.XXXXXX" in builder
     assert 'cp -a "$REPOSITORY_ROOT/src/quanthus/platform"' in builder
@@ -184,7 +196,13 @@ def test_platform_image_excludes_unneeded_or_restricted_surfaces() -> None:
     assert '"$REPOSITORY_ROOT/src/quanthus/expert_evaluation/release_verification.py"' in builder
     assert all(
         forbidden not in builder
-        for forbidden in ("src/quanthus/providers", "src/quanthus/backtest", "event_library")
+        for forbidden in (
+            "src/quanthus/providers",
+            "src/quanthus/backtest",
+            "event_library",
+            "src/quanthus/forward_validation/official_cycle.py",
+            "src/quanthus/forward_validation/reproduction.py",
+        )
     )
     assert "quanthus-platform-kernel:local" in compose
     assert "quanthus-platform-web:local" in compose

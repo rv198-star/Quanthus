@@ -37,6 +37,9 @@ COPY src/quanthus/expert_evaluation/__init__.py \
     src/quanthus/expert_evaluation/serialization.py \
     ./src/quanthus/expert_evaluation/
 COPY src/quanthus/forward_validation/__init__.py \
+    src/quanthus/forward_validation/activation.py \
+    src/quanthus/forward_validation/contracts.py \
+    src/quanthus/forward_validation/serialization.py \
     src/quanthus/forward_validation/product_view.py \
     ./src/quanthus/forward_validation/
 COPY src/quanthus/platform ./src/quanthus/platform

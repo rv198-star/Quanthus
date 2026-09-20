@@ -367,7 +367,7 @@ def test_missing_prior_reconstruction_is_bounded_and_event_worker_transport_isol
     assert reconstruction.minimum_market_date == date(2026, 8, 1)
     assert reconstruction.through_market_date == date(2026, 9, 17)
     assert reconstruction.source_id == "cn01"
-    assert reconstruction.original_code_revision == "c317fdb2ac81e34b5571b9e1abde524da1c5b05b"
+    assert reconstruction.revision_allowlist.name == "dwd-revision-allowlist.v1.json"
     assert reconstruction.maximum_prior_candidates == 8
     assert reconstruction.maximum_reconstructed_packages == 8
     assert reconstruction.maximum_calendar_scan_days == 14
@@ -386,6 +386,28 @@ def test_missing_prior_reconstruction_is_bounded_and_event_worker_transport_isol
     assert "/home/ubuntu/.ssh/cn01_ods:/run/secrets/quanthus-cn01-ods-ro:ro" in event_block
     assert "QUANTHUS_CN01_ODS_RSYNC_KEY" not in replay_block
     assert "quanthus-cn01-ods-ro" not in replay_block
+
+
+def test_child_bound_package_resolves_pre_result_historical_builder_revision() -> None:
+    reconstruction = _missing_prior_reconstruction(_request(CONFIG), project=ROOT)
+
+    assert input_qualification._builder_revision_for_package(
+        market_date=date(2026, 9, 11),
+        package_id="dwd-daily-20260911-f536d90fb04d-f97f90c",
+        reconstruction=reconstruction,
+    ) == "f97f90c8e8ef6d14877e54408cb6eb3698813d23"
+    assert input_qualification._builder_revision_for_package(
+        market_date=date(2026, 9, 16),
+        package_id="dwd-daily-20260916-996324770eea-c317fdb",
+        reconstruction=reconstruction,
+    ) == "c317fdb2ac81e34b5571b9e1abde524da1c5b05b"
+
+    with pytest.raises(ExpertEvaluationError, match="revision_not_frozen"):
+        input_qualification._builder_revision_for_package(
+            market_date=date(2026, 9, 11),
+            package_id="dwd-daily-20260911-f536d90fb04d-0000000",
+            reconstruction=reconstruction,
+        )
 
 
 def test_suffix_reconstruction_publishes_only_after_exact_child_binding_and_keeps_current(
@@ -564,6 +586,7 @@ def test_suffix_builder_chains_all_ready_market_dates_from_one_anchor(
         reconstruction=reconstruction,
         base_root=tmp_path / "base",
         attempt_root=tmp_path / "attempt",
+        code_revision="c317fdb2ac81e34b5571b9e1abde524da1c5b05b",
     )
 
     assert final.market_date == dates[-1]

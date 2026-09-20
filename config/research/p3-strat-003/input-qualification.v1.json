@@ -28,7 +28,11 @@
     "source_id": "cn01",
     "ods_source_config": "config/pipelines/ods-handoff-sources.v1.json",
     "release_config": "config/releases/v2-build202607.json",
-    "original_code_revision": "c317fdb2ac81e34b5571b9e1abde524da1c5b05b",
+    "revision_allowlist": {
+      "path": "config/research/p3-strat-003/dwd-revision-allowlist.v1.json",
+      "file_sha256": "sha256:bb7beae1166fa86919f4471cf5322f6dec8c9b211b2794755d97a1bd464e40fb",
+      "semantic_digest": "sha256:2c3bb437d4c02f5729e4c418beea9bfdc284f1241bdebd98528413972cf9ff7f"
+    },
     "maximum_prior_candidates": 8,
     "maximum_reconstructed_packages": 8,
     "maximum_calendar_scan_days": 14,

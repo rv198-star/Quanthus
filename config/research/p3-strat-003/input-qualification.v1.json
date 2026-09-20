@@ -23,15 +23,18 @@
   },
   "partition": "p3-strat-003-recent-history",
   "missing_prior_reconstruction": {
-    "authorized_market_date": "2026-09-17",
-    "authorized_package_id": "dwd-daily-20260917-134a855f5624-c317fdb",
+    "minimum_market_date": "2026-08-01",
+    "authorized_through_market_date": "2026-09-17",
     "source_id": "cn01",
     "ods_source_config": "config/pipelines/ods-handoff-sources.v1.json",
     "release_config": "config/releases/v2-build202607.json",
     "original_code_revision": "c317fdb2ac81e34b5571b9e1abde524da1c5b05b",
     "maximum_prior_candidates": 8,
+    "maximum_reconstructed_packages": 8,
+    "maximum_calendar_scan_days": 14,
     "maximum_source_attempts_per_lane": 8,
     "job_local_only": true,
+    "child_binding_required": true,
     "mutate_daily_current": false
   },
   "outputs": {

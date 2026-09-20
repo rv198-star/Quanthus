@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +61,9 @@ from quanthus.pipelines.ods_handoff import (
 )
 from quanthus.pipelines.ods_handoff import (
     _attempt_directories as _ods_attempt_directories,
+)
+from quanthus.pipelines.ods_handoff import (
+    _probe_latest_ready_attempt as _ods_probe_latest_ready_attempt,
 )
 from quanthus.pipelines.ods_handoff import _remote as _ods_remote
 from quanthus.pipelines.ods_handoff import _rsync as _ods_rsync
@@ -195,13 +198,15 @@ def _scope(raw: Mapping[str, Any]) -> tuple[date, date, date, date, int]:
 
 @dataclass(frozen=True)
 class _MissingPriorReconstruction:
-    market_date: date
-    package_id: str
+    minimum_market_date: date
+    through_market_date: date
     source_id: str
     ods_source_config: Path
     release_config: Path
     original_code_revision: str
     maximum_prior_candidates: int
+    maximum_reconstructed_packages: int
+    maximum_calendar_scan_days: int
     maximum_source_attempts_per_lane: int
 
 
@@ -217,11 +222,15 @@ def _missing_prior_reconstruction(
             "missing-prior reconstruction contract is missing",
         )
     try:
-        market_date = date.fromisoformat(str(value["authorized_market_date"]))
-        package_id = str(value["authorized_package_id"])
+        minimum_market_date = date.fromisoformat(str(value["minimum_market_date"]))
+        through_market_date = date.fromisoformat(
+            str(value["authorized_through_market_date"])
+        )
         source_id = str(value["source_id"])
         original_code_revision = str(value["original_code_revision"])
         maximum_prior_candidates = int(value["maximum_prior_candidates"])
+        maximum_reconstructed_packages = int(value["maximum_reconstructed_packages"])
+        maximum_calendar_scan_days = int(value["maximum_calendar_scan_days"])
         maximum_source_attempts_per_lane = int(value["maximum_source_attempts_per_lane"])
     except (KeyError, TypeError, ValueError) as exc:
         raise ExpertEvaluationError(
@@ -229,13 +238,17 @@ def _missing_prior_reconstruction(
             "missing-prior reconstruction fields are invalid",
         ) from exc
     if (
-        market_date != date(2026, 9, 17)
-        or package_id != "dwd-daily-20260917-134a855f5624-c317fdb"
+        minimum_market_date != date(2026, 8, 1)
+        or through_market_date != date(2026, 9, 17)
         or source_id != "cn01"
         or re.fullmatch(r"[0-9a-f]{40}", original_code_revision) is None
         or not 1 <= maximum_prior_candidates <= 16
+        or not 1 <= maximum_reconstructed_packages <= 16
+        or not 1 <= maximum_calendar_scan_days <= 31
+        or maximum_reconstructed_packages > maximum_calendar_scan_days
         or not 1 <= maximum_source_attempts_per_lane <= 16
         or value.get("job_local_only") is not True
+        or value.get("child_binding_required") is not True
         or value.get("mutate_daily_current") is not False
     ):
         raise ExpertEvaluationError(
@@ -258,13 +271,15 @@ def _missing_prior_reconstruction(
             "missing-prior reconstruction source config is unavailable",
         )
     return _MissingPriorReconstruction(
-        market_date=market_date,
-        package_id=package_id,
+        minimum_market_date=minimum_market_date,
+        through_market_date=through_market_date,
         source_id=source_id,
         ods_source_config=ods_source_config,
         release_config=release_config,
         original_code_revision=original_code_revision,
         maximum_prior_candidates=maximum_prior_candidates,
+        maximum_reconstructed_packages=maximum_reconstructed_packages,
+        maximum_calendar_scan_days=maximum_calendar_scan_days,
         maximum_source_attempts_per_lane=maximum_source_attempts_per_lane,
     )
 
@@ -351,11 +366,9 @@ def _verified_local_prior_candidates(
     return tuple(candidates[:limit])
 
 
-def _pull_reconstruction_ods(
+def _resolved_reconstruction_ods_source(
     reconstruction: _MissingPriorReconstruction,
-    *,
-    output_root: Path,
-) -> tuple[Path, tuple[dict[str, Any], ...]]:
+) -> Any:
     config = load_ods_source_config(reconstruction.ods_source_config)
     configured = next(
         (item for item in config.sources if item.source_id == reconstruction.source_id),
@@ -367,23 +380,76 @@ def _pull_reconstruction_ods(
             "authorized ODS source is not configured",
         )
     try:
-        source = resolve_ods_source(configured)
+        return resolve_ods_source(configured)
     except OdsHandoffError as exc:
         raise ExpertEvaluationError(
             "p3_strat_003_prior_reconstruction_source_invalid",
             str(exc),
         ) from exc
 
+
+def _reconstruction_market_dates(
+    reconstruction: _MissingPriorReconstruction,
+    *,
+    anchor_date: date,
+    target_date: date,
+) -> tuple[date, ...]:
+    calendar_days = (target_date - anchor_date).days
+    if (
+        calendar_days <= 0
+        or calendar_days > reconstruction.maximum_calendar_scan_days
+    ):
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_reconstruction_calendar_budget",
+            f"{anchor_date.isoformat()}->{target_date.isoformat()}",
+        )
+    source = _resolved_reconstruction_ods_source(reconstruction)
+    dates: list[date] = []
+    for offset in range(1, calendar_days + 1):
+        candidate = anchor_date + timedelta(days=offset)
+        try:
+            attempt = _ods_probe_latest_ready_attempt(
+                source,
+                schedule="daily",
+                market_date=candidate.isoformat(),
+            )
+        except (OdsHandoffError, subprocess.TimeoutExpired) as exc:
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_reconstruction_source_failed",
+                f"daily/{candidate.isoformat()}: {exc}",
+            ) from exc
+        if attempt is not None:
+            dates.append(candidate)
+    if not dates or dates[-1] != target_date:
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_reconstruction_target_not_ready",
+            target_date.isoformat(),
+        )
+    if len(dates) > reconstruction.maximum_reconstructed_packages:
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_reconstruction_package_budget",
+            f"{len(dates)} packages required",
+        )
+    return tuple(dates)
+
+
+def _pull_reconstruction_ods(
+    reconstruction: _MissingPriorReconstruction,
+    *,
+    market_date: date,
+    output_root: Path,
+) -> tuple[Path, tuple[dict[str, Any], ...]]:
+    source = _resolved_reconstruction_ods_source(reconstruction)
     release_root = output_root.resolve() / "ods-releases"
     release_root.mkdir(parents=True, exist_ok=True)
     inventory: list[dict[str, Any]] = []
-    market_date = reconstruction.market_date.isoformat()
+    market_text = market_date.isoformat()
     for schedule in ("daily", "daily/1m", "daily/5m"):
         try:
             attempts = _ods_attempt_directories(
                 source,
                 schedule=schedule,
-                market_date=market_date,
+                market_date=market_text,
             )
         except (OdsHandoffError, subprocess.TimeoutExpired) as exc:
             raise ExpertEvaluationError(
@@ -393,7 +459,7 @@ def _pull_reconstruction_ods(
         if not attempts:
             raise ExpertEvaluationError(
                 "p3_strat_003_prior_reconstruction_source_missing",
-                f"no ODS attempts for {schedule}/{market_date}",
+                f"no ODS attempts for {schedule}/{market_text}",
             )
         if len(attempts) > reconstruction.maximum_source_attempts_per_lane:
             raise ExpertEvaluationError(
@@ -403,12 +469,12 @@ def _pull_reconstruction_ods(
         for attempt_id in attempts:
             destination = release_root.joinpath(
                 *schedule.split("/"),
-                market_date,
+                market_text,
                 attempt_id,
             )
             destination.mkdir(parents=True, exist_ok=True)
             remote = (
-                f"{source.release_root}/{schedule}/{market_date}/{attempt_id}/"
+                f"{source.release_root}/{schedule}/{market_text}/{attempt_id}/"
             )
             try:
                 completed = _ods_rsync(
@@ -435,6 +501,7 @@ def _pull_reconstruction_ods(
                 )
             inventory.append(
                 {
+                    "market_date": market_text,
                     "schedule": schedule,
                     "attempt_id": attempt_id,
                     "disposition": "copied_job_local_read_only_source",
@@ -474,6 +541,119 @@ def _prior_pointer(
     return pointer
 
 
+def _publish_reconstructed_suffix(
+    *,
+    cache_root: Path,
+    candidates: Sequence[_PriorCandidate],
+) -> None:
+    for candidate in candidates:
+        target = (
+            cache_root.resolve()
+            / "packages"
+            / candidate.market_date.isoformat()
+            / candidate.package_id
+        ).resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            verified = verify_daily_domain_increment(target)
+            if (
+                verified.market_date != candidate.market_date
+                or verified.package_id != candidate.package_id
+                or verified.manifest_sha256 != candidate.manifest_sha256
+            ):
+                raise ExpertEvaluationError(
+                    "p3_strat_003_prior_package_drift",
+                    "reconstructed suffix conflicts with an existing job-local package",
+                )
+            continue
+        os.replace(candidate.root, target)
+
+
+def _build_reconstruction_suffix(
+    *,
+    cache_root: Path,
+    anchor: _PriorCandidate,
+    target_date: date,
+    reconstruction: _MissingPriorReconstruction,
+    base_root: Path,
+    attempt_root: Path,
+) -> tuple[_PriorCandidate, tuple[_PriorCandidate, ...], tuple[dict[str, Any], ...]]:
+    market_dates = _reconstruction_market_dates(
+        reconstruction,
+        anchor_date=anchor.market_date,
+        target_date=target_date,
+    )
+    prior = anchor
+    built_candidates: list[_PriorCandidate] = []
+    steps: list[dict[str, Any]] = []
+    for market_date in market_dates:
+        day_root = attempt_root / market_date.isoformat()
+        release_root, source_inventory = _pull_reconstruction_ods(
+            reconstruction,
+            market_date=market_date,
+            output_root=day_root,
+        )
+        catalog_root = day_root / "catalog"
+        try:
+            catalog = build_daily_ods_catalog(
+                release_root=release_root,
+                market_date=market_date,
+                output=catalog_root,
+            )
+        except DailyOdsCatalogError as exc:
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_reconstruction_catalog_failed",
+                f"{market_date.isoformat()}: {exc}",
+            ) from exc
+        pointer = _prior_pointer(
+            candidate=prior,
+            root=day_root / "prior",
+        )
+        output = day_root / "package"
+        try:
+            built = build_daily_domain_increment(
+                catalog_root=catalog_root,
+                release_root=release_root,
+                base_root=base_root,
+                release_config=reconstruction.release_config,
+                output=output,
+                code_revision=reconstruction.original_code_revision,
+                prior_pointer=pointer,
+            )
+            verified = verify_daily_domain_increment(output)
+        except DailyDomainBuildError as exc:
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_reconstruction_build_failed",
+                f"{market_date.isoformat()}: {exc}",
+            ) from exc
+        if (
+            built.package_id != verified.package_id
+            or built.manifest_sha256 != verified.manifest_sha256
+            or verified.market_date != market_date
+        ):
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_reconstruction_build_drift",
+                market_date.isoformat(),
+            )
+        prior = _PriorCandidate(
+            root=output,
+            market_date=market_date,
+            package_id=verified.package_id,
+            manifest_sha256=verified.manifest_sha256,
+        )
+        built_candidates.append(prior)
+        steps.append(
+            {
+                "market_date": market_date.isoformat(),
+                "package_id": verified.package_id,
+                "manifest_sha256": verified.manifest_sha256,
+                "catalog_digest": catalog.catalog_digest,
+                "source_attempts": list(source_inventory),
+            }
+        )
+    return prior, tuple(built_candidates), tuple(steps)
+
+
 def _reconstruct_exact_prior_package(
     *,
     cache_root: Path,
@@ -485,27 +665,32 @@ def _reconstruct_exact_prior_package(
     base_root: Path,
     transport_failure: str,
 ) -> tuple[Path, dict[str, Any]]:
-    if (
-        market_date != reconstruction.market_date
-        or package_id != reconstruction.package_id
+    if not (
+        reconstruction.minimum_market_date
+        <= market_date
+        <= reconstruction.through_market_date
     ):
         raise ExpertEvaluationError(
             "p3_strat_003_prior_reconstruction_not_authorized",
             f"{market_date.isoformat()}:{package_id}",
         )
+    expected_prefix = f"dwd-daily-{market_date.strftime('%Y%m%d')}-"
+    expected_revision_suffix = "-" + reconstruction.original_code_revision[:7]
+    if (
+        not package_id.startswith(expected_prefix)
+        or not package_id.endswith(expected_revision_suffix)
+    ):
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_reconstruction_not_authorized",
+            (
+                "child-bound package identity is outside the frozen reconstruction "
+                f"family: {package_id}"
+            ),
+        )
 
-    target = (
-        cache_root.resolve()
-        / "packages"
-        / market_date.isoformat()
-        / package_id
-    ).resolve()
-    recovery_root = (
-        cache_root.resolve()
-        / "reconstruction"
-        / market_date.isoformat()
-        / package_id
-    ).resolve()
+    cache_root = cache_root.resolve()
+    target = cache_root / "packages" / market_date.isoformat() / package_id
+    recovery_root = cache_root / "reconstruction" / market_date.isoformat() / package_id
     if target.exists():
         verified = verify_daily_domain_increment(target)
         if (
@@ -527,23 +712,6 @@ def _reconstruct_exact_prior_package(
         shutil.rmtree(recovery_root)
     recovery_root.mkdir(parents=True)
 
-    release_root, source_inventory = _pull_reconstruction_ods(
-        reconstruction,
-        output_root=recovery_root,
-    )
-    catalog_root = recovery_root / "catalog"
-    try:
-        catalog = build_daily_ods_catalog(
-            release_root=release_root,
-            market_date=market_date,
-            output=catalog_root,
-        )
-    except DailyOdsCatalogError as exc:
-        raise ExpertEvaluationError(
-            "p3_strat_003_prior_reconstruction_catalog_failed",
-            str(exc),
-        ) from exc
-
     prior_candidates = _verified_local_prior_candidates(
         daily_root,
         before=market_date,
@@ -552,55 +720,51 @@ def _reconstruct_exact_prior_package(
     if not prior_candidates:
         raise ExpertEvaluationError(
             "p3_strat_003_prior_reconstruction_prior_missing",
-            "no verified local package exists before the missing package",
+            "no verified local package exists before the missing suffix",
         )
 
     observed_manifest_sha256: list[str] = []
-    for index, candidate in enumerate(prior_candidates):
-        attempt_root = recovery_root / "build-attempts" / f"{index:02d}"
-        pointer = _prior_pointer(
-            candidate=candidate,
-            root=attempt_root / "prior",
-        )
-        output = attempt_root / "package"
+    for index, anchor in enumerate(prior_candidates):
+        attempt_root = recovery_root / "suffix-attempts" / f"{index:02d}"
         try:
-            built = build_daily_domain_increment(
-                catalog_root=catalog_root,
-                release_root=release_root,
+            final, rebuilt, steps = _build_reconstruction_suffix(
+                cache_root=cache_root,
+                anchor=anchor,
+                target_date=market_date,
+                reconstruction=reconstruction,
                 base_root=base_root,
-                release_config=reconstruction.release_config,
-                output=output,
-                code_revision=reconstruction.original_code_revision,
-                prior_pointer=pointer,
+                attempt_root=attempt_root,
             )
-        except DailyDomainBuildError as exc:
-            raise ExpertEvaluationError(
-                "p3_strat_003_prior_reconstruction_build_failed",
-                f"prior={candidate.package_id}: {exc}",
-            ) from exc
-        if built.package_id != package_id:
+        except ExpertEvaluationError as exc:
+            if exc.reason_code in {
+                "p3_strat_003_prior_reconstruction_calendar_budget",
+                "p3_strat_003_prior_reconstruction_package_budget",
+            }:
+                continue
+            raise
+        if final.package_id != package_id:
             raise ExpertEvaluationError(
                 "p3_strat_003_prior_reconstruction_identity_mismatch",
-                (
-                    f"catalog={catalog.catalog_digest} produced {built.package_id}, "
-                    f"expected {package_id}"
-                ),
+                f"rebuilt suffix produced {final.package_id}, expected {package_id}",
             )
-        observed_manifest_sha256.append(built.manifest_sha256)
-        if built.manifest_sha256 != manifest_sha256:
+        observed_manifest_sha256.append(final.manifest_sha256)
+        if final.manifest_sha256 != manifest_sha256:
             continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(output, target)
+        _publish_reconstructed_suffix(
+            cache_root=cache_root,
+            candidates=rebuilt,
+        )
+        target = cache_root / "packages" / market_date.isoformat() / package_id
         return target, {
             "market_date": market_date.isoformat(),
             "package_id": package_id,
             "manifest_sha256": manifest_sha256,
-            "disposition": "reconstructed_exact_from_cn01_ods",
+            "disposition": "reconstructed_exact_suffix_from_cn01_ods",
             "source_id": reconstruction.source_id,
-            "catalog_digest": catalog.catalog_digest,
-            "source_attempts": list(source_inventory),
-            "prior_package_id": candidate.package_id,
-            "prior_market_date": candidate.market_date.isoformat(),
+            "anchor_market_date": anchor.market_date.isoformat(),
+            "anchor_package_id": anchor.package_id,
+            "reconstructed_package_count": len(rebuilt),
+            "reconstructed_packages": list(steps),
             "remote_exact_fetch_failure": transport_failure[:800],
         }
 
@@ -694,8 +858,9 @@ def _fetch_bound_prior_package(
                 reconstruction is not None
                 and daily_root is not None
                 and base_root is not None
-                and market_date == reconstruction.market_date
-                and package_id == reconstruction.package_id
+                and reconstruction.minimum_market_date
+                <= market_date
+                <= reconstruction.through_market_date
             ):
                 return _reconstruct_exact_prior_package(
                     cache_root=cache_root,

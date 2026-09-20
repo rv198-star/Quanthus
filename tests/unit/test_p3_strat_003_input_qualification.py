@@ -360,15 +360,17 @@ def test_bound_prior_fetch_preserves_multiline_transport_error(
         )
 
 
-def test_missing_prior_reconstruction_is_exact_and_event_worker_transport_is_bounded() -> None:
+def test_missing_prior_reconstruction_is_bounded_and_event_worker_transport_isolated() -> None:
     raw = _request(CONFIG)
     reconstruction = _missing_prior_reconstruction(raw, project=ROOT)
 
-    assert reconstruction.market_date == date(2026, 9, 17)
-    assert reconstruction.package_id == "dwd-daily-20260917-134a855f5624-c317fdb"
+    assert reconstruction.minimum_market_date == date(2026, 8, 1)
+    assert reconstruction.through_market_date == date(2026, 9, 17)
     assert reconstruction.source_id == "cn01"
     assert reconstruction.original_code_revision == "c317fdb2ac81e34b5571b9e1abde524da1c5b05b"
     assert reconstruction.maximum_prior_candidates == 8
+    assert reconstruction.maximum_reconstructed_packages == 8
+    assert reconstruction.maximum_calendar_scan_days == 14
     assert reconstruction.maximum_source_attempts_per_lane == 8
 
     compose = (ROOT / "ops/platform/compose.yaml").read_text(encoding="utf-8")
@@ -386,29 +388,115 @@ def test_missing_prior_reconstruction_is_exact_and_event_worker_transport_is_bou
     assert "quanthus-cn01-ods-ro" not in replay_block
 
 
-def test_exact_ods_reconstruction_uses_job_local_prior_and_never_mutates_current(
+def test_suffix_reconstruction_publishes_only_after_exact_child_binding_and_keeps_current(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     raw = _request(CONFIG)
     reconstruction = _missing_prior_reconstruction(raw, project=ROOT)
     daily_root = tmp_path / "daily"
-    prior_id = "dwd-daily-20260916-prior"
-    _daily_package(daily_root, "2026-09-16", prior_id)
     current = daily_root / "CURRENT.json"
+    current.parent.mkdir(parents=True)
     current.write_text('{"sentinel":"unchanged"}\n', encoding="ascii")
+    anchor_root = tmp_path / "anchor"
+    anchor_root.mkdir()
+    (anchor_root / "manifest.json").write_text("{}\n", encoding="ascii")
+    anchor = input_qualification._PriorCandidate(
+        root=anchor_root,
+        market_date=date(2026, 9, 9),
+        package_id="dwd-daily-20260909-anchor-c317fdb",
+        manifest_sha256="sha256:" + "1" * 64,
+    )
+    target_date = date(2026, 9, 16)
+    target_id = "dwd-daily-20260916-996324770eea-c317fdb"
+    target_sha = "sha256:" + "2" * 64
+    target_root = tmp_path / "rebuilt-target"
+    target_root.mkdir()
+    (target_root / "manifest.json").write_text("{}\n", encoding="ascii")
+    final = input_qualification._PriorCandidate(
+        root=target_root,
+        market_date=target_date,
+        package_id=target_id,
+        manifest_sha256=target_sha,
+    )
+    monkeypatch.setattr(
+        input_qualification,
+        "_verified_local_prior_candidates",
+        lambda *_args, **_kwargs: (anchor,),
+    )
+    monkeypatch.setattr(
+        input_qualification,
+        "_build_reconstruction_suffix",
+        lambda **_kwargs: (
+            final,
+            (final,),
+            (
+                {
+                    "market_date": target_date.isoformat(),
+                    "package_id": target_id,
+                    "manifest_sha256": target_sha,
+                },
+            ),
+        ),
+    )
 
+    cache = tmp_path / "cache"
+    package, receipt = input_qualification._reconstruct_exact_prior_package(
+        cache_root=cache,
+        daily_root=daily_root,
+        market_date=target_date,
+        package_id=target_id,
+        manifest_sha256=target_sha,
+        reconstruction=reconstruction,
+        base_root=tmp_path / "base",
+        transport_failure="exact package absent",
+    )
+
+    assert package == cache / "packages/2026-09-16" / target_id
+    assert package.is_dir()
+    assert receipt["disposition"] == "reconstructed_exact_suffix_from_cn01_ods"
+    assert receipt["anchor_market_date"] == "2026-09-09"
+    assert receipt["reconstructed_package_count"] == 1
+    assert current.read_text(encoding="ascii") == '{"sentinel":"unchanged"}\n'
+
+
+def test_suffix_builder_chains_all_ready_market_dates_from_one_anchor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw = _request(CONFIG)
+    reconstruction = _missing_prior_reconstruction(raw, project=ROOT)
+    dates = (
+        date(2026, 9, 10),
+        date(2026, 9, 11),
+        date(2026, 9, 14),
+        date(2026, 9, 15),
+        date(2026, 9, 16),
+    )
+    anchor_root = tmp_path / "anchor"
+    anchor_root.mkdir()
+    (anchor_root / "manifest.json").write_text("{}\n", encoding="ascii")
+    anchor = input_qualification._PriorCandidate(
+        root=anchor_root,
+        market_date=date(2026, 9, 9),
+        package_id="dwd-daily-20260909-anchor-c317fdb",
+        manifest_sha256="sha256:" + "3" * 64,
+    )
+    monkeypatch.setattr(
+        input_qualification,
+        "_reconstruction_market_dates",
+        lambda *_args, **_kwargs: dates,
+    )
     release_root = tmp_path / "ods"
     release_root.mkdir()
     monkeypatch.setattr(
         input_qualification,
         "_pull_reconstruction_ods",
-        lambda *_args, **_kwargs: (
+        lambda *_args, **kwargs: (
             release_root,
             (
                 {
+                    "market_date": kwargs["market_date"].isoformat(),
                     "schedule": "daily",
                     "attempt_id": "fixture",
-                    "disposition": "copied_job_local_read_only_source",
                 },
             ),
         ),
@@ -416,121 +504,121 @@ def test_exact_ods_reconstruction_uses_job_local_prior_and_never_mutates_current
     monkeypatch.setattr(
         input_qualification,
         "build_daily_ods_catalog",
-        lambda **_kwargs: SimpleNamespace(catalog_digest="sha256:134a855f5624" + "0" * 52),
+        lambda **_kwargs: SimpleNamespace(catalog_digest="sha256:" + "4" * 64),
     )
 
-    expected_sha = "sha256:" + "a" * 64
-    seen_prior: list[dict[str, object]] = []
-
-    def fake_build(**kwargs: object) -> SimpleNamespace:
-        pointer = Path(kwargs["prior_pointer"])
-        seen_prior.append(json.loads(pointer.read_text(encoding="ascii")))
-        output = Path(kwargs["output"])
-        output.mkdir(parents=True)
-        (output / "manifest.json").write_text("{}\n", encoding="ascii")
-        (output / "READY").write_text(expected_sha + "\n", encoding="ascii")
-        return SimpleNamespace(
-            package_id=reconstruction.package_id,
-            market_date=reconstruction.market_date,
-            manifest_sha256=expected_sha,
-        )
-
-    monkeypatch.setattr(input_qualification, "build_daily_domain_increment", fake_build)
-    cache = tmp_path / "cache"
-    package, receipt = input_qualification._reconstruct_exact_prior_package(
-        cache_root=cache,
-        daily_root=daily_root,
-        market_date=reconstruction.market_date,
-        package_id=reconstruction.package_id,
-        manifest_sha256=expected_sha,
-        reconstruction=reconstruction,
-        base_root=tmp_path / "base",
-        transport_failure="exact package absent",
-    )
-
-    assert package == cache / "packages/2026-09-17" / reconstruction.package_id
-    assert receipt["disposition"] == "reconstructed_exact_from_cn01_ods"
-    assert receipt["prior_package_id"] == prior_id
-    assert seen_prior[0]["market_date"] == "2026-09-16"
-    assert current.read_text(encoding="ascii") == '{"sentinel":"unchanged"}\n'
-
-
-def test_reconstruction_manifest_mismatch_can_try_next_prior_but_identity_mismatch_stops(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    raw = _request(CONFIG)
-    reconstruction = _missing_prior_reconstruction(raw, project=ROOT)
-    daily_root = tmp_path / "daily"
-    newest = "dwd-daily-20260916-newest"
-    older = "dwd-daily-20260915-older"
-    _daily_package(daily_root, "2026-09-16", newest)
-    _daily_package(daily_root, "2026-09-15", older)
-    release_root = tmp_path / "ods"
-    release_root.mkdir()
-    monkeypatch.setattr(
-        input_qualification,
-        "_pull_reconstruction_ods",
-        lambda *_args, **_kwargs: (release_root, ()),
-    )
-    monkeypatch.setattr(
-        input_qualification,
-        "build_daily_ods_catalog",
-        lambda **_kwargs: SimpleNamespace(catalog_digest="sha256:134a855f5624" + "0" * 52),
-    )
-
-    expected_sha = "sha256:" + "b" * 64
-    build_calls: list[str] = []
+    built_by_root: dict[Path, SimpleNamespace] = {}
+    seen_prior_dates: list[str] = []
 
     def fake_build(**kwargs: object) -> SimpleNamespace:
         pointer = json.loads(Path(kwargs["prior_pointer"]).read_text(encoding="ascii"))
-        build_calls.append(str(pointer["package_id"]))
+        seen_prior_dates.append(str(pointer["market_date"]))
         output = Path(kwargs["output"])
         output.mkdir(parents=True)
-        manifest_sha = (
-            "sha256:" + "c" * 64 if pointer["package_id"] == newest else expected_sha
+        market_date = dates[len(seen_prior_dates) - 1]
+        package_id = (
+            f"dwd-daily-{market_date.strftime('%Y%m%d')}-fixture-c317fdb"
         )
-        return SimpleNamespace(
-            package_id=reconstruction.package_id,
-            market_date=reconstruction.market_date,
+        manifest = output / "manifest.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "kind": "cn01_daily_dwd_domain_increment",
+                    "package_id": package_id,
+                    "market_date": market_date.isoformat(),
+                    "files": [],
+                    "content_digest": "sha256:"
+                    + hashlib.sha256(b"[]").hexdigest(),
+                    "row_counts": {},
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n",
+            encoding="ascii",
+        )
+        manifest_sha = _sha(manifest)
+        (output / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+        value = SimpleNamespace(
+            package_id=package_id,
+            market_date=market_date,
             manifest_sha256=manifest_sha,
         )
+        built_by_root[output.resolve()] = value
+        return value
+
+    original_verify = input_qualification.verify_daily_domain_increment
+
+    def fake_verify(path: Path) -> object:
+        resolved = Path(path).resolve()
+        return built_by_root.get(resolved) or original_verify(resolved)
 
     monkeypatch.setattr(input_qualification, "build_daily_domain_increment", fake_build)
-    package, _ = input_qualification._reconstruct_exact_prior_package(
+    monkeypatch.setattr(input_qualification, "verify_daily_domain_increment", fake_verify)
+
+    final, built, steps = input_qualification._build_reconstruction_suffix(
         cache_root=tmp_path / "cache",
-        daily_root=daily_root,
-        market_date=reconstruction.market_date,
-        package_id=reconstruction.package_id,
-        manifest_sha256=expected_sha,
+        anchor=anchor,
+        target_date=dates[-1],
         reconstruction=reconstruction,
         base_root=tmp_path / "base",
-        transport_failure="missing",
+        attempt_root=tmp_path / "attempt",
     )
-    assert package.is_dir()
-    assert build_calls == [newest, older]
 
-    identity_calls = 0
+    assert final.market_date == dates[-1]
+    assert [item.market_date for item in built] == list(dates)
+    assert len(steps) == 5
+    assert seen_prior_dates == [
+        "2026-09-09",
+        "2026-09-10",
+        "2026-09-11",
+        "2026-09-14",
+        "2026-09-15",
+    ]
 
-    def wrong_identity(**kwargs: object) -> SimpleNamespace:
-        nonlocal identity_calls
-        identity_calls += 1
-        Path(kwargs["output"]).mkdir(parents=True)
-        return SimpleNamespace(
-            package_id="dwd-daily-20260917-different-c317fdb",
-            market_date=reconstruction.market_date,
-            manifest_sha256=expected_sha,
-        )
 
-    monkeypatch.setattr(input_qualification, "build_daily_domain_increment", wrong_identity)
+def test_suffix_reconstruction_identity_mismatch_fails_without_publishing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reconstruction = _missing_prior_reconstruction(_request(CONFIG), project=ROOT)
+    anchor_root = tmp_path / "anchor"
+    anchor_root.mkdir()
+    (anchor_root / "manifest.json").write_text("{}\n", encoding="ascii")
+    anchor = input_qualification._PriorCandidate(
+        root=anchor_root,
+        market_date=date(2026, 9, 9),
+        package_id="dwd-daily-20260909-anchor-c317fdb",
+        manifest_sha256="sha256:" + "5" * 64,
+    )
+    wrong_root = tmp_path / "wrong"
+    wrong_root.mkdir()
+    wrong = input_qualification._PriorCandidate(
+        root=wrong_root,
+        market_date=date(2026, 9, 16),
+        package_id="dwd-daily-20260916-different-c317fdb",
+        manifest_sha256="sha256:" + "6" * 64,
+    )
+    monkeypatch.setattr(
+        input_qualification,
+        "_verified_local_prior_candidates",
+        lambda *_args, **_kwargs: (anchor,),
+    )
+    monkeypatch.setattr(
+        input_qualification,
+        "_build_reconstruction_suffix",
+        lambda **_kwargs: (wrong, (wrong,), ()),
+    )
+
     with pytest.raises(ExpertEvaluationError, match="produced"):
         input_qualification._reconstruct_exact_prior_package(
-            cache_root=tmp_path / "cache-identity",
-            daily_root=daily_root,
-            market_date=reconstruction.market_date,
-            package_id=reconstruction.package_id,
-            manifest_sha256=expected_sha,
+            cache_root=tmp_path / "cache",
+            daily_root=tmp_path / "daily",
+            market_date=date(2026, 9, 16),
+            package_id="dwd-daily-20260916-996324770eea-c317fdb",
+            manifest_sha256="sha256:" + "7" * 64,
             reconstruction=reconstruction,
             base_root=tmp_path / "base",
             transport_failure="missing",
         )
-    assert identity_calls == 1
+    assert not (tmp_path / "cache/packages/2026-09-16").exists()

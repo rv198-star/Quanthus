@@ -5,6 +5,7 @@ import json
 import shutil
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -21,6 +22,7 @@ from quanthus.expert_strategy.p3_strat_003_input_qualification import (
     PARTITION,
     REQUEST_DIGEST,
     _fetch_bound_prior_package,
+    _missing_prior_reconstruction,
     _request,
     _scope,
     _verify_replay_bundle,
@@ -356,3 +358,179 @@ def test_bound_prior_fetch_preserves_multiline_transport_error(
             package_id="dwd-daily-20260917-fixture",
             manifest_sha256="sha256:" + "1" * 64,
         )
+
+
+def test_missing_prior_reconstruction_is_exact_and_event_worker_transport_is_bounded() -> None:
+    raw = _request(CONFIG)
+    reconstruction = _missing_prior_reconstruction(raw, project=ROOT)
+
+    assert reconstruction.market_date == date(2026, 9, 17)
+    assert reconstruction.package_id == "dwd-daily-20260917-134a855f5624-c317fdb"
+    assert reconstruction.source_id == "cn01"
+    assert reconstruction.original_code_revision == "c317fdb2ac81e34b5571b9e1abde524da1c5b05b"
+    assert reconstruction.maximum_prior_candidates == 8
+    assert reconstruction.maximum_source_attempts_per_lane == 8
+
+    compose = (ROOT / "ops/platform/compose.yaml").read_text(encoding="utf-8")
+    event_block = compose.split("  event-worker:", 1)[1].split("  event-shard-worker:", 1)[0]
+    replay_block = compose.split("  replay-worker:", 1)[1].split("  event-worker:", 1)[0]
+
+    assert "QUANTHUS_CN01_ODS_RSYNC_KEY: /run/secrets/quanthus-cn01-ods-ro" in event_block
+    assert "QUANTHUS_CN01_ODS_RSYNC_USER: root" in event_block
+    assert (
+        "QUANTHUS_CN01_ODS_RELEASE_ROOT: /root/work/astock/data/shadow/cn01-ods-v1/releases"
+        in event_block
+    )
+    assert "/home/ubuntu/.ssh/cn01_ods:/run/secrets/quanthus-cn01-ods-ro:ro" in event_block
+    assert "QUANTHUS_CN01_ODS_RSYNC_KEY" not in replay_block
+    assert "quanthus-cn01-ods-ro" not in replay_block
+
+
+def test_exact_ods_reconstruction_uses_job_local_prior_and_never_mutates_current(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw = _request(CONFIG)
+    reconstruction = _missing_prior_reconstruction(raw, project=ROOT)
+    daily_root = tmp_path / "daily"
+    prior_id = "dwd-daily-20260916-prior"
+    _daily_package(daily_root, "2026-09-16", prior_id)
+    current = daily_root / "CURRENT.json"
+    current.write_text('{"sentinel":"unchanged"}\n', encoding="ascii")
+
+    release_root = tmp_path / "ods"
+    release_root.mkdir()
+    monkeypatch.setattr(
+        input_qualification,
+        "_pull_reconstruction_ods",
+        lambda *_args, **_kwargs: (
+            release_root,
+            (
+                {
+                    "schedule": "daily",
+                    "attempt_id": "fixture",
+                    "disposition": "copied_job_local_read_only_source",
+                },
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        input_qualification,
+        "build_daily_ods_catalog",
+        lambda **_kwargs: SimpleNamespace(catalog_digest="sha256:134a855f5624" + "0" * 52),
+    )
+
+    expected_sha = "sha256:" + "a" * 64
+    seen_prior: list[dict[str, object]] = []
+
+    def fake_build(**kwargs: object) -> SimpleNamespace:
+        pointer = Path(kwargs["prior_pointer"])
+        seen_prior.append(json.loads(pointer.read_text(encoding="ascii")))
+        output = Path(kwargs["output"])
+        output.mkdir(parents=True)
+        (output / "manifest.json").write_text("{}\n", encoding="ascii")
+        (output / "READY").write_text(expected_sha + "\n", encoding="ascii")
+        return SimpleNamespace(
+            package_id=reconstruction.package_id,
+            market_date=reconstruction.market_date,
+            manifest_sha256=expected_sha,
+        )
+
+    monkeypatch.setattr(input_qualification, "build_daily_domain_increment", fake_build)
+    cache = tmp_path / "cache"
+    package, receipt = input_qualification._reconstruct_exact_prior_package(
+        cache_root=cache,
+        daily_root=daily_root,
+        market_date=reconstruction.market_date,
+        package_id=reconstruction.package_id,
+        manifest_sha256=expected_sha,
+        reconstruction=reconstruction,
+        base_root=tmp_path / "base",
+        transport_failure="exact package absent",
+    )
+
+    assert package == cache / "packages/2026-09-17" / reconstruction.package_id
+    assert receipt["disposition"] == "reconstructed_exact_from_cn01_ods"
+    assert receipt["prior_package_id"] == prior_id
+    assert seen_prior[0]["market_date"] == "2026-09-16"
+    assert current.read_text(encoding="ascii") == '{"sentinel":"unchanged"}\n'
+
+
+def test_reconstruction_manifest_mismatch_can_try_next_prior_but_identity_mismatch_stops(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw = _request(CONFIG)
+    reconstruction = _missing_prior_reconstruction(raw, project=ROOT)
+    daily_root = tmp_path / "daily"
+    newest = "dwd-daily-20260916-newest"
+    older = "dwd-daily-20260915-older"
+    _daily_package(daily_root, "2026-09-16", newest)
+    _daily_package(daily_root, "2026-09-15", older)
+    release_root = tmp_path / "ods"
+    release_root.mkdir()
+    monkeypatch.setattr(
+        input_qualification,
+        "_pull_reconstruction_ods",
+        lambda *_args, **_kwargs: (release_root, ()),
+    )
+    monkeypatch.setattr(
+        input_qualification,
+        "build_daily_ods_catalog",
+        lambda **_kwargs: SimpleNamespace(catalog_digest="sha256:134a855f5624" + "0" * 52),
+    )
+
+    expected_sha = "sha256:" + "b" * 64
+    build_calls: list[str] = []
+
+    def fake_build(**kwargs: object) -> SimpleNamespace:
+        pointer = json.loads(Path(kwargs["prior_pointer"]).read_text(encoding="ascii"))
+        build_calls.append(str(pointer["package_id"]))
+        output = Path(kwargs["output"])
+        output.mkdir(parents=True)
+        manifest_sha = (
+            "sha256:" + "c" * 64 if pointer["package_id"] == newest else expected_sha
+        )
+        return SimpleNamespace(
+            package_id=reconstruction.package_id,
+            market_date=reconstruction.market_date,
+            manifest_sha256=manifest_sha,
+        )
+
+    monkeypatch.setattr(input_qualification, "build_daily_domain_increment", fake_build)
+    package, _ = input_qualification._reconstruct_exact_prior_package(
+        cache_root=tmp_path / "cache",
+        daily_root=daily_root,
+        market_date=reconstruction.market_date,
+        package_id=reconstruction.package_id,
+        manifest_sha256=expected_sha,
+        reconstruction=reconstruction,
+        base_root=tmp_path / "base",
+        transport_failure="missing",
+    )
+    assert package.is_dir()
+    assert build_calls == [newest, older]
+
+    identity_calls = 0
+
+    def wrong_identity(**kwargs: object) -> SimpleNamespace:
+        nonlocal identity_calls
+        identity_calls += 1
+        Path(kwargs["output"]).mkdir(parents=True)
+        return SimpleNamespace(
+            package_id="dwd-daily-20260917-different-c317fdb",
+            market_date=reconstruction.market_date,
+            manifest_sha256=expected_sha,
+        )
+
+    monkeypatch.setattr(input_qualification, "build_daily_domain_increment", wrong_identity)
+    with pytest.raises(ExpertEvaluationError, match="produced"):
+        input_qualification._reconstruct_exact_prior_package(
+            cache_root=tmp_path / "cache-identity",
+            daily_root=daily_root,
+            market_date=reconstruction.market_date,
+            package_id=reconstruction.package_id,
+            manifest_sha256=expected_sha,
+            reconstruction=reconstruction,
+            base_root=tmp_path / "base",
+            transport_failure="missing",
+        )
+    assert identity_calls == 1

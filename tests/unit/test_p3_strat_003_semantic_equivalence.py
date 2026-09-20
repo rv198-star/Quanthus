@@ -135,6 +135,14 @@ def test_probe_config_is_frozen_and_result_blind() -> None:
             ),
         },
     }
+    boundary = config.raw["missing_boundary"]
+    assert boundary["source_identity_rule"] == "selected_cn01_release_self_verified"
+    assert boundary["cross_source_physical_sha256_required"] is False
+    assert boundary["required_ods_artifact"] == {
+        "lane": "calendar_daily_events",
+        "name": "financial_disclosures_delta",
+        "row_count": 0,
+    }
     assert config.raw["boundaries"] == {
         "strategy_or_economic_results": False,
         "target_outcome_labels": False,

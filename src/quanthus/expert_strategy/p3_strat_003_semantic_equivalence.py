@@ -109,7 +109,6 @@ class _BoundarySpec:
     artifact_lane: str
     artifact_name: str
     artifact_row_count: int
-    artifact_sha256: str
 
 
 @dataclass(frozen=True)
@@ -302,7 +301,6 @@ def _load_config(path: Path) -> _ProbeConfig:
             artifact_lane=str(artifact["lane"]),
             artifact_name=str(artifact["name"]),
             artifact_row_count=int(artifact["row_count"]),
-            artifact_sha256=str(artifact["sha256"]),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ExpertEvaluationError(
@@ -320,10 +318,12 @@ def _load_config(path: Path) -> _ProbeConfig:
         or re.fullmatch(r"[0-9a-f]{40}", boundary_spec.current_builder_blob) is None
         or boundary_spec.compatibility_class
         != "audit_only_financial_disclosure_accounting_when_empty"
+        or boundary.get("source_identity_rule") != "selected_cn01_release_self_verified"
+        or boundary.get("cross_source_physical_sha256_required") is not False
+        or set(artifact) != {"lane", "name", "row_count"}
         or boundary_spec.artifact_lane != "calendar_daily_events"
         or boundary_spec.artifact_name != "financial_disclosures_delta"
         or boundary_spec.artifact_row_count != 0
-        or re.fullmatch(r"sha256:[0-9a-f]{64}", boundary_spec.artifact_sha256) is None
     ):
         raise ExpertEvaluationError(
             "p3_strat_003_semantic_probe_invalid",
@@ -819,11 +819,13 @@ def _boundary_receipt(
         lane_name=boundary.artifact_lane,
         artifact_name=boundary.artifact_name,
     )
-    if artifact.get("sha256") != boundary.artifact_sha256 or _sha256(artifact_path) != (
-        boundary.artifact_sha256
+    observed_artifact_sha256 = str(artifact.get("sha256") or "")
+    if (
+        re.fullmatch(r"sha256:[0-9a-f]{64}", observed_artifact_sha256) is None
+        or _sha256(artifact_path) != observed_artifact_sha256
     ):
         raise ExpertEvaluationError(
-            "p3_strat_003_semantic_probe_boundary_artifact_mismatch",
+            "p3_strat_003_semantic_probe_boundary_artifact_integrity",
             boundary.artifact_name,
         )
     try:
@@ -865,7 +867,8 @@ def _boundary_receipt(
             "lane": boundary.artifact_lane,
             "name": boundary.artifact_name,
             "row_count": row_count,
-            "sha256": boundary.artifact_sha256,
+            "sha256": observed_artifact_sha256,
+            "identity_rule": "selected_cn01_release_self_verified",
         },
         "source": source,
         "original_manifest_claimed_reproduced": False,

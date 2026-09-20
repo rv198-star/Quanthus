@@ -401,6 +401,11 @@ def test_child_bound_package_resolves_pre_result_historical_builder_revision() -
         package_id="dwd-daily-20260916-996324770eea-c317fdb",
         reconstruction=reconstruction,
     ) == "c317fdb2ac81e34b5571b9e1abde524da1c5b05b"
+    assert input_qualification._builder_revision_for_package(
+        market_date=date(2026, 8, 27),
+        package_id="dwd-daily-20260827-aaaaaaaaaaaa-f8f8330",
+        reconstruction=reconstruction,
+    ) == "f8f83309e11815f37212fa87163ceccdaae3e0b4"
 
     with pytest.raises(ExpertEvaluationError, match="revision_not_frozen"):
         input_qualification._builder_revision_for_package(

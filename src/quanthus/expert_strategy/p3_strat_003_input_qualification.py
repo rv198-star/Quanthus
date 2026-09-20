@@ -203,7 +203,9 @@ class _MissingPriorReconstruction:
     source_id: str
     ods_source_config: Path
     release_config: Path
-    original_code_revision: str
+    revision_allowlist: Path
+    revision_allowlist_file_sha256: str
+    revision_allowlist_semantic_digest: str
     maximum_prior_candidates: int
     maximum_reconstructed_packages: int
     maximum_calendar_scan_days: int
@@ -227,7 +229,15 @@ def _missing_prior_reconstruction(
             str(value["authorized_through_market_date"])
         )
         source_id = str(value["source_id"])
-        original_code_revision = str(value["original_code_revision"])
+        revision_allowlist_raw = value["revision_allowlist"]
+        if not isinstance(revision_allowlist_raw, dict):
+            raise TypeError("revision_allowlist must be an object")
+        revision_allowlist_file_sha256 = str(
+            revision_allowlist_raw["file_sha256"]
+        )
+        revision_allowlist_semantic_digest = str(
+            revision_allowlist_raw["semantic_digest"]
+        )
         maximum_prior_candidates = int(value["maximum_prior_candidates"])
         maximum_reconstructed_packages = int(value["maximum_reconstructed_packages"])
         maximum_calendar_scan_days = int(value["maximum_calendar_scan_days"])
@@ -241,7 +251,8 @@ def _missing_prior_reconstruction(
         minimum_market_date != date(2026, 8, 1)
         or through_market_date != date(2026, 9, 17)
         or source_id != "cn01"
-        or re.fullmatch(r"[0-9a-f]{40}", original_code_revision) is None
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", revision_allowlist_file_sha256) is None
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", revision_allowlist_semantic_digest) is None
         or not 1 <= maximum_prior_candidates <= 16
         or not 1 <= maximum_reconstructed_packages <= 16
         or not 1 <= maximum_calendar_scan_days <= 31
@@ -265,7 +276,17 @@ def _missing_prior_reconstruction(
         value.get("release_config"),
         "missing_prior_reconstruction.release_config",
     )
-    if not ods_source_config.is_file() or not release_config.is_file():
+    revision_allowlist = _safe_relative(
+        project,
+        revision_allowlist_raw.get("path"),
+        "missing_prior_reconstruction.revision_allowlist.path",
+    )
+    if (
+        not ods_source_config.is_file()
+        or not release_config.is_file()
+        or not revision_allowlist.is_file()
+        or _sha256(revision_allowlist) != revision_allowlist_file_sha256
+    ):
         raise ExpertEvaluationError(
             "p3_strat_003_input_request_invalid",
             "missing-prior reconstruction source config is unavailable",
@@ -276,12 +297,92 @@ def _missing_prior_reconstruction(
         source_id=source_id,
         ods_source_config=ods_source_config,
         release_config=release_config,
-        original_code_revision=original_code_revision,
+        revision_allowlist=revision_allowlist,
+        revision_allowlist_file_sha256=revision_allowlist_file_sha256,
+        revision_allowlist_semantic_digest=revision_allowlist_semantic_digest,
         maximum_prior_candidates=maximum_prior_candidates,
         maximum_reconstructed_packages=maximum_reconstructed_packages,
         maximum_calendar_scan_days=maximum_calendar_scan_days,
         maximum_source_attempts_per_lane=maximum_source_attempts_per_lane,
     )
+
+
+def _revision_allowlist(
+    reconstruction: _MissingPriorReconstruction,
+) -> dict[str, str]:
+    raw = _object(
+        reconstruction.revision_allowlist,
+        "P3-STRAT-003 DWD revision allowlist",
+    )
+    semantic = raw.get("semantic_digest")
+    payload = {key: value for key, value in raw.items() if key != "semantic_digest"}
+    mapping = raw.get("prefix_to_revision")
+    if (
+        raw.get("schema_version")
+        != "quanthus.p3-strat-003-dwd-revision-allowlist.v1"
+        or raw.get("work_item") != "P3-STRAT-003-B"
+        or raw.get("prefix_uniqueness") is not True
+        or semantic != reconstruction.revision_allowlist_semantic_digest
+        or semantic != digest_value(payload)
+        or not isinstance(mapping, dict)
+        or raw.get("revision_count") != len(mapping)
+    ):
+        raise ExpertEvaluationError(
+            "p3_strat_003_revision_allowlist_invalid",
+            "historical DWD revision allowlist identity differs",
+        )
+    observed: dict[str, str] = {}
+    for prefix, revision in mapping.items():
+        if (
+            not isinstance(prefix, str)
+            or re.fullmatch(r"[0-9a-f]{7}", prefix) is None
+            or not isinstance(revision, str)
+            or re.fullmatch(r"[0-9a-f]{40}", revision) is None
+            or not revision.startswith(prefix)
+        ):
+            raise ExpertEvaluationError(
+                "p3_strat_003_revision_allowlist_invalid",
+                "historical DWD revision mapping contains an invalid entry",
+            )
+        observed[prefix] = revision
+    return observed
+
+
+def _builder_revision_for_package(
+    *,
+    market_date: date,
+    package_id: str,
+    reconstruction: _MissingPriorReconstruction,
+) -> str:
+    matched = re.fullmatch(
+        r"dwd-daily-([0-9]{8})-([0-9a-f]{12})-([0-9a-f]{7})",
+        package_id,
+    )
+    if matched is None:
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_reconstruction_not_authorized",
+            f"child-bound package id is outside the frozen DWD identity shape: {package_id}",
+        )
+    try:
+        encoded_date = datetime.strptime(matched.group(1), "%Y%m%d").date()
+    except ValueError as exc:
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_reconstruction_not_authorized",
+            f"child-bound package date is invalid: {package_id}",
+        ) from exc
+    if encoded_date != market_date:
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_reconstruction_not_authorized",
+            "child-bound package date differs from its manifest binding",
+        )
+    prefix = matched.group(3)
+    revision = _revision_allowlist(reconstruction).get(prefix)
+    if revision is None:
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_reconstruction_revision_not_frozen",
+            prefix,
+        )
+    return revision
 
 
 def _target_release(daily_root: Path, market_date: date) -> ProspectiveDwdRelease:
@@ -577,6 +678,7 @@ def _build_reconstruction_suffix(
     reconstruction: _MissingPriorReconstruction,
     base_root: Path,
     attempt_root: Path,
+    code_revision: str,
 ) -> tuple[_PriorCandidate, tuple[_PriorCandidate, ...], tuple[dict[str, Any], ...]]:
     market_dates = _reconstruction_market_dates(
         reconstruction,
@@ -617,7 +719,7 @@ def _build_reconstruction_suffix(
                 base_root=base_root,
                 release_config=reconstruction.release_config,
                 output=output,
-                code_revision=reconstruction.original_code_revision,
+                code_revision=code_revision,
                 prior_pointer=pointer,
             )
             verified = verify_daily_domain_increment(output)
@@ -648,6 +750,7 @@ def _build_reconstruction_suffix(
                 "package_id": verified.package_id,
                 "manifest_sha256": verified.manifest_sha256,
                 "catalog_digest": catalog.catalog_digest,
+                "code_revision": code_revision,
                 "source_attempts": list(source_inventory),
             }
         )
@@ -674,19 +777,11 @@ def _reconstruct_exact_prior_package(
             "p3_strat_003_prior_reconstruction_not_authorized",
             f"{market_date.isoformat()}:{package_id}",
         )
-    expected_prefix = f"dwd-daily-{market_date.strftime('%Y%m%d')}-"
-    expected_revision_suffix = "-" + reconstruction.original_code_revision[:7]
-    if (
-        not package_id.startswith(expected_prefix)
-        or not package_id.endswith(expected_revision_suffix)
-    ):
-        raise ExpertEvaluationError(
-            "p3_strat_003_prior_reconstruction_not_authorized",
-            (
-                "child-bound package identity is outside the frozen reconstruction "
-                f"family: {package_id}"
-            ),
-        )
+    target_builder_revision = _builder_revision_for_package(
+        market_date=market_date,
+        package_id=package_id,
+        reconstruction=reconstruction,
+    )
 
     cache_root = cache_root.resolve()
     target = cache_root / "packages" / market_date.isoformat() / package_id
@@ -734,6 +829,7 @@ def _reconstruct_exact_prior_package(
                 reconstruction=reconstruction,
                 base_root=base_root,
                 attempt_root=attempt_root,
+                code_revision=target_builder_revision,
             )
         except ExpertEvaluationError as exc:
             if exc.reason_code in {
@@ -761,6 +857,7 @@ def _reconstruct_exact_prior_package(
             "manifest_sha256": manifest_sha256,
             "disposition": "reconstructed_exact_suffix_from_cn01_ods",
             "source_id": reconstruction.source_id,
+            "target_builder_revision": target_builder_revision,
             "anchor_market_date": anchor.market_date.isoformat(),
             "anchor_package_id": anchor.package_id,
             "reconstructed_package_count": len(rebuilt),

@@ -325,7 +325,9 @@ def test_platform_kernel_public_edge_exposes_only_the_web_service() -> None:
     assert 'QUANTHUS_STRUCTURE_ECONOMIC_QUALIFICATION_SEED: "0"' in event_worker
     assert 'QUANTHUS_STRUCTURE_FACTS_QUALIFICATION_SEED: "0"' in event_worker
     assert "quanthus-event-runs:/data/event-runs" in event_worker
-    assert event_worker.count(":ro") == 7
+    assert "/home/ubuntu/.ssh/cn01_ods:/run/secrets/quanthus-cn01-ods-ro:ro" in event_worker
+    assert "QUANTHUS_CN01_ODS_RSYNC_KEY: /run/secrets/quanthus-cn01-ods-ro" in event_worker
+    assert event_worker.count(":ro") == 8
     assert event_shard_worker.count(":ro") == 3
     assert "/dwd-base-202607-v2.1:ro" in event_worker
     assert "correction-20260813-001:ro" in event_worker

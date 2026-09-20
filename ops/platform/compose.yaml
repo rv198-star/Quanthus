@@ -105,6 +105,12 @@ services:
       QUANTHUS_CN01_DWD_KEY: /run/secrets/quanthus-cn01-dwd-ro
       QUANTHUS_CN01_DWD_KNOWN_HOSTS: /run/secrets/quanthus-cn01-known-hosts
       QUANTHUS_CN01_DWD_REMOTE_ROOT: .
+      QUANTHUS_CN01_ODS_RSYNC_KEY: /run/secrets/quanthus-cn01-ods-ro
+      QUANTHUS_CN01_ODS_KNOWN_HOSTS: /run/secrets/quanthus-cn01-known-hosts
+      QUANTHUS_CN01_ODS_RSYNC_HOST: 39.98.85.149
+      QUANTHUS_CN01_ODS_RSYNC_PORT: "22"
+      QUANTHUS_CN01_ODS_RSYNC_USER: root
+      QUANTHUS_CN01_ODS_RELEASE_ROOT: /root/work/astock/data/shadow/cn01-ods-v1/releases
       QUANTHUS_EVENT_SHARD_TARGET: ${QUANTHUS_EVENT_SHARD_TARGET:-0}
       QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED: "0"
       QUANTHUS_STRUCTURE_ECONOMIC_QUALIFICATION_SEED: "0"
@@ -128,6 +134,7 @@ services:
       - /srv/quanthus/reference-data/p4/historical-industry-source-20b51d52070b.json:/srv/quanthus/reference-data/p4/historical-industry-source-20b51d52070b.json:ro
       - /home/ubuntu/data/quanthus/dwd-daily:/data/dwd-daily:ro
       - /home/ubuntu/.ssh/cn01_candidate_ro:/run/secrets/quanthus-cn01-dwd-ro:ro
+      - /home/ubuntu/.ssh/cn01_ods:/run/secrets/quanthus-cn01-ods-ro:ro
       - /home/ubuntu/.ssh/known_hosts_cn01_dual_lane:/run/secrets/quanthus-cn01-known-hosts:ro
       - quanthus-event-runs:/data/event-runs
 

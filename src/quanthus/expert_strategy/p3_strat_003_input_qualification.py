@@ -54,6 +54,7 @@ from quanthus.forward_validation.prospective_source import (
     _build_candidate_projection,
     _verify_seed,
 )
+from quanthus.pipelines.contracts import OdsRelease, OdsReleaseError
 from quanthus.pipelines.ods_handoff import (
     OdsHandoffError,
     load_ods_source_config,
@@ -416,6 +417,24 @@ def _target_release(daily_root: Path, market_date: date) -> ProspectiveDwdReleas
     return candidates[0]
 
 
+_RECONSTRUCTION_ODS_LANES: dict[str, tuple[str, str]] = {
+    "market_daily_core": ("daily", "hermes-market-daily-core-"),
+    "calendar_daily_events": ("daily", "hermes-calendar-daily-events-"),
+    "intraday_1m": ("daily/1m", "hermes-intraday-archive-1m-"),
+    "intraday_5m": ("daily/5m", "hermes-intraday-archive-5m-"),
+}
+
+
+@dataclass(frozen=True)
+class _SelectedOdsRelease:
+    lane: str
+    schedule_path: str
+    attempt_id: str
+    release_id: str
+    created_at: datetime
+    manifest_sha256: str
+
+
 @dataclass(frozen=True)
 class _PriorCandidate:
     root: Path
@@ -534,80 +553,192 @@ def _reconstruction_market_dates(
     return tuple(dates)
 
 
+def _reconstruction_lane(schedule_path: str, release_id: str) -> str | None:
+    for lane, (expected_schedule, prefix) in _RECONSTRUCTION_ODS_LANES.items():
+        if schedule_path == expected_schedule and release_id.startswith(prefix):
+            return lane
+    return None
+
+
+def _probe_reconstruction_release(
+    source: Any,
+    *,
+    schedule_path: str,
+    market_date: date,
+    attempt_id: str,
+    metadata_root: Path,
+) -> _SelectedOdsRelease | None:
+    market_text = market_date.isoformat()
+    target = metadata_root.joinpath(
+        *schedule_path.split("/"),
+        market_text,
+        attempt_id,
+    )
+    target.mkdir(parents=True, exist_ok=True)
+    remote_root = (
+        f"{source.release_root}/{schedule_path}/{market_text}/{attempt_id}"
+    )
+    for filename in ("release.json", "READY"):
+        try:
+            completed = _ods_rsync(
+                source,
+                "-a",
+                "--timeout=20",
+                _ods_remote(source, f"{remote_root}/{filename}"),
+                str(target / filename),
+                timeout_seconds=30,
+            )
+        except subprocess.TimeoutExpired:
+            return None
+        if completed.returncode:
+            return None
+    manifest = target / "release.json"
+    try:
+        ready = (target / "READY").read_text(encoding="ascii").strip()
+        if ready != _sha256(manifest):
+            return None
+        release = OdsRelease.load(manifest)
+    except (OSError, OdsReleaseError):
+        return None
+    if release.schedule != "daily" or release.market_date != market_date:
+        return None
+    lane = _reconstruction_lane(schedule_path, release.release_id)
+    if lane is None:
+        return None
+    return _SelectedOdsRelease(
+        lane=lane,
+        schedule_path=schedule_path,
+        attempt_id=attempt_id,
+        release_id=release.release_id,
+        created_at=release.created_at,
+        manifest_sha256=_sha256(manifest),
+    )
+
+
+def _select_reconstruction_ods_releases(
+    reconstruction: _MissingPriorReconstruction,
+    *,
+    market_date: date,
+    metadata_root: Path,
+) -> tuple[Any, tuple[_SelectedOdsRelease, ...]]:
+    source = _resolved_reconstruction_ods_source(reconstruction)
+    selected: dict[str, _SelectedOdsRelease] = {}
+    market_text = market_date.isoformat()
+    for schedule_path in sorted(
+        {value[0] for value in _RECONSTRUCTION_ODS_LANES.values()}
+    ):
+        try:
+            attempts = _ods_attempt_directories(
+                source,
+                schedule=schedule_path,
+                market_date=market_text,
+            )
+        except (OdsHandoffError, subprocess.TimeoutExpired) as exc:
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_reconstruction_source_failed",
+                f"{schedule_path}: {exc}",
+            ) from exc
+        if not attempts:
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_reconstruction_source_missing",
+                f"no ODS attempts for {schedule_path}/{market_text}",
+            )
+        if len(attempts) > reconstruction.maximum_source_attempts_per_lane:
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_reconstruction_source_budget",
+                f"{schedule_path} has {len(attempts)} attempts",
+            )
+        for attempt_id in attempts:
+            candidate = _probe_reconstruction_release(
+                source,
+                schedule_path=schedule_path,
+                market_date=market_date,
+                attempt_id=attempt_id,
+                metadata_root=metadata_root,
+            )
+            if candidate is None:
+                continue
+            current = selected.get(candidate.lane)
+            if current is None or (
+                candidate.created_at,
+                candidate.release_id,
+                candidate.attempt_id,
+            ) > (
+                current.created_at,
+                current.release_id,
+                current.attempt_id,
+            ):
+                selected[candidate.lane] = candidate
+    missing = set(_RECONSTRUCTION_ODS_LANES) - set(selected)
+    if missing:
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_reconstruction_source_missing",
+            "missing READY ODS lanes: " + ",".join(sorted(missing)),
+        )
+    return source, tuple(selected[lane] for lane in sorted(selected))
+
+
 def _pull_reconstruction_ods(
     reconstruction: _MissingPriorReconstruction,
     *,
     market_date: date,
     output_root: Path,
 ) -> tuple[Path, tuple[dict[str, Any], ...]]:
-    source = _resolved_reconstruction_ods_source(reconstruction)
-    release_root = output_root.resolve() / "ods-releases"
+    output_root = output_root.resolve()
+    source, selected = _select_reconstruction_ods_releases(
+        reconstruction,
+        market_date=market_date,
+        metadata_root=output_root / "ods-metadata",
+    )
+    release_root = output_root / "ods-releases"
     release_root.mkdir(parents=True, exist_ok=True)
     inventory: list[dict[str, Any]] = []
     market_text = market_date.isoformat()
-    for schedule in ("daily", "daily/1m", "daily/5m"):
+    for release in selected:
+        destination = release_root.joinpath(
+            *release.schedule_path.split("/"),
+            market_text,
+            release.attempt_id,
+        )
+        destination.mkdir(parents=True, exist_ok=True)
+        remote = (
+            f"{source.release_root}/{release.schedule_path}/{market_text}/"
+            f"{release.attempt_id}/"
+        )
         try:
-            attempts = _ods_attempt_directories(
+            completed = _ods_rsync(
                 source,
-                schedule=schedule,
-                market_date=market_text,
+                "-a",
+                "--checksum",
+                "--delay-updates",
+                "--partial-dir=.rsync-partial",
+                "--timeout=300",
+                _ods_remote(source, remote),
+                f"{destination}/",
+                timeout_seconds=330,
             )
-        except (OdsHandoffError, subprocess.TimeoutExpired) as exc:
+        except subprocess.TimeoutExpired as exc:
             raise ExpertEvaluationError(
                 "p3_strat_003_prior_reconstruction_source_failed",
-                f"{schedule}: {exc}",
+                f"{release.lane}/{release.attempt_id}: timeout",
             ) from exc
-        if not attempts:
+        if completed.returncode:
+            detail = " ".join((completed.stderr or completed.stdout).split())
             raise ExpertEvaluationError(
-                "p3_strat_003_prior_reconstruction_source_missing",
-                f"no ODS attempts for {schedule}/{market_text}",
+                "p3_strat_003_prior_reconstruction_source_failed",
+                f"{release.lane}/{release.attempt_id}: {detail[-900:]}",
             )
-        if len(attempts) > reconstruction.maximum_source_attempts_per_lane:
-            raise ExpertEvaluationError(
-                "p3_strat_003_prior_reconstruction_source_budget",
-                f"{schedule} has {len(attempts)} attempts",
-            )
-        for attempt_id in attempts:
-            destination = release_root.joinpath(
-                *schedule.split("/"),
-                market_text,
-                attempt_id,
-            )
-            destination.mkdir(parents=True, exist_ok=True)
-            remote = (
-                f"{source.release_root}/{schedule}/{market_text}/{attempt_id}/"
-            )
-            try:
-                completed = _ods_rsync(
-                    source,
-                    "-a",
-                    "--checksum",
-                    "--delay-updates",
-                    "--partial-dir=.rsync-partial",
-                    "--timeout=300",
-                    _ods_remote(source, remote),
-                    f"{destination}/",
-                    timeout_seconds=330,
-                )
-            except subprocess.TimeoutExpired as exc:
-                raise ExpertEvaluationError(
-                    "p3_strat_003_prior_reconstruction_source_failed",
-                    f"{schedule}/{attempt_id}: timeout",
-                ) from exc
-            if completed.returncode:
-                detail = " ".join((completed.stderr or completed.stdout).split())
-                raise ExpertEvaluationError(
-                    "p3_strat_003_prior_reconstruction_source_failed",
-                    f"{schedule}/{attempt_id}: {detail[-900:]}",
-                )
-            inventory.append(
-                {
-                    "market_date": market_text,
-                    "schedule": schedule,
-                    "attempt_id": attempt_id,
-                    "disposition": "copied_job_local_read_only_source",
-                }
-            )
+        inventory.append(
+            {
+                "market_date": market_text,
+                "lane": release.lane,
+                "schedule": release.schedule_path,
+                "attempt_id": release.attempt_id,
+                "release_id": release.release_id,
+                "manifest_sha256": release.manifest_sha256,
+                "disposition": "selected_ready_release_copied_job_local",
+            }
+        )
     return release_root, tuple(inventory)
 
 

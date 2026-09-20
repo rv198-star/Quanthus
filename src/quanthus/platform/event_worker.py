@@ -298,8 +298,7 @@ def _seed_structure_mvp_qualification_jobs(
     return tuple(jobs)
 
 
-
-[1643 more lines in file. Use offset=301 to continue.]def _seed_structure_economic_qualification_jobs(
+def _seed_structure_economic_qualification_jobs(
     store: PlatformStore,
     *,
     enabled_value: str,
@@ -599,8 +598,7 @@ def _verify_structure_economic_artifact(
         or manifest.get("schema_version")
         != "quanthus.structure-economic-artifact-manifest.v1"
         or manifest.get("research_only") is not True
-
-[1343 more lines in file. Use offset=601 to continue.]        or manifest.get("execution_authorized") is not False
+        or manifest.get("execution_authorized") is not False
         or manifest.get("code_revision") != code_revision
         or manifest.get("request_digest") != request_digest
     ):
@@ -900,8 +898,7 @@ def _verify_label_corpus(root: Path) -> LabelCorpusEnvelope:
             sys.executable,
             "-m",
             "quanthus",
-
-[1043 more lines in file. Use offset=901 to continue.]            "verify-p4-label-corpus",
+            "verify-p4-label-corpus",
             "--root",
             str(root),
         ),
@@ -1201,8 +1198,7 @@ def _validate_run_directory(
         )
         report_manifest = json.loads(
             (path / "comparison-report" / "manifest.json").read_text(encoding="utf-8")
-
-[743 more lines in file. Use offset=1201 to continue.]        )
+        )
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("event_label_or_report_manifest_unreadable") from exc
     expected = {
@@ -1502,8 +1498,7 @@ class EventWorker:
             module,
             "--request",
             governed["run_config"],
-
-[443 more lines in file. Use offset=1501 to continue.]            "--output",
+            "--output",
             str(artifact_root),
             "--code-revision",
             governed["code_revision"],
@@ -1803,8 +1798,7 @@ class EventWorker:
             + label_result.neutral_events
             + label_result.failure_events
         )
-
-[143 more lines in file. Use offset=1801 to continue.]        if report_result.three_class_events != three_class_events:
+        if report_result.three_class_events != three_class_events:
             raise RuntimeError("comparison_report_three_class_count_mismatch")
         run_manifest = {
             "schema_version": RUN_SCHEMA,
@@ -1946,5 +1940,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-[1 more lines in file. Use offset=1943 to continue.]

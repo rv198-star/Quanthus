@@ -62,11 +62,12 @@
     "current_builder_blob": "2bbd524d9a3ced9160c06cb3228f52723536ff45",
     "only_builder_change_after_historical_revision": "9ca913554e59b048d0533b622076bc92c5cfd65c",
     "compatibility_class": "audit_only_financial_disclosure_accounting_when_empty",
+    "source_identity_rule": "selected_cn01_release_self_verified",
+    "cross_source_physical_sha256_required": false,
     "required_ods_artifact": {
       "lane": "calendar_daily_events",
       "name": "financial_disclosures_delta",
-      "row_count": 0,
-      "sha256": "sha256:2a5ef549b95c6870fef4e44262e1575b80da0108b6d9aaea78ffa45bee3ace44"
+      "row_count": 0
     }
   },
   "boundaries": {

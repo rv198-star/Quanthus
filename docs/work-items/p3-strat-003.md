@@ -93,8 +93,11 @@ not required when the consumer payload is exact.
 The missing 2026-08-27 boundary is admitted only if its child-bound original package identity,
 current ODS catalog prefix, and the frozen audit-only compatibility precondition all agree. The
 compatibility precondition is limited to the known `f8f8330` -> `9ca9135` daily-domain change and
-requires the `financial_disclosures_delta` source artifact to be exactly empty as frozen before the
-probe. This is a bounded compatibility proof, not a generic historical-Git executor.
+requires the `financial_disclosures_delta` artifact in the actually selected CN01 release to have
+exactly zero rows. The selected CN01 release and artifact bytes remain self-verified through
+READY/manifest/size/SHA checks and the observed artifact SHA is recorded as evidence, but a physical
+SHA copied from another source such as Hermes is not a cross-source prerequisite. This is a bounded
+compatibility proof, not a generic historical-Git executor.
 
 If either overlap sentinel differs at the consumer-payload level, if the missing-boundary source
 precondition differs, or if proving equivalence requires materially broader historical-execution
@@ -103,21 +106,28 @@ be shortened and no D result may be read to repair the input path.
 
 ### Current recovery checkpoint
 
-Last verified after the B protocol correction:
+Last verified after the first real semantic-equivalence probe:
 
 - GitHub #319 is open and remains unaccepted.
-- PR #397 is open from base `5a8cb3b7eac99531629b8bf6fe5ea24c92474e14`; its current head is
-  `fa6ecdfde4c2cca46ff88a727805ed610ce3ceac`.
-- The probe-only implementation/config/event-worker route and focused tests are present in that PR.
-- No real semantic-equivalence probe Job, corrected full-B qualification, D result-bearing run, or
-  P6 mutation has occurred.
+- PR #397 merged as `07af498ea9ba77a3c8033fe168668a2b159bad96`; production event-worker
+  runs `quanthus-event:git-07af498` while the P6 replay-worker remains frozen at `git-6cb72eb`.
+- The first governed probe Job `job_895ce99fa1c043eca6efb09ddfdcc271` failed before any
+  strategy/economic result with
+  `p3_strat_003_semantic_probe_boundary_artifact_mismatch: financial_disclosures_delta`.
+- Root-cause review classified that failure as a probe-config provenance defect: the fixed physical
+  SHA had been observed on Hermes, while the governed reconstruction source is CN01. The semantic
+  compatibility requirement is zero rows in the selected CN01 artifact; CN01 release/artifact bytes
+  remain internally checksum-verified and the observed SHA is recorded.
+- A single bounded source-local repair/recovery is authorized with unchanged consumer-payload
+  equivalence semantics. No corrected full-B qualification, D result-bearing run, or P6 mutation
+  has occurred.
 
-Resume order after interruption: verify live #319/#397/main state; review/merge #397 if its scope
-still matches this contract; deploy event-worker only; run exactly one governed semantic-equivalence
-probe; preserve any failure. A passing probe permits completing and independently reviewing the
-corrected B manifest, not skipping directly to D. A failing probe either receives a bounded
-implementation repair with unchanged equivalence semantics or closes B for insufficient admissible
-historical input evidence.
+Resume order after interruption: verify live #319/main/current repair branch or PR; finish only this
+source-local probe repair; deploy event-worker only; run one recovery semantic-equivalence probe and
+preserve its result. A passing recovery permits completing and independently reviewing the corrected
+B manifest, not skipping directly to D. A payload-level mismatch, semantic-precondition failure, or
+second unrelated probe-design failure closes B for insufficient admissible historical input evidence
+rather than starting another retry sequence.
 
 This checkpoint is operational status, not authority. Frozen config, immutable artifacts and live
 Git/GitHub state take precedence if it becomes stale.

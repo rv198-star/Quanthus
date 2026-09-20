@@ -101,6 +101,27 @@ precondition differs, or if proving equivalence requires materially broader hist
 infrastructure, B closes as insufficient admissible historical input evidence. The window must not
 be shortened and no D result may be read to repair the input path.
 
+### Current recovery checkpoint
+
+Last verified after the B protocol correction:
+
+- GitHub #319 is open and remains unaccepted.
+- PR #397 is open from base `5a8cb3b7eac99531629b8bf6fe5ea24c92474e14`; its current head is
+  `fa6ecdfde4c2cca46ff88a727805ed610ce3ceac`.
+- The probe-only implementation/config/event-worker route and focused tests are present in that PR.
+- No real semantic-equivalence probe Job, corrected full-B qualification, D result-bearing run, or
+  P6 mutation has occurred.
+
+Resume order after interruption: verify live #319/#397/main state; review/merge #397 if its scope
+still matches this contract; deploy event-worker only; run exactly one governed semantic-equivalence
+probe; preserve any failure. A passing probe permits completing and independently reviewing the
+corrected B manifest, not skipping directly to D. A failing probe either receives a bounded
+implementation repair with unchanged equivalence semantics or closes B for insufficient admissible
+historical input evidence.
+
+This checkpoint is operational status, not authority. Frozen config, immutable artifacts and live
+Git/GitHub state take precedence if it becomes stale.
+
 ## Evidence and decision rules
 
 The headline claim has two separate support surfaces rather than one universal score:

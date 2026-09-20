@@ -24,6 +24,9 @@ from typing import Any
 from quanthus.expert_strategy.p3_strat_003_input_qualification import (
     verify_p3_strat_003_input_artifact,
 )
+from quanthus.expert_strategy.p3_strat_003_semantic_equivalence import (
+    verify_semantic_equivalence_probe_artifact,
+)
 from quanthus.expert_strategy.stage_semantic_consumption import (
     verify_stage_expert_consumption_artifact,
 )
@@ -71,6 +74,9 @@ _STRUCTURE_F9_RUN_CONFIG = "config/structure-f9-run.development.v1.json"
 _TREND_EVOLUTION_RUN_CONFIG = "config/structure-trend-evolution-qualification.v1.json"
 _STRUCTURE_ORDER_RUN_CONFIG = "config/structure-order-qualification.v1.json"
 _P3_STRAT_003_INPUT_RUN_CONFIG = "config/research/p3-strat-003/input-qualification.v1.json"
+_P3_STRAT_003_SEMANTIC_PROBE_RUN_CONFIG = (
+    "config/research/p3-strat-003/semantic-equivalence-probe.v1.json"
+)
 _STRUCTURE_RUN_CONFIGS = frozenset(
     {
         _STRUCTURE_MVP_RUN_CONFIG,
@@ -85,6 +91,7 @@ _STRUCTURE_RUN_CONFIGS = frozenset(
         _TREND_EVOLUTION_RUN_CONFIG,
         _STRUCTURE_ORDER_RUN_CONFIG,
         _P3_STRAT_003_INPUT_RUN_CONFIG,
+        _P3_STRAT_003_SEMANTIC_PROBE_RUN_CONFIG,
         _REFERENCE_FEASIBILITY_CONFIG,
     }
 )
@@ -452,6 +459,9 @@ def _structure_request_digest(run_config: str) -> str:
         _TREND_EVOLUTION_RUN_CONFIG: "quanthus.trend-evolution-qualification.v1",
         _STRUCTURE_ORDER_RUN_CONFIG: "quanthus.structure-order-qualification.v1",
         _P3_STRAT_003_INPUT_RUN_CONFIG: "quanthus.p3-strat-003-input-qualification.v1",
+        _P3_STRAT_003_SEMANTIC_PROBE_RUN_CONFIG: (
+            "quanthus.p3-strat-003-semantic-equivalence-probe.v1"
+        ),
         _REFERENCE_FEASIBILITY_CONFIG: "quanthus.stage-order-reference-feasibility.v1",
     }[run_config]
     if not isinstance(raw, dict) or raw.get("schema_version") != expected_schema:
@@ -1337,6 +1347,13 @@ class EventWorker:
             running_stage = "running-p3-strat-003-input-qualification"
             validating_stage = "validating-p3-strat-003-input"
             recovering_stage = "recovering-sealed-p3-strat-003-input"
+        elif run_config == _P3_STRAT_003_SEMANTIC_PROBE_RUN_CONFIG:
+            verifier = verify_semantic_equivalence_probe_artifact
+            module = "quanthus.expert_strategy.p3_strat_003_semantic_equivalence"
+            artifact_name = "p3-strat-003-semantic-equivalence"
+            running_stage = "running-p3-strat-003-semantic-equivalence"
+            validating_stage = "validating-p3-strat-003-semantic-equivalence"
+            recovering_stage = "recovering-sealed-p3-strat-003-semantic-equivalence"
         elif run_config == _REFERENCE_FEASIBILITY_CONFIG:
             verifier = partial(verify_feasibility_artifact, job_input=governed)
             module = "quanthus.stage_learning.order_reference_feasibility"

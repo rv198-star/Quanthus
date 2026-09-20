@@ -1,0 +1,80 @@
+{
+  "schema_version": "quanthus.p3-strat-003-semantic-equivalence-probe.v1",
+  "work_item": "P3-STRAT-003-B",
+  "state": "FROZEN_PRE_RESULT_INPUT_ONLY",
+  "request": {
+    "path": "config/research/p3-strat-003/request.v1.json",
+    "semantic_digest": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde",
+    "file_sha256": "sha256:e1234e80857e012e2d125babba15fd4d0985cd0b38402d5737db0470d6be7c3b"
+  },
+  "source_runtime": {
+    "path": "config/forward-validation/activation/p6-prospective-runtime.v1.json",
+    "file_sha256": "sha256:b8935da7f639d67632de3aef66be50082b59dc3a1d0281f694ea121954d919ce",
+    "p6_authority_inherited": false
+  },
+  "legacy_transport_contract": {
+    "path": "config/research/p3-strat-003/input-qualification.v1.json",
+    "file_sha256": "sha256:78dbc83236f49dbffcd87a7470aad2595b87e7d0acc7308a3ac3665c63306c96",
+    "usage": "transport_and_resource_limits_only",
+    "exact_manifest_reconstruction_semantics_inherited": false
+  },
+  "runtime_implementation": {
+    "daily_domain": {
+      "path": "src/quanthus/pipelines/securities_warehouse/daily_domain.py",
+      "file_sha256": "sha256:9dd94a250782a259701a030cb9a1b6a6e2591ad382ec12bf478fe3b609a06368"
+    },
+    "daily_ods_catalog": {
+      "path": "src/quanthus/pipelines/securities_warehouse/daily_ods_catalog.py",
+      "file_sha256": "sha256:fad9ffe15d254757f19d55132dd89a26ae1911c20d258bc6b343164527373290"
+    }
+  },
+  "consumer_payload": {
+    "tables": [
+      "dwd_security_bar",
+      "dwd_tradability_state",
+      "dwd_trading_calendar"
+    ],
+    "equality": "exact_declared_payload_file_sha256_size_and_row_count",
+    "manifest_byte_equality_required": false,
+    "audit_json_equality_required": false,
+    "package_id_equality_required": false
+  },
+  "sentinels": [
+    {
+      "sentinel_id": "pre_builder_change_overlap",
+      "selection": "latest_verified_original_prior_child_pair",
+      "date_start": "2026-08-01",
+      "date_end": "2026-08-26",
+      "required_package_count": 2
+    },
+    {
+      "sentinel_id": "post_builder_change_overlap",
+      "selection": "latest_verified_original_prior_child_pair",
+      "date_start": "2026-09-01",
+      "date_end": "2026-09-10",
+      "required_package_count": 2
+    }
+  ],
+  "missing_boundary": {
+    "market_date": "2026-08-27",
+    "historical_builder_revision": "f8f83309e11815f37212fa87163ceccdaae3e0b4",
+    "historical_builder_blob": "d7ebc97b8559bb39957983dd8f1d6da83dcd6b65",
+    "current_builder_blob": "2bbd524d9a3ced9160c06cb3228f52723536ff45",
+    "only_builder_change_after_historical_revision": "9ca913554e59b048d0533b622076bc92c5cfd65c",
+    "compatibility_class": "audit_only_financial_disclosure_accounting_when_empty",
+    "required_ods_artifact": {
+      "lane": "calendar_daily_events",
+      "name": "financial_disclosures_delta",
+      "row_count": 0,
+      "sha256": "sha256:2a5ef549b95c6870fef4e44262e1575b80da0108b6d9aaea78ffa45bee3ace44"
+    }
+  },
+  "boundaries": {
+    "strategy_or_economic_results": false,
+    "target_outcome_labels": false,
+    "candidate_scoring": false,
+    "mutate_daily_current": false,
+    "mutate_p6": false,
+    "job_local_output_only": true
+  }
+}

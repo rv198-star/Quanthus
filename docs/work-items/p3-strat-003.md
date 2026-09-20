@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | A, C and C-R1 accepted; B / #319 ready; D blocked by B; E blocked by D |
+| Delivery gate | A, C and C-R1 accepted; B / #319 reopened for pre-result input-protocol correction; D blocked by B; E blocked by D |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |
@@ -66,6 +66,61 @@ The result-bearing windows are frozen before any P3-STRAT-003 result read:
 Open positions at the final admitted close are marked to market without forced liquidation.
 Unmatured targets remain pending and are excluded from settled expert-quality denominators. D does
 not wait for future sessions solely to make the end of the historical window look mature.
+
+### B pre-result reconstruction correction
+
+B remains an input-only gate. The failed exact-manifest recovery attempts are retained as evidence
+and are not reclassified as accepted input. R9 proved that the recovery path resolved a historical
+builder revision from the original package id but still executed the current daily-domain builder,
+so matching the old package id did not reproduce the old manifest bytes. That mechanism is no
+longer an admissible route to B acceptance.
+
+The replacement path separates two identities:
+
+- **original historical package identity** remains immutable evidence and is never rewritten or
+  claimed to have been reproduced when its bytes are unavailable;
+- **research reconstruction identity** is a new, result-blind materialization from exact immutable
+  ODS/Base inputs under a frozen reconstruction implementation.
+
+Before a research reconstruction may feed B, an outcome-blind equivalence probe must pass over the
+exact daily payload consumed by the existing recent-history effective-view builder:
+`dwd_security_bar`, `dwd_tradability_state`, and `dwd_trading_calendar`. Existing original packages
+on both sides of the known builder-change boundary are overlap sentinels: the reconstructed and
+original consumer payload file checksums, sizes, and row counts must match exactly. Manifest,
+package-id, and audit-only byte equality are not substitutes for that payload comparison and are
+not required when the consumer payload is exact.
+
+The missing 2026-08-27 boundary is admitted only if its child-bound original package identity,
+current ODS catalog prefix, and the frozen audit-only compatibility precondition all agree. The
+compatibility precondition is limited to the known `f8f8330` -> `9ca9135` daily-domain change and
+requires the `financial_disclosures_delta` source artifact to be exactly empty as frozen before the
+probe. This is a bounded compatibility proof, not a generic historical-Git executor.
+
+If either overlap sentinel differs at the consumer-payload level, if the missing-boundary source
+precondition differs, or if proving equivalence requires materially broader historical-execution
+infrastructure, B closes as insufficient admissible historical input evidence. The window must not
+be shortened and no D result may be read to repair the input path.
+
+### Current recovery checkpoint
+
+Last verified after the B protocol correction:
+
+- GitHub #319 is open and remains unaccepted.
+- PR #397 is open from base `5a8cb3b7eac99531629b8bf6fe5ea24c92474e14`; its current head is
+  `fa6ecdfde4c2cca46ff88a727805ed610ce3ceac`.
+- The probe-only implementation/config/event-worker route and focused tests are present in that PR.
+- No real semantic-equivalence probe Job, corrected full-B qualification, D result-bearing run, or
+  P6 mutation has occurred.
+
+Resume order after interruption: verify live #319/#397/main state; review/merge #397 if its scope
+still matches this contract; deploy event-worker only; run exactly one governed semantic-equivalence
+probe; preserve any failure. A passing probe permits completing and independently reviewing the
+corrected B manifest, not skipping directly to D. A failing probe either receives a bounded
+implementation repair with unchanged equivalence semantics or closes B for insufficient admissible
+historical input evidence.
+
+This checkpoint is operational status, not authority. Frozen config, immutable artifacts and live
+Git/GitHub state take precedence if it becomes stale.
 
 ## Evidence and decision rules
 

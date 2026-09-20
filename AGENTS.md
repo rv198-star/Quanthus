@@ -24,6 +24,25 @@
 - The operator-assisted two-window profile, forward email transport, the full expert set, and the
   training layer remain blocked by their explicit phase and activation gates.
 
+## Current active task routing — P3-STRAT-003
+
+- Active line: `P3-STRAT-003` / #317. Current gate: `B` / #319 input qualification.
+- Purpose: compare existing Trend + Position Risk against a non-empty deterministic P4 baseline
+  while P6 continues independently; P6 is not a predecessor and must not be mutated.
+- Dependency state: A / #318 accepted; C / #320 accepted; C-R1 / #385 accepted; B active and not
+  accepted; D / #321 blocked by B; E / #322 blocked by D.
+- Before working on this line, read `docs/work-items/p3-strat-003.md`. For interrupted-session
+  recovery, start with its `Current recovery checkpoint`, then expand only the sections needed for
+  the task at hand.
+- Frozen authority lives in `config/research/p3-strat-003/request.v1.json`; live issue/PR status
+  must be verified rather than trusted from cached prose.
+- Hard boundaries: no 2025/2026 strategy/economic result read before D; no cutoff roll-forward or
+  window shrink; no rerun of accepted A/C/C-R1 as new progress; no resurrection of the stopped
+  exact-manifest retry sequence; no generic historical-execution platform without separate
+  authority; no P6 production mutation.
+- Negative, inconclusive, or unavailable historical evidence is a valid outcome. A green transport
+  or unit test is not B acceptance.
+
 ## Development
 
 - Support Python 3.10 or newer.

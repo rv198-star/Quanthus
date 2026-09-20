@@ -410,6 +410,132 @@ def test_child_bound_package_resolves_pre_result_historical_builder_revision() -
         )
 
 
+def test_reconstruction_selects_only_latest_ready_release_for_each_lane(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reconstruction = _missing_prior_reconstruction(_request(CONFIG), project=ROOT)
+    source = SimpleNamespace(release_root="/remote/releases")
+    monkeypatch.setattr(
+        input_qualification,
+        "_resolved_reconstruction_ods_source",
+        lambda _reconstruction: source,
+    )
+    attempts = {
+        "daily": ["market-old", "events-old", "market-new", "events-new", "junk"],
+        "daily/1m": ["1m-old", "1m-new"],
+        "daily/5m": ["5m-old", "5m-new"],
+    }
+    monkeypatch.setattr(
+        input_qualification,
+        "_ods_attempt_directories",
+        lambda _source, *, schedule, market_date: attempts[schedule],
+    )
+    created = {
+        "market-old": (1, "market_daily_core", "hermes-market-daily-core-old"),
+        "market-new": (5, "market_daily_core", "hermes-market-daily-core-new"),
+        "events-old": (2, "calendar_daily_events", "hermes-calendar-daily-events-old"),
+        "events-new": (6, "calendar_daily_events", "hermes-calendar-daily-events-new"),
+        "1m-old": (3, "intraday_1m", "hermes-intraday-archive-1m-old"),
+        "1m-new": (7, "intraday_1m", "hermes-intraday-archive-1m-new"),
+        "5m-old": (4, "intraday_5m", "hermes-intraday-archive-5m-old"),
+        "5m-new": (8, "intraday_5m", "hermes-intraday-archive-5m-new"),
+    }
+
+    def probe(
+        _source: object,
+        *,
+        schedule_path: str,
+        market_date: date,
+        attempt_id: str,
+        metadata_root: Path,
+    ) -> object:
+        del market_date, metadata_root
+        value = created.get(attempt_id)
+        if value is None:
+            return None
+        order, lane, release_id = value
+        return input_qualification._SelectedOdsRelease(
+            lane=lane,
+            schedule_path=schedule_path,
+            attempt_id=attempt_id,
+            release_id=release_id,
+            created_at=datetime(2026, 9, 17, 10, order, tzinfo=timezone.utc),
+            manifest_sha256="sha256:" + f"{order:x}" * 64,
+        )
+
+    monkeypatch.setattr(input_qualification, "_probe_reconstruction_release", probe)
+    _, selected = input_qualification._select_reconstruction_ods_releases(
+        reconstruction,
+        market_date=date(2026, 9, 17),
+        metadata_root=tmp_path / "metadata",
+    )
+
+    assert {item.lane: item.attempt_id for item in selected} == {
+        "calendar_daily_events": "events-new",
+        "intraday_1m": "1m-new",
+        "intraday_5m": "5m-new",
+        "market_daily_core": "market-new",
+    }
+
+
+def test_reconstruction_pull_copies_exactly_four_selected_releases(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reconstruction = _missing_prior_reconstruction(_request(CONFIG), project=ROOT)
+    source = SimpleNamespace(
+        release_root="/remote/releases",
+        user="readonly",
+        host="cn01.example",
+    )
+    selected = tuple(
+        input_qualification._SelectedOdsRelease(
+            lane=lane,
+            schedule_path=schedule,
+            attempt_id=f"{lane}-attempt",
+            release_id=f"{prefix}selected",
+            created_at=datetime(2026, 9, 17, 12, 0, tzinfo=timezone.utc),
+            manifest_sha256="sha256:" + str(index) * 64,
+        )
+        for index, (lane, (schedule, prefix)) in enumerate(
+            sorted(input_qualification._RECONSTRUCTION_ODS_LANES.items()),
+            start=1,
+        )
+    )
+    monkeypatch.setattr(
+        input_qualification,
+        "_select_reconstruction_ods_releases",
+        lambda *_args, **_kwargs: (source, selected),
+    )
+    transfers: list[str] = []
+
+    def fake_rsync(
+        _source: object,
+        *arguments: str,
+        timeout_seconds: int,
+    ) -> SimpleNamespace:
+        del timeout_seconds
+        transfers.append(arguments[-2])
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+    monkeypatch.setattr(input_qualification, "_ods_rsync", fake_rsync)
+
+    _, inventory = input_qualification._pull_reconstruction_ods(
+        reconstruction,
+        market_date=date(2026, 9, 17),
+        output_root=tmp_path / "pull",
+    )
+
+    assert len(transfers) == 4
+    assert len(inventory) == 4
+    assert {item["lane"] for item in inventory} == set(
+        input_qualification._RECONSTRUCTION_ODS_LANES
+    )
+    assert all(
+        item["disposition"] == "selected_ready_release_copied_job_local"
+        for item in inventory
+    )
+
+
 def test_suffix_reconstruction_publishes_only_after_exact_child_binding_and_keeps_current(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -120,9 +120,9 @@ Last verified on 2026-09-22 after opening the bounded B-R1 successor:
   Its negative evidence is immutable and is not reopened or rewritten as PASS.
 - `P3-STRAT-003-B-R1` / #412 is the only active B continuation. It is a bounded input-source
   correction and coverage diagnosis, not a new historical platform or a reset of B.
-- Draft PR #413 contains the result-blind industry-coverage inspection. Its latest reviewed head at
-  this checkpoint is `f4568f45488484dad5d62ecbfc6a3b38c77d41bd`; live PR state must still be
-  verified before execution. The frozen inspection request digest is
+- PR #413 is merged. The result-blind industry-coverage inspection is published on main at
+  `cb5065dfb6d5f38d2ebf3c2a8d7b7c1d4cc56635`. PR #414 is also merged and makes NexusAgent-only
+  routing project governance. The frozen inspection request digest is
   `sha256:3262e61bf8cfab5e58f049a5215dedce319ec71c6d2ec2a6855e43562364d57c`.
 - The inspection is allowed to read only the retained failed-B candidate identity/date columns and
   sealed industry-source evidence. It must keep the historical `10259` missing candidate-event
@@ -145,10 +145,10 @@ Last verified on 2026-09-22 after opening the bounded B-R1 successor:
   executed. That limitation is about the conversation's execution channel, not evidence that
   Quanthus or its nodes are offline.
 
-Resume by verifying live #412/#413 state and the exact PR head. When NexusAgent is available, run
-the project checks on the exact reviewed head; only if they pass may the Event Worker be deployed
-through NexusAgent and exactly one frozen industry-inspection Job be submitted. Interpret its sealed
-disposition before deciding whether B-R1 may proceed to a source-binding closure.
+Resume by verifying live #412 and current main. When NexusAgent is available, run the project checks
+on main `cb5065dfb6d5f38d2ebf3c2a8d7b7c1d4cc56635`; only if they pass may the Event Worker be
+deployed through NexusAgent and exactly one frozen industry-inspection Job be submitted. Interpret
+its sealed disposition before deciding whether B-R1 may proceed to a source-binding closure.
 
 Do not repeat A/C/C-R1, #409/#410, the semantic probe, or the failed formal B job. Do not replace the
 frozen industry SHA in place, drop unmapped candidates, lower the coverage gate, shrink the window,

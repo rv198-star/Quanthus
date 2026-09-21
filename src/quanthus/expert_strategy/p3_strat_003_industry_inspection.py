@@ -371,13 +371,42 @@ def _p4_reference(
 
         historical_reference = adm_policy.get("historical_industry_reference")
         supplement = source_receipt.get("historical_supplement")
+        source_receipt_digest = source_receipt.get("content_digest")
+        source_receipt_payload = {
+            key: value
+            for key, value in source_receipt.items()
+            if key != "content_digest"
+        }
+        supplement_digest = (
+            supplement.get("content_digest")
+            if isinstance(supplement, dict)
+            else None
+        )
+        supplement_payload = (
+            {
+                key: value
+                for key, value in supplement.items()
+                if key != "content_digest"
+            }
+            if isinstance(supplement, dict)
+            else {}
+        )
+        dwd_base = adm_manifest.get("dwd_base")
         if (
             source_receipt.get("schema_version")
             != "quanthus.p4-adm-static-industry-receipt.v1"
             or not isinstance(historical_reference, dict)
             or not isinstance(supplement, dict)
-            or supplement.get("content_digest")
+            or not isinstance(dwd_base, dict)
+            or not isinstance(source_receipt_digest, str)
+            or source_receipt_digest != digest_value(source_receipt_payload)
+            or not isinstance(supplement_digest, str)
+            or supplement_digest != digest_value(supplement_payload)
+            or supplement_digest
             != historical_reference.get("source_content_digest")
+            or mapping.source.source_revision != source_receipt_digest
+            or source_receipt.get("dwd_base_package_id")
+            != dwd_base.get("package_id")
         ):
             _fail("P4 historical industry provenance differs from its sealed policy")
         dwd_membership_count = source_receipt.get("dwd_membership_count")

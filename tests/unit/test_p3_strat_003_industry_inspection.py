@@ -75,6 +75,9 @@ def test_coverage_keeps_event_occurrences_separate_from_security_count() -> None
     observed = inspection._coverage(
         identities,
         legacy={"600001": "legacy"},
+        legacy_by_code={
+            ("600003", "SSE"): ["legacy-600003"],
+        },
         dwd={"sec-a": "industry-1"},
         dwd_reasons={
             "sec-a": "covered",
@@ -98,7 +101,8 @@ def test_coverage_keeps_event_occurrences_separate_from_security_count() -> None
         "p4_sealed_reference": 1,
     }
     assert observed["remaining_unresolved_security_count"] == 1
-    assert observed["code_venue_only_reference_match_count"] == 1
+    assert observed["p4_code_venue_only_reference_match_count"] == 1
+    assert observed["legacy_p3_code_venue_only_match_count"] == 1
     assert "candidate_event_count" not in observed
 
 
@@ -205,6 +209,39 @@ def test_candidate_inventory_rejects_security_company_ambiguity(
         )
 
 
+def test_coverage_reports_ambiguous_legacy_code_venue_matches() -> None:
+    identity = {
+        "security_id": "sec-x",
+        "company_id": "co-x",
+        "listing_code": "600999",
+        "venue_id": "SSE",
+        "first_session": "2025-01-02",
+        "last_session": "2026-09-18",
+        "in_decision_scope": True,
+    }
+    observed = inspection._coverage(
+        [identity],
+        legacy={},
+        legacy_by_code={
+            ("600999", "SSE"): ["legacy-a", "legacy-b"],
+        },
+        dwd={},
+        dwd_reasons={"sec-x": "no_company_industry_membership"},
+        p4={},
+        p4_by_code={},
+        sample_limit=20,
+    )
+    assert observed["remaining_unresolved_security_count"] == 1
+    assert observed["legacy_p3_code_venue_only_match_count"] == 0
+    assert observed["legacy_p3_code_venue_ambiguous_match_count"] == 1
+    assert (
+        observed["remaining_unresolved_samples"][0][
+            "legacy_p3_code_venue_match_count"
+        ]
+        == 2
+    )
+
+
 def test_coverage_reports_dwd_p4_industry_conflicts() -> None:
     identity = {
         "security_id": "sec-a",
@@ -218,6 +255,7 @@ def test_coverage_reports_dwd_p4_industry_conflicts() -> None:
     observed = inspection._coverage(
         [identity],
         legacy={},
+        legacy_by_code={},
         dwd={"sec-a": "industry-dwd"},
         dwd_reasons={"sec-a": "covered"},
         p4={"sec-a": ("industry-p4", "600001", "SSE")},

@@ -101,6 +101,109 @@ def test_coverage_keeps_event_occurrences_separate_from_security_count() -> None
     assert "candidate_event_count" not in observed
 
 
+def test_candidate_inventory_counts_distinct_security_identity(
+    tmp_path: Path,
+) -> None:
+    duckdb = pytest.importorskip("duckdb")
+    run_root = tmp_path / "event-runs"
+    candidate = (
+        run_root
+        / ".staging/job_failed/1/p3-strat-003-input/candidate-daily.parquet"
+    )
+    candidate.parent.mkdir(parents=True)
+    connection = duckdb.connect(":memory:")
+    try:
+        connection.execute(
+            """
+            COPY (
+              SELECT * FROM (
+                VALUES
+                  ('sec-a','co-a','list-a','600001','SSE',DATE '2024-12-30'),
+                  ('sec-a','co-a','list-a','600001','SSE',DATE '2025-01-02'),
+                  ('sec-b','co-b','list-b','000001','SZSE',DATE '2025-01-02')
+              ) AS t(
+                dwd_security_id,
+                dwd_company_id,
+                dwd_listing_id,
+                listing_code,
+                venue_id,
+                session_date
+              )
+            ) TO ? (FORMAT PARQUET)
+            """,
+            [str(candidate)],
+        )
+    finally:
+        connection.close()
+
+    receipt, identities = inspection._candidate_inventory(
+        run_root,
+        {
+            "job_id": "job_failed",
+            "claim_generation": 1,
+            "candidate_relative_path": "p3-strat-003-input/candidate-daily.parquet",
+        },
+        decision_start=inspection.date(2025, 1, 1),
+        decision_end=inspection.date(2026, 9, 17),
+    )
+    assert receipt["row_count"] == 3
+    assert receipt["security_count"] == 2
+    assert receipt["decision_security_count"] == 2
+    assert len(identities) == 2
+    assert identities[0]["security_id"] == "sec-a"
+    assert identities[0]["in_decision_scope"] is True
+    assert receipt["claim_execution_time_bytes_reproduced"] is False
+
+
+def test_candidate_inventory_rejects_security_company_ambiguity(
+    tmp_path: Path,
+) -> None:
+    duckdb = pytest.importorskip("duckdb")
+    run_root = tmp_path / "event-runs"
+    candidate = (
+        run_root
+        / ".staging/job_failed/1/p3-strat-003-input/candidate-daily.parquet"
+    )
+    candidate.parent.mkdir(parents=True)
+    connection = duckdb.connect(":memory:")
+    try:
+        connection.execute(
+            """
+            COPY (
+              SELECT * FROM (
+                VALUES
+                  ('sec-a','co-a','list-a','600001','SSE',DATE '2025-01-02'),
+                  ('sec-a','co-b','list-a','600001','SSE',DATE '2025-01-03')
+              ) AS t(
+                dwd_security_id,
+                dwd_company_id,
+                dwd_listing_id,
+                listing_code,
+                venue_id,
+                session_date
+              )
+            ) TO ? (FORMAT PARQUET)
+            """,
+            [str(candidate)],
+        )
+    finally:
+        connection.close()
+
+    with pytest.raises(ExpertEvaluationError, match="ambiguous security identity"):
+        inspection._candidate_inventory(
+            run_root,
+            {
+                "job_id": "job_failed",
+                "claim_generation": 1,
+                "candidate_relative_path": (
+                    "p3-strat-003-input/candidate-daily.parquet"
+                ),
+            },
+            decision_start=inspection.date(2025, 1, 1),
+            decision_end=inspection.date(2026, 9, 17),
+        )
+
+
 def test_coverage_reports_dwd_p4_industry_conflicts() -> None:
     identity = {
         "security_id": "sec-a",

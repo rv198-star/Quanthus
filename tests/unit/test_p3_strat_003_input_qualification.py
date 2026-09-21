@@ -1099,3 +1099,388 @@ def test_suffix_reconstruction_identity_mismatch_fails_without_publishing(
             transport_failure="missing",
         )
     assert not (tmp_path / "cache/packages/2026-09-16").exists()
+
+
+
+def _prior_transport_fixture(
+    monkeypatch: pytest.MonkeyPatch, remote: Path
+) -> list[str]:
+    from quanthus.warehouse_sync import WarehouseSyncError
+
+    calls: list[str] = []
+    monkeypatch.setenv("QUANTHUS_CN01_DWD_HOST", "cn01.example")
+    monkeypatch.setattr(
+        input_qualification, "_warehouse_ssh_command",
+        lambda: ("cn01.example", "22", "readonly", "key", "hosts", "ssh fixture"),
+    )
+    monkeypatch.setattr(input_qualification, "_warehouse_remote_path", lambda value: value)
+
+    def transfer(*, source: str, destination: Path, **_kwargs: object) -> None:
+        relative = source.split(":", 1)[1].rstrip("/")
+        calls.append(relative)
+        source_path = remote / relative
+        if not source_path.exists():
+            raise WarehouseSyncError("remote exact package unavailable")
+        if source_path.is_dir():
+            for child in source_path.iterdir():
+                if child.name == "READY":
+                    continue
+                if child.is_dir():
+                    shutil.copytree(child, destination / child.name)
+                else:
+                    shutil.copy2(child, destination / child.name)
+        else:
+            shutil.copy2(source_path, destination)
+
+    monkeypatch.setattr(input_qualification, "_warehouse_rsync", transfer)
+    return calls
+
+
+@pytest.mark.parametrize("layout", ["full", "short", "both"])
+def test_exact_original_prior_accepts_only_known_layouts(
+    tmp_path: Path, layout: str,
+) -> None:
+    package_id = "dwd-daily-20260831-2cb5f15cb13f-f8f8330"
+    daily = tmp_path / "daily"
+    full = daily / "packages/2026-08-31" / package_id
+    package, manifest_sha, _ = _consumer_daily_package(
+        full, market_date=date(2026, 8, 31), package_id=package_id,
+    )
+    short = full.parent / "2cb5f15cb13f-f8f8330"
+    if layout == "short":
+        package.rename(short)
+    elif layout == "both":
+        shutil.copytree(package, short)
+    other, _, _ = _consumer_daily_package(
+        full.parent / "ffffffffffff-f8f8330", market_date=date(2026, 8, 31),
+        package_id="dwd-daily-20260831-ffffffffffff-f8f8330",
+    )
+    (daily / "CURRENT.json").write_text(json.dumps({"manifest_path": str(other)}))
+    observed = input_qualification._resolve_exact_local_prior_package(
+        daily_root=daily, market_date=date(2026, 8, 31),
+        package_id=package_id, manifest_sha256=manifest_sha,
+    )
+    assert observed == (short if layout == "short" else full)
+    assert input_qualification._resolve_exact_local_prior_package(
+        daily_root=daily, market_date=date(2026, 8, 31),
+        package_id="dwd-daily-20260831-000000000000-f8f8330",
+        manifest_sha256=manifest_sha,
+    ) is None
+
+
+@pytest.mark.parametrize(
+    "damage", ["wrong_hash", "wrong_id", "wrong_date", "ready", "payload", "escape", "alias_drift"],
+)
+def test_exact_local_prior_damage_never_becomes_a_cache_miss(
+    tmp_path: Path, damage: str,
+) -> None:
+    package_id = "dwd-daily-20260831-2cb5f15cb13f-f8f8330"
+    daily = tmp_path / "daily"
+    short = daily / "packages/2026-08-31/2cb5f15cb13f-f8f8330"
+    _, manifest_sha, _ = _consumer_daily_package(
+        short, market_date=date(2026, 8, 31), package_id=package_id,
+    )
+    market_date = date(2026, 8, 31)
+    if damage == "wrong_hash":
+        manifest_sha = "sha256:" + "0" * 64
+    elif damage == "wrong_date":
+        market_date = date(2026, 8, 30)
+    elif damage == "ready":
+        (short / "READY").write_text("sha256:" + "0" * 64)
+    elif damage == "payload":
+        next((short / "payload").rglob("*.parquet")).write_bytes(b"changed")
+    elif damage == "escape":
+        escaped = tmp_path / "escaped"
+        short.rename(escaped)
+        short.symlink_to(escaped, target_is_directory=True)
+    elif damage == "alias_drift":
+        full = short.parent / package_id
+        shutil.copytree(short, full)
+        raw = json.loads((full / "manifest.json").read_text())
+        raw["extra"] = "different manifest"
+        (full / "manifest.json").write_text(json.dumps(raw))
+        (full / "READY").write_text(_sha(full / "manifest.json") + "\n")
+    else:
+        raw = json.loads((short / "manifest.json").read_text())
+        raw["package_id"] = "dwd-daily-20260831-ffffffffffff-f8f8330"
+        (short / "manifest.json").write_text(json.dumps(raw))
+        manifest_sha = _sha(short / "manifest.json")
+        (short / "READY").write_text(manifest_sha + "\n")
+    with pytest.raises(ExpertEvaluationError):
+        input_qualification._resolve_exact_local_prior_package(
+            daily_root=daily, market_date=market_date,
+            package_id=package_id, manifest_sha256=manifest_sha,
+        )
+
+
+@pytest.mark.parametrize("layout", ["short", "full"])
+def test_exact_prior_remote_uses_producer_layout_then_legacy_full(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, layout: str,
+) -> None:
+    package_id = "dwd-daily-20260831-2cb5f15cb13f-f8f8330"
+    remote = tmp_path / "remote"
+    name = "2cb5f15cb13f-f8f8330" if layout == "short" else package_id
+    package = remote / "packages/2026-08-31" / name
+    _, manifest_sha, _ = _consumer_daily_package(
+        package, market_date=date(2026, 8, 31), package_id=package_id,
+    )
+    calls = _prior_transport_fixture(monkeypatch, remote)
+    observed, receipt = _fetch_bound_prior_package(
+        cache_root=tmp_path / "cache", market_date=date(2026, 8, 31),
+        package_id=package_id, manifest_sha256=manifest_sha,
+    )
+    assert calls[0] == "packages/2026-08-31/2cb5f15cb13f-f8f8330"
+    assert calls[-1] == f"packages/2026-08-31/{name}/READY"
+    assert len(calls) == (2 if layout == "short" else 3)
+    assert observed.name == package_id and _sha(observed / "manifest.json") == manifest_sha
+    assert receipt["disposition"] == "fetched_exact_child_binding"
+
+
+@pytest.mark.parametrize("damage", ["missing_ready", "bad_ready", "wrong_hash", "partial"])
+def test_corrupt_remote_short_layout_does_not_fall_back_or_reconstruct(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, damage: str,
+) -> None:
+    from quanthus.warehouse_sync import WarehouseSyncError
+
+    package_id = "dwd-daily-20260831-2cb5f15cb13f-f8f8330"
+    remote = tmp_path / "remote"
+    short = remote / "packages/2026-08-31/2cb5f15cb13f-f8f8330"
+    _, manifest_sha, _ = _consumer_daily_package(
+        short, market_date=date(2026, 8, 31), package_id=package_id,
+    )
+    shutil.copytree(short, short.parent / package_id)
+    calls = _prior_transport_fixture(monkeypatch, remote)
+    if damage == "missing_ready":
+        (short / "READY").unlink()
+    elif damage == "bad_ready":
+        (short / "READY").write_text("sha256:" + "0" * 64)
+    elif damage == "wrong_hash":
+        manifest_sha = "sha256:" + "0" * 64
+    else:
+        def partial(*, source: str, destination: Path, **_kwargs: object) -> None:
+            calls.append(source)
+            (destination / "partial").write_text("incomplete")
+            raise WarehouseSyncError("partial transfer")
+        monkeypatch.setattr(input_qualification, "_warehouse_rsync", partial)
+
+    def forbidden(**_kwargs: object) -> None:
+        pytest.fail("damaged exact input must not trigger reconstruction")
+
+    monkeypatch.setattr(input_qualification, "_reconstruct_exact_prior_package", forbidden)
+    with pytest.raises(ExpertEvaluationError):
+        _fetch_bound_prior_package(
+            cache_root=tmp_path / "cache", market_date=date(2026, 8, 31),
+            package_id=package_id, manifest_sha256=manifest_sha,
+            daily_root=tmp_path / "daily", base_root=tmp_path / "base",
+            reconstruction=_missing_prior_reconstruction(_request(CONFIG), project=ROOT),
+        )
+    assert all(package_id not in call for call in calls)
+    assert not (tmp_path / "cache/packages/2026-08-31" / package_id).exists()
+
+
+def _chain_daily_fixture(
+    root: Path, *, market_date: date, package_id: str,
+    prior: tuple[date, str, str] | None,
+) -> tuple[Path, str, str]:
+    package, _, consumer_digest = _consumer_daily_package(
+        root, market_date=market_date, package_id=package_id,
+    )
+    manifest_path = package / "manifest.json"
+    raw = json.loads(manifest_path.read_text())
+    raw.update({
+        "code_revision": "f8f8330" + "0" * 33,
+        "covered_after_date": (prior[0] if prior else date(2026, 8, 25)).isoformat(),
+        "base": {"package_id": "dwd-base-202607-v2.1",
+                 "manifest_sha256": "sha256:" + "1" * 64,
+                 "content_digest": "sha256:" + "2" * 64},
+        "prior": None if prior is None else {
+            "market_date": prior[0].isoformat(), "package_id": prior[1],
+            "manifest_sha256": prior[2],
+        },
+    })
+    manifest_path.write_text(json.dumps(raw, sort_keys=True) + "\n")
+    manifest_sha = _sha(manifest_path)
+    (package / "READY").write_text(manifest_sha + "\n")
+    return package, manifest_sha, consumer_digest
+
+
+def test_short_original_chain_reaches_only_the_sealed_aug27_bridge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daily = tmp_path / "daily"
+    anchor_id = "dwd-daily-20260826-111111111111-f8f8330"
+    anchor, anchor_sha, _ = _chain_daily_fixture(
+        daily / "packages/2026-08-26/111111111111-f8f8330",
+        market_date=date(2026, 8, 26), package_id=anchor_id, prior=None,
+    )
+    original_id = "dwd-daily-20260827-aaaaaaaaaaaa-f8f8330"
+    original_sha = "sha256:" + "c" * 64
+    research_id = "dwd-daily-20260827-aaaaaaaaaaaa-aaaaaaa"
+    research, research_sha, consumer_digest = _chain_daily_fixture(
+        tmp_path / "probe/missing-boundary/package", market_date=date(2026, 8, 27),
+        package_id=research_id, prior=(date(2026, 8, 26), anchor_id, anchor_sha),
+    )
+    prior = (date(2026, 8, 27), original_id, original_sha)
+    expected_dates = [date(2026, 8, 26), date(2026, 8, 27)]
+    for market_date, prefix in (
+        (date(2026, 8, 28), "333333333333"),
+        (date(2026, 8, 31), "2cb5f15cb13f"),
+        (date(2026, 9, 1), "444444444444"),
+    ):
+        package_id = f"dwd-daily-{market_date:%Y%m%d}-{prefix}-f8f8330"
+        target, target_sha, _ = _chain_daily_fixture(
+            daily / "packages" / market_date.isoformat() / f"{prefix}-f8f8330",
+            market_date=market_date, package_id=package_id, prior=prior,
+        )
+        prior = (market_date, package_id, target_sha)
+        expected_dates.append(market_date)
+    runtime = SimpleNamespace(
+        daily_root=daily, historical_base_root=tmp_path / "base",
+        historical_base_through_date=date(2026, 8, 25),
+        historical_base_manifest_sha256="sha256:" + "1" * 64,
+        historical_base_content_digest="sha256:" + "2" * 64,
+    )
+    prerequisite = input_qualification._SemanticEquivalencePrerequisite(
+        artifact_root=tmp_path / "probe", code_revision="a" * 40,
+        request_digest="sha256:" + "b" * 64, manifest_sha256="sha256:" + "d" * 64,
+        result_digest="sha256:" + "e" * 64, boundary_market_date=date(2026, 8, 27),
+        original_package_id=original_id, original_manifest_sha256=original_sha,
+        research_package_root=research, research_package_id=research_id,
+        research_manifest_sha256=research_sha, consumer_payload_digest=consumer_digest,
+    )
+    current = daily / "CURRENT.json"
+    current.write_text('{"sentinel":"unchanged"}\n')
+    before = {path: path.read_bytes() for path in daily.rglob("manifest.json")}
+    before[research / "manifest.json"] = (research / "manifest.json").read_bytes()
+    monkeypatch.setattr(input_qualification, "_verify_seed", lambda _config: None)
+    calls = _prior_transport_fixture(monkeypatch, tmp_path / "absent-remote")
+
+    def forbidden(**_kwargs: object) -> None:
+        pytest.fail("exact short-name original input must not be reconstructed")
+
+    monkeypatch.setattr(input_qualification, "_reconstruct_exact_prior_package", forbidden)
+    chain, recovered = input_qualification._load_bound_daily_chain(
+        config=runtime, target=SimpleNamespace(package_root=target, manifest_sha256=target_sha),
+        cache_root=tmp_path / "cache",
+        reconstruction=_missing_prior_reconstruction(_request(CONFIG_V2), project=ROOT),
+        semantic_prerequisite=prerequisite,
+    )
+    assert [item.market_date for item in chain] == expected_dates
+    assert chain[0].root == anchor and chain[1].root == research
+    assert len(recovered) == 1
+    assert recovered[0]["disposition"] == "reused_sealed_semantic_equivalence_reconstruction"
+    assert calls == [
+        "packages/2026-08-27/aaaaaaaaaaaa-f8f8330",
+        f"packages/2026-08-27/{original_id}",
+    ]
+    assert current.read_text() == '{"sentinel":"unchanged"}\n'
+    assert all(path.read_bytes() == content for path, content in before.items())
+
+
+
+def _reseal_input_fixture(root: Path, manifest: dict[str, object]) -> None:
+    payload = {key: value for key, value in manifest.items() if key != "result_digest"}
+    (root / "manifest.json").write_text(
+        json.dumps({**payload, "result_digest": digest_value(payload)}, sort_keys=True) + "\n",
+    )
+    (root / "READY").write_text(_sha(root / "manifest.json") + "\n")
+
+
+def _qualification_artifact_fixture(
+    root: Path, monkeypatch: pytest.MonkeyPatch,
+) -> dict[str, object]:
+    root.mkdir()
+    bundle = _bundle(root / "replay")
+    candidate = root / "candidate-input/manifest.json"
+    candidate.parent.mkdir()
+    candidate.write_text("{}\n")
+    candidate_digest = "sha256:" + "a" * 64
+    monkeypatch.setattr(
+        input_qualification.P3Strat003CandidateInput, "load",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            manifest_digest=candidate_digest, replay_bundle_digest=bundle.digest,
+        ),
+    )
+    summary = {
+        "target_release": {"market_date": "2026-09-18"},
+        "daily_chain": [
+            {"market_date": "2026-08-27", "package_id": "research-27",
+             "manifest_sha256": "sha256:" + "b" * 64, "covered_after_date": "2026-08-26",
+             "prior_package_id": "anchor-26", "prior_manifest_sha256": "sha256:" + "c" * 64},
+            {"market_date": "2026-08-28", "package_id": "original-28",
+             "manifest_sha256": "sha256:" + "d" * 64, "covered_after_date": "2026-08-27",
+             "prior_package_id": "original-27", "prior_manifest_sha256": "sha256:" + "e" * 64},
+        ],
+        "prior_chain_recovery": {"mutated_local_daily_root": False},
+        "replay_audit": {"ready_for_strategy_replay": True},
+        "candidate_scan": {"candidate_events": 0},
+        "deferred_daily_artifact_contract": {"daily_package_count": 2},
+        "semantic_equivalence_prerequisite": {
+            "result_digest": "sha256:" + "f" * 64,
+            "disposition": "PASS_CONSUMER_SEMANTIC_EQUIVALENCE_PROBE",
+            "original_manifest_claimed_reproduced": False,
+            "original_child_binding": {
+                "package_id": "original-27", "manifest_sha256": "sha256:" + "e" * 64,
+            },
+            "research_reconstruction": {
+                "package_id": "research-27", "manifest_sha256": "sha256:" + "b" * 64,
+            },
+        },
+        "strategy_or_economic_result_count": 0, "outcome_label_count": 0, "p6_mutation": False,
+        "bundle_digest": bundle.digest, "candidate_manifest_digest": candidate_digest,
+    }
+    (root / "summary.json").write_text(json.dumps(summary) + "\n")
+    files = {"summary": "summary.json", "replay_bundle": "replay/bundle.json",
+             "candidate_manifest": "candidate-input/manifest.json"}
+    manifest: dict[str, object] = {
+        "schema_version": input_qualification.ARTIFACT_SCHEMA, "work_item": "P3-STRAT-003-B",
+        "code_revision": "a" * 40, "request_digest": "sha256:" + "0" * 64,
+        "partition": PARTITION, "strategy_result_produced": False,
+        "outcome_labels_produced": False, "p6_mutation": False,
+        "qualification_evidence": input_qualification._qualification_evidence(summary),
+        "files": {name: {"path": path, "sha256": _sha(root / path)}
+                  for name, path in files.items()},
+        "bundle_digest": bundle.digest, "candidate_manifest_digest": candidate_digest,
+        "semantic_equivalence_result_digest": "sha256:" + "f" * 64,
+        "row_count": 0, "candidate_event_count": 0,
+    }
+    _reseal_input_fixture(root, manifest)
+    return manifest
+
+
+@pytest.mark.parametrize("changed", [None, "target_release", "daily_chain", "bridge"])
+def test_qualification_manifest_exposes_one_bridge_and_rejects_resealed_projection_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str | None,
+) -> None:
+    root = tmp_path / "artifact"
+    manifest = _qualification_artifact_fixture(root, monkeypatch)
+    verify = input_qualification.verify_p3_strat_003_input_artifact
+    result = verify(root, code_revision="a" * 40, request_digest="sha256:" + "0" * 64)
+    assert result["execution_authorized"] is False
+    evidence = manifest["qualification_evidence"]
+    assert isinstance(evidence, dict)
+    chain = evidence["daily_chain"]
+    bridge = evidence["semantic_equivalence_prerequisite"]
+    assert chain[0]["manifest_sha256"] == bridge["research_reconstruction"]["manifest_sha256"]
+    assert chain[1]["prior_manifest_sha256"] == bridge["original_child_binding"]["manifest_sha256"]
+    assert chain[0]["manifest_sha256"] != chain[1]["prior_manifest_sha256"]
+    if changed is None:
+        return
+    key = "semantic_equivalence_prerequisite" if changed == "bridge" else changed
+    evidence[key] = {"unbound": "changed"}
+    _reseal_input_fixture(root, manifest)
+    with pytest.raises(ExpertEvaluationError, match="projection differs"):
+        verify(root, code_revision="a" * 40, request_digest="sha256:" + "0" * 64)
+
+
+def test_qualification_manifest_size_limit_rejects_oversized_complete_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "artifact"
+    manifest = _qualification_artifact_fixture(root, monkeypatch)
+    manifest["oversized"] = "x" * input_qualification._MAX_QUALIFICATION_MANIFEST_BYTES
+    _reseal_input_fixture(root, manifest)
+    with pytest.raises(ExpertEvaluationError, match="512 KiB"):
+        input_qualification.verify_p3_strat_003_input_artifact(
+            root, code_revision="a" * 40, request_digest="sha256:" + "0" * 64,
+        )

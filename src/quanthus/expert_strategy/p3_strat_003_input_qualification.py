@@ -89,6 +89,11 @@ ARTIFACT_SCHEMA = "quanthus.p3-strat-003-input-artifact.v1"
 BUNDLE_SCHEMA = "quanthus.p3-strat-003-sealed-replay-bundle.v1"
 CANDIDATE_SCHEMA = "quanthus.p3-strat-003-candidate-input.v1"
 PARTITION = "p3-strat-003-recent-history"
+_MAX_QUALIFICATION_MANIFEST_BYTES = 512 * 1024
+_QUALIFICATION_EVIDENCE_FIELDS = (
+    "target_release", "daily_chain", "prior_chain_recovery", "replay_audit",
+    "candidate_scan", "deferred_daily_artifact_contract",
+)
 _SSE_VENUE = "venue_bec59e31eb6bb28111a10d7e6d2c689f"
 _SZSE_VENUE = "venue_8c0bd9088a0dc88f28e5e7fa8efdce87"
 
@@ -1204,6 +1209,68 @@ def _reconstruct_exact_prior_package(
     )
 
 
+def _bound_prior_directory_names(market_date: date, package_id: str) -> tuple[str, ...]:
+    """Known physical layouts, derived only from the immutable child identity."""
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,191}", package_id):
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_package_invalid", "bound prior package id is unsafe"
+        )
+    matched = re.fullmatch(r"dwd-daily-(\d{8})-([0-9a-f]{12})-([0-9a-f]{7})", package_id)
+    if matched is None:
+        return (package_id,)
+    if matched.group(1) != market_date.strftime("%Y%m%d"):
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_package_invalid", "bound prior package date differs"
+        )
+    return package_id, f"{matched.group(2)}-{matched.group(3)}"
+
+
+def _verify_prior_metadata_paths(package: Path) -> None:
+    for name in ("manifest.json", "READY"):
+        if not (package / name).resolve().is_relative_to(package.resolve()):
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_package_invalid", "prior metadata escapes its package"
+            )
+
+
+def _resolve_exact_local_prior_package(
+    *, daily_root: Path, market_date: date, package_id: str, manifest_sha256: str
+) -> Path | None:
+    """Locate an original package without selecting another retained version."""
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", manifest_sha256):
+        raise ExpertEvaluationError(
+            "p3_strat_003_prior_package_invalid", "bound prior manifest digest is invalid"
+        )
+    daily_root = daily_root.resolve()
+    matches: list[Path] = []
+    for name in _bound_prior_directory_names(market_date, package_id):
+        candidate = (daily_root / "packages" / market_date.isoformat() / name).resolve()
+        if not candidate.is_relative_to(daily_root):
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_package_invalid", "local prior escapes the governed daily root"
+            )
+        if not candidate.exists():
+            continue
+        _verify_prior_metadata_paths(candidate)
+        try:
+            verified = verify_daily_domain_increment(candidate)
+        except (DailyDomainBuildError, OSError, ValueError) as exc:
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_package_invalid", "existing OCI prior package is invalid"
+            ) from exc
+        if (
+            verified.market_date != market_date
+            or verified.package_id != package_id
+            or verified.manifest_sha256 != manifest_sha256
+        ):
+            raise ExpertEvaluationError(
+                "p3_strat_003_prior_package_drift",
+                "existing OCI prior package differs from its child binding",
+            )
+        matches.append(candidate)
+    return matches[0] if matches else None
+
+
 def _fetch_bound_prior_package(
     *,
     cache_root: Path,
@@ -1217,11 +1284,7 @@ def _fetch_bound_prior_package(
 ) -> tuple[Path, dict[str, Any]]:
     """Fetch one exact child-bound prior package into job-local scratch only."""
 
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,191}", package_id):
-        raise ExpertEvaluationError(
-            "p3_strat_003_prior_package_invalid",
-            "bound prior package id is unsafe",
-        )
+    directory_names = _bound_prior_directory_names(market_date, package_id)
     if not re.fullmatch(r"sha256:[0-9a-f]{64}", manifest_sha256):
         raise ExpertEvaluationError(
             "p3_strat_003_prior_package_invalid",
@@ -1235,6 +1298,7 @@ def _fetch_bound_prior_package(
             "bound prior package escapes the job-local cache",
         )
     if target.exists():
+        _verify_prior_metadata_paths(target)
         try:
             verified = verify_daily_domain_increment(target)
         except DailyDomainBuildError as exc:
@@ -1263,22 +1327,43 @@ def _fetch_bound_prior_package(
     try:
         _, _, remote_user, _, _, ssh = _warehouse_ssh_command()
         remote_host = os.environ["QUANTHUS_CN01_DWD_HOST"]
-        relative = f"packages/{market_date.isoformat()}/{package_id}"
-        remote_package = (
-            f"{remote_user}@{remote_host}:{_warehouse_remote_path(relative)}/"
-        )
+        remote_names = tuple(reversed(directory_names))
         try:
-            _warehouse_rsync(
-                source=remote_package,
-                destination=staging,
-                ssh=ssh,
-                extra=("--exclude=READY",),
-            )
-            _warehouse_rsync(
-                source=f"{remote_package}READY",
-                destination=staging / "READY",
-                ssh=ssh,
-            )
+            for index, name in enumerate(remote_names):
+                relative = f"packages/{market_date.isoformat()}/{name}"
+                remote_package = (
+                    f"{remote_user}@{remote_host}:{_warehouse_remote_path(relative)}/"
+                )
+                try:
+                    _warehouse_rsync(
+                        source=remote_package,
+                        destination=staging,
+                        ssh=ssh,
+                        extra=("--exclude=READY",),
+                    )
+                except WarehouseSyncError as transfer_error:
+                    if any(staging.iterdir()):
+                        raise ExpertEvaluationError(
+                            "p3_strat_003_prior_package_verification_failed",
+                            "partial prior package transfer cannot fall back to another layout",
+                        ) from transfer_error
+                    if index == len(remote_names) - 1:
+                        raise
+                    shutil.rmtree(staging)
+                    staging.mkdir()
+                    continue
+                try:
+                    _warehouse_rsync(
+                        source=f"{remote_package}READY",
+                        destination=staging / "READY",
+                        ssh=ssh,
+                    )
+                except WarehouseSyncError as ready_error:
+                    raise ExpertEvaluationError(
+                        "p3_strat_003_prior_package_verification_failed",
+                        "fetched prior package READY is unavailable",
+                    ) from ready_error
+                break
         except WarehouseSyncError as exc:
             detail = " ".join(str(exc).split())
             shutil.rmtree(staging, ignore_errors=True)
@@ -1329,6 +1414,7 @@ def _fetch_bound_prior_package(
                 "p3_strat_003_prior_fetch_failed",
                 detail[:1200],
             ) from exc
+        _verify_prior_metadata_paths(staging)
         try:
             verified = verify_daily_domain_increment(staging)
         except DailyDomainBuildError as exc:
@@ -1487,20 +1573,13 @@ def _load_bound_daily_chain(
             break
 
         assert prior_date is not None and prior_id is not None and prior_sha is not None
-        local_prior = (
-            daily_root / "packages" / prior_date.isoformat() / prior_id
-        ).resolve()
-        if daily_root not in local_prior.parents:
-            raise ExpertEvaluationError(
-                "p3_strat_003_prior_package_invalid",
-                "local prior package escapes the governed daily root",
-            )
-        if local_prior.is_dir():
-            if _sha256(local_prior / "manifest.json") != prior_sha:
-                raise ExpertEvaluationError(
-                    "p3_strat_003_prior_package_drift",
-                    "existing OCI prior package differs from its child binding",
-                )
+        local_prior = _resolve_exact_local_prior_package(
+            daily_root=daily_root,
+            market_date=prior_date,
+            package_id=prior_id,
+            manifest_sha256=prior_sha,
+        )
+        if local_prior is not None:
             cursor = local_prior
             continue
 
@@ -1728,6 +1807,17 @@ def _candidate_manifest(
     return {**payload, "semantic_digest": digest_value(payload)}
 
 
+def _qualification_evidence(summary: Mapping[str, Any]) -> dict[str, Any]:
+    if any(key not in summary for key in _QUALIFICATION_EVIDENCE_FIELDS):
+        raise ExpertEvaluationError(
+            "p3_strat_003_input_artifact_invalid", "qualification evidence summary is incomplete"
+        )
+    evidence = {key: summary[key] for key in _QUALIFICATION_EVIDENCE_FIELDS}
+    if "semantic_equivalence_prerequisite" in summary:
+        evidence["semantic_equivalence_prerequisite"] = summary["semantic_equivalence_prerequisite"]
+    return evidence
+
+
 def build_input_artifact(
     *,
     request_path: Path,
@@ -1916,6 +2006,9 @@ def build_input_artifact(
                 "manifest_sha256": item.manifest_sha256,
                 "content_digest": item.content_digest,
                 "code_revision": item.code_revision,
+                "covered_after_date": item.covered_after_date.isoformat(),
+                "prior_package_id": item.prior_package_id,
+                "prior_manifest_sha256": item.prior_manifest_sha256,
             }
             for item in chain
         ],
@@ -1967,6 +2060,7 @@ def build_input_artifact(
         "code_revision": code_revision,
         "partition": PARTITION,
         "scope": summary["scope"],
+        "qualification_evidence": _qualification_evidence(summary),
         "files": {
             name: {"path": relative, "sha256": _sha256(output / relative)}
             for name, relative in sorted(files.items())
@@ -1989,7 +2083,13 @@ def build_input_artifact(
         "result_digest": digest_value(manifest_payload),
     }
     manifest_path = output / "manifest.json"
-    manifest_path.write_bytes(canonical_json_bytes(manifest) + b"\n")
+    manifest_bytes = canonical_json_bytes(manifest) + b"\n"
+    if len(manifest_bytes) > _MAX_QUALIFICATION_MANIFEST_BYTES:
+        raise ExpertEvaluationError(
+            "p3_strat_003_input_artifact_invalid",
+            "complete qualification manifest exceeds the 512 KiB evidence limit",
+        )
+    manifest_path.write_bytes(manifest_bytes)
     (output / "READY").write_text(_sha256(manifest_path) + "\n", encoding="ascii")
     return verify_p3_strat_003_input_artifact(
         output,
@@ -2080,6 +2180,11 @@ def verify_p3_strat_003_input_artifact(
     request_digest: str,
 ) -> dict[str, Any]:
     root = root.resolve()
+    if (root / "manifest.json").stat().st_size > _MAX_QUALIFICATION_MANIFEST_BYTES:
+        raise ExpertEvaluationError(
+            "p3_strat_003_input_artifact_invalid",
+            "complete qualification manifest exceeds the 512 KiB evidence limit",
+        )
     manifest = _object(root / "manifest.json", "P3-STRAT-003-B manifest")
     summary = _object(root / "summary.json", "P3-STRAT-003-B summary")
     try:
@@ -2109,6 +2214,11 @@ def verify_p3_strat_003_input_artifact(
         raise ExpertEvaluationError(
             "p3_strat_003_input_artifact_drift",
             "P3-STRAT-003-B result digest differs",
+        )
+    if manifest.get("qualification_evidence") != _qualification_evidence(summary):
+        raise ExpertEvaluationError(
+            "p3_strat_003_input_artifact_drift",
+            "qualification evidence projection differs from its bound summary",
         )
     files = manifest.get("files")
     if not isinstance(files, dict):

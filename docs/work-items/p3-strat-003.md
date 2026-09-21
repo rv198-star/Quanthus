@@ -114,23 +114,33 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-Last verified on 2026-09-21 after the formal B-v2 attempt:
+Last verified on 2026-09-21 after the fixed input-identity inspection:
 
-- GitHub #319 is open and remains unaccepted.
-- PR #399 merged as `340ea120be01eaab7da79e6d3396c7ff5758e2ab`; the verified production
-  event-worker runs `quanthus-event:git-340ea12` while the P6 replay-worker remains
-  `git-6cb72eb`.
-- Recovery probe Job `job_ab6d6afa749244299c29995968b21b84` succeeded once at attempt 1 with
-  disposition `PASS_CONSUMER_SEMANTIC_EQUIVALENCE_PROBE`. Its manifest SHA is
-  `sha256:4f6c6d5fa0fe92d9bcee2e07b1aeace9b066ba76de2ca9b8b6fdae6847029a85` and result digest is
+- GitHub #319 is open and remains unaccepted. PR #409 merged as
+  `1d3e80693228580e73b3a94db247b9462f795e2e` and was deployed to the event-worker only.
+  The P6 replay-worker remains `git-6cb72eb`.
+- Recovery probe Job `job_ab6d6afa749244299c29995968b21b84` remains the accepted sealed
+  prerequisite, with manifest SHA
+  `sha256:4f6c6d5fa0fe92d9bcee2e07b1aeace9b066ba76de2ca9b8b6fdae6847029a85` and result digest
   `sha256:e42d6b09e215b476d73fdd33de9ad456d7310af11f9b4018d5d86e9bfa3a6869`.
 - Formal B-v2 Job `job_b36c3aa41b3745a9a05f7806cc0bee99` failed at attempt 1 on
-  2026-09-21T07:31:21Z, with no sealed result. The exact prior-manifest expectation was
-  `sha256:21ba655c360a7dc50bdbae4665f94c9be3fe9452e5b34f26c763ef869356fc46`.
-  The bounded status excerpt does not identify that prior package or its market date.
+  2026-09-21T07:31:21Z, with no sealed result. Its exact prior expectation
+  `sha256:21ba655c360a7dc50bdbae4665f94c9be3fe9452e5b34f26c763ef869356fc46` is now attributed
+  to original package `dwd-daily-20260831-2cb5f15cb13f-f8f8330`, not the 2026-08-27 bridge.
+- Inspection Job `job_d31ff95f43384313a93072fcb87de184` succeeded once at attempt 1 on
+  2026-09-21T15:10:59Z, with disposition `INPUT_IDENTITY_INSPECTION_COMPLETE`, manifest SHA
+  `sha256:4b6364cfccc7a77673312ab484f189a480585c5f59ca2eee71f5f7d872f9be41` and result digest
+  `sha256:8be38026bc78c1540e81d193ddf529c7e13d922db626c08a4a1a78ef7892f8b2`.
+  Its 35-manifest inventory, observed at 2026-09-21T15:10:58Z, found that exact original manifest
+  at `packages/2026-08-31/2cb5f15cb13f-f8f8330/manifest.json`; the 2026-09-01 child's prior
+  references the same identity. Two matching occurrences identify one distinct target.
+- The producer and warehouse sync preserve the short directory layout, while B's prior resolver
+  had constructed the physical path from the full logical package id. The current retained
+  original supports a bounded path-resolution repair; the inspection does not claim to recreate
+  the failed Job's historical inventory or qualify retained payload bytes.
 - No B acceptance, D result-bearing run, P6 mutation or daily-CURRENT mutation has occurred.
 
-The next action is one bounded input-identity inspection, governed by
+The completed bounded input-identity inspection is governed by
 `config/research/p3-strat-003/input-inspection.v1.json`. It binds the failed Job, its exact
 qualification config and the already sealed probe. It reads retained daily manifests for
 2026-08-01 through 2026-09-18, preserving every retained version and actual relative package path,
@@ -146,9 +156,18 @@ transfer ODS, build a provider, score candidates, produce strategy results or ou
 mutate P6/CURRENT, or accept B. The immutable inspection manifest exposes the core identity matches
 through the existing Worker status interface; this does not add a general file-reading endpoint.
 
-Resume order after interruption: verify live #319/main and the exact diagnostic Job; preserve its
-receipt and attribute the failed expectation before considering any corrected full-B attempt.
-A scoped integration repair must preserve the single 2026-08-27 semantic bridge and every other
+Resume order after interruption: verify live #319/main and the exact diagnostic receipt, complete
+and review the B-only path-resolution repair, deploy event-worker only, then run one corrected
+formal B-v2 qualification. The resolver may recognize only the producer's short directory and the
+existing full-id job-local layout, with the child-bound date/package-id/manifest-SHA and existing
+READY/payload verification still required. The formal B manifest also exposes a bounded projection
+of the already generated chain edges, recovery/bridge receipts, target identity and input audits,
+with equality to the sealed summary verified before publication. This projection adds no input
+read or calculation and enables independent review through the existing status interface.
+It must not select the latest daily version, reinterpret
+a manifest mismatch as a cache miss, or change P6's resolver.
+
+The scoped integration repair must preserve the single 2026-08-27 semantic bridge and every other
 exact edge. A successful formal B artifact still requires independent B review before D may open.
 A payload-level mismatch, semantic-precondition failure, or unrelated missing historical input
 closes B for insufficient admissible historical input evidence rather than starting another retry

@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | blocked; A, C and C-R1 accepted; B / #319 closed no-pass and unaccepted; D blocked by B acceptance; E blocked by D |
+| Delivery gate | blocked; A, C and C-R1 accepted; B / #319 closed no-pass and unaccepted; B-R1 / #412 is the only active B continuation; D blocked by B acceptance; E blocked by D |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |
@@ -114,36 +114,45 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-Last verified on 2026-09-21 after the corrected formal B-v2 attempt:
+Last verified on 2026-09-22 after opening the bounded B-R1 successor:
 
-- B / #319 is closed with `NO_PASS_STATIC_INDUSTRY_INPUT_COVERAGE`, **not accepted**.
-  The parent / #317 remains open and blocked; D / #321 and E / #322 remain open and blocked.
-  Closing this qualification attempt does not satisfy B's acceptance gate.
-- PR #409's bounded metadata inspection attributed the earlier exact-manifest error to the
-  retained original 2026-08-31 package in the producer's short physical directory.
-  PR #410 corrected B's exact path resolver, added a bounded qualification-evidence projection,
-  and was deployed to the event-worker at
-  `e256ffb1783d964c689a116a7f870282b96da8a3`.
-- The one corrected formal Job `job_313b915e82fd4865b32c1222c5b094f2` failed at
-  2026-09-21T15:43:14.326292Z with
-  `p3_strat_003_industry_mapping_incomplete: 10259`; `result_ref=null`.
-  The count is isolated candidate-event occurrences, not distinct securities.
-- The current frozen industry source is the legacy P3 development mapping. It does not satisfy
-  the accepted P4 candidate-identity/complete-coverage contract. This finding does not establish
-  that historical industry data are inherently unavailable or that an identifier conversion
-  alone would repair all gaps.
-- The successful sealed 2026-08-27 semantic probe is preserved, as are A/C/C-R1. There is no
-  accepted B input/candidate digest and no complete A+B+C batch binding. The P6 replay-worker
-  remains `git-6cb72eb`; its operation and frozen configuration were not changed.
+- B / #319 remains closed with `NO_PASS_STATIC_INDUSTRY_INPUT_COVERAGE`, **not accepted**.
+  Its negative evidence is immutable and is not reopened or rewritten as PASS.
+- `P3-STRAT-003-B-R1` / #412 is the only active B continuation. It is a bounded input-source
+  correction and coverage diagnosis, not a new historical platform or a reset of B.
+- Draft PR #413 contains the result-blind industry-coverage inspection. Its latest reviewed head at
+  this checkpoint is `f4568f45488484dad5d62ecbfc6a3b38c77d41bd`; live PR state must still be
+  verified before execution. The frozen inspection request digest is
+  `sha256:3262e61bf8cfab5e58f049a5215dedce319ec71c6d2ec2a6855e43562364d57c`.
+- The inspection is allowed to read only the retained failed-B candidate identity/date columns and
+  sealed industry-source evidence. It must keep the historical `10259` missing candidate-event
+  occurrences separate from distinct-security counts, and it carries no strategy-result, outcome-
+  label, P6 mutation, candidate rebuild, network collection, or B-acceptance authority.
+- If the failed candidate projection or sealed source evidence is unavailable, the valid outcome is
+  `DIAGNOSTIC_INPUT_UNAVAILABLE`; do not reconstruct the candidate projection or silently acquire
+  a replacement industry source.
+- The original corrected formal Job
+  `job_313b915e82fd4865b32c1222c5b094f2` remains the latest formal B-v2 execution and failed with
+  `p3_strat_003_industry_mapping_incomplete: 10259`. Do not rerun it.
+- PR #409/#410's exact-package diagnosis and repair remain accepted history; the successful
+  2026-08-27 semantic probe, A/C/C-R1, and all their existing digests remain preserved.
+- D / #321 and E / #322 remain blocked. There is no accepted B input/candidate digest and no
+  complete A+B+C batch binding.
+- **NexusAgent is the only current remote execution/control channel. OCI is retired.** Historical
+  OCI references are archival evidence only; do not restore or use OCI as a fallback.
+- At this checkpoint the current conversation did not expose NexusAgent, so no project Ruff/pytest,
+  `make check`, deployment, diagnostic Job, market-data read, or B-R1 runtime acceptance had been
+  executed. That limitation is about the conversation's execution channel, not evidence that
+  Quanthus or its nodes are offline.
 
-Exact receipts, identities, count semantics, tests, operational observations and the eight-part
-qualification assessment are in
-[the B no-pass evidence](../acceptance/p3-strat-003-b-input-qualification-20260921.md).
+Resume by verifying live #412/#413 state and the exact PR head. When NexusAgent is available, run
+the project checks on the exact reviewed head; only if they pass may the Event Worker be deployed
+through NexusAgent and exactly one frozen industry-inspection Job be submitted. Interpret its sealed
+disposition before deciding whether B-R1 may proceed to a source-binding closure.
 
-Resume by reading that evidence and verifying live issue/Job state. Do not repeat the failed Job,
-replace the frozen industry SHA, drop unmapped candidates, lower the coverage gate, shrink the
-window, or start D. A later source-binding correction needs its own explicit input closure and
-coverage review; it is not opened by this negative qualification record.
+Do not repeat A/C/C-R1, #409/#410, the semantic probe, or the failed formal B job. Do not replace the
+frozen industry SHA in place, drop unmapped candidates, lower the coverage gate, shrink the window,
+read D results, mutate P6, or revive retired OCI infrastructure.
 
 This checkpoint is operational status, not authority. Frozen config, immutable artifacts and live
 Git/GitHub state take precedence if it becomes stale.
@@ -173,6 +182,7 @@ and do not authorize threshold search.
 | --- | --- | --- | --- |
 | P3-STRAT-003-A / #318 | freeze request, authority, comparisons, metrics and budget | none | no |
 | P3-STRAT-003-B / #319 | qualify immutable recent-history inputs and isolation | A | no strategy result |
+| P3-STRAT-003-B-R1 / #412 | bounded static-industry source diagnosis and corrected B input closure | B no-pass evidence + A | no strategy result |
 | P3-STRAT-003-C / #320 | implement the four-variant research control and exact runner | A | synthetic / consumed only |
 | P3-STRAT-003-C-R1 / #385 | bind recent-history D to B's outcome-blind candidate manifest instead of a legacy Event+Label outer Run | C | no |
 | P3-STRAT-003-D / #321 | run primary and independent cold-reproduction batches | B + C-R1 | yes |

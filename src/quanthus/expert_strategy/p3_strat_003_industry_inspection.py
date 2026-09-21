@@ -314,8 +314,16 @@ def _p4_reference(
                 f"P4 event reference {run_id} is unavailable",
                 cause=exc,
             )
+        try:
+            ready = (event_root / "READY").read_text(encoding="ascii").strip()
+        except OSError as exc:
+            _source_unavailable(
+                f"P4 event READY for {run_id} is unavailable",
+                cause=exc,
+            )
         if (
             event_manifest_sha != expected_manifest
+            or ready != event_manifest_sha
             or not isinstance(event_manifest.get("adm"), dict)
         ):
             _fail("P4 event identity differs from the frozen reference")

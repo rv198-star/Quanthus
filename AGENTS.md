@@ -27,7 +27,9 @@
 ## Current active task routing — P3-STRAT-003
 
 - Active line: `P3-STRAT-003` / #317, open and blocked. B / #319 closed with negative input
-  qualification evidence; its acceptance gate remains unsatisfied.
+  qualification evidence; its acceptance gate remains unsatisfied. The bounded successor
+  `P3-STRAT-003-B-R1` / #412 is the only active B continuation; it preserves #319's NO_PASS
+  evidence and does not unlock D by itself.
 - Purpose: compare existing Trend + Position Risk against a non-empty deterministic P4 baseline
   while P6 continues independently; P6 is not a predecessor and must not be mutated.
 - Dependency state: A / #318 accepted; C / #320 accepted; C-R1 / #385 accepted; B not accepted
@@ -78,14 +80,19 @@
 
 ## Deployment and remote access
 
-- GitHub is the only normal code-distribution path. Hermes, CN01, and future nodes each use a
-  distinct read-only deploy key and update a node-local Git checkout with `git pull --ff-only`.
-  Do not use rsync, scp, or an OCI-built archive to distribute repository code.
-- OCI audits Hermes through the reverse tunnel at host-loopback `127.0.0.1:2222`. The
-  `hermes-ods-ro` forced-command account and `astock-ro` rrsync jail are read-only; a healthy
-  tunnel does not grant shell, deployment, or root authority.
-- Codex's default command sandbox may use a different network namespace from the OCI host. A
-  failed sandbox `ss` check or `hermes-ods-schedule-check.sh` call is not evidence that the tunnel
-  is down. Re-run the approved check in the host network context before reporting an outage.
-- Do not probe Hermes root with unrelated keys. Deployment runs on Hermes itself from GitHub;
-  OCI verifies exported evidence through the read-only channel.
+- **NexusAgent is the only current remote execution and control channel for Quanthus.** OCI has
+  been retired and must not be restored, reconnected, treated as a fallback, or used as a current
+  deployment/planning authority.
+- GitHub remains the only normal code-distribution path. Remote execution through NexusAgent must
+  consume versioned repository state; do not distribute ad-hoc source trees with rsync, scp, or
+  retired OCI-built archives.
+- Historical documents and acceptance records may still mention OCI because work was executed there
+  before retirement. Treat those references as archival evidence only, not as current routing or
+  recovery instructions.
+- If NexusAgent is absent from the current conversation/tool context, report the execution-channel
+  limitation precisely. Do not infer that Quanthus, its nodes, or GitHub are offline, and do not ask
+  the Owner to repair OCI.
+- Preserve node-local read-only/deployment boundaries and current approved interfaces when
+  NexusAgent operates on remote nodes. Do not revive retired OCI-specific tunnels, credentials,
+  users, or host assumptions as a workaround.
+

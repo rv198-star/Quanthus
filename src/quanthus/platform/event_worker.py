@@ -21,6 +21,9 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+from quanthus.expert_strategy.p3_strat_003_industry_inspection import (
+    verify_industry_inspection_artifact,
+)
 from quanthus.expert_strategy.p3_strat_003_input_inspection import (
     verify_input_inspection_artifact,
 )
@@ -81,6 +84,9 @@ _P3_STRAT_003_INPUT_RUN_CONFIG_V2 = "config/research/p3-strat-003/input-qualific
 _P3_STRAT_003_INPUT_INSPECTION_RUN_CONFIG = (
     "config/research/p3-strat-003/input-inspection.v1.json"
 )
+_P3_STRAT_003_INDUSTRY_INSPECTION_RUN_CONFIG = (
+    "config/research/p3-strat-003/industry-inspection.v1.json"
+)
 _P3_STRAT_003_SEMANTIC_PROBE_RUN_CONFIG = (
     "config/research/p3-strat-003/semantic-equivalence-probe.v1.json"
 )
@@ -100,6 +106,7 @@ _STRUCTURE_RUN_CONFIGS = frozenset(
         _P3_STRAT_003_INPUT_RUN_CONFIG,
         _P3_STRAT_003_INPUT_RUN_CONFIG_V2,
         _P3_STRAT_003_INPUT_INSPECTION_RUN_CONFIG,
+        _P3_STRAT_003_INDUSTRY_INSPECTION_RUN_CONFIG,
         _P3_STRAT_003_SEMANTIC_PROBE_RUN_CONFIG,
         _REFERENCE_FEASIBILITY_CONFIG,
     }
@@ -470,6 +477,9 @@ def _structure_request_digest(run_config: str) -> str:
         _P3_STRAT_003_INPUT_RUN_CONFIG: "quanthus.p3-strat-003-input-qualification.v1",
         _P3_STRAT_003_INPUT_RUN_CONFIG_V2: "quanthus.p3-strat-003-input-qualification.v2",
         _P3_STRAT_003_INPUT_INSPECTION_RUN_CONFIG: "quanthus.p3-strat-003-input-inspection.v1",
+        _P3_STRAT_003_INDUSTRY_INSPECTION_RUN_CONFIG: (
+            "quanthus.p3-strat-003-industry-inspection.v1"
+        ),
         _P3_STRAT_003_SEMANTIC_PROBE_RUN_CONFIG: (
             "quanthus.p3-strat-003-semantic-equivalence-probe.v1"
         ),
@@ -1368,6 +1378,13 @@ class EventWorker:
             running_stage = "running-p3-strat-003-input-inspection"
             validating_stage = "validating-p3-strat-003-input-inspection"
             recovering_stage = "recovering-sealed-p3-strat-003-input-inspection"
+        elif run_config == _P3_STRAT_003_INDUSTRY_INSPECTION_RUN_CONFIG:
+            verifier = verify_industry_inspection_artifact
+            module = "quanthus.expert_strategy.p3_strat_003_industry_inspection"
+            artifact_name = "p3-strat-003-industry-inspection"
+            running_stage = "running-p3-strat-003-industry-inspection"
+            validating_stage = "validating-p3-strat-003-industry-inspection"
+            recovering_stage = "recovering-sealed-p3-strat-003-industry-inspection"
         elif run_config == _P3_STRAT_003_SEMANTIC_PROBE_RUN_CONFIG:
             verifier = verify_semantic_equivalence_probe_artifact
             module = "quanthus.expert_strategy.p3_strat_003_semantic_equivalence"

@@ -1,0 +1,854 @@
+{
+  "schema_version": "quanthus.p5-stage-001-stage-targets.v1",
+  "work_item": "P5-STAGE-001-A",
+  "target_set_id": "p5-stage-001-layered-stage-assessment-targets-v1",
+  "state": "FROZEN_A_NO_MARKET_READ_NO_TRAINING",
+  "effective_date": "2026-09-22",
+  "purpose": "Freeze a layered, non-top1, partially observable 1..12 research target vocabulary for comparing rule-based and learned stage assessments without promoting any historical Stage proposition or changing Continuous Facts authority.",
+  "global_output_contract": {
+    "historical_stage_codes": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "global_softmax_forbidden": true,
+    "multiple_stage_scores_may_coexist": true,
+    "raw_score_semantics": "model_support_score_not_probability_until_calibrated",
+    "raw_score_range": [
+      0,
+      1
+    ],
+    "calibrated_probability_requires_reference_and_calibration_gate": true,
+    "ineligible_or_untrained_head_raw_score": null,
+    "ineligible_or_uncalibrated_probability": null,
+    "primary_stage_output": null,
+    "evidence_grade_is_not_probability": true,
+    "model_score_is_not_future_return_probability": true
+  },
+  "epistemic_and_control_outputs": {
+    "0_DIRECTIONLESS": {
+      "kind": "market_context",
+      "meaning": "Valid PIT evidence supports directionless price action.",
+      "is_part_of_1_to_12_model_heads": false,
+      "uncertainty_must_not_create_it": true
+    },
+    "ABSTAIN": {
+      "kind": "epistemic",
+      "meaning": "Usable inputs do not support a sufficiently definite assertion.",
+      "is_market_state": false
+    },
+    "X": {
+      "kind": "control",
+      "meaning": "Ordinary stage inference is invalid or frozen because of data or market-condition controls.",
+      "is_market_state": false,
+      "may_not_imply_structural_damage": true
+    }
+  },
+  "reference_label_states": [
+    "positive",
+    "negative",
+    "ambiguous",
+    "unjudgeable",
+    "unreviewed"
+  ],
+  "reference_rules": {
+    "ambiguous_unjudgeable_unreviewed_excluded_from_binary_supervised_loss": true,
+    "unknown_is_not_negative": true,
+    "confirmatory_primary_requires_blind_to_tested_outputs": true,
+    "confirmatory_primary_may_not_be_derived_only_from_tested_rule": true,
+    "rule_silver_allowed_for_training_or_exploration": true,
+    "model_suggestion_allowed_for_training_triage_not_truth": true,
+    "b_must_freeze_reference_eligibility_before_training": true
+  },
+  "time_contract_defaults": {
+    "anchor_time": "T_after_close",
+    "feature_cutoff": "T_close",
+    "label_observation_end": "T_close",
+    "first_execution_time_if_later_consumed_by_strategy": "T_plus_1_open",
+    "historical_evidence_grade": "retrospective_T_only_until_B_proves_as_known",
+    "future_rows_for_label_confirmation_forbidden": true
+  },
+  "severe_error_defaults": {
+    "event": "high_confidence_wrong_assertion",
+    "definite_negative_error": "calibrated_probability_at_or_above_0.80",
+    "definite_positive_error": "calibrated_probability_at_or_below_0.20",
+    "confirmatory_slice_id": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+    "reference_slice_membership_rule": {
+      "reference_eligibility": "reference_eligible_for_confirmatory_primary",
+      "reference_label": [
+        "positive",
+        "negative"
+      ],
+      "target_applicability": true,
+      "ambiguous_unjudgeable_unreviewed_excluded": true
+    },
+    "paired_metric_case_rule": "within the fixed reference slice, severe-error rate comparison uses identical cases with finite calibrated probabilities from both candidate and comparator; missing prediction is not imputed and is governed by the frozen coverage/inconclusive rules",
+    "head_weighting": "equal_weight_macro_in_request_contract",
+    "uncalibrated_handling": "head_metric_unavailable_and_confirmatory_inconclusive"
+  },
+  "cards": [
+    {
+      "historical_stage_code": 1,
+      "proposition_id": "stock_stage.condition.downside_stabilization",
+      "display_name_zh": "止跌企稳",
+      "layer": "event_or_nested_condition",
+      "evidence_grade": "research_supported_parent_context_not_qualified",
+      "probability_semantics": "conditional",
+      "conditioning_population": "stage_12_downside_context_qualified_at_T",
+      "parent_proposition_id": "stock_stage.context.downside",
+      "parent_not_applicable_handling": "applicability_false_probability_null",
+      "parent_episode_id_rule": "downside_context_episode_id",
+      "anchor_time": "T_after_close",
+      "feature_cutoff": "T_close",
+      "label_observation_end": "T_close",
+      "as_known_or_retrospective": "retrospective_T_only_until_B_proves_as_known",
+      "reference_eligibility": "unresolved_until_B",
+      "initial_trainability": "conditional_on_parent_reference_readiness",
+      "severe_error_slice": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "semantic_intent": "T-only deceleration or stabilization nested inside a qualified downside context; it does not itself assert structural repair.",
+      "t_visible_evidence_requirements": [
+        "qualified Stage12 downside context at T",
+        "T-only downside momentum deceleration or selling-pressure exhaustion evidence",
+        "no future recovery or later support reclaim"
+      ],
+      "semantic_examples": {
+        "positive": [
+          "Qualified downside context with materially decelerating decline and T-only stabilization evidence, while repair remains unproven."
+        ],
+        "negative": [
+          "Qualified downside context with decline continuing or accelerating and no T-only stabilization evidence."
+        ],
+        "ambiguous": [
+          "Downside velocity decelerates but structure/order and selling-pressure evidence materially conflict."
+        ],
+        "unjudgeable": [
+          "Stage12 parent context or required T-only downside/stabilization facts are unavailable."
+        ]
+      },
+      "rule_model_distinction": {
+        "existing_rule_or_projection_status": "research_supported_parent_context_not_qualified",
+        "tested_rule_may_supply_training_silver": true,
+        "tested_rule_alone_may_not_be_confirmatory_truth": true,
+        "learned_target": "the frozen semantic proposition inside its declared applicability population, not reproduction of one threshold implementation"
+      },
+      "relationships": {
+        "required_parent_code": 12,
+        "cross_layer_coexistence_allowed": true,
+        "same_layer_mutual_exclusion_codes": [],
+        "same_layer_ambiguity_preserved": true,
+        "historical_number_does_not_imply_precedence": true
+      },
+      "known_parent_not_applicable_reference_handling": "no_stage1_reference_label; applicability_false; calibrated_probability_null",
+      "diagnostic_error_slice_hint": "downside_lifecycle_transition_boundary",
+      "severe_error_slice_membership_rule": "stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule"
+    },
+    {
+      "historical_stage_code": 2,
+      "proposition_id": "stock_stage.condition.orderly_consolidation",
+      "display_name_zh": "蓄势整理",
+      "layer": "event_or_nested_condition",
+      "evidence_grade": "strong_exploratory",
+      "probability_semantics": "marginal_over_BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "conditioning_population": "BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "parent_proposition_id": null,
+      "parent_not_applicable_handling": null,
+      "parent_episode_id_rule": "order_structure_episode_id",
+      "anchor_time": "T_after_close",
+      "feature_cutoff": "T_close",
+      "label_observation_end": "T_close",
+      "as_known_or_retrospective": "retrospective_T_only_until_B_proves_as_known",
+      "reference_eligibility": "unresolved_until_B",
+      "initial_trainability": "candidate_if_B_capacity_gate_passes",
+      "severe_error_slice": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "semantic_intent": "T-only orderly consolidation/order condition over continuous structure facts; no future breakout expectation is used as truth.",
+      "t_visible_evidence_requirements": [
+        "T-only Structure Order/geometry facts",
+        "range/width and center behavior available at T",
+        "no future breakout or return used to label T"
+      ],
+      "semantic_examples": {
+        "positive": [
+          "Range/order facts show coherent contraction or stable ordering with a stable center at T."
+        ],
+        "negative": [
+          "T-only facts show directional disorder, expansion, or unstable center incompatible with orderly consolidation."
+        ],
+        "ambiguous": [
+          "Width and center/order channels point in conflicting directions."
+        ],
+        "unjudgeable": [
+          "Required T-only Structure Order or geometry facts are missing or reset."
+        ]
+      },
+      "rule_model_distinction": {
+        "existing_rule_or_projection_status": "strong_exploratory",
+        "tested_rule_may_supply_training_silver": true,
+        "tested_rule_alone_may_not_be_confirmatory_truth": true,
+        "learned_target": "the frozen semantic proposition inside its declared applicability population, not reproduction of one threshold implementation"
+      },
+      "relationships": {
+        "required_parent_code": null,
+        "cross_layer_coexistence_allowed": true,
+        "same_layer_mutual_exclusion_codes": [],
+        "same_layer_ambiguity_preserved": true,
+        "historical_number_does_not_imply_precedence": true
+      },
+      "diagnostic_error_slice_hint": "order_disorder_boundary",
+      "severe_error_slice_membership_rule": "stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule",
+      "applicability_population_id": "BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "applicability_rule_ref": "stage-targets.v1.json:marginal_population_contract",
+      "missing_required_T_facts_handling": "UNAVAILABLE_not_NOT_APPLICABLE"
+    },
+    {
+      "historical_stage_code": 3,
+      "proposition_id": "stock_stage.event.breakout_probe",
+      "display_name_zh": "试探突破",
+      "layer": "event_or_nested_condition",
+      "evidence_grade": "development_candidate",
+      "probability_semantics": "marginal_over_BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "conditioning_population": "BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "parent_proposition_id": null,
+      "parent_not_applicable_handling": null,
+      "parent_episode_id_rule": "breakout_probe_episode_id",
+      "anchor_time": "T_after_close",
+      "feature_cutoff": "T_close",
+      "label_observation_end": "T_close",
+      "as_known_or_retrospective": "retrospective_T_only_until_B_proves_as_known",
+      "reference_eligibility": "unresolved_until_B",
+      "initial_trainability": "candidate_if_B_capacity_gate_passes",
+      "severe_error_slice": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "semantic_intent": "A T-time breakout-probe event, not later breakout acceptance.",
+      "t_visible_evidence_requirements": [
+        "predeclared key-level relation visible by T",
+        "first/renewed attack evidence at T",
+        "T-only price-volume evidence; later acceptance forbidden"
+      ],
+      "semantic_examples": {
+        "positive": [
+          "Price attacks the predeclared key level at T with the frozen probe evidence present."
+        ],
+        "negative": [
+          "No qualifying key-level attack occurs at T or price remains clearly below the probe boundary."
+        ],
+        "ambiguous": [
+          "A key-level crossing occurs but attack/volume evidence is conflicting or below the semantic boundary."
+        ],
+        "unjudgeable": [
+          "The key-level reference or required T-only price/volume evidence is unavailable."
+        ]
+      },
+      "rule_model_distinction": {
+        "existing_rule_or_projection_status": "development_candidate",
+        "tested_rule_may_supply_training_silver": true,
+        "tested_rule_alone_may_not_be_confirmatory_truth": true,
+        "learned_target": "the frozen semantic proposition inside its declared applicability population, not reproduction of one threshold implementation"
+      },
+      "relationships": {
+        "required_parent_code": null,
+        "cross_layer_coexistence_allowed": true,
+        "same_layer_mutual_exclusion_codes": [],
+        "same_layer_ambiguity_preserved": true,
+        "historical_number_does_not_imply_precedence": true
+      },
+      "diagnostic_error_slice_hint": "breakout_probe_acceptance_boundary",
+      "severe_error_slice_membership_rule": "stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule",
+      "applicability_population_id": "BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "applicability_rule_ref": "stage-targets.v1.json:marginal_population_contract",
+      "missing_required_T_facts_handling": "UNAVAILABLE_not_NOT_APPLICABLE"
+    },
+    {
+      "historical_stage_code": 4,
+      "proposition_id": "stock_stage.condition.breakout_acceptance",
+      "display_name_zh": "突破接受",
+      "layer": "event_or_nested_condition",
+      "evidence_grade": "development_candidate",
+      "probability_semantics": "conditional",
+      "conditioning_population": "prior_stage3_episode_provenance_available_at_T",
+      "parent_proposition_id": "stock_stage.event.breakout_probe",
+      "parent_not_applicable_handling": "applicability_false_probability_null",
+      "parent_episode_id_rule": "stage3_episode_id",
+      "anchor_time": "T_after_close",
+      "feature_cutoff": "T_close",
+      "label_observation_end": "T_close",
+      "as_known_or_retrospective": "retrospective_T_only_until_B_proves_as_known",
+      "reference_eligibility": "unresolved_until_B",
+      "initial_trainability": "conditional_on_stage3_episode_reference_readiness",
+      "severe_error_slice": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "semantic_intent": "T-only acceptance condition after valid Stage3 episode provenance; it cannot be backfilled from later success.",
+      "t_visible_evidence_requirements": [
+        "valid Stage3 parent episode provenance known by T",
+        "T-only evidence that the breakout remains accepted/held at T",
+        "no future continuation used"
+      ],
+      "semantic_examples": {
+        "positive": [
+          "A valid Stage3 episode exists and T-only evidence shows the breakout remains accepted above its governed relation."
+        ],
+        "negative": [
+          "A valid Stage3 episode exists but T-only evidence shows acceptance failed or retreated without qualification."
+        ],
+        "ambiguous": [
+          "Parent episode is valid but holding/acceptance evidence at T conflicts."
+        ],
+        "unjudgeable": [
+          "Valid Stage3 episode provenance or required T-only acceptance facts are unknown or unavailable."
+        ]
+      },
+      "rule_model_distinction": {
+        "existing_rule_or_projection_status": "development_candidate",
+        "tested_rule_may_supply_training_silver": true,
+        "tested_rule_alone_may_not_be_confirmatory_truth": true,
+        "learned_target": "the frozen semantic proposition inside its declared applicability population, not reproduction of one threshold implementation"
+      },
+      "relationships": {
+        "required_parent_code": 3,
+        "cross_layer_coexistence_allowed": true,
+        "same_layer_mutual_exclusion_codes": [],
+        "same_layer_ambiguity_preserved": true,
+        "historical_number_does_not_imply_precedence": true
+      },
+      "known_parent_not_applicable_reference_handling": "no_stage4_reference_label; applicability_false; calibrated_probability_null",
+      "diagnostic_error_slice_hint": "breakout_probe_acceptance_boundary",
+      "severe_error_slice_membership_rule": "stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule"
+    },
+    {
+      "historical_stage_code": 5,
+      "proposition_id": "stock_stage.context.advancing",
+      "display_name_zh": "上升推进",
+      "layer": "context_or_structural_state",
+      "evidence_grade": "parked",
+      "probability_semantics": "marginal_over_BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "conditioning_population": "BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "parent_proposition_id": null,
+      "parent_not_applicable_handling": null,
+      "parent_episode_id_rule": "advancing_context_episode_id",
+      "anchor_time": "T_after_close",
+      "feature_cutoff": "T_close",
+      "label_observation_end": "T_close",
+      "as_known_or_retrospective": "retrospective_T_only_until_B_proves_as_known",
+      "reference_eligibility": "unresolved_until_B",
+      "initial_trainability": "parked_until_B_reference_readiness",
+      "severe_error_slice": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "semantic_intent": "Persistent advancing-trend context at T; currently parked and not assumed trainable.",
+      "t_visible_evidence_requirements": [
+        "T-only trend/structure facts",
+        "directional advance context must be defined without future return",
+        "continuous Facts remain authoritative"
+      ],
+      "semantic_examples": {
+        "positive": [
+          "T-only trend/structure facts coherently support an advancing context."
+        ],
+        "negative": [
+          "T-only facts do not support an advancing context and instead show non-advance or structural deterioration."
+        ],
+        "ambiguous": [
+          "Trend direction and structural integrity channels materially disagree."
+        ],
+        "unjudgeable": [
+          "Required T-only trend/structure facts are unavailable."
+        ]
+      },
+      "rule_model_distinction": {
+        "existing_rule_or_projection_status": "parked",
+        "tested_rule_may_supply_training_silver": true,
+        "tested_rule_alone_may_not_be_confirmatory_truth": true,
+        "learned_target": "the frozen semantic proposition inside its declared applicability population, not reproduction of one threshold implementation"
+      },
+      "relationships": {
+        "required_parent_code": null,
+        "cross_layer_coexistence_allowed": true,
+        "same_layer_mutual_exclusion_codes": [],
+        "same_layer_ambiguity_preserved": true,
+        "historical_number_does_not_imply_precedence": true
+      },
+      "diagnostic_error_slice_hint": "advance_pullback_repair_boundary",
+      "severe_error_slice_membership_rule": "stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule",
+      "applicability_population_id": "BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "applicability_rule_ref": "stage-targets.v1.json:marginal_population_contract",
+      "missing_required_T_facts_handling": "UNAVAILABLE_not_NOT_APPLICABLE"
+    },
+    {
+      "historical_stage_code": 6,
+      "proposition_id": "stock_stage.condition.pullback_test",
+      "display_name_zh": "回踩测试",
+      "layer": "event_or_nested_condition",
+      "evidence_grade": "parked",
+      "probability_semantics": "conditional",
+      "conditioning_population": "stage_5_advancing_context_qualified_at_T",
+      "parent_proposition_id": "stock_stage.context.advancing",
+      "parent_not_applicable_handling": "applicability_false_probability_null",
+      "parent_episode_id_rule": "advancing_context_episode_id",
+      "anchor_time": "T_after_close",
+      "feature_cutoff": "T_close",
+      "label_observation_end": "T_close",
+      "as_known_or_retrospective": "retrospective_T_only_until_B_proves_as_known",
+      "reference_eligibility": "unresolved_until_B",
+      "initial_trainability": "conditional_on_parent_reference_readiness",
+      "severe_error_slice": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "semantic_intent": "Pullback-test process nested in a qualified Stage5 advancing context.",
+      "t_visible_evidence_requirements": [
+        "qualified Stage5 advancing context at T",
+        "T-only retracement toward governed support/structure",
+        "trend not structurally failed at T"
+      ],
+      "semantic_examples": {
+        "positive": [
+          "Within qualified advance, T-only facts show a retracement/test toward support while trend structure remains intact."
+        ],
+        "negative": [
+          "Within a qualified Stage5 advancing context, required T-only facts show no qualifying pullback/test."
+        ],
+        "ambiguous": [
+          "Retracement is present but integrity and volume/process evidence conflict."
+        ],
+        "unjudgeable": [
+          "Stage5 parent context or required T-only pullback/integrity facts are unavailable."
+        ]
+      },
+      "rule_model_distinction": {
+        "existing_rule_or_projection_status": "parked",
+        "tested_rule_may_supply_training_silver": true,
+        "tested_rule_alone_may_not_be_confirmatory_truth": true,
+        "learned_target": "the frozen semantic proposition inside its declared applicability population, not reproduction of one threshold implementation"
+      },
+      "relationships": {
+        "required_parent_code": 5,
+        "cross_layer_coexistence_allowed": true,
+        "same_layer_mutual_exclusion_codes": [],
+        "same_layer_ambiguity_preserved": true,
+        "historical_number_does_not_imply_precedence": true
+      },
+      "known_parent_not_applicable_reference_handling": "no_stage6_reference_label; applicability_false; calibrated_probability_null",
+      "diagnostic_error_slice_hint": "advance_pullback_repair_boundary",
+      "severe_error_slice_membership_rule": "stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule"
+    },
+    {
+      "historical_stage_code": 7,
+      "proposition_id": "stock_stage.condition.repair_rebuild",
+      "display_name_zh": "修复重建",
+      "layer": "event_or_nested_condition",
+      "evidence_grade": "parked",
+      "probability_semantics": "unavailable_until_governed_repair_context",
+      "conditioning_population": null,
+      "parent_proposition_id": null,
+      "parent_not_applicable_handling": "head_ineligible_probability_null",
+      "parent_episode_id_rule": "repair_process_episode_id",
+      "anchor_time": "T_after_close",
+      "feature_cutoff": "T_close",
+      "label_observation_end": "T_close",
+      "as_known_or_retrospective": "retrospective_T_only_until_B_proves_as_known",
+      "reference_eligibility": "ineligible_until_governed_repair_context",
+      "initial_trainability": "ineligible_head_output_null_until_governed_repair_context",
+      "severe_error_slice": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "semantic_intent": "Repair/rebuild condition requires a governed T-only repair-context predicate; A intentionally does not invent one.",
+      "t_visible_evidence_requirements": [
+        "a separately governed repair-context predicate is required before trainability",
+        "repair evidence must be T-only and independent of future recovery",
+        "damage depth alone cannot qualify repair"
+      ],
+      "semantic_examples": {
+        "positive": [
+          "Illustrative only: a governed repair context exists and T-only reclaim/rebuild evidence is present."
+        ],
+        "negative": [
+          "Illustrative only: a governed repair context exists but T-only repair evidence is absent or repair has failed."
+        ],
+        "ambiguous": [
+          "Illustrative only: repair channels conflict under an otherwise governed repair context."
+        ],
+        "unjudgeable": [
+          "Current A state: no governed repair-context predicate is frozen, so the head is ineligible and outputs remain null."
+        ]
+      },
+      "rule_model_distinction": {
+        "existing_rule_or_projection_status": "parked",
+        "tested_rule_may_supply_training_silver": true,
+        "tested_rule_alone_may_not_be_confirmatory_truth": true,
+        "learned_target": "the frozen semantic proposition inside its declared applicability population, not reproduction of one threshold implementation"
+      },
+      "relationships": {
+        "required_parent_code": null,
+        "cross_layer_coexistence_allowed": true,
+        "same_layer_mutual_exclusion_codes": [],
+        "same_layer_ambiguity_preserved": true,
+        "historical_number_does_not_imply_precedence": true
+      },
+      "diagnostic_error_slice_hint": "advance_pullback_repair_boundary",
+      "severe_error_slice_membership_rule": "stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule"
+    },
+    {
+      "historical_stage_code": 8,
+      "proposition_id": "stock_stage.modifier.upside_acceleration_extension",
+      "display_name_zh": "加速赶顶",
+      "layer": "modifier",
+      "evidence_grade": "research_only_resource_no_pass",
+      "probability_semantics": "unavailable_until_governed_high_side_context_predicate",
+      "conditioning_population": null,
+      "parent_proposition_id": "stock_stage.context.advancing",
+      "parent_not_applicable_handling": "head_ineligible_probability_null",
+      "parent_episode_id_rule": "unavailable_until_governed_high_side_context_predicate",
+      "anchor_time": "T_after_close",
+      "feature_cutoff": "T_close",
+      "label_observation_end": "T_close",
+      "as_known_or_retrospective": "retrospective_T_only_until_B_proves_as_known",
+      "reference_eligibility": "ineligible_until_governed_high_side_context_predicate",
+      "initial_trainability": "ineligible_head_output_null_until_governed_high_side_context_predicate",
+      "severe_error_slice": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "semantic_intent": "Upside acceleration/extension modifier requires a separately governed T-only high-side applicability predicate; A does not derive 'high-side' from Stage5 alone.",
+      "t_visible_evidence_requirements": [
+        "a separately governed high-side applicability predicate is required before trainability",
+        "qualified Stage5 advancing context alone is insufficient to define high-side",
+        "T-only acceleration/extension facts; no future reversal used"
+      ],
+      "semantic_examples": {
+        "positive": [
+          "Illustrative only: a governed high-side context exists and T-only facts show material acceleration/extension."
+        ],
+        "negative": [
+          "Illustrative only: a governed high-side context exists but acceleration/extension evidence is absent."
+        ],
+        "ambiguous": [
+          "Illustrative only: within a governed high-side context, price extension and participation/acceleration channels conflict."
+        ],
+        "unjudgeable": [
+          "Current A state: no governed high-side applicability predicate is frozen, so the head is ineligible and outputs remain null."
+        ]
+      },
+      "rule_model_distinction": {
+        "existing_rule_or_projection_status": "research_only_resource_no_pass",
+        "tested_rule_may_supply_training_silver": true,
+        "tested_rule_alone_may_not_be_confirmatory_truth": true,
+        "learned_target": "the frozen semantic proposition inside its declared applicability population, not reproduction of one threshold implementation"
+      },
+      "relationships": {
+        "required_parent_code": 5,
+        "cross_layer_coexistence_allowed": true,
+        "same_layer_mutual_exclusion_codes": [],
+        "same_layer_ambiguity_preserved": true,
+        "historical_number_does_not_imply_precedence": true
+      },
+      "diagnostic_error_slice_hint": "high_side_modifier_boundary",
+      "severe_error_slice_membership_rule": "stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule"
+    },
+    {
+      "historical_stage_code": 9,
+      "proposition_id": "stock_stage.modifier.high_side_price_volume_divergence",
+      "display_name_zh": "高位分歧/派发",
+      "layer": "modifier",
+      "evidence_grade": "parked_missing_fact_relation",
+      "probability_semantics": "unavailable_until_governed_activity_relation",
+      "conditioning_population": null,
+      "parent_proposition_id": "stock_stage.context.advancing",
+      "parent_not_applicable_handling": "head_ineligible_probability_null",
+      "parent_episode_id_rule": "high_side_episode_id",
+      "anchor_time": "T_after_close",
+      "feature_cutoff": "T_close",
+      "label_observation_end": "T_close",
+      "as_known_or_retrospective": "retrospective_T_only_until_B_proves_as_known",
+      "reference_eligibility": "ineligible_until_governed_activity_relation",
+      "initial_trainability": "ineligible_head_output_null_until_governed_activity_relation",
+      "severe_error_slice": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "semantic_intent": "High-side price-volume divergence modifier requiring a governed activity relation; A does not infer distribution intent from price alone.",
+      "t_visible_evidence_requirements": [
+        "qualified high-side context at T",
+        "separately governed activity/participation relation required",
+        "no latent 'main-force intent' inference"
+      ],
+      "semantic_examples": {
+        "positive": [
+          "Illustrative only: qualified high-side context plus governed activity relation shows T-only price-volume divergence."
+        ],
+        "negative": [
+          "Illustrative only: governed activity relation supports continued acceptance rather than divergence."
+        ],
+        "ambiguous": [
+          "Illustrative only: price and governed activity channels conflict."
+        ],
+        "unjudgeable": [
+          "Current A state: the required governed activity relation is missing, so the head is ineligible and outputs remain null."
+        ]
+      },
+      "rule_model_distinction": {
+        "existing_rule_or_projection_status": "parked_missing_fact_relation",
+        "tested_rule_may_supply_training_silver": true,
+        "tested_rule_alone_may_not_be_confirmatory_truth": true,
+        "learned_target": "the frozen semantic proposition inside its declared applicability population, not reproduction of one threshold implementation"
+      },
+      "relationships": {
+        "required_parent_code": 5,
+        "cross_layer_coexistence_allowed": true,
+        "same_layer_mutual_exclusion_codes": [],
+        "same_layer_ambiguity_preserved": true,
+        "historical_number_does_not_imply_precedence": true
+      },
+      "diagnostic_error_slice_hint": "high_side_modifier_boundary",
+      "severe_error_slice_membership_rule": "stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule"
+    },
+    {
+      "historical_stage_code": 10,
+      "proposition_id": "stock_stage.context.structural_failure",
+      "display_name_zh": "结构失效",
+      "layer": "context_or_structural_state",
+      "evidence_grade": "accepted_development_projection",
+      "probability_semantics": "marginal_over_BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "conditioning_population": "BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "parent_proposition_id": null,
+      "parent_not_applicable_handling": null,
+      "parent_episode_id_rule": "support_failure_episode_id",
+      "anchor_time": "T_after_close",
+      "feature_cutoff": "T_close",
+      "label_observation_end": "T_close",
+      "as_known_or_retrospective": "retrospective_T_only_until_B_proves_as_known",
+      "reference_eligibility": "unresolved_until_B_independent_reference_check",
+      "initial_trainability": "candidate_existing_projection_may_be_training_silver_not_confirmatory_truth",
+      "severe_error_slice": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "semantic_intent": "Persistent structural-failure context tied to the same predeclared support role; a one-day crossing is insufficient.",
+      "t_visible_evidence_requirements": [
+        "predeclared support-role identity",
+        "T-only persistent failure evidence",
+        "same support remains unreclaimed through T"
+      ],
+      "semantic_examples": {
+        "positive": [
+          "The same governed support role has failed persistently through T and remains unreclaimed."
+        ],
+        "negative": [
+          "Support is intact or a transient crossing has been promptly reclaimed by T."
+        ],
+        "ambiguous": [
+          "Failure depth/persistence and reclaim evidence conflict near the frozen boundary."
+        ],
+        "unjudgeable": [
+          "Support-role identity or required T-only persistence/reclaim facts are unavailable."
+        ]
+      },
+      "rule_model_distinction": {
+        "existing_rule_or_projection_status": "accepted_development_projection",
+        "tested_rule_may_supply_training_silver": true,
+        "tested_rule_alone_may_not_be_confirmatory_truth": true,
+        "learned_target": "the frozen semantic proposition inside its declared applicability population, not reproduction of one threshold implementation"
+      },
+      "relationships": {
+        "required_parent_code": null,
+        "cross_layer_coexistence_allowed": true,
+        "same_layer_mutual_exclusion_codes": [],
+        "same_layer_ambiguity_preserved": true,
+        "historical_number_does_not_imply_precedence": true
+      },
+      "diagnostic_error_slice_hint": "failure_rebound_hierarchy",
+      "severe_error_slice_membership_rule": "stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule",
+      "applicability_population_id": "BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "applicability_rule_ref": "stage-targets.v1.json:marginal_population_contract",
+      "missing_required_T_facts_handling": "UNAVAILABLE_not_NOT_APPLICABLE"
+    },
+    {
+      "historical_stage_code": 11,
+      "proposition_id": "stock_stage.condition.post_break_rebound",
+      "display_name_zh": "反抽",
+      "layer": "event_or_nested_condition",
+      "evidence_grade": "accepted_development_projection",
+      "probability_semantics": "conditional",
+      "conditioning_population": "stage_10_structural_failure_context_qualified_at_T",
+      "parent_proposition_id": "stock_stage.context.structural_failure",
+      "parent_not_applicable_handling": "applicability_false_probability_null",
+      "parent_episode_id_rule": "same_support_failure_episode_id",
+      "anchor_time": "T_after_close",
+      "feature_cutoff": "T_close",
+      "label_observation_end": "T_close",
+      "as_known_or_retrospective": "retrospective_T_only_until_B_proves_as_known",
+      "reference_eligibility": "unresolved_until_B_independent_reference_check",
+      "initial_trainability": "candidate_existing_projection_may_be_training_silver_not_confirmatory_truth",
+      "severe_error_slice": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "semantic_intent": "Post-break rebound condition only inside a qualified Stage10 structural-failure context while the same failed support remains unreclaimed.",
+      "t_visible_evidence_requirements": [
+        "qualified Stage10 context at T",
+        "same support-failure episode identity",
+        "T-only rebound from post-break low",
+        "same support unreclaimed at T"
+      ],
+      "semantic_examples": {
+        "positive": [
+          "Within qualified Stage10, price has rebounded from the post-break low by T while the same failed support remains unreclaimed."
+        ],
+        "negative": [
+          "Within qualified Stage10, the same failed support remains unreclaimed at T but no qualifying post-break rebound is present."
+        ],
+        "ambiguous": [
+          "Within qualified Stage10, rebound magnitude/process and support-reclaim evidence conflict."
+        ],
+        "unjudgeable": [
+          "Stage10 context or the same-support episode/rebound facts are unknown or unavailable at T."
+        ]
+      },
+      "rule_model_distinction": {
+        "existing_rule_or_projection_status": "accepted_development_projection",
+        "tested_rule_may_supply_training_silver": true,
+        "tested_rule_alone_may_not_be_confirmatory_truth": true,
+        "learned_target": "the frozen semantic proposition inside its declared applicability population, not reproduction of one threshold implementation"
+      },
+      "relationships": {
+        "required_parent_code": 10,
+        "cross_layer_coexistence_allowed": true,
+        "same_layer_mutual_exclusion_codes": [],
+        "same_layer_ambiguity_preserved": true,
+        "historical_number_does_not_imply_precedence": true
+      },
+      "known_parent_not_applicable_reference_handling": "no_stage11_reference_label; applicability_false; calibrated_probability_null",
+      "diagnostic_error_slice_hint": "failure_rebound_hierarchy",
+      "severe_error_slice_membership_rule": "stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule"
+    },
+    {
+      "historical_stage_code": 12,
+      "proposition_id": "stock_stage.context.downside",
+      "display_name_zh": "下行推进",
+      "layer": "context_or_structural_state",
+      "evidence_grade": "research_reference_no_pass",
+      "probability_semantics": "marginal_over_BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "conditioning_population": "BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "parent_proposition_id": null,
+      "parent_not_applicable_handling": null,
+      "parent_episode_id_rule": "downside_context_episode_id",
+      "anchor_time": "T_after_close",
+      "feature_cutoff": "T_close",
+      "label_observation_end": "T_close",
+      "as_known_or_retrospective": "retrospective_T_only_until_B_proves_as_known",
+      "reference_eligibility": "unresolved_until_B",
+      "initial_trainability": "reference_no_pass_until_B_readiness",
+      "severe_error_slice": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "semantic_intent": "Persistent downside context at T; it may coexist with nested Stage1 stabilization evidence.",
+      "t_visible_evidence_requirements": [
+        "T-only directional/downside facts",
+        "persistent downside context defined without future decline",
+        "Stage1 nesting does not force Stage12 false"
+      ],
+      "semantic_examples": {
+        "positive": [
+          "T-only direction/structure facts coherently support persistent downside context."
+        ],
+        "negative": [
+          "T-only evidence does not support persistent downside context, such as qualified recovery/non-downside structure."
+        ],
+        "ambiguous": [
+          "Downside direction and structural/order channels materially disagree."
+        ],
+        "unjudgeable": [
+          "Required T-only directional/downside facts are unavailable."
+        ]
+      },
+      "rule_model_distinction": {
+        "existing_rule_or_projection_status": "research_reference_no_pass",
+        "tested_rule_may_supply_training_silver": true,
+        "tested_rule_alone_may_not_be_confirmatory_truth": true,
+        "learned_target": "the frozen semantic proposition inside its declared applicability population, not reproduction of one threshold implementation"
+      },
+      "relationships": {
+        "required_parent_code": null,
+        "cross_layer_coexistence_allowed": true,
+        "same_layer_mutual_exclusion_codes": [],
+        "same_layer_ambiguity_preserved": true,
+        "historical_number_does_not_imply_precedence": true
+      },
+      "diagnostic_error_slice_hint": "downside_lifecycle_transition_boundary",
+      "severe_error_slice_membership_rule": "stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule",
+      "applicability_population_id": "BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+      "applicability_rule_ref": "stage-targets.v1.json:marginal_population_contract",
+      "missing_required_T_facts_handling": "UNAVAILABLE_not_NOT_APPLICABLE"
+    }
+  ],
+  "claim_ceiling": "This target set freezes semantics only. It does not claim any head is trainable, calibrated, reference-qualified, predictive, economically useful, official, production-ready, or authorized for strategy/trading use.",
+  "semantic_digest": "sha256:2e175cefbc7a68ecf1e7a2856bb01ef849baee10260e4a2cfe4957bcb4abddc3",
+  "model_output_schema": {
+    "fields": {
+      "proposition_id": "stable target id",
+      "historical_stage_code": "1..12",
+      "applicability": "true when the frozen target population is satisfied; false when parent/context is known not applicable; null when required parent/context is unavailable or unknown",
+      "raw_score": "nullable [0,1] learned support score; not a probability",
+      "calibrated_probability": "nullable probability only after the per-head calibration gate",
+      "decision_state": [
+        "ASSERT_POSITIVE",
+        "ASSERT_NEGATIVE",
+        "ABSTAIN",
+        "NOT_APPLICABLE",
+        "UNAVAILABLE",
+        "X"
+      ],
+      "reason_codes": "ordered stable reason-code list",
+      "model_identity": "model/checkpoint/input/split/calibrator digests"
+    },
+    "precedence": [
+      "X_when_system_control_invalid",
+      "UNAVAILABLE_when_head_not_trainable_or_required_seed_missing",
+      "NOT_APPLICABLE_when_frozen_parent_or_context_is_false",
+      "ABSTAIN_when_parent_or_context_is_unknown_or_probability_is_unavailable",
+      "ASSERT_POSITIVE_when_calibrated_probability_gte_0.70",
+      "ASSERT_NEGATIVE_when_calibrated_probability_lte_0.30",
+      "ABSTAIN_otherwise"
+    ],
+    "positive_assertion_probability_minimum": 0.7,
+    "negative_assertion_probability_maximum": 0.3,
+    "uncalibrated_score_may_be_reported_diagnostically": true,
+    "uncalibrated_score_may_not_create_assertion": true,
+    "model_decision_is_not_policy_effect": true
+  },
+  "coverage_contract": {
+    "raw_score_coverage": {
+      "numerator": "reference_eligible definite cases with target applicability true and finite confirmatory primary raw score from all required seeds",
+      "denominator": "reference_eligible definite cases with target applicability true",
+      "parent_not_applicable_or_unknown_excluded_from_denominator_by_frozen_target_contract": true,
+      "model_abstain_with_finite_raw_score_remains_in_numerator": true
+    },
+    "calibrated_probability_coverage": {
+      "numerator": "reference_eligible definite applicable cases with publishable calibrated_probability",
+      "denominator": "reference_eligible definite cases with target applicability true"
+    },
+    "assertion_coverage": {
+      "numerator": "reference_eligible definite applicable cases with ASSERT_POSITIVE or ASSERT_NEGATIVE",
+      "denominator": "reference_eligible definite cases with target applicability true",
+      "role": "diagnostic_only"
+    },
+    "head_ineligible_handling": "exclude_from_confirmatory_macro_head_set_and_report_in_k_of_12",
+    "primary_coverage_gate_metric": "raw_score_coverage",
+    "primary_coverage_minimum": 0.8,
+    "abstention_never_removes_case_from_AP_or_Brier_when_probability_exists": true
+  },
+  "marginal_population_contract": {
+    "population_id": "BASE_ACTIVE_RESEARCH_ANCHOR_V1",
+    "semantic_role": "outcome_blind_risk_set_for_all_parentless_marginal_stage_heads",
+    "base_membership": {
+      "data_scope": "exact B-bound 2012-01-01..2021-12-31 SSE/SZSE development manifest only",
+      "anchor_unit": "unique (security_id, T_market_date) at T_after_close",
+      "control_requirement": "ordinary inference control state ACTIVE; X is outside the Stage-assessment population",
+      "semantic_applicability": "every base member is applicable for marginal-head semantics; missing target-specific T-only facts make that head UNAVAILABLE, not NOT_APPLICABLE",
+      "prohibited_membership_inputs": [
+        "stage reference label",
+        "tested rule output",
+        "model score or prediction",
+        "future price/return/event outcome",
+        "post-T correction not known at T",
+        "current sector membership used as historical proxy"
+      ]
+    },
+    "B_authority": {
+      "may_resolve_exact_source_manifest_and_counts": true,
+      "may_not_redefine_population_semantics": true,
+      "may_not_filter_base_population_by_label_rule_model_or_future_outcome": true,
+      "must_publish_population_count_and_digest_before_label_adjudication": true
+    },
+    "sampling_roles": {
+      "train": "label-aware enrichment may be separately preregistered by B for training efficiency, but must preserve source inclusion probabilities/role and cannot define calibration/evaluation prevalence",
+      "development_validation": "outcome-blind sample from the frozen base population; selection rule frozen by B before label adjudication",
+      "calibration": "outcome-blind sample from the frozen base population; no positive/negative enrichment",
+      "evaluation": "outcome-blind sample from the frozen base population; no positive/negative enrichment; confirmatory probability claims refer only to this frozen population/sample design"
+    }
+  }
+}

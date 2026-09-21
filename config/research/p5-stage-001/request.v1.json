@@ -1,0 +1,651 @@
+{
+  "schema_version": "quanthus.p5-stage-001-research-request.v1",
+  "work_item": "P5-STAGE-001-A",
+  "request_id": "p5-stage-001-layered-stage-assessment-dual-track-v1",
+  "state": "FROZEN_A_NO_MARKET_READ_NO_TRAINING",
+  "effective_date": "2026-09-22",
+  "planning_anchor": {
+    "parent_issue": 400,
+    "a_issue": 401,
+    "owner_direction_observed_in_active_session": "2026-09-22",
+    "owner_direction": "Open P5-STAGE-001-A and freeze the bounded learned-stage assessment research protocol while keeping the rule path in parallel.",
+    "source_revision": "ff83909f4584a60cb3bdf6808cae39d339326336"
+  },
+  "downstream_value_card": {
+    "card_id": "p5.research-scoring.proposal-to-rule-shadow-review",
+    "card_version": "1.0.0",
+    "consumer_kind": "existing_p5_research_scoring_lifecycle_review",
+    "consumer_authority": "research_read_only",
+    "decision_owner": "Quanthus owner acting as human research lifecycle reviewer",
+    "governing_design": "docs/design/lld/07-research-scoring.md",
+    "current_authoritative_substrate": "continuous_facts_plus_layered_stage_proposition_bundle_plus_governed_rule_surface",
+    "current_inputs": [
+      "authoritative Continuous Facts",
+      "Layered Stage Proposition surface",
+      "existing governed rule/projection results where available"
+    ],
+    "bounded_gap": "The existing P5 proposal-to-rule-shadow lifecycle can review deterministic Facts and already-derived Stage propositions, but it has no governed learned per-proposition support distribution on the same semantics, no calibrated learned uncertainty, and no rule-versus-learned disagreement surface for deciding whether parked/inconclusive recognition boundaries merit further rule engineering.",
+    "value_question": "For B-qualified reference-eligible Stage propositions, does a fixed learned temporal assessment provide incremental semantic identification or useful calibrated disagreement beyond simple learned baselines and the existing rule surface, sufficient to inform the P5 proposal-to-rule-shadow lifecycle decision?",
+    "output_consumed": "Read-only R/L/G/T0/T1 scorecard, per-head k/12 readiness, calibration status and rule-versus-learned disagreement report.",
+    "human_decision_supported": [
+      "continue_with_simple_L_or_G",
+      "retain_T0_sequence_architecture",
+      "retain_T1_self_supervised_pretraining",
+      "limit_learned_assessment_to_specific_heads",
+      "close_no_increment_or_data_limited"
+    ],
+    "gap_cannot_be_satisfied_by_existing_surface_alone": "Existing Facts and Layered Propositions remain the factual authority but do not answer whether a learned recognition route adds reference-supported information or uncertainty beyond the rule route.",
+    "stop_when": [
+      "no_head_has_reference_eligible_capacity",
+      "no_independent_confirmatory_reference_exists",
+      "learned_route_has_no_supported_increment",
+      "compute_budget_cannot_support_the_pre_registered_run_matrix",
+      "any_protected_data_or_PIT_boundary_would_need_to_be_relaxed"
+    ],
+    "not_supported": [
+      "strategy_action",
+      "expert_policy_effect",
+      "veto_or_constraint",
+      "production_label",
+      "daily_inference",
+      "P6_mutation",
+      "trading"
+    ]
+  },
+  "bindings": {
+    "p0_policy": {
+      "path": "config/p0-policy.v1.json",
+      "sha256": "sha256:b5d6ae725e9ce8d9e4b936d2324458c341c9fabc4a3a33e15671d84ff4df4338"
+    },
+    "p5_design": {
+      "path": "docs/design/lld/07-research-scoring.md",
+      "sha256": "sha256:97476bfa685f012fd15cced7ef1b0cb599334f2e09fcbe6b93bcac8ef26bc421"
+    },
+    "p5_stage_design": {
+      "path": "docs/design/lld/07-research-scoring/p5-stage-001.md",
+      "sha256": "sha256:592ee358726a511e2ca2d062b6a2cc00d1f1f89a9381035c3b39d50ce46962eb"
+    },
+    "stage_portfolio": {
+      "path": "docs/design/stock-stage-vocabulary-portfolio.md",
+      "sha256": "sha256:0c0a1a481a3b6ed613d5bbbffdcee9ef74d5764b49bbe99b2ec62f7f4c2a1e8e"
+    },
+    "stage_phase1_closeout": {
+      "path": "config/stage-learning/stock-stage-research-phase1-closeout.v1.json",
+      "sha256": "sha256:f5c66c5071cfdc3c4a75e6ebcc8c936dead6401a5025f4c43fdaea22eca36268"
+    },
+    "layered_stage_bundle": {
+      "path": "config/stage-learning/stage-proposition-bundle.v1.json",
+      "sha256": "sha256:652cddb4be100a2990b47cf8946112de3b5ddadb284ea6d63df2da981440a07b"
+    },
+    "stage_targets": {
+      "path": "config/research/p5-stage-001/stage-targets.v1.json",
+      "sha256": "sha256:315fab9f7bd0304b418bc2a35f27e557a0f97b0c23b82b228f2754a386173d2f",
+      "semantic_digest": "sha256:2e175cefbc7a68ecf1e7a2856bb01ef849baee10260e4a2cfe4957bcb4abddc3"
+    },
+    "owner_authorization": {
+      "path": "config/research/p5-stage-001/authorization.v1.json",
+      "sha256": "sha256:8bd4a8a5ea726038c13e6bfb69c4aab18bcab0a3f1d7377c559e70e768920ec9"
+    },
+    "four_perspective_design_review": {
+      "path": "config/research/p5-stage-001/design-review-evidence.v1.json",
+      "sha256": "sha256:f3cb9c21285c4dfaf7f690abef5fca889fa376fe69dddcf5106d9b203458186c"
+    },
+    "A_validation_evidence": {
+      "path": "config/research/p5-stage-001/validation-evidence.v1.json",
+      "sha256": "sha256:e2bbd988e2d093ca5ee549924b46202f61c86254233fc47ee8202fd5a4e8ae0f"
+    }
+  },
+  "authority": {
+    "narrow_p5_research_line_authorized": true,
+    "authorization_basis": "Bound owner authorization receipt at config/research/p5-stage-001/authorization.v1.json; A only.",
+    "A_docs_config_tests_and_synthetic_contracts_authorized": true,
+    "P3_stage_phase1_official_qualification_reopened": false,
+    "historical_stage_vocabulary_reused_as_research_targets_only": true,
+    "market_data_row_read_in_A_authorized": false,
+    "model_training_in_A_authorized": false,
+    "successor_issue_execution_auto_authorized": false,
+    "B_requires_explicit_issue_activation": true,
+    "C_requires_explicit_issue_activation": true,
+    "D_requires_explicit_issue_activation": true,
+    "P5_promotion_authorized": false,
+    "production_expert_consumption_authorized": false,
+    "strategy_consumption_authorized": false,
+    "P6_mutation_authorized": false,
+    "broker_or_live_capital_authorized": false,
+    "trading_authorized": false,
+    "authorization_receipt_path": "config/research/p5-stage-001/authorization.v1.json"
+  },
+  "data_use": {
+    "A": {
+      "allowed": [
+        "repository_design_and_config_metadata",
+        "published_non_market_acceptance_and_reference_counts",
+        "synthetic_contract_cases"
+      ],
+      "market_row_read": false,
+      "training": false
+    },
+    "B_candidate_scope_after_explicit_activation": {
+      "market_date_start": "2012-01-01",
+      "market_date_end": "2021-12-31",
+      "exchanges": [
+        "SSE",
+        "SZSE"
+      ],
+      "exact_manifest_selection_deferred_to_B": true,
+      "row_read_before_B_freezes_and_verifies_manifest": false,
+      "allowed_source_families": [
+        "dwd_security_bar",
+        "dwd_tradability_state",
+        "dwd_trading_calendar",
+        "accepted_continuous_structure_facts",
+        "published_stage_reference_artifacts"
+      ],
+      "allowed_purposes": [
+        "outcome_blind_readiness_accounting",
+        "T_only_feature_window_materialization",
+        "reference_packet_construction",
+        "train_partition_supervised_learning",
+        "train_partition_self_supervised_learning",
+        "development_validation",
+        "calibration",
+        "frozen_evaluation"
+      ],
+      "strategy_or_economic_outcome_read": false,
+      "sector_membership_feature_use": false,
+      "current_membership_as_historical_proxy": false
+    },
+    "warmup_2011": {
+      "authorized_by_A": false,
+      "may_be_requested_by_B_only_if_exact_T_only_feature_dependency_requires_it": true,
+      "requires_separate_pre_result_authority_update": true
+    },
+    "protected_2022_2024": {
+      "authorized": false
+    },
+    "blind_2025": {
+      "authorized": false
+    },
+    "simulation_2026": {
+      "authorized": false
+    },
+    "p3_strat_003_data_authority_inheritance": false
+  },
+  "target_contract": {
+    "target_set_path": "config/research/p5-stage-001/stage-targets.v1.json",
+    "head_count": 12,
+    "global_softmax_forbidden": true,
+    "primary_stage_top1_forbidden": true,
+    "partial_head_training_allowed": true,
+    "unqualified_head_output": "raw_score_null_probability_null",
+    "code_0_directionless_is_separate_from_ABSTAIN": true,
+    "X_is_control_not_market_stage": true,
+    "stage_11_probability": "P(Stage11 | Stage10 context qualified at T)",
+    "stage_11_parent_not_applicable": "applicability_false_probability_null",
+    "model_output_schema": "config/research/p5-stage-001/stage-targets.v1.json:model_output_schema",
+    "coverage_contract": "config/research/p5-stage-001/stage-targets.v1.json:coverage_contract",
+    "stage_7": "head_ineligible_probability_null_until_governed_repair_context",
+    "stage_9": "head_ineligible_probability_null_until_governed_activity_relation",
+    "stage_8": "head_ineligible_probability_null_until_governed_high_side_context_predicate"
+  },
+  "sample_qualification": {
+    "maximum_unique_episode_anchors": 1500,
+    "maximum_self_supervised_windows": 200000,
+    "minimum_per_head_episode_counts": {
+      "train": {
+        "positive": 50,
+        "negative": 50
+      },
+      "development_validation": {
+        "positive": 20,
+        "negative": 20
+      },
+      "calibration": {
+        "positive": 20,
+        "negative": 20
+      },
+      "evaluation": {
+        "positive": 50,
+        "negative": 50
+      }
+    },
+    "B_must_publish_readiness_matrix_before_formal_labeling": true,
+    "readiness_matrix_required_fields": [
+      "historical_stage_code",
+      "candidate_positive_count",
+      "candidate_negative_count",
+      "independent_episode_count",
+      "effective_time_block_count",
+      "reference_source_and_exposure_grade",
+      "estimated_human_adjudication_count",
+      "train_capacity",
+      "development_validation_capacity",
+      "calibration_capacity",
+      "evaluation_capacity",
+      "trainable",
+      "calibratable",
+      "evaluable",
+      "reason"
+    ],
+    "insufficient_head_disposition": "head_not_evaluable_keep_output_null",
+    "no_budget_expansion_to_complete_all_12": true,
+    "no_result_driven_gate_lowering": true
+  },
+  "model_ladder": {
+    "R": {
+      "kind": "existing_rule_or_stage_projection",
+      "purpose": "rule_route_reference_where_governed",
+      "must_not_invent_missing_rule": true
+    },
+    "L": {
+      "kind": "fixed_regularized_logistic",
+      "purpose": "simple_linear_learning_baseline"
+    },
+    "G": {
+      "kind": "fixed_small_GBDT",
+      "purpose": "non_sequence_nonlinear_baseline"
+    },
+    "T0": {
+      "kind": "fixed_small_sequence_encoder_direct_supervision",
+      "purpose": "sequence_architecture_increment"
+    },
+    "T1": {
+      "kind": "same_T0_encoder_masked_pretraining_then_supervision",
+      "purpose": "self_supervised_pretraining_increment"
+    },
+    "sequence_architecture": {
+      "window_sessions": 120,
+      "maximum_input_channels": 24,
+      "patch_sessions": 5,
+      "encoder_layers": 4,
+      "d_model": 128,
+      "attention_heads": 4,
+      "ffn_dimension": 512,
+      "maximum_parameters": 2000000,
+      "text_BERT_weights_used": false
+    },
+    "automatic_hyperparameter_search": false,
+    "fusion_model_in_A_to_H": false
+  },
+  "comparison_contract": {
+    "simple_baseline_B_star": {
+      "candidate_models": [
+        "L",
+        "G"
+      ],
+      "selection_partition": "development_validation_only",
+      "head_set": "B_frozen_common_reference_eligible_trainable_heads",
+      "metric": "macro_average_precision",
+      "direction": "maximize",
+      "tie_epsilon": 1e-12,
+      "tie_breaker": "L_preferred_for_simplicity",
+      "single_valid_model": "use_the_only_valid_model",
+      "neither_valid": "INCONCLUSIVE_NO_B_STAR",
+      "lock_after_selection": true
+    },
+    "T0_minus_B_star": "component_diagnostic_sequence_architecture_increment",
+    "T1_minus_T0": "component_diagnostic_self_supervised_pretraining_increment",
+    "T1_minus_B_star": "sole_confirmatory_complete_learned_route_increment",
+    "rule_model_agreement": "diagnostic_only_not_confidence_multiplier",
+    "confirmatory_claim_hierarchy": {
+      "sole_line_level_confirmatory_contrast": "T1_minus_B_star",
+      "component_diagnostic_contrasts": [
+        "T0_minus_B_star",
+        "T1_minus_T0"
+      ],
+      "component_diagnostics_may_not_create_SUPPORTED_INCREMENT_line_disposition": true,
+      "component_diagnostics_report_same_pre_registered_metrics_and_intervals": true,
+      "if_T1_not_admitted": "line_disposition_COMPUTE_LIMITED; T0 component diagnostic may still be reported"
+    }
+  },
+  "seed_policy": {
+    "downstream_seeds": [
+      17,
+      29,
+      43
+    ],
+    "confirmatory_raw_primary": "arithmetic_mean_of_raw_sigmoid_scores_across_all_three_seeds_for_same_sample_and_head",
+    "single_seed_results": "stability_secondary_only",
+    "best_seed_selection_forbidden": true,
+    "missing_required_seed_after_pre_registered_recovery": "confirmatory_primary_inconclusive_no_replacement_seed",
+    "T1_pretraining_checkpoint_count": 1,
+    "T1_pretraining_seed_uncertainty_must_be_disclosed": true
+  },
+  "calibration": {
+    "method": "platt_scaling",
+    "fit_partition": "calibration_only",
+    "per_head": true,
+    "model_inputs": {
+      "L": "L_raw_score",
+      "G": "G_raw_score",
+      "T0": "three_seed_mean_raw_score",
+      "T1": "three_seed_mean_raw_score"
+    },
+    "B_star_calibrator": "calibrator_of_selected_underlying_L_or_G_model",
+    "R_probability_calibration": "not_applicable_hard_rule_route",
+    "publication_requires_calibration_capacity_and_effective_blocks": true,
+    "insufficient_evidence": "calibrated_probability_null_raw_score_may_remain",
+    "assertion_thresholds": {
+      "positive_probability_minimum": 0.7,
+      "negative_probability_maximum": 0.3,
+      "middle_interval": "ABSTAIN"
+    }
+  },
+  "primary_evaluation": {
+    "reference_population": "B_frozen_reference_eligible_definite_applicable_cases_only",
+    "primary_metric": "macro_average_precision_over_confirmatory_evaluable_heads",
+    "all_definite_cases_scored_even_when_model_abstains": true,
+    "coverage_minimum": 0.8,
+    "uncertainty": {
+      "method": "paired_calendar_block_bootstrap_v1",
+      "protocol_ref": "primary_evaluation.bootstrap_protocol",
+      "block_sessions": 22,
+      "effective_time_blocks_minimum": 8,
+      "target_valid_resamples": 2000,
+      "maximum_candidate_resamples": 4000,
+      "confidence_level": 0.95
+    },
+    "AP_increment_rule": "paired_difference_95pct_interval_lower_bound_gt_0",
+    "Brier_noninferiority": {
+      "tolerance": 0.01,
+      "signed_difference": "candidate_minus_comparator",
+      "rule": "paired_difference_95pct_interval_upper_bound_lte_0.01",
+      "point_estimate_only_pass_forbidden": true
+    },
+    "severe_error": {
+      "point_tolerance": 0.02,
+      "slice_id": "ALL_REFERENCE_ELIGIBLE_DEFINITE_APPLICABLE_CASES",
+      "slice_binding": "config/research/p5-stage-001/stage-targets.v1.json:severe_error_defaults.reference_slice_membership_rule",
+      "signed_difference": "candidate_severe_error_rate_minus_comparator_severe_error_rate",
+      "per_head_rate_denominator": "the fixed confirmatory reference slice for that head restricted to identical paired cases with finite calibrated probabilities from candidate and comparator",
+      "cross_head_aggregation": "equal_weight_macro_mean_of_per_head_paired_rate_differences_over_the_exact_frozen_confirmatory_head_set",
+      "rule": "paired_difference_95pct_interval_upper_bound_lte_0.02",
+      "insufficient_resolution_or_blocks": "INCONCLUSIVE"
+    },
+    "multiple_comparison_policy": {
+      "line_level_confirmatory_family": {
+        "contrasts": [
+          "T1_minus_B_star"
+        ],
+        "family_size": 1,
+        "multiplicity_adjustment": "none_required_single_confirmatory_claim"
+      },
+      "component_contrasts": {
+        "contrasts": [
+          "T0_minus_B_star",
+          "T1_minus_T0"
+        ],
+        "claim_ceiling": "pre_registered_diagnostic_only_no_line_level_supported_increment"
+      },
+      "per_head_results": {
+        "claim_ceiling": "descriptive_diagnostic_only",
+        "confirmatory_hypotheses": false,
+        "p_values": "not_computed",
+        "multiplicity_adjustment": "not_applicable_because_no_per_head_confirmatory_claims",
+        "may_not_create_or_upgrade_line_level_SUPPORTED_INCREMENT": true
+      },
+      "diagnostic_slices": "descriptive_only_unless_separately_pre_registered"
+    },
+    "no_independent_reference": "INCONCLUSIVE_OR_DISTILLATION_ONLY",
+    "negative_or_no_increment_is_valid_closeout": true,
+    "coverage_metric": "raw_score_coverage_on_reference_eligible_applicable_definite_cases",
+    "comparator_coverage_minimum": 0.8,
+    "contrast_decision_table": {
+      "registered_contrasts": {
+        "T1_minus_B_star": {
+          "candidate": "T1",
+          "comparator": "B_star",
+          "role": "sole_line_level_confirmatory",
+          "question": "complete_learned_route_increment"
+        },
+        "T0_minus_B_star": {
+          "candidate": "T0",
+          "comparator": "B_star",
+          "role": "component_diagnostic",
+          "question": "sequence_architecture_increment"
+        },
+        "T1_minus_T0": {
+          "candidate": "T1",
+          "comparator": "T0",
+          "role": "component_diagnostic",
+          "question": "self_supervised_pretraining_increment"
+        }
+      },
+      "sole_confirmatory_contrast": "T1_minus_B_star",
+      "confirmatory_decision_precedence": [
+        {
+          "order": 1,
+          "disposition": "INVALID_EVIDENCE",
+          "when_any": [
+            "PIT_or_partition_leakage",
+            "binding_digest_drift",
+            "result_driven_head_or_gate_change",
+            "protected_data_boundary_violation"
+          ]
+        },
+        {
+          "order": 2,
+          "disposition": "COMPUTE_LIMITED",
+          "when_any": [
+            "T1_not_admitted_under_frozen_compute_budget"
+          ]
+        },
+        {
+          "order": 3,
+          "disposition": "INCONCLUSIVE",
+          "when_any": [
+            "no_confirmatory_reference",
+            "no_evaluable_head",
+            "B_star_unavailable_or_invalid",
+            "required_seed_primary_unavailable",
+            "Brier_or_severe_error_not_resolvable_at_pre_registered_precision",
+            "confirmatory_head_metric_unavailable",
+            "fewer_than_2000_valid_shared_replicates_after_4000_candidates",
+            "constructed_block_count_lt_8",
+            "any_constructed_block_not_jointly_effective"
+          ]
+        },
+        {
+          "order": 4,
+          "disposition": "NO_INCREMENT",
+          "reason": "LOW_COVERAGE",
+          "when_any": [
+            "candidate_raw_score_coverage_lt_0.80",
+            "comparator_raw_score_coverage_lt_0.80"
+          ]
+        },
+        {
+          "order": 5,
+          "disposition": "NO_INCREMENT",
+          "reason": "RESOLVED_NONINFERIORITY_FAILURE",
+          "when_any": [
+            "Brier_candidate_minus_comparator_95pct_upper_bound_gt_0.01",
+            "severe_error_candidate_minus_comparator_95pct_upper_bound_gt_0.02"
+          ]
+        },
+        {
+          "order": 6,
+          "disposition": "NO_INCREMENT",
+          "reason": "AP_INCREMENT_NOT_SUPPORTED",
+          "when_any": [
+            "AP_paired_difference_95pct_lower_bound_lte_0"
+          ]
+        },
+        {
+          "order": 7,
+          "disposition": "SUPPORTED_INCREMENT",
+          "when_all": [
+            "protocol_and_reference_evidence_valid",
+            "required_models_and_primary_seed_aggregation_available",
+            "candidate_and_comparator_raw_score_coverage_gte_0.80",
+            "effective_time_blocks_gte_8",
+            "AP_paired_difference_95pct_lower_bound_gt_0",
+            "Brier_candidate_minus_comparator_95pct_upper_bound_lte_0.01",
+            "severe_error_candidate_minus_comparator_95pct_upper_bound_lte_0.02"
+          ]
+        }
+      ],
+      "precedence_semantics": "evaluate_rules_in_ascending_order_and_take_the_first_matching_disposition; rule_7_is_the_exhaustive_valid_pass_fallback_after_rules_1_to_6_do_not_match",
+      "component_diagnostic_disposition": {
+        "role": "descriptive_pre_registered_component_evidence_only",
+        "reports": [
+          "paired_AP_difference_and_interval",
+          "paired_Brier_difference_and_interval_when_calibrated",
+          "paired_severe_error_difference_and_interval_when_resolvable",
+          "raw_score_coverage"
+        ],
+        "may_use_labels": [
+          "COMPONENT_SIGNAL_POSITIVE",
+          "COMPONENT_SIGNAL_NOT_SUPPORTED",
+          "COMPONENT_INCONCLUSIVE",
+          "COMPONENT_COMPUTE_LIMITED",
+          "COMPONENT_INVALID_EVIDENCE"
+        ],
+        "line_level_SUPPORTED_INCREMENT_authority": false
+      },
+      "PARTIAL_line_closeout": "aggregate line disposition only; may summarize mixed component/head availability or evidence, but cannot override the sole confirmatory contrast disposition"
+    },
+    "confirmatory_head_set": {
+      "frozen_by": "B_before_E_and_before_any_model_result",
+      "eligibility": [
+        "reference_eligible_for_confirmatory_primary",
+        "trainable",
+        "development_validation_qualified",
+        "calibratable",
+        "evaluation_qualified"
+      ],
+      "same_head_set_for": [
+        "macro_average_precision",
+        "macro_Brier_difference",
+        "macro_severe_error_difference"
+      ],
+      "post_result_head_drop_forbidden": true,
+      "any_frozen_head_metric_unavailable": "INCONCLUSIVE"
+    },
+    "line_level_metric_construction": {
+      "pairing_unit": "same historical_stage_code plus same reference episode/sample identity",
+      "common_case_rule": "within each frozen head, candidate and comparator are evaluated on the identical reference-eligible definite applicable evaluation cases; metric construction uses only cases with both required predictions, while raw-score/probability coverage is reported against the full frozen applicable denominator",
+      "missing_case_rule": "missing prediction is never converted to a correct/incorrect pseudo-value; coverage records it; if paired metric eligibility falls below the frozen gate or any frozen head cannot produce the required metric, line-level disposition is INCONCLUSIVE",
+      "head_weighting": "equal_weight_macro_over_the_exact_B_frozen_confirmatory_head_set",
+      "per_head_AP": "compute AP separately per frozen head on its paired raw-score cases, then arithmetic mean across frozen heads",
+      "per_head_Brier_difference": "for each frozen head and paired calibrated-probability case, compute candidate squared_error minus comparator squared_error; average within head, then arithmetic mean the head differences",
+      "per_head_severe_error_difference": "for each frozen head and paired calibrated-probability case eligible for that head severe-error definition, compute candidate severe_error_indicator minus comparator severe_error_indicator; average within head, then arithmetic mean the head differences",
+      "temporal_blocks": {
+        "protocol_ref": "primary_evaluation.bootstrap_protocol",
+        "per_resample_aggregation": "compute each head metric/difference on cases in sampled blocks, then equal-weight arithmetic mean across the complete frozen head set"
+      },
+      "Brier_line_level_statistic": "macro equal-weight mean of per-head paired Brier differences; 95pct bootstrap interval from the shared temporal-block replicates",
+      "severe_error_line_level_statistic": "macro equal-weight mean of per-head paired severe-error-rate differences; 95pct bootstrap interval from the shared temporal-block replicates"
+    },
+    "bootstrap_protocol": {
+      "protocol_id": "paired-calendar-block-bootstrap-v1",
+      "outcome_blind_partition_basis": "B_frozen_evaluation_trading_calendar_dates_only; no labels, predictions, losses, AP, Brier or severe-error values participate in partition construction",
+      "block_partition": {
+        "sort": "ascending unique admitted evaluation trading dates",
+        "base_block_sessions": 22,
+        "algorithm": "partition from the earliest admitted evaluation trading date into consecutive non-overlapping 22-session blocks; if a trailing remainder of 1..21 sessions exists, append it to the immediately preceding full block; if there is no full 22-session block, interval evidence is INCONCLUSIVE",
+        "all_evaluation_dates_used_when_at_least_one_full_block_exists": true,
+        "block_boundaries_frozen_by": "B evaluation manifest before E"
+      },
+      "effective_block_requirement": "Let K be the deterministic constructed block count. K must be at least 8 and EVERY constructed block must contain at least one paired metric-eligible case for EVERY frozen confirmatory head. No constructed block is dropped or filtered. If K<8 or any constructed block fails joint effectiveness, all line-level interval evidence is INCONCLUSIVE.",
+      "bootstrap_draws": {
+        "target_valid_replicates": 2000,
+        "maximum_candidate_replicates": 4000,
+        "draw_count_per_candidate_replicate": "number_of_constructed_blocks",
+        "sampling": "with replacement from integer block indices 0..K-1",
+        "deterministic_index_rule": "for candidate replicate r and draw j, compute SHA256(UTF8(seed_material + ':' + decimal(r) + ':' + decimal(j))); interpret first 8 digest bytes as unsigned big-endian integer; sampled_index = integer mod K",
+        "seed_material": "request_id + ':' + contrast_id + ':paired-calendar-block-bootstrap-v1'",
+        "shared_indices": "the exact same block-index draws are used for candidate/comparator and every frozen head"
+      },
+      "replicate_validity": {
+        "AP": "for every frozen head, sampled paired raw-score cases must contain at least one positive and one negative reference label; otherwise the candidate replicate is invalid",
+        "Brier": "every frozen head must have at least one sampled paired calibrated-probability case",
+        "severe_error": "every frozen head must have at least one sampled paired severe-error-eligible calibrated-probability case",
+        "shared_validity": "a candidate replicate is valid only when AP, Brier and severe-error requirements all hold for every frozen head",
+        "replacement_policy": "scan deterministic candidate replicate ids r=0..3999 in order and keep the first 2000 valid shared replicates; fewer than 2000 valid replicates after r=3999 makes interval evidence INCONCLUSIVE"
+      },
+      "per_valid_replicate": "compute each per-head statistic/difference on all cases carried by sampled blocks including repeated blocks, then equal-weight arithmetic mean across the complete frozen confirmatory head set",
+      "confidence_interval": {
+        "method": "empirical_nearest_rank_percentile",
+        "confidence_level": 0.95,
+        "valid_replicate_count": 2000,
+        "sorting": "ascending numeric statistic",
+        "lower": "50th smallest value (one-based rank ceil(0.025*2000)=50; zero-based index 49)",
+        "upper": "1950th smallest value (one-based rank ceil(0.975*2000)=1950; zero-based index 1949)",
+        "interpolation": "none"
+      }
+    }
+  },
+  "resource_budget": {
+    "worker_concurrency": 1,
+    "maximum_total_node_hours": 24,
+    "maximum_new_artifact_and_cache_gib": 20,
+    "maximum_GPU_working_set_gib": 12,
+    "maximum_host_ram_gib": 24,
+    "host_ram_may_not_exceed_available_fraction": 0.5,
+    "pretraining_max_epochs": 10,
+    "downstream_max_epochs": 50,
+    "early_stop_patience": 5,
+    "T0_formal_fits": 3,
+    "T1_pretraining_fits": 1,
+    "T1_formal_fits": 3,
+    "GPU_primary_hard_requirements": [
+      "full_forward_backward_optimizer_checkpoint_correctness",
+      "recoverable_checkpoint",
+      "no_undeclared_CPU_fallback",
+      "resource_budget_pass",
+      "positive_end_to_end_total_cost_benefit"
+    ],
+    "GPU_two_x_median_speedup": "recommended_preference_not_absolute_gate",
+    "C_must_freeze_sub_2x_GPU_rule_before_benchmark_results": true,
+    "T1_over_budget_disposition": "COMPUTE_LIMITED_without_blocking_L_G_T0"
+  },
+  "phase_permissions": {
+    "A": "docs_config_tests_and_synthetic_contract_only; no market rows; no training",
+    "B": "only after explicit issue activation: metadata/readiness first, then exact-manifest bounded development rows under this request; no protected years",
+    "C": "only after explicit issue activation: environment and synthetic CPU/GPU benchmark; no market rows",
+    "D": "only after explicit issue activation: implementation and synthetic contract tests; no evaluation market result read",
+    "E": "only after B+C+D accepted and exact run matrix sealed: train/development-validation only",
+    "F": "calibration then one frozen evaluation under B reference eligibility",
+    "G": "read-only report projection",
+    "H": "read-only evidence review and closeout"
+  },
+  "stop_conditions": [
+    "request_or_binding_digest_drift",
+    "A_market_row_read_or_training_attempt",
+    "successor_execution_without_explicit_issue_activation",
+    "protected_2022_2024_or_2025_or_2026_access",
+    "future_row_used_to_confirm_T_stage_label",
+    "current_sector_membership_used_as_historical_feature",
+    "unknown_or_unjudgeable_reference_converted_to_negative",
+    "tested_rule_is_only_confirmatory_truth_source",
+    "result_driven_head_selection_or_gate_lowering",
+    "replacement_seed_after_result",
+    "hyperparameter_search_after_result",
+    "P3_STRAT_003_or_P6_mutation",
+    "production_or_trading_authority_claim"
+  ],
+  "A_closeout_outcomes": [
+    "A_ACCEPTED_PREREGISTRATION_ONLY",
+    "REOPEN_NOT_AUTHORIZED",
+    "INVALID_A_CONTRACT"
+  ],
+  "line_closeout_outcomes": [
+    "SUPPORTED_INCREMENT",
+    "NO_INCREMENT",
+    "PARTIAL",
+    "INCONCLUSIVE",
+    "DATA_LIMITED",
+    "COMPUTE_LIMITED",
+    "INVALID_EVIDENCE"
+  ],
+  "claim_ceiling": "P5-STAGE-001-A freezes a research-only rule-versus-learned Stage-assessment protocol. It authorizes no market row read or training in A, does not reopen official P3 Stage qualification, does not qualify any 1..12 head, and grants no expert policy, strategy, P6, production, broker, live-capital or trading authority.",
+  "semantic_digest": "sha256:89c729c8b206f8d051d681736f2a58d5d2f301e78c4a7977330263c7dcf2d8ec",
+  "evidence_requirements": {
+    "owner_authorization_binding_required": true,
+    "four_perspective_design_review_binding_required": true,
+    "A_validation_receipt_binding_required_before_A_acceptance": true,
+    "final_independent_implementation_review_required_after_substantive_fixes": true,
+    "raw_run_artifacts_remain_external_immutable_artifacts": true
+  }
+}

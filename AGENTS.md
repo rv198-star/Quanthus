@@ -46,6 +46,19 @@
 - Negative, inconclusive, or unavailable historical evidence is a valid outcome. A green transport
   or unit test is not B acceptance.
 
+## Parallel research routing — P5-STAGE-001
+
+- Parallel line: `P5-STAGE-001` / #400. Current gate: A / #401 preregistration only.
+- Purpose: compare the existing rule/Stage surface with fixed simple baselines and one bounded learned
+  temporal assessment over the layered 1..12 research vocabulary; it is not a top-1 Stage classifier.
+- Before working on this line, read `docs/work-items/p5-stage-001.md`, then the frozen request and
+  target set under `config/research/p5-stage-001/`. After interruption, start with the work-item
+  `Current recovery checkpoint` and expand only what the current gate needs.
+- A permits docs/config/tests and synthetic contract cases only: no market-row read, model training,
+  protected 2022-2026 access, P3-STRAT data-authority inheritance, P6 mutation, promotion or trading.
+- A completion does not auto-start B/C/D. Each successor requires explicit issue activation; negative,
+  partial, data-limited, compute-limited and inconclusive outcomes are all valid.
+
 ## Development
 
 - Support Python 3.10 or newer.

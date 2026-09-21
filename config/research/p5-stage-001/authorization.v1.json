@@ -1,0 +1,60 @@
+{
+  "schema_version": "quanthus.p5-stage-001-authorization.v1",
+  "work_item": "P5-STAGE-001-A",
+  "effective_date": "2026-09-22",
+  "authority_source": "owner_explicit_active_session_direction",
+  "owner_decisions": [
+    {
+      "date": "2026-09-21",
+      "decision": "Run the existing rule route and the learned Stage-assessment route in parallel and design the learned 1..12 issue series."
+    },
+    {
+      "date": "2026-09-22",
+      "decision": "Open P5-STAGE-001-A / issue #401."
+    }
+  ],
+  "concrete_downstream_consumer": {
+    "consumer_id": "p5.research-scoring.proposal-to-rule-shadow-review",
+    "consumer_version": "1.0.0",
+    "governing_design": "docs/design/lld/07-research-scoring.md",
+    "decision_owner": "Quanthus owner acting as human research lifecycle reviewer",
+    "current_inputs": [
+      "authoritative Continuous Facts",
+      "Layered Stage Proposition surface",
+      "existing governed rule/projection results where available"
+    ],
+    "bounded_gap": "The existing research lifecycle can consume deterministic Facts and already-derived Stage propositions, but it cannot compare a learned per-proposition support distribution against the rule route on the same semantics, expose calibrated uncertainty or route disagreement for parked/inconclusive recognition boundaries, or decide whether further rule engineering is justified.",
+    "decision_supported": "Choose whether the next research lifecycle should keep a simple model, retain the fixed sequence encoder, retain self-supervised pretraining, narrow the learned route to specific Stage heads, or close the learned route with no increment/data/compute limitation.",
+    "output_consumed": "Read-only R/L/G/T0/T1 scorecard, k/12 readiness, calibration status and rule-versus-model disagreement report.",
+    "does_not_change_policy_effect": true,
+    "does_not_issue_orders": true
+  },
+  "authorized_now": [
+    "A_repository_docs_config_tests",
+    "A_synthetic_contract_cases",
+    "A_independent_read_only_review"
+  ],
+  "not_authorized_now": [
+    "market_row_read",
+    "model_training",
+    "B_execution",
+    "C_execution",
+    "D_execution",
+    "protected_2022_2024_access",
+    "blind_2025_access",
+    "2026_simulation_data_access",
+    "P3_official_stage_qualification_reopen",
+    "P5_promotion",
+    "P6_mutation",
+    "production",
+    "strategy",
+    "broker",
+    "trading"
+  ],
+  "successor_activation": {
+    "B_requires_explicit_owner_activation": true,
+    "C_requires_explicit_owner_activation": true,
+    "D_requires_explicit_owner_activation": true
+  },
+  "claim_ceiling": "This receipt authorizes only P5-STAGE-001-A preregistration work. It does not authorize any market-data read, training, successor execution, official Stage qualification, production or trading use."
+}

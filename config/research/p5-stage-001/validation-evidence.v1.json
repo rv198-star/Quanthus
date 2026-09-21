@@ -1,0 +1,49 @@
+{
+  "schema_version": "quanthus.p5-stage-001-a-validation-evidence.v1",
+  "work_item": "P5-STAGE-001-A",
+  "source_baseline": "ff83909f4584a60cb3bdf6808cae39d339326336",
+  "artifact": {
+    "artifact_id": "82680dff61dffb4af983bc6b85e59f4e",
+    "sha256": "sha256:3c871be21087ceb7cb6b14165b3121d2de78c4cada8cbf5ce9428744bb2edfa8",
+    "content": "validation-receipt.json"
+  },
+  "focused_contract": {
+    "result": "16_passed",
+    "session_id": "session-716ab9f952d21fa7072883b6"
+  },
+  "equivalent_repository_check": {
+    "result": "2759_passed_7_skipped_3_deselected",
+    "session_id": "session-f9e843abacf6155d92329c95",
+    "ruff": "pass",
+    "git_diff_check": "pass",
+    "planning_check": "pass",
+    "doctor": "pass",
+    "compileall": "pass"
+  },
+  "baseline_reproduction": {
+    "source": "untouched_ff83909_worktree",
+    "result": "same_three_BaoStock_socket_tests_failed",
+    "session_id": "session-736bc9f29da44ce6774b0977",
+    "disposition": "pre_existing_main_baseline_failure_not_caused_by_A"
+  },
+  "excluded_baseline_tests": [
+    "tests/unit/test_lane_runner.py::test_baostock_query_reconnects_when_row_iteration_breaks",
+    "tests/unit/test_lane_runner.py::test_baostock_empty_response_does_not_reconnect",
+    "tests/unit/test_lane_runner.py::test_baostock_missing_set_retry_repairs_only_early_gaps"
+  ],
+  "validated_environment": {
+    "python": "3.10.12",
+    "quanthus": "0.1.0.dev0",
+    "duckdb": "1.5.5",
+    "pyarrow": "23.0.1",
+    "polars": "1.43.0",
+    "baostock": "0.9.3",
+    "pytest": "8.4.2",
+    "ruff": "0.16.8"
+  },
+  "receipt_scope": "The immutable v7 receipt binds the final outcome-blind marginal population, all-block joint-effectiveness rule, and descriptive-only per-head claim policy. It uses the last full repository regression as the runtime baseline plus the final 16-test preregistration check. This evidence-binding file and request binding are verified afterward.",
+  "market_data_row_read": false,
+  "model_training": false,
+  "P6_mutation": false,
+  "claim_ceiling": "This evidence supports A preregistration engineering only; it does not support a model-quality, data-read, training, Stage-qualification, strategy or trading claim."
+}

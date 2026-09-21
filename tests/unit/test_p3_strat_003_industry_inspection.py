@@ -200,8 +200,8 @@ def test_candidate_inventory_rejects_security_company_ambiguity(
                     "p3-strat-003-input/candidate-daily.parquet"
                 ),
             },
-            decision_start=inspection.date(2025, 1, 1),
-            decision_end=inspection.date(2026, 9, 17),
+            decision_start=date(2025, 1, 1),
+            decision_end=date(2026, 9, 17),
         )
 
 

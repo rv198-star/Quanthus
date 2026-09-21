@@ -139,13 +139,11 @@ def _candidate_inventory(
 
     connection = duckdb.connect(":memory:")
     try:
-        columns = {
-            str(row[0])
-            for row in connection.execute(
-                "DESCRIBE SELECT * FROM read_parquet(?)",
-                [str(path)],
-            ).fetchall()
-        }
+        cursor = connection.execute(
+            "SELECT * FROM read_parquet(?) LIMIT 0",
+            [str(path)],
+        )
+        columns = {str(item[0]) for item in cursor.description}
         required = {
             "dwd_security_id",
             "dwd_company_id",

@@ -1,0 +1,49 @@
+{
+  "schema_version": "quanthus.p3-strat-003-input-inspection.v1",
+  "work_item": "P3-STRAT-003-B",
+  "state": "FROZEN_INPUT_METADATA_ONLY",
+  "qualification": {
+    "path": "config/research/p3-strat-003/input-qualification.v2.json",
+    "file_sha256": "sha256:ac66ada85b8fd68d31c490e613389a4b2aef8029fc60ca451bae023f038ee6e6"
+  },
+  "failed_job": {
+    "job_id": "job_b36c3aa41b3745a9a05f7806cc0bee99",
+    "claim_generation": 1,
+    "code_revision": "340ea120be01eaab7da79e6d3396c7ff5758e2ab",
+    "input_digest": "sha256:b7e24afd980431ca89dc37adca3d3e17ccb7d6aeef80140a05daf79ae524083b",
+    "error_code": "p3_strat_003_prior_reconstruction_manifest_mismatch",
+    "expected_manifest_sha256": "sha256:21ba655c360a7dc50bdbae4665f94c9be3fe9452e5b34f26c763ef869356fc46",
+    "observed_manifest_sha256_prefixes": [
+      "sha256:cfcc2c6f015e5cb5a44d6903de16c31d1bbf34a466f9f13ec4b6b388c61fe3c2",
+      "sha256:2a486ff847961d293e9417d86968a6f214f4deb905a031737f4140e91838ec2"
+    ],
+    "status_error_is_bounded_excerpt": true
+  },
+  "scope": {
+    "market_date_start": "2026-08-01",
+    "market_date_end": "2026-09-18",
+    "selection": "all_retained_manifest_versions_in_scope_observed_for_attribution_only",
+    "read_current": false,
+    "read_payloads": false,
+    "reverify_sealed_probe_package": true,
+    "claim_failed_job_inventory_reproduced": false
+  },
+  "limits": {
+    "maximum_packages": 128,
+    "maximum_manifest_bytes": 262144,
+    "maximum_stderr_bytes": 65536,
+    "maximum_output_bytes": 131072,
+    "maximum_wall_seconds": 60
+  },
+  "authority": {
+    "reconstruction": false,
+    "ods_transfer": false,
+    "provider_build": false,
+    "candidate_scoring": false,
+    "strategy_or_economic_results": false,
+    "target_outcome_labels": false,
+    "p6_mutation": false,
+    "daily_current_mutation": false,
+    "b_acceptance": false
+  }
+}

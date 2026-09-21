@@ -114,28 +114,46 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-Last verified after the recovery semantic-equivalence probe:
+Last verified on 2026-09-21 after the formal B-v2 attempt:
 
 - GitHub #319 is open and remains unaccepted.
-- PR #398 merged as `47fac8eb0af9184589dd323fdfdc3bd6d9de93c1`; production event-worker
-  runs `quanthus-event:git-47fac8e` while the P6 replay-worker remains frozen at `git-6cb72eb`.
+- PR #399 merged as `340ea120be01eaab7da79e6d3396c7ff5758e2ab`; the verified production
+  event-worker runs `quanthus-event:git-340ea12` while the P6 replay-worker remains
+  `git-6cb72eb`.
 - Recovery probe Job `job_ab6d6afa749244299c29995968b21b84` succeeded once at attempt 1 with
   disposition `PASS_CONSUMER_SEMANTIC_EQUIVALENCE_PROBE`. Its manifest SHA is
   `sha256:4f6c6d5fa0fe92d9bcee2e07b1aeace9b066ba76de2ca9b8b6fdae6847029a85` and result digest is
   `sha256:e42d6b09e215b476d73fdd33de9ad456d7310af11f9b4018d5d86e9bfa3a6869`.
-- The probe produced no candidate scoring, strategy/economic result, outcome label, P6 mutation or
-  daily-CURRENT mutation.
-- Corrected B-v2 integration is the active work: bind the sealed probe evidence, reuse only its
-  verified 2026-08-27 research package as the explicit semantic bridge, produce the formal B replay
-  and candidate manifests, and then independently review B.
-- No corrected full-B qualification, D result-bearing run, or P6 mutation has occurred.
+- Formal B-v2 Job `job_b36c3aa41b3745a9a05f7806cc0bee99` failed at attempt 1 on
+  2026-09-21T07:31:21Z, with no sealed result. The exact prior-manifest expectation was
+  `sha256:21ba655c360a7dc50bdbae4665f94c9be3fe9452e5b34f26c763ef869356fc46`.
+  The bounded status excerpt does not identify that prior package or its market date.
+- No B acceptance, D result-bearing run, P6 mutation or daily-CURRENT mutation has occurred.
 
-Resume order after interruption: verify live #319/main/current B-v2 branch or PR; finish and review
-the B-v2 bridge integration; deploy event-worker only; run one corrected full-B input qualification
-and preserve its result. A successful B artifact still requires independent B review before D may
-open. A payload-level mismatch, semantic-precondition failure, or new unrelated reconstruction
-failure closes B for insufficient admissible historical input evidence rather than starting another
-retry sequence.
+The next action is one bounded input-identity inspection, governed by
+`config/research/p3-strat-003/input-inspection.v1.json`. It binds the failed Job, its exact
+qualification config and the already sealed probe. It reads retained daily manifests for
+2026-08-01 through 2026-09-18, preserving every retained version and actual relative package path,
+and compares their identities and child prior-bindings with the exact failed expectation. The
+artifact reports whether attribution is unique, ambiguous or unavailable; it does not silently
+select a latest version or claim that the present inventory reproduces the failed Job's inventory.
+The failed Job's bounded retained stderr may contribute only whitelisted function names and
+manifest hashes, including full hashes whose prefixes appeared in the truncated status excerpt.
+
+The inspection is limited to 128 packages, 256 KiB per manifest, 64 KiB of stderr, 128 KiB of total
+output and 60 seconds. It may reverify the sealed probe package, but cannot reconstruct packages,
+transfer ODS, build a provider, score candidates, produce strategy results or outcome labels,
+mutate P6/CURRENT, or accept B. The immutable inspection manifest exposes the core identity matches
+through the existing Worker status interface; this does not add a general file-reading endpoint.
+
+Resume order after interruption: verify live #319/main and the exact diagnostic Job; preserve its
+receipt and attribute the failed expectation before considering any corrected full-B attempt.
+A scoped integration repair must preserve the single 2026-08-27 semantic bridge and every other
+exact edge. A successful formal B artifact still requires independent B review before D may open.
+A payload-level mismatch, semantic-precondition failure, or unrelated missing historical input
+closes B for insufficient admissible historical input evidence rather than starting another retry
+sequence. An unavailable or ambiguous diagnostic is recorded as such and does not authorize
+automatic scope expansion or repeat execution.
 
 This checkpoint is operational status, not authority. Frozen config, immutable artifacts and live
 Git/GitHub state take precedence if it becomes stale.

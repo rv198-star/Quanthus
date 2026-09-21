@@ -188,6 +188,22 @@ def _candidate_inventory(
             or int(duplicates[0])
         ):
             _fail("failed candidate projection identity rows are invalid")
+        identity_ambiguity = connection.execute(
+            """
+            SELECT count(*)
+            FROM (
+              SELECT dwd_security_id
+              FROM read_parquet(?)
+              GROUP BY dwd_security_id
+              HAVING count(DISTINCT dwd_company_id) <> 1
+                  OR count(DISTINCT listing_code) <> 1
+                  OR count(DISTINCT venue_id) <> 1
+            )
+            """,
+            [str(path)],
+        ).fetchone()
+        if identity_ambiguity is None or int(identity_ambiguity[0]):
+            _fail("failed candidate projection has ambiguous security identity bindings")
         totals = connection.execute(
             """
             SELECT count(*) AS row_count,
@@ -204,7 +220,7 @@ def _candidate_inventory(
         rows = connection.execute(
             """
             SELECT dwd_security_id,
-                   dwd_company_id,
+                   min(dwd_company_id) AS dwd_company_id,
                    min(listing_code) AS listing_code,
                    min(venue_id) AS venue_id,
                    min(session_date) AS first_session,
@@ -216,7 +232,7 @@ def _candidate_inventory(
                      END
                    ) AS in_decision_scope
             FROM read_parquet(?)
-            GROUP BY dwd_security_id, dwd_company_id
+            GROUP BY dwd_security_id
             ORDER BY dwd_security_id
             """,
             [decision_start, decision_end, str(path)],

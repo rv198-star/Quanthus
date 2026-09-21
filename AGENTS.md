@@ -26,11 +26,12 @@
 
 ## Current active task routing — P3-STRAT-003
 
-- Active line: `P3-STRAT-003` / #317. Current gate: `B` / #319 input qualification.
+- Active line: `P3-STRAT-003` / #317, open and blocked. B / #319 closed with negative input
+  qualification evidence; its acceptance gate remains unsatisfied.
 - Purpose: compare existing Trend + Position Risk against a non-empty deterministic P4 baseline
   while P6 continues independently; P6 is not a predecessor and must not be mutated.
-- Dependency state: A / #318 accepted; C / #320 accepted; C-R1 / #385 accepted; B active and not
-  accepted; D / #321 blocked by B; E / #322 blocked by D.
+- Dependency state: A / #318 accepted; C / #320 accepted; C-R1 / #385 accepted; B not accepted
+  (`NO_PASS_STATIC_INDUSTRY_INPUT_COVERAGE`); D / #321 and E / #322 remain open and blocked.
 - Before working on this line, read `docs/work-items/p3-strat-003.md`. For interrupted-session
   recovery, start with its `Current recovery checkpoint`, then expand only the sections needed for
   the task at hand.

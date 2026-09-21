@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | A, C and C-R1 accepted; B / #319 reopened for pre-result input-protocol correction; D blocked by B; E blocked by D |
+| Delivery gate | blocked; A, C and C-R1 accepted; B / #319 closed no-pass and unaccepted; D blocked by B acceptance; E blocked by D |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |
@@ -114,65 +114,36 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-Last verified on 2026-09-21 after the fixed input-identity inspection:
+Last verified on 2026-09-21 after the corrected formal B-v2 attempt:
 
-- GitHub #319 is open and remains unaccepted. PR #409 merged as
-  `1d3e80693228580e73b3a94db247b9462f795e2e` and was deployed to the event-worker only.
-  The P6 replay-worker remains `git-6cb72eb`.
-- Recovery probe Job `job_ab6d6afa749244299c29995968b21b84` remains the accepted sealed
-  prerequisite, with manifest SHA
-  `sha256:4f6c6d5fa0fe92d9bcee2e07b1aeace9b066ba76de2ca9b8b6fdae6847029a85` and result digest
-  `sha256:e42d6b09e215b476d73fdd33de9ad456d7310af11f9b4018d5d86e9bfa3a6869`.
-- Formal B-v2 Job `job_b36c3aa41b3745a9a05f7806cc0bee99` failed at attempt 1 on
-  2026-09-21T07:31:21Z, with no sealed result. Its exact prior expectation
-  `sha256:21ba655c360a7dc50bdbae4665f94c9be3fe9452e5b34f26c763ef869356fc46` is now attributed
-  to original package `dwd-daily-20260831-2cb5f15cb13f-f8f8330`, not the 2026-08-27 bridge.
-- Inspection Job `job_d31ff95f43384313a93072fcb87de184` succeeded once at attempt 1 on
-  2026-09-21T15:10:59Z, with disposition `INPUT_IDENTITY_INSPECTION_COMPLETE`, manifest SHA
-  `sha256:4b6364cfccc7a77673312ab484f189a480585c5f59ca2eee71f5f7d872f9be41` and result digest
-  `sha256:8be38026bc78c1540e81d193ddf529c7e13d922db626c08a4a1a78ef7892f8b2`.
-  Its 35-manifest inventory, observed at 2026-09-21T15:10:58Z, found that exact original manifest
-  at `packages/2026-08-31/2cb5f15cb13f-f8f8330/manifest.json`; the 2026-09-01 child's prior
-  references the same identity. Two matching occurrences identify one distinct target.
-- The producer and warehouse sync preserve the short directory layout, while B's prior resolver
-  had constructed the physical path from the full logical package id. The current retained
-  original supports a bounded path-resolution repair; the inspection does not claim to recreate
-  the failed Job's historical inventory or qualify retained payload bytes.
-- No B acceptance, D result-bearing run, P6 mutation or daily-CURRENT mutation has occurred.
+- B / #319 is closed with `NO_PASS_STATIC_INDUSTRY_INPUT_COVERAGE`, **not accepted**.
+  The parent / #317 remains open and blocked; D / #321 and E / #322 remain open and blocked.
+  Closing this qualification attempt does not satisfy B's acceptance gate.
+- PR #409's bounded metadata inspection attributed the earlier exact-manifest error to the
+  retained original 2026-08-31 package in the producer's short physical directory.
+  PR #410 corrected B's exact path resolver, added a bounded qualification-evidence projection,
+  and was deployed to the event-worker at
+  `e256ffb1783d964c689a116a7f870282b96da8a3`.
+- The one corrected formal Job `job_313b915e82fd4865b32c1222c5b094f2` failed at
+  2026-09-21T15:43:14.326292Z with
+  `p3_strat_003_industry_mapping_incomplete: 10259`; `result_ref=null`.
+  The count is isolated candidate-event occurrences, not distinct securities.
+- The current frozen industry source is the legacy P3 development mapping. It does not satisfy
+  the accepted P4 candidate-identity/complete-coverage contract. This finding does not establish
+  that historical industry data are inherently unavailable or that an identifier conversion
+  alone would repair all gaps.
+- The successful sealed 2026-08-27 semantic probe is preserved, as are A/C/C-R1. There is no
+  accepted B input/candidate digest and no complete A+B+C batch binding. The P6 replay-worker
+  remains `git-6cb72eb`; its operation and frozen configuration were not changed.
 
-The completed bounded input-identity inspection is governed by
-`config/research/p3-strat-003/input-inspection.v1.json`. It binds the failed Job, its exact
-qualification config and the already sealed probe. It reads retained daily manifests for
-2026-08-01 through 2026-09-18, preserving every retained version and actual relative package path,
-and compares their identities and child prior-bindings with the exact failed expectation. The
-artifact reports whether attribution is unique, ambiguous or unavailable; it does not silently
-select a latest version or claim that the present inventory reproduces the failed Job's inventory.
-The failed Job's bounded retained stderr may contribute only whitelisted function names and
-manifest hashes, including full hashes whose prefixes appeared in the truncated status excerpt.
+Exact receipts, identities, count semantics, tests, operational observations and the eight-part
+qualification assessment are in
+[the B no-pass evidence](../acceptance/p3-strat-003-b-input-qualification-20260921.md).
 
-The inspection is limited to 128 packages, 256 KiB per manifest, 64 KiB of stderr, 128 KiB of total
-output and 60 seconds. It may reverify the sealed probe package, but cannot reconstruct packages,
-transfer ODS, build a provider, score candidates, produce strategy results or outcome labels,
-mutate P6/CURRENT, or accept B. The immutable inspection manifest exposes the core identity matches
-through the existing Worker status interface; this does not add a general file-reading endpoint.
-
-Resume order after interruption: verify live #319/main and the exact diagnostic receipt, complete
-and review the B-only path-resolution repair, deploy event-worker only, then run one corrected
-formal B-v2 qualification. The resolver may recognize only the producer's short directory and the
-existing full-id job-local layout, with the child-bound date/package-id/manifest-SHA and existing
-READY/payload verification still required. The formal B manifest also exposes a bounded projection
-of the already generated chain edges, recovery/bridge receipts, target identity and input audits,
-with equality to the sealed summary verified before publication. This projection adds no input
-read or calculation and enables independent review through the existing status interface.
-It must not select the latest daily version, reinterpret
-a manifest mismatch as a cache miss, or change P6's resolver.
-
-The scoped integration repair must preserve the single 2026-08-27 semantic bridge and every other
-exact edge. A successful formal B artifact still requires independent B review before D may open.
-A payload-level mismatch, semantic-precondition failure, or unrelated missing historical input
-closes B for insufficient admissible historical input evidence rather than starting another retry
-sequence. An unavailable or ambiguous diagnostic is recorded as such and does not authorize
-automatic scope expansion or repeat execution.
+Resume by reading that evidence and verifying live issue/Job state. Do not repeat the failed Job,
+replace the frozen industry SHA, drop unmapped candidates, lower the coverage gate, shrink the
+window, or start D. A later source-binding correction needs its own explicit input closure and
+coverage review; it is not opened by this negative qualification record.
 
 This checkpoint is operational status, not authority. Frozen config, immutable artifacts and live
 Git/GitHub state take precedence if it becomes stale.

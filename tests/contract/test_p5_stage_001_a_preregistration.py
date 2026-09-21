@@ -323,9 +323,10 @@ def test_p5_stage_001_repository_routing_is_compact_and_parallel() -> None:
 
     assert "### 3.1 Bounded P5-STAGE-001 sequence-model exception" in design
     assert "does not authorize architecture search" in design
-    assert "P5-STAGE-001-A / #401" in work_item
+    assert "A_ACCEPTED_PREREGISTRATION_ONLY" in work_item
+    assert "B, C, and D remain not started" in work_item
     assert "Current recovery checkpoint" in work_item
-    assert "P5-STAGE-001 | Learned Stage assessment dual-track research" in index
+    assert "A/#401 accepted preregistration-only" in index
 
 
 def test_p5_stage_001_target_cards_are_semantically_complete() -> None:

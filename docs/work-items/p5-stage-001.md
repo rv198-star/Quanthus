@@ -4,8 +4,8 @@
 | --- | --- |
 | Parent issue | #400 |
 | Milestone | #12 |
-| Current gate | P5-STAGE-001-A / #401 |
-| Current status | A implementation in progress |
+| Current gate | A / #401 accepted; B/C/D inactive |
+| Current status | A_ACCEPTED_PREREGISTRATION_ONLY |
 | Governing design | `../design/lld/07-research-scoring/p5-stage-001.md` |
 | Frozen request | `../../config/research/p5-stage-001/request.v1.json` |
 | Frozen targets | `../../config/research/p5-stage-001/stage-targets.v1.json` |
@@ -60,16 +60,15 @@ successor.
 
 As of 2026-09-22:
 
-- Owner explicitly opened #401 after approving the dual-track direction and the four-perspective
-  design amendments.
+- #401 completed as `A_ACCEPTED_PREREGISTRATION_ONLY` after the frozen contract tests and a fresh independent final review returned PASS with no BLOCKER/MATERIAL finding.
 - A is allowed to change repository docs/config/tests and run synthetic/contract verification only.
 - A must not read market rows, train a model, inspect protected 2022-2026 data, or mutate P6/P3-STRAT.
 - The source baseline for A is `ff83909f4584a60cb3bdf6808cae39d339326336`.
 - A's machine assets are:
   `config/research/p5-stage-001/request.v1.json` and
   `config/research/p5-stage-001/stage-targets.v1.json`.
-- A must finish with a real independent read-only design/implementation review after repository tests.
-- Only after A is accepted may the owner separately activate B, C, or D.
+- Final independent review PASS is archived externally with the #401 closeout evidence.
+- B, C, and D remain not started; each still requires separate explicit owner activation.
 
 Resume order after interruption:
 

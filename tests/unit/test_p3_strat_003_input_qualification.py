@@ -17,6 +17,7 @@ from quanthus.contracts import SnapshotRef
 from quanthus.data_foundation import DatasetManifest
 from quanthus.expert_evaluation.serialization import ExpertEvaluationError, digest_value
 from quanthus.expert_strategy import p3_strat_003_input_qualification as input_qualification
+from quanthus.expert_strategy import p3_strat_003_semantic_equivalence as semantic_probe
 from quanthus.expert_strategy.p3_strat_003_input_qualification import (
     BUNDLE_SCHEMA,
     PARTITION,
@@ -25,6 +26,7 @@ from quanthus.expert_strategy.p3_strat_003_input_qualification import (
     _missing_prior_reconstruction,
     _request,
     _scope,
+    _semantic_equivalence_prerequisite,
     _verify_replay_bundle,
     _warmup_dates,
 )
@@ -32,6 +34,7 @@ from quanthus.platform.event_worker import _structure_input, _structure_request_
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "config/research/p3-strat-003/input-qualification.v1.json"
+CONFIG_V2 = ROOT / "config/research/p3-strat-003/input-qualification.v2.json"
 
 
 def _sha(path: Path) -> str:
@@ -125,6 +128,144 @@ def test_b_request_is_fixed_input_only_and_worker_admits_exact_config() -> None:
         _structure_input({**job_input, "run_config": "/tmp/not-governed.json"})
 
 
+
+
+def test_b_v2_request_binds_passed_semantic_probe_and_worker_admits_exact_config(
+    tmp_path: Path,
+) -> None:
+    _, binding, identities = _semantic_probe_fixture(tmp_path / "probe")
+    raw = json.loads(CONFIG_V2.read_text(encoding="utf-8"))
+    raw["semantic_equivalence_prerequisite"] = binding
+
+    prerequisite = _semantic_equivalence_prerequisite(raw)
+
+    assert prerequisite is not None
+    assert prerequisite.boundary_market_date == date(2026, 8, 27)
+    assert prerequisite.original_package_id == identities["original_package_id"]
+    assert prerequisite.original_manifest_sha256 == identities["original_manifest_sha256"]
+    assert prerequisite.research_package_id == identities["research_package_id"]
+    assert prerequisite.research_manifest_sha256 == identities["research_manifest_sha256"]
+    assert prerequisite.consumer_payload_digest == identities["consumer_payload_digest"]
+
+    request = _request(CONFIG_V2)
+    assert request["schema_version"] == "quanthus.p3-strat-003-input-qualification.v2"
+    assert request["authority"]["2025_outcome_read_authorized"] is False
+    assert request["authority"]["2026_strategy_result_read_authorized"] is False
+    assert request["authority"]["p6_mutation_authorized"] is False
+
+    job_input = {
+        "code_revision": "a" * 40,
+        "run_config": "config/research/p3-strat-003/input-qualification.v2.json",
+    }
+    assert _structure_input(job_input) == job_input
+    assert _structure_request_digest(job_input["run_config"]) == digest_value(request)
+
+
+def test_semantic_prior_fetch_reuses_only_sealed_probe_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quanthus.warehouse_sync import WarehouseSyncError
+
+    artifact_root, binding, identities = _semantic_probe_fixture(tmp_path / "probe")
+    raw = json.loads(CONFIG_V2.read_text(encoding="utf-8"))
+    raw["semantic_equivalence_prerequisite"] = binding
+    prerequisite = _semantic_equivalence_prerequisite(raw)
+    assert prerequisite is not None
+
+    monkeypatch.setenv("QUANTHUS_CN01_DWD_HOST", "cn01.example")
+    monkeypatch.setattr(
+        input_qualification,
+        "_warehouse_ssh_command",
+        lambda: (
+            "cn01.example",
+            "22",
+            "quanthus-dwd-ro",
+            "/run/secrets/key",
+            "/run/secrets/known-hosts",
+            "ssh fixture",
+        ),
+    )
+    monkeypatch.setattr(
+        input_qualification,
+        "_warehouse_remote_path",
+        lambda relative: relative,
+    )
+
+    def fail_rsync(**_kwargs: object) -> None:
+        raise WarehouseSyncError("remote exact package unavailable")
+
+    monkeypatch.setattr(input_qualification, "_warehouse_rsync", fail_rsync)
+    package, receipt = _fetch_bound_prior_package(
+        cache_root=tmp_path / "cache",
+        market_date=date(2026, 8, 27),
+        package_id=identities["original_package_id"],
+        manifest_sha256=identities["original_manifest_sha256"],
+        semantic_prerequisite=prerequisite,
+    )
+
+    assert package == artifact_root / "missing-boundary" / "package"
+    assert receipt["disposition"] == "reused_sealed_semantic_equivalence_reconstruction"
+    assert receipt["research_package_id"] == identities["research_package_id"]
+    assert receipt["original_manifest_claimed_reproduced"] is False
+
+    with pytest.raises(ExpertEvaluationError, match="remote exact package unavailable"):
+        _fetch_bound_prior_package(
+            cache_root=tmp_path / "other-cache",
+            market_date=date(2026, 8, 28),
+            package_id="dwd-daily-20260828-other",
+            manifest_sha256="sha256:" + "d" * 64,
+            semantic_prerequisite=prerequisite,
+        )
+
+
+def test_semantic_bridge_allows_exactly_the_probe_bound_original_child(
+    tmp_path: Path,
+) -> None:
+    _, binding, identities = _semantic_probe_fixture(tmp_path / "probe")
+    raw = json.loads(CONFIG_V2.read_text(encoding="utf-8"))
+    raw["semantic_equivalence_prerequisite"] = binding
+    prerequisite = _semantic_equivalence_prerequisite(raw)
+    assert prerequisite is not None
+
+    left = input_qualification.P6DailyChainPackage(
+        root=prerequisite.research_package_root,
+        package_id=prerequisite.research_package_id,
+        market_date=date(2026, 8, 27),
+        manifest_sha256=prerequisite.research_manifest_sha256,
+        content_digest="sha256:" + "1" * 64,
+        code_revision=prerequisite.code_revision,
+        covered_after_date=date(2026, 8, 26),
+        prior_package_id="anchor",
+        prior_manifest_sha256="sha256:" + "2" * 64,
+    )
+    right = input_qualification.P6DailyChainPackage(
+        root=tmp_path / "child",
+        package_id="dwd-daily-20260828-child",
+        market_date=date(2026, 8, 28),
+        manifest_sha256="sha256:" + "3" * 64,
+        content_digest="sha256:" + "4" * 64,
+        code_revision="b" * 40,
+        covered_after_date=date(2026, 8, 27),
+        prior_package_id=prerequisite.original_package_id,
+        prior_manifest_sha256=prerequisite.original_manifest_sha256,
+    )
+
+    assert input_qualification._semantic_bridge_allows(left, right, prerequisite)
+
+    wrong = input_qualification.P6DailyChainPackage(
+        root=right.root,
+        package_id=right.package_id,
+        market_date=right.market_date,
+        manifest_sha256=right.manifest_sha256,
+        content_digest=right.content_digest,
+        code_revision=right.code_revision,
+        covered_after_date=right.covered_after_date,
+        prior_package_id=right.prior_package_id,
+        prior_manifest_sha256="sha256:" + "5" * 64,
+    )
+    assert not input_qualification._semantic_bridge_allows(left, wrong, prerequisite)
+
+
 def test_b_replay_bundle_verifier_binds_every_dataset_file(tmp_path: Path) -> None:
     root = tmp_path / "replay"
     expected = _bundle(root)
@@ -175,6 +316,188 @@ def _daily_package(root: Path, market_date: str, package_id: str) -> str:
     manifest_sha = _sha(manifest_path)
     (package / "READY").write_text(manifest_sha + "\n", encoding="ascii")
     return manifest_sha
+
+
+
+
+def _consumer_daily_package(
+    root: Path,
+    *,
+    market_date: date,
+    package_id: str,
+) -> tuple[Path, str, str]:
+    package = root.resolve()
+    package.mkdir(parents=True)
+    files: list[dict[str, object]] = []
+    row_counts: dict[str, int] = {}
+    for index, table in enumerate(semantic_probe._CONSUMER_TABLES, start=1):
+        path = (
+            package
+            / "payload"
+            / "fixture"
+            / table
+            / f"market_date={market_date.isoformat()}"
+            / "part-00000.parquet"
+        )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(f"{table}:{market_date.isoformat()}\n".encode("ascii"))
+        files.append(
+            {
+                "path": path.relative_to(package).as_posix(),
+                "sha256": _sha(path),
+                "size_bytes": path.stat().st_size,
+            }
+        )
+        row_counts[table] = index
+    files.sort(key=lambda item: str(item["path"]))
+    content_digest = "sha256:" + hashlib.sha256(
+        json.dumps(
+            files,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("ascii")
+    ).hexdigest()
+    manifest = {
+        "schema_version": 1,
+        "kind": "cn01_daily_dwd_domain_increment",
+        "package_id": package_id,
+        "market_date": market_date.isoformat(),
+        "files": files,
+        "content_digest": content_digest,
+        "row_counts": row_counts,
+    }
+    manifest_path = package / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            manifest,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="ascii",
+    )
+    manifest_sha = _sha(manifest_path)
+    (package / "READY").write_text(manifest_sha + "\n", encoding="ascii")
+    consumer_digest, _ = semantic_probe._consumer_payload_identity(package)
+    return package, manifest_sha, consumer_digest
+
+
+def _semantic_probe_fixture(
+    root: Path,
+) -> tuple[Path, dict[str, object], dict[str, str]]:
+    root.mkdir(parents=True)
+    code_revision = "a" * 40
+    request_digest = "sha256:" + "b" * 64
+    original_package_id = "dwd-daily-20260827-aaaaaaaaaaaa-f8f8330"
+    original_manifest_sha256 = "sha256:" + "c" * 64
+    research_package_id = "dwd-daily-20260827-aaaaaaaaaaaa-aaaaaaa"
+    research_root, research_manifest_sha256, consumer_payload_digest = (
+        _consumer_daily_package(
+            root / "missing-boundary" / "package",
+            market_date=date(2026, 8, 27),
+            package_id=research_package_id,
+        )
+    )
+    del research_root
+    summary = {
+        "schema_version": semantic_probe.SUMMARY_SCHEMA,
+        "work_item": "P3-STRAT-003-B",
+        "request_digest": request_digest,
+        "frozen_research_request_digest": REQUEST_DIGEST,
+        "code_revision": code_revision,
+        "consumer_tables": list(semantic_probe._CONSUMER_TABLES),
+        "sentinels": [
+            {
+                "sentinel_id": "pre",
+                "consumer_payload_exact_match": True,
+                "selected_releases_exact_match": True,
+            },
+            {
+                "sentinel_id": "post",
+                "consumer_payload_exact_match": True,
+                "selected_releases_exact_match": True,
+            },
+        ],
+        "missing_boundary": {
+            "market_date": "2026-08-27",
+            "original_child_binding": {
+                "package_id": original_package_id,
+                "manifest_sha256": original_manifest_sha256,
+            },
+            "research_reconstruction": {
+                "package_id": research_package_id,
+                "manifest_sha256": research_manifest_sha256,
+                "consumer_payload_digest": consumer_payload_digest,
+            },
+            "consumer_semantic_compatibility_precondition_passed": True,
+            "original_manifest_claimed_reproduced": False,
+        },
+        "strategy_or_economic_result_count": 0,
+        "target_outcome_label_count": 0,
+        "candidate_scoring_count": 0,
+        "p6_mutation": False,
+        "daily_current_mutation": False,
+        "disposition": "PASS_CONSUMER_SEMANTIC_EQUIVALENCE_PROBE",
+    }
+    summary_path = root / "summary.json"
+    summary_path.write_text(
+        json.dumps(summary, ensure_ascii=True, separators=(",", ":"), sort_keys=True) + "\n",
+        encoding="ascii",
+    )
+    manifest_payload = {
+        "schema_version": semantic_probe.ARTIFACT_SCHEMA,
+        "work_item": "P3-STRAT-003-B",
+        "request_digest": request_digest,
+        "frozen_research_request_digest": REQUEST_DIGEST,
+        "code_revision": code_revision,
+        "files": {
+            "summary": {
+                "path": "summary.json",
+                "sha256": _sha(summary_path),
+            }
+        },
+        "consumer_tables": list(semantic_probe._CONSUMER_TABLES),
+        "sentinel_count": 2,
+        "strategy_result_produced": False,
+        "outcome_labels_produced": False,
+        "candidate_scoring_performed": False,
+        "p6_mutation": False,
+        "daily_current_mutation": False,
+        "disposition": "PASS_CONSUMER_SEMANTIC_EQUIVALENCE_PROBE",
+    }
+    manifest = {
+        **manifest_payload,
+        "result_digest": digest_value(manifest_payload),
+    }
+    manifest_path = root / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=True, separators=(",", ":"), sort_keys=True) + "\n",
+        encoding="ascii",
+    )
+    manifest_sha256 = _sha(manifest_path)
+    (root / "READY").write_text(manifest_sha256 + "\n", encoding="ascii")
+    binding = {
+        "artifact_ref": str(root),
+        "code_revision": code_revision,
+        "request_digest": request_digest,
+        "manifest_sha256": manifest_sha256,
+        "result_digest": manifest["result_digest"],
+        "disposition": "PASS_CONSUMER_SEMANTIC_EQUIVALENCE_PROBE",
+        "boundary_market_date": "2026-08-27",
+        "reuse_boundary_package": True,
+        "allow_original_child_semantic_bridge": True,
+        "original_manifest_claimed_reproduced": False,
+    }
+    identities = {
+        "original_package_id": original_package_id,
+        "original_manifest_sha256": original_manifest_sha256,
+        "research_package_id": research_package_id,
+        "research_manifest_sha256": research_manifest_sha256,
+        "consumer_payload_digest": consumer_payload_digest,
+    }
+    return root, binding, identities
 
 
 def test_bound_prior_fetch_uses_exact_child_identity_and_job_local_cache(

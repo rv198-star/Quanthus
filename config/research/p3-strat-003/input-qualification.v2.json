@@ -1,0 +1,73 @@
+{
+  "schema_version": "quanthus.p3-strat-003-input-qualification.v2",
+  "work_item": "P3-STRAT-003-B",
+  "state": "FROZEN_INPUT_ONLY",
+  "request": {
+    "path": "config/research/p3-strat-003/request.v1.json",
+    "semantic_digest": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde",
+    "file_sha256": "sha256:e1234e80857e012e2d125babba15fd4d0985cd0b38402d5737db0470d6be7c3b"
+  },
+  "source_runtime": {
+    "path": "config/forward-validation/activation/p6-prospective-runtime.v1.json",
+    "file_sha256": "sha256:b8935da7f639d67632de3aef66be50082b59dc3a1d0281f694ea121954d919ce",
+    "usage": "read_only_data_identity_and_effective_view_builder_reuse",
+    "p6_authority_inherited": false
+  },
+  "scope": {
+    "warmup_open_sessions": 60,
+    "decision_start": "2025-01-01",
+    "decision_end": "2026-09-17",
+    "execution_end": "2026-09-18",
+    "target_daily_market_date": "2026-09-18",
+    "roll_forward_authorized": false
+  },
+  "partition": "p3-strat-003-recent-history",
+  "missing_prior_reconstruction": {
+    "minimum_market_date": "2026-08-01",
+    "authorized_through_market_date": "2026-09-17",
+    "source_id": "cn01",
+    "ods_source_config": "config/pipelines/ods-handoff-sources.v1.json",
+    "release_config": "config/releases/v2-build202607.json",
+    "revision_allowlist": {
+      "path": "config/research/p3-strat-003/dwd-revision-allowlist.v1.json",
+      "file_sha256": "sha256:e107e0c9e11f08b2b425b4d9dc17e4c8d260101a6adec8f2f9e4af4d18d6cba0",
+      "semantic_digest": "sha256:34b8af85237128a7cd1ece594446319e4a8ce28d737265fd2f31e44dcbabee4d"
+    },
+    "maximum_prior_candidates": 8,
+    "maximum_reconstructed_packages": 8,
+    "maximum_calendar_scan_days": 14,
+    "maximum_source_attempts_per_lane": 8,
+    "job_local_only": true,
+    "child_binding_required": true,
+    "mutate_daily_current": false
+  },
+  "semantic_equivalence_prerequisite": {
+    "artifact_ref": "/data/event-runs/structure-runs/run_ab6d6afa749244299c29995968b21b84",
+    "code_revision": "47fac8eb0af9184589dd323fdfdc3bd6d9de93c1",
+    "request_digest": "sha256:ae73140c7edfce7f9259b9df99864f71fe3b03f0aff738cfa8def11c96205554",
+    "manifest_sha256": "sha256:4f6c6d5fa0fe92d9bcee2e07b1aeace9b066ba76de2ca9b8b6fdae6847029a85",
+    "result_digest": "sha256:e42d6b09e215b476d73fdd33de9ad456d7310af11f9b4018d5d86e9bfa3a6869",
+    "disposition": "PASS_CONSUMER_SEMANTIC_EQUIVALENCE_PROBE",
+    "boundary_market_date": "2026-08-27",
+    "reuse_boundary_package": true,
+    "allow_original_child_semantic_bridge": true,
+    "original_manifest_claimed_reproduced": false
+  },
+  "outputs": {
+    "strategy_or_economic_results": false,
+    "target_outcome_labels": false,
+    "historical_replay_bundle": true,
+    "outcome_blind_candidate_input": true,
+    "coverage_and_pit_audit": true
+  },
+  "authority": {
+    "general_2022_2024_result_access": false,
+    "2024_warmup_calendar_and_input_rows_only": true,
+    "2025_candidate_and_input_read_authorized": true,
+    "2025_outcome_read_authorized": false,
+    "2026_candidate_and_input_read_authorized": true,
+    "2026_strategy_result_read_authorized": false,
+    "p6_mutation_authorized": false,
+    "broker_or_live_capital_authorized": false
+  }
+}

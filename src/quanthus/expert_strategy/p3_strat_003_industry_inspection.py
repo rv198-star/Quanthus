@@ -85,6 +85,18 @@ def _run_root() -> Path:
     return Path(os.environ.get("QUANTHUS_EVENT_RUN_ROOT", "/data/event-runs")).resolve()
 
 
+def _relative_child(root: Path, raw: object, label: str) -> Path:
+    if not isinstance(raw, str) or not raw:
+        _fail(f"{label} path must be non-empty text")
+    relative = Path(raw)
+    if relative.is_absolute() or ".." in relative.parts:
+        _fail(f"{label} path is unsafe")
+    path = (root.resolve() / relative).resolve()
+    if not path.is_relative_to(root.resolve()):
+        _fail(f"{label} path escapes its fixed root")
+    return path
+
+
 def _candidate_inventory(
     run_root: Path,
     failed_job: dict[str, Any],
@@ -308,8 +320,16 @@ def _p4_reference(
         ):
             _fail("P4 industry provenance binding is incomplete")
 
-        mapping_path = adm_root / str(industry.get("path"))
-        source_path = adm_root / str(source.get("path"))
+        mapping_path = _relative_child(
+            adm_root,
+            industry.get("path"),
+            "P4 static industry mapping",
+        )
+        source_path = _relative_child(
+            adm_root,
+            source.get("path"),
+            "P4 industry source receipt",
+        )
         try:
             mapping_sha = _sha256(mapping_path)
             source_sha = _sha256(source_path)

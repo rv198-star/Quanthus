@@ -597,25 +597,55 @@ def _dwd_reference(
     return mapping, reasons
 
 
-def _legacy_reference(runtime: Any) -> tuple[dict[str, str], dict[str, Any]]:
+def _legacy_reference(
+    runtime: Any,
+    *,
+    json_limit: int,
+) -> tuple[
+    dict[str, str],
+    dict[tuple[str, str], list[str]],
+    dict[str, Any],
+]:
     try:
         mapping = load_static_industry_mapping(
             runtime.static_industry_mapping,
             expected_version="static-level1-concentration-research-v1",
         )
         mapping_sha = _sha256(runtime.static_industry_mapping)
-    except (IndustryMappingError, OSError) as exc:
+        raw_mapping = _object(
+            runtime.static_industry_mapping,
+            root=runtime.static_industry_mapping.parent,
+            limit=json_limit,
+            label="legacy P3 static industry mapping",
+        )
+    except (IndustryMappingError, ExpertEvaluationError, OSError) as exc:
         _source_unavailable(
             "legacy P3 static industry mapping is unavailable or invalid",
             cause=exc,
         )
     if mapping_sha != runtime.static_industry_mapping_sha256:
         _fail("legacy P3 static industry mapping checksum differs")
+
+    by_code: dict[tuple[str, str], list[str]] = {}
+    memberships = raw_mapping.get("memberships")
+    if not isinstance(memberships, list):
+        _fail("legacy P3 static industry memberships are invalid")
+    for row in memberships:
+        if not isinstance(row, dict):
+            _fail("legacy P3 static industry membership is invalid")
+        security_id = str(row.get("security_id") or "")
+        stock_code = str(row.get("stock_code") or "")
+        venue_id = str(row.get("exchange") or "")
+        if not all((security_id, stock_code, venue_id)):
+            _fail("legacy P3 static industry identity fields are incomplete")
+        by_code.setdefault((stock_code, venue_id), []).append(security_id)
+
     return (
         {
             security_id: membership.level1_industry_id
             for security_id, membership in mapping.by_security_id.items()
         },
+        by_code,
         {
             "path": str(runtime.static_industry_mapping),
             "sha256": mapping_sha,
@@ -629,6 +659,7 @@ def _coverage(
     identities: list[dict[str, Any]],
     *,
     legacy: dict[str, str],
+    legacy_by_code: dict[tuple[str, str], list[str]],
     dwd: dict[str, str],
     dwd_reasons: dict[str, str],
     p4: dict[str, tuple[str, str, str]],
@@ -639,7 +670,9 @@ def _coverage(
     decision_counts: Counter[str] = Counter()
     unresolved: list[dict[str, Any]] = []
     conflicts: list[dict[str, Any]] = []
-    code_only_matches = 0
+    p4_code_only_matches = 0
+    legacy_code_only_matches = 0
+    legacy_code_ambiguous_matches = 0
 
     for identity in identities:
         security_id = str(identity["security_id"])
@@ -673,17 +706,34 @@ def _coverage(
             )
 
         if resolved_value is None:
-            code_matches = p4_by_code.get(
-                (str(identity["listing_code"]), str(identity["venue_id"])),
-                [],
+            identity_key = (
+                str(identity["listing_code"]),
+                str(identity["venue_id"]),
             )
-            if len(code_matches) == 1 and code_matches[0] != security_id:
-                code_only_matches += 1
+            p4_code_matches = p4_by_code.get(identity_key, [])
+            if (
+                len(p4_code_matches) == 1
+                and p4_code_matches[0] != security_id
+            ):
+                p4_code_only_matches += 1
+
+            legacy_code_matches = legacy_by_code.get(identity_key, [])
+            if (
+                len(legacy_code_matches) == 1
+                and legacy_code_matches[0] != security_id
+            ):
+                legacy_code_only_matches += 1
+            elif len(legacy_code_matches) > 1:
+                legacy_code_ambiguous_matches += 1
+
             unresolved.append(
                 {
                     **identity,
                     "dwd_reason": dwd_reasons.get(security_id),
                     "legacy_p3_exact_identity": security_id in legacy,
+                    "legacy_p3_code_venue_match_count": len(
+                        legacy_code_matches
+                    ),
                 }
             )
 
@@ -695,7 +745,11 @@ def _coverage(
         ),
         "remaining_unresolved_security_count": len(unresolved),
         "dwd_p4_conflict_count": len(conflicts),
-        "code_venue_only_reference_match_count": code_only_matches,
+        "p4_code_venue_only_reference_match_count": p4_code_only_matches,
+        "legacy_p3_code_venue_only_match_count": legacy_code_only_matches,
+        "legacy_p3_code_venue_ambiguous_match_count": (
+            legacy_code_ambiguous_matches
+        ),
         "remaining_unresolved_samples": unresolved[:sample_limit],
         "conflict_samples": conflicts[:sample_limit],
     }
@@ -833,7 +887,10 @@ def build_industry_inspection(
         )
 
     try:
-        legacy, legacy_receipt = _legacy_reference(runtime)
+        legacy, legacy_by_code, legacy_receipt = _legacy_reference(
+            runtime,
+            json_limit=int(raw["p4_reference"]["maximum_mapping_bytes"]),
+        )
         p4_receipt, p4_mapping, p4_by_code = _p4_reference(
             run_root,
             raw["p4_reference"],
@@ -865,6 +922,7 @@ def build_industry_inspection(
             "coverage": _coverage(
                 identities,
                 legacy=legacy,
+                legacy_by_code=legacy_by_code,
                 dwd=dwd_mapping,
                 dwd_reasons=dwd_reasons,
                 p4=p4_mapping,

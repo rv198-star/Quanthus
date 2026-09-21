@@ -74,6 +74,7 @@ _STRUCTURE_F9_RUN_CONFIG = "config/structure-f9-run.development.v1.json"
 _TREND_EVOLUTION_RUN_CONFIG = "config/structure-trend-evolution-qualification.v1.json"
 _STRUCTURE_ORDER_RUN_CONFIG = "config/structure-order-qualification.v1.json"
 _P3_STRAT_003_INPUT_RUN_CONFIG = "config/research/p3-strat-003/input-qualification.v1.json"
+_P3_STRAT_003_INPUT_RUN_CONFIG_V2 = "config/research/p3-strat-003/input-qualification.v2.json"
 _P3_STRAT_003_SEMANTIC_PROBE_RUN_CONFIG = (
     "config/research/p3-strat-003/semantic-equivalence-probe.v1.json"
 )
@@ -91,6 +92,7 @@ _STRUCTURE_RUN_CONFIGS = frozenset(
         _TREND_EVOLUTION_RUN_CONFIG,
         _STRUCTURE_ORDER_RUN_CONFIG,
         _P3_STRAT_003_INPUT_RUN_CONFIG,
+        _P3_STRAT_003_INPUT_RUN_CONFIG_V2,
         _P3_STRAT_003_SEMANTIC_PROBE_RUN_CONFIG,
         _REFERENCE_FEASIBILITY_CONFIG,
     }
@@ -459,6 +461,7 @@ def _structure_request_digest(run_config: str) -> str:
         _TREND_EVOLUTION_RUN_CONFIG: "quanthus.trend-evolution-qualification.v1",
         _STRUCTURE_ORDER_RUN_CONFIG: "quanthus.structure-order-qualification.v1",
         _P3_STRAT_003_INPUT_RUN_CONFIG: "quanthus.p3-strat-003-input-qualification.v1",
+        _P3_STRAT_003_INPUT_RUN_CONFIG_V2: "quanthus.p3-strat-003-input-qualification.v2",
         _P3_STRAT_003_SEMANTIC_PROBE_RUN_CONFIG: (
             "quanthus.p3-strat-003-semantic-equivalence-probe.v1"
         ),
@@ -1340,7 +1343,10 @@ class EventWorker:
         run_config = governed["run_config"]
         economic = run_config == _STRUCTURE_ECONOMIC_RUN_CONFIG
         facts = run_config == _STRUCTURE_FACTS_RUN_CONFIG
-        if run_config == _P3_STRAT_003_INPUT_RUN_CONFIG:
+        if run_config in {
+            _P3_STRAT_003_INPUT_RUN_CONFIG,
+            _P3_STRAT_003_INPUT_RUN_CONFIG_V2,
+        }:
             verifier = verify_p3_strat_003_input_artifact
             module = "quanthus.expert_strategy.p3_strat_003_input_qualification"
             artifact_name = "p3-strat-003-input"

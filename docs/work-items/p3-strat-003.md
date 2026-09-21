@@ -104,30 +104,38 @@ precondition differs, or if proving equivalence requires materially broader hist
 infrastructure, B closes as insufficient admissible historical input evidence. The window must not
 be shortened and no D result may be read to repair the input path.
 
+After that probe passes, corrected B may reuse the sealed 2026-08-27 research-reconstruction package
+inside the accepted probe artifact rather than rebuilding it. B must reverify that package, its
+manifest and its consumer-payload digest against the probe receipt. The original 2026-08-28 child
+still retains its historical prior package id/manifest SHA; B records the resulting 2026-08-27 to
+2026-08-28 lineage difference as one explicit semantic bridge. It must not rewrite the child,
+rewrite CURRENT, or claim the old 2026-08-27 manifest was reproduced. Every other daily-chain edge
+continues to require the existing exact binding.
+
 ### Current recovery checkpoint
 
-Last verified after the first real semantic-equivalence probe:
+Last verified after the recovery semantic-equivalence probe:
 
 - GitHub #319 is open and remains unaccepted.
-- PR #397 merged as `07af498ea9ba77a3c8033fe168668a2b159bad96`; production event-worker
-  runs `quanthus-event:git-07af498` while the P6 replay-worker remains frozen at `git-6cb72eb`.
-- The first governed probe Job `job_895ce99fa1c043eca6efb09ddfdcc271` failed before any
-  strategy/economic result with
-  `p3_strat_003_semantic_probe_boundary_artifact_mismatch: financial_disclosures_delta`.
-- Root-cause review classified that failure as a probe-config provenance defect: the fixed physical
-  SHA had been observed on Hermes, while the governed reconstruction source is CN01. The semantic
-  compatibility requirement is zero rows in the selected CN01 artifact; CN01 release/artifact bytes
-  remain internally checksum-verified and the observed SHA is recorded.
-- A single bounded source-local repair/recovery is authorized with unchanged consumer-payload
-  equivalence semantics. No corrected full-B qualification, D result-bearing run, or P6 mutation
-  has occurred.
+- PR #398 merged as `47fac8eb0af9184589dd323fdfdc3bd6d9de93c1`; production event-worker
+  runs `quanthus-event:git-47fac8e` while the P6 replay-worker remains frozen at `git-6cb72eb`.
+- Recovery probe Job `job_ab6d6afa749244299c29995968b21b84` succeeded once at attempt 1 with
+  disposition `PASS_CONSUMER_SEMANTIC_EQUIVALENCE_PROBE`. Its manifest SHA is
+  `sha256:4f6c6d5fa0fe92d9bcee2e07b1aeace9b066ba76de2ca9b8b6fdae6847029a85` and result digest is
+  `sha256:e42d6b09e215b476d73fdd33de9ad456d7310af11f9b4018d5d86e9bfa3a6869`.
+- The probe produced no candidate scoring, strategy/economic result, outcome label, P6 mutation or
+  daily-CURRENT mutation.
+- Corrected B-v2 integration is the active work: bind the sealed probe evidence, reuse only its
+  verified 2026-08-27 research package as the explicit semantic bridge, produce the formal B replay
+  and candidate manifests, and then independently review B.
+- No corrected full-B qualification, D result-bearing run, or P6 mutation has occurred.
 
-Resume order after interruption: verify live #319/main/current repair branch or PR; finish only this
-source-local probe repair; deploy event-worker only; run one recovery semantic-equivalence probe and
-preserve its result. A passing recovery permits completing and independently reviewing the corrected
-B manifest, not skipping directly to D. A payload-level mismatch, semantic-precondition failure, or
-second unrelated probe-design failure closes B for insufficient admissible historical input evidence
-rather than starting another retry sequence.
+Resume order after interruption: verify live #319/main/current B-v2 branch or PR; finish and review
+the B-v2 bridge integration; deploy event-worker only; run one corrected full-B input qualification
+and preserve its result. A successful B artifact still requires independent B review before D may
+open. A payload-level mismatch, semantic-precondition failure, or new unrelated reconstruction
+failure closes B for insufficient admissible historical input evidence rather than starting another
+retry sequence.
 
 This checkpoint is operational status, not authority. Frozen config, immutable artifacts and live
 Git/GitHub state take precedence if it becomes stale.

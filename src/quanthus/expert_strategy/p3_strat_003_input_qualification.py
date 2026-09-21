@@ -84,6 +84,7 @@ from quanthus.warehouse_sync import _run_rsync as _warehouse_rsync
 from quanthus.warehouse_sync import _ssh_command as _warehouse_ssh_command
 
 REQUEST_SCHEMA = "quanthus.p3-strat-003-input-qualification.v1"
+REQUEST_SCHEMA_V2 = "quanthus.p3-strat-003-input-qualification.v2"
 ARTIFACT_SCHEMA = "quanthus.p3-strat-003-input-artifact.v1"
 BUNDLE_SCHEMA = "quanthus.p3-strat-003-sealed-replay-bundle.v1"
 CANDIDATE_SCHEMA = "quanthus.p3-strat-003-candidate-input.v1"
@@ -133,7 +134,10 @@ def _safe_relative(root: Path, relative: object, label: str) -> Path:
 
 def _request(path: Path) -> dict[str, Any]:
     raw = _object(path, "P3-STRAT-003-B request")
-    if raw.get("schema_version") != REQUEST_SCHEMA or raw.get("work_item") != "P3-STRAT-003-B":
+    if (
+        raw.get("schema_version") not in {REQUEST_SCHEMA, REQUEST_SCHEMA_V2}
+        or raw.get("work_item") != "P3-STRAT-003-B"
+    ):
         raise ExpertEvaluationError(
             "p3_strat_003_input_request_invalid",
             "P3-STRAT-003-B request schema differs",
@@ -305,6 +309,201 @@ def _missing_prior_reconstruction(
         maximum_reconstructed_packages=maximum_reconstructed_packages,
         maximum_calendar_scan_days=maximum_calendar_scan_days,
         maximum_source_attempts_per_lane=maximum_source_attempts_per_lane,
+    )
+
+
+
+@dataclass(frozen=True)
+class _SemanticEquivalencePrerequisite:
+    artifact_root: Path
+    code_revision: str
+    request_digest: str
+    manifest_sha256: str
+    result_digest: str
+    boundary_market_date: date
+    original_package_id: str
+    original_manifest_sha256: str
+    research_package_root: Path
+    research_package_id: str
+    research_manifest_sha256: str
+    consumer_payload_digest: str
+
+    def receipt(self) -> dict[str, Any]:
+        return {
+            "artifact_ref": str(self.artifact_root),
+            "code_revision": self.code_revision,
+            "request_digest": self.request_digest,
+            "manifest_sha256": self.manifest_sha256,
+            "result_digest": self.result_digest,
+            "disposition": "PASS_CONSUMER_SEMANTIC_EQUIVALENCE_PROBE",
+            "boundary_market_date": self.boundary_market_date.isoformat(),
+            "original_child_binding": {
+                "package_id": self.original_package_id,
+                "manifest_sha256": self.original_manifest_sha256,
+            },
+            "research_reconstruction": {
+                "package_id": self.research_package_id,
+                "manifest_sha256": self.research_manifest_sha256,
+                "consumer_payload_digest": self.consumer_payload_digest,
+            },
+            "original_manifest_claimed_reproduced": False,
+        }
+
+
+def _semantic_equivalence_prerequisite(
+    raw: Mapping[str, Any],
+) -> _SemanticEquivalencePrerequisite | None:
+    from quanthus.expert_strategy.p3_strat_003_semantic_equivalence import (
+        _consumer_payload_identity as semantic_consumer_payload_identity,
+    )
+    from quanthus.expert_strategy.p3_strat_003_semantic_equivalence import (
+        verify_semantic_equivalence_probe_artifact,
+    )
+
+    schema = raw.get("schema_version")
+    value = raw.get("semantic_equivalence_prerequisite")
+    if schema == REQUEST_SCHEMA:
+        if value is not None:
+            raise ExpertEvaluationError(
+                "p3_strat_003_input_request_invalid",
+                "v1 input qualification cannot bind semantic-equivalence evidence",
+            )
+        return None
+    if schema != REQUEST_SCHEMA_V2 or not isinstance(value, dict):
+        raise ExpertEvaluationError(
+            "p3_strat_003_input_request_invalid",
+            "v2 input qualification requires semantic-equivalence evidence",
+        )
+    try:
+        artifact_root = Path(str(value["artifact_ref"]))
+        code_revision = str(value["code_revision"])
+        request_digest = str(value["request_digest"])
+        manifest_sha256 = str(value["manifest_sha256"])
+        result_digest = str(value["result_digest"])
+        disposition = str(value["disposition"])
+        boundary_market_date = date.fromisoformat(str(value["boundary_market_date"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ExpertEvaluationError(
+            "p3_strat_003_input_request_invalid",
+            "semantic-equivalence binding fields are invalid",
+        ) from exc
+    if (
+        not artifact_root.is_absolute()
+        or re.fullmatch(r"[0-9a-f]{40}", code_revision) is None
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", request_digest) is None
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", manifest_sha256) is None
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", result_digest) is None
+        or disposition != "PASS_CONSUMER_SEMANTIC_EQUIVALENCE_PROBE"
+        or boundary_market_date != date(2026, 8, 27)
+        or value.get("reuse_boundary_package") is not True
+        or value.get("allow_original_child_semantic_bridge") is not True
+        or value.get("original_manifest_claimed_reproduced") is not False
+    ):
+        raise ExpertEvaluationError(
+            "p3_strat_003_input_request_invalid",
+            "semantic-equivalence binding boundary differs",
+        )
+
+    artifact_root = artifact_root.resolve()
+    observed = verify_semantic_equivalence_probe_artifact(
+        artifact_root,
+        code_revision=code_revision,
+        request_digest=request_digest,
+    )
+    if (
+        observed.get("manifest_sha256") != manifest_sha256
+        or observed.get("result_digest") != result_digest
+        or observed.get("disposition") != disposition
+        or observed.get("strategy_result_produced") is not False
+        or observed.get("outcome_labels_produced") is not False
+        or observed.get("p6_mutation") is not False
+    ):
+        raise ExpertEvaluationError(
+            "p3_strat_003_semantic_prerequisite_drift",
+            "semantic-equivalence artifact identity differs",
+        )
+
+    summary = _object(
+        artifact_root / "summary.json",
+        "P3-STRAT-003 semantic-equivalence summary",
+    )
+    boundary = summary.get("missing_boundary")
+    if not isinstance(boundary, dict):
+        raise ExpertEvaluationError(
+            "p3_strat_003_semantic_prerequisite_invalid",
+            "semantic-equivalence boundary receipt is missing",
+        )
+    original = boundary.get("original_child_binding")
+    research = boundary.get("research_reconstruction")
+    if not isinstance(original, dict) or not isinstance(research, dict):
+        raise ExpertEvaluationError(
+            "p3_strat_003_semantic_prerequisite_invalid",
+            "semantic-equivalence boundary identities are incomplete",
+        )
+    original_package_id = str(original.get("package_id") or "")
+    original_manifest_sha256 = str(original.get("manifest_sha256") or "")
+    research_package_id = str(research.get("package_id") or "")
+    research_manifest_sha256 = str(research.get("manifest_sha256") or "")
+    consumer_payload_digest = str(research.get("consumer_payload_digest") or "")
+    if (
+        boundary.get("market_date") != boundary_market_date.isoformat()
+        or boundary.get("consumer_semantic_compatibility_precondition_passed") is not True
+        or boundary.get("original_manifest_claimed_reproduced") is not False
+        or not original_package_id
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", original_manifest_sha256) is None
+        or not research_package_id
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", research_manifest_sha256) is None
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", consumer_payload_digest) is None
+    ):
+        raise ExpertEvaluationError(
+            "p3_strat_003_semantic_prerequisite_invalid",
+            "semantic-equivalence boundary receipt differs",
+        )
+
+    research_package_root = (artifact_root / "missing-boundary" / "package").resolve()
+    if not research_package_root.is_relative_to(artifact_root):
+        raise ExpertEvaluationError(
+            "p3_strat_003_semantic_prerequisite_invalid",
+            "semantic-equivalence package escapes its artifact root",
+        )
+    try:
+        verified = verify_daily_domain_increment(research_package_root)
+    except DailyDomainBuildError as exc:
+        raise ExpertEvaluationError(
+            "p3_strat_003_semantic_prerequisite_invalid",
+            "sealed semantic-equivalence package is invalid",
+        ) from exc
+    if (
+        verified.market_date != boundary_market_date
+        or verified.package_id != research_package_id
+        or verified.manifest_sha256 != research_manifest_sha256
+    ):
+        raise ExpertEvaluationError(
+            "p3_strat_003_semantic_prerequisite_drift",
+            "sealed semantic-equivalence package identity differs",
+        )
+    observed_consumer_digest, _ = semantic_consumer_payload_identity(
+        research_package_root
+    )
+    if observed_consumer_digest != consumer_payload_digest:
+        raise ExpertEvaluationError(
+            "p3_strat_003_semantic_prerequisite_drift",
+            "sealed semantic-equivalence consumer payload differs",
+        )
+
+    return _SemanticEquivalencePrerequisite(
+        artifact_root=artifact_root,
+        code_revision=code_revision,
+        request_digest=request_digest,
+        manifest_sha256=manifest_sha256,
+        result_digest=result_digest,
+        boundary_market_date=boundary_market_date,
+        original_package_id=original_package_id,
+        original_manifest_sha256=original_manifest_sha256,
+        research_package_root=research_package_root,
+        research_package_id=research_package_id,
+        research_manifest_sha256=research_manifest_sha256,
+        consumer_payload_digest=consumer_payload_digest,
     )
 
 
@@ -1014,6 +1213,7 @@ def _fetch_bound_prior_package(
     daily_root: Path | None = None,
     base_root: Path | None = None,
     reconstruction: _MissingPriorReconstruction | None = None,
+    semantic_prerequisite: _SemanticEquivalencePrerequisite | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     """Fetch one exact child-bound prior package into job-local scratch only."""
 
@@ -1083,6 +1283,31 @@ def _fetch_bound_prior_package(
             detail = " ".join(str(exc).split())
             shutil.rmtree(staging, ignore_errors=True)
             if (
+                semantic_prerequisite is not None
+                and market_date == semantic_prerequisite.boundary_market_date
+                and package_id == semantic_prerequisite.original_package_id
+                and manifest_sha256
+                == semantic_prerequisite.original_manifest_sha256
+            ):
+                return semantic_prerequisite.research_package_root, {
+                    "market_date": market_date.isoformat(),
+                    "package_id": package_id,
+                    "manifest_sha256": manifest_sha256,
+                    "disposition": "reused_sealed_semantic_equivalence_reconstruction",
+                    "semantic_equivalence_result_digest": (
+                        semantic_prerequisite.result_digest
+                    ),
+                    "research_package_id": semantic_prerequisite.research_package_id,
+                    "research_manifest_sha256": (
+                        semantic_prerequisite.research_manifest_sha256
+                    ),
+                    "consumer_payload_digest": (
+                        semantic_prerequisite.consumer_payload_digest
+                    ),
+                    "remote_exact_fetch_failure": detail[:800],
+                    "original_manifest_claimed_reproduced": False,
+                }
+            if (
                 reconstruction is not None
                 and daily_root is not None
                 and base_root is not None
@@ -1132,12 +1357,32 @@ def _fetch_bound_prior_package(
     }
 
 
+def _semantic_bridge_allows(
+    left: P6DailyChainPackage,
+    right: P6DailyChainPackage,
+    semantic_prerequisite: _SemanticEquivalencePrerequisite | None,
+) -> bool:
+    return (
+        semantic_prerequisite is not None
+        and left.market_date == semantic_prerequisite.boundary_market_date
+        and left.package_id == semantic_prerequisite.research_package_id
+        and left.manifest_sha256
+        == semantic_prerequisite.research_manifest_sha256
+        and right.prior_package_id
+        == semantic_prerequisite.original_package_id
+        and right.prior_manifest_sha256
+        == semantic_prerequisite.original_manifest_sha256
+        and right.covered_after_date == left.market_date
+    )
+
+
 def _load_bound_daily_chain(
     *,
     config: Any,
     target: ProspectiveDwdRelease,
     cache_root: Path,
     reconstruction: _MissingPriorReconstruction,
+    semantic_prerequisite: _SemanticEquivalencePrerequisite | None = None,
 ) -> tuple[tuple[P6DailyChainPackage, ...], tuple[dict[str, Any], ...]]:
     """Resolve one complete immutable chain without mutating the local daily root."""
 
@@ -1267,6 +1512,7 @@ def _load_bound_daily_chain(
             package_id=prior_id,
             manifest_sha256=prior_sha,
             reconstruction=reconstruction,
+            semantic_prerequisite=semantic_prerequisite,
         )
         recovered.append(recovery)
 
@@ -1277,11 +1523,17 @@ def _load_bound_daily_chain(
             "target package identity differs after chain resolution",
         )
     for left, right in zip(ordered, ordered[1:], strict=False):
-        if (
-            right.prior_package_id != left.package_id
-            or right.prior_manifest_sha256 != left.manifest_sha256
-            or right.covered_after_date != left.market_date
-        ):
+        exact_edge = (
+            right.prior_package_id == left.package_id
+            and right.prior_manifest_sha256 == left.manifest_sha256
+            and right.covered_after_date == left.market_date
+        )
+        semantic_bridge = _semantic_bridge_allows(
+            left,
+            right,
+            semantic_prerequisite,
+        )
+        if not exact_edge and not semantic_bridge:
             raise ExpertEvaluationError(
                 "p3_strat_003_daily_chain_gap",
                 f"{left.package_id}->{right.package_id}",
@@ -1487,6 +1739,7 @@ def build_input_artifact(
     raw = _request(request_path)
     decision_start, decision_end, execution_end, target_date, warmup_count = _scope(raw)
     reconstruction = _missing_prior_reconstruction(raw, project=project)
+    semantic_prerequisite = _semantic_equivalence_prerequisite(raw)
     runtime_path = project / str(raw["source_runtime"]["path"])
     runtime = load_prospective_runtime_config(runtime_path, root=project)
     output = output.resolve()
@@ -1518,6 +1771,7 @@ def build_input_artifact(
             target=target,
             cache_root=chain_cache,
             reconstruction=reconstruction,
+            semantic_prerequisite=semantic_prerequisite,
         )
         output.mkdir(parents=True)
         replay_root = output / "replay"
@@ -1693,6 +1947,10 @@ def build_input_artifact(
         "p2_fill_count": 0,
         "p6_mutation": False,
     }
+    if semantic_prerequisite is not None:
+        summary["semantic_equivalence_prerequisite"] = (
+            semantic_prerequisite.receipt()
+        )
     summary_path = output / "summary.json"
     summary_path.write_bytes(canonical_json_bytes(summary) + b"\n")
 
@@ -1722,6 +1980,10 @@ def build_input_artifact(
         "outcome_labels_produced": False,
         "p6_mutation": False,
     }
+    if semantic_prerequisite is not None:
+        manifest_payload["semantic_equivalence_result_digest"] = (
+            semantic_prerequisite.result_digest
+        )
     manifest = {
         **manifest_payload,
         "result_digest": digest_value(manifest_payload),
@@ -1877,6 +2139,27 @@ def verify_p3_strat_003_input_artifact(
         decision_end=date(2026, 9, 17),
         execution_end=date(2026, 9, 18),
     )
+    semantic_result_digest = manifest.get("semantic_equivalence_result_digest")
+    semantic_summary = summary.get("semantic_equivalence_prerequisite")
+    if semantic_result_digest is None:
+        if semantic_summary is not None:
+            raise ExpertEvaluationError(
+                "p3_strat_003_input_artifact_invalid",
+                "semantic-equivalence summary is unbound",
+            )
+    elif (
+        not isinstance(semantic_summary, dict)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", str(semantic_result_digest))
+        is None
+        or semantic_summary.get("result_digest") != semantic_result_digest
+        or semantic_summary.get("disposition")
+        != "PASS_CONSUMER_SEMANTIC_EQUIVALENCE_PROBE"
+        or semantic_summary.get("original_manifest_claimed_reproduced") is not False
+    ):
+        raise ExpertEvaluationError(
+            "p3_strat_003_input_artifact_invalid",
+            "semantic-equivalence binding differs",
+        )
     if (
         summary.get("strategy_or_economic_result_count") != 0
         or summary.get("outcome_label_count") != 0
@@ -1891,7 +2174,7 @@ def verify_p3_strat_003_input_artifact(
             "p3_strat_003_input_artifact_invalid",
             "input-only summary boundary differs",
         )
-    return {
+    result = {
         "artifact_ref": str(root),
         "manifest_sha256": _sha256(root / "manifest.json"),
         "result_digest": str(manifest["result_digest"]),
@@ -1910,6 +2193,11 @@ def verify_p3_strat_003_input_artifact(
         "outcome_labels_produced": False,
         "p6_mutation": False,
     }
+    if semantic_result_digest is not None:
+        result["semantic_equivalence_result_digest"] = str(
+            semantic_result_digest
+        )
+    return result
 
 
 def _parser() -> Any:

@@ -101,7 +101,7 @@ def test_p3_expert_006_closes_sufficient_without_reopening_stage_research() -> N
     assert WORK_ITEM.is_file()
 
 
-def test_p3_expert_006_stays_closed_when_strategy_research_resumes() -> None:
+def test_p3_expert_006_stays_closed_when_strategy_input_qualification_stops() -> None:
     items = {item.stable_id: item for item in work_items(ROOT)}
     assert items["P3-EXPERT-006"].status == "closed"
     ready_p3 = {
@@ -109,5 +109,5 @@ def test_p3_expert_006_stays_closed_when_strategy_research_resumes() -> None:
         for item in items.values()
         if item.phase == "P3" and item.status == "ready"
     }
-    assert ready_p3 == {"P3-STRAT-003", "P3-STRAT-003-B"}
+    assert ready_p3 == set()
     assert all(not stable_id.startswith("P3-STAGE-") for stable_id in ready_p3)

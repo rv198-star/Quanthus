@@ -1,0 +1,42 @@
+{
+  "schema_version": "quanthus.p5-stage-001-design-review-evidence.v1",
+  "work_item": "P5-STAGE-001-A",
+  "review_date": "2026-09-22",
+  "review_type": "four_isolated_model_perspective_design_review",
+  "human_experts": false,
+  "provider_model": "gpt-5.6-sol",
+  "isolation": "four_new_read_only_no_web_sessions_with_cross_role_outputs_hidden",
+  "artifact": {
+    "artifact_id": "42737764950ac91851a23f2c81331e85",
+    "archive_sha256": "sha256:82faeddf1573631d2915d8578ab491cb86e6d742cad58d0c19545587e532807e",
+    "contents": "four review.json plus four receipt.json files"
+  },
+  "roles": {
+    "quant": {
+      "input_sha256": "sha256:bbe094b19857098ba875c793e09f9c14f9cb1d40309710a08fa8f5a4e9c829f2",
+      "output_sha256": "sha256:87c5f3a3628ab3c3ac2c1b6526619566279dc381ffa8219ee4854022bba2cff4",
+      "verdict": "CONDITIONAL_PASS",
+      "exit_code": 0
+    },
+    "ml": {
+      "input_sha256": "sha256:3f343409d9c20e551b056a6ae1958cb5c56ffabc934696792f042cf2244f325e",
+      "output_sha256": "sha256:d5ae9805f1228fdcfe11b674d562012de4028a30155f557ef91f7c3a5d6c28a1",
+      "verdict": "CONDITIONAL_PASS",
+      "exit_code": 0
+    },
+    "data": {
+      "input_sha256": "sha256:a4516088d57bfb4a6099c7b9d7f0fd51820e3cc4045ff347b5f1115ea8d8129b",
+      "output_sha256": "sha256:fbf31f7c7fb3824566697845147bdee1a05ab38cb248a53327ed749fc7253389",
+      "verdict": "CONDITIONAL_PASS",
+      "exit_code": 0
+    },
+    "engineering": {
+      "input_sha256": "sha256:a63158a9b48c524f567a54f57bd496f2d428f209fc568ba21f9648ff78089005",
+      "output_sha256": "sha256:7c768bee168ef88fa95298424a22ede020e790395d897b65ee502df623e3ad64",
+      "verdict": "CONDITIONAL_PASS",
+      "exit_code": 0
+    }
+  },
+  "disposition": "Design direction accepted conditionally; findings were incorporated into #400-#408 before A implementation.",
+  "claim_ceiling": "These are four isolated model review sessions, not four human experts and not evidence that A implementation passed."
+}

@@ -22,7 +22,8 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 
 ADR 0007 is the current topology authority. `config/releases/v2-build202607.json` binds immutable
 `ods-base-202607-v2` and `dwd-base-202607-v2.1`. CN01 and Hermes run the same READY-gated ODS-to-DWD
-daily path; OCI mirrors CN01's verified DWD increments. The Base packages are read-only. Weekly
+daily path. The former OCI mirror leg is retired; its retained artifacts are historical evidence,
+not a current synchronization target. The Base packages are read-only. Weekly
 DWD corrections remain maintenance work until separately accepted. `META-DATA-MAINT-001` owns the
 post-V2.1 Daily recovery, synchronization, August promotion, provider-retry, and schedule-hardening
 changes that accumulated after Issue #78's Base remediation scope was complete.
@@ -410,6 +411,7 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STRAT-003 | Validate multi-expert incremental value on fixed recent history | P3-STRAT-002, P3-ATTR-001 | blocked epic; #317 remains open; B closed no-pass, no accepted input for D; A/C/C-R1 preserved; P6-v1 remains parallel; `docs/work-items/p3-strat-003.md` |
 | P3-STRAT-003-A | Freeze research request, four-way factorial, data authority and result rules | P3-STRAT-002, P3-ATTR-001 | closed by `docs/acceptance/p3-strat-003-a-preregistration-20260920.md`; #318; no 2025/2026 strategy-result read occurred |
 | P3-STRAT-003-B | Qualify immutable 2025-2026 inputs, PIT boundary and run isolation | P3-STRAT-003-A | closed `NO_PASS_STATIC_INDUSTRY_INPUT_COVERAGE`, not accepted; #319; no final input manifest; `docs/acceptance/p3-strat-003-b-input-qualification-20260921.md` |
+| P3-STRAT-003-B-R1 | Diagnose and correct the static-industry source binding without reopening B evidence | P3-STRAT-003-B, P3-STRAT-003-A | active bounded successor; #412; Draft #413 prepares result-blind coverage inspection; no B acceptance yet |
 | P3-STRAT-003-C | Implement B/T/R/TR research control and exact four-variant runner | P3-STRAT-003-A | closed by `docs/acceptance/p3-strat-003-c-engineering-20260920.md`; #320; result-blind engineering accepted at `1fdce608` |
 | P3-STRAT-003-C-R1 | Decouple recent-history candidate input from the legacy Event+Outcome-Label outer Run | P3-STRAT-003-C | closed by `docs/acceptance/p3-strat-003-c-r1-outcome-blind-candidate-binding-20260920.md`; #385; no recent-history outcome access |
 | P3-STRAT-003-D | Execute primary recent-history batch and independent cold reproduction | P3-STRAT-003-B, P3-STRAT-003-C-R1 | blocked; #321 remains open; B closed-unaccepted with input manifest absent, so D acceptance prerequisite remains unsatisfied; C-R1 accepted |
@@ -510,7 +512,7 @@ Existing node-local warehouse schedules remain explicitly outside this milestone
 | PK-WORKER-005 | Publish immutable Run/evidence and switch active digest atomically | PK-WORKER-004 | accepted |
 | PK-WORKER-006 | Add replay operations and Run history to the candidate workbench | PK-WORKER-005 | accepted |
 | PK-WORKER-007 | Inventory warehouse execution boundaries and retain node-local schedules | PK-WORKER-003 | accepted |
-| PK-WORKER-008 | Deploy and accept one PostgreSQL Replay Worker on OCI | PK-WORKER-005, PK-WORKER-006 | accepted |
+| PK-WORKER-008 | Deploy and accept one PostgreSQL Replay Worker on OCI | PK-WORKER-005, PK-WORKER-006 | accepted historical deployment evidence; OCI is now retired and is not current routing authority |
 | PK-AUTHORING-001 | Optionally implement isolated strategy/indicator draft authoring | PK-WEB-001 | not-applicable |
 | PK-RECOVERY-001 | Build provenance, contract, schema, dependency, and restoration packages | PK-BOUNDARY-001 | accepted |
 | PK-CUTOVER-001 | Execute deployment, rollback, restoration drill, and old-path shutdown | PK-WEB-001, PK-AUTHORING-001, PK-RECOVERY-001 | accepted |
@@ -524,14 +526,17 @@ traceability.
 
 ## Planning synchronization
 
-OCI owns GitHub planning synchronization. Preview the document-derived plan without network
-access, then apply it through the GitHub CLI authenticated on OCI:
+NexusAgent is the only current remote execution/control channel for GitHub planning synchronization.
+OCI is retired and must not be restored or used as a fallback. Preview the document-derived plan
+without network access, then apply it from the NexusAgent-controlled project environment through the
+currently approved GitHub authentication path:
 
 ```bash
 python3 scripts/sync_github_planning.py
 python3 scripts/sync_github_planning.py --apply
 ```
 
-The synchronization is idempotent, reconciles transient GitHub list inconsistencies, aborts
-on duplicate stable IDs, and preserves unmanaged labels. GitHub credentials remain in OCI's
-user configuration and are never read from the repository.
+The synchronization is idempotent, reconciles transient GitHub list inconsistencies, aborts on
+duplicate stable IDs, and preserves unmanaged labels. Credentials remain outside the repository.
+Historical issue/work-item text may still mention OCI where it records past execution; those
+references are archival evidence, not current routing authority.

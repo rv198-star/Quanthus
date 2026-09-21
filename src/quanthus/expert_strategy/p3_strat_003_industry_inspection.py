@@ -41,11 +41,18 @@ def _fail(message: str) -> NoReturn:
     raise ExpertEvaluationError("p3_strat_003_industry_inspection_invalid", message)
 
 
-def _source_unavailable(message: str) -> NoReturn:
-    raise ExpertEvaluationError(
+def _source_unavailable(
+    message: str,
+    *,
+    cause: BaseException | None = None,
+) -> NoReturn:
+    error = ExpertEvaluationError(
         "p3_strat_003_industry_inspection_source_unavailable",
         message,
     )
+    if cause is None:
+        raise error
+    raise error from cause
 
 
 def _sha256(path: Path) -> str:
@@ -214,10 +221,11 @@ def _candidate_inventory(
             """,
             [decision_start, decision_end, str(path)],
         ).fetchall()
-    except Exception as exc:
-        if exc.__class__.__module__.startswith("duckdb"):
-            _source_unavailable("failed candidate projection cannot be read by DuckDB")
-        raise
+    except duckdb.Error as exc:
+        _source_unavailable(
+            "failed candidate projection cannot be read by DuckDB",
+            cause=exc,
+        )
     finally:
         connection.close()
 
@@ -288,7 +296,10 @@ def _p4_reference(
             )
             event_manifest_sha = _sha256(event_manifest_path)
         except (ExpertEvaluationError, OSError) as exc:
-            _source_unavailable(f"P4 event reference {run_id} is unavailable")
+            _source_unavailable(
+                f"P4 event reference {run_id} is unavailable",
+                cause=exc,
+            )
         if (
             event_manifest_sha != expected_manifest
             or not isinstance(event_manifest.get("adm"), dict)
@@ -305,8 +316,11 @@ def _p4_reference(
                 label="P4 ADM manifest",
             )
             adm_manifest_sha = _sha256(adm_manifest_path)
-        except (ExpertEvaluationError, OSError):
-            _source_unavailable(f"P4 ADM reference {run_id} is unavailable")
+        except (ExpertEvaluationError, OSError) as exc:
+            _source_unavailable(
+                f"P4 ADM reference {run_id} is unavailable",
+                cause=exc,
+            )
         if adm_manifest_sha != event_manifest["adm"].get("manifest_sha256"):
             _fail("P4 ADM manifest differs from the event binding")
 
@@ -333,8 +347,11 @@ def _p4_reference(
         try:
             mapping_sha = _sha256(mapping_path)
             source_sha = _sha256(source_path)
-        except OSError:
-            _source_unavailable(f"P4 industry assets for {run_id} are unavailable")
+        except OSError as exc:
+            _source_unavailable(
+                f"P4 industry assets for {run_id} are unavailable",
+                cause=exc,
+            )
         if mapping_sha != industry.get("sha256") or source_sha != source.get("sha256"):
             _fail("P4 industry asset checksum differs from its sealed ADM")
 
@@ -443,8 +460,11 @@ def _dwd_reference(
         node_expression = _read_parquet_expression(
             _table_paths(base_root, "dwd_industry_node")
         )
-    except PhysicalEventScanError:
-        _source_unavailable("DWD static industry source tables are unavailable")
+    except PhysicalEventScanError as exc:
+        _source_unavailable(
+            "DWD static industry source tables are unavailable",
+            cause=exc,
+        )
 
     connection = duckdb.connect(":memory:")
     try:
@@ -499,10 +519,11 @@ def _dwd_reference(
             ORDER BY candidate.security_id
             """
         ).fetchall()
-    except Exception as exc:
-        if exc.__class__.__module__.startswith("duckdb"):
-            _source_unavailable("DWD industry coverage query failed")
-        raise
+    except duckdb.Error as exc:
+        _source_unavailable(
+            "DWD industry coverage query failed",
+            cause=exc,
+        )
     finally:
         connection.close()
 
@@ -532,8 +553,11 @@ def _legacy_reference(runtime: Any) -> tuple[dict[str, str], dict[str, Any]]:
             expected_version="static-level1-concentration-research-v1",
         )
         mapping_sha = _sha256(runtime.static_industry_mapping)
-    except (IndustryMappingError, OSError):
-        _source_unavailable("legacy P3 static industry mapping is unavailable or invalid")
+    except (IndustryMappingError, OSError) as exc:
+        _source_unavailable(
+            "legacy P3 static industry mapping is unavailable or invalid",
+            cause=exc,
+        )
     if mapping_sha != runtime.static_industry_mapping_sha256:
         _fail("legacy P3 static industry mapping checksum differs")
     return (

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -113,8 +114,9 @@ def test_candidate_inventory_counts_distinct_security_identity(
     candidate.parent.mkdir(parents=True)
     connection = duckdb.connect(":memory:")
     try:
+        escaped = str(candidate).replace("'", "''")
         connection.execute(
-            """
+            f"""
             COPY (
               SELECT * FROM (
                 VALUES
@@ -129,9 +131,8 @@ def test_candidate_inventory_counts_distinct_security_identity(
                 venue_id,
                 session_date
               )
-            ) TO ? (FORMAT PARQUET)
-            """,
-            [str(candidate)],
+            ) TO '{escaped}' (FORMAT PARQUET)
+            """
         )
     finally:
         connection.close()
@@ -143,8 +144,8 @@ def test_candidate_inventory_counts_distinct_security_identity(
             "claim_generation": 1,
             "candidate_relative_path": "p3-strat-003-input/candidate-daily.parquet",
         },
-        decision_start=inspection.date(2025, 1, 1),
-        decision_end=inspection.date(2026, 9, 17),
+        decision_start=date(2025, 1, 1),
+        decision_end=date(2026, 9, 17),
     )
     assert receipt["row_count"] == 3
     assert receipt["security_count"] == 2
@@ -167,8 +168,9 @@ def test_candidate_inventory_rejects_security_company_ambiguity(
     candidate.parent.mkdir(parents=True)
     connection = duckdb.connect(":memory:")
     try:
+        escaped = str(candidate).replace("'", "''")
         connection.execute(
-            """
+            f"""
             COPY (
               SELECT * FROM (
                 VALUES
@@ -182,9 +184,8 @@ def test_candidate_inventory_rejects_security_company_ambiguity(
                 venue_id,
                 session_date
               )
-            ) TO ? (FORMAT PARQUET)
-            """,
-            [str(candidate)],
+            ) TO '{escaped}' (FORMAT PARQUET)
+            """
         )
     finally:
         connection.close()

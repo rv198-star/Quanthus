@@ -1024,6 +1024,44 @@ def test_minute_collector_defaults_to_repository_module(
     assert result["timeout_seconds"] == 1800
 
 
+def test_minute_collector_reuses_complete_exact_universe_seed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "data"
+    home.mkdir()
+    seed = tmp_path / "seed"
+    seed.mkdir()
+    (seed / "status.json").write_text(
+        json.dumps(
+            {"state": "done", "freq": "1m", "total": 1, "done": 1, "error": 0}
+        )
+    )
+    (seed / "checkpoint.json").write_text(
+        json.dumps({"symbols": {"000001": {"status": "done"}}})
+    )
+    (seed / "000001_1m.parquet").write_bytes(b"verified-by-downstream-reader")
+    monkeypatch.setenv("HERMES_ODS_MINUTE_SEED_HOME", str(seed))
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail("provider must not run for a valid seed"),
+    )
+
+    raw_home = tmp_path / "attempt" / "minute_1m"
+    result = lane_runner._run_minute_collector(
+        paths=_paths(home, tmp_path),
+        market_date=date(2026, 9, 21),
+        bar_size="1m",
+        symbols=["000001"],
+        raw_home=raw_home,
+    )
+
+    assert result["exit_code"] == 0
+    assert result["api"] == "verified_attempt_seed_copy"
+    assert result["isolation"] == "attempt-local-seed-copy"
+    assert (raw_home / "000001_1m.parquet").read_bytes() == b"verified-by-downstream-reader"
+
+
 @pytest.mark.parametrize(
     ("configured", "message"),
     [

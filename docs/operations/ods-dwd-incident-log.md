@@ -193,3 +193,71 @@ sent a `2026-09-19` failure email at `00:15:20`. This was a recovery-operation f
 regression of the verified 2026-09-18 package. The services are inactive, all three timers are
 active with their next contract-defined triggers, and the runbook now requires failed-state reset
 while timers remain stopped.
+
+## 2026-09-21 CN01/Hermes ODS failure and OCI sync cascade
+
+| Field | Value |
+| --- | --- |
+| Incident id | `ODS-DWD-20260921-DUAL-001` / [#417](https://github.com/rv198-star/Quanthus/issues/417) |
+| Market date | `2026-09-21` |
+| Nodes / units | CN01 and Hermes daily ODS orchestrators; OCI DWD daily sync |
+| Status | `resolved` on 2026-09-22, with independent CN01, Hermes, and OCI receipts in #417 |
+| Failed stage | Both minute streams on both ODS nodes; Hermes first market attempt also had transient BaoStock errors |
+| Impact | Both node-local DWD builds remained blocked by absent minute READY releases; OCI could not mirror a same-date CN01 DWD package. |
+
+The fixed TDX endpoint was TCP-reachable but returned no usable minute-bar probe. The minute
+collector used Eastmoney without adequate historical-date handling and pacing for the full 4,992
+security universe. Remote closes accumulated until the fixed 1,800-second lane limit expired. The
+after-hours recovery then exposed a separate date-binding defect: an unrelated minute-bar probe
+rejected usable historical transaction data and the latest-day fallback could not satisfy the
+requested 2026-09-21 date. DWD and OCI failed closed because the upstream same-date READY evidence
+was absent; they were not independent transformation or sync defects.
+
+PRs #418, #421, #422, and #423 addressed the provider fallback, transaction-specific probe, and
+verified immutable seed recovery. CN01 recovery run `20260922T081348241628Z` and Hermes recovery run
+`20260922T081348172026Z` each finished with four READY lanes, catalog READY, and DWD READY. OCI
+installed CN01 package `dwd-daily-20260921-faf4478eb321-b02fb3c` at
+`2026-09-22T08:25:40Z`; CN01/OCI content digest and manifest SHA-256 matched
+`sha256:dfdf5c5781443da3b7c5099dee550141851652aeacf01cca753b7bed5215a9ae`.
+The transient CN01 recovery unit did not inherit the standard success-mail hook, so the OCI email
+alone was never used as proof of CN01 completion. Exact failed attempt paths, recovery manifests,
+and the notification limitation are retained in #417; this entry was appended after recovery.
+
+## 2026-09-22 CN01/Hermes daily ODS failure — recovery in progress
+
+| Field | Value |
+| --- | --- |
+| Incident id | `ODS-DWD-20260922-DUAL-001` / [#432](https://github.com/rv198-star/Quanthus/issues/432) |
+| Market date | `2026-09-22` |
+| Nodes / units | CN01 and Hermes daily ODS orchestrators; CN01-to-OCI DWD mirror pending |
+| Window | CN01 `18:30:01–19:40:12`; Hermes `19:30:18–21:35:19` Asia/Shanghai |
+| Status | `pending_attribution` and `recovery_in_progress` at 2026-09-23 04:05 Asia/Shanghai; delayed entry after session interruption |
+| Failed stage | Both minute streams on both nodes, exit 4 in each orchestrator run; Hermes market daily first run also failed but recovered in its second run |
+| Impact | Both catalogs and DWD builds reported `blocked_by_lane_failure`. No 2026-09-22 CN01-origin DWD package was available for OCI verification. |
+
+The directly observed minute failure on both nodes was `Eastmoney circuit opened after 20
+consecutive symbol failures`. The upstream error class, exact provider availability, and the
+relative contribution of the minute collector's probe/fallback behavior still require attribution.
+Hermes runtime dependency drift tracked in #431 has not been established as this incident's cause.
+The READY gate correctly withheld incomplete catalogs and DWD packages. OCI's own current state
+could not be inspected at this checkpoint because direct SSH closed during handshake.
+
+Preserved orchestrator run roots:
+
+- CN01: `/root/work/astock/data/shadow/cn01-ods-v1/orchestrator/daily/2026-09-22/20260922T103001436219Z`
+  and `20260922T113203053722Z`.
+- Hermes: `/root/work/astock/data/shadow/hermes-ods-v1/orchestrator/daily/2026-09-22/20260922T113019117601Z`
+  and `20260922T130558138878Z`.
+
+One same-date CN01 5m recovery release was READY at
+`/root/work/astock/data/shadow/cn01-ods-v1/releases/daily/5m/2026-09-22/20260922-20260922T192318338303Z`:
+its attempt held 4,992 symbol files and the release manifest listed artifact checksums. CN01 1m
+was still missing. That 5m collector's `status.json` says `server=sina-minute-jsonp`, while the
+release acquisition log's collector command still names `mootdx/tdx.incr`; the checkout was dirty
+and the attempt has no recorded code revision. Its provider and code lineage need reconciliation
+before treating it as evidence for a DWD promotion. Hermes 5m attempt
+`/root/work/astock/data/shadow/hermes-ods-v1/attempts/intraday-archive/5m/2026-09-22/20260922-20260922T195645033988Z`
+was still acquiring; Hermes 1m was missing. Other operations work had uncommitted provider changes
+on both nodes, so no overlapping collector or checkout mutation was made during this audit.
+The #432 gate requires verified four-lane, catalog, DWD, notification, and OCI date/package/hash
+receipts before changing this status to `resolved`.

@@ -19,6 +19,8 @@ from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from quanthus.providers.baostock_transport import set_socket_timeout
+
 PAGE_SIZE = 800
 FREQUENCIES = {"1m": 8, "5m": 0}
 LAYER_FREQUENCIES = {"prod": "5m", "research": "1m"}
@@ -243,21 +245,79 @@ def _eastmoney_bars(
             )
             .rename(columns={"_bucket": "ts"})
         )
-        frame = frame[
-            ["stock_code", "ts", "open", "high", "low", "close", "volume", "amount"]
-        ]
+        frame = frame[["stock_code", "ts", "open", "high", "low", "close", "volume", "amount"]]
     else:
         raise RuntimeError(f"unsupported Eastmoney fallback frequency: {frequency}")
     frame = (
-        frame.drop_duplicates(subset=["stock_code", "ts"])
-        .sort_values("ts")
-        .reset_index(drop=True)
+        frame.drop_duplicates(subset=["stock_code", "ts"]).sort_values("ts").reset_index(drop=True)
     )
     return frame, {
         "ok": True,
         "provider": "eastmoney-push2delay-trends2",
         "native_frequency": "1m",
         "derived_from": "1m" if frequency == "5m" else None,
+        "pages": 1,
+        "rows": len(frame),
+        "elapsed_seconds": round(time.monotonic() - started, 3),
+        "earliest": str(frame["ts"].iloc[0]) if len(frame) else None,
+        "latest": str(frame["ts"].iloc[-1]) if len(frame) else None,
+    }
+
+
+def _baostock_native_5m_bars(
+    symbol: str, market_date: str, *, client: Any
+) -> tuple[Any, dict[str, Any]]:
+    """Read unadjusted native five-minute OHLCV for one exact security/date."""
+    import pandas as pd
+
+    started = time.monotonic()
+    code = ("sh." if symbol.startswith("6") else "sz.") + symbol
+    response = client.query_history_k_data_plus(
+        code,
+        "date,time,code,open,high,low,close,volume,amount",
+        start_date=market_date,
+        end_date=market_date,
+        frequency="5",
+        adjustflag="3",
+    )
+    if str(response.error_code) != "0":
+        raise RuntimeError(f"BaoStock native 5m error={response.error_code}: {response.error_msg}")
+    rows: list[dict[str, Any]] = []
+    while response.next():
+        raw = response.get_row_data()
+        if len(raw) != 9 or raw[0] != market_date or raw[2] != code:
+            raise RuntimeError("BaoStock native 5m returned wrong date/code/schema")
+        timestamp = pd.to_datetime(raw[1], format="%Y%m%d%H%M%S%f", errors="raise")
+        if timestamp.strftime("%Y-%m-%d") != market_date:
+            raise RuntimeError("BaoStock native 5m timestamp differs from market date")
+        rows.append(
+            {
+                "stock_code": symbol,
+                "ts": timestamp,
+                "open": float(raw[3]),
+                "high": float(raw[4]),
+                "low": float(raw[5]),
+                "close": float(raw[6]),
+                "volume": float(raw[7]),
+                "amount": float(raw[8]),
+            }
+        )
+    frame = pd.DataFrame(
+        rows, columns=("stock_code", "ts", "open", "high", "low", "close", "volume", "amount")
+    )
+    if not frame.empty:
+        if frame.duplicated(subset=["stock_code", "ts"]).any():
+            raise RuntimeError("BaoStock native 5m returned duplicate bar timestamps")
+        frame = frame.sort_values("ts").reset_index(drop=True)
+    return frame, {
+        "ok": True,
+        "provider": "baostock-native-5m",
+        "native_frequency": "5m",
+        "derived_from": None,
+        "source_market_date": market_date if len(frame) else None,
+        "adjustflag": "3",
+        "volume_unit": "share",
+        "amount_unit": "CNY",
         "pages": 1,
         "rows": len(frame),
         "elapsed_seconds": round(time.monotonic() - started, 3),
@@ -339,9 +399,7 @@ def page_bars(
         }
     )
     output = (
-        output.drop_duplicates(subset=["stock_code", "ts"])
-        .sort_values("ts")
-        .reset_index(drop=True)
+        output.drop_duplicates(subset=["stock_code", "ts"]).sort_values("ts").reset_index(drop=True)
     )
     return output, {
         "ok": True,
@@ -393,14 +451,32 @@ def collect(
     checkpoint_path = home / "checkpoint.json"
     client: Any | None
     fallback = False
-    try:
-        client, server = tdx_client()
-    except RuntimeError:
-        if mode != "incr":
+    # Both scheduled and explicitly requested historical repairs target one exact
+    # session; provider pagination is unnecessary for this date-bounded API.
+    native_5m = frequency == "5m" and market_date is not None
+    if native_5m:
+        import baostock as bs
+
+        assert market_date is not None
+        login = bs.login()
+        if str(login.error_code) != "0":
+            raise RuntimeError(f"BaoStock native 5m login failed: {login.error_msg}")
+        try:
+            set_socket_timeout(30.0)
+        except Exception:
+            bs.logout()
             raise
-        client = None
-        server = "eastmoney-push2delay-trends2"
-        fallback = True
+        client = bs
+        server = "baostock-native-5m"
+    else:
+        try:
+            client, server = tdx_client()
+        except RuntimeError:
+            if mode != "incr":
+                raise
+            client = None
+            server = "eastmoney-push2delay-trends2"
+            fallback = True
     started = time.monotonic()
     results: dict[str, dict[str, Any]] = {}
     errors = 0
@@ -435,7 +511,9 @@ def collect(
     record("running")
     for index, symbol in enumerate(symbols, 1):
         try:
-            if fallback:
+            if native_5m:
+                frame, meta = _baostock_native_5m_bars(symbol, market_date, client=client)
+            elif fallback:
                 frame, meta = _eastmoney_bars(
                     symbol,
                     frequency,
@@ -473,7 +551,18 @@ def collect(
                 "status": "error",
                 "error": f"{type(exc).__name__}: {exc}",
             }
-            if not fallback:
+            if native_5m and consecutive_errors >= 3:
+                _atomic_json(
+                    checkpoint_path,
+                    {"symbols": results, "updated_at": _now_iso()},
+                )
+                record("failed", symbol)
+                with contextlib.suppress(Exception):
+                    client.logout()
+                raise RuntimeError(
+                    "BaoStock native 5m circuit opened after 3 consecutive failures"
+                ) from exc
+            if not fallback and not native_5m:
                 with contextlib.suppress(Exception):
                     client, server = tdx_client()
             elif consecutive_errors >= EASTMONEY_CONSECUTIVE_ERROR_LIMIT:
@@ -496,6 +585,8 @@ def collect(
     record("done" if errors == 0 else "done_with_errors")
     if session is not None:
         session.close()
+    if native_5m:
+        client.logout()
     return 0 if errors == 0 else 1
 
 

@@ -3662,13 +3662,20 @@ def _run_minute_collector(
         observed = checkpoint.get("symbols")
         if not isinstance(observed, dict):
             raise LaneRunError("minute recovery seed checkpoint has no symbols mapping")
-        invalid = sorted(
-            code
-            for code in expected
-            if not isinstance(observed.get(code), dict)
-            or observed[code].get("status") != "done"
-            or not (seed_home / f"{code}_{bar_size}.parquet").is_file()
-        )
+        invalid: list[str] = []
+        for code in sorted(expected):
+            entry = observed.get(code)
+            path = seed_home / f"{code}_{bar_size}.parquet"
+            if not isinstance(entry, dict) or entry.get("status") != "done":
+                invalid.append(code)
+                continue
+            try:
+                rows_file = int(entry.get("rows_file", -1))
+            except (TypeError, ValueError):
+                invalid.append(code)
+                continue
+            if rows_file < 0 or (rows_file > 0 and not path.is_file()):
+                invalid.append(code)
         extra = sorted(set(observed) - expected)
         if (
             status.get("state") != "done"

@@ -1033,11 +1033,18 @@ def test_minute_collector_reuses_complete_exact_universe_seed(
     seed.mkdir()
     (seed / "status.json").write_text(
         json.dumps(
-            {"state": "done", "freq": "1m", "total": 1, "done": 1, "error": 0}
+            {"state": "done", "freq": "1m", "total": 2, "done": 2, "error": 0}
         )
     )
     (seed / "checkpoint.json").write_text(
-        json.dumps({"symbols": {"000001": {"status": "done"}}})
+        json.dumps(
+            {
+                "symbols": {
+                    "000001": {"status": "done", "rows_file": 240},
+                    "000002": {"status": "done", "rows_file": 0},
+                }
+            }
+        )
     )
     (seed / "000001_1m.parquet").write_bytes(b"verified-by-downstream-reader")
     monkeypatch.setenv("HERMES_ODS_MINUTE_SEED_HOME", str(seed))
@@ -1052,7 +1059,7 @@ def test_minute_collector_reuses_complete_exact_universe_seed(
         paths=_paths(home, tmp_path),
         market_date=date(2026, 9, 21),
         bar_size="1m",
-        symbols=["000001"],
+        symbols=["000001", "000002"],
         raw_home=raw_home,
     )
 

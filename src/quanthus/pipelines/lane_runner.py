@@ -3777,7 +3777,11 @@ def _run_minute_collector(
     )
     return {
         "provider": collector_identity,
-        "api": f"mootdx/tdx.{fetch_mode}",
+        "api": (
+            "baostock.query_history_k_data_plus.native_5m"
+            if bar_size == "5m" and not collector_override
+            else f"mootdx/tdx.{fetch_mode}"
+        ),
         "layer": layer,
         "bar_size": bar_size,
         "fetch_mode": fetch_mode,

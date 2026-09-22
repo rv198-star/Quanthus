@@ -854,6 +854,53 @@ def test_eastmoney_minute_fallback_preserves_exact_amount_and_aggregates_5m(
     )
 
 
+def test_eastmoney_minute_fallback_requests_and_filters_target_date(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "code": "000001",
+        "trends": [
+            "2026-09-20 15:00,10,10,10,10,1,10,10",
+            "2026-09-21 15:00,11,11,11,11,2,22,11",
+            "2026-09-22 15:00,12,12,12,12,3,36,12",
+        ],
+    }
+    observed: dict[str, object] = {}
+
+    def fake_payload(symbol: str, **kwargs: object) -> dict[str, object]:
+        observed["symbol"] = symbol
+        observed.update(kwargs)
+        return payload
+
+    monkeypatch.setattr(minute_tdx, "_eastmoney_payload", fake_payload)
+    monkeypatch.setattr(minute_tdx, "_eastmoney_ndays", lambda _date: 2)
+
+    frame, _meta = minute_tdx._eastmoney_bars(
+        "000001", "1m", market_date="2026-09-21", session=object()
+    )
+
+    assert observed["symbol"] == "000001"
+    assert observed["ndays"] == 2
+    assert frame["ts"].dt.strftime("%Y-%m-%d").tolist() == ["2026-09-21"]
+
+
+def test_eastmoney_payload_treats_null_data_as_no_data() -> None:
+    class Response:
+        def read(self) -> bytes:
+            return b'{"rc": 0, "data": null}'
+
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    payload = minute_tdx._eastmoney_payload(
+        "000001", opener=lambda *_args, **_kwargs: Response()
+    )
+    assert payload == {"code": "000001", "trends": [], "no_data": True}
+
+
 def test_minute_collect_uses_eastmoney_only_for_incremental_tdx_outage(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -881,7 +928,7 @@ def test_minute_collect_uses_eastmoney_only_for_incremental_tdx_outage(
     monkeypatch.setattr(
         minute_tdx,
         "_eastmoney_bars",
-        lambda _symbol, _frequency: (
+        lambda _symbol, _frequency, **_kwargs: (
             frame,
             {"ok": True, "provider": "eastmoney-push2delay-trends2", "rows": 1},
         ),
@@ -942,6 +989,7 @@ def test_minute_collector_defaults_to_repository_module(
     )
 
     assert observed[1:3] == ["-m", "quanthus.providers.minute_tdx"]
+    assert observed[observed.index("--market-date") + 1] == "2026-07-24"
     assert result["provider"] == "quanthus.providers.minute_tdx"
     assert observed_timeout == [1800]
     assert result["timeout_seconds"] == 1800

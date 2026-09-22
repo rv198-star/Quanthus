@@ -3666,6 +3666,8 @@ def _run_minute_collector(
         bar_size,
         "--mode",
         fetch_mode,
+        "--market-date",
+        market_date.isoformat(),
         "--symbols",
         ",".join(symbols),
         "--no-lock",

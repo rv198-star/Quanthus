@@ -114,41 +114,72 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-Last verified on 2026-09-22 after opening the bounded B-R1 successor:
+Last verified on 2026-09-22 during the bounded S1 source-repair closeout:
 
 - B / #319 remains closed with `NO_PASS_STATIC_INDUSTRY_INPUT_COVERAGE`, **not accepted**.
   Its negative evidence is immutable and is not reopened or rewritten as PASS.
 - `P3-STRAT-003-B-R1` / #412 is the only active B continuation. It is a bounded input-source
   correction and coverage diagnosis, not a new historical platform or a reset of B.
-- PR #413 is merged. The result-blind industry-coverage inspection is published on main at
-  `cb5065dfb6d5f38d2ebf3c2a8d7b7c1d4cc56635`. PR #414 is also merged and makes NexusAgent-only
-  routing project governance. The frozen inspection request digest is
+- PR #413 is merged at `cb5065dfb6d5f38d2ebf3c2a8d7b7c1d4cc56635`; PR #414 is also merged
+  and makes NexusAgent-only routing project governance. The frozen inspection request remains
+  byte-identical, with digest
   `sha256:3262e61bf8cfab5e58f049a5215dedce319ec71c6d2ec2a6855e43562364d57c`.
-- The inspection is allowed to read only the retained failed-B candidate identity/date columns and
-  sealed industry-source evidence. It must keep the historical `10259` missing candidate-event
-  occurrences separate from distinct-security counts, and it carries no strategy-result, outcome-
-  label, P6 mutation, candidate rebuild, network collection, or B-acceptance authority.
-- If the failed candidate projection or sealed source evidence is unavailable, the valid outcome is
-  `DIAGNOSTIC_INPUT_UNAVAILABLE`; do not reconstruct the candidate projection or silently acquire
-  a replacement industry source.
-- The original corrected formal Job
-  `job_313b915e82fd4865b32c1222c5b094f2` remains the latest formal B-v2 execution and failed with
-  `p3_strat_003_industry_mapping_incomplete: 10259`. Do not rerun it.
-- PR #409/#410's exact-package diagnosis and repair remain accepted history; the successful
-  2026-08-27 semantic probe, A/C/C-R1, and all their existing digests remain preserved.
+- [Draft PR #420](https://github.com/rv198-star/Quanthus/pull/420), branch
+  `issue-412-s1-source-closure-repair`, preserves source-repair commit
+  `fb1ea787e1dd38b9a4d10c1bb8c5ffdb097267cf` on parent
+  `8bd989dfae98acd4f28799a376ee0ca5df9162aa`. It verifies the DWD manifest/READY and two
+  industry-file bindings, retains independent all/decision-period DWD/P4 coverage and reason
+  counts, and rejects exact-security P4 matches with conflicting listing-code/venue identity.
+  The diagnostic module SHA is
+  `sha256:01d96c46d2e4deb1594887054634d1b324f3b91c26e2a989771fbe27c48dfd1d`.
+  Event Worker changes are formatting only; its AST is identical to the `8bd989df` base.
+- The authorized merge of current main
+  `98ae4a0518968bd5e071275df5b0a417f6a472e5` into that branch produced integration commit
+  `4f38ee11f03b5f50d7ea4cf2352a600d8a7d90ec`. Relative to `fb1ea787`, it adds only
+  `lane_runner.py`, `minute_tdx.py`, and `test_ods_providers.py` changes; all S1 repair and
+  frozen-config file hashes remain unchanged. PR #420 is still a draft and has **not** merged
+  into main.
+- Source commit `fb1ea787`: Ruff check/format and syntax passed; focused tests returned
+  **131 passed, 0 failed, 0 skipped** (exit 0, 4.473 seconds); `make check` returned
+  **2799 passed, 0 failed, 0 errors, 7 skipped** (exit 0, 270.846 seconds).
+  Integration commit `4f38ee11`: its one additional `make check` returned
+  **2801 passed, 0 failed, 0 errors, 7 skipped**
+  (exit 0, 266.771 seconds). Full-suite evidence binds these code revisions; the subsequent
+  checkpoint-only documentation commit does not represent another full-suite run.
+- Both full-suite runs skipped five PostgreSQL tests because `QUANTHUS_TEST_POSTGRES_DSN`
+  is not configured (acceptance, candidate runs, event shards, expert-evaluation runs, and worker
+  queue), plus two tests because production expert artifacts are not mounted
+  (`test_expert_mvp_acceptance.py` and `test_product_expert_evidence.py`).
+  Original commands, logs, JUnit counts, file hashes and AST receipts are retained under
+  `/srv/agentdock/experiments/quanthus-p3-strat-003-s1-source-closure-20260922/`;
+  the independent integration evidence is in its `integration-98ae4a05/` subdirectory.
+- **No actual S1 industry-inspection Job has been submitted in this closeout; no sealed S1
+  diagnostic result exists.** The repair has not been deployed. The inspection may read only
+  the retained failed-B candidate identity/date projection and sealed industry-source evidence.
+  The historical `10259` missing candidate-event occurrences remain separate from distinct-
+  security counts. Synthetic repair tests confer no runtime, strategy-result, outcome-label,
+  candidate-rebuild, source-collection, P6 mutation, or B-acceptance authority.
+- If the failed candidate projection or sealed source evidence is unavailable, the valid outcome
+  is `DIAGNOSTIC_INPUT_UNAVAILABLE`; do not reconstruct the projection or acquire a replacement.
+  The original corrected formal Job `job_313b915e82fd4865b32c1222c5b094f2` remains the latest
+  formal B-v2 execution, failed with `p3_strat_003_industry_mapping_incomplete: 10259`; do not rerun it.
+  PR #409/#410, the accepted 2026-08-27 semantic probe, A/C/C-R1 and their digests remain preserved.
 - D / #321 and E / #322 remain blocked. There is no accepted B input/candidate digest and no
   complete A+B+C batch binding.
+- One broad status response in a prior execution context prevents certification that the
+  preceding access history remained result-blind throughout. No historical result values are
+  reproduced in this checkpoint. Any later runtime execution requires a fresh context with
+  strict allowlisted field filtering before responses are displayed or persisted.
 - **NexusAgent is the only current remote execution/control channel. OCI is retired.** Historical
   OCI references are archival evidence only; do not restore or use OCI as a fallback.
-- At this checkpoint the current conversation did not expose NexusAgent, so no project Ruff/pytest,
-  `make check`, deployment, diagnostic Job, market-data read, or B-R1 runtime acceptance had been
-  executed. That limitation is about the conversation's execution channel, not evidence that
-  Quanthus or its nodes are offline.
 
-Resume by verifying live #412 and current main. When NexusAgent is available, run the project checks
-on main `cb5065dfb6d5f38d2ebf3c2a8d7b7c1d4cc56635`; only if they pass may the Event Worker be
-deployed through NexusAgent and exactly one frozen industry-inspection Job be submitted. Interpret
-its sealed disposition before deciding whether B-R1 may proceed to a source-binding closure.
+Resume by verifying live #412 and PR #420 and completing the draft review. Before any deployment
+or diagnostic execution, explicitly approve the reviewed replacement code revision in place of
+the originally requested `f4568f` revision. Then bind the approved merged revision and frozen
+request to an event-worker-only deployment and exactly one industry-inspection Job through the
+authorized execution channel. This checkpoint records the draft-PR closeout; it does not grant
+merge, deployment or Job authority. Interpret the sealed S1 disposition before deciding whether
+B-R1 may proceed to a source-binding closure.
 
 Do not repeat A/C/C-R1, #409/#410, the semantic probe, or the failed formal B job. Do not replace the
 frozen industry SHA in place, drop unmapped candidates, lower the coverage gate, shrink the window,

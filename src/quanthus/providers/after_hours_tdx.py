@@ -23,7 +23,7 @@ from quanthus.providers.common import (
     sha256_bytes,
     write_parquet,
 )
-from quanthus.providers.minute_tdx import tdx_client
+from quanthus.providers.minute_tdx import TDX_SERVERS
 
 PROVIDER_REVISION = "after-hours-fixed-price-trades-v1"
 PAGE_SIZE = 800
@@ -89,6 +89,40 @@ def _frame_records(frame: Any) -> list[dict[str, Any]]:
     if isinstance(frame, Sequence):
         return [dict(row) for row in frame]
     raise TypeError(f"unsupported transaction response {type(frame).__name__}")
+
+
+def tdx_transaction_client(
+    market_date: date,
+    *,
+    quotes_factory: Callable[..., Any] | None = None,
+) -> tuple[Any, str]:
+    """Select a TDX node by probing the API this collector actually uses."""
+
+    if quotes_factory is None:
+        from mootdx.quotes import Quotes
+
+        quotes_factory = Quotes.factory
+    last_error: Exception | None = None
+    for host, port in TDX_SERVERS:
+        client: Any | None = None
+        try:
+            client = quotes_factory(market="std", server=(host, port))
+            probe = client.transactions(
+                symbol="600519",
+                start=0,
+                offset=1,
+                date=market_date.strftime("%Y%m%d"),
+            )
+            if _frame_records(probe):
+                return client, f"{host}:{port}"
+        except Exception as exc:  # noqa: BLE001 - probe every governed endpoint
+            last_error = exc
+        if client is not None:
+            _disconnect(client)
+    raise RuntimeError(
+        "no TDX endpoint returned a valid historical-transactions probe"
+        + (f": {last_error}" if last_error is not None else "")
+    )
 
 
 def _eastmoney_secid(code: str) -> str:
@@ -484,7 +518,7 @@ def collect_after_hours(
     *,
     max_pages: int = 10,
     sleep_seconds: float = 0.0,
-    client_factory: Callable[[], tuple[Any, str]] = tdx_client,
+    client_factory: Callable[[], tuple[Any, str]] | None = None,
     eastmoney_opener: Callable[..., Any] = urlopen,
     quote_opener: Callable[..., Any] = urlopen,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
@@ -496,8 +530,11 @@ def collect_after_hours(
     receipts: list[dict[str, Any]] = []
     client: Any | None = None
     fallback = False
+    resolved_client_factory = client_factory or (
+        lambda: tdx_transaction_client(market_date)
+    )
     try:
-        client, server = client_factory()
+        client, server = resolved_client_factory()
     except RuntimeError:
         latest_market_date = _eastmoney_latest_market_date(opener=eastmoney_opener)
         if latest_market_date != market_date.isoformat():
@@ -557,7 +594,7 @@ def collect_after_hours(
                         error = exc
                         _disconnect(client)
                         if attempts == 1:
-                            client, server = client_factory()
+                            client, server = resolved_client_factory()
             acquired_at = now_shanghai_iso()
             if error is not None:
                 status = "failed"

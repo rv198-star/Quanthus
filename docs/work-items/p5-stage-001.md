@@ -4,8 +4,8 @@
 | --- | --- |
 | Parent issue | #400 |
 | Milestone | #12 |
-| Current gate | A / #401 accepted; B/C/D inactive |
-| Current status | A_ACCEPTED_PREREGISTRATION_ONLY |
+| Current gate | A / #401 accepted; B/C/D activated with separate bounded scopes |
+| Current status | B_READINESS / C_SYNTHETIC_ENV / D_SYNTHETIC_ENGINEERING_STARTED |
 | Governing design | `../design/lld/07-research-scoring/p5-stage-001.md` |
 | Frozen request | `../../config/research/p5-stage-001/request.v1.json` |
 | Frozen targets | `../../config/research/p5-stage-001/stage-targets.v1.json` |
@@ -58,6 +58,28 @@ successor.
 
 ## Current recovery checkpoint
 
+As of the local Codex handoff on 2026-09-22:
+
+- live GitHub `main` and the local source both resolve to
+  `8bd989dfae98acd4f28799a376ee0ca5df9162aa`; PR #416 is merged and #401 is completed;
+- the owner explicitly activated B, C, and D in the active handoff, recorded without modifying A's
+  sealed receipt in `config/research/p5-stage-001/successor-activation.v1.json`;
+- branch `issue-p5-stage-001-next` is an independent worktree based on that source commit;
+- B produced an outcome-blind preflight with all unresolved counts kept null and Stage7/8/9 kept
+  ineligible; zero market rows were read because NexusAgent is absent from this tool context;
+- C inventoried the actual local Apple M4 host. It is not the RX6800/WSL node, so no RX6800 result or
+  offline claim is inferred; the isolated Python/CPU full-path benchmark remains next;
+- D added the first synthetic contract primitives for the fixed encoder shape, partial-label BCE,
+  required-seed aggregation, output precedence, parent applicability, T-only windows, and recovery
+  envelope; no result-bearing training occurred;
+- E / #405 remains inactive.
+
+Unique next actions: B must resolve and freeze the exact governed source manifest through NexusAgent;
+C must provision the isolated Python 3.12 environment and run the full synthetic CPU path; D must add
+the fixed L/G/T0 executable adapters and checkpoint round-trip on top of the synthetic contracts.
+
+### Sealed A predecessor checkpoint
+
 As of 2026-09-22:
 
 - #401 completed as `A_ACCEPTED_PREREGISTRATION_ONLY` after the frozen contract tests and a fresh independent final review returned PASS with no BLOCKER/MATERIAL finding.
@@ -68,15 +90,18 @@ As of 2026-09-22:
   `config/research/p5-stage-001/request.v1.json` and
   `config/research/p5-stage-001/stage-targets.v1.json`.
 - Final independent review PASS is archived externally with the #401 closeout evidence.
-- B, C, and D remain not started; each still requires separate explicit owner activation.
+- The sealed A checkpoint states: "B, C, and D remain not started; each still requires separate
+  explicit owner activation." That historical fact is preserved; the later bounded activation above
+  is the current state.
 
 Resume order after interruption:
 
 1. verify live #401 and current branch/source SHA;
 2. read this checkpoint, then the frozen request and target set;
 3. inspect the latest A test/review receipt;
-4. continue the single unfinished A step only;
-5. never rerun accepted work merely because the chat session changed.
+4. read the successor activation and the latest B/C/D receipt for the active gate;
+5. continue only the unique next action and never rerun accepted work merely because the chat
+   session changed.
 
 ## A acceptance boundary
 

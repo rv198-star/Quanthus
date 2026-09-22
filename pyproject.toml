@@ -33,6 +33,15 @@ stage-training = [
   "pytz>=2024.1",
   "scikit-learn>=1.6,<2",
 ]
+p5-stage-training = [
+  "duckdb>=1.1,<2",
+  "numpy>=2.1,<3",
+  "psutil>=6,<8",
+  "pyarrow>=18,<24",
+  "pytz>=2024.1",
+  "scikit-learn>=1.6,<2",
+  "torch>=2.5,<3",
+]
 ods = [
   "baostock>=0.9.3,<0.10",
   "mootdx>=0.11,<0.12",
@@ -56,6 +65,7 @@ quanthus-event-shard-worker = "quanthus.platform.event_shard_worker:main"
 quanthus-minute-tdx = "quanthus.providers.minute_tdx:main"
 quanthus-ods-snapshot = "quanthus.providers.ods_snapshot:main"
 quanthus-calendar-refresh = "quanthus.providers.trading_calendar:main"
+quanthus-p5-cpu-probe = "quanthus.stage_learning.p5_compute_probe:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

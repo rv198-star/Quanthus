@@ -1,0 +1,48 @@
+{
+  "schema_version": "quanthus.p5-stage-001-cpu-probe-result.v1",
+  "device": "cpu",
+  "platform": "macOS-26.6-arm64-arm-64bit",
+  "python": "3.12.9",
+  "torch": "2.14.0",
+  "batch_size": 32,
+  "parameter_count": 844428,
+  "warmup_steps": 2,
+  "warmup_losses": [
+    0.75892573595047,
+    0.6276105642318726
+  ],
+  "measured_steps": 3,
+  "end_to_end_seconds": [
+    0.0287823339967872,
+    0.025796375004574656,
+    0.0275029580006958
+  ],
+  "median_end_to_end_seconds": 0.0275029580006958,
+  "median_windows_per_second": 1163.5112121100003,
+  "measured_losses": [
+    0.554599404335022,
+    0.47730112075805664,
+    0.39985573291778564
+  ],
+  "checkpoint_bytes": [
+    10211066,
+    10211066,
+    10211066
+  ],
+  "checkpoint_resume": {
+    "fresh_process_pid": 68295,
+    "resumed_from_batch_cursor": 3,
+    "completed_batch_cursor": 4,
+    "finite_loss": true,
+    "loss": 0.3407007157802582
+  },
+  "nan_or_infinite_observed": false,
+  "market_data_rows_read": 0,
+  "model_results_read": 0,
+  "limitations": [
+    "T0 synthetic path only",
+    "RX6800 absent from current host",
+    "T1 masked reconstruction path not admitted by B/C pre-result gates",
+    "node-hour estimate pending B window counts"
+  ]
+}

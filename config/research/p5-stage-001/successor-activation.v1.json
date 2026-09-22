@@ -1,0 +1,59 @@
+{
+  "schema_version": "quanthus.p5-stage-001-successor-activation.v1",
+  "work_item": "P5-STAGE-001",
+  "effective_date": "2026-09-22",
+  "source_commit": "8bd989dfae98acd4f28799a376ee0ca5df9162aa",
+  "authority_source": "owner_explicit_active_session_handoff",
+  "activation": {
+    "B_issue_402": "ACTIVE_OUTCOME_BLIND_READINESS_FIRST",
+    "C_issue_403": "ACTIVE_SYNTHETIC_ENVIRONMENT_ONLY",
+    "D_issue_404": "ACTIVE_SYNTHETIC_ENGINEERING_ONLY",
+    "E_issue_405": "INACTIVE_PENDING_B_C_D_ACCEPTANCE"
+  },
+  "B_data_boundary": {
+    "candidate_market": [
+      "SSE",
+      "SZSE"
+    ],
+    "candidate_start": "2012-01-01",
+    "candidate_end": "2021-12-31",
+    "exact_manifest_required_before_first_market_row_read": true,
+    "2011_warmup_authorized": false,
+    "protected_2022_2026_access_authorized": false,
+    "strategy_or_economic_result_read_authorized": false,
+    "P3_STRAT_003_authority_inherited": false
+  },
+  "C_boundary": {
+    "environment_inventory_authorized": true,
+    "synthetic_full_path_benchmark_authorized": true,
+    "host_driver_change_authorized": false,
+    "system_reinstallation_authorized": false,
+    "source_built_ROCm_authorized": false,
+    "market_data_read_authorized": false
+  },
+  "D_boundary": {
+    "repository_code_config_tests_authorized": true,
+    "synthetic_contract_execution_authorized": true,
+    "market_data_read_authorized": false,
+    "result_bearing_model_training_authorized": false,
+    "T1_full_path_requires_pre_result_B_C_admission": true
+  },
+  "unchanged_prohibitions": [
+    "P5_promotion",
+    "P6_mutation",
+    "P3_STRAT_003_mutation",
+    "production",
+    "strategy",
+    "broker",
+    "trading",
+    "protected_year_access",
+    "automatic_hyperparameter_search",
+    "best_seed_selection"
+  ],
+  "bindings": {
+    "A_authorization_sha256": "sha256:8bd4a8a5ea726038c13e6bfb69c4aab18bcab0a3f1d7377c559e70e768920ec9",
+    "request_sha256": "sha256:37ca82557a1c0a538f5d7dd945536c54a9c6ceb022e1f8f400d4a1243bf1397b",
+    "target_set_sha256": "sha256:315fab9f7bd0304b418bc2a35f27e557a0f97b0c23b82b228f2754a386173d2f"
+  },
+  "claim_ceiling": "This receipt activates B readiness, C synthetic environment work, and D synthetic engineering only. It does not accept any successor, activate E, authorize protected data, or support a model-quality, production, strategy, or trading claim."
+}

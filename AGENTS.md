@@ -48,16 +48,23 @@
 
 ## Parallel research routing — P5-STAGE-001
 
-- Parallel line: `P5-STAGE-001` / #400. A / #401 is accepted as preregistration-only; B/C/D remain inactive until separately authorized.
+- Parallel line: `P5-STAGE-001` / #400. A / #401 is accepted as preregistration-only. The
+  2026-09-22 owner handoff separately activates B readiness, C synthetic/environment work, and D
+  synthetic engineering under `config/research/p5-stage-001/successor-activation.v1.json`; E remains
+  inactive until B/C/D acceptance.
 - Purpose: compare the existing rule/Stage surface with fixed simple baselines and one bounded learned
   temporal assessment over the layered 1..12 research vocabulary; it is not a top-1 Stage classifier.
 - Before working on this line, read `docs/work-items/p5-stage-001.md`, then the frozen request and
   target set under `config/research/p5-stage-001/`. After interruption, start with the work-item
   `Current recovery checkpoint` and expand only what the current gate needs.
-- A permits docs/config/tests and synthetic contract cases only: no market-row read, model training,
-  protected 2022-2026 access, P3-STRAT data-authority inheritance, P6 mutation, promotion or trading.
-- A completion does not auto-start B/C/D. Each successor requires explicit issue activation; negative,
-  partial, data-limited, compute-limited and inconclusive outcomes are all valid.
+- A permits docs/config/tests and synthetic contract cases only; that sealed predecessor boundary is
+  unchanged by the later successor activation.
+- A completion does not auto-start B/C/D; the current start comes from the separate bounded owner
+  activation receipt.
+- The successor receipt does not alter sealed A evidence. B must freeze an exact manifest before its
+  first market-row read; C/D remain synthetic until their own gates. No protected 2022-2026 access,
+  result-bearing training, P3-STRAT data-authority inheritance, P6 mutation, promotion or trading.
+- Negative, partial, data-limited, compute-limited and inconclusive outcomes are all valid.
 
 ## Development
 
@@ -108,4 +115,3 @@
 - Preserve node-local read-only/deployment boundaries and current approved interfaces when
   NexusAgent operates on remote nodes. Do not revive retired OCI-specific tunnels, credentials,
   users, or host assumptions as a workaround.
-

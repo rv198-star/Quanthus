@@ -286,3 +286,15 @@ returned 48 same-date native 5m bars, 09:35–15:00, for each of the other 14 sy
 recovery. #434 tracks the versioned direct-5m adapter and per-symbol provenance gate. A new
 immutable attempt must independently validate all 4,992 dispositions, source/date/session grid,
 code revision and checksums before any READY/catalog/DWD promotion; old attempts stay intact.
+
+The 1m source remains unqualified as well. Each node's two scheduled 9/22 1m attempts stopped
+after 15 Eastmoney errors; no later 1m recovery attempt was found at this checkpoint. A bounded
+CN01 probe of the temporary Sina adapter returned only 238 of 240 expected timestamps for
+`000001`, 140 for `001234`, and zero for suspended `002860`. Tencent's sample response did carry
+`date=20260922` and all 240 regular-session timestamps, but its row fields are a quote price plus
+cumulative volume/amount and continue as repeated fixed quotes after 15:00. The temporary adapter
+constructs timestamps from the requested date without checking that source date, treats quote
+prices as OHLC, and records cumulative figures as per-minute volume/amount. Three sampled
+TCP-reachable TDX servers returned zero native 1m bars for `000001`. These probes do not qualify a
+formal replacement. [#436](https://github.com/rv198-star/Quanthus/issues/436) tracks native 1m
+source/date/units qualification and recovery; the 240-grid and PIT gates remain intact.

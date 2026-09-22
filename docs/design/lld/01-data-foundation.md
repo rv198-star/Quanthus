@@ -555,6 +555,29 @@ cgroup must cover controller termination and escaped descendants; that Linux
 integration is a separate release gate, not proven by local POSIX unit tests.
 No historical package, Base, or pointer is modified by process cleanup.
 
+### Minute terminal checkpoint ordering
+
+`META-OPS-MINUTE-001` (#427), the C1 slice of #424, keeps provider semantics and
+request/retry policy unchanged. Within one isolated minute collector attempt:
+
+- Before publishing any terminal status, atomically replace `checkpoint.json` with
+  all completed per-security success/error results. An unattempted or interrupted
+  security does not acquire a fabricated result.
+- Circuit breaking and catchable Python exceptions/cancellation attempt the same
+  checkpoint-before-failed-status sequence, then propagate the original exception.
+  Secondary persistence failure is reported to stderr and must not replace the
+  original cause. A failed checkpoint write cannot produce a new terminal receipt.
+- Always attempt HTTP session cleanup. Cleanup failure propagates on a normal exit;
+  during exception unwinding it is reported without masking the original failure.
+- Atomic replacement is per file, not a multi-file transaction or power-loss/fsync
+  guarantee. A crash between writes can leave a newer checkpoint and older status;
+  missing/stale status never grants READY or recovery-reuse authority.
+
+This is not residual-set retry, checkpoint identity/checksum admission, forced-signal
+flushing, or a change to direct formal 5m collection. Default SIGTERM and SIGKILL
+are outside Python exception flushing; production process/cgroup validation remains
+a separate release gate.
+
 ### Implementation conformance map
 
 | Capability | Governing implementation | Contract and evidence |
@@ -564,6 +587,7 @@ No historical package, Base, or pointer is modified by process cleanup.
 | Immutable ODS handoff and daily DWD/DWS | `src/quanthus/pipelines/`, `config/pipelines/` | `tests/unit/test_ods_handoff.py`, `tests/unit/test_pipeline_runner.py`, `tests/p1/test_daily_warehouse.py` |
 | Repository-owned ODS schedule | `src/quanthus/pipelines/lane_runner.py`, `config/schedules/`, `ops/bin/`, `ops/systemd/` | `tests/unit/test_lane_runner.py`, `tests/unit/test_schedule_contracts.py`, ADR 0004 and its runbook |
 | Daily process ownership and non-retryable cleanup failure | `src/quanthus/pipelines/process_control.py`, `ops/bin/run-cn01-ods-daily`, `ops/bin/run-ods-daily-with-retry` | `tests/unit/test_ops_process_lifecycle.py`, `tests/unit/test_cn01_ods_orchestrator.py`; #424/#425; Linux/systemd and deployment acceptance still required |
+| Minute terminal checkpoint ordering and exception cleanup | `src/quanthus/providers/minute_tdx.py` | `tests/unit/test_minute_terminal_checkpoint.py`, `tests/unit/test_ods_providers.py`; #427; no recovery-reuse authority or production acceptance |
 | Dual-lane epoch, daily bars/status/summary candidates, fixed-primary arbitration, fenced publication/correction/rollback, recovery evidence, catalog, limited operational ADS, publication intent, and release set | `src/quanthus/pipelines/dual_lane.py`, `config/pipelines/dual-lane-dwd-dws.v1.json` | `tests/unit/test_dual_lane.py`, ADR 0005; runtime qualification and cutover acceptance evidence remains open |
 | Sealed DWD/DWS history seed and lane-local logical merge | `src/quanthus/pipelines/dual_lane_history.py`, `config/pipelines/dual-lane-history-base.v1.json`, `ops/bin/*dual-lane-history*` | `tests/unit/test_dual_lane_history.py`, ADR 0005, `docs/operations/dual-lane-data-platform-runbook.md` |
 | Monthly-complete DWD/DWS Base packages, guarded Base descriptors, and Base-aware lane catalogs | `src/quanthus/pipelines/dwd_dws_base.py`, `config/pipelines/dwd-dws-base-through-20260730.v2.json`, `ops/bin/*dwd-dws-base*` | `tests/unit/test_dwd_dws_base.py`, Issue #48, `docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md` |
@@ -596,6 +620,7 @@ No historical package, Base, or pointer is modified by process cleanup.
 | META-DATA-MAINT-001 | Reconcile post-V2.1 Daily ODS/DWD operational hardening | META-DATA-DWD-002 accepted, ADR 0007 | Current-main reconciliation, focused recovery/sync/schedule tests, and Issue #143 acceptance without changing Base or P4 authority |
 | META-OPS-RELIABILITY-001 | Deliver bounded ODS/DWD reliability improvements | META-DATA-DWD-002 accepted | #424; reviewed plan, staged engineering/Linux/deployment evidence, historical gap disposition and ten-session observation |
 | META-OPS-PROCESS-001 | Reap owned daily process groups before retry | META-OPS-RELIABILITY-001 | #425; real shell pipeline faults, bounded cleanup, no late writes, exit-75 retry suppression; separate Linux/deployment gate |
+| META-OPS-MINUTE-001 | Preserve minute collector terminal checkpoint evidence | META-OPS-RELIABILITY-001 | #427; synthetic circuit, cancellation and disk faults; complete processed-symbol checkpoint before terminal status; Linux/deployment remains separate |
 | P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | Exact-key source backfill and reconciled child revision |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | Exact-key backfill, active-universe coverage, and OCI child revision |
 | P1-DATA-004 | Normalize mixed-unit corporate actions for continuous historical replay | C1, S4, P1-SNAPSHOT-001 | Deterministic authority audit, fully versioned per-security exceptions, and immutable replay input bundle |

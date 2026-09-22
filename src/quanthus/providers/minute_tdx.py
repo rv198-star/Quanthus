@@ -409,7 +409,16 @@ def collect(
         session = requests.Session()
         sleep_seconds = max(sleep_seconds, EASTMONEY_MIN_INTERVAL_SECONDS)
 
+    def checkpoint() -> None:
+        _atomic_json(
+            checkpoint_path,
+            {"symbols": results, "updated_at": _now_iso()},
+        )
+
     def record(state: str, current: str | None = None) -> None:
+        # A terminal receipt must never outrun its per-symbol evidence.
+        if state != "running":
+            checkpoint()
         _atomic_json(
             status_path,
             {
@@ -428,66 +437,78 @@ def collect(
             },
         )
 
-    record("running")
-    for index, symbol in enumerate(symbols, 1):
-        try:
-            if fallback:
-                frame, meta = _eastmoney_bars(
-                    symbol,
-                    frequency,
-                    market_date=market_date,
-                    session=session,
-                )
-            else:
-                frame, meta = page_bars(
-                    client,
-                    symbol,
-                    FREQUENCIES[frequency],
-                    max_pages,
-                    mode,
-                )
-            if not meta.get("ok"):
-                raise RuntimeError(str(meta.get("error") or "minute bars request failed"))
-            rows, path = _merge_write(home, symbol, frequency, frame)
-            results[symbol] = {
-                "status": "done",
-                "path": str(path),
-                "rows_file": rows,
-                **meta,
-            }
-            done += 1
-            consecutive_errors = 0
-        except Exception as exc:  # noqa: BLE001 - record per-symbol provider failures
-            errors += 1
-            consecutive_errors += 1
-            results[symbol] = {
-                "status": "error",
-                "error": f"{type(exc).__name__}: {exc}",
-            }
-            if not fallback:
-                with contextlib.suppress(Exception):
-                    client, server = tdx_client()
-            elif consecutive_errors >= EASTMONEY_CONSECUTIVE_ERROR_LIMIT:
-                record("failed", symbol)
-                if session is not None:
-                    session.close()
-                raise RuntimeError(
-                    "Eastmoney circuit opened after "
-                    f"{consecutive_errors} consecutive symbol failures"
-                ) from exc
-        if index % 5 == 0 or index == len(symbols):
-            _atomic_json(
-                checkpoint_path,
-                {"symbols": results, "updated_at": _now_iso()},
-            )
-            record("running", symbol)
-        if sleep_seconds > 0:
-            time.sleep(sleep_seconds)
+    current: str | None = None
+    try:
+        record("running")
+        for index, symbol in enumerate(symbols, 1):
+            current = symbol
+            try:
+                if fallback:
+                    frame, meta = _eastmoney_bars(
+                        symbol,
+                        frequency,
+                        market_date=market_date,
+                        session=session,
+                    )
+                else:
+                    frame, meta = page_bars(
+                        client,
+                        symbol,
+                        FREQUENCIES[frequency],
+                        max_pages,
+                        mode,
+                    )
+                if not meta.get("ok"):
+                    raise RuntimeError(str(meta.get("error") or "minute bars request failed"))
+                rows, path = _merge_write(home, symbol, frequency, frame)
+                results[symbol] = {
+                    "status": "done",
+                    "path": str(path),
+                    "rows_file": rows,
+                    **meta,
+                }
+                done += 1
+                consecutive_errors = 0
+            except Exception as exc:  # noqa: BLE001 - record per-symbol provider failures
+                errors += 1
+                consecutive_errors += 1
+                results[symbol] = {
+                    "status": "error",
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+                if not fallback:
+                    with contextlib.suppress(Exception):
+                        client, server = tdx_client()
+                elif consecutive_errors >= EASTMONEY_CONSECUTIVE_ERROR_LIMIT:
+                    raise RuntimeError(
+                        "Eastmoney circuit opened after "
+                        f"{consecutive_errors} consecutive symbol failures"
+                    ) from exc
+            if index % 5 == 0 or index == len(symbols):
+                checkpoint()
+                record("running", symbol)
+            if sleep_seconds > 0:
+                time.sleep(sleep_seconds)
 
-    record("done" if errors == 0 else "done_with_errors")
-    if session is not None:
-        session.close()
-    return 0 if errors == 0 else 1
+        record("done" if errors == 0 else "done_with_errors")
+        return 0 if errors == 0 else 1
+    except BaseException:
+        # Includes catchable cancellation, not uncatchable SIGKILL/default SIGTERM.
+        # Persistence failure must not replace the original cause or claim success.
+        try:
+            record("failed", current)
+        except Exception as exc:  # noqa: BLE001 - preserve the original exception
+            print(f"minute terminal evidence write failed: {exc}", file=sys.stderr)
+        raise
+    finally:
+        if session is not None:
+            unwinding = sys.exc_info()[0] is not None
+            try:
+                session.close()
+            except Exception as exc:  # noqa: BLE001 - preserve an active failure
+                if not unwinding:
+                    raise
+                print(f"minute session cleanup failed: {exc}", file=sys.stderr)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

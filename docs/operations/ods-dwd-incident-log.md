@@ -258,7 +258,9 @@ and the attempt has no recorded code revision. Its checkpoint contains 4,969 sec
 and 23 from `tencent-minute-query`; the temporary code constructs the latter's 5m rows by grouping
 1m samples. ADR 0004 requires the formal 5m archive to be acquired directly, so this READY release
 does not qualify for the formal daily catalog/DWD. Its provider and code lineage also need
-reconciliation before any recovery promotion. Hermes 5m attempt
+reconciliation before any recovery promotion. This contract mismatch predates the temporary code:
+the merged Eastmoney fallback also groups 1m samples for 5m, although that provider path did not
+produce this READY release. Hermes 5m attempt
 `/root/work/astock/data/shadow/hermes-ods-v1/attempts/intraday-archive/5m/2026-09-22/20260922-20260922T195645033988Z`
 was still acquiring; Hermes 1m was missing. Other operations work had uncommitted provider changes
 on both nodes, so no overlapping collector or checkout mutation was made during this audit.

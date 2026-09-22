@@ -218,6 +218,8 @@ def _eastmoney_bars(
         return minute, {
             "ok": True,
             "provider": "eastmoney-push2delay-trends2",
+            "native_frequency": "1m",
+            "derived_from": "1m" if frequency == "5m" else None,
             "pages": 1,
             "rows": 0,
             "elapsed_seconds": round(time.monotonic() - started, 3),
@@ -254,6 +256,8 @@ def _eastmoney_bars(
     return frame, {
         "ok": True,
         "provider": "eastmoney-push2delay-trends2",
+        "native_frequency": "1m",
+        "derived_from": "1m" if frequency == "5m" else None,
         "pages": 1,
         "rows": len(frame),
         "elapsed_seconds": round(time.monotonic() - started, 3),
@@ -445,6 +449,11 @@ def collect(
                     FREQUENCIES[frequency],
                     max_pages,
                     mode,
+                )
+                meta.update(
+                    provider="mootdx-native-kline",
+                    native_frequency=frequency,
+                    derived_from=None,
                 )
             if not meta.get("ok"):
                 raise RuntimeError(str(meta.get("error") or "minute bars request failed"))

@@ -34,7 +34,11 @@ TDX_SERVERS = (
     ("121.36.225.169", 7709),
 )
 EASTMONEY_TRENDS_URL = "https://push2delay.eastmoney.com/api/qt/stock/trends2/get"
+EASTMONEY_HISTORY_TRENDS_URL = "https://push2his.eastmoney.com/api/qt/stock/trends2/get"
 EASTMONEY_TOKEN = "bd1d9ddb04089700cf9c27f6f7426281"
+EASTMONEY_MAX_DAYS = 5
+EASTMONEY_MIN_INTERVAL_SECONDS = 0.2
+EASTMONEY_CONSECUTIVE_ERROR_LIMIT = 20
 
 
 def _now_iso() -> str:
@@ -91,38 +95,65 @@ def _eastmoney_secid(symbol: str) -> str:
 def _eastmoney_payload(
     symbol: str,
     *,
+    ndays: int = 1,
     timeout: float = 10.0,
     opener: Callable[..., Any] = urlopen,
+    session: Any | None = None,
 ) -> dict[str, Any]:
     query = urlencode(
         {
             "secid": _eastmoney_secid(symbol),
             "fields1": "f1,f2,f3,f4,f5,f6,f7,f8",
             "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
-            "ndays": "1",
+            "ndays": str(ndays),
             "iscr": "0",
             "iscca": "0",
             "ut": EASTMONEY_TOKEN,
         }
     )
+    endpoint = EASTMONEY_HISTORY_TRENDS_URL if ndays > 1 else EASTMONEY_TRENDS_URL
     request = Request(
-        f"{EASTMONEY_TRENDS_URL}?{query}",
+        f"{endpoint}?{query}",
         headers={"User-Agent": "Mozilla/5.0 Quanthus/1.0"},
     )
     last_error: Exception | None = None
-    for attempt in range(3):
+    for attempt in range(5):
         try:
-            with opener(request, timeout=timeout) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-            data = payload.get("data") or {}
+            if session is None:
+                with opener(request, timeout=timeout) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+            else:
+                response = session.get(
+                    request.full_url,
+                    headers=dict(request.header_items()),
+                    timeout=timeout,
+                )
+                response.raise_for_status()
+                payload = response.json()
+            data = payload.get("data")
+            if data is None:
+                return {"code": symbol, "trends": [], "no_data": True}
             if str(data.get("code") or "").zfill(6) != symbol:
                 raise RuntimeError("Eastmoney returned a mismatched security")
             return data
         except Exception as exc:  # noqa: BLE001 - bounded provider retry
             last_error = exc
-            if attempt < 2:
-                time.sleep(0.25 * (attempt + 1))
+            if attempt < 4:
+                time.sleep(0.5 * (2**attempt))
     raise RuntimeError(f"Eastmoney trends request failed: {last_error}")
+
+
+def _eastmoney_ndays(market_date: str) -> int:
+    target = datetime.strptime(market_date, "%Y-%m-%d").date()
+    shanghai_today = datetime.now(timezone(timedelta(hours=8))).date()
+    days = (shanghai_today - target).days + 1
+    if days < 1:
+        raise ValueError("market_date must not be in the future")
+    if days > EASTMONEY_MAX_DAYS:
+        raise ValueError(
+            f"market_date is outside Eastmoney's {EASTMONEY_MAX_DAYS}-day recovery window"
+        )
+    return days
 
 
 def _eastmoney_one_minute_frame(data: dict[str, Any], symbol: str) -> Any:
@@ -164,9 +195,25 @@ def _five_minute_label(ts: Any) -> Any:
     return base.replace(minute=rounded)
 
 
-def _eastmoney_bars(symbol: str, frequency: str) -> tuple[Any, dict[str, Any]]:
+def _eastmoney_bars(
+    symbol: str,
+    frequency: str,
+    *,
+    market_date: str | None = None,
+    session: Any | None = None,
+) -> tuple[Any, dict[str, Any]]:
     started = time.monotonic()
-    minute = _eastmoney_one_minute_frame(_eastmoney_payload(symbol), symbol)
+    if market_date is None and session is None:
+        payload = _eastmoney_payload(symbol)
+    else:
+        payload = _eastmoney_payload(
+            symbol,
+            ndays=_eastmoney_ndays(market_date) if market_date else 1,
+            session=session,
+        )
+    minute = _eastmoney_one_minute_frame(payload, symbol)
+    if market_date is not None and not minute.empty:
+        minute = minute.loc[minute["ts"].dt.strftime("%Y-%m-%d") == market_date].copy()
     if minute.empty:
         return minute, {
             "ok": True,
@@ -333,6 +380,7 @@ def collect(
     symbols: list[str],
     max_pages: int,
     sleep_seconds: float,
+    market_date: str | None = None,
 ) -> int:
     if not symbols:
         raise ValueError("symbols must not be empty")
@@ -353,6 +401,13 @@ def collect(
     results: dict[str, dict[str, Any]] = {}
     errors = 0
     done = 0
+    consecutive_errors = 0
+    session: Any | None = None
+    if fallback:
+        import requests
+
+        session = requests.Session()
+        sleep_seconds = max(sleep_seconds, EASTMONEY_MIN_INTERVAL_SECONDS)
 
     def record(state: str, current: str | None = None) -> None:
         _atomic_json(
@@ -377,7 +432,12 @@ def collect(
     for index, symbol in enumerate(symbols, 1):
         try:
             if fallback:
-                frame, meta = _eastmoney_bars(symbol, frequency)
+                frame, meta = _eastmoney_bars(
+                    symbol,
+                    frequency,
+                    market_date=market_date,
+                    session=session,
+                )
             else:
                 frame, meta = page_bars(
                     client,
@@ -396,8 +456,10 @@ def collect(
                 **meta,
             }
             done += 1
+            consecutive_errors = 0
         except Exception as exc:  # noqa: BLE001 - record per-symbol provider failures
             errors += 1
+            consecutive_errors += 1
             results[symbol] = {
                 "status": "error",
                 "error": f"{type(exc).__name__}: {exc}",
@@ -405,6 +467,14 @@ def collect(
             if not fallback:
                 with contextlib.suppress(Exception):
                     client, server = tdx_client()
+            elif consecutive_errors >= EASTMONEY_CONSECUTIVE_ERROR_LIMIT:
+                record("failed", symbol)
+                if session is not None:
+                    session.close()
+                raise RuntimeError(
+                    "Eastmoney circuit opened after "
+                    f"{consecutive_errors} consecutive symbol failures"
+                ) from exc
         if index % 5 == 0 or index == len(symbols):
             _atomic_json(
                 checkpoint_path,
@@ -415,6 +485,8 @@ def collect(
             time.sleep(sleep_seconds)
 
     record("done" if errors == 0 else "done_with_errors")
+    if session is not None:
+        session.close()
     return 0 if errors == 0 else 1
 
 
@@ -426,6 +498,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--symbols", required=True)
     parser.add_argument("--max-pages", type=int, default=500)
     parser.add_argument("--sleep", type=float, default=0.05)
+    parser.add_argument("--market-date")
     parser.add_argument("--home", required=True)
     parser.add_argument("--no-lock", action="store_true")
     args = parser.parse_args(argv)
@@ -445,6 +518,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             symbols=_symbols(args.symbols),
             max_pages=args.max_pages,
             sleep_seconds=args.sleep,
+            market_date=args.market_date,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"minute collector failed: {exc}", file=sys.stderr)

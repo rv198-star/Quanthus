@@ -658,6 +658,7 @@ def test_baostock_query_keeps_reconnect_failure_bounded(
 def test_baostock_query_reconnects_when_row_iteration_breaks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(lane_runner, "set_socket_timeout", lambda _seconds: True)
     class Login:
         error_code = "0"
         error_msg = "ok"
@@ -735,6 +736,7 @@ def test_baostock_query_reconnects_when_row_iteration_breaks(
 def test_baostock_empty_response_does_not_reconnect(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(lane_runner, "set_socket_timeout", lambda _seconds: True)
     class Login:
         error_code = "0"
         error_msg = "ok"
@@ -784,6 +786,7 @@ def test_baostock_empty_response_does_not_reconnect(
 def test_baostock_missing_set_retry_repairs_only_early_gaps(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(lane_runner, "set_socket_timeout", lambda _seconds: True)
     class Login:
         error_code = "0"
         error_msg = "ok"

@@ -3884,6 +3884,39 @@ def _build_after_hours_fixed_price(
     ]
 
 
+_DIRECT_5M_PROVIDERS = frozenset(
+    {"mootdx-native-kline", "sina-minute-jsonp", "baostock-native-5m"}
+)
+
+
+def _direct_5m_provenance_error(raw_home: Path, universe: Sequence[str]) -> str | None:
+    """Fail closed if a formal 5m attempt lacks exact direct-source receipts."""
+    try:
+        checkpoint = json.loads((raw_home / "checkpoint.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError) as exc:
+        return f"direct_5m_checkpoint_unreadable: {type(exc).__name__}"
+    observed = checkpoint.get("symbols")
+    if not isinstance(observed, dict):
+        return "direct_5m_checkpoint_symbols_missing"
+    expected = set(universe)
+    if set(observed) != expected:
+        return (
+            "direct_5m_universe_mismatch: "
+            f"missing={len(expected - set(observed))} extra={len(set(observed) - expected)}"
+        )
+    for code in sorted(expected):
+        receipt = observed[code]
+        if not isinstance(receipt, dict) or receipt.get("status") != "done":
+            return f"direct_5m_receipt_incomplete: {code}"
+        if (
+            receipt.get("provider") not in _DIRECT_5M_PROVIDERS
+            or receipt.get("native_frequency") != "5m"
+            or receipt.get("derived_from") is not None
+        ):
+            return f"direct_5m_source_nonconforming: {code}"
+    return None
+
+
 def _build_intraday_stream(
     *,
     paths: LanePaths,
@@ -3965,6 +3998,32 @@ def _build_intraday_stream(
                     watermark=watermark,
                 ),
             ]
+        if bar_size == "5m":
+            provenance_error = _direct_5m_provenance_error(layer_dir, universe)
+            if provenance_error is not None:
+                return [
+                    DatasetStatus(
+                        name="intraday_bars",
+                        status="failed",
+                        detail=provenance_error,
+                        source_request=json.dumps(collector_meta, sort_keys=True, default=str),
+                    ),
+                    _seal_json_dataset(
+                        name="acquisition_log",
+                        payload={
+                            "lane": "intraday-archive",
+                            "stream": bar_size,
+                            "market_date": watermark,
+                            "collector": collector_meta,
+                            "provenance_error": provenance_error,
+                            "source_revision": rev,
+                        },
+                        landing=landing,
+                        source_revision=rev,
+                        knowledge_cutoff=knowledge_cutoff,
+                        watermark=watermark,
+                    ),
+                ]
 
     rows: list[dict[str, Any]] = []
     coverage_rows: list[dict[str, Any]] = []

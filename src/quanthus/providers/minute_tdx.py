@@ -250,6 +250,8 @@ def _eastmoney_bars(
         return minute, {
             "ok": True,
             "provider": "eastmoney-push2delay-trends2",
+            "native_frequency": "1m",
+            "derived_from": "1m" if frequency == "5m" else None,
             "pages": 1,
             "rows": 0,
             "elapsed_seconds": round(time.monotonic() - started, 3),
@@ -282,6 +284,8 @@ def _eastmoney_bars(
     return frame, {
         "ok": True,
         "provider": "eastmoney-push2delay-trends2",
+        "native_frequency": "1m",
+        "derived_from": "1m" if frequency == "5m" else None,
         "pages": 1,
         "rows": len(frame),
         "elapsed_seconds": round(time.monotonic() - started, 3),
@@ -507,6 +511,11 @@ def collect(
                     max_pages,
                     mode,
                     **budget_kwargs,
+                )
+                meta.update(
+                    provider="mootdx-native-kline",
+                    native_frequency=frequency,
+                    derived_from=None,
                 )
             if budget:
                 budget.remaining()

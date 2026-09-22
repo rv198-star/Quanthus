@@ -93,7 +93,13 @@
 
 ## Deployment and remote access
 
-- **NexusAgent is the only current remote execution and control channel for Quanthus.**
+- **NexusAgent is the default remote execution and control channel for Quanthus,
+  except for an explicit task-scoped Owner override.** For the ODS/DWD reliability
+  programme (#424), the Owner explicitly instructed on 2026-09-22: prefer existing
+  passwordless SSH and do not use MCP for node management. Use the existing CN01,
+  hermes and oci SSH entries with batch authentication and known-host verification;
+  do not weaken host checks, change credentials, or infer deployment approval from
+  successful connectivity. GitHub code distribution and release gates still apply.
   This control-channel rule does not retire the OCI data node: the Owner confirmed on 2026-09-22
   that the current data path remains Base V2.1 + Daily, with OCI mirroring CN01's verified DWD
   increments as defined in ADR 0007. Do not restore legacy OCI-specific control paths or use OCI

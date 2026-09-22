@@ -318,6 +318,34 @@ log are marked `run_mode=manual_recovery` and
 `excluded_from_collection_window_experiment=true`. It may restore ODS continuity and feed OCI, but
 it is never counted as an early/late A/B observation.
 
+## C2 opt-in minute recovery (not deployed)
+
+For programme #424, the Owner's 2026-09-22 task-scoped exception in root AGENTS.md
+authorizes existing passwordless SSH first, without MCP node management. Preserve
+known-host checks and GitHub distribution. Connectivity is not deployment approval;
+do not replace a running daily job's checkout or restart its service during preflight.
+
+Issue #429 / `META-OPS-MINUTE-002` is governed by the data-foundation LLD's
+“Opt-in same-attempt 1m residual retry” section. No service env or timer is changed
+by installing this code. After Linux and node release gates pass, an approved rollout
+may set `HERMES_ODS_MINUTE_1M_RECOVERY_POLICY` to the absolute path of the deployed
+`config/pipelines/minute-attempt-recovery.v1.json`. Record its id and SHA-256 from
+both lane metadata and collector status with the code revision and node receipt.
+The v1 budget is 1740 seconds; the existing default outer timeout is 1800 seconds.
+Do not combine this setting with a seed or collector override. The 5m lane ignores
+this 1m-only setting; the standalone collector rejects an explicit 5m policy request.
+
+Expect `symbol_attempts`, `scan_round`, `terminal_reason`, and per-symbol `attempts`
+history. `budget_exhausted`, storage failure or circuit opening is failure, not
+partial success/READY. An uncooperative call may reach the outer timeout; verify
+process/cgroup cleanup before retry. Do not infer that a recovered checkpoint alone
+proves coverage, date validity, publication, or timely SLA success.
+
+Rollback after a controlled stop by removing only this opt-in env setting, preserving
+failed evidence; do not mutate published packages or Base. This disables extra rounds
+and the cooperative budget without changing OCI sync. C2 does not repair or authorize
+the separate cross-attempt seed path or the formal-5m fallback conformance gap.
+
 ## Migration
 
 On a replacement collector, restore repository code/config, source credentials, ODS raw evidence,

@@ -7,7 +7,6 @@ integration and does not write shared canonical minute partitions.
 from __future__ import annotations
 
 import argparse
-import contextlib
 import json
 import socket
 import sys
@@ -18,6 +17,13 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+from quanthus.providers.minute_recovery import (
+    MinuteBudget,
+    MinuteBudgetExceeded,
+    MinuteRecoveryPolicy,
+    load_minute_recovery_policy,
+)
 
 PAGE_SIZE = 800
 FREQUENCIES = {"1m": 8, "5m": 0}
@@ -63,25 +69,42 @@ def _probe(host: str, port: int, timeout: float = 2.0) -> bool:
         return False
 
 
-def tdx_client() -> tuple[Any, str]:
+def tdx_client(*, budget: MinuteBudget | None = None) -> tuple[Any, str]:
     from mootdx.quotes import Quotes
 
     for host, port in TDX_SERVERS:
-        if not _probe(host, port):
+        timeout = min(2.0, budget.remaining()) if budget else 2.0
+        if not _probe(host, port, timeout=timeout):
             continue
         try:
+            if budget:
+                budget.remaining()
             client = Quotes.factory(market="std", server=(host, port))
+            if budget:
+                budget.remaining()
             probe = client.bars(symbol="000001", frequency=9, offset=1)
+            if budget:
+                budget.remaining()
             if probe is not None and not probe.empty:
                 return client, f"{host}:{port}"
+        except MinuteBudgetExceeded:
+            raise
         except Exception:  # noqa: BLE001 - provider failover must try the next endpoint
             continue
     for options in ({"bestip": True}, {}):
         try:
+            if budget:
+                budget.remaining()
             client = Quotes.factory(market="std", **options)
+            if budget:
+                budget.remaining()
             probe = client.bars(symbol="000001", frequency=9, offset=1)
+            if budget:
+                budget.remaining()
             if probe is not None and not probe.empty:
                 return client, f"factory:{options}"
+        except MinuteBudgetExceeded:
+            raise
         except Exception:  # noqa: BLE001 - provider failover must try the next endpoint
             continue
     raise RuntimeError("no TDX endpoint returned a valid bars probe")
@@ -99,6 +122,7 @@ def _eastmoney_payload(
     timeout: float = 10.0,
     opener: Callable[..., Any] = urlopen,
     session: Any | None = None,
+    budget: MinuteBudget | None = None,
 ) -> dict[str, Any]:
     query = urlencode(
         {
@@ -119,27 +143,33 @@ def _eastmoney_payload(
     last_error: Exception | None = None
     for attempt in range(5):
         try:
+            request_timeout = min(timeout, budget.remaining()) if budget else timeout
             if session is None:
-                with opener(request, timeout=timeout) as response:
+                with opener(request, timeout=request_timeout) as response:
                     payload = json.loads(response.read().decode("utf-8"))
             else:
                 response = session.get(
                     request.full_url,
                     headers=dict(request.header_items()),
-                    timeout=timeout,
+                    timeout=request_timeout,
                 )
                 response.raise_for_status()
                 payload = response.json()
+            if budget:
+                budget.remaining()
             data = payload.get("data")
             if data is None:
                 return {"code": symbol, "trends": [], "no_data": True}
             if str(data.get("code") or "").zfill(6) != symbol:
                 raise RuntimeError("Eastmoney returned a mismatched security")
             return data
+        except MinuteBudgetExceeded:
+            raise
         except Exception as exc:  # noqa: BLE001 - bounded provider retry
             last_error = exc
             if attempt < 4:
-                time.sleep(0.5 * (2**attempt))
+                delay = 0.5 * (2**attempt)
+                budget.sleep(delay) if budget else time.sleep(delay)
     raise RuntimeError(f"Eastmoney trends request failed: {last_error}")
 
 
@@ -201,15 +231,17 @@ def _eastmoney_bars(
     *,
     market_date: str | None = None,
     session: Any | None = None,
+    budget: MinuteBudget | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     started = time.monotonic()
-    if market_date is None and session is None:
+    if market_date is None and session is None and budget is None:
         payload = _eastmoney_payload(symbol)
     else:
         payload = _eastmoney_payload(
             symbol,
             ndays=_eastmoney_ndays(market_date) if market_date else 1,
             session=session,
+            **({"budget": budget} if budget else {}),
         )
     minute = _eastmoney_one_minute_frame(payload, symbol)
     if market_date is not None and not minute.empty:
@@ -241,15 +273,11 @@ def _eastmoney_bars(
             )
             .rename(columns={"_bucket": "ts"})
         )
-        frame = frame[
-            ["stock_code", "ts", "open", "high", "low", "close", "volume", "amount"]
-        ]
+        frame = frame[["stock_code", "ts", "open", "high", "low", "close", "volume", "amount"]]
     else:
         raise RuntimeError(f"unsupported Eastmoney fallback frequency: {frequency}")
     frame = (
-        frame.drop_duplicates(subset=["stock_code", "ts"])
-        .sort_values("ts")
-        .reset_index(drop=True)
+        frame.drop_duplicates(subset=["stock_code", "ts"]).sort_values("ts").reset_index(drop=True)
     )
     return frame, {
         "ok": True,
@@ -280,6 +308,8 @@ def page_bars(
     frequency: int,
     max_pages: int,
     mode: str,
+    *,
+    budget: MinuteBudget | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     import pandas as pd
 
@@ -289,12 +319,18 @@ def page_bars(
     pages = 1 if mode == "incr" else max_pages
     for index in range(pages):
         try:
+            if budget:
+                budget.remaining()
             frame = client.bars(
                 symbol=symbol,
                 frequency=frequency,
                 offset=PAGE_SIZE,
                 start=index * PAGE_SIZE,
             )
+            if budget:
+                budget.remaining()
+        except MinuteBudgetExceeded:
+            raise
         except Exception as exc:  # noqa: BLE001 - preserve provider failure in evidence
             return pd.DataFrame(), {
                 "ok": False,
@@ -335,9 +371,7 @@ def page_bars(
         }
     )
     output = (
-        output.drop_duplicates(subset=["stock_code", "ts"])
-        .sort_values("ts")
-        .reset_index(drop=True)
+        output.drop_duplicates(subset=["stock_code", "ts"]).sort_values("ts").reset_index(drop=True)
     )
     return output, {
         "ok": True,
@@ -381,33 +415,31 @@ def collect(
     max_pages: int,
     sleep_seconds: float,
     market_date: str | None = None,
+    recovery_policy: MinuteRecoveryPolicy | None = None,
 ) -> int:
     if not symbols:
         raise ValueError("symbols must not be empty")
+    if recovery_policy and (frequency != "1m" or layer != "research" or mode != "incr"):
+        raise ValueError("minute recovery v1 is limited to research 1m incr")
+    if recovery_policy and len(set(symbols)) != len(symbols):
+        raise ValueError("minute recovery requires unique symbols")
+    started = time.monotonic()
+    budget = MinuteBudget.start(recovery_policy.budget_seconds) if recovery_policy else None
+    budget_kwargs = {"budget": budget} if budget else {}
     home.mkdir(parents=True, exist_ok=True)
     status_path = home / "status.json"
     checkpoint_path = home / "checkpoint.json"
-    client: Any | None
+    client: Any | None = None
+    server = "unselected"
     fallback = False
-    try:
-        client, server = tdx_client()
-    except RuntimeError:
-        if mode != "incr":
-            raise
-        client = None
-        server = "eastmoney-push2delay-trends2"
-        fallback = True
-    started = time.monotonic()
     results: dict[str, dict[str, Any]] = {}
     errors = 0
     done = 0
     consecutive_errors = 0
     session: Any | None = None
-    if fallback:
-        import requests
-
-        session = requests.Session()
-        sleep_seconds = max(sleep_seconds, EASTMONEY_MIN_INTERVAL_SECONDS)
+    scan_round = 0
+    attempts_total = 0
+    terminal_reason: str | None = None
 
     def checkpoint() -> None:
         _atomic_json(
@@ -434,71 +466,150 @@ def collect(
                 "current": current,
                 "elapsed_s": round(time.monotonic() - started, 1),
                 "updated_at": _now_iso(),
+                **(
+                    {
+                        "recovery_policy_id": recovery_policy.policy_id,
+                        "recovery_policy_sha256": recovery_policy.sha256,
+                        "budget_seconds": recovery_policy.budget_seconds,
+                        "scan_round": scan_round,
+                        "symbol_attempts": attempts_total,
+                        "terminal_reason": terminal_reason,
+                    }
+                    if recovery_policy
+                    else {}
+                ),
             },
         )
+
+    def collect_symbol(symbol: str) -> None:
+        nonlocal current, client, server, done, errors, consecutive_errors, attempts_total
+        current = symbol
+        if budget:
+            budget.remaining()
+        previous = results.get(symbol, {})
+        history = list(previous.get("attempts", []))
+        attempts_total += 1
+        writing = False
+        try:
+            if fallback:
+                frame, meta = _eastmoney_bars(
+                    symbol,
+                    frequency,
+                    market_date=market_date,
+                    session=session,
+                    **budget_kwargs,
+                )
+            else:
+                frame, meta = page_bars(
+                    client,
+                    symbol,
+                    FREQUENCIES[frequency],
+                    max_pages,
+                    mode,
+                    **budget_kwargs,
+                )
+            if budget:
+                budget.remaining()
+            if not meta.get("ok"):
+                raise RuntimeError(str(meta.get("error") or "minute bars request failed"))
+            writing = True
+            rows, path = _merge_write(home, symbol, frequency, frame)
+            results[symbol] = {
+                **meta,
+                "status": "done",
+                "path": str(path),
+                "rows_file": rows,
+            }
+            if previous.get("status") == "error":
+                errors -= 1
+            done += 1
+            consecutive_errors = 0
+            if recovery_policy:
+                history.append({"attempt": len(history) + 1, "round": scan_round, "status": "done"})
+                results[symbol]["attempts"] = history
+        except MinuteBudgetExceeded:
+            raise
+        except Exception as exc:  # noqa: BLE001 - durable per-symbol failure evidence
+            if previous.get("status") != "error":
+                errors += 1
+            consecutive_errors += 1
+            detail = f"{type(exc).__name__}: {exc}"
+            results[symbol] = {"status": "error", "error": detail}
+            if recovery_policy:
+                history.append(
+                    {
+                        "attempt": len(history) + 1,
+                        "round": scan_round,
+                        "status": "error",
+                        "error": detail,
+                    }
+                )
+                results[symbol]["attempts"] = history
+                if writing:
+                    raise  # Storage failures must not induce more network traffic.
+            if not fallback:
+                try:
+                    client, server = tdx_client(**budget_kwargs)
+                except MinuteBudgetExceeded:
+                    raise
+                except Exception:
+                    pass
+            elif consecutive_errors >= EASTMONEY_CONSECUTIVE_ERROR_LIMIT:
+                raise RuntimeError(
+                    "Eastmoney circuit opened after "
+                    f"{consecutive_errors} consecutive symbol failures"
+                ) from exc
 
     current: str | None = None
     try:
         record("running")
-        for index, symbol in enumerate(symbols, 1):
-            current = symbol
-            try:
-                if fallback:
-                    frame, meta = _eastmoney_bars(
-                        symbol,
-                        frequency,
-                        market_date=market_date,
-                        session=session,
-                    )
-                else:
-                    frame, meta = page_bars(
-                        client,
-                        symbol,
-                        FREQUENCIES[frequency],
-                        max_pages,
-                        mode,
-                    )
-                if not meta.get("ok"):
-                    raise RuntimeError(str(meta.get("error") or "minute bars request failed"))
-                rows, path = _merge_write(home, symbol, frequency, frame)
-                results[symbol] = {
-                    "status": "done",
-                    "path": str(path),
-                    "rows_file": rows,
-                    **meta,
-                }
-                done += 1
-                consecutive_errors = 0
-            except Exception as exc:  # noqa: BLE001 - record per-symbol provider failures
-                errors += 1
-                consecutive_errors += 1
-                results[symbol] = {
-                    "status": "error",
-                    "error": f"{type(exc).__name__}: {exc}",
-                }
-                if not fallback:
-                    with contextlib.suppress(Exception):
-                        client, server = tdx_client()
-                elif consecutive_errors >= EASTMONEY_CONSECUTIVE_ERROR_LIMIT:
-                    raise RuntimeError(
-                        "Eastmoney circuit opened after "
-                        f"{consecutive_errors} consecutive symbol failures"
-                    ) from exc
-            if index % 5 == 0 or index == len(symbols):
-                checkpoint()
-                record("running", symbol)
-            if sleep_seconds > 0:
-                time.sleep(sleep_seconds)
+        try:
+            client, server = tdx_client(**budget_kwargs)
+        except MinuteBudgetExceeded:
+            raise
+        except RuntimeError:
+            if mode != "incr":
+                raise
+            server = "eastmoney-push2delay-trends2"
+            fallback = True
+        if budget:
+            budget.remaining()
+        if fallback:
+            import requests
 
+            session = requests.Session()
+            sleep_seconds = max(sleep_seconds, EASTMONEY_MIN_INTERVAL_SECONDS)
+        pending = list(symbols)
+        max_rounds = 1 + (recovery_policy.retry_rounds if recovery_policy else 0)
+        for scan_round in range(1, max_rounds + 1):
+            if not pending:
+                break
+            if scan_round > 1:
+                budget.sleep(recovery_policy.retry_delay_seconds)
+            for index, symbol in enumerate(pending, 1):
+                # The helper below owns the per-symbol attempt; round membership
+                # is derived only from this invocation's failed results.
+                collect_symbol(symbol)
+                if index % 5 == 0 or index == len(pending):
+                    checkpoint()
+                    record("running", symbol)
+                if sleep_seconds > 0 and (not recovery_policy or index < len(pending)):
+                    budget.sleep(sleep_seconds) if budget else time.sleep(sleep_seconds)
+            pending = [code for code in symbols if results[code]["status"] == "error"]
+        if budget:
+            budget.remaining()
         record("done" if errors == 0 else "done_with_errors")
         return 0 if errors == 0 else 1
-    except BaseException:
+    except BaseException as exc:
+        terminal_reason = (
+            "budget_exhausted" if isinstance(exc, MinuteBudgetExceeded) else type(exc).__name__
+        )
         # Includes catchable cancellation, not uncatchable SIGKILL/default SIGTERM.
         # Persistence failure must not replace the original cause or claim success.
         try:
             record("failed", current)
-        except Exception as exc:  # noqa: BLE001 - preserve the original exception
-            print(f"minute terminal evidence write failed: {exc}", file=sys.stderr)
+        except Exception as write_exc:  # noqa: BLE001 - preserve the original exception
+            print(f"minute terminal evidence write failed: {write_exc}", file=sys.stderr)
         raise
     finally:
         if session is not None:
@@ -520,6 +631,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--max-pages", type=int, default=500)
     parser.add_argument("--sleep", type=float, default=0.05)
     parser.add_argument("--market-date")
+    parser.add_argument("--recovery-policy", type=Path)
     parser.add_argument("--home", required=True)
     parser.add_argument("--no-lock", action="store_true")
     args = parser.parse_args(argv)
@@ -540,6 +652,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_pages=args.max_pages,
             sleep_seconds=args.sleep,
             market_date=args.market_date,
+            recovery_policy=(
+                load_minute_recovery_policy(args.recovery_policy) if args.recovery_policy else None
+            ),
         )
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"minute collector failed: {exc}", file=sys.stderr)

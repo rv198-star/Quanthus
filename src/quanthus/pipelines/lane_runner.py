@@ -39,6 +39,7 @@ from quanthus.pipelines.schedule_contracts import (
     load_schedule_contract,
 )
 from quanthus.providers.baostock_transport import set_socket_timeout
+from quanthus.providers.minute_recovery import load_minute_recovery_policy
 from quanthus.providers.trading_calendar import (
     CalendarRefreshError,
     refresh_calendar,
@@ -3649,6 +3650,23 @@ def _run_minute_collector(
         market_date=market_date, bar_size=bar_size
     )
     seed_raw = os.environ.get("HERMES_ODS_MINUTE_SEED_HOME", "").strip()
+    collector_override = os.environ.get("HERMES_ODS_MINUTE_COLLECTOR", "").strip()
+    policy_raw = (
+        os.environ.get("HERMES_ODS_MINUTE_1M_RECOVERY_POLICY", "").strip()
+        if bar_size == "1m" else ""
+    )
+    recovery_policy = None
+    policy_path = None
+    if policy_raw:
+        if seed_raw or collector_override or fetch_mode != "incr":
+            raise LaneRunError("minute recovery policy requires repository 1m incr without seed")
+        policy_path = Path(policy_raw).resolve()
+        try:
+            recovery_policy = load_minute_recovery_policy(policy_path)
+        except (OSError, ValueError, TypeError) as exc:
+            raise LaneRunError(f"invalid minute recovery policy: {exc}") from exc
+        if recovery_policy.budget_seconds >= _minute_collector_timeout_seconds():
+            raise LaneRunError("minute recovery budget must be below collector timeout")
     if seed_raw:
         seed_home = Path(seed_raw).resolve()
         try:
@@ -3711,7 +3729,6 @@ def _run_minute_collector(
             "isolation": "attempt-local-seed-copy",
             "seed_home": str(seed_home),
         }
-    collector_override = os.environ.get("HERMES_ODS_MINUTE_COLLECTOR", "").strip()
     if collector_override:
         script = Path(collector_override).resolve()
         if not script.is_file():
@@ -3739,6 +3756,8 @@ def _run_minute_collector(
     ]
     if max_pages is not None:
         cmd.extend(["--max-pages", str(max_pages)])
+    if policy_path is not None:
+        cmd.extend(["--recovery-policy", str(policy_path)])
     # Provider collection is always attempt-local. There is deliberately no
     # production fallback: shadow runs must never mutate shared legacy partitions.
     raw_home.mkdir(parents=True, exist_ok=False)
@@ -3773,6 +3792,12 @@ def _run_minute_collector(
         "market_date": market_date.isoformat(),
         "universe_size": len(symbols),
         "isolation": "attempt-local",
+        **(
+            {"recovery_policy_id": recovery_policy.policy_id,
+             "recovery_policy_sha256": recovery_policy.sha256,
+             "budget_seconds": recovery_policy.budget_seconds}
+            if recovery_policy else {}
+        ),
     }
 
 

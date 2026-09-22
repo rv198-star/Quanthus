@@ -149,7 +149,7 @@ def test_normal_terminal_counts_and_exit_codes_are_unchanged(
     fallback.close.assert_called_once()
 
 
-def test_initial_status_write_failure_still_closes_session(
+def test_initial_status_write_failure_never_opens_session(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     fallback: Mock,
@@ -157,7 +157,8 @@ def test_initial_status_write_failure_still_closes_session(
     monkeypatch.setattr(minute_tdx, "_atomic_json", Mock(side_effect=OSError("status unwritable")))
     with pytest.raises(OSError, match="status unwritable"):
         collect(tmp_path, 1)
-    fallback.close.assert_called_once()
+    minute_tdx.tdx_client.assert_not_called()
+    fallback.close.assert_not_called()
 
 
 def test_tdx_interruption_also_flushes_completed_results(

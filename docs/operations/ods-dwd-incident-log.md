@@ -254,8 +254,11 @@ One same-date CN01 5m recovery release was READY at
 its attempt held 4,992 symbol files and the release manifest listed artifact checksums. CN01 1m
 was still missing. That 5m collector's `status.json` says `server=sina-minute-jsonp`, while the
 release acquisition log's collector command still names `mootdx/tdx.incr`; the checkout was dirty
-and the attempt has no recorded code revision. Its provider and code lineage need reconciliation
-before treating it as evidence for a DWD promotion. Hermes 5m attempt
+and the attempt has no recorded code revision. Its checkpoint contains 4,969 securities from Sina
+and 23 from `tencent-minute-query`; the temporary code constructs the latter's 5m rows by grouping
+1m samples. ADR 0004 requires the formal 5m archive to be acquired directly, so this READY release
+does not qualify for the formal daily catalog/DWD. Its provider and code lineage also need
+reconciliation before any recovery promotion. Hermes 5m attempt
 `/root/work/astock/data/shadow/hermes-ods-v1/attempts/intraday-archive/5m/2026-09-22/20260922-20260922T195645033988Z`
 was still acquiring; Hermes 1m was missing. Other operations work had uncommitted provider changes
 on both nodes, so no overlapping collector or checkout mutation was made during this audit.

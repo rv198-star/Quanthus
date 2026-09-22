@@ -193,3 +193,108 @@ sent a `2026-09-19` failure email at `00:15:20`. This was a recovery-operation f
 regression of the verified 2026-09-18 package. The services are inactive, all three timers are
 active with their next contract-defined triggers, and the runbook now requires failed-state reset
 while timers remain stopped.
+
+## 2026-09-21 CN01/Hermes ODS failure and OCI sync cascade
+
+| Field | Value |
+| --- | --- |
+| Incident id | `ODS-DWD-20260921-DUAL-001` / [#417](https://github.com/rv198-star/Quanthus/issues/417) |
+| Market date | `2026-09-21` |
+| Nodes / units | CN01 and Hermes daily ODS orchestrators; OCI DWD daily sync |
+| Status | `resolved` on 2026-09-22, with independent CN01, Hermes, and OCI receipts in #417 |
+| Failed stage | Both minute streams on both ODS nodes; Hermes first market attempt also had transient BaoStock errors |
+| Impact | Both node-local DWD builds remained blocked by absent minute READY releases; OCI could not mirror a same-date CN01 DWD package. |
+
+The fixed TDX endpoint was TCP-reachable but returned no usable minute-bar probe. The minute
+collector used Eastmoney without adequate historical-date handling and pacing for the full 4,992
+security universe. Remote closes accumulated until the fixed 1,800-second lane limit expired. The
+after-hours recovery then exposed a separate date-binding defect: an unrelated minute-bar probe
+rejected usable historical transaction data and the latest-day fallback could not satisfy the
+requested 2026-09-21 date. DWD and OCI failed closed because the upstream same-date READY evidence
+was absent; they were not independent transformation or sync defects.
+
+PRs #418, #421, #422, and #423 addressed the provider fallback, transaction-specific probe, and
+verified immutable seed recovery. CN01 recovery run `20260922T081348241628Z` and Hermes recovery run
+`20260922T081348172026Z` each finished with four READY lanes, catalog READY, and DWD READY. OCI
+installed CN01 package `dwd-daily-20260921-faf4478eb321-b02fb3c` at
+`2026-09-22T08:25:40Z`; CN01/OCI content digest and manifest SHA-256 matched
+`sha256:dfdf5c5781443da3b7c5099dee550141851652aeacf01cca753b7bed5215a9ae`.
+The transient CN01 recovery unit did not inherit the standard success-mail hook, so the OCI email
+alone was never used as proof of CN01 completion. Exact failed attempt paths, recovery manifests,
+and the notification limitation are retained in #417; this entry was appended after recovery.
+
+## 2026-09-22 CN01/Hermes daily ODS failure — recovery in progress
+
+| Field | Value |
+| --- | --- |
+| Incident id | `ODS-DWD-20260922-DUAL-001` / [#432](https://github.com/rv198-star/Quanthus/issues/432) |
+| Market date | `2026-09-22` |
+| Nodes / units | CN01 and Hermes daily ODS orchestrators; CN01-to-OCI DWD mirror pending |
+| Window | CN01 `18:30:01–19:40:12`; Hermes `19:30:18–21:35:19` Asia/Shanghai |
+| Status | `pending_attribution` and `recovery_in_progress` at 2026-09-23 04:05 Asia/Shanghai; delayed entry after session interruption |
+| Failed stage | Both minute streams on both nodes, exit 4 in each orchestrator run; Hermes market daily first run also failed but recovered in its second run |
+| Impact | Both catalogs and DWD builds reported `blocked_by_lane_failure`. No 2026-09-22 CN01-origin DWD package was available for OCI verification. |
+
+The directly observed minute failure on both nodes was `Eastmoney circuit opened after 20
+consecutive symbol failures`. The upstream error class, exact provider availability, and the
+relative contribution of the minute collector's probe/fallback behavior still require attribution.
+Hermes runtime dependency drift tracked in #431 has not been established as this incident's cause.
+The READY gate correctly withheld incomplete catalogs and DWD packages. OCI's own current state
+could not be inspected at this checkpoint because direct SSH closed during handshake.
+
+Preserved orchestrator run roots:
+
+- CN01: `/root/work/astock/data/shadow/cn01-ods-v1/orchestrator/daily/2026-09-22/20260922T103001436219Z`
+  and `20260922T113203053722Z`.
+- Hermes: `/root/work/astock/data/shadow/hermes-ods-v1/orchestrator/daily/2026-09-22/20260922T113019117601Z`
+  and `20260922T130558138878Z`.
+
+One same-date CN01 5m recovery release was READY at
+`/root/work/astock/data/shadow/cn01-ods-v1/releases/daily/5m/2026-09-22/20260922-20260922T192318338303Z`:
+its attempt held 4,992 symbol files and the release manifest listed artifact checksums. CN01 1m
+was still missing. That 5m collector's `status.json` says `server=sina-minute-jsonp`, while the
+release acquisition log's collector command still names `mootdx/tdx.incr`; the checkout was dirty
+and the attempt has no recorded code revision. Its checkpoint contains 4,969 securities from Sina
+and 23 from `tencent-minute-query`; the temporary code constructs the latter's 5m rows by grouping
+1m samples. ADR 0004 requires the formal 5m archive to be acquired directly, so this READY release
+does not qualify for the formal daily catalog/DWD. Its provider and code lineage also need
+reconciliation before any recovery promotion. This contract mismatch predates the temporary code:
+the merged Eastmoney fallback also groups 1m samples for 5m, although that provider path did not
+produce this READY release. Hermes 5m attempt
+`/root/work/astock/data/shadow/hermes-ods-v1/attempts/intraday-archive/5m/2026-09-22/20260922-20260922T195645033988Z`
+was still acquiring; Hermes 1m was missing. Other operations work had uncommitted provider changes
+on both nodes, so no overlapping collector or checkout mutation was made during this audit.
+The #432 gate requires verified four-lane, catalog, DWD, notification, and OCI date/package/hash
+receipts before changing this status to `resolved`.
+
+At 2026-09-23 04:26 Asia/Shanghai, that Hermes 5m recovery attempt ended `failed` after its
+collector timed out. Its checkpoint contains 3,755 of 4,992 symbols: 3,746 Sina direct-5m results
+and nine Tencent 1m-to-5m results. It is neither a complete 5m release nor direct-source compliant;
+the other operations checkout remains dirty. No same-date Hermes minute READY or DWD receipt has
+been verified. CN01 still lacks a verified 1m and formal direct-5m set. OCI SSH closes before key
+exchange, so its current mirror cannot be certified by this check.
+
+A read-only source qualification narrowed CN01's 23 Tencent substitutions. The earlier direct-Sina
+5m attempt `20260922-20260922T185026583612Z` had 14 symbols with only 45–47 native 5m bars and
+nine with zero bars. The nine zero-row symbols (`002860`, `300082`, `300585`, `601059`, `601198`,
+`601238`, `601995`, `603400`, `605303`) each have same-date `tradestatus=0` in the verified CN01
+market release; BaoStock native 5m also returned zero. Tencent's 48 synthetic zero-volume bars for
+these names must not be promoted as trades. A bounded BaoStock `frequency=5`, `adjustflag=3` probe
+returned 48 same-date native 5m bars, 09:35–15:00, for each of the other 14 symbols (`001234`,
+`300329`, `603173`, `603639`, `605259`, `605298`, `688089`, `688366`, `688459`, `688526`,
+`688569`, `688606`, `688638`, `688816`). This is source-qualification evidence, not a published
+recovery. #434 tracks the versioned direct-5m adapter and per-symbol provenance gate. A new
+immutable attempt must independently validate all 4,992 dispositions, source/date/session grid,
+code revision and checksums before any READY/catalog/DWD promotion; old attempts stay intact.
+
+The 1m source remains unqualified as well. Each node's two scheduled 9/22 1m attempts stopped
+after 15 Eastmoney errors; no later 1m recovery attempt was found at this checkpoint. A bounded
+CN01 probe of the temporary Sina adapter returned only 238 of 240 expected timestamps for
+`000001`, 140 for `001234`, and zero for suspended `002860`. Tencent's sample response did carry
+`date=20260922` and all 240 regular-session timestamps, but its row fields are a quote price plus
+cumulative volume/amount and continue as repeated fixed quotes after 15:00. The temporary adapter
+constructs timestamps from the requested date without checking that source date, treats quote
+prices as OHLC, and records cumulative figures as per-minute volume/amount. Three sampled
+TCP-reachable TDX servers returned zero native 1m bars for `000001`. These probes do not qualify a
+formal replacement. [#436](https://github.com/rv198-star/Quanthus/issues/436) tracks native 1m
+source/date/units qualification and recovery; the 240-grid and PIT gates remain intact.

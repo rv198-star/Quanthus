@@ -18,6 +18,7 @@ from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from quanthus.providers.baostock_transport import set_socket_timeout
 from quanthus.providers.minute_recovery import (
     MinuteBudget,
     MinuteBudgetExceeded,
@@ -294,6 +295,68 @@ def _eastmoney_bars(
     }
 
 
+def _baostock_native_5m_bars(
+    symbol: str, market_date: str, *, client: Any
+) -> tuple[Any, dict[str, Any]]:
+    """Read unadjusted native five-minute OHLCV for one exact security/date."""
+    import pandas as pd
+
+    started = time.monotonic()
+    code = ("sh." if symbol.startswith("6") else "sz.") + symbol
+    response = client.query_history_k_data_plus(
+        code,
+        "date,time,code,open,high,low,close,volume,amount",
+        start_date=market_date,
+        end_date=market_date,
+        frequency="5",
+        adjustflag="3",
+    )
+    if str(response.error_code) != "0":
+        raise RuntimeError(f"BaoStock native 5m error={response.error_code}: {response.error_msg}")
+    rows: list[dict[str, Any]] = []
+    while response.next():
+        raw = response.get_row_data()
+        if len(raw) != 9 or raw[0] != market_date or raw[2] != code:
+            raise RuntimeError("BaoStock native 5m returned wrong date/code/schema")
+        timestamp = pd.to_datetime(raw[1], format="%Y%m%d%H%M%S%f", errors="raise")
+        if timestamp.strftime("%Y-%m-%d") != market_date:
+            raise RuntimeError("BaoStock native 5m timestamp differs from market date")
+        rows.append(
+            {
+                "stock_code": symbol,
+                "ts": timestamp,
+                "open": float(raw[3]),
+                "high": float(raw[4]),
+                "low": float(raw[5]),
+                "close": float(raw[6]),
+                "volume": float(raw[7]),
+                "amount": float(raw[8]),
+            }
+        )
+    frame = pd.DataFrame(
+        rows, columns=("stock_code", "ts", "open", "high", "low", "close", "volume", "amount")
+    )
+    if not frame.empty:
+        if frame.duplicated(subset=["stock_code", "ts"]).any():
+            raise RuntimeError("BaoStock native 5m returned duplicate bar timestamps")
+        frame = frame.sort_values("ts").reset_index(drop=True)
+    return frame, {
+        "ok": True,
+        "provider": "baostock-native-5m",
+        "native_frequency": "5m",
+        "derived_from": None,
+        "source_market_date": market_date if len(frame) else None,
+        "adjustflag": "3",
+        "volume_unit": "share",
+        "amount_unit": "CNY",
+        "pages": 1,
+        "rows": len(frame),
+        "elapsed_seconds": round(time.monotonic() - started, 3),
+        "earliest": str(frame["ts"].iloc[0]) if len(frame) else None,
+        "latest": str(frame["ts"].iloc[-1]) if len(frame) else None,
+    }
+
+
 def _row_timestamp(row: Any) -> Any:
     import pandas as pd
 
@@ -436,6 +499,9 @@ def collect(
     client: Any | None = None
     server = "unselected"
     fallback = False
+    # Both scheduled and explicitly requested historical repairs target one exact
+    # session; provider pagination is unnecessary for this date-bounded API.
+    native_5m = frequency == "5m" and market_date is not None
     results: dict[str, dict[str, Any]] = {}
     errors = 0
     done = 0
@@ -495,7 +561,10 @@ def collect(
         attempts_total += 1
         writing = False
         try:
-            if fallback:
+            if native_5m:
+                assert market_date is not None
+                frame, meta = _baostock_native_5m_bars(symbol, market_date, client=client)
+            elif fallback:
                 frame, meta = _eastmoney_bars(
                     symbol,
                     frequency,
@@ -556,7 +625,11 @@ def collect(
                 results[symbol]["attempts"] = history
                 if writing:
                     raise  # Storage failures must not induce more network traffic.
-            if not fallback:
+            if native_5m and consecutive_errors >= 3:
+                raise RuntimeError(
+                    "BaoStock native 5m circuit opened after 3 consecutive failures"
+                ) from exc
+            if not fallback and not native_5m:
                 try:
                     client, server = tdx_client(**budget_kwargs)
                 except MinuteBudgetExceeded:
@@ -572,15 +645,25 @@ def collect(
     current: str | None = None
     try:
         record("running")
-        try:
-            client, server = tdx_client(**budget_kwargs)
-        except MinuteBudgetExceeded:
-            raise
-        except RuntimeError:
-            if mode != "incr":
+        if native_5m:
+            import baostock as bs
+
+            login = bs.login()
+            if str(login.error_code) != "0":
+                raise RuntimeError(f"BaoStock native 5m login failed: {login.error_msg}")
+            client = bs
+            set_socket_timeout(30.0)
+            server = "baostock-native-5m"
+        else:
+            try:
+                client, server = tdx_client(**budget_kwargs)
+            except MinuteBudgetExceeded:
                 raise
-            server = "eastmoney-push2delay-trends2"
-            fallback = True
+            except RuntimeError:
+                if mode != "incr":
+                    raise
+                server = "eastmoney-push2delay-trends2"
+                fallback = True
         if budget:
             budget.remaining()
         if fallback:
@@ -629,6 +712,14 @@ def collect(
                 if not unwinding:
                     raise
                 print(f"minute session cleanup failed: {exc}", file=sys.stderr)
+        if native_5m and client is not None:
+            unwinding = sys.exc_info()[0] is not None
+            try:
+                client.logout()
+            except Exception as exc:  # noqa: BLE001 - preserve an active failure
+                if not unwinding:
+                    raise
+                print(f"BaoStock cleanup failed: {exc}", file=sys.stderr)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

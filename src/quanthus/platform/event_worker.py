@@ -81,9 +81,7 @@ _TREND_EVOLUTION_RUN_CONFIG = "config/structure-trend-evolution-qualification.v1
 _STRUCTURE_ORDER_RUN_CONFIG = "config/structure-order-qualification.v1.json"
 _P3_STRAT_003_INPUT_RUN_CONFIG = "config/research/p3-strat-003/input-qualification.v1.json"
 _P3_STRAT_003_INPUT_RUN_CONFIG_V2 = "config/research/p3-strat-003/input-qualification.v2.json"
-_P3_STRAT_003_INPUT_INSPECTION_RUN_CONFIG = (
-    "config/research/p3-strat-003/input-inspection.v1.json"
-)
+_P3_STRAT_003_INPUT_INSPECTION_RUN_CONFIG = "config/research/p3-strat-003/input-inspection.v1.json"
 _P3_STRAT_003_INDUSTRY_INSPECTION_RUN_CONFIG = (
     "config/research/p3-strat-003/industry-inspection.v1.json"
 )
@@ -114,9 +112,7 @@ _STRUCTURE_RUN_CONFIGS = frozenset(
 # Backward-compatible name retained for the technical-MVP qualification seeder/tests.
 _STRUCTURE_RUN_CONFIG = _STRUCTURE_MVP_RUN_CONFIG
 _STRUCTURE_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED"
-_STRUCTURE_ECONOMIC_QUALIFICATION_SEED_ENV = (
-    "QUANTHUS_STRUCTURE_ECONOMIC_QUALIFICATION_SEED"
-)
+_STRUCTURE_ECONOMIC_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_ECONOMIC_QUALIFICATION_SEED"
 _STRUCTURE_FACTS_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_FACTS_QUALIFICATION_SEED"
 _STRUCTURE_FACT_ROW_FIELDS = frozenset(
     {
@@ -293,19 +289,18 @@ def _seed_structure_mvp_qualification_jobs(
     }
     jobs: list[str] = []
     for suffix in ("a", "b"):
-        stable_job_id = "job_" + hashlib.sha256(
-            f"{STRUCTURE_MVP_JOB}:{code_revision}:{suffix}".encode()
-        ).hexdigest()[:32]
+        stable_job_id = (
+            "job_"
+            + hashlib.sha256(f"{STRUCTURE_MVP_JOB}:{code_revision}:{suffix}".encode()).hexdigest()[
+                :32
+            ]
+        )
         job, _created = queue.submit(
             kind=STRUCTURE_MVP_JOB,
             actor_user_id=actor_user_id,
-            idempotency_key=(
-                f"structure-mvp-qualification-v2-{suffix}-{code_revision[:12]}"
-            ),
+            idempotency_key=(f"structure-mvp-qualification-v2-{suffix}-{code_revision[:12]}"),
             input_ref=input_ref,
-            concurrency_key=(
-                f"structure-mvp:qualification-v2-{suffix}:{code_revision[:12]}"
-            ),
+            concurrency_key=(f"structure-mvp:qualification-v2-{suffix}:{code_revision[:12]}"),
             requested_job_id=stable_job_id,
         )
         if job.kind != STRUCTURE_MVP_JOB or job.input_ref != input_ref:
@@ -337,22 +332,20 @@ def _seed_structure_economic_qualification_jobs(
     }
     jobs: list[str] = []
     for suffix in ("a", "b"):
-        stable_job_id = "job_" + hashlib.sha256(
-            (
-                f"{STRUCTURE_MVP_JOB}:{_STRUCTURE_ECONOMIC_RUN_CONFIG}:"
-                f"{code_revision}:{suffix}"
-            ).encode()
-        ).hexdigest()[:32]
+        stable_job_id = (
+            "job_"
+            + hashlib.sha256(
+                (
+                    f"{STRUCTURE_MVP_JOB}:{_STRUCTURE_ECONOMIC_RUN_CONFIG}:{code_revision}:{suffix}"
+                ).encode()
+            ).hexdigest()[:32]
+        )
         job, _created = queue.submit(
             kind=STRUCTURE_MVP_JOB,
             actor_user_id=actor_user_id,
-            idempotency_key=(
-                f"structure-economic-qualification-v1-{suffix}-{code_revision[:12]}"
-            ),
+            idempotency_key=(f"structure-economic-qualification-v1-{suffix}-{code_revision[:12]}"),
             input_ref=input_ref,
-            concurrency_key=(
-                f"structure-economic:qualification-v1-{suffix}:{code_revision[:12]}"
-            ),
+            concurrency_key=(f"structure-economic:qualification-v1-{suffix}:{code_revision[:12]}"),
             requested_job_id=stable_job_id,
         )
         if job.kind != STRUCTURE_MVP_JOB or job.input_ref != input_ref:
@@ -384,22 +377,20 @@ def _seed_structure_facts_qualification_jobs(
     }
     jobs: list[str] = []
     for suffix in ("a", "b"):
-        stable_job_id = "job_" + hashlib.sha256(
-            (
-                f"{STRUCTURE_MVP_JOB}:{_STRUCTURE_FACTS_RUN_CONFIG}:"
-                f"{code_revision}:{suffix}"
-            ).encode()
-        ).hexdigest()[:32]
+        stable_job_id = (
+            "job_"
+            + hashlib.sha256(
+                (
+                    f"{STRUCTURE_MVP_JOB}:{_STRUCTURE_FACTS_RUN_CONFIG}:{code_revision}:{suffix}"
+                ).encode()
+            ).hexdigest()[:32]
+        )
         job, _created = queue.submit(
             kind=STRUCTURE_MVP_JOB,
             actor_user_id=actor_user_id,
-            idempotency_key=(
-                f"structure-facts-qualification-v1-{suffix}-{code_revision[:12]}"
-            ),
+            idempotency_key=(f"structure-facts-qualification-v1-{suffix}-{code_revision[:12]}"),
             input_ref=input_ref,
-            concurrency_key=(
-                f"structure-facts:qualification-v1-{suffix}:{code_revision[:12]}"
-            ),
+            concurrency_key=(f"structure-facts:qualification-v1-{suffix}:{code_revision[:12]}"),
             requested_job_id=stable_job_id,
         )
         if job.kind != STRUCTURE_MVP_JOB or job.input_ref != input_ref:
@@ -578,10 +569,9 @@ def _verify_structure_mvp_artifact(
         ]
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("structure_mvp_adm_rows_invalid") from exc
-    if (
-        len(row_values) != int(adm_manifest.get("row_count", -1))
-        or _canonical_digest(row_values) != adm_manifest.get("content_digest")
-    ):
+    if len(row_values) != int(adm_manifest.get("row_count", -1)) or _canonical_digest(
+        row_values
+    ) != adm_manifest.get("content_digest"):
         raise RuntimeError("structure_mvp_adm_content_digest_mismatch")
     return {
         "artifact_ref": str(root.resolve()),
@@ -616,8 +606,7 @@ def _verify_structure_economic_artifact(
         raise RuntimeError("structure_economic_artifact_unreadable") from exc
     if (
         not isinstance(manifest, dict)
-        or manifest.get("schema_version")
-        != "quanthus.structure-economic-artifact-manifest.v1"
+        or manifest.get("schema_version") != "quanthus.structure-economic-artifact-manifest.v1"
         or manifest.get("research_only") is not True
         or manifest.get("execution_authorized") is not False
         or manifest.get("code_revision") != code_revision
@@ -741,8 +730,7 @@ def _verify_structure_facts_artifact(
         raise RuntimeError("structure_facts_artifact_unreadable") from exc
     if (
         not isinstance(manifest, dict)
-        or manifest.get("schema_version")
-        != "quanthus.structure-facts-artifact-manifest.v1"
+        or manifest.get("schema_version") != "quanthus.structure-facts-artifact-manifest.v1"
         or manifest.get("research_only") is not True
         or manifest.get("execution_authorized") is not False
         or manifest.get("code_revision") != code_revision
@@ -814,14 +802,12 @@ def _verify_structure_facts_artifact(
         ]
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("structure_facts_rows_invalid") from exc
-    if (
-        len(row_values) != int(adm_manifest.get("row_count", -1))
-        or _canonical_digest(row_values) != adm_manifest.get("content_digest")
-    ):
+    if len(row_values) != int(adm_manifest.get("row_count", -1)) or _canonical_digest(
+        row_values
+    ) != adm_manifest.get("content_digest"):
         raise RuntimeError("structure_facts_content_digest_mismatch")
     if any(
-        not isinstance(row, dict) or set(row) != _STRUCTURE_FACT_ROW_FIELDS
-        for row in row_values
+        not isinstance(row, dict) or set(row) != _STRUCTURE_FACT_ROW_FIELDS for row in row_values
     ):
         raise RuntimeError("structure_facts_row_schema_invalid")
     return {
@@ -1204,9 +1190,7 @@ def _validate_run_directory(
     if report_result.candidate_events != event_result.candidate_events:
         raise RuntimeError("comparison_report_event_count_mismatch")
     three_class_events = (
-        label_result.positive_events
-        + label_result.neutral_events
-        + label_result.failure_events
+        label_result.positive_events + label_result.neutral_events + label_result.failure_events
     )
     if report_result.three_class_events != three_class_events:
         raise RuntimeError("comparison_report_three_class_count_mismatch")
@@ -1682,11 +1666,7 @@ class EventWorker:
         command: tuple[str, ...] = (
             sys.executable,
             "-m",
-            (
-                "quanthus.event_library.sharded_batch"
-                if self.shard_target
-                else "quanthus"
-            ),
+            ("quanthus.event_library.sharded_batch" if self.shard_target else "quanthus"),
             *(("run-p4-reported-event-scan",) if not self.shard_target else ()),
             "--source-policy",
             governed["source_policy"],
@@ -1754,10 +1734,7 @@ class EventWorker:
                 progress_mtime_ns = progress_path.stat().st_mtime_ns
             except OSError:
                 progress_mtime_ns = None
-            if (
-                progress_mtime_ns is not None
-                and progress_mtime_ns != last_progress_mtime_ns
-            ):
+            if progress_mtime_ns is not None and progress_mtime_ns != last_progress_mtime_ns:
                 receipt = _load_progress_receipt(progress_path)
                 last_progress_mtime_ns = progress_mtime_ns
                 if receipt is not None:
@@ -1832,9 +1809,7 @@ class EventWorker:
         if report_result.candidate_events != event_result.candidate_events:
             raise RuntimeError("comparison_report_event_count_mismatch")
         three_class_events = (
-            label_result.positive_events
-            + label_result.neutral_events
-            + label_result.failure_events
+            label_result.positive_events + label_result.neutral_events + label_result.failure_events
         )
         if report_result.three_class_events != three_class_events:
             raise RuntimeError("comparison_report_three_class_count_mismatch")
@@ -1932,9 +1907,7 @@ def main(argv: list[str] | None = None) -> int:
                     reason=str(exc),
                 )
         print(f"structure qualification seed rejected: {exc}", file=sys.stderr)
-    economic_seed_value = os.environ.get(
-        _STRUCTURE_ECONOMIC_QUALIFICATION_SEED_ENV, "0"
-    )
+    economic_seed_value = os.environ.get(_STRUCTURE_ECONOMIC_QUALIFICATION_SEED_ENV, "0")
     try:
         _seed_structure_economic_qualification_jobs(
             store,

@@ -19,6 +19,8 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-DATA-BASE-003 | Build OCI-authoritative operational ADS July Base (Issue #46) | accepted historical trial slice |
 | META-DATA-DWD-002 | Build the product-bounded seven-domain DWD Base V2.1 | accepted Release; 33 DWD objects; daily maintenance active; correction-001 accepted; recurring weekly corrections open; generic DWS deferred |
 | META-DATA-MAINT-001 | Reconcile post-V2.1 daily ODS/DWD operational hardening | active under Issue #143; post-2026-07-31 maintenance only; does not reopen Issue #78 or P4 gates |
+| META-OPS-RELIABILITY-001 | Deliver bounded ODS/DWD reliability improvements | open; #424; [reviewed plan](ods-dwd-reliability.md); engineering and production gates are separate |
+| META-OPS-PROCESS-001 | Reap owned daily process groups before retry | open; #425; first implementation slice; Linux and node deployment acceptance pending |
 
 ADR 0007 is the current topology authority. `config/releases/v2-build202607.json` binds immutable
 `ods-base-202607-v2` and `dwd-base-202607-v2.1`. CN01 and Hermes run the same READY-gated ODS-to-DWD

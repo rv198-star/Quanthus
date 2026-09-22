@@ -265,6 +265,26 @@ On weekends, only event-lane output is expected.
 
 ## Failure and rollback
 
+The current remote execution channel is NexusAgent as required by root `AGENTS.md`.
+Older OCI-specific access examples in this historical runbook are not permission
+to restore that channel. A missing node connection blocks deployment verification,
+not local engineering and not by itself proof of a production outage.
+
+Under `META-OPS-PROCESS-001`, daily lane/catalog/DWD children use owned process
+groups. The controller gives TERM 10 seconds, then KILL up to 10 seconds, and only
+releases ownership after the group disappears. Exit 75 / `process_cleanup_unconfirmed`
+means automatic retry is prohibited: inspect the retained run/log/notification
+context and confirm quiescence through the approved node channel before any manual
+recovery. Do not convert that exit to success or start a replacement while writers
+may remain. A missing launcher also leaves an explicit failed run rather than
+continuing to catalog/DWD.
+
+Before deploying this slice, validate Linux shell pipelines and service-stop
+behaviour, including the installed systemd cgroup kill settings. An externally
+daemonized collector and a controller killed without cleanup are outside the
+process-group proof. Retain failed evidence and rollout/rollback receipts under
+Issue #425; merging the code alone does not close it.
+
 Do not edit a release, reuse its id, update PG directly, or fill missing observations with zeros.
 Keep failed/partial attempts for diagnosis and retry into a new attempt.
 

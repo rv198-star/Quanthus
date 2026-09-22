@@ -885,6 +885,8 @@ def test_eastmoney_minute_fallback_requests_and_filters_target_date(
 
 
 def test_eastmoney_payload_treats_null_data_as_no_data() -> None:
+    observed: dict[str, str] = {}
+
     class Response:
         def read(self) -> bytes:
             return b'{"rc": 0, "data": null}'
@@ -895,10 +897,13 @@ def test_eastmoney_payload_treats_null_data_as_no_data() -> None:
         def __exit__(self, *_args: object) -> None:
             return None
 
-    payload = minute_tdx._eastmoney_payload(
-        "000001", opener=lambda *_args, **_kwargs: Response()
-    )
+    def opener(request: object, **_kwargs: object) -> Response:
+        observed["url"] = str(getattr(request, "full_url"))
+        return Response()
+
+    payload = minute_tdx._eastmoney_payload("000001", ndays=2, opener=opener)
     assert payload == {"code": "000001", "trends": [], "no_data": True}
+    assert observed["url"].startswith(minute_tdx.EASTMONEY_HISTORY_TRENDS_URL)
 
 
 def test_minute_collect_uses_eastmoney_only_for_incremental_tdx_outage(

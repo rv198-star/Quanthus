@@ -34,6 +34,7 @@ TDX_SERVERS = (
     ("121.36.225.169", 7709),
 )
 EASTMONEY_TRENDS_URL = "https://push2delay.eastmoney.com/api/qt/stock/trends2/get"
+EASTMONEY_HISTORY_TRENDS_URL = "https://push2his.eastmoney.com/api/qt/stock/trends2/get"
 EASTMONEY_TOKEN = "bd1d9ddb04089700cf9c27f6f7426281"
 EASTMONEY_MAX_DAYS = 5
 EASTMONEY_MIN_INTERVAL_SECONDS = 0.2
@@ -110,8 +111,9 @@ def _eastmoney_payload(
             "ut": EASTMONEY_TOKEN,
         }
     )
+    endpoint = EASTMONEY_HISTORY_TRENDS_URL if ndays > 1 else EASTMONEY_TRENDS_URL
     request = Request(
-        f"{EASTMONEY_TRENDS_URL}?{query}",
+        f"{endpoint}?{query}",
         headers={"User-Agent": "Mozilla/5.0 Quanthus/1.0"},
     )
     last_error: Exception | None = None

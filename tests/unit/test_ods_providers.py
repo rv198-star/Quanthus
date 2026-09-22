@@ -397,6 +397,30 @@ def test_after_hours_collector_preserves_sparse_matches() -> None:
     assert metadata["provider_rows"] == 2
 
 
+def test_after_hours_tdx_probe_uses_requested_market_date(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: dict[str, object] = {}
+
+    class Client:
+        def transactions(self, **kwargs: object) -> list[dict[str, object]]:
+            observed.update(kwargs)
+            return [{"time": "15:00", "price": 10, "vol": 1, "buyorsell": 1}]
+
+    def factory(**kwargs: object) -> Client:
+        observed["factory"] = kwargs
+        return Client()
+
+    monkeypatch.setattr(after_hours_tdx, "TDX_SERVERS", (("127.0.0.1", 7709),))
+    _client, server = after_hours_tdx.tdx_transaction_client(
+        date(2026, 9, 21), quotes_factory=factory
+    )
+
+    assert server == "127.0.0.1:7709"
+    assert observed["date"] == "20260921"
+    assert observed["symbol"] == "600519"
+
+
 def test_after_hours_eastmoney_fallback_expands_window_and_binds_date() -> None:
     calls: list[tuple[str, str]] = []
 

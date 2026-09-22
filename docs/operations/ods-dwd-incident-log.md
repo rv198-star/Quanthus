@@ -266,3 +266,23 @@ was still acquiring; Hermes 1m was missing. Other operations work had uncommitte
 on both nodes, so no overlapping collector or checkout mutation was made during this audit.
 The #432 gate requires verified four-lane, catalog, DWD, notification, and OCI date/package/hash
 receipts before changing this status to `resolved`.
+
+At 2026-09-23 04:26 Asia/Shanghai, that Hermes 5m recovery attempt ended `failed` after its
+collector timed out. Its checkpoint contains 3,755 of 4,992 symbols: 3,746 Sina direct-5m results
+and nine Tencent 1m-to-5m results. It is neither a complete 5m release nor direct-source compliant;
+the other operations checkout remains dirty. No same-date Hermes minute READY or DWD receipt has
+been verified. CN01 still lacks a verified 1m and formal direct-5m set. OCI SSH closes before key
+exchange, so its current mirror cannot be certified by this check.
+
+A read-only source qualification narrowed CN01's 23 Tencent substitutions. The earlier direct-Sina
+5m attempt `20260922-20260922T185026583612Z` had 14 symbols with only 45–47 native 5m bars and
+nine with zero bars. The nine zero-row symbols (`002860`, `300082`, `300585`, `601059`, `601198`,
+`601238`, `601995`, `603400`, `605303`) each have same-date `tradestatus=0` in the verified CN01
+market release; BaoStock native 5m also returned zero. Tencent's 48 synthetic zero-volume bars for
+these names must not be promoted as trades. A bounded BaoStock `frequency=5`, `adjustflag=3` probe
+returned 48 same-date native 5m bars, 09:35–15:00, for each of the other 14 symbols (`001234`,
+`300329`, `603173`, `603639`, `605259`, `605298`, `688089`, `688366`, `688459`, `688526`,
+`688569`, `688606`, `688638`, `688816`). This is source-qualification evidence, not a published
+recovery. #434 tracks the versioned direct-5m adapter and per-symbol provenance gate. A new
+immutable attempt must independently validate all 4,992 dispositions, source/date/session grid,
+code revision and checksums before any READY/catalog/DWD promotion; old attempts stay intact.

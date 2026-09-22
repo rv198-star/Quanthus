@@ -3,6 +3,9 @@
 Work item: META-OPS-MINUTE-002 / #429; parent #424; stacked on C1 #428.
 Governing design: `../design/lld/01-data-foundation.md`, opt-in same-attempt 1m section.
 Decision: PASS_SCOPED_ENGINEERING / NO_GO_PRODUCTION.
+Subsequent SSH/Linux qualification: `ods-linux-qualification-20260922.md` records
+182 scoped passes, cgroup fault probes, incomplete full-suite runs and #431 runtime
+drift. These additional results do not change the production decision above.
 Review method: same assistant, separate design, adversarial diff review and regression
 phases. This is not independent approval or production acceptance.
 

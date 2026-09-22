@@ -618,6 +618,27 @@ coverage/date/READY checks, immutable Base and CN01-to-OCI DWD sync are unchange
 Synthetic acceptance includes a 4992-symbol universe with two transient errors:
 4994 symbol attempts, not two full scans. This is not a network performance benchmark.
 
+### Runtime qualification before node rollout
+
+`META-OPS-ENV-001` (#431), under programme #424 A/E, tracks the actual interpreter
+and dependency boundary separately for orchestrator, lane, minute collector and DWD.
+Design status: approved for scoped qualification; delivery gate: blocked.
+
+Preflight must resolve effective service/child interpreter paths, source revision,
+unit hash and allowlisted non-secret profile values, rather than assuming a repository
+`.venv` is active. Qualification needs versioned, fully resolved role/test-profile
+dependencies aligned with both project ranges and applicable frozen runtime contracts.
+Historical reproduction profiles do not authorize retired publication routes.
+Build new isolated environments; never repair a shared astock environment in place.
+An active job blocks a checkout/interpreter switch. Reviewed rollout and rollback
+receipts remain distinct from synthetic test success and physical data acceptance.
+
+The 2026-09-22 SSH/Linux evidence is in
+`../../reviews/ods-linux-qualification-20260922.md`: the scoped Linux suite and
+synthetic cgroup faults passed, while production environment drift and incomplete
+full-suite qualification keep rollout blocked. This introduces no new deployed
+entry point, package version, timer or data-contract change.
+
 ### Implementation conformance map
 
 | Capability | Governing implementation | Contract and evidence |
@@ -663,6 +684,7 @@ Synthetic acceptance includes a 4992-symbol universe with two transient errors:
 | META-OPS-PROCESS-001 | Reap owned daily process groups before retry | META-OPS-RELIABILITY-001 | #425; real shell pipeline faults, bounded cleanup, no late writes, exit-75 retry suppression; separate Linux/deployment gate |
 | META-OPS-MINUTE-001 | Preserve minute collector terminal checkpoint evidence | META-OPS-RELIABILITY-001 | #427; synthetic circuit, cancellation and disk faults; complete processed-symbol checkpoint before terminal status; Linux/deployment remains separate |
 | META-OPS-MINUTE-002 | Bound opt-in same-attempt minute residual retry | META-OPS-MINUTE-001 | #429; 4992-symbol residual-set, one monotonic deadline, fail-closed profile activation; Linux/deployment remains separate |
+| META-OPS-ENV-001 | Qualify effective collector runtimes and reproducible test profiles | META-OPS-RELIABILITY-001 | #431; actual interpreter inventory, role/profile locks, read-only deployment preflight, isolated environments and controlled rollback; deployment blocked |
 | P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | Exact-key source backfill and reconciled child revision |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | Exact-key backfill, active-universe coverage, and OCI child revision |
 | P1-DATA-004 | Normalize mixed-unit corporate actions for continuous historical replay | C1, S4, P1-SNAPSHOT-001 | Deterministic authority audit, fully versioned per-security exceptions, and immutable replay input bundle |

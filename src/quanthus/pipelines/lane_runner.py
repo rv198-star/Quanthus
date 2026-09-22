@@ -3648,6 +3648,62 @@ def _run_minute_collector(
     fetch_mode, max_pages = _minute_collector_fetch_mode(
         market_date=market_date, bar_size=bar_size
     )
+    seed_raw = os.environ.get("HERMES_ODS_MINUTE_SEED_HOME", "").strip()
+    if seed_raw:
+        seed_home = Path(seed_raw).resolve()
+        try:
+            status = json.loads((seed_home / "status.json").read_text(encoding="utf-8"))
+            checkpoint = json.loads(
+                (seed_home / "checkpoint.json").read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            raise LaneRunError(f"minute recovery seed is unreadable: {exc}") from exc
+        expected = {_code6(code) for code in symbols}
+        observed = checkpoint.get("symbols")
+        if not isinstance(observed, dict):
+            raise LaneRunError("minute recovery seed checkpoint has no symbols mapping")
+        invalid = sorted(
+            code
+            for code in expected
+            if not isinstance(observed.get(code), dict)
+            or observed[code].get("status") != "done"
+            or not (seed_home / f"{code}_{bar_size}.parquet").is_file()
+        )
+        extra = sorted(set(observed) - expected)
+        if (
+            status.get("state") != "done"
+            or status.get("freq") != bar_size
+            or int(status.get("total", -1)) != len(expected)
+            or int(status.get("done", -1)) != len(expected)
+            or int(status.get("error", -1)) != 0
+            or invalid
+            or extra
+        ):
+            raise LaneRunError(
+                "minute recovery seed is not a complete exact-universe success: "
+                f"invalid={invalid[:5]} extra={extra[:5]} status={status}"
+            )
+        started = time.monotonic()
+        shutil.copytree(seed_home, raw_home)
+        return {
+            "provider": "quanthus.minute-recovery-seed",
+            "api": "verified_attempt_seed_copy",
+            "layer": layer,
+            "bar_size": bar_size,
+            "fetch_mode": fetch_mode,
+            "max_pages": max_pages,
+            "cmd": [],
+            "exit_code": 0,
+            "stdout_tail": "",
+            "stderr_tail": "",
+            "duration_seconds": round(time.monotonic() - started, 3),
+            "timeout_seconds": 0,
+            "layer_dir": str(raw_home),
+            "market_date": market_date.isoformat(),
+            "universe_size": len(expected),
+            "isolation": "attempt-local-seed-copy",
+            "seed_home": str(seed_home),
+        }
     collector_override = os.environ.get("HERMES_ODS_MINUTE_COLLECTOR", "").strip()
     if collector_override:
         script = Path(collector_override).resolve()

@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 RENDERER = ROOT / "ops" / "bin" / "render-ods-node-units"
 WINDOW_CHECKER = ROOT / "ops" / "bin" / "check-ods-collection-window"
+ORCHESTRATOR_CHECKER = ROOT / "ops" / "bin" / "check-ods-orchestrator-window"
 
 
 class OdsUnitRendererTests(unittest.TestCase):
@@ -41,6 +42,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertIn("Unit=cn01-ods-daily-orchestrator.service", orchestrator_timer)
         self.assertIn("run-ods-daily-with-retry", orchestrator_service)
         self.assertIn("run-cn01-ods-daily", orchestrator_service)
+        self.assertIn("check-ods-orchestrator-window --node-id cn01", orchestrator_service)
         self.assertIn("EnvironmentFile=-/etc/quanthus/cn01-ods-lane.env", orchestrator_service)
         self.assertIn("Environment=HERMES_ODS_NODE_ID=cn01", orchestrator_service)
         self.assertIn(
@@ -111,11 +113,32 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertIn("OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai", orchestrator)
         orchestrator_service = (output / "hermes-ods-daily-orchestrator.service").read_text()
         self.assertIn("run-ods-daily-with-retry", orchestrator_service)
+        self.assertIn("check-ods-orchestrator-window --node-id hermes", orchestrator_service)
         self.assertIn("QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS=14760", orchestrator_service)
         self.assertIn("TimeoutStartSec=540min", orchestrator_service)
         self.assertNotIn("Restart=on-failure", orchestrator_service)
         self.assertIn("--event hermes_dwd_completed", success_notification)
         self.assertIn("--node Hermes", success_notification)
+
+    def test_orchestrator_window_skips_early_systemd_activation(self) -> None:
+        cases = [
+            ("cn01", "2026-09-23T05:39:00+08:00", 1),
+            ("cn01", "2026-09-23T18:29:59+08:00", 1),
+            ("cn01", "2026-09-23T18:30:00+08:00", 0),
+            ("hermes", "2026-09-23T05:39:00+08:00", 1),
+            ("hermes", "2026-09-23T19:29:59+08:00", 1),
+            ("hermes", "2026-09-23T19:30:00+08:00", 0),
+            ("hermes", "2026-09-26T19:30:00+08:00", 1),
+        ]
+        for node_id, observed_at, expected in cases:
+            with self.subTest(node_id=node_id, observed_at=observed_at):
+                result = subprocess.run(
+                    [str(ORCHESTRATOR_CHECKER), "--node-id", node_id, "--at", observed_at],
+                    check=False,
+                    text=True,
+                    capture_output=True,
+                )
+                self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
 
     def test_collection_window_checker_enforces_each_node_start(self) -> None:
         config = ROOT / "config/schedules/hermes-ods-schedule.v1.json"

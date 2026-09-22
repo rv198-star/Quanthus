@@ -1,0 +1,37 @@
+#!/usr/bin/env python3
+"""Skip a daily systemd orchestrator activation before the node's close window."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from datetime import datetime, time
+from zoneinfo import ZoneInfo
+
+SHANGHAI = ZoneInfo("Asia/Shanghai")
+NODE_START = {"cn01": time(18, 30), "hermes": time(19, 30)}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--node-id", choices=sorted(NODE_START), required=True)
+    parser.add_argument("--at", help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    try:
+        observed = datetime.fromisoformat(args.at) if args.at else datetime.now(SHANGHAI)
+        if observed.tzinfo is None:
+            raise ValueError("--at requires a timezone offset")
+        observed = observed.astimezone(SHANGHAI)
+    except ValueError as exc:
+        print(f"invalid orchestrator time: {exc}", file=sys.stderr)
+        return 255
+    start = NODE_START[args.node_id]
+    if observed.weekday() < 5 and observed.time() >= start:
+        print(f"daily orchestrator window open: {args.node_id} {observed.isoformat()}")
+        return 0
+    print(f"daily orchestrator window closed: {args.node_id} {observed.isoformat()}")
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

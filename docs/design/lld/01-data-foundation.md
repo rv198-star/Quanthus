@@ -578,6 +578,46 @@ flushing, or a change to direct formal 5m collection. Default SIGTERM and SIGKIL
 are outside Python exception flushing; production process/cgroup validation remains
 a separate release gate.
 
+### Opt-in same-attempt 1m residual retry
+
+`META-OPS-MINUTE-002` (#429), C2 of #424, adds a bounded policy on top of C1.
+Design status: approved for scoped implementation. Delivery gate: open; production
+activation remains blocked by Linux/process and node deployment evidence.
+
+The repository collector accepts `--recovery-policy PATH` only for research `1m`
+`incr` with a unique universe. The strict v1 profile is
+`config/pipelines/minute-attempt-recovery.v1.json`: explicit opt-in, one additional
+round, one-second inter-round delay and 1740-second cooperative attempt budget.
+Its exact-byte SHA-256 and policy id are recorded in status. Without the flag there
+is no new residual retry or budget. The lane runner passes the profile only for 1m
+when `HERMES_ODS_MINUTE_1M_RECOVERY_POLICY` is explicitly set; a seed, custom
+collector, non-incremental mode or budget >= outer timeout is rejected before
+creating the attempt directory. A 5m lane never inherits this 1m setting.
+
+- Within this invocation only, each next round selects the latest failed symbols.
+  Successful symbols are not refetched. Status counts latest outcomes, not attempts;
+  checkpoint entries retain per-symbol attempt/round/error history after recovery.
+- One monotonic deadline starts before endpoint selection and never resets between
+  rounds. Check it before/after provider calls and before accepting responses; clamp
+  HTTP/probe timeouts and retry/pacing sleeps to remaining time. Budget exhaustion
+  propagates distinctly to terminal `failed` / `budget_exhausted`, without further
+  provider requests. An interrupted symbol has no invented completed result.
+- Twenty consecutive Eastmoney failures still open the circuit immediately. Storage
+  failure is terminal under the opt-in policy, not a reason to repeat network work.
+  Initial status persistence now precedes any endpoint selection for all modes;
+  failure there opens no session. Terminal C1 checkpoint ordering remains in force.
+- This is a cooperative deadline, not a hard cancellation guarantee for an in-flight
+  library call or disk operation. The existing outer subprocess timeout and Linux
+  process-group/systemd cgroup release gate remain mandatory. This is not yet a
+  whole-controller or multi-attempt shared acquisition budget.
+
+No cross-attempt files are admitted or reused by this feature; seed admission needs
+its separate complete semantic identity/checksum contract. Existing zero-row and
+provider rc/null semantics are not reclassified. Formal direct-5m conformance,
+coverage/date/READY checks, immutable Base and CN01-to-OCI DWD sync are unchanged.
+Synthetic acceptance includes a 4992-symbol universe with two transient errors:
+4994 symbol attempts, not two full scans. This is not a network performance benchmark.
+
 ### Implementation conformance map
 
 | Capability | Governing implementation | Contract and evidence |
@@ -588,6 +628,7 @@ a separate release gate.
 | Repository-owned ODS schedule | `src/quanthus/pipelines/lane_runner.py`, `config/schedules/`, `ops/bin/`, `ops/systemd/` | `tests/unit/test_lane_runner.py`, `tests/unit/test_schedule_contracts.py`, ADR 0004 and its runbook |
 | Daily process ownership and non-retryable cleanup failure | `src/quanthus/pipelines/process_control.py`, `ops/bin/run-cn01-ods-daily`, `ops/bin/run-ods-daily-with-retry` | `tests/unit/test_ops_process_lifecycle.py`, `tests/unit/test_cn01_ods_orchestrator.py`; #424/#425; Linux/systemd and deployment acceptance still required |
 | Minute terminal checkpoint ordering and exception cleanup | `src/quanthus/providers/minute_tdx.py` | `tests/unit/test_minute_terminal_checkpoint.py`, `tests/unit/test_ods_providers.py`; #427; no recovery-reuse authority or production acceptance |
+| Opt-in same-attempt 1m residual retry and cooperative budget | `src/quanthus/providers/minute_recovery.py`, `src/quanthus/providers/minute_tdx.py`, `src/quanthus/pipelines/lane_runner.py`, `config/pipelines/minute-attempt-recovery.v1.json` | `tests/unit/test_minute_bounded_recovery.py`; #429; explicit activation, no cross-attempt reuse or formal 5m change |
 | Dual-lane epoch, daily bars/status/summary candidates, fixed-primary arbitration, fenced publication/correction/rollback, recovery evidence, catalog, limited operational ADS, publication intent, and release set | `src/quanthus/pipelines/dual_lane.py`, `config/pipelines/dual-lane-dwd-dws.v1.json` | `tests/unit/test_dual_lane.py`, ADR 0005; runtime qualification and cutover acceptance evidence remains open |
 | Sealed DWD/DWS history seed and lane-local logical merge | `src/quanthus/pipelines/dual_lane_history.py`, `config/pipelines/dual-lane-history-base.v1.json`, `ops/bin/*dual-lane-history*` | `tests/unit/test_dual_lane_history.py`, ADR 0005, `docs/operations/dual-lane-data-platform-runbook.md` |
 | Monthly-complete DWD/DWS Base packages, guarded Base descriptors, and Base-aware lane catalogs | `src/quanthus/pipelines/dwd_dws_base.py`, `config/pipelines/dwd-dws-base-through-20260730.v2.json`, `ops/bin/*dwd-dws-base*` | `tests/unit/test_dwd_dws_base.py`, Issue #48, `docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md` |
@@ -621,6 +662,7 @@ a separate release gate.
 | META-OPS-RELIABILITY-001 | Deliver bounded ODS/DWD reliability improvements | META-DATA-DWD-002 accepted | #424; reviewed plan, staged engineering/Linux/deployment evidence, historical gap disposition and ten-session observation |
 | META-OPS-PROCESS-001 | Reap owned daily process groups before retry | META-OPS-RELIABILITY-001 | #425; real shell pipeline faults, bounded cleanup, no late writes, exit-75 retry suppression; separate Linux/deployment gate |
 | META-OPS-MINUTE-001 | Preserve minute collector terminal checkpoint evidence | META-OPS-RELIABILITY-001 | #427; synthetic circuit, cancellation and disk faults; complete processed-symbol checkpoint before terminal status; Linux/deployment remains separate |
+| META-OPS-MINUTE-002 | Bound opt-in same-attempt minute residual retry | META-OPS-MINUTE-001 | #429; 4992-symbol residual-set, one monotonic deadline, fail-closed profile activation; Linux/deployment remains separate |
 | P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | Exact-key source backfill and reconciled child revision |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | Exact-key backfill, active-universe coverage, and OCI child revision |
 | P1-DATA-004 | Normalize mixed-unit corporate actions for continuous historical replay | C1, S4, P1-SNAPSHOT-001 | Deterministic authority audit, fully versioned per-security exceptions, and immutable replay input bundle |

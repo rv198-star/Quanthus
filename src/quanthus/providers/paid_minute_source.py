@@ -15,6 +15,7 @@ import os
 import sys
 import time
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -160,6 +161,66 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
     os.replace(temp, path)
 
 
+def _audit_symbol(
+    code: str,
+    *,
+    day: str,
+    key: str,
+    daily: dict[str, Any],
+    first_5m_volume: Any,
+    output_dir: Path,
+) -> dict[str, Any]:
+    import requests
+
+    symbol = code + (".SH" if code.startswith("6") else ".SZ")
+    receipt: dict[str, Any] = {"stock_code": code, "market_date": day}
+    try:
+        response = requests.get(
+            ENDPOINT,
+            params={
+                "ts_code": symbol,
+                "freq": "1min",
+                "start_date": day + " 09:00:00",
+                "end_date": day + " 16:00:00",
+            },
+            headers={"X-API-Key": key},
+            timeout=25,
+        )
+        receipt["http_status"] = response.status_code
+        receipt["request_id"] = response.headers.get("x-request-id")
+        if response.status_code == 202:
+            receipt.update(status="source_pending", retry_after=response.headers.get("retry-after"))
+        elif response.status_code != 200:
+            receipt.update(status="http_error")
+        else:
+            raw = response.content
+            receipt["source_raw_sha256"] = hashlib.sha256(raw).hexdigest()
+            raw_path = output_dir / "raw" / f"{code}.json.gz"
+            raw_path.parent.mkdir(parents=True, exist_ok=True)
+            with (
+                raw_path.open("wb") as sink,
+                gzip.GzipFile(fileobj=sink, mode="wb", mtime=0) as zipped,
+            ):
+                zipped.write(raw)
+            try:
+                receipt.update(
+                    qualify_payload(
+                        response.json(),
+                        symbol=symbol,
+                        market_date=day,
+                        daily_volume=daily["volume"],
+                        daily_close=daily["close"],
+                        first_5m_volume=first_5m_volume,
+                    )
+                )
+            except (ValueError, KeyError) as exc:
+                receipt.update(status="unqualified", reason=str(exc)[:350])
+    except requests.RequestException as exc:
+        receipt.update(status="transport_error", reason=type(exc).__name__)
+    _write_json(output_dir / "receipts" / f"{code}.json", receipt)
+    return receipt
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Quarantine-only paid 1m source coverage audit")
     parser.add_argument("--market-date", required=True, type=date.fromisoformat)
@@ -168,16 +229,18 @@ def main() -> int:
     parser.add_argument("--five-path", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--rate-per-second", type=float, default=4)
+    parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--limit", type=int)
     args = parser.parse_args()
     if (
         args.rate_per_second <= 0
         or args.rate_per_second > 5
+        or args.workers < 1
+        or args.workers > 8
         or (args.limit is not None and args.limit < 1)
     ):
-        parser.error("rate must be in (0,5] and limit must be positive")
+        parser.error("rate must be in (0,5], workers in [1,8], and limit positive")
     import pyarrow.parquet as pq
-    import requests
 
     daily_rows = pq.read_table(
         args.daily_path, columns=["stock_code", "market_date", "volume", "close"]
@@ -206,76 +269,43 @@ def main() -> int:
         raise ValueError("native 5m opening bucket missing for selected symbols")
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
         raise ValueError("audit output directory must be empty")
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    args.output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     print("READY_FOR_KEY", flush=True)
     key = sys.stdin.readline().strip()
     if not key:
         raise ValueError("empty API key")
-    session = requests.Session()
     counts: Counter[str] = Counter()
     next_call = time.monotonic()
     try:
-        for index, code in enumerate(codes, 1):
-            symbol = code + (".SH" if code.startswith("6") else ".SZ")
-            time.sleep(max(0.0, next_call - time.monotonic()))
-            next_call = time.monotonic() + 1 / args.rate_per_second
-            receipt: dict[str, Any] = {"stock_code": code, "market_date": day}
-            try:
-                response = session.get(
-                    ENDPOINT,
-                    params={
-                        "ts_code": symbol,
-                        "freq": "1min",
-                        "start_date": day + " 09:00:00",
-                        "end_date": day + " 16:00:00",
-                    },
-                    headers={"X-API-Key": key},
-                    timeout=25,
-                )
-                receipt["http_status"] = response.status_code
-                receipt["request_id"] = response.headers.get("x-request-id")
-                if response.status_code == 202:
-                    receipt.update(
-                        status="source_pending", retry_after=response.headers.get("retry-after")
-                    )
-                elif response.status_code != 200:
-                    receipt.update(status="http_error")
-                else:
-                    raw = response.content
-                    receipt["source_raw_sha256"] = hashlib.sha256(raw).hexdigest()
-                    raw_path = args.output_dir / "raw" / f"{code}.json.gz"
-                    raw_path.parent.mkdir(parents=True, exist_ok=True)
-                    with (
-                        raw_path.open("wb") as sink,
-                        gzip.GzipFile(fileobj=sink, mode="wb", mtime=0) as zipped,
-                    ):
-                        zipped.write(raw)
-                    try:
-                        receipt.update(
-                            qualify_payload(
-                                response.json(),
-                                symbol=symbol,
-                                market_date=day,
-                                daily_volume=daily[code]["volume"],
-                                daily_close=daily[code]["close"],
-                                first_5m_volume=first[code],
-                            )
+        with ThreadPoolExecutor(max_workers=args.workers) as pool:
+            for start in range(0, len(codes), 100):
+                batch = codes[start : start + 100]
+                futures = []
+                for code in batch:
+                    time.sleep(max(0.0, next_call - time.monotonic()))
+                    next_call = time.monotonic() + 1 / args.rate_per_second
+                    futures.append(
+                        pool.submit(
+                            _audit_symbol,
+                            code,
+                            day=day,
+                            key=key,
+                            daily=daily[code],
+                            first_5m_volume=first[code],
+                            output_dir=args.output_dir,
                         )
-                    except (ValueError, KeyError) as exc:
-                        receipt.update(status="unqualified", reason=str(exc)[:350])
-            except requests.RequestException as exc:
-                receipt.update(status="transport_error", reason=type(exc).__name__)
-            _write_json(args.output_dir / "receipts" / f"{code}.json", receipt)
-            counts[receipt["status"]] += 1
-            if index % 100 == 0 or index == len(codes):
+                    )
+                for future in as_completed(futures):
+                    receipt = future.result()
+                    counts[receipt["status"]] += 1
                 print(
                     json.dumps(
-                        {"processed": index, "total": len(codes), "counts": counts}, sort_keys=True
+                        {"processed": start + len(batch), "total": len(codes), "counts": counts},
+                        sort_keys=True,
                     ),
                     flush=True,
                 )
     finally:
-        session.close()
         key = ""
     _write_json(
         args.output_dir / "summary.json",

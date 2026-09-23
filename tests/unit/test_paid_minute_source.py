@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from quanthus.providers.paid_minute_source import qualify_payload
+from quanthus.providers.paid_minute_source import _audit_symbol, qualify_payload
 from quanthus.providers.tencent_m1_normalize import expected_times
 
 DATE = "2026-09-23"
@@ -63,9 +63,14 @@ def test_daily_volume_mismatch_is_not_reallocated() -> None:
         check(payload(), daily=2496)
 
 
-def test_first_5m_mismatch_blocks_even_if_daily_volume_matches() -> None:
+def test_first_5m_disagreement_is_recorded_when_daily_is_exact() -> None:
+    result = check(payload(), first5=149)
+    assert result["first_5m_volume_delta"] == "1"
+
+
+def test_first_5m_mismatch_blocks_auction_exclusion() -> None:
     with pytest.raises(ValueError, match="daily/native-5m volume mismatch"):
-        check(payload(), first5=149)
+        check(payload(), daily=2400, first5=49)
 
 
 def test_wrong_date_and_duplicate_timestamp_block() -> None:
@@ -89,3 +94,25 @@ def test_partial_response_and_missing_grid_block() -> None:
     missing["count"] -= 1
     with pytest.raises(ValueError, match="session grid missing"):
         check(missing)
+
+
+def test_rate_limit_is_recorded_without_persisting_key(tmp_path, monkeypatch) -> None:
+    import requests
+
+    class Response:
+        status_code = 429
+        headers = {"x-request-id": "request-1", "retry-after": "60"}
+
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: Response())
+    receipt = _audit_symbol(
+        "000001",
+        day=DATE,
+        key="do-not-persist-this-key",
+        daily={"volume": 2500, "close": 11.0},
+        first_5m_volume=150,
+        output_dir=tmp_path,
+    )
+    assert receipt["status"] == "rate_limited"
+    assert receipt["retry_after"] == "60"
+    assert not (tmp_path / "raw").exists()
+    assert "do-not-persist-this-key" not in (tmp_path / "receipts/000001.json").read_text()

@@ -123,12 +123,18 @@ def qualify_payload(
     daily = _decimal(daily_volume)
     reference_first = _decimal(first_5m_volume)
     auction_volume = auction["vol"] if auction else Decimal(0)
-    include = normal + auction_volume == daily and first + auction_volume == reference_first
+    # A different 5m provider can disagree about the opening bucket even when
+    # the paid native 1m source is internally exact. Record that disagreement,
+    # but do not turn a cross-provider diagnostic into a new formal daily gate.
+    # Excluding a nonzero 09:30 row does require independent 5m confirmation.
+    include = normal + auction_volume == daily
     exclude = normal == daily and first == reference_first
     if include:
-        auction_mode = "merged_into_0931"
+        auction_mode = "merged_into_0931" if auction_volume else "zero_or_absent_0930"
+        first_5m_delta = first + auction_volume - reference_first
     elif exclude:
         auction_mode = "duplicate_0930_excluded"
+        first_5m_delta = Decimal(0)
     else:
         raise ValueError(
             "proxy daily/native-5m volume mismatch: "
@@ -148,6 +154,7 @@ def qualify_payload(
         "session_rows": len(grid),
         "preopen_duplicate_snapshots_excluded": len(preopen),
         "auction_mode": auction_mode,
+        "first_5m_volume_delta": str(first_5m_delta),
         "source_volume": str(daily),
         "source_close": str(seen["15:00"]["close"]),
         "amount_status": "source_present_unpublished_pending_separate_quality_review",
@@ -190,6 +197,8 @@ def _audit_symbol(
         receipt["request_id"] = response.headers.get("x-request-id")
         if response.status_code == 202:
             receipt.update(status="source_pending", retry_after=response.headers.get("retry-after"))
+        elif response.status_code == 429:
+            receipt.update(status="rate_limited", retry_after=response.headers.get("retry-after"))
         elif response.status_code != 200:
             receipt.update(status="http_error")
         else:
@@ -228,7 +237,7 @@ def main() -> int:
     parser.add_argument("--status-path", required=True, type=Path)
     parser.add_argument("--five-path", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
-    parser.add_argument("--rate-per-second", type=float, default=4)
+    parser.add_argument("--rate-per-second", type=float, default=1)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--limit", type=int)
     args = parser.parse_args()
@@ -276,6 +285,8 @@ def main() -> int:
         raise ValueError("empty API key")
     counts: Counter[str] = Counter()
     next_call = time.monotonic()
+    processed = 0
+    stop_reason = "completed"
     try:
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
             for start in range(0, len(codes), 100):
@@ -298,13 +309,17 @@ def main() -> int:
                 for future in as_completed(futures):
                     receipt = future.result()
                     counts[receipt["status"]] += 1
+                processed = start + len(batch)
                 print(
                     json.dumps(
-                        {"processed": start + len(batch), "total": len(codes), "counts": counts},
+                        {"processed": processed, "total": len(codes), "counts": counts},
                         sort_keys=True,
                     ),
                     flush=True,
                 )
+                if counts["rate_limited"]:
+                    stop_reason = "stopped_on_provider_rate_limit"
+                    break
     finally:
         key = ""
     _write_json(
@@ -312,12 +327,14 @@ def main() -> int:
         {
             "market_date": day,
             "selected_traded_symbols": len(codes),
+            "processed": processed,
             "counts": counts,
+            "stop_reason": stop_reason,
             "quarantine_only": True,
             "production_publication": False,
         },
     )
-    return 0
+    return 0 if stop_reason == "completed" else 3
 
 
 if __name__ == "__main__":

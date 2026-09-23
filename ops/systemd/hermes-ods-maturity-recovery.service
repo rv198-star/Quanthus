@@ -1,0 +1,26 @@
+[Unit]
+Description=Quanthus ODS/DWD matured Tencent 1m recovery (READY-gated)
+After=network-online.target
+Wants=network-online.target
+OnFailure=quanthus-pipeline-failure@%n.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=-/etc/quanthus/hermes-ods-lane.env
+EnvironmentFile=-/etc/quanthus/hermes-dwd.env
+EnvironmentFile=/etc/quanthus/dwd-notification.env
+Environment=HERMES_ODS_NODE_ID=hermes
+Environment=HERMES_ODS_ENV_FILE=/etc/quanthus/hermes-ods-lane.env
+Environment=QUANTHUS_NOTIFICATION_STATE_ROOT=/srv/quanthus/dwd-dws-v2/notifications
+WorkingDirectory=/root/work/Quanthus
+ExecStart=/root/work/astock/.venv/bin/python /root/work/Quanthus/ops/bin/recover-matured-ods-daily
+TimeoutStartSec=5h
+Nice=5
+UMask=0027
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

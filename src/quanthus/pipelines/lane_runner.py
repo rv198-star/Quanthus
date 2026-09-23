@@ -39,6 +39,7 @@ from quanthus.pipelines.schedule_contracts import (
     load_schedule_contract,
 )
 from quanthus.providers.baostock_transport import set_socket_timeout
+from quanthus.providers.minute_recovery import load_minute_recovery_policy
 from quanthus.providers.trading_calendar import (
     CalendarRefreshError,
     refresh_calendar,
@@ -3649,6 +3650,23 @@ def _run_minute_collector(
         market_date=market_date, bar_size=bar_size
     )
     seed_raw = os.environ.get("HERMES_ODS_MINUTE_SEED_HOME", "").strip()
+    collector_override = os.environ.get("HERMES_ODS_MINUTE_COLLECTOR", "").strip()
+    policy_raw = (
+        os.environ.get("HERMES_ODS_MINUTE_1M_RECOVERY_POLICY", "").strip()
+        if bar_size == "1m" else ""
+    )
+    recovery_policy = None
+    policy_path = None
+    if policy_raw:
+        if seed_raw or collector_override or fetch_mode != "incr":
+            raise LaneRunError("minute recovery policy requires repository 1m incr without seed")
+        policy_path = Path(policy_raw).resolve()
+        try:
+            recovery_policy = load_minute_recovery_policy(policy_path)
+        except (OSError, ValueError, TypeError) as exc:
+            raise LaneRunError(f"invalid minute recovery policy: {exc}") from exc
+        if recovery_policy.budget_seconds >= _minute_collector_timeout_seconds():
+            raise LaneRunError("minute recovery budget must be below collector timeout")
     if seed_raw:
         seed_home = Path(seed_raw).resolve()
         try:
@@ -3711,7 +3729,6 @@ def _run_minute_collector(
             "isolation": "attempt-local-seed-copy",
             "seed_home": str(seed_home),
         }
-    collector_override = os.environ.get("HERMES_ODS_MINUTE_COLLECTOR", "").strip()
     if collector_override:
         script = Path(collector_override).resolve()
         if not script.is_file():
@@ -3739,6 +3756,36 @@ def _run_minute_collector(
     ]
     if max_pages is not None:
         cmd.extend(["--max-pages", str(max_pages)])
+    if policy_path is not None:
+        cmd.extend(["--recovery-policy", str(policy_path)])
+    tencent_opt_in = os.environ.get("HERMES_ODS_MINUTE_TENCENT_FALLBACK", "").strip()
+    if tencent_opt_in not in {"", "0", "1"}:
+        raise LaneRunError("HERMES_ODS_MINUTE_TENCENT_FALLBACK must be 0 or 1")
+    if tencent_opt_in == "1" and bar_size == "1m":
+        if collector_override or policy_path or fetch_mode != "incr":
+            raise LaneRunError("Tencent 1m requires the repository collector in incr mode")
+        daily_artifact = _latest_market_artifact(
+            paths=paths,
+            market_date=market_date,
+            available_at=_now(),
+            artifact_name="daily_ohlcv_none_delta",
+        )
+        status_artifact = _latest_market_artifact(
+            paths=paths,
+            market_date=market_date,
+            available_at=_now(),
+            artifact_name="daily_status_observation_delta",
+        )
+        if daily_artifact is None or status_artifact is None:
+            raise LaneRunError("Tencent 1m requires a same-date READY market release")
+        cmd.extend(
+            [
+                "--tencent-daily-path",
+                str(daily_artifact[0]),
+                "--tencent-status-path",
+                str(status_artifact[0]),
+            ]
+        )
     # Provider collection is always attempt-local. There is deliberately no
     # production fallback: shadow runs must never mutate shared legacy partitions.
     raw_home.mkdir(parents=True, exist_ok=False)
@@ -3758,7 +3805,11 @@ def _run_minute_collector(
     )
     return {
         "provider": collector_identity,
-        "api": f"mootdx/tdx.{fetch_mode}",
+        "api": (
+            "baostock.query_history_k_data_plus.native_5m"
+            if bar_size == "5m" and not collector_override
+            else f"mootdx/tdx.{fetch_mode}"
+        ),
         "layer": layer,
         "bar_size": bar_size,
         "fetch_mode": fetch_mode,
@@ -3773,6 +3824,12 @@ def _run_minute_collector(
         "market_date": market_date.isoformat(),
         "universe_size": len(symbols),
         "isolation": "attempt-local",
+        **(
+            {"recovery_policy_id": recovery_policy.policy_id,
+             "recovery_policy_sha256": recovery_policy.sha256,
+             "budget_seconds": recovery_policy.budget_seconds}
+            if recovery_policy else {}
+        ),
     }
 
 
@@ -3859,6 +3916,39 @@ def _build_after_hours_fixed_price(
     ]
 
 
+_DIRECT_5M_PROVIDERS = frozenset(
+    {"mootdx-native-kline", "sina-minute-jsonp", "baostock-native-5m"}
+)
+
+
+def _direct_5m_provenance_error(raw_home: Path, universe: Sequence[str]) -> str | None:
+    """Fail closed if a formal 5m attempt lacks exact direct-source receipts."""
+    try:
+        checkpoint = json.loads((raw_home / "checkpoint.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError) as exc:
+        return f"direct_5m_checkpoint_unreadable: {type(exc).__name__}"
+    observed = checkpoint.get("symbols")
+    if not isinstance(observed, dict):
+        return "direct_5m_checkpoint_symbols_missing"
+    expected = set(universe)
+    if set(observed) != expected:
+        return (
+            "direct_5m_universe_mismatch: "
+            f"missing={len(expected - set(observed))} extra={len(set(observed) - expected)}"
+        )
+    for code in sorted(expected):
+        receipt = observed[code]
+        if not isinstance(receipt, dict) or receipt.get("status") != "done":
+            return f"direct_5m_receipt_incomplete: {code}"
+        if (
+            receipt.get("provider") not in _DIRECT_5M_PROVIDERS
+            or receipt.get("native_frequency") != "5m"
+            or receipt.get("derived_from") is not None
+        ):
+            return f"direct_5m_source_nonconforming: {code}"
+    return None
+
+
 def _build_intraday_stream(
     *,
     paths: LanePaths,
@@ -3940,6 +4030,32 @@ def _build_intraday_stream(
                     watermark=watermark,
                 ),
             ]
+        if bar_size == "5m":
+            provenance_error = _direct_5m_provenance_error(layer_dir, universe)
+            if provenance_error is not None:
+                return [
+                    DatasetStatus(
+                        name="intraday_bars",
+                        status="failed",
+                        detail=provenance_error,
+                        source_request=json.dumps(collector_meta, sort_keys=True, default=str),
+                    ),
+                    _seal_json_dataset(
+                        name="acquisition_log",
+                        payload={
+                            "lane": "intraday-archive",
+                            "stream": bar_size,
+                            "market_date": watermark,
+                            "collector": collector_meta,
+                            "provenance_error": provenance_error,
+                            "source_revision": rev,
+                        },
+                        landing=landing,
+                        source_revision=rev,
+                        knowledge_cutoff=knowledge_cutoff,
+                        watermark=watermark,
+                    ),
+                ]
 
     rows: list[dict[str, Any]] = []
     coverage_rows: list[dict[str, Any]] = []

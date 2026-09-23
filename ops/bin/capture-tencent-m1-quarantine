@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Preserve Tencent rolling m1 responses without publishing an ODS release.
+
+This is an evidence capture tool, not a minute-bar provider. The Tencent rolling
+window and its volume units are ungoverned; captured bytes must never be used as
+formal ODS/DWD input without a separate source contract and validation gate.
+"""
+
+from __future__ import annotations
+
+import argparse
+import gzip
+import hashlib
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pyarrow.parquet as pq
+
+
+ENDPOINT = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/kline/mkline"
+
+
+def atomic_json(path: Path, obj: dict) -> None:
+    tmp = path.with_name(path.name + f".tmp.{os.getpid()}")
+    tmp.write_text(json.dumps(obj, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+    os.replace(tmp, path)
+
+
+def atomic_gzip(path: Path, body: bytes) -> None:
+    tmp = path.with_name(path.name + f".tmp.{os.getpid()}")
+    with tmp.open("wb") as sink:
+        with gzip.GzipFile(fileobj=sink, mode="wb", mtime=0) as zipped:
+            zipped.write(body)
+    os.replace(tmp, path)
+
+
+def load_universe(status_path: Path, daily_path: Path, market_date: str) -> tuple[list[str], dict]:
+    statuses = pq.read_table(status_path, columns=["stock_code", "market_date", "tradestatus"]).to_pylist()
+    daily_rows = pq.read_table(daily_path, columns=["stock_code", "market_date", "volume"]).to_pylist()
+    status = {r["stock_code"]: r for r in statuses}
+    daily = {r["stock_code"]: r for r in daily_rows}
+    if len(status) != len(statuses) or len(daily) != len(daily_rows) or set(status) != set(daily):
+        raise ValueError("sealed status/daily universe mismatch or duplicate stock code")
+    if len(status) != 4992 or any(r["market_date"] != market_date for r in statuses + daily_rows):
+        raise ValueError("unexpected universe size or market date")
+    codes = sorted(status)
+    if any(len(code) != 6 or code[0] not in "036" or not code.isdigit() for code in codes):
+        raise ValueError("unexpected stock code in sealed universe")
+    return codes, {code: {"status": status[code]["tradestatus"], "daily_volume": daily[code]["volume"]} for code in codes}
+
+
+def fetch(code: str, timeout: int) -> tuple[int, bytes]:
+    symbol = ("sh" if code.startswith("6") else "sz") + code
+    url = f"{ENDPOINT}?param={symbol},m1,,800"
+    req = urllib.request.Request(url, headers={"Referer": "https://gu.qq.com/", "User-Agent": "Mozilla/5.0 Quanthus-Quarantine/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read()
+
+
+def inspect(body: bytes, code: str, market_date: str) -> dict:
+    symbol = ("sh" if code.startswith("6") else "sz") + code
+    payload = json.loads(body)
+    rows = payload["data"][symbol]["m1"]
+    day = market_date.replace("-", "")
+    selected = [row for row in rows if isinstance(row, list) and row and str(row[0]).startswith(day)]
+    stamps = [str(row[0]) for row in selected]
+    return {
+        "upstream_code": payload.get("code"),
+        "rolling_rows": len(rows),
+        "target_rows": len(selected),
+        "target_first": min(stamps) if stamps else None,
+        "target_last": max(stamps) if stamps else None,
+        "target_distinct_timestamps": len(set(stamps)),
+        "raw_volume_sum": sum(float(row[5]) for row in selected),
+        "minute_amount_available": False,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--market-date", required=True)
+    parser.add_argument("--status-path", type=Path, required=True)
+    parser.add_argument("--daily-path", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--shard-index", type=int, required=True)
+    parser.add_argument("--shard-count", type=int, required=True)
+    parser.add_argument("--source-commit", required=True)
+    parser.add_argument("--sleep", type=float, default=0.18)
+    parser.add_argument("--timeout", type=int, default=15)
+    parser.add_argument("--attempts", type=int, default=3)
+    args = parser.parse_args()
+    if not 0 <= args.shard_index < args.shard_count or args.attempts < 1:
+        parser.error("invalid shard or attempts")
+
+    codes, daily = load_universe(args.status_path, args.daily_path, args.market_date)
+    shard = [code for i, code in enumerate(codes) if i % args.shard_count == args.shard_index]
+    args.output.mkdir(parents=True, exist_ok=True)
+    raw_dir = args.output / "raw"
+    receipt_dir = args.output / "receipts"
+    raw_dir.mkdir(exist_ok=True)
+    receipt_dir.mkdir(exist_ok=True)
+    manifest = {
+        "purpose": "raw-quarantine-only-no-ods-ready-no-dwd",
+        "market_date": args.market_date,
+        "source_commit": args.source_commit,
+        "endpoint": ENDPOINT,
+        "count": 800,
+        "universe_count": len(codes),
+        "universe_sha256": hashlib.sha256("\n".join(codes).encode()).hexdigest(),
+        "shard_index": args.shard_index,
+        "shard_count": args.shard_count,
+        "shard_size": len(shard),
+        "status_path": str(args.status_path),
+        "daily_path": str(args.daily_path),
+    }
+    manifest_path = args.output / "manifest.json"
+    if manifest_path.exists():
+        if json.loads(manifest_path.read_text()) != manifest:
+            raise ValueError("existing manifest differs; refusing to mix captures")
+    else:
+        atomic_json(manifest_path, manifest)
+    print(json.dumps({"event": "start", **manifest}), flush=True)
+
+    saved = 0
+    failed = 0
+    for index, code in enumerate(shard, 1):
+        receipt_path = receipt_dir / f"{code}.json"
+        raw_path = raw_dir / f"{code}.json.gz"
+        if receipt_path.exists() and raw_path.exists():
+            try:
+                old = json.loads(receipt_path.read_text())
+                if old.get("raw_sha256") == hashlib.sha256(gzip.decompress(raw_path.read_bytes())).hexdigest():
+                    saved += 1
+                    continue
+            except (OSError, ValueError, KeyError):
+                pass
+        error = None
+        for attempt in range(1, args.attempts + 1):
+            try:
+                http_status, body = fetch(code, args.timeout)
+                if http_status != 200 or not body:
+                    raise ValueError(f"HTTP_{http_status}_bytes_{len(body)}")
+                atomic_gzip(raw_path, body)
+                details = inspect(body, code, args.market_date)
+                receipt = {
+                    "code": code,
+                    "captured_at_utc": datetime.now(timezone.utc).isoformat(),
+                    "http_status": http_status,
+                    "raw_bytes": len(body),
+                    "raw_sha256": hashlib.sha256(body).hexdigest(),
+                    "sealed_tradestatus": daily[code]["status"],
+                    "sealed_daily_volume": daily[code]["daily_volume"],
+                    **details,
+                }
+                atomic_json(receipt_path, receipt)
+                saved += 1
+                error = None
+                break
+            except Exception as exc:  # save per-symbol failure, then continue the capture
+                error = f"{type(exc).__name__}: {exc}"
+                if attempt < args.attempts:
+                    time.sleep(attempt * 2)
+        if error:
+            failed += 1
+            print(json.dumps({"event": "failed", "code": code, "error": error}), flush=True)
+        if index % 100 == 0 or index == len(shard):
+            print(json.dumps({"event": "progress", "processed": index, "shard_size": len(shard), "saved": saved, "failed": failed}), flush=True)
+        time.sleep(args.sleep)
+    return 0 if failed == 0 else 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -105,8 +105,20 @@ readiness deadline expires. An empty successful response is not a connection err
 cause an immediate logout/login cycle. Provider/network errors have bounded reconnects; each
 successful login applies a 30-second socket timeout. After readiness, the first stock pass is
 followed by one retry of only the missing set. A residual gap or the configured completion
-deadline produces no READY. The CN01 profile uses 19:00/19:46; the Hermes late profile uses
-20:00/20:46.
+deadline produces no READY. The CN01 profile uses 19:00/19:46. Following the
+2026-09-23 incident, the Hermes late profile retains 20:00 readiness but uses a
+23:36 completion deadline: 4,680 successful requests took 75 minutes, leaving
+312 in-scope securities unqueried at the former 20:46 cutoff despite zero provider
+errors. This restores the profile's already-declared 7,380-second observed duration
+plus 100% safety margin from its 19:30 trigger; it does not weaken row coverage or
+turn a partial attempt into READY. The profile revision is
+`hermes-late-window-throughput-budget-20260923`.
+The rendered Hermes daily controller now gets a six-hour ODS budget and one
+attempt; its separate one-hour DWD budget still fits under the nine-hour unit
+bound. This replaces the 90-minute first attempt plus four-hour retry, whose
+first attempt could never honor the extended market deadline. CN01 retains its
+existing two-attempt profile. Do not deploy only the schedule JSON without the
+matching rendered Hermes controller unit.
 
 Minute provider collection is always written under the current attempt. Shared legacy minute
 partitions and ad hoc `.nodata` files are not accepted as shadow evidence. A no-bar security must
@@ -118,6 +130,14 @@ matrix backfills set their own explicit, still-bounded timeout.
 The default minute collector is the repository module `quanthus.providers.minute_tdx`; a reviewed
 external fork may be selected with `HERMES_ODS_MINUTE_COLLECTOR`. Both forms receive an
 attempt-local `--home` and have no curated-PG path.
+When the explicitly enabled Tencent 1m path is used, the collector first probes
+traded SZ, SH, and STAR symbols from the sealed same-date daily/status evidence,
+preferring non-round daily share volumes for the lot-based markets. A failed
+probe writes `source_qualification.json`, retains the raw response in the
+attempt, and stops before scanning the universe. A passed probe is only an
+early source check: every security still has to pass exact date, session-grid,
+daily-volume, and close validation. The absent minute amount stays nullable;
+neither probe success nor nullable amount removes the #436 quality limitation.
 
 Hermes may write only raw/ODS artifacts. Remove all direct curated PG sync from replacement
 launchers. OCI publication is a separate job and credential.
@@ -265,6 +285,26 @@ On weekends, only event-lane output is expected.
 
 ## Failure and rollback
 
+The current remote execution channel is NexusAgent as required by root `AGENTS.md`.
+Older OCI-specific access examples in this historical runbook are not permission
+to restore that channel. A missing node connection blocks deployment verification,
+not local engineering and not by itself proof of a production outage.
+
+Under `META-OPS-PROCESS-001`, daily lane/catalog/DWD children use owned process
+groups. The controller gives TERM 10 seconds, then KILL up to 10 seconds, and only
+releases ownership after the group disappears. Exit 75 / `process_cleanup_unconfirmed`
+means automatic retry is prohibited: inspect the retained run/log/notification
+context and confirm quiescence through the approved node channel before any manual
+recovery. Do not convert that exit to success or start a replacement while writers
+may remain. A missing launcher also leaves an explicit failed run rather than
+continuing to catalog/DWD.
+
+Before deploying this slice, validate Linux shell pipelines and service-stop
+behaviour, including the installed systemd cgroup kill settings. An externally
+daemonized collector and a controller killed without cleanup are outside the
+process-group proof. Retain failed evidence and rollout/rollback receipts under
+Issue #425; merging the code alone does not close it.
+
 Do not edit a release, reuse its id, update PG directly, or fill missing observations with zeros.
 Keep failed/partial attempts for diagnosis and retry into a new attempt.
 
@@ -297,6 +337,34 @@ timer. Pass the original `--market-date` and a reviewed, timezone-aware
 log are marked `run_mode=manual_recovery` and
 `excluded_from_collection_window_experiment=true`. It may restore ODS continuity and feed OCI, but
 it is never counted as an early/late A/B observation.
+
+## C2 opt-in minute recovery (not deployed)
+
+For programme #424, the Owner's 2026-09-22 task-scoped exception in root AGENTS.md
+authorizes existing passwordless SSH first, without MCP node management. Preserve
+known-host checks and GitHub distribution. Connectivity is not deployment approval;
+do not replace a running daily job's checkout or restart its service during preflight.
+
+Issue #429 / `META-OPS-MINUTE-002` is governed by the data-foundation LLD's
+“Opt-in same-attempt 1m residual retry” section. No service env or timer is changed
+by installing this code. After Linux and node release gates pass, an approved rollout
+may set `HERMES_ODS_MINUTE_1M_RECOVERY_POLICY` to the absolute path of the deployed
+`config/pipelines/minute-attempt-recovery.v1.json`. Record its id and SHA-256 from
+both lane metadata and collector status with the code revision and node receipt.
+The v1 budget is 1740 seconds; the existing default outer timeout is 1800 seconds.
+Do not combine this setting with a seed or collector override. The 5m lane ignores
+this 1m-only setting; the standalone collector rejects an explicit 5m policy request.
+
+Expect `symbol_attempts`, `scan_round`, `terminal_reason`, and per-symbol `attempts`
+history. `budget_exhausted`, storage failure or circuit opening is failure, not
+partial success/READY. An uncooperative call may reach the outer timeout; verify
+process/cgroup cleanup before retry. Do not infer that a recovered checkpoint alone
+proves coverage, date validity, publication, or timely SLA success.
+
+Rollback after a controlled stop by removing only this opt-in env setting, preserving
+failed evidence; do not mutate published packages or Base. This disables extra rounds
+and the cooperative budget without changing OCI sync. C2 does not repair or authorize
+the separate cross-attempt seed path or the formal-5m fallback conformance gap.
 
 ## Migration
 

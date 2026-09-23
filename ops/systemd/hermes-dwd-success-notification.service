@@ -13,6 +13,7 @@ Environment=QUANTHUS_NOTIFICATION_STATE_ROOT=/srv/quanthus/dwd-dws-v2/notificati
 Environment=QUANTHUS_NODE=Hermes
 Environment=QUANTHUS_SYSTEMD_UNIT=hermes-ods-daily-orchestrator.service
 WorkingDirectory=/root/work/Quanthus
+ExecCondition=/root/work/Quanthus/ops/bin/check-ods-dwd-completion-notification --context /root/work/astock/data/shadow/hermes-ods-v1/orchestrator/daily/notification-context.json
 ExecStart=/root/work/Quanthus/.venv-p1/bin/python /root/work/Quanthus/ops/bin/notify-dwd-event --event hermes_dwd_completed --node Hermes --stage ods_to_dwd_build --unit hermes-ods-daily-orchestrator.service
 TimeoutStartSec=2min
 NoNewPrivileges=true

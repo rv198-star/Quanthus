@@ -33,12 +33,12 @@ _MARKET_PROFILES: dict[str, dict[str, str]] = {
         "completion_deadline": "19:46:00",
     },
     "hermes-ods-schedule-late-v1": {
-        "contract_revision": "hermes-late-window-cn01-throughput-20260814",
+        "contract_revision": "hermes-late-window-throughput-budget-20260923",
         "trigger_time": "19:30:00",
         "experiment_id": "baostock-load-window-20260814-v4",
         "hermes_timer_start": "19:30:00",
         "readiness_deadline": "20:00:00",
-        "completion_deadline": "20:46:00",
+        "completion_deadline": "23:36:00",
     },
 }
 
@@ -95,9 +95,7 @@ def load_schedule_contract(path: Path) -> ScheduleContract:
         raise ScheduleContractError("unsupported schedule contract schema_version")
 
     schedule_id = _string(root.get("schedule_id"), field="schedule_id")
-    contract_revision = _string(
-        root.get("contract_revision"), field="contract_revision"
-    )
+    contract_revision = _string(root.get("contract_revision"), field="contract_revision")
     market_profile = _MARKET_PROFILES.get(schedule_id)
     if market_profile is None:
         raise ScheduleContractError(f"unsupported schedule_id: {schedule_id}")
@@ -178,9 +176,7 @@ def _validate_bootstrap(lane: Mapping[str, Any]) -> None:
         raise ScheduleContractError("bootstrap must not be enabled by the scheduler")
 
 
-def _validate_market_daily(
-    lane: Mapping[str, Any], *, profile: Mapping[str, str]
-) -> None:
+def _validate_market_daily(lane: Mapping[str, Any], *, profile: Mapping[str, str]) -> None:
     trigger = _mapping(lane.get("trigger"), field="market-daily-core.trigger")
     if trigger.get("weekdays") != [1, 2, 3, 4, 5]:
         raise ScheduleContractError("market-daily-core must run Monday through Friday")
@@ -278,10 +274,7 @@ def _validate_market_daily(
         timing_sla.get("observed_max_duration_seconds"),
         field="market-daily-core.timing_sla.observed_max_duration_seconds",
     )
-    if (
-        timing_sla.get("basis")
-        != "scheduled_market_daily_incident_20260728_rounded_to_123_minutes"
-    ):
+    if timing_sla.get("basis") != "scheduled_market_daily_incident_20260728_rounded_to_123_minutes":
         raise ScheduleContractError("market-daily-core timing SLA must name its incident evidence")
     if timing_sla.get("validation_status") != "provisional_pending_five_open_sessions":
         raise ScheduleContractError("market-daily-core timing SLA must remain provisional")

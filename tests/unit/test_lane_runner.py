@@ -658,6 +658,7 @@ def test_baostock_query_keeps_reconnect_failure_bounded(
 def test_baostock_query_reconnects_when_row_iteration_breaks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(lane_runner, "set_socket_timeout", lambda _seconds: True)
     class Login:
         error_code = "0"
         error_msg = "ok"
@@ -735,6 +736,7 @@ def test_baostock_query_reconnects_when_row_iteration_breaks(
 def test_baostock_empty_response_does_not_reconnect(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(lane_runner, "set_socket_timeout", lambda _seconds: True)
     class Login:
         error_code = "0"
         error_msg = "ok"
@@ -784,6 +786,7 @@ def test_baostock_empty_response_does_not_reconnect(
 def test_baostock_missing_set_retry_repairs_only_early_gaps(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(lane_runner, "set_socket_timeout", lambda _seconds: True)
     class Login:
         error_code = "0"
         error_msg = "ok"
@@ -2048,8 +2051,20 @@ def test_weekly_provider_error_is_not_a_business_conflict(
     assert not list((tmp_path / "shadow").rglob("READY"))
 
 
+@pytest.mark.parametrize(
+    ("provider", "native_frequency", "expected_status"),
+    [
+        ("sina-minute-jsonp", "5m", "smoke_only"),
+        ("tencent-minute-query", "1m", "failed"),
+    ],
+)
 def test_provider_minute_is_attempt_local_and_symbol_limit_is_smoke_only(
-    fixture_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    fixture_home: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    provider: str,
+    native_frequency: str,
+    expected_status: str,
 ) -> None:
     monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
     monkeypatch.setenv("HERMES_ODS_SYMBOL_LIMIT", "1")
@@ -2075,6 +2090,21 @@ def test_provider_minute_is_attempt_local_and_symbol_limit_is_smoke_only(
                 )
             ],
         )
+        (raw_home / "checkpoint.json").write_text(
+            json.dumps(
+                {
+                    "symbols": {
+                        "000001": {
+                            "status": "done",
+                            "provider": provider,
+                            "native_frequency": native_frequency,
+                            "derived_from": "1m" if native_frequency == "1m" else None,
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
         return {
             "exit_code": 0,
             "layer_dir": str(raw_home),
@@ -2094,7 +2124,7 @@ def test_provider_minute_is_attempt_local_and_symbol_limit_is_smoke_only(
     assert observed_raw_homes
     assert "attempts/intraday-archive/5m" in str(observed_raw_homes[0])
     bars = next(d for d in result.datasets if d.name == "intraday_bars")
-    assert bars.status == "smoke_only"
+    assert bars.status == expected_status
     assert result.status == "partial"
     assert result.release_dir is None
     assert not list(shadow.rglob("READY"))

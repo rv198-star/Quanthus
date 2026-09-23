@@ -20,6 +20,11 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
+from quanthus.pipelines.process_control import (  # noqa: E402
+    PROCESS_CLEANUP_FAILED,
+    ProcessGroupCleanupError,
+    terminate_process_group,
+)
 from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (  # noqa: E402
     find_ready_daily_ods_lanes,
 )
@@ -34,6 +39,15 @@ _CATALOG_LANES = {
     "intraday-1m": "intraday_1m",
     "intraday-5m": "intraday_5m",
 }
+
+# This return status is deliberately distinct from a failed ODS/DWD run.  Tencent
+# exposes the current session's 1m volumes in whole lots, while the sealed daily
+# source records exact shares (including odd lots).  A same-day mismatch is thus
+# not safe to publish, but it is also not repaired by repeating the full scan.
+# The maturity recovery timer retries that exact date only after the source has
+# had time to publish its historical representation.
+SOURCE_MATURITY_DEFERRED = 3
+_TENCENT_QUALIFICATION_MARKER = "tencent source qualification failed"
 
 
 def _load_env_file(path: Path) -> None:
@@ -109,19 +123,27 @@ class LaneJob:
     log_handle: Any = None
     next_start_at: float = 0.0
     logs: list[str] = field(default_factory=list)
+    termination_grace_seconds: float = 10.0
 
     def start(self) -> None:
         self.attempt += 1
         log_path = self.log_root / f"{self.lane.replace('/', '-')}-{self.attempt}.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         self.log_handle = log_path.open("wb")
-        self.process = subprocess.Popen(
-            self.command,
-            stdout=self.log_handle,
-            stderr=subprocess.STDOUT,
-            env=os.environ.copy(),
-        )
         self.logs.append(str(log_path))
+        try:
+            self.process = subprocess.Popen(
+                self.command,
+                stdout=self.log_handle,
+                stderr=subprocess.STDOUT,
+                env=os.environ.copy(),
+                start_new_session=True,
+            )
+        except OSError as exc:
+            self.log_handle.write(f"command failed to start: {exc}\n".encode())
+            self.log_handle.close()
+            self.log_handle = None
+            raise
 
     def poll(self) -> tuple[str, int | None]:
         if self.process is None:
@@ -129,32 +151,24 @@ class LaneJob:
         returncode = self.process.poll()
         if returncode is None:
             return "running", None
-        if self.log_handle is not None:
-            self.log_handle.close()
-            self.log_handle = None
+        # A shell may have exited before its descendants. Never lose ownership
+        # or retry a busy lock until all writers in this group have stopped.
+        self.terminate()
         log_text = Path(self.logs[-1]).read_text(encoding="utf-8", errors="replace")
-        self.process = None
-        if (
-            returncode != 0
-            and self.retry_on_busy
-            and "lock busy" in log_text.lower()
-        ):
+        if returncode != 0 and self.retry_on_busy and "lock busy" in log_text.lower():
             return "retry", returncode
         return "done", returncode
 
     def terminate(self) -> None:
         if self.process is None:
             return
-        self.process.terminate()
         try:
-            self.process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait(timeout=10)
-        self.process = None
-        if self.log_handle is not None:
-            self.log_handle.close()
-            self.log_handle = None
+            terminate_process_group(self.process, grace_seconds=self.termination_grace_seconds)
+            self.process = None
+        finally:
+            if self.log_handle is not None:
+                self.log_handle.close()
+                self.log_handle = None
 
 
 def _lane_command(
@@ -197,7 +211,30 @@ def _run_group(
     deadline: float,
     poll_seconds: float,
 ) -> dict[str, dict[str, Any]]:
+    try:
+        return _run_group_owned(jobs, deadline=deadline, poll_seconds=poll_seconds)
+    finally:
+        # Includes partially started groups and Python interruption paths. One
+        # cleanup error must not skip cleanup of the remaining owned groups.
+        cleanup_errors = []
+        for job in jobs:
+            try:
+                job.terminate()
+            except ProcessGroupCleanupError as exc:
+                cleanup_errors.append(str(exc))
+        if cleanup_errors:
+            raise ProcessGroupCleanupError("; ".join(cleanup_errors))
+
+
+def _run_group_owned(
+    jobs: list[LaneJob],
+    *,
+    deadline: float,
+    poll_seconds: float,
+) -> dict[str, dict[str, Any]]:
     for job in jobs:
+        if time.monotonic() >= deadline:
+            break
         job.start()
     pending = list(jobs)
     results: dict[str, dict[str, Any]] = {}
@@ -244,23 +281,40 @@ def _run_command(
     log_path: Path,
     timeout: float,
 ) -> tuple[int, str]:
+    try:
+        return _run_command_owned(command, log_path=log_path, timeout=timeout)
+    except ProcessGroupCleanupError as exc:
+        with log_path.open("ab") as stream:
+            stream.write(f"{exc}\n".encode())
+        return PROCESS_CLEANUP_FAILED, str(log_path)
+
+
+def _run_command_owned(
+    command: list[str],
+    *,
+    log_path: Path,
+    timeout: float,
+) -> tuple[int, str]:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("wb") as stream:
+        process = None
         try:
-            completed = subprocess.run(
+            process = subprocess.Popen(
                 command,
                 stdout=stream,
                 stderr=subprocess.STDOUT,
                 env=os.environ.copy(),
-                timeout=max(1.0, timeout),
-                check=False,
+                start_new_session=True,
             )
-            return completed.returncode, str(log_path)
+            return process.wait(timeout=max(1.0, timeout)), str(log_path)
         except subprocess.TimeoutExpired:
             return 124, str(log_path)
         except OSError as exc:
             stream.write(f"command failed to start: {exc}\n".encode())
             return 127, str(log_path)
+        finally:
+            if process is not None:
+                terminate_process_group(process)
 
 
 def _write_run_state(run_root: Path, state: dict[str, Any], *, ready: bool) -> None:
@@ -271,6 +325,31 @@ def _write_run_state(run_root: Path, state: dict[str, Any], *, ready: bool) -> N
         ready_path.write_text(_sha256(manifest) + "\n", encoding="ascii")
     else:
         ready_path.unlink(missing_ok=True)
+
+
+def _source_maturity_deferred(lanes: dict[str, dict[str, Any]]) -> bool:
+    """Recognize the bounded, auditable Tencent current-session deferral only.
+
+    A transport, storage, daily, calendar, or 5m failure must remain a terminal
+    failed run.  Deferral is permitted only when those three independent lanes
+    are READY and the 1m collector stopped at its explicit source qualification
+    before scanning the full universe.
+    """
+
+    required = ("market-daily-core", "calendar-daily-events", "intraday-5m")
+    if any(lanes.get(lane, {}).get("status") != "ready" for lane in required):
+        return False
+    minute = lanes.get("intraday-1m", {})
+    if minute.get("status") != "failed":
+        return False
+    for raw_path in minute.get("logs", []):
+        try:
+            log_text = Path(str(raw_path)).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if _TENCENT_QUALIFICATION_MARKER in log_text.lower():
+            return True
+    return False
 
 
 def main() -> int:
@@ -313,12 +392,8 @@ def main() -> int:
 
     astock_root = Path(os.environ.get("ASTOCK_ROOT", "/root/work/astock"))
     home = Path(os.environ.get("ASTOCK_HOME", str(astock_root / "data")))
-    shadow_root = Path(
-        os.environ.get("HERMES_ODS_SHADOW_ROOT", str(home / "shadow/cn01-ods-v1"))
-    )
-    release_root = Path(
-        os.environ.get("HERMES_ODS_RELEASE_ROOT", str(shadow_root / "releases"))
-    )
+    shadow_root = Path(os.environ.get("HERMES_ODS_SHADOW_ROOT", str(home / "shadow/cn01-ods-v1")))
+    release_root = Path(os.environ.get("HERMES_ODS_RELEASE_ROOT", str(shadow_root / "releases")))
     calendar = Path(
         os.environ.get("HERMES_ODS_CALENDAR", str(home / "ref_trading_calendar.parquet"))
     )
@@ -327,9 +402,7 @@ def main() -> int:
             "HERMES_ODS_SCHEDULE", str(ROOT / "config/schedules/hermes-ods-schedule.v1.json")
         )
     )
-    runner = Path(
-        os.environ.get("HERMES_ODS_RUNNER", str(ROOT / "ops/bin/run-hermes-ods-lane"))
-    )
+    runner = Path(os.environ.get("HERMES_ODS_RUNNER", str(ROOT / "ops/bin/run-hermes-ods-lane")))
     catalog_builder = Path(
         os.environ.get(
             "HERMES_ODS_CATALOG_BUILDER", str(ROOT / "ops/bin/build-cn01-daily-ods-catalog")
@@ -340,9 +413,7 @@ def main() -> int:
         or os.environ.get("QUANTHUS_DWD_RUNNER")
         or str(ROOT / "ops/bin/run-cn01-daily-dwd")
     )
-    dwd_python = Path(
-        os.environ.get("QUANTHUS_DWD_PYTHON", str(ROOT / ".venv-p1/bin/python"))
-    )
+    dwd_python = Path(os.environ.get("QUANTHUS_DWD_PYTHON", str(ROOT / ".venv-p1/bin/python")))
     if not dwd_python.is_file():
         dwd_python = Path(sys.executable)
 
@@ -367,9 +438,7 @@ def main() -> int:
     )
     run_root.mkdir(parents=True, exist_ok=False)
     os.environ["HERMES_ODS_NODE_ID"] = node_id
-    os.environ.setdefault(
-        "HERMES_ODS_ENV_FILE", f"/etc/quanthus/{node_id}-ods-lane.env"
-    )
+    os.environ.setdefault("HERMES_ODS_ENV_FILE", f"/etc/quanthus/{node_id}-ods-lane.env")
     notification_context_path = shadow_root / "orchestrator/daily/notification-context.json"
     notification_context: dict[str, Any] = {
         "schema_version": 1,
@@ -506,9 +575,30 @@ def main() -> int:
         ):
             jobs = [pending_by_lane[lane] for lane in lane_group if lane in pending_by_lane]
             if jobs:
-                state["lanes"].update(
-                    _run_group(jobs, deadline=deadline, poll_seconds=poll_seconds)
-                )
+                try:
+                    state["lanes"].update(
+                        _run_group(jobs, deadline=deadline, poll_seconds=poll_seconds)
+                    )
+                except (OSError, ProcessGroupCleanupError) as exc:
+                    cleanup_failed = isinstance(exc, ProcessGroupCleanupError)
+                    state["error_code"] = (
+                        "process_cleanup_unconfirmed" if cleanup_failed else "lane_start_failed"
+                    )
+                    state["error"] = str(exc)
+                    for pending_job in pending:
+                        if pending_job.lane not in state["lanes"]:
+                            status = "cleanup_failed" if cleanup_failed else "failed"
+                            state["lanes"][pending_job.lane] = {
+                                "status": status if pending_job.attempt else "not_started",
+                                "returncode": (
+                                    (PROCESS_CLEANUP_FAILED if cleanup_failed else 127)
+                                    if pending_job.attempt
+                                    else None
+                                ),
+                                "attempts": pending_job.attempt,
+                                "logs": pending_job.logs,
+                            }
+                    break
     else:
         for job in daily_group:
             state["lanes"][job.lane] = {
@@ -519,6 +609,7 @@ def main() -> int:
             }
 
     lane_success = all(item.get("status") == "ready" for item in state["lanes"].values())
+    source_deferred = not lane_success and _source_maturity_deferred(state["lanes"])
     if lane_success:
         dwd_deadline = time.monotonic() + dwd_sla_seconds
         catalog_command = [
@@ -588,6 +679,14 @@ def main() -> int:
                     "log": dwd_log,
                     "daily_root": str(dwd_daily_root),
                 }
+    elif source_deferred:
+        state["lanes"]["intraday-1m"]["status"] = "deferred_source_maturity"
+        state["catalog"] = {"status": "deferred_source_maturity"}
+        state["dwd"] = {"status": "deferred_source_maturity"}
+        state["deferred_reason"] = (
+            "Tencent current-session 1m source failed exact qualification; "
+            "awaiting date-bounded maturity recovery"
+        )
     elif not lane_success:
         state["catalog"] = {"status": "blocked_by_lane_failure"}
         state["dwd"] = {"status": "blocked_by_lane_failure"}
@@ -595,9 +694,20 @@ def main() -> int:
     state["finished_at"] = _iso(_now())
     catalog_state = state.get("catalog") or {}
     dwd_state = state.get("dwd") or {}
+    cleanup_failed = state.get("error_code") == "process_cleanup_unconfirmed" or any(
+        item.get("returncode") == PROCESS_CLEANUP_FAILED
+        for item in [*state["lanes"].values(), catalog_state, dwd_state]
+    )
+    if cleanup_failed:
+        state["error_code"] = "process_cleanup_unconfirmed"
+        state.setdefault(
+            "error", "Owned process group cleanup could not be confirmed; retry prohibited"
+        )
     ods_ready = lane_success and catalog_state.get("status") == "ready"
     fully_ready = ods_ready and dwd_state.get("status") == "ready"
-    if args.ods_only and ods_ready:
+    if source_deferred:
+        state["status"] = "deferred_source_maturity"
+    elif args.ods_only and ods_ready:
         state["status"] = "ods_ready"
     else:
         state["status"] = "ready" if fully_ready else "failed"
@@ -612,8 +722,18 @@ def main() -> int:
     if successful:
         notification_context["error_code"] = None
         notification_context["error"] = None
+    elif source_deferred:
+        notification_context["error_code"] = "source_maturity_deferred"
+        notification_context["error"] = state["deferred_reason"]
+    elif state.get("error_code"):
+        notification_context["error_code"] = state["error_code"]
+        notification_context["error"] = state["error"]
     _atomic_json(notification_context_path, notification_context)
     print(json.dumps(state, ensure_ascii=True, sort_keys=True))
+    if cleanup_failed:
+        return PROCESS_CLEANUP_FAILED
+    if source_deferred:
+        return SOURCE_MATURITY_DEFERRED
     return 0 if successful else 2
 
 

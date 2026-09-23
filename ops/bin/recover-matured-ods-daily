@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""Recover the preceding open session after a qualified Tencent 1m deferral.
+
+The nightly controller never publishes a synthetic minute series.  When its
+same-session Tencent qualification is deferred, this worker rechecks only the
+same immutable market date during the following day's maturity window.  It
+first seals ODS only, then makes a separate DWD attempt, so a DWD failure
+cannot cause another upstream 1m scan.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import date, datetime
+from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
+
+ROOT = Path(__file__).resolve().parents[2]
+SHANGHAI = ZoneInfo("Asia/Shanghai")
+SOURCE_MATURITY_DEFERRED = 3
+_QUALIFICATION_MARKER = "tencent source qualification failed"
+_LEGACY_VOLUME_MARKER = "tencent/daily volume mismatch"
+_ATTEMPT_DIR_PATTERN = re.compile(r'"attempt_dir"\s*:\s*"([^"]+)"')
+
+
+def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="ascii")
+    os.replace(temporary, path)
+
+
+def _lane_status(payload: dict[str, Any], lane: str) -> str | None:
+    raw = payload.get("lanes")
+    if not isinstance(raw, dict):
+        return None
+    entry = raw.get(lane)
+    return entry.get("status") if isinstance(entry, dict) and isinstance(entry.get("status"), str) else None
+
+
+def _legacy_source_maturity_failure(payload: dict[str, Any]) -> bool:
+    """Recognize the pre-deferral 9/23 form without masking other failures."""
+
+    if any(
+        _lane_status(payload, lane) != "ready"
+        for lane in ("market-daily-core", "calendar-daily-events", "intraday-5m")
+    ) or _lane_status(payload, "intraday-1m") != "failed":
+        return False
+    lanes = payload.get("lanes", {})
+    minute = lanes.get("intraday-1m", {}) if isinstance(lanes, dict) else {}
+    logs = minute.get("logs", []) if isinstance(minute, dict) else []
+    for raw_path in logs:
+        try:
+            text = Path(str(raw_path)).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        normalized = text.lower()
+        if _QUALIFICATION_MARKER in normalized or _LEGACY_VOLUME_MARKER in normalized:
+            return True
+        # The former collector only included the failed attempt directory in
+        # its lane receipt; per-security mismatch text lives in checkpoint.json.
+        # Follow this one repository-written path, never a provider-supplied
+        # file name, and demand the exact marker there as well.
+        for raw_attempt_dir in _ATTEMPT_DIR_PATTERN.findall(text):
+            checkpoint = (
+                Path(raw_attempt_dir)
+                / "landing/provider_raw/minute_1m/checkpoint.json"
+            )
+            try:
+                checkpoint_text = checkpoint.read_text(encoding="utf-8", errors="replace").lower()
+            except OSError:
+                continue
+            if _LEGACY_VOLUME_MARKER in checkpoint_text:
+                return True
+    return False
+
+
+def _pending_maturity_session(shadow_root: Path, today: date) -> date | None:
+    """Find the oldest eligible prior-session deferral from sealed run evidence.
+
+    This deliberately does not use the mutable reference calendar: a stale
+    calendar cannot redirect a recovery to an unrelated historical date.  The
+    existing controller's lane receipts are the authoritative work queue.
+    """
+
+    root = shadow_root / "orchestrator/daily"
+    candidates: list[date] = []
+    if not root.is_dir():
+        return None
+    for date_root in root.iterdir():
+        try:
+            market_date = date.fromisoformat(date_root.name)
+        except ValueError:
+            continue
+        if market_date >= today or not date_root.is_dir():
+            continue
+        latest: tuple[str, dict[str, Any]] | None = None
+        for run_path in date_root.glob("*/run.json"):
+            try:
+                payload = json.loads(run_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            marker = str(payload.get("finished_at") or payload.get("started_at") or run_path.parent.name)
+            if latest is None or marker > latest[0]:
+                latest = (marker, payload)
+        if latest is None:
+            continue
+        payload = latest[1]
+        if payload.get("status") == "deferred_source_maturity" or _legacy_source_maturity_failure(
+            payload
+        ):
+            candidates.append(market_date)
+    return min(candidates) if candidates else None
+
+
+def _run(command: list[str]) -> int:
+    completed = subprocess.run(command, cwd=ROOT, check=False)
+    return completed.returncode
+
+
+def _completion_marker(root: Path, market_date: date) -> Path:
+    return root / "recovery/matured-1m" / market_date.isoformat() / "dwd-complete.json"
+
+
+def _notify(node_id: str, market_date: date, run_path: str) -> int:
+    node = "CN01" if node_id == "cn01" else node_id.title()
+    return _run(
+        [
+            str(ROOT / "ops/bin/notify-dwd-event"),
+            "--event",
+            f"{node_id}_dwd_completed",
+            "--market-date",
+            market_date.isoformat(),
+            "--node",
+            node,
+            "--stage",
+            "ods_to_dwd_maturity_recovery",
+            "--unit",
+            f"{node_id}-ods-maturity-recovery.service",
+            "--run-path",
+            run_path,
+        ]
+    )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--market-date", type=date.fromisoformat)
+    parser.add_argument("--recovery-window-seconds", type=int, default=10800)
+    args = parser.parse_args()
+    if args.recovery_window_seconds <= 0:
+        parser.error("--recovery-window-seconds must be positive")
+
+    node_id = os.environ.get("HERMES_ODS_NODE_ID", "cn01").strip().lower()
+    if node_id not in {"cn01", "hermes"}:
+        parser.error("HERMES_ODS_NODE_ID must be cn01 or hermes")
+    astock_root = Path(os.environ.get("ASTOCK_ROOT", "/root/work/astock"))
+    home = Path(os.environ.get("ASTOCK_HOME", str(astock_root / "data")))
+    shadow_root = Path(
+        os.environ.get("HERMES_ODS_SHADOW_ROOT", str(home / f"shadow/{node_id}-ods-v1"))
+    )
+    market_date = args.market_date or _pending_maturity_session(
+        shadow_root, datetime.now(SHANGHAI).date()
+    )
+    if market_date is None:
+        print(json.dumps({"status": "no_pending_source_maturity_recovery"}))
+        return 0
+    marker = _completion_marker(shadow_root, market_date)
+    if marker.is_file():
+        print(json.dumps({"status": "already_complete", "market_date": market_date.isoformat()}))
+        return 0
+
+    orchestrator = Path(
+        os.environ.get("QUANTHUS_ODS_DAILY_ORCHESTRATOR", str(ROOT / "ops/bin/run-cn01-ods-daily"))
+    )
+    common = [
+        str(orchestrator),
+        "--market-date",
+        market_date.isoformat(),
+        "--recovery-window-seconds",
+        str(args.recovery_window_seconds),
+    ]
+    ods_rc = _run([*common, "--ods-only"])
+    if ods_rc == SOURCE_MATURITY_DEFERRED:
+        print(json.dumps({"status": "pending_source_maturity", "market_date": market_date.isoformat()}))
+        return 0
+    if ods_rc != 0:
+        return ods_rc
+
+    dwd_rc = _run(common)
+    if dwd_rc != 0:
+        return dwd_rc
+    run_root = shadow_root / "orchestrator/daily" / market_date.isoformat()
+    _atomic_json(
+        marker,
+        {
+            "schema_version": 1,
+            "kind": "matured_1m_dwd_recovery",
+            "market_date": market_date.isoformat(),
+            "node": node_id,
+            "status": "ready",
+            "completed_at": datetime.now(SHANGHAI).isoformat(),
+            "run_root": str(run_root),
+        },
+    )
+    return _notify(node_id, market_date, str(run_root))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

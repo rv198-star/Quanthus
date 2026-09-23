@@ -1020,6 +1020,7 @@ def test_minute_collector_defaults_to_repository_module(
     assert observed[1:3] == ["-m", "quanthus.providers.minute_tdx"]
     assert observed[observed.index("--market-date") + 1] == "2026-07-24"
     assert result["provider"] == "quanthus.providers.minute_tdx"
+    assert result["api"] == "baostock.query_history_k_data_plus.native_5m"
     assert observed_timeout == [1800]
     assert result["timeout_seconds"] == 1800
 

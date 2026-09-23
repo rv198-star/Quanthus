@@ -1,0 +1,11 @@
+[Unit]
+Description=Recheck preceding session's qualified Tencent 1m source through its maturity window
+
+[Timer]
+OnCalendar=*-*-* 06..17:10/30:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=true
+Unit=hermes-ods-maturity-recovery.service
+
+[Install]
+WantedBy=timers.target

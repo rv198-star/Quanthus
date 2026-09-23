@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import date, datetime
@@ -25,6 +26,7 @@ SHANGHAI = ZoneInfo("Asia/Shanghai")
 SOURCE_MATURITY_DEFERRED = 3
 _QUALIFICATION_MARKER = "tencent source qualification failed"
 _LEGACY_VOLUME_MARKER = "tencent/daily volume mismatch"
+_ATTEMPT_DIR_PATTERN = re.compile(r'"attempt_dir"\s*:\s*"([^"]+)"')
 
 
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
@@ -55,11 +57,27 @@ def _legacy_source_maturity_failure(payload: dict[str, Any]) -> bool:
     logs = minute.get("logs", []) if isinstance(minute, dict) else []
     for raw_path in logs:
         try:
-            text = Path(str(raw_path)).read_text(encoding="utf-8", errors="replace").lower()
+            text = Path(str(raw_path)).read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        if _QUALIFICATION_MARKER in text or _LEGACY_VOLUME_MARKER in text:
+        normalized = text.lower()
+        if _QUALIFICATION_MARKER in normalized or _LEGACY_VOLUME_MARKER in normalized:
             return True
+        # The former collector only included the failed attempt directory in
+        # its lane receipt; per-security mismatch text lives in checkpoint.json.
+        # Follow this one repository-written path, never a provider-supplied
+        # file name, and demand the exact marker there as well.
+        for raw_attempt_dir in _ATTEMPT_DIR_PATTERN.findall(text):
+            checkpoint = (
+                Path(raw_attempt_dir)
+                / "landing/provider_raw/minute_1m/checkpoint.json"
+            )
+            try:
+                checkpoint_text = checkpoint.read_text(encoding="utf-8", errors="replace").lower()
+            except OSError:
+                continue
+            if _LEGACY_VOLUME_MARKER in checkpoint_text:
+                return True
     return False
 
 

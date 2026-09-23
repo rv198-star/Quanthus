@@ -422,7 +422,14 @@ def test_maturity_recovery_uses_existing_lane_receipts_not_a_stale_calendar(tmp_
     logs = root / "logs"
     logs.mkdir(parents=True)
     minute_log = logs / "intraday-1m.log"
-    minute_log.write_text("RuntimeError: Tencent/daily volume mismatch\n", encoding="ascii")
+    attempt = tmp_path / "attempt"
+    checkpoint = attempt / "landing/provider_raw/minute_1m/checkpoint.json"
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_text(
+        '{"symbols":{"000001":{"error":"Tencent/daily volume mismatch"}}}\n',
+        encoding="ascii",
+    )
+    minute_log.write_text(json.dumps({"attempt_dir": str(attempt)}) + "\n", encoding="ascii")
     (root / "run.json").write_text(
         json.dumps(
             {

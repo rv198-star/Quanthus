@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.machinery
 import json
 import os
 import stat
@@ -8,11 +9,18 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 ORCHESTRATOR = ROOT / "ops/bin/run-cn01-ods-daily"
 RETRY_WRAPPER = ROOT / "ops/bin/run-ods-daily-with-retry"
 COMPLETION_NOTIFICATION_CHECKER = ROOT / "ops/bin/check-ods-dwd-completion-notification"
+MATURITY_RECOVERY = ROOT / "ops/bin/recover-matured-ods-daily"
+
+
+def _load_maturity_recovery_module():
+    loader = importlib.machinery.SourceFileLoader("maturity_recovery", str(MATURITY_RECOVERY))
+    return loader.load_module()
 
 
 def _write_executable(path: Path, text: str) -> None:
@@ -342,6 +350,65 @@ def test_completion_notification_checker_refuses_deferred_state(tmp_path: Path) 
         check=False,
     )
     assert ready.returncode == 0
+
+
+def test_maturity_recovery_keeps_a_qualified_pending_source_quiet(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_SHADOW_ROOT": str(shadow),
+        "QUANTHUS_ODS_DAILY_ORCHESTRATOR": str(tmp_path / "orchestrator"),
+    }
+    with (
+        patch.dict(os.environ, env, clear=False),
+        patch.object(sys, "argv", [str(MATURITY_RECOVERY), "--market-date", "2026-08-04"]),
+        patch.object(module, "_run", return_value=3) as run,
+    ):
+        assert module.main() == 0
+    assert run.call_count == 1
+    assert run.call_args.args[0][-1] == "--ods-only"
+    assert not (shadow / "recovery/matured-1m/2026-08-04/dwd-complete.json").exists()
+
+
+def test_maturity_recovery_seals_one_completion_marker_before_notifying(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_SHADOW_ROOT": str(shadow),
+        "QUANTHUS_ODS_DAILY_ORCHESTRATOR": str(tmp_path / "orchestrator"),
+    }
+    with (
+        patch.dict(os.environ, env, clear=False),
+        patch.object(sys, "argv", [str(MATURITY_RECOVERY), "--market-date", "2026-08-04"]),
+        patch.object(module, "_run", side_effect=[0, 0, 0]) as run,
+    ):
+        assert module.main() == 0
+    marker = shadow / "recovery/matured-1m/2026-08-04/dwd-complete.json"
+    assert json.loads(marker.read_text(encoding="ascii"))["status"] == "ready"
+    assert run.call_count == 3
+    assert run.call_args_list[0].args[0][-1] == "--ods-only"
+    assert "--ods-only" not in run.call_args_list[1].args[0]
+    assert "--market-date" in run.call_args_list[2].args[0]
+
+
+def test_maturity_recovery_does_not_repeat_a_marked_completion(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    marker = tmp_path / "shadow/recovery/matured-1m/2026-08-04/dwd-complete.json"
+    marker.parent.mkdir(parents=True)
+    marker.write_text('{"status":"ready"}\n', encoding="ascii")
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+    }
+    with (
+        patch.dict(os.environ, env, clear=False),
+        patch.object(sys, "argv", [str(MATURITY_RECOVERY), "--market-date", "2026-08-04"]),
+        patch.object(module, "_run") as run,
+    ):
+        assert module.main() == 0
+    run.assert_not_called()
 
 
 def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:

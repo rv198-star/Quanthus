@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.machinery
+import importlib.util
 import json
 import os
 import stat
@@ -19,8 +19,11 @@ MATURITY_RECOVERY = ROOT / "ops/bin/recover-matured-ods-daily"
 
 
 def _load_maturity_recovery_module():
-    loader = importlib.machinery.SourceFileLoader("maturity_recovery", str(MATURITY_RECOVERY))
-    return loader.load_module()
+    spec = importlib.util.spec_from_file_location("maturity_recovery", MATURITY_RECOVERY)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _write_executable(path: Path, text: str) -> None:

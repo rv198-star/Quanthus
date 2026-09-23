@@ -227,6 +227,29 @@ def _tencent_daily_evidence(
     }
 
 
+def _tencent_qualification_symbols(
+    symbols: Sequence[str], daily: dict[str, dict[str, Any]]
+) -> tuple[str, ...]:
+    """Probe both lot-based markets and STAR before a full Tencent scan.
+
+    Prefer a daily volume that cannot be represented by integer lots. A passing
+    sample is only an early source check; every symbol still has its own exact
+    daily-volume and session-grid gate.
+    """
+    from decimal import Decimal
+
+    selected: dict[str, tuple[int, str]] = {}
+    for symbol in symbols:
+        evidence = daily[symbol]
+        if evidence["tradestatus"] != "1" or Decimal(str(evidence["volume"])) <= 0:
+            continue
+        market = "star" if symbol.startswith("68") else "sh" if symbol.startswith("6") else "sz"
+        score = 0 if market == "star" or Decimal(str(evidence["volume"])) % 100 else 1
+        if market not in selected or score < selected[market][0]:
+            selected[market] = (score, symbol)
+    return tuple(selected[market][1] for market in ("sz", "sh", "star") if market in selected)
+
+
 def _tencent_one_minute_bars(
     symbol: str,
     market_date: str,
@@ -246,16 +269,29 @@ def _tencent_one_minute_bars(
             "User-Agent": "Mozilla/5.0 Quanthus-TencentM1/1.0",
         },
     )
+    raw_home.mkdir(parents=True, exist_ok=True)
+    raw_path = raw_home / f"{symbol}.json.gz"
     last_error: Exception | None = None
     for attempt in range(1, 4):
         try:
             with opener(request, timeout=12) as response:
                 raw = response.read()
+            # Retain source bytes even when strict validation fails. A failed
+            # qualification must remain auditable without publishing minute bars.
+            temporary = raw_path.with_name(f"{raw_path.name}.tmp.{os.getpid()}")
+            with (
+                temporary.open("wb") as sink,
+                gzip.GzipFile(fileobj=sink, mode="wb", mtime=0) as zipped,
+            ):
+                zipped.write(raw)
+            os.replace(temporary, raw_path)
             payload = json.loads(raw)
             if payload.get("code") != 0:
                 raise ValueError(f"Tencent response code {payload.get('code')}")
             source = payload["data"][provider_symbol]["m1"]
-            selected = [row for row in source if str(row[0]).startswith(market_date.replace("-", ""))]
+            selected = [
+                row for row in source if str(row[0]).startswith(market_date.replace("-", ""))
+            ]
             if daily["tradestatus"] == "0":
                 if selected or float(daily["volume"]) != 0:
                     raise ValueError(f"suspended stock has Tencent 1m data: {symbol}")
@@ -275,13 +311,6 @@ def _tencent_one_minute_bars(
             # Pandas otherwise serializes an all-None column as Parquet null
             # type, not the governed nullable float64 amount field.
             frame["amount"] = pd.Series([pd.NA] * len(frame), dtype="Float64")
-            raw_home.mkdir(parents=True, exist_ok=True)
-            raw_path = raw_home / f"{symbol}.json.gz"
-            temporary = raw_path.with_name(f"{raw_path.name}.tmp.{os.getpid()}")
-            with temporary.open("wb") as sink:
-                with gzip.GzipFile(fileobj=sink, mode="wb", mtime=0) as zipped:
-                    zipped.write(raw)
-            os.replace(temporary, raw_path)
             return frame, {
                 "ok": True,
                 "provider": "tencent-mkline-validated",
@@ -647,6 +676,7 @@ def collect(
     done = 0
     consecutive_errors = 0
     session: Any | None = None
+    tencent_preflight_cache: dict[str, tuple[Any, dict[str, Any]]] = {}
     scan_round = 0
     attempts_total = 0
     terminal_reason: str | None = None
@@ -706,12 +736,15 @@ def collect(
                 frame, meta = _baostock_native_5m_bars(symbol, market_date, client=client)
             elif fallback == "tencent":
                 assert market_date is not None
-                frame, meta = _tencent_one_minute_bars(
-                    symbol,
-                    market_date,
-                    tencent_daily[symbol],
-                    home / "provider_raw" / "tencent-m1",
-                )
+                if symbol in tencent_preflight_cache:
+                    frame, meta = tencent_preflight_cache.pop(symbol)
+                else:
+                    frame, meta = _tencent_one_minute_bars(
+                        symbol,
+                        market_date,
+                        tencent_daily[symbol],
+                        home / "provider_raw" / "tencent-m1",
+                    )
             elif fallback == "eastmoney":
                 frame, meta = _eastmoney_bars(
                     symbol,
@@ -823,6 +856,42 @@ def collect(
 
             session = requests.Session()
             sleep_seconds = max(sleep_seconds, EASTMONEY_MIN_INTERVAL_SECONDS)
+        if fallback == "tencent":
+            assert market_date is not None
+            probes = _tencent_qualification_symbols(symbols, tencent_daily)
+            qualification_path = home / "source_qualification.json"
+            for symbol in probes:
+                try:
+                    tencent_preflight_cache[symbol] = _tencent_one_minute_bars(
+                        symbol,
+                        market_date,
+                        tencent_daily[symbol],
+                        home / "provider_raw" / "tencent-m1",
+                    )
+                except Exception as exc:
+                    _atomic_json(
+                        qualification_path,
+                        {
+                            "provider": "tencent-mkline",
+                            "market_date": market_date,
+                            "status": "failed",
+                            "probes": list(probes),
+                            "failed_symbol": symbol,
+                            "error": str(exc),
+                        },
+                    )
+                    raise RuntimeError(
+                        f"Tencent source qualification failed for {market_date}/{symbol}: {exc}"
+                    ) from exc
+            _atomic_json(
+                qualification_path,
+                {
+                    "provider": "tencent-mkline",
+                    "market_date": market_date,
+                    "status": "sample_passed_per_symbol_gates_still_required",
+                    "probes": list(probes),
+                },
+            )
         pending = list(symbols)
         max_rounds = 1 + (recovery_policy.retry_rounds if recovery_policy else 0)
         for scan_round in range(1, max_rounds + 1):

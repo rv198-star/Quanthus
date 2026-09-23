@@ -9,12 +9,19 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from quanthus.providers.minute_tdx import _tencent_daily_evidence, _tencent_one_minute_bars
+from quanthus.providers.minute_tdx import (
+    _tencent_daily_evidence,
+    _tencent_one_minute_bars,
+    _tencent_qualification_symbols,
+    collect,
+)
 from quanthus.providers.tencent_m1_normalize import expected_times
 
-
-HAS_DATA_LIBRARIES = bool(importlib.util.find_spec("pandas") and importlib.util.find_spec("pyarrow"))
+HAS_DATA_LIBRARIES = bool(
+    importlib.util.find_spec("pandas") and importlib.util.find_spec("pyarrow")
+)
 
 
 class _Response:
@@ -67,15 +74,17 @@ class TencentMinuteFallbackTests(unittest.TestCase):
             self.assertEqual(gzip.decompress(Path(meta["source_raw_path"]).read_bytes()), raw)
 
     def test_wrong_date_never_becomes_requested_date(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            with self.assertRaisesRegex(RuntimeError, "incomplete Tencent session"):
-                _tencent_one_minute_bars(
-                    "000001",
-                    "2026-09-23",
-                    {"volume": 24100, "close": 10, "tradestatus": "1"},
-                    Path(temporary),
-                    opener=lambda *_args, **_kwargs: _Response(_payload("2026-09-22")),
-                )
+        with (
+            tempfile.TemporaryDirectory() as temporary,
+            self.assertRaisesRegex(RuntimeError, "incomplete Tencent session"),
+        ):
+            _tencent_one_minute_bars(
+                "000001",
+                "2026-09-23",
+                {"volume": 24100, "close": 10, "tradestatus": "1"},
+                Path(temporary),
+                opener=lambda *_args, **_kwargs: _Response(_payload("2026-09-22")),
+            )
 
     def test_daily_volume_mismatch_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -87,6 +96,89 @@ class TencentMinuteFallbackTests(unittest.TestCase):
                     Path(temporary),
                     opener=lambda *_args, **_kwargs: _Response(_payload("2026-09-23")),
                 )
+            self.assertEqual(
+                gzip.decompress((Path(temporary) / "000001.json.gz").read_bytes()),
+                _payload("2026-09-23"),
+            )
+
+    def test_qualification_prefers_non_round_lot_volume_per_market(self):
+        daily = {
+            "000001": {"volume": 20000, "tradestatus": "1"},
+            "000002": {"volume": 20035, "tradestatus": "1"},
+            "600000": {"volume": 30000, "tradestatus": "1"},
+            "600001": {"volume": 30017, "tradestatus": "1"},
+            "688001": {"volume": 73, "tradestatus": "1"},
+        }
+        self.assertEqual(
+            _tencent_qualification_symbols(list(daily), daily),
+            ("000002", "600001", "688001"),
+        )
+
+    def test_source_qualification_blocks_full_scan_before_partial_bars(self):
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            daily = root / "daily.parquet"
+            status = root / "status.parquet"
+            pq.write_table(
+                pa.Table.from_pylist(
+                    [
+                        {
+                            "stock_code": "000001",
+                            "market_date": "2026-09-23",
+                            "volume": 24135.0,
+                            "close": 10.0,
+                        },
+                        {
+                            "stock_code": "600000",
+                            "market_date": "2026-09-23",
+                            "volume": 24117.0,
+                            "close": 10.0,
+                        },
+                    ]
+                ),
+                daily,
+            )
+            pq.write_table(
+                pa.Table.from_pylist(
+                    [
+                        {"stock_code": code, "market_date": "2026-09-23", "tradestatus": "1"}
+                        for code in ("000001", "600000")
+                    ]
+                ),
+                status,
+            )
+            home = root / "minute"
+            with (
+                patch(
+                    "quanthus.providers.minute_tdx._tencent_one_minute_bars",
+                    side_effect=RuntimeError("Tencent/daily volume mismatch"),
+                ) as fetch,
+                self.assertRaisesRegex(RuntimeError, "source qualification failed"),
+            ):
+                collect(
+                    home=home,
+                    layer="research",
+                    frequency="1m",
+                    mode="incr",
+                    symbols=["000001", "600000"],
+                    max_pages=1,
+                    sleep_seconds=0,
+                    market_date="2026-09-23",
+                    tencent_daily_path=daily,
+                    tencent_status_path=status,
+                )
+            self.assertEqual(fetch.call_count, 1)
+            self.assertEqual(
+                list(json.loads((home / "checkpoint.json").read_text())["symbols"]), []
+            )
+            self.assertEqual(
+                json.loads((home / "source_qualification.json").read_text())["failed_symbol"],
+                "000001",
+            )
+            self.assertEqual(json.loads((home / "status.json").read_text())["state"], "failed")
 
     def test_sealed_market_evidence_requires_same_date_and_both_files(self):
         import pyarrow as pa
@@ -98,7 +190,14 @@ class TencentMinuteFallbackTests(unittest.TestCase):
             status = root / "status.parquet"
             pq.write_table(
                 pa.Table.from_pylist(
-                    [{"stock_code": "000001", "market_date": "2026-09-23", "volume": 24100.0, "close": 10.0}]
+                    [
+                        {
+                            "stock_code": "000001",
+                            "market_date": "2026-09-23",
+                            "volume": 24100.0,
+                            "close": 10.0,
+                        }
+                    ]
                 ),
                 daily,
             )

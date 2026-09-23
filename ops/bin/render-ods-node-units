@@ -70,6 +70,12 @@ for unit in "${UNITS[@]}"; do
   if [[ "$NODE_ID" == "cn01" && "$unit" == "hermes-ods-market-daily-core.service" ]]; then
     sed -i "s/TimeoutStartSec=4h10min/TimeoutStartSec=80min/g" "$tmp_path"
   fi
+  if [[ "$NODE_ID" == "hermes" && "$unit" == "hermes-ods-daily-orchestrator.service" ]]; then
+    # One bounded first attempt has enough time for the versioned 23:36 market
+    # cutoff plus minute lanes. A second full retry cannot fit in the 9h unit.
+    sed -i "s/QUANTHUS_ODS_DAILY_MAX_ATTEMPTS=2/QUANTHUS_ODS_DAILY_MAX_ATTEMPTS=1/g" "$tmp_path"
+    sed -i "s|run-cn01-ods-daily$|run-cn01-ods-daily --sla-seconds 21600|g" "$tmp_path"
+  fi
   if [[ "$NODE_ID" == "cn01" && "$unit" =~ ^hermes-dwd-.*\.service$ ]]; then
     sed -i 's/Hermes/CN01/g' "$tmp_path"
   fi

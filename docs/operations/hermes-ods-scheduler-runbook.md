@@ -105,8 +105,20 @@ readiness deadline expires. An empty successful response is not a connection err
 cause an immediate logout/login cycle. Provider/network errors have bounded reconnects; each
 successful login applies a 30-second socket timeout. After readiness, the first stock pass is
 followed by one retry of only the missing set. A residual gap or the configured completion
-deadline produces no READY. The CN01 profile uses 19:00/19:46; the Hermes late profile uses
-20:00/20:46.
+deadline produces no READY. The CN01 profile uses 19:00/19:46. Following the
+2026-09-23 incident, the Hermes late profile retains 20:00 readiness but uses a
+23:36 completion deadline: 4,680 successful requests took 75 minutes, leaving
+312 in-scope securities unqueried at the former 20:46 cutoff despite zero provider
+errors. This restores the profile's already-declared 7,380-second observed duration
+plus 100% safety margin from its 19:30 trigger; it does not weaken row coverage or
+turn a partial attempt into READY. The profile revision is
+`hermes-late-window-throughput-budget-20260923`.
+The rendered Hermes daily controller now gets a six-hour ODS budget and one
+attempt; its separate one-hour DWD budget still fits under the nine-hour unit
+bound. This replaces the 90-minute first attempt plus four-hour retry, whose
+first attempt could never honor the extended market deadline. CN01 retains its
+existing two-attempt profile. Do not deploy only the schedule JSON without the
+matching rendered Hermes controller unit.
 
 Minute provider collection is always written under the current attempt. Shared legacy minute
 partitions and ad hoc `.nodata` files are not accepted as shadow evidence. A no-bar security must
@@ -118,6 +130,14 @@ matrix backfills set their own explicit, still-bounded timeout.
 The default minute collector is the repository module `quanthus.providers.minute_tdx`; a reviewed
 external fork may be selected with `HERMES_ODS_MINUTE_COLLECTOR`. Both forms receive an
 attempt-local `--home` and have no curated-PG path.
+When the explicitly enabled Tencent 1m path is used, the collector first probes
+traded SZ, SH, and STAR symbols from the sealed same-date daily/status evidence,
+preferring non-round daily share volumes for the lot-based markets. A failed
+probe writes `source_qualification.json`, retains the raw response in the
+attempt, and stops before scanning the universe. A passed probe is only an
+early source check: every security still has to pass exact date, session-grid,
+daily-volume, and close validation. The absent minute amount stays nullable;
+neither probe success nor nullable amount removes the #436 quality limitation.
 
 Hermes may write only raw/ODS artifacts. Remove all direct curated PG sync from replacement
 launchers. OCI publication is a separate job and credential.

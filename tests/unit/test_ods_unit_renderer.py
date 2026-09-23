@@ -50,6 +50,7 @@ class OdsUnitRendererTests(unittest.TestCase):
             orchestrator_service,
         )
         self.assertIn("QUANTHUS_ODS_DAILY_MAX_ATTEMPTS=2", orchestrator_service)
+        self.assertNotIn("--sla-seconds 21600", orchestrator_service)
         self.assertIn("QUANTHUS_ODS_DAILY_RETRY_DELAY_SECONDS=600", orchestrator_service)
         self.assertIn("QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS=14760", orchestrator_service)
         self.assertIn("TimeoutStartSec=540min", orchestrator_service)
@@ -114,6 +115,8 @@ class OdsUnitRendererTests(unittest.TestCase):
         orchestrator_service = (output / "hermes-ods-daily-orchestrator.service").read_text()
         self.assertIn("run-ods-daily-with-retry", orchestrator_service)
         self.assertIn("check-ods-orchestrator-window --node-id hermes", orchestrator_service)
+        self.assertIn("QUANTHUS_ODS_DAILY_MAX_ATTEMPTS=1", orchestrator_service)
+        self.assertIn("run-cn01-ods-daily --sla-seconds 21600", orchestrator_service)
         self.assertIn("QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS=14760", orchestrator_service)
         self.assertIn("TimeoutStartSec=540min", orchestrator_service)
         self.assertNotIn("Restart=on-failure", orchestrator_service)

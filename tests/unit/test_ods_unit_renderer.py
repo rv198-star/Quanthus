@@ -63,7 +63,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         recovery_timer = (output / "cn01-ods-maturity-recovery.timer").read_text()
         self.assertIn("recover-matured-ods-daily", recovery_service)
         self.assertIn("HERMES_ODS_NODE_ID=cn01", recovery_service)
-        self.assertIn("OnCalendar=*-*-* 06..17:10/30:00 Asia/Shanghai", recovery_timer)
+        self.assertIn("OnCalendar=*-*-* 00..17:10/30:00 Asia/Shanghai", recovery_timer)
         self.assertIn("Persistent=true", recovery_timer)
 
         weekly_service = (output / "cn01-ods-weekly-corrections.service").read_text()

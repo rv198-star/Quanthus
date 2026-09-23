@@ -23,6 +23,8 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[2]
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 SOURCE_MATURITY_DEFERRED = 3
+_QUALIFICATION_MARKER = "tencent source qualification failed"
+_LEGACY_VOLUME_MARKER = "tencent/daily volume mismatch"
 
 
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
@@ -32,26 +34,71 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
     os.replace(temporary, path)
 
 
-def _latest_open_session_before(calendar: Path, today: date) -> date:
-    try:
-        import pyarrow.parquet as pq
+def _lane_status(payload: dict[str, Any], lane: str) -> str | None:
+    raw = payload.get("lanes")
+    if not isinstance(raw, dict):
+        return None
+    entry = raw.get(lane)
+    return entry.get("status") if isinstance(entry, dict) and isinstance(entry.get("status"), str) else None
 
-        rows = pq.read_table(calendar, columns=["trade_date", "is_open"]).to_pylist()
-    except Exception as exc:  # noqa: BLE001 - this is an operational input gate
-        raise RuntimeError(f"cannot read trading calendar {calendar}: {exc}") from exc
-    sessions = []
-    for row in rows:
-        raw_date = row.get("trade_date")
+
+def _legacy_source_maturity_failure(payload: dict[str, Any]) -> bool:
+    """Recognize the pre-deferral 9/23 form without masking other failures."""
+
+    if any(
+        _lane_status(payload, lane) != "ready"
+        for lane in ("market-daily-core", "calendar-daily-events", "intraday-5m")
+    ) or _lane_status(payload, "intraday-1m") != "failed":
+        return False
+    lanes = payload.get("lanes", {})
+    minute = lanes.get("intraday-1m", {}) if isinstance(lanes, dict) else {}
+    logs = minute.get("logs", []) if isinstance(minute, dict) else []
+    for raw_path in logs:
         try:
-            session = raw_date.date() if isinstance(raw_date, datetime) else raw_date
-            session = session if isinstance(session, date) else date.fromisoformat(str(session)[:10])
-        except (TypeError, ValueError):
+            text = Path(str(raw_path)).read_text(encoding="utf-8", errors="replace").lower()
+        except OSError:
             continue
-        if int(row.get("is_open") or 0) == 1 and session < today:
-            sessions.append(session)
-    if not sessions:
-        raise RuntimeError(f"trading calendar has no open session before {today.isoformat()}")
-    return max(sessions)
+        if _QUALIFICATION_MARKER in text or _LEGACY_VOLUME_MARKER in text:
+            return True
+    return False
+
+
+def _pending_maturity_session(shadow_root: Path, today: date) -> date | None:
+    """Find the oldest eligible prior-session deferral from sealed run evidence.
+
+    This deliberately does not use the mutable reference calendar: a stale
+    calendar cannot redirect a recovery to an unrelated historical date.  The
+    existing controller's lane receipts are the authoritative work queue.
+    """
+
+    root = shadow_root / "orchestrator/daily"
+    candidates: list[date] = []
+    if not root.is_dir():
+        return None
+    for date_root in root.iterdir():
+        try:
+            market_date = date.fromisoformat(date_root.name)
+        except ValueError:
+            continue
+        if market_date >= today or not date_root.is_dir():
+            continue
+        latest: tuple[str, dict[str, Any]] | None = None
+        for run_path in date_root.glob("*/run.json"):
+            try:
+                payload = json.loads(run_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            marker = str(payload.get("finished_at") or payload.get("started_at") or run_path.parent.name)
+            if latest is None or marker > latest[0]:
+                latest = (marker, payload)
+        if latest is None:
+            continue
+        payload = latest[1]
+        if payload.get("status") == "deferred_source_maturity" or _legacy_source_maturity_failure(
+            payload
+        ):
+            candidates.append(market_date)
+    return min(candidates) if candidates else None
 
 
 def _run(command: list[str]) -> int:
@@ -100,10 +147,12 @@ def main() -> int:
     shadow_root = Path(
         os.environ.get("HERMES_ODS_SHADOW_ROOT", str(home / f"shadow/{node_id}-ods-v1"))
     )
-    calendar = Path(os.environ.get("HERMES_ODS_CALENDAR", str(home / "ref_trading_calendar.parquet")))
-    market_date = args.market_date or _latest_open_session_before(
-        calendar, datetime.now(SHANGHAI).date()
+    market_date = args.market_date or _pending_maturity_session(
+        shadow_root, datetime.now(SHANGHAI).date()
     )
+    if market_date is None:
+        print(json.dumps({"status": "no_pending_source_maturity_recovery"}))
+        return 0
     marker = _completion_marker(shadow_root, market_date)
     if marker.is_file():
         print(json.dumps({"status": "already_complete", "market_date": market_date.isoformat()}))

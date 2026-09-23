@@ -416,6 +416,33 @@ def test_maturity_recovery_does_not_repeat_a_marked_completion(tmp_path: Path) -
     run.assert_not_called()
 
 
+def test_maturity_recovery_uses_existing_lane_receipts_not_a_stale_calendar(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    root = tmp_path / "shadow/orchestrator/daily/2026-09-23/legacy"
+    logs = root / "logs"
+    logs.mkdir(parents=True)
+    minute_log = logs / "intraday-1m.log"
+    minute_log.write_text("RuntimeError: Tencent/daily volume mismatch\n", encoding="ascii")
+    (root / "run.json").write_text(
+        json.dumps(
+            {
+                "finished_at": "2026-09-23T13:55:29Z",
+                "status": "failed",
+                "lanes": {
+                    "market-daily-core": {"status": "ready"},
+                    "calendar-daily-events": {"status": "ready"},
+                    "intraday-5m": {"status": "ready"},
+                    "intraday-1m": {"status": "failed", "logs": [str(minute_log)]},
+                },
+            }
+        ),
+        encoding="ascii",
+    )
+    assert module._pending_maturity_session(tmp_path / "shadow", date(2026, 9, 24)) == date(
+        2026, 9, 23
+    )
+
+
 def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
     service = (ROOT / "ops/systemd/hermes-ods-daily-orchestrator.service").read_text(
         encoding="ascii"

@@ -272,6 +272,9 @@ def _tencent_one_minute_bars(
                     market_date=market_date,
                 )
                 frame = pd.DataFrame(rows)
+            # Pandas otherwise serializes an all-None column as Parquet null
+            # type, not the governed nullable float64 amount field.
+            frame["amount"] = pd.Series([pd.NA] * len(frame), dtype="Float64")
             raw_home.mkdir(parents=True, exist_ok=True)
             raw_path = raw_home / f"{symbol}.json.gz"
             temporary = raw_path.with_name(f"{raw_path.name}.tmp.{os.getpid()}")

@@ -61,6 +61,7 @@ class TencentMinuteFallbackTests(unittest.TestCase):
             self.assertEqual(len(frame), 240)
             self.assertEqual(frame.iloc[0]["volume"], 200)
             self.assertTrue(frame["amount"].isna().all())
+            self.assertEqual(str(frame["amount"].dtype), "Float64")
             self.assertEqual(meta["market_date"], "2026-09-23")
             self.assertEqual(meta["source_raw_sha256"], hashlib.sha256(raw).hexdigest())
             self.assertEqual(gzip.decompress(Path(meta["source_raw_path"]).read_bytes()), raw)

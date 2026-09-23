@@ -24,6 +24,7 @@ class TencentMinuteLaneTest(unittest.TestCase):
         self.date = date(2026, 9, 22)
         self.env = {
             "HERMES_ODS_MINUTE_TENCENT_FALLBACK": "1",
+            "HERMES_ODS_MINUTE_TIMEOUT_SEC": "3600",
             "ASTOCK_MINUTE_PYTHON": sys.executable,
             "HERMES_ODS_MINUTE_MODE": "incr",
         }
@@ -64,6 +65,7 @@ class TencentMinuteLaneTest(unittest.TestCase):
         ), patch("subprocess.run", side_effect=run):
             result = self.invoke()
         self.assertEqual(result["exit_code"], 0)
+        self.assertEqual(result["timeout_seconds"], 3600)
         self.assertEqual(observed[observed.index("--tencent-daily-path") + 1], str(daily))
         self.assertEqual(observed[observed.index("--tencent-status-path") + 1], str(status))
 

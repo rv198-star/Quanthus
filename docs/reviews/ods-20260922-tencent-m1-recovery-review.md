@@ -26,3 +26,21 @@ The minute issue #436 remains open for a durable historical source that includes
 ## Test scope
 
 New seed validation tests reject missing/wrong-date bars, estimated amount, daily-volume mismatch and invalid OHLC. Eleven targeted Tencent normalization/seed unit tests passed on 2026-09-23. `make check` could not start on the local Mac because the installed Xcode license is unaccepted; the previous full repository run for this PR was 2,844 passed, 20 failed, 7 skipped and is not a green baseline. This is a scoped technical review, not a claim of full-suite or human approval.
+
+## Same-day recurrence guard (PR #438 commit `54794cd`)
+
+The old `1m` path still reaches an Eastmoney EOF on a 2026-09-23 CN01 sample; leaving it
+unchanged would predict another terminal circuit tonight. A separate opt-in repository adapter
+therefore uses the same native Tencent `mkline` OHLCV after the sequential market lane has
+published a same-date READY daily/status release. It checks every requested code/date, opening
+auction, full 240-session grid, per-security daily volume and close, and preserves compressed
+raw response bytes plus SHA-256 in the attempt-local collector home. Suspended securities must
+have zero same-date provider rows. Exact minute amount remains NULL. The opt-in cannot combine
+with an external collector or recovery policy; missing market evidence blocks collection.
+
+The three-symbol 2026-09-22 live source smoke (`000001`, `600519`, `688001`) completed with
+3/3 per-security receipts, 240 rows each, matching daily volume and 0 non-null amount; the
+versioned SHA-bearing raw responses were preserved. The full-universe route is sequential, so
+the opt-in rollout uses a 3,600-second collector timeout (below the 4-hour service ceiling),
+with the existing orchestrator deadline still authoritative. This does not prove 2026-09-23
+full-universe success; tonight's actual four-lane, DWD and OCI receipts remain a separate gate.

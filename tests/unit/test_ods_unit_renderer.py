@@ -28,7 +28,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         output = self._render("cn01")
 
         units = sorted(output.iterdir())
-        self.assertEqual(len(units), 15)
+        self.assertEqual(len(units), 17)
         node_units = [path for path in units if path.name != "quanthus-pipeline-failure@.service"]
         self.assertTrue(
             all(path.name.startswith(("cn01-ods-", "cn01-dwd-")) for path in node_units)
@@ -58,6 +58,13 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertNotIn("RestartSec=10min", orchestrator_service)
         self.assertIn("OnSuccess=cn01-dwd-success-notification.service", orchestrator_service)
         self.assertIn("SuccessExitStatus=0 3", orchestrator_service)
+
+        recovery_service = (output / "cn01-ods-maturity-recovery.service").read_text()
+        recovery_timer = (output / "cn01-ods-maturity-recovery.timer").read_text()
+        self.assertIn("recover-matured-ods-daily", recovery_service)
+        self.assertIn("HERMES_ODS_NODE_ID=cn01", recovery_service)
+        self.assertIn("OnCalendar=*-*-* 06..17:10/30:00 Asia/Shanghai", recovery_timer)
+        self.assertIn("Persistent=true", recovery_timer)
 
         weekly_service = (output / "cn01-ods-weekly-corrections.service").read_text()
         self.assertIn("TimeoutStartSec=8h", weekly_service)
@@ -125,6 +132,8 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertNotIn("Restart=on-failure", orchestrator_service)
         self.assertIn("--event hermes_dwd_completed", success_notification)
         self.assertIn("--node Hermes", success_notification)
+        recovery_service = (output / "hermes-ods-maturity-recovery.service").read_text()
+        self.assertIn("HERMES_ODS_NODE_ID=hermes", recovery_service)
 
     def test_orchestrator_window_skips_early_systemd_activation(self) -> None:
         cases = [

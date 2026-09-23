@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Recover the preceding open session after a qualified Tencent 1m deferral.
+
+The nightly controller never publishes a synthetic minute series.  When its
+same-session Tencent qualification is deferred, this worker rechecks only the
+same immutable market date during the following day's maturity window.  It
+first seals ODS only, then makes a separate DWD attempt, so a DWD failure
+cannot cause another upstream 1m scan.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from datetime import date, datetime
+from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
+
+ROOT = Path(__file__).resolve().parents[2]
+SHANGHAI = ZoneInfo("Asia/Shanghai")
+SOURCE_MATURITY_DEFERRED = 3
+
+
+def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="ascii")
+    os.replace(temporary, path)
+
+
+def _latest_open_session_before(calendar: Path, today: date) -> date:
+    try:
+        import pyarrow.parquet as pq
+
+        rows = pq.read_table(calendar, columns=["trade_date", "is_open"]).to_pylist()
+    except Exception as exc:  # noqa: BLE001 - this is an operational input gate
+        raise RuntimeError(f"cannot read trading calendar {calendar}: {exc}") from exc
+    sessions = []
+    for row in rows:
+        raw_date = row.get("trade_date")
+        try:
+            session = raw_date.date() if isinstance(raw_date, datetime) else raw_date
+            session = session if isinstance(session, date) else date.fromisoformat(str(session)[:10])
+        except (TypeError, ValueError):
+            continue
+        if int(row.get("is_open") or 0) == 1 and session < today:
+            sessions.append(session)
+    if not sessions:
+        raise RuntimeError(f"trading calendar has no open session before {today.isoformat()}")
+    return max(sessions)
+
+
+def _run(command: list[str]) -> int:
+    completed = subprocess.run(command, cwd=ROOT, check=False)
+    return completed.returncode
+
+
+def _completion_marker(root: Path, market_date: date) -> Path:
+    return root / "recovery/matured-1m" / market_date.isoformat() / "dwd-complete.json"
+
+
+def _notify(node_id: str, market_date: date, run_path: str) -> int:
+    node = "CN01" if node_id == "cn01" else node_id.title()
+    return _run(
+        [
+            str(ROOT / "ops/bin/notify-dwd-event"),
+            "--event",
+            f"{node_id}_dwd_completed",
+            "--market-date",
+            market_date.isoformat(),
+            "--node",
+            node,
+            "--stage",
+            "ods_to_dwd_maturity_recovery",
+            "--unit",
+            f"{node_id}-ods-maturity-recovery.service",
+            "--run-path",
+            run_path,
+        ]
+    )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--market-date", type=date.fromisoformat)
+    parser.add_argument("--recovery-window-seconds", type=int, default=10800)
+    args = parser.parse_args()
+    if args.recovery_window_seconds <= 0:
+        parser.error("--recovery-window-seconds must be positive")
+
+    node_id = os.environ.get("HERMES_ODS_NODE_ID", "cn01").strip().lower()
+    if node_id not in {"cn01", "hermes"}:
+        parser.error("HERMES_ODS_NODE_ID must be cn01 or hermes")
+    astock_root = Path(os.environ.get("ASTOCK_ROOT", "/root/work/astock"))
+    home = Path(os.environ.get("ASTOCK_HOME", str(astock_root / "data")))
+    shadow_root = Path(
+        os.environ.get("HERMES_ODS_SHADOW_ROOT", str(home / f"shadow/{node_id}-ods-v1"))
+    )
+    calendar = Path(os.environ.get("HERMES_ODS_CALENDAR", str(home / "ref_trading_calendar.parquet")))
+    market_date = args.market_date or _latest_open_session_before(
+        calendar, datetime.now(SHANGHAI).date()
+    )
+    marker = _completion_marker(shadow_root, market_date)
+    if marker.is_file():
+        print(json.dumps({"status": "already_complete", "market_date": market_date.isoformat()}))
+        return 0
+
+    orchestrator = Path(
+        os.environ.get("QUANTHUS_ODS_DAILY_ORCHESTRATOR", str(ROOT / "ops/bin/run-cn01-ods-daily"))
+    )
+    common = [
+        str(orchestrator),
+        "--market-date",
+        market_date.isoformat(),
+        "--recovery-window-seconds",
+        str(args.recovery_window_seconds),
+    ]
+    ods_rc = _run([*common, "--ods-only"])
+    if ods_rc == SOURCE_MATURITY_DEFERRED:
+        print(json.dumps({"status": "pending_source_maturity", "market_date": market_date.isoformat()}))
+        return 0
+    if ods_rc != 0:
+        return ods_rc
+
+    dwd_rc = _run(common)
+    if dwd_rc != 0:
+        return dwd_rc
+    run_root = shadow_root / "orchestrator/daily" / market_date.isoformat()
+    _atomic_json(
+        marker,
+        {
+            "schema_version": 1,
+            "kind": "matured_1m_dwd_recovery",
+            "market_date": market_date.isoformat(),
+            "node": node_id,
+            "status": "ready",
+            "completed_at": datetime.now(SHANGHAI).isoformat(),
+            "run_root": str(run_root),
+        },
+    )
+    return _notify(node_id, market_date, str(run_root))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

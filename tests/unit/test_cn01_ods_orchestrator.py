@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 ORCHESTRATOR = ROOT / "ops/bin/run-cn01-ods-daily"
 RETRY_WRAPPER = ROOT / "ops/bin/run-ods-daily-with-retry"
+COMPLETION_NOTIFICATION_CHECKER = ROOT / "ops/bin/check-ods-dwd-completion-notification"
 
 
 def _write_executable(path: Path, text: str) -> None:
@@ -262,6 +263,87 @@ catalog.write_text('{"kind":"daily_ods_input_catalog"}\\n', encoding='ascii')
     )
 
 
+def test_cn01_orchestrator_defers_only_a_qualified_current_session_tencent_failure(
+    tmp_path: Path,
+) -> None:
+    calls = tmp_path / "calls.log"
+    runner = tmp_path / "runner.py"
+    _write_executable(
+        runner,
+        """#!/usr/bin/env python3
+from pathlib import Path
+import sys
+args = sys.argv[1:]
+with Path(__CALLS__).open('a', encoding='utf-8') as stream:
+    stream.write(' '.join(args) + '\\n')
+if '--stream' in args and args[args.index('--stream') + 1] == '1m':
+    print('RuntimeError: Tencent source qualification failed for 2026-08-04/000001: Tencent/daily volume mismatch')
+    raise SystemExit(4)
+raise SystemExit(0)
+""".replace("__CALLS__", repr(str(calls))),
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "HERMES_ODS_NODE_ID": "cn01",
+            "HERMES_ODS_ENV_FILE": str(tmp_path / "missing.env"),
+            "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+            "ASTOCK_HOME": str(tmp_path / "home"),
+            "HERMES_ODS_RUNNER": str(runner),
+            "HERMES_ODS_DAILY_SLA_SECONDS": "20",
+            "HERMES_ODS_ORCHESTRATOR_POLL_SECONDS": "0.1",
+        }
+    )
+
+    completed = subprocess.run(
+        [str(ORCHESTRATOR), "--market-date", "2026-08-04"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 3, completed.stderr + completed.stdout
+    state = json.loads(completed.stdout)
+    assert state["status"] == "deferred_source_maturity"
+    assert state["lanes"]["intraday-1m"]["status"] == "deferred_source_maturity"
+    assert state["catalog"] == {"status": "deferred_source_maturity"}
+    assert state["dwd"] == {"status": "deferred_source_maturity"}
+    run_root = next((tmp_path / "shadow/orchestrator/daily/2026-08-04").iterdir())
+    assert not (run_root / "READY").exists()
+    context = json.loads(
+        (tmp_path / "shadow/orchestrator/daily/notification-context.json").read_text(
+            encoding="ascii"
+        )
+    )
+    assert context["status"] == "deferred_source_maturity"
+    assert context["error_code"] == "source_maturity_deferred"
+
+
+def test_completion_notification_checker_refuses_deferred_state(tmp_path: Path) -> None:
+    context = tmp_path / "context.json"
+    context.write_text('{"status":"deferred_source_maturity"}\n', encoding="ascii")
+    deferred = subprocess.run(
+        [str(COMPLETION_NOTIFICATION_CHECKER), "--context", str(context)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert deferred.returncode == 1
+
+    context.write_text('{"status":"ready"}\n', encoding="ascii")
+    ready = subprocess.run(
+        [str(COMPLETION_NOTIFICATION_CHECKER), "--context", str(context)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ready.returncode == 0
+
+
 def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
     service = (ROOT / "ops/systemd/hermes-ods-daily-orchestrator.service").read_text(
         encoding="ascii"
@@ -271,7 +353,7 @@ def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
     assert "run-cn01-ods-daily" in service
     assert "QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS=14760" in service
     assert "TimeoutStartSec=540min" in service
-    assert "SuccessExitStatus=0" in service
+    assert "SuccessExitStatus=0 3" in service
     assert "OnSuccess=hermes-dwd-success-notification.service" in service
     assert "OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai" in timer
     assert "Persistent=false" in timer
@@ -350,6 +432,36 @@ def test_daily_retry_wrapper_returns_final_failure_status(tmp_path: Path) -> Non
 
     assert completed.returncode == 23
     assert attempts.read_text(encoding="ascii") == "2\n"
+
+
+def test_daily_retry_wrapper_delegates_source_maturity_without_repeating(tmp_path: Path) -> None:
+    attempts = tmp_path / "attempts"
+    runner = tmp_path / "runner"
+    _write_executable(
+        runner,
+        "#!/usr/bin/env bash\n"
+        f"printf '1\\n' > {str(attempts)!r}\n"
+        "exit 3\n",
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "QUANTHUS_ODS_DAILY_MAX_ATTEMPTS": "2",
+            "QUANTHUS_ODS_DAILY_RETRY_DELAY_SECONDS": "0",
+        }
+    )
+
+    completed = subprocess.run(
+        [str(RETRY_WRAPPER), str(runner)],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 3
+    assert attempts.read_text(encoding="ascii") == "1\n"
 
 
 def test_orchestrator_reuses_existing_ready_lane_and_preserves_node(tmp_path: Path) -> None:

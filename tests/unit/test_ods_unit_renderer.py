@@ -57,6 +57,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertNotIn("Restart=on-failure", orchestrator_service)
         self.assertNotIn("RestartSec=10min", orchestrator_service)
         self.assertIn("OnSuccess=cn01-dwd-success-notification.service", orchestrator_service)
+        self.assertIn("SuccessExitStatus=0 3", orchestrator_service)
 
         weekly_service = (output / "cn01-ods-weekly-corrections.service").read_text()
         self.assertIn("TimeoutStartSec=8h", weekly_service)
@@ -65,6 +66,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         success_notification = (output / "cn01-dwd-success-notification.service").read_text()
         failure_notification = (output / "cn01-dwd-failure-notification.service").read_text()
         self.assertIn("--event cn01_dwd_completed", success_notification)
+        self.assertIn("check-ods-dwd-completion-notification", success_notification)
         self.assertIn("--node CN01", success_notification)
         self.assertIn("--event cn01_dwd_failed", failure_notification)
         self.assertIn("--failure-receipt", failure_notification)
@@ -119,6 +121,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertIn("run-cn01-ods-daily --sla-seconds 21600", orchestrator_service)
         self.assertIn("QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS=14760", orchestrator_service)
         self.assertIn("TimeoutStartSec=540min", orchestrator_service)
+        self.assertIn("SuccessExitStatus=0 3", orchestrator_service)
         self.assertNotIn("Restart=on-failure", orchestrator_service)
         self.assertIn("--event hermes_dwd_completed", success_notification)
         self.assertIn("--node Hermes", success_notification)

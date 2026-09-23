@@ -40,6 +40,15 @@ _CATALOG_LANES = {
     "intraday-5m": "intraday_5m",
 }
 
+# This return status is deliberately distinct from a failed ODS/DWD run.  Tencent
+# exposes the current session's 1m volumes in whole lots, while the sealed daily
+# source records exact shares (including odd lots).  A same-day mismatch is thus
+# not safe to publish, but it is also not repaired by repeating the full scan.
+# The maturity recovery timer retries that exact date only after the source has
+# had time to publish its historical representation.
+SOURCE_MATURITY_DEFERRED = 3
+_TENCENT_QUALIFICATION_MARKER = "tencent source qualification failed"
+
 
 def _load_env_file(path: Path) -> None:
     """Load the simple KEY=VALUE env files used by the systemd units."""
@@ -318,6 +327,31 @@ def _write_run_state(run_root: Path, state: dict[str, Any], *, ready: bool) -> N
         ready_path.unlink(missing_ok=True)
 
 
+def _source_maturity_deferred(lanes: dict[str, dict[str, Any]]) -> bool:
+    """Recognize the bounded, auditable Tencent current-session deferral only.
+
+    A transport, storage, daily, calendar, or 5m failure must remain a terminal
+    failed run.  Deferral is permitted only when those three independent lanes
+    are READY and the 1m collector stopped at its explicit source qualification
+    before scanning the full universe.
+    """
+
+    required = ("market-daily-core", "calendar-daily-events", "intraday-5m")
+    if any(lanes.get(lane, {}).get("status") != "ready" for lane in required):
+        return False
+    minute = lanes.get("intraday-1m", {})
+    if minute.get("status") != "failed":
+        return False
+    for raw_path in minute.get("logs", []):
+        try:
+            log_text = Path(str(raw_path)).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if _TENCENT_QUALIFICATION_MARKER in log_text.lower():
+            return True
+    return False
+
+
 def main() -> int:
     _load_node_environment()
     parser = argparse.ArgumentParser()
@@ -575,6 +609,7 @@ def main() -> int:
             }
 
     lane_success = all(item.get("status") == "ready" for item in state["lanes"].values())
+    source_deferred = not lane_success and _source_maturity_deferred(state["lanes"])
     if lane_success:
         dwd_deadline = time.monotonic() + dwd_sla_seconds
         catalog_command = [
@@ -644,6 +679,14 @@ def main() -> int:
                     "log": dwd_log,
                     "daily_root": str(dwd_daily_root),
                 }
+    elif source_deferred:
+        state["lanes"]["intraday-1m"]["status"] = "deferred_source_maturity"
+        state["catalog"] = {"status": "deferred_source_maturity"}
+        state["dwd"] = {"status": "deferred_source_maturity"}
+        state["deferred_reason"] = (
+            "Tencent current-session 1m source failed exact qualification; "
+            "awaiting date-bounded maturity recovery"
+        )
     elif not lane_success:
         state["catalog"] = {"status": "blocked_by_lane_failure"}
         state["dwd"] = {"status": "blocked_by_lane_failure"}
@@ -662,7 +705,9 @@ def main() -> int:
         )
     ods_ready = lane_success and catalog_state.get("status") == "ready"
     fully_ready = ods_ready and dwd_state.get("status") == "ready"
-    if args.ods_only and ods_ready:
+    if source_deferred:
+        state["status"] = "deferred_source_maturity"
+    elif args.ods_only and ods_ready:
         state["status"] = "ods_ready"
     else:
         state["status"] = "ready" if fully_ready else "failed"
@@ -677,12 +722,19 @@ def main() -> int:
     if successful:
         notification_context["error_code"] = None
         notification_context["error"] = None
+    elif source_deferred:
+        notification_context["error_code"] = "source_maturity_deferred"
+        notification_context["error"] = state["deferred_reason"]
     elif state.get("error_code"):
         notification_context["error_code"] = state["error_code"]
         notification_context["error"] = state["error"]
     _atomic_json(notification_context_path, notification_context)
     print(json.dumps(state, ensure_ascii=True, sort_keys=True))
-    return PROCESS_CLEANUP_FAILED if cleanup_failed else (0 if successful else 2)
+    if cleanup_failed:
+        return PROCESS_CLEANUP_FAILED
+    if source_deferred:
+        return SOURCE_MATURITY_DEFERRED
+    return 0 if successful else 2
 
 
 if __name__ == "__main__":

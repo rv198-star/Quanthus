@@ -20,7 +20,7 @@ Environment=QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS=14760
 ExecCondition=/root/work/Quanthus/ops/bin/check-ods-orchestrator-window --node-id hermes
 ExecStart=/root/work/Quanthus/ops/bin/run-ods-daily-with-retry /root/work/Quanthus/ops/bin/run-cn01-ods-daily
 TimeoutStartSec=540min
-SuccessExitStatus=0
+SuccessExitStatus=0 3
 Nice=5
 UMask=0027
 StandardOutput=journal

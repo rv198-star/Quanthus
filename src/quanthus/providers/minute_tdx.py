@@ -51,6 +51,7 @@ EASTMONEY_MAX_DAYS = 5
 EASTMONEY_MIN_INTERVAL_SECONDS = 0.2
 EASTMONEY_CONSECUTIVE_ERROR_LIMIT = 20
 TENCENT_M1_URL = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/kline/mkline"
+TENCENT_MIN_INTERVAL_SECONDS = 0.18
 
 
 def _now_iso() -> str:
@@ -624,6 +625,8 @@ def collect(
         if tencent_enabled
         else {}
     )
+    if tencent_enabled:
+        sleep_seconds = max(sleep_seconds, TENCENT_MIN_INTERVAL_SECONDS)
     started = time.monotonic()
     budget = MinuteBudget.start(recovery_policy.budget_seconds) if recovery_policy else None
     budget_kwargs = {"budget": budget} if budget else {}

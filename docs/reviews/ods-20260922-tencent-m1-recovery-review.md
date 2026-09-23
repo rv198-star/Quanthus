@@ -41,6 +41,8 @@ with an external collector or recovery policy; missing market evidence blocks co
 The three-symbol 2026-09-22 live source smoke (`000001`, `600519`, `688001`) completed with
 3/3 per-security receipts, 240 rows each, matching daily volume and 0 non-null amount; the
 versioned SHA-bearing raw responses were preserved. The full-universe route is sequential, so
-the opt-in rollout uses a 3,600-second collector timeout (below the 4-hour service ceiling),
+only the Tencent 1m collector enforces a 0.18-second minimum inter-symbol interval; the native
+5m lane retains its existing pace. The opt-in rollout uses a 3,600-second collector timeout
+(below the 4-hour service ceiling),
 with the existing orchestrator deadline still authoritative. This does not prove 2026-09-23
 full-universe success; tonight's actual four-lane, DWD and OCI receipts remain a separate gate.

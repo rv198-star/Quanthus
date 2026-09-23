@@ -3758,6 +3758,34 @@ def _run_minute_collector(
         cmd.extend(["--max-pages", str(max_pages)])
     if policy_path is not None:
         cmd.extend(["--recovery-policy", str(policy_path)])
+    tencent_opt_in = os.environ.get("HERMES_ODS_MINUTE_TENCENT_FALLBACK", "").strip()
+    if tencent_opt_in not in {"", "0", "1"}:
+        raise LaneRunError("HERMES_ODS_MINUTE_TENCENT_FALLBACK must be 0 or 1")
+    if tencent_opt_in == "1" and bar_size == "1m":
+        if collector_override or policy_path or fetch_mode != "incr":
+            raise LaneRunError("Tencent 1m requires the repository collector in incr mode")
+        daily_artifact = _latest_market_artifact(
+            paths=paths,
+            market_date=market_date,
+            available_at=_now(),
+            artifact_name="daily_ohlcv_none_delta",
+        )
+        status_artifact = _latest_market_artifact(
+            paths=paths,
+            market_date=market_date,
+            available_at=_now(),
+            artifact_name="daily_status_observation_delta",
+        )
+        if daily_artifact is None or status_artifact is None:
+            raise LaneRunError("Tencent 1m requires a same-date READY market release")
+        cmd.extend(
+            [
+                "--tencent-daily-path",
+                str(daily_artifact[0]),
+                "--tencent-status-path",
+                str(status_artifact[0]),
+            ]
+        )
     # Provider collection is always attempt-local. There is deliberately no
     # production fallback: shadow runs must never mutate shared legacy partitions.
     raw_home.mkdir(parents=True, exist_ok=False)

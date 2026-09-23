@@ -22,12 +22,12 @@ TARGET_DATE = "2026-09-22"
 SOURCE_COMMIT = "26fb13de28f4c79d01db15ce0ddd49d39e39abc5"
 
 
-def expected_times() -> tuple[str, ...]:
+def expected_times(market_date: str = TARGET_DATE) -> tuple[str, ...]:
     intervals = (("09:31", "11:30"), ("13:01", "15:00"))
     result: list[str] = []
     for first, last in intervals:
-        current = datetime.fromisoformat(f"{TARGET_DATE}T{first}:00")
-        end = datetime.fromisoformat(f"{TARGET_DATE}T{last}:00")
+        current = datetime.fromisoformat(f"{market_date}T{first}:00")
+        end = datetime.fromisoformat(f"{market_date}T{last}:00")
         while current <= end:
             result.append(current.strftime("%Y%m%d%H%M"))
             current += timedelta(minutes=1)
@@ -44,7 +44,8 @@ def _number(value: Any) -> Decimal:
 
 
 def normalize_symbol(
-    code: str, raw: bytes, *, daily_volume: Any, daily_close: Any
+    code: str, raw: bytes, *, daily_volume: Any, daily_close: Any,
+    market_date: str = TARGET_DATE,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Produce 240 OHLCV observations; preserve absent amount as null.
 
@@ -57,8 +58,8 @@ def normalize_symbol(
     if payload.get("code") != 0:
         raise ValueError(f"Tencent response code for {code}: {payload.get('code')}")
     source = payload["data"][symbol]["m1"]
-    day = TARGET_DATE.replace("-", "")
-    grid = expected_times()
+    day = market_date.replace("-", "")
+    grid = expected_times(market_date)
     allowed = set(grid) | {day + "0930"}
     observed: dict[str, dict[str, Decimal]] = {}
     multiplier = Decimal(1 if code.startswith("68") else 100)

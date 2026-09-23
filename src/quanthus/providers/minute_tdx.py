@@ -7,7 +7,10 @@ integration and does not write shared canonical minute partitions.
 from __future__ import annotations
 
 import argparse
+import gzip
+import hashlib
 import json
+import os
 import socket
 import sys
 import time
@@ -25,6 +28,7 @@ from quanthus.providers.minute_recovery import (
     MinuteRecoveryPolicy,
     load_minute_recovery_policy,
 )
+from quanthus.providers.tencent_m1_normalize import normalize_symbol
 
 PAGE_SIZE = 800
 FREQUENCIES = {"1m": 8, "5m": 0}
@@ -46,6 +50,7 @@ EASTMONEY_TOKEN = "bd1d9ddb04089700cf9c27f6f7426281"
 EASTMONEY_MAX_DAYS = 5
 EASTMONEY_MIN_INTERVAL_SECONDS = 0.2
 EASTMONEY_CONSECUTIVE_ERROR_LIMIT = 20
+TENCENT_M1_URL = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/kline/mkline"
 
 
 def _now_iso() -> str:
@@ -185,6 +190,112 @@ def _eastmoney_ndays(market_date: str) -> int:
             f"market_date is outside Eastmoney's {EASTMONEY_MAX_DAYS}-day recovery window"
         )
     return days
+
+
+def _tencent_daily_evidence(
+    *, daily_path: Path, status_path: Path, market_date: str, symbols: Sequence[str]
+) -> dict[str, dict[str, Any]]:
+    """Require one sealed same-date market universe before Tencent 1m recovery."""
+    import pyarrow.parquet as pq
+
+    daily_rows = pq.read_table(
+        daily_path, columns=["stock_code", "market_date", "volume", "close"]
+    ).to_pylist()
+    status_rows = pq.read_table(
+        status_path, columns=["stock_code", "market_date", "tradestatus"]
+    ).to_pylist()
+    daily = {str(row["stock_code"]): row for row in daily_rows}
+    status = {str(row["stock_code"]): row for row in status_rows}
+    if (
+        len(daily) != len(daily_rows)
+        or len(status) != len(status_rows)
+        or not daily
+        or set(daily) != set(status)
+        or not set(symbols).issubset(daily)
+        or any(row["market_date"] != market_date for row in daily_rows + status_rows)
+        or any(str(row["tradestatus"]) not in {"0", "1"} for row in status_rows)
+    ):
+        raise ValueError("Tencent 1m sealed daily/status evidence is incomplete or wrong-date")
+    return {
+        code: {
+            "volume": daily[code]["volume"],
+            "close": daily[code]["close"],
+            "tradestatus": str(status[code]["tradestatus"]),
+        }
+        for code in symbols
+    }
+
+
+def _tencent_one_minute_bars(
+    symbol: str,
+    market_date: str,
+    daily: dict[str, Any],
+    raw_home: Path,
+    *,
+    opener: Callable[..., Any] = urlopen,
+) -> tuple[Any, dict[str, Any]]:
+    """Fetch native OHLCV, preserve raw bytes, and never infer minute amount."""
+    import pandas as pd
+
+    provider_symbol = ("sh" if symbol.startswith("6") else "sz") + symbol
+    request = Request(
+        f"{TENCENT_M1_URL}?param={provider_symbol},m1,,800",
+        headers={
+            "Referer": "https://gu.qq.com/",
+            "User-Agent": "Mozilla/5.0 Quanthus-TencentM1/1.0",
+        },
+    )
+    last_error: Exception | None = None
+    for attempt in range(1, 4):
+        try:
+            with opener(request, timeout=12) as response:
+                raw = response.read()
+            payload = json.loads(raw)
+            if payload.get("code") != 0:
+                raise ValueError(f"Tencent response code {payload.get('code')}")
+            source = payload["data"][provider_symbol]["m1"]
+            selected = [row for row in source if str(row[0]).startswith(market_date.replace("-", ""))]
+            if daily["tradestatus"] == "0":
+                if selected or float(daily["volume"]) != 0:
+                    raise ValueError(f"suspended stock has Tencent 1m data: {symbol}")
+                frame = pd.DataFrame(
+                    columns=("stock_code", "ts", "open", "high", "low", "close", "volume", "amount")
+                )
+                detail: dict[str, Any] = {"source_rows": 0, "normalized_rows": 0}
+            else:
+                rows, detail = normalize_symbol(
+                    symbol,
+                    raw,
+                    daily_volume=daily["volume"],
+                    daily_close=daily["close"],
+                    market_date=market_date,
+                )
+                frame = pd.DataFrame(rows)
+            raw_home.mkdir(parents=True, exist_ok=True)
+            raw_path = raw_home / f"{symbol}.json.gz"
+            temporary = raw_path.with_name(f"{raw_path.name}.tmp.{os.getpid()}")
+            with temporary.open("wb") as sink:
+                with gzip.GzipFile(fileobj=sink, mode="wb", mtime=0) as zipped:
+                    zipped.write(raw)
+            os.replace(temporary, raw_path)
+            return frame, {
+                "ok": True,
+                "provider": "tencent-mkline-validated",
+                "native_frequency": "1m",
+                "derived_from": None,
+                "market_date": market_date,
+                "source_raw_sha256": hashlib.sha256(raw).hexdigest(),
+                "source_raw_bytes": len(raw),
+                "source_raw_path": str(raw_path),
+                "minute_amount_status": "source_absent_null_not_estimated",
+                "attempts": attempt,
+                **detail,
+            }
+        except Exception as exc:  # noqa: BLE001 - retry bounded provider read
+            last_error = exc
+            if attempt < 3:
+                time.sleep(0.4 * attempt)
+    raise RuntimeError(f"Tencent m1 request/validation failed for {symbol}: {last_error}")
 
 
 def _eastmoney_one_minute_frame(data: dict[str, Any], symbol: str) -> Any:
@@ -483,6 +594,8 @@ def collect(
     sleep_seconds: float,
     market_date: str | None = None,
     recovery_policy: MinuteRecoveryPolicy | None = None,
+    tencent_daily_path: Path | None = None,
+    tencent_status_path: Path | None = None,
 ) -> int:
     if not symbols:
         raise ValueError("symbols must not be empty")
@@ -490,6 +603,27 @@ def collect(
         raise ValueError("minute recovery v1 is limited to research 1m incr")
     if recovery_policy and len(set(symbols)) != len(symbols):
         raise ValueError("minute recovery requires unique symbols")
+    tencent_enabled = tencent_daily_path is not None or tencent_status_path is not None
+    if tencent_enabled and (
+        tencent_daily_path is None
+        or tencent_status_path is None
+        or frequency != "1m"
+        or layer != "research"
+        or mode != "incr"
+        or market_date is None
+        or recovery_policy is not None
+    ):
+        raise ValueError("Tencent 1m requires paired sealed evidence and research incr mode")
+    tencent_daily = (
+        _tencent_daily_evidence(
+            daily_path=tencent_daily_path,
+            status_path=tencent_status_path,
+            market_date=market_date,
+            symbols=symbols,
+        )
+        if tencent_enabled
+        else {}
+    )
     started = time.monotonic()
     budget = MinuteBudget.start(recovery_policy.budget_seconds) if recovery_policy else None
     budget_kwargs = {"budget": budget} if budget else {}
@@ -498,7 +632,7 @@ def collect(
     checkpoint_path = home / "checkpoint.json"
     client: Any | None = None
     server = "unselected"
-    fallback = False
+    fallback: str | None = None
     # Both scheduled and explicitly requested historical repairs target one exact
     # session; provider pagination is unnecessary for this date-bounded API.
     native_5m = frequency == "5m" and market_date is not None
@@ -564,7 +698,15 @@ def collect(
             if native_5m:
                 assert market_date is not None
                 frame, meta = _baostock_native_5m_bars(symbol, market_date, client=client)
-            elif fallback:
+            elif fallback == "tencent":
+                assert market_date is not None
+                frame, meta = _tencent_one_minute_bars(
+                    symbol,
+                    market_date,
+                    tencent_daily[symbol],
+                    home / "provider_raw" / "tencent-m1",
+                )
+            elif fallback == "eastmoney":
                 frame, meta = _eastmoney_bars(
                     symbol,
                     frequency,
@@ -629,7 +771,7 @@ def collect(
                 raise RuntimeError(
                     "BaoStock native 5m circuit opened after 3 consecutive failures"
                 ) from exc
-            if not fallback and not native_5m:
+            if fallback is None and not native_5m:
                 try:
                     client, server = tdx_client(**budget_kwargs)
                 except MinuteBudgetExceeded:
@@ -638,7 +780,7 @@ def collect(
                     pass
             elif consecutive_errors >= EASTMONEY_CONSECUTIVE_ERROR_LIMIT:
                 raise RuntimeError(
-                    "Eastmoney circuit opened after "
+                    f"{fallback or 'provider'} circuit opened after "
                     f"{consecutive_errors} consecutive symbol failures"
                 ) from exc
 
@@ -655,18 +797,22 @@ def collect(
             set_socket_timeout(30.0)
             server = "baostock-native-5m"
         else:
-            try:
-                client, server = tdx_client(**budget_kwargs)
-            except MinuteBudgetExceeded:
-                raise
-            except RuntimeError:
-                if mode != "incr":
+            if tencent_enabled:
+                server = "tencent-mkline-validated"
+                fallback = "tencent"
+            else:
+                try:
+                    client, server = tdx_client(**budget_kwargs)
+                except MinuteBudgetExceeded:
                     raise
-                server = "eastmoney-push2delay-trends2"
-                fallback = True
+                except RuntimeError:
+                    if mode != "incr":
+                        raise
+                    server = "eastmoney-push2delay-trends2"
+                    fallback = "eastmoney"
         if budget:
             budget.remaining()
-        if fallback:
+        if fallback == "eastmoney":
             import requests
 
             session = requests.Session()
@@ -732,6 +878,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--sleep", type=float, default=0.05)
     parser.add_argument("--market-date")
     parser.add_argument("--recovery-policy", type=Path)
+    parser.add_argument("--tencent-daily-path", type=Path)
+    parser.add_argument("--tencent-status-path", type=Path)
     parser.add_argument("--home", required=True)
     parser.add_argument("--no-lock", action="store_true")
     args = parser.parse_args(argv)
@@ -755,6 +903,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             recovery_policy=(
                 load_minute_recovery_policy(args.recovery_policy) if args.recovery_policy else None
             ),
+            tencent_daily_path=args.tencent_daily_path,
+            tencent_status_path=args.tencent_status_path,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"minute collector failed: {exc}", file=sys.stderr)

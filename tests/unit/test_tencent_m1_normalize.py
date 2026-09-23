@@ -66,6 +66,29 @@ class TencentM1NormalizeTests(unittest.TestCase):
         self.assertEqual(sum(row["volume"] for row in normalized), 241)
         self.assertEqual(detail["volume_multiplier"], 1)
 
+    def test_same_date_is_parameterized_without_accepting_older_rolling_rows(self) -> None:
+        stamps = ["202609220930", *expected_times(), "202609230930", *expected_times("2026-09-23")]
+        rows, detail = normalize_symbol(
+            "000001",
+            payload(stamps),
+            daily_volume=24100,
+            daily_close=10,
+            market_date="2026-09-23",
+        )
+        self.assertEqual(len(rows), 240)
+        self.assertTrue(all(row["ts"].startswith("2026-09-23") for row in rows))
+        self.assertEqual(detail["source_rows"], 241)
+
+    def test_wrong_requested_date_fails(self) -> None:
+        with self.assertRaisesRegex(ValueError, "incomplete Tencent session"):
+            normalize_symbol(
+                "000001",
+                payload(["202609220930", *expected_times()]),
+                daily_volume=24100,
+                daily_close=10,
+                market_date="2026-09-23",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

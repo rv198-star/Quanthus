@@ -37,8 +37,13 @@ def _decimal(value: Any) -> Decimal:
 
 
 def qualify_payload(
-    payload: dict[str, Any], *, symbol: str, market_date: str,
-    daily_volume: Any, daily_close: Any, first_5m_volume: Any,
+    payload: dict[str, Any],
+    *,
+    symbol: str,
+    market_date: str,
+    daily_volume: Any,
+    daily_close: Any,
+    first_5m_volume: Any,
 ) -> dict[str, Any]:
     """Check source-faithful rows without adjusting any reported shares.
 
@@ -71,7 +76,7 @@ def qualify_payload(
     for item in items:
         if not isinstance(item, list) or len(item) != len(fields):
             raise ValueError("malformed proxy minute item")
-        row = dict(zip(fields, item))
+        row = dict(zip(fields, item, strict=True))
         stamp = str(row["trade_time"])
         if (
             row["ts_code"] != symbol
@@ -89,7 +94,8 @@ def qualify_payload(
         for name in ("open", "high", "low", "close", "vol", "amount"):
             row[name] = _decimal(row[name])
         if (
-            row["vol"] < 0 or row["amount"] < 0
+            row["vol"] < 0
+            or row["amount"] < 0
             or row["high"] < max(row["open"], row["close"], row["low"])
             or row["low"] > min(row["open"], row["close"], row["high"])
         ):
@@ -99,7 +105,10 @@ def qualify_payload(
     if preopen and (
         len(preopen) != 5
         or any(
-            any(row[name] != preopen[0][name] for name in ("open", "high", "low", "close", "vol", "amount"))
+            any(
+                row[name] != preopen[0][name]
+                for name in ("open", "high", "low", "close", "vol", "amount")
+            )
             for row in preopen[1:]
         )
     ):
@@ -161,20 +170,31 @@ def main() -> int:
     parser.add_argument("--rate-per-second", type=float, default=4)
     parser.add_argument("--limit", type=int)
     args = parser.parse_args()
-    if args.rate_per_second <= 0 or args.rate_per_second > 5 or (args.limit is not None and args.limit < 1):
+    if (
+        args.rate_per_second <= 0
+        or args.rate_per_second > 5
+        or (args.limit is not None and args.limit < 1)
+    ):
         parser.error("rate must be in (0,5] and limit must be positive")
     import pyarrow.parquet as pq
     import requests
 
-    daily_rows = pq.read_table(args.daily_path, columns=["stock_code", "market_date", "volume", "close"]).to_pylist()
-    status_rows = pq.read_table(args.status_path, columns=["stock_code", "market_date", "tradestatus"]).to_pylist()
+    daily_rows = pq.read_table(
+        args.daily_path, columns=["stock_code", "market_date", "volume", "close"]
+    ).to_pylist()
+    status_rows = pq.read_table(
+        args.status_path, columns=["stock_code", "market_date", "tradestatus"]
+    ).to_pylist()
     first_rows = pq.read_table(args.five_path, columns=["stock_code", "ts", "volume"]).to_pylist()
     day = args.market_date.isoformat()
     daily = {row["stock_code"]: row for row in daily_rows}
     status = {row["stock_code"]: row for row in status_rows}
-    first = {row["stock_code"]: row["volume"] for row in first_rows if str(row["ts"])[11:16] == "09:35"}
+    first = {
+        row["stock_code"]: row["volume"] for row in first_rows if str(row["ts"])[11:16] == "09:35"
+    }
     if (
-        len(daily) != len(daily_rows) or len(status) != len(status_rows)
+        len(daily) != len(daily_rows)
+        or len(status) != len(status_rows)
         or set(daily) != set(status)
         or any(row["market_date"] != day for row in daily_rows + status_rows)
     ):
@@ -203,13 +223,21 @@ def main() -> int:
             try:
                 response = session.get(
                     ENDPOINT,
-                    params={"ts_code": symbol, "freq": "1min", "start_date": day + " 09:00:00", "end_date": day + " 16:00:00"},
-                    headers={"X-API-Key": key}, timeout=25,
+                    params={
+                        "ts_code": symbol,
+                        "freq": "1min",
+                        "start_date": day + " 09:00:00",
+                        "end_date": day + " 16:00:00",
+                    },
+                    headers={"X-API-Key": key},
+                    timeout=25,
                 )
                 receipt["http_status"] = response.status_code
                 receipt["request_id"] = response.headers.get("x-request-id")
                 if response.status_code == 202:
-                    receipt.update(status="source_pending", retry_after=response.headers.get("retry-after"))
+                    receipt.update(
+                        status="source_pending", retry_after=response.headers.get("retry-after")
+                    )
                 elif response.status_code != 200:
                     receipt.update(status="http_error")
                 else:
@@ -217,14 +245,22 @@ def main() -> int:
                     receipt["source_raw_sha256"] = hashlib.sha256(raw).hexdigest()
                     raw_path = args.output_dir / "raw" / f"{code}.json.gz"
                     raw_path.parent.mkdir(parents=True, exist_ok=True)
-                    with raw_path.open("wb") as sink, gzip.GzipFile(fileobj=sink, mode="wb", mtime=0) as zipped:
+                    with (
+                        raw_path.open("wb") as sink,
+                        gzip.GzipFile(fileobj=sink, mode="wb", mtime=0) as zipped,
+                    ):
                         zipped.write(raw)
                     try:
-                        receipt.update(qualify_payload(
-                            response.json(), symbol=symbol, market_date=day,
-                            daily_volume=daily[code]["volume"], daily_close=daily[code]["close"],
-                            first_5m_volume=first[code],
-                        ))
+                        receipt.update(
+                            qualify_payload(
+                                response.json(),
+                                symbol=symbol,
+                                market_date=day,
+                                daily_volume=daily[code]["volume"],
+                                daily_close=daily[code]["close"],
+                                first_5m_volume=first[code],
+                            )
+                        )
                     except (ValueError, KeyError) as exc:
                         receipt.update(status="unqualified", reason=str(exc)[:350])
             except requests.RequestException as exc:
@@ -232,14 +268,25 @@ def main() -> int:
             _write_json(args.output_dir / "receipts" / f"{code}.json", receipt)
             counts[receipt["status"]] += 1
             if index % 100 == 0 or index == len(codes):
-                print(json.dumps({"processed": index, "total": len(codes), "counts": counts}, sort_keys=True), flush=True)
+                print(
+                    json.dumps(
+                        {"processed": index, "total": len(codes), "counts": counts}, sort_keys=True
+                    ),
+                    flush=True,
+                )
     finally:
         session.close()
         key = ""
-    _write_json(args.output_dir / "summary.json", {
-        "market_date": day, "selected_traded_symbols": len(codes), "counts": counts,
-        "quarantine_only": True, "production_publication": False,
-    })
+    _write_json(
+        args.output_dir / "summary.json",
+        {
+            "market_date": day,
+            "selected_traded_symbols": len(codes),
+            "counts": counts,
+            "quarantine_only": True,
+            "production_publication": False,
+        },
+    )
     return 0
 
 

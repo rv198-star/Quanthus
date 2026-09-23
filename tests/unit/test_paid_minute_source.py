@@ -16,12 +16,18 @@ def payload(*, auction_volume: int = 100, preopen: bool = False) -> dict:
     for stamp in expected_times(DATE):
         ts = f"{DATE} {stamp[-4:-2]}:{stamp[-2:]}:00"
         items.append(["000001.SZ", ts, "1MIN", 11.0, 11.0, 11.0, 11.0, 10, 110])
-    items.append(["000001.SZ", f"{DATE} 09:30:00", "1MIN", 11.0, 11.0, 11.0, 11.0, auction_volume, 1100])
+    items.append(
+        ["000001.SZ", f"{DATE} 09:30:00", "1MIN", 11.0, 11.0, 11.0, 11.0, auction_volume, 1100]
+    )
     if preopen:
         for minute in range(25, 30):
-            items.append(["000001.SZ", f"{DATE} 09:{minute}:00", "1MIN", 11.0, 11.0, 11.0, 11.0, 200, 2200])
+            items.append(
+                ["000001.SZ", f"{DATE} 09:{minute}:00", "1MIN", 11.0, 11.0, 11.0, 11.0, 200, 2200]
+            )
     return {
-        "code": 0, "api_name": "stk_mins", "count": len(items),
+        "code": 0,
+        "api_name": "stk_mins",
+        "count": len(items),
         "meta": {"partial": False, "coverage": "complete"},
         "data": {"fields": FIELDS, "items": items},
     }
@@ -29,8 +35,12 @@ def payload(*, auction_volume: int = 100, preopen: bool = False) -> dict:
 
 def check(value: dict, *, daily: int = 2500, first5: int = 150) -> dict:
     return qualify_payload(
-        value, symbol="000001.SZ", market_date=DATE,
-        daily_volume=daily, daily_close=11.0, first_5m_volume=first5,
+        value,
+        symbol="000001.SZ",
+        market_date=DATE,
+        daily_volume=daily,
+        daily_close=11.0,
+        first_5m_volume=first5,
     )
 
 

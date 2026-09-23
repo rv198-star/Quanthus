@@ -261,6 +261,7 @@ and the detailed source judgment are recorded in
 - OCI, reached by verified-key passwordless SSH through CN01, pulled and independently verified
   the *exact* CN01 package, manifest and content digest above. `CURRENT.json` is 2026-09-22;
   receipt is `/home/ubuntu/data/quanthus/dwd-daily/receipts/2026-09-22/dwd-daily-20260922-c724bfe7416b-80fb79b.json`.
+  OCI sync success mail message id: `01a0cd50-6ac7-71bc-95c1-137b59f1f7f5`.
 
 The recovery is not a claim of complete minute money data: **all 1,195,920 1m DWD turnover
 values are NULL** on both producers, matching the source's missing field; 239,184 5m and 4,992
@@ -269,3 +270,16 @@ from coarser bars. #436 remains open for exact-minute-turnover source qualificat
 requiring that measure remain fail-closed. #424/#438 continue the durable source, timeout,
 same-date receipt and multi-day observation programme. The 2026-09-23 daily cycle must be
 observed separately and cannot inherit this backfill's success.
+
+### 2026-09-23 recurrence-guard deployment
+
+PR #438 commit `480e7f3dd327dd9967753d39a5df541fe45d6d31` was fast-forwarded into the
+production checkout on both CN01 and Hermes. The source change adds an opt-in Tencent 1m
+collector behind same-date READY market evidence, exact per-security daily-volume/close checks,
+240-session-grid validation, raw-response hashes, and source-faithful nullable `double` amount.
+The live node environment enables that path and a 3,600-second 1m collector timeout; it does
+not change the global 5m collector interval. Environment backups were retained with suffix
+`.pre-c06bf77-20260923`. CN01 passed 72 focused tests and Hermes 19; real-source three-symbol
+smokes passed on both nodes. A separate broad isolated run returned 2,810 passed, 73 failed,
+7 skipped, so this is **not** a claim that the full suite is green. The 2026-09-23 scheduled
+four-lane/DWD/OCI run remains the decisive production acceptance gate.

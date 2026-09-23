@@ -27,7 +27,7 @@ The minute issue #436 remains open for a durable historical source that includes
 
 New seed validation tests reject missing/wrong-date bars, estimated amount, daily-volume mismatch and invalid OHLC. Eleven targeted Tencent normalization/seed unit tests passed on 2026-09-23. `make check` could not start on the local Mac because the installed Xcode license is unaccepted; the previous full repository run for this PR was 2,844 passed, 20 failed, 7 skipped and is not a green baseline. This is a scoped technical review, not a claim of full-suite or human approval.
 
-## Same-day recurrence guard (PR #438 commit `54794cd`)
+## Same-day recurrence guard (PR #438 commit `480e7f3`)
 
 The old `1m` path still reaches an Eastmoney EOF on a 2026-09-23 CN01 sample; leaving it
 unchanged would predict another terminal circuit tonight. A separate opt-in repository adapter
@@ -46,3 +46,11 @@ only the Tencent 1m collector enforces a 0.18-second minimum inter-symbol interv
 (below the 4-hour service ceiling),
 with the existing orchestrator deadline still authoritative. This does not prove 2026-09-23
 full-universe success; tonight's actual four-lane, DWD and OCI receipts remain a separate gate.
+
+The production revision is `480e7f3dd327dd9967753d39a5df541fe45d6d31` on both CN01
+and Hermes. The live opt-in environment was backed up before the two required settings were
+enabled; the global sleep override was removed so native 5m pacing is unchanged. Live focused
+tests passed (CN01 72, Hermes 19), and the three-symbol path produced nullable `double` amount
+on the actual Parquet output. A broader isolated CN01 test run was not green (2,810 passed,
+73 failed, 7 skipped); its planning-snapshot and DuckDB-version-sensitive failures require
+separate triage and do not substitute for the scheduled production acceptance gate.

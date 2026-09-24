@@ -36,8 +36,10 @@ If the new code is deployed after an evening run, the worker can reclassify
 that run's failed receipt into the same deferred queue only when its complete
 node/date-local checkpoint satisfies the exact source-mismatch rule. This
 avoids rewriting or relabeling the immutable prior run.
-If ODS reaches READY but DWD fails or the worker exits before recording its
-completion marker, the same date remains eligible for a later DWD retry.
+If ODS reaches READY but DWD fails, the same date remains eligible for a later
+DWD retry. A latest `ready` DWD run is treated as complete even if the worker
+never wrote its private completion marker (for example, an authorized manual
+recovery); it must not be rebuilt just to synthesize that marker.
 
 Publication still requires four READY ODS lanes and the existing catalog and
 DWD validations. OCI only mirrors the qualified CN01 package and must match

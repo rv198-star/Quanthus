@@ -695,7 +695,7 @@ def test_recovery_keeps_date_open_after_ods_ready_or_dwd_failure(tmp_path: Path)
     }
     later = date_root / "later"
     later.mkdir()
-    for status in ("ods_ready", "failed", "ready"):
+    for status in ("ods_ready", "failed"):
         (later / "run.json").write_text(
             json.dumps(
                 {
@@ -709,6 +709,17 @@ def test_recovery_keeps_date_open_after_ods_ready_or_dwd_failure(tmp_path: Path)
         assert module._pending_maturity_session(shadow, date(2026, 9, 25)) == date(
             2026, 9, 24
         )
+    (later / "run.json").write_text(
+        json.dumps(
+            {
+                "finished_at": "2026-09-25T03:00:00Z",
+                "status": "ready",
+                "lanes": ready_lanes,
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert module._pending_maturity_session(shadow, date(2026, 9, 25)) is None
     completion = shadow / "recovery/matured-1m/2026-09-24/dwd-complete.json"
     completion.parent.mkdir(parents=True)
     completion.write_text('{"status":"ready"}\n', encoding="ascii")

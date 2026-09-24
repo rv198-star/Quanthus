@@ -1,8 +1,9 @@
 [Unit]
-Description=Recheck preceding session's qualified Tencent 1m source through its maturity window
+Description=Recheck qualified 1m source on T+1 and continue dated backfill if overdue
 
 [Timer]
-OnCalendar=*-*-* 00..17:10/30:00 Asia/Shanghai
+OnCalendar=*-*-* 06,08,10,12,14,16:10:00 Asia/Shanghai
+OnCalendar=*-*-* 17:40:00 Asia/Shanghai
 AccuracySec=1min
 Persistent=true
 Unit=hermes-ods-maturity-recovery.service

@@ -3,7 +3,8 @@
 
 The nightly controller never publishes a synthetic minute series.  When its
 same-session Tencent qualification is deferred, this worker rechecks only the
-same immutable market date during the following day's maturity window.  It
+same immutable market date during the following day's maturity window and
+continues dated backfill if it remains overdue.  It
 first seals ODS only, then makes a separate DWD attempt, so a DWD failure
 cannot cause another upstream 1m scan.
 """
@@ -16,12 +17,16 @@ import os
 import re
 import subprocess
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+
+from quanthus.pipelines.source_maturity import source_maturity_deferred  # noqa: E402
+
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 SOURCE_MATURITY_DEFERRED = 3
 _QUALIFICATION_MARKER = "tencent source qualification failed"
@@ -41,16 +46,21 @@ def _lane_status(payload: dict[str, Any], lane: str) -> str | None:
     if not isinstance(raw, dict):
         return None
     entry = raw.get(lane)
-    return entry.get("status") if isinstance(entry, dict) and isinstance(entry.get("status"), str) else None
+    if isinstance(entry, dict) and isinstance(entry.get("status"), str):
+        return entry["status"]
+    return None
 
 
 def _legacy_source_maturity_failure(payload: dict[str, Any]) -> bool:
     """Recognize the pre-deferral 9/23 form without masking other failures."""
 
-    if any(
-        _lane_status(payload, lane) != "ready"
-        for lane in ("market-daily-core", "calendar-daily-events", "intraday-5m")
-    ) or _lane_status(payload, "intraday-1m") != "failed":
+    if (
+        any(
+            _lane_status(payload, lane) != "ready"
+            for lane in ("market-daily-core", "calendar-daily-events", "intraday-5m")
+        )
+        or _lane_status(payload, "intraday-1m") != "failed"
+    ):
         return False
     lanes = payload.get("lanes", {})
     minute = lanes.get("intraday-1m", {}) if isinstance(lanes, dict) else {}
@@ -68,10 +78,7 @@ def _legacy_source_maturity_failure(payload: dict[str, Any]) -> bool:
         # Follow this one repository-written path, never a provider-supplied
         # file name, and demand the exact marker there as well.
         for raw_attempt_dir in _ATTEMPT_DIR_PATTERN.findall(text):
-            checkpoint = (
-                Path(raw_attempt_dir)
-                / "landing/provider_raw/minute_1m/checkpoint.json"
-            )
+            checkpoint = Path(raw_attempt_dir) / "landing/provider_raw/minute_1m/checkpoint.json"
             try:
                 checkpoint_text = checkpoint.read_text(encoding="utf-8", errors="replace").lower()
             except OSError:
@@ -100,20 +107,48 @@ def _pending_maturity_session(shadow_root: Path, today: date) -> date | None:
             continue
         if market_date >= today or not date_root.is_dir():
             continue
-        latest: tuple[str, dict[str, Any]] | None = None
+        if _completion_marker(shadow_root, market_date).is_file():
+            continue
+        latest: tuple[str, dict[str, Any], bool] | None = None
+        had_deferred = False
         for run_path in date_root.glob("*/run.json"):
             try:
                 payload = json.loads(run_path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 continue
-            marker = str(payload.get("finished_at") or payload.get("started_at") or run_path.parent.name)
+            marker = str(
+                payload.get("finished_at") or payload.get("started_at") or run_path.parent.name
+            )
+            lanes = payload.get("lanes")
+            is_deferred = (
+                payload.get("status") == "deferred_source_maturity"
+                or (
+                    payload.get("status") == "failed"
+                    and isinstance(lanes, dict)
+                    and source_maturity_deferred(
+                        lanes, shadow_root=shadow_root, market_date=market_date
+                    )
+                )
+                or (market_date == date(2026, 9, 23) and _legacy_source_maturity_failure(payload))
+            )
+            had_deferred = had_deferred or is_deferred
             if latest is None or marker > latest[0]:
-                latest = (marker, payload)
-        if latest is None:
+                latest = (marker, payload, is_deferred)
+        if latest is None or not had_deferred:
             continue
         payload = latest[1]
-        if payload.get("status") == "deferred_source_maturity" or _legacy_source_maturity_failure(
-            payload
+        lanes = payload.get("lanes")
+        all_lanes_ready = isinstance(lanes, dict) and all(
+            _lane_status(payload, lane) == "ready"
+            for lane in (
+                "market-daily-core",
+                "calendar-daily-events",
+                "intraday-5m",
+                "intraday-1m",
+            )
+        )
+        if latest[2] or (
+            payload.get("status") in {"failed", "ods_ready", "ready"} and all_lanes_ready
         ):
             candidates.append(market_date)
     return min(candidates) if candidates else None
@@ -126,6 +161,40 @@ def _run(command: list[str]) -> int:
 
 def _completion_marker(root: Path, market_date: date) -> Path:
     return root / "recovery/matured-1m" / market_date.isoformat() / "dwd-complete.json"
+
+
+def _overdue_marker(root: Path, market_date: date) -> Path:
+    return root / "recovery/matured-1m" / market_date.isoformat() / "tplus1-overdue.json"
+
+
+def _is_overdue(market_date: date, now: datetime, cutoff: time) -> bool:
+    """The T+1 alert is distinct from the still-open dated backfill queue."""
+
+    return now >= datetime.combine(market_date + timedelta(days=1), cutoff, SHANGHAI)
+
+
+def _notify_overdue(node_id: str, market_date: date, run_path: str, cutoff: time) -> int:
+    node = "CN01" if node_id == "cn01" else node_id.title()
+    return _run(
+        [
+            str(ROOT / "ops/bin/notify-dwd-event"),
+            "--event",
+            f"{node_id}_dwd_failed",
+            "--market-date",
+            market_date.isoformat(),
+            "--node",
+            node,
+            "--stage",
+            "ods_to_dwd_maturity_recovery",
+            "--unit",
+            f"{node_id}-ods-maturity-recovery.service",
+            "--run-path",
+            run_path,
+            "--error",
+            f"T+1 {cutoff.strftime('%H:%M')} CST source maturity deadline exceeded; "
+            "dated backfill remains active",
+        ]
+    )
 
 
 def _notify(node_id: str, market_date: date, run_path: str) -> int:
@@ -153,6 +222,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--market-date", type=date.fromisoformat)
     parser.add_argument("--recovery-window-seconds", type=int, default=10800)
+    parser.add_argument("--tplus1-cutoff", type=time.fromisoformat, default=time(17, 40))
     args = parser.parse_args()
     if args.recovery_window_seconds <= 0:
         parser.error("--recovery-window-seconds must be positive")
@@ -175,6 +245,8 @@ def main() -> int:
     if marker.is_file():
         print(json.dumps({"status": "already_complete", "market_date": market_date.isoformat()}))
         return 0
+    run_root = shadow_root / "orchestrator/daily" / market_date.isoformat()
+    overdue = _overdue_marker(shadow_root, market_date)
 
     orchestrator = Path(
         os.environ.get("QUANTHUS_ODS_DAILY_ORCHESTRATOR", str(ROOT / "ops/bin/run-cn01-ods-daily"))
@@ -188,7 +260,32 @@ def main() -> int:
     ]
     ods_rc = _run([*common, "--ods-only"])
     if ods_rc == SOURCE_MATURITY_DEFERRED:
-        print(json.dumps({"status": "pending_source_maturity", "market_date": market_date.isoformat()}))
+        if (
+            _is_overdue(market_date, datetime.now(SHANGHAI), args.tplus1_cutoff)
+            and not overdue.is_file()
+        ):
+            notification_rc = _notify_overdue(
+                node_id, market_date, str(run_root), args.tplus1_cutoff
+            )
+            if notification_rc != 0:
+                return notification_rc
+            _atomic_json(
+                overdue,
+                {
+                    "schema_version": 1,
+                    "kind": "matured_1m_tplus1_overdue",
+                    "market_date": market_date.isoformat(),
+                    "node": node_id,
+                    "status": "overdue_backfill_active",
+                    "notified_at": datetime.now(SHANGHAI).isoformat(),
+                    "run_root": str(run_root),
+                },
+            )
+        print(
+            json.dumps(
+                {"status": "pending_source_maturity", "market_date": market_date.isoformat()}
+            )
+        )
         return 0
     if ods_rc != 0:
         return ods_rc
@@ -196,7 +293,6 @@ def main() -> int:
     dwd_rc = _run(common)
     if dwd_rc != 0:
         return dwd_rc
-    run_root = shadow_root / "orchestrator/daily" / market_date.isoformat()
     _atomic_json(
         marker,
         {

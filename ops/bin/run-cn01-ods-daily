@@ -28,6 +28,7 @@ from quanthus.pipelines.process_control import (  # noqa: E402
 from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (  # noqa: E402
     find_ready_daily_ods_lanes,
 )
+from quanthus.pipelines.source_maturity import source_maturity_deferred  # noqa: E402
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 UTC = timezone.utc
@@ -47,7 +48,6 @@ _CATALOG_LANES = {
 # The maturity recovery timer retries that exact date only after the source has
 # had time to publish its historical representation.
 SOURCE_MATURITY_DEFERRED = 3
-_TENCENT_QUALIFICATION_MARKER = "tencent source qualification failed"
 
 
 def _load_env_file(path: Path) -> None:
@@ -327,31 +327,6 @@ def _write_run_state(run_root: Path, state: dict[str, Any], *, ready: bool) -> N
         ready_path.unlink(missing_ok=True)
 
 
-def _source_maturity_deferred(lanes: dict[str, dict[str, Any]]) -> bool:
-    """Recognize the bounded, auditable Tencent current-session deferral only.
-
-    A transport, storage, daily, calendar, or 5m failure must remain a terminal
-    failed run.  Deferral is permitted only when those three independent lanes
-    are READY and the 1m collector stopped at its explicit source qualification
-    before scanning the full universe.
-    """
-
-    required = ("market-daily-core", "calendar-daily-events", "intraday-5m")
-    if any(lanes.get(lane, {}).get("status") != "ready" for lane in required):
-        return False
-    minute = lanes.get("intraday-1m", {})
-    if minute.get("status") != "failed":
-        return False
-    for raw_path in minute.get("logs", []):
-        try:
-            log_text = Path(str(raw_path)).read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        if _TENCENT_QUALIFICATION_MARKER in log_text.lower():
-            return True
-    return False
-
-
 def main() -> int:
     _load_node_environment()
     parser = argparse.ArgumentParser()
@@ -609,7 +584,9 @@ def main() -> int:
             }
 
     lane_success = all(item.get("status") == "ready" for item in state["lanes"].values())
-    source_deferred = not lane_success and _source_maturity_deferred(state["lanes"])
+    source_deferred = not lane_success and source_maturity_deferred(
+        state["lanes"], shadow_root=shadow_root, market_date=market_date
+    )
     if lane_success:
         dwd_deadline = time.monotonic() + dwd_sla_seconds
         catalog_command = [
@@ -684,7 +661,8 @@ def main() -> int:
         state["catalog"] = {"status": "deferred_source_maturity"}
         state["dwd"] = {"status": "deferred_source_maturity"}
         state["deferred_reason"] = (
-            "Tencent current-session 1m source failed exact qualification; "
+            "Tencent 1m source failed exact qualification or a complete scan's "
+            "daily volume/close checks; "
             "awaiting date-bounded maturity recovery"
         )
     elif not lane_success:

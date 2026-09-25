@@ -627,7 +627,7 @@ def main() -> int:
     closed_session = all(
         state["lanes"].get(lane, {}).get("status") == "closed_session"
         for lane in ("market-daily-core", "intraday-5m", "intraday-1m")
-    )
+    ) and state["lanes"].get("calendar-daily-events", {}).get("status") == "ready"
     lane_success = all(item.get("status") == "ready" for item in state["lanes"].values())
     source_deferred = not lane_success and source_maturity_deferred(
         state["lanes"], shadow_root=shadow_root, market_date=market_date

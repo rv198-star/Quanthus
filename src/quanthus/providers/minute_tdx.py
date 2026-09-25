@@ -293,7 +293,10 @@ def _tencent_one_minute_bars(
             os.replace(temporary, raw_path)
             payload = json.loads(raw)
             if payload.get("code") != 0:
-                raise ValueError(f"Tencent response code {payload.get('code')}")
+                # Provider faults such as code 11 (Redis unavailable) are
+                # transient, unlike a deterministic daily-volume mismatch.
+                # Keep the raw response and use the bounded transport retry.
+                raise RuntimeError(f"Tencent response code {payload.get('code')}")
             source = payload["data"][provider_symbol]["m1"]
             selected = [
                 row for row in source if str(row[0]).startswith(market_date.replace("-", ""))

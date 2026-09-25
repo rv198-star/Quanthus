@@ -168,6 +168,17 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
     os.replace(temp, path)
 
 
+def select_canary_symbols(raw: str, traded_codes: list[str]) -> list[str]:
+    requested = [item.strip() for item in raw.split(",")]
+    if (
+        len(requested) not in {1, 2, 3}
+        or len(requested) != len(set(requested))
+        or any(code not in traded_codes for code in requested)
+    ):
+        raise ValueError("canary requires one to three unique, traded sealed-universe codes")
+    return requested
+
+
 def _audit_symbol(
     code: str,
     *,
@@ -240,6 +251,10 @@ def main() -> int:
     parser.add_argument("--rate-per-second", type=float, default=1)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--limit", type=int)
+    parser.add_argument(
+        "--symbols",
+        help="Comma-separated, at most three traded codes for a bounded canary audit",
+    )
     args = parser.parse_args()
     if (
         args.rate_per_second <= 0
@@ -247,8 +262,9 @@ def main() -> int:
         or args.workers < 1
         or args.workers > 8
         or (args.limit is not None and args.limit < 1)
+        or (args.symbols is not None and args.limit is not None)
     ):
-        parser.error("rate must be in (0,5], workers in [1,8], and limit positive")
+        parser.error("invalid rate, workers, limit, or mutually exclusive symbol selection")
     import pyarrow.parquet as pq
 
     daily_rows = pq.read_table(
@@ -272,7 +288,9 @@ def main() -> int:
     ):
         raise ValueError("sealed daily/status universe or date mismatch")
     codes = [code for code in sorted(daily) if str(status[code]["tradestatus"]) == "1"]
-    if args.limit is not None:
+    if args.symbols is not None:
+        codes = select_canary_symbols(args.symbols, codes)
+    elif args.limit is not None:
         codes = codes[: args.limit]
     if any(code not in first for code in codes):
         raise ValueError("native 5m opening bucket missing for selected symbols")

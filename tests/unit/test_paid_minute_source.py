@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from quanthus.providers.paid_minute_source import _audit_symbol, qualify_payload
+from quanthus.providers.paid_minute_source import (
+    _audit_symbol,
+    qualify_payload,
+    select_canary_symbols,
+)
 from quanthus.providers.tencent_m1_normalize import expected_times
 
 DATE = "2026-09-23"
@@ -116,3 +120,11 @@ def test_rate_limit_is_recorded_without_persisting_key(tmp_path, monkeypatch) ->
     assert receipt["retry_after"] == "60"
     assert not (tmp_path / "raw").exists()
     assert "do-not-persist-this-key" not in (tmp_path / "receipts/000001.json").read_text()
+
+
+def test_explicit_canary_is_bounded_to_traded_sealed_universe() -> None:
+    traded = ["000001", "600000", "688001", "000002"]
+    assert select_canary_symbols("000001,600000,688001", traded) == traded[:3]
+    for invalid in ("", "000001,000001", "000001,600000,688001,000002", "300001"):
+        with pytest.raises(ValueError, match="canary requires"):
+            select_canary_symbols(invalid, traded)

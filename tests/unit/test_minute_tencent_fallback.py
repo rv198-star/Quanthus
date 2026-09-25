@@ -101,6 +101,31 @@ class TencentMinuteFallbackTests(unittest.TestCase):
                 _payload("2026-09-23"),
             )
 
+    def test_transient_provider_code_retries_without_publishing_bad_raw(self):
+        responses = iter(
+            (json.dumps({"code": 11, "msg": "Redis server went away"}).encode(),
+             _payload("2026-09-23"))
+        )
+        calls = []
+
+        def opener(*_args, **_kwargs):
+            calls.append(1)
+            return _Response(next(responses))
+
+        with tempfile.TemporaryDirectory() as temporary:
+            frame, meta = _tencent_one_minute_bars(
+                "000001", "2026-09-23",
+                {"volume": 24100, "close": 10, "tradestatus": "1"},
+                Path(temporary), opener=opener,
+            )
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(meta["attempts"], 2)
+            self.assertEqual(len(frame), 240)
+            self.assertEqual(
+                gzip.decompress(Path(meta["source_raw_path"]).read_bytes()),
+                _payload("2026-09-23"),
+            )
+
     def test_qualification_prefers_non_round_lot_volume_per_market(self):
         daily = {
             "000001": {"volume": 20000, "tradestatus": "1"},

@@ -726,6 +726,45 @@ def test_recovery_keeps_date_open_after_ods_ready_or_dwd_failure(tmp_path: Path)
     assert module._pending_maturity_session(shadow, date(2026, 9, 25)) is None
 
 
+def test_recovery_keeps_deferred_date_open_after_transient_ods_failure(
+    tmp_path: Path,
+) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    date_root = shadow / "orchestrator/daily/2026-09-24"
+    first = date_root / "first"
+    first.mkdir(parents=True)
+    (first / "run.json").write_text(
+        json.dumps(
+            {
+                "finished_at": "2026-09-25T04:10:00Z",
+                "status": "deferred_source_maturity",
+            }
+        ),
+        encoding="utf-8",
+    )
+    later = date_root / "later"
+    later.mkdir()
+    (later / "run.json").write_text(
+        json.dumps(
+            {
+                "finished_at": "2026-09-25T06:44:00Z",
+                "status": "failed",
+                "lanes": {
+                    "market-daily-core": {"status": "ready"},
+                    "calendar-daily-events": {"status": "ready"},
+                    "intraday-5m": {"status": "ready"},
+                    "intraday-1m": {"status": "failed"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert module._pending_maturity_session(shadow, date(2026, 9, 25)) == date(
+        2026, 9, 24
+    )
+
+
 def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
     service = (ROOT / "ops/systemd/hermes-ods-daily-orchestrator.service").read_text(
         encoding="ascii"

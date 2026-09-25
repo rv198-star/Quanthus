@@ -334,6 +334,77 @@ raise SystemExit(0)
     assert context["error_code"] == "source_maturity_deferred"
 
 
+def test_orchestrator_defers_only_a_complete_source_mismatch_scan(tmp_path: Path) -> None:
+    shadow = tmp_path / "shadow"
+    attempt = shadow / "attempts/intraday-archive/1m/2026-08-04/run-1"
+    landing = attempt / "landing"
+    checkpoint = landing / "provider_raw/minute_1m/checkpoint.json"
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_text(
+        json.dumps(
+            {
+                "symbols": {
+                    "000001": {"ok": True, "status": "done"},
+                    "000002": {
+                        "status": "error",
+                        "error": "Tencent/daily close mismatch for 000002",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (landing / "acquisition_log.json").write_text(
+        json.dumps(
+            {
+                "collector": {
+                    "provider": "quanthus.providers.minute_tdx",
+                    "bar_size": "1m",
+                    "market_date": "2026-08-04",
+                    "exit_code": 1,
+                    "universe_size": 2,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    runner = tmp_path / "runner.py"
+    _write_executable(
+        runner,
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "if '--stream' in sys.argv and sys.argv[sys.argv.index('--stream') + 1] == '1m':\n"
+        f"    print({json.dumps({'attempt_dir': str(attempt)})!r})\n"
+        "    raise SystemExit(1)\n"
+        "raise SystemExit(0)\n",
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "HERMES_ODS_NODE_ID": "cn01",
+            "HERMES_ODS_ENV_FILE": str(tmp_path / "missing.env"),
+            "HERMES_ODS_SHADOW_ROOT": str(shadow),
+            "ASTOCK_HOME": str(tmp_path / "home"),
+            "HERMES_ODS_RUNNER": str(runner),
+            "HERMES_ODS_DAILY_SLA_SECONDS": "20",
+            "HERMES_ODS_ORCHESTRATOR_POLL_SECONDS": "0.1",
+        }
+    )
+    completed = subprocess.run(
+        [str(ORCHESTRATOR), "--market-date", "2026-08-04"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 3, completed.stderr + completed.stdout
+    state = json.loads(completed.stdout)
+    assert state["status"] == "deferred_source_maturity"
+    assert state["catalog"] == {"status": "deferred_source_maturity"}
+    assert state["dwd"] == {"status": "deferred_source_maturity"}
+
+
 def test_completion_notification_checker_refuses_deferred_state(tmp_path: Path) -> None:
     context = tmp_path / "context.json"
     context.write_text('{"status":"deferred_source_maturity"}\n', encoding="ascii")
@@ -368,12 +439,78 @@ def test_maturity_recovery_keeps_a_qualified_pending_source_quiet(tmp_path: Path
     with (
         patch.dict(os.environ, env, clear=False),
         patch.object(sys, "argv", [str(MATURITY_RECOVERY), "--market-date", "2026-08-04"]),
+        patch.object(module, "_is_overdue", return_value=False),
         patch.object(module, "_run", return_value=3) as run,
     ):
         assert module.main() == 0
     assert run.call_count == 1
     assert run.call_args.args[0][-1] == "--ods-only"
     assert not (shadow / "recovery/matured-1m/2026-08-04/dwd-complete.json").exists()
+
+
+def test_maturity_recovery_alerts_once_after_tplus1_but_keeps_backfill_open(
+    tmp_path: Path,
+) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_SHADOW_ROOT": str(shadow),
+        "QUANTHUS_ODS_DAILY_ORCHESTRATOR": str(tmp_path / "orchestrator"),
+    }
+    with (
+        patch.dict(os.environ, env, clear=False),
+        patch.object(sys, "argv", [str(MATURITY_RECOVERY), "--market-date", "2026-08-04"]),
+        patch.object(module, "_is_overdue", return_value=True),
+        patch.object(module, "_run", side_effect=[3, 0, 3]) as run,
+    ):
+        assert module.main() == 0
+        assert module.main() == 0
+    overdue = shadow / "recovery/matured-1m/2026-08-04/tplus1-overdue.json"
+    assert json.loads(overdue.read_text(encoding="ascii"))["status"] == "overdue_backfill_active"
+    assert run.call_count == 3
+    assert "cn01_dwd_failed" in run.call_args_list[1].args[0]
+    assert not (overdue.parent / "dwd-complete.json").exists()
+
+
+def test_maturity_recovery_does_not_mark_overdue_when_alert_fails(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_SHADOW_ROOT": str(shadow),
+        "QUANTHUS_ODS_DAILY_ORCHESTRATOR": str(tmp_path / "orchestrator"),
+    }
+    with (
+        patch.dict(os.environ, env, clear=False),
+        patch.object(sys, "argv", [str(MATURITY_RECOVERY), "--market-date", "2026-08-04"]),
+        patch.object(module, "_is_overdue", return_value=True),
+        patch.object(module, "_run", side_effect=[3, 2]) as run,
+    ):
+        assert module.main() == 2
+    assert run.call_count == 2
+    assert not (shadow / "recovery/matured-1m/2026-08-04/tplus1-overdue.json").exists()
+
+
+def test_maturity_recovery_cutoff_is_on_the_following_shanghai_day() -> None:
+    module = _load_maturity_recovery_module()
+    from datetime import datetime, time
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("Asia/Shanghai")
+    market_date = date(2026, 9, 23)
+    cutoff = time(17, 40)
+    assert not module._is_overdue(market_date, datetime(2026, 9, 24, 17, 39, tzinfo=tz), cutoff)
+    assert module._is_overdue(market_date, datetime(2026, 9, 24, 17, 40, tzinfo=tz), cutoff)
+
+
+def test_maturity_timer_uses_bounded_tplus1_probe_cadence() -> None:
+    timer = (ROOT / "ops/systemd/hermes-ods-maturity-recovery.timer").read_text(
+        encoding="ascii"
+    )
+    assert "OnCalendar=*-*-* 06,08,10,12,14,16:10:00 Asia/Shanghai" in timer
+    assert "OnCalendar=*-*-* 17:40:00 Asia/Shanghai" in timer
+    assert "Persistent=true" in timer
 
 
 def test_maturity_recovery_seals_one_completion_marker_before_notifying(tmp_path: Path) -> None:
@@ -448,6 +585,145 @@ def test_maturity_recovery_uses_existing_lane_receipts_not_a_stale_calendar(tmp_
     assert module._pending_maturity_session(tmp_path / "shadow", date(2026, 9, 24)) == date(
         2026, 9, 23
     )
+
+
+def test_legacy_volume_marker_cannot_defer_new_dates(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    root = tmp_path / "shadow/orchestrator/daily/2026-09-24/legacy"
+    root.mkdir(parents=True)
+    log = root / "minute.log"
+    log.write_text("Tencent/daily volume mismatch", encoding="utf-8")
+    (root / "run.json").write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "lanes": {
+                    "market-daily-core": {"status": "ready"},
+                    "calendar-daily-events": {"status": "ready"},
+                    "intraday-5m": {"status": "ready"},
+                    "intraday-1m": {"status": "failed", "logs": [str(log)]},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert module._pending_maturity_session(tmp_path / "shadow", date(2026, 9, 25)) is None
+
+
+def test_recovery_adopts_complete_source_mismatch_from_predeployment_run(
+    tmp_path: Path,
+) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    market_date = date(2026, 9, 24)
+    attempt = shadow / "attempts/intraday-archive/1m/2026-09-24/run-1"
+    landing = attempt / "landing"
+    checkpoint = landing / "provider_raw/minute_1m/checkpoint.json"
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_text(
+        json.dumps(
+            {
+                "symbols": {
+                    "000001": {"ok": True, "status": "done"},
+                    "000002": {
+                        "status": "error",
+                        "error": "Tencent/daily close mismatch for 000002",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (landing / "acquisition_log.json").write_text(
+        json.dumps(
+            {
+                "collector": {
+                    "provider": "quanthus.providers.minute_tdx",
+                    "bar_size": "1m",
+                    "market_date": market_date.isoformat(),
+                    "exit_code": 1,
+                    "universe_size": 2,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    run = shadow / "orchestrator/daily/2026-09-24/old-run"
+    run.mkdir(parents=True)
+    log = run / "minute.log"
+    log.write_text(json.dumps({"attempt_dir": str(attempt)}), encoding="utf-8")
+    (run / "run.json").write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "lanes": {
+                    "market-daily-core": {"status": "ready"},
+                    "calendar-daily-events": {"status": "ready"},
+                    "intraday-5m": {"status": "ready"},
+                    "intraday-1m": {"status": "failed", "logs": [str(log)]},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert module._pending_maturity_session(shadow, date(2026, 9, 25)) == market_date
+
+
+def test_recovery_keeps_date_open_after_ods_ready_or_dwd_failure(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    date_root = shadow / "orchestrator/daily/2026-09-24"
+    deferred = date_root / "first"
+    deferred.mkdir(parents=True)
+    (deferred / "run.json").write_text(
+        json.dumps(
+            {
+                "finished_at": "2026-09-24T12:00:00Z",
+                "status": "deferred_source_maturity",
+            }
+        ),
+        encoding="utf-8",
+    )
+    ready_lanes = {
+        lane: {"status": "ready"}
+        for lane in (
+            "market-daily-core",
+            "calendar-daily-events",
+            "intraday-5m",
+            "intraday-1m",
+        )
+    }
+    later = date_root / "later"
+    later.mkdir()
+    for status in ("ods_ready", "failed"):
+        (later / "run.json").write_text(
+            json.dumps(
+                {
+                    "finished_at": "2026-09-25T03:00:00Z",
+                    "status": status,
+                    "lanes": ready_lanes,
+                }
+            ),
+            encoding="utf-8",
+        )
+        assert module._pending_maturity_session(shadow, date(2026, 9, 25)) == date(
+            2026, 9, 24
+        )
+    (later / "run.json").write_text(
+        json.dumps(
+            {
+                "finished_at": "2026-09-25T03:00:00Z",
+                "status": "ready",
+                "lanes": ready_lanes,
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert module._pending_maturity_session(shadow, date(2026, 9, 25)) is None
+    completion = shadow / "recovery/matured-1m/2026-09-24/dwd-complete.json"
+    completion.parent.mkdir(parents=True)
+    completion.write_text('{"status":"ready"}\n', encoding="ascii")
+    assert module._pending_maturity_session(shadow, date(2026, 9, 25)) is None
 
 
 def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:

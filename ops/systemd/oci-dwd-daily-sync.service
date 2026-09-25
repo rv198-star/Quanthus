@@ -25,8 +25,11 @@ Environment=QUANTHUS_DWD_FAILURE_RECEIPT=/home/ubuntu/data/quanthus/dwd-daily/fa
 Environment=QUANTHUS_NODE=OCI
 Environment=QUANTHUS_SYSTEMD_UNIT=oci-dwd-daily-sync.service
 WorkingDirectory=/opt/quanthus/warehouse-current
-ExecStart=/opt/quanthus/warehouse-current/.venv/bin/python /opt/quanthus/warehouse-current/ops/bin/sync-cn01-dwd-daily --wait-seconds 43200 --poll-seconds 60 --max-attempts 3
-TimeoutStartSec=13h
+# 20:30 T through 20:00 T+1: allow the 17:40 source-maturity
+# deadline plus bounded ODS/DWD build time, then free the unit before
+# the next 20:30 timer. A stale CURRENT before then is not a sync failure.
+ExecStart=/opt/quanthus/warehouse-current/.venv/bin/python /opt/quanthus/warehouse-current/ops/bin/sync-cn01-dwd-daily --wait-seconds 84600 --poll-seconds 60 --max-attempts 3
+TimeoutStartSec=24h
 Nice=5
 IOSchedulingClass=best-effort
 IOSchedulingPriority=5

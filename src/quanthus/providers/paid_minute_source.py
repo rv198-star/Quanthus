@@ -21,6 +21,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from quanthus.providers.minute_source_selection import MinuteCandidate
 from quanthus.providers.tencent_m1_normalize import expected_times
 
 ENDPOINT = "https://pcd.mobcvb.cn/tushare/pro/stk_mins"
@@ -159,6 +160,69 @@ def qualify_payload(
         "source_close": str(seen["15:00"]["close"]),
         "amount_status": "source_present_unpublished_pending_separate_quality_review",
     }
+
+
+def normalized_candidate(
+    raw: bytes,
+    *,
+    symbol: str,
+    market_date: str,
+    daily_volume: Any,
+    daily_close: Any,
+    first_5m_volume: Any,
+    raw_ref: str,
+) -> MinuteCandidate:
+    """Build one quarantined, whole-security candidate from exact source bytes.
+
+    The 09:30 auction is merged only when the daily/5m qualification above
+    licenses it. Minute amount remains null until its own quality contract is
+    accepted, despite the relay exposing an amount field in its raw response.
+    """
+    payload = json.loads(raw)
+    result = qualify_payload(
+        payload,
+        symbol=symbol,
+        market_date=market_date,
+        daily_volume=daily_volume,
+        daily_close=daily_close,
+        first_5m_volume=first_5m_volume,
+    )
+    fields = payload["data"]["fields"]
+    by_time = {
+        str(row[fields.index("trade_time")])[11:16]: dict(zip(fields, row, strict=True))
+        for row in payload["data"]["items"]
+    }
+    auction = by_time.get("09:30")
+    rows: list[dict[str, Any]] = []
+    for stamp in expected_times(market_date):
+        hhmm = stamp[-4:-2] + ":" + stamp[-2:]
+        source = by_time[hhmm]
+        values = {name: _decimal(source[name]) for name in ("open", "high", "low", "close", "vol")}
+        if hhmm == "09:31" and auction and result["auction_mode"] == "merged_into_0931":
+            values["open"] = _decimal(auction["open"])
+            values["high"] = max(values["high"], _decimal(auction["high"]))
+            values["low"] = min(values["low"], _decimal(auction["low"]))
+            values["vol"] += _decimal(auction["vol"])
+        rows.append(
+            {
+                "stock_code": symbol.split(".")[0],
+                "ts": f"{market_date} {hhmm}:00",
+                "open": values["open"],
+                "high": values["high"],
+                "low": values["low"],
+                "close": values["close"],
+                "volume": values["vol"],
+                "amount": None,
+            }
+        )
+    return MinuteCandidate(
+        provider="paid-tushare-style-proxy-stk_mins",
+        raw_sha256=hashlib.sha256(raw).hexdigest(),
+        raw_ref=raw_ref,
+        rows=tuple(rows),
+        auction_provenance=result["auction_mode"],
+        amount_status="source_present_unpublished_pending_separate_quality_review",
+    )
 
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:

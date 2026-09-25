@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
+from quanthus.providers.minute_source_selection import qualify_candidate
 from quanthus.providers.paid_minute_source import (
     _audit_symbol,
+    normalized_candidate,
     qualify_payload,
     select_canary_symbols,
 )
@@ -128,3 +132,42 @@ def test_explicit_canary_is_bounded_to_traded_sealed_universe() -> None:
     for invalid in ("", "000001,000001", "000001,600000,688001,000002", "300001"):
         with pytest.raises(ValueError, match="canary requires"):
             select_canary_symbols(invalid, traded)
+
+
+def test_qualified_payload_becomes_one_complete_candidate_without_amount_inference() -> None:
+    raw = json.dumps(payload(preopen=True)).encode()
+    result = normalized_candidate(
+        raw,
+        symbol="000001.SZ",
+        market_date=DATE,
+        daily_volume=2500,
+        daily_close=11,
+        first_5m_volume=150,
+        raw_ref="quarantine/raw/000001.json.gz",
+    )
+    assert len(result.rows) == 240
+    assert result.rows[0]["volume"] == 110
+    assert all(row["amount"] is None for row in result.rows)
+    assert qualify_candidate(
+        result,
+        symbol="000001",
+        market_date=DATE,
+        daily_volume=2500,
+        daily_close=11,
+        traded=True,
+    )
+
+
+def test_duplicate_auction_is_not_counted_twice_in_candidate() -> None:
+    result = normalized_candidate(
+        json.dumps(payload()).encode(),
+        symbol="000001.SZ",
+        market_date=DATE,
+        daily_volume=2400,
+        daily_close=11,
+        first_5m_volume=50,
+        raw_ref="quarantine/raw/000001.json.gz",
+    )
+    assert result.auction_provenance == "duplicate_0930_excluded"
+    assert result.rows[0]["volume"] == 10
+    assert sum(row["volume"] for row in result.rows) == 2400

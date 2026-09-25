@@ -314,6 +314,7 @@ def main() -> int:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--rate-per-second", type=float, default=1)
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--wall-budget-seconds", type=int, default=240)
     parser.add_argument("--limit", type=int)
     parser.add_argument(
         "--full-market",
@@ -330,6 +331,7 @@ def main() -> int:
         or args.rate_per_second > 5
         or args.workers < 1
         or args.workers > 8
+        or args.wall_budget_seconds < 60
         or (args.limit is not None and args.limit < 1)
         or (args.symbols is not None and args.limit is not None)
         or (args.full_market and (args.symbols is not None or args.limit is not None))
@@ -373,13 +375,33 @@ def main() -> int:
     if not key:
         raise ValueError("empty API key")
     counts: Counter[str] = Counter()
+    started = time.monotonic()
     next_call = time.monotonic()
     processed = 0
     stop_reason = "completed"
+
+    def checkpoint() -> None:
+        _write_json(
+            args.output_dir / "summary.json",
+            {
+                "market_date": day,
+                "selected_traded_symbols": len(codes),
+                "processed": processed,
+                "counts": counts,
+                "stop_reason": stop_reason,
+                "elapsed_seconds": round(time.monotonic() - started, 1),
+                "quarantine_only": True,
+                "production_publication": False,
+            },
+        )
+
     try:
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
-            for start in range(0, len(codes), 20):
-                batch = codes[start : start + 20]
+            for start in range(0, len(codes), 10):
+                if time.monotonic() - started >= args.wall_budget_seconds:
+                    stop_reason = "stopped_on_wall_budget"
+                    break
+                batch = codes[start : start + 10]
                 futures = []
                 for code in batch:
                     time.sleep(max(0.0, next_call - time.monotonic()))
@@ -401,6 +423,7 @@ def main() -> int:
                     counts[receipt["status"]] += 1
                     batch_counts[receipt["status"]] += 1
                 processed = start + len(batch)
+                checkpoint()
                 print(
                     json.dumps(
                         {"processed": processed, "total": len(codes), "counts": counts},
@@ -417,20 +440,15 @@ def main() -> int:
                 if batch_counts["http_error"]:
                     stop_reason = "stopped_on_provider_http_error_batch"
                     break
+                if time.monotonic() - started >= args.wall_budget_seconds:
+                    stop_reason = "stopped_on_wall_budget"
+                    break
+    except BaseException:
+        stop_reason = "interrupted_before_terminal_batch"
+        raise
     finally:
         key = ""
-    _write_json(
-        args.output_dir / "summary.json",
-        {
-            "market_date": day,
-            "selected_traded_symbols": len(codes),
-            "processed": processed,
-            "counts": counts,
-            "stop_reason": stop_reason,
-            "quarantine_only": True,
-            "production_publication": False,
-        },
-    )
+        checkpoint()
     return 0 if stop_reason == "completed" else 3
 
 

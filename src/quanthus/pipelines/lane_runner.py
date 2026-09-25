@@ -3759,8 +3759,11 @@ def _run_minute_collector(
     if policy_path is not None:
         cmd.extend(["--recovery-policy", str(policy_path)])
     tencent_opt_in = os.environ.get("HERMES_ODS_MINUTE_TENCENT_FALLBACK", "").strip()
+    paid_audit_raw = os.environ.get("HERMES_ODS_MINUTE_PAID_AUDIT_DIR", "").strip()
     if tencent_opt_in not in {"", "0", "1"}:
         raise LaneRunError("HERMES_ODS_MINUTE_TENCENT_FALLBACK must be 0 or 1")
+    if paid_audit_raw and (tencent_opt_in != "1" or bar_size != "1m"):
+        raise LaneRunError("paid minute audit replay requires Tencent 1m sealed evidence")
     if tencent_opt_in == "1" and bar_size == "1m":
         if collector_override or policy_path or fetch_mode != "incr":
             raise LaneRunError("Tencent 1m requires the repository collector in incr mode")
@@ -3786,8 +3789,13 @@ def _run_minute_collector(
                 str(status_artifact[0]),
             ]
         )
-    # Provider collection is always attempt-local. There is deliberately no
-    # production fallback: shadow runs must never mutate shared legacy partitions.
+        if paid_audit_raw:
+            paid_audit_dir = Path(paid_audit_raw).resolve()
+            if not paid_audit_dir.is_dir():
+                raise LaneRunError("paid minute audit directory is missing")
+            cmd.extend(["--paid-audit-dir", str(paid_audit_dir)])
+    # Provider collection, including explicitly audited whole-security fallback,
+    # is attempt-local and never mutates shared legacy partitions.
     raw_home.mkdir(parents=True, exist_ok=False)
     cmd.extend(["--home", str(raw_home)])
     layer_dir = raw_home

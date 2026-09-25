@@ -42,9 +42,8 @@ class TencentMinuteLaneTest(unittest.TestCase):
         with patch.dict(os.environ, self.env), patch(
             "quanthus.pipelines.lane_runner._latest_market_artifact",
             return_value=None,
-        ):
-            with self.assertRaisesRegex(LaneRunError, "same-date READY market"):
-                self.invoke()
+        ), self.assertRaisesRegex(LaneRunError, "same-date READY market"):
+            self.invoke()
         self.assertFalse(self.raw_home.exists())
 
     def test_passes_both_sealed_artifacts_to_versioned_collector(self):
@@ -68,6 +67,28 @@ class TencentMinuteLaneTest(unittest.TestCase):
         self.assertEqual(result["timeout_seconds"], 3600)
         self.assertEqual(observed[observed.index("--tencent-daily-path") + 1], str(daily))
         self.assertEqual(observed[observed.index("--tencent-status-path") + 1], str(status))
+
+    def test_paid_audit_replay_is_explicit_and_never_passes_a_key(self):
+        audit = self.paths.shadow_root / "audited-raw"
+        audit.mkdir(parents=True)
+        observed = []
+
+        def artifact(*, artifact_name, **_kwargs):
+            return (self.paths.shadow_root / f"{artifact_name}.parquet", {})
+
+        def run(command, **_kwargs):
+            observed.extend(command)
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        with patch.dict(
+            os.environ,
+            {**self.env, "HERMES_ODS_MINUTE_PAID_AUDIT_DIR": str(audit)},
+        ), patch(
+            "quanthus.pipelines.lane_runner._latest_market_artifact", side_effect=artifact
+        ), patch("subprocess.run", side_effect=run):
+            self.invoke()
+        self.assertEqual(observed[observed.index("--paid-audit-dir") + 1], str(audit.resolve()))
+        self.assertFalse(any("key" in argument.lower() for argument in observed))
 
 
 if __name__ == "__main__":

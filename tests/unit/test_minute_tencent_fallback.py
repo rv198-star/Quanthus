@@ -114,7 +114,7 @@ class TencentMinuteFallbackTests(unittest.TestCase):
             ("000002", "600001", "688001"),
         )
 
-    def test_source_qualification_blocks_full_scan_before_partial_bars(self):
+    def test_source_mismatch_scans_each_symbol_but_never_publishes_partial_lane(self):
         import pyarrow as pa
         import pyarrow.parquet as pq
 
@@ -156,9 +156,8 @@ class TencentMinuteFallbackTests(unittest.TestCase):
                     "quanthus.providers.minute_tdx._tencent_one_minute_bars",
                     side_effect=RuntimeError("Tencent/daily volume mismatch"),
                 ) as fetch,
-                self.assertRaisesRegex(RuntimeError, "source qualification failed"),
             ):
-                collect(
+                result = collect(
                     home=home,
                     layer="research",
                     frequency="1m",
@@ -170,15 +169,19 @@ class TencentMinuteFallbackTests(unittest.TestCase):
                     tencent_daily_path=daily,
                     tencent_status_path=status,
                 )
-            self.assertEqual(fetch.call_count, 1)
+            self.assertEqual(result, 1)
+            self.assertEqual(fetch.call_count, 2)
             self.assertEqual(
-                list(json.loads((home / "checkpoint.json").read_text())["symbols"]), []
+                set(json.loads((home / "checkpoint.json").read_text())["symbols"]),
+                {"000001", "600000"},
             )
             self.assertEqual(
-                json.loads((home / "source_qualification.json").read_text())["failed_symbol"],
-                "000001",
+                json.loads((home / "source_qualification.json").read_text())["status"],
+                "per_symbol_strict_scan_not_yet_published",
             )
-            self.assertEqual(json.loads((home / "status.json").read_text())["state"], "failed")
+            self.assertEqual(
+                json.loads((home / "status.json").read_text())["state"], "done_with_errors"
+            )
 
     def test_sealed_market_evidence_requires_same_date_and_both_files(self):
         import pyarrow as pa
@@ -221,6 +224,60 @@ class TencentMinuteFallbackTests(unittest.TestCase):
                     market_date="2026-09-22",
                     symbols=["000001"],
                 )
+
+    def test_qualified_paid_raw_replays_for_one_failed_tencent_symbol(self):
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        day = "2026-09-23"
+        fields = ["ts_code", "trade_time", "freq", "open", "high", "low", "close", "vol", "amount"]
+        items = [
+            ["000001.SZ", f"{day} {stamp[-4:-2]}:{stamp[-2:]}:00", "1MIN", 11, 11, 11, 11, 10, 110]
+            for stamp in expected_times(day)
+        ]
+        items.append(["000001.SZ", f"{day} 09:30:00", "1MIN", 11, 11, 11, 11, 100, 1100])
+        raw = json.dumps(
+            {"code": 0, "api_name": "stk_mins", "count": len(items),
+             "data": {"fields": fields, "items": items}},
+        ).encode()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            daily = root / "daily.parquet"
+            status = root / "status.parquet"
+            pq.write_table(pa.Table.from_pylist([
+                {"stock_code": "000001", "market_date": day, "volume": 2500.0, "close": 11.0}
+            ]), daily)
+            pq.write_table(pa.Table.from_pylist([
+                {"stock_code": "000001", "market_date": day, "tradestatus": "1"}
+            ]), status)
+            audit = root / "audit"
+            (audit / "raw").mkdir(parents=True)
+            (audit / "receipts").mkdir()
+            (audit / "raw/000001.json.gz").write_bytes(gzip.compress(raw))
+            (audit / "receipts/000001.json").write_text(json.dumps({
+                "stock_code": "000001", "market_date": day, "http_status": 200,
+                "status": "qualified_candidate_not_published",
+                "source_raw_sha256": hashlib.sha256(raw).hexdigest(),
+            }))
+            home = root / "minute"
+            with patch(
+                "quanthus.providers.minute_tdx._tencent_one_minute_bars",
+                side_effect=RuntimeError("Tencent/daily volume mismatch"),
+            ):
+                result = collect(
+                    home=home, layer="research", frequency="1m", mode="incr",
+                    symbols=["000001"], max_pages=1, sleep_seconds=0,
+                    market_date=day, tencent_daily_path=daily,
+                    tencent_status_path=status, paid_audit_dir=audit,
+                )
+            self.assertEqual(result, 0)
+            receipt = json.loads((home / "checkpoint.json").read_text())["symbols"]["000001"]
+            self.assertEqual(receipt["provider"], "paid-tushare-style-proxy-stk_mins")
+            self.assertEqual(receipt["source_raw_sha256"], hashlib.sha256(raw).hexdigest())
+            frame = pq.read_table(home / "000001_1m.parquet").to_pandas()
+            self.assertEqual(len(frame), 240)
+            self.assertEqual(frame["volume"].sum(), 2500)
+            self.assertTrue(frame["amount"].isna().all())
 
 
 if __name__ == "__main__":

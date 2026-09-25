@@ -28,6 +28,11 @@ from quanthus.providers.minute_recovery import (
     MinuteRecoveryPolicy,
     load_minute_recovery_policy,
 )
+from quanthus.providers.minute_source_selection import (
+    MinuteCandidate,
+    choose_whole_security,
+)
+from quanthus.providers.paid_minute_source import normalized_candidate
 from quanthus.providers.tencent_m1_normalize import normalize_symbol
 
 PAGE_SIZE = 800
@@ -52,6 +57,7 @@ EASTMONEY_MIN_INTERVAL_SECONDS = 0.2
 EASTMONEY_CONSECUTIVE_ERROR_LIMIT = 20
 TENCENT_M1_URL = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/kline/mkline"
 TENCENT_MIN_INTERVAL_SECONDS = 0.18
+MINUTE_SOURCE_POLICY = "tencent-then-paid-audited-raw-v1"
 
 
 def _now_iso() -> str:
@@ -324,11 +330,77 @@ def _tencent_one_minute_bars(
                 "attempts": attempt,
                 **detail,
             }
+        except ValueError as exc:
+            # A source-quality mismatch is not a transport fault. Retrying the
+            # same preliminary snapshot three times only delays the scan.
+            raise RuntimeError(f"Tencent m1 request/validation failed for {symbol}: {exc}") from exc
         except Exception as exc:  # noqa: BLE001 - retry bounded provider read
             last_error = exc
             if attempt < 3:
                 time.sleep(0.4 * attempt)
     raise RuntimeError(f"Tencent m1 request/validation failed for {symbol}: {last_error}")
+
+
+def _tencent_candidate(frame: Any, meta: dict[str, Any]) -> MinuteCandidate:
+    return MinuteCandidate(
+        provider="tencent-mkline-validated",
+        raw_sha256=meta["source_raw_sha256"],
+        raw_ref=meta["source_raw_path"],
+        rows=tuple(
+            {
+                "stock_code": row.stock_code,
+                "ts": str(row.ts),
+                "open": row.open,
+                "high": row.high,
+                "low": row.low,
+                "close": row.close,
+                "volume": row.volume,
+                "amount": None,
+            }
+            for row in frame.itertuples(index=False)
+        ),
+        auction_provenance="tencent-m1-normalize-v1",
+        amount_status="source_absent_null_not_estimated",
+    )
+
+
+def _paid_audit_candidate(
+    audit_dir: Path,
+    symbol: str,
+    market_date: str,
+    daily: dict[str, Any],
+) -> MinuteCandidate:
+    """Replay an immutable, date-bound audit receipt; never fetch or read a key."""
+    suffix = ".SH" if symbol.startswith("6") else ".SZ"
+    receipt_path = audit_dir / "receipts" / f"{symbol}.json"
+    raw_path = audit_dir / "raw" / f"{symbol}.json.gz"
+    if receipt_path.is_symlink() or raw_path.is_symlink():
+        raise ValueError("paid audit evidence must not use symlinks")
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    if (
+        receipt.get("stock_code") != symbol
+        or receipt.get("market_date") != market_date
+        or receipt.get("http_status") != 200
+        or receipt.get("status") != "qualified_candidate_not_published"
+    ):
+        raise ValueError("paid audit receipt is not a qualified same-date HTTP 200")
+    if raw_path.stat().st_size > 2_000_000:
+        raise ValueError("paid audit raw capture is unexpectedly large")
+    with gzip.open(raw_path, "rb") as source:
+        raw = source.read(16_000_001)
+    if len(raw) > 16_000_000 or hashlib.sha256(raw).hexdigest() != receipt.get(
+        "source_raw_sha256"
+    ):
+        raise ValueError("paid audit raw SHA-256 or size mismatch")
+    return normalized_candidate(
+        raw,
+        symbol=symbol + suffix,
+        market_date=market_date,
+        daily_volume=daily["volume"],
+        daily_close=daily["close"],
+        first_5m_volume=None,
+        raw_ref=str(raw_path),
+    )
 
 
 def _eastmoney_one_minute_frame(data: dict[str, Any], symbol: str) -> Any:
@@ -629,6 +701,7 @@ def collect(
     recovery_policy: MinuteRecoveryPolicy | None = None,
     tencent_daily_path: Path | None = None,
     tencent_status_path: Path | None = None,
+    paid_audit_dir: Path | None = None,
 ) -> int:
     if not symbols:
         raise ValueError("symbols must not be empty")
@@ -647,6 +720,10 @@ def collect(
         or recovery_policy is not None
     ):
         raise ValueError("Tencent 1m requires paired sealed evidence and research incr mode")
+    if paid_audit_dir is not None and (
+        not tencent_enabled or paid_audit_dir.is_symlink() or not paid_audit_dir.is_dir()
+    ):
+        raise ValueError("paid audit fallback requires a real directory and sealed 1m evidence")
     tencent_daily = (
         _tencent_daily_evidence(
             daily_path=tencent_daily_path,
@@ -676,7 +753,6 @@ def collect(
     done = 0
     consecutive_errors = 0
     session: Any | None = None
-    tencent_preflight_cache: dict[str, tuple[Any, dict[str, Any]]] = {}
     scan_round = 0
     attempts_total = 0
     terminal_reason: str | None = None
@@ -736,15 +812,104 @@ def collect(
                 frame, meta = _baostock_native_5m_bars(symbol, market_date, client=client)
             elif fallback == "tencent":
                 assert market_date is not None
-                if symbol in tencent_preflight_cache:
-                    frame, meta = tencent_preflight_cache.pop(symbol)
-                else:
+                candidates: list[MinuteCandidate] = []
+                tencent_error: Exception | None = None
+                try:
                     frame, meta = _tencent_one_minute_bars(
                         symbol,
                         market_date,
                         tencent_daily[symbol],
                         home / "provider_raw" / "tencent-m1",
                     )
+                    candidates.append(_tencent_candidate(frame, meta))
+                except (OSError, RuntimeError, ValueError) as exc:
+                    tencent_error = exc
+                audit_receipt = (
+                    paid_audit_dir / "receipts" / f"{symbol}.json"
+                    if paid_audit_dir is not None and tencent_daily[symbol]["tradestatus"] == "1"
+                    else None
+                )
+                if audit_receipt is not None and audit_receipt.exists():
+                    try:
+                        audit_record = json.loads(audit_receipt.read_text(encoding="utf-8"))
+                        audit_status = audit_record["status"]
+                        if (
+                            audit_record.get("stock_code") != symbol
+                            or audit_record.get("market_date") != market_date
+                            or audit_status not in {
+                                "qualified_candidate_not_published",
+                                "source_pending",
+                                "unqualified",
+                                "rate_limited",
+                                "http_error",
+                                "transport_error",
+                            }
+                        ):
+                            raise ValueError("paid audit receipt code/date/status mismatch")
+                        if audit_status == "qualified_candidate_not_published":
+                            candidates.append(
+                                _paid_audit_candidate(
+                                    paid_audit_dir, symbol, market_date, tencent_daily[symbol]
+                                )
+                            )
+                    except (OSError, ValueError, KeyError, TypeError) as exc:
+                        raise RuntimeError(
+                            f"paid audit evidence invalid for {symbol}: {exc}"
+                        ) from exc
+                decision = choose_whole_security(
+                    candidates,
+                    symbol=symbol,
+                    market_date=market_date,
+                    daily_volume=tencent_daily[symbol]["volume"],
+                    daily_close=tencent_daily[symbol]["close"],
+                    traded=tencent_daily[symbol]["tradestatus"] == "1",
+                    priority=("tencent-mkline-validated", "paid-tushare-style-proxy-stk_mins"),
+                )
+                if decision.status != "qualified_whole_security_candidate":
+                    if decision.status == "blocked_cross_source_conflict":
+                        raise RuntimeError(f"cross-source minute conflict for {symbol}")
+                    raise RuntimeError(
+                        f"{tencent_error or 'no qualified 1m source'}; "
+                        f"candidate rejections={decision.rejected}"
+                    )
+                if decision.selected_provider == "paid-tushare-style-proxy-stk_mins":
+                    import pandas as pd
+
+                    selected = next(
+                        candidate for candidate in candidates
+                        if candidate.provider == decision.selected_provider
+                    )
+                    frame = pd.DataFrame(
+                        {
+                            **row,
+                            **{
+                                name: float(row[name])
+                                for name in ("open", "high", "low", "close", "volume")
+                            },
+                        }
+                        for row in selected.rows
+                    )
+                    frame["ts"] = pd.to_datetime(frame["ts"])
+                    frame["amount"] = pd.Series([pd.NA] * len(frame), dtype="Float64")
+                    meta = {
+                        "ok": True,
+                        "provider": selected.provider,
+                        "native_frequency": "1m",
+                        "derived_from": None,
+                        "market_date": market_date,
+                        "source_raw_sha256": selected.raw_sha256,
+                        "source_raw_path": selected.raw_ref,
+                        "minute_amount_status": selected.amount_status,
+                        "auction_mode": selected.auction_provenance,
+                        "normalized_rows": len(frame),
+                    }
+                meta.update(
+                    source_selection_policy=MINUTE_SOURCE_POLICY,
+                    source_selection_status=decision.status,
+                    source_semantic_sha256=decision.normalized_sha256,
+                    source_qualified=list(decision.qualified),
+                    source_rejected=list(decision.rejected),
+                )
             elif fallback == "eastmoney":
                 frame, meta = _eastmoney_bars(
                     symbol,
@@ -817,7 +982,19 @@ def collect(
                     raise
                 except Exception:
                     pass
-            elif consecutive_errors >= EASTMONEY_CONSECUTIVE_ERROR_LIMIT:
+            elif (
+                consecutive_errors >= EASTMONEY_CONSECUTIVE_ERROR_LIMIT
+                and not (
+                    fallback == "tencent"
+                    and any(
+                        marker in detail.lower()
+                        for marker in (
+                            "tencent/daily volume mismatch",
+                            "tencent/daily close mismatch",
+                        )
+                    )
+                )
+            ):
                 raise RuntimeError(
                     f"{fallback or 'provider'} circuit opened after "
                     f"{consecutive_errors} consecutive symbol failures"
@@ -857,39 +1034,14 @@ def collect(
             session = requests.Session()
             sleep_seconds = max(sleep_seconds, EASTMONEY_MIN_INTERVAL_SECONDS)
         if fallback == "tencent":
-            assert market_date is not None
-            probes = _tencent_qualification_symbols(symbols, tencent_daily)
-            qualification_path = home / "source_qualification.json"
-            for symbol in probes:
-                try:
-                    tencent_preflight_cache[symbol] = _tencent_one_minute_bars(
-                        symbol,
-                        market_date,
-                        tencent_daily[symbol],
-                        home / "provider_raw" / "tencent-m1",
-                    )
-                except Exception as exc:
-                    _atomic_json(
-                        qualification_path,
-                        {
-                            "provider": "tencent-mkline",
-                            "market_date": market_date,
-                            "status": "failed",
-                            "probes": list(probes),
-                            "failed_symbol": symbol,
-                            "error": str(exc),
-                        },
-                    )
-                    raise RuntimeError(
-                        f"Tencent source qualification failed for {market_date}/{symbol}: {exc}"
-                    ) from exc
             _atomic_json(
-                qualification_path,
+                home / "source_qualification.json",
                 {
-                    "provider": "tencent-mkline",
+                    "provider": "whole-security-source-selection",
                     "market_date": market_date,
-                    "status": "sample_passed_per_symbol_gates_still_required",
-                    "probes": list(probes),
+                    "status": "per_symbol_strict_scan_not_yet_published",
+                    "policy": MINUTE_SOURCE_POLICY,
+                    "paid_audit_dir": str(paid_audit_dir) if paid_audit_dir else None,
                 },
             )
         pending = list(symbols)
@@ -955,6 +1107,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--recovery-policy", type=Path)
     parser.add_argument("--tencent-daily-path", type=Path)
     parser.add_argument("--tencent-status-path", type=Path)
+    parser.add_argument("--paid-audit-dir", type=Path)
     parser.add_argument("--home", required=True)
     parser.add_argument("--no-lock", action="store_true")
     args = parser.parse_args(argv)
@@ -980,6 +1133,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
             tencent_daily_path=args.tencent_daily_path,
             tencent_status_path=args.tencent_status_path,
+            paid_audit_dir=args.paid_audit_dir,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"minute collector failed: {exc}", file=sys.stderr)

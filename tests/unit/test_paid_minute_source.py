@@ -66,6 +66,20 @@ def test_duplicated_auction_must_match_independent_first_5m_without_it() -> None
     assert result["auction_mode"] == "duplicate_0930_excluded"
 
 
+def test_replay_without_5m_only_accepts_exact_included_auction() -> None:
+    result = qualify_payload(
+        payload(), symbol="000001.SZ", market_date=DATE,
+        daily_volume=2500, daily_close=11, first_5m_volume=None,
+    )
+    assert result["auction_mode"] == "merged_into_0931"
+    assert result["first_5m_volume_delta"] is None
+    with pytest.raises(ValueError, match="daily/native-5m volume mismatch"):
+        qualify_payload(
+            payload(), symbol="000001.SZ", market_date=DATE,
+            daily_volume=2400, daily_close=11, first_5m_volume=None,
+        )
+
+
 def test_daily_volume_mismatch_is_not_reallocated() -> None:
     with pytest.raises(ValueError, match="daily/native-5m volume mismatch"):
         check(payload(), daily=2496)

@@ -45,7 +45,7 @@ def qualify_payload(
     market_date: str,
     daily_volume: Any,
     daily_close: Any,
-    first_5m_volume: Any,
+    first_5m_volume: Any | None,
 ) -> dict[str, Any]:
     """Check source-faithful rows without adjusting any reported shares.
 
@@ -122,27 +122,39 @@ def qualify_payload(
     first = sum((seen[t]["vol"] for t in grid if "09:31" <= t <= "09:35"), Decimal(0))
     normal = sum((seen[t]["vol"] for t in grid), Decimal(0))
     daily = _decimal(daily_volume)
-    reference_first = _decimal(first_5m_volume)
+    reference_first = (
+        _decimal(first_5m_volume) if first_5m_volume is not None else None
+    )
     auction_volume = auction["vol"] if auction else Decimal(0)
     # A different 5m provider can disagree about the opening bucket even when
     # the paid native 1m source is internally exact. Record that disagreement,
     # but do not turn a cross-provider diagnostic into a new formal daily gate.
     # Excluding a nonzero 09:30 row does require independent 5m confirmation.
     include = normal + auction_volume == daily
-    exclude = normal == daily and first == reference_first
+    exclude = normal == daily and reference_first is not None and first == reference_first
     if include:
         auction_mode = "merged_into_0931" if auction_volume else "zero_or_absent_0930"
-        first_5m_delta = first + auction_volume - reference_first
+        first_5m_delta = (
+            first + auction_volume - reference_first if reference_first is not None else None
+        )
     elif exclude:
         auction_mode = "duplicate_0930_excluded"
         first_5m_delta = Decimal(0)
     else:
+        first_with_delta = (
+            first + auction_volume - reference_first
+            if reference_first is not None
+            else "unavailable"
+        )
+        first_without_delta = (
+            first - reference_first if reference_first is not None else "unavailable"
+        )
         raise ValueError(
             "proxy daily/native-5m volume mismatch: "
             f"with_auction_delta={normal + auction_volume - daily}, "
             f"without_auction_delta={normal - daily}, "
-            f"first_5m_with_delta={first + auction_volume - reference_first}, "
-            f"first_5m_without_delta={first - reference_first}"
+            f"first_5m_with_delta={first_with_delta}, "
+            f"first_5m_without_delta={first_without_delta}"
         )
     if abs(seen["15:00"]["close"] - _decimal(daily_close)) > Decimal("0.011"):
         raise ValueError("proxy/daily close mismatch")
@@ -155,7 +167,9 @@ def qualify_payload(
         "session_rows": len(grid),
         "preopen_duplicate_snapshots_excluded": len(preopen),
         "auction_mode": auction_mode,
-        "first_5m_volume_delta": str(first_5m_delta),
+        "first_5m_volume_delta": (
+            str(first_5m_delta) if first_5m_delta is not None else None
+        ),
         "source_volume": str(daily),
         "source_close": str(seen["15:00"]["close"]),
         "amount_status": "source_present_unpublished_pending_separate_quality_review",
@@ -169,7 +183,7 @@ def normalized_candidate(
     market_date: str,
     daily_volume: Any,
     daily_close: Any,
-    first_5m_volume: Any,
+    first_5m_volume: Any | None,
     raw_ref: str,
 ) -> MinuteCandidate:
     """Build one quarantined, whole-security candidate from exact source bytes.

@@ -10,6 +10,7 @@ import subprocess
 import sys
 from datetime import date, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -17,6 +18,16 @@ ORCHESTRATOR = ROOT / "ops/bin/run-cn01-ods-daily"
 RETRY_WRAPPER = ROOT / "ops/bin/run-ods-daily-with-retry"
 COMPLETION_NOTIFICATION_CHECKER = ROOT / "ops/bin/check-ods-dwd-completion-notification"
 MATURITY_RECOVERY = ROOT / "ops/bin/recover-matured-ods-daily"
+
+
+def _load_orchestrator_module():
+    loader = importlib.machinery.SourceFileLoader("daily_orchestrator", str(ORCHESTRATOR))
+    spec = importlib.util.spec_from_loader("daily_orchestrator", loader)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def _load_maturity_recovery_module():
@@ -274,6 +285,79 @@ catalog.write_text('{"kind":"daily_ods_input_catalog"}\\n', encoding='ascii')
         for call in lane_calls
         if "--lane market-daily-core" not in call
     )
+
+
+def test_closed_session_does_not_attempt_catalog_or_publish_dwd(tmp_path: Path) -> None:
+    runner = tmp_path / "runner.sh"
+    _write_executable(
+        runner,
+        """#!/bin/sh
+date=""
+lane=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --market-date) date="$2"; shift 2 ;;
+        --lane) lane="$2"; shift 2 ;;
+        *) shift ;;
+    esac
+done
+if [ "$lane" = "calendar-daily-events" ]; then
+    printf '{"status":"ready","market_date":"%s"}\\n' "$date"
+else
+    printf '{"status":"closed_session","preflight":"both_closed","market_date":"%s"}\\n' "$date"
+fi
+""",
+    )
+    catalog = tmp_path / "catalog-started"
+    env = os.environ.copy()
+    env.update(
+        {
+            "HERMES_ODS_NODE_ID": "cn01",
+            "HERMES_ODS_ENV_FILE": str(tmp_path / "missing.env"),
+            "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+            "ASTOCK_HOME": str(tmp_path / "home"),
+            "HERMES_ODS_RUNNER": str(runner),
+            "HERMES_ODS_CATALOG_BUILDER": str(catalog),
+            "HERMES_ODS_DAILY_SLA_SECONDS": "20",
+            "HERMES_ODS_ORCHESTRATOR_POLL_SECONDS": "0.1",
+        }
+    )
+    completed = subprocess.run(
+        [sys.executable, str(ORCHESTRATOR), "--market-date", "2026-09-25"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr + completed.stdout
+    state = json.loads(completed.stdout)
+    assert state["status"] == "closed_session"
+    assert state["catalog"] == {"status": "not_applicable_closed_session"}
+    assert state["dwd"] == {"status": "not_applicable_closed_session"}
+    assert not catalog.exists()
+    run_root = next((tmp_path / "shadow/orchestrator/daily/2026-09-25").iterdir())
+    assert not (run_root / "READY").exists()
+    context = json.loads(
+        (tmp_path / "shadow/orchestrator/daily/notification-context.json").read_text()
+    )
+    assert context["status"] == "closed_session"
+    assert context["error_code"] is None
+
+
+def test_verified_calendar_only_release_is_closed_not_ready() -> None:
+    module = _load_orchestrator_module()
+    market_date = date(2026, 9, 25)
+    closed = SimpleNamespace(
+        name="trading_calendar", source_revision="calendar-closed-20260925-v2"
+    )
+    lane_status = SimpleNamespace(name="lane_status", source_revision="lane-status-v1")
+    verified = SimpleNamespace(release=SimpleNamespace(artifacts=(closed, lane_status)))
+    assert module._closed_verified_release(verified, market_date)
+    assert not module._closed_verified_release(verified, date(2026, 9, 24))
+    with_bars = SimpleNamespace(name="minute_bars", source_revision="source-v1")
+    verified.release.artifacts = (closed, lane_status, with_bars)
+    assert not module._closed_verified_release(verified, market_date)
 
 
 def test_cn01_orchestrator_defers_only_a_qualified_current_session_tencent_failure(

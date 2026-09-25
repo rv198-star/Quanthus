@@ -107,6 +107,36 @@ def _sha256(path: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
+def _closed_lane_receipt(log_path: Path, market_date: date) -> bool:
+    """Require a dated, explicit closed-session receipt from a completed lane."""
+
+    try:
+        payload = json.loads(log_path.read_text(encoding="utf-8").splitlines()[-1])
+    except (OSError, ValueError, IndexError):
+        return False
+    return (
+        isinstance(payload, dict)
+        and payload.get("status") == "closed_session"
+        and payload.get("preflight") == "both_closed"
+        and payload.get("market_date") == market_date.isoformat()
+    )
+
+
+def _closed_verified_release(verified: Any, market_date: date) -> bool:
+    """Recognize a checksum-verified calendar-only release reused by a retry."""
+
+    artifacts = verified.release.artifacts
+    if {artifact.name for artifact in artifacts} != {"trading_calendar", "lane_status"}:
+        return False
+    return any(
+        artifact.name == "trading_calendar"
+        and artifact.source_revision.startswith(
+            f"calendar-closed-{market_date.strftime('%Y%m%d')}-"
+        )
+        for artifact in artifacts
+    )
+
+
 def _duration(deadline: float) -> float:
     return max(1.0, deadline - time.monotonic())
 
@@ -531,7 +561,12 @@ def main() -> int:
                 pending.append(job)
                 continue
             state["lanes"][job.lane] = {
-                "status": "ready",
+                "status": (
+                    "closed_session"
+                    if job.lane != "calendar-daily-events"
+                    and _closed_verified_release(verified, market_date)
+                    else "ready"
+                ),
                 "returncode": 0,
                 "attempts": 0,
                 "logs": [],
@@ -551,9 +586,15 @@ def main() -> int:
             jobs = [pending_by_lane[lane] for lane in lane_group if lane in pending_by_lane]
             if jobs:
                 try:
-                    state["lanes"].update(
-                        _run_group(jobs, deadline=deadline, poll_seconds=poll_seconds)
-                    )
+                    results = _run_group(jobs, deadline=deadline, poll_seconds=poll_seconds)
+                    for result in results.values():
+                        if (
+                            result.get("status") == "ready"
+                            and result.get("logs")
+                            and _closed_lane_receipt(Path(result["logs"][-1]), market_date)
+                        ):
+                            result["status"] = "closed_session"
+                    state["lanes"].update(results)
                 except (OSError, ProcessGroupCleanupError) as exc:
                     cleanup_failed = isinstance(exc, ProcessGroupCleanupError)
                     state["error_code"] = (
@@ -583,11 +624,18 @@ def main() -> int:
                 "logs": [],
             }
 
+    closed_session = all(
+        state["lanes"].get(lane, {}).get("status") == "closed_session"
+        for lane in ("market-daily-core", "intraday-5m", "intraday-1m")
+    ) and state["lanes"].get("calendar-daily-events", {}).get("status") == "ready"
     lane_success = all(item.get("status") == "ready" for item in state["lanes"].values())
     source_deferred = not lane_success and source_maturity_deferred(
         state["lanes"], shadow_root=shadow_root, market_date=market_date
     )
-    if lane_success:
+    if closed_session:
+        state["catalog"] = {"status": "not_applicable_closed_session"}
+        state["dwd"] = {"status": "not_applicable_closed_session"}
+    elif lane_success:
         dwd_deadline = time.monotonic() + dwd_sla_seconds
         catalog_command = [
             str(catalog_builder),
@@ -683,14 +731,17 @@ def main() -> int:
         )
     ods_ready = lane_success and catalog_state.get("status") == "ready"
     fully_ready = ods_ready and dwd_state.get("status") == "ready"
-    if source_deferred:
+    if closed_session:
+        state["status"] = "closed_session"
+    elif source_deferred:
         state["status"] = "deferred_source_maturity"
     elif args.ods_only and ods_ready:
         state["status"] = "ods_ready"
     else:
         state["status"] = "ready" if fully_ready else "failed"
-    successful = state["status"] in {"ready", "ods_ready"}
-    _write_run_state(run_root, state, ready=successful)
+    published = state["status"] in {"ready", "ods_ready"}
+    successful = published or closed_session
+    _write_run_state(run_root, state, ready=published)
     notification_context.update(
         {
             "status": state["status"],

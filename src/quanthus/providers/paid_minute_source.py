@@ -316,6 +316,11 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--limit", type=int)
     parser.add_argument(
+        "--full-market",
+        action="store_true",
+        help="Explicitly authorize a bounded full-market audit",
+    )
+    parser.add_argument(
         "--symbols",
         help="Comma-separated, at most three traded codes for a bounded canary audit",
     )
@@ -327,8 +332,10 @@ def main() -> int:
         or args.workers > 8
         or (args.limit is not None and args.limit < 1)
         or (args.symbols is not None and args.limit is not None)
+        or (args.full_market and (args.symbols is not None or args.limit is not None))
+        or (not args.full_market and args.symbols is None and args.limit is None)
     ):
-        parser.error("invalid rate, workers, limit, or mutually exclusive symbol selection")
+        parser.error("choose exactly one of --symbols, --limit, or --full-market")
     import pyarrow.parquet as pq
 
     daily_rows = pq.read_table(
@@ -371,8 +378,8 @@ def main() -> int:
     stop_reason = "completed"
     try:
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
-            for start in range(0, len(codes), 100):
-                batch = codes[start : start + 100]
+            for start in range(0, len(codes), 20):
+                batch = codes[start : start + 20]
                 futures = []
                 for code in batch:
                     time.sleep(max(0.0, next_call - time.monotonic()))
@@ -388,9 +395,11 @@ def main() -> int:
                             output_dir=args.output_dir,
                         )
                     )
+                batch_counts: Counter[str] = Counter()
                 for future in as_completed(futures):
                     receipt = future.result()
                     counts[receipt["status"]] += 1
+                    batch_counts[receipt["status"]] += 1
                 processed = start + len(batch)
                 print(
                     json.dumps(
@@ -401,6 +410,12 @@ def main() -> int:
                 )
                 if counts["rate_limited"]:
                     stop_reason = "stopped_on_provider_rate_limit"
+                    break
+                if batch_counts["source_pending"] >= max(3, len(batch) // 2):
+                    stop_reason = "stopped_on_provider_pending_batch"
+                    break
+                if batch_counts["http_error"]:
+                    stop_reason = "stopped_on_provider_http_error_batch"
                     break
     finally:
         key = ""

@@ -628,8 +628,8 @@ def test_oci_sync_units_define_2030_pull_and_success_and_failure_notifications()
     assert "OnSuccess=oci-dwd-sync-notification.service" in service
     assert "oci-dwd-cn01-notification.service" not in service
     assert "OnFailure=oci-dwd-sync-failure-notification.service" in service
-    assert "--wait-seconds 43200 --poll-seconds 60 --max-attempts 3" in service
-    assert "TimeoutStartSec=13h" in service
+    assert "--wait-seconds 84600 --poll-seconds 60 --max-attempts 3" in service
+    assert "TimeoutStartSec=24h" in service
     assert "StartLimitBurst=2" in service
     assert "Restart=" not in service
     assert "RestartSec=" not in service

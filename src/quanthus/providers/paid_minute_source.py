@@ -386,9 +386,9 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
 
 
 def _resume_state(
-    output_dir: Path, *, codes: list[str], market_date: str
+    output_dir: Path, *, codes: list[str], market_date: str, defer_pending: bool = False
 ) -> tuple[list[str], Counter[str]]:
-    """Verify immutable HTTP-200 evidence and return only unfinished codes."""
+    """Verify HTTP-200 evidence and optionally defer recorded HTTP-202 symbols."""
 
     selected = set(codes)
     summary_path = output_dir / "summary.json"
@@ -405,6 +405,12 @@ def _resume_state(
         code = receipt.get("stock_code")
         if code not in selected or receipt.get("market_date") != market_date:
             raise ValueError("resume receipt date or selected-universe mismatch")
+        if defer_pending and receipt.get("status") == "source_pending":
+            if receipt.get("http_status") != 202:
+                raise ValueError("deferred pending receipt is not HTTP 202")
+            complete.add(code)
+            counts["source_pending"] += 1
+            continue
         if receipt.get("status") not in {"qualified_candidate_not_published", "unqualified"}:
             continue
         if receipt.get("http_status") != 200:
@@ -511,6 +517,11 @@ def main() -> int:
         help="Resume a hash-verified audit directory without re-requesting terminal HTTP-200 rows",
     )
     parser.add_argument(
+        "--defer-pending",
+        action="store_true",
+        help="With --resume, leave recorded HTTP-202 symbols pending while auditing unseen symbols",
+    )
+    parser.add_argument(
         "--full-market",
         action="store_true",
         help="Explicitly authorize a bounded full-market audit",
@@ -527,6 +538,7 @@ def main() -> int:
         or args.workers > 8
         or args.wall_budget_seconds < 60
         or (args.limit is not None and args.limit < 1)
+        or (args.defer_pending and not (args.resume and args.full_market))
         or (args.symbols is not None and args.limit is not None)
         or (args.full_market and (args.symbols is not None or args.limit is not None))
         or (not args.full_market and args.symbols is None and args.limit is None)
@@ -567,12 +579,29 @@ def main() -> int:
         raise ValueError("audit output directory must be empty")
     args.output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     if args.resume:
-        codes, counts = _resume_state(args.output_dir, codes=codes, market_date=day)
+        codes, counts = _resume_state(
+            args.output_dir, codes=codes, market_date=day, defer_pending=args.defer_pending
+        )
     else:
         counts = Counter()
     resumed_terminal = selected_count - len(codes)
     if not codes:
-        return 0
+        _write_json(
+            args.output_dir / "summary.json",
+            {
+                "market_date": day,
+                "selected_traded_symbols": selected_count,
+                "processed": resumed_terminal,
+                "counts": counts,
+                "stop_reason": (
+                    "completed_scan_with_source_pending" if counts["source_pending"] else "completed"
+                ),
+                "elapsed_seconds": 0,
+                "quarantine_only": True,
+                "production_publication": False,
+            },
+        )
+        return 3 if counts["source_pending"] else 0
     print("READY_FOR_KEY", flush=True)
     key = getpass.getpass("") if sys.stdin.isatty() else sys.stdin.readline().strip()
     if not key:
@@ -650,6 +679,8 @@ def main() -> int:
         raise
     finally:
         key = ""
+        if stop_reason == "completed" and counts["source_pending"]:
+            stop_reason = "completed_scan_with_source_pending"
         checkpoint()
     return 0 if stop_reason == "completed" else 3
 

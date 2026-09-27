@@ -288,3 +288,25 @@ def test_two_exact_but_different_time_label_interpretations_block() -> None:
     by_time["15:00"][fields.index("amount")] = 110
     with pytest.raises(ValueError, match="ambiguous proxy minute time-label"):
         check(value, daily=2410, first5=50)
+
+
+def test_incomplete_extra_observation_is_ignored_but_selected_material_is_required() -> None:
+    value = payload(auction_volume=0)
+    auction = value["data"]["items"][-1]
+    for name in ("open", "high", "low", "vol", "amount"):
+        auction[FIELDS.index(name)] = None
+    result = check(value, daily=2400, first5=50)
+    assert result["time_label_mode"] == "interval_end_native"
+    assert result["auction_mode"] == "zero_or_absent_0930"
+
+    selected = value["data"]["items"][0]
+    selected[FIELDS.index("vol")] = None
+    with pytest.raises(ValueError, match="incomplete material minutes"):
+        check(value, daily=2390, first5=40)
+
+
+def test_null_amount_on_selected_minute_remains_visible_quality_debt() -> None:
+    value = payload()
+    value["data"]["items"][0][FIELDS.index("amount")] = None
+    result = check(value)
+    assert result["amount_status"] == "source_present_unpublished_pending_separate_quality_review"

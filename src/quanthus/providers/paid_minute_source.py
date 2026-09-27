@@ -16,7 +16,7 @@ import sys
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -24,7 +24,7 @@ from typing import Any
 from quanthus.providers.minute_source_selection import MinuteCandidate
 from quanthus.providers.tencent_m1_normalize import expected_times
 
-ENDPOINT = "https://pcd.mobcvb.cn/tushare/pro/stk_mins"
+ENDPOINT = "https://tl.kaixin8.top/tushare/pro/stk_mins"
 FIELDS = {"ts_code", "trade_time", "freq", "open", "high", "low", "close", "vol", "amount"}
 
 
@@ -38,23 +38,19 @@ def _decimal(value: Any) -> Decimal:
     return number
 
 
-def qualify_payload(
-    payload: dict[str, Any],
-    *,
-    symbol: str,
-    market_date: str,
-    daily_volume: Any,
-    daily_close: Any,
-    first_5m_volume: Any | None,
-) -> dict[str, Any]:
-    """Check source-faithful rows without adjusting any reported shares.
+def _source_start_times(market_date: str) -> dict[str, str]:
+    """Map the governed minute-end grid to an interval-start source grid."""
 
-    The proxy sometimes repeats one auction snapshot at 09:25–09:29, and some
-    securities have a duplicate 09:30 observation. Only the independent first
-    native 5m bucket can license excluding the latter; no residual is spread
-    over minute bars. Every other time must be on the governed 240-minute grid.
-    """
+    result: dict[str, str] = {}
+    for stamp in expected_times(market_date):
+        canonical = datetime.strptime(stamp, "%Y%m%d%H%M")
+        result[canonical.strftime("%H:%M")] = (canonical - timedelta(minutes=1)).strftime("%H:%M")
+    return result
 
+
+def _parse_rows(
+    payload: dict[str, Any], *, symbol: str, market_date: str
+) -> tuple[list[str], list[list[Any]], dict[str, dict[str, Any]]]:
     if payload.get("code") != 0 or payload.get("api_name") not in (None, "stk_mins"):
         raise ValueError("proxy response is not successful stk_mins")
     meta = payload.get("meta") or {}
@@ -68,11 +64,9 @@ def qualify_payload(
         raise ValueError("proxy minute fields/items contract changed")
     if payload.get("count") != len(items):
         raise ValueError("proxy minute count disagrees with items")
-    code = symbol.split(".")[0]
-    grid = {
-        date_stamp[-4:-2] + ":" + date_stamp[-2:]: date_stamp
-        for date_stamp in expected_times(market_date)
-    }
+
+    canonical = {stamp[-4:-2] + ":" + stamp[-2:] for stamp in expected_times(market_date)}
+    source_starts = set(_source_start_times(market_date).values())
     date_prefix = market_date + " "
     seen: dict[str, dict[str, Any]] = {}
     for item in items:
@@ -91,7 +85,17 @@ def qualify_payload(
         hhmm = stamp[11:16]
         if hhmm in seen:
             raise ValueError("duplicate proxy minute timestamp")
-        if hhmm not in grid and hhmm not in {"09:25", "09:26", "09:27", "09:28", "09:29", "09:30"}:
+        # The relay may expose call-auction observations and repeated quote
+        # snapshots during the lunch break or after the close. They are retained
+        # in the immutable raw response but are never admitted to the candidate.
+        admitted_observation = (
+            hhmm in canonical
+            or hhmm in source_starts
+            or "09:25" <= hhmm <= "09:30"
+            or "11:30" <= hhmm <= "12:59"
+            or "15:00" <= hhmm <= "15:59"
+        )
+        if not admitted_observation:
             raise ValueError("out-of-session proxy minute timestamp")
         for name in ("open", "high", "low", "close", "vol", "amount"):
             row[name] = _decimal(row[name])
@@ -103,6 +107,71 @@ def qualify_payload(
         ):
             raise ValueError("invalid proxy minute OHLCVA")
         seen[hhmm] = row
+    return fields, items, seen
+
+
+def _qualify_start_labeled(
+    seen: dict[str, dict[str, Any]],
+    *,
+    market_date: str,
+    daily_volume: Decimal,
+    daily_close: Decimal,
+    first_5m_volume: Any | None,
+) -> dict[str, Any]:
+    mapping = _source_start_times(market_date)
+    source_times = set(mapping.values())
+    missing = source_times - set(seen)
+    if missing:
+        raise ValueError(f"proxy interval-start grid missing {len(missing)} minutes")
+    source_volume = sum((seen[t]["vol"] for t in source_times), Decimal(0))
+    if source_volume != daily_volume:
+        raise ValueError(
+            f"proxy interval-start daily volume mismatch: delta={source_volume - daily_volume}"
+        )
+    close = seen[mapping["15:00"]]["close"]
+    if abs(close - daily_close) > Decimal("0.011"):
+        raise ValueError("proxy interval-start/daily close mismatch")
+    first = sum(
+        (seen[mapping[t]]["vol"] for t in mapping if "09:31" <= t <= "09:35"),
+        Decimal(0),
+    )
+    reference_first = _decimal(first_5m_volume) if first_5m_volume is not None else None
+    return {
+        "time_label_mode": "interval_start_shifted_plus_1m",
+        "auction_mode": "source_interval_start_shifted_plus_1m",
+        "first_5m_volume_delta": (
+            str(first - reference_first) if reference_first is not None else None
+        ),
+        "source_close": str(close),
+        "excluded_observation_rows": len(seen) - len(source_times),
+    }
+
+
+def qualify_payload(
+    payload: dict[str, Any],
+    *,
+    symbol: str,
+    market_date: str,
+    daily_volume: Any,
+    daily_close: Any,
+    first_5m_volume: Any | None,
+) -> dict[str, Any]:
+    """Check source-faithful rows without adjusting any reported shares.
+
+    The proxy supports both the historical minute-end convention and an
+    interval-start convention observed on the replacement relay. Only a complete
+    fixed 240-row session can be selected. Other admitted observations remain in
+    immutable raw evidence but are excluded before normalization; exact sealed
+    daily volume and close still license the selected interpretation. No residual
+    is spread over minute bars.
+    """
+
+    _, items, seen = _parse_rows(payload, symbol=symbol, market_date=market_date)
+    code = symbol.split(".")[0]
+    grid = {
+        date_stamp[-4:-2] + ":" + date_stamp[-2:]: date_stamp
+        for date_stamp in expected_times(market_date)
+    }
     preopen = [seen[t] for t in ("09:25", "09:26", "09:27", "09:28", "09:29") if t in seen]
     if preopen and (
         len(preopen) != 5
@@ -115,49 +184,98 @@ def qualify_payload(
         )
     ):
         raise ValueError("unexpected preopen observations are not identical snapshots")
-    missing = set(grid) - set(seen)
-    if missing:
-        raise ValueError(f"proxy session grid missing {len(missing)} minutes")
-    auction = seen.get("09:30")
-    first = sum((seen[t]["vol"] for t in grid if "09:31" <= t <= "09:35"), Decimal(0))
-    normal = sum((seen[t]["vol"] for t in grid), Decimal(0))
     daily = _decimal(daily_volume)
-    reference_first = (
-        _decimal(first_5m_volume) if first_5m_volume is not None else None
-    )
-    auction_volume = auction["vol"] if auction else Decimal(0)
-    # A different 5m provider can disagree about the opening bucket even when
-    # the paid native 1m source is internally exact. Record that disagreement,
-    # but do not turn a cross-provider diagnostic into a new formal daily gate.
-    # Excluding a nonzero 09:30 row does require independent 5m confirmation.
-    include = normal + auction_volume == daily
-    exclude = normal == daily and reference_first is not None and first == reference_first
-    if include:
-        auction_mode = "merged_into_0931" if auction_volume else "zero_or_absent_0930"
-        first_5m_delta = (
-            first + auction_volume - reference_first if reference_first is not None else None
-        )
-    elif exclude:
-        auction_mode = "duplicate_0930_excluded"
-        first_5m_delta = Decimal(0)
+    close = _decimal(daily_close)
+    missing = set(grid) - set(seen)
+    end_error: ValueError | None = None
+    end_result: dict[str, Any] | None = None
+    if not missing:
+        auction = seen.get("09:30")
+        first = sum((seen[t]["vol"] for t in grid if "09:31" <= t <= "09:35"), Decimal(0))
+        normal = sum((seen[t]["vol"] for t in grid), Decimal(0))
+        reference_first = _decimal(first_5m_volume) if first_5m_volume is not None else None
+        auction_volume = auction["vol"] if auction else Decimal(0)
+        include = normal + auction_volume == daily
+        exclude = normal == daily and reference_first is not None and first == reference_first
+        if include or exclude:
+            auction_mode = (
+                "merged_into_0931"
+                if include and auction_volume
+                else "zero_or_absent_0930"
+                if include
+                else "duplicate_0930_excluded"
+            )
+            first_5m_delta = (
+                first + auction_volume - reference_first
+                if include and reference_first is not None
+                else Decimal(0)
+                if exclude
+                else None
+            )
+            if abs(seen["15:00"]["close"] - close) <= Decimal("0.011"):
+                end_result = {
+                    "time_label_mode": "interval_end_native",
+                    "auction_mode": auction_mode,
+                    "first_5m_volume_delta": (
+                        str(first_5m_delta) if first_5m_delta is not None else None
+                    ),
+                    "source_close": str(seen["15:00"]["close"]),
+                    "excluded_observation_rows": len(seen)
+                    - len(grid)
+                    - (1 if auction and auction_mode == "merged_into_0931" else 0),
+                }
+            else:
+                end_error = ValueError("proxy/daily close mismatch")
+        else:
+            first_with_delta = (
+                first + auction_volume - reference_first
+                if reference_first is not None
+                else "unavailable"
+            )
+            first_without_delta = (
+                first - reference_first if reference_first is not None else "unavailable"
+            )
+            end_error = ValueError(
+                "proxy daily/native-5m volume mismatch: "
+                f"with_auction_delta={normal + auction_volume - daily}, "
+                f"without_auction_delta={normal - daily}, "
+                f"first_5m_with_delta={first_with_delta}, "
+                f"first_5m_without_delta={first_without_delta}"
+            )
     else:
-        first_with_delta = (
-            first + auction_volume - reference_first
-            if reference_first is not None
-            else "unavailable"
+        end_error = ValueError(f"proxy session grid missing {len(missing)} minutes")
+
+    start_result: dict[str, Any] | None = None
+    start_error: ValueError | None = None
+    try:
+        start_result = _qualify_start_labeled(
+            seen,
+            market_date=market_date,
+            daily_volume=daily,
+            daily_close=close,
+            first_5m_volume=first_5m_volume,
         )
-        first_without_delta = (
-            first - reference_first if reference_first is not None else "unavailable"
-        )
-        raise ValueError(
-            "proxy daily/native-5m volume mismatch: "
-            f"with_auction_delta={normal + auction_volume - daily}, "
-            f"without_auction_delta={normal - daily}, "
-            f"first_5m_with_delta={first_with_delta}, "
-            f"first_5m_without_delta={first_without_delta}"
-        )
-    if abs(seen["15:00"]["close"] - _decimal(daily_close)) > Decimal("0.011"):
-        raise ValueError("proxy/daily close mismatch")
+    except ValueError as exc:
+        start_error = exc
+
+    if end_result is not None and start_result is not None:
+        start_mapping = _source_start_times(market_date)
+        material = ("open", "high", "low", "close", "vol")
+        if any(
+            any(seen[canonical][name] != seen[start_mapping[canonical]][name] for name in material)
+            for canonical in grid
+        ):
+            raise ValueError("ambiguous proxy minute time-label interpretation")
+        result = end_result
+    elif end_result is not None:
+        result = end_result
+    elif start_result is not None:
+        result = start_result
+    else:
+        assert end_error is not None and start_error is not None
+        if set(_source_start_times(market_date).values()).issubset(seen):
+            raise start_error from None
+        raise end_error from None
     return {
         "status": "qualified_candidate_not_published",
         "provider": "paid-tushare-style-proxy-stk_mins",
@@ -166,12 +284,8 @@ def qualify_payload(
         "source_rows": len(items),
         "session_rows": len(grid),
         "preopen_duplicate_snapshots_excluded": len(preopen),
-        "auction_mode": auction_mode,
-        "first_5m_volume_delta": (
-            str(first_5m_delta) if first_5m_delta is not None else None
-        ),
+        **result,
         "source_volume": str(daily),
-        "source_close": str(seen["15:00"]["close"]),
         "amount_status": "source_present_unpublished_pending_separate_quality_review",
     }
 
@@ -207,10 +321,15 @@ def normalized_candidate(
         for row in payload["data"]["items"]
     }
     auction = by_time.get("09:30")
+    start_mapping = _source_start_times(market_date)
     rows: list[dict[str, Any]] = []
     for stamp in expected_times(market_date):
         hhmm = stamp[-4:-2] + ":" + stamp[-2:]
-        source = by_time[hhmm]
+        source = by_time[
+            start_mapping[hhmm]
+            if result["time_label_mode"] == "interval_start_shifted_plus_1m"
+            else hhmm
+        ]
         values = {name: _decimal(source[name]) for name in ("open", "high", "low", "close", "vol")}
         if hhmm == "09:31" and auction and result["auction_mode"] == "merged_into_0931":
             values["open"] = _decimal(auction["open"])

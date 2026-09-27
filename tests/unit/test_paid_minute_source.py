@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -41,6 +42,49 @@ def payload(*, auction_volume: int = 100, preopen: bool = False) -> dict:
     }
 
 
+def start_labeled_payload() -> dict:
+    items = []
+    for stamp in expected_times(DATE):
+        canonical = datetime.strptime(stamp, "%Y%m%d%H%M")
+        source = canonical - timedelta(minutes=1)
+        items.append(
+            [
+                "000001.SZ",
+                source.strftime("%Y-%m-%d %H:%M:00"),
+                "1MIN",
+                11.0,
+                11.0,
+                11.0,
+                11.0,
+                10,
+                110,
+            ]
+        )
+    # These observations are preserved in raw evidence, but fixed-session
+    # selection must not admit them to the 240-row candidate.
+    for hhmm, volume in (
+        ("09:25", 70),
+        ("09:26", 70),
+        ("09:27", 70),
+        ("09:28", 70),
+        ("09:29", 70),
+        ("11:30", 19),
+        ("12:59", 20),
+        ("15:00", 30),
+        ("15:33", 30),
+    ):
+        items.append(
+            ["000001.SZ", f"{DATE} {hhmm}:00", "1MIN", 11.0, 11.0, 11.0, 11.0, volume, volume * 11]
+        )
+    return {
+        "code": 0,
+        "api_name": "stk_mins",
+        "count": len(items),
+        "meta": {"partial": False, "coverage": "complete"},
+        "data": {"fields": FIELDS, "items": items},
+    }
+
+
 def check(value: dict, *, daily: int = 2500, first5: int = 150) -> dict:
     return qualify_payload(
         value,
@@ -68,15 +112,23 @@ def test_duplicated_auction_must_match_independent_first_5m_without_it() -> None
 
 def test_replay_without_5m_only_accepts_exact_included_auction() -> None:
     result = qualify_payload(
-        payload(), symbol="000001.SZ", market_date=DATE,
-        daily_volume=2500, daily_close=11, first_5m_volume=None,
+        payload(),
+        symbol="000001.SZ",
+        market_date=DATE,
+        daily_volume=2500,
+        daily_close=11,
+        first_5m_volume=None,
     )
     assert result["auction_mode"] == "merged_into_0931"
     assert result["first_5m_volume_delta"] is None
     with pytest.raises(ValueError, match="daily/native-5m volume mismatch"):
         qualify_payload(
-            payload(), symbol="000001.SZ", market_date=DATE,
-            daily_volume=2400, daily_close=11, first_5m_volume=None,
+            payload(),
+            symbol="000001.SZ",
+            market_date=DATE,
+            daily_volume=2400,
+            daily_close=11,
+            first_5m_volume=None,
         )
 
 
@@ -185,3 +237,54 @@ def test_duplicate_auction_is_not_counted_twice_in_candidate() -> None:
     assert result.auction_provenance == "duplicate_0930_excluded"
     assert result.rows[0]["volume"] == 10
     assert sum(row["volume"] for row in result.rows) == 2400
+
+
+def test_interval_start_labels_are_shifted_and_non_session_observations_excluded() -> None:
+    value = start_labeled_payload()
+    result = check(value, daily=2400, first5=50)
+    assert result["time_label_mode"] == "interval_start_shifted_plus_1m"
+    assert result["auction_mode"] == "source_interval_start_shifted_plus_1m"
+    assert result["session_rows"] == 240
+    assert result["excluded_observation_rows"] == 9
+    candidate = normalized_candidate(
+        json.dumps(value).encode(),
+        symbol="000001.SZ",
+        market_date=DATE,
+        daily_volume=2400,
+        daily_close=11,
+        first_5m_volume=50,
+        raw_ref="quarantine/raw/000001.json.gz",
+    )
+    assert candidate.rows[0]["ts"] == f"{DATE} 09:31:00"
+    assert candidate.rows[-1]["ts"] == f"{DATE} 15:00:00"
+    assert sum(row["volume"] for row in candidate.rows) == 2400
+
+
+def test_interval_start_mode_still_blocks_daily_mismatch() -> None:
+    with pytest.raises(ValueError, match="interval-start daily volume mismatch"):
+        check(start_labeled_payload(), daily=2399, first5=50)
+
+
+def test_unknown_observation_time_remains_fail_closed() -> None:
+    value = start_labeled_payload()
+    value["data"]["items"].append(["000001.SZ", f"{DATE} 16:00:00", "1MIN", 11, 11, 11, 11, 1, 11])
+    value["count"] += 1
+    with pytest.raises(ValueError, match="out-of-session"):
+        check(value, daily=2400, first5=50)
+
+
+def test_two_exact_but_different_time_label_interpretations_block() -> None:
+    value = start_labeled_payload()
+    fields = value["data"]["fields"]
+    by_time = {row[1][11:16]: row for row in value["data"]["items"]}
+    # Both interpretations total 2,410 shares: the end-labelled path uses the
+    # two canonical boundary observations plus 09:30, while the start-labelled
+    # path uses 09:30 and 13:00. Their selected minute rows are not identical.
+    by_time["13:00"][fields.index("vol")] = 20
+    by_time["13:00"][fields.index("amount")] = 220
+    by_time["11:30"][fields.index("vol")] = 10
+    by_time["11:30"][fields.index("amount")] = 110
+    by_time["15:00"][fields.index("vol")] = 10
+    by_time["15:00"][fields.index("amount")] = 110
+    with pytest.raises(ValueError, match="ambiguous proxy minute time-label"):
+        check(value, daily=2410, first5=50)

@@ -351,6 +351,54 @@ def test_resume_skips_only_hash_verified_terminal_http_200_receipts(tmp_path) ->
     assert counts == {"qualified_candidate_not_published": 1}
 
 
+def test_resume_can_defer_recorded_http_202_without_calling_it_qualified(tmp_path) -> None:
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    (receipts / "600000.json").write_text(
+        json.dumps(
+            {
+                "stock_code": "600000",
+                "market_date": DATE,
+                "status": "source_pending",
+                "http_status": 202,
+                "retry_after": "30",
+            }
+        )
+    )
+    remaining, counts = _resume_state(
+        tmp_path,
+        codes=["600000", "688001"],
+        market_date=DATE,
+        defer_pending=True,
+    )
+    assert remaining == ["688001"]
+    assert counts == {"source_pending": 1}
+    retry, retry_counts = _resume_state(
+        tmp_path, codes=["600000", "688001"], market_date=DATE
+    )
+    assert retry == ["600000", "688001"]
+    assert retry_counts == {}
+
+
+def test_resume_rejects_false_deferred_pending_receipt(tmp_path) -> None:
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    (receipts / "600000.json").write_text(
+        json.dumps(
+            {
+                "stock_code": "600000",
+                "market_date": DATE,
+                "status": "source_pending",
+                "http_status": 200,
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="not HTTP 202"):
+        _resume_state(
+            tmp_path, codes=["600000"], market_date=DATE, defer_pending=True
+        )
+
+
 def test_resume_rejects_tampered_raw_or_wrong_universe(tmp_path) -> None:
     raw_path = tmp_path / "raw/000001.json.gz"
     raw_path.parent.mkdir()

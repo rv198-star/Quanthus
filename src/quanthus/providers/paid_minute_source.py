@@ -26,6 +26,7 @@ from quanthus.providers.tencent_m1_normalize import expected_times
 
 ENDPOINT = "https://tl.kaixin8.top/tushare/pro/stk_mins"
 FIELDS = {"ts_code", "trade_time", "freq", "open", "high", "low", "close", "vol", "amount"}
+MATERIAL_FIELDS = ("open", "high", "low", "close", "vol")
 
 
 def _decimal(value: Any) -> Decimal:
@@ -36,6 +37,10 @@ def _decimal(value: Any) -> Decimal:
     if not number.is_finite():
         raise ValueError("non-finite minute number")
     return number
+
+
+def _material_complete(row: dict[str, Any]) -> bool:
+    return all(row[name] is not None for name in MATERIAL_FIELDS)
 
 
 def _source_start_times(market_date: str) -> dict[str, str]:
@@ -97,11 +102,11 @@ def _parse_rows(
         )
         if not admitted_observation:
             raise ValueError("out-of-session proxy minute timestamp")
-        for name in ("open", "high", "low", "close", "vol", "amount"):
-            row[name] = _decimal(row[name])
-        if (
+        for name in (*MATERIAL_FIELDS, "amount"):
+            row[name] = None if row[name] is None else _decimal(row[name])
+        if _material_complete(row) and (
             row["vol"] < 0
-            or row["amount"] < 0
+            or (row["amount"] is not None and row["amount"] < 0)
             or row["high"] < max(row["open"], row["close"], row["low"])
             or row["low"] > min(row["open"], row["close"], row["high"])
         ):
@@ -123,6 +128,11 @@ def _qualify_start_labeled(
     missing = source_times - set(seen)
     if missing:
         raise ValueError(f"proxy interval-start grid missing {len(missing)} minutes")
+    incomplete = [t for t in source_times if not _material_complete(seen[t])]
+    if incomplete:
+        raise ValueError(
+            f"proxy interval-start grid has {len(incomplete)} incomplete material minutes"
+        )
     source_volume = sum((seen[t]["vol"] for t in source_times), Decimal(0))
     if source_volume != daily_volume:
         raise ValueError(
@@ -191,16 +201,23 @@ def qualify_payload(
     end_result: dict[str, Any] | None = None
     if not missing:
         auction = seen.get("09:30")
-        first = sum((seen[t]["vol"] for t in grid if "09:31" <= t <= "09:35"), Decimal(0))
-        normal = sum((seen[t]["vol"] for t in grid), Decimal(0))
-        reference_first = _decimal(first_5m_volume) if first_5m_volume is not None else None
-        auction_volume = auction["vol"] if auction else Decimal(0)
-        include = normal + auction_volume == daily
-        exclude = normal == daily and reference_first is not None and first == reference_first
-        if include or exclude:
+        incomplete = [t for t in grid if not _material_complete(seen[t])]
+        if incomplete:
+            end_error = ValueError(
+                f"proxy session grid has {len(incomplete)} incomplete material minutes"
+            )
+        else:
+            first = sum((seen[t]["vol"] for t in grid if "09:31" <= t <= "09:35"), Decimal(0))
+            normal = sum((seen[t]["vol"] for t in grid), Decimal(0))
+            reference_first = _decimal(first_5m_volume) if first_5m_volume is not None else None
+            usable_auction = auction if auction and _material_complete(auction) else None
+            auction_volume = usable_auction["vol"] if usable_auction else Decimal(0)
+            include = normal + auction_volume == daily
+            exclude = normal == daily and reference_first is not None and first == reference_first
+        if not incomplete and (include or exclude):
             auction_mode = (
                 "merged_into_0931"
-                if include and auction_volume
+                if include and usable_auction and auction_volume
                 else "zero_or_absent_0930"
                 if include
                 else "duplicate_0930_excluded"
@@ -222,11 +239,11 @@ def qualify_payload(
                     "source_close": str(seen["15:00"]["close"]),
                     "excluded_observation_rows": len(seen)
                     - len(grid)
-                    - (1 if auction and auction_mode == "merged_into_0931" else 0),
+                    - (1 if usable_auction and auction_mode == "merged_into_0931" else 0),
                 }
             else:
                 end_error = ValueError("proxy/daily close mismatch")
-        else:
+        elif not incomplete:
             first_with_delta = (
                 first + auction_volume - reference_first
                 if reference_first is not None
@@ -260,9 +277,11 @@ def qualify_payload(
 
     if end_result is not None and start_result is not None:
         start_mapping = _source_start_times(market_date)
-        material = ("open", "high", "low", "close", "vol")
         if any(
-            any(seen[canonical][name] != seen[start_mapping[canonical]][name] for name in material)
+            any(
+                seen[canonical][name] != seen[start_mapping[canonical]][name]
+                for name in MATERIAL_FIELDS
+            )
             for canonical in grid
         ):
             raise ValueError("ambiguous proxy minute time-label interpretation")

@@ -8,6 +8,7 @@ The API key is read from stdin by the audit command and is never persisted.
 from __future__ import annotations
 
 import argparse
+import getpass
 import gzip
 import hashlib
 import json
@@ -384,6 +385,42 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
     os.replace(temp, path)
 
 
+def _resume_state(
+    output_dir: Path, *, codes: list[str], market_date: str
+) -> tuple[list[str], Counter[str]]:
+    """Verify immutable HTTP-200 evidence and return only unfinished codes."""
+
+    selected = set(codes)
+    summary_path = output_dir / "summary.json"
+    if summary_path.exists():
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        if summary.get("market_date") != market_date or summary.get(
+            "selected_traded_symbols"
+        ) != len(codes):
+            raise ValueError("resume summary date or selected-universe mismatch")
+    counts: Counter[str] = Counter()
+    complete: set[str] = set()
+    for receipt_path in sorted((output_dir / "receipts").glob("*.json")):
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        code = receipt.get("stock_code")
+        if code not in selected or receipt.get("market_date") != market_date:
+            raise ValueError("resume receipt date or selected-universe mismatch")
+        if receipt.get("status") not in {"qualified_candidate_not_published", "unqualified"}:
+            continue
+        if receipt.get("http_status") != 200:
+            raise ValueError("terminal resume receipt is not HTTP 200")
+        raw_path = output_dir / "raw" / f"{code}.json.gz"
+        if not raw_path.is_file():
+            raise ValueError("terminal resume receipt has no immutable raw response")
+        with gzip.open(raw_path, "rb") as source:
+            raw_sha256 = hashlib.sha256(source.read()).hexdigest()
+        if raw_sha256 != receipt.get("source_raw_sha256"):
+            raise ValueError("terminal resume raw response hash mismatch")
+        complete.add(code)
+        counts[receipt["status"]] += 1
+    return [code for code in codes if code not in complete], counts
+
+
 def select_canary_symbols(raw: str, traded_codes: list[str]) -> list[str]:
     requested = [item.strip() for item in raw.split(",")]
     if (
@@ -469,6 +506,11 @@ def main() -> int:
     parser.add_argument("--wall-budget-seconds", type=int, default=240)
     parser.add_argument("--limit", type=int)
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume a hash-verified audit directory without re-requesting terminal HTTP-200 rows",
+    )
+    parser.add_argument(
         "--full-market",
         action="store_true",
         help="Explicitly authorize a bounded full-market audit",
@@ -519,17 +561,25 @@ def main() -> int:
         codes = codes[: args.limit]
     if any(code not in first for code in codes):
         raise ValueError("native 5m opening bucket missing for selected symbols")
-    if args.output_dir.exists() and any(args.output_dir.iterdir()):
+    selected_count = len(codes)
+    output_exists = args.output_dir.exists() and any(args.output_dir.iterdir())
+    if output_exists and not args.resume:
         raise ValueError("audit output directory must be empty")
     args.output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if args.resume:
+        codes, counts = _resume_state(args.output_dir, codes=codes, market_date=day)
+    else:
+        counts = Counter()
+    resumed_terminal = selected_count - len(codes)
+    if not codes:
+        return 0
     print("READY_FOR_KEY", flush=True)
-    key = sys.stdin.readline().strip()
+    key = getpass.getpass("") if sys.stdin.isatty() else sys.stdin.readline().strip()
     if not key:
         raise ValueError("empty API key")
-    counts: Counter[str] = Counter()
     started = time.monotonic()
     next_call = time.monotonic()
-    processed = 0
+    processed = resumed_terminal
     stop_reason = "completed"
 
     def checkpoint() -> None:
@@ -537,7 +587,7 @@ def main() -> int:
             args.output_dir / "summary.json",
             {
                 "market_date": day,
-                "selected_traded_symbols": len(codes),
+                "selected_traded_symbols": selected_count,
                 "processed": processed,
                 "counts": counts,
                 "stop_reason": stop_reason,
@@ -574,11 +624,11 @@ def main() -> int:
                     receipt = future.result()
                     counts[receipt["status"]] += 1
                     batch_counts[receipt["status"]] += 1
-                processed = start + len(batch)
+                processed = resumed_terminal + start + len(batch)
                 checkpoint()
                 print(
                     json.dumps(
-                        {"processed": processed, "total": len(codes), "counts": counts},
+                        {"processed": processed, "total": selected_count, "counts": counts},
                         sort_keys=True,
                     ),
                     flush=True,

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import gzip
+import hashlib
 import json
 from datetime import datetime, timedelta
 
@@ -10,6 +12,7 @@ import pytest
 from quanthus.providers.minute_source_selection import qualify_candidate
 from quanthus.providers.paid_minute_source import (
     _audit_symbol,
+    _resume_state,
     normalized_candidate,
     qualify_payload,
     select_canary_symbols,
@@ -310,3 +313,63 @@ def test_null_amount_on_selected_minute_remains_visible_quality_debt() -> None:
     value["data"]["items"][0][FIELDS.index("amount")] = None
     result = check(value)
     assert result["amount_status"] == "source_present_unpublished_pending_separate_quality_review"
+
+
+def test_resume_skips_only_hash_verified_terminal_http_200_receipts(tmp_path) -> None:
+    raw = json.dumps(payload()).encode()
+    raw_path = tmp_path / "raw/000001.json.gz"
+    raw_path.parent.mkdir()
+    with gzip.open(raw_path, "wb") as sink:
+        sink.write(raw)
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    (receipts / "000001.json").write_text(
+        json.dumps(
+            {
+                "stock_code": "000001",
+                "market_date": DATE,
+                "status": "qualified_candidate_not_published",
+                "http_status": 200,
+                "source_raw_sha256": hashlib.sha256(raw).hexdigest(),
+            }
+        )
+    )
+    (receipts / "600000.json").write_text(
+        json.dumps(
+            {
+                "stock_code": "600000",
+                "market_date": DATE,
+                "status": "http_error",
+                "http_status": 503,
+            }
+        )
+    )
+    remaining, counts = _resume_state(
+        tmp_path, codes=["000001", "600000", "688001"], market_date=DATE
+    )
+    assert remaining == ["600000", "688001"]
+    assert counts == {"qualified_candidate_not_published": 1}
+
+
+def test_resume_rejects_tampered_raw_or_wrong_universe(tmp_path) -> None:
+    raw_path = tmp_path / "raw/000001.json.gz"
+    raw_path.parent.mkdir()
+    with gzip.open(raw_path, "wb") as sink:
+        sink.write(b"tampered")
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    (receipts / "000001.json").write_text(
+        json.dumps(
+            {
+                "stock_code": "000001",
+                "market_date": DATE,
+                "status": "unqualified",
+                "http_status": 200,
+                "source_raw_sha256": "0" * 64,
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="hash mismatch"):
+        _resume_state(tmp_path, codes=["000001"], market_date=DATE)
+    with pytest.raises(ValueError, match="selected-universe mismatch"):
+        _resume_state(tmp_path, codes=["600000"], market_date=DATE)

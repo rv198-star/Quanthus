@@ -176,6 +176,33 @@ def test_dual_qualified_true_minute_difference_still_blocks(tmp_path):
     assert rows[0]["qualified_providers"] == list(ledger.PRIORITY)
 
 
+@pytest.mark.parametrize("difference", [False, True])
+def test_opt_in_difference_description_never_changes_exact_disposition(tmp_path, difference):
+    refs, ts, paid = fixture(tmp_path)
+    put_tencent(ts)
+    value = payload()
+    if difference:
+        value["data"]["items"][10][FIELDS.index("high")] = 11.000000000000002
+    put_paid(paid, value)
+    normal, ordinary, _ = run(tmp_path, refs, ts, paid, name="ordinary")
+    described, detailed, _ = run(
+        tmp_path, refs, ts, paid, name="described", describe_source_differences=True
+    )
+    assert described["dispositions"] == normal["dispositions"]
+    assert described["qualification_records_sha256"] == normal["records_sha256"]
+    assert detailed[0]["disposition"] == ordinary[0]["disposition"]
+    assert detailed[0]["sources"] == ordinary[0]["sources"]
+    assert "source_difference" not in ordinary[0]
+    counts = described["source_difference_description"]
+    assert counts["paired_currently_qualified_securities"] == 1
+    assert not counts["changes_qualification"]
+    assert not detailed[0]["source_difference"]["gate_changed"]
+    assert not described["publication_authorized"]
+    assert detailed[0]["disposition"] == (
+        "blocked_cross_source_conflict" if difference else "qualified_whole_security_candidate"
+    )
+
+
 @pytest.mark.parametrize("fault", ["hash", "date", "path", "gzip", "symlink"])
 def test_capture_integrity_fault_blocks_even_a_qualified_peer(tmp_path, fault):
     refs, ts, paid = fixture(tmp_path)

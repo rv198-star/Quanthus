@@ -782,6 +782,25 @@ The focused contract is `tests/unit/test_minute_offline_ledger.py`, including a
 These tests prove diagnostic mechanics, not independent acquisition, supplier
 truth, source availability, runtime qualification or publication acceptance.
 
+The optional `--describe-source-differences` view supports programme #456 C without
+changing qualification. Only two currently qualified, exactly aligned whole
+candidates are described by `minute_source_difference.describe_pair`: exact
+decimal OHLCV cell differences, their minute/field counts, maximum absolute
+deltas and the first three differing minutes. A fixed absolute price floor of
+`1e-10` partitions diagnostic counts only. Below-floor differences do not prove
+float provenance, justify rounding or clear a conflict; volume differences have
+no tolerance. The helper returns no repaired candidate and does not shift labels,
+assign a true source, infer amount or inspect external reference truth. Unknown
+or misaligned input aborts rather than inventing a correspondence. The combined
+ledger reuses the same captured candidates and reference view within its Job;
+it neither rereads a prerequisite per consumer nor duplicates acquisition.
+The completion summary binds the full records and a separate canonical hash of
+the qualification records without the optional description, allowing a direct
+mechanical check that the annotation did not change qualification. This is not
+a cross-Job reuse grant. `tests/unit/test_minute_source_difference.py` includes
+tiny-price, exact-floor, real-cent and volume-redistribution counterexamples;
+every numerically differing qualified pair remains blocked by the existing gate.
+
 ### Runtime qualification before node rollout
 
 `META-OPS-ENV-001` (#431), under programme #424 A/E, tracks the actual interpreter

@@ -24,6 +24,7 @@ from typing import Any
 
 from quanthus.providers import (
     minute_references,
+    minute_source_difference,
     minute_source_selection,
     paid_minute_source,
     tencent_m1_normalize,
@@ -251,6 +252,8 @@ def _evaluate(
     tencent_root: Path,
     paid_root: Path,
     witness: Mapping[str, Any] | None,
+    *,
+    describe_source_differences: bool = False,
 ) -> dict[str, Any]:
     candidates: list[MinuteCandidate] = []
     sources: list[dict[str, Any]] = []
@@ -318,7 +321,7 @@ def _evaluate(
     )
     integrity = any(source["status"] == "integrity_fault" for source in sources)
     disposition = "blocked_capture_integrity" if integrity else decision.status
-    return {
+    row = {
         "stock_code": code,
         "market_date": refs.market_date,
         "tradestatus": daily["tradestatus"],
@@ -330,10 +333,19 @@ def _evaluate(
         "publication_authorized": False,
         "recovery_authorized": False,
     }
+    if describe_source_differences and not integrity and len(candidates) == 2:
+        row["source_difference"] = minute_source_difference.describe_pair(*candidates)
+    return row
 
 
 def _implementation_identity() -> dict[str, Any]:
-    modules = (minute_references, minute_source_selection, paid_minute_source, tencent_m1_normalize)
+    modules = (
+        minute_references,
+        minute_source_difference,
+        minute_source_selection,
+        paid_minute_source,
+        tencent_m1_normalize,
+    )
     paths = [Path(__file__), *(Path(module.__file__) for module in modules)]
     return {
         "schema": SCHEMA,
@@ -358,6 +370,7 @@ def build_ledger(
     node_label: str,
     budget_seconds: float = 900,
     provenance: Mapping[str, Any] | None = None,
+    describe_source_differences: bool = False,
 ) -> dict[str, Any]:
     """Write a fresh full-denominator diagnostic; partial output is not complete."""
     if not node_label or not 0 < budget_seconds <= 1800:
@@ -404,6 +417,12 @@ def build_ledger(
         "tencent_checkpoint_sha256": hashlib.sha256(checkpoint_raw).hexdigest(),
         "universe_sha256": hashlib.sha256("\n".join(refs).encode()).hexdigest(),
         "lifecycle": "job-local-TMP-diagnostic-not-cache-or-recovery-authority",
+        "source_difference_description": {
+            "enabled": describe_source_differences,
+            "schema": minute_source_difference.SCHEMA,
+            "price_abs_floor": str(minute_source_difference.PRICE_FLOOR),
+            "changes_qualification": False,
+        },
     }
     output.mkdir(parents=True, exist_ok=False)
     job = {
@@ -414,23 +433,48 @@ def build_ledger(
     }
     (output / "job.json").write_bytes(_json_bytes(job))
     digest = hashlib.sha256()
+    qualification_digest = hashlib.sha256()
     counts: Counter[str] = Counter()
     source_counts = {provider: Counter() for provider in PRIORITY}
     reasons = {provider: Counter() for provider in PRIORITY}
     processed = 0
+    difference_categories: Counter[str] = Counter()
+    difference_fields: Counter[str] = Counter()
+    difference_field_securities: Counter[str] = Counter()
+    difference_minutes: Counter[str] = Counter()
+    difference_cells: Counter[str] = Counter()
     with (output / "records.jsonl").open("xb") as sink:
         for code in refs:
             if time.monotonic() - started >= budget_seconds:
                 raise TimeoutError("offline diagnostic budget exhausted; no complete summary")
-            row = _evaluate(code, refs, tencent_root, paid_root, checkpoint.get(code))
+            row = _evaluate(
+                code,
+                refs,
+                tencent_root,
+                paid_root,
+                checkpoint.get(code),
+                describe_source_differences=describe_source_differences,
+            )
             raw = _json_bytes(row)
             sink.write(raw)
             digest.update(raw)
+            qualification_digest.update(
+                _json_bytes(
+                    {key: value for key, value in row.items() if key != "source_difference"}
+                )
+            )
             counts[row["disposition"]] += 1
             for source in row["sources"]:
                 source_counts[source["provider"]][source["status"]] += 1
                 reasons[source["provider"]].update(source.get("reason_codes", []))
             processed += 1
+            if "source_difference" in row:
+                detail = row["source_difference"]
+                difference_categories[detail["category"]] += 1
+                difference_fields.update(detail["field_difference_counts"])
+                difference_field_securities.update(detail["field_difference_counts"].keys())
+                difference_minutes.update(detail["minute_difference_counts"].keys())
+                difference_cells.update(detail["minute_difference_counts"])
     if time.monotonic() - started >= budget_seconds:
         raise TimeoutError("offline diagnostic budget exhausted; no complete summary")
     summary = {
@@ -438,6 +482,7 @@ def build_ledger(
         "status": "offline_evaluation_completed_not_published",
         "identity_sha256": hashlib.sha256(_json_bytes(identity)).hexdigest(),
         "records_sha256": digest.hexdigest(),
+        "qualification_records_sha256": qualification_digest.hexdigest(),
         "universe_count": len(refs),
         "processed": processed,
         "dispositions": dict(sorted(counts.items())),
@@ -448,6 +493,19 @@ def build_ledger(
         "publication_authorized": False,
         "recovery_authorized": False,
     }
+    if describe_source_differences:
+        summary["source_difference_description"] = {
+            "schema": minute_source_difference.SCHEMA,
+            "paired_currently_qualified_securities": sum(difference_categories.values()),
+            "categories": dict(sorted(difference_categories.items())),
+            "field_difference_cells": dict(sorted(difference_fields.items())),
+            "securities_different_by_field": dict(sorted(difference_field_securities.items())),
+            "securities_different_by_minute": dict(sorted(difference_minutes.items())),
+            "different_cells_by_minute": dict(sorted(difference_cells.items())),
+            "price_abs_floor": str(minute_source_difference.PRICE_FLOOR),
+            "cause": "not_determined_by_numeric_description",
+            "changes_qualification": False,
+        }
     with (output / "summary.json").open("xb") as sink:
         sink.write(_json_bytes(summary))
     return summary
@@ -463,6 +521,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--node-label", required=True)
     parser.add_argument("--budget-seconds", type=float, default=900)
+    parser.add_argument("--describe-source-differences", action="store_true")
     args = parser.parse_args()
     from datetime import date
 
@@ -500,6 +559,7 @@ def main() -> int:
         output=args.output,
         node_label=args.node_label,
         budget_seconds=args.budget_seconds,
+        describe_source_differences=args.describe_source_differences,
         provenance={
             "code_revision": revision,
             "release_handoff": {key: value[1] for key, value in artifacts.items()},

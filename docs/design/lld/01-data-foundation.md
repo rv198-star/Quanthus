@@ -615,6 +615,13 @@ No cross-attempt files are admitted or reused by this feature; seed admission ne
 its separate complete semantic identity/checksum contract. Existing zero-row and
 provider rc/null semantics are not reclassified. Formal direct-5m conformance,
 coverage/date/READY checks, immutable Base and CN01-to-OCI DWD sync are unchanged.
+For 1m specifically, the legacy `HERMES_ODS_MINUTE_SEED_HOME` copy path is withheld
+until that current raw/reference/materialized identity verifier exists. A complete
+checkpoint count, zero inferred-minute counter, old qualification tag or file
+existence cannot authorize copying. Reject before reading/copying the seed or
+opening a source session, preserve all prior evidence, and require a fresh attempt.
+This is a fail-closed conformance repair, not an approved cross-Job reuse format;
+legacy direct-5m seed handling is not expanded or qualified by this repair.
 Synthetic acceptance includes a 4992-symbol universe with two transient errors:
 4994 symbol attempts, not two full scans. This is not a network performance benchmark.
 
@@ -659,6 +666,13 @@ rollout evidence are required before activation.
 `META-OPS-MINUTE-007` (#458), programme #456 B1, closes the paid audit/replay
 final-gate discrepancy. Design status: approved for scoped conformance repair.
 Delivery gate: open; tests do not activate a source or production deployment.
+
+Authenticated paid-source requests are restricted to the explicitly configured
+HTTPS endpoint with certificate verification enabled. Disable automatic redirects:
+`requests` can otherwise forward the custom `X-API-Key` header across a host or
+scheme change. A 3xx response is a retained HTTP error, not a new authorized source
+or qualification input. The existing bounded audit stop behavior applies; never
+retry a Location URL or print/store the credential in evidence.
 
 - `paid_minute_source.qualify_payload` interprets the existing auction/time-label
   contract only. Its result is `interpreted_payload_pending_strict_check`, not

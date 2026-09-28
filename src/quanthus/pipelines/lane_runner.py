@@ -2011,12 +2011,11 @@ def _cninfo_fetch_announcements(
         except Exception:
             org_map = {}
 
-    url = "http://www.cninfo.com.cn/new/hisAnnouncement/query"
+    url = "https://www.cninfo.com.cn/new/hisAnnouncement/query"
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Referer": (
-            "http://www.cninfo.com.cn/new/commonUrl/pageOfSearch"
-            "?url=disclosure/list/search"
+            "https://www.cninfo.com.cn/new/commonUrl/pageOfSearch?url=disclosure/list/search"
         ),
     }
     session = requests.Session()
@@ -2066,7 +2065,10 @@ def _cninfo_fetch_announcements(
                             "sortType": "",
                             "isHLtitle": "false",
                         }
-                        resp = session.post(url, data=payload, headers=headers, timeout=30)
+                        resp = session.post(
+                            url, data=payload, headers=headers, timeout=30,
+                            verify=True, allow_redirects=False,
+                        )
                         if resp.status_code != 200:
                             raise RuntimeError(f"HTTP {resp.status_code}")
                         body = resp.json()
@@ -2095,7 +2097,7 @@ def _cninfo_fetch_announcements(
                                     "announce_date": pub[:10],
                                     "name": item.get("secName") or "",
                                     "url": (
-                                        f"http://www.cninfo.com.cn/new/disclosure/detail?"
+                                        f"https://www.cninfo.com.cn/new/disclosure/detail?"
                                         f"stockCode={code}&announcementId={ann_id}"
                                     ),
                                     "source": "cninfo.hisAnnouncement",
@@ -3762,6 +3764,15 @@ def _run_minute_collector(
         if recovery_policy.budget_seconds >= _minute_collector_timeout_seconds():
             raise LaneRunError("minute recovery budget must be below collector timeout")
     if seed_raw:
+        if bar_size == "1m":
+            # Status counts, an absent inferred counter, and a file's existence
+            # do not establish current raw/reference/materialization identity.
+            # Cross-Job 1m reuse has no admitted verifier yet. Preserve the seed
+            # and fail before copy rather than bypass the qualified collector.
+            raise LaneRunError(
+                "1m seed reuse withheld: complete current raw/reference/materialization "
+                "identity verification is not implemented; use a fresh attempt"
+            )
         seed_home = Path(seed_raw).resolve()
         try:
             status = json.loads((seed_home / "status.json").read_text(encoding="utf-8"))
@@ -3779,9 +3790,6 @@ def _run_minute_collector(
             entry = observed.get(code)
             path = seed_home / f"{code}_{bar_size}.parquet"
             if not isinstance(entry, dict) or entry.get("status") != "done":
-                invalid.append(code)
-                continue
-            if bar_size == "1m" and entry.get("inferred_zero_volume_minutes"):
                 invalid.append(code)
                 continue
             try:

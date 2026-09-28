@@ -195,6 +195,40 @@ def test_rate_limit_is_recorded_without_persisting_key(tmp_path, monkeypatch) ->
     assert "do-not-persist-this-key" not in (tmp_path / "receipts/000001.json").read_text()
 
 
+@pytest.mark.parametrize("location", ["http://unapproved.invalid/", "https://other.invalid/"])
+def test_redirect_never_forwards_key_or_disables_tls(tmp_path, monkeypatch, location) -> None:
+    import requests
+
+    calls = []
+
+    class Response:
+        status_code = 302
+        headers = {"location": location}
+
+    def get(url, **kwargs):
+        calls.append(url)
+        assert url.startswith("https://")
+        assert kwargs["verify"] is True
+        assert kwargs["allow_redirects"] is False
+        assert kwargs["headers"] == {"X-API-Key": "synthetic-private-value"}
+        return Response()
+
+    monkeypatch.setattr(requests, "get", get)
+    receipt = _audit_symbol(
+        "000001",
+        day=DATE,
+        key="synthetic-private-value",
+        daily={"volume": 2500, "close": 11.0},
+        first_5m_volume=150,
+        output_dir=tmp_path,
+    )
+    assert len(calls) == 1
+    assert receipt["http_status"] == 302
+    assert receipt["status"] == "http_error"
+    assert not (tmp_path / "raw").exists()
+    assert "synthetic-private-value" not in (tmp_path / "receipts/000001.json").read_text()
+
+
 def test_explicit_canary_is_bounded_to_traded_sealed_universe() -> None:
     traded = ["000001", "600000", "688001", "000002"]
     assert select_canary_symbols("000001,600000,688001", traded) == traded[:3]
@@ -373,9 +407,7 @@ def test_resume_can_defer_recorded_http_202_without_calling_it_qualified(tmp_pat
     )
     assert remaining == ["688001"]
     assert counts == {"source_pending": 1}
-    retry, retry_counts = _resume_state(
-        tmp_path, codes=["600000", "688001"], market_date=DATE
-    )
+    retry, retry_counts = _resume_state(tmp_path, codes=["600000", "688001"], market_date=DATE)
     assert retry == ["600000", "688001"]
     assert retry_counts == {}
 
@@ -394,9 +426,7 @@ def test_resume_rejects_false_deferred_pending_receipt(tmp_path) -> None:
         )
     )
     with pytest.raises(ValueError, match="not HTTP 202"):
-        _resume_state(
-            tmp_path, codes=["600000"], market_date=DATE, defer_pending=True
-        )
+        _resume_state(tmp_path, codes=["600000"], market_date=DATE, defer_pending=True)
 
 
 def test_resume_rejects_tampered_raw_or_wrong_universe(tmp_path) -> None:

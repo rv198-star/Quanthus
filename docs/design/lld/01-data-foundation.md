@@ -728,6 +728,15 @@ activation is granted by engineering tests.
   Full offline receipt reclassification and complete residual/recovery identity
   remain separate B/D work.
 
+The contract tests are `tests/unit/test_minute_references.py` and
+`tests/unit/test_minute_reference_handoff.py`, plus the existing audit, source
+selection, materialization and lane suites. They cover wrong dates/duplicates,
+bad/symlink inputs, single capture, immutable reuse, explicit reference/hash
+handoff, current quality rejection versus hard integrity, and an old-unqualified
+but now-qualified conflicting source remaining blocked. Synthetic agreement is
+not 9/24 source qualification or data delivery. Linux/role qualification, controlled
+rollout and real-source evidence remain independently gated.
+
 ### Current offline minute qualification ledger
 
 `META-OPS-MINUTE-009` (#462), programme #456 B3, supplies a bounded diagnostic
@@ -768,14 +777,10 @@ latency. Cooperative checks do not hard-cancel a stuck library/filesystem call;
 the isolated invocation still needs an outer bounded process timeout. No new
 timer, paid-source promotion, automatic queue/retry or source truth is introduced.
 
-The contract tests are `tests/unit/test_minute_references.py` and
-`tests/unit/test_minute_reference_handoff.py`, plus the existing audit, source
-selection, materialization and lane suites. They cover wrong dates/duplicates,
-bad/symlink inputs, single capture, immutable reuse, explicit reference/hash
-handoff, current quality rejection versus hard integrity, and an old-unqualified
-but now-qualified conflicting source remaining blocked. Synthetic agreement is
-not 9/24 source qualification or data delivery. Linux/role qualification, controlled
-rollout and real-source evidence remain independently gated.
+The focused contract is `tests/unit/test_minute_offline_ledger.py`, including a
+4992-security synthetic denominator and actual versus inferred zero-volume bars.
+These tests prove diagnostic mechanics, not independent acquisition, supplier
+truth, source availability, runtime qualification or publication acceptance.
 
 ### Runtime qualification before node rollout
 

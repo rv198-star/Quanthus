@@ -198,6 +198,30 @@ TMP 目录和有限评估预算；中断、预算或未知故障不得写完成�
 本片先做合成故障、本地/Linux隔离验证，再用已有9/24 raw只读重放；各项另记证据，
 不把方法一致、测试通过或HTTP200当作来源正确、冲突解除或历史日期已完成。
 
+草稿 [PR #463](https://github.com/rv198-star/Quanthus/pull/463) 堆叠在 #461，code commit
+`153b54bbf515eb1eff02c3fdb0cc7f7f9d3b27a8` 的十一分钟套件本地/Linux均 `228 passed`，
+含31条新账本回归。Linux复用已完成/干净的CN01隔离checkout，经GitHub fetch固定版本；
+不切两个保留的未提交组合树、不动生产或共享环境。有效Python/依赖与B2相同，禁用插件及
+共享目录bytecode写回；focused Ruff与diff whitespace通过。文档/账本组`68 passed / 1 failed`，
+唯一失败仍为既有`P3-STRAT-003-B-R1`追踪缺口；`make check`仍在本机Xcode许可前置退出69。
+CI run `36427714219` 三job均steps0，annotation仍是已知账户payment/spending阻断。
+这些是作者工程/反向审查证据，不是独立批准、完整CI或生产角色验收。
+
+随后在同一干净Linux code commit上，对CN01既有9/24全量raw做只读CLI重放，冻结paired
+READY市场参照及同契约原生5m，实际bytes/SHA匹配。完整4992分母评估用时`192.688008s`，
+参照装载`1.805867s`：2296整票候选无冲突（含7停牌）、2672被双合格整源冲突门禁阻断、
+24无合格整源，无证据完整性错误。腾讯4877候选含7停牌，另115因推断缺行拒绝；中转2767
+候选、2218拒绝、7停牌未请求。冲突计数并未全部消除表示尾差，不能都称真实价格差。
+未知来源语义不被账本裁决；24中22仍日量不符，000755/300501仍竞价/首桶联合拒绝。
+
+诊断目录为CN01 `/root/work/astock/data/quarantine/minute-ledger/2026-09-24-20260928T2120`，
+records SHA `5755ace8cd5157b24ffcf2eaf40b1eae9830ef122684fa3ede62d7743b669297`，
+identity SHA `f4d68d45668904414215b2e1583389ee04ca9f2e086af24da5a48f6ac2324518`。
+同Job参照view为`60a2f4948901e34792b3f7e9a4b774684bf5227d63e3f8baeff5182f9f48a26f`。
+没有读取Key/网络取数/物化或写回旧证据；这只是现行资格和缺口账本，不是跨Job复用、独立采集
+或9/24 READY/DWD完成。生产与timers未改。B的在线/恢复闭合、C语义归因、D预算队列和
+受控发布仍分别未完成；不以测试或这次诊断自动恢复每日采集。
+
 ## 5. 评审与交付顺序
 
 采用上级 #424 已声明的同一助手“方案 / 反向审查 / 测试”阶段，不称独立审批。

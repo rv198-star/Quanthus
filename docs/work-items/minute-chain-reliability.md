@@ -136,5 +136,22 @@ timers 不因代码发布自动开启。回滚不重写 Base、READY 或失败�
 许可阻断，一个是上述既有文档追踪缺口。在基线相同的 PR #454 checkout 上，日编排
 套件复现相同七项失败（`18 passed / 7 failed`）。这些不是新增改动的回归，也不等于
 完整验证已经通过。子进程测试显式使用绝对 `PYTHONPATH`，避免切换工作目录造成导入误报。
-Linux 验证、GitHub/逐节点放行和运行观察尚待执行；没有改生产代码、服务或 timer。
-上述计数是本地工程证据，不是 9/24 来源资格、READY 或数据发布验收。
+
+同日 CN01 仅通过 GitHub fetch 建立隔离 checkout，对
+`429b28044153f7e53f1e68311633f69860a0d71c` 做 Linux smoke：分钟七套件
+`118 passed`，上述扩大八套件 `174 passed / 1 failed`（仅既有文档追踪缺口）。
+运行环境为 Linux `5.15.0-106-generic`，文件系统报告 `ext2/ext3`，Python `3.10.12`、
+pandas `2.3.3`、pyarrow `23.0.1`、pytest `8.4.2`。测试 venv 单独创建，pandas/pyarrow
+只读使用节点 `/root/work/Quanthus/.deps`；`PYTHONPATH` 首项为隔离 checkout 的 `src`，
+显式禁用 pytest 自动插件，没有修改共享 collector 环境、访问真实来源或读取 Key。
+这验证了该 Linux/文件系统上的暂存读回和 no-replace 行为，不代替 #431 的完整锁定角色环境
+与部署资格，也不证明断电耐久性或多进程整个目录的安全。
+
+另一个隔离 checkout 仅组合 GitHub 的本片 commit 与 PR #454
+`857afb387ec36abd6ed4a09cbaac4147c254d4dd`，未提交的组合树
+`e46319db1da52bf7436998618409c0e55afe9d9d` 上八个分钟/seed 套件 `122 passed`。
+它是兼容性测试，不是合并、独立评审或生产放行。草稿 [PR #457](https://github.com/rv198-star/Quanthus/pull/457)
+CI 在任何 step 前仍因账户 payment/spending limit 被阻断，annotation 已核实；不把它称为代码回归。
+测试后两采集节点生产 HEAD 均仍为基线，CN01 晚间编排在运行，Hermes 原 timer 保留；
+恢复 timers 仍 disabled。没有改生产代码、服务或 timer。
+GitHub/逐节点放行和运行观察尚待执行；上述计数不是 9/24 来源资格、READY 或数据发布验收。

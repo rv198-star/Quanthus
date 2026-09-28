@@ -22,7 +22,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from quanthus.providers.minute_source_selection import MinuteCandidate
+from quanthus.providers.minute_source_selection import MinuteCandidate, qualify_candidate
 from quanthus.providers.tencent_m1_normalize import expected_times
 
 ENDPOINT = "https://tl.kaixin8.top/tushare/pro/stk_mins"
@@ -57,6 +57,8 @@ def _source_start_times(market_date: str) -> dict[str, str]:
 def _parse_rows(
     payload: dict[str, Any], *, symbol: str, market_date: str
 ) -> tuple[list[str], list[list[Any]], dict[str, dict[str, Any]]]:
+    if not isinstance(payload, dict):
+        raise ValueError("proxy response is not a data mapping")
     if payload.get("code") != 0 or payload.get("api_name") not in (None, "stk_mins"):
         raise ValueError("proxy response is not successful stk_mins")
     meta = payload.get("meta") or {}
@@ -167,14 +169,15 @@ def qualify_payload(
     daily_close: Any,
     first_5m_volume: Any | None,
 ) -> dict[str, Any]:
-    """Check source-faithful rows without adjusting any reported shares.
+    """Interpret source-faithful rows without adjusting any reported shares.
 
     The proxy supports both the historical minute-end convention and an
     interval-start convention observed on the replacement relay. Only a complete
     fixed 240-row session can be selected. Other admitted observations remain in
-    immutable raw evidence but are excluded before normalization; exact sealed
-    daily volume and close still license the selected interpretation. No residual
-    is spread over minute bars.
+    immutable raw evidence but are excluded before normalization; sealed daily
+    inputs constrain the selected interpretation. No residual
+    is spread over minute bars. This adapter-level result is provisional: only
+    qualify_raw's shared exact whole-security gate licenses qualification.
     """
 
     _, items, seen = _parse_rows(payload, symbol=symbol, market_date=market_date)
@@ -297,7 +300,7 @@ def qualify_payload(
             raise start_error from None
         raise end_error from None
     return {
-        "status": "qualified_candidate_not_published",
+        "status": "interpreted_payload_pending_strict_check",
         "provider": "paid-tushare-style-proxy-stk_mins",
         "stock_code": code,
         "market_date": market_date,
@@ -310,7 +313,7 @@ def qualify_payload(
     }
 
 
-def normalized_candidate(
+def _interpreted_candidate(
     raw: bytes,
     *,
     symbol: str,
@@ -319,12 +322,14 @@ def normalized_candidate(
     daily_close: Any,
     first_5m_volume: Any | None,
     raw_ref: str,
-) -> MinuteCandidate:
-    """Build one quarantined, whole-security candidate from exact source bytes.
+) -> tuple[MinuteCandidate, dict[str, Any]]:
+    """Build one provisional whole security and adapter detail from captured bytes.
 
     The 09:30 auction is merged only when the daily/5m qualification above
     licenses it. Minute amount remains null until its own quality contract is
     accepted, despite the relay exposing an amount field in its raw response.
+    This shared builder cannot grant final qualification; the exact qualifier
+    owns that outcome in audit and whole-security source selection.
     """
     payload = json.loads(raw)
     result = qualify_payload(
@@ -368,7 +373,7 @@ def normalized_candidate(
                 "amount": None,
             }
         )
-    return MinuteCandidate(
+    candidate = MinuteCandidate(
         provider="paid-tushare-style-proxy-stk_mins",
         raw_sha256=hashlib.sha256(raw).hexdigest(),
         raw_ref=raw_ref,
@@ -376,6 +381,69 @@ def normalized_candidate(
         auction_provenance=result["auction_mode"],
         amount_status="source_present_unpublished_pending_separate_quality_review",
     )
+    return candidate, result
+
+
+def qualify_raw(
+    raw: bytes,
+    *,
+    symbol: str,
+    market_date: str,
+    daily_volume: Any,
+    daily_close: Any,
+    first_5m_volume: Any | None,
+    raw_ref: str,
+) -> tuple[MinuteCandidate, dict[str, Any]]:
+    """Grant quarantine-only qualification through the existing exact final gate."""
+    candidate, result = _interpreted_candidate(
+        raw,
+        symbol=symbol,
+        market_date=market_date,
+        daily_volume=daily_volume,
+        daily_close=daily_close,
+        first_5m_volume=first_5m_volume,
+        raw_ref=raw_ref,
+    )
+    semantic_hash = qualify_candidate(
+        candidate,
+        symbol=symbol.split(".")[0],
+        market_date=market_date,
+        daily_volume=daily_volume,
+        daily_close=daily_close,
+        traded=True,
+    )
+    return candidate, {
+        **result,
+        "status": "qualified_candidate_not_published",
+        "source_semantic_sha256": semantic_hash,
+    }
+
+
+def normalized_candidate(
+    raw: bytes,
+    *,
+    symbol: str,
+    market_date: str,
+    daily_volume: Any,
+    daily_close: Any,
+    first_5m_volume: Any | None,
+    raw_ref: str,
+) -> MinuteCandidate:
+    """Build a provisional candidate; whole-security selection owns its final gate.
+
+    Keep quality rejection in source selection: preemptively raising here would
+    turn a rejected candidate into a hard evidence error and block a valid peer.
+    """
+    candidate, _ = _interpreted_candidate(
+        raw,
+        symbol=symbol,
+        market_date=market_date,
+        daily_volume=daily_volume,
+        daily_close=daily_close,
+        first_5m_volume=first_5m_volume,
+        raw_ref=raw_ref,
+    )
+    return candidate
 
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:
@@ -482,16 +550,16 @@ def _audit_symbol(
             ):
                 zipped.write(raw)
             try:
-                receipt.update(
-                    qualify_payload(
-                        response.json(),
-                        symbol=symbol,
-                        market_date=day,
-                        daily_volume=daily["volume"],
-                        daily_close=daily["close"],
-                        first_5m_volume=first_5m_volume,
-                    )
+                _, qualification = qualify_raw(
+                    raw,
+                    symbol=symbol,
+                    market_date=day,
+                    daily_volume=daily["volume"],
+                    daily_close=daily["close"],
+                    first_5m_volume=first_5m_volume,
+                    raw_ref=str(raw_path),
                 )
+                receipt.update(qualification)
             except (ValueError, KeyError) as exc:
                 receipt.update(status="unqualified", reason=str(exc)[:350])
     except requests.RequestException as exc:
@@ -594,7 +662,9 @@ def main() -> int:
                 "processed": resumed_terminal,
                 "counts": counts,
                 "stop_reason": (
-                    "completed_scan_with_source_pending" if counts["source_pending"] else "completed"
+                    "completed_scan_with_source_pending"
+                    if counts["source_pending"]
+                    else "completed"
                 ),
                 "elapsed_seconds": 0,
                 "quarantine_only": True,

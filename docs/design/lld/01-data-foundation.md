@@ -654,6 +654,38 @@ single-process exclusion; the no-replace link does not prove whole-home concurre
 status/raw safety or power-loss/fsync durability. Linux/filesystem and controlled
 rollout evidence are required before activation.
 
+### Paid 1m shared final qualification
+
+`META-OPS-MINUTE-007` (#458), programme #456 B1, closes the paid audit/replay
+final-gate discrepancy. Design status: approved for scoped conformance repair.
+Delivery gate: open; tests do not activate a source or production deployment.
+
+- `paid_minute_source.qualify_payload` interprets the existing auction/time-label
+  contract only. Its result is `interpreted_payload_pending_strict_check`, not
+  final qualification; its provisional close tolerance cannot license a receipt.
+- `qualify_raw` decodes the captured response bytes once, applies that adapter,
+  constructs one whole candidate and invokes the existing
+  `minute_source_selection.qualify_candidate` exact code/date/240-grid/sealed
+  daily shares/close gate. Only successful evaluation returns
+  `qualified_candidate_not_published` with `source_semantic_sha256`.
+- `_audit_symbol` qualifies the very bytes whose SHA is recorded and gzip capture
+  retained, never a separately obtained `response.json()` value. Non-mapping or
+  invalid captured JSON remains HTTP-200 raw evidence but is unqualified.
+- Production `normalized_candidate` shares the same raw candidate builder; its
+  existing `choose_whole_security` invokes the same exact final qualifier. Keep
+  that owner: preemptive quality exceptions in an adapter must not turn a rejected
+  candidate into a hard evidence fault that blocks a qualified peer. No price
+  rounding, true-price tolerance, residual shares or minute amount inference is
+  added. Existing HTTP-200 unqualified raw remains a hash-verified acquisition
+  terminal for resume, not a reason to refetch or publish.
+
+Equality is claimed only for the same raw, version and reference inputs. This
+slice does not supply production's currently absent independent first-5m
+reference, reclassify old receipts in place, or make a legacy receipt authoritative
+under a newer adapter. Those reference/replay interfaces remain separately open
+in B. Existing auction normalization, source priorities, cross-source conflict,
+four-lane, DWD and OCI gates are unchanged; amount debt stays under #436.
+
 ### Runtime qualification before node rollout
 
 `META-OPS-ENV-001` (#431), under programme #424 A/E, tracks the actual interpreter
@@ -687,6 +719,7 @@ entry point, package version, timer or data-contract change.
 | Minute terminal checkpoint ordering and exception cleanup | `src/quanthus/providers/minute_tdx.py` | `tests/unit/test_minute_terminal_checkpoint.py`, `tests/unit/test_ods_providers.py`; #427; no recovery-reuse authority or production acceptance |
 | Opt-in same-attempt 1m residual retry and cooperative budget | `src/quanthus/providers/minute_recovery.py`, `src/quanthus/providers/minute_tdx.py`, `src/quanthus/pipelines/lane_runner.py`, `config/pipelines/minute-attempt-recovery.v1.json` | `tests/unit/test_minute_bounded_recovery.py`; #429; explicit activation, no cross-attempt reuse or formal 5m change |
 | Qualified whole-security 1m materialization consistency | `src/quanthus/providers/minute_tdx.py` | `tests/unit/test_minute_materialization.py`; #455 / PR #457; new attempt, staged exact readback and no-replace file visibility; isolated Linux smoke passed, runtime/rollout still open |
+| Paid 1m audit/replay shared final qualification | `src/quanthus/providers/paid_minute_source.py` | `tests/unit/test_paid_minute_shared_qualification.py`, `tests/unit/test_paid_minute_source.py`; #458; same captured bytes and sealed references, provisional adapter versus exact final gate; Linux/rollout separately required |
 | Dual-lane epoch, daily bars/status/summary candidates, fixed-primary arbitration, fenced publication/correction/rollback, recovery evidence, catalog, limited operational ADS, publication intent, and release set | `src/quanthus/pipelines/dual_lane.py`, `config/pipelines/dual-lane-dwd-dws.v1.json` | `tests/unit/test_dual_lane.py`, ADR 0005; runtime qualification and cutover acceptance evidence remains open |
 | Sealed DWD/DWS history seed and lane-local logical merge | `src/quanthus/pipelines/dual_lane_history.py`, `config/pipelines/dual-lane-history-base.v1.json`, `ops/bin/*dual-lane-history*` | `tests/unit/test_dual_lane_history.py`, ADR 0005, `docs/operations/dual-lane-data-platform-runbook.md` |
 | Monthly-complete DWD/DWS Base packages, guarded Base descriptors, and Base-aware lane catalogs | `src/quanthus/pipelines/dwd_dws_base.py`, `config/pipelines/dwd-dws-base-through-20260730.v2.json`, `ops/bin/*dwd-dws-base*` | `tests/unit/test_dwd_dws_base.py`, Issue #48, `docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md` |
@@ -723,6 +756,7 @@ entry point, package version, timer or data-contract change.
 | META-OPS-MINUTE-002 | Bound opt-in same-attempt minute residual retry | META-OPS-MINUTE-001 | #429; 4992-symbol residual-set, one monotonic deadline, fail-closed profile activation; Linux/deployment remains separate |
 | META-OPS-MINUTE-005 | Close the entire 1m acquisition and qualification chain | META-OPS-RELIABILITY-001 | #456; [Staged plan](../../work-items/minute-chain-reliability.md); qualification, semantics, residual queue, dated publication and ten-session observation remain separately gated |
 | META-OPS-MINUTE-006 | Preserve qualified whole-security semantics during materialization | META-OPS-MINUTE-005 | #455 / PR #457; `tests/unit/test_minute_materialization.py`; fresh attempt, exact staged readback, storage-fault stop and no ghost file; isolated Linux smoke passed, runtime/rollout open |
+| META-OPS-MINUTE-007 | Share exact final qualification between paid audit and replay | META-OPS-MINUTE-005 | #458; `tests/unit/test_paid_minute_shared_qualification.py`; captured bytes own evidence and same-input exact final qualification; reference closure and rollout remain open |
 | META-OPS-ENV-001 | Qualify effective collector runtimes and reproducible test profiles | META-OPS-RELIABILITY-001 | #431; actual interpreter inventory, role/profile locks, read-only deployment preflight, isolated environments and controlled rollback; deployment blocked |
 | P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | Exact-key source backfill and reconciled child revision |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | Exact-key backfill, active-universe coverage, and OCI child revision |

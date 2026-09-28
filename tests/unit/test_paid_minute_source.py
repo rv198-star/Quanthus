@@ -105,7 +105,7 @@ def test_exact_auction_is_merged_and_preopen_snapshots_are_excluded() -> None:
     assert result["preopen_duplicate_snapshots_excluded"] == 5
     assert result["source_rows"] == 246
     assert result["session_rows"] == 240
-    assert result["status"] == "qualified_candidate_not_published"
+    assert result["status"] == "interpreted_payload_pending_strict_check"
 
 
 def test_duplicated_auction_must_match_independent_first_5m_without_it() -> None:

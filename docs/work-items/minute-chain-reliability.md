@@ -11,7 +11,77 @@
 | GitHub 跟踪 | [整链路 #456](https://github.com/rv198-star/Quanthus/issues/456)，首片 [#455](https://github.com/rv198-star/Quanthus/issues/455)，B1 [#458](https://github.com/rv198-star/Quanthus/issues/458)，B2 [#460](https://github.com/rv198-star/Quanthus/issues/460) |
 | 当前生产放行 | blocked；本工作项不是 9/24 READY/DWD 完成证据 |
 
+最新候选（2026-09-29）：`META-OPS-MINUTE-010` 显式小误差配置和同 raw 的审计/离线
+重验入口已实现，尚未接入生产 collector/物化/发布。默认 exact 路径保持，生产仍
+`be96a7cb`、采集与每小时跟进仍暂停。[草稿 PR #467](https://github.com/rv198-star/Quanthus/pull/467)
+初版代码 `c48bda97` 已完成 Linux 分钟/文档扩大检查 `358 passed / 1 failed`；
+后续配置类型/原因标签收紧后本机 `361 passed / 1 root-role skipped / 1 failed`。
+唯一剩余失败是既有
+`P3-STRAT-003-B-R1` 文档追踪缺 governing LLD 行；不是新规则回归。
+focused Ruff/diff检查通过，`make check`仍在目标执行前被Xcode许可阻断。
+本轮两份全量既有 raw 离线重验均完成；结果与仍未完成的DWD见下节。
+作者测试不当独立审批或DWD成功。
+
+### 9/29 小误差候选的全市场隔离回执
+
+固定代码 `c48bda97da372fea48f17aa6ce767412a9a323f4`，同一份最新冷拉
+`minute-cold-test/2026-09-24-20260928T2331` 的 verified market/native5m参照，
+重放既有 `tencent-full-20260924-20260928T1145` 与
+`paid-1m/2026-09-24-full-20260928T0025` 不可变 raw。
+这不是新一轮冷采、不是两次独立采集，也没有网络请求或读取Key。
+
+两Job输出均在CN01 `/root/work/astock/data/quarantine/minute-ledger/` 下：
+
+| Job / 同一4992封存票 | 无冲突整票候选 | 双合格源冲突 | 无合格整源 |
+| --- | ---: | ---: | ---: |
+| `2026-09-24-strict-20260929T0250` / 默认exact | 2296（含7停牌） | 2672 | 24 |
+| `2026-09-24-bounded-20260929T0250` / amount也要求非空 | 2817（含7停牌） | 0 | 2175 |
+
+不能把第二行的0冲突解释为两源一致或小误差完全消除了冲突：腾讯4870实有完整交易票
+因原始接口不提供amount而拒绝，另115票因推断分钟拒绝；它并未参与双合格源比较。
+中转由2767增加至2810交易票候选，净增43；仍有2059日量/适用首5m联合条件拒绝、
+113关键分钟不完整、2竞价/标签歧义、1其他资格拒绝，共2175。
+amount豁免仍需Owner明确决定，不能通过替换价格×量推算或降级来源绕开。
+113票中99票有4个、14票有26个不完整关键分钟，不能归为可容忍数值毛刺。
+
+bounded耗时305.119416秒、strict322.773441秒，processed均4992。
+两份records实际SHA与sealed summary一致；summary均
+`offline_evaluation_completed_not_published`，publication/recovery授权均false。
+
+| Job | Summary SHA256 | Records SHA256 |
+| --- | --- | --- |
+| bounded | `591058f8d5b4d00df58d97a9786acd202bb0b84e2d828eff9abce41f80131ec9` | `c84fed5582b34c1739a24d2bbd3ec77c6a893f9d01db92686ce54b3ddb113e3d` |
+| strict | `3eed3b2cadc503a3bf6ccc61139c6c77f6cd40cf392761d961f5098707f469e4` | `2dd3f24422276f73900f5bb76b44fd152e1237a82f29c7518e2307ebe8d96780` |
+
+旧回执中的腾讯`MISSING_MINUTE_AMOUNT`还伴随泛化的`MINUTE_GRID_OR_EVIDENCE_MISSING`标签，
+并不表示4870票缺时间行；后续仅修正描述标签，保留旧回执不覆盖，资格及候选数量不改变。
+测试环境先误用了无依赖overlay的venv（pyarrow/requests缺失），明确是运行环境错误；
+实际回归/两Job使用只读`PYTHONPATH=src:/root/work/Quanthus/.deps`，
+Python3.10.12/pandas2.3.3/pyarrow23.0.1。没有修改共享依赖。
+
+本轮结论仍 **NO_GO_DATA / NO_GO_PRODUCTION**：没有1m READY、DWD或OCI验收，
+新规则尚未接入collector/物化/DWD，#466质量错误误计网络熔断也尚未修复。
+默认生产规则及停用timer/暂停heartbeat不变，不能从离线候选数自动发布或恢复。
+
 ## 1. 复盘：从补单票转为修完整链路
+
+2026-09-29 Owner进一步确认“按1–3做”：先拆清24只硬缺口，再只验证现有渠道能否
+覆盖这些难票；不具备能力就明确停止当前路线、研究替代样本，而不是反复全市场拉取。
+24只均有腾讯实际未返回分钟，22只中转在现行标签/竞价解释下日量不符；000755/
+300501的without-auction日量相等但首5m冲突，不能把两票说成日量缺失或取消首桶条件。
+本轮能力脚本由LLD 01同节治理：关闭的strict账本及actual SHA钉住范围，默认离线，
+显式单次最多24只窄复测，保留旧/新raw/hash及全部拒绝原因；质量拒绝不遮住剩余难票，
+网络/pending/限流则有界停止。同一新raw同时诊断exact OHLCV与bounded含amount口径，
+不因少量数值容忍而补造行/空值。只有24难票覆盖成立才进入下一次全量冷拉候选；失败
+则给出可供替代渠道实际试取的24票/日期/字段样本规范。文档支持历史1m不算实际准入，
+新来源权限/费用/凭据仍需明确，生产、timer和paused heartbeat均不变。
+
+本次03:50–03:51 CST单次窄复测在第四票202时结束：前三票中转raw SHA不变、腾讯仍
+缺原分钟；四票exact/bounded均无候选，余20票未请求。**现有路线没有通过能力验证**，
+不启动全市场重拉/发布；实际回执与替代24票样本规范见
+[来源能力检查](../reviews/minute-hard-gap-source-capability-20260929.md)。
+替代文档支持不等于已供数，须拿到真实难票样本/权限才可进入新源准入。没有新采购、
+费用承诺、生产部署或恢复调度，#440/#456仍未完成。
 
 基线、事故事实和证据更新由 [#440](https://github.com/rv198-star/Quanthus/issues/440)
 及 [#436](https://github.com/rv198-star/Quanthus/issues/436) 保持，不在本方案重复事故账本。
@@ -34,6 +104,14 @@
 工程目标不承诺创造供应商未提供的精确分钟。
 
 ## 2. 保持的业务和发布边界
+
+2026-09-29 Owner明确接受浮点尾差、小成交量误差和一分钱价格差异，但拒绝缺数据、空值、
+错日期，并要求开始处理。新增 **META-OPS-MINUTE-010** 显式候选规则由
+LLD 01 的“Owner-bounded minute quality candidate”及
+`config/minute-quality/bounded-v1.json`治理；下面旧“精确/任何冲突阻断”文字仍描述
+未变的默认生产口径，不覆盖新隔离候选，也不是新口径已经发布的证据。
+量差同时100股/0.001%按前一轮建议进入候选；amount是否豁免未单独明确，先保守要求
+源实际非空，不伪造也不隐瞒。成交额单位/真实性与完整DWD验收仍分别待验证。
 
 当前来源仲裁仍由上级方案的“2026-09-25 逐票分钟来源恢复增量”和
 `minute_source_selection.py` 治理。日期、代码、实际来源、240 格点、封存日线精确股数及

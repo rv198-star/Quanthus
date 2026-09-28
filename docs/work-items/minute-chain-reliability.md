@@ -8,7 +8,7 @@
 | Design status | approved；仅分阶段工程路线，不批准未决来源语义或发布契约 |
 | Delivery gate | open；工程、Linux、节点部署、数据验收及观察期分别留证 |
 | 授权 | Owner 要求优化整个 1m 采集链路；已有付费中转、受保护凭据和追补授权延续 |
-| GitHub 跟踪 | [整链路 #456](https://github.com/rv198-star/Quanthus/issues/456)，首片 [#455](https://github.com/rv198-star/Quanthus/issues/455) |
+| GitHub 跟踪 | [整链路 #456](https://github.com/rv198-star/Quanthus/issues/456)，首片 [#455](https://github.com/rv198-star/Quanthus/issues/455)，B1 [#458](https://github.com/rv198-star/Quanthus/issues/458) |
 | 当前生产放行 | blocked；本工作项不是 9/24 READY/DWD 完成证据 |
 
 ## 1. 复盘：从补单票转为修完整链路
@@ -101,6 +101,38 @@ attempt，保持该边界可以直接消除旧行混合，而 `keep=last` 会暗
 精确量价和格点回读、日总量合格但分钟语义改变、序列化读回损坏、目标文件碰撞、
 物化失败停止下一请求、停牌 ghost 文件，以及旧非合格路径无隐式契约改变。
 
+### B1：META-OPS-MINUTE-007 / #458
+
+9/28 作者入口复盘的纯合成反例：日收盘 11.00、分钟末 close 11.01，适配器 0.011
+容差报告候选合格，但生产精确 `qualify_candidate` 拒绝。这是资格声明分叉，不是已证明
+9/24 来源缺口的原因。审计还在保存 `response.content` 后使用 `response.json()` 判定，
+证据 bytes 与判定输入未由同一路径闭合。
+
+有界修复由 LLD 01 的“Paid 1m shared final qualification”治理：保留现有竞价/时间解释，
+仅把 adapter 结果明确为 provisional；审计和生产 raw 重放共用候选构造，单次解码已捕获
+bytes；审计 `qualify_raw` 与生产整票仲裁调用同一个既有精确门禁，成功后记录 OHLCV
+语义 hash。不能把适配器提前拒绝变成整票仲裁之前的硬错误去遮住合格另一源。
+HTTP 200 不合格 raw 仍保留和可验证复用，不因质量不合格重取；表示尾差也不舍入放行。
+amount 限制继续可见。
+
+当前本地八分钟套件 `134 passed`；新增十六条合成用例覆盖两种标签、
+真实一分价差、表示尾差仍拒绝、捕获/SDK JSON 分离、无效 root、原始/hash 保留、一次适配，
+以及拒绝的中转候选不能遮住真正合格的另一整票源。focused Ruff 与 diff whitespace 通过；
+文档/调度 `57 passed / 1 failed` 仍为已复现的既有研究线追踪缺口，`make check` 仍被本机
+Xcode 未接受许可阻断；不自动接受许可、不称全仓绿灯。
+它只是 B1，不称 B 完成：生产缺少 first-5m 参照、历史 receipt 现行离线重验及完整恢复
+身份/成本队列仍需后续接口闭合。同输入一致不等于不同参照的一致，也不证明供应商真值。
+代码 [PR #459](https://github.com/rv198-star/Quanthus/pull/459) 是堆叠在 PR #457 上的草稿，
+不是 main 发布。GitHub code commit `ff38880adb48ca07296caea2ac845ed7e4ab804a`
+在 CN01 的另一隔离 checkout 上八分钟套件 `134 passed`，未改共享 collector 环境、
+未访问真实来源或读取 Key。与 PR #454 `857afb387ec36abd6ed4a09cbaac4147c254d4dd`
+组成的未提交树 `8ed2c7ad4d6bc617e1fb3805ee15170b60e0e90a` 上九分钟/seed 套件
+`138 passed`；组合树保留在隔离 checkout，不是合并或部署。有效 Python/依赖与本节后述
+A 的 Linux 环境相同，`PYTHONPATH` 首项改为 B1 隔离 checkout 的 `src`，显式禁用插件。
+GitHub CI 仍在任何 step 前遭账户 payment/spending limit 阻断，已核实 annotation，
+不称代码失败或重复告警。Linux smoke、作者反向审查、运行环境资格和生产放行分别留证；
+当前仅 scoped engineering 通过，参考输入闭合及生产放行仍未完成，不改今晚编排。
+
 ## 5. 评审与交付顺序
 
 采用上级 #424 已声明的同一助手“方案 / 反向审查 / 测试”阶段，不称独立审批。
@@ -115,8 +147,9 @@ attempt，保持该边界可以直接消除旧行混合，而 `keep=last` 会暗
 | 代码修好就能补齐 9/24 吗？ | 不能；仍需实际来源覆盖、冲突可归因及完整日期发布证据。 |
 | 未决口径会迫使每小时全扫吗？ | 不会；已有 raw 优先，窄 canary 和显式下一行动，遵守有限预算。 |
 
-下一动作依次为首片回归和 diff 审查、GitHub PR、Linux 隔离验证；与 PR #454 组合复核后，
-才做静默窗口内逐节点发布评审。今天 18:30/19:30 日编排不得被中途替换。
+首片与 B1 的 GitHub 草稿、本地/Linux 回归及 PR #454 组合 smoke 已留证；
+运行角色资格、参考输入闭合和静默窗口内逐节点发布评审仍未完成。
+今天 18:30/19:30 日编排不得被中途替换。
 部署保存原 HEAD、unit/timer 状态，GitHub fast-forward、同版本测试和回执；已有 disabled
 timers 不因代码发布自动开启。回滚不重写 Base、READY 或失败证据。
 

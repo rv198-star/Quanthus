@@ -62,6 +62,8 @@ BOUNDED = MinuteQualityPolicy(
 
 
 def require_supported_policy(policy: MinuteQualityPolicy) -> None:
+    if type(policy) is not MinuteQualityPolicy or type(policy.require_amount) is not bool:
+        raise ValueError("unsupported minute quality policy")
     if policy not in (STRICT, BOUNDED):
         raise ValueError("unsupported minute quality policy")
 
@@ -81,6 +83,9 @@ def load_policy(path: Path | None) -> MinuteQualityPolicy:
         return STRICT
     value = json.loads(path.read_bytes(), object_pairs_hook=_unique_object)
     expected = {key: val for key, val in BOUNDED.evidence().items() if key != "semantic_sha256"}
-    if value != expected:
+    if not isinstance(value, dict) or value.keys() != expected.keys():
+        raise ValueError("unsupported or altered minute quality policy")
+    if any(type(value[key]) is not type(val) or value[key] != val
+           for key, val in expected.items()):
         raise ValueError("unsupported or altered minute quality policy")
     return BOUNDED

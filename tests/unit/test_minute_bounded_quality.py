@@ -194,6 +194,19 @@ def test_undeclared_programmatic_policy_cannot_bypass_approved_bounds():
         qualify(complete(), replace(BOUNDED, price_abs=Decimal("1")))
 
 
+@pytest.mark.parametrize("value", [1, "true", None])
+def test_amount_policy_requires_boolean_not_equal_looking_json(value, tmp_path):
+    fields = {key: val for key, val in BOUNDED.evidence().items()
+              if key != "semantic_sha256"}
+    fields["require_amount"] = value
+    path = tmp_path / "policy.json"
+    path.write_text(json.dumps(fields))
+    with pytest.raises(ValueError, match="unsupported"):
+        load_policy(path)
+    with pytest.raises(ValueError, match="unsupported"):
+        qualify(complete(), replace(BOUNDED, require_amount=value))
+
+
 def test_offline_bounded_replay_retains_old_receipts_and_rejects_tencent_missing_amount(tmp_path):
     from tests.unit.test_minute_offline_ledger import fixture, put_paid, put_tencent, run
 
@@ -209,3 +222,9 @@ def test_offline_bounded_replay_retains_old_receipts_and_rejects_tencent_missing
     assert summary["quality_policy"]["semantic_sha256"] == BOUNDED.evidence()["semantic_sha256"]
     assert not summary["publication_authorized"]
     assert not list(output.rglob("*.parquet"))
+
+
+def test_absent_amount_reason_does_not_claim_minute_grid_is_missing():
+    from quanthus.providers.minute_offline_ledger import _quality_reasons
+
+    assert _quality_reasons("missing minute amount") == ["MISSING_MINUTE_AMOUNT"]

@@ -136,7 +136,11 @@ def _quality_reasons(message: str) -> list[str]:
         ("not successful", "PROVIDER_RESPONSE_FAULT"),
         ("missing minute amount", "MISSING_MINUTE_AMOUNT"),
     )
-    return sorted({reason for match, reason in rules if match in message}) or [
+    reasons = {reason for match, reason in rules if match in message}
+    # An absent amount is not evidence of an absent timestamp/grid row.
+    if "MISSING_MINUTE_AMOUNT" in reasons:
+        reasons.discard("MINUTE_GRID_OR_EVIDENCE_MISSING")
+    return sorted(reasons) or [
         "CURRENT_ADAPTER_OR_EXACT_GATE_REJECTED"
     ]
 

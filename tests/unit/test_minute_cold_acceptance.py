@@ -3,6 +3,7 @@
 import importlib.machinery
 import importlib.util
 import os
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -105,7 +106,7 @@ def test_credential_descriptor_rejects_world_readable_and_symlink(tmp_path):
 def test_harness_has_no_production_service_or_notification_calls():
     text = SCRIPT.read_text()
     assert "systemctl" not in text
-    assert '--daily-root", str(job / "dwd")' in text
+    assert '"--daily-root",str(job/"dwd")' in re.sub(r"\s+", "", text)
     assert "--resume" not in text
     assert "--force-preflight" not in text
     assert '--symbol"' not in text

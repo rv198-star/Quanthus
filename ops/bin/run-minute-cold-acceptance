@@ -1,0 +1,340 @@
+#!/usr/bin/env python3
+"""One bounded, isolated historical cold test; never a production publisher.
+
+Only metadata/event snapshots and the existing Base are read-only inputs.
+Daily prices/status, native 5m and both 1m suppliers are freshly requested.
+No old minute artifacts, seeds, environment profiles or READY releases are used.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import time
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+
+from quanthus.pipelines.lane_runner import (  # noqa: E402
+    _sealed_minute_reference_artifacts,
+    resolve_paths,
+)
+from quanthus.pipelines.process_control import terminate_process_group  # noqa: E402
+from quanthus.pipelines.securities_warehouse import (  # noqa: E402
+    verify_daily_domain_increment,
+)
+
+TEST_ROOT = Path("/root/work/astock/data/quarantine/minute-cold-test")
+INPUTS = (
+    "stock_list.parquet",
+    "ref_security_master.parquet",
+    "ref_trading_calendar.parquet",
+    "ref_adjustment_factors.parquet",
+    "ref_corporate_actions.parquet",
+    "dividend_history.parquet",
+    "financial_quarterly.parquet",
+    "ref_suspensions.parquet",
+    "cninfo_orgid_map.json",
+)
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return "sha256:" + digest.hexdigest()
+
+
+def write_summary(root: Path, value: dict) -> None:
+    temporary = root / "summary.json.tmp"
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+    temporary.replace(root / "summary.json")
+
+
+def prepare_job(job: Path, metadata: Path, *, allowed_root: Path = TEST_ROOT) -> dict:
+    job, allowed_root = job.resolve(), allowed_root.resolve()
+    if job.parent != allowed_root or job.is_symlink():
+        raise ValueError("cold test must be a new direct child of the isolated test root")
+    if job.exists():
+        raise ValueError("cold test directory already exists; old captures cannot seed a cold test")
+    if shutil.disk_usage(allowed_root.parent).free < 8 * 1024**3:
+        raise ValueError("cold test requires at least 8 GiB free; existing evidence is not deleted")
+    job.mkdir(parents=True, exist_ok=False, mode=0o700)
+    home = job / "metadata"
+    home.mkdir(mode=0o700)
+    inputs = {}
+    for name in INPUTS:
+        source = metadata / name
+        if not source.is_file():
+            if name == "cninfo_orgid_map.json":
+                continue
+            raise ValueError(f"required read-only metadata/snapshot missing: {name}")
+        before = sha256(source)
+        target = home / name
+        shutil.copyfile(source, target)
+        if sha256(target) != before or sha256(source) != before:
+            raise ValueError(f"metadata changed during capture: {name}")
+        target.chmod(0o400)
+        inputs[name] = {
+            "source": str(source),
+            "sha256": before,
+            "scope": "metadata_or_event_snapshot_not_fresh_vendor_acquisition",
+        }
+    return inputs
+
+
+def isolated_environment(job: Path, python: str) -> dict[str, str]:
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(("ASTOCK_", "HERMES_ODS_", "QUANTHUS_"))
+    }
+    env.update(
+        ASTOCK_ROOT=str(job),
+        ASTOCK_HOME=str(job / "metadata"),
+        ASTOCK_PYTHON=python,
+        ASTOCK_MINUTE_PYTHON=python,
+        ASTOCK_MINUTE_ROOT=str(job / "minute-unused"),
+        HERMES_ODS_SHADOW_ROOT=str(job / "shadow"),
+        HERMES_ODS_LOCK_ROOT=str(job / "locks"),
+        HERMES_ODS_NODE_ID="cn01",
+        HERMES_ODS_ACQUIRE_MODE="provider",
+        HERMES_ODS_PROVIDER_SPEC=str(
+            ROOT / "config/pipelines/hermes-provider-collectors.spec.example.json"
+        ),
+        HERMES_ODS_MINUTE_TENCENT_FALLBACK="1",
+        HERMES_ODS_MINUTE_MODE="incr",
+        HERMES_ODS_MINUTE_TIMEOUT_SEC="7200",
+        HERMES_ODS_MINUTE_SLEEP="0.01",
+        PYTHONDONTWRITEBYTECODE="1",
+        PYTHONUNBUFFERED="1",
+    )
+    # Never source the production env file: it can restore canonical output paths,
+    # seed/override options or a different code/runtime. PYTHONPATH is the test role.
+    env["PYTHONPATH"] = str(ROOT / "src") + (
+        os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else ""
+    )
+    return env
+
+
+def protected_key(path: Path):
+    # Open without following symlinks, check the opened inode, pass the descriptor
+    # directly to the audit child. The parent never reads or stores key bytes.
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    info = os.fstat(fd)
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077:
+        os.close(fd)
+        raise ValueError("relay credential must be a root-only regular file")
+    return os.fdopen(fd, "rb")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--market-date", required=True, type=date.fromisoformat)
+    parser.add_argument("--job-root", required=True, type=Path)
+    parser.add_argument("--metadata-home", required=True, type=Path)
+    parser.add_argument("--base", required=True, type=Path)
+    parser.add_argument("--relay-key-file", required=True, type=Path)
+    args = parser.parse_args()
+    job = args.job_root.resolve()
+    inputs = prepare_job(job, args.metadata_home.resolve())
+    python = sys.executable
+    env = isolated_environment(job, python)
+    started = time.monotonic()
+    summary = {
+        "market_date": args.market_date.isoformat(),
+        "state": "running",
+        "production_publication": False,
+        "deployment": False,
+        "timer_changes": False,
+        "cold_minute_inputs": True,
+        "metadata_snapshot_inputs": inputs,
+        "phases": [],
+        "code_revision": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+        ).strip(),
+        "python": python,
+        "base_read_only": str(args.base.resolve()),
+    }
+    write_summary(job, summary)
+
+    def run(
+        name: str,
+        command: list[str],
+        budget: int,
+        stdin=None,
+        accepted_codes: tuple[int, ...] = (0,),
+    ) -> int:
+        remaining = int(28800 - (time.monotonic() - started))
+        if remaining <= 0:
+            raise RuntimeError("cold test exceeded the 8-hour total budget")
+        phase = {
+            "name": name,
+            "state": "running",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        }
+        summary["phases"].append(phase)
+        write_summary(job, summary)
+        with (job / (name + ".log")).open("xb") as log:
+            process = subprocess.Popen(
+                command,
+                cwd=ROOT,
+                env=env,
+                stdin=stdin or subprocess.DEVNULL,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            phase["pid"] = process.pid
+            write_summary(job, summary)
+            try:
+                rc = process.wait(timeout=min(budget, remaining))
+            except subprocess.TimeoutExpired:
+                terminate_process_group(process)
+                phase["state"] = "bounded_timeout"
+                raise RuntimeError(f"{name}: bounded timeout") from None
+            # A parent exit is not proof that every owned collector has exited.
+            terminate_process_group(process)
+        phase.update(
+            state="completed" if rc == 0 else "rejected",
+            exit_code=rc,
+            finished_at=datetime.now(timezone.utc).isoformat(),
+        )
+        write_summary(job, summary)
+        if rc not in accepted_codes:
+            raise RuntimeError(f"{name}: rejected with exit {rc}; see retained phase log")
+        return rc
+
+    lane = [
+        python,
+        "-m",
+        "quanthus.cli",
+        "lane-run",
+        "--config",
+        str(ROOT / "config/schedules/hermes-ods-schedule.v1.json"),
+        "--market-date",
+        args.market_date.isoformat(),
+        "--home",
+        str(job / "metadata"),
+        "--shadow-root",
+        str(job / "shadow"),
+        "--calendar",
+        str(job / "metadata/ref_trading_calendar.parquet"),
+        "--issue-ref",
+        "#456",
+    ]
+    try:
+        deadline = (datetime.now(timezone.utc) + timedelta(minutes=90)).isoformat()
+        run(
+            "fresh-market",
+            lane + ["--lane", "market-daily-core", "--recovery-deadline-at", deadline],
+            5500,
+        )
+        run("fresh-native-5m", lane + ["--lane", "intraday-archive", "--stream", "5m"], 7500)
+        paths = resolve_paths(
+            home=job / "metadata",
+            shadow_root=job / "shadow",
+            calendar=job / "metadata/ref_trading_calendar.parquet",
+        )
+        references = _sealed_minute_reference_artifacts(
+            paths=paths,
+            market_date=args.market_date,
+            available_at=datetime.now(timezone.utc),
+            require_five=True,
+        )
+        hashes = {role: item[1]["artifact_sha256"] for role, item in references.items()}
+        summary["reference_inputs"] = {role: item[1] for role, item in references.items()}
+        write_summary(job, summary)
+        audit = [
+            python,
+            str(ROOT / "ops/bin/audit-paid-minute-source"),
+            "--market-date",
+            args.market_date.isoformat(),
+            "--daily-path",
+            str(references["sealed_daily"][0]),
+            "--status-path",
+            str(references["sealed_status"][0]),
+            "--five-path",
+            str(references["sealed_native_5m"][0]),
+            "--reference-sha256-json",
+            json.dumps(hashes),
+            "--output-dir",
+            str(job / "paid-raw"),
+            "--workers",
+            "1",
+            "--rate-per-second",
+            "1",
+            "--wall-budget-seconds",
+            "9000",
+            "--full-market",
+        ]
+        with protected_key(args.relay_key_file) as credential:
+            audit_rc = run(
+                "fresh-paid-1m-audit", audit, 9200, stdin=credential, accepted_codes=(0, 3)
+            )
+        env["HERMES_ODS_MINUTE_PAID_AUDIT_DIR"] = str(job / "paid-raw")
+        run(
+            "fresh-tencent-and-whole-security-replay",
+            lane + ["--lane", "intraday-archive", "--stream", "1m"],
+            7500,
+        )
+        if audit_rc:
+            raise RuntimeError(
+                "paid source bounded stop retained; both-source cold scan incomplete"
+            )
+        # Event snapshot inputs remain explicit; live announcements are re-requested.
+        run("events-with-snapshot-inputs", lane + ["--lane", "calendar-daily-events"], 5500)
+        run(
+            "isolated-dwd",
+            [
+                python,
+                str(ROOT / "ops/bin/run-cn01-daily-dwd"),
+                "--market-date",
+                args.market_date.isoformat(),
+                "--release-root",
+                str(job / "shadow/releases"),
+                "--base",
+                str(args.base.resolve()),
+                "--release-config",
+                str(ROOT / "config/releases/v2-build20260731.json"),
+                "--daily-root",
+                str(job / "dwd"),
+            ],
+            1800,
+        )
+        pointer = json.loads((job / "dwd/CURRENT.json").read_text())
+        package = (job / "dwd" / pointer["manifest_path"]).resolve().parent
+        if job not in package.parents:
+            raise ValueError("isolated DWD pointer escaped the cold test directory")
+        verified = verify_daily_domain_increment(package)
+        summary.update(
+            state="isolated_dwd_verified_not_published",
+            package=str(package),
+            dwd_verification=verified.__dict__,
+        )
+    except Exception as exc:  # keep failed test evidence; never retry/relax automatically
+        summary.update(
+            state="cold_test_rejected_not_published",
+            error=f"{type(exc).__name__}: {exc}",
+            elapsed_seconds=round(time.monotonic() - started, 3),
+        )
+        write_summary(job, summary)
+        return 2
+    summary["elapsed_seconds"] = round(time.monotonic() - started, 3)
+    # Verification objects contain Paths; retain a JSON-safe receipt.
+    summary = json.loads(json.dumps(summary, default=str))
+    write_summary(job, summary)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

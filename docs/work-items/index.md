@@ -27,6 +27,7 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-OPS-MINUTE-006 | Preserve qualified whole-security semantics during materialization | open; #455 / PR #457; fresh attempt, staged readback and no-replace output; isolated Linux smoke passed, runtime/rollout pending |
 | META-OPS-MINUTE-007 | Share exact final qualification between paid audit and replay | open; #458 / PR #459; captured bytes and shared exact whole-security gate; isolated Linux smoke passed, reference closure and rollout pending |
 | META-OPS-MINUTE-008 | Close immutable same-Job minute reference inputs and current raw replay | open; #460; paired READY market release, explicit same-contract 5m/hash handoff, current raw qualification not receipt labels; tests and rollout separately gated |
+| META-OPS-MINUTE-009 | Re-evaluate current 1m qualification over immutable captures | open; #462; bounded TMP ledger with full denominator, current captured-byte adapters/exact gate, integrity and conflict reasons; no network, publishing, cache/recovery or scheduler authority |
 | META-OPS-ENV-001 | Qualify effective collector runtimes and test profiles | open; #431; Hermes dependency drift identified by SSH; no in-place shared environment change; rollout blocked |
 
 ADR 0007 is the current topology authority. `config/releases/v2-build202607.json` binds immutable

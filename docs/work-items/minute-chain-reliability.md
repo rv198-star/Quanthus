@@ -308,6 +308,26 @@ timers 不因代码发布自动开启。回滚不重写 Base、READY 或失败�
 
 ## 6. 当前工程检查点
 
+### Owner 授权的 9/24 冷拉验收（2026-09-28）
+
+Owner 要求先验收、全新获取 2026-09-24 数据并尝试产出 DWD，成功后才讨论发布部署。
+`ops/bin/run-minute-cold-acceptance` 是一次性、最长八小时的隔离测试入口，不是新调度、
+生产部署或通知入口。组合 #454/#457/#459/#461/#463 后，在 CN01 的隔离 GitHub checkout
+与全新 `quarantine/minute-cold-test/<job>` 运行；每日、lane、maturity 与小时跟进均保持暂停。
+
+全新请求日线/交易状态、原生 5m、付费中转 1m、腾讯 1m；禁用旧分钟 raw、seed、collector
+override、旧 READY 和生产 env 的复用。证券主数据、调整因子及事件快照捕获实际 SHA 后
+只读输入；现有 `ods_snapshot` 不做供应商新采集，不能把这些输入或 Base 称为冷拉。
+实有格点、精确量价、整源冲突、四 lane 与 DWD 规则不变。付费源单 worker、每秒最多一次、
+显式有界全市场；202/429/5xx 不无限重试。受保护 key 仅打开 root-only 描述符交给 audit stdin，
+不读取到父进程变量或写副本。超时只清理本测试自己创建的进程组，原生产失败服务不重启。
+
+仅四 lane 与完整双源冷拉通过时，现有 DWD builder 在测试目录生成并深验候选包；
+测试目录内的 CURRENT 不等于生产发布。失败保留分阶段日志和 summary，不删除旧证据。
+成功也不自动合并、部署、发送生产邮件、同步 OCI 或恢复 timers。
+组合单元测试不代替运行角色或来源语义验收；尤其旧 seed 仅验计数和文件存在的漏洞
+仍未完整闭合，本次禁用该入口，不把其测试通过记成 P0 所有入口验收完成。
+
 2026-09-28 首片分钟相关七个套件本地 `118 passed`，focused Ruff 与 diff whitespace 检查通过。
 文档/调度三个套件 `57 passed / 1 failed`；唯一失败为既有
 `P3-STRAT-003-B-R1 has no governing LLD work-item row`，在未改文档的 PR #454 checkout

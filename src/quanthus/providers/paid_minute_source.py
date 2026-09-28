@@ -22,8 +22,18 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from quanthus.providers.minute_quality_policy import (
+    STRICT,
+    MinuteQualityPolicy,
+    load_policy,
+    require_supported_policy,
+)
 from quanthus.providers.minute_references import load_minute_references, parse_reference_sha256
-from quanthus.providers.minute_source_selection import MinuteCandidate, qualify_candidate
+from quanthus.providers.minute_source_selection import (
+    MinuteCandidate,
+    numeric_deviations,
+    qualify_candidate,
+)
 from quanthus.providers.tencent_m1_normalize import expected_times
 
 ENDPOINT = "https://tl.kaixin8.top/tushare/pro/stk_mins"
@@ -126,6 +136,7 @@ def _qualify_start_labeled(
     daily_volume: Decimal,
     daily_close: Decimal,
     first_5m_volume: Any | None,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> dict[str, Any]:
     mapping = _source_start_times(market_date)
     source_times = set(mapping.values())
@@ -138,12 +149,15 @@ def _qualify_start_labeled(
             f"proxy interval-start grid has {len(incomplete)} incomplete material minutes"
         )
     source_volume = sum((seen[t]["vol"] for t in source_times), Decimal(0))
-    if source_volume != daily_volume:
+    if not quality_policy.volume_matches(source_volume, daily_volume):
         raise ValueError(
             f"proxy interval-start daily volume mismatch: delta={source_volume - daily_volume}"
         )
     close = seen[mapping["15:00"]]["close"]
-    if abs(close - daily_close) > Decimal("0.011"):
+    if not (
+        abs(close - daily_close) <= Decimal("0.011")
+        if quality_policy == STRICT else quality_policy.price_matches(close, daily_close)
+    ):
         raise ValueError("proxy interval-start/daily close mismatch")
     first = sum(
         (seen[mapping[t]]["vol"] for t in mapping if "09:31" <= t <= "09:35"),
@@ -169,6 +183,7 @@ def qualify_payload(
     daily_volume: Any,
     daily_close: Any,
     first_5m_volume: Any | None,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> dict[str, Any]:
     """Interpret source-faithful rows without adjusting any reported shares.
 
@@ -181,6 +196,7 @@ def qualify_payload(
     qualify_raw's shared exact whole-security gate licenses qualification.
     """
 
+    require_supported_policy(quality_policy)
     _, items, seen = _parse_rows(payload, symbol=symbol, market_date=market_date)
     code = symbol.split(".")[0]
     grid = {
@@ -217,8 +233,13 @@ def qualify_payload(
             reference_first = _decimal(first_5m_volume) if first_5m_volume is not None else None
             usable_auction = auction if auction and _material_complete(auction) else None
             auction_volume = usable_auction["vol"] if usable_auction else Decimal(0)
-            include = normal + auction_volume == daily
-            exclude = normal == daily and reference_first is not None and first == reference_first
+            include = quality_policy.volume_matches(normal + auction_volume, daily)
+            exclude = (
+                quality_policy.volume_matches(normal, daily)
+                and reference_first is not None and first == reference_first
+            )
+            if quality_policy != STRICT and include and exclude and auction_volume:
+                raise ValueError("ambiguous proxy auction interpretation under bounded policy")
         if not incomplete and (include or exclude):
             auction_mode = (
                 "merged_into_0931"
@@ -234,7 +255,11 @@ def qualify_payload(
                 if exclude
                 else None
             )
-            if abs(seen["15:00"]["close"] - close) <= Decimal("0.011"):
+            if (
+                abs(seen["15:00"]["close"] - close) <= Decimal("0.011")
+                if quality_policy == STRICT
+                else quality_policy.price_matches(seen["15:00"]["close"], close)
+            ):
                 end_result = {
                     "time_label_mode": "interval_end_native",
                     "auction_mode": auction_mode,
@@ -276,6 +301,7 @@ def qualify_payload(
             daily_volume=daily,
             daily_close=close,
             first_5m_volume=first_5m_volume,
+            quality_policy=quality_policy,
         )
     except ValueError as exc:
         start_error = exc
@@ -323,14 +349,16 @@ def _interpreted_candidate(
     daily_close: Any,
     first_5m_volume: Any | None,
     raw_ref: str,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> tuple[MinuteCandidate, dict[str, Any]]:
     """Build one provisional whole security and adapter detail from captured bytes.
 
     The 09:30 auction is merged only when the daily/5m qualification above
     licenses it. Minute amount remains null until its own quality contract is
     accepted, despite the relay exposing an amount field in its raw response.
-    This shared builder cannot grant final qualification; the exact qualifier
-    owns that outcome in audit and whole-security source selection.
+    The default retains this debt. The explicit bounded candidate instead keeps
+    observed amount and rejects null at its shared final gate. This builder does
+    not grant final qualification or monetary/source truth.
     """
     payload = json.loads(raw)
     result = qualify_payload(
@@ -340,6 +368,7 @@ def _interpreted_candidate(
         daily_volume=daily_volume,
         daily_close=daily_close,
         first_5m_volume=first_5m_volume,
+        quality_policy=quality_policy,
     )
     fields = payload["data"]["fields"]
     by_time = {
@@ -357,11 +386,19 @@ def _interpreted_candidate(
             else hhmm
         ]
         values = {name: _decimal(source[name]) for name in ("open", "high", "low", "close", "vol")}
+        amount = (
+            None if source["amount"] is None else _decimal(source["amount"])
+        ) if quality_policy.require_amount else None
         if hhmm == "09:31" and auction and result["auction_mode"] == "merged_into_0931":
             values["open"] = _decimal(auction["open"])
             values["high"] = max(values["high"], _decimal(auction["high"]))
             values["low"] = min(values["low"], _decimal(auction["low"]))
             values["vol"] += _decimal(auction["vol"])
+            if quality_policy.require_amount:
+                amount = (
+                    amount + _decimal(auction["amount"])
+                    if amount is not None and auction["amount"] is not None else None
+                )
         rows.append(
             {
                 "stock_code": symbol.split(".")[0],
@@ -371,7 +408,7 @@ def _interpreted_candidate(
                 "low": values["low"],
                 "close": values["close"],
                 "volume": values["vol"],
-                "amount": None,
+                "amount": amount,
             }
         )
     candidate = MinuteCandidate(
@@ -380,7 +417,11 @@ def _interpreted_candidate(
         raw_ref=raw_ref,
         rows=tuple(rows),
         auction_provenance=result["auction_mode"],
-        amount_status="source_present_unpublished_pending_separate_quality_review",
+        amount_status=(
+            "source_observed_cny_no_estimation_candidate_only"
+            if quality_policy.require_amount
+            else "source_present_unpublished_pending_separate_quality_review"
+        ),
     )
     return candidate, result
 
@@ -394,8 +435,9 @@ def qualify_raw(
     daily_close: Any,
     first_5m_volume: Any | None,
     raw_ref: str,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> tuple[MinuteCandidate, dict[str, Any]]:
-    """Grant quarantine-only qualification through the existing exact final gate."""
+    """Apply the same explicitly selected final gate in audit and raw replay."""
     candidate, result = _interpreted_candidate(
         raw,
         symbol=symbol,
@@ -404,6 +446,7 @@ def qualify_raw(
         daily_close=daily_close,
         first_5m_volume=first_5m_volume,
         raw_ref=raw_ref,
+        quality_policy=quality_policy,
     )
     semantic_hash = qualify_candidate(
         candidate,
@@ -412,11 +455,17 @@ def qualify_raw(
         daily_volume=daily_volume,
         daily_close=daily_close,
         traded=True,
+        quality_policy=quality_policy,
     )
     return candidate, {
         **result,
         "status": "qualified_candidate_not_published",
         "source_semantic_sha256": semantic_hash,
+        "quality_policy": quality_policy.evidence(),
+        "amount_status": candidate.amount_status,
+        "numeric_deviations": numeric_deviations(
+            candidate, daily_volume=daily_volume, daily_close=daily_close,
+        ),
     }
 
 
@@ -429,6 +478,7 @@ def normalized_candidate(
     daily_close: Any,
     first_5m_volume: Any | None,
     raw_ref: str,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> MinuteCandidate:
     """Build a provisional candidate; whole-security selection owns its final gate.
 
@@ -443,6 +493,7 @@ def normalized_candidate(
         daily_close=daily_close,
         first_5m_volume=first_5m_volume,
         raw_ref=raw_ref,
+        quality_policy=quality_policy,
     )
     return candidate
 
@@ -516,11 +567,15 @@ def _audit_symbol(
     first_5m_volume: Any,
     output_dir: Path,
     reference_view_sha256: str | None = None,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> dict[str, Any]:
     import requests
 
+    require_supported_policy(quality_policy)
     symbol = code + (".SH" if code.startswith("6") else ".SZ")
-    receipt: dict[str, Any] = {"stock_code": code, "market_date": day}
+    receipt: dict[str, Any] = {
+        "stock_code": code, "market_date": day, "quality_policy": quality_policy.evidence(),
+    }
     if reference_view_sha256 is not None:
         receipt["reference_effective_view_sha256"] = reference_view_sha256
     try:
@@ -565,6 +620,7 @@ def _audit_symbol(
                     daily_volume=daily["volume"],
                     daily_close=daily["close"],
                     first_5m_volume=first_5m_volume,
+                    quality_policy=quality_policy,
                     raw_ref=str(raw_path),
                 )
                 receipt.update(qualification)
@@ -583,6 +639,7 @@ def main() -> int:
     parser.add_argument("--status-path", required=True, type=Path)
     parser.add_argument("--five-path", required=True, type=Path)
     parser.add_argument("--reference-sha256-json", type=parse_reference_sha256)
+    parser.add_argument("--quality-policy", type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--rate-per-second", type=float, default=1)
     parser.add_argument("--workers", type=int, default=8)
@@ -608,6 +665,7 @@ def main() -> int:
         help="Comma-separated, at most three traded codes for a bounded canary audit",
     )
     args = parser.parse_args()
+    quality_policy = load_policy(args.quality_policy)
     if (
         args.rate_per_second <= 0
         or args.rate_per_second > 5
@@ -671,6 +729,7 @@ def main() -> int:
                 "production_publication": False,
                 "reference_inputs": reference_evidence,
                 "qualification_reference_scope": reference_scope,
+                "quality_policy": quality_policy.evidence(),
             },
         )
         return 3 if counts["source_pending"] else 0
@@ -697,6 +756,7 @@ def main() -> int:
                 "production_publication": False,
                 "reference_inputs": reference_evidence,
                 "qualification_reference_scope": reference_scope,
+                "quality_policy": quality_policy.evidence(),
             },
         )
 
@@ -721,6 +781,7 @@ def main() -> int:
                             first_5m_volume=references[code]["first_5m_volume"],
                             output_dir=args.output_dir,
                             reference_view_sha256=references.effective_view_sha256,
+                            quality_policy=quality_policy,
                         )
                     )
                 batch_counts: Counter[str] = Counter()

@@ -23,16 +23,19 @@ from pathlib import Path
 from typing import Any
 
 from quanthus.providers import (
+    minute_quality_policy,
     minute_references,
     minute_source_difference,
     minute_source_selection,
     paid_minute_source,
     tencent_m1_normalize,
 )
+from quanthus.providers.minute_quality_policy import STRICT, MinuteQualityPolicy, load_policy
 from quanthus.providers.minute_references import MinuteReferences, load_minute_references
 from quanthus.providers.minute_source_selection import (
     MinuteCandidate,
     choose_whole_security,
+    numeric_deviations,
     qualify_candidate,
 )
 
@@ -131,6 +134,7 @@ def _quality_reasons(message: str) -> list[str]:
         ("OHLC", "INVALID_OHLCV"),
         ("response code", "PROVIDER_RESPONSE_FAULT"),
         ("not successful", "PROVIDER_RESPONSE_FAULT"),
+        ("missing minute amount", "MISSING_MINUTE_AMOUNT"),
     )
     return sorted({reason for match, reason in rules if match in message}) or [
         "CURRENT_ADAPTER_OR_EXACT_GATE_REJECTED"
@@ -143,6 +147,7 @@ def _tencent_candidate(
     code: str,
     refs: MinuteReferences,
     report: dict[str, Any],
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> tuple[MinuteCandidate | None, dict[str, Any]]:
     report["status"] = "capture_missing"
     if witness is None:
@@ -175,6 +180,7 @@ def _tencent_candidate(
             market_date=refs.market_date,
             daily_volume=reference["volume"],
             daily_close=reference["close"],
+            quality_policy=quality_policy,
         )
     report["interpretation"] = detail
     # P0's approved no-inference boundary, not a new normalizer or price rule.
@@ -200,6 +206,7 @@ def _paid_candidate(
     code: str,
     refs: MinuteReferences,
     report: dict[str, Any],
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> tuple[MinuteCandidate | None, dict[str, Any]]:
     report["status"] = "capture_missing"
     if refs[code]["tradestatus"] == "0":
@@ -242,6 +249,7 @@ def _paid_candidate(
         daily_close=daily["close"],
         first_5m_volume=daily["first_5m_volume"],
         raw_ref=str(raw_path),
+        quality_policy=quality_policy,
     )
     return candidate, report
 
@@ -254,6 +262,7 @@ def _evaluate(
     witness: Mapping[str, Any] | None,
     *,
     describe_source_differences: bool = False,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> dict[str, Any]:
     candidates: list[MinuteCandidate] = []
     sources: list[dict[str, Any]] = []
@@ -264,9 +273,9 @@ def _evaluate(
         report: dict[str, Any] = {"provider": provider}
         try:
             candidate, report = (
-                _tencent_candidate(tencent_root, witness, code, refs, report)
+                _tencent_candidate(tencent_root, witness, code, refs, report, quality_policy)
                 if provider == PRIORITY[0]
-                else _paid_candidate(paid_root, code, refs, report)
+                else _paid_candidate(paid_root, code, refs, report, quality_policy)
             )
             if candidate is not None:
                 report.update(
@@ -281,6 +290,7 @@ def _evaluate(
                     daily_volume=daily["volume"],
                     daily_close=daily["close"],
                     traded=daily["tradestatus"] == "1",
+                    quality_policy=quality_policy,
                 )
                 report.update(
                     status="qualified_candidate_not_published",
@@ -288,6 +298,9 @@ def _evaluate(
                     normalized_rows=len(candidate.rows),
                     auction_provenance=candidate.auction_provenance,
                     amount_status=candidate.amount_status,
+                    numeric_deviations=numeric_deviations(
+                        candidate, daily_volume=daily["volume"], daily_close=daily["close"],
+                    ),
                 )
                 candidates.append(candidate)
         except (EvidenceFault, OSError) as exc:
@@ -318,6 +331,7 @@ def _evaluate(
         daily_close=daily["close"],
         traded=daily["tradestatus"] == "1",
         priority=PRIORITY,
+        quality_policy=quality_policy,
     )
     integrity = any(source["status"] == "integrity_fault" for source in sources)
     disposition = "blocked_capture_integrity" if integrity else decision.status
@@ -332,6 +346,8 @@ def _evaluate(
         "qualified_providers": list(decision.qualified),
         "publication_authorized": False,
         "recovery_authorized": False,
+        "quality_policy_id": decision.quality_policy_id,
+        "tolerated_differences": list(decision.tolerated_differences),
     }
     if describe_source_differences and not integrity and len(candidates) == 2:
         row["source_difference"] = minute_source_difference.describe_pair(*candidates)
@@ -341,6 +357,7 @@ def _evaluate(
 def _implementation_identity() -> dict[str, Any]:
     modules = (
         minute_references,
+        minute_quality_policy,
         minute_source_difference,
         minute_source_selection,
         paid_minute_source,
@@ -371,6 +388,7 @@ def build_ledger(
     budget_seconds: float = 900,
     provenance: Mapping[str, Any] | None = None,
     describe_source_differences: bool = False,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> dict[str, Any]:
     """Write a fresh full-denominator diagnostic; partial output is not complete."""
     if not node_label or not 0 < budget_seconds <= 1800:
@@ -408,6 +426,7 @@ def build_ledger(
         "node_label": node_label,
         "market_date": refs.market_date,
         "frequency": "1m",
+        "quality_policy": quality_policy.evidence(),
         "references": {k: v for k, v in refs.evidence().items() if k != "load_seconds"},
         "provenance": dict(provenance)
         if provenance is not None
@@ -454,6 +473,7 @@ def build_ledger(
                 paid_root,
                 checkpoint.get(code),
                 describe_source_differences=describe_source_differences,
+                quality_policy=quality_policy,
             )
             raw = _json_bytes(row)
             sink.write(raw)
@@ -492,6 +512,7 @@ def build_ledger(
         "evaluation_seconds": round(time.monotonic() - started, 6),
         "publication_authorized": False,
         "recovery_authorized": False,
+        "quality_policy": quality_policy.evidence(),
     }
     if describe_source_differences:
         summary["source_difference_description"] = {
@@ -522,7 +543,9 @@ def main() -> int:
     parser.add_argument("--node-label", required=True)
     parser.add_argument("--budget-seconds", type=float, default=900)
     parser.add_argument("--describe-source-differences", action="store_true")
+    parser.add_argument("--quality-policy", type=Path)
     args = parser.parse_args()
+    quality_policy = load_policy(args.quality_policy)
     from datetime import date
 
     from quanthus.pipelines.lane_runner import _sealed_minute_reference_artifacts, resolve_paths
@@ -560,6 +583,7 @@ def main() -> int:
         node_label=args.node_label,
         budget_seconds=args.budget_seconds,
         describe_source_differences=args.describe_source_differences,
+        quality_policy=quality_policy,
         provenance={
             "code_revision": revision,
             "release_handoff": {key: value[1] for key, value in artifacts.items()},

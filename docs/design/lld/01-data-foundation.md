@@ -815,6 +815,62 @@ a cross-Job reuse grant. `tests/unit/test_minute_source_difference.py` includes
 tiny-price, exact-floor, real-cent and volume-redistribution counterexamples;
 every numerically differing qualified pair remains blocked by the existing gate.
 
+### Owner-bounded minute quality candidate
+
+`META-OPS-MINUTE-010`, programme #456, implements the Owner's 2026-09-29 direction:
+accept small numerical differences, never incomplete data or wrong dates.
+Design status: approved for explicit isolated candidate engineering. Delivery gate:
+blocked; default collectors, schedules, materialization and DWD remain on the
+existing strict policy. Tests do not activate this candidate in production.
+
+`config/minute-quality/bounded-v1.json` is the sole bounded profile.
+`minute_quality_policy.py` rejects unknown/altered profiles, including programmatic
+widening; `minute_source_selection.py` owns the final gate. Paid audit/raw replay
+and offline evaluation share the same explicit policy and immutable captured bytes.
+Omitting the policy preserves the old exact contract and its visible #436 amount debt.
+
+- Original OHLC cell and last-close versus sealed-day price differences may be
+  <=CNY 0.01, plus an explicit `1e-10` representation epsilon. This is comparison,
+  not rounding source values, replacing OHLC, averaging or claiming source equivalence.
+- Per-security daily-share deviation must pass **both** <=100 shares and <=0.001%
+  (`0.00001` ratio). Zero-reference residual must be zero. These proposed bounds
+  enter the candidate after the Owner's instruction to start, not a blanket finding
+  that every historical volume difference is harmless.
+- Traded securities require 240 actual, ordered, code/date-correct minutes and
+  finite non-null OHLCV, valid OHLC and nonnegative shares. Reported zero-volume
+  rows can pass; inferred rows, gaps, duplicate times and wrong dates cannot.
+  Suspensions keep the existing empty-row/zero-daily-volume contract.
+- With no explicit exemption, amount is conservatively required finite,
+  nonnegative and non-null. Preserve paid source observations; the existing
+  authorized auction merge sums only observed auction/minute amounts. A missing
+  amount propagates to rejection, never price-times-volume estimation. Tencent's
+  absent amount makes it ineligible in this candidate. This is not certification
+  of relay units/truth or exact monetary accuracy. Official `stk_mins` documents
+  shares and CNY, not the relay's SLA:
+  <https://tushare.pro/document/2?doc_id=370>.
+- Time labels, auction semantics and the independent opening-5m condition remain
+  unchanged. Reject if tolerance makes distinct auction interpretations both
+  plausible, rather than choosing a convenient one.
+- Qualify every source, compare **every pair** (tolerance is nontransitive), and
+  select one unchanged whole source by existing priority. Beyond-bound prices
+  still block; cross-source minute shares and observed amounts remain exact as
+  no distribution or amount tolerance was authorized. No stitching/residuals,
+  invented data or suppression of independently qualified conflicting peers.
+- Record actual raw identity, policy/hash, original versus sealed share/close
+  deviations, tolerated comparisons and the chosen source's actual digest.
+  Bounded digests include observed amount; strict OHLCV digests stay unchanged.
+  Never relabel alternatives' hashes as equal just because a difference is tolerated.
+
+`paid_minute_source --quality-policy` is audit-only and
+`minute_offline_ledger --quality-policy` is diagnostic-only. The ledger preserves
+full-denominator missing/acquisition/integrity evidence, with no candidate bars,
+READY/DWD, notices, credentials or timer changes. Production policy/reference/
+materialization/release handoff and date-bounded DWD acceptance remain open.
+`tests/unit/test_minute_bounded_quality.py` covers cent/epsilon and both-share
+boundaries, pairwise comparisons, amount retention/hash, null/bool/nonfinite fields,
+actual zero volume, grid/date/identity errors, no source mutation, exact defaults
+and immutable offline replay. Tolerance is business acceptance, not supplier truth.
+
 ### Runtime qualification before node rollout
 
 `META-OPS-ENV-001` (#431), under programme #424 A/E, tracks the actual interpreter
@@ -889,6 +945,7 @@ entry point, package version, timer or data-contract change.
 | META-OPS-MINUTE-007 | Share exact final qualification between paid audit and replay | META-OPS-MINUTE-005 | #458 / PR #459; `tests/unit/test_paid_minute_shared_qualification.py`; captured bytes own evidence and same-input exact final qualification; isolated Linux smoke passed, reference closure and rollout remain open |
 | META-OPS-MINUTE-008 | Close same-Job sealed reference inputs and current raw replay | META-OPS-MINUTE-007 | #460; `tests/unit/test_minute_references.py`, `tests/unit/test_minute_reference_handoff.py`; immutable captured view, paired READY market and explicit same-contract opening reference/hash, no stale qualification/conflict bypass; rollout and real data remain gated |
 | META-OPS-MINUTE-009 | Re-evaluate current minute qualification over immutable captures | META-OPS-MINUTE-008 | #462; `tests/unit/test_minute_offline_ledger.py`; complete denominator, actual capture hashes, current exact whole-security gate, integrity/conflict blocking and bounded TMP-only completion; no publishing/reuse authority |
+| META-OPS-MINUTE-010 | Implement explicit owner-bounded minute-quality candidate | META-OPS-MINUTE-009 | #456; `config/minute-quality/bounded-v1.json`, `tests/unit/test_minute_bounded_quality.py`; completeness hard gates, bounded original-value comparison, observed amount and immutable replay; production/DWD activation blocked |
 | META-OPS-ENV-001 | Qualify effective collector runtimes and reproducible test profiles | META-OPS-RELIABILITY-001 | #431; actual interpreter inventory, role/profile locks, read-only deployment preflight, isolated environments and controlled rollback; deployment blocked |
 | P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | Exact-key source backfill and reconciled child revision |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | Exact-key backfill, active-universe coverage, and OCI child revision |

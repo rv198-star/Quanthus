@@ -17,6 +17,11 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from quanthus.providers.minute_quality_policy import (
+    STRICT,
+    MinuteQualityPolicy,
+    require_supported_policy,
+)
 
 TARGET_DATE = "2026-09-22"
 SOURCE_COMMIT = "26fb13de28f4c79d01db15ce0ddd49d39e39abc5"
@@ -46,6 +51,7 @@ def _number(value: Any) -> Decimal:
 def normalize_symbol(
     code: str, raw: bytes, *, daily_volume: Any, daily_close: Any,
     market_date: str = TARGET_DATE,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Produce 240 OHLCV observations; preserve absent amount as null.
 
@@ -53,6 +59,7 @@ def normalize_symbol(
     source volume equals the sealed daily volume. A separate acceptance gate
     must decide whether this inference is acceptable for formal publication.
     """
+    require_supported_policy(quality_policy)
     symbol = ("sh" if code.startswith("6") else "sz") + code
     payload = json.loads(raw)
     if payload.get("code") != 0:
@@ -90,7 +97,12 @@ def normalize_symbol(
     if not observed or min(observed) > day + "0931" or max(observed) != day + "1500":
         raise ValueError(f"incomplete Tencent session boundary for {code}")
     source_volume = sum((row["volume"] for row in observed.values()), Decimal(0))
-    if abs(source_volume - _number(daily_volume)) > Decimal("0.01"):
+    volume_valid = (
+        abs(source_volume - _number(daily_volume)) <= Decimal("0.01")
+        if quality_policy == STRICT
+        else quality_policy.volume_matches(source_volume, _number(daily_volume))
+    )
+    if not volume_valid:
         raise ValueError(f"Tencent/daily volume mismatch for {code}")
 
     raw_day_rows = len(observed)
@@ -141,9 +153,15 @@ def normalize_symbol(
                 "amount": None,
             }
         )
-    if abs(_number(rows[-1]["close"]) - _number(daily_close)) > Decimal("0.011"):
+    close_valid = (
+        abs(_number(rows[-1]["close"]) - _number(daily_close)) <= Decimal("0.011")
+        if quality_policy == STRICT
+        else quality_policy.price_matches(_number(rows[-1]["close"]), _number(daily_close))
+    )
+    if not close_valid:
         raise ValueError(f"Tencent/daily close mismatch for {code}")
-    if abs(sum((_number(row["volume"]) for row in rows), Decimal(0)) - source_volume) > Decimal("0.01"):
+    normalized_total = sum((_number(row["volume"]) for row in rows), Decimal(0))
+    if abs(normalized_total - source_volume) > Decimal("0.01"):
         raise ValueError(f"normalization lost source volume for {code}")
     return rows, {
         "source_rows": raw_day_rows,
@@ -169,8 +187,12 @@ def build_candidate(
 
     if output.exists():
         raise ValueError(f"candidate output already exists: {output}")
-    statuses = pq.read_table(status_path, columns=["stock_code", "market_date", "tradestatus"]).to_pylist()
-    dailies = pq.read_table(daily_path, columns=["stock_code", "market_date", "volume", "close"]).to_pylist()
+    statuses = pq.read_table(
+        status_path, columns=["stock_code", "market_date", "tradestatus"]
+    ).to_pylist()
+    dailies = pq.read_table(
+        daily_path, columns=["stock_code", "market_date", "volume", "close"]
+    ).to_pylist()
     status = {row["stock_code"]: row for row in statuses}
     daily = {row["stock_code"]: row for row in dailies}
     codes = sorted(status)

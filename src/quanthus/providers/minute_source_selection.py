@@ -16,6 +16,11 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from quanthus.providers.minute_quality_policy import (
+    STRICT,
+    MinuteQualityPolicy,
+    require_supported_policy,
+)
 from quanthus.providers.tencent_m1_normalize import expected_times
 
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
@@ -40,9 +45,13 @@ class MinuteDecision:
     rejected: tuple[tuple[str, str], ...]
     qualified: tuple[str, ...]
     amount_status: str | None
+    quality_policy_id: str = STRICT.id
+    tolerated_differences: tuple[str, ...] = ()
 
 
 def _decimal(value: Any, label: str) -> Decimal:
+    if value is None or isinstance(value, bool):
+        raise ValueError(f"missing or invalid {label}")
     try:
         number = Decimal(str(value))
     except (InvalidOperation, TypeError) as exc:
@@ -60,13 +69,16 @@ def qualify_candidate(
     daily_volume: Any,
     daily_close: Any,
     traded: bool,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> str:
-    """Return a semantic OHLCV hash only after exact daily and grid checks.
+    """Return original-value hash after identity, grid and explicit numeric checks.
 
     Amount is deliberately excluded from the semantic hash until its own
     cross-provider reconciliation is governed; its provenance is still kept in
     the decision. The candidate's raw hash identifies the original response.
+    The explicit bounded candidate instead requires and hashes observed amount.
     """
+    require_supported_policy(quality_policy)
     if (
         not candidate.provider
         or not _SHA256.fullmatch(candidate.raw_sha256)
@@ -104,17 +116,40 @@ def qualify_candidate(
         ):
             raise ValueError("invalid minute OHLCV")
         amount = row.get("amount")
+        if quality_policy.require_amount and amount is None:
+            raise ValueError("missing minute amount")
         if amount is not None and _decimal(amount, "amount") < 0:
             raise ValueError("negative minute amount")
         total += values["volume"]
-        canonical.append((stamp, *(str(values[name].normalize()) for name in values)))
-    if total != daily_shares:
+        cell = (stamp, *(str(values[name].normalize()) for name in values))
+        if quality_policy.require_amount:
+            cell += (str(_decimal(amount, "amount").normalize()),)
+        canonical.append(cell)
+    if not quality_policy.volume_matches(total, daily_shares):
         raise ValueError(f"minute/daily share volume mismatch: {total - daily_shares}")
-    if _decimal(candidate.rows[-1].get("close"), "last close") != _decimal(
-        daily_close, "sealed daily close"
+    if not quality_policy.price_matches(
+        _decimal(candidate.rows[-1].get("close"), "last close"),
+        _decimal(daily_close, "sealed daily close"),
     ):
         raise ValueError("minute/daily close mismatch")
     return hashlib.sha256(json.dumps(canonical, separators=(",", ":")).encode()).hexdigest()
+
+
+def numeric_deviations(
+    candidate: MinuteCandidate, *, daily_volume: Any, daily_close: Any,
+) -> dict[str, str]:
+    """Describe original observations; no allocation, rounding or repair."""
+    total = sum((_decimal(row["volume"], "volume") for row in candidate.rows), Decimal(0))
+    reference = _decimal(daily_volume, "sealed daily volume")
+    return {
+        "source_daily_shares": str(total),
+        "sealed_daily_shares": str(reference),
+        "daily_share_delta": str(total - reference),
+        "last_close_delta": (
+            str(_decimal(candidate.rows[-1]["close"], "last close")
+                - _decimal(daily_close, "sealed daily close")) if candidate.rows else "0"
+        ),
+    }
 
 
 def choose_whole_security(
@@ -126,12 +161,14 @@ def choose_whole_security(
     daily_close: Any,
     traded: bool,
     priority: Sequence[str],
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> MinuteDecision:
-    """Choose a single qualified source; disagreeing qualified sources block.
+    """Choose a whole source; beyond-policy differences remain blocking.
 
     All supplied candidates are independently checked. `priority` is a
     versioned policy input, never derived from response order or latency.
     """
+    require_supported_policy(quality_policy)
     if len(priority) != len(set(priority)) or not priority:
         raise ValueError("source priority must be a nonempty unique sequence")
     if len(candidates) != len({item.provider for item in candidates}):
@@ -149,6 +186,7 @@ def choose_whole_security(
                 daily_volume=daily_volume,
                 daily_close=daily_close,
                 traded=traded,
+                quality_policy=quality_policy,
             )
         except ValueError as exc:
             rejected.append((candidate.provider, str(exc)))
@@ -156,14 +194,46 @@ def choose_whole_security(
             passing.append((candidate, semantic_hash))
     if not passing:
         return MinuteDecision(
-            "pending_no_qualified_source", None, None, None, tuple(rejected), (), None
+            "pending_no_qualified_source", None, None, None, tuple(rejected), (), None,
+            quality_policy.id,
         )
     qualified = tuple(
         provider for provider in priority if any(c.provider == provider for c, _ in passing)
     )
-    if len({digest for _, digest in passing}) != 1:
+    tolerated: list[str] = []
+    for candidate, _ in passing:
+        detail = numeric_deviations(candidate, daily_volume=daily_volume, daily_close=daily_close)
+        if Decimal(detail["daily_share_delta"]) or Decimal(detail["last_close_delta"]):
+            tolerated.append(
+                f"{candidate.provider}: day shares delta={detail['daily_share_delta']}; "
+                f"close delta={detail['last_close_delta']}"
+            )
+    incompatible = False
+    for index, (left, left_hash) in enumerate(passing):
+        for right, right_hash in passing[index + 1:]:
+            if left_hash == right_hash:
+                continue
+            # Compare every pair, not just to a primary: tolerances are not transitive.
+            matches = all(
+                _decimal(a["volume"], "volume") == _decimal(b["volume"], "volume")
+                and (
+                    not quality_policy.require_amount
+                    or _decimal(a["amount"], "amount") == _decimal(b["amount"], "amount")
+                )
+                and all(
+                    quality_policy.price_matches(_decimal(a[name], name), _decimal(b[name], name))
+                    for name in ("open", "high", "low", "close")
+                )
+                for a, b in zip(left.rows, right.rows, strict=True)
+            )
+            if matches:
+                tolerated.append(f"{left.provider}/{right.provider}: bounded price differences")
+            else:
+                incompatible = True
+    if incompatible:
         return MinuteDecision(
-            "blocked_cross_source_conflict", None, None, None, tuple(rejected), qualified, None
+            "blocked_cross_source_conflict", None, None, None, tuple(rejected), qualified, None,
+            quality_policy.id,
         )
     chosen, semantic_hash = next(
         (c, digest) for provider in priority for c, digest in passing if c.provider == provider
@@ -176,4 +246,6 @@ def choose_whole_security(
         tuple(rejected),
         qualified,
         chosen.amount_status,
+        quality_policy.id,
+        tuple(tolerated),
     )

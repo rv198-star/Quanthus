@@ -11,6 +11,14 @@
 | GitHub 跟踪 | [整链路 #456](https://github.com/rv198-star/Quanthus/issues/456)，首片 [#455](https://github.com/rv198-star/Quanthus/issues/455)，B1 [#458](https://github.com/rv198-star/Quanthus/issues/458)，B2 [#460](https://github.com/rv198-star/Quanthus/issues/460) |
 | 当前生产放行 | blocked；本工作项不是 9/24 READY/DWD 完成证据 |
 
+最新候选（2026-09-29）：`META-OPS-MINUTE-010` 显式小误差配置和同 raw 的审计/离线
+重验入口已实现，尚未接入生产 collector/物化/发布。默认 exact 路径保持，生产仍
+`be96a7cb`、采集与每小时跟进仍暂停。初轮本机分钟/文档扩大检查
+`357 passed / 1 root-role skipped / 1 failed`，唯一剩余失败是既有
+`P3-STRAT-003-B-R1` 文档追踪缺 governing LLD 行；不是新规则回归。
+focused Ruff/diff检查通过，`make check`仍在目标执行前被Xcode许可阻断。
+Linux与全量既有raw重验尚待本轮实际回执；作者测试不当独立审批或DWD成功。
+
 ## 1. 复盘：从补单票转为修完整链路
 
 基线、事故事实和证据更新由 [#440](https://github.com/rv198-star/Quanthus/issues/440)
@@ -34,6 +42,14 @@
 工程目标不承诺创造供应商未提供的精确分钟。
 
 ## 2. 保持的业务和发布边界
+
+2026-09-29 Owner明确接受浮点尾差、小成交量误差和一分钱价格差异，但拒绝缺数据、空值、
+错日期，并要求开始处理。新增 **META-OPS-MINUTE-010** 显式候选规则由
+LLD 01 的“Owner-bounded minute quality candidate”及
+`config/minute-quality/bounded-v1.json`治理；下面旧“精确/任何冲突阻断”文字仍描述
+未变的默认生产口径，不覆盖新隔离候选，也不是新口径已经发布的证据。
+量差同时100股/0.001%按前一轮建议进入候选；amount是否豁免未单独明确，先保守要求
+源实际非空，不伪造也不隐瞒。成交额单位/真实性与完整DWD验收仍分别待验证。
 
 当前来源仲裁仍由上级方案的“2026-09-25 逐票分钟来源恢复增量”和
 `minute_source_selection.py` 治理。日期、代码、实际来源、240 格点、封存日线精确股数及

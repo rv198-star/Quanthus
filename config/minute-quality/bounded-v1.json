@@ -1,0 +1,13 @@
+{
+  "schema": "quanthus.minute-quality-policy.v1",
+  "id": "owner-bounded-1m-20260929-v1",
+  "price_abs_cny": "0.01",
+  "price_representation_epsilon": "0.0000000001",
+  "daily_volume_abs_shares": "100",
+  "daily_volume_relative": "0.00001",
+  "require_amount": true,
+  "cross_source_minute_volume": "exact",
+  "cross_source_amount": "exact",
+  "source_selection": "whole_security_priority_no_blending",
+  "activation": "explicit_candidate_only"
+}

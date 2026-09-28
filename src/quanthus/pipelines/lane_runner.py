@@ -3368,6 +3368,100 @@ def _latest_market_artifact(
     return artifact_path, metadata
 
 
+def _sealed_minute_reference_artifacts(
+    *, paths: LanePaths, market_date: date, available_at: datetime, require_five: bool,
+) -> dict[str, tuple[Path, dict[str, Any]]]:
+    """Freeze one verified market release and optional same-contract native 5m.
+
+    Do not resolve daily/status independently or infer an opening reference from
+    audit receipts. This selection does not make 5m a new whole-day truth gate.
+    """
+    if available_at.tzinfo is None or available_at.utcoffset() is None:
+        raise LaneRunError("minute reference selection requires a timezone-aware cutoff")
+
+    def candidates(root: Path, prefix: str, names: set[str]) -> list[tuple[Any, ...]]:
+        found: list[tuple[Any, ...]] = []
+        if not root.is_dir():
+            return found
+        for release_dir in root.iterdir():
+            if not release_dir.is_dir() or release_dir.is_symlink():
+                continue
+            try:
+                verified = verify_ods_release(release_dir)
+            except OdsReleaseError:
+                continue
+            release = verified.release
+            lineage = (
+                release.schedule_contract_id,
+                release.schedule_contract_revision,
+                release.schedule_config_sha256,
+            )
+            artifacts = {item.name: item for item in release.artifacts if item.name in names}
+            if (
+                release.market_date != market_date
+                or release.schedule != "daily"
+                or not release.release_id.startswith(prefix)
+                or release.created_at > available_at
+                or not all(lineage)
+                or set(artifacts) != names
+                or any(item.knowledge_cutoff > available_at for item in artifacts.values())
+            ):
+                continue
+            found.append((release.created_at, release_dir, verified, artifacts, lineage))
+        return found
+
+    def latest(values: list[tuple[Any, ...]], description: str) -> tuple[Any, ...]:
+        if not values:
+            raise LaneRunError(f"minute references require same-date READY {description}")
+        newest = max(item[0] for item in values)
+        selected = [item for item in values if item[0] == newest]
+        if len(selected) != 1:
+            raise LaneRunError(f"minute reference {description} selection is ambiguous")
+        return selected[0]
+
+    market = latest(
+        candidates(
+            paths.shadow_root / "releases" / "daily" / market_date.isoformat(),
+            "hermes-market-daily-core-",
+            {"daily_ohlcv_none_delta", "daily_status_observation_delta"},
+        ),
+        "market release with paired daily/status",
+    )
+    selections = {
+        "sealed_daily": (market, "daily_ohlcv_none_delta"),
+        "sealed_status": (market, "daily_status_observation_delta"),
+    }
+    if require_five:
+        five_values = candidates(
+            paths.shadow_root / "releases" / "daily" / "5m" / market_date.isoformat(),
+            "hermes-intraday-archive-5m-",
+            {"intraday_bars"},
+        )
+        five = latest(
+            [item for item in five_values if item[4] == market[4]],
+            "native-5m release with the same schedule contract",
+        )
+        selections["sealed_native_5m"] = (five, "intraday_bars")
+    result = {}
+    for role, (selected, artifact_name) in selections.items():
+        _, directory, verified, artifacts, lineage = selected
+        artifact = artifacts[artifact_name]
+        result[role] = (
+            directory.joinpath(*artifact.relative_path.parts),
+            {
+                "release_id": verified.release.release_id,
+                "release_dir": str(directory),
+                "manifest_sha256": verified.manifest_sha256,
+                "artifact_sha256": artifact.sha256,
+                "knowledge_cutoff": artifact.knowledge_cutoff.isoformat(),
+                "schedule_contract_id": lineage[0],
+                "schedule_contract_revision": lineage[1],
+                "schedule_config_sha256": lineage[2],
+            },
+        )
+    return result
+
+
 def _first_iso_date(*values: Any) -> str:
     """Return the first real ISO date, ignoring null-like temporal scalars."""
 
@@ -3760,6 +3854,7 @@ def _run_minute_collector(
         cmd.extend(["--recovery-policy", str(policy_path)])
     tencent_opt_in = os.environ.get("HERMES_ODS_MINUTE_TENCENT_FALLBACK", "").strip()
     paid_audit_raw = os.environ.get("HERMES_ODS_MINUTE_PAID_AUDIT_DIR", "").strip()
+    reference_artifacts = {}
     if tencent_opt_in not in {"", "0", "1"}:
         raise LaneRunError("HERMES_ODS_MINUTE_TENCENT_FALLBACK must be 0 or 1")
     if paid_audit_raw and (tencent_opt_in != "1" or bar_size != "1m"):
@@ -3767,33 +3862,29 @@ def _run_minute_collector(
     if tencent_opt_in == "1" and bar_size == "1m":
         if collector_override or policy_path or fetch_mode != "incr":
             raise LaneRunError("Tencent 1m requires the repository collector in incr mode")
-        daily_artifact = _latest_market_artifact(
-            paths=paths,
-            market_date=market_date,
-            available_at=_now(),
-            artifact_name="daily_ohlcv_none_delta",
+        references = _sealed_minute_reference_artifacts(
+            paths=paths, market_date=market_date, available_at=_now(),
+            require_five=bool(paid_audit_raw),
         )
-        status_artifact = _latest_market_artifact(
-            paths=paths,
-            market_date=market_date,
-            available_at=_now(),
-            artifact_name="daily_status_observation_delta",
-        )
-        if daily_artifact is None or status_artifact is None:
-            raise LaneRunError("Tencent 1m requires a same-date READY market release")
+        reference_artifacts = {role: item[1] for role, item in references.items()}
         cmd.extend(
             [
                 "--tencent-daily-path",
-                str(daily_artifact[0]),
+                str(references["sealed_daily"][0]),
                 "--tencent-status-path",
-                str(status_artifact[0]),
+                str(references["sealed_status"][0]),
+                "--reference-sha256-json",
+                json.dumps({role: item[1]["artifact_sha256"] for role, item in references.items()}),
             ]
         )
         if paid_audit_raw:
             paid_audit_dir = Path(paid_audit_raw).resolve()
             if not paid_audit_dir.is_dir():
                 raise LaneRunError("paid minute audit directory is missing")
-            cmd.extend(["--paid-audit-dir", str(paid_audit_dir)])
+            cmd.extend([
+                "--paid-audit-dir", str(paid_audit_dir),
+                "--sealed-five-path", str(references["sealed_native_5m"][0]),
+            ])
     # Provider collection, including explicitly audited whole-security fallback,
     # is attempt-local and never mutates shared legacy partitions.
     raw_home.mkdir(parents=True, exist_ok=False)
@@ -3832,6 +3923,7 @@ def _run_minute_collector(
         "market_date": market_date.isoformat(),
         "universe_size": len(symbols),
         "isolation": "attempt-local",
+        **({"reference_artifacts": reference_artifacts} if reference_artifacts else {}),
         **(
             {"recovery_policy_id": recovery_policy.policy_id,
              "recovery_policy_sha256": recovery_policy.sha256,

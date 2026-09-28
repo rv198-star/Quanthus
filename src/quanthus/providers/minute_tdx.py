@@ -30,6 +30,11 @@ from quanthus.providers.minute_recovery import (
     MinuteRecoveryPolicy,
     load_minute_recovery_policy,
 )
+from quanthus.providers.minute_references import (
+    MinuteReferences,
+    load_minute_references,
+    parse_reference_sha256,
+)
 from quanthus.providers.minute_source_selection import (
     MinuteCandidate,
     choose_whole_security,
@@ -203,37 +208,16 @@ def _eastmoney_ndays(market_date: str) -> int:
 
 
 def _tencent_daily_evidence(
-    *, daily_path: Path, status_path: Path, market_date: str, symbols: Sequence[str]
-) -> dict[str, dict[str, Any]]:
+    *, daily_path: Path, status_path: Path, market_date: str, symbols: Sequence[str],
+    five_path: Path | None = None, require_first_five: bool = False,
+    expected_sha256: dict[str, str] | None = None,
+) -> MinuteReferences:
     """Require one sealed same-date market universe before Tencent 1m recovery."""
-    import pyarrow.parquet as pq
-
-    daily_rows = pq.read_table(
-        daily_path, columns=["stock_code", "market_date", "volume", "close"]
-    ).to_pylist()
-    status_rows = pq.read_table(
-        status_path, columns=["stock_code", "market_date", "tradestatus"]
-    ).to_pylist()
-    daily = {str(row["stock_code"]): row for row in daily_rows}
-    status = {str(row["stock_code"]): row for row in status_rows}
-    if (
-        len(daily) != len(daily_rows)
-        or len(status) != len(status_rows)
-        or not daily
-        or set(daily) != set(status)
-        or not set(symbols).issubset(daily)
-        or any(row["market_date"] != market_date for row in daily_rows + status_rows)
-        or any(str(row["tradestatus"]) not in {"0", "1"} for row in status_rows)
-    ):
-        raise ValueError("Tencent 1m sealed daily/status evidence is incomplete or wrong-date")
-    return {
-        code: {
-            "volume": daily[code]["volume"],
-            "close": daily[code]["close"],
-            "tradestatus": str(status[code]["tradestatus"]),
-        }
-        for code in symbols
-    }
+    return load_minute_references(
+        daily_path=daily_path, status_path=status_path, market_date=market_date,
+        symbols=symbols, five_path=five_path, require_first_five=require_first_five,
+        expected_sha256=expected_sha256,
+    )
 
 
 def _tencent_qualification_symbols(
@@ -370,6 +354,10 @@ def _tencent_candidate(frame: Any, meta: dict[str, Any]) -> MinuteCandidate:
     )
 
 
+class PaidMinuteCandidateRejected(ValueError):
+    """Hash-verified raw cannot form a candidate under current reference rules."""
+
+
 def _paid_audit_candidate(
     audit_dir: Path,
     symbol: str,
@@ -387,9 +375,9 @@ def _paid_audit_candidate(
         receipt.get("stock_code") != symbol
         or receipt.get("market_date") != market_date
         or receipt.get("http_status") != 200
-        or receipt.get("status") != "qualified_candidate_not_published"
+        or receipt.get("status") not in {"qualified_candidate_not_published", "unqualified"}
     ):
-        raise ValueError("paid audit receipt is not a qualified same-date HTTP 200")
+        raise ValueError("paid audit receipt is not a same-date HTTP 200 capture")
     if raw_path.stat().st_size > 2_000_000:
         raise ValueError("paid audit raw capture is unexpectedly large")
     with gzip.open(raw_path, "rb") as source:
@@ -398,15 +386,24 @@ def _paid_audit_candidate(
         "source_raw_sha256"
     ):
         raise ValueError("paid audit raw SHA-256 or size mismatch")
-    return normalized_candidate(
-        raw,
-        symbol=symbol + suffix,
-        market_date=market_date,
-        daily_volume=daily["volume"],
-        daily_close=daily["close"],
-        first_5m_volume=None,
-        raw_ref=str(raw_path),
-    )
+    volume, close, first_five = daily["volume"], daily["close"], daily["first_5m_volume"]
+    if first_five is None:
+        raise ValueError("paid candidate replay lacks explicit sealed native-5m evidence")
+    try:
+        return normalized_candidate(
+            raw,
+            symbol=symbol + suffix,
+            market_date=market_date,
+            daily_volume=volume,
+            daily_close=close,
+            first_5m_volume=first_five,
+            raw_ref=str(raw_path),
+        )
+    except (ValueError, KeyError) as exc:
+        # Integrity/code/date/HTTP checks above are still hard evidence faults.
+        # A current adapter rejection is different: it cannot preempt a valid
+        # whole-security peer or acquire fabricated rows merely to reach the gate.
+        raise PaidMinuteCandidateRejected(str(exc)) from exc
 
 
 def _eastmoney_one_minute_frame(data: dict[str, Any], symbol: str) -> Any:
@@ -786,6 +783,8 @@ def collect(
     tencent_daily_path: Path | None = None,
     tencent_status_path: Path | None = None,
     paid_audit_dir: Path | None = None,
+    sealed_five_path: Path | None = None,
+    reference_sha256: dict[str, str] | None = None,
 ) -> int:
     if not symbols:
         raise ValueError("symbols must not be empty")
@@ -810,14 +809,22 @@ def collect(
         _require_fresh_qualified_home(home)
     if paid_audit_dir is not None and (
         not tencent_enabled or paid_audit_dir.is_symlink() or not paid_audit_dir.is_dir()
+        or sealed_five_path is None
     ):
-        raise ValueError("paid audit fallback requires a real directory and sealed 1m evidence")
+        raise ValueError(
+            "paid audit fallback requires a real directory and explicit sealed native-5m evidence"
+        )
+    if (sealed_five_path is not None or reference_sha256 is not None) and not tencent_enabled:
+        raise ValueError("sealed native-5m references require paired sealed daily/status evidence")
     tencent_daily = (
         _tencent_daily_evidence(
             daily_path=tencent_daily_path,
             status_path=tencent_status_path,
             market_date=market_date,
             symbols=symbols,
+            five_path=sealed_five_path,
+            require_first_five=paid_audit_dir is not None,
+            expected_sha256=reference_sha256,
         )
         if tencent_enabled
         else {}
@@ -902,6 +909,7 @@ def collect(
             elif fallback == "tencent":
                 assert market_date is not None
                 candidates: list[MinuteCandidate] = []
+                interpretation_rejections: list[tuple[str, str]] = []
                 tencent_error: Exception | None = None
                 try:
                     frame, meta = _tencent_one_minute_bars(
@@ -935,12 +943,23 @@ def collect(
                             }
                         ):
                             raise ValueError("paid audit receipt code/date/status mismatch")
-                        if audit_status == "qualified_candidate_not_published":
+                        captured_200 = audit_status in {
+                            "qualified_candidate_not_published", "unqualified"
+                        }
+                        if captured_200 != (audit_record.get("http_status") == 200):
+                            raise ValueError("paid audit receipt HTTP/status mismatch")
+                        if captured_200:
+                            # Old audit classification is neither current qualification
+                            # nor authority to exclude a now-qualified conflicting peer.
                             candidates.append(
                                 _paid_audit_candidate(
                                     paid_audit_dir, symbol, market_date, tencent_daily[symbol]
                                 )
                             )
+                    except PaidMinuteCandidateRejected as exc:
+                        interpretation_rejections.append(
+                            ("paid-tushare-style-proxy-stk_mins", str(exc))
+                        )
                     except (OSError, ValueError, KeyError, TypeError) as exc:
                         raise RuntimeError(
                             f"paid audit evidence invalid for {symbol}: {exc}"
@@ -959,7 +978,7 @@ def collect(
                         raise RuntimeError(f"cross-source minute conflict for {symbol}")
                     raise RuntimeError(
                         f"{tencent_error or 'no qualified 1m source'}; "
-                        f"candidate rejections={decision.rejected}"
+                        f"candidate rejections={(*decision.rejected, *interpretation_rejections)}"
                     )
                 selected = next(
                     candidate for candidate in candidates
@@ -996,7 +1015,7 @@ def collect(
                     source_selection_status=decision.status,
                     source_semantic_sha256=decision.normalized_sha256,
                     source_qualified=list(decision.qualified),
-                    source_rejected=list(decision.rejected),
+                    source_rejected=[*decision.rejected, *interpretation_rejections],
                 )
             elif fallback == "eastmoney":
                 frame, meta = _eastmoney_bars(
@@ -1141,6 +1160,7 @@ def collect(
                     "status": "per_symbol_strict_scan_not_yet_published",
                     "policy": MINUTE_SOURCE_POLICY,
                     "paid_audit_dir": str(paid_audit_dir) if paid_audit_dir else None,
+                    "reference_inputs": tencent_daily.evidence(),
                 },
             )
         pending = list(symbols)
@@ -1207,6 +1227,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--tencent-daily-path", type=Path)
     parser.add_argument("--tencent-status-path", type=Path)
     parser.add_argument("--paid-audit-dir", type=Path)
+    parser.add_argument("--sealed-five-path", type=Path)
+    parser.add_argument("--reference-sha256-json", type=parse_reference_sha256)
     parser.add_argument("--home", required=True)
     parser.add_argument("--no-lock", action="store_true")
     args = parser.parse_args(argv)
@@ -1236,6 +1258,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             tencent_daily_path=args.tencent_daily_path,
             tencent_status_path=args.tencent_status_path,
             paid_audit_dir=args.paid_audit_dir,
+            sealed_five_path=args.sealed_five_path,
+            reference_sha256=args.reference_sha256_json,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"minute collector failed: {exc}", file=sys.stderr)

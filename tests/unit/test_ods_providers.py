@@ -915,14 +915,14 @@ def test_eastmoney_payload_treats_null_data_as_no_data() -> None:
         def read(self) -> bytes:
             return b'{"rc": 0, "data": null}'
 
-        def __enter__(self) -> "Response":
+        def __enter__(self) -> Response:
             return self
 
         def __exit__(self, *_args: object) -> None:
             return None
 
     def opener(request: object, **_kwargs: object) -> Response:
-        observed["url"] = str(getattr(request, "full_url"))
+        observed["url"] = str(request.full_url)
         return Response()
 
     payload = minute_tdx._eastmoney_payload("000001", ndays=2, opener=opener)
@@ -1025,7 +1025,7 @@ def test_minute_collector_defaults_to_repository_module(
     assert result["timeout_seconds"] == 1800
 
 
-def test_minute_collector_reuses_complete_exact_universe_seed(
+def test_minute_collector_withholds_1m_seed_without_current_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     home = tmp_path / "data"
@@ -1056,18 +1056,16 @@ def test_minute_collector_reuses_complete_exact_universe_seed(
     )
 
     raw_home = tmp_path / "attempt" / "minute_1m"
-    result = lane_runner._run_minute_collector(
-        paths=_paths(home, tmp_path),
-        market_date=date(2026, 9, 21),
-        bar_size="1m",
-        symbols=["000001", "000002"],
-        raw_home=raw_home,
-    )
-
-    assert result["exit_code"] == 0
-    assert result["api"] == "verified_attempt_seed_copy"
-    assert result["isolation"] == "attempt-local-seed-copy"
-    assert (raw_home / "000001_1m.parquet").read_bytes() == b"verified-by-downstream-reader"
+    with pytest.raises(lane_runner.LaneRunError, match="1m seed reuse withheld"):
+        lane_runner._run_minute_collector(
+            paths=_paths(home, tmp_path),
+            market_date=date(2026, 9, 21),
+            bar_size="1m",
+            symbols=["000001", "000002"],
+            raw_home=raw_home,
+        )
+    assert not raw_home.exists()
+    assert (seed / "000001_1m.parquet").read_bytes() == b"verified-by-downstream-reader"
 
 
 @pytest.mark.parametrize(

@@ -328,6 +328,12 @@ override、旧 READY 和生产 env 的复用。证券主数据、调整因子及
 组合单元测试不代替运行角色或来源语义验收；尤其旧 seed 仅验计数和文件存在的漏洞
 仍未完整闭合，本次禁用该入口，不把其测试通过记成 P0 所有入口验收完成。
 
+后续准入审查确认：1m seed 当前没有 raw/参照/最终文件的完整现行身份 verifier。
+按 LLD 的跨 Job 复用边界，在独立分片直接拒绝该旧入口，连明示零推断计数也不能放行，
+而不是临时创造一个未批准的 seed 格式。旧 seed 与 receipts 原样保留；5m 行为不扩大。
+正在执行的冷拉固定于 `84170737a246f9e82547528f6398fa8f75978569`，没有 seed，不能
+途中换 checkout。此后续分片的测试与冷拉固定版本须分开记录，不能冒充已在生产部署。
+
 2026-09-28 首片分钟相关七个套件本地 `118 passed`，focused Ruff 与 diff whitespace 检查通过。
 文档/调度三个套件 `57 passed / 1 failed`；唯一失败为既有
 `P3-STRAT-003-B-R1 has no governing LLD work-item row`，在未改文档的 PR #454 checkout

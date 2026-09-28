@@ -615,6 +615,13 @@ No cross-attempt files are admitted or reused by this feature; seed admission ne
 its separate complete semantic identity/checksum contract. Existing zero-row and
 provider rc/null semantics are not reclassified. Formal direct-5m conformance,
 coverage/date/READY checks, immutable Base and CN01-to-OCI DWD sync are unchanged.
+For 1m specifically, the legacy `HERMES_ODS_MINUTE_SEED_HOME` copy path is withheld
+until that current raw/reference/materialized identity verifier exists. A complete
+checkpoint count, zero inferred-minute counter, old qualification tag or file
+existence cannot authorize copying. Reject before reading/copying the seed or
+opening a source session, preserve all prior evidence, and require a fresh attempt.
+This is a fail-closed conformance repair, not an approved cross-Job reuse format;
+legacy direct-5m seed handling is not expanded or qualified by this repair.
 Synthetic acceptance includes a 4992-symbol universe with two transient errors:
 4994 symbol attempts, not two full scans. This is not a network performance benchmark.
 

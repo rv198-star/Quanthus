@@ -728,6 +728,46 @@ activation is granted by engineering tests.
   Full offline receipt reclassification and complete residual/recovery identity
   remain separate B/D work.
 
+### Current offline minute qualification ledger
+
+`META-OPS-MINUTE-009` (#462), programme #456 B3, supplies a bounded diagnostic
+over existing captures. Design status: approved for scoped offline engineering.
+Delivery gate: open; this is job-local TMP, not an ADM or publishing/reuse contract.
+
+- The CLI uses B2's deeply verified, same-date/same-contract READY reference
+  handoff and captures its applicable immutable reference view once. Record the
+  exact release/artifact/view witnesses, current clean code revision, controlled
+  adapter/qualifier file hashes, node/host, policy, frequency, complete selected
+  universe and runtime versions. This evidence is not complete cross-Job cache
+  identity, runtime qualification or authorization to reuse an output.
+- Freeze the Tencent checkpoint bytes as capture witnesses, never its done or
+  old qualification claims. For each source/security, capture actual receipt and
+  gzip bytes once; verify expected raw SHA and interpret that same decompressed
+  capture through the existing current adapter and exact final qualifier.
+  Re-evaluate old paid qualified/unqualified HTTP-200 captures alike. No request,
+  Key, old receipt update, candidate Parquet, READY, DWD or notification occurs.
+- Enforce #453/#454's approved no-inferred-minutes boundary in the diagnostic;
+  explicit source zero-volume minutes remain valid. The research normalizer is
+  unchanged. Neither day totals nor a final semantic hash proves raw completeness.
+- Include every reference security in deterministic order, including suspended,
+  missing captures, acquisition pending/rate/fault, current candidate rejection
+  and evidence-integrity faults. Recognized quality rejection isolates only that
+  source; an integrity fault blocks the security even if its peer qualifies.
+  All qualified peers go to the unchanged whole-security selector; conflicts
+  remain blocking. Reason tags only explain existing rejection, never grant
+  source maturity or modify auction, OHLC, price, amount or first-bucket semantics.
+- Write a new diagnostic directory outside input roots. A fixed cooperative
+  evaluation budget (maximum 1800 seconds) and unknown engineering/storage faults
+  leave partial evidence without a completion summary. Only after the full
+  denominator is evaluated and records are closed does a no-replace summary bind
+  their SHA and identity digest. Completion means offline evaluation, never data
+  publication; both publication/recovery authorization remain false.
+
+Reference loading/deep verification is separately timed, not hidden in network
+latency. Cooperative checks do not hard-cancel a stuck library/filesystem call;
+the isolated invocation still needs an outer bounded process timeout. No new
+timer, paid-source promotion, automatic queue/retry or source truth is introduced.
+
 The contract tests are `tests/unit/test_minute_references.py` and
 `tests/unit/test_minute_reference_handoff.py`, plus the existing audit, source
 selection, materialization and lane suites. They cover wrong dates/duplicates,
@@ -810,6 +850,7 @@ entry point, package version, timer or data-contract change.
 | META-OPS-MINUTE-006 | Preserve qualified whole-security semantics during materialization | META-OPS-MINUTE-005 | #455 / PR #457; `tests/unit/test_minute_materialization.py`; fresh attempt, exact staged readback, storage-fault stop and no ghost file; isolated Linux smoke passed, runtime/rollout open |
 | META-OPS-MINUTE-007 | Share exact final qualification between paid audit and replay | META-OPS-MINUTE-005 | #458 / PR #459; `tests/unit/test_paid_minute_shared_qualification.py`; captured bytes own evidence and same-input exact final qualification; isolated Linux smoke passed, reference closure and rollout remain open |
 | META-OPS-MINUTE-008 | Close same-Job sealed reference inputs and current raw replay | META-OPS-MINUTE-007 | #460; `tests/unit/test_minute_references.py`, `tests/unit/test_minute_reference_handoff.py`; immutable captured view, paired READY market and explicit same-contract opening reference/hash, no stale qualification/conflict bypass; rollout and real data remain gated |
+| META-OPS-MINUTE-009 | Re-evaluate current minute qualification over immutable captures | META-OPS-MINUTE-008 | #462; `tests/unit/test_minute_offline_ledger.py`; complete denominator, actual capture hashes, current exact whole-security gate, integrity/conflict blocking and bounded TMP-only completion; no publishing/reuse authority |
 | META-OPS-ENV-001 | Qualify effective collector runtimes and reproducible test profiles | META-OPS-RELIABILITY-001 | #431; actual interpreter inventory, role/profile locks, read-only deployment preflight, isolated environments and controlled rollback; deployment blocked |
 | P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | Exact-key source backfill and reconciled child revision |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | Exact-key backfill, active-universe coverage, and OCI child revision |

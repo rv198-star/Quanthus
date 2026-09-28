@@ -97,3 +97,36 @@ def test_probe_without_key_or_with_input_overlap_is_rejected(tmp_path):
         cap.run(source, sha, tmp_path / "out", probe=True)
     with pytest.raises(ValueError, match="overlaps"):
         cap.run(source, sha, source / "out")
+
+
+def test_new_capture_integrity_fault_stops_before_next_security(tmp_path, monkeypatch):
+    source, sha = gaps(tmp_path, codes=("000001", "000002"))
+    calls = []
+    monkeypatch.setattr(cap.time, "sleep", lambda _: None)
+
+    def tencent(code, _day, _refs, root):
+        calls.append(("tencent", code))
+        root.mkdir(parents=True, exist_ok=True)
+        (root / (code + ".json.gz")).write_bytes(
+            gzip.compress(json.dumps(tencent_payload(code)).encode())
+        )
+
+    def paid(code, *, output_dir, **_kw):
+        calls.append(("paid", code))
+        from tests.unit.test_paid_minute_source import payload
+        (output_dir / "raw").mkdir(exist_ok=True)
+        (output_dir / "receipts").mkdir(exist_ok=True)
+        put_paid(output_dir, payload(), code=code)
+        receipt_path = output_dir / "receipts" / (code + ".json")
+        receipt = json.loads(receipt_path.read_bytes())
+        receipt["source_raw_sha256"] = "0" * 64
+        receipt_path.write_text(json.dumps(receipt))
+        return receipt
+
+    monkeypatch.setattr(cap, "_tencent_one_minute_bars", tencent)
+    monkeypatch.setattr(cap, "_audit_symbol", paid)
+    result = cap.run(source, sha, tmp_path / "capability", probe=True, key="synthetic")
+    assert calls == [("tencent", "000001"), ("paid", "000001")]
+    assert result["probe_processed"] == 1
+    assert result["stop_reason"] == "new_capture_integrity_fault"
+    assert not result["all_hard_gaps_qualified"]

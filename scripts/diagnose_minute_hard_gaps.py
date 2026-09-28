@@ -175,6 +175,10 @@ def run(root: Path, expected_records_sha: str, output: Path, *, probe=False, key
             )
             print(json.dumps({"processed": len(new_rows), "total": len(gaps),
                               "stock_code": code, "disposition": row["disposition"]}), flush=True)
+            if any(r["disposition"] == "blocked_capture_integrity"
+                   for r in (row, row["bounded_diagnostic"])):
+                stop = "new_capture_integrity_fault"
+                break
             if probe_status_stops(receipt):
                 stop = "relay_acquisition_stop_" + receipt["status"]
                 break

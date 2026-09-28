@@ -123,8 +123,7 @@ def _failure_injection_stage(*, shadow_root: Path) -> str | None:
         return None
     if not enabled:
         raise LaneRunError(
-            "HERMES_ODS_FAILURE_INJECTION_STAGE requires "
-            "HERMES_ODS_ENABLE_FAILURE_INJECTION=1"
+            "HERMES_ODS_FAILURE_INJECTION_STAGE requires HERMES_ODS_ENABLE_FAILURE_INJECTION=1"
         )
     if stage not in _FAILURE_INJECTION_STAGES:
         raise LaneRunError(
@@ -351,9 +350,7 @@ class LaneRunResult:
             "schedule_config_sha256": self.schedule_config_sha256,
             "run_mode": self.run_mode,
             "recovery_deadline_at": (
-                None
-                if self.recovery_deadline_at is None
-                else self.recovery_deadline_at.isoformat()
+                None if self.recovery_deadline_at is None else self.recovery_deadline_at.isoformat()
             ),
         }
 
@@ -373,14 +370,11 @@ def resolve_paths(
     calendar: Path | None = None,
 ) -> LanePaths:
     root = Path(os.environ.get("ASTOCK_ROOT") or "/root/work/astock").resolve()
-    resolved_home = (
-        home or Path(os.environ.get("ASTOCK_HOME") or (root / "data"))
-    ).resolve()
+    resolved_home = (home or Path(os.environ.get("ASTOCK_HOME") or (root / "data"))).resolve()
     resolved_shadow = (
         shadow_root
         or Path(
-            os.environ.get("HERMES_ODS_SHADOW_ROOT")
-            or (resolved_home / "shadow" / "hermes-ods-v1")
+            os.environ.get("HERMES_ODS_SHADOW_ROOT") or (resolved_home / "shadow" / "hermes-ods-v1")
         )
     ).resolve()
     resolved_calendar = (
@@ -524,15 +518,9 @@ def _run_configured_provider_collector(
         "stock_list": str(paths.home / "stock_list.parquet"),
         "market_date": market_date.isoformat(),
         "window_start": window_start.isoformat(),
-        "statement_periods": (
-            os.environ.get("HERMES_ODS_STATEMENT_PERIODS") or "8"
-        ),
-        "statement_workers": (
-            os.environ.get("HERMES_ODS_STATEMENT_WORKERS") or "4"
-        ),
-        "statement_batch_size": (
-            os.environ.get("HERMES_ODS_STATEMENT_BATCH_SIZE") or "100"
-        ),
+        "statement_periods": (os.environ.get("HERMES_ODS_STATEMENT_PERIODS") or "8"),
+        "statement_workers": (os.environ.get("HERMES_ODS_STATEMENT_WORKERS") or "4"),
+        "statement_batch_size": (os.environ.get("HERMES_ODS_STATEMENT_BATCH_SIZE") or "100"),
         "statement_checkpoint": str(
             paths.shadow_root
             / "provider-checkpoints"
@@ -542,11 +530,7 @@ def _run_configured_provider_collector(
             / f"periods-{os.environ.get('HERMES_ODS_STATEMENT_PERIODS') or '8'}"
         ),
         "provider_checkpoint": str(
-            paths.shadow_root
-            / "provider-checkpoints"
-            / lane_id
-            / dataset
-            / market_date.isoformat()
+            paths.shadow_root / "provider-checkpoints" / lane_id / dataset / market_date.isoformat()
         ),
         "quarterly_output": str(quarterly_output),
     }
@@ -564,9 +548,7 @@ def _run_configured_provider_collector(
             f"unsupported provider receipt contract: {lane_id}/{dataset}={receipt_contract}"
         )
     if receipt_contract and "{receipts}" not in argv_template:
-        raise LaneRunError(
-            f"provider argv must include {{receipts}}: {lane_id}/{dataset}"
-        )
+        raise LaneRunError(f"provider argv must include {{receipts}}: {lane_id}/{dataset}")
 
     import subprocess
 
@@ -597,14 +579,10 @@ def _run_configured_provider_collector(
             f"{meta['stderr_tail']}"
         )
     if not output.is_file():
-        raise LaneRunError(
-            f"provider collector produced no attempt output: {lane_id}/{dataset}"
-        )
+        raise LaneRunError(f"provider collector produced no attempt output: {lane_id}/{dataset}")
     return_mode = str(collector.get("return_mode") or "rows")
     if return_mode not in {"rows", "artifact"}:
-        raise LaneRunError(
-            f"unsupported provider return mode: {lane_id}/{dataset}={return_mode}"
-        )
+        raise LaneRunError(f"unsupported provider return mode: {lane_id}/{dataset}={return_mode}")
     try:
         import pyarrow.parquet as pq
 
@@ -616,23 +594,15 @@ def _run_configured_provider_collector(
     rows = _read_parquet(output) if return_mode == "rows" else []
     if receipt_contract:
         if not receipts_output.is_file():
-            raise LaneRunError(
-                f"provider collector produced no receipts: {lane_id}/{dataset}"
-            )
+            raise LaneRunError(f"provider collector produced no receipts: {lane_id}/{dataset}")
         receipts = _read_parquet(receipts_output)
         if not receipts:
-            raise LaneRunError(
-                f"provider collector produced zero receipts: {lane_id}/{dataset}"
-            )
+            raise LaneRunError(f"provider collector produced zero receipts: {lane_id}/{dataset}")
         allowed_statuses = {"success_nonempty", "justified_empty", "failed"}
-        invalid = [
-            item for item in receipts if str(item.get("status")) not in allowed_statuses
-        ]
+        invalid = [item for item in receipts if str(item.get("status")) not in allowed_statuses]
         failed = [item for item in receipts if str(item.get("status")) == "failed"]
         if invalid:
-            raise LaneRunError(
-                f"provider receipts contain invalid statuses: {lane_id}/{dataset}"
-            )
+            raise LaneRunError(f"provider receipts contain invalid statuses: {lane_id}/{dataset}")
         if failed:
             raise LaneRunError(
                 f"provider receipts contain failures: {lane_id}/{dataset} "
@@ -655,13 +625,9 @@ def _run_configured_provider_collector(
         try:
             provider_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise LaneRunError(
-                f"invalid provider metadata {lane_id}/{dataset}: {exc}"
-            ) from exc
+            raise LaneRunError(f"invalid provider metadata {lane_id}/{dataset}: {exc}") from exc
         if not isinstance(provider_metadata, dict):
-            raise LaneRunError(
-                f"provider metadata must be an object: {lane_id}/{dataset}"
-            )
+            raise LaneRunError(f"provider metadata must be an object: {lane_id}/{dataset}")
         meta["provider_metadata"] = provider_metadata
         meta["completed_at"] = provider_metadata.get("completed_at")
     meta["return_mode"] = return_mode
@@ -1080,9 +1046,7 @@ def _baostock_fetch_day(
     if missing_set_retry_delay_seconds < 0:
         raise LaneRunError("missing_set_retry_delay_seconds must be non-negative")
     day = market_date.isoformat()
-    login_attempts = _baostock_login_with_retry(
-        bs, socket_timeout_seconds=socket_timeout_seconds
-    )
+    login_attempts = _baostock_login_with_retry(bs, socket_timeout_seconds=socket_timeout_seconds)
     fields = (
         "date,code,open,high,low,close,volume,amount,turn,pctChg,tradestatus,isST,"
         "peTTM,pbMRQ,psTTM,pcfNcfTTM"
@@ -1208,9 +1172,7 @@ def _baostock_fetch_index_day(
     import baostock as bs
 
     day = market_date.isoformat()
-    login_attempts = _baostock_login_with_retry(
-        bs, socket_timeout_seconds=socket_timeout_seconds
-    )
+    login_attempts = _baostock_login_with_retry(bs, socket_timeout_seconds=socket_timeout_seconds)
     fields = "date,code,open,high,low,close,volume,amount,pctChg"
     rows_out: list[dict[str, Any]] = []
     log_rows: list[dict[str, Any]] = []
@@ -1287,9 +1249,7 @@ def _latest_observed_cutoff(
     candidates = [fallback, _now_sh_iso()]
     for rows in row_groups:
         candidates.extend(
-            str(row["acquired_at"])
-            for row in rows
-            if row.get("acquired_at") not in {None, ""}
+            str(row["acquired_at"]) for row in rows if row.get("acquired_at") not in {None, ""}
         )
 
     def parsed(value: str) -> datetime:
@@ -1328,12 +1288,9 @@ def _market_acquisition_metrics(log_rows: Sequence[Mapping[str, Any]]) -> dict[s
             str(row.get("response_error_code")) == "empty_response" for row in request_rows
         ),
         "provider_error_count": sum(
-            str(row.get("response_error_code")) not in provider_error_codes
-            for row in request_rows
+            str(row.get("response_error_code")) not in provider_error_codes for row in request_rows
         ),
-        "reconnect_count": sum(
-            max(int(row.get("attempts") or 1) - 1, 0) for row in request_rows
-        ),
+        "reconnect_count": sum(max(int(row.get("attempts") or 1) - 1, 0) for row in request_rows),
         "average_request_duration_seconds": (
             round(sum(durations) / len(durations), 3) if durations else None
         ),
@@ -1583,9 +1540,7 @@ def _build_market_open(
             bars, status_rows, stock_log_rows = _baostock_fetch_day(
                 codes,
                 market_date,
-                missing_set_retry_rounds=int(
-                    provider_readiness["missing_set_retry_rounds"]
-                ),
+                missing_set_retry_rounds=int(provider_readiness["missing_set_retry_rounds"]),
                 missing_set_retry_delay_seconds=float(
                     provider_readiness["missing_set_retry_delay_seconds"]
                 ),
@@ -1611,9 +1566,7 @@ def _build_market_open(
             index_rows = [
                 {
                     **row,
-                    "index_code": _canonical_index_code(
-                        row.get("index_code") or row.get("code")
-                    ),
+                    "index_code": _canonical_index_code(row.get("index_code") or row.get("code")),
                 }
                 for row in index_rows
             ]
@@ -1724,8 +1677,7 @@ def _build_market_open(
         )
     valuation_fields = ("pe_ttm", "pb", "ps_ttm", "pcf_ttm", "total_mv")
     if not any(
-        any(row.get(field) is not None for field in valuation_fields)
-        for row in valuation_rows
+        any(row.get(field) is not None for field in valuation_fields) for row in valuation_rows
     ):
         valuation.status = "failed"
         valuation.detail = "all valuation fields are null; READY withheld"
@@ -1775,8 +1727,7 @@ def _build_market_open(
         require_rows=True,
     )
     observed_indices = {
-        _canonical_index_code(row.get("index_code") or row.get("code"))
-        for row in index_rows
+        _canonical_index_code(row.get("index_code") or row.get("code")) for row in index_rows
     }
     missing_indices = sorted(set(INDEX_CODES) - observed_indices)
     if missing_indices:
@@ -1834,9 +1785,7 @@ def _build_market_open(
                 "recovery_deadline_at": (
                     recovery_deadline_at.isoformat() if recovery_deadline_at else None
                 ),
-                "excluded_from_collection_window_experiment": (
-                    recovery_deadline_at is not None
-                ),
+                "excluded_from_collection_window_experiment": (recovery_deadline_at is not None),
                 "metrics": _market_acquisition_metrics(log_rows),
                 "requests": log_rows,
                 "source_revision": rev,
@@ -2001,8 +1950,7 @@ def _cninfo_fetch_announcements(
 
     Path(os.environ.get("ASTOCK_ROOT") or "/root/work/astock") / "toolkit"
     org_map_path = (
-        Path(os.environ.get("ASTOCK_HOME") or "/root/work/astock/data")
-        / "cninfo_orgid_map.json"
+        Path(os.environ.get("ASTOCK_HOME") or "/root/work/astock/data") / "cninfo_orgid_map.json"
     )
     org_map: dict[str, str] = {}
     if org_map_path.is_file():
@@ -2011,12 +1959,11 @@ def _cninfo_fetch_announcements(
         except Exception:
             org_map = {}
 
-    url = "http://www.cninfo.com.cn/new/hisAnnouncement/query"
+    url = "https://www.cninfo.com.cn/new/hisAnnouncement/query"
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Referer": (
-            "http://www.cninfo.com.cn/new/commonUrl/pageOfSearch"
-            "?url=disclosure/list/search"
+            "https://www.cninfo.com.cn/new/commonUrl/pageOfSearch?url=disclosure/list/search"
         ),
     }
     session = requests.Session()
@@ -2066,7 +2013,14 @@ def _cninfo_fetch_announcements(
                             "sortType": "",
                             "isHLtitle": "false",
                         }
-                        resp = session.post(url, data=payload, headers=headers, timeout=30)
+                        resp = session.post(
+                            url,
+                            data=payload,
+                            headers=headers,
+                            timeout=30,
+                            verify=True,
+                            allow_redirects=False,
+                        )
                         if resp.status_code != 200:
                             raise RuntimeError(f"HTTP {resp.status_code}")
                         body = resp.json()
@@ -2095,7 +2049,7 @@ def _cninfo_fetch_announcements(
                                     "announce_date": pub[:10],
                                     "name": item.get("secName") or "",
                                     "url": (
-                                        f"http://www.cninfo.com.cn/new/disclosure/detail?"
+                                        f"https://www.cninfo.com.cn/new/disclosure/detail?"
                                         f"stockCode={code}&announcementId={ann_id}"
                                     ),
                                     "source": "cninfo.hisAnnouncement",
@@ -2227,9 +2181,7 @@ def _build_calendar_events(
             lookback_days=(market_date - start).days,
         )
         log_rows.extend(ann_logs)
-        failed_requests = [
-            row for row in ann_logs if str(row.get("response_error_code")) != "0"
-        ]
+        failed_requests = [row for row in ann_logs if str(row.get("response_error_code")) != "0"]
         for row in ann_rows:
             pub = str(row.get("publish_time") or row.get("announce_date") or "")
             if pub and (observed_max is None or pub > observed_max):
@@ -2456,8 +2408,7 @@ def _build_calendar_events(
             "input_watermark": input_wm,
             "lookback_days": lookback,
             "note": (
-                "ex_date/effective retained as business fields; "
-                "filter uses disclose keys first"
+                "ex_date/effective retained as business fields; filter uses disclose keys first"
             ),
         }
         acquired_at = _now_sh_iso()
@@ -2922,9 +2873,7 @@ def _build_weekly_corrections(
                 watermark=watermark,
                 relative_name="st_status_observation_revision.parquet",
                 source_request=(
-                    json.dumps(st_request, sort_keys=True, default=str)
-                    if st_request
-                    else None
+                    json.dumps(st_request, sort_keys=True, default=str) if st_request else None
                 ),
             )
         )
@@ -2947,9 +2896,7 @@ def _build_weekly_corrections(
         )
     )
 
-    for name, source in (
-        ("security_lifecycle", paths.home / "ref_security_master.parquet"),
-    ):
+    for name, source in (("security_lifecycle", paths.home / "ref_security_master.parquet"),):
         if source.is_file():
             datasets.append(
                 _copy_dataset(
@@ -3050,17 +2997,11 @@ def _build_weekly_corrections(
                 if day not in session_days:
                     continue
                 key = f"{code}|{day.isoformat()}"
-                daily_map[key] = _row_fingerprint(
-                    row, ("open", "high", "low", "close", "volume")
-                )
+                daily_map[key] = _row_fingerprint(row, ("open", "high", "low", "close", "volume"))
 
             # Build independent upstream correction revision for same window.
             codes = sorted(
-                {
-                    _code6(r.get("stock_code"))
-                    for r in published_rows
-                    if r.get("stock_code")
-                }
+                {_code6(r.get("stock_code")) for r in published_rows if r.get("stock_code")}
             )
             if not codes:
                 codes = _universe_from_stock_list(paths.home)
@@ -3083,8 +3024,7 @@ def _build_weekly_corrections(
                 login = bs.login()
                 if str(login.error_code) != "0":
                     raise LaneRunError(
-                        "baostock login failed for weekly correction: "
-                        f"{login.error_msg}"
+                        f"baostock login failed for weekly correction: {login.error_msg}"
                     )
                 set_socket_timeout(30)
                 fields = "date,code,open,high,low,close,volume,amount"
@@ -3296,9 +3236,9 @@ def _expected_bar_timestamps(market_date: date, bar_size: str) -> set[str]:
 
     timestamps: set[str] = set()
     for (start_hour, start_minute), (end_hour, end_minute) in sessions:
-        current = datetime.combine(
-            market_date, datetime.min.time(), tzinfo=SH
-        ).replace(hour=start_hour, minute=start_minute)
+        current = datetime.combine(market_date, datetime.min.time(), tzinfo=SH).replace(
+            hour=start_hour, minute=start_minute
+        )
         end = current.replace(hour=end_hour, minute=end_minute)
         while current <= end:
             timestamps.add(current.strftime("%Y-%m-%d %H:%M:%S"))
@@ -3318,9 +3258,7 @@ def _latest_market_artifact(
     if available_at.tzinfo is None or available_at.utcoffset() is None:
         return None
 
-    release_root = (
-        paths.shadow_root / "releases" / "daily" / market_date.isoformat()
-    )
+    release_root = paths.shadow_root / "releases" / "daily" / market_date.isoformat()
     if not release_root.is_dir():
         return None
 
@@ -3340,11 +3278,7 @@ def _latest_market_artifact(
         ):
             continue
         artifact = next(
-            (
-                item
-                for item in release.artifacts
-                if item.name == artifact_name
-            ),
+            (item for item in release.artifacts if item.name == artifact_name),
             None,
         )
         if artifact is None or artifact.knowledge_cutoff > available_at:
@@ -3369,7 +3303,11 @@ def _latest_market_artifact(
 
 
 def _sealed_minute_reference_artifacts(
-    *, paths: LanePaths, market_date: date, available_at: datetime, require_five: bool,
+    *,
+    paths: LanePaths,
+    market_date: date,
+    available_at: datetime,
+    require_five: bool,
 ) -> dict[str, tuple[Path, dict[str, Any]]]:
     """Freeze one verified market release and optional same-contract native 5m.
 
@@ -3500,9 +3438,7 @@ def _minute_no_data_evidence(
             if code not in wanted:
                 continue
             list_date = _first_iso_date(row.get("list_date"), row.get("ipo_date"))
-            delist_date = _first_iso_date(
-                row.get("delist_date"), row.get("terminal_date")
-            )
+            delist_date = _first_iso_date(row.get("delist_date"), row.get("terminal_date"))
             if list_date and list_date > target:
                 evidence[code] = {
                     "reason": "not_yet_listed",
@@ -3656,10 +3592,7 @@ def _minute_collector_fetch_mode(
 
     mode = (os.environ.get("HERMES_ODS_MINUTE_MODE") or "incr").strip().lower()
     if mode not in {"incr", "backfill"}:
-        raise LaneRunError(
-            "HERMES_ODS_MINUTE_MODE must be 'incr' or 'backfill' "
-            f"(got {mode!r})"
-        )
+        raise LaneRunError(f"HERMES_ODS_MINUTE_MODE must be 'incr' or 'backfill' (got {mode!r})")
 
     pages_raw = (os.environ.get("HERMES_ODS_MINUTE_MAX_PAGES") or "").strip()
     if mode == "incr":
@@ -3668,20 +3601,16 @@ def _minute_collector_fetch_mode(
 
     if not pages_raw:
         raise LaneRunError(
-            "HERMES_ODS_MINUTE_MAX_PAGES is required when "
-            "HERMES_ODS_MINUTE_MODE=backfill"
+            "HERMES_ODS_MINUTE_MAX_PAGES is required when HERMES_ODS_MINUTE_MODE=backfill"
         )
     try:
         max_pages = int(pages_raw)
     except ValueError as exc:
         raise LaneRunError(
-            "HERMES_ODS_MINUTE_MAX_PAGES must be an integer when "
-            "HERMES_ODS_MINUTE_MODE=backfill"
+            "HERMES_ODS_MINUTE_MAX_PAGES must be an integer when HERMES_ODS_MINUTE_MODE=backfill"
         ) from exc
     if max_pages < 1:
-        raise LaneRunError(
-            f"HERMES_ODS_MINUTE_MAX_PAGES must be >= 1 (got {max_pages})"
-        )
+        raise LaneRunError(f"HERMES_ODS_MINUTE_MAX_PAGES must be >= 1 (got {max_pages})")
     try:
         cap = int(os.environ.get("HERMES_ODS_MINUTE_MAX_PAGES_CAP", "50"))
     except ValueError as exc:
@@ -3690,8 +3619,7 @@ def _minute_collector_fetch_mode(
         raise LaneRunError(f"HERMES_ODS_MINUTE_MAX_PAGES_CAP must be >= 1 (got {cap})")
     if max_pages > cap:
         raise LaneRunError(
-            "HERMES_ODS_MINUTE_MAX_PAGES exceeds the configured safety cap: "
-            f"{max_pages} > {cap}"
+            f"HERMES_ODS_MINUTE_MAX_PAGES exceeds the configured safety cap: {max_pages} > {cap}"
         )
     return "backfill", max_pages
 
@@ -3731,23 +3659,18 @@ def _run_minute_collector(
         os.environ.get("ASTOCK_MINUTE_ROOT") or (paths.home.parent / "minute")
     ).resolve()
     layer = "research" if bar_size == "1m" else "prod"
-    py = (
-        os.environ.get("ASTOCK_MINUTE_PYTHON")
-        or os.environ.get("ASTOCK_PYTHON")
-        or sys.executable
-    )
+    py = os.environ.get("ASTOCK_MINUTE_PYTHON") or os.environ.get("ASTOCK_PYTHON") or sys.executable
     env = os.environ.copy()
     env["ASTOCK_ROOT"] = str(paths.home.parent)
     env["ASTOCK_HOME"] = str(paths.home)
     env["ASTOCK_MINUTE_ROOT"] = str(minute_root)
-    fetch_mode, max_pages = _minute_collector_fetch_mode(
-        market_date=market_date, bar_size=bar_size
-    )
+    fetch_mode, max_pages = _minute_collector_fetch_mode(market_date=market_date, bar_size=bar_size)
     seed_raw = os.environ.get("HERMES_ODS_MINUTE_SEED_HOME", "").strip()
     collector_override = os.environ.get("HERMES_ODS_MINUTE_COLLECTOR", "").strip()
     policy_raw = (
         os.environ.get("HERMES_ODS_MINUTE_1M_RECOVERY_POLICY", "").strip()
-        if bar_size == "1m" else ""
+        if bar_size == "1m"
+        else ""
     )
     recovery_policy = None
     policy_path = None
@@ -3774,9 +3697,7 @@ def _run_minute_collector(
         seed_home = Path(seed_raw).resolve()
         try:
             status = json.loads((seed_home / "status.json").read_text(encoding="utf-8"))
-            checkpoint = json.loads(
-                (seed_home / "checkpoint.json").read_text(encoding="utf-8")
-            )
+            checkpoint = json.loads((seed_home / "checkpoint.json").read_text(encoding="utf-8"))
         except (OSError, ValueError, TypeError) as exc:
             raise LaneRunError(f"minute recovery seed is unreadable: {exc}") from exc
         expected = {_code6(code) for code in symbols}
@@ -3872,7 +3793,9 @@ def _run_minute_collector(
         if collector_override or policy_path or fetch_mode != "incr":
             raise LaneRunError("Tencent 1m requires the repository collector in incr mode")
         references = _sealed_minute_reference_artifacts(
-            paths=paths, market_date=market_date, available_at=_now(),
+            paths=paths,
+            market_date=market_date,
+            available_at=_now(),
             require_five=bool(paid_audit_raw),
         )
         reference_artifacts = {role: item[1] for role, item in references.items()}
@@ -3890,10 +3813,14 @@ def _run_minute_collector(
             paid_audit_dir = Path(paid_audit_raw).resolve()
             if not paid_audit_dir.is_dir():
                 raise LaneRunError("paid minute audit directory is missing")
-            cmd.extend([
-                "--paid-audit-dir", str(paid_audit_dir),
-                "--sealed-five-path", str(references["sealed_native_5m"][0]),
-            ])
+            cmd.extend(
+                [
+                    "--paid-audit-dir",
+                    str(paid_audit_dir),
+                    "--sealed-five-path",
+                    str(references["sealed_native_5m"][0]),
+                ]
+            )
     # Provider collection, including explicitly audited whole-security fallback,
     # is attempt-local and never mutates shared legacy partitions.
     raw_home.mkdir(parents=True, exist_ok=False)
@@ -3934,10 +3861,13 @@ def _run_minute_collector(
         "isolation": "attempt-local",
         **({"reference_artifacts": reference_artifacts} if reference_artifacts else {}),
         **(
-            {"recovery_policy_id": recovery_policy.policy_id,
-             "recovery_policy_sha256": recovery_policy.sha256,
-             "budget_seconds": recovery_policy.budget_seconds}
-            if recovery_policy else {}
+            {
+                "recovery_policy_id": recovery_policy.policy_id,
+                "recovery_policy_sha256": recovery_policy.sha256,
+                "budget_seconds": recovery_policy.budget_seconds,
+            }
+            if recovery_policy
+            else {}
         ),
     }
 
@@ -4025,9 +3955,7 @@ def _build_after_hours_fixed_price(
     ]
 
 
-_DIRECT_5M_PROVIDERS = frozenset(
-    {"mootdx-native-kline", "sina-minute-jsonp", "baostock-native-5m"}
-)
+_DIRECT_5M_PROVIDERS = frozenset({"mootdx-native-kline", "sina-minute-jsonp", "baostock-native-5m"})
 
 
 def _direct_5m_provenance_error(raw_home: Path, universe: Sequence[str]) -> str | None:
@@ -4075,9 +4003,7 @@ def _build_intraday_stream(
     minute_root = Path(
         os.environ.get("ASTOCK_MINUTE_ROOT") or (paths.home.parent / "minute")
     ).resolve()
-    layer_dir = minute_root / "data" / (
-        "research_1m" if bar_size == "1m" else "prod_5m"
-    )
+    layer_dir = minute_root / "data" / ("research_1m" if bar_size == "1m" else "prod_5m")
     rev = f"intraday-{bar_size}-archive-{market_date.strftime('%Y%m%d')}-v3"
     watermark = market_date.isoformat()
     mode = _acquire_mode()
@@ -4187,9 +4113,7 @@ def _build_intraday_stream(
     for code in universe:
         path = layer_dir / f"{code}_{bar_size}.parquet"
         request = {
-            "provider": (
-                "minute_backfill" if mode == "provider" else "minute-fixture"
-            ),
+            "provider": ("minute_backfill" if mode == "provider" else "minute-fixture"),
             "api": "read_after_collect" if mode == "provider" else "read_symbol_partition",
             "code": code,
             "bar_size": bar_size,
@@ -4252,12 +4176,7 @@ def _build_intraday_stream(
         code_timestamps: list[str] = []
         code_has_trades = False
         for row in _read_parquet(path):
-            ts = (
-                row.get("ts")
-                or row.get("datetime")
-                or row.get("date")
-                or row.get("time")
-            )
+            ts = row.get("ts") or row.get("datetime") or row.get("date") or row.get("time")
             if ts is None:
                 continue
             day = str(ts)[:10]
@@ -4333,11 +4252,7 @@ def _build_intraday_stream(
         missing_timestamps = expected_timestamps - unique_timestamps
         unexpected_timestamps = unique_timestamps - expected_timestamps
         duplicate_count = matched - len(unique_timestamps)
-        complete = (
-            not missing_timestamps
-            and not unexpected_timestamps
-            and duplicate_count == 0
-        )
+        complete = not missing_timestamps and not unexpected_timestamps and duplicate_count == 0
         if not complete:
             evidence = no_data_evidence.get(code)
             if evidence and not code_has_trades:
@@ -4428,20 +4343,12 @@ def _build_intraday_stream(
             }
         )
 
-    coverage_ok = (
-        unexplained_missing == 0
-        and ready_symbols + justified == len(universe)
-    )
-    coverage_columns = sorted(
-        {column for row in coverage_rows for column in row}
-    )
+    coverage_ok = unexplained_missing == 0 and ready_symbols + justified == len(universe)
+    coverage_columns = sorted({column for row in coverage_rows for column in row})
     coverage_rows = [
-        {column: row.get(column) for column in coverage_columns}
-        for row in coverage_rows
+        {column: row.get(column) for column in coverage_columns} for row in coverage_rows
     ]
-    auction_session_complete = bool(
-        observed_max and observed_max[:16] >= expected_last[:16]
-    )
+    auction_session_complete = bool(observed_max and observed_max[:16] >= expected_last[:16])
     meta = {
         "bar_size": bar_size,
         "layer": layer,
@@ -4459,12 +4366,8 @@ def _build_intraday_stream(
         "session_phase": minute_bar_contract["session_phase"],
         "session_scope": minute_bar_contract["session_scope"],
         "session_policy_version": minute_bar_contract["policy_version"],
-        "covers_after_hours_fixed_price": minute_bar_contract[
-            "covers_after_hours_fixed_price"
-        ],
-        "after_hours_fixed_price_contract": minute_bar_contract[
-            "after_hours_fixed_price_contract"
-        ],
+        "covers_after_hours_fixed_price": minute_bar_contract["covers_after_hours_fixed_price"],
+        "after_hours_fixed_price_contract": minute_bar_contract["after_hours_fixed_price_contract"],
         "expected_last_bar": expected_last,
         "expected_rows_per_ready_symbol": len(expected_timestamps),
         "source_files": files_used,
@@ -4482,19 +4385,19 @@ def _build_intraday_stream(
     datasets: list[DatasetStatus] = []
     if coverage_ok and auction_session_complete and len(rows) > 0:
         bars_dataset = _seal_dataset(
-                name="intraday_bars",
-                rows=rows,
-                landing=landing,
-                source_revision=rev,
-                knowledge_cutoff=knowledge_cutoff,
-                watermark=watermark,
-                relative_name=f"intraday_{bar_size}_bars.parquet",
-                require_rows=True,
-                source_request=json.dumps(
-                    {"universe_size": len(universe), "coverage_ok": True},
-                    sort_keys=True,
-                ),
-            )
+            name="intraday_bars",
+            rows=rows,
+            landing=landing,
+            source_revision=rev,
+            knowledge_cutoff=knowledge_cutoff,
+            watermark=watermark,
+            relative_name=f"intraday_{bar_size}_bars.parquet",
+            require_rows=True,
+            source_request=json.dumps(
+                {"universe_size": len(universe), "coverage_ok": True},
+                sort_keys=True,
+            ),
+        )
         if smoke_only:
             bars_dataset.status = "smoke_only"
             bars_dataset.detail = (
@@ -4507,8 +4410,7 @@ def _build_intraday_stream(
             detail_parts.append(f"unexplained_missing={unexplained_missing}")
         if not auction_session_complete:
             detail_parts.append(
-                f"session_incomplete observed={observed_max} "
-                f"expected={expected_last}"
+                f"session_incomplete observed={observed_max} expected={expected_last}"
             )
         if len(rows) <= 0:
             detail_parts.append("zero_bars")
@@ -4609,9 +4511,7 @@ def _evaluate_mandatory(
     by_name = {item.name: item for item in datasets}
     missing = sorted(name for name in mandatory if name not in by_name)
     not_ready = sorted(
-        name
-        for name in mandatory
-        if name in by_name and by_name[name].status != "ready"
+        name for name in mandatory if name in by_name and by_name[name].status != "ready"
     )
     if missing or not_ready:
         detail = []
@@ -4703,8 +4603,7 @@ def _publish(
 
     suffix = f"-{stream}" if stream else ""
     release_id = (
-        f"hermes-{lane_id}{suffix}-{market_date.strftime('%Y%m%d')}-"
-        f"{attempt_id[-8:]}-v2"
+        f"hermes-{lane_id}{suffix}-{market_date.strftime('%Y%m%d')}-{attempt_id[-8:]}-v2"
     ).replace("/", "-")
     spec = {
         "schema_version": 1,
@@ -4718,18 +4617,11 @@ def _publish(
         "artifacts": artifacts,
     }
     if stream:
-        release_dir = (
-            release_root / schedule / stream / market_date.isoformat() / attempt_id
-        )
+        release_dir = release_root / schedule / stream / market_date.isoformat() / attempt_id
     elif lane_id == "market-daily-core" or schedule != "daily":
         release_dir = release_root / schedule / market_date.isoformat() / attempt_id
     else:
-        release_dir = (
-            release_root
-            / schedule
-            / market_date.isoformat()
-            / f"{lane_id}-{attempt_id}"
-        )
+        release_dir = release_root / schedule / market_date.isoformat() / f"{lane_id}-{attempt_id}"
     spec_path = landing / "release-spec.json"
     _atomic_json(spec_path, spec)
     try:
@@ -4737,9 +4629,11 @@ def _publish(
             spec_path=spec_path,
             output=release_dir,
             before_ready=(
-                lambda: _inject_failure(failure_injection_stage, "transfer")
-                if failure_injection_stage == "transfer"
-                else None
+                lambda: (
+                    _inject_failure(failure_injection_stage, "transfer")
+                    if failure_injection_stage == "transfer"
+                    else None
+                )
             ),
         )
     except OdsReleaseError as exc:
@@ -4783,9 +4677,7 @@ def _commit_watermark(
         try:
             prev = date.fromisoformat(str(prev_date)[:10])
             if market_date < prev:
-                raise LaneRunError(
-                    f"watermark regression: {market_date} < committed {prev}"
-                )
+                raise LaneRunError(f"watermark regression: {market_date} < committed {prev}")
         except ValueError:
             pass
     if row_count <= 0 or not observed_maximum:
@@ -4847,11 +4739,7 @@ def run_lane(
         )
     else:
         attempt_dir = (
-            resolved.shadow_root
-            / "attempts"
-            / lane_id
-            / market_date.isoformat()
-            / attempt_id
+            resolved.shadow_root / "attempts" / lane_id / market_date.isoformat() / attempt_id
         )
     attempt_dir.mkdir(parents=True, exist_ok=False)
     landing = attempt_dir / "landing"
@@ -4872,9 +4760,7 @@ def run_lane(
         recovery_deadline_at=recovery_deadline_at,
     )
     _atomic_json(attempt_dir / "attempt.json", result.to_dict())
-    failure_injection_stage = _failure_injection_stage(
-        shadow_root=resolved.shadow_root
-    )
+    failure_injection_stage = _failure_injection_stage(shadow_root=resolved.shadow_root)
 
     lock_name = {
         "market-daily-core": "market-daily-core.lock",
@@ -4910,18 +4796,14 @@ def run_lane(
         if lane_id in {"market-daily-core", "intraday-archive"}:
             acquire_mode = _acquire_mode()
             if acquire_mode == "provider" and force_preflight is None:
-                calendar_output = (
-                    landing / "preflight" / "ref_trading_calendar.parquet"
-                )
+                calendar_output = landing / "preflight" / "ref_trading_calendar.parquet"
                 try:
                     refresh = refresh_calendar(
                         source=resolved.calendar,
                         output=calendar_output,
                         target_date=market_date,
                         lookback_days=int(
-                            lane["session_preflight"]["calendar_refresh"][
-                                "lookback_calendar_days"
-                            ]
+                            lane["session_preflight"]["calendar_refresh"]["lookback_calendar_days"]
                         ),
                     )
                 except CalendarRefreshError as exc:
@@ -4958,10 +4840,7 @@ def run_lane(
             result.preflight = preflight
             if preflight == "missing_or_disagree":
                 result.status = "failed"
-                result.detail = (
-                    "calendar missing or SSE/SZSE disagree; "
-                    "no provider calls; no READY"
-                )
+                result.detail = "calendar missing or SSE/SZSE disagree; no provider calls; no READY"
                 result.finished_at = _now()
                 _atomic_json(attempt_dir / "attempt.json", result.to_dict())
                 _atomic_json(attempt_dir / "datasets.json", {"datasets": []})
@@ -5012,9 +4891,7 @@ def run_lane(
                     knowledge_cutoff=knowledge_cutoff,
                     provider_readiness=lane.get("provider_readiness"),
                     completion_deadline=str(lane.get("completion_deadline") or ""),
-                    collection_window_experiment=lane.get(
-                        "collection_window_experiment"
-                    ),
+                    collection_window_experiment=lane.get("collection_window_experiment"),
                     recovery_deadline_at=recovery_deadline_at,
                 )
                 result.datasets = datasets
@@ -5210,9 +5087,9 @@ def run_lane(
                     observed = None
                     if meta and meta.path:
                         try:
-                            observed = json.loads(
-                                Path(meta.path).read_text(encoding="utf-8")
-                            ).get("observed_maximum")
+                            observed = json.loads(Path(meta.path).read_text(encoding="utf-8")).get(
+                                "observed_maximum"
+                            )
                         except Exception:
                             observed = None
                     _commit_watermark(
@@ -5270,9 +5147,7 @@ def run_lane(
                 handle.close()
 
 
-def expected_timer_oncalendar(
-    schedule_config: Path, *, node_id: str = "hermes"
-) -> dict[str, str]:
+def expected_timer_oncalendar(schedule_config: Path, *, node_id: str = "hermes") -> dict[str, str]:
     """Derive systemd OnCalendar strings from the versioned schedule contract."""
 
     payload = json.loads(Path(schedule_config).read_text(encoding="utf-8"))
@@ -5285,9 +5160,7 @@ def expected_timer_oncalendar(
                 trigger = stream["trigger"]
                 time_s = trigger["time"]
                 # Mon..Fri
-                out[f"intraday-{stream['bar_size']}"] = (
-                    f"Mon..Fri *-*-* {time_s} {tz}"
-                )
+                out[f"intraday-{stream['bar_size']}"] = f"Mon..Fri *-*-* {time_s} {tz}"
             continue
         trigger = lane.get("trigger") or {}
         if trigger.get("kind") != "timer":

@@ -343,6 +343,11 @@ override、旧 READY 和生产 env 的复用。证券主数据、调整因子及
 HTTP 降级和跨 HTTPS 主机均只能收到一次请求；新固定候选从另一个全新目录冷拉，不复用
 这份中断测试的分钟或 READY，不改生产、通知或 timers。
 
+同一候选亦将既有 cninfo 公告入口及 Referer 改为同主机 HTTPS、显式校验证书并不跟随
+重定向，没有改变日期/代码/分页语义。CN01 单票无凭据只读 HTTPS 预检返回 200 JSON；
+不是全市场公告可用性验收。冷拉的付费 Key 仅发给授权 HTTPS 中转，不存在明文 HTTP
+备用或证书绕过。
+
 2026-09-28 首片分钟相关七个套件本地 `118 passed`，focused Ruff 与 diff whitespace 检查通过。
 文档/调度三个套件 `57 passed / 1 failed`；唯一失败为既有
 `P3-STRAT-003-B-R1 has no governing LLD work-item row`，在未改文档的 PR #454 checkout

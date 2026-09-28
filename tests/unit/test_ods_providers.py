@@ -38,6 +38,38 @@ def _paths(home: Path, tmp_path: Path) -> lane_runner.LanePaths:
     )
 
 
+def test_cninfo_live_request_is_verified_https_without_redirects(monkeypatch):
+    import requests
+
+    calls = []
+
+    class Response:
+        status_code = 200
+
+        def json(self):
+            return {"announcements": [], "hasMore": False}
+
+    class Session:
+        def post(self, url, **kwargs):
+            calls.append(url)
+            assert url == "https://www.cninfo.com.cn/new/hisAnnouncement/query"
+            assert kwargs["headers"]["Referer"].startswith("https://")
+            assert kwargs["verify"] is True
+            assert kwargs["allow_redirects"] is False
+            return Response()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(requests, "Session", Session)
+    rows, logs = lane_runner._cninfo_fetch_announcements(
+        codes=["000001"], start=date(2026, 9, 24), end=date(2026, 9, 24)
+    )
+    assert rows == []
+    assert len(calls) == 1
+    assert logs[0]["response_error_code"] == "0"
+
+
 def test_ods_snapshot_windows_local_source_and_writes_only_output(tmp_path: Path) -> None:
     home = tmp_path / "home"
     source = home / "ref_corporate_actions.parquet"
@@ -125,9 +157,7 @@ def test_calendar_refresh_rejects_response_without_target(tmp_path: Path) -> Non
             source=source,
             output=tmp_path / "attempt" / "ref_trading_calendar.parquet",
             target_date=date(2026, 7, 27),
-            fetcher=lambda _start, _end: [
-                {"trade_date": "2026-07-26", "is_open": 0}
-            ],
+            fetcher=lambda _start, _end: [{"trade_date": "2026-07-26", "is_open": 0}],
         )
 
 
@@ -224,9 +254,7 @@ def test_checkpoint_reuse_binds_metadata_revision_and_part_identity(tmp_path: Pa
         assert not common.checkpoint_parts_reusable(
             {**saved, "failed_receipts": malformed}, expected, parts
         )
-    assert not common.checkpoint_parts_reusable(
-        saved, {"provider_revision": "provider-v2"}, parts
-    )
+    assert not common.checkpoint_parts_reusable(saved, {"provider_revision": "provider-v2"}, parts)
 
     common.write_parquet([{"value": 2}], part, schema)
     assert not common.checkpoint_parts_reusable(saved, expected, parts)
@@ -296,9 +324,7 @@ def test_statement_bootstrap_is_checkpointed_and_derives_nonempty_quarterly(
     )
     assert third["reused_batches"] == 1
     assert len(calls) == 9
-    monkeypatch.setattr(
-        fundamentals, "PROVIDER_REVISION", "quanthus-fundamentals-provider-v2-test"
-    )
+    monkeypatch.setattr(fundamentals, "PROVIDER_REVISION", "quanthus-fundamentals-provider-v2-test")
     fourth = fundamentals.collect_statements_checkpointed(
         ["000001", "600519"], date(2026, 7, 31), **kwargs
     )
@@ -814,9 +840,7 @@ def test_f10_checkpoint_invalidates_tampering_and_provider_revision(
     assert third["reused_batches"] == 1
     assert factory_calls == 3
 
-    monkeypatch.setattr(
-        fundamentals, "PROVIDER_REVISION", "quanthus-fundamentals-provider-v2-test"
-    )
+    monkeypatch.setattr(fundamentals, "PROVIDER_REVISION", "quanthus-fundamentals-provider-v2-test")
     fourth = fundamentals.collect_f10_checkpointed(codes, date(2026, 7, 31), **kwargs)
     assert fourth["reused_batches"] == 0
     assert factory_calls == 5
@@ -1033,9 +1057,7 @@ def test_minute_collector_withholds_1m_seed_without_current_identity(
     seed = tmp_path / "seed"
     seed.mkdir()
     (seed / "status.json").write_text(
-        json.dumps(
-            {"state": "done", "freq": "1m", "total": 2, "done": 2, "error": 0}
-        )
+        json.dumps({"state": "done", "freq": "1m", "total": 2, "done": 2, "error": 0})
     )
     (seed / "checkpoint.json").write_text(
         json.dumps(

@@ -667,6 +667,13 @@ rollout evidence are required before activation.
 final-gate discrepancy. Design status: approved for scoped conformance repair.
 Delivery gate: open; tests do not activate a source or production deployment.
 
+Authenticated paid-source requests are restricted to the explicitly configured
+HTTPS endpoint with certificate verification enabled. Disable automatic redirects:
+`requests` can otherwise forward the custom `X-API-Key` header across a host or
+scheme change. A 3xx response is a retained HTTP error, not a new authorized source
+or qualification input. The existing bounded audit stop behavior applies; never
+retry a Location URL or print/store the credential in evidence.
+
 - `paid_minute_source.qualify_payload` interprets the existing auction/time-label
   contract only. Its result is `interpreted_payload_pending_strict_check`, not
   final qualification; its provisional close tolerance cannot license a receipt.

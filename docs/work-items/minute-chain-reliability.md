@@ -334,6 +334,15 @@ override、旧 READY 和生产 env 的复用。证券主数据、调整因子及
 正在执行的冷拉固定于 `84170737a246f9e82547528f6398fa8f75978569`，没有 seed，不能
 途中换 checkout。此后续分片的测试与冷拉固定版本须分开记录，不能冒充已在生产部署。
 
+验收中另发现付费客户端默认跟随重定向，可能向非授权地址转发自定义 Key header。
+在进入 paid 阶段和读取 Key 前，测试 `2026-09-24-20260928T2255` 已受控停止：新日线
+4992 票 READY；原生 5m 最后 checkpoint 为 2500 done/error0，未完成、未生成 DWD。
+旧 summary/status 的 running 不是仍有进程；已核原 PID 全部退出，transient unit 卸载。
+这是操作者安全停止，不是自然来源质量或网络故障，不把 systemd not-found 默认 success
+字段称为成功。全部原始/失败证据保留。修复为显式 TLS 校验且拒绝任何重定向，反向测试
+HTTP 降级和跨 HTTPS 主机均只能收到一次请求；新固定候选从另一个全新目录冷拉，不复用
+这份中断测试的分钟或 READY，不改生产、通知或 timers。
+
 2026-09-28 首片分钟相关七个套件本地 `118 passed`，focused Ruff 与 diff whitespace 检查通过。
 文档/调度三个套件 `57 passed / 1 failed`；唯一失败为既有
 `P3-STRAT-003-B-R1 has no governing LLD work-item row`，在未改文档的 PR #454 checkout

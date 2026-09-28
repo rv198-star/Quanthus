@@ -534,6 +534,10 @@ def _audit_symbol(
             },
             headers={"X-API-Key": key},
             timeout=25,
+            verify=True,
+            # Custom authentication headers survive requests' default redirects.
+            # Only the explicitly authorized HTTPS endpoint may receive this key.
+            allow_redirects=False,
         )
         receipt["http_status"] = response.status_code
         receipt["request_id"] = response.headers.get("x-request-id")
@@ -634,7 +638,8 @@ def main() -> int:
     reference_evidence = references.evidence()
     reference_scope = (
         "new_requests_only_resumed_receipts_not_requalified"
-        if args.resume else "this_audit_requests"
+        if args.resume
+        else "this_audit_requests"
     )
     selected_count = len(codes)
     output_exists = args.output_dir.exists() and any(args.output_dir.iterdir())

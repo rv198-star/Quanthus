@@ -8,7 +8,7 @@
 | Design status | approved；仅分阶段工程路线，不批准未决来源语义或发布契约 |
 | Delivery gate | open；工程、Linux、节点部署、数据验收及观察期分别留证 |
 | 授权 | Owner 要求优化整个 1m 采集链路；已有付费中转、受保护凭据和追补授权延续 |
-| GitHub 跟踪 | [整链路 #456](https://github.com/rv198-star/Quanthus/issues/456)，首片 [#455](https://github.com/rv198-star/Quanthus/issues/455)，B1 [#458](https://github.com/rv198-star/Quanthus/issues/458) |
+| GitHub 跟踪 | [整链路 #456](https://github.com/rv198-star/Quanthus/issues/456)，首片 [#455](https://github.com/rv198-star/Quanthus/issues/455)，B1 [#458](https://github.com/rv198-star/Quanthus/issues/458)，B2 [#460](https://github.com/rv198-star/Quanthus/issues/460) |
 | 当前生产放行 | blocked；本工作项不是 9/24 READY/DWD 完成证据 |
 
 ## 1. 复盘：从补单票转为修完整链路
@@ -39,6 +39,12 @@
 `minute_source_selection.py` 治理。日期、代码、实际来源、240 格点、封存日线精确股数及
 收盘价保持；缺失分钟不能由日总量反推零量。合格整源冲突仍阻断，优先级不能消除冲突。
 独立 5m 是口径诊断证据，不因本方案自动成为全字段多数票裁判。
+
+2026-09-28 19:41 CST 的最新 Owner 决策：CN01/Hermes 每日采集 timers 已停用，
+分项与 maturity timers 继续 disabled。只读跟踪此前已启动的当晚 attempt，不强杀、
+不重启、不途中换代码；不能手动启动新的每日采集。先修复并验收 1m DWD，再由 Owner
+明确确认是否恢复，即使工程测试通过或 9/24 追补完成也不得自动 enable。OCI 同步及
+weekly-corrections 没有因此改动。下文早于该决策的正常时刻/保留 timer 记载是历史证据。
 
 禁止拼分钟、分配差股数、推算 amount、把未知状态归为自然成熟等待，或仅凭旧 receipt
 放行。分钟 amount 的质量限制继续由 #436 显示。表示尾差、竞价标签和午后前收沿用
@@ -133,6 +139,32 @@ GitHub CI 仍在任何 step 前遭账户 payment/spending limit 阻断，已核�
 不称代码失败或重复告警。Linux smoke、作者反向审查、运行环境资格和生产放行分别留证；
 当前仅 scoped engineering 通过，参考输入闭合及生产放行仍未完成，不改今晚编排。
 
+### B2：META-OPS-MINUTE-008 / #460
+
+有界接口复盘确认：审计传封存首 5m，而生产 replay 始终传 None；审计首桶仅按 09:35
+选择，未校验日期和重复；lane 日线/状态分别选 latest。这是输入闭合问题，不是已证明
+9/24 真实缺口或来源分歧的根因。
+
+LLD 01 的“Job-local sealed minute reference closure”拥有本片规则：同一个 verified
+market release 提供日线/状态，显式付费重放才要求同日期/同调度契约 verified 原生 5m。
+捕获 bytes 的输入 SHA、不可变有效视图、所选分母及装载成本在 Job 内共享；正式 handoff
+带 expected artifact SHA，变动或不完整在网络/输出前拒绝。参照摘要不冒充完整跨 Job
+缓存/恢复身份，5m 不增加全 48 桶真值门禁，竞价/标签和精确准入不变。
+
+同一当前参照下重新解释已捕获的 HTTP 200，不因旧 receipt 的 unqualified 跳过可能已
+合格且冲突的整票，也不把旧 qualified 当新资格。旧 raw/receipt 不改、无新网络请求。
+完整性异常仍硬失败；可识别的适配质量拒绝只拒该源，不提前遮住好整票；最终质量和冲突
+仍由现有仲裁所有。audit resume 的计数依旧来自旧回执时，摘要明确不是当前重验。
+完整全量离线资格账本、跨 Job 恢复身份/失效与残余队列还未闭环，不称 B 或 #456 完成。
+
+本地十一个分钟/provider 套件 `227 passed`，新增文件覆盖不可变共享、日期/分母/首桶/
+SHA 故障、READY/PIT/契约 handoff，以及旧不合格标签不能掩盖当前双源冲突；Linux、角色
+环境和节点受控发布仍待独立留证。没有读取 Key、请求真实来源、修改生产或恢复调度。
+扩展文档、调度、lane 和研究 normalizer 为 `117 passed / 1 failed`，唯一失败仍是
+既有 `P3-STRAT-003-B-R1 has no governing LLD work-item row`。focused Ruff 和 diff
+whitespace 通过；`make check` 仍在进入目标前被 Xcode 许可阻断（exit 69），不接受许可或
+修补另一研究线来粉饰完整验证。作者反向审查不是独立批准。
+
 ## 5. 评审与交付顺序
 
 采用上级 #424 已声明的同一助手“方案 / 反向审查 / 测试”阶段，不称独立审批。
@@ -149,7 +181,7 @@ GitHub CI 仍在任何 step 前遭账户 payment/spending limit 阻断，已核�
 
 首片与 B1 的 GitHub 草稿、本地/Linux 回归及 PR #454 组合 smoke 已留证；
 运行角色资格、参考输入闭合和静默窗口内逐节点发布评审仍未完成。
-今天 18:30/19:30 日编排不得被中途替换。
+9/28 18:30/19:30 已启动的同一日编排不得被中途替换；以后每日触发已按 Owner 暂停。
 部署保存原 HEAD、unit/timer 状态，GitHub fast-forward、同版本测试和回执；已有 disabled
 timers 不因代码发布自动开启。回滚不重写 Base、READY 或失败证据。
 

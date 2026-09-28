@@ -40,8 +40,8 @@ class TencentMinuteLaneTest(unittest.TestCase):
 
     def test_requires_ready_daily_and_status(self):
         with patch.dict(os.environ, self.env), patch(
-            "quanthus.pipelines.lane_runner._latest_market_artifact",
-            return_value=None,
+            "quanthus.pipelines.lane_runner._sealed_minute_reference_artifacts",
+            side_effect=LaneRunError("minute references require same-date READY market release"),
         ), self.assertRaisesRegex(LaneRunError, "same-date READY market"):
             self.invoke()
         self.assertFalse(self.raw_home.exists())
@@ -51,16 +51,19 @@ class TencentMinuteLaneTest(unittest.TestCase):
         status = self.paths.shadow_root / "status.parquet"
         observed = []
 
-        def artifact(*, artifact_name, **_kwargs):
-            return (daily if artifact_name == "daily_ohlcv_none_delta" else status, {})
+        def artifacts(**_kwargs):
+            return {
+                "sealed_daily": (daily, {"artifact_sha256": "a" * 64}),
+                "sealed_status": (status, {"artifact_sha256": "b" * 64}),
+            }
 
         def run(command, **_kwargs):
             observed.extend(command)
             return subprocess.CompletedProcess(command, 0, "", "")
 
         with patch.dict(os.environ, self.env), patch(
-            "quanthus.pipelines.lane_runner._latest_market_artifact",
-            side_effect=artifact,
+            "quanthus.pipelines.lane_runner._sealed_minute_reference_artifacts",
+            side_effect=artifacts,
         ), patch("subprocess.run", side_effect=run):
             result = self.invoke()
         self.assertEqual(result["exit_code"], 0)
@@ -73,8 +76,18 @@ class TencentMinuteLaneTest(unittest.TestCase):
         audit.mkdir(parents=True)
         observed = []
 
-        def artifact(*, artifact_name, **_kwargs):
-            return (self.paths.shadow_root / f"{artifact_name}.parquet", {})
+        five = self.paths.shadow_root / "native-5m.parquet"
+        def artifacts(**kwargs):
+            self.assertTrue(kwargs["require_five"])
+            return {
+                "sealed_daily": (
+                    self.paths.shadow_root / "daily.parquet", {"artifact_sha256": "a" * 64}
+                ),
+                "sealed_status": (
+                    self.paths.shadow_root / "status.parquet", {"artifact_sha256": "b" * 64}
+                ),
+                "sealed_native_5m": (five, {"artifact_sha256": "c" * 64}),
+            }
 
         def run(command, **_kwargs):
             observed.extend(command)
@@ -84,10 +97,13 @@ class TencentMinuteLaneTest(unittest.TestCase):
             os.environ,
             {**self.env, "HERMES_ODS_MINUTE_PAID_AUDIT_DIR": str(audit)},
         ), patch(
-            "quanthus.pipelines.lane_runner._latest_market_artifact", side_effect=artifact
+            "quanthus.pipelines.lane_runner._sealed_minute_reference_artifacts",
+            side_effect=artifacts,
         ), patch("subprocess.run", side_effect=run):
             self.invoke()
         self.assertEqual(observed[observed.index("--paid-audit-dir") + 1], str(audit.resolve()))
+        self.assertEqual(observed[observed.index("--sealed-five-path") + 1], str(five))
+        self.assertIn("--reference-sha256-json", observed)
         self.assertFalse(any("key" in argument.lower() for argument in observed))
 
 

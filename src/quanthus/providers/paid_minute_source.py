@@ -22,6 +22,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+from quanthus.providers.minute_references import load_minute_references, parse_reference_sha256
 from quanthus.providers.minute_source_selection import MinuteCandidate, qualify_candidate
 from quanthus.providers.tencent_m1_normalize import expected_times
 
@@ -514,11 +515,14 @@ def _audit_symbol(
     daily: dict[str, Any],
     first_5m_volume: Any,
     output_dir: Path,
+    reference_view_sha256: str | None = None,
 ) -> dict[str, Any]:
     import requests
 
     symbol = code + (".SH" if code.startswith("6") else ".SZ")
     receipt: dict[str, Any] = {"stock_code": code, "market_date": day}
+    if reference_view_sha256 is not None:
+        receipt["reference_effective_view_sha256"] = reference_view_sha256
     try:
         response = requests.get(
             ENDPOINT,
@@ -574,6 +578,7 @@ def main() -> int:
     parser.add_argument("--daily-path", required=True, type=Path)
     parser.add_argument("--status-path", required=True, type=Path)
     parser.add_argument("--five-path", required=True, type=Path)
+    parser.add_argument("--reference-sha256-json", type=parse_reference_sha256)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--rate-per-second", type=float, default=1)
     parser.add_argument("--workers", type=int, default=8)
@@ -612,35 +617,25 @@ def main() -> int:
         or (not args.full_market and args.symbols is None and args.limit is None)
     ):
         parser.error("choose exactly one of --symbols, --limit, or --full-market")
-    import pyarrow.parquet as pq
-
-    daily_rows = pq.read_table(
-        args.daily_path, columns=["stock_code", "market_date", "volume", "close"]
-    ).to_pylist()
-    status_rows = pq.read_table(
-        args.status_path, columns=["stock_code", "market_date", "tradestatus"]
-    ).to_pylist()
-    first_rows = pq.read_table(args.five_path, columns=["stock_code", "ts", "volume"]).to_pylist()
     day = args.market_date.isoformat()
-    daily = {row["stock_code"]: row for row in daily_rows}
-    status = {row["stock_code"]: row for row in status_rows}
-    first = {
-        row["stock_code"]: row["volume"] for row in first_rows if str(row["ts"])[11:16] == "09:35"
-    }
-    if (
-        len(daily) != len(daily_rows)
-        or len(status) != len(status_rows)
-        or set(daily) != set(status)
-        or any(row["market_date"] != day for row in daily_rows + status_rows)
-    ):
-        raise ValueError("sealed daily/status universe or date mismatch")
-    codes = [code for code in sorted(daily) if str(status[code]["tradestatus"]) == "1"]
+    references = load_minute_references(
+        daily_path=args.daily_path,
+        status_path=args.status_path,
+        five_path=args.five_path,
+        market_date=day,
+        expected_sha256=args.reference_sha256_json,
+    )
+    codes = [code for code in references if references[code]["tradestatus"] == "1"]
     if args.symbols is not None:
         codes = select_canary_symbols(args.symbols, codes)
     elif args.limit is not None:
         codes = codes[: args.limit]
-    if any(code not in first for code in codes):
-        raise ValueError("native 5m opening bucket missing for selected symbols")
+    references = references.select(codes, require_first_five=True)
+    reference_evidence = references.evidence()
+    reference_scope = (
+        "new_requests_only_resumed_receipts_not_requalified"
+        if args.resume else "this_audit_requests"
+    )
     selected_count = len(codes)
     output_exists = args.output_dir.exists() and any(args.output_dir.iterdir())
     if output_exists and not args.resume:
@@ -669,6 +664,8 @@ def main() -> int:
                 "elapsed_seconds": 0,
                 "quarantine_only": True,
                 "production_publication": False,
+                "reference_inputs": reference_evidence,
+                "qualification_reference_scope": reference_scope,
             },
         )
         return 3 if counts["source_pending"] else 0
@@ -693,6 +690,8 @@ def main() -> int:
                 "elapsed_seconds": round(time.monotonic() - started, 1),
                 "quarantine_only": True,
                 "production_publication": False,
+                "reference_inputs": reference_evidence,
+                "qualification_reference_scope": reference_scope,
             },
         )
 
@@ -713,9 +712,10 @@ def main() -> int:
                             code,
                             day=day,
                             key=key,
-                            daily=daily[code],
-                            first_5m_volume=first[code],
+                            daily=references[code],
+                            first_5m_volume=references[code]["first_5m_volume"],
                             output_dir=args.output_dir,
+                            reference_view_sha256=references.effective_view_sha256,
                         )
                     )
                 batch_counts: Counter[str] = Counter()

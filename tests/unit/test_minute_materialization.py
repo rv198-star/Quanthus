@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from quanthus.providers import minute_tdx
+from quanthus.providers.minute_references import MinuteReferences
 from quanthus.providers.minute_source_selection import MinuteCandidate, qualify_candidate
 from quanthus.providers.tencent_m1_normalize import expected_times
 
@@ -106,7 +107,9 @@ def stub_source(monkeypatch, frame):
         }
 
     monkeypatch.setattr(
-        minute_tdx, "_tencent_daily_evidence", lambda **kw: {code: DAILY for code in kw["symbols"]}
+        minute_tdx, "_tencent_daily_evidence", lambda **kw: MinuteReferences(
+            DAY, {code: DAILY for code in kw["symbols"]}, (), "b" * 64, 0
+        )
     )
     monkeypatch.setattr(minute_tdx, "_tencent_one_minute_bars", fetch)
     monkeypatch.setattr(minute_tdx.time, "sleep", lambda _seconds: None)

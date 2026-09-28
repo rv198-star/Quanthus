@@ -276,6 +276,10 @@ class TencentMinuteFallbackTests(unittest.TestCase):
                 {"stock_code": "000001", "market_date": day, "tradestatus": "1"}
             ]), status)
             audit = root / "audit"
+            five = root / "five.parquet"
+            pq.write_table(pa.Table.from_pylist([
+                {"stock_code": "000001", "ts": f"{day} 09:35:00", "volume": 150}
+            ]), five)
             (audit / "raw").mkdir(parents=True)
             (audit / "receipts").mkdir()
             (audit / "raw/000001.json.gz").write_bytes(gzip.compress(raw))
@@ -293,7 +297,7 @@ class TencentMinuteFallbackTests(unittest.TestCase):
                     home=home, layer="research", frequency="1m", mode="incr",
                     symbols=["000001"], max_pages=1, sleep_seconds=0,
                     market_date=day, tencent_daily_path=daily,
-                    tencent_status_path=status, paid_audit_dir=audit,
+                    tencent_status_path=status, paid_audit_dir=audit, sealed_five_path=five,
                 )
             self.assertEqual(result, 0)
             receipt = json.loads((home / "checkpoint.json").read_text())["symbols"]["000001"]

@@ -871,6 +871,24 @@ boundaries, pairwise comparisons, amount retention/hash, null/bool/nonfinite fie
 actual zero volume, grid/date/identity errors, no source mutation, exact defaults
 and immutable offline replay. Tolerance is business acceptance, not supplier truth.
 
+The Owner's next capability decision is deliberately narrower than publication:
+`scripts/diagnose_minute_hard_gaps.py` takes a closed exact diagnostic ledger with
+caller-pinned records SHA and revalidates its immutable references/raw. Its
+default is offline; explicit `--probe-existing` permits one at-most-24-security,
+single-date, single-worker re-observation using existing authorized adapters,
+with protected stdin authentication, separate fresh output and a 600-second
+network admission budget. Pending/429/transport/provider faults stop acquisition;
+quality rejection remains in the denominator and does not trip a network circuit.
+Both strict OHLCV (visible absent-amount debt) and the amount-required bounded
+candidate are evaluated against the same newly captured bytes, without a second
+request. This emits diagnosis/raw/receipts only, never candidate Parquet, READY,
+DWD, notifications or schedule changes. Partial acquisition is not full coverage.
+No further full-market cold acceptance should start until every hard case has an
+actual complete whole-source candidate under the agreed contract; a negative
+capability conclusion means stop this route and seek a replacement sample, not
+invent missing minutes or silently modify auction/first-5m semantics. Tests are
+`tests/unit/test_minute_hard_gap_capability.py`.
+
 ### Runtime qualification before node rollout
 
 `META-OPS-ENV-001` (#431), under programme #424 A/E, tracks the actual interpreter

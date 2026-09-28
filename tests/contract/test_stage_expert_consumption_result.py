@@ -105,9 +105,7 @@ def test_p3_expert_006_stays_closed_when_strategy_input_qualification_stops() ->
     items = {item.stable_id: item for item in work_items(ROOT)}
     assert items["P3-EXPERT-006"].status == "closed"
     ready_p3 = {
-        item.stable_id
-        for item in items.values()
-        if item.phase == "P3" and item.status == "ready"
+        item.stable_id for item in items.values() if item.phase == "P3" and item.status == "ready"
     }
-    assert ready_p3 == set()
+    assert ready_p3 == {"P3-STRAT-003-B-R1"}
     assert all(not stable_id.startswith("P3-STAGE-") for stable_id in ready_p3)

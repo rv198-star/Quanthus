@@ -14,9 +14,7 @@ from pathlib import Path
 from typing import Any, NoReturn
 
 from quanthus.event_library.physical_scan import (
-    PhysicalEventScanError,
     _read_parquet_expression,
-    _table_paths,
 )
 from quanthus.expert_evaluation.serialization import (
     ExpertEvaluationError,
@@ -121,11 +119,7 @@ def _candidate_inventory(
         / str(failed_job["claim_generation"])
         / relative
     ).resolve()
-    if (
-        not path.is_file()
-        or path.is_symlink()
-        or not path.is_relative_to(run_root.resolve())
-    ):
+    if not path.is_file() or path.is_symlink() or not path.is_relative_to(run_root.resolve()):
         return {
             "status": "missing_or_unreadable",
             "path": str(path),
@@ -179,12 +173,7 @@ def _candidate_inventory(
             """,
             [str(path)],
         ).fetchone()
-        if (
-            bad is None
-            or duplicates is None
-            or int(bad[0])
-            or int(duplicates[0])
-        ):
+        if bad is None or duplicates is None or int(bad[0]) or int(duplicates[0]):
             _fail("failed candidate projection identity rows are invalid")
         identity_ambiguity = connection.execute(
             """
@@ -395,28 +384,19 @@ def _p4_reference(
         supplement = source_receipt.get("historical_supplement")
         source_receipt_digest = source_receipt.get("content_digest")
         source_receipt_payload = {
-            key: value
-            for key, value in source_receipt.items()
-            if key != "content_digest"
+            key: value for key, value in source_receipt.items() if key != "content_digest"
         }
         supplement_digest = (
-            supplement.get("content_digest")
-            if isinstance(supplement, dict)
-            else None
+            supplement.get("content_digest") if isinstance(supplement, dict) else None
         )
         supplement_payload = (
-            {
-                key: value
-                for key, value in supplement.items()
-                if key != "content_digest"
-            }
+            {key: value for key, value in supplement.items() if key != "content_digest"}
             if isinstance(supplement, dict)
             else {}
         )
         dwd_base = adm_manifest.get("dwd_base")
         if (
-            source_receipt.get("schema_version")
-            != "quanthus.p4-adm-static-industry-receipt.v1"
+            source_receipt.get("schema_version") != "quanthus.p4-adm-static-industry-receipt.v1"
             or not isinstance(historical_reference, dict)
             or not isinstance(supplement, dict)
             or not isinstance(dwd_base, dict)
@@ -424,11 +404,9 @@ def _p4_reference(
             or source_receipt_digest != digest_value(source_receipt_payload)
             or not isinstance(supplement_digest, str)
             or supplement_digest != digest_value(supplement_payload)
-            or supplement_digest
-            != historical_reference.get("source_content_digest")
+            or supplement_digest != historical_reference.get("source_content_digest")
             or mapping.source.source_revision != source_receipt_digest
-            or source_receipt.get("dwd_base_package_id")
-            != dwd_base.get("package_id")
+            or source_receipt.get("dwd_base_package_id") != dwd_base.get("package_id")
         ):
             _fail("P4 historical industry provenance differs from its sealed policy")
         dwd_membership_count = source_receipt.get("dwd_membership_count")
@@ -495,27 +473,104 @@ def _p4_reference(
     return {"runs": receipts}, exact, by_code
 
 
+def _dwd_source_tables(
+    runtime: Any,
+    *,
+    json_limit: int,
+) -> tuple[dict[str, tuple[Path, ...]], dict[str, Any]]:
+    """Verify only the frozen Base identity and the industry members S1 reads."""
+    base_root = runtime.historical_base_root.resolve()
+    manifest_path = base_root / "manifest.json"
+    ready_path = base_root / "READY"
+    tables = ("dwd_company_industry_membership", "dwd_industry_node")
+    try:
+        manifest = _object(
+            manifest_path,
+            root=base_root,
+            limit=json_limit,
+            label="DWD Base manifest",
+        )
+        manifest_sha = _sha256(manifest_path)
+        if (
+            ready_path.is_symlink()
+            or not ready_path.resolve().is_relative_to(base_root)
+            or ready_path.stat().st_size > json_limit
+        ):
+            _fail("DWD Base READY is invalid")
+        ready = ready_path.read_text(encoding="ascii").strip()
+        if (
+            manifest_sha != runtime.historical_base_manifest_sha256
+            or ready != manifest_sha
+            or manifest.get("package_id") != "dwd-base-202607-v2.1"
+            or manifest.get("content_digest") != runtime.historical_base_content_digest
+        ):
+            _fail("DWD Base identity differs from the frozen source")
+
+        inventory = manifest.get("files")
+        if not isinstance(inventory, list):
+            _fail("DWD Base file inventory is invalid")
+        selected: dict[str, list[Path]] = {table: [] for table in tables}
+        file_receipts: dict[str, list[dict[str, Any]]] = {table: [] for table in tables}
+        seen: set[str] = set()
+        for raw in inventory:
+            if not isinstance(raw, dict) or not isinstance(raw.get("path"), str):
+                _fail("DWD Base inventory entry is invalid")
+            relative = raw["path"]
+            for table in tables:
+                if not (relative.endswith(f"/{table}.parquet") or f"/{table}/" in relative):
+                    continue
+                if relative in seen:
+                    _fail("DWD industry inventory contains duplicate members")
+                seen.add(relative)
+                member = _relative_child(base_root, relative, "DWD industry member")
+                size = raw.get("size_bytes")
+                if (
+                    (base_root / relative).is_symlink()
+                    or not member.is_file()
+                    or not isinstance(size, int)
+                    or isinstance(size, bool)
+                    or size < 0
+                    or member.stat().st_size != size
+                    or _sha256(member) != raw.get("sha256")
+                ):
+                    _fail(f"DWD industry member differs from sealed inventory: {relative}")
+                selected[table].append(member)
+                file_receipts[table].append(
+                    {"path": relative, "size_bytes": size, "sha256": raw["sha256"]}
+                )
+        if any(not paths for paths in selected.values()):
+            _fail("DWD static industry source tables are unavailable")
+        receipt = {
+            "path": str(base_root),
+            "package_id": manifest["package_id"],
+            "manifest_sha256": manifest_sha,
+            "ready_sha256": _sha256(ready_path),
+            "base_content_digest": manifest["content_digest"],
+            "files": {
+                table: sorted(rows, key=lambda row: row["path"])
+                for table, rows in file_receipts.items()
+            },
+        }
+        receipt["receipt_digest"] = digest_value(receipt)
+    except (ExpertEvaluationError, OSError, UnicodeError) as exc:
+        _source_unavailable(f"DWD static industry source validation failed: {exc}", cause=exc)
+    return {table: tuple(sorted(paths)) for table, paths in selected.items()}, receipt
+
+
 def _dwd_reference(
-    base_root: Path,
+    runtime: Any,
     identities: list[dict[str, Any]],
-) -> tuple[dict[str, str], dict[str, str]]:
+    *,
+    json_limit: int = 524288,
+) -> tuple[dict[str, str], dict[str, str], dict[str, Any]]:
+    tables, receipt = _dwd_source_tables(runtime, json_limit=json_limit)
     try:
         import duckdb
     except ModuleNotFoundError as exc:
         raise ExpertEvaluationError("dependency_missing", "duckdb") from exc
 
-    try:
-        membership_expression = _read_parquet_expression(
-            _table_paths(base_root, "dwd_company_industry_membership")
-        )
-        node_expression = _read_parquet_expression(
-            _table_paths(base_root, "dwd_industry_node")
-        )
-    except PhysicalEventScanError as exc:
-        _source_unavailable(
-            "DWD static industry source tables are unavailable",
-            cause=exc,
-        )
+    membership_expression = _read_parquet_expression(tables["dwd_company_industry_membership"])
+    node_expression = _read_parquet_expression(tables["dwd_industry_node"])
 
     connection = duckdb.connect(":memory:")
     try:
@@ -524,10 +579,7 @@ def _dwd_reference(
         )
         connection.executemany(
             "INSERT INTO candidate_identity VALUES (?, ?)",
-            [
-                (identity["security_id"], identity["company_id"])
-                for identity in identities
-            ],
+            [(identity["security_id"], identity["company_id"]) for identity in identities],
         )
         rows = connection.execute(
             f"""
@@ -594,7 +646,7 @@ def _dwd_reference(
         else:
             reason = "level1_parent_unresolved"
         reasons[security] = reason
-    return mapping, reasons
+    return mapping, reasons, receipt
 
 
 def _legacy_reference(
@@ -668,90 +720,122 @@ def _coverage(
 ) -> dict[str, Any]:
     all_counts: Counter[str] = Counter()
     decision_counts: Counter[str] = Counter()
-    unresolved: list[dict[str, Any]] = []
-    conflicts: list[dict[str, Any]] = []
-    p4_code_only_matches = 0
-    legacy_code_only_matches = 0
-    legacy_code_ambiguous_matches = 0
+    all_sources: Counter[str] = Counter()
+    decision_sources: Counter[str] = Counter()
+    all_dwd_reasons: Counter[str] = Counter()
+    decision_dwd_reasons: Counter[str] = Counter()
+    unresolved_samples: list[dict[str, Any]] = []
+    industry_conflict_samples: list[dict[str, Any]] = []
+    identity_conflict_samples: list[dict[str, Any]] = []
 
     for identity in identities:
         security_id = str(identity["security_id"])
+        identity_key = (str(identity["listing_code"]), str(identity["venue_id"]))
         p4_value = p4.get(security_id)
         dwd_value = dwd.get(security_id)
+        p4_identity_conflict = p4_value is not None and p4_value[1:] != identity_key
+        p4_exact = p4_value is not None and not p4_identity_conflict
+        industry_conflict = (
+            dwd_value is not None and p4_exact and p4_value is not None and dwd_value != p4_value[0]
+        )
+        dwd_reason = dwd_reasons.get(security_id, "unclassified")
+        unresolved = dwd_value is None and not p4_exact
         if dwd_value is not None:
             status = "dwd_native"
-            resolved_value = dwd_value
-        elif p4_value is not None:
+        elif p4_exact:
             status = "p4_sealed_reference"
-            resolved_value = p4_value[0]
+        elif p4_identity_conflict:
+            status = "p4_identity_conflict"
         else:
-            status = dwd_reasons.get(security_id, "unclassified")
-            resolved_value = None
+            status = dwd_reason
 
+        p4_code_matches = p4_by_code.get(identity_key, [])
+        legacy_code_matches = legacy_by_code.get(identity_key, [])
+        # Each source is counted independently; overlap never disappears under DWD priority.
+        source_counts = {
+            "security_count": 1,
+            "dwd_native_security_count": int(dwd_value is not None),
+            "p4_exact_security_count": int(p4_exact),
+            "legacy_p3_exact_security_count": int(security_id in legacy),
+            "dwd_p4_overlap_security_count": int(dwd_value is not None and p4_exact),
+            "remaining_unresolved_security_count": int(unresolved),
+            "dwd_p4_industry_conflict_count": int(industry_conflict),
+            "p4_identity_conflict_count": int(p4_identity_conflict),
+            "conflict_security_count": int(industry_conflict or p4_identity_conflict),
+            "p4_code_venue_only_reference_match_count": int(
+                len(p4_code_matches) == 1 and p4_code_matches[0] != security_id
+            ),
+            "legacy_p3_code_venue_only_match_count": int(
+                len(legacy_code_matches) == 1 and legacy_code_matches[0] != security_id
+            ),
+            "legacy_p3_code_venue_ambiguous_match_count": int(len(legacy_code_matches) > 1),
+        }
         all_counts[status] += 1
+        all_sources.update(source_counts)
+        all_dwd_reasons[dwd_reason] += 1
         if identity["in_decision_scope"]:
             decision_counts[status] += 1
+            decision_sources.update(source_counts)
+            decision_dwd_reasons[dwd_reason] += 1
 
-        if (
-            dwd_value is not None
-            and p4_value is not None
-            and dwd_value != p4_value[0]
-        ):
-            conflicts.append(
+        if industry_conflict and len(industry_conflict_samples) < sample_limit:
+            assert p4_value is not None
+            industry_conflict_samples.append(
                 {
                     **identity,
                     "dwd_level1_industry_id": dwd_value,
                     "p4_level1_industry_id": p4_value[0],
                 }
             )
-
-        if resolved_value is None:
-            identity_key = (
-                str(identity["listing_code"]),
-                str(identity["venue_id"]),
-            )
-            p4_code_matches = p4_by_code.get(identity_key, [])
-            if (
-                len(p4_code_matches) == 1
-                and p4_code_matches[0] != security_id
-            ):
-                p4_code_only_matches += 1
-
-            legacy_code_matches = legacy_by_code.get(identity_key, [])
-            if (
-                len(legacy_code_matches) == 1
-                and legacy_code_matches[0] != security_id
-            ):
-                legacy_code_only_matches += 1
-            elif len(legacy_code_matches) > 1:
-                legacy_code_ambiguous_matches += 1
-
-            unresolved.append(
+        if p4_identity_conflict and len(identity_conflict_samples) < sample_limit:
+            assert p4_value is not None
+            identity_conflict_samples.append(
                 {
                     **identity,
-                    "dwd_reason": dwd_reasons.get(security_id),
+                    "p4_listing_code": p4_value[1],
+                    "p4_venue_id": p4_value[2],
+                    "p4_level1_industry_id": p4_value[0],
+                    "dwd_level1_industry_id": dwd_value,
+                }
+            )
+        if unresolved and len(unresolved_samples) < sample_limit:
+            unresolved_samples.append(
+                {
+                    **identity,
+                    "dwd_reason": dwd_reason,
+                    "p4_identity_conflict": p4_identity_conflict,
                     "legacy_p3_exact_identity": security_id in legacy,
-                    "legacy_p3_code_venue_match_count": len(
-                        legacy_code_matches
-                    ),
+                    "legacy_p3_code_venue_match_count": len(legacy_code_matches),
                 }
             )
 
+    # Empty decision scope still has every count at zero, never a missing field.
+    for key in all_sources:
+        decision_sources.setdefault(key, 0)
     return {
         "all_security_status_counts": dict(sorted(all_counts.items())),
         "decision_security_status_counts": dict(sorted(decision_counts.items())),
-        "legacy_p3_exact_security_count": sum(
-            identity["security_id"] in legacy for identity in identities
+        "all_dwd_reason_counts": dict(sorted(all_dwd_reasons.items())),
+        "decision_dwd_reason_counts": dict(sorted(decision_dwd_reasons.items())),
+        "all_source_counts": dict(sorted(all_sources.items())),
+        "decision_source_counts": dict(sorted(decision_sources.items())),
+        "legacy_p3_exact_security_count": all_sources["legacy_p3_exact_security_count"],
+        "remaining_unresolved_security_count": all_sources["remaining_unresolved_security_count"],
+        "dwd_p4_conflict_count": all_sources["dwd_p4_industry_conflict_count"],
+        "p4_identity_conflict_count": all_sources["p4_identity_conflict_count"],
+        "conflict_security_count": all_sources["conflict_security_count"],
+        "p4_code_venue_only_reference_match_count": (
+            all_sources["p4_code_venue_only_reference_match_count"]
         ),
-        "remaining_unresolved_security_count": len(unresolved),
-        "dwd_p4_conflict_count": len(conflicts),
-        "p4_code_venue_only_reference_match_count": p4_code_only_matches,
-        "legacy_p3_code_venue_only_match_count": legacy_code_only_matches,
+        "legacy_p3_code_venue_only_match_count": all_sources[
+            "legacy_p3_code_venue_only_match_count"
+        ],
         "legacy_p3_code_venue_ambiguous_match_count": (
-            legacy_code_ambiguous_matches
+            all_sources["legacy_p3_code_venue_ambiguous_match_count"]
         ),
-        "remaining_unresolved_samples": unresolved[:sample_limit],
-        "conflict_samples": conflicts[:sample_limit],
+        "remaining_unresolved_samples": unresolved_samples,
+        "conflict_samples": industry_conflict_samples,
+        "identity_conflict_samples": identity_conflict_samples,
     }
 
 
@@ -809,9 +893,7 @@ def _seal(
     }
     manifest = {**payload, "result_digest": digest_value(payload)}
     manifest_data = canonical_json_bytes(manifest) + b"\n"
-    ready = (
-        "sha256:" + hashlib.sha256(manifest_data).hexdigest() + "\n"
-    ).encode("ascii")
+    ready = ("sha256:" + hashlib.sha256(manifest_data).hexdigest() + "\n").encode("ascii")
     if len(summary_data) + len(manifest_data) + len(ready) > output_limit:
         _fail("complete industry inspection artifact exceeds output limit")
     output.mkdir(parents=True)
@@ -896,9 +978,10 @@ def build_industry_inspection(
             raw["p4_reference"],
             json_limit=int(raw["limits"]["maximum_json_bytes"]),
         )
-        dwd_mapping, dwd_reasons = _dwd_reference(
-            runtime.historical_base_root.resolve(),
+        dwd_mapping, dwd_reasons, dwd_receipt = _dwd_reference(
+            runtime,
             identities,
+            json_limit=int(raw["limits"]["maximum_json_bytes"]),
         )
     except ExpertEvaluationError as exc:
         core = {
@@ -917,6 +1000,7 @@ def build_industry_inspection(
             "failed_job": raw["failed_job"],
             "candidate_projection": candidate,
             "legacy_p3_mapping": legacy_receipt,
+            "dwd_reference": dwd_receipt,
             "dwd_reason_counts": dict(sorted(Counter(dwd_reasons.values()).items())),
             "p4_reference": p4_receipt,
             "coverage": _coverage(
@@ -970,9 +1054,7 @@ def verify_industry_inspection_artifact(
             "industry inspection READY",
         ) from exc
 
-    payload = {
-        key: value for key, value in manifest.items() if key != "result_digest"
-    }
+    payload = {key: value for key, value in manifest.items() if key != "result_digest"}
     expected_file = {
         "path": "summary.json",
         "size_bytes": (root / "summary.json").stat().st_size,
@@ -1003,8 +1085,7 @@ def verify_industry_inspection_artifact(
         or manifest.get("result_digest") != digest_value(payload)
         or manifest.get("files") != {"summary": expected_file}
         or manifest.get("inspection") != summary.get("inspection")
-        or manifest.get("disposition")
-        != manifest.get("inspection", {}).get("disposition")
+        or manifest.get("disposition") != manifest.get("inspection", {}).get("disposition")
         or any(manifest.get(field) is not False for field in false_flags)
         or any(manifest.get(field) != 0 for field in zero_counts)
     ):
@@ -1034,9 +1115,9 @@ def verify_industry_inspection_artifact(
                 "remaining_unresolved_security_count": int(
                     coverage["remaining_unresolved_security_count"]
                 ),
-                "dwd_p4_conflict_count": int(
-                    coverage["dwd_p4_conflict_count"]
-                ),
+                "dwd_p4_conflict_count": int(coverage["dwd_p4_conflict_count"]),
+                "p4_identity_conflict_count": int(coverage["p4_identity_conflict_count"]),
+                "conflict_security_count": int(coverage["conflict_security_count"]),
             }
         )
     return result

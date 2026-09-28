@@ -283,7 +283,8 @@ class DocumentTraceabilityTests(unittest.TestCase):
             all(
                 state in {"blocked", "deferred"}
                 for item_id, state in gate["work_items"].items()
-                if item_id not in accepted
+                if item_id
+                not in accepted
                 | {
                     "PK-AUTHORING-001",
                 }
@@ -876,16 +877,10 @@ class DocumentTraceabilityTests(unittest.TestCase):
         gate_path = root / "config" / "p3-gates.v1.json"
         p0_path = root / "config" / "p0-policy.v1.json"
         acceptance_path = (
-            root
-            / "docs"
-            / "acceptance"
-            / "p3-attribution-synthetic-publication-20260731.md"
+            root / "docs" / "acceptance" / "p3-attribution-synthetic-publication-20260731.md"
         )
         formal_acceptance_path = (
-            root
-            / "docs"
-            / "acceptance"
-            / "p3-attr-formal-production-20260823.md"
+            root / "docs" / "acceptance" / "p3-attr-formal-production-20260823.md"
         )
         fields = _header_fields(child_path)
         child = child_path.read_text(encoding="utf-8")
@@ -902,9 +897,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         architecture_fields = _header_fields(
             root / "docs" / "architecture" / "strategy-attribution-publication.md"
         )
-        work_items = (root / "docs" / "work-items" / "index.md").read_text(
-            encoding="utf-8"
-        )
+        work_items = (root / "docs" / "work-items" / "index.md").read_text(encoding="utf-8")
         acceptance = acceptance_path.read_text(encoding="utf-8")
         formal_acceptance = formal_acceptance_path.read_text(encoding="utf-8")
         gate = json.loads(gate_path.read_text(encoding="utf-8"))
@@ -952,9 +945,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("`execution_authorized=false`", formal_acceptance)
         self.assertIn("All 104 release", formal_acceptance)
         self.assertTrue((root / "src" / "quanthus" / "strategy_attribution.py").is_file())
-        self.assertTrue(
-            (root / "src" / "quanthus" / "strategy_attribution_pipeline.py").is_file()
-        )
+        self.assertTrue((root / "src" / "quanthus" / "strategy_attribution_pipeline.py").is_file())
         self.assertTrue(
             (root / "src" / "quanthus" / "strategy_attribution_publication.py").is_file()
         )
@@ -963,9 +954,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             (root / "tests" / "unit" / "test_strategy_attribution_publication.py").is_file()
         )
         self.assertTrue((root / "web" / "app" / "attribution-workbench.tsx").is_file())
-        self.assertTrue(
-            (root / "web" / "app" / "published-workspace-catalog.ts").is_file()
-        )
+        self.assertTrue((root / "web" / "app" / "published-workspace-catalog.ts").is_file())
 
     def test_two_window_profile_preserves_active_clock_and_manual_boundary(self) -> None:
         root = find_project_root()
@@ -1016,15 +1005,11 @@ class DocumentTraceabilityTests(unittest.TestCase):
 
     def test_p4_event_contract_slice_is_traceable_and_stage_b_approved(self) -> None:
         root = find_project_root()
-        lld = (root / "docs" / "design" / "lld" / "06-event-library.md").read_text(
-            encoding="utf-8"
-        )
+        lld = (root / "docs" / "design" / "lld" / "06-event-library.md").read_text(encoding="utf-8")
         card = load_candidate_rule_card(
             root / "config" / "p4-candidate-price-volume-transition.research.v1.json"
         )
-        split = load_split_policy(
-            root / "config" / "p4-event-split-policy.research.v1.json"
-        )
+        split = load_split_policy(root / "config" / "p4-event-split-policy.research.v1.json")
 
         self.assertIn("`P4-EVENT-001`", lld)
         self.assertIn("`P4-EVENT-002`", lld)
@@ -1041,9 +1026,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue((root / "src" / "quanthus" / "event_library" / "contracts.py").is_file())
         self.assertTrue((root / "src" / "quanthus" / "event_library" / "rule_card.py").is_file())
         self.assertTrue((root / "src" / "quanthus" / "event_library" / "splits.py").is_file())
-        self.assertTrue(
-            (root / "tests" / "unit" / "test_event_library_contracts.py").is_file()
-        )
+        self.assertTrue((root / "tests" / "unit" / "test_event_library_contracts.py").is_file())
         self.assertTrue((root / "tests" / "unit" / "test_event_rule_card.py").is_file())
         self.assertTrue((root / "tests" / "unit" / "test_event_splits.py").is_file())
         acceptance_path = root / "docs" / "acceptance" / "p4-event-contract-freeze-20260806.md"
@@ -1055,9 +1038,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
 
     def test_p4_forward_scan_first_slice_is_new_chain_only_and_traceable(self) -> None:
         root = find_project_root()
-        lld = (root / "docs" / "design" / "lld" / "06-event-library.md").read_text(
-            encoding="utf-8"
-        )
+        lld = (root / "docs" / "design" / "lld" / "06-event-library.md").read_text(encoding="utf-8")
         source = load_event_scan_source_policy(
             root / "config" / "p4-event-scan-source.research.v1.json",
             release_path=root / "config" / "releases" / "v2-build202607.json",
@@ -1138,10 +1119,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("53,527", remediation)
         self.assertIn("46,522", remediation)
         supplement_path = (
-            root
-            / "docs"
-            / "acceptance"
-            / "p4-research-adm-industry-supplement-20260820.md"
+            root / "docs" / "acceptance" / "p4-research-adm-industry-supplement-20260820.md"
         )
         self.assertTrue(supplement_path.is_file())
         supplement = supplement_path.read_text(encoding="utf-8")
@@ -1166,10 +1144,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn(adm.semantic_digest, correction)
         self.assertIn(adm.historical_industry_reference.source_content_digest, correction)
         entry_binding_path = (
-            root
-            / "docs"
-            / "acceptance"
-            / "p4-event-entry-snapshot-binding-remediation-20260821.md"
+            root / "docs" / "acceptance" / "p4-event-entry-snapshot-binding-remediation-20260821.md"
         )
         self.assertTrue(entry_binding_path.is_file())
         entry_binding = entry_binding_path.read_text(encoding="utf-8")
@@ -1187,10 +1162,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         self.assertIn("historical_only=259", adm_checkpoint)
         adm_adr = (
-            root
-            / "docs"
-            / "architecture"
-            / "adr-0013-p4-research-adm-and-legacy-ads-retirement.md"
+            root / "docs" / "architecture" / "adr-0013-p4-research-adm-and-legacy-ads-retirement.md"
         )
         self.assertTrue(adm_adr.is_file())
 
@@ -1215,10 +1187,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn(structural.semantic_digest, lld)
         self.assertIn(report_policy.semantic_digest, lld)
         label_proposal_path = (
-            root
-            / "docs"
-            / "acceptance"
-            / "p4-event-label-governance-proposal-20260821.md"
+            root / "docs" / "acceptance" / "p4-event-label-governance-proposal-20260821.md"
         )
         self.assertTrue(label_proposal_path.is_file())
         label_proposal = label_proposal_path.read_text(encoding="utf-8")
@@ -1226,10 +1195,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn(structural.semantic_digest, label_proposal)
         self.assertIn("No real future-outcome corpus may be read", label_proposal)
         label_approval_path = (
-            root
-            / "docs"
-            / "acceptance"
-            / "p4-event-label-human-approval-20260821.md"
+            root / "docs" / "acceptance" / "p4-event-label-human-approval-20260821.md"
         )
         self.assertTrue(label_approval_path.is_file())
         label_approval = label_approval_path.read_text(encoding="utf-8")
@@ -1237,10 +1203,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn(structural.semantic_digest, label_approval)
         self.assertIn("#issuecomment-5366610770", label_approval)
         label_implementation_path = (
-            root
-            / "docs"
-            / "acceptance"
-            / "p4-event-label-corpus-implementation-20260821.md"
+            root / "docs" / "acceptance" / "p4-event-label-corpus-implementation-20260821.md"
         )
         self.assertTrue(label_implementation_path.is_file())
         label_implementation = label_implementation_path.read_text(encoding="utf-8")
@@ -1248,14 +1211,9 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn(structural.semantic_digest, label_implementation)
         self.assertIn("quanthus.p4-event-run.v2", label_implementation)
         self.assertIn("run-p4-labeled-event-scan", label_implementation)
-        self.assertTrue(
-            (root / "src" / "quanthus" / "event_library" / "label_corpus.py").is_file()
-        )
+        self.assertTrue((root / "src" / "quanthus" / "event_library" / "label_corpus.py").is_file())
         label_acceptance_path = (
-            root
-            / "docs"
-            / "acceptance"
-            / "p4-event-label-corpus-production-ab-20260821.md"
+            root / "docs" / "acceptance" / "p4-event-label-corpus-production-ab-20260821.md"
         )
         self.assertTrue(label_acceptance_path.is_file())
         label_acceptance = label_acceptance_path.read_text(encoding="utf-8")
@@ -1272,10 +1230,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             label_acceptance,
         )
         report_implementation_path = (
-            root
-            / "docs"
-            / "acceptance"
-            / "p4-event-comparison-report-implementation-20260821.md"
+            root / "docs" / "acceptance" / "p4-event-comparison-report-implementation-20260821.md"
         )
         self.assertTrue(report_implementation_path.is_file())
         report_implementation = report_implementation_path.read_text(encoding="utf-8")
@@ -1295,10 +1250,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIn("panel_security_id", report_identity_remediation)
         self.assertIn("job_15a9f9c2d3934b96a1349b0f3ae2a288", report_identity_remediation)
         report_acceptance_path = (
-            root
-            / "docs"
-            / "acceptance"
-            / "p4-event-comparison-report-production-ab-20260823.md"
+            root / "docs" / "acceptance" / "p4-event-comparison-report-production-ab-20260823.md"
         )
         self.assertTrue(report_acceptance_path.is_file())
         report_acceptance = report_acceptance_path.read_text(encoding="utf-8")
@@ -1319,9 +1271,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue(
             (root / "src" / "quanthus" / "event_library" / "comparison_report.py").is_file()
         )
-        self.assertTrue(
-            (root / "tests" / "unit" / "test_event_comparison_report.py").is_file()
-        )
+        self.assertTrue((root / "tests" / "unit" / "test_event_comparison_report.py").is_file())
         self.assertIn("label-corpus", lld)
         self.assertIn("comparison-report", lld)
         self.assertIn("quanthus.p4-event-run.v3", lld)
@@ -1341,14 +1291,10 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )["items"]
         lineage_ids = {item["id"] for item in lineage_plan}
         self.assertEqual(lineage_ids, {"P3-DICT-003", *[f"P3-DICT-003-{c}" for c in "ABCD"]})
-        stage_plan = json.loads(
-            (root / "config/stock-stage-learning-delivery.v1.json").read_text()
-        )
+        stage_plan = json.loads((root / "config/stock-stage-learning-delivery.v1.json").read_text())
         stage_ids = {item["id"] for item in stage_plan["items"]}
         self.assertEqual(stage_ids, {"P3-STAGE-001", *[f"P3-STAGE-001-{c}" for c in "ABCDEFGHIJ"]})
-        f9_plan = json.loads(
-            (root / "config/structure-f9-delivery.v1.json").read_text()
-        )["items"]
+        f9_plan = json.loads((root / "config/structure-f9-delivery.v1.json").read_text())["items"]
         f9_ids = {item["id"] for item in f9_plan}
         self.assertEqual(f9_ids, {"P3-STRUCT-005", *[f"P3-STRUCT-005-{c}" for c in "ABCD"]})
         projection_plan_raw = json.loads(
@@ -1433,9 +1379,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         for key, value in trend_auth.items():
             if key.endswith("_authorized"):
                 self.assertIs(value, False)
-        order_raw = json.loads(
-            (root / "config/structure-order-delivery.v1.json").read_text()
-        )
+        order_raw = json.loads((root / "config/structure-order-delivery.v1.json").read_text())
         order_ids = {item["id"] for item in order_raw["items"]}
         self.assertEqual(
             order_ids,
@@ -1476,9 +1420,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertEqual(screen_ids, {"P3-STAGE-007", *[f"P3-STAGE-007-{c}" for c in "ABCD"]})
         self.assertIs(screen_raw["milestone_completed"], True)
         self.assertEqual(screen_raw["runtime_receipts"]["failed_prepare"]["state"], "failed")
-        self.assertEqual(
-            screen_raw["runtime_receipts"]["successful_prepare"]["state"], "succeeded"
-        )
+        self.assertEqual(screen_raw["runtime_receipts"]["successful_prepare"]["state"], "succeeded")
         screen_positive_authority = {"implementation_and_synthetic_tests"}
         for key, value in screen_raw["authorization"].items():
             self.assertIs(value, key in screen_positive_authority)
@@ -1501,8 +1443,15 @@ class DocumentTraceabilityTests(unittest.TestCase):
             reference_feasibility_ids,
             {"P3-STAGE-006", *[f"P3-STAGE-006-{c}" for c in "ABCD"]},
         )
-        for key in ("new_dwd_read", "parameter_search", "arbitration", "permanent_blind",
-                    "official_labels", "daily_or_strategy", "trading"):
+        for key in (
+            "new_dwd_read",
+            "parameter_search",
+            "arbitration",
+            "permanent_blind",
+            "official_labels",
+            "daily_or_strategy",
+            "trading",
+        ):
             self.assertIs(reference_feasibility_raw["authorization"][key], False)
         self.assertEqual(
             order_stage_ids,
@@ -1534,16 +1483,12 @@ class DocumentTraceabilityTests(unittest.TestCase):
             if key.endswith("_authorized"):
                 self.assertIs(value, False)
         self.assertIs(stage_plan["authorization"]["capacity_benchmark_authorized"], True)
-        self.assertIs(
-            stage_plan["authorization"]["stage_harness_implementation_authorized"], True
-        )
+        self.assertIs(stage_plan["authorization"]["stage_harness_implementation_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["stage_reference_pilot_implementation_authorized"],
             True,
         )
-        self.assertIs(
-            stage_plan["authorization"]["development_future_settlement_authorized"], True
-        )
+        self.assertIs(stage_plan["authorization"]["development_future_settlement_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["development_learning_implementation_authorized"], True
         )
@@ -1553,9 +1498,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertIs(
             stage_plan["authorization"]["synthetic_expert_development_learning_authorized"], True
         )
-        self.assertIs(
-            stage_plan["authorization"]["development_capacity_census_authorized"], True
-        )
+        self.assertIs(stage_plan["authorization"]["development_capacity_census_authorized"], True)
         self.assertIs(
             stage_plan["authorization"]["second_group_development_profile_authorized"], True
         )
@@ -1629,8 +1572,9 @@ class DocumentTraceabilityTests(unittest.TestCase):
             | reference_feasibility_ids
             | screen_ids
         )
-        p3_items = [item for item in items
-                    if item.phase == "P3" and item.stable_id not in catalog_owned_ids]
+        p3_items = [
+            item for item in items if item.phase == "P3" and item.stable_id not in catalog_owned_ids
+        ]
         p4_items = [item for item in items if item.phase == "P4"]
         pk_items = [item for item in items if item.phase == "PK"]
 
@@ -1651,11 +1595,12 @@ class DocumentTraceabilityTests(unittest.TestCase):
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            set(),
+            {"P3-STRAT-003-B-R1"},
         )
         p012_closeout = json.loads(
-            (root / "config/stage-learning/stage-atomic-proposition-p012-closeout.v1.json")
-            .read_text()
+            (
+                root / "config/stage-learning/stage-atomic-proposition-p012-closeout.v1.json"
+            ).read_text()
         )
         self.assertEqual(p012_closeout["state"], "CLOSED_INCONCLUSIVE_FRESHNESS_CAPACITY")
         self.assertIs(p012_closeout["qualification"]["market_qualification"], False)
@@ -1683,11 +1628,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             {"P6-000", "P6-ACTIVATE-001"},
         )
         self.assertEqual(
-            {
-                item.stable_id
-                for item in p6_items
-                if item.status == "closed"
-            },
+            {item.stable_id for item in p6_items if item.status == "closed"},
             {
                 "P6-GOV-001",
                 "P6-DATA-001",

@@ -157,7 +157,9 @@ def test_calendar_refresh_rejects_response_without_target(tmp_path: Path) -> Non
             source=source,
             output=tmp_path / "attempt" / "ref_trading_calendar.parquet",
             target_date=date(2026, 7, 27),
-            fetcher=lambda _start, _end: [{"trade_date": "2026-07-26", "is_open": 0}],
+            fetcher=lambda _start, _end: [
+                {"trade_date": "2026-07-26", "is_open": 0}
+            ],
         )
 
 
@@ -254,7 +256,9 @@ def test_checkpoint_reuse_binds_metadata_revision_and_part_identity(tmp_path: Pa
         assert not common.checkpoint_parts_reusable(
             {**saved, "failed_receipts": malformed}, expected, parts
         )
-    assert not common.checkpoint_parts_reusable(saved, {"provider_revision": "provider-v2"}, parts)
+    assert not common.checkpoint_parts_reusable(
+        saved, {"provider_revision": "provider-v2"}, parts
+    )
 
     common.write_parquet([{"value": 2}], part, schema)
     assert not common.checkpoint_parts_reusable(saved, expected, parts)
@@ -324,7 +328,9 @@ def test_statement_bootstrap_is_checkpointed_and_derives_nonempty_quarterly(
     )
     assert third["reused_batches"] == 1
     assert len(calls) == 9
-    monkeypatch.setattr(fundamentals, "PROVIDER_REVISION", "quanthus-fundamentals-provider-v2-test")
+    monkeypatch.setattr(
+        fundamentals, "PROVIDER_REVISION", "quanthus-fundamentals-provider-v2-test"
+    )
     fourth = fundamentals.collect_statements_checkpointed(
         ["000001", "600519"], date(2026, 7, 31), **kwargs
     )
@@ -840,7 +846,9 @@ def test_f10_checkpoint_invalidates_tampering_and_provider_revision(
     assert third["reused_batches"] == 1
     assert factory_calls == 3
 
-    monkeypatch.setattr(fundamentals, "PROVIDER_REVISION", "quanthus-fundamentals-provider-v2-test")
+    monkeypatch.setattr(
+        fundamentals, "PROVIDER_REVISION", "quanthus-fundamentals-provider-v2-test"
+    )
     fourth = fundamentals.collect_f10_checkpointed(codes, date(2026, 7, 31), **kwargs)
     assert fourth["reused_batches"] == 0
     assert factory_calls == 5
@@ -1057,7 +1065,9 @@ def test_minute_collector_withholds_1m_seed_without_current_identity(
     seed = tmp_path / "seed"
     seed.mkdir()
     (seed / "status.json").write_text(
-        json.dumps({"state": "done", "freq": "1m", "total": 2, "done": 2, "error": 0})
+        json.dumps(
+            {"state": "done", "freq": "1m", "total": 2, "done": 2, "error": 0}
+        )
     )
     (seed / "checkpoint.json").write_text(
         json.dumps(

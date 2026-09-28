@@ -158,12 +158,31 @@ market release 提供日线/状态，显式付费重放才要求同日期/同调
 完整全量离线资格账本、跨 Job 恢复身份/失效与残余队列还未闭环，不称 B 或 #456 完成。
 
 本地十一个分钟/provider 套件 `227 passed`，新增文件覆盖不可变共享、日期/分母/首桶/
-SHA 故障、READY/PIT/契约 handoff，以及旧不合格标签不能掩盖当前双源冲突；Linux、角色
-环境和节点受控发布仍待独立留证。没有读取 Key、请求真实来源、修改生产或恢复调度。
+SHA 故障、READY/PIT/契约 handoff，以及旧不合格标签不能掩盖当前双源冲突；运行角色
+环境和节点受控发布仍待分别留证。没有读取 Key、请求真实来源、修改生产或恢复调度。
 扩展文档、调度、lane 和研究 normalizer 为 `117 passed / 1 failed`，唯一失败仍是
 既有 `P3-STRAT-003-B-R1 has no governing LLD work-item row`。focused Ruff 和 diff
 whitespace 通过；`make check` 仍在进入目标前被 Xcode 许可阻断（exit 69），不接受许可或
 修补另一研究线来粉饰完整验证。作者反向审查不是独立批准。
+
+草稿 [PR #461](https://github.com/rv198-star/Quanthus/pull/461) 堆叠在 #459，code commit
+`3434e87d4a75c439544d422b8868409a7cf5f32d` 经 GitHub fetch 到 CN01 的既有空闲隔离
+checkout（保留自己的 `.test-venv`，未触碰生产 checkout）：同十一套件 `227 passed`。
+扩展文档/调度/lane/normalizer/日编排六套件在 Linux 为 `142 passed / 1 failed`，仍仅
+上述既有文档追踪失败；包括的日编排测试通过不授权恢复每日采集。Python/依赖及只读
+依赖目录同 A 的 Linux 环境，禁用自动插件、禁止 bytecode 写回共享路径。
+与 PR #454 `857afb387ec36abd6ed4a09cbaac4147c254d4dd` 的未提交组合树
+`0b82001b7a176750d25af9e103e77693cc08ea57` 上十二套件 `235 passed`；树保留在隔离
+checkout，是兼容性证据，不是合并或部署。#461 CI 同样在任何 step 前被已知账户
+payment/spending limit 阻断（job steps=0），不能称为代码运行失败或完整 CI 通过。
+
+另在该隔离组合树上，对已经保存的 9/24 `000001/600000/688001` 中转 raw 做三票只读
+重放：verified READY 日线/状态及同契约 5m handoff、captured artifact SHA 均通过；
+每票在现行精确门禁下为 240 行候选。Job 的 selected view digest 为
+`ce2caacbeaf3a7a6ce9cb55d8e939627402184de685759299403bffba4c9c2f1`，本次一次性完整
+装载参照耗时 `1.893884s`。没有读取 Key、网络取数、写回 raw/receipt 或物化候选。
+这只验证真实文件的输入交接，不是全市场覆盖、独立采集、双源冲突解除或发布验收；
+9/24 的来源缺口仍在，不能以三票或合成回归宣布 1m READY/DWD 完成。
 
 ## 5. 评审与交付顺序
 
@@ -179,8 +198,8 @@ whitespace 通过；`make check` 仍在进入目标前被 Xcode 许可阻断（e
 | 代码修好就能补齐 9/24 吗？ | 不能；仍需实际来源覆盖、冲突可归因及完整日期发布证据。 |
 | 未决口径会迫使每小时全扫吗？ | 不会；已有 raw 优先，窄 canary 和显式下一行动，遵守有限预算。 |
 
-首片与 B1 的 GitHub 草稿、本地/Linux 回归及 PR #454 组合 smoke 已留证；
-运行角色资格、参考输入闭合和静默窗口内逐节点发布评审仍未完成。
+首片、B1、B2 的 GitHub 草稿、本地/Linux 回归及 PR #454 组合 smoke 已留证；
+运行角色资格、完整跨 Job 恢复身份和静默窗口内逐节点发布评审仍未完成。
 9/28 18:30/19:30 已启动的同一日编排不得被中途替换；以后每日触发已按 Owner 暂停。
 部署保存原 HEAD、unit/timer 状态，GitHub fast-forward、同版本测试和回执；已有 disabled
 timers 不因代码发布自动开启。回滚不重写 Base、READY 或失败证据。

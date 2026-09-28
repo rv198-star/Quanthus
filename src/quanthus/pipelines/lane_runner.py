@@ -2065,7 +2065,10 @@ def _cninfo_fetch_announcements(
                             "sortType": "",
                             "isHLtitle": "false",
                         }
-                        resp = session.post(url, data=payload, headers=headers, timeout=30)
+                        resp = session.post(
+                            url, data=payload, headers=headers, timeout=30,
+                            verify=True, allow_redirects=False,
+                        )
                         if resp.status_code != 200:
                             raise RuntimeError(f"HTTP {resp.status_code}")
                         body = resp.json()

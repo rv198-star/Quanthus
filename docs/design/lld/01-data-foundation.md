@@ -618,6 +618,41 @@ coverage/date/READY checks, immutable Base and CN01-to-OCI DWD sync are unchange
 Synthetic acceptance includes a 4992-symbol universe with two transient errors:
 4994 symbol attempts, not two full scans. This is not a network performance benchmark.
 
+### Qualified 1m materialization consistency
+
+`META-OPS-MINUTE-006` (#455), under the whole-chain programme
+[`../../work-items/minute-chain-reliability.md`](../../work-items/minute-chain-reliability.md),
+is a fail-closed conformance repair for the opt-in sealed-daily/whole-security 1m
+path. Design status: approved for scoped engineering. Delivery gate: open;
+Linux qualification and node rollout remain separate.
+
+- Before changing status, checkpoint, raw capture or output, require an absent
+  or empty attempt home and unique requested symbols. A prior file, partial
+  attempt or directory symlink requires a new attempt; preserve all old evidence.
+- Never concatenate a qualified source frame with an existing Parquet, whether
+  its keys overlap or belong to another date. Cross-attempt replay and historical
+  partition replacement require their separate identity/retention contract.
+- Serialize the selected whole security into a private temporary Parquet. Read
+  it back through the existing exact code/date/240-grid/daily-share/close
+  qualifier and require its OHLCV semantic hash to equal the selection hash.
+  Only then expose the complete target using a no-replace same-filesystem link.
+  A target collision is failure, never overwrite or last-minute merge.
+- Record `materialized_semantic_sha256` alongside `source_semantic_sha256` only
+  after this check. A suspended security passes the existing empty/zero-volume
+  qualifier, writes no bar target and cannot retain a prior target file.
+- Storage or consistency failure stops further provider requests, persists the
+  complete processed-symbol checkpoint before failed status, and propagates the
+  failure. Unknown disk faults are not source-maturity pending.
+
+This does not qualify an inferred source minute, change auction normalization,
+remove dual-qualified source conflict blocking, or claim exact minute amount.
+PR #454 owns the separate inferred-minute admission repair. Semantic equality
+is output consistency, not proof of provider truth. Legacy unqualified/backfill
+writers and formal 5m behavior are unchanged. The existing node/attempt lock owns
+single-process exclusion; the no-replace link does not prove whole-home concurrent
+status/raw safety or power-loss/fsync durability. Linux/filesystem and controlled
+rollout evidence are required before activation.
+
 ### Runtime qualification before node rollout
 
 `META-OPS-ENV-001` (#431), under programme #424 A/E, tracks the actual interpreter
@@ -650,6 +685,7 @@ entry point, package version, timer or data-contract change.
 | Daily process ownership and non-retryable cleanup failure | `src/quanthus/pipelines/process_control.py`, `ops/bin/run-cn01-ods-daily`, `ops/bin/run-ods-daily-with-retry` | `tests/unit/test_ops_process_lifecycle.py`, `tests/unit/test_cn01_ods_orchestrator.py`; #424/#425; Linux/systemd and deployment acceptance still required |
 | Minute terminal checkpoint ordering and exception cleanup | `src/quanthus/providers/minute_tdx.py` | `tests/unit/test_minute_terminal_checkpoint.py`, `tests/unit/test_ods_providers.py`; #427; no recovery-reuse authority or production acceptance |
 | Opt-in same-attempt 1m residual retry and cooperative budget | `src/quanthus/providers/minute_recovery.py`, `src/quanthus/providers/minute_tdx.py`, `src/quanthus/pipelines/lane_runner.py`, `config/pipelines/minute-attempt-recovery.v1.json` | `tests/unit/test_minute_bounded_recovery.py`; #429; explicit activation, no cross-attempt reuse or formal 5m change |
+| Qualified whole-security 1m materialization consistency | `src/quanthus/providers/minute_tdx.py` | `tests/unit/test_minute_materialization.py`; #455; new attempt, staged exact readback and no-replace file visibility; Linux/rollout still open |
 | Dual-lane epoch, daily bars/status/summary candidates, fixed-primary arbitration, fenced publication/correction/rollback, recovery evidence, catalog, limited operational ADS, publication intent, and release set | `src/quanthus/pipelines/dual_lane.py`, `config/pipelines/dual-lane-dwd-dws.v1.json` | `tests/unit/test_dual_lane.py`, ADR 0005; runtime qualification and cutover acceptance evidence remains open |
 | Sealed DWD/DWS history seed and lane-local logical merge | `src/quanthus/pipelines/dual_lane_history.py`, `config/pipelines/dual-lane-history-base.v1.json`, `ops/bin/*dual-lane-history*` | `tests/unit/test_dual_lane_history.py`, ADR 0005, `docs/operations/dual-lane-data-platform-runbook.md` |
 | Monthly-complete DWD/DWS Base packages, guarded Base descriptors, and Base-aware lane catalogs | `src/quanthus/pipelines/dwd_dws_base.py`, `config/pipelines/dwd-dws-base-through-20260730.v2.json`, `ops/bin/*dwd-dws-base*` | `tests/unit/test_dwd_dws_base.py`, Issue #48, `docs/acceptance/meta-data-base-002-dwd-dws-base-202607/README.md` |
@@ -684,6 +720,8 @@ entry point, package version, timer or data-contract change.
 | META-OPS-PROCESS-001 | Reap owned daily process groups before retry | META-OPS-RELIABILITY-001 | #425; real shell pipeline faults, bounded cleanup, no late writes, exit-75 retry suppression; separate Linux/deployment gate |
 | META-OPS-MINUTE-001 | Preserve minute collector terminal checkpoint evidence | META-OPS-RELIABILITY-001 | #427; synthetic circuit, cancellation and disk faults; complete processed-symbol checkpoint before terminal status; Linux/deployment remains separate |
 | META-OPS-MINUTE-002 | Bound opt-in same-attempt minute residual retry | META-OPS-MINUTE-001 | #429; 4992-symbol residual-set, one monotonic deadline, fail-closed profile activation; Linux/deployment remains separate |
+| META-OPS-MINUTE-005 | Close the entire 1m acquisition and qualification chain | META-OPS-RELIABILITY-001 | #456; [Staged plan](../../work-items/minute-chain-reliability.md); qualification, semantics, residual queue, dated publication and ten-session observation remain separately gated |
+| META-OPS-MINUTE-006 | Preserve qualified whole-security semantics during materialization | META-OPS-MINUTE-005 | #455; `tests/unit/test_minute_materialization.py`; fresh attempt, exact staged readback, storage-fault stop and no ghost file; Linux/rollout open |
 | META-OPS-ENV-001 | Qualify effective collector runtimes and reproducible test profiles | META-OPS-RELIABILITY-001 | #431; actual interpreter inventory, role/profile locks, read-only deployment preflight, isolated environments and controlled rollback; deployment blocked |
 | P1-DATA-002 | Restore incomplete none histories detected by S3 replay | S3 coverage audit | Exact-key source backfill and reconciled child revision |
 | P1-DATA-003 | Restore truncated active none histories detected by daily coverage | P1-DATA-002 | Exact-key backfill, active-universe coverage, and OCI child revision |

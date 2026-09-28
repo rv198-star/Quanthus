@@ -23,6 +23,8 @@ acceptance evidence; closing an epic requires all blocking child ids to close.
 | META-OPS-PROCESS-001 | Reap owned daily process groups before retry | open; #425; first implementation slice; Linux and node deployment acceptance pending |
 | META-OPS-MINUTE-001 | Preserve minute collector terminal checkpoint evidence | open; #427; C1 slice only; no new retry/reuse semantics; Linux and deployment acceptance pending |
 | META-OPS-MINUTE-002 | Bound opt-in same-attempt minute residual retry | open; #429; C2 research 1m incremental only; Linux and production activation pending |
+| META-OPS-MINUTE-005 | Close the entire 1m acquisition and qualification chain | open; #456; [staged plan](minute-chain-reliability.md); source semantics and production gates remain separate |
+| META-OPS-MINUTE-006 | Preserve qualified whole-security semantics during materialization | open; #455; fresh attempt, staged readback and no-replace output; Linux and rollout pending |
 | META-OPS-ENV-001 | Qualify effective collector runtimes and test profiles | open; #431; Hermes dependency drift identified by SSH; no in-place shared environment change; rollout blocked |
 
 ADR 0007 is the current topology authority. `config/releases/v2-build202607.json` binds immutable

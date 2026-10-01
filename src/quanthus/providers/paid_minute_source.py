@@ -22,12 +22,27 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from quanthus.providers.minute_source_selection import MinuteCandidate
+from quanthus.providers.minute_quality_policy import (
+    STRICT,
+    MinuteQualityPolicy,
+    load_policy,
+    require_supported_policy,
+)
+from quanthus.providers.minute_references import load_minute_references, parse_reference_sha256
+from quanthus.providers.minute_source_selection import (
+    MinuteCandidate,
+    numeric_deviations,
+    qualify_candidate,
+)
 from quanthus.providers.tencent_m1_normalize import expected_times
 
 ENDPOINT = "https://tl.kaixin8.top/tushare/pro/stk_mins"
 FIELDS = {"ts_code", "trade_time", "freq", "open", "high", "low", "close", "vol", "amount"}
 MATERIAL_FIELDS = ("open", "high", "low", "close", "vol")
+
+
+class PaidMinuteIdentityError(ValueError):
+    """Captured rows belong to another security, date, or frequency."""
 
 
 def _decimal(value: Any) -> Decimal:
@@ -57,6 +72,8 @@ def _source_start_times(market_date: str) -> dict[str, str]:
 def _parse_rows(
     payload: dict[str, Any], *, symbol: str, market_date: str
 ) -> tuple[list[str], list[list[Any]], dict[str, dict[str, Any]]]:
+    if not isinstance(payload, dict):
+        raise ValueError("proxy response is not a data mapping")
     if payload.get("code") != 0 or payload.get("api_name") not in (None, "stk_mins"):
         raise ValueError("proxy response is not successful stk_mins")
     meta = payload.get("meta") or {}
@@ -87,7 +104,7 @@ def _parse_rows(
             or len(stamp) != 19
             or not stamp.endswith(":00")
         ):
-            raise ValueError("proxy minute symbol/frequency/date mismatch")
+            raise PaidMinuteIdentityError("proxy minute symbol/frequency/date mismatch")
         hhmm = stamp[11:16]
         if hhmm in seen:
             raise ValueError("duplicate proxy minute timestamp")
@@ -123,6 +140,7 @@ def _qualify_start_labeled(
     daily_volume: Decimal,
     daily_close: Decimal,
     first_5m_volume: Any | None,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> dict[str, Any]:
     mapping = _source_start_times(market_date)
     source_times = set(mapping.values())
@@ -135,12 +153,15 @@ def _qualify_start_labeled(
             f"proxy interval-start grid has {len(incomplete)} incomplete material minutes"
         )
     source_volume = sum((seen[t]["vol"] for t in source_times), Decimal(0))
-    if source_volume != daily_volume:
+    if not quality_policy.volume_matches(source_volume, daily_volume):
         raise ValueError(
             f"proxy interval-start daily volume mismatch: delta={source_volume - daily_volume}"
         )
     close = seen[mapping["15:00"]]["close"]
-    if abs(close - daily_close) > Decimal("0.011"):
+    if not (
+        abs(close - daily_close) <= Decimal("0.011")
+        if quality_policy == STRICT else quality_policy.price_matches(close, daily_close)
+    ):
         raise ValueError("proxy interval-start/daily close mismatch")
     first = sum(
         (seen[mapping[t]]["vol"] for t in mapping if "09:31" <= t <= "09:35"),
@@ -166,17 +187,20 @@ def qualify_payload(
     daily_volume: Any,
     daily_close: Any,
     first_5m_volume: Any | None,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> dict[str, Any]:
-    """Check source-faithful rows without adjusting any reported shares.
+    """Interpret source-faithful rows without adjusting any reported shares.
 
     The proxy supports both the historical minute-end convention and an
     interval-start convention observed on the replacement relay. Only a complete
     fixed 240-row session can be selected. Other admitted observations remain in
-    immutable raw evidence but are excluded before normalization; exact sealed
-    daily volume and close still license the selected interpretation. No residual
-    is spread over minute bars.
+    immutable raw evidence but are excluded before normalization; sealed daily
+    inputs constrain the selected interpretation. No residual
+    is spread over minute bars. This adapter-level result is provisional: only
+    qualify_raw's shared exact whole-security gate licenses qualification.
     """
 
+    require_supported_policy(quality_policy)
     _, items, seen = _parse_rows(payload, symbol=symbol, market_date=market_date)
     code = symbol.split(".")[0]
     grid = {
@@ -213,8 +237,13 @@ def qualify_payload(
             reference_first = _decimal(first_5m_volume) if first_5m_volume is not None else None
             usable_auction = auction if auction and _material_complete(auction) else None
             auction_volume = usable_auction["vol"] if usable_auction else Decimal(0)
-            include = normal + auction_volume == daily
-            exclude = normal == daily and reference_first is not None and first == reference_first
+            include = quality_policy.volume_matches(normal + auction_volume, daily)
+            exclude = (
+                quality_policy.volume_matches(normal, daily)
+                and reference_first is not None and first == reference_first
+            )
+            if quality_policy != STRICT and include and exclude and auction_volume:
+                raise ValueError("ambiguous proxy auction interpretation under bounded policy")
         if not incomplete and (include or exclude):
             auction_mode = (
                 "merged_into_0931"
@@ -230,7 +259,11 @@ def qualify_payload(
                 if exclude
                 else None
             )
-            if abs(seen["15:00"]["close"] - close) <= Decimal("0.011"):
+            if (
+                abs(seen["15:00"]["close"] - close) <= Decimal("0.011")
+                if quality_policy == STRICT
+                else quality_policy.price_matches(seen["15:00"]["close"], close)
+            ):
                 end_result = {
                     "time_label_mode": "interval_end_native",
                     "auction_mode": auction_mode,
@@ -272,6 +305,7 @@ def qualify_payload(
             daily_volume=daily,
             daily_close=close,
             first_5m_volume=first_5m_volume,
+            quality_policy=quality_policy,
         )
     except ValueError as exc:
         start_error = exc
@@ -297,7 +331,7 @@ def qualify_payload(
             raise start_error from None
         raise end_error from None
     return {
-        "status": "qualified_candidate_not_published",
+        "status": "interpreted_payload_pending_strict_check",
         "provider": "paid-tushare-style-proxy-stk_mins",
         "stock_code": code,
         "market_date": market_date,
@@ -310,7 +344,7 @@ def qualify_payload(
     }
 
 
-def normalized_candidate(
+def _interpreted_candidate(
     raw: bytes,
     *,
     symbol: str,
@@ -319,12 +353,16 @@ def normalized_candidate(
     daily_close: Any,
     first_5m_volume: Any | None,
     raw_ref: str,
-) -> MinuteCandidate:
-    """Build one quarantined, whole-security candidate from exact source bytes.
+    quality_policy: MinuteQualityPolicy = STRICT,
+) -> tuple[MinuteCandidate, dict[str, Any]]:
+    """Build one provisional whole security and adapter detail from captured bytes.
 
     The 09:30 auction is merged only when the daily/5m qualification above
     licenses it. Minute amount remains null until its own quality contract is
     accepted, despite the relay exposing an amount field in its raw response.
+    The default retains this debt. The explicit bounded candidate instead keeps
+    observed amount and rejects null at its shared final gate. This builder does
+    not grant final qualification or monetary/source truth.
     """
     payload = json.loads(raw)
     result = qualify_payload(
@@ -334,6 +372,7 @@ def normalized_candidate(
         daily_volume=daily_volume,
         daily_close=daily_close,
         first_5m_volume=first_5m_volume,
+        quality_policy=quality_policy,
     )
     fields = payload["data"]["fields"]
     by_time = {
@@ -351,11 +390,19 @@ def normalized_candidate(
             else hhmm
         ]
         values = {name: _decimal(source[name]) for name in ("open", "high", "low", "close", "vol")}
+        amount = (
+            None if source["amount"] is None else _decimal(source["amount"])
+        ) if quality_policy.require_amount else None
         if hhmm == "09:31" and auction and result["auction_mode"] == "merged_into_0931":
             values["open"] = _decimal(auction["open"])
             values["high"] = max(values["high"], _decimal(auction["high"]))
             values["low"] = min(values["low"], _decimal(auction["low"]))
             values["vol"] += _decimal(auction["vol"])
+            if quality_policy.require_amount:
+                amount = (
+                    amount + _decimal(auction["amount"])
+                    if amount is not None and auction["amount"] is not None else None
+                )
         rows.append(
             {
                 "stock_code": symbol.split(".")[0],
@@ -365,17 +412,94 @@ def normalized_candidate(
                 "low": values["low"],
                 "close": values["close"],
                 "volume": values["vol"],
-                "amount": None,
+                "amount": amount,
             }
         )
-    return MinuteCandidate(
+    candidate = MinuteCandidate(
         provider="paid-tushare-style-proxy-stk_mins",
         raw_sha256=hashlib.sha256(raw).hexdigest(),
         raw_ref=raw_ref,
         rows=tuple(rows),
         auction_provenance=result["auction_mode"],
-        amount_status="source_present_unpublished_pending_separate_quality_review",
+        amount_status=(
+            "source_observed_cny_no_estimation_candidate_only"
+            if quality_policy.require_amount
+            else "source_present_unpublished_pending_separate_quality_review"
+        ),
     )
+    return candidate, result
+
+
+def qualify_raw(
+    raw: bytes,
+    *,
+    symbol: str,
+    market_date: str,
+    daily_volume: Any,
+    daily_close: Any,
+    first_5m_volume: Any | None,
+    raw_ref: str,
+    quality_policy: MinuteQualityPolicy = STRICT,
+) -> tuple[MinuteCandidate, dict[str, Any]]:
+    """Apply the same explicitly selected final gate in audit and raw replay."""
+    candidate, result = _interpreted_candidate(
+        raw,
+        symbol=symbol,
+        market_date=market_date,
+        daily_volume=daily_volume,
+        daily_close=daily_close,
+        first_5m_volume=first_5m_volume,
+        raw_ref=raw_ref,
+        quality_policy=quality_policy,
+    )
+    semantic_hash = qualify_candidate(
+        candidate,
+        symbol=symbol.split(".")[0],
+        market_date=market_date,
+        daily_volume=daily_volume,
+        daily_close=daily_close,
+        traded=True,
+        quality_policy=quality_policy,
+    )
+    return candidate, {
+        **result,
+        "status": "qualified_candidate_not_published",
+        "source_semantic_sha256": semantic_hash,
+        "quality_policy": quality_policy.evidence(),
+        "amount_status": candidate.amount_status,
+        "numeric_deviations": numeric_deviations(
+            candidate, daily_volume=daily_volume, daily_close=daily_close,
+        ),
+    }
+
+
+def normalized_candidate(
+    raw: bytes,
+    *,
+    symbol: str,
+    market_date: str,
+    daily_volume: Any,
+    daily_close: Any,
+    first_5m_volume: Any | None,
+    raw_ref: str,
+    quality_policy: MinuteQualityPolicy = STRICT,
+) -> MinuteCandidate:
+    """Build a provisional candidate; whole-security selection owns its final gate.
+
+    Keep quality rejection in source selection: preemptively raising here would
+    turn a rejected candidate into a hard evidence error and block a valid peer.
+    """
+    candidate, _ = _interpreted_candidate(
+        raw,
+        symbol=symbol,
+        market_date=market_date,
+        daily_volume=daily_volume,
+        daily_close=daily_close,
+        first_5m_volume=first_5m_volume,
+        raw_ref=raw_ref,
+        quality_policy=quality_policy,
+    )
+    return candidate
 
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:
@@ -446,11 +570,18 @@ def _audit_symbol(
     daily: dict[str, Any],
     first_5m_volume: Any,
     output_dir: Path,
+    reference_view_sha256: str | None = None,
+    quality_policy: MinuteQualityPolicy = STRICT,
 ) -> dict[str, Any]:
     import requests
 
+    require_supported_policy(quality_policy)
     symbol = code + (".SH" if code.startswith("6") else ".SZ")
-    receipt: dict[str, Any] = {"stock_code": code, "market_date": day}
+    receipt: dict[str, Any] = {
+        "stock_code": code, "market_date": day, "quality_policy": quality_policy.evidence(),
+    }
+    if reference_view_sha256 is not None:
+        receipt["reference_effective_view_sha256"] = reference_view_sha256
     try:
         response = requests.get(
             ENDPOINT,
@@ -462,6 +593,10 @@ def _audit_symbol(
             },
             headers={"X-API-Key": key},
             timeout=25,
+            verify=True,
+            # Custom authentication headers survive requests' default redirects.
+            # Only the explicitly authorized HTTPS endpoint may receive this key.
+            allow_redirects=False,
         )
         receipt["http_status"] = response.status_code
         receipt["request_id"] = response.headers.get("x-request-id")
@@ -482,16 +617,17 @@ def _audit_symbol(
             ):
                 zipped.write(raw)
             try:
-                receipt.update(
-                    qualify_payload(
-                        response.json(),
-                        symbol=symbol,
-                        market_date=day,
-                        daily_volume=daily["volume"],
-                        daily_close=daily["close"],
-                        first_5m_volume=first_5m_volume,
-                    )
+                _, qualification = qualify_raw(
+                    raw,
+                    symbol=symbol,
+                    market_date=day,
+                    daily_volume=daily["volume"],
+                    daily_close=daily["close"],
+                    first_5m_volume=first_5m_volume,
+                    quality_policy=quality_policy,
+                    raw_ref=str(raw_path),
                 )
+                receipt.update(qualification)
             except (ValueError, KeyError) as exc:
                 receipt.update(status="unqualified", reason=str(exc)[:350])
     except requests.RequestException as exc:
@@ -506,6 +642,8 @@ def main() -> int:
     parser.add_argument("--daily-path", required=True, type=Path)
     parser.add_argument("--status-path", required=True, type=Path)
     parser.add_argument("--five-path", required=True, type=Path)
+    parser.add_argument("--reference-sha256-json", type=parse_reference_sha256)
+    parser.add_argument("--quality-policy", type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--rate-per-second", type=float, default=1)
     parser.add_argument("--workers", type=int, default=8)
@@ -531,6 +669,7 @@ def main() -> int:
         help="Comma-separated, at most three traded codes for a bounded canary audit",
     )
     args = parser.parse_args()
+    quality_policy = load_policy(args.quality_policy)
     if (
         args.rate_per_second <= 0
         or args.rate_per_second > 5
@@ -544,35 +683,26 @@ def main() -> int:
         or (not args.full_market and args.symbols is None and args.limit is None)
     ):
         parser.error("choose exactly one of --symbols, --limit, or --full-market")
-    import pyarrow.parquet as pq
-
-    daily_rows = pq.read_table(
-        args.daily_path, columns=["stock_code", "market_date", "volume", "close"]
-    ).to_pylist()
-    status_rows = pq.read_table(
-        args.status_path, columns=["stock_code", "market_date", "tradestatus"]
-    ).to_pylist()
-    first_rows = pq.read_table(args.five_path, columns=["stock_code", "ts", "volume"]).to_pylist()
     day = args.market_date.isoformat()
-    daily = {row["stock_code"]: row for row in daily_rows}
-    status = {row["stock_code"]: row for row in status_rows}
-    first = {
-        row["stock_code"]: row["volume"] for row in first_rows if str(row["ts"])[11:16] == "09:35"
-    }
-    if (
-        len(daily) != len(daily_rows)
-        or len(status) != len(status_rows)
-        or set(daily) != set(status)
-        or any(row["market_date"] != day for row in daily_rows + status_rows)
-    ):
-        raise ValueError("sealed daily/status universe or date mismatch")
-    codes = [code for code in sorted(daily) if str(status[code]["tradestatus"]) == "1"]
+    references = load_minute_references(
+        daily_path=args.daily_path,
+        status_path=args.status_path,
+        five_path=args.five_path,
+        market_date=day,
+        expected_sha256=args.reference_sha256_json,
+    )
+    codes = [code for code in references if references[code]["tradestatus"] == "1"]
     if args.symbols is not None:
         codes = select_canary_symbols(args.symbols, codes)
     elif args.limit is not None:
         codes = codes[: args.limit]
-    if any(code not in first for code in codes):
-        raise ValueError("native 5m opening bucket missing for selected symbols")
+    references = references.select(codes, require_first_five=True)
+    reference_evidence = references.evidence()
+    reference_scope = (
+        "new_requests_only_resumed_receipts_not_requalified"
+        if args.resume
+        else "this_audit_requests"
+    )
     selected_count = len(codes)
     output_exists = args.output_dir.exists() and any(args.output_dir.iterdir())
     if output_exists and not args.resume:
@@ -594,11 +724,16 @@ def main() -> int:
                 "processed": resumed_terminal,
                 "counts": counts,
                 "stop_reason": (
-                    "completed_scan_with_source_pending" if counts["source_pending"] else "completed"
+                    "completed_scan_with_source_pending"
+                    if counts["source_pending"]
+                    else "completed"
                 ),
                 "elapsed_seconds": 0,
                 "quarantine_only": True,
                 "production_publication": False,
+                "reference_inputs": reference_evidence,
+                "qualification_reference_scope": reference_scope,
+                "quality_policy": quality_policy.evidence(),
             },
         )
         return 3 if counts["source_pending"] else 0
@@ -623,6 +758,9 @@ def main() -> int:
                 "elapsed_seconds": round(time.monotonic() - started, 1),
                 "quarantine_only": True,
                 "production_publication": False,
+                "reference_inputs": reference_evidence,
+                "qualification_reference_scope": reference_scope,
+                "quality_policy": quality_policy.evidence(),
             },
         )
 
@@ -643,9 +781,11 @@ def main() -> int:
                             code,
                             day=day,
                             key=key,
-                            daily=daily[code],
-                            first_5m_volume=first[code],
+                            daily=references[code],
+                            first_5m_volume=references[code]["first_5m_volume"],
                             output_dir=args.output_dir,
+                            reference_view_sha256=references.effective_view_sha256,
+                            quality_policy=quality_policy,
                         )
                     )
                 batch_counts: Counter[str] = Counter()

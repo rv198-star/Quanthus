@@ -47,6 +47,10 @@
   authority; no P6 production mutation.
 - Negative, inconclusive, or unavailable historical evidence is a valid outcome. A green transport
   or unit test is not B acceptance.
+- The 2026-10-03 Owner activation in
+  `config/research/p3-p5-temporary-source-activation.v1.json` permits only the bound one-security
+  source qualification. This is temporary research input; formal industry repair belongs to #470.
+  Temporary success never closes the data issue or changes the historical NO_PASS/closeout.
 
 ## Parallel research routing — P5-STAGE-001
 
@@ -66,8 +70,10 @@
   unchanged by the later successor activation.
 - A completion does not auto-start B/C/D. The current B continuation comes from the separate Owner
   instruction and live #402 activation, without authorizing training or widening source families.
-  `input-closure-proposal.v1.json` is unactivated; its four additional source members cannot be
-  consumed through B until separate source activation is recorded.
+  The 2026-10-03 Owner activation in `config/research/p3-p5-temporary-source-activation.v1.json`
+  permits the four exact members in `input-closure-proposal.v1.json` for temporary qualification.
+  Formal data/lineage repair belongs to #471/#472; unresolved scope still blocks coordinate/window
+  qualification. Temporary success does not close data issues or accept B.
 - The successor receipt does not alter sealed A evidence. B must freeze an exact manifest before its
   first market-row read; C/D remain synthetic until their own gates. No protected 2022-2026 access,
   result-bearing training, P3-STRAT data-authority inheritance, P6 mutation, promotion or trading.

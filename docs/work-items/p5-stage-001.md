@@ -58,6 +58,17 @@ successor.
 
 ## Current recovery checkpoint
 
+The Owner approved the frozen four-source proposal on 2026-10-03 and explicitly limited this task
+to temporary treatment; unified data repair belongs to the separate data workstream. Activation is
+recorded in `config/research/p3-p5-temporary-source-activation.v1.json` without editing the sealed
+proposal. [#471](https://github.com/rv198-star/Quanthus/issues/471) tracks original normalization
+manifest/source-closure availability; [#472](https://github.com/rv198-star/Quanthus/issues/472)
+tracks the 18,991 state-only slots as an investigation, not established missing bars. The 119-session
+F9 sidecar is a research-package limitation, not evidence of DWD history loss. Temporary qualification
+cannot close these data issues or mutate formal data. Missing original scope still prevents coordinate
+and 120-session-window qualification. A governed replacement needs a frozen closure and comparison
+before the temporary source exits new runs; retain prior audit evidence.
+
 The Owner explicitly required continued attempts after PR #419 merged. Live #400/#402 were reopened
 for bounded input integrity, schema and listing/session census; E/F remain inactive. OCI is an
 available existing data node under the current Owner instructions; control remains NexusAgent.
@@ -102,8 +113,8 @@ normalized-action/exception members from the existing OCI correction. Its manife
 `4c8eeb5c0d74bbf2953f003364fd138832f15a5163254b710f9db8430767ffde`; no payload was read.
 The four members total 5,228,757 bytes. They physically include later years, so the proposal requires
 a fixed historical date/identity projection and intersecting exception controls before consumption.
-It remains **unactivated** and requires separate source authority. Raw actions and unbound
-correction tradability are not substituted for accepted source semantics.
+The separate 2026-10-03 activation above now permits temporary qualification of these exact members.
+Raw actions and unbound correction tradability are not substituted for accepted source semantics.
 Preserve the 120-session gate and ordinary ACTIVE controls. B is not accepted.
 
 The Owner's continuation instruction also reopens D / #404 for the unfinished synthetic claim
@@ -118,8 +129,8 @@ The final synthetic recovery code passed independent read-only review and 135 fo
 Full `make check`: 2,992 passed / 7 skipped / 56 failed; all 56 failed IDs match the prior baseline,
 with zero new failures. Full D acceptance is not inferred from these engineering results.
 
-Current next action: finish the minimal source-extension review, then execute its bounded source
-qualification only after separate activation. The extension cannot read payloads before that gate.
+Current next action: execute the approved bounded temporary source qualification, retaining the
+original-normalization-scope gate and routing formal repairs through #471/#472.
 
 ### Historical bounded closeout — 2026-10-02
 

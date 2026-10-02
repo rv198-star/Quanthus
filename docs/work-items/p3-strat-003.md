@@ -134,8 +134,17 @@ This is an actual isolated diagnostic, not a formal platform B Job or B acceptan
 permissions were preserved; only exact industry members were copied into private job-local inputs.
 No candidate rebuild, strategy outcome, target label, P6 mutation or daily pipeline work occurred.
 
-Current next action: independently review the specific residual industry gap and the bounded source
-closure. Preserve #319 NO_PASS; do not drop 688287, infer its classification, or run D without B.
+The Owner approved the frozen one-security proposal on 2026-10-03, then required data gaps to be
+registered for unified repair by the separate data workstream. The separate activation receipt is
+`config/research/p3-p5-temporary-source-activation.v1.json`; the original proposal stays sealed.
+[Data issue #470](https://github.com/rv198-star/Quanthus/issues/470) tracks formal industry repair,
+including the 49 existing supplemental dependencies and the one residual. Any new source here is
+temporary, static non-PIT, private research evidence. It cannot modify Base/Daily/CURRENT or close
+the data issue. A governed replacement needs an exact closure and comparison before temporary
+sources exit new runs; preserve old audit receipts.
+
+Current next action: execute the approved bounded source qualification. Preserve #319 NO_PASS;
+do not drop 688287, infer its classification, or run D without B.
 
 ### Historical bounded closeout — 2026-10-02
 

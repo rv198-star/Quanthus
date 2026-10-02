@@ -36,6 +36,14 @@ for ((attempt = 1; attempt <= max_attempts; attempt++)); do
   if (( last_status == 0 )); then
     exit 0
   fi
+  if (( last_status == 75 )); then
+    echo "daily orchestrator process cleanup unconfirmed; automatic retry prohibited" >&2
+    exit "$last_status"
+  fi
+  if (( last_status == 3 )); then
+    echo "daily orchestrator deferred pending exact 1m source maturity; retry is delegated" >&2
+    exit "$last_status"
+  fi
   if (( attempt < max_attempts )); then
     echo "daily orchestrator attempt ${attempt}/${max_attempts} failed; retrying in ${retry_delay_seconds}s" >&2
     sleep "$retry_delay_seconds"

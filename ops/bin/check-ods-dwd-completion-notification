@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+"""Permit a DWD completion notice only for a completed orchestrator run."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--context", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        payload = json.loads(args.context.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"completion notification context unavailable: {exc}", file=sys.stderr)
+        return 1
+    if payload.get("status") == "ready":
+        return 0
+    print(
+        f"completion notification suppressed for orchestrator status {payload.get('status')!r}",
+        file=sys.stderr,
+    )
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

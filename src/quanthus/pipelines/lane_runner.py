@@ -39,6 +39,7 @@ from quanthus.pipelines.schedule_contracts import (
     load_schedule_contract,
 )
 from quanthus.providers.baostock_transport import set_socket_timeout
+from quanthus.providers.minute_recovery import load_minute_recovery_policy
 from quanthus.providers.trading_calendar import (
     CalendarRefreshError,
     refresh_calendar,
@@ -3648,7 +3649,86 @@ def _run_minute_collector(
     fetch_mode, max_pages = _minute_collector_fetch_mode(
         market_date=market_date, bar_size=bar_size
     )
+    seed_raw = os.environ.get("HERMES_ODS_MINUTE_SEED_HOME", "").strip()
     collector_override = os.environ.get("HERMES_ODS_MINUTE_COLLECTOR", "").strip()
+    policy_raw = (
+        os.environ.get("HERMES_ODS_MINUTE_1M_RECOVERY_POLICY", "").strip()
+        if bar_size == "1m" else ""
+    )
+    recovery_policy = None
+    policy_path = None
+    if policy_raw:
+        if seed_raw or collector_override or fetch_mode != "incr":
+            raise LaneRunError("minute recovery policy requires repository 1m incr without seed")
+        policy_path = Path(policy_raw).resolve()
+        try:
+            recovery_policy = load_minute_recovery_policy(policy_path)
+        except (OSError, ValueError, TypeError) as exc:
+            raise LaneRunError(f"invalid minute recovery policy: {exc}") from exc
+        if recovery_policy.budget_seconds >= _minute_collector_timeout_seconds():
+            raise LaneRunError("minute recovery budget must be below collector timeout")
+    if seed_raw:
+        seed_home = Path(seed_raw).resolve()
+        try:
+            status = json.loads((seed_home / "status.json").read_text(encoding="utf-8"))
+            checkpoint = json.loads(
+                (seed_home / "checkpoint.json").read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            raise LaneRunError(f"minute recovery seed is unreadable: {exc}") from exc
+        expected = {_code6(code) for code in symbols}
+        observed = checkpoint.get("symbols")
+        if not isinstance(observed, dict):
+            raise LaneRunError("minute recovery seed checkpoint has no symbols mapping")
+        invalid: list[str] = []
+        for code in sorted(expected):
+            entry = observed.get(code)
+            path = seed_home / f"{code}_{bar_size}.parquet"
+            if not isinstance(entry, dict) or entry.get("status") != "done":
+                invalid.append(code)
+                continue
+            try:
+                rows_file = int(entry.get("rows_file", -1))
+            except (TypeError, ValueError):
+                invalid.append(code)
+                continue
+            if rows_file < 0 or (rows_file > 0 and not path.is_file()):
+                invalid.append(code)
+        extra = sorted(set(observed) - expected)
+        if (
+            status.get("state") != "done"
+            or status.get("freq") != bar_size
+            or int(status.get("total", -1)) != len(expected)
+            or int(status.get("done", -1)) != len(expected)
+            or int(status.get("error", -1)) != 0
+            or invalid
+            or extra
+        ):
+            raise LaneRunError(
+                "minute recovery seed is not a complete exact-universe success: "
+                f"invalid={invalid[:5]} extra={extra[:5]} status={status}"
+            )
+        started = time.monotonic()
+        shutil.copytree(seed_home, raw_home)
+        return {
+            "provider": "quanthus.minute-recovery-seed",
+            "api": "verified_attempt_seed_copy",
+            "layer": layer,
+            "bar_size": bar_size,
+            "fetch_mode": fetch_mode,
+            "max_pages": max_pages,
+            "cmd": [],
+            "exit_code": 0,
+            "stdout_tail": "",
+            "stderr_tail": "",
+            "duration_seconds": round(time.monotonic() - started, 3),
+            "timeout_seconds": 0,
+            "layer_dir": str(raw_home),
+            "market_date": market_date.isoformat(),
+            "universe_size": len(expected),
+            "isolation": "attempt-local-seed-copy",
+            "seed_home": str(seed_home),
+        }
     if collector_override:
         script = Path(collector_override).resolve()
         if not script.is_file():
@@ -3666,6 +3746,8 @@ def _run_minute_collector(
         bar_size,
         "--mode",
         fetch_mode,
+        "--market-date",
+        market_date.isoformat(),
         "--symbols",
         ",".join(symbols),
         "--no-lock",
@@ -3674,8 +3756,46 @@ def _run_minute_collector(
     ]
     if max_pages is not None:
         cmd.extend(["--max-pages", str(max_pages)])
-    # Provider collection is always attempt-local. There is deliberately no
-    # production fallback: shadow runs must never mutate shared legacy partitions.
+    if policy_path is not None:
+        cmd.extend(["--recovery-policy", str(policy_path)])
+    tencent_opt_in = os.environ.get("HERMES_ODS_MINUTE_TENCENT_FALLBACK", "").strip()
+    paid_audit_raw = os.environ.get("HERMES_ODS_MINUTE_PAID_AUDIT_DIR", "").strip()
+    if tencent_opt_in not in {"", "0", "1"}:
+        raise LaneRunError("HERMES_ODS_MINUTE_TENCENT_FALLBACK must be 0 or 1")
+    if paid_audit_raw and (tencent_opt_in != "1" or bar_size != "1m"):
+        raise LaneRunError("paid minute audit replay requires Tencent 1m sealed evidence")
+    if tencent_opt_in == "1" and bar_size == "1m":
+        if collector_override or policy_path or fetch_mode != "incr":
+            raise LaneRunError("Tencent 1m requires the repository collector in incr mode")
+        daily_artifact = _latest_market_artifact(
+            paths=paths,
+            market_date=market_date,
+            available_at=_now(),
+            artifact_name="daily_ohlcv_none_delta",
+        )
+        status_artifact = _latest_market_artifact(
+            paths=paths,
+            market_date=market_date,
+            available_at=_now(),
+            artifact_name="daily_status_observation_delta",
+        )
+        if daily_artifact is None or status_artifact is None:
+            raise LaneRunError("Tencent 1m requires a same-date READY market release")
+        cmd.extend(
+            [
+                "--tencent-daily-path",
+                str(daily_artifact[0]),
+                "--tencent-status-path",
+                str(status_artifact[0]),
+            ]
+        )
+        if paid_audit_raw:
+            paid_audit_dir = Path(paid_audit_raw).resolve()
+            if not paid_audit_dir.is_dir():
+                raise LaneRunError("paid minute audit directory is missing")
+            cmd.extend(["--paid-audit-dir", str(paid_audit_dir)])
+    # Provider collection, including explicitly audited whole-security fallback,
+    # is attempt-local and never mutates shared legacy partitions.
     raw_home.mkdir(parents=True, exist_ok=False)
     cmd.extend(["--home", str(raw_home)])
     layer_dir = raw_home
@@ -3693,7 +3813,11 @@ def _run_minute_collector(
     )
     return {
         "provider": collector_identity,
-        "api": f"mootdx/tdx.{fetch_mode}",
+        "api": (
+            "baostock.query_history_k_data_plus.native_5m"
+            if bar_size == "5m" and not collector_override
+            else f"mootdx/tdx.{fetch_mode}"
+        ),
         "layer": layer,
         "bar_size": bar_size,
         "fetch_mode": fetch_mode,
@@ -3708,6 +3832,12 @@ def _run_minute_collector(
         "market_date": market_date.isoformat(),
         "universe_size": len(symbols),
         "isolation": "attempt-local",
+        **(
+            {"recovery_policy_id": recovery_policy.policy_id,
+             "recovery_policy_sha256": recovery_policy.sha256,
+             "budget_seconds": recovery_policy.budget_seconds}
+            if recovery_policy else {}
+        ),
     }
 
 
@@ -3794,6 +3924,39 @@ def _build_after_hours_fixed_price(
     ]
 
 
+_DIRECT_5M_PROVIDERS = frozenset(
+    {"mootdx-native-kline", "sina-minute-jsonp", "baostock-native-5m"}
+)
+
+
+def _direct_5m_provenance_error(raw_home: Path, universe: Sequence[str]) -> str | None:
+    """Fail closed if a formal 5m attempt lacks exact direct-source receipts."""
+    try:
+        checkpoint = json.loads((raw_home / "checkpoint.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError) as exc:
+        return f"direct_5m_checkpoint_unreadable: {type(exc).__name__}"
+    observed = checkpoint.get("symbols")
+    if not isinstance(observed, dict):
+        return "direct_5m_checkpoint_symbols_missing"
+    expected = set(universe)
+    if set(observed) != expected:
+        return (
+            "direct_5m_universe_mismatch: "
+            f"missing={len(expected - set(observed))} extra={len(set(observed) - expected)}"
+        )
+    for code in sorted(expected):
+        receipt = observed[code]
+        if not isinstance(receipt, dict) or receipt.get("status") != "done":
+            return f"direct_5m_receipt_incomplete: {code}"
+        if (
+            receipt.get("provider") not in _DIRECT_5M_PROVIDERS
+            or receipt.get("native_frequency") != "5m"
+            or receipt.get("derived_from") is not None
+        ):
+            return f"direct_5m_source_nonconforming: {code}"
+    return None
+
+
 def _build_intraday_stream(
     *,
     paths: LanePaths,
@@ -3875,6 +4038,32 @@ def _build_intraday_stream(
                     watermark=watermark,
                 ),
             ]
+        if bar_size == "5m":
+            provenance_error = _direct_5m_provenance_error(layer_dir, universe)
+            if provenance_error is not None:
+                return [
+                    DatasetStatus(
+                        name="intraday_bars",
+                        status="failed",
+                        detail=provenance_error,
+                        source_request=json.dumps(collector_meta, sort_keys=True, default=str),
+                    ),
+                    _seal_json_dataset(
+                        name="acquisition_log",
+                        payload={
+                            "lane": "intraday-archive",
+                            "stream": bar_size,
+                            "market_date": watermark,
+                            "collector": collector_meta,
+                            "provenance_error": provenance_error,
+                            "source_revision": rev,
+                        },
+                        landing=landing,
+                        source_revision=rev,
+                        knowledge_cutoff=knowledge_cutoff,
+                        watermark=watermark,
+                    ),
+                ]
 
     rows: list[dict[str, Any]] = []
     coverage_rows: list[dict[str, Any]] = []

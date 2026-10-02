@@ -1,0 +1,103 @@
+# 2026-09-22 1m recovery technical review (2026-09-23)
+
+## Decision
+
+**GO, narrowly, for historical 1m OHLCV plus explicit nullable amount; NO_GO for any claim that minute turnover is complete.** The ODS data dictionary allows nullable source-faithful minute fields. DWD turnover is nullable. A null is materially more accurate than estimated `price × volume`, TDX whole-lot reconstruction, or allocation of daily/5m turnover. The accepted source label is `tencent-mkline-raw-normalized`, not native TDX bars or a quotation series. This is a date-bounded recovery, not a general daily-source switch.
+
+The minute issue #436 remains open for a durable historical source that includes exact minute amount. A 2026-09-22 ODS/DWD/OCI release may restore OHLCV continuity, but must report minute amount coverage as **0/1,195,920** and cannot be described as economically complete.
+
+## Source and independent checks
+
+- Same-date Tencent `mkline` raw JSON was captured for the sealed 4,992-stock universe on CN01/Hermes (2,496 each), with exact shard membership, per-response SHA-256 and immutable receipts. Both nodes hold both shards for independent normalization.
+- 4,983 traded stocks yield 240 bars each after 09:30 opening-auction merge and 177 zero-volume absent-session slots. Nine suspended stocks yield no bars. Every traded symbol's normalized total volume and close agree with the sealed 2026-09-22 BaoStock daily observations. All 1,195,920 amounts remain null, never inferred.
+- Source time labels are end-of-minute: TDX historical transactions at 09:31 align predominantly with Tencent 09:32 bars; 09:25 and 09:30 auction activity belongs to the first 09:31 bar. TDX transaction volume is whole-lot rounded and differs from daily by odd shares, so transaction `price × lots × 100` is not an exact replacement for minute amount.
+- CN01 candidate independent scan found 4,983 distinct securities, exactly 240 unique session timestamps per traded security, 0 duplicate keys, 0 OHLC-envelope violations, 0 daily volume/close mismatches and 0 non-null amounts. Versioned seed builder rechecks raw/receipt hashes, full grid, OHLCV and sealed daily comparison on each node before generating a terminal `status.json`/`checkpoint.json` seed.
+- CN01 historical TDX after-hours collector independently returned 39,957 fixed-price trades and 6,672 complete equity/ETF receipts, with 0 failed, 0 wrong-date, 0 out-of-window, 0 duplicate-event and 0 amount-arithmetic violations. `trades.parquet` SHA-256 `a8c52b998e81f7081d59df5a6b014c4361daf60efd03289230b3712c40bd30c5`; `receipts.parquet` SHA-256 `48f130cc612f9c453e78c51d47dbed33eecf4cb7db215c2e37c5ecdb227f6e58`. Hermes independent acquisition and formal lane results must be appended before declaring both-node acceptance.
+- Hermes' independent TDX acquisition also returned 39,957 rows and 6,672 receipts with no failures. A content-only per-security comparison agrees for 4,144/4,145 nonempty securities. For `688525`, one otherwise identical 2-lot trade is timestamped 15:10 by the CN01 route and 15:11 by the Hermes route; each route returns its own value consistently on three repeated queries. Preserve both immutable source receipts and flag this provider-route minute-label discrepancy for follow-up; it does not affect the 1m continuous bars, date, price, quantity, or DWD warehouse (the sparse trade dataset is ODS-only/deferred).
+- OCI is reachable by verified-key passwordless SSH through CN01. Its 2026-09-22 sync failure receipt states `source_market_date_stale`: CN01 DWD CURRENT is 2026-09-21. This is downstream of missing CN01 ODS/DWD, not an OCI target-write failure.
+
+## Release gates and limitations
+
+1. Only use a verified, exact-universe, date-bound seed in a new 1m lane attempt; do not edit an older release, weaken the 240-grid or 4,992-universe gate, or overwrite the live checkout.
+2. The separate 15:05–15:30 after-hours dataset must have complete per-security receipts on **each** formal node attempt. No-data receipts are valid only on successful historical transaction queries.
+3. Accept two nodes only after four 2026-09-22 lanes and the catalog are READY, DWD build id/date/hash is verified, and OCI mirrors the same verified CN01 package. Do not infer this from email alone.
+4. Record the null amount limitation in issue #436 and the incident ledger. Continue exact-minute-amount sourcing as a distinct unresolved quality work item; consumers requiring turnover must remain fail-closed.
+
+## Test scope
+
+New seed validation tests reject missing/wrong-date bars, estimated amount, daily-volume mismatch and invalid OHLC. Eleven targeted Tencent normalization/seed unit tests passed on 2026-09-23. `make check` could not start on the local Mac because the installed Xcode license is unaccepted; the previous full repository run for this PR was 2,844 passed, 20 failed, 7 skipped and is not a green baseline. This is a scoped technical review, not a claim of full-suite or human approval.
+
+## Same-day recurrence guard (PR #438 commit `480e7f3`)
+
+The old `1m` path still reaches an Eastmoney EOF on a 2026-09-23 CN01 sample; leaving it
+unchanged would predict another terminal circuit tonight. A separate opt-in repository adapter
+therefore uses the same native Tencent `mkline` OHLCV after the sequential market lane has
+published a same-date READY daily/status release. It checks every requested code/date, opening
+auction, full 240-session grid, per-security daily volume and close, and preserves compressed
+raw response bytes plus SHA-256 in the attempt-local collector home. Suspended securities must
+have zero same-date provider rows. Exact minute amount remains NULL. The opt-in cannot combine
+with an external collector or recovery policy; missing market evidence blocks collection.
+
+The three-symbol 2026-09-22 live source smoke (`000001`, `600519`, `688001`) completed with
+3/3 per-security receipts, 240 rows each, matching daily volume and 0 non-null amount; the
+versioned SHA-bearing raw responses were preserved. The full-universe route is sequential, so
+only the Tencent 1m collector enforces a 0.18-second minimum inter-symbol interval; the native
+5m lane retains its existing pace. The opt-in rollout uses a 3,600-second collector timeout
+(below the 4-hour service ceiling),
+with the existing orchestrator deadline still authoritative. This does not prove 2026-09-23
+full-universe success; tonight's actual four-lane, DWD and OCI receipts remain a separate gate.
+
+The production revision is `480e7f3dd327dd9967753d39a5df541fe45d6d31` on both CN01
+and Hermes. The live opt-in environment was backed up before the two required settings were
+enabled; the global sleep override was removed so native 5m pacing is unchanged. Live focused
+tests passed (CN01 72, Hermes 19), and the three-symbol path produced nullable `double` amount
+on the actual Parquet output. A broader isolated CN01 test run was not green (2,810 passed,
+73 failed, 7 skipped); its planning-snapshot and DuckDB-version-sensitive failures require
+separate triage and do not substitute for the scheduled production acceptance gate.
+
+## 2026-09-23 runtime falsification of the daily-source rollout
+
+**NO_GO for using this Tencent path as the same-evening all-market daily 1m source.**
+This does not revoke the independently verified, date-bounded 2026-09-22 historical
+recovery. It revokes the unproved extrapolation from that recovery to the following
+market day's scheduled run. CN01's 18:30 orchestration and its 10-minute-later retry
+both ended with the 1m lane failed, the other three lanes READY, and catalog/DWD
+blocked. The first 1m collector processed 316 securities before its consecutive-error
+circuit: 73 succeeded and 243 failed, all 243 reporting Tencent/daily volume mismatch.
+All 73 successful securities had daily volume divisible by 100 shares; 242 of the 243
+failed securities did not. The second attempt reproduced 73/243 and failed at 19:57:47
+CST. No 2026-09-23 CN01 1m READY or DWD package was published. Hermes was still running
+at the time of this review; its independent terminal result must be appended separately.
+
+The exact same Tencent `mkline` request for `000001` now returns both dates. For
+2026-09-22, 14 of 241 bars have fractional *hands* and their sum is 759,457.32 hands,
+exactly the sealed 75,945,732 daily shares. Its immutable raw receipt was captured at
+2026-09-23 13:20 CST, i.e. the next day's historical state. For 2026-09-23, all 241
+same-date bars have integer hands and sum to 906,726 hands (90,672,600 shares), 35
+shares above the sealed 90,672,565. `000002`, `600000` and `600519` show the same
+historical-fractional/current-day-integer contrast; this is a source precision and
+maturity boundary, **not** a new HTTP interface failure. Whether and when Tencent
+later revises 2026-09-23 to exact historical volume is not yet proven.
+
+The review/control failure was specific: this document's original decision explicitly
+said *date-bounded recovery, not a general daily-source switch*, yet commit `54794cd`
+exposed a general opt-in for the next daily run. Its tests used synthetic one-hand bars
+and a daily total divisible by 100; they demonstrated rejection of a mismatch but
+could not establish that current-day provider volume would satisfy the gate. The
+2026-09-23 live preflight checked HTTP 200 and last time 15:00, not fractional-hand
+precision or daily-volume reconciliation. Three-symbol smoke used the already matured
+2026-09-22 date. A draft PR, focused unit tests and a non-green whole-repository run
+were therefore treated as stronger production-source evidence than they were. The
+semantic decision to qualify a *same-evening* source belonged at technical review and
+production admission, not inside a mechanical per-symbol collector after rollout.
+
+The correct immediate behavior is the observed fail-closed block; do not raise volume
+tolerance or distribute the missing shares among minutes. A read-only 30-security
+survey of a second Sina 1m endpoint found exact daily volume for 10 sampled Shenzhen
+names, but deficits for all 10 ordinary Shanghai and all 10 STAR names; Tencent was
+exact for the sampled STAR names. These are bounded samples, not an all-market
+replacement. Any renewed daily-source GO requires explicit same-evening, cross-market
+and full-universe qualification against sealed daily volume/close, raw-receipt evidence,
+independent-node reproduction, and a terminal DWD/OCI run. If only next-day historical
+precision is available, recovery scheduling and the same-day SLA need a separate
+versioned decision rather than a silent timer change.

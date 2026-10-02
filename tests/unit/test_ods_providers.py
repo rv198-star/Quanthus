@@ -397,6 +397,30 @@ def test_after_hours_collector_preserves_sparse_matches() -> None:
     assert metadata["provider_rows"] == 2
 
 
+def test_after_hours_tdx_probe_uses_requested_market_date(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: dict[str, object] = {}
+
+    class Client:
+        def transactions(self, **kwargs: object) -> list[dict[str, object]]:
+            observed.update(kwargs)
+            return [{"time": "15:00", "price": 10, "vol": 1, "buyorsell": 1}]
+
+    def factory(**kwargs: object) -> Client:
+        observed["factory"] = kwargs
+        return Client()
+
+    monkeypatch.setattr(after_hours_tdx, "TDX_SERVERS", (("127.0.0.1", 7709),))
+    _client, server = after_hours_tdx.tdx_transaction_client(
+        date(2026, 9, 21), quotes_factory=factory
+    )
+
+    assert server == "127.0.0.1:7709"
+    assert observed["date"] == "20260921"
+    assert observed["symbol"] == "600519"
+
+
 def test_after_hours_eastmoney_fallback_expands_window_and_binds_date() -> None:
     calls: list[tuple[str, str]] = []
 
@@ -854,6 +878,58 @@ def test_eastmoney_minute_fallback_preserves_exact_amount_and_aggregates_5m(
     )
 
 
+def test_eastmoney_minute_fallback_requests_and_filters_target_date(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "code": "000001",
+        "trends": [
+            "2026-09-20 15:00,10,10,10,10,1,10,10",
+            "2026-09-21 15:00,11,11,11,11,2,22,11",
+            "2026-09-22 15:00,12,12,12,12,3,36,12",
+        ],
+    }
+    observed: dict[str, object] = {}
+
+    def fake_payload(symbol: str, **kwargs: object) -> dict[str, object]:
+        observed["symbol"] = symbol
+        observed.update(kwargs)
+        return payload
+
+    monkeypatch.setattr(minute_tdx, "_eastmoney_payload", fake_payload)
+    monkeypatch.setattr(minute_tdx, "_eastmoney_ndays", lambda _date: 2)
+
+    frame, _meta = minute_tdx._eastmoney_bars(
+        "000001", "1m", market_date="2026-09-21", session=object()
+    )
+
+    assert observed["symbol"] == "000001"
+    assert observed["ndays"] == 2
+    assert frame["ts"].dt.strftime("%Y-%m-%d").tolist() == ["2026-09-21"]
+
+
+def test_eastmoney_payload_treats_null_data_as_no_data() -> None:
+    observed: dict[str, str] = {}
+
+    class Response:
+        def read(self) -> bytes:
+            return b'{"rc": 0, "data": null}'
+
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    def opener(request: object, **_kwargs: object) -> Response:
+        observed["url"] = str(getattr(request, "full_url"))
+        return Response()
+
+    payload = minute_tdx._eastmoney_payload("000001", ndays=2, opener=opener)
+    assert payload == {"code": "000001", "trends": [], "no_data": True}
+    assert observed["url"].startswith(minute_tdx.EASTMONEY_HISTORY_TRENDS_URL)
+
+
 def test_minute_collect_uses_eastmoney_only_for_incremental_tdx_outage(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -881,7 +957,7 @@ def test_minute_collect_uses_eastmoney_only_for_incremental_tdx_outage(
     monkeypatch.setattr(
         minute_tdx,
         "_eastmoney_bars",
-        lambda _symbol, _frequency: (
+        lambda _symbol, _frequency, **_kwargs: (
             frame,
             {"ok": True, "provider": "eastmoney-push2delay-trends2", "rows": 1},
         ),
@@ -942,9 +1018,56 @@ def test_minute_collector_defaults_to_repository_module(
     )
 
     assert observed[1:3] == ["-m", "quanthus.providers.minute_tdx"]
+    assert observed[observed.index("--market-date") + 1] == "2026-07-24"
     assert result["provider"] == "quanthus.providers.minute_tdx"
+    assert result["api"] == "baostock.query_history_k_data_plus.native_5m"
     assert observed_timeout == [1800]
     assert result["timeout_seconds"] == 1800
+
+
+def test_minute_collector_reuses_complete_exact_universe_seed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "data"
+    home.mkdir()
+    seed = tmp_path / "seed"
+    seed.mkdir()
+    (seed / "status.json").write_text(
+        json.dumps(
+            {"state": "done", "freq": "1m", "total": 2, "done": 2, "error": 0}
+        )
+    )
+    (seed / "checkpoint.json").write_text(
+        json.dumps(
+            {
+                "symbols": {
+                    "000001": {"status": "done", "rows_file": 240},
+                    "000002": {"status": "done", "rows_file": 0},
+                }
+            }
+        )
+    )
+    (seed / "000001_1m.parquet").write_bytes(b"verified-by-downstream-reader")
+    monkeypatch.setenv("HERMES_ODS_MINUTE_SEED_HOME", str(seed))
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail("provider must not run for a valid seed"),
+    )
+
+    raw_home = tmp_path / "attempt" / "minute_1m"
+    result = lane_runner._run_minute_collector(
+        paths=_paths(home, tmp_path),
+        market_date=date(2026, 9, 21),
+        bar_size="1m",
+        symbols=["000001", "000002"],
+        raw_home=raw_home,
+    )
+
+    assert result["exit_code"] == 0
+    assert result["api"] == "verified_attempt_seed_copy"
+    assert result["isolation"] == "attempt-local-seed-copy"
+    assert (raw_home / "000001_1m.parquet").read_bytes() == b"verified-by-downstream-reader"
 
 
 @pytest.mark.parametrize(

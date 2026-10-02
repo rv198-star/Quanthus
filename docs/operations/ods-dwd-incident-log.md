@@ -193,3 +193,93 @@ sent a `2026-09-19` failure email at `00:15:20`. This was a recovery-operation f
 regression of the verified 2026-09-18 package. The services are inactive, all three timers are
 active with their next contract-defined triggers, and the runbook now requires failed-state reset
 while timers remain stopped.
+
+## 2026-09-22 CN01/Hermes daily ODS-DWD and OCI mirror
+
+| Field | Value |
+| --- | --- |
+| Incident id | `ODS-DWD-20260922-DUAL-001` / GitHub #432 |
+| Market date | `2026-09-22` |
+| Nodes / units | CN01 and Hermes daily ODS orchestrators; OCI `oci-dwd-daily-sync.service` |
+| Scheduled failure window | CN01 `18:30–19:40`, Hermes `19:30–21:35 Asia/Shanghai` on 2026-09-22; OCI stale-source failure `2026-09-23 08:30 Asia/Shanghai` |
+| Status | Operational date/package recovery verified `2026-09-23 16:19 Asia/Shanghai`; exact 1m turnover quality remains open in #436 |
+| Failed stage | Both nodes' 1m/5m acquisition; Hermes also had an initial market failure. Four-lane catalog/DWD and OCI sync remained gated. |
+| Impact | No 2026-09-22 DWD package existed on either producer or OCI until the recovery described below. No partial package was accepted. |
+
+### Attribution and failed evidence
+
+The immediate 1m/5m collector failure was Eastmoney historical `trends2` ending the remote HTTP
+response without usable data, followed by the 20-consecutive-error circuit. The configured TDX
+minute-bar endpoints returned no usable rows; Tencent's quote sequence is not OHLCV and the
+old-data Tencent tick wrapper does not cover the required date. The 5m fallback lacked an
+independent direct source, while the approved 1m path had no qualified historical fallback. The
+data gate worked as designed: it withheld 1m/5m READY, catalog, DWD and the OCI mirror. OCI's
+2026-09-22 failure receipt reports `source_market_date_stale` (CN01 DWD CURRENT still 2026-09-21),
+not a target-write failure. An unverified change to Hermes's Python environment was not proved to
+be the cause; #431 tracks that separately.
+
+- CN01 scheduled/retry orchestration evidence:
+  `/root/work/astock/data/shadow/cn01-ods-v1/orchestrator/daily/2026-09-22/20260922T103001436219Z`
+  and `20260922T113203053722Z`.
+- Hermes scheduled/retry evidence:
+  `/root/work/astock/data/shadow/hermes-ods-v1/orchestrator/daily/2026-09-22/20260922T113019117601Z`
+  and `20260922T130558138878Z`.
+- OCI immutable failure evidence:
+  `/home/ubuntu/data/quanthus/dwd-daily/failures/2026-09-22/latest.json`.
+
+### Recovery and acceptance evidence
+
+PR #438 commit `80fb79b` supplied the deployed reliability fixes. The producer checkouts were
+not overwritten during this recovery. Both nodes independently published native BaoStock 5m
+READY (tracked by #434). A versioned, isolated Tencent `mkline` raw capture, normalization and
+seed verifier (PR #438 commits `26fb13d`, `507cf81`, `5ad4b00`) checked source date, 4,992 exact
+securities, per-response SHA-256, auction merge, 240 timestamps, per-security daily volume and
+close, and nine justified suspended securities. Both nodes built a new 1m READY attempt with
+1,195,920 OHLCV rows and 4,992 coverage rows. Each formal attempt independently queried TDX
+historical transactions for the 15:05–15:30 sparse after-hours dataset, yielding 39,957 trades,
+6,672 receipts and zero failed receipts. The one `688525` route-dependent minute-label discrepancy
+and the detailed source judgment are recorded in
+`docs/reviews/ods-20260922-tencent-m1-recovery-review.md`.
+
+- CN01 1m attempt/release:
+  `.../attempts/intraday-archive/1m/2026-09-22/20260922-20260923T075749007562Z` and matching
+  `.../releases/daily/1m/2026-09-22/20260922-20260923T075749007562Z`.
+- Hermes 1m attempt/release:
+  `.../attempts/intraday-archive/1m/2026-09-22/20260922-20260923T080700439331Z` and matching
+  `.../releases/daily/1m/2026-09-22/20260922-20260923T080700439331Z`.
+- CN01 four-lane catalog produced DWD package
+  `dwd-daily-20260922-c724bfe7416b-80fb79b`, manifest
+  `sha256:34273ec99aba28f22730c06ddb0e099e377acc51b21b06d03ec04d208f6ae529`, content
+  `sha256:62d04743bcf3b279d4f450b2bc6d034d34b7c2e7f134da2fe2a8c13663e86955`.
+  Its `dwd_security_bar` has 1,440,096 rows. CN01 success mail receipt/message id:
+  `01a0cd52-bc09-76bf-8436-1efab1acec7b`.
+- Hermes independently built package `dwd-daily-20260922-3005cecf0add-80fb79b`, manifest
+  `sha256:007a0436f2c6038c93748d25b8c7066a15cbc9ad6d5423710bcb96c2700fc22a`, content
+  `sha256:5eb51a74947bfcf8fac578c5d07efaad43061579bebb8317a9d97eccd0a8eb24`, also
+  1,440,096 security-bar rows. Hermes success mail message id:
+  `01a0cd59-30ab-7169-ac73-d24ff04dcc44`.
+- OCI, reached by verified-key passwordless SSH through CN01, pulled and independently verified
+  the *exact* CN01 package, manifest and content digest above. `CURRENT.json` is 2026-09-22;
+  receipt is `/home/ubuntu/data/quanthus/dwd-daily/receipts/2026-09-22/dwd-daily-20260922-c724bfe7416b-80fb79b.json`.
+  OCI sync success mail message id: `01a0cd50-6ac7-71bc-95c1-137b59f1f7f5`.
+
+The recovery is not a claim of complete minute money data: **all 1,195,920 1m DWD turnover
+values are NULL** on both producers, matching the source's missing field; 239,184 5m and 4,992
+daily turnover values are non-null. No value was manufactured from `price × volume` or allocated
+from coarser bars. #436 remains open for exact-minute-turnover source qualification; consumers
+requiring that measure remain fail-closed. #424/#438 continue the durable source, timeout,
+same-date receipt and multi-day observation programme. The 2026-09-23 daily cycle must be
+observed separately and cannot inherit this backfill's success.
+
+### 2026-09-23 recurrence-guard deployment
+
+PR #438 commit `480e7f3dd327dd9967753d39a5df541fe45d6d31` was fast-forwarded into the
+production checkout on both CN01 and Hermes. The source change adds an opt-in Tencent 1m
+collector behind same-date READY market evidence, exact per-security daily-volume/close checks,
+240-session-grid validation, raw-response hashes, and source-faithful nullable `double` amount.
+The live node environment enables that path and a 3,600-second 1m collector timeout; it does
+not change the global 5m collector interval. Environment backups were retained with suffix
+`.pre-c06bf77-20260923`. CN01 passed 72 focused tests and Hermes 19; real-source three-symbol
+smokes passed on both nodes. A separate broad isolated run returned 2,810 passed, 73 failed,
+7 skipped, so this is **not** a claim that the full suite is green. The 2026-09-23 scheduled
+four-lane/DWD/OCI run remains the decisive production acceptance gate.

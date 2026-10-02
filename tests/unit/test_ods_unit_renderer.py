@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 RENDERER = ROOT / "ops" / "bin" / "render-ods-node-units"
 WINDOW_CHECKER = ROOT / "ops" / "bin" / "check-ods-collection-window"
+ORCHESTRATOR_CHECKER = ROOT / "ops" / "bin" / "check-ods-orchestrator-window"
 
 
 class OdsUnitRendererTests(unittest.TestCase):
@@ -27,7 +28,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         output = self._render("cn01")
 
         units = sorted(output.iterdir())
-        self.assertEqual(len(units), 15)
+        self.assertEqual(len(units), 17)
         node_units = [path for path in units if path.name != "quanthus-pipeline-failure@.service"]
         self.assertTrue(
             all(path.name.startswith(("cn01-ods-", "cn01-dwd-")) for path in node_units)
@@ -41,6 +42,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertIn("Unit=cn01-ods-daily-orchestrator.service", orchestrator_timer)
         self.assertIn("run-ods-daily-with-retry", orchestrator_service)
         self.assertIn("run-cn01-ods-daily", orchestrator_service)
+        self.assertIn("check-ods-orchestrator-window --node-id cn01", orchestrator_service)
         self.assertIn("EnvironmentFile=-/etc/quanthus/cn01-ods-lane.env", orchestrator_service)
         self.assertIn("Environment=HERMES_ODS_NODE_ID=cn01", orchestrator_service)
         self.assertIn(
@@ -48,12 +50,22 @@ class OdsUnitRendererTests(unittest.TestCase):
             orchestrator_service,
         )
         self.assertIn("QUANTHUS_ODS_DAILY_MAX_ATTEMPTS=2", orchestrator_service)
+        self.assertNotIn("--sla-seconds 21600", orchestrator_service)
         self.assertIn("QUANTHUS_ODS_DAILY_RETRY_DELAY_SECONDS=600", orchestrator_service)
         self.assertIn("QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS=14760", orchestrator_service)
         self.assertIn("TimeoutStartSec=540min", orchestrator_service)
         self.assertNotIn("Restart=on-failure", orchestrator_service)
         self.assertNotIn("RestartSec=10min", orchestrator_service)
         self.assertIn("OnSuccess=cn01-dwd-success-notification.service", orchestrator_service)
+        self.assertIn("SuccessExitStatus=0 3", orchestrator_service)
+
+        recovery_service = (output / "cn01-ods-maturity-recovery.service").read_text()
+        recovery_timer = (output / "cn01-ods-maturity-recovery.timer").read_text()
+        self.assertIn("recover-matured-ods-daily", recovery_service)
+        self.assertIn("HERMES_ODS_NODE_ID=cn01", recovery_service)
+        self.assertIn("OnCalendar=*-*-* 06,08,10,12,14,16:10:00 Asia/Shanghai", recovery_timer)
+        self.assertIn("OnCalendar=*-*-* 17:40:00 Asia/Shanghai", recovery_timer)
+        self.assertIn("Persistent=true", recovery_timer)
 
         weekly_service = (output / "cn01-ods-weekly-corrections.service").read_text()
         self.assertIn("TimeoutStartSec=8h", weekly_service)
@@ -62,6 +74,7 @@ class OdsUnitRendererTests(unittest.TestCase):
         success_notification = (output / "cn01-dwd-success-notification.service").read_text()
         failure_notification = (output / "cn01-dwd-failure-notification.service").read_text()
         self.assertIn("--event cn01_dwd_completed", success_notification)
+        self.assertIn("check-ods-dwd-completion-notification", success_notification)
         self.assertIn("--node CN01", success_notification)
         self.assertIn("--event cn01_dwd_failed", failure_notification)
         self.assertIn("--failure-receipt", failure_notification)
@@ -111,11 +124,40 @@ class OdsUnitRendererTests(unittest.TestCase):
         self.assertIn("OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai", orchestrator)
         orchestrator_service = (output / "hermes-ods-daily-orchestrator.service").read_text()
         self.assertIn("run-ods-daily-with-retry", orchestrator_service)
+        self.assertIn("check-ods-orchestrator-window --node-id hermes", orchestrator_service)
+        self.assertIn("QUANTHUS_ODS_DAILY_MAX_ATTEMPTS=1", orchestrator_service)
+        self.assertIn("run-cn01-ods-daily --sla-seconds 21600", orchestrator_service)
         self.assertIn("QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS=14760", orchestrator_service)
         self.assertIn("TimeoutStartSec=540min", orchestrator_service)
+        self.assertIn("SuccessExitStatus=0 3", orchestrator_service)
         self.assertNotIn("Restart=on-failure", orchestrator_service)
         self.assertIn("--event hermes_dwd_completed", success_notification)
         self.assertIn("--node Hermes", success_notification)
+        recovery_service = (output / "hermes-ods-maturity-recovery.service").read_text()
+        recovery_timer = (output / "hermes-ods-maturity-recovery.timer").read_text()
+        self.assertIn("HERMES_ODS_NODE_ID=hermes", recovery_service)
+        self.assertIn("OnCalendar=*-*-* 06,08,10,12,14,16:10:00 Asia/Shanghai", recovery_timer)
+        self.assertIn("OnCalendar=*-*-* 17:40:00 Asia/Shanghai", recovery_timer)
+
+    def test_orchestrator_window_skips_early_systemd_activation(self) -> None:
+        cases = [
+            ("cn01", "2026-09-23T05:39:00+08:00", 1),
+            ("cn01", "2026-09-23T18:29:59+08:00", 1),
+            ("cn01", "2026-09-23T18:30:00+08:00", 0),
+            ("hermes", "2026-09-23T05:39:00+08:00", 1),
+            ("hermes", "2026-09-23T19:29:59+08:00", 1),
+            ("hermes", "2026-09-23T19:30:00+08:00", 0),
+            ("hermes", "2026-09-26T19:30:00+08:00", 1),
+        ]
+        for node_id, observed_at, expected in cases:
+            with self.subTest(node_id=node_id, observed_at=observed_at):
+                result = subprocess.run(
+                    [str(ORCHESTRATOR_CHECKER), "--node-id", node_id, "--at", observed_at],
+                    check=False,
+                    text=True,
+                    capture_output=True,
+                )
+                self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
 
     def test_collection_window_checker_enforces_each_node_start(self) -> None:
         config = ROOT / "config/schedules/hermes-ods-schedule.v1.json"

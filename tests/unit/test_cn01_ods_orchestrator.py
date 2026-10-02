@@ -1,17 +1,42 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.machinery
+import importlib.util
 import json
 import os
 import stat
 import subprocess
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 ORCHESTRATOR = ROOT / "ops/bin/run-cn01-ods-daily"
 RETRY_WRAPPER = ROOT / "ops/bin/run-ods-daily-with-retry"
+COMPLETION_NOTIFICATION_CHECKER = ROOT / "ops/bin/check-ods-dwd-completion-notification"
+MATURITY_RECOVERY = ROOT / "ops/bin/recover-matured-ods-daily"
+
+
+def _load_orchestrator_module():
+    loader = importlib.machinery.SourceFileLoader("daily_orchestrator", str(ORCHESTRATOR))
+    spec = importlib.util.spec_from_loader("daily_orchestrator", loader)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_maturity_recovery_module():
+    loader = importlib.machinery.SourceFileLoader("maturity_recovery", str(MATURITY_RECOVERY))
+    spec = importlib.util.spec_from_loader("maturity_recovery", loader)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _write_executable(path: Path, text: str) -> None:
@@ -262,6 +287,568 @@ catalog.write_text('{"kind":"daily_ods_input_catalog"}\\n', encoding='ascii')
     )
 
 
+def test_closed_session_does_not_attempt_catalog_or_publish_dwd(tmp_path: Path) -> None:
+    runner = tmp_path / "runner.sh"
+    _write_executable(
+        runner,
+        """#!/bin/sh
+date=""
+lane=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --market-date) date="$2"; shift 2 ;;
+        --lane) lane="$2"; shift 2 ;;
+        *) shift ;;
+    esac
+done
+if [ "$lane" = "calendar-daily-events" ]; then
+    printf '{"status":"ready","market_date":"%s"}\\n' "$date"
+else
+    printf '{"status":"closed_session","preflight":"both_closed","market_date":"%s"}\\n' "$date"
+fi
+""",
+    )
+    catalog = tmp_path / "catalog-started"
+    env = os.environ.copy()
+    env.update(
+        {
+            "HERMES_ODS_NODE_ID": "cn01",
+            "HERMES_ODS_ENV_FILE": str(tmp_path / "missing.env"),
+            "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+            "ASTOCK_HOME": str(tmp_path / "home"),
+            "HERMES_ODS_RUNNER": str(runner),
+            "HERMES_ODS_CATALOG_BUILDER": str(catalog),
+            "HERMES_ODS_DAILY_SLA_SECONDS": "20",
+            "HERMES_ODS_ORCHESTRATOR_POLL_SECONDS": "0.1",
+        }
+    )
+    completed = subprocess.run(
+        [sys.executable, str(ORCHESTRATOR), "--market-date", "2026-09-25"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr + completed.stdout
+    state = json.loads(completed.stdout)
+    assert state["status"] == "closed_session"
+    assert state["catalog"] == {"status": "not_applicable_closed_session"}
+    assert state["dwd"] == {"status": "not_applicable_closed_session"}
+    assert not catalog.exists()
+    run_root = next((tmp_path / "shadow/orchestrator/daily/2026-09-25").iterdir())
+    assert not (run_root / "READY").exists()
+    context = json.loads(
+        (tmp_path / "shadow/orchestrator/daily/notification-context.json").read_text()
+    )
+    assert context["status"] == "closed_session"
+    assert context["error_code"] is None
+
+
+def test_verified_calendar_only_release_is_closed_not_ready() -> None:
+    module = _load_orchestrator_module()
+    market_date = date(2026, 9, 25)
+    closed = SimpleNamespace(
+        name="trading_calendar", source_revision="calendar-closed-20260925-v2"
+    )
+    lane_status = SimpleNamespace(name="lane_status", source_revision="lane-status-v1")
+    verified = SimpleNamespace(release=SimpleNamespace(artifacts=(closed, lane_status)))
+    assert module._closed_verified_release(verified, market_date)
+    assert not module._closed_verified_release(verified, date(2026, 9, 24))
+    with_bars = SimpleNamespace(name="minute_bars", source_revision="source-v1")
+    verified.release.artifacts = (closed, lane_status, with_bars)
+    assert not module._closed_verified_release(verified, market_date)
+
+
+def test_cn01_orchestrator_defers_only_a_qualified_current_session_tencent_failure(
+    tmp_path: Path,
+) -> None:
+    calls = tmp_path / "calls.log"
+    runner = tmp_path / "runner.py"
+    _write_executable(
+        runner,
+        """#!/usr/bin/env python3
+from pathlib import Path
+import sys
+args = sys.argv[1:]
+with Path(__CALLS__).open('a', encoding='utf-8') as stream:
+    stream.write(' '.join(args) + '\\n')
+if '--stream' in args and args[args.index('--stream') + 1] == '1m':
+    print('RuntimeError: Tencent source qualification failed for 2026-08-04/000001: Tencent/daily volume mismatch')
+    raise SystemExit(4)
+raise SystemExit(0)
+""".replace("__CALLS__", repr(str(calls))),
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "HERMES_ODS_NODE_ID": "cn01",
+            "HERMES_ODS_ENV_FILE": str(tmp_path / "missing.env"),
+            "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+            "ASTOCK_HOME": str(tmp_path / "home"),
+            "HERMES_ODS_RUNNER": str(runner),
+            "HERMES_ODS_DAILY_SLA_SECONDS": "20",
+            "HERMES_ODS_ORCHESTRATOR_POLL_SECONDS": "0.1",
+        }
+    )
+
+    completed = subprocess.run(
+        [str(ORCHESTRATOR), "--market-date", "2026-08-04"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 3, completed.stderr + completed.stdout
+    state = json.loads(completed.stdout)
+    assert state["status"] == "deferred_source_maturity"
+    assert state["lanes"]["intraday-1m"]["status"] == "deferred_source_maturity"
+    assert state["catalog"] == {"status": "deferred_source_maturity"}
+    assert state["dwd"] == {"status": "deferred_source_maturity"}
+    run_root = next((tmp_path / "shadow/orchestrator/daily/2026-08-04").iterdir())
+    assert not (run_root / "READY").exists()
+    context = json.loads(
+        (tmp_path / "shadow/orchestrator/daily/notification-context.json").read_text(
+            encoding="ascii"
+        )
+    )
+    assert context["status"] == "deferred_source_maturity"
+    assert context["error_code"] == "source_maturity_deferred"
+
+
+def test_orchestrator_defers_only_a_complete_source_mismatch_scan(tmp_path: Path) -> None:
+    shadow = tmp_path / "shadow"
+    attempt = shadow / "attempts/intraday-archive/1m/2026-08-04/run-1"
+    landing = attempt / "landing"
+    checkpoint = landing / "provider_raw/minute_1m/checkpoint.json"
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_text(
+        json.dumps(
+            {
+                "symbols": {
+                    "000001": {"ok": True, "status": "done"},
+                    "000002": {
+                        "status": "error",
+                        "error": "Tencent/daily close mismatch for 000002",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (landing / "acquisition_log.json").write_text(
+        json.dumps(
+            {
+                "collector": {
+                    "provider": "quanthus.providers.minute_tdx",
+                    "bar_size": "1m",
+                    "market_date": "2026-08-04",
+                    "exit_code": 1,
+                    "universe_size": 2,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    runner = tmp_path / "runner.py"
+    _write_executable(
+        runner,
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "if '--stream' in sys.argv and sys.argv[sys.argv.index('--stream') + 1] == '1m':\n"
+        f"    print({json.dumps({'attempt_dir': str(attempt)})!r})\n"
+        "    raise SystemExit(1)\n"
+        "raise SystemExit(0)\n",
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "HERMES_ODS_NODE_ID": "cn01",
+            "HERMES_ODS_ENV_FILE": str(tmp_path / "missing.env"),
+            "HERMES_ODS_SHADOW_ROOT": str(shadow),
+            "ASTOCK_HOME": str(tmp_path / "home"),
+            "HERMES_ODS_RUNNER": str(runner),
+            "HERMES_ODS_DAILY_SLA_SECONDS": "20",
+            "HERMES_ODS_ORCHESTRATOR_POLL_SECONDS": "0.1",
+        }
+    )
+    completed = subprocess.run(
+        [str(ORCHESTRATOR), "--market-date", "2026-08-04"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 3, completed.stderr + completed.stdout
+    state = json.loads(completed.stdout)
+    assert state["status"] == "deferred_source_maturity"
+    assert state["catalog"] == {"status": "deferred_source_maturity"}
+    assert state["dwd"] == {"status": "deferred_source_maturity"}
+
+
+def test_completion_notification_checker_refuses_deferred_state(tmp_path: Path) -> None:
+    context = tmp_path / "context.json"
+    context.write_text('{"status":"deferred_source_maturity"}\n', encoding="ascii")
+    deferred = subprocess.run(
+        [str(COMPLETION_NOTIFICATION_CHECKER), "--context", str(context)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert deferred.returncode == 1
+
+    context.write_text('{"status":"ready"}\n', encoding="ascii")
+    ready = subprocess.run(
+        [str(COMPLETION_NOTIFICATION_CHECKER), "--context", str(context)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ready.returncode == 0
+
+
+def test_maturity_recovery_keeps_a_qualified_pending_source_quiet(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_SHADOW_ROOT": str(shadow),
+        "QUANTHUS_ODS_DAILY_ORCHESTRATOR": str(tmp_path / "orchestrator"),
+    }
+    with (
+        patch.dict(os.environ, env, clear=False),
+        patch.object(sys, "argv", [str(MATURITY_RECOVERY), "--market-date", "2026-08-04"]),
+        patch.object(module, "_is_overdue", return_value=False),
+        patch.object(module, "_run", return_value=3) as run,
+    ):
+        assert module.main() == 0
+    assert run.call_count == 1
+    assert run.call_args.args[0][-1] == "--ods-only"
+    assert not (shadow / "recovery/matured-1m/2026-08-04/dwd-complete.json").exists()
+
+
+def test_maturity_recovery_alerts_once_after_tplus1_but_keeps_backfill_open(
+    tmp_path: Path,
+) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_SHADOW_ROOT": str(shadow),
+        "QUANTHUS_ODS_DAILY_ORCHESTRATOR": str(tmp_path / "orchestrator"),
+    }
+    with (
+        patch.dict(os.environ, env, clear=False),
+        patch.object(sys, "argv", [str(MATURITY_RECOVERY), "--market-date", "2026-08-04"]),
+        patch.object(module, "_is_overdue", return_value=True),
+        patch.object(module, "_run", side_effect=[3, 0, 3]) as run,
+    ):
+        assert module.main() == 0
+        assert module.main() == 0
+    overdue = shadow / "recovery/matured-1m/2026-08-04/tplus1-overdue.json"
+    assert json.loads(overdue.read_text(encoding="ascii"))["status"] == "overdue_backfill_active"
+    assert run.call_count == 3
+    assert "cn01_dwd_failed" in run.call_args_list[1].args[0]
+    assert not (overdue.parent / "dwd-complete.json").exists()
+
+
+def test_maturity_recovery_does_not_mark_overdue_when_alert_fails(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_SHADOW_ROOT": str(shadow),
+        "QUANTHUS_ODS_DAILY_ORCHESTRATOR": str(tmp_path / "orchestrator"),
+    }
+    with (
+        patch.dict(os.environ, env, clear=False),
+        patch.object(sys, "argv", [str(MATURITY_RECOVERY), "--market-date", "2026-08-04"]),
+        patch.object(module, "_is_overdue", return_value=True),
+        patch.object(module, "_run", side_effect=[3, 2]) as run,
+    ):
+        assert module.main() == 2
+    assert run.call_count == 2
+    assert not (shadow / "recovery/matured-1m/2026-08-04/tplus1-overdue.json").exists()
+
+
+def test_maturity_recovery_cutoff_is_on_the_following_shanghai_day() -> None:
+    module = _load_maturity_recovery_module()
+    from datetime import datetime, time
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("Asia/Shanghai")
+    market_date = date(2026, 9, 23)
+    cutoff = time(17, 40)
+    assert not module._is_overdue(market_date, datetime(2026, 9, 24, 17, 39, tzinfo=tz), cutoff)
+    assert module._is_overdue(market_date, datetime(2026, 9, 24, 17, 40, tzinfo=tz), cutoff)
+
+
+def test_maturity_timer_uses_bounded_tplus1_probe_cadence() -> None:
+    timer = (ROOT / "ops/systemd/hermes-ods-maturity-recovery.timer").read_text(
+        encoding="ascii"
+    )
+    assert "OnCalendar=*-*-* 06,08,10,12,14,16:10:00 Asia/Shanghai" in timer
+    assert "OnCalendar=*-*-* 17:40:00 Asia/Shanghai" in timer
+    assert "Persistent=true" in timer
+
+
+def test_maturity_recovery_seals_one_completion_marker_before_notifying(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_SHADOW_ROOT": str(shadow),
+        "QUANTHUS_ODS_DAILY_ORCHESTRATOR": str(tmp_path / "orchestrator"),
+    }
+    with (
+        patch.dict(os.environ, env, clear=False),
+        patch.object(sys, "argv", [str(MATURITY_RECOVERY), "--market-date", "2026-08-04"]),
+        patch.object(module, "_run", side_effect=[0, 0, 0]) as run,
+    ):
+        assert module.main() == 0
+    marker = shadow / "recovery/matured-1m/2026-08-04/dwd-complete.json"
+    assert json.loads(marker.read_text(encoding="ascii"))["status"] == "ready"
+    assert run.call_count == 3
+    assert run.call_args_list[0].args[0][-1] == "--ods-only"
+    assert "--ods-only" not in run.call_args_list[1].args[0]
+    assert "--market-date" in run.call_args_list[2].args[0]
+
+
+def test_maturity_recovery_does_not_repeat_a_marked_completion(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    marker = tmp_path / "shadow/recovery/matured-1m/2026-08-04/dwd-complete.json"
+    marker.parent.mkdir(parents=True)
+    marker.write_text('{"status":"ready"}\n', encoding="ascii")
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+    }
+    with (
+        patch.dict(os.environ, env, clear=False),
+        patch.object(sys, "argv", [str(MATURITY_RECOVERY), "--market-date", "2026-08-04"]),
+        patch.object(module, "_run") as run,
+    ):
+        assert module.main() == 0
+    run.assert_not_called()
+
+
+def test_maturity_recovery_uses_existing_lane_receipts_not_a_stale_calendar(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    root = tmp_path / "shadow/orchestrator/daily/2026-09-23/legacy"
+    logs = root / "logs"
+    logs.mkdir(parents=True)
+    minute_log = logs / "intraday-1m.log"
+    attempt = tmp_path / "attempt"
+    checkpoint = attempt / "landing/provider_raw/minute_1m/checkpoint.json"
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_text(
+        '{"symbols":{"000001":{"error":"Tencent/daily volume mismatch"}}}\n',
+        encoding="ascii",
+    )
+    minute_log.write_text(json.dumps({"attempt_dir": str(attempt)}) + "\n", encoding="ascii")
+    (root / "run.json").write_text(
+        json.dumps(
+            {
+                "finished_at": "2026-09-23T13:55:29Z",
+                "status": "failed",
+                "lanes": {
+                    "market-daily-core": {"status": "ready"},
+                    "calendar-daily-events": {"status": "ready"},
+                    "intraday-5m": {"status": "ready"},
+                    "intraday-1m": {"status": "failed", "logs": [str(minute_log)]},
+                },
+            }
+        ),
+        encoding="ascii",
+    )
+    assert module._pending_maturity_session(tmp_path / "shadow", date(2026, 9, 24)) == date(
+        2026, 9, 23
+    )
+
+
+def test_legacy_volume_marker_cannot_defer_new_dates(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    root = tmp_path / "shadow/orchestrator/daily/2026-09-24/legacy"
+    root.mkdir(parents=True)
+    log = root / "minute.log"
+    log.write_text("Tencent/daily volume mismatch", encoding="utf-8")
+    (root / "run.json").write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "lanes": {
+                    "market-daily-core": {"status": "ready"},
+                    "calendar-daily-events": {"status": "ready"},
+                    "intraday-5m": {"status": "ready"},
+                    "intraday-1m": {"status": "failed", "logs": [str(log)]},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert module._pending_maturity_session(tmp_path / "shadow", date(2026, 9, 25)) is None
+
+
+def test_recovery_adopts_complete_source_mismatch_from_predeployment_run(
+    tmp_path: Path,
+) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    market_date = date(2026, 9, 24)
+    attempt = shadow / "attempts/intraday-archive/1m/2026-09-24/run-1"
+    landing = attempt / "landing"
+    checkpoint = landing / "provider_raw/minute_1m/checkpoint.json"
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_text(
+        json.dumps(
+            {
+                "symbols": {
+                    "000001": {"ok": True, "status": "done"},
+                    "000002": {
+                        "status": "error",
+                        "error": "Tencent/daily close mismatch for 000002",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (landing / "acquisition_log.json").write_text(
+        json.dumps(
+            {
+                "collector": {
+                    "provider": "quanthus.providers.minute_tdx",
+                    "bar_size": "1m",
+                    "market_date": market_date.isoformat(),
+                    "exit_code": 1,
+                    "universe_size": 2,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    run = shadow / "orchestrator/daily/2026-09-24/old-run"
+    run.mkdir(parents=True)
+    log = run / "minute.log"
+    log.write_text(json.dumps({"attempt_dir": str(attempt)}), encoding="utf-8")
+    (run / "run.json").write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "lanes": {
+                    "market-daily-core": {"status": "ready"},
+                    "calendar-daily-events": {"status": "ready"},
+                    "intraday-5m": {"status": "ready"},
+                    "intraday-1m": {"status": "failed", "logs": [str(log)]},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert module._pending_maturity_session(shadow, date(2026, 9, 25)) == market_date
+
+
+def test_recovery_keeps_date_open_after_ods_ready_or_dwd_failure(tmp_path: Path) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    date_root = shadow / "orchestrator/daily/2026-09-24"
+    deferred = date_root / "first"
+    deferred.mkdir(parents=True)
+    (deferred / "run.json").write_text(
+        json.dumps(
+            {
+                "finished_at": "2026-09-24T12:00:00Z",
+                "status": "deferred_source_maturity",
+            }
+        ),
+        encoding="utf-8",
+    )
+    ready_lanes = {
+        lane: {"status": "ready"}
+        for lane in (
+            "market-daily-core",
+            "calendar-daily-events",
+            "intraday-5m",
+            "intraday-1m",
+        )
+    }
+    later = date_root / "later"
+    later.mkdir()
+    for status in ("ods_ready", "failed"):
+        (later / "run.json").write_text(
+            json.dumps(
+                {
+                    "finished_at": "2026-09-25T03:00:00Z",
+                    "status": status,
+                    "lanes": ready_lanes,
+                }
+            ),
+            encoding="utf-8",
+        )
+        assert module._pending_maturity_session(shadow, date(2026, 9, 25)) == date(
+            2026, 9, 24
+        )
+    (later / "run.json").write_text(
+        json.dumps(
+            {
+                "finished_at": "2026-09-25T03:00:00Z",
+                "status": "ready",
+                "lanes": ready_lanes,
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert module._pending_maturity_session(shadow, date(2026, 9, 25)) is None
+    completion = shadow / "recovery/matured-1m/2026-09-24/dwd-complete.json"
+    completion.parent.mkdir(parents=True)
+    completion.write_text('{"status":"ready"}\n', encoding="ascii")
+    assert module._pending_maturity_session(shadow, date(2026, 9, 25)) is None
+
+
+def test_recovery_keeps_deferred_date_open_after_transient_ods_failure(
+    tmp_path: Path,
+) -> None:
+    module = _load_maturity_recovery_module()
+    shadow = tmp_path / "shadow"
+    date_root = shadow / "orchestrator/daily/2026-09-24"
+    first = date_root / "first"
+    first.mkdir(parents=True)
+    (first / "run.json").write_text(
+        json.dumps(
+            {
+                "finished_at": "2026-09-25T04:10:00Z",
+                "status": "deferred_source_maturity",
+            }
+        ),
+        encoding="utf-8",
+    )
+    later = date_root / "later"
+    later.mkdir()
+    (later / "run.json").write_text(
+        json.dumps(
+            {
+                "finished_at": "2026-09-25T06:44:00Z",
+                "status": "failed",
+                "lanes": {
+                    "market-daily-core": {"status": "ready"},
+                    "calendar-daily-events": {"status": "ready"},
+                    "intraday-5m": {"status": "ready"},
+                    "intraday-1m": {"status": "failed"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert module._pending_maturity_session(shadow, date(2026, 9, 25)) == date(
+        2026, 9, 24
+    )
+
+
 def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
     service = (ROOT / "ops/systemd/hermes-ods-daily-orchestrator.service").read_text(
         encoding="ascii"
@@ -271,7 +858,7 @@ def test_cn01_orchestrator_units_define_ready_gated_control_plane() -> None:
     assert "run-cn01-ods-daily" in service
     assert "QUANTHUS_ODS_DAILY_RETRY_RECOVERY_SECONDS=14760" in service
     assert "TimeoutStartSec=540min" in service
-    assert "SuccessExitStatus=0" in service
+    assert "SuccessExitStatus=0 3" in service
     assert "OnSuccess=hermes-dwd-success-notification.service" in service
     assert "OnCalendar=Mon..Fri *-*-* 19:30:00 Asia/Shanghai" in timer
     assert "Persistent=false" in timer
@@ -350,6 +937,36 @@ def test_daily_retry_wrapper_returns_final_failure_status(tmp_path: Path) -> Non
 
     assert completed.returncode == 23
     assert attempts.read_text(encoding="ascii") == "2\n"
+
+
+def test_daily_retry_wrapper_delegates_source_maturity_without_repeating(tmp_path: Path) -> None:
+    attempts = tmp_path / "attempts"
+    runner = tmp_path / "runner"
+    _write_executable(
+        runner,
+        "#!/usr/bin/env bash\n"
+        f"printf '1\\n' > {str(attempts)!r}\n"
+        "exit 3\n",
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "QUANTHUS_ODS_DAILY_MAX_ATTEMPTS": "2",
+            "QUANTHUS_ODS_DAILY_RETRY_DELAY_SECONDS": "0",
+        }
+    )
+
+    completed = subprocess.run(
+        [str(RETRY_WRAPPER), str(runner)],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 3
+    assert attempts.read_text(encoding="ascii") == "1\n"
 
 
 def test_orchestrator_reuses_existing_ready_lane_and_preserves_node(tmp_path: Path) -> None:

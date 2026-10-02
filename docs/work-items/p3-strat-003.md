@@ -157,6 +157,15 @@ and does not authorize a second query. The fixed attempt cannot be automatically
 Current next action: bind the qualified temporary receipt into a B-specific input closure and
 review its admission before any formal B rerun. #470 stays open; #319 stays NO_PASS. D is not active.
 
+The retained failed-job replay input also still exists. Metadata SHA for `replay/bundle.json` is
+`5d592983f9d04ca78e65bdcc48ed95c6a90c116106b4c5760187cae2e6f11b8e`; bundle identity is
+`84f0e7dba9c5373e1b01f3c21ba254f6af4fadf8b11197f1e7226cf1d36b9a60`. All seven declared files
+(245,777,504 bytes) match their recorded physical checksums, verified through OCI session
+`session-a0435a2fc91ae14e0af6f20e`. This metadata/byte check did not deserialize market values,
+evaluate strategy economics, rebuild a candidate or reproduce the original failed Job. It provides
+a concrete retained-input option for the next bounded closure; no historical chain reconstruction
+or formal B/D continuation is implied by these file checks.
+
 ### Historical bounded closeout — 2026-10-02
 
 The 2026-10-02 continuation completed the permitted early failure closeout under #317/#322.

@@ -28,8 +28,9 @@
 
 - `P3-STRAT-003` / #317 and B-R1 / #412 were reopened under the Owner's explicit continuation.
   The exact retained candidate and sealed industry sources were recovered through NexusAgent on
-  OCI. The bounded inspection resolves 5,250 of 5,251 securities with zero source conflicts;
-  688287 remains unresolved. B / #319 stays NO_PASS and unaccepted; D remains NOT_RUN.
+  OCI. The bounded inspection resolved 5,250 of 5,251 securities with zero source conflicts;
+  the approved single-security query now supplies a qualified temporary source for 688287.
+  Formal DWD repair stays with #470. B / #319 stays NO_PASS and unaccepted; D remains NOT_RUN.
   Preserve the earlier closeout as historical evidence, not the current routing instruction.
 - Purpose: compare existing Trend + Position Risk against a non-empty deterministic P4 baseline
   while P6 continues independently; P6 is not a predecessor and must not be mutated.

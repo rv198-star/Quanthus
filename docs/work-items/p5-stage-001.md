@@ -69,6 +69,20 @@ cannot close these data issues or mutate formal data. Missing original scope sti
 and 120-session-window qualification. A governed replacement needs a frozen closure and comparison
 before the temporary source exits new runs; retain prior audit evidence.
 
+The approved identity-only subset ran at `d115ea05cbf087fcd4b1746473c3d6032b05db22` through
+Nexus OCI `session-59d72502d2293e2738d16980`: both exact dimension members (541,560 bytes)
+verified; 4,679 historical listing rows and 4,679 linked security-version rows retained. No listing
+row completely lacks an overlapping security version. Two security IDs have multiple retained
+versions; this is neither per-session uniqueness nor an established defect. Both dimensions have
+knowledge_from `2026-08-03T23:59:00Z`, so no historical as-known claim follows.
+Receipt SHA `69e90f8912226ab84fbf916c551fa3a498c4bd2771ba930ffd018a3996c820f7` lives in private
+OCI `p3-p5-20261002/p5-census-runs/identity-d115ea0`. Each TMP was built once and reused;
+3,339,491 TMP bytes were removed after the 0.725-second application run. No action or market rows
+were consumed in this stage. Original normalization scope, coordinate/window and ACTIVE gates remain
+unestablished; #471/#472 stay open. Full check at this revision: 3,014 passed / 7 skipped / 56 failed,
+with the same 56 failure IDs as the earlier baseline. The seven new boundary tests also passed an
+independent read-only review.
+
 The Owner explicitly required continued attempts after PR #419 merged. Live #400/#402 were reopened
 for bounded input integrity, schema and listing/session census; E/F remain inactive. OCI is an
 available existing data node under the current Owner instructions; control remains NexusAgent.

@@ -34,10 +34,23 @@ by automatic approval review and was not executed. The successful alternative co
 industry members into private task directories, verified every source hash, and ran unprivileged
 with read-only inputs and no network. This is an actual isolated diagnostic, not a formal B Job.
 
-`single-security-industry-proposal.v1.json` is a concrete **unactivated** proposal for one source
-query on the first observed identity date. It cannot inherit network authority from #412's
-existing-source inspection. B remains unaccepted and D remains NOT_RUN. A/C/C-R1 and #319 NO_PASS
-remain unchanged.
+The Owner separately approved `single-security-industry-proposal.v1.json` on 2026-10-03.
+The activation is sealed in `config/research/p3-p5-temporary-source-activation.v1.json`, together
+with the Owner's subsequent instruction that formal data gaps belong to the separate data workstream
+and current research handling is temporary only. Formal industry repair is tracked by
+[#470](https://github.com/rv198-star/Quanthus/issues/470), not closed by temporary success.
+
+The exact one-security/date query ran once at `3d2ac91`, through OCI Nexus
+`session-b8e60ae67d4f9030de5fff08`, with isolated BaoStock 0.9.3. It returned
+`QUALIFIED_TEMPORARY_STATIC_SOURCE` in 1.439 application seconds, zero retries; identity/date,
+classification and hierarchy checks passed. Receipt SHA
+`b26177362b1da0f15a4f4612ffb4325e8bded039b1035443fed2c429176a428b`; response SHA
+`6883ab4e46add9770c79f49cdaec258bd5a80912612ddfadbcb40edbc3a2abfd`. Actual retrieval time is
+`2026-10-02T17:55:56.775201+00:00`, not a backdated historical knowledge time. The fixed private
+attempt is durable and cannot be automatically repeated; source files and DWD remain untouched.
+No server request-echo attributes were captured; those extra audit fields were not an approved
+qualification gate and cannot justify another query. B remains unaccepted and D remains NOT_RUN.
+A/C/C-R1 and #319 NO_PASS remain unchanged.
 
 ## P5: verified three-table supply
 
@@ -57,7 +70,7 @@ Nexus in an isolated unprivileged container, no network, 2 CPUs/2 GiB container 
 | Tradability | 7,741,185 |
 | Calendars | 7,829 |
 | Unique date-aligned bar/state supply | 7,722,194 |
-| State-only, missing bar | 18,991 |
+| State-only/no matched bar; cause unclassified | 18,991 |
 | Bar-only | 0 |
 | Orphan or ambiguous calendar slots | 0 |
 
@@ -88,7 +101,7 @@ These packages cannot supply the missing 120-session closure. This is a statemen
 registered members only. An old `coordinate_epoch` string is not a digest of security/listing identity.
 No settlement/outcome member was opened to search for input evidence.
 
-The new unactivated `input-closure-proposal.v1.json` binds two Base identity files (541,560 bytes)
+The separately approved `input-closure-proposal.v1.json` binds two Base identity files (541,560 bytes)
 and the accepted v3 normalized-action/exception members (4,687,197 bytes), from checksum-verified
 manifest metadata only. The exact correction manifest/READY is available on OCI and matches
 `4c8eeb5c0d74bbf2953f003364fd138832f15a5163254b710f9db8430767ffde` (Nexus
@@ -97,6 +110,22 @@ two source members. It does not imply any other artifact or reference ledger is 
 The source extension requires full member verification, a fixed historical projection from mixed-year
 members and coordinate-contract equivalence before Facts materialization. It does not read raw
 action/term data or correction tradability, or manufacture ACTIVE/reference truth.
+
+The identity-only subset executed at `d115ea0`: 4,679 historical listing rows and 4,679 linked
+security-version rows, zero listing rows completely lacking an overlapping security version, and
+two security IDs with multiple retained versions. This establishes dimension availability, not
+per-session uniqueness or complete coverage. Both knowledge_from extrema are
+`2026-08-03T23:59:00Z`. Receipt SHA
+`69e90f8912226ab84fbf916c551fa3a498c4bd2771ba930ffd018a3996c820f7`; application elapsed 0.725
+seconds; 3,339,491 bytes of shared job-local TMP removed. No action or market rows were consumed.
+
+[#471](https://github.com/rv198-star/Quanthus/issues/471) tracks original normalization manifest
+availability, and [#472](https://github.com/rv198-star/Quanthus/issues/472) tracks the 18,991 state-only
+slots for classification. Neither is a claim that all DWD data is missing. Original normalization
+scope, coordinate/120-session windows, ACTIVE and B remain unqualified. The 119-session F9 sidecar
+is a research-package limitation, not evidence of DWD history loss. Formal repair stays with the
+data workstream; private research sources must exit new runs only after a governed replacement is
+bound and compared. Existing audit artifacts are preserved, never silently overwritten.
 
 ## P5: bounded synthetic execution recovery
 
@@ -126,11 +155,18 @@ The final full check at `6c254d2` reports **2,968 passed / 7 skipped / 56 failed
 Every failed test ID matches the prior 56-failure baseline: zero new failures, not a green full check.
 The sidecar's nine synthetic tests and separate independent read-only review also pass.
 
-After the Worker recovery fixes, final full `make check` reports **2,992 passed / 7 skipped /
+After the Worker recovery fixes, the full `make check` reported **2,992 passed / 7 skipped /
 56 failed** in 94.32 seconds. Failed IDs still exactly match the same baseline; zero new failures.
 The planning check (after the test target's baseline failure) and focused Ruff checks pass separately.
 Raw receipts: `orphan-final-check.log`, `orphan-final-check.xml`, and
 `orphan-final-check-comparison.json` in the external artifact root.
+
+After temporary-source implementation, full `make check` at `d115ea0` reports **3,014 passed /
+7 skipped / 56 failed** in 96.96 seconds, with exactly the same 56 failed IDs. Fifteen P3 collector
+boundary tests and seven P5 identity boundary tests pass; both implementations received independent
+read-only review. The precise 0.9.3 provider source was inspected on OCI; the reviewer's local 0.9.4
+source observation is not substituted for that version evidence. Planning and focused Ruff checks
+pass separately. Latest check receipts use the `temporary-identity-check` prefix.
 
 Remote source/output roots are private under `/home/ubuntu/quanthus-research/p3-p5-20261002`.
 Raw tool and run receipts are external local artifacts under

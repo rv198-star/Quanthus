@@ -149,6 +149,7 @@ def test_one_query_durable_receipt_and_no_repeat(tmp_path, monkeypatch, rows, ex
     )
     monkeypatch.setattr(module.importlib.metadata, "version", lambda _: "0.9.3")
     monkeypatch.setattr(module, "verify_code_receipt", lambda *_: "sha256:synthetic")
+    monkeypatch.setattr(module, "bound_transport", lambda _: {"received_bytes": 0})
     monkeypatch.setattr(module, "RUNTIME_ROOT", tmp_path)
     tmp_path.chmod(0o700)
     monkeypatch.setitem(
@@ -212,3 +213,18 @@ def test_prepare_rejects_symlink_before_writing(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="SYMLINK_ATTEMPT_ROOT_FORBIDDEN"):
         module.prepare_code_receipt(ROOT, "a" * 40)
     assert list(target.iterdir()) == []
+
+
+def test_transport_budget_bypasses_provider_catch(monkeypatch):
+    context = SimpleNamespace(default_socket=SimpleNamespace(recv=lambda _: b"12345"))
+    package = SimpleNamespace(common=SimpleNamespace(context=context))
+    monkeypatch.setitem(sys.modules, "baostock", package)
+    monkeypatch.setitem(sys.modules, "baostock.common", package.common)
+    monkeypatch.setitem(sys.modules, "baostock.common.context", context)
+    measured = module.bound_transport(4)
+    with pytest.raises(module.SourceBudgetExceeded, match="BUDGET"):
+        try:
+            context.default_socket.recv(8192)
+        except Exception:
+            pytest.fail("provider must not swallow our deadline/transport budget")
+    assert measured["received_bytes"] == 5

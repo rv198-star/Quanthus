@@ -27,6 +27,33 @@ CODE_FILES = (
 )
 
 
+class SourceBudgetExceeded(BaseException):
+    """Bypass the provider's broad Exception handler; caught by our receipt boundary."""
+
+
+def bound_transport(maximum: int) -> dict[str, int]:
+    import baostock.common.context as context
+
+    original = context.default_socket
+    measured = {"received_bytes": 0}
+
+    class SocketBudget:
+        def __getattr__(self, name: str) -> Any:
+            return getattr(original, name)
+
+        def recv(self, length: int) -> bytes:
+            received = original.recv(min(length, maximum - measured["received_bytes"] + 1))
+            measured["received_bytes"] += len(received)
+            if measured["received_bytes"] > maximum:
+                raise SourceBudgetExceeded("PROVIDER_RESPONSE_BUDGET_EXCEEDED")
+            if not received:
+                raise SourceBudgetExceeded("PROVIDER_INCOMPLETE_TRANSPORT_DO_NOT_REQUERY")
+            return received
+
+    context.default_socket = SocketBudget()
+    return measured
+
+
 def encoded(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
 
@@ -244,7 +271,7 @@ def run(root: Path, inspection: Path, output: Path, revision: str) -> dict[str, 
     started = time.monotonic()
 
     def timeout(_signum: int, _frame: Any) -> None:
-        raise TimeoutError("PROVIDER_DEADLINE_EXCEEDED")
+        raise SourceBudgetExceeded("PROVIDER_DEADLINE_EXCEEDED")
 
     old_handler = signal.signal(signal.SIGALRM, timeout)
     signal.alarm(proposal["budget"]["maximum_wall_seconds"])
@@ -253,6 +280,7 @@ def run(root: Path, inspection: Path, output: Path, revision: str) -> dict[str, 
         login = bs.login()
         if login.error_code != "0":
             raise ValueError("PROVIDER_LOGIN_UNAVAILABLE")
+        receipt["query_transport"] = bound_transport(proposal["budget"]["maximum_response_bytes"])
         # No automatic retry is chosen: it is within the approved maximum of one.
         receipt["query_calls"] = 1
         result = bs.query_stock_industry(
@@ -262,6 +290,8 @@ def run(root: Path, inspection: Path, output: Path, revision: str) -> dict[str, 
         response["error_code"] = str(result.error_code)
         while result.error_code == "0" and result.next():
             response["rows"].append(list(result.get_row_data()))
+            if len(response["rows"]) > 1:
+                raise ValueError("UNQUALIFIED_RESPONSE_CARDINALITY")
             if len(encoded(response)) > proposal["budget"]["maximum_response_bytes"]:
                 raise ValueError("PROVIDER_RESPONSE_BUDGET_EXCEEDED")
         response["error_code"] = str(result.error_code)
@@ -274,7 +304,7 @@ def run(root: Path, inspection: Path, output: Path, revision: str) -> dict[str, 
         receipt["response_semantic_digest"] = sha(encoded(response))
         receipt["qualified_mapping"] = qualify(response, proposal, hierarchy)
         receipt["disposition"] = "QUALIFIED_TEMPORARY_STATIC_SOURCE"
-    except (ValueError, TimeoutError) as exc:
+    except (ValueError, SourceBudgetExceeded) as exc:
         receipt["disposition"] = str(exc)
     except Exception as exc:
         receipt["disposition"] = "PROVIDER_INCOMPLETE_OR_UNKNOWN_DO_NOT_REQUERY"

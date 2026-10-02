@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import math
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -24,6 +24,23 @@ from quanthus.stage_learning.p5_assessment import (
 
 ROOT = Path(__file__).resolve().parents[2]
 P5 = ROOT / "config/research/p5-stage-001"
+
+
+@pytest.mark.parametrize("applicability", [True, False, None])
+@pytest.mark.parametrize("missing", ["head_trained", "required_facts_available"])
+def test_unavailable_precedes_parent_applicability(
+    applicability: bool | None, missing: str
+) -> None:
+    result = resolve_output(
+        historical_stage_code=11,
+        applicability=applicability,
+        raw_score=None,
+        calibrated_probability=0.99,
+        **{missing: False},
+    )
+    assert result.decision_state is DecisionState.UNAVAILABLE
+    assert result.raw_score is None
+    assert result.calibrated_probability is None
 
 
 def test_successor_activation_preserves_e_and_protected_boundaries() -> None:
@@ -75,32 +92,59 @@ def test_temporal_encoder_is_fixed_multi_head_and_below_parameter_cap() -> None:
 
 
 def test_feature_window_rejects_future_input_and_mask_conflation() -> None:
-    config = TemporalEncoderConfig(window_sessions=5)
+    config = TemporalEncoderConfig()
     row = tuple(FeatureCell(1.0) for _ in range(24))
+    dates = tuple(date(2020, 1, 1) + timedelta(days=index) for index in range(120))
     with pytest.raises(P5AssessmentError, match="future session"):
         FeatureWindow(
-            (date(2021, 1, 4), date(2021, 1, 5)),
-            (row, row),
-            date(2021, 1, 4),
+            dates,
+            (row,) * 120,
+            dates[-2],
         ).validate(config)
     with pytest.raises(P5AssessmentError, match="must stay distinct"):
         FeatureCell(None, actual_missing=True, artificial_mask=True).validate()
 
 
 def test_l_and_g_share_one_deterministic_causal_summary() -> None:
-    config = TemporalEncoderConfig(window_sessions=5)
+    config = TemporalEncoderConfig()
     rows = tuple(
         tuple(FeatureCell(float(session + channel)) for channel in range(24))
-        for session in range(5)
+        for session in range(120)
     )
+    dates = tuple(date(2020, 1, 1) + timedelta(days=index) for index in range(120))
     window = FeatureWindow(
-        tuple(date(2021, 1, day) for day in range(4, 9)),
+        dates,
         rows,
-        date(2021, 1, 8),
+        dates[-1],
     )
     summary = summarize_window(window, config)
     assert len(summary) == 24 * 5
-    assert summary[:5] == (4.0, 2.0, 0.0, 4.0, 0.0)
+    assert summary[:5] == (119.0, 59.5, 0.0, 119.0, 0.0)
+
+
+@pytest.mark.parametrize("sessions", [5, 115, 125])
+def test_model_and_baselines_reject_non_frozen_history(sessions: int) -> None:
+    with pytest.raises(P5AssessmentError, match="frozen 120-session"):
+        build_t0_model(TemporalEncoderConfig(window_sessions=sessions))
+    dates = tuple(date(2020, 1, 1) + timedelta(days=index) for index in range(sessions))
+    row = tuple(FeatureCell(1.0) for _ in range(24))
+    with pytest.raises(P5AssessmentError, match="exactly 120"):
+        summarize_window(
+            FeatureWindow(dates, (row,) * sessions, dates[-1]), TemporalEncoderConfig()
+        )
+
+
+@pytest.mark.parametrize("probability", [None, 0.99])
+def test_missing_model_score_is_unavailable_even_with_a_stale_calibrator(probability) -> None:
+    output = resolve_output(
+        historical_stage_code=2,
+        applicability=True,
+        raw_score=None,
+        calibrated_probability=probability,
+    )
+    assert output.decision_state is DecisionState.UNAVAILABLE
+    assert output.raw_score is None
+    assert output.calibrated_probability is None
 
 
 def test_masked_bce_ignores_unknown_and_non_applicable_without_making_negatives() -> None:
@@ -218,8 +262,18 @@ def test_fixed_l_and_g_fit_independent_heads_and_suppress_7_8_9() -> None:
         rows = model.predict_raw(features[:2])
         assert len(rows) == 2
         assert all(rows[0][index] is None for index in (6, 7, 8))
-        assert all(
-            rows[0][index] is not None for index in set(range(12)) - {6, 7, 8}
+        assert all(rows[0][index] is not None for index in set(range(12)) - {6, 7, 8})
+        model.fit(features, [[0] * 12 for _ in features], applicability)
+        missing = model.predict_raw(features[:1])[0][1]
+        assert missing is None
+        assert (
+            resolve_output(
+                historical_stage_code=2,
+                applicability=True,
+                raw_score=missing,
+                calibrated_probability=None,
+            ).decision_state
+            is DecisionState.UNAVAILABLE
         )
 
 

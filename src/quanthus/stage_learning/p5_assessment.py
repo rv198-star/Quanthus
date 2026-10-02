@@ -3,6 +3,7 @@
 This module deliberately contains no market-data reader and no result-bearing training entrypoint.
 It implements the synthetic contracts shared by L/G/T0/T1 before B, C, and D can be accepted.
 """
+
 from __future__ import annotations
 
 import math
@@ -42,8 +43,8 @@ class TemporalEncoderConfig:
     maximum_parameters: int = 2_000_000
 
     def validate(self) -> None:
-        if not 1 <= self.window_sessions <= 120:
-            raise P5AssessmentError("window_sessions exceeds the frozen 120-session cap")
+        if self.window_sessions != 120:
+            raise P5AssessmentError("window_sessions differs from the frozen 120-session value")
         if not 1 <= self.input_channels <= 24:
             raise P5AssessmentError("input_channels exceeds the frozen 24-channel cap")
         if self.patch_sessions != 5:
@@ -72,10 +73,7 @@ class TemporalEncoderConfig:
         position_and_cls = (patches + 2) * self.d_model
         attention = 4 * self.d_model * self.d_model + 4 * self.d_model
         feed_forward = (
-            self.d_model * self.ffn_dim
-            + self.ffn_dim
-            + self.ffn_dim * self.d_model
-            + self.d_model
+            self.d_model * self.ffn_dim + self.ffn_dim + self.ffn_dim * self.d_model + self.d_model
         )
         layer_norms = 4 * self.d_model
         encoder = self.encoder_layers * (attention + feed_forward + layer_norms)
@@ -106,8 +104,8 @@ class FeatureWindow:
 
     def validate(self, config: TemporalEncoderConfig) -> None:
         config.validate()
-        if not self.session_dates or len(self.session_dates) > config.window_sessions:
-            raise P5AssessmentError("feature window length is outside the frozen boundary")
+        if len(self.session_dates) != config.window_sessions:
+            raise P5AssessmentError("feature window must contain exactly 120 sessions")
         if tuple(sorted(self.session_dates)) != self.session_dates:
             raise P5AssessmentError("feature sessions must be ordered")
         if len(set(self.session_dates)) != len(self.session_dates):
@@ -193,6 +191,8 @@ def resolve_output(
     calibrated_probability: float | None,
     control_x: bool = False,
     required_seeds_complete: bool = True,
+    head_trained: bool = True,
+    required_facts_available: bool = True,
 ) -> AssessmentOutput:
     """Apply the frozen X/unavailable/applicability/calibration precedence."""
     if historical_stage_code not in range(1, 13):
@@ -224,6 +224,15 @@ def resolve_output(
             DecisionState.UNAVAILABLE,
             ("REQUIRED_SEED_SET_INCOMPLETE",),
         )
+    if not head_trained or not required_facts_available:
+        return AssessmentOutput(
+            historical_stage_code,
+            applicability,
+            None,
+            None,
+            DecisionState.UNAVAILABLE,
+            ("HEAD_UNTRAINED" if not head_trained else "REQUIRED_FACTS_UNAVAILABLE",),
+        )
     if applicability is False:
         return AssessmentOutput(
             historical_stage_code,
@@ -242,10 +251,17 @@ def resolve_output(
             DecisionState.ABSTAIN,
             ("FROZEN_PARENT_OR_CONTEXT_UNKNOWN",),
         )
-    if raw_score is not None and (
-        not math.isfinite(raw_score) or not 0.0 <= raw_score <= 1.0
-    ):
+    if raw_score is not None and (not math.isfinite(raw_score) or not 0.0 <= raw_score <= 1.0):
         raise P5AssessmentError("raw score is outside the sigmoid range")
+    if raw_score is None:
+        return AssessmentOutput(
+            historical_stage_code,
+            True,
+            None,
+            None,
+            DecisionState.UNAVAILABLE,
+            ("HEAD_RAW_SCORE_UNAVAILABLE",),
+        )
     if calibrated_probability is None:
         return AssessmentOutput(
             historical_stage_code,
@@ -365,10 +381,10 @@ class FixedBaselineSet:
         matrix = np.asarray(features, dtype=float)
         if matrix.ndim != 2 or not np.isfinite(matrix).all():
             raise P5AssessmentError("baseline features must be a finite two-dimensional matrix")
-        if any(len(row) != 12 for row in labels) or any(
-            len(row) != 12 for row in applicability
-        ):
+        if any(len(row) != 12 for row in labels) or any(len(row) != 12 for row in applicability):
             raise P5AssessmentError("baseline labels/applicability require twelve heads")
+        self._models.clear()
+        fitted_models: dict[int, Any] = {}
         for code in range(1, 13):
             if code in INELIGIBLE_HEADS:
                 continue
@@ -397,7 +413,8 @@ class FixedBaselineSet:
                     random_state=self.config.random_state,
                 )
             model.fit(matrix[selected], target)
-            self._models[code] = model
+            fitted_models[code] = model
+        self._models = fitted_models
         return self
 
     def predict_raw(
@@ -412,8 +429,7 @@ class FixedBaselineSet:
             raise P5AssessmentError("baseline features must be a finite two-dimensional matrix")
         rows: list[tuple[float | None, ...]] = []
         probabilities = {
-            code: model.predict_proba(matrix)[:, 1].tolist()
-            for code, model in self._models.items()
+            code: model.predict_proba(matrix)[:, 1].tolist() for code, model in self._models.items()
         }
         for row in range(len(matrix)):
             rows.append(

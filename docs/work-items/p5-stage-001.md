@@ -58,7 +58,37 @@ successor.
 
 ## Current recovery checkpoint
 
-As of the local Codex handoff on 2026-09-22:
+As of the recovery on 2026-10-02:
+
+- the owner delegated technical execution and convergence of P3/P5 within their frozen contracts;
+  this does not lower acceptance gates or open protected years, P6, production or trading;
+- main `be96a7cb3b2b7e41937aef7e5b19ab5c5fbee9f1` was merged into the PR #419 recovery branch;
+  A remains accepted and is not repeated as new progress;
+- NexusAgent is available. CN01 has the exact Base manifest and matching READY at
+  `/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2.1`, SHA
+  `541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b`;
+  this verifies metadata only, not a P5-authorized 2012-2021 effective view;
+- the historical reference ledgers and correction are bound to RX6800, which Nexus reports offline.
+  No verified migration copy has been found on the inspected permitted nodes. No market rows have
+  been read, reference eligibility remains unknown, and B is not accepted;
+- C's local CPU/T0 synthetic probe now compares fresh-process resume against uninterrupted
+  execution, including model/optimizer/scheduler, RNG, sampler and epoch/batch cursors. The
+  fixed-size 120-session window and checkpoint input/code identities are enforced;
+- D has executable L/G and synthetic T0 primitives. T1 admission, real-data adapters, exact output
+  provenance, and worker integration remain unfinished. These are not accepted research results;
+- the existing P015/P020 reference assets are candidates for a P5 source/exposure audit. Their
+  historical sufficiency decisions do not qualify P5 heads. Their individual counts also do not
+  prove the entire authorized development population lacks capacity;
+- E / #405 remains inactive. Do not use unqualified or rule-only references to start training.
+
+Unique next action: locate a verified permitted copy of the RX6800 source/correction and reference
+ledgers, then freeze the P5-specific 2012-2021 manifest before any market-row read. Preserve unknown
+capacity as null. Do not provision another worker or rerun the completed synthetic probe merely to
+replace this missing input evidence. See `../acceptance/p3-p5-convergence-recovery-20261002.md`.
+
+### Historical start checkpoint — 2026-09-22
+
+At the original successor handoff:
 
 - live GitHub `main` and the local source both resolve to
   `8bd989dfae98acd4f28799a376ee0ca5df9162aa`; PR #416 is merged and #401 is completed;
@@ -74,9 +104,9 @@ As of the local Codex handoff on 2026-09-22:
   envelope; no result-bearing training occurred;
 - E / #405 remains inactive.
 
-Unique next actions: B must resolve and freeze the exact governed source manifest through NexusAgent;
-C must provision the isolated Python 3.12 environment and run the full synthetic CPU path; D must add
-the fixed L/G/T0 executable adapters and checkpoint round-trip on top of the synthetic contracts.
+The originally pending CPU environment, L/G adapters and checkpoint round-trip were subsequently
+implemented. They must not remain listed as unstarted work; the current checkpoint above supersedes
+those next-action statements.
 
 ### Sealed A predecessor checkpoint
 
@@ -124,7 +154,7 @@ A does not need a market-data manifest, model weights, GPU benchmark, label corp
 
 ## Successor boundary
 
-B's candidate scope is predeclared but inactive:
+B's candidate scope is active only under its separately recorded bounded activation:
 
 - 2012-2021 SSE/SZSE development only;
 - exact manifest resolved and verified in B before any row read;
@@ -133,7 +163,7 @@ B's candidate scope is predeclared but inactive:
 - 2022-2026 remain closed;
 - no strategy/economic result read.
 
-C and D are likewise inactive until separately started. E cannot open until B/C/D are accepted.
+C and D have separately started synthetic work. E cannot open until B/C/D are accepted.
 
 ## Stop conditions
 

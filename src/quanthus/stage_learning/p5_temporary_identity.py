@@ -7,6 +7,7 @@ import json
 import re
 import tempfile
 import time
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -65,6 +66,19 @@ STAGE_GRAPH = [
         "lifecycle": "none",
     },
 ]
+
+
+def receipt_json(value: Any) -> str:
+    def date_only(item: Any) -> str:
+        if isinstance(item, datetime):
+            if item.tzinfo is None or item.utcoffset() is None:
+                raise TypeError("Naive receipt timestamp")
+            return item.astimezone(timezone.utc).isoformat()
+        if isinstance(item, date):
+            return item.isoformat()
+        raise TypeError(f"Unsupported receipt value: {type(item).__name__}")
+
+    return json.dumps(value, sort_keys=True, indent=2, default=date_only) + "\n"
 
 
 def verify_inputs(repo: Path, base: Path) -> tuple[dict[str, Path], dict[str, Any]]:
@@ -374,8 +388,9 @@ def run(
             "elapsed_seconds": round(time.monotonic() - started, 3),
         }
     )
-    (output / "receipt.json").write_text(json.dumps(result, sort_keys=True, indent=2) + "\n")
-    return result
+    serialized = receipt_json(result)
+    (output / "receipt.json").write_text(serialized)
+    return json.loads(serialized)
 
 
 def main() -> None:

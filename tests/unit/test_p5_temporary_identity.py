@@ -1,13 +1,38 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from quanthus.stage_learning import p5_temporary_identity as module
+from tests.unit.test_p5_input_census import _fixture as census_fixture
 
 duckdb = pytest.importorskip("duckdb")
+
+
+def test_session_run_writes_dated_census_receipt_and_removes_tmp(tmp_path, monkeypatch):
+    dimensions = fixture_paths(tmp_path)
+    census_base, request = census_fixture(tmp_path)
+    config = tmp_path / "config/research/p5-stage-001/input-census.v1.json"
+    config.parent.mkdir(parents=True)
+    config.write_text(json.dumps(request))
+    monkeypatch.setattr(module, "verify_inputs", lambda *_: (dimensions, {}))
+    output = tmp_path / "output"
+    result = module.run(tmp_path, tmp_path, output, "a" * 40, census_base)
+    assert result == json.loads((output / "receipt.json").read_text())
+    bars = result["job_local_census"]["table_counts"]["dwd_security_bar"]
+    assert bars["earliest_knowledge_from"] == "2019-01-01T00:00:00+00:00"
+    assert result["session_identity"]["bar_slot_denominator"] == 6
+    assert result["tmp_removed"] is True
+    assert result["B_accepted"] is False
+    assert list(output.iterdir()) == [output / "receipt.json"]
+
+
+def test_receipt_serialization_does_not_silently_stringify_unknown_objects():
+    with pytest.raises(TypeError, match="Unsupported receipt value"):
+        module.receipt_json({"bad": object()})
 
 
 def fixture_paths(tmp_path, *, extra_listing=None, extra_security=None):

@@ -32,6 +32,7 @@ from typing import Any
 JOB_SCHEMA = "quanthus.stage-worker-job.v1"
 STATUS_SCHEMA = "quanthus.stage-worker-status.v1"
 STAGE_HARNESS_JOB = "quanthus.stage-harness.v1"
+P5_SYNTHETIC_JOB = "quanthus.p5-stage-synthetic.v1"
 STAGE_REFERENCE_PILOT_JOB = "quanthus.stage-reference-pilot.v1"
 STAGE_QUALIFICATION_JOB = "quanthus.stage-qualification.v1"
 STAGE_CAPACITY_CENSUS_JOB = "quanthus.stage-capacity-census.v1"
@@ -231,6 +232,13 @@ MAIN_REF = "refs/remotes/stage-control/main"
 _JOB_ID = re.compile(r"^stage_[0-9a-f]{32}$")
 _REVISION = re.compile(r"^[0-9a-f]{40}$")
 _JOB_SPECS: dict[str, dict[str, Any]] = {
+    P5_SYNTHETIC_JOB: {
+        "config": "config/research/p5-stage-001/synthetic-worker.v1.json",
+        "module": "quanthus.stage_learning.p5_synthetic_runner",
+        "artifact_glob": "p5-synthetic-*",
+        "process_error": "p5_synthetic_process_failed",
+        "wall_seconds": 120,
+    },
     STAGE_HARNESS_JOB: {
         "config": "config/stage-learning/harness.v1.json",
         "module": "quanthus.stage_learning.harness",
@@ -4385,6 +4393,39 @@ def _paths(args: argparse.Namespace) -> StageWorkerPaths:
     )
 
 
+def _submit_p5_synthetic(paths: StageWorkerPaths, *, code_revision: str) -> dict[str, Any]:
+    """One engineering fixture per code/config identity; never reserve formal P5 seeds."""
+    import fcntl
+
+    key = _digest({"kind": P5_SYNTHETIC_JOB, "code_revision": code_revision,
+                   "config": _JOB_SPECS[P5_SYNTHETIC_JOB]["config"]}).removeprefix("sha256:")
+    root = paths.control_root / "p5-synthetic-submissions"
+    root.mkdir(parents=True, exist_ok=True)
+    with (root / "submit.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        marker = root / f"{key}.json"
+        existed = marker.exists()
+        if existed:
+            job = StageJob.from_dict(json.loads(marker.read_text()))
+            if (
+                job.code_revision != code_revision
+                or job.kind != P5_SYNTHETIC_JOB
+                or job.job_id != "stage_" + key[:32]
+            ):
+                raise StageWorkerError("P5 synthetic idempotency marker differs")
+        else:
+            job = StageJob("stage_" + key[:32], P5_SYNTHETIC_JOB, code_revision,
+                           _JOB_SPECS[P5_SYNTHETIC_JOB]["config"], _utc_now())
+            _atomic_json(marker, job.to_dict())
+        # Repair only the crash before queue publication, never a claimed/running/terminal job.
+        queue = paths.queue / f"{job.job_id}.json"
+        if not any(path.exists() for path in (queue, paths.claimed / queue.name,
+                                              paths.status / queue.name)):
+            _atomic_json(queue, job.to_dict())
+        result = _idempotent_stage_submission(paths, job)
+        return {**result, "idempotent_reuse": existed, "formal_seed_budget_consumed": 0}
+
+
 def submit_job(
     paths: StageWorkerPaths,
     *,
@@ -4397,6 +4438,8 @@ def submit_job(
     spec = _JOB_SPECS.get(kind)
     if spec is None:
         raise StageWorkerError("submit kind is not admitted")
+    if kind == P5_SYNTHETIC_JOB:
+        return _submit_p5_synthetic(paths, code_revision=code_revision)
     prepare_retry_of: StageJob | None = None
     positive_instability_quantitative_d1_retry_of: StageJob | None = None
     positive_instability_quantitative_d1_recovery_of: StageJob | None = None

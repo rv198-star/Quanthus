@@ -58,7 +58,25 @@ successor.
 
 ## Current recovery checkpoint
 
-As of the recovery on 2026-10-02:
+The 2026-10-02 continuation is preparing the permitted early closeout. Proposed conclusion:
+`INCONCLUSIVE` because this generation's input and independent-reference qualification were not
+established. It is not global data insufficiency or model ineffectiveness. See
+`../acceptance/p3-p5-bounded-closeout-20261002.md` and
+`config/research/p3-p5-closeout-20261002.v1.json`; independent review and ordered live issue
+dispositions are pending. No formal training or protected-year read is authorized by this proposal.
+
+CN01 physical inventory is complete at manifest/file-property level: 120 bar files, 120 tradability
+files and 10 calendars for 2012–2021; no payload opened. Exact source selection is B's authority and
+does not require the old RX6800 package specifically. ACTIVE population, payload hashes and
+independent reference capacity remain unknown. C/D retain tested partial synthetic engineering;
+T1, real-data materialization and full Worker orphan recovery were not completed.
+
+Unique next action: finalize the evidence review and lawful NOT_RUN dispositions before E/F/G/H
+closeout. Do not restart asset searches or interpret any negative close as input acceptance.
+
+### Historical first recovery checkpoint — 2026-10-02
+
+Before the continuation and corrected source-selection interpretation:
 
 - the owner delegated technical execution and convergence of P3/P5 within their frozen contracts;
   this does not lower acceptance gates or open protected years, P6, production or trading;
@@ -81,7 +99,7 @@ As of the recovery on 2026-10-02:
   prove the entire authorized development population lacks capacity;
 - E / #405 remains inactive. Do not use unqualified or rule-only references to start training.
 
-Unique next action: locate a verified permitted copy of the RX6800 source/correction and reference
+Historical next action (superseded): locate a verified permitted copy of the RX6800 source/correction and reference
 ledgers, then freeze the P5-specific 2012-2021 manifest before any market-row read. Preserve unknown
 capacity as null. Do not provision another worker or rerun the completed synthetic probe merely to
 replace this missing input evidence. See `../acceptance/p3-p5-convergence-recovery-20261002.md`.

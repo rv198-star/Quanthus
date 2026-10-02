@@ -1,5 +1,9 @@
 # P3/P5 recovery and engineering evidence — 2026-10-02
 
+This is the preserved first recovery checkpoint. Its input-location-only next action was superseded
+by `p3-p5-bounded-closeout-20261002.md`, which records subsequent inventory, synthetic adapter work,
+and the allowed early-closeout path. Do not interpret this older checkpoint as current routing.
+
 Disposition: `ENGINEERING_RECOVERY_INPUT_LOCATION_BLOCKED`. This is not P3 B-R1/B acceptance,
 P5 B/C/D acceptance, a terminal research conclusion, or permission to start P3 D / P5 E.
 

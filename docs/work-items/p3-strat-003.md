@@ -114,7 +114,20 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-Current recovery on 2026-10-02:
+The 2026-10-02 continuation is preparing the permitted early failure closeout under #317/#322.
+Proposed outcome: `invalid_execution_evidence`; hypothesis support remains `inconclusive`.
+Bounded recovery disposition `DIAGNOSTIC_INPUT_UNAVAILABLE` describes the actual authorized
+metadata investigation, not a formal diagnostic Job. #319 remains NO_PASS and B unaccepted;
+S2/S3/new formal B/D/cold reproduction are NOT_RUN. See
+`../acceptance/p3-p5-bounded-closeout-20261002.md` and
+`config/research/p3-p5-closeout-20261002.v1.json`.
+
+Unique next action: complete independent evidence review, then dispose #412 and #321 with explicit
+negative/NOT_RUN reasons before #322 early review. No reconstruction or new source campaign starts.
+
+### Historical first recovery checkpoint — 2026-10-02
+
+Before the bounded closeout continuation:
 
 - owner delegated P3/P5 execution and convergence within the existing frozen contracts;
 - live #412 remains open/blocked; #319 remains NO_PASS and unaccepted, D/E remain blocked;
@@ -131,7 +144,7 @@ Current recovery on 2026-10-02:
 - current user instructions explicitly retire OCI. Later conflicting repository prose is not
   authority to access that node in this recovery.
 
-Unique next action: obtain the exact location of an already retained candidate and sealed sources on
+Historical next action (superseded): obtain the exact location of an already retained candidate and sealed sources on
 a permitted NexusAgent node. If no such input survives, record the diagnostic-unavailable stop with
 its actual observation limits; do not reconstruct it. Do not submit a placeholder Job on a new empty
 node to manufacture an unavailable receipt. See

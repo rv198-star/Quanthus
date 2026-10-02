@@ -21,6 +21,17 @@ class P5AssessmentError(ValueError):
     """Raised when an assessment input violates the frozen P5 contract."""
 
 
+def validate_trainable_heads(codes: Sequence[int]) -> tuple[int, ...]:
+    if any(
+        type(code) is not int or code not in range(1, 13) or code in INELIGIBLE_HEADS
+        for code in codes
+    ):
+        raise P5AssessmentError("head set must contain B-eligible integer codes")
+    if tuple(sorted(set(codes))) != tuple(codes):
+        raise P5AssessmentError("head set must be ordered and unique")
+    return tuple(codes)
+
+
 class DecisionState(str, Enum):
     ASSERT_POSITIVE = "ASSERT_POSITIVE"
     ASSERT_NEGATIVE = "ASSERT_NEGATIVE"
@@ -125,12 +136,15 @@ def masked_binary_cross_entropy(
     probabilities: Sequence[Sequence[float]],
     labels: Sequence[Sequence[int | None]],
     applicability: Sequence[Sequence[bool | None]],
+    *,
+    trainable_heads: Sequence[int] = (1, 2, 3, 4, 5, 6, 10, 11, 12),
 ) -> float:
     """Return mean BCE over definite, applicable labels only.
 
     ``None`` labels include ambiguous, unjudgeable, and unreviewed references.  They are not
     negatives.  ``False`` and ``None`` applicability are also excluded rather than recoded.
     """
+    validate_trainable_heads(trainable_heads)
     if not (len(probabilities) == len(labels) == len(applicability)):
         raise P5AssessmentError("masked BCE batch dimensions differ")
     losses: list[float] = []
@@ -139,8 +153,15 @@ def masked_binary_cross_entropy(
     ):
         if not (len(score_row) == len(label_row) == len(applicable_row) == 12):
             raise P5AssessmentError("masked BCE requires twelve aligned heads")
-        for score, label, applies in zip(score_row, label_row, applicable_row, strict=True):
-            if label is None or applies is not True:
+        for code, (score, label, applies) in enumerate(
+            zip(score_row, label_row, applicable_row, strict=True), 1
+        ):
+            if (
+                code not in trainable_heads
+                or code in INELIGIBLE_HEADS
+                or label is None
+                or applies is not True
+            ):
                 continue
             if label not in (0, 1):
                 raise P5AssessmentError("definite labels must be binary")
@@ -364,12 +385,20 @@ class FixedBaselineSet:
         self.config = config or BaselineConfig()
         self._models: dict[int, Any] = {}
 
+    @property
+    def trained_heads(self) -> tuple[int, ...]:
+        return tuple(sorted(self._models))
+
     def fit(
         self,
         features: Sequence[Sequence[float]],
         labels: Sequence[Sequence[int | None]],
         applicability: Sequence[Sequence[bool | None]],
+        *,
+        trainable_heads: Sequence[int] = (1, 2, 3, 4, 5, 6, 10, 11, 12),
     ) -> FixedBaselineSet:
+        self._models.clear()
+        validate_trainable_heads(trainable_heads)
         if not (len(features) == len(labels) == len(applicability)) or not features:
             raise P5AssessmentError("baseline training batches are empty or unaligned")
         try:
@@ -383,10 +412,9 @@ class FixedBaselineSet:
             raise P5AssessmentError("baseline features must be a finite two-dimensional matrix")
         if any(len(row) != 12 for row in labels) or any(len(row) != 12 for row in applicability):
             raise P5AssessmentError("baseline labels/applicability require twelve heads")
-        self._models.clear()
         fitted_models: dict[int, Any] = {}
         for code in range(1, 13):
-            if code in INELIGIBLE_HEADS:
+            if code in INELIGIBLE_HEADS or code not in trainable_heads:
                 continue
             index = code - 1
             selected = [
@@ -490,6 +518,8 @@ def build_t0_model(config: TemporalEncoderConfig | None = None) -> Any:
             patches = frozen.window_sessions // frozen.patch_sessions
             shape = (batch, patches, frozen.patch_sessions * frozen.input_channels)
             clean = values.masked_fill(actual_missing.bool() | artificial_mask.bool(), 0.0)
+            if not torch.isfinite(clean).all():
+                raise P5AssessmentError("T0 observed values must be finite")
             tokens = self.value_projection(clean.reshape(shape))
             tokens = tokens + self.actual_missing_projection(actual_missing.float().reshape(shape))
             tokens = tokens + self.artificial_mask_projection(

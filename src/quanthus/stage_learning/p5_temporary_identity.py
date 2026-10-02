@@ -247,17 +247,26 @@ def inspect_dimensions(connection: Any, paths: dict[str, Path]) -> dict[str, Any
 def inspect_session_identity(connection: Any) -> dict[str, Any]:
     """Account for every bar slot; effective-interval matches never imply as-known."""
     started = time.monotonic()
-    connection.execute("""
+    connection.execute(
+        """
         CREATE TABLE session_identity_counts AS
         WITH slots AS (
           SELECT b.rowid AS bar_id, b.listing_id, c.venue_id, c.rowid AS calendar_version,
-                 c.trade_date::TIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS session_at
+                 c.trade_date::TIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS session_at,
+                 coalesce(b.interval_size='1d' AND b.price_basis='UNADJUSTED', false) bar_admitted,
+                 coalesce(c.venue_id IN (?, ?) AND c.session_type='REGULAR_DAY'
+                          AND c.is_open, false) calendar_admitted,
+                 coalesce(CAST(b.observation_start AT TIME ZONE 'Asia/Shanghai' AS DATE)
+                          = c.trade_date, false) date_aligned
           FROM dwd_security_bar b
           LEFT JOIN dwd_trading_calendar c ON b.calendar_session_id=c.calendar_session_id
         )
         SELECT t.bar_id, count(DISTINCT l.rowid) AS listing_versions,
                count(s.rowid) AS security_versions,
-               count(DISTINCT t.calendar_version) AS calendar_versions
+               count(DISTINCT t.calendar_version) AS calendar_versions,
+               bool_and(t.bar_admitted) bar_admitted,
+               bool_and(t.calendar_admitted) calendar_admitted,
+               bool_and(t.date_aligned) date_aligned
         FROM slots t
         LEFT JOIN dwd_listing l ON l.listing_id=t.listing_id AND l.venue_id=t.venue_id
           AND l.effective_from<=t.session_at
@@ -266,12 +275,16 @@ def inspect_session_identity(connection: Any) -> dict[str, Any]:
           AND s.effective_from<=t.session_at
           AND (s.effective_to IS NULL OR t.session_at<s.effective_to)
         GROUP BY t.bar_id
-        """)
+        """,
+        list(VENUES),
+    )
     population = connection.execute("SELECT count(*) FROM dwd_security_bar").fetchone()[0]
     counts = dict(
         connection.execute("""
         SELECT CASE
-          WHEN calendar_versions<>1 THEN 'calendar_unqualified'
+          WHEN calendar_versions<>1 OR NOT calendar_admitted THEN 'calendar_unqualified'
+          WHEN NOT bar_admitted THEN 'bar_scope_unqualified'
+          WHEN NOT date_aligned THEN 'session_date_unqualified'
           WHEN listing_versions=0 THEN 'listing_missing'
           WHEN listing_versions>1 THEN 'listing_ambiguous'
           WHEN security_versions=0 THEN 'security_missing'

@@ -54,6 +54,51 @@ def inspect(paths):
         connection.close()
 
 
+@pytest.mark.parametrize(
+    "change,reason",
+    [
+        ("", "unique_retrospective_identity"),
+        (
+            "UPDATE dwd_security_bar SET observation_start='2013-01-04 15:00:00+08:00'",
+            "session_date_unqualified",
+        ),
+        (
+            "UPDATE dwd_security_bar SET observation_start='2012-01-03 16:00:00+00:00'",
+            "unique_retrospective_identity",
+        ),
+        ("UPDATE dwd_security_bar SET price_basis='ADJUSTED'", "bar_scope_unqualified"),
+        ("UPDATE dwd_trading_calendar SET is_open=false", "calendar_unqualified"),
+        ("UPDATE dwd_trading_calendar SET session_type='OTHER'", "calendar_unqualified"),
+        ("UPDATE dwd_trading_calendar SET venue_id='not_admitted'", "calendar_unqualified"),
+        ("UPDATE dwd_listing SET effective_to='2012-01-04 00:00:00+08:00'", "listing_missing"),
+        ("UPDATE dwd_security SET effective_to='2012-01-04 00:00:00+08:00'", "security_missing"),
+    ],
+)
+def test_session_scope_and_half_open_boundaries(tmp_path, change, reason):
+    paths = fixture_paths(tmp_path)
+    connection = duckdb.connect()
+    try:
+        module.inspect_dimensions(connection, paths)
+        connection.execute(
+            "CREATE TABLE dwd_trading_calendar AS SELECT 'day1'::VARCHAR calendar_session_id, "
+            "?::VARCHAR venue_id, DATE '2012-01-04' trade_date, "
+            "'REGULAR_DAY'::VARCHAR session_type, true is_open",
+            [module.VENUES[0]],
+        )
+        connection.execute(
+            "CREATE TABLE dwd_security_bar AS SELECT 'listing_1'::VARCHAR listing_id, "
+            "'day1'::VARCHAR calendar_session_id, '1d'::VARCHAR interval_size, "
+            "'UNADJUSTED'::VARCHAR price_basis, "
+            "TIMESTAMPTZ '2012-01-04 15:00:00+08:00' observation_start"
+        )
+        if change:
+            connection.execute(change)
+        result = module.inspect_session_identity(connection)
+        assert result["reason_counts"] == {reason: 1}
+    finally:
+        connection.close()
+
+
 def test_shanghai_half_open_scope_and_no_qualification(tmp_path):
     result = inspect(
         fixture_paths(
@@ -133,16 +178,21 @@ def test_session_identity_keeps_missing_and_ambiguous_denominators(tmp_path):
         module.inspect_dimensions(connection, paths)
         connection.execute(
             "CREATE TABLE dwd_trading_calendar("
-            "calendar_session_id VARCHAR, venue_id VARCHAR, trade_date DATE)"
+            "calendar_session_id VARCHAR, venue_id VARCHAR, trade_date DATE, "
+            "session_type VARCHAR DEFAULT 'REGULAR_DAY', is_open BOOLEAN DEFAULT true)"
         )
         connection.execute(
-            "INSERT INTO dwd_trading_calendar VALUES ('day1', ?, '2012-01-04')", [module.VENUES[0]]
+            "INSERT INTO dwd_trading_calendar(calendar_session_id,venue_id,trade_date) "
+            "VALUES ('day1', ?, '2012-01-04')",
+            [module.VENUES[0]],
         )
         connection.execute(
-            "CREATE TABLE dwd_security_bar(listing_id VARCHAR, calendar_session_id VARCHAR)"
+            "CREATE TABLE dwd_security_bar(listing_id VARCHAR, calendar_session_id VARCHAR, "
+            "interval_size VARCHAR DEFAULT '1d', price_basis VARCHAR DEFAULT 'UNADJUSTED', "
+            "observation_start TIMESTAMPTZ DEFAULT '2012-01-04 15:00:00+08:00')"
         )
         connection.execute(
-            "INSERT INTO dwd_security_bar VALUES "
+            "INSERT INTO dwd_security_bar(listing_id,calendar_session_id) VALUES "
             "('listing_1','day1'), ('missing','day1'), ('listing_1','unknown')"
         )
         result = module.inspect_session_identity(connection)

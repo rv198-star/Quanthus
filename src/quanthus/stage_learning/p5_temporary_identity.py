@@ -1,4 +1,4 @@
-"""Temporary dimension availability only; no action/market rows or window acceptance."""
+"""Temporary historical identity joins; no price/action values or window acceptance."""
 
 from __future__ import annotations
 
@@ -13,8 +13,12 @@ from typing import Any
 from quanthus.stage_learning.p5_input_census import (
     VENUES,
     bounded_tmp,
+    census_tables,
     checked_child,
     file_digest,
+)
+from quanthus.stage_learning.p5_input_census import (
+    verify_inputs as verify_census_inputs,
 )
 
 PROPOSAL_SHA = "sha256:ef0819b57e970f53f92629e55ff8533f2999e45b6cedb111cb279d7b09fa4a69"
@@ -240,12 +244,75 @@ def inspect_dimensions(connection: Any, paths: dict[str, Path]) -> dict[str, Any
     }
 
 
-def run(repo: Path, base: Path, output: Path, revision: str) -> dict[str, Any]:
+def inspect_session_identity(connection: Any) -> dict[str, Any]:
+    """Account for every bar slot; effective-interval matches never imply as-known."""
+    started = time.monotonic()
+    connection.execute("""
+        CREATE TABLE session_identity_counts AS
+        WITH slots AS (
+          SELECT b.rowid AS bar_id, b.listing_id, c.venue_id, c.rowid AS calendar_version,
+                 c.trade_date::TIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS session_at
+          FROM dwd_security_bar b
+          LEFT JOIN dwd_trading_calendar c ON b.calendar_session_id=c.calendar_session_id
+        )
+        SELECT t.bar_id, count(DISTINCT l.rowid) AS listing_versions,
+               count(s.rowid) AS security_versions,
+               count(DISTINCT t.calendar_version) AS calendar_versions
+        FROM slots t
+        LEFT JOIN dwd_listing l ON l.listing_id=t.listing_id AND l.venue_id=t.venue_id
+          AND l.effective_from<=t.session_at
+          AND (l.effective_to IS NULL OR t.session_at<l.effective_to)
+        LEFT JOIN dwd_security s ON s.security_id=l.security_id
+          AND s.effective_from<=t.session_at
+          AND (s.effective_to IS NULL OR t.session_at<s.effective_to)
+        GROUP BY t.bar_id
+        """)
+    population = connection.execute("SELECT count(*) FROM dwd_security_bar").fetchone()[0]
+    counts = dict(
+        connection.execute("""
+        SELECT CASE
+          WHEN calendar_versions<>1 THEN 'calendar_unqualified'
+          WHEN listing_versions=0 THEN 'listing_missing'
+          WHEN listing_versions>1 THEN 'listing_ambiguous'
+          WHEN security_versions=0 THEN 'security_missing'
+          WHEN security_versions>1 THEN 'security_ambiguous'
+          ELSE 'unique_retrospective_identity' END AS reason, count(*)
+        FROM session_identity_counts GROUP BY reason ORDER BY reason
+        """).fetchall()
+    )
+    if sum(counts.values()) != population:
+        raise ValueError("SESSION_IDENTITY_DENOMINATOR_MISMATCH")
+    projected_bytes = connection.execute(
+        "SELECT coalesce(sum(octet_length(encode(to_json(t)))), 0) FROM session_identity_counts t"
+    ).fetchone()[0]
+    return {
+        "bar_slot_denominator": population,
+        "reason_counts": counts,
+        "qualified_as_known": False,
+        "ACTIVE_qualification": None,
+        "elapsed_seconds": round(time.monotonic() - started, 3),
+        "rows": population,
+        "projection_json_bytes": projected_bytes,
+        "disposition": "built_once_from_shared_TMP",
+        "lifecycle": "TMP",
+    }
+
+
+def run(
+    repo: Path, base: Path, output: Path, revision: str, census_base: Path | None = None
+) -> dict[str, Any]:
     import duckdb
 
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("EXACT_CODE_REVISION_REQUIRED")
     paths, source = verify_inputs(repo, base)
+    census_paths = None
+    if census_base is not None:
+        census_request = repo / "config/research/p5-stage-001/input-census.v1.json"
+        request = json.loads(census_request.read_text())
+        census_paths = verify_census_inputs(census_base, request)
+        source["census_request_sha256"] = file_digest(census_request)
+        source["existing_census_selection_digest"] = request["selection_digest"]
     output.mkdir(parents=False, exist_ok=False, mode=0o700)
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="p5-identity-", dir=output) as tmp:
@@ -257,6 +324,23 @@ def run(repo: Path, base: Path, output: Path, revision: str) -> dict[str, Any]:
         try:
             with bounded_tmp(connection, temporary, deadline=started + 600, limit=4294967296):
                 result = inspect_dimensions(connection, paths)
+                if census_paths is not None:
+                    result["job_local_census"] = census_tables(connection, census_paths)
+                    result["session_identity"] = inspect_session_identity(connection)
+                    result["stage_graph_extension"] = [
+                        {
+                            "stage": "three_table_census_TMP",
+                            "depends_on": ["exact_census_integrity"],
+                        },
+                        {
+                            "stage": "session_identity",
+                            "depends_on": [
+                                "historical_listing",
+                                "historical_security",
+                                "three_table_census_TMP",
+                            ],
+                        },
+                    ]
                 result["tmp_bytes"] = sum(
                     p.stat().st_size for p in temporary.rglob("*") if p.is_file()
                 )
@@ -286,8 +370,9 @@ def main() -> None:
     for key in ("repo", "base", "output"):
         parser.add_argument("--" + key, type=Path, required=True)
     parser.add_argument("--revision", required=True)
+    parser.add_argument("--census-base", type=Path)
     args = parser.parse_args()
-    print(json.dumps(run(args.repo, args.base, args.output, args.revision)))
+    print(json.dumps(run(args.repo, args.base, args.output, args.revision, args.census_base)))
 
 
 if __name__ == "__main__":

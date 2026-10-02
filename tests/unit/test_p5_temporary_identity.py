@@ -119,3 +119,39 @@ def test_proposal_is_frozen():
         module.file_digest(root / "config/research/p5-stage-001/input-closure-proposal.v1.json")
         == module.PROPOSAL_SHA
     )
+
+
+def test_session_identity_keeps_missing_and_ambiguous_denominators(tmp_path):
+    paths = fixture_paths(
+        tmp_path,
+        extra_security=[
+            {"knowledge_from": datetime(2026, 7, 1, tzinfo=timezone.utc)},
+        ],
+    )
+    connection = duckdb.connect()
+    try:
+        module.inspect_dimensions(connection, paths)
+        connection.execute(
+            "CREATE TABLE dwd_trading_calendar("
+            "calendar_session_id VARCHAR, venue_id VARCHAR, trade_date DATE)"
+        )
+        connection.execute(
+            "INSERT INTO dwd_trading_calendar VALUES ('day1', ?, '2012-01-04')", [module.VENUES[0]]
+        )
+        connection.execute(
+            "CREATE TABLE dwd_security_bar(listing_id VARCHAR, calendar_session_id VARCHAR)"
+        )
+        connection.execute(
+            "INSERT INTO dwd_security_bar VALUES "
+            "('listing_1','day1'), ('missing','day1'), ('listing_1','unknown')"
+        )
+        result = module.inspect_session_identity(connection)
+        assert result["bar_slot_denominator"] == 3
+        assert result["reason_counts"] == {
+            "calendar_unqualified": 1,
+            "listing_missing": 1,
+            "security_ambiguous": 1,
+        }
+        assert result["qualified_as_known"] is False
+    finally:
+        connection.close()

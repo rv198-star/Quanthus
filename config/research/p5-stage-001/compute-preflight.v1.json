@@ -1,0 +1,54 @@
+{
+  "schema_version": "quanthus.p5-stage-001-compute-preflight.v1",
+  "work_item": "P5-STAGE-001-C",
+  "state": "LOCAL_CPU_T0_SYNTHETIC_PATH_VALID_RX6800_UNVERIFIED",
+  "as_of": "2026-09-22",
+  "source_commit": "8bd989dfae98acd4f28799a376ee0ca5df9162aa",
+  "host": {
+    "model": "Mac mini Mac16,10",
+    "cpu": "Apple M4 10 cores",
+    "ram_bytes": 17179869184,
+    "os": "macOS 26.6 build 25G72",
+    "architecture": "arm64",
+    "gpu": "Apple M4 integrated 10 cores",
+    "RX6800_present": false,
+    "filesystem_available_kib": 687901564
+  },
+  "environment": {
+    "repository_python_requirement": ">=3.10",
+    "default_python": "3.9.6",
+    "python_3_12_available": true,
+    "numpy_default_version": "2.0.2",
+    "scikit_learn_default": "missing",
+    "torch_isolated_probe": "2.14.0",
+    "torch_default": "missing",
+    "duckdb_default": "missing",
+    "pyarrow_default": "missing"
+  },
+  "sub_2x_GPU_primary_rule_frozen_before_benchmark": {
+    "allowed": true,
+    "requirements": [
+      "all GPU hard correctness and recovery gates pass",
+      "measured total node-hours for the frozen admitted workload are lower than CPU",
+      "one-time backend setup and maintenance fit the two-engineering-hour investigation budget",
+      "no host driver, system, source-built ROCm, or worker-environment mutation is required"
+    ],
+    "default_when_any_requirement_fails": "CPU_PRIMARY"
+  },
+  "benchmark": {
+    "CPU_full_path": "PASS_T0_SYNTHETIC_ONLY",
+    "RX6800_full_path": "UNAVAILABLE_WRONG_HOST",
+    "three_warmed_measurements": true,
+    "batch_size": 32,
+    "median_end_to_end_seconds": 0.0275029580006958,
+    "median_windows_per_second": 1163.5112121100003,
+    "checkpoint_restart_resume": true,
+    "checkpoint_bytes": 10211066,
+    "nan_or_infinite_observed": false,
+    "hidden_CPU_fallback_checked": "not_applicable_cpu_only",
+    "result_path": "config/research/p5-stage-001/cpu-probe-result.v1.json"
+  },
+  "decision": "CPU_PATH_PROVISIONALLY_VALID_RX6800_AND_T1_UNVERIFIED",
+  "unique_next_action": "Use NexusAgent for the same full-path RX6800 benchmark if that governed channel is available, and combine B window counts with T1 admission before freezing node-hour estimates or a final backend decision.",
+  "claim_ceiling": "This is an environment receipt, not C acceptance and not evidence that the RX6800 node is offline. It cannot select GPU_PRIMARY or estimate final node-hours before B readiness and D executable code exist."
+}

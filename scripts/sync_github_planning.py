@@ -314,6 +314,7 @@ P3_STRAT_003_DESIGN_PATH = "docs/work-items/p3-strat-003.md"
 P3_STRAT_003_CHILD_IDS = (
     "P3-STRAT-003-A",
     "P3-STRAT-003-B",
+    "P3-STRAT-003-B-R1",
     "P3-STRAT-003-C",
     "P3-STRAT-003-C-R1",
     "P3-STRAT-003-D",
@@ -393,6 +394,27 @@ P3_STRAT_003_IMPLEMENTATION_SPECS = {
             "P6 Worker, ledger, budget and mutable pointers remain untouched.",
         ),
     ),
+    "P3-STRAT-003-B-R1": IssueImplementationSpec(
+        design_path=P3_STRAT_003_DESIGN_PATH,
+        approach=(
+            "Inspect retained failed-B identity/date columns and sealed industry sources under "
+            "the frozen diagnostic request; preserve the original B NO_PASS evidence."
+        ),
+        owned_paths=(
+            "config/research/p3-strat-003/industry-inspection.v1.json",
+            "src/quanthus/expert_strategy/p3_strat_003_industry_inspection.py",
+        ),
+        decision_gates=(
+            "Missing retained inputs yield DIAGNOSTIC_INPUT_UNAVAILABLE; candidate reconstruction "
+            "and replacement-source collection are forbidden.",
+            "A completed inspection does not accept B or unlock D; P6 remains untouched.",
+        ),
+        verification=(
+            "Verify source identities and report candidate-event occurrences separately from "
+            "distinct-security coverage.",
+            "No strategy/economic result or outcome label is read.",
+        ),
+    ),
     "P3-STRAT-003-C": IssueImplementationSpec(
         design_path=P3_STRAT_003_DESIGN_PATH,
         approach=(
@@ -439,14 +461,17 @@ P3_STRAT_003_IMPLEMENTATION_SPECS = {
             "No 2025/2026 outcome label may be read before D.",
         ),
         verification=(
-            "Candidate input checksum, scope, industry mapping and replay-bundle identity fail closed.",
-            "Existing formal attribution and C runner regressions remain green with no P6 mutation.",
+            "Candidate input checksum, scope, industry mapping and replay-bundle identity "
+            "fail closed.",
+            "Existing formal attribution and C runner regressions remain green with no "
+            "P6 mutation.",
         ),
     ),
     "P3-STRAT-003-D": IssueImplementationSpec(
         design_path=P3_STRAT_003_DESIGN_PATH,
         approach=(
-            "Bind exact A request + B input/candidate manifest + C-R1 code revision, then run one primary "
+            "Bind exact A request + B input/candidate manifest + C-R1 code revision, then run "
+            "one primary "
             "four-variant composite batch and one independent cold reproduction with no "
             "cross-batch intermediate reuse."
         ),
@@ -708,10 +733,17 @@ IMPLEMENTATION_SPECS = {
     **P3_STRAT_003_IMPLEMENTATION_SPECS,
     **P6_IMPLEMENTATION_SPECS,
 }
-PROGRAM_EPIC_IDS = frozenset({
-    "PK-WORKER-000", "P3-EXPERT-000", "P3-STRAT-003", "P3-STRUCT-004", "P3-DICT-002",
-    "P6-000", "P3-STAGE-001",
-})
+PROGRAM_EPIC_IDS = frozenset(
+    {
+        "PK-WORKER-000",
+        "P3-EXPERT-000",
+        "P3-STRAT-003",
+        "P3-STRUCT-004",
+        "P3-DICT-002",
+        "P6-000",
+        "P3-STAGE-001",
+    }
+)
 
 MILESTONES = (
     "P1 Data Foundation",

@@ -1,0 +1,49 @@
+{
+  "schema_version": "quanthus.p5-stage-001-successor-validation-evidence.v1",
+  "work_items": [
+    "P5-STAGE-001-B",
+    "P5-STAGE-001-C",
+    "P5-STAGE-001-D"
+  ],
+  "source_commit": "8bd989dfae98acd4f28799a376ee0ca5df9162aa",
+  "branch": "issue-p5-stage-001-next",
+  "as_of": "2026-09-22",
+  "focused_contract": {
+    "command_scope": [
+      "tests/contract/test_p5_stage_001_a_preregistration.py",
+      "tests/unit/test_p5_stage_assessment.py"
+    ],
+    "environment": "Python 3.12.9; pytest 8.4.2; scikit-learn and torch installed in an isolated uv environment",
+    "result": "29_passed",
+    "ruff_changed_files": "pass",
+    "git_diff_check": "pass",
+    "json_parse": "pass"
+  },
+  "cpu_probe": {
+    "result": "PASS_T0_SYNTHETIC_ONLY",
+    "result_path": "config/research/p5-stage-001/cpu-probe-result.v1.json",
+    "fresh_process_checkpoint_resume": true,
+    "market_data_rows_read": 0
+  },
+  "repository_checks": {
+    "doctor": "pass",
+    "compileall": "pass",
+    "planning_check": "fail_pre_existing_P3_STRAT_003_B_R1_missing_governing_LLD_row",
+    "full_pytest": "2693_passed_7_skipped_95_failed",
+    "full_pytest_disposition": "not_a_successor_acceptance_basis; failures are outside changed P5 files and include the same planning inconsistency plus macOS /var versus /private/var path identity and the three sealed BaoStock socket failures; a clean-main reproduction was not run in this checkpoint"
+  },
+  "changed_scope": [
+    "bounded successor activation and recovery routing",
+    "outcome-blind nullable readiness preflight",
+    "local compute inventory and CPU T0 synthetic probe",
+    "fixed L/G adapters and fixed T0 synthetic contract primitives"
+  ],
+  "not_completed": [
+    "B exact source manifest and non-null readiness counts",
+    "RX6800 full-path benchmark",
+    "T1 pre-result admission and masked reconstruction path",
+    "B/C/D independent acceptance",
+    "E activation"
+  ],
+  "claim_ceiling": "This evidence supports a B/C/D start checkpoint and a working local synthetic T0 path only. It does not accept B, C, or D and does not support model quality, RX6800 availability, E training, promotion, production, strategy, or trading claims."
+}

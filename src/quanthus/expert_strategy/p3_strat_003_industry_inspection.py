@@ -121,11 +121,7 @@ def _candidate_inventory(
         / str(failed_job["claim_generation"])
         / relative
     ).resolve()
-    if (
-        not path.is_file()
-        or path.is_symlink()
-        or not path.is_relative_to(run_root.resolve())
-    ):
+    if not path.is_file() or path.is_symlink() or not path.is_relative_to(run_root.resolve()):
         return {
             "status": "missing_or_unreadable",
             "path": str(path),
@@ -179,12 +175,7 @@ def _candidate_inventory(
             """,
             [str(path)],
         ).fetchone()
-        if (
-            bad is None
-            or duplicates is None
-            or int(bad[0])
-            or int(duplicates[0])
-        ):
+        if bad is None or duplicates is None or int(bad[0]) or int(duplicates[0]):
             _fail("failed candidate projection identity rows are invalid")
         identity_ambiguity = connection.execute(
             """
@@ -395,28 +386,19 @@ def _p4_reference(
         supplement = source_receipt.get("historical_supplement")
         source_receipt_digest = source_receipt.get("content_digest")
         source_receipt_payload = {
-            key: value
-            for key, value in source_receipt.items()
-            if key != "content_digest"
+            key: value for key, value in source_receipt.items() if key != "content_digest"
         }
         supplement_digest = (
-            supplement.get("content_digest")
-            if isinstance(supplement, dict)
-            else None
+            supplement.get("content_digest") if isinstance(supplement, dict) else None
         )
         supplement_payload = (
-            {
-                key: value
-                for key, value in supplement.items()
-                if key != "content_digest"
-            }
+            {key: value for key, value in supplement.items() if key != "content_digest"}
             if isinstance(supplement, dict)
             else {}
         )
         dwd_base = adm_manifest.get("dwd_base")
         if (
-            source_receipt.get("schema_version")
-            != "quanthus.p4-adm-static-industry-receipt.v1"
+            source_receipt.get("schema_version") != "quanthus.p4-adm-static-industry-receipt.v1"
             or not isinstance(historical_reference, dict)
             or not isinstance(supplement, dict)
             or not isinstance(dwd_base, dict)
@@ -424,11 +406,9 @@ def _p4_reference(
             or source_receipt_digest != digest_value(source_receipt_payload)
             or not isinstance(supplement_digest, str)
             or supplement_digest != digest_value(supplement_payload)
-            or supplement_digest
-            != historical_reference.get("source_content_digest")
+            or supplement_digest != historical_reference.get("source_content_digest")
             or mapping.source.source_revision != source_receipt_digest
-            or source_receipt.get("dwd_base_package_id")
-            != dwd_base.get("package_id")
+            or source_receipt.get("dwd_base_package_id") != dwd_base.get("package_id")
         ):
             _fail("P4 historical industry provenance differs from its sealed policy")
         dwd_membership_count = source_receipt.get("dwd_membership_count")
@@ -495,22 +475,70 @@ def _p4_reference(
     return {"runs": receipts}, exact, by_code
 
 
+def _verify_dwd_industry_source(base_root: Path, *, manifest_sha256: str) -> None:
+    """Verify the frozen Base and only the two industry payloads before any row scan."""
+    manifest_path = base_root / "manifest.json"
+    ready_path = base_root / "READY"
+    if manifest_path.is_symlink() or ready_path.is_symlink():
+        _fail("DWD industry source metadata must not be symlinked")
+    try:
+        if _sha256(manifest_path) != manifest_sha256:
+            _fail("DWD industry source manifest differs from frozen Base")
+        if ready_path.read_text(encoding="utf-8").strip() != manifest_sha256:
+            _fail("DWD industry source READY differs from frozen Base")
+        # The exact frozen digest bounds these metadata bytes. No market payload is read here.
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        tables = {"dwd_company_industry_membership", "dwd_industry_node"}
+        found: set[str] = set()
+        seen: set[str] = set()
+        for entry in manifest["files"]:
+            relative = str(entry["path"])
+            matches = {
+                table
+                for table in tables
+                if relative.endswith(f"/{table}.parquet") or f"/{table}/" in relative
+            }
+            if not matches:
+                continue
+            if relative in seen:
+                _fail("DWD industry source contains a duplicate payload")
+            seen.add(relative)
+            path = _relative_child(base_root, relative, "DWD industry payload")
+            original = base_root / relative
+            if original.is_symlink() or any(
+                parent.is_symlink()
+                for parent in original.parents
+                if parent != base_root and parent.is_relative_to(base_root)
+            ):
+                _fail("DWD industry payload must not be symlinked")
+            if path.stat().st_size != entry["size_bytes"] or _sha256(path) != entry["sha256"]:
+                _fail("DWD industry payload differs from frozen Base inventory")
+            found.update(matches)
+        if found != tables:
+            _source_unavailable("DWD frozen Base lacks an industry source table")
+    except ExpertEvaluationError:
+        raise
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        _source_unavailable("DWD industry source metadata or payload is unreadable", cause=exc)
+
+
 def _dwd_reference(
     base_root: Path,
     identities: list[dict[str, Any]],
+    *,
+    manifest_sha256: str,
 ) -> tuple[dict[str, str], dict[str, str]]:
     try:
         import duckdb
     except ModuleNotFoundError as exc:
         raise ExpertEvaluationError("dependency_missing", "duckdb") from exc
 
+    _verify_dwd_industry_source(base_root, manifest_sha256=manifest_sha256)
     try:
         membership_expression = _read_parquet_expression(
             _table_paths(base_root, "dwd_company_industry_membership")
         )
-        node_expression = _read_parquet_expression(
-            _table_paths(base_root, "dwd_industry_node")
-        )
+        node_expression = _read_parquet_expression(_table_paths(base_root, "dwd_industry_node"))
     except PhysicalEventScanError as exc:
         _source_unavailable(
             "DWD static industry source tables are unavailable",
@@ -524,10 +552,7 @@ def _dwd_reference(
         )
         connection.executemany(
             "INSERT INTO candidate_identity VALUES (?, ?)",
-            [
-                (identity["security_id"], identity["company_id"])
-                for identity in identities
-            ],
+            [(identity["security_id"], identity["company_id"]) for identity in identities],
         )
         rows = connection.execute(
             f"""
@@ -692,11 +717,7 @@ def _coverage(
         if identity["in_decision_scope"]:
             decision_counts[status] += 1
 
-        if (
-            dwd_value is not None
-            and p4_value is not None
-            and dwd_value != p4_value[0]
-        ):
+        if dwd_value is not None and p4_value is not None and dwd_value != p4_value[0]:
             conflicts.append(
                 {
                     **identity,
@@ -711,17 +732,11 @@ def _coverage(
                 str(identity["venue_id"]),
             )
             p4_code_matches = p4_by_code.get(identity_key, [])
-            if (
-                len(p4_code_matches) == 1
-                and p4_code_matches[0] != security_id
-            ):
+            if len(p4_code_matches) == 1 and p4_code_matches[0] != security_id:
                 p4_code_only_matches += 1
 
             legacy_code_matches = legacy_by_code.get(identity_key, [])
-            if (
-                len(legacy_code_matches) == 1
-                and legacy_code_matches[0] != security_id
-            ):
+            if len(legacy_code_matches) == 1 and legacy_code_matches[0] != security_id:
                 legacy_code_only_matches += 1
             elif len(legacy_code_matches) > 1:
                 legacy_code_ambiguous_matches += 1
@@ -731,9 +746,7 @@ def _coverage(
                     **identity,
                     "dwd_reason": dwd_reasons.get(security_id),
                     "legacy_p3_exact_identity": security_id in legacy,
-                    "legacy_p3_code_venue_match_count": len(
-                        legacy_code_matches
-                    ),
+                    "legacy_p3_code_venue_match_count": len(legacy_code_matches),
                 }
             )
 
@@ -747,9 +760,7 @@ def _coverage(
         "dwd_p4_conflict_count": len(conflicts),
         "p4_code_venue_only_reference_match_count": p4_code_only_matches,
         "legacy_p3_code_venue_only_match_count": legacy_code_only_matches,
-        "legacy_p3_code_venue_ambiguous_match_count": (
-            legacy_code_ambiguous_matches
-        ),
+        "legacy_p3_code_venue_ambiguous_match_count": (legacy_code_ambiguous_matches),
         "remaining_unresolved_samples": unresolved[:sample_limit],
         "conflict_samples": conflicts[:sample_limit],
     }
@@ -809,9 +820,7 @@ def _seal(
     }
     manifest = {**payload, "result_digest": digest_value(payload)}
     manifest_data = canonical_json_bytes(manifest) + b"\n"
-    ready = (
-        "sha256:" + hashlib.sha256(manifest_data).hexdigest() + "\n"
-    ).encode("ascii")
+    ready = ("sha256:" + hashlib.sha256(manifest_data).hexdigest() + "\n").encode("ascii")
     if len(summary_data) + len(manifest_data) + len(ready) > output_limit:
         _fail("complete industry inspection artifact exceeds output limit")
     output.mkdir(parents=True)
@@ -867,12 +876,23 @@ def build_industry_inspection(
 
     decision_start = date.fromisoformat(raw["scope"]["decision_start"])
     decision_end = date.fromisoformat(raw["scope"]["decision_end"])
-    candidate, identities = _candidate_inventory(
-        run_root,
-        raw["failed_job"],
-        decision_start=decision_start,
-        decision_end=decision_end,
-    )
+    try:
+        candidate, identities = _candidate_inventory(
+            run_root,
+            raw["failed_job"],
+            decision_start=decision_start,
+            decision_end=decision_end,
+        )
+    except ExpertEvaluationError as exc:
+        if exc.reason_code != "p3_strat_003_industry_inspection_source_unavailable":
+            raise
+        candidate = {
+            "status": "missing_or_unreadable",
+            "reason_code": exc.reason_code,
+            "detail": str(exc)[:300],
+            "claim_execution_time_bytes_reproduced": False,
+        }
+        identities = []
     if not identities:
         core = {
             "disposition": UNAVAILABLE,
@@ -899,6 +919,7 @@ def build_industry_inspection(
         dwd_mapping, dwd_reasons = _dwd_reference(
             runtime.historical_base_root.resolve(),
             identities,
+            manifest_sha256=runtime.historical_base_manifest_sha256,
         )
     except ExpertEvaluationError as exc:
         core = {
@@ -917,6 +938,7 @@ def build_industry_inspection(
             "failed_job": raw["failed_job"],
             "candidate_projection": candidate,
             "legacy_p3_mapping": legacy_receipt,
+            "dwd_base_manifest_sha256": runtime.historical_base_manifest_sha256,
             "dwd_reason_counts": dict(sorted(Counter(dwd_reasons.values()).items())),
             "p4_reference": p4_receipt,
             "coverage": _coverage(
@@ -970,9 +992,7 @@ def verify_industry_inspection_artifact(
             "industry inspection READY",
         ) from exc
 
-    payload = {
-        key: value for key, value in manifest.items() if key != "result_digest"
-    }
+    payload = {key: value for key, value in manifest.items() if key != "result_digest"}
     expected_file = {
         "path": "summary.json",
         "size_bytes": (root / "summary.json").stat().st_size,
@@ -1003,8 +1023,7 @@ def verify_industry_inspection_artifact(
         or manifest.get("result_digest") != digest_value(payload)
         or manifest.get("files") != {"summary": expected_file}
         or manifest.get("inspection") != summary.get("inspection")
-        or manifest.get("disposition")
-        != manifest.get("inspection", {}).get("disposition")
+        or manifest.get("disposition") != manifest.get("inspection", {}).get("disposition")
         or any(manifest.get(field) is not False for field in false_flags)
         or any(manifest.get(field) != 0 for field in zero_counts)
     ):
@@ -1034,9 +1053,7 @@ def verify_industry_inspection_artifact(
                 "remaining_unresolved_security_count": int(
                     coverage["remaining_unresolved_security_count"]
                 ),
-                "dwd_p4_conflict_count": int(
-                    coverage["dwd_p4_conflict_count"]
-                ),
+                "dwd_p4_conflict_count": int(coverage["dwd_p4_conflict_count"]),
             }
         )
     return result

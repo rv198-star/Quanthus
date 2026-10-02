@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | blocked; A, C and C-R1 accepted; B / #319 closed no-pass and unaccepted; B-R1 / #412 is the only active B continuation; D blocked by B acceptance; E blocked by D |
+| Delivery gate | generation closed invalid_execution_evidence / inconclusive; A/C/C-R1 preserved; B unaccepted; B-R1 recovery stopped; D NOT_RUN; E stop review complete |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |
@@ -114,7 +114,46 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-Last verified on 2026-09-22 after opening the bounded B-R1 successor:
+The 2026-10-02 continuation completed the permitted early failure closeout under #317/#322.
+Outcome: `invalid_execution_evidence`; hypothesis support remains `inconclusive`.
+Bounded recovery disposition `DIAGNOSTIC_INPUT_UNAVAILABLE` describes the actual authorized
+metadata investigation, not a formal diagnostic Job. #319 remains NO_PASS and B unaccepted;
+S2/S3/new formal B/D/cold reproduction are NOT_RUN. See
+`../acceptance/p3-p5-bounded-closeout-20261002.md` and
+`config/research/p3-p5-closeout-20261002.v1.json`.
+
+Current next action: none within this closed generation. #412 and #321 were closed with explicit
+stop/NOT_RUN reasons before #322's independent early review; #322 and #317 are now closed.
+No reconstruction or new source campaign starts automatically. Reopening needs a new bounded input proposal.
+
+### Historical first recovery checkpoint — 2026-10-02
+
+Before the bounded closeout continuation:
+
+- owner delegated P3/P5 execution and convergence within the existing frozen contracts;
+- live #412 remains open/blocked; #319 remains NO_PASS and unaccepted, D/E remain blocked;
+- NexusAgent is available. CN01's Base at
+  `/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2.1` has the exact frozen manifest and READY
+  (`sha256:541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b`);
+- the retained failed candidate has not been located on permitted reachable nodes. CN01 lacks both
+  known Event volume names; Hermes volume metadata is permission-denied. Host path absence alone
+  is not proof that an uninspected container volume or another migration copy is absent;
+- no market rows, candidate rebuild, formal diagnostic Job, B rerun, or D result read occurred;
+- recovery code now seals corrupt/unreadable retained candidate input as unavailable, verifies
+  frozen DWD manifest/READY/selected industry payloads before scanning, and repairs B-R1 planning
+  ownership. These engineering changes do not constitute runtime B-R1 acceptance;
+- current user instructions explicitly retire OCI. Later conflicting repository prose is not
+  authority to access that node in this recovery.
+
+Historical next action (superseded): obtain the exact location of an already retained candidate and sealed sources on
+a permitted NexusAgent node. If no such input survives, record the diagnostic-unavailable stop with
+its actual observation limits; do not reconstruct it. Do not submit a placeholder Job on a new empty
+node to manufacture an unavailable receipt. See
+`../acceptance/p3-p5-convergence-recovery-20261002.md` for this recovery's checks and limitations.
+
+### Historical B-R1 checkpoint — 2026-09-22
+
+Last verified after opening the bounded B-R1 successor:
 
 - B / #319 remains closed with `NO_PASS_STATIC_INDUSTRY_INPUT_COVERAGE`, **not accepted**.
   Its negative evidence is immutable and is not reopened or rewritten as PASS.

@@ -13,6 +13,7 @@ from quanthus.stage_learning.worker import (
     _JOB_SPECS,
     JOB_KIND,
     JOB_SCHEMA,
+    P5_SYNTHETIC_JOB,
     STAGE_ADMISSION_EXPOSURE_CAPACITY_JOB,
     STAGE_ATOMIC_PROPOSITION_ADMISSION_QUALIFIED_D1_JOB,
     STAGE_ATOMIC_PROPOSITION_G1_JOB,
@@ -327,6 +328,7 @@ def test_doctor_is_node_local_and_has_no_database_requirement(tmp_path: Path) ->
     assert result["recent_p026c_packet_failure"] is None
     assert set(result["job_kinds"]) == {
         JOB_KIND,
+        P5_SYNTHETIC_JOB,
         STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB,
         STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB,
         STAGE_REFERENCE_PILOT_JOB,
@@ -527,6 +529,7 @@ def test_worker_publishes_runtime_identity_receipt(
     assert receipt["pid"] > 0
     assert set(receipt["job_kinds"]) == {
         JOB_KIND,
+        P5_SYNTHETIC_JOB,
         STAGE_DOWNSIDE_LIFECYCLE_REFERENCE_PREPARE_JOB,
         STAGE_HIGH_SIDE_MODIFIER_REFERENCE_PREPARE_JOB,
         STAGE_REFERENCE_PILOT_JOB,

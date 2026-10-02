@@ -4,8 +4,8 @@
 | --- | --- |
 | Parent issue | #400 |
 | Milestone | #12 |
-| Current gate | A / #401 accepted; B/C/D inactive |
-| Current status | A_ACCEPTED_PREREGISTRATION_ONLY |
+| Current gate | A preserved; B unqualified; C/D partial; E/F/G NOT_RUN; H stop review complete |
+| Current status | CLOSED_GENERATION_INCONCLUSIVE_INPUT_AND_REFERENCE_QUALIFICATION_UNESTABLISHED |
 | Governing design | `../design/lld/07-research-scoring/p5-stage-001.md` |
 | Frozen request | `../../config/research/p5-stage-001/request.v1.json` |
 | Frozen targets | `../../config/research/p5-stage-001/stage-targets.v1.json` |
@@ -58,6 +58,76 @@ successor.
 
 ## Current recovery checkpoint
 
+The 2026-10-02 continuation completed the permitted early closeout. Conclusion:
+`INCONCLUSIVE` because this generation's input and independent-reference qualification were not
+established. It is not global data insufficiency or model ineffectiveness. See
+`../acceptance/p3-p5-bounded-closeout-20261002.md` and
+`config/research/p3-p5-closeout-20261002.v1.json`; independent H review and ordered live issue
+dispositions are complete. #400 and #402–#408 are closed. No training or protected-year authority opens.
+
+CN01 physical inventory is complete at manifest/file-property level: 120 bar files, 120 tradability
+files and 10 calendars for 2012–2021; no payload opened. Exact source selection is B's authority and
+does not require the old RX6800 package specifically. ACTIVE population, payload hashes and
+independent reference capacity remain unknown. C/D retain tested partial synthetic engineering;
+T1, real-data materialization and full Worker orphan recovery were not completed.
+
+Current next action: none within this closed generation. Do not restart asset searches or interpret
+any negative close as input acceptance. Reopening needs a new bounded qualified-reference/input proposal.
+
+### Historical first recovery checkpoint — 2026-10-02
+
+Before the continuation and corrected source-selection interpretation:
+
+- the owner delegated technical execution and convergence of P3/P5 within their frozen contracts;
+  this does not lower acceptance gates or open protected years, P6, production or trading;
+- main `be96a7cb3b2b7e41937aef7e5b19ab5c5fbee9f1` was merged into the PR #419 recovery branch;
+  A remains accepted and is not repeated as new progress;
+- NexusAgent is available. CN01 has the exact Base manifest and matching READY at
+  `/srv/quanthus/dwd-dws-v2/base/dwd-base-202607-v2.1`, SHA
+  `541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b`;
+  this verifies metadata only, not a P5-authorized 2012-2021 effective view;
+- the historical reference ledgers and correction are bound to RX6800, which Nexus reports offline.
+  No verified migration copy has been found on the inspected permitted nodes. No market rows have
+  been read, reference eligibility remains unknown, and B is not accepted;
+- C's local CPU/T0 synthetic probe now compares fresh-process resume against uninterrupted
+  execution, including model/optimizer/scheduler, RNG, sampler and epoch/batch cursors. The
+  fixed-size 120-session window and checkpoint input/code identities are enforced;
+- D has executable L/G and synthetic T0 primitives. T1 admission, real-data adapters, exact output
+  provenance, and worker integration remain unfinished. These are not accepted research results;
+- the existing P015/P020 reference assets are candidates for a P5 source/exposure audit. Their
+  historical sufficiency decisions do not qualify P5 heads. Their individual counts also do not
+  prove the entire authorized development population lacks capacity;
+- E / #405 remains inactive. Do not use unqualified or rule-only references to start training.
+
+Historical next action (superseded): locate a verified permitted copy of the RX6800 source/correction and reference
+ledgers, then freeze the P5-specific 2012-2021 manifest before any market-row read. Preserve unknown
+capacity as null. Do not provision another worker or rerun the completed synthetic probe merely to
+replace this missing input evidence. See `../acceptance/p3-p5-convergence-recovery-20261002.md`.
+
+### Historical start checkpoint — 2026-09-22
+
+At the original successor handoff:
+
+- live GitHub `main` and the local source both resolve to
+  `8bd989dfae98acd4f28799a376ee0ca5df9162aa`; PR #416 is merged and #401 is completed;
+- the owner explicitly activated B, C, and D in the active handoff, recorded without modifying A's
+  sealed receipt in `config/research/p5-stage-001/successor-activation.v1.json`;
+- branch `issue-p5-stage-001-next` is an independent worktree based on that source commit;
+- B produced an outcome-blind preflight with all unresolved counts kept null and Stage7/8/9 kept
+  ineligible; zero market rows were read because NexusAgent is absent from this tool context;
+- C inventoried the actual local Apple M4 host. It is not the RX6800/WSL node, so no RX6800 result or
+  offline claim is inferred; the isolated Python/CPU full-path benchmark remains next;
+- D added the first synthetic contract primitives for the fixed encoder shape, partial-label BCE,
+  required-seed aggregation, output precedence, parent applicability, T-only windows, and recovery
+  envelope; no result-bearing training occurred;
+- E / #405 remains inactive.
+
+The originally pending CPU environment, L/G adapters and checkpoint round-trip were subsequently
+implemented. They must not remain listed as unstarted work; the current checkpoint above supersedes
+those next-action statements.
+
+### Sealed A predecessor checkpoint
+
 As of 2026-09-22:
 
 - #401 completed as `A_ACCEPTED_PREREGISTRATION_ONLY` after the frozen contract tests and a fresh independent final review returned PASS with no BLOCKER/MATERIAL finding.
@@ -68,15 +138,18 @@ As of 2026-09-22:
   `config/research/p5-stage-001/request.v1.json` and
   `config/research/p5-stage-001/stage-targets.v1.json`.
 - Final independent review PASS is archived externally with the #401 closeout evidence.
-- B, C, and D remain not started; each still requires separate explicit owner activation.
+- The sealed A checkpoint states: "B, C, and D remain not started; each still requires separate
+  explicit owner activation." That historical fact is preserved; the later bounded activation above
+  is the current state.
 
 Resume order after interruption:
 
 1. verify live #401 and current branch/source SHA;
 2. read this checkpoint, then the frozen request and target set;
 3. inspect the latest A test/review receipt;
-4. continue the single unfinished A step only;
-5. never rerun accepted work merely because the chat session changed.
+4. read the successor activation and the latest B/C/D receipt for the active gate;
+5. continue only the unique next action and never rerun accepted work merely because the chat
+   session changed.
 
 ## A acceptance boundary
 
@@ -99,7 +172,7 @@ A does not need a market-data manifest, model weights, GPU benchmark, label corp
 
 ## Successor boundary
 
-B's candidate scope is predeclared but inactive:
+B's candidate scope is active only under its separately recorded bounded activation:
 
 - 2012-2021 SSE/SZSE development only;
 - exact manifest resolved and verified in B before any row read;
@@ -108,7 +181,7 @@ B's candidate scope is predeclared but inactive:
 - 2022-2026 remain closed;
 - no strategy/economic result read.
 
-C and D are likewise inactive until separately started. E cannot open until B/C/D are accepted.
+C and D have separately started synthetic work. E cannot open until B/C/D are accepted.
 
 ## Stop conditions
 

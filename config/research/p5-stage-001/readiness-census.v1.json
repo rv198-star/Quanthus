@@ -1,0 +1,45 @@
+{
+  "schema_version": "quanthus.p5-stage-001-readiness-census.v1",
+  "work_item": "P5-STAGE-001-B",
+  "state": "OUTCOME_BLIND_PREFLIGHT_SOURCE_UNAVAILABLE",
+  "as_of": "2026-09-22",
+  "source_commit": "8bd989dfae98acd4f28799a376ee0ca5df9162aa",
+  "activation_receipt": "config/research/p5-stage-001/successor-activation.v1.json",
+  "market_data_rows_read": 0,
+  "formal_labels_created": 0,
+  "exact_manifest": null,
+  "population_count": null,
+  "population_digest": null,
+  "source_runtime": {
+    "required_channel": "NexusAgent",
+    "available_in_current_session": false,
+    "disposition": "Do not infer that the node or data is offline; exact manifest resolution and row census require the governed remote channel."
+  },
+  "budgets": {
+    "maximum_unique_episodes": 1500,
+    "maximum_SSL_windows": 200000
+  },
+  "summary": {
+    "trainable_heads": null,
+    "calibratable_heads": null,
+    "evaluable_heads": null,
+    "known_ineligible_heads": 3,
+    "reason": "Exact source manifest and governed metadata are unavailable in the current local session; unknown counts remain null."
+  },
+  "readiness_matrix": [
+    {"historical_stage_code": 1, "candidate_positive_count": null, "candidate_negative_count": null, "independent_episode_count": null, "effective_time_block_count": null, "reference_source_and_exposure_grade": null, "estimated_human_adjudication_count": null, "train_capacity": null, "development_validation_capacity": null, "calibration_capacity": null, "evaluation_capacity": null, "trainable": null, "calibratable": null, "evaluable": null, "reason": "PENDING_EXACT_MANIFEST_AND_PARENT_REFERENCE_CENSUS"},
+    {"historical_stage_code": 2, "candidate_positive_count": null, "candidate_negative_count": null, "independent_episode_count": null, "effective_time_block_count": null, "reference_source_and_exposure_grade": null, "estimated_human_adjudication_count": null, "train_capacity": null, "development_validation_capacity": null, "calibration_capacity": null, "evaluation_capacity": null, "trainable": null, "calibratable": null, "evaluable": null, "reason": "PENDING_EXACT_MANIFEST_AND_REFERENCE_CENSUS"},
+    {"historical_stage_code": 3, "candidate_positive_count": null, "candidate_negative_count": null, "independent_episode_count": null, "effective_time_block_count": null, "reference_source_and_exposure_grade": null, "estimated_human_adjudication_count": null, "train_capacity": null, "development_validation_capacity": null, "calibration_capacity": null, "evaluation_capacity": null, "trainable": null, "calibratable": null, "evaluable": null, "reason": "PENDING_EXACT_MANIFEST_AND_REFERENCE_CENSUS"},
+    {"historical_stage_code": 4, "candidate_positive_count": null, "candidate_negative_count": null, "independent_episode_count": null, "effective_time_block_count": null, "reference_source_and_exposure_grade": null, "estimated_human_adjudication_count": null, "train_capacity": null, "development_validation_capacity": null, "calibration_capacity": null, "evaluation_capacity": null, "trainable": null, "calibratable": null, "evaluable": null, "reason": "PENDING_STAGE3_EPISODE_REFERENCE_CENSUS"},
+    {"historical_stage_code": 5, "candidate_positive_count": null, "candidate_negative_count": null, "independent_episode_count": null, "effective_time_block_count": null, "reference_source_and_exposure_grade": null, "estimated_human_adjudication_count": null, "train_capacity": null, "development_validation_capacity": null, "calibration_capacity": null, "evaluation_capacity": null, "trainable": null, "calibratable": null, "evaluable": null, "reason": "PENDING_INDEPENDENT_REFERENCE_CENSUS"},
+    {"historical_stage_code": 6, "candidate_positive_count": null, "candidate_negative_count": null, "independent_episode_count": null, "effective_time_block_count": null, "reference_source_and_exposure_grade": null, "estimated_human_adjudication_count": null, "train_capacity": null, "development_validation_capacity": null, "calibration_capacity": null, "evaluation_capacity": null, "trainable": null, "calibratable": null, "evaluable": null, "reason": "PENDING_STAGE5_PARENT_REFERENCE_CENSUS"},
+    {"historical_stage_code": 7, "candidate_positive_count": null, "candidate_negative_count": null, "independent_episode_count": null, "effective_time_block_count": null, "reference_source_and_exposure_grade": null, "estimated_human_adjudication_count": 0, "train_capacity": 0, "development_validation_capacity": 0, "calibration_capacity": 0, "evaluation_capacity": 0, "trainable": false, "calibratable": false, "evaluable": false, "reason": "INELIGIBLE_NO_GOVERNED_REPAIR_CONTEXT"},
+    {"historical_stage_code": 8, "candidate_positive_count": null, "candidate_negative_count": null, "independent_episode_count": null, "effective_time_block_count": null, "reference_source_and_exposure_grade": null, "estimated_human_adjudication_count": 0, "train_capacity": 0, "development_validation_capacity": 0, "calibration_capacity": 0, "evaluation_capacity": 0, "trainable": false, "calibratable": false, "evaluable": false, "reason": "INELIGIBLE_NO_GOVERNED_HIGH_SIDE_PREDICATE"},
+    {"historical_stage_code": 9, "candidate_positive_count": null, "candidate_negative_count": null, "independent_episode_count": null, "effective_time_block_count": null, "reference_source_and_exposure_grade": null, "estimated_human_adjudication_count": 0, "train_capacity": 0, "development_validation_capacity": 0, "calibration_capacity": 0, "evaluation_capacity": 0, "trainable": false, "calibratable": false, "evaluable": false, "reason": "INELIGIBLE_NO_GOVERNED_ACTIVITY_RELATION"},
+    {"historical_stage_code": 10, "candidate_positive_count": null, "candidate_negative_count": null, "independent_episode_count": null, "effective_time_block_count": null, "reference_source_and_exposure_grade": "RULE_PROJECTION_SILVER_ONLY_UNTIL_INDEPENDENCE_CHECK", "estimated_human_adjudication_count": null, "train_capacity": null, "development_validation_capacity": null, "calibration_capacity": null, "evaluation_capacity": null, "trainable": null, "calibratable": null, "evaluable": null, "reason": "PENDING_INDEPENDENT_REFERENCE_AND_EXPOSURE_CENSUS"},
+    {"historical_stage_code": 11, "candidate_positive_count": null, "candidate_negative_count": null, "independent_episode_count": null, "effective_time_block_count": null, "reference_source_and_exposure_grade": "RULE_PROJECTION_SILVER_ONLY_UNTIL_INDEPENDENCE_CHECK", "estimated_human_adjudication_count": null, "train_capacity": null, "development_validation_capacity": null, "calibration_capacity": null, "evaluation_capacity": null, "trainable": null, "calibratable": null, "evaluable": null, "reason": "PENDING_STAGE10_APPLICABLE_EPISODE_AND_INDEPENDENT_REFERENCE_CENSUS"},
+    {"historical_stage_code": 12, "candidate_positive_count": null, "candidate_negative_count": null, "independent_episode_count": null, "effective_time_block_count": null, "reference_source_and_exposure_grade": "EXISTING_REFERENCE_NO_PASS", "estimated_human_adjudication_count": null, "train_capacity": null, "development_validation_capacity": null, "calibration_capacity": null, "evaluation_capacity": null, "trainable": null, "calibratable": null, "evaluable": null, "reason": "PENDING_EXACT_MANIFEST_AND_REFERENCE_CENSUS"}
+  ],
+  "unique_next_action": "Connect through NexusAgent, resolve the exact authorized source/view manifest without reading protected years, freeze its digest, then run the outcome-blind metadata census before adjudication or training.",
+  "claim_ceiling": "This preflight records known ineligibility and unavailable evidence. Null is not zero or negative, and this artifact does not qualify any head or authorize E."
+}

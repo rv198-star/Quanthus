@@ -1,0 +1,10 @@
+{
+  "schema_version": "quanthus.p5-synthetic-worker.v1",
+  "synthetic_only": true,
+  "market_row_read": false,
+  "formal_seed_budget_consumed": 0,
+  "heads": [2, 3],
+  "input_channels": 2,
+  "samples": 24,
+  "T1_admitted": false
+}

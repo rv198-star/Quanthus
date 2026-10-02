@@ -111,10 +111,7 @@ def test_candidate_inventory_counts_distinct_security_identity(
 ) -> None:
     duckdb = pytest.importorskip("duckdb")
     run_root = tmp_path / "event-runs"
-    candidate = (
-        run_root
-        / ".staging/job_failed/1/p3-strat-003-input/candidate-daily.parquet"
-    )
+    candidate = run_root / ".staging/job_failed/1/p3-strat-003-input/candidate-daily.parquet"
     candidate.parent.mkdir(parents=True)
     connection = duckdb.connect(":memory:")
     try:
@@ -165,10 +162,7 @@ def test_candidate_inventory_rejects_security_company_ambiguity(
 ) -> None:
     duckdb = pytest.importorskip("duckdb")
     run_root = tmp_path / "event-runs"
-    candidate = (
-        run_root
-        / ".staging/job_failed/1/p3-strat-003-input/candidate-daily.parquet"
-    )
+    candidate = run_root / ".staging/job_failed/1/p3-strat-003-input/candidate-daily.parquet"
     candidate.parent.mkdir(parents=True)
     connection = duckdb.connect(":memory:")
     try:
@@ -200,9 +194,7 @@ def test_candidate_inventory_rejects_security_company_ambiguity(
             {
                 "job_id": "job_failed",
                 "claim_generation": 1,
-                "candidate_relative_path": (
-                    "p3-strat-003-input/candidate-daily.parquet"
-                ),
+                "candidate_relative_path": ("p3-strat-003-input/candidate-daily.parquet"),
             },
             decision_start=date(2025, 1, 1),
             decision_end=date(2026, 9, 17),
@@ -234,12 +226,7 @@ def test_coverage_reports_ambiguous_legacy_code_venue_matches() -> None:
     assert observed["remaining_unresolved_security_count"] == 1
     assert observed["legacy_p3_code_venue_only_match_count"] == 0
     assert observed["legacy_p3_code_venue_ambiguous_match_count"] == 1
-    assert (
-        observed["remaining_unresolved_samples"][0][
-            "legacy_p3_code_venue_match_count"
-        ]
-        == 2
-    )
+    assert observed["remaining_unresolved_samples"][0]["legacy_p3_code_venue_match_count"] == 2
 
 
 def test_coverage_reports_dwd_p4_industry_conflicts() -> None:
@@ -277,9 +264,7 @@ def missing_candidate(
     request = project / CONFIG.relative_to(ROOT)
     request.parent.mkdir(parents=True)
     raw = json.loads(CONFIG.read_text(encoding="utf-8"))
-    qualification = json.loads(
-        (ROOT / raw["qualification"]["path"]).read_text(encoding="utf-8")
-    )
+    qualification = json.loads((ROOT / raw["qualification"]["path"]).read_text(encoding="utf-8"))
     qualification_path = project / raw["qualification"]["path"]
     qualification_path.parent.mkdir(parents=True, exist_ok=True)
     qualification_data = json.dumps(
@@ -287,9 +272,7 @@ def missing_candidate(
         sort_keys=True,
     ).encode()
     qualification_path.write_bytes(qualification_data)
-    raw["qualification"]["file_sha256"] = (
-        "sha256:" + hashlib.sha256(qualification_data).hexdigest()
-    )
+    raw["qualification"]["file_sha256"] = "sha256:" + hashlib.sha256(qualification_data).hexdigest()
     request.write_text(json.dumps(raw), encoding="utf-8")
 
     monkeypatch.setattr(inspection, "REQUEST_DIGEST", digest_value(raw))
@@ -310,10 +293,7 @@ def missing_candidate(
     )
     return SimpleNamespace(
         request=request,
-        output=(
-            event_root
-            / ".staging/job_new/1/p3-strat-003-industry-inspection"
-        ),
+        output=(event_root / ".staging/job_new/1/p3-strat-003-industry-inspection"),
     )
 
 
@@ -335,9 +315,7 @@ def test_missing_projection_seals_unavailable_without_opening_industry_sources(
     assert result["disposition"] == inspection.UNAVAILABLE
     assert result["b_acceptance"] is False
 
-    manifest = json.loads(
-        (missing_candidate.output / "manifest.json").read_text(encoding="utf-8")
-    )
+    manifest = json.loads((missing_candidate.output / "manifest.json").read_text(encoding="utf-8"))
     core = manifest["inspection"]
     assert core["candidate_projection"]["status"] == "missing_or_unreadable"
     assert core["strategy_or_economic_results_read"] is False
@@ -371,7 +349,11 @@ def test_source_failure_seals_unavailable_instead_of_triggering_fallback(
         lambda *_args, **_kwargs: (candidate, identities),
     )
 
-    def unavailable(_runtime: object) -> tuple[dict[str, str], dict[str, object]]:
+    def unavailable(
+        _runtime: object,
+        *,
+        json_limit: int,
+    ) -> tuple[dict[str, str], dict[str, object]]:
         raise ExpertEvaluationError(
             "p3_strat_003_industry_inspection_source_unavailable",
             "legacy source unavailable",
@@ -384,14 +366,80 @@ def test_source_failure_seals_unavailable_instead_of_triggering_fallback(
         code_revision="c" * 40,
     )
     assert result["disposition"] == inspection.UNAVAILABLE
-    manifest = json.loads(
-        (missing_candidate.output / "manifest.json").read_text(encoding="utf-8")
-    )
-    assert (
-        manifest["inspection"]["industry_sources"]["status"]
-        == "unavailable_or_invalid"
-    )
+    manifest = json.loads((missing_candidate.output / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["inspection"]["industry_sources"]["status"] == "unavailable_or_invalid"
     assert manifest["inspection"]["p6_mutation"] is False
+
+
+def test_corrupt_retained_projection_seals_unavailable(missing_candidate: SimpleNamespace) -> None:
+    raw = json.loads(missing_candidate.request.read_text())
+    failed = raw["failed_job"]
+    staging = missing_candidate.output.parents[2]
+    candidate = (
+        staging
+        / failed["job_id"]
+        / str(failed["claim_generation"])
+        / failed["candidate_relative_path"]
+    )
+    candidate.parent.mkdir(parents=True)
+    candidate.write_bytes(b"invalid parquet")
+    result = inspection.build_industry_inspection(
+        request_path=missing_candidate.request,
+        output=missing_candidate.output,
+        code_revision="c" * 40,
+    )
+    assert result["disposition"] == inspection.UNAVAILABLE
+    manifest = json.loads((missing_candidate.output / "manifest.json").read_text())
+    assert manifest["inspection"]["candidate_projection"]["reason_code"] == (
+        "p3_strat_003_industry_inspection_source_unavailable"
+    )
+
+
+@pytest.fixture
+def sealed_industry_base(tmp_path: Path) -> tuple[Path, str]:
+    root = tmp_path / "base"
+    files = []
+    for table in ("dwd_company_industry_membership", "dwd_industry_node"):
+        path = root / "tables" / (table + ".parquet")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(table.encode())
+        files.append(
+            {
+                "path": str(path.relative_to(root)),
+                "size_bytes": path.stat().st_size,
+                "sha256": inspection._sha256(path),
+            }
+        )
+    (root / "manifest.json").write_text(json.dumps({"files": files}))
+    digest = inspection._sha256(root / "manifest.json")
+    (root / "READY").write_text(digest + "\n")
+    return root, digest
+
+
+@pytest.mark.parametrize("tamper", ["none", "manifest", "READY", "payload", "missing", "symlink"])
+def test_dwd_industry_verifies_seal_before_scan(
+    sealed_industry_base: tuple[Path, str],
+    tamper: str,
+) -> None:
+    root, digest = sealed_industry_base
+    payload = root / "tables/dwd_industry_node.parquet"
+    if tamper == "manifest":
+        (root / "manifest.json").write_text("{}")
+    elif tamper == "READY":
+        (root / "READY").write_text("sha256:" + "0" * 64)
+    elif tamper == "payload":
+        payload.write_bytes(b"x" * payload.stat().st_size)
+    elif tamper == "missing":
+        payload.unlink()
+    elif tamper == "symlink":
+        moved = root / "moved"
+        payload.rename(moved)
+        payload.symlink_to(moved)
+    if tamper == "none":
+        inspection._verify_dwd_industry_source(root, manifest_sha256=digest)
+    else:
+        with pytest.raises(ExpertEvaluationError):
+            inspection._verify_dwd_industry_source(root, manifest_sha256=digest)
 
 
 def test_sealed_industry_inspection_detects_summary_tamper(

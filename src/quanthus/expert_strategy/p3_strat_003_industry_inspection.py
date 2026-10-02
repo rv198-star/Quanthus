@@ -185,7 +185,6 @@ def _candidate_inventory(
               FROM read_parquet(?)
               GROUP BY dwd_security_id
               HAVING count(DISTINCT dwd_company_id) <> 1
-                  OR count(DISTINCT listing_code) <> 1
                   OR count(DISTINCT venue_id) <> 1
             )
             """,
@@ -226,6 +225,16 @@ def _candidate_inventory(
             """,
             [decision_start, decision_end, str(path)],
         ).fetchall()
+        binding_rows = connection.execute(
+            """
+            SELECT dwd_security_id, dwd_listing_id, listing_code, venue_id,
+                   min(session_date), max(session_date)
+            FROM read_parquet(?)
+            GROUP BY ALL
+            ORDER BY dwd_security_id, min(session_date), dwd_listing_id, listing_code
+            """,
+            [str(path)],
+        ).fetchall()
     except duckdb.Error as exc:
         _source_unavailable(
             "failed candidate projection cannot be read by DuckDB",
@@ -236,11 +245,30 @@ def _candidate_inventory(
 
     if totals is None or totals[2] is None or totals[3] is None:
         _fail("failed candidate projection inventory is empty")
+    bindings: dict[str, list[dict[str, str]]] = {}
+    for security_id, listing_id, code, venue, first, last in binding_rows:
+        history = bindings.setdefault(str(security_id), [])
+        if history and first.isoformat() <= history[-1]["last_session"]:
+            _fail("failed candidate projection has overlapping listing identity intervals")
+        history.append(
+            {
+                "listing_id": str(listing_id),
+                "listing_code": str(code),
+                "venue_id": str(venue),
+                "first_session": first.isoformat(),
+                "last_session": last.isoformat(),
+            }
+        )
     identities = [
         {
             "security_id": str(security_id),
             "company_id": str(company_id),
-            "listing_code": str(listing_code),
+            "listing_code": (
+                str(listing_code)
+                if len({item["listing_code"] for item in bindings[str(security_id)]}) == 1
+                else None
+            ),
+            "listing_bindings": bindings[str(security_id)],
             "venue_id": str(venue_id),
             "first_session": first_session.isoformat(),
             "last_session": last_session.isoformat(),
@@ -267,6 +295,14 @@ def _candidate_inventory(
         "decision_security_count": int(totals[4]),
         "first_session": totals[2].isoformat(),
         "last_session": totals[3].isoformat(),
+        "listing_binding_count": len(binding_rows),
+        "listing_code_change_security_count": sum(
+            identity["listing_code"] is None for identity in identities
+        ),
+        "identity_bindings_digest": digest_value(identities),
+        "listing_code_change_samples": [
+            identity for identity in identities if identity["listing_code"] is None
+        ][:20],
     }, identities
 
 
@@ -727,15 +763,21 @@ def _coverage(
             )
 
         if resolved_value is None:
-            identity_key = (
-                str(identity["listing_code"]),
-                str(identity["venue_id"]),
+            # Historical codes are diagnostic aliases only. Even a unique alias match
+            # never supplies a classification or replaces the stable DWD identity.
+            aliases = identity.get("listing_bindings") or [identity]
+            identity_keys = {
+                (str(item["listing_code"]), str(item["venue_id"])) for item in aliases
+            }
+            p4_code_matches = sorted(
+                {match for key in identity_keys for match in p4_by_code.get(key, [])}
             )
-            p4_code_matches = p4_by_code.get(identity_key, [])
             if len(p4_code_matches) == 1 and p4_code_matches[0] != security_id:
                 p4_code_only_matches += 1
 
-            legacy_code_matches = legacy_by_code.get(identity_key, [])
+            legacy_code_matches = sorted(
+                {match for key in identity_keys for match in legacy_by_code.get(key, [])}
+            )
             if len(legacy_code_matches) == 1 and legacy_code_matches[0] != security_id:
                 legacy_code_only_matches += 1
             elif len(legacy_code_matches) > 1:

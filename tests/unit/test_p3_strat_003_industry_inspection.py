@@ -201,6 +201,65 @@ def test_candidate_inventory_rejects_security_company_ambiguity(
         )
 
 
+@pytest.mark.parametrize("overlap", [False, True])
+def test_candidate_inventory_preserves_sequential_listing_codes(
+    tmp_path: Path, overlap: bool
+) -> None:
+    duckdb = pytest.importorskip("duckdb")
+    candidate = tmp_path / ".staging/job_failed/1/candidate.parquet"
+    candidate.parent.mkdir(parents=True)
+    rows = [
+        ("sec-a", "co-a", "list-old", "300001", "SZSE", date(2025, 2, 17)),
+        ("sec-a", "co-a", "list-new", "302001", "SZSE", date(2025, 2, 18)),
+    ]
+    if overlap:
+        rows.append(("sec-a", "co-a", "list-old", "300001", "SZSE", date(2025, 2, 19)))
+    with duckdb.connect(":memory:") as connection:
+        connection.execute(
+            "CREATE TABLE sample(dwd_security_id VARCHAR, dwd_company_id VARCHAR, "
+            "dwd_listing_id VARCHAR, listing_code VARCHAR, venue_id VARCHAR, session_date DATE)"
+        )
+        connection.executemany("INSERT INTO sample VALUES (?, ?, ?, ?, ?, ?)", rows)
+        connection.execute("COPY sample TO ? (FORMAT PARQUET)", [str(candidate)])
+
+    kwargs = {
+        "run_root": tmp_path,
+        "failed_job": {
+            "job_id": "job_failed",
+            "claim_generation": 1,
+            "candidate_relative_path": "candidate.parquet",
+        },
+        "decision_start": date(2025, 1, 1),
+        "decision_end": date(2026, 9, 17),
+    }
+    if overlap:
+        with pytest.raises(ExpertEvaluationError, match="overlapping listing identity"):
+            inspection._candidate_inventory(**kwargs)
+        return
+    receipt, identities = inspection._candidate_inventory(**kwargs)
+    assert receipt["security_count"] == receipt["decision_security_count"] == 1
+    assert receipt["listing_code_change_security_count"] == 1
+    assert receipt["identity_bindings_digest"] == digest_value(identities)
+    identity = identities[0]
+    assert identity["listing_code"] is None
+    assert [row["listing_code"] for row in identity["listing_bindings"]] == ["300001", "302001"]
+    assert identity["listing_bindings"][0]["last_session"] == "2025-02-17"
+    assert identity["listing_bindings"][1]["first_session"] == "2025-02-18"
+    coverage = inspection._coverage(
+        identities,
+        legacy={"old-reference": "industry-a"},
+        legacy_by_code={("300001", "SZSE"): ["old-reference"]},
+        dwd={},
+        dwd_reasons={"sec-a": "no_company_industry_membership"},
+        p4={},
+        p4_by_code={},
+        sample_limit=20,
+    )
+    assert coverage["legacy_p3_code_venue_only_match_count"] == 1
+    # An observed historical code match does not qualify a missing stable identity.
+    assert coverage["remaining_unresolved_security_count"] == 1
+
+
 def test_coverage_reports_ambiguous_legacy_code_venue_matches() -> None:
     identity = {
         "security_id": "sec-x",

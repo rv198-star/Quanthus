@@ -460,7 +460,7 @@ need or independently new admissible evidence.
 | P5-BASE-001 | Build rule and logistic baseline scoreboard | P5 | deferred; optional research |
 | P5-GBDT-001 | Train constrained GBDT research pipeline | P5 | deferred; optional research |
 | P5-PROMOTE-001 | Implement model promotion/shadow gate | P5 | deferred; optional research |
-| P5-STAGE-001 | Learned Stage assessment dual-track research | P5 | blocked pending bounded input/reference qualification; #400/#402 reopened under Owner continuation; A preserved, B exact-input census active, C/D partial, E/F/G NOT_RUN; `docs/work-items/p5-stage-001.md` current recovery checkpoint |
+| P5-STAGE-001 | Learned Stage assessment dual-track research | P5 | blocked pending bounded input/reference qualification; #400/#402 reopened under Owner continuation; A/#401 accepted preregistration-only; B exact-input census active, C/D partial, E/F/G NOT_RUN; `docs/work-items/p5-stage-001.md` current recovery checkpoint |
 | P6-000 | Coordinate the bounded P6 prospective-validation program | P6 | open epic |
 | P6-GOV-001 | Freeze entry proposal, observation budget, stop rules, and rollback | P6 | closed by `docs/acceptance/p6-gov001-prospective-mvp-entry-20260917.md`; proposal is entry-only and grants no activation/downstream authority |
 | P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6 | closed by `docs/acceptance/p6-data001-prospective-boundary-20260917.md`; owner value checkpoint accepted, no activation/prospective read |

@@ -1,0 +1,64 @@
+{
+  "schema_version": "quanthus.p3-strat-003-single-security-industry-proposal.v1",
+  "state": "PROPOSED_REQUIRES_SEPARATE_SOURCE_ACTIVATION",
+  "parent_issue": 317,
+  "continuation_issue": 412,
+  "authority_inherited_from_industry_inspection": false,
+  "purpose": "Obtain one independently bound static industry source for the sole residual security; no strategy or outcome read.",
+  "prerequisites": {
+    "inspection_manifest_sha256": "sha256:0afe3c451292e94bffa35c064585720ece936f2f858a897aa4dfbd1e8ef11123",
+    "inspection_result_digest": "sha256:3a1d4b28b64498f9a89af9d6247878a091f528ee83a04fc0c002a3ab829d9965",
+    "candidate_sha256": "sha256:7a7ffc385152c67ca8389cf3bde6b0dbff3f9bcfb659f63d28b7ce962d368699",
+    "identity_bindings_digest": "sha256:7de477c850c2fcb9e097e321d99308911774f58ef6ddfc4b3d2bc8e360764389",
+    "all_version_membership_count": 0,
+    "all_version_audit_session": "session-1e732f4e527c963237e5ebff",
+    "sealed_259_supplement_code_matches": 0,
+    "existing_resolved_security_count_unchanged": 5250
+  },
+  "target": {
+    "security_code": "688287",
+    "exchange": "SSE",
+    "security_id": "security_b04586f27d4491d5e56ee3330719ade3",
+    "company_id": "company_ef244ef600daa1ada46f6bde6f9f2ad3",
+    "listing_id": "listing_d39e6cf939ce547849726da45ca4735c",
+    "observed_binding_start": "2024-10-09",
+    "observed_binding_end": "2026-06-10"
+  },
+  "source": {
+    "provider": "baostock.query_stock_industry",
+    "provider_version": "0.9.3",
+    "classification": "证监会行业分类",
+    "query_date": "2024-10-09",
+    "query_date_basis": "First observed candidate identity date, fixed before any strategy result; no backward inference from a later listing identity.",
+    "provider_code": "sh.688287",
+    "hierarchy_path": "config/pipelines/csrc-industry-hierarchy.v1.json",
+    "hierarchy_sha256": "sha256:fedcd39375e4de8a1dd6da28e63e119f0f50c6d818f429f58e8e30e62e6ff8e6",
+    "identity_requirement": "Exact code+venue response must be bound to the retained candidate company/security/listing relationship on the query date itself; name similarity or a later identity cannot substitute. Missing evidence yields UNQUALIFIED_IDENTITY_AT_QUERY_DATE.",
+    "provider_update_date_must_not_exceed_query_date": true,
+    "usage": "static_non_pit_concentration_only",
+    "historical_public_as_known_claim": false
+  },
+  "budget": {
+    "target_security_count": 1,
+    "semantic_queries": 1,
+    "maximum_transport_retries_without_valid_response": 1,
+    "maximum_wall_seconds": 120,
+    "maximum_response_bytes": 1048576,
+    "automatic_date_or_provider_fallback": false
+  },
+  "retry_semantics": "Only connection/transport failure before a complete provider response permits the one transport retry. A complete empty, missing, conflicting, malformed or date-invalid response consumes the single semantic query and is terminal.",
+  "receipt_requirements": [
+    "exact request and implementation revision",
+    "provider fields, query date and provider update date",
+    "actual current retrieval timestamp, never backdated",
+    "response bytes hash and semantic digest; null before actual retrieval",
+    "unique identity and leaf-to-level1 hierarchy validation",
+    "absence/conflict disposition without defaults or retries over alternate dates"
+  ],
+  "successor": "Independent source qualification may feed a new B-specific input closure; it does not accept B or activate D.",
+  "preserved": ["old 259-member receipt and digest", "A/C/C-R1", "original #319 NO_PASS", "all-security coverage gate", "fixed windows", "P6", "daily ODS/DWD programme"],
+  "new_source_sha256": null,
+  "network_query_executed": false,
+  "B_accepted": false,
+  "D_activated": false
+}

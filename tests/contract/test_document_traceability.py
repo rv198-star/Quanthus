@@ -1644,11 +1644,12 @@ class DocumentTraceabilityTests(unittest.TestCase):
             {
                 "P3-LABEL-004",
                 "P3-DASH-001",
+                "P3-STRAT-003",
             },
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            set(),
+            {"P3-STRAT-003-B-R1"},
         )
         p012_closeout = json.loads(
             (root / "config/stage-learning/stage-atomic-proposition-p012-closeout.v1.json")
@@ -1678,7 +1679,7 @@ class DocumentTraceabilityTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            next(item for item in items if item.stable_id == "P5-STAGE-001").status, "closed"
+            next(item for item in items if item.stable_id == "P5-STAGE-001").status, "blocked"
         )
         closeout = json.loads(
             (root / "config/research/p3-p5-closeout-20261002.v1.json").read_text()

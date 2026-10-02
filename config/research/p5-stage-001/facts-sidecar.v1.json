@@ -1,0 +1,29 @@
+{
+  "schema_version": "quanthus.p5-stage-001-facts-sidecar-request.v1",
+  "work_item": "P5-STAGE-001-B",
+  "activation_issue": 402,
+  "purpose": "Verify and project only the exact accepted F9 input members into a narrow identity/coordinate sidecar; count contiguous member availability without inferring ACTIVE or new reference labels.",
+  "p5_request_sha256": "sha256:37ca82557a1c0a538f5d7dd945536c54a9c6ceb022e1f8f400d4a1243bf1397b",
+  "source_code_revision": "44571610b1da1792a80bbd45ee7f180d59e8495a",
+  "source_request_digest": "sha256:33ae7300f6b4ab61e32d0f84bbf94739c7f78f220bd424bed945c888aaa88849",
+  "sources": [
+    {"run_id": "run_237a3e986b49490381f380a7ed5d4d14", "manifest_sha256": "sha256:88a2a1a57d2cef4d3f75b55c36ded41d42b737082644c8232eeecf6497de3c90"},
+    {"run_id": "run_f371d3f2cb0440aea2c49ceaad1c237b", "manifest_sha256": "sha256:429d298651e7d6596c4490b0e2a1b3c359c26e5d8081e918392450aafa944373"}
+  ],
+  "member": "source-inputs.jsonl",
+  "member_sha256": "sha256:85ca06b7b8ef5f5362f2a5d4b91d823f264b26005233dea936e89f0e499b7bac",
+  "source_market_start": "2019-10-08",
+  "source_market_end": "2020-03-31",
+  "security_codes": ["000001", "300750", "600519"],
+  "exchanges": ["SSE", "SZSE"],
+  "maximum_rows": 5000,
+  "maximum_member_bytes": 16777216,
+  "window_sessions": 120,
+  "knowledge_view": "retrospective",
+  "other_F9_members_read": false,
+  "market_data_reconstruction": false,
+  "scope_extrapolation": false,
+  "ACTIVE_inference": false,
+  "training": false,
+  "claim_ceiling": "Exact source-member identity availability only. A contiguous identity window is not a qualified P5 feature window, independent reference, accepted B input or public as-known proof."
+}

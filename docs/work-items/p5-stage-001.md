@@ -72,15 +72,26 @@ connections. It does not infer stable security identity, coordinate epochs, ACTI
 or reference eligibility from tradability flags. Warehouse knowledge times remain diagnostic;
 they are never backdated to manufacture public as-known evidence.
 
+The exact census executed at `71864bcddfadfdcf5b2fa47ff56ead0fb7adb4ba` and finished in 97.32
+application seconds (127.07 seconds including container orchestration). Manifest:
+`sha256:119af99681a7ce2b2ee9620564b970fc5db7c1226f42c8f2fc6ca6dfd3e534de`.
+There are 7,722,194 bar rows, 7,741,185 state rows and 7,829 calendar rows; 7,722,194 date-aligned
+bar/state slots, 18,991 state-only slots, no duplicate business keys or orphan calendar joins.
+All three sources have warehouse knowledge_from `2026-08-03T23:59:00Z`; none proves a warehouse
+version known at the historical session close. No public as-known or ACTIVE qualification is inferred.
+Each source projection was built once; aggregate TMP was 1,193,029,632 bytes and removed after use.
+Source copies remain private immutable selected inputs, not a new Base or ADM publication.
+
 Accepted F9 A/B manifests are present at exact OCI event-volume paths. Their identical
 `source-inputs.jsonl` member digest is
 `sha256:85ca06b7b8ef5f5362f2a5d4b91d823f264b26005233dea936e89f0e499b7bac`.
 This is a possible narrowly bound three-security identity/coordinate sidecar for 2019–2020,
 not a full-population identity source. The member has not yet been read in this continuation.
 
-Current next action: complete synthetic checks and independent review of the census, publish the
-exact code through GitHub, then run the bounded verified input census via NexusAgent. Follow the
-actual evidence into the accepted Facts sidecar and T-only window readiness without opening E.
+Current next action: verify the exact F9 source members under the separate
+`facts-sidecar.v1.json` selection, project identity/coordinate availability, then establish whether
+any source-contained 120-session windows exist. Never extrapolate these identities to the full
+three-table population or claim source-session continuity alone qualifies a P5 feature window.
 
 ### Historical bounded closeout — 2026-10-02
 

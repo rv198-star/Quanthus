@@ -4,8 +4,8 @@
 | --- | --- |
 | Parent issue | #400 |
 | Milestone | #12 |
-| Current gate | A preserved; B unqualified; C/D partial; E/F/G NOT_RUN; H stop review complete |
-| Current status | CLOSED_GENERATION_INCONCLUSIVE_INPUT_AND_REFERENCE_QUALIFICATION_UNESTABLISHED |
+| Current gate | A preserved; B exact-input census active; C/D partial; E/F/G NOT_RUN |
+| Current status | OWNER_CONTINUATION_INPUT_QUALIFICATION_IN_PROGRESS |
 | Governing design | `../design/lld/07-research-scoring/p5-stage-001.md` |
 | Frozen request | `../../config/research/p5-stage-001/request.v1.json` |
 | Frozen targets | `../../config/research/p5-stage-001/stage-targets.v1.json` |
@@ -58,6 +58,32 @@ successor.
 
 ## Current recovery checkpoint
 
+The Owner explicitly required continued attempts after PR #419 merged. Live #400/#402 were reopened
+for bounded input integrity, schema and listing/session census; E/F remain inactive. OCI is an
+available existing data node under the current Owner instructions; control remains NexusAgent.
+
+`config/research/p5-stage-001/input-census.v1.json` freezes the exact 250 selected Base members
+(120 daily bar, 120 tradability, 10 calendar), 824,617,539 bytes, for 2012–2021 before any payload
+read. Complete member-list digest:
+`sha256:84edfba056bf1cf1378dce3b4eaf087e1d80d4309e2c24d9356fd2ddff83c668`.
+The narrow census verifies the complete selected closure before schema/row access, projects only
+identity/session/provenance columns once into job-local TMP, and retains duplicates and unmatched
+connections. It does not infer stable security identity, coordinate epochs, ACTIVE control, labels
+or reference eligibility from tradability flags. Warehouse knowledge times remain diagnostic;
+they are never backdated to manufacture public as-known evidence.
+
+Accepted F9 A/B manifests are present at exact OCI event-volume paths. Their identical
+`source-inputs.jsonl` member digest is
+`sha256:85ca06b7b8ef5f5362f2a5d4b91d823f264b26005233dea936e89f0e499b7bac`.
+This is a possible narrowly bound three-security identity/coordinate sidecar for 2019–2020,
+not a full-population identity source. The member has not yet been read in this continuation.
+
+Current next action: complete synthetic checks and independent review of the census, publish the
+exact code through GitHub, then run the bounded verified input census via NexusAgent. Follow the
+actual evidence into the accepted Facts sidecar and T-only window readiness without opening E.
+
+### Historical bounded closeout — 2026-10-02
+
 The 2026-10-02 continuation completed the permitted early closeout. Conclusion:
 `INCONCLUSIVE` because this generation's input and independent-reference qualification were not
 established. It is not global data insufficiency or model ineffectiveness. See
@@ -71,7 +97,7 @@ does not require the old RX6800 package specifically. ACTIVE population, payload
 independent reference capacity remain unknown. C/D retain tested partial synthetic engineering;
 T1, real-data materialization and full Worker orphan recovery were not completed.
 
-Current next action: none within this closed generation. Do not restart asset searches or interpret
+Historical next action (superseded): none within that closed generation. Do not interpret
 any negative close as input acceptance. Reopening needs a new bounded qualified-reference/input proposal.
 
 ### Historical first recovery checkpoint — 2026-10-02

@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | generation closed invalid_execution_evidence / inconclusive; A/C/C-R1 preserved; B unaccepted; B-R1 recovery stopped; D NOT_RUN; E stop review complete |
+| Delivery gate | Owner continuation active; B-R1 industry inspection complete with one unresolved security; A/C/C-R1 preserved; B unaccepted; D NOT_RUN |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |
@@ -114,6 +114,31 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+The Owner explicitly required continued attempts after PR #419 merged at `a64a3f3`.
+Live #317/#412 were reopened. Current Owner instructions permit OCI as an existing data node
+through NexusAgent; the #424-only SSH override is not used here.
+
+The exact retained candidate and accepted P4 A/B industry sources were recovered. A bounded
+isolated CLI inspection at `835dea9b5502f9dbe1f0830b538312bc8f0f4b9e` completed in 38 seconds:
+2,455,175 identity/date rows, 5,251 distinct securities, 5,249 in the decision window.
+DWD covers 5,201; sealed P4 covers another 49 (47 in the decision window); zero source conflicts.
+One decision-window security, 688287, lacks a company industry membership in both admitted sources.
+Its absence also holds in the original 259-member supplement; no code-only substitution is used.
+The valid sequential 300114 -> 302132 ticker change is represented by dated listing bindings.
+
+The diagnostic manifest is `sha256:0afe3c451292e94bffa35c064585720ece936f2f858a897aa4dfbd1e8ef11123`;
+result digest `sha256:3a1d4b28b64498f9a89af9d6247878a091f528ee83a04fc0c002a3ab829d9965`.
+Artifact: OCI `/home/ubuntu/quanthus-research/p3-p5-20261002/diagnostic-v3/.staging/`
+`p3-b-r1-resume-20261002/inspection-835dea9-private-base`.
+This is an actual isolated diagnostic, not a formal platform B Job or B acceptance. Original source
+permissions were preserved; only exact industry members were copied into private job-local inputs.
+No candidate rebuild, strategy outcome, target label, P6 mutation or daily pipeline work occurred.
+
+Current next action: independently review the specific residual industry gap and the bounded source
+closure. Preserve #319 NO_PASS; do not drop 688287, infer its classification, or run D without B.
+
+### Historical bounded closeout — 2026-10-02
+
 The 2026-10-02 continuation completed the permitted early failure closeout under #317/#322.
 Outcome: `invalid_execution_evidence`; hypothesis support remains `inconclusive`.
 Bounded recovery disposition `DIAGNOSTIC_INPUT_UNAVAILABLE` describes the actual authorized
@@ -122,7 +147,7 @@ S2/S3/new formal B/D/cold reproduction are NOT_RUN. See
 `../acceptance/p3-p5-bounded-closeout-20261002.md` and
 `config/research/p3-p5-closeout-20261002.v1.json`.
 
-Current next action: none within this closed generation. #412 and #321 were closed with explicit
+Historical next action (superseded): none within that closed generation. #412 and #321 were closed with explicit
 stop/NOT_RUN reasons before #322's independent early review; #322 and #317 are now closed.
 No reconstruction or new source campaign starts automatically. Reopening needs a new bounded input proposal.
 

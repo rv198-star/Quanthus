@@ -1,7 +1,9 @@
 {
   "schema_version": "quanthus.p3-p5-bounded-closeout.v1",
   "as_of": "2026-10-02",
-  "state": "EARLY_CLOSEOUT_PENDING_INDEPENDENT_REVIEW",
+  "state": "CLOSED_BOUNDED_GENERATIONS_EVIDENCE_LIMITED",
+  "reviewed_code_revision": "9ac8218c867377365262e683200b25ebd02e0cde",
+  "closed_issues": [412, 321, 322, 317, 402, 403, 404, 405, 406, 407, 408, 400],
   "scope": [
     "P3-STRAT-003",
     "P5-STAGE-001"
@@ -339,10 +341,14 @@
   },
   "next_generation": "No automatic successor. Reopen only for a separately authorized exact retained-input/independent-reference recovery; preserve this generation's negative evidence.",
   "independent_review": {
-    "status": "PENDING",
+    "status": "PASS_CLOSEOUT_ONLY",
     "kind": "separate_read_only_agent_execution_not_human_adjudication_not_cold_reproduction",
     "pre_review": "PASS_NO_BLOCKER_OR_MATERIAL_FOR_BOUNDED_STOP_PACKET",
-    "reviewers": ["/root/p3_recovery_review", "/root/p5_worker_review"]
+    "reviewers": ["/root/p3_recovery_review", "/root/p5_worker_review"],
+    "p3_final_review": "PASS_AFTER_412_AND_321_STOP_DISPOSITIONS_VERIFIED_LIVE",
+    "p5_final_review": "PASS_AFTER_B_C_D_AND_E_F_G_ORDERED_STOP_DISPOSITIONS_VERIFIED_LIVE",
+    "p5_reviewed_at_utc": "2026-10-02T13:09:47Z",
+    "scope": "Evidence completeness and honest early closeout only; not input, model, strategy, full engineering acceptance, human reference adjudication or independent cold reproduction."
   },
   "verification": {
     "make_check": "FAILED_EXISTING_BASELINE_FAILURES",

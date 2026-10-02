@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | blocked; A, C and C-R1 accepted; B / #319 closed no-pass and unaccepted; B-R1 / #412 is the only active B continuation; D blocked by B acceptance; E blocked by D |
+| Delivery gate | generation closed invalid_execution_evidence / inconclusive; A/C/C-R1 preserved; B unaccepted; B-R1 recovery stopped; D NOT_RUN; E stop review complete |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |
@@ -114,16 +114,17 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-The 2026-10-02 continuation is preparing the permitted early failure closeout under #317/#322.
-Proposed outcome: `invalid_execution_evidence`; hypothesis support remains `inconclusive`.
+The 2026-10-02 continuation completed the permitted early failure closeout under #317/#322.
+Outcome: `invalid_execution_evidence`; hypothesis support remains `inconclusive`.
 Bounded recovery disposition `DIAGNOSTIC_INPUT_UNAVAILABLE` describes the actual authorized
 metadata investigation, not a formal diagnostic Job. #319 remains NO_PASS and B unaccepted;
 S2/S3/new formal B/D/cold reproduction are NOT_RUN. See
 `../acceptance/p3-p5-bounded-closeout-20261002.md` and
 `config/research/p3-p5-closeout-20261002.v1.json`.
 
-Unique next action: complete independent evidence review, then dispose #412 and #321 with explicit
-negative/NOT_RUN reasons before #322 early review. No reconstruction or new source campaign starts.
+Current next action: none within this closed generation. #412 and #321 were closed with explicit
+stop/NOT_RUN reasons before #322's independent early review; #322 and #317 are now closed.
+No reconstruction or new source campaign starts automatically. Reopening needs a new bounded input proposal.
 
 ### Historical first recovery checkpoint — 2026-10-02
 

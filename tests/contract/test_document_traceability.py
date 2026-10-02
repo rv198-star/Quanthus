@@ -1644,14 +1644,11 @@ class DocumentTraceabilityTests(unittest.TestCase):
             {
                 "P3-LABEL-004",
                 "P3-DASH-001",
-                "P3-STRAT-003",
-                "P3-STRAT-003-D",
-                "P3-STRAT-003-E",
             },
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            {"P3-STRAT-003-B-R1"},
+            set(),
         )
         p012_closeout = json.loads(
             (root / "config/stage-learning/stage-atomic-proposition-p012-closeout.v1.json")
@@ -1675,8 +1672,19 @@ class DocumentTraceabilityTests(unittest.TestCase):
         self.assertTrue(p4_items)
         self.assertTrue(all(item.status == "closed" for item in p4_items))
         self.assertTrue(
-            all(item.status == "blocked" for item in items if item.phase in {"P5", "P7"})
+            all(
+                item.status == "blocked" for item in items
+                if item.phase in {"P5", "P7"} and item.stable_id != "P5-STAGE-001"
+            )
         )
+        self.assertEqual(
+            next(item for item in items if item.stable_id == "P5-STAGE-001").status, "closed"
+        )
+        closeout = json.loads(
+            (root / "config/research/p3-p5-closeout-20261002.v1.json").read_text()
+        )
+        self.assertIs(closeout["p5"]["B_accepted"], False)
+        self.assertEqual(closeout["p5"]["formal_model_fits"], 0)
         p6_items = [item for item in items if item.phase == "P6"]
         self.assertEqual(
             {item.stable_id for item in p6_items if item.status == "ready"},

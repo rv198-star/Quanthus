@@ -26,14 +26,15 @@
 
 ## Current active task routing — P3-STRAT-003
 
-- Active line: `P3-STRAT-003` / #317, open and blocked. B / #319 closed with negative input
-  qualification evidence; its acceptance gate remains unsatisfied. The bounded successor
-  `P3-STRAT-003-B-R1` / #412 is the only active B continuation; it preserves #319's NO_PASS
-  evidence and does not unlock D by itself.
+- `P3-STRAT-003` / #317 is closed for this generation as `invalid_execution_evidence` with
+  hypothesis support `inconclusive`. B / #319 remains NO_PASS and unaccepted. B-R1 / #412 ended
+  with bounded recovery-input-unavailable evidence; D / #321 is NOT_RUN_INPUT_UNQUALIFIED.
+  E / #322 accepted only the honest early failure closeout. No automatic B continuation remains.
 - Purpose: compare existing Trend + Position Risk against a non-empty deterministic P4 baseline
   while P6 continues independently; P6 is not a predecessor and must not be mutated.
-- Dependency state: A / #318 accepted; C / #320 accepted; C-R1 / #385 accepted; B not accepted
-  (`NO_PASS_STATIC_INDUSTRY_INPUT_COVERAGE`); D / #321 and E / #322 remain open and blocked.
+- Preserved state: A / #318, C / #320 and C-R1 / #385 accepted; B not accepted
+  (`NO_PASS_STATIC_INDUSTRY_INPUT_COVERAGE`). Issue closure does not satisfy B/D acceptance.
+  See `docs/acceptance/p3-p5-bounded-closeout-20261002.md` before proposing any reopening.
 - Before working on this line, read `docs/work-items/p3-strat-003.md`. For interrupted-session
   recovery, start with its `Current recovery checkpoint`, then expand only the sections needed for
   the task at hand.
@@ -48,10 +49,10 @@
 
 ## Parallel research routing — P5-STAGE-001
 
-- Parallel line: `P5-STAGE-001` / #400. A / #401 is accepted as preregistration-only. The
-  2026-09-22 owner handoff separately activates B readiness, C synthetic/environment work, and D
-  synthetic engineering under `config/research/p5-stage-001/successor-activation.v1.json`; E remains
-  inactive until B/C/D acceptance.
+- `P5-STAGE-001` / #400 is closed for this generation as `INCONCLUSIVE`: input and independent
+  reference qualification were not established. A / #401 remains accepted preregistration-only;
+  B/C/D ended with unqualified inputs or partial synthetic engineering, not acceptance. E/F/G are
+  NOT_RUN; H / #408 accepted only the stop evidence. No automatic training/research continuation.
 - Purpose: compare the existing rule/Stage surface with fixed simple baselines and one bounded learned
   temporal assessment over the layered 1..12 research vocabulary; it is not a top-1 Stage classifier.
 - Before working on this line, read `docs/work-items/p5-stage-001.md`, then the frozen request and
@@ -59,8 +60,8 @@
   `Current recovery checkpoint` and expand only what the current gate needs.
 - A permits docs/config/tests and synthetic contract cases only; that sealed predecessor boundary is
   unchanged by the later successor activation.
-- A completion does not auto-start B/C/D; the current start comes from the separate bounded owner
-  activation receipt.
+- A completion does not auto-start B/C/D; the historical start came from the separate bounded owner
+  activation receipt. That generation is now closed; it is not standing authority to restart.
 - The successor receipt does not alter sealed A evidence. B must freeze an exact manifest before its
   first market-row read; C/D remain synthetic until their own gates. No protected 2022-2026 access,
   result-bearing training, P3-STRAT data-authority inheritance, P6 mutation, promotion or trading.

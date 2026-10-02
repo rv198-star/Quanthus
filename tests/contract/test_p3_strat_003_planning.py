@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from scripts.sync_github_planning import (
@@ -40,15 +41,21 @@ def test_p3_strat_003_is_one_epic_with_dependency_gated_children() -> None:
     )
     assert all(items[item_id].milestone == P3_STRAT_003_MILESTONE for item_id in P3_STRAT_003_IDS)
     assert items["P3-STRAT-003"].issue_type == "epic"
-    assert items["P3-STRAT-003"].status == "blocked"
+    assert items["P3-STRAT-003"].status == "closed"
     assert items["P3-STRAT-003-A"].status == "closed"
     assert items["P3-STRAT-003-B"].status == "closed"
-    assert items["P3-STRAT-003-B-R1"].status == "ready"
+    assert items["P3-STRAT-003-B-R1"].status == "closed"
     assert "P3-STRAT-003-B" in items["P3-STRAT-003-B-R1"].dependencies
     assert items["P3-STRAT-003-C"].status == "closed"
     assert items["P3-STRAT-003-C-R1"].status == "closed"
-    assert items["P3-STRAT-003-D"].status == "blocked"
-    assert items["P3-STRAT-003-E"].status == "blocked"
+    assert items["P3-STRAT-003-D"].status == "closed"
+    assert items["P3-STRAT-003-E"].status == "closed"
+    closeout = json.loads((ROOT / "config/research/p3-p5-closeout-20261002.v1.json").read_text())
+    assert closeout["p3"]["B_accepted"] is False
+    assert closeout["p3"]["input_manifest"] is None
+    assert closeout["p3"]["candidate_manifest"] is None
+    assert closeout["p3"]["not_run"]["D_all_four_variants"] == "NOT_RUN_INPUT_UNQUALIFIED"
+    assert closeout["p3"]["strategy_result_rows_read"] == 0
     assert "P3-STRAT-003-A" in items["P3-STRAT-003-B"].dependencies
     assert "P3-STRAT-003-A" in items["P3-STRAT-003-C"].dependencies
     assert "P3-STRAT-003-C" in items["P3-STRAT-003-C-R1"].dependencies

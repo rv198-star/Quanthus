@@ -1,6 +1,6 @@
 # P3/P5 bounded generation closeout — 2026-10-02
 
-Status: **EARLY_CLOSEOUT_PENDING_INDEPENDENT_REVIEW**. This record proposes a terminal,
+Status: **CLOSED_BOUNDED_GENERATIONS_EVIDENCE_LIMITED**. This record seals a terminal,
 evidence-limited disposition of P3-STRAT-003 and P5-STAGE-001. It does not accept their missing
 input gates, declare a strategy/model ineffective, or close the entire P3/P5 capability roadmap.
 Machine record: `config/research/p3-p5-closeout-20261002.v1.json`.
@@ -26,7 +26,7 @@ before final review. They do not require endless asset searches or lowering acce
 
 ## P3 disposition
 
-Proposed generation outcome: **invalid_execution_evidence**; scientific conclusion: **inconclusive**.
+Generation outcome: **invalid_execution_evidence**; scientific conclusion: **inconclusive**.
 The bounded recovery investigation records **DIAGNOSTIC_INPUT_UNAVAILABLE** under the current
 authorized routes. This is **not** a sealed formal diagnostic Job result: no such Job ran.
 
@@ -61,7 +61,7 @@ There is no recent economic result and no evidence here that the experts add or 
 
 ## P5 disposition and denominator
 
-Proposed generation outcome: **INCONCLUSIVE**, specifically bounded input and independent-reference
+Generation outcome: **INCONCLUSIVE**, specifically bounded input and independent-reference
 qualification were not established. This is not proof that all 2012–2021 resources lack capacity.
 There are **0 confirmed qualified trainable/evaluable heads**, while actual qualifiable capacity
 remains **unknown**. The machine record retains twelve rows: Stage7/8/9 stay ineligible; every other
@@ -145,11 +145,26 @@ unavailable. No GPU speedup is claimed. The local TPlan trace records orchestrat
 
 ## Final-review and state transition
 
-Separate read-only agents must inspect the actual evidence packet. Their review is an independently
-executed AI audit, not human reference adjudication, a market experiment, or cold reproduction.
-Until that review and ordered issue dispositions are recorded, this document remains pending.
+Two separate read-only agents completed final review against exact remote source
+`9ac8218c867377365262e683200b25ebd02e0cde` after observing the actual prerequisite issue closures.
+`/root/p3_recovery_review` returned PASS for E's early failure closeout after #412/#321; it verified
+raw call bindings, unchanged A/C/C-R1/B/request evidence and JUnit failure identity comparison.
+`/root/p5_worker_review` returned PASS_CLOSEOUT_ONLY at 2026-10-02 13:09:47 UTC after B/C/D and
+E/F/G were closed in order; it rechecked the twelve-head null matrix, metadata digest, exact
+code/test receipts and NOT_RUN cost claims. No BLOCKER/MATERIAL remained in the stop packet.
+These are independently executed AI audits, not human labels, market experiments or cold reproduction.
 
-Upon a valid early closeout, preserve all negative and unknown evidence, close unexecuted successors
-with explicit reasons, then complete the P3 E / P5 H stop review. Do not check missing acceptance
-criteria as passed. No automatic successor is created. Any future reopening must bring an exact,
-authorized retained-input or independent-reference recovery proposal before spending on training.
+E/#322 and H/#408 were then closed, followed by parents #317/#400. All twelve active parent/child
+issues listed in the machine record are closed with explicit stop, partial or NOT_RUN dispositions.
+Missing acceptance checkboxes were not marked PASS. The whole P3/P5 capability roadmap is not
+declared complete; only these bounded generations have ended without sufficient evidence.
+
+No automatic successor is created. A future reopening must bring an exact, authorized retained-input
+or independent-reference recovery proposal before spending on training. Production gates remain shut.
+
+Final routing synchronization changes only status/evidence documents and planning assertions; it
+does not change the reviewed implementation. The three affected planning/traceability/preregistration
+modules pass **53 tests**, and the planning dry run passes. GitHub CI on `9ac8218` remains red:
+its Python 3.12 job has 29 failures / 2,956 passes / 20 skips; the failed test identity set is unchanged
+from the preceding `22a339a` CI. The Web job's existing TypeScript-loader failures remain unrelated
+to these changes. No CI or phase gate is recorded as fully passed or waived.

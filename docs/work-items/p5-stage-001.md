@@ -4,8 +4,8 @@
 | --- | --- |
 | Parent issue | #400 |
 | Milestone | #12 |
-| Current gate | A / #401 accepted; B/C/D activated with separate bounded scopes |
-| Current status | B_READINESS / C_SYNTHETIC_ENV / D_SYNTHETIC_ENGINEERING_STARTED |
+| Current gate | A preserved; B unqualified; C/D partial; E/F/G NOT_RUN; H stop review complete |
+| Current status | CLOSED_GENERATION_INCONCLUSIVE_INPUT_AND_REFERENCE_QUALIFICATION_UNESTABLISHED |
 | Governing design | `../design/lld/07-research-scoring/p5-stage-001.md` |
 | Frozen request | `../../config/research/p5-stage-001/request.v1.json` |
 | Frozen targets | `../../config/research/p5-stage-001/stage-targets.v1.json` |
@@ -58,12 +58,12 @@ successor.
 
 ## Current recovery checkpoint
 
-The 2026-10-02 continuation is preparing the permitted early closeout. Proposed conclusion:
+The 2026-10-02 continuation completed the permitted early closeout. Conclusion:
 `INCONCLUSIVE` because this generation's input and independent-reference qualification were not
 established. It is not global data insufficiency or model ineffectiveness. See
 `../acceptance/p3-p5-bounded-closeout-20261002.md` and
-`config/research/p3-p5-closeout-20261002.v1.json`; independent review and ordered live issue
-dispositions are pending. No formal training or protected-year read is authorized by this proposal.
+`config/research/p3-p5-closeout-20261002.v1.json`; independent H review and ordered live issue
+dispositions are complete. #400 and #402–#408 are closed. No training or protected-year authority opens.
 
 CN01 physical inventory is complete at manifest/file-property level: 120 bar files, 120 tradability
 files and 10 calendars for 2012–2021; no payload opened. Exact source selection is B's authority and
@@ -71,8 +71,8 @@ does not require the old RX6800 package specifically. ACTIVE population, payload
 independent reference capacity remain unknown. C/D retain tested partial synthetic engineering;
 T1, real-data materialization and full Worker orphan recovery were not completed.
 
-Unique next action: finalize the evidence review and lawful NOT_RUN dispositions before E/F/G/H
-closeout. Do not restart asset searches or interpret any negative close as input acceptance.
+Current next action: none within this closed generation. Do not restart asset searches or interpret
+any negative close as input acceptance. Reopening needs a new bounded qualified-reference/input proposal.
 
 ### Historical first recovery checkpoint — 2026-10-02
 

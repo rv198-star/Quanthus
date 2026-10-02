@@ -1,0 +1,37 @@
+{
+  "schema_version": "quanthus.p3-temporary-industry-closure.v1",
+  "state": "FROZEN_TEMPORARY_SOURCE_COMPOSITION_ONLY",
+  "research_issue": 412,
+  "data_repair_issue": 470,
+  "activation_path": "config/research/p3-p5-temporary-source-activation.v1.json",
+  "inspection_request_path": "config/research/p3-strat-003/industry-inspection.v1.json",
+  "inspection_request_digest": "sha256:3262e61bf8cfab5e58f049a5215dedce319ec71c6d2ec2a6855e43562364d57c",
+  "inspection_manifest_sha256": "sha256:0afe3c451292e94bffa35c064585720ece936f2f858a897aa4dfbd1e8ef11123",
+  "temporary_receipt_sha256": "sha256:b26177362b1da0f15a4f4612ffb4325e8bded039b1035443fed2c429176a428b",
+  "temporary_response_sha256": "sha256:6883ab4e46add9770c79f49cdaec258bd5a80912612ddfadbcb40edbc3a2abfd",
+  "expected_sources": {"dwd_native": 5201, "p4_sealed_reference": 49, "temporary_static_source": 1},
+  "expected_security_count": 5251,
+  "expected_decision_security_count": 5249,
+  "mapping_version": "static-level1-concentration-research-v1",
+  "usage": "static_non_pit_concentration_only",
+  "limits": {"maximum_wall_seconds": 120, "maximum_output_bytes": 8388608},
+  "outputs": ["static_industry_mapping.json", "identity-provenance.json", "receipt.json"],
+  "stage_graph": [
+    {"stage": "source_integrity", "depends_on": [], "lifecycle": "none"},
+    {"stage": "retained_identity_inventory", "depends_on": ["source_integrity"], "lifecycle": "TMP_in_memory"},
+    {"stage": "compose_static_mapping", "depends_on": ["retained_identity_inventory"], "lifecycle": "private_temporary_research"},
+    {"stage": "verify_exact_coverage", "depends_on": ["compose_static_mapping"], "lifecycle": "none"}
+  ],
+  "authority": {
+    "network_collection": false,
+    "candidate_rebuild": false,
+    "candidate_scoring": false,
+    "replay_market_values": false,
+    "strategy_or_outcome_results": false,
+    "formal_B_job": false,
+    "B_accepted": false,
+    "D_activated": false,
+    "DWD_or_P6_mutation": false,
+    "data_issue_closure": false
+  }
+}

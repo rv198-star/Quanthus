@@ -53,7 +53,9 @@
 - `P5-STAGE-001` / #400 and B / #402 were reopened under the Owner's explicit continuation for
   exact input integrity, schema and listing/session census. The three-table 2012–2021 file set is
   frozen in `config/research/p5-stage-001/input-census.v1.json` before row access.
-  A remains accepted preregistration-only; B is unqualified; C/D preserve partial engineering.
+  A remains accepted preregistration-only; B is unqualified; C preserves partial engineering.
+  D / #404 is reopened only for synthetic orphan recovery under
+  `config/research/p5-stage-001/engineering-continuation.v1.json`; full D acceptance remains open.
   E/F/G remain NOT_RUN. The prior closeout remains historical evidence.
 - Purpose: compare the existing rule/Stage surface with fixed simple baselines and one bounded learned
   temporal assessment over the layered 1..12 research vocabulary; it is not a top-1 Stage classifier.
@@ -64,6 +66,8 @@
   unchanged by the later successor activation.
 - A completion does not auto-start B/C/D. The current B continuation comes from the separate Owner
   instruction and live #402 activation, without authorizing training or widening source families.
+  `input-closure-proposal.v1.json` is unactivated; its four additional source members cannot be
+  consumed through B until separate source activation is recorded.
 - The successor receipt does not alter sealed A evidence. B must freeze an exact manifest before its
   first market-row read; C/D remain synthetic until their own gates. No protected 2022-2026 access,
   result-bearing training, P3-STRAT data-authority inheritance, P6 mutation, promotion or trading.

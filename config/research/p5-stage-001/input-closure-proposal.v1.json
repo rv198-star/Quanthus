@@ -1,0 +1,101 @@
+{
+  "schema_version": "quanthus.p5-stage-001-input-closure-proposal.v1",
+  "state": "PROPOSED_REQUIRES_SEPARATE_SOURCE_ACTIVATION",
+  "issue": 402,
+  "purpose": "Qualify the missing identity and corporate-action dependencies for retrospective T-only 120-session Facts windows; no result-bearing training.",
+  "existing_request_unchanged": "config/research/p5-stage-001/request.v1.json",
+  "prerequisites": {
+    "three_table_census_manifest_sha256": "sha256:119af99681a7ce2b2ee9620564b970fc5db7c1226f42c8f2fc6ca6dfd3e534de",
+    "accepted_facts_sidecar_manifest_sha256": "sha256:5a2a1cc24d962fb8fd5dd2b603fb7c15a20479d4b473447880b6707fd5542089",
+    "existing_facts_source_contiguous_sessions_per_security": 119,
+    "existing_facts_source_security_count": 3,
+    "required_sessions_unchanged": 120,
+    "published_reference_artifacts_supply_complete_120_session_input": false,
+    "global_input_capacity_claim": null
+  },
+  "metadata_verified_source": {
+    "base_manifest_sha256": "sha256:541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b",
+    "metadata_inspection_session": "session-ef9776f385ae207faac1c240",
+    "dimension_members": [
+      {
+        "path": "payload/listed_company/dwd_listing.parquet",
+        "sha256": "sha256:b6be712b684d804b952594037e56e3b3b72d795efe5dba65ec6a06f66e8d2951",
+        "size_bytes": 286983
+      },
+      {
+        "path": "payload/listed_company/dwd_security.parquet",
+        "sha256": "sha256:9f2169f93be4ce7ee7fc9a4718e814dd9041729b3b5b1c18784cc7ed2be6eb86",
+        "size_bytes": 254577
+      }
+    ],
+    "correction_manifest_sha256": "sha256:4c8eeb5c0d74bbf2953f003364fd138832f15a5163254b710f9db8430767ffde",
+    "correction_READY_verified": true,
+    "correction_metadata_inspection_session": "session-50642482f5b8e473ace0fcdc",
+    "normalization_revision": "corporate_action_replay_2012_20260730_v3",
+    "normalization_policy": "p1-corporate-action-normalization-20260730-v3",
+    "normalization_policy_path": "config/p1-corporate-action-normalization.v3.json",
+    "normalization_policy_sha256": "sha256:d3c8e2a9a16c642fa65ef5c3a319cdfc940f7b6a8b0b30b6569159586b012010",
+    "normalization_manifest_sha256": "sha256:eb770d29f9f4f77dc109c47f6f8c2d3f8950915fd0af3b7e88d933f6f293a5db",
+    "correction_members": [
+      {
+        "path": "payload/replay/corporate_actions_normalized.parquet",
+        "sha256": "sha256:1e460ac593401584824102654b6082e1f75f0125101f651de925e6afb95937a9",
+        "size_bytes": 4642940
+      },
+      {
+        "path": "payload/replay/corporate_action_exceptions.parquet",
+        "sha256": "sha256:5cebff427a8bb733890f69ca750a63df0272aa9f8ca863157ef5e30e1c5aa70e",
+        "size_bytes": 44257
+      }
+    ],
+    "selected_additional_source_bytes": 5228757,
+    "payloads_read": false,
+    "missing_partition_means_no_action": false,
+    "physical_members_contain_later_years": true
+  },
+  "proposed_scope": {
+    "exchanges": ["SSE", "SZSE"],
+    "date_start": "2012-01-01",
+    "date_end": "2021-12-31",
+    "new_source_families": ["dwd_listing", "dwd_security", "corporate_actions_normalized", "corporate_action_exceptions"],
+    "dimension_use": "Versioned security/listing identity and validity fields for admitted historical sessions only. Exclude later-only listings and attributes; current identity or current membership is never a historical proxy.",
+    "corporate_action_use": "Use only the two checksum-bound accepted v3 replay members. Preserve normalization/authority/exception lineage. Do not regenerate normalized actions from raw parent or term tables.",
+    "physical_access_boundary": "Verify complete immutable file bytes and metadata, then use a fixed date/identity guard before materializing any payload rows. No protected-year market/result rows may be returned, serialized, counted as development supply or consumed by Facts. This is explicitly a bounded projection from mixed-year source members, not whole-member market authority.",
+    "action_row_guard": "2012-01-01 <= effective_date <= T <= 2021-12-31, plus historical SSE/SZSE identity; keep known_at and retrospective/as-known distinction.",
+    "exception_guard": "Retain only blocking-control intervals intersecting 2012-2021: blocked_from <= 2021-12-31 AND (blocked_through IS NULL OR blocked_through >= 2012-01-01). A pre-2012 blocked_from is control provenance for the admitted period, not authorization for 2011 market features; preserve the original interval and distinguish known_at from effective date.",
+    "date_filtered_projection_required": true,
+    "industry_sector_features": false,
+    "inherited_P3_authority": false,
+    "implicit_correction_bundle_access": false,
+    "correction_tradability_or_raw_action_term_payload_access": false,
+    "network_collection": false,
+    "2011_market_feature_or_warmup_access": false,
+    "2022_2026_market_or_result_access": false,
+    "E_or_F_activation": false
+  },
+  "execution_sequence_after_separate_activation": [
+    "Freeze complete selected member inventory, schema, source/config/code digests, historical projection and resource budget before payload access.",
+    "Verify exact member checksums; project historical identity, admitted normalized actions and intersecting exception controls once into job-local TMP. Record rejected or ambiguous identities separately without exporting excluded rows.",
+    "Before claiming left-boundary completeness, obtain the original normalization manifest at its bound SHA; verify kind, revision, ready_for_snapshot=true, execution_authorized=false, scope.start=2012-01-01, scope.end>=2021-12-31, both checksums, policy, exception-ledger and lineage digests. Its absence does not prevent identity-only inspection, but blocks coordinate/window qualification. Do not read upstream reports or market payloads to replace this metadata.",
+    "For every T, use the accepted serialization/order over the full source-scope action prefix through T, never only the last 120 sessions. Unknown prehistory stays unavailable; a later new action does not repair an unknown prefix. Empty means none within the verified version scope, not none in all history.",
+    "Only after that equivalence and source-availability gate passes, freeze a bounded Facts materialization using the existing accepted engine and exact code/config. Reuse each prerequisite once per Job; formal independent rebuild remains separate.",
+    "Derive ordinary ACTIVE/X through the governed inference controls and record all unavailable reasons. Tradability, a source epoch string or a successful join cannot stand in for ACTIVE.",
+    "Seal readiness denominators and reference/exposure qualifications independently. Same-origin old rule references never become independent truth. B stays unaccepted until its full contract passes."
+  ],
+  "initial_qualification_budget": {
+    "maximum_additional_source_bytes": 8388608,
+    "threads": 2,
+    "memory_limit_mib": 1024,
+    "maximum_temp_bytes": 4294967296,
+    "maximum_wall_seconds": 600,
+    "automatic_retry_or_source_expansion": false
+  },
+  "missing_evidence_disposition": "Keep unknown counts null and stop the affected materialization stage with an explicit reason; do not shrink windows, infer identities, import unbound corrections or weaken reference gates.",
+  "unknown_scope_row_disposition": "Null or invalid dates/identities cannot be silently treated as out of scope. Stop the affected member qualification without exporting the raw ambiguous row.",
+  "exception_control_grade": "Retrospective fail-closed control. Inclusive blocked_from/blocked_through, open-ended intervals remain blocked until the accepted ledger resolves them; a later normal action does not clear them. This does not establish historical as-known ACTIVE.",
+  "original_normalization_manifest_physically_verified": false,
+  "historical_evidence_grade": "retrospective_T_only_until_as_known_proven",
+  "B_accepted": false,
+  "market_payload_read_under_this_proposal": false,
+  "P6_or_production_mutation": false
+}

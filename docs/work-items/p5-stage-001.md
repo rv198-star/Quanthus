@@ -4,7 +4,7 @@
 | --- | --- |
 | Parent issue | #400 |
 | Milestone | #12 |
-| Current gate | A preserved; B exact-input census active; C/D partial; E/F/G NOT_RUN |
+| Current gate | A preserved; B source qualification and D synthetic recovery active; C partial; E/F/G NOT_RUN |
 | Current status | OWNER_CONTINUATION_INPUT_QUALIFICATION_IN_PROGRESS |
 | Governing design | `../design/lld/07-research-scoring/p5-stage-001.md` |
 | Frozen request | `../../config/research/p5-stage-001/request.v1.json` |
@@ -85,13 +85,41 @@ Source copies remain private immutable selected inputs, not a new Base or ADM pu
 Accepted F9 A/B manifests are present at exact OCI event-volume paths. Their identical
 `source-inputs.jsonl` member digest is
 `sha256:85ca06b7b8ef5f5362f2a5d4b91d823f264b26005233dea936e89f0e499b7bac`.
-This is a possible narrowly bound three-security identity/coordinate sidecar for 2019–2020,
-not a full-population identity source. The member has not yet been read in this continuation.
+The bounded sidecar ran at `6c254d2053b9c28b12d1e8076d0759374d0ade22`, verifying both copies and
+parsing one. It has 357 members: three securities with 119 contiguous sessions each. No source-contained
+120-member identity window exists. This is not a full-population identity source or proof of global
+capacity shortage. Its manifest is
+`sha256:5a2a1cc24d962fb8fd5dd2b603fb7c15a20479d4b473447880b6707fd5542089`.
 
-Current next action: verify the exact F9 source members under the separate
-`facts-sidecar.v1.json` selection, project identity/coordinate availability, then establish whether
-any source-contained 120-session windows exist. Never extrapolate these identities to the full
-three-table population or claim source-session continuity alone qualifies a P5 feature window.
+The registered P014/P015/P020 and second-group publication contracts were then inspected. None
+retains a complete 120-session source closure: P014/P015 use 61-session windows, P020 keeps endpoint
+Trend facts, and second-group publishes only summary/candidate members. The early D pilot's history
+lacks daily security/listing/calendar/action identities. Matching an epoch string does not restore
+that missing evidence. This finding does not establish global data unavailability.
+
+`input-closure-proposal.v1.json` now binds two exact Base dimension members and the two accepted v3
+normalized-action/exception members from the existing OCI correction. Its manifest/READY match
+`4c8eeb5c0d74bbf2953f003364fd138832f15a5163254b710f9db8430767ffde`; no payload was read.
+The four members total 5,228,757 bytes. They physically include later years, so the proposal requires
+a fixed historical date/identity projection and intersecting exception controls before consumption.
+It remains **unactivated** and requires separate source authority. Raw actions and unbound
+correction tradability are not substituted for accepted source semantics.
+Preserve the 120-session gate and ordinary ACTIVE controls. B is not accepted.
+
+The Owner's continuation instruction also reopens D / #404 for the unfinished synthetic claim
+recovery work under `engineering-continuation.v1.json`. The P5 execution and verifier inherit a
+worker lease, so a surviving child blocks new work after supervisor death. A completed orphan
+artifact is verified at the same revision; an incomplete artifact is retained and marked failed
+without replaying a fit. Cancel admission and the terminal commit share a short state lock. Legacy
+P5 claims with unknown ownership remain blocked. No existing worker has been deployed or changed.
+C remains partial, T1 is not admitted, and E/F remain inactive.
+
+The final synthetic recovery code passed independent read-only review and 135 focused tests.
+Full `make check`: 2,992 passed / 7 skipped / 56 failed; all 56 failed IDs match the prior baseline,
+with zero new failures. Full D acceptance is not inferred from these engineering results.
+
+Current next action: finish the minimal source-extension review, then execute its bounded source
+qualification only after separate activation. The extension cannot read payloads before that gate.
 
 ### Historical bounded closeout — 2026-10-02
 

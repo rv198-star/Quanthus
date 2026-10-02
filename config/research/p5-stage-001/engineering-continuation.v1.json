@@ -1,0 +1,24 @@
+{
+  "schema_version": "quanthus.p5-stage-001-engineering-continuation.v1",
+  "effective_date": "2026-10-03",
+  "issue": 404,
+  "state": "ACTIVE_SYNTHETIC_ORPHAN_RECOVERY_ONLY",
+  "authority_source": "Owner delegation and explicit instruction to continue incomplete P3/P5 work after PR419; original D synthetic engineering scope retained",
+  "superseded_disposition": "PARTIAL_SYNTHETIC_ENGINEERING_STOPPED_WITH_B",
+  "scope": [
+    "P5_SYNTHETIC_JOB supervisor interruption and claim recovery",
+    "inherited execution/verifier lease and cancellation linearization",
+    "reuse verified completed artifacts without rerunning a fit",
+    "synthetic fault injection and existing Worker regression"
+  ],
+  "terminal_incomplete_artifact_action": "fail closed, preserve evidence, no automatic fit retry",
+  "legacy_claim_without_ownership_protocol": "preserve and block new work pending explicit diagnosis",
+  "full_D_acceptance": false,
+  "C_reactivated": false,
+  "T1_admitted": false,
+  "formal_seed_budget_consumed": 0,
+  "market_data_access": false,
+  "E_or_F_activation": false,
+  "production_deployment": false,
+  "P6_mutation": false
+}

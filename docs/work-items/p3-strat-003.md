@@ -143,8 +143,19 @@ temporary, static non-PIT, private research evidence. It cannot modify Base/Dail
 the data issue. A governed replacement needs an exact closure and comparison before temporary
 sources exit new runs; preserve old audit receipts.
 
-Current next action: execute the approved bounded source qualification. Preserve #319 NO_PASS;
-do not drop 688287, infer its classification, or run D without B.
+The approved single query executed at `3d2ac91c02de819ee1e998349d87da9fec02fb39` through Nexus
+OCI session `session-b8e60ae67d4f9030de5fff08`, using an isolated BaoStock 0.9.3 dependency.
+Disposition: `QUALIFIED_TEMPORARY_STATIC_SOURCE`; one query, zero retries, 1.439 application seconds.
+Receipt SHA `b26177362b1da0f15a4f4612ffb4325e8bded039b1035443fed2c429176a428b`;
+captured response SHA `6883ab4e46add9770c79f49cdaec258bd5a80912612ddfadbcb40edbc3a2abfd`.
+Actual retrieval was `2026-10-02T17:55:56.775201+00:00` (2026-10-03 Asia/Shanghai), never backdated.
+Source evidence lives in private OCI `p3-p5-20261002/p3-temporary-source/attempt`, not DWD.
+The collector captured exact request, provider fields/rows and update date; server request-echo
+attributes were not retained. That extra audit suggestion is not an approved qualification gate
+and does not authorize a second query. The fixed attempt cannot be automatically reopened.
+
+Current next action: bind the qualified temporary receipt into a B-specific input closure and
+review its admission before any formal B rerun. #470 stays open; #319 stays NO_PASS. D is not active.
 
 ### Historical bounded closeout — 2026-10-02
 

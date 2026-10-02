@@ -154,8 +154,25 @@ The collector captured exact request, provider fields/rows and update date; serv
 attributes were not retained. That extra audit suggestion is not an approved qualification gate
 and does not authorize a second query. The fixed attempt cannot be automatically reopened.
 
-Current next action: bind the qualified temporary receipt into a B-specific input closure and
-review its admission before any formal B rerun. #470 stays open; #319 stays NO_PASS. D is not active.
+The isolated S2 static-industry composition ran at `782b37e0c67996d163b172f5b605b560caee01a9`
+through Nexus OCI `session-e2238406ba64130c4fb872b7`. All 5,251 securities are covered:
+5,201 DWD + 49 sealed P4 + 1 approved temporary source; missing/duplicate/conflict counts are zero.
+The 5,249 decision-window denominator and dated code changes are preserved. Application time was
+5.028 seconds; each identity inventory was built once and reused. Twelve synthetic tests and an
+independent read-only implementation review passed. Execution verified the clean Git revision and
+every production/config file against a host-generated code receipt; outputs are fixed to a private
+owner-1001 root. No new network lookup, candidate rebuild/scoring, replay values or outcome access.
+
+Receipt SHA `2981ae78e2afffe638c610ce0c6545f84b4c489350e8b03e982939c7a7dcda3a`;
+mapping SHA `36dac5f6f941ddad05640a0f12d0f77555af8457d07a528e7b43d9a5af4b0280`;
+identity/provenance SHA `b27484490a201e54a4d44b84fccd7eedb41396170c3b81faff67d510b40534f9`.
+The three files total 3,573,178 bytes under private OCI
+`p3-p5-20261002/p3-temporary-industry-closure/attempt`. They are temporary static non-PIT
+concentration inputs, not a governed DWD repair. #470 remains open.
+
+Current next action: qualify the retained replay/candidate source closure for S3, then freeze the
+new formal input-only B request and budget. The static mapping alone is not complete B input
+qualification. #319 stays NO_PASS; B remains unaccepted and D is not active.
 
 The retained failed-job replay input also still exists. Metadata SHA for `replay/bundle.json` is
 `5d592983f9d04ca78e65bdcc48ed95c6a90c116106b4c5760187cae2e6f11b8e`; bundle identity is
@@ -165,6 +182,26 @@ The retained failed-job replay input also still exists. Metadata SHA for `replay
 evaluate strategy economics, rebuild a candidate or reproduce the original failed Job. It provides
 a concrete retained-input option for the next bounded closure; no historical chain reconstruction
 or formal B/D continuation is implied by these file checks.
+
+The subsequent source investigation recovered the exact Base V2.1 predecessor chain without
+rebuilding any package. OCI retains the suffix; CN01 retains the exact Aug05/Aug04/Aug03 prefix.
+The actual target chain has 35 members through 2026-09-18, including only the already accepted
+Aug27 semantic bridge. All declared files total 870,036,020 bytes and matched their checksums.
+CN01 verification used Nexus and its existing passwordless sudo permission for fixed read-only
+paths; no mode/credential/service was changed. The initial unprivileged permission failures were
+resolved through that existing interface, not recorded as missing data. Old Base-v2 Aug04/Aug05
+entries in the historical 35-row inventory are a different branch and were not spliced into V2.1.
+External lineage receipt SHA `f270f66bacedc15de744a590841740247b394a3fd4164b8bf316f57c1435e9f7`;
+CN01 byte-check session `session-0dd82cb246f4a583508d4b23`, OCI
+`session-3050af1458f431228293fa46`. The target identity and sync timestamp match the retained bundle.
+This is recovered-source evidence, not independent reproduction of the failed Job.
+
+The existing EventWorker executes its deployed code and does not check out the Job's declared SHA.
+It has no single-Job claim filter; an extra `--once` Worker is not a safe substitute. The formal S3
+route therefore needs a narrowly governed retained-input entry/allowlist, engineering review, and
+the existing event-worker-only versioned release gate before one new B Job. P6/replay-worker and
+their environment must remain unchanged. A private CLI or private SQLite Job must not be described
+as that formal B run. No new formal B has been submitted.
 
 ### Historical bounded closeout — 2026-10-02
 

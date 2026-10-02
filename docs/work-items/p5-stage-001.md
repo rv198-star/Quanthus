@@ -83,6 +83,26 @@ unestablished; #471/#472 stay open. Full check at this revision: 3,014 passed / 
 with the same 56 failure IDs as the earlier baseline. The seven new boundary tests also passed an
 independent read-only review.
 
+The per-session identity extension completed at `2d739679174e8ce9a44c9ac9c3bba0ebe14c5672`
+through OCI Nexus `session-0d8cd9c6c5e9cc65bd026fbd`: all 7,722,194 bar rows have exactly one
+admitted, date-aligned calendar/listing/security identity. Missing/ambiguous identity counts are zero;
+the two multi-version security IDs do not create ambiguity in this admitted session population.
+Receipt SHA `31f3670bb872f1373a94ed40d4144d87e3b92aa5ecd642c4863185fbc2a7138e`
+(14,740 bytes), private path `p5-census-runs/session-identity-2d73967/receipt.json`.
+Application time 518.736 seconds, within the unchanged 600-second limit; aggregate TMP
+1,364,297,412 bytes was removed. Each of the five narrow source tables was built once and shared.
+Only the aggregate receipt remains. No prices, actions, labels or protected-year payloads were read.
+This establishes retrospective session identity only: ACTIVE, action-prefix completeness,
+coordinate/window qualification and B acceptance remain unresolved. #471/#472 remain open.
+
+The first run at `28eccbf` reached receipt serialization but failed on a datetime value and left no
+accepted result. The corrected revision explicitly serializes dates and includes an end-to-end
+synthetic census/identity/receipt cleanup test; it did not enlarge the source/window/resource scope.
+Nineteen identity tests pass; the preceding session join implementation also passed independent
+read-only review. Full `make check` with the baseline `TMPDIR=/private/tmp`: 3,038 passed / 7 skipped /
+56 failed, with exactly the prior failure IDs and no new failures. A first check using macOS's
+symlinked temporary path had 31 additional path-alias failures; both receipts are retained.
+
 The Owner explicitly required continued attempts after PR #419 merged. Live #400/#402 were reopened
 for bounded input integrity, schema and listing/session census; E/F remain inactive. OCI is an
 available existing data node under the current Owner instructions; control remains NexusAgent.

@@ -52,7 +52,46 @@ No server request-echo attributes were captured; those extra audit fields were n
 qualification gate and cannot justify another query. B remains unaccepted and D remains NOT_RUN.
 A/C/C-R1 and #319 NO_PASS remain unchanged.
 
+The next isolated composition at `782b37e` completed the temporary static mapping in 5.028
+application seconds: 5,201 DWD + 49 sealed P4 + 1 approved residual = all 5,251 securities,
+zero missing/duplicate/conflicting identities. The original 5,249 decision-window securities and
+dated aliases remain unchanged. No candidate/replay/strategy calculation ran. Nexus session
+`session-e2238406ba64130c4fb872b7`; receipt SHA
+`2981ae78e2afffe638c610ce0c6545f84b4c489350e8b03e982939c7a7dcda3a`, mapping SHA
+`36dac5f6f941ddad05640a0f12d0f77555af8457d07a528e7b43d9a5af4b0280`, provenance SHA
+`b27484490a201e54a4d44b84fccd7eedb41396170c3b81faff67d510b40534f9`. The fixed private root is
+`p3-p5-20261002/p3-temporary-industry-closure/attempt`; three outputs total 3,573,178 bytes.
+This resolves the temporary mapping subproblem only. Formal B source/availability/scan acceptance
+remains open. The implementation passed 12 synthetic contracts and an independent read-only review.
+
+Exact source-lineage recovery also found the required Aug05/Aug04/Aug03 Base V2.1 versions on CN01.
+With the OCI suffix and the accepted Aug27 bridge, all 35 selected packages (870,036,020 declared
+bytes) passed physical SHA checks; no package was rebuilt. Target identity and sync time match the
+retained bundle. External source-lineage receipt SHA
+`f270f66bacedc15de744a590841740247b394a3fd4164b8bf316f57c1435e9f7`. The old Base-v2 branch in
+the inspection inventory is excluded. Initial CN01 access failures were resolved through existing
+Nexus/passwordless-sudo read permission without changing permissions; they are not data-loss evidence.
+This is recovered provenance, not independent reproduction or formal B qualification. Formal B
+still requires a versioned retained-input entry and the existing event-worker-only release gate;
+the current Worker does not load new source merely because a Job names a new revision.
+
 ## P5: verified three-table supply
+
+The later full per-session identity join succeeded at `2d73967`, Nexus
+`session-0d8cd9c6c5e9cc65bd026fbd`: all 7,722,194 bars match one admitted calendar/listing/security
+version at the Shanghai session date; zero missing or ambiguous identities. Receipt SHA
+`31f3670bb872f1373a94ed40d4144d87e3b92aa5ecd642c4863185fbc2a7138e` (14,740 bytes).
+It consumed the same frozen 250 census members and two identity dimensions, built each narrow TMP
+once and reused it. The 1,364,297,412-byte TMP was removed; application time 518.736 seconds under
+the unchanged 600-second cap. No OHLCV values, action rows, labels or protected-year payloads were
+read. This is retrospective identity coverage only; original normalization scope and action prefix
+still block coordinate/window qualification. It does not establish ACTIVE or accept B.
+
+The first attempt at `28eccbf` failed at date serialization, so it produced no accepted receipt.
+The corrected code adds explicit timestamp serialization and an end-to-end synthetic receipt test;
+the retry kept all source and resource boundaries. Full check with canonical `TMPDIR=/private/tmp`
+at `782b37e`: 3,038 passed / 7 skipped / 56 failed, exactly the baseline failure IDs. The preceding
+macOS symlink-TMP check had 31 extra path-alias failures; both logs and the comparison are retained.
 
 The frozen `input-census.v1.json` selects exactly 250 existing 2012–2021 members. All payload
 checksums matched Base manifest `541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b`
@@ -166,7 +205,12 @@ After temporary-source implementation, full `make check` at `d115ea0` reports **
 boundary tests and seven P5 identity boundary tests pass; both implementations received independent
 read-only review. The precise 0.9.3 provider source was inspected on OCI; the reviewer's local 0.9.4
 source observation is not substituted for that version evidence. Planning and focused Ruff checks
-pass separately. Latest check receipts use the `temporary-identity-check` prefix.
+pass separately. Those check receipts use the `temporary-identity-check` prefix.
+
+Latest S2/identity checks at `782b37e` use `temporary-closure-canonicaltmp-check`: **3,038 passed /
+7 skipped / 56 failed**, zero new failure IDs, 110.44 seconds. The first noncanonical macOS TMP run
+and its 31 path-alias failures remain available under `temporary-closure-check`; the canonical-path
+rerun resolves all 31 without changing production code. Planning and focused Ruff pass separately.
 
 Remote source/output roots are private under `/home/ubuntu/quanthus-research/p3-p5-20261002`.
 Raw tool and run receipts are external local artifacts under

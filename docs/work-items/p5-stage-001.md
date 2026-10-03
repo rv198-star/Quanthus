@@ -163,8 +163,16 @@ The final synthetic recovery code passed independent read-only review and 135 fo
 Full `make check`: 2,992 passed / 7 skipped / 56 failed; all 56 failed IDs match the prior baseline,
 with zero new failures. Full D acceptance is not inferred from these engineering results.
 
-Current next action: execute the approved bounded temporary source qualification, retaining the
-original-normalization-scope gate and routing formal repairs through #471/#472.
+Current next action: recover the exact original normalization manifest before the approved action
+prefix/coordinate stage. Further metadata-only checks on 2026-10-03 found no exact body in Nexus
+Recall, matching local Quanthus build records, the old OCI acceptance path or the inspected CN01
+artifact roots. These are bounded lookup outcomes, not proof of global loss. RX6800 and Hermes
+are currently offline; the earlier development bundle points to an older revision and cannot
+substitute for the fixed v3 SHA. No source report/market payload was read to infer scope, no JSON
+was reconstructed from prose, and the accepted identity join was not rerun. #471 carries the new
+lookup evidence for the separate data workstream. #472, B/reference/ACTIVE gates and E/F remain
+unchanged. Recovery requires the original body or a separately governed unavailable/replacement
+disposition; technical delegation cannot manufacture its missing facts.
 
 ### Historical bounded closeout — 2026-10-02
 

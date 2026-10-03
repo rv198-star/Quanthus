@@ -141,8 +141,12 @@ validity and raw-time counts. This is a new diagnostic closure under the Owner's
 delegation, not a retry/rename of the spent retained request. It builds no corrected bundle or
 candidate, opens no economics/labels, and cannot qualify B, activate D, close data issues or
 mutate P6/formal data. Budget: 600 seconds per node, two DuckDB threads, 2 GB memory, 512 MiB TMP,
-64 KiB output, one attempt per node. The probe is not yet executed; frozen PIT gates still apply
-to any later corrected B proposal. See `../acceptance/p3-p5-input-recovery-20261003.md`.
+64 KiB output, one attempt per node. CN01's Aug04/Aug05 probe has completed: 9,984 `none`日线,
+zero legacy matches/invalid prices, all raw timestamps late. OCI stopped before market rows at
+Aug27 read permission, preserving the old marker. A separate frozen pre-read recovery binds the
+failure and changes only that package's storage to private exact copies; one new OCI attempt,
+unchanged bytes/budgets, no repeated CN01 and no further automatic recovery. Frozen PIT gates
+still apply to any later corrected B proposal. See `../acceptance/p3-p5-input-recovery-20261003.md`.
 
 The exact retained candidate and accepted P4 A/B industry sources were recovered. A bounded
 isolated CLI inspection at `835dea9b5502f9dbe1f0830b538312bc8f0f4b9e` completed in 38 seconds:

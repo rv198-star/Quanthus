@@ -19,6 +19,8 @@ from quanthus.expert_evaluation.serialization import canonical_json_bytes, diges
 
 REQUEST_CONFIG = "config/research/p3-strat-003/daily-adapter-probe.v1.json"
 REQUEST_SHA = "sha256:396b823a16ee28b2636b90a8b915f26ab6897cf2e0edd6b54ed5186a2ce78f3c"
+RECOVERY_CONFIG = "config/research/p3-strat-003/daily-adapter-pre-read-recovery.v1.json"
+RECOVERY_SHA = "sha256:571f936fa97edcf6a57ac42aa02125b9ecb23f7dc3cf334f58c1d477bf258550"
 
 
 def sha256(path: Path) -> str:
@@ -144,11 +146,38 @@ def _timeout(_signal: int, _frame: Any) -> None:
     raise ProbeBudgetExceeded("ADAPTER_PROBE_WALL_BUDGET_EXCEEDED")
 
 
-def prepare_code_receipt(*, repo: Path, node: str, code_revision: str) -> dict[str, Any]:
-    """Bind the complete production/config tree on the clean Git host before row access."""
+def _request(repo: Path, node: str, pre_read_recovery: bool) -> tuple[dict[str, Any], str]:
     if sha256(repo / REQUEST_CONFIG) != REQUEST_SHA:
         raise ValueError("ADAPTER_REQUEST_DRIFT")
     raw = json.loads((repo / REQUEST_CONFIG).read_bytes())
+    if not pre_read_recovery:
+        return raw, REQUEST_SHA
+    if node != "OCI" or sha256(repo / RECOVERY_CONFIG) != RECOVERY_SHA:
+        raise ValueError("ADAPTER_RECOVERY_NOT_ADMITTED")
+    recovery = json.loads((repo / RECOVERY_CONFIG).read_bytes())
+    if recovery["original_request"] != {"path": REQUEST_CONFIG, "sha256": REQUEST_SHA}:
+        raise ValueError("ADAPTER_RECOVERY_REQUEST_DRIFT")
+    prior = Path(recovery["old_attempt"]["root"])
+    for f in recovery["old_attempt"]["files"]:
+        path = _path(prior, f["path"])
+        if path.stat().st_size != f["size_bytes"] or sha256(path) != f["sha256"]:
+            raise ValueError("ADAPTER_PRE_ROW_FAILURE_EVIDENCE_DRIFT")
+    if (prior / "attempt/receipt.json").exists():
+        raise ValueError("ADAPTER_COMPLETED_ATTEMPT_CANNOT_RECOVER")
+    raw["nodes"][node] = recovery["output"]
+    relocation = recovery["root_relocation"]
+    matches = [p for p in raw["packages"] if p["market_date"] == relocation["market_date"]]
+    if len(matches) != 1 or matches[0]["root"] != relocation["old_root"]:
+        raise ValueError("ADAPTER_RECOVERY_SOURCE_DRIFT")
+    matches[0]["root"] = relocation["new_root"]
+    return raw, RECOVERY_SHA
+
+
+def prepare_code_receipt(
+    *, repo: Path, node: str, code_revision: str, pre_read_recovery: bool = False
+) -> dict[str, Any]:
+    """Bind the complete production/config tree on the clean Git host before row access."""
+    raw, _ = _request(repo, node, pre_read_recovery)
     if not re.fullmatch(r"[0-9a-f]{40}", code_revision):
         raise ValueError("ADAPTER_EXACT_REVISION_REQUIRED")
     git = ["git", "-c", f"safe.directory={repo}", "-C", str(repo)]
@@ -169,11 +198,10 @@ def prepare_code_receipt(*, repo: Path, node: str, code_revision: str) -> dict[s
     return {"code_revision": code_revision, "file_count": len(files)}
 
 
-def build(*, repo: Path, node: str, code_revision: str) -> dict[str, Any]:
-    request_path = repo / REQUEST_CONFIG
-    if sha256(request_path) != REQUEST_SHA:
-        raise ValueError("ADAPTER_REQUEST_DRIFT")
-    raw = json.loads(request_path.read_bytes())
+def build(
+    *, repo: Path, node: str, code_revision: str, pre_read_recovery: bool = False
+) -> dict[str, Any]:
+    raw, active_request_sha = _request(repo, node, pre_read_recovery)
     authority = raw["authority"]["original_research_request"]
     if sha256(repo / authority["path"]) != authority["sha256"]:
         raise ValueError("ADAPTER_RESEARCH_AUTHORITY_DRIFT")
@@ -202,7 +230,7 @@ def build(*, repo: Path, node: str, code_revision: str) -> dict[str, Any]:
     _write(
         marker,
         {
-            "request_sha256": REQUEST_SHA,
+            "request_sha256": active_request_sha,
             "code_revision": code_revision,
             "node": node,
             "maximum_attempts": 1,
@@ -236,7 +264,9 @@ def build(*, repo: Path, node: str, code_revision: str) -> dict[str, Any]:
         aggregate = {k: sum(r[k] for r in daily) for k in daily[0] if k != "market_date"}
         result = {
             "schema_version": "quanthus.p3-daily-adapter-probe-receipt.v1",
-            "request_sha256": REQUEST_SHA,
+            "request_sha256": active_request_sha,
+            "original_request_sha256": REQUEST_SHA,
+            "pre_read_access_recovery": pre_read_recovery,
             "code_revision": code_revision,
             "node": node,
             "disposition": "INPUT_ONLY_ADAPTER_EVIDENCE"
@@ -288,11 +318,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--node", choices=("OCI", "CN01"), required=True)
     parser.add_argument("--code-revision", required=True)
     parser.add_argument("--prepare-code-receipt", action="store_true")
+    parser.add_argument("--pre-read-recovery", action="store_true")
     args = parser.parse_args(argv)
     print(
         json.dumps(
             (prepare_code_receipt if args.prepare_code_receipt else build)(
-                repo=args.repository_root, node=args.node, code_revision=args.code_revision
+                repo=args.repository_root,
+                node=args.node,
+                code_revision=args.code_revision,
+                pre_read_recovery=args.pre_read_recovery,
             )
         )
     )

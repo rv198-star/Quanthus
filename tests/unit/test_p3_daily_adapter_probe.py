@@ -234,3 +234,41 @@ def test_complete_build_seals_diagnostic_and_cannot_rerun(package, tmp_path, mon
     assert json.loads((output / "receipt.json").read_text()) == result
     with pytest.raises(FileExistsError):
         probe.build(repo=repo, node="OCI", code_revision=revision)
+
+
+def test_pre_read_recovery_preserves_entire_payload_closure(tmp_path, monkeypatch):
+    root = Path(__file__).resolve().parents[2]
+    original = json.loads((root / probe.REQUEST_CONFIG).read_text())
+    recovery = json.loads((root / probe.RECOVERY_CONFIG).read_text())
+    assert probe.sha256(root / probe.RECOVERY_CONFIG) == probe.RECOVERY_SHA
+    repo = tmp_path / "repo"
+    request = repo / probe.REQUEST_CONFIG
+    request.parent.mkdir(parents=True)
+    shutil.copyfile(root / probe.REQUEST_CONFIG, request)
+    prior = tmp_path / "prior"
+    prior.mkdir()
+    recovery["old_attempt"]["root"] = str(prior)
+    for f in recovery["old_attempt"]["files"]:
+        path = prior / f["path"]
+        path.write_text("Synthetic pre-row failure evidence")
+        f.update(sha256=probe.sha256(path), size_bytes=path.stat().st_size)
+    path = repo / probe.RECOVERY_CONFIG
+    path.write_text(json.dumps(recovery))
+    monkeypatch.setattr(probe, "RECOVERY_SHA", probe.sha256(path))
+    recovered, active = probe._request(repo, "OCI", True)
+    assert active == probe.RECOVERY_SHA
+    assert recovered["scope"] == original["scope"]
+    assert recovered["budgets"] == original["budgets"]
+    for old, new in zip(original["packages"], recovered["packages"], strict=True):
+        assert old["files"] == new["files"]
+        assert {k: v for k, v in old.items() if k != "root"} == {
+            k: v for k, v in new.items() if k != "root"
+        }
+        assert (old["root"] != new["root"]) is (old["market_date"] == "2026-08-27")
+    assert recovered["nodes"]["CN01"] == original["nodes"]["CN01"]
+    with pytest.raises(ValueError, match="ADAPTER_RECOVERY_NOT_ADMITTED"):
+        probe._request(repo, "CN01", True)
+    (prior / "attempt").mkdir()
+    (prior / "attempt/receipt.json").write_text("{}")
+    with pytest.raises(ValueError, match="ADAPTER_COMPLETED_ATTEMPT_CANNOT_RECOVER"):
+        probe._request(repo, "OCI", True)

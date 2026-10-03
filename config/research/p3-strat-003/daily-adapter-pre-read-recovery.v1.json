@@ -1,0 +1,59 @@
+{
+  "schema_version": "quanthus.p3-daily-adapter-pre-read-recovery.v1",
+  "state": "FROZEN_ONE_PRE_ROW_ACCESS_RECOVERY",
+  "original_request": {
+    "path": "config/research/p3-strat-003/daily-adapter-probe.v1.json",
+    "sha256": "sha256:396b823a16ee28b2636b90a8b915f26ab6897cf2e0edd6b54ed5186a2ce78f3c"
+  },
+  "reason": "original Aug27 package not readable by unprivileged isolated probe; stop occurred inside verify_packages before duckdb import or Parquet read",
+  "owner_authority": "continued delegated P3/P5 completion with temporary handling and registered data gaps",
+  "old_attempt": {
+    "root": "/home/ubuntu/quanthus-research/p3-p5-20261002/daily-adapter-probe/oci",
+    "code_revision": "7b501fe55ad155fb61a7e540ab1255ba61cbc940",
+    "files": [
+      {
+        "path": "execution.log",
+        "sha256": "sha256:732e205cf37df226d86a3929092681058b75d280cd401e90aeb7fa65f4aa9b31",
+        "size_bytes": 1880
+      },
+      {
+        "path": "attempt.json",
+        "sha256": "sha256:d8ce949c367e00e46be5a8d80e210020605b971f52ea5f05706b6e9fe35dca42",
+        "size_bytes": 186
+      }
+    ],
+    "market_rows_read": false,
+    "marker_preserved_and_spent": true
+  },
+  "node": "OCI",
+  "output": {
+    "output": "/home/ubuntu/quanthus-research/p3-p5-20261002/daily-adapter-probe/oci-recovery/attempt",
+    "uid": 1001
+  },
+  "root_relocation": {
+    "market_date": "2026-08-27",
+    "old_root": "/data/event-runs/structure-runs/run_ab6d6afa749244299c29995968b21b84/missing-boundary/package",
+    "new_root": "/home/ubuntu/quanthus-research/p3-p5-20261002/daily-adapter-probe/oci-recovery/private-sources/2026-08-27",
+    "copy_members": [
+      "manifest.json",
+      "READY",
+      "payload/security_market_observation/dwd_security_bar/market_date=2026-08-27/part-00000.parquet",
+      "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-27/part-00000.parquet"
+    ],
+    "source_bytes_or_permissions_changed": false
+  },
+  "boundaries": {
+    "original_35_package_70_file_closure_unchanged": true,
+    "original_bytes_846352085_unchanged": true,
+    "OCI_packages": 33,
+    "CN01_successful_attempt_reused": true,
+    "one_new_attempt_with_original_per_node_budget": true,
+    "further_automatic_recovery": false,
+    "candidate_or_strategy_or_labels": false,
+    "PIT_inferred": false,
+    "B_accepted": false,
+    "D_activated": false,
+    "P6_or_formal_data_mutated": false,
+    "old_attempt_renamed_or_overwritten": false
+  }
+}

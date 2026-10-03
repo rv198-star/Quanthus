@@ -67,7 +67,30 @@ Unknown basis remains fail closed. Raw times and values are never rewritten; pub
 inferred. Only aggregate receipts are emitted, no corrected bundle/candidate/economics/labels or
 formal B acceptance. One external attempt marker per node, wall 600 seconds, DuckDB 2 threads /
 2 GB, TMP 512 MiB, output 64 KiB. It is a new diagnostic, not a repeat of the spent formal request.
-At this checkpoint it has not executed. Original-data repair and any later B gate remain separate.
+At the initial preregistration it had not executed. Original-data repair and any later B gate remain separate.
+
+CN01 has now completed its exact Aug04/Aug05 subset at `7b501fe`, Nexus
+`session-d25081a34a794c559536cf03`: 9,984 raw 1d rows, all `none`, legacy-selected zero,
+invalid-price zero, zero-activity eight. All 9,984 raw times are after T-close; none was inferred or
+changed. Four files / 48,277,010 bytes verified; application elapsed 0.384 seconds, TMP removed.
+Receipt SHA `b3a2b3bb18caa39aa2a79fadb0862e2b146e4bd00379e28020a7c4421db73831`.
+The exact Linux/Python 3.10/duckdb 1.5.6 environment passes all 16 synthetic cases. Its isolated
+test venv needed pytz for fetching synthetic timestamps; no global dependency or formal data changed.
+
+OCI's preflight passed 15 pure cases in its actual Python 3.11/duckdb 1.5.6 image; the Git-host
+fixture was separately covered on CN01. Its first actual attempt stopped at source-byte verification,
+before DuckDB import/Parquet row access: the Aug27 original package is not readable by the
+unprivileged diagnostic. Original source permissions and the spent attempt are preserved.
+Failure log SHA `732e205cf37df226d86a3929092681058b75d280cd401e90aeb7fa65f4aa9b31`;
+marker SHA `d8ce949c367e00e46be5a8d80e210020605b971f52ea5f05706b6e9fe35dca42`.
+It is an access failure, not evidence of missing DWD or a completed row probe.
+
+The separate `daily-adapter-pre-read-recovery.v1.json` binds that exact failure and original request.
+It authorizes one new OCI attempt with the same per-node budget and all original package/member
+bytes, changing only the Aug27 storage location to private exact copies through the existing
+read-only source interface. It does not rename/reset the old marker, alter original permissions,
+repeat the successful CN01 subset, open candidate/economic data or admit another automatic
+recovery. No root diagnostic container is used. The new recovery is not yet executed.
 
 Sixteen new synthetic cases and all 30 retained-input cases pass (46 total). Full `make check`:
 3,099 passed / 7 skipped / 41 existing failures in 118.68 seconds; failed IDs exactly equal the

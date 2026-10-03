@@ -120,6 +120,38 @@ dual-lane runtime bindings and one BaoStock version gate); Python 3.12 was fail-
 Web retains nine existing Node TypeScript-extension failures. Neither check is reported as green.
 The source diagnostic and its read-only implementation review do not qualify formal B.
 
+### Temporary Daily basis adaptation — preregistered next step
+
+The Owner's continuing delegation and temporary-only boundary permit the new, distinct
+`temporary-daily-adapter.v1.json`. It binds the completed diagnostic receipts and exactly the same
+35 original package identities. The spent diagnostic and retained B attempts are not reopened.
+This performs one private materialization per node: retain every raw column/value/type, rename
+the original `price_basis` to `source_price_basis`, and add canonical `UNADJUSTED` plus the adapter
+policy version. Source prices, quantities, timestamps and provenance remain byte-semantically
+unchanged, verified by exact typed `EXCEPT ALL` after Parquet serialization. Unknown basis,
+invalid prices, duplicate identities or source drift stop publication.
+
+All adapted rows explicitly carry `decision_admissible=false` and
+`P3_ECONOMIC_AVAILABILITY_UNQUALIFIED`. This source artifact cannot feed candidate/replay/strategy
+decisions until a separate fully qualified B binds every input family's economic availability.
+It is not a corrected retained bundle, candidate scan, D result or formal DWD repair.
+
+Dependency graph: complete source/code/config/diagnostic verification -> one calendar and 1d TMP
+per package -> identity/basis/price validation -> canonical serialization -> exact raw-column
+comparison -> immutable receipt. All consumers share that one 1d TMP; staging is removed. Outputs
+are private content-addressed caches, reuse disabled, 30-day retention with research-operator
+cleanup; preserve receipts after payload expiry. The key covers the complete source closure,
+config/policy, code tree/revision, output schema, scope and security subset. No ADM promotion.
+Budget per node: 600 wall seconds, two DuckDB threads / 2 GB, separate 512 MiB TMP and 64 MiB
+published-output ceilings, one attempt with no automatic recovery. No P6 or original permissions
+change. Unified repair and temporary exit still belong to #473/#474.
+
+Sixteen adapter synthetic cases pass; with diagnostic and retained cases, 63 tests pass.
+Independent read-only review found and verified repairs to COPY parameter ordering and separate
+TMP/output accounting. Full `make check`: 3,116 passed / 7 skipped / 41 failed in 116.64 seconds,
+with exactly the prior 41 failure IDs and zero new IDs. Focused Ruff/planning/diff checks pass.
+Actual materialization remains pending here; the full repository check is not green.
+
 ## P3: actual retained-input diagnosis
 
 The exact failed candidate survived in the original event volume. SHA:

@@ -162,6 +162,14 @@ bundle or candidate was built. Current next action: qualify per-family economic 
 existing bound source evidence before proposing a distinct corrected B; a price-basis alias alone
 cannot fix #474 or activate D. See `../acceptance/p3-p5-input-recovery-20261003.md`.
 
+The separately frozen `temporary-daily-adapter.v1.json` now prepares a temporary source adaptation
+under the Owner's continuing delegation. It retains all raw values/types/times/provenance and the
+raw `none` label, adding canonical `UNADJUSTED` only. Every output row remains explicitly
+decision-unavailable pending #474. One new private, content-addressed materialization per node;
+no old attempt reset, retained-bundle repair, candidate scan, economics, labels or formal data/P6
+mutation. Sixteen new adapter contracts and the independent implementation review pass. Execute
+only versioned GitHub code after the full check and preregistration; retain #473/#474 as open.
+
 The exact retained candidate and accepted P4 A/B industry sources were recovered. A bounded
 isolated CLI inspection at `835dea9b5502f9dbe1f0830b538312bc8f0f4b9e` completed in 38 seconds:
 2,455,175 identity/date rows, 5,251 distinct securities, 5,249 in the decision window.

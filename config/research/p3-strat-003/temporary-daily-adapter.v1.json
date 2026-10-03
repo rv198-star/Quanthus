@@ -1,0 +1,80 @@
+{
+  "schema_version": "quanthus.p3-temporary-daily-adapter.v1",
+  "state": "FROZEN_TEMPORARY_INPUT_ONLY",
+  "policy_version": "p3-daily-none-to-unadjusted-temporary-v1",
+  "authority": {
+    "owner_delegation": "我希望尽快完成P3和P5，并收敛，但我可能不太懂也不知道量化指标这些技术细节，所以我想全权委托你完成、",
+    "owner_continue": "继续",
+    "owner_temporary_boundary": "缺口需要登记issue，然后他统一修复数据，你现在的修复只能做临时处理",
+    "data_issues": [473, 474],
+    "retained_B_attempt_reopened": false,
+    "B_accepted": false,
+    "D_activated": false,
+    "P6_or_formal_data_mutation": false
+  },
+  "source_request": {
+    "path": "config/research/p3-strat-003/daily-adapter-probe.v1.json",
+    "sha256": "sha256:396b823a16ee28b2636b90a8b915f26ab6897cf2e0edd6b54ed5186a2ce78f3c"
+  },
+  "source_access_recovery": {
+    "path": "config/research/p3-strat-003/daily-adapter-pre-read-recovery.v1.json",
+    "sha256": "sha256:571f936fa97edcf6a57ac42aa02125b9ecb23f7dc3cf334f58c1d477bf258550",
+    "use": "reuse the exact Aug27 private source location only; never execute the prior diagnostic"
+  },
+  "scope": {
+    "start": "2026-08-03",
+    "end": "2026-09-18",
+    "packages": 35,
+    "rows_per_package": 4992,
+    "payload_files": 70,
+    "payload_bytes": 846352085,
+    "security_subset": "all original 1d listing rows in the exact 35 source packages"
+  },
+  "contract": {
+    "interval_size": "1d",
+    "accepted_source_price_basis": "none",
+    "canonical_price_basis": "UNADJUSTED",
+    "source_price_basis_preserved_as": "source_price_basis",
+    "prices_and_raw_times": "preserve original typed values exactly; no rescaling or time projection",
+    "unknown_basis_or_invalid_price": "fail_closed_before_publication",
+    "decision_admissible": false,
+    "unavailable_reason": "P3_ECONOMIC_AVAILABILITY_UNQUALIFIED",
+    "future_use": "cannot be consumed by candidate/replay/strategy decisions until a distinct fully qualified B binds economic availability for every consumed input family",
+    "corrected_retained_bundle": false,
+    "candidate_scan_or_economics_or_labels": false
+  },
+  "lifecycle": {
+    "kind": "content_addressed_cache",
+    "usage": "private temporary research source adaptation only; not ADM",
+    "identity": "complete exact source package/member closure, source and adapter config digests, code receipt/revision, output schema, scope and security subset",
+    "reuse": "disabled; single materialization only; formal cold construction remains separate",
+    "retention_days": 30,
+    "cleanup_owner": "research operator; preserve receipt after payload expiry",
+    "formal_replacement": "freeze and independently compare a governed replacement before any new admission; stop temporary source use without rewriting old receipts"
+  },
+  "budgets": {
+    "wall_seconds_per_node": 600,
+    "threads": 2,
+    "memory_limit": "2GB",
+    "tmp_limit": "512MiB",
+    "output_max_bytes_per_node": 67108864,
+    "attempts_per_node": 1,
+    "automatic_recovery": false
+  },
+  "nodes": {
+    "OCI": {
+      "uid": 1001,
+      "output_root": "/home/ubuntu/quanthus-research/p3-p5-20261002/temporary-daily-adapter/oci",
+      "diagnostic_receipt": "/home/ubuntu/quanthus-research/p3-p5-20261002/daily-adapter-probe/oci-recovery/attempt/receipt.json",
+      "diagnostic_receipt_sha256": "sha256:c9b50c3dccc6489f3f695018f5888fa5e3b2cec4ba5af98c1353622efe5ea070",
+      "diagnostic_result_digest": "sha256:af12c027f2fabe007a1f570498668b4008d83f4966d6ecf30c987c94f43c9db1"
+    },
+    "CN01": {
+      "uid": 0,
+      "output_root": "/var/tmp/quanthus-p3-temporary-daily-adapter-20261003-cn01",
+      "diagnostic_receipt": "/var/tmp/quanthus-p3-daily-adapter-20261003-cn01/attempt/receipt.json",
+      "diagnostic_receipt_sha256": "sha256:b3a2b3bb18caa39aa2a79fadb0862e2b146e4bd00379e28020a7c4421db73831",
+      "diagnostic_result_digest": "sha256:4c768fa76219efac7215652d2b784213f45bb80cb1f9a0531200bc538c258605"
+    }
+  }
+}

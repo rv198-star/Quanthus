@@ -134,7 +134,7 @@ why missing_bar=0 does not establish coverage. This proves a consumer mismatch, 
 availability/PIT qualification. Raw-known-late timestamps remain preserved; they are neither
 automatic leakage proof nor permission to replace them with T-close.
 
-Current next action: the separate input-only `daily-adapter-probe.v1.json` freezes the exact
+The completed input-only `daily-adapter-probe.v1.json` freezes the exact
 35 original packages and 70 bar/calendar files (846,352,085 bytes). One aggregate diagnostic per
 node uses 33 OCI packages and two exact CN01 packages; it reports raw 1d coverage, basis/price
 validity and raw-time counts. This is a new diagnostic closure under the Owner's continued
@@ -146,7 +146,21 @@ zero legacy matches/invalid prices, all raw timestamps late. OCI stopped before 
 Aug27 read permission, preserving the old marker. A separate frozen pre-read recovery binds the
 failure and changes only that package's storage to private exact copies; one new OCI attempt,
 unchanged bytes/budgets, no repeated CN01 and no further automatic recovery. Frozen PIT gates
-still apply to any later corrected B proposal. See `../acceptance/p3-p5-input-recovery-20261003.md`.
+still apply to any later corrected B proposal.
+
+The separate OCI recovery completed at `5cf2fb1` in 2.246 application seconds: 164,736 raw 1d
+rows, all `none`, zero legacy matches/invalid prices/unknown basis or time. Receipt SHA
+`c9b50c3dccc6489f3f695018f5888fa5e3b2cec4ba5af98c1353622efe5ea070`.
+Combining this with the existing CN01 success verifies exactly all 35 frozen dates, 4,992 raw rows
+each, 70 files / 846,352,085 bytes: 174,720 valid-price rows, zero selected by the legacy adapter,
+173 zero-activity rows. All raw knowledge timestamps are after T-close. Thus the entire diagnosed
+suffix has raw bars; #473 is a consumer adaptation defect, not evidence of absent DWD daily bars.
+Zero-activity rows retain their existing tradability gate; valid prices do not establish eligibility.
+The combined result digest is `sha256:69cb5e1626990f044ef2fc163ad016c81a2213b2d1d4a5ce6cc568a335eb9cb8`.
+Both successful attempts and the original pre-row failure are spent and preserved. No corrected
+bundle or candidate was built. Current next action: qualify per-family economic availability from
+existing bound source evidence before proposing a distinct corrected B; a price-basis alias alone
+cannot fix #474 or activate D. See `../acceptance/p3-p5-input-recovery-20261003.md`.
 
 The exact retained candidate and accepted P4 A/B industry sources were recovered. A bounded
 isolated CLI inspection at `835dea9b5502f9dbe1f0830b538312bc8f0f4b9e` completed in 38 seconds:

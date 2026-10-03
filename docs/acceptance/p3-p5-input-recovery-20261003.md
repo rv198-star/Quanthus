@@ -90,12 +90,35 @@ It authorizes one new OCI attempt with the same per-node budget and all original
 bytes, changing only the Aug27 storage location to private exact copies through the existing
 read-only source interface. It does not rename/reset the old marker, alter original permissions,
 repeat the successful CN01 subset, open candidate/economic data or admit another automatic
-recovery. No root diagnostic container is used. The new recovery is not yet executed.
+recovery. No root diagnostic container is used.
 
-Sixteen new synthetic cases and all 30 retained-input cases pass (46 total). Full `make check`:
-3,099 passed / 7 skipped / 41 existing failures in 118.68 seconds; failed IDs exactly equal the
+The recovery completed at `5cf2fb1cf95f3219232b50988de890e398ad80ba`, Nexus
+`session-d8cb204d5265b323c33cb6ed`: 33 exact packages / 66 files / 798,075,075 bytes,
+164,736 raw 1d rows. Every row has `none` basis and valid prices; legacy-selected zero,
+unknown-basis/time zero, zero-activity 165. All raw knowledge times remain after T-close.
+Application elapsed 2.246 seconds (byte verification 0.636; shared TMP scan 1.610); TMP removed.
+Receipt SHA `c9b50c3dccc6489f3f695018f5888fa5e3b2cec4ba5af98c1353622efe5ea070`, result digest
+`sha256:af12c027f2fabe007a1f570498668b4008d83f4966d6ecf30c987c94f43c9db1`.
+The source copying and container orchestration are not included in application elapsed time.
+The isolated production-image preflight passes 16 cases; its Git-host fixture is covered separately.
+
+Independent local receipt verification recomputed both result digests and physical receipt hashes,
+matched each node's exact frozen date set, and proved the union has 35 unique dates, each with
+4,992 rows. Combined: 174,720 raw/valid-price/`none` rows, zero legacy matches or unknown basis/time,
+173 zero-activity rows, 70 files / 846,352,085 bytes. All raw times are late; none was replaced.
+Combined verification digest: `sha256:69cb5e1626990f044ef2fc163ad016c81a2213b2d1d4a5ce6cc568a335eb9cb8`.
+This establishes the diagnosed suffix's consumer mismatch, not loss of the original DWD bars.
+Zero activity remains subject to tradability rules and is not silently treated as an eligible entry.
+Both successful attempts are spent. No corrected bundle, candidate scan, economics or labels ran.
+PIT/economic availability remains unproven, B remains NO_PASS, D inactive and data issues open.
+
+Seventeen new synthetic cases and all 30 retained-input cases pass (47 total). Full `make check`:
+3,100 passed / 7 skipped / 41 existing failures in 112.59 seconds; failed IDs exactly equal the
 prior reviewed retained-entry check, with zero new IDs. Focused Ruff, planning and diff checks pass.
-This is engineering evidence, not a green full-repository check or source probe execution.
+CI at `5cf2fb1` records Python 3.10: 3,100 passed / 20 skipped / 28 prior failures (27 retired
+dual-lane runtime bindings and one BaoStock version gate); Python 3.12 was fail-fast cancelled.
+Web retains nine existing Node TypeScript-extension failures. Neither check is reported as green.
+The source diagnostic and its read-only implementation review do not qualify formal B.
 
 ## P3: actual retained-input diagnosis
 

@@ -509,7 +509,7 @@ def test_shared_report_matches_real_reader_and_scanner_cleans_tmp(fixture):
         "source": {
             "provider": "synthetic",
             "endpoint": "test",
-            "retrieved_at": "2026-10-01T00:00:00Z",
+            "retrieved_at": "2026-10-01T00:00:00+00:00",
             "source_revision": "test",
         },
         "memberships": [

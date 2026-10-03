@@ -375,6 +375,16 @@ is a research-package limitation, not evidence of DWD history loss. Formal repai
 data workstream; private research sources must exit new runs only after a governed replacement is
 bound and compared. Existing audit artifacts are preserved, never silently overwritten.
 
+Further original-manifest recovery was metadata-only. Exact SHA/revision queries in Nexus Recall
+returned no hits. Matching local Quanthus session records contain v3 references/source code, not
+an original manifest body matching the bound SHA. OCI's old acceptance directory is absent; its
+currently mounted development manifest still points to the earlier July29 snapshot. Inspected
+CN01 artifact/Quanthus data subdirectories are absent. None establishes global loss or permits a
+replacement manifest from reconstructed fields. RX6800 and Hermes are currently offline; source
+payloads/reports were not opened to infer the missing scope. Lookup evidence is appended to #471.
+The action-prefix stage remains stopped at this factual prerequisite; prior identity/census
+receipts and unconsumed E/F budgets are preserved.
+
 ## P5: bounded synthetic execution recovery
 
 D / #404 was reopened within its original synthetic engineering boundary under the Owner's

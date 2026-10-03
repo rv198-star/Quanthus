@@ -3,7 +3,76 @@
 Status: active input qualification, not research acceptance or another terminal closeout.
 The Owner explicitly instructed continued attempts after approving PR #419. Current Owner routing
 permits the existing OCI data node through NexusAgent; no #424 SSH exception or legacy OCI control
-path was used. PR #469 contains the reviewable continuation.
+path was used. PR #469 merged the reviewed continuation; this record preserves its actual result.
+
+## Formal retained B: successful execution, partial qualification
+
+Job `job_5352d6c61af94a1aac4162a9a6a5d357` / Run
+`run_5352d6c61af94a1aac4162a9a6a5d357` completed at `2026-10-03T04:07:13.870879Z`,
+attempt/claim generation 1/1, started `04:01:16.912367Z`. Exact runtime
+`92a70a7bc11b2df2da16cd00dbacdbd4877d6b8b` was released through the existing production interface,
+EventWorker only, after normal PR #469 merge at `1857cc5182db3173f3569e8fd4d2019bd03ca6ec`.
+Effective image: `sha256:3477f9201848cf5ff26ade4ddd1971296bf2def5aba99886667b89595c4efa3d`.
+P6/replay image and full environment digest were unchanged; health/ready returned 200.
+
+Output is immutable under `/data/event-runs/structure-runs/run_5352d6c61af94a1aac4162a9a6a5d357`.
+Manifest SHA `4a6557aad4416d9f86c184c2f57552d444093fbb2e76f4db942e02906887fcce`, result digest
+`15a42673fb01e41e33cc34bf6a1fddaeb787019470c89cce4e5b9fb9e6fe9105`, candidate digest
+`d126a7576f7e1f31c8cdd3b3afb155bce59a39cae56b0c324a16667ace08f19e`.
+Independent read-only verifier `session-470b3c43e95f9ef1c1647055` passed full frozen-input bytes,
+READY, result recomputation and 57 output files / 313,766,273 bytes. This is independent verification,
+not independent cold construction. The single attempt marker remains spent and unchanged.
+
+All 27 retained producer fields matched over 2,455,175 rows with zero differences. Actual decision
+denominator is 2,143,553, excluding 306,630 warmup rows and the final 4,992 execution-day rows.
+All 5,251 securities have temporary static industry coverage. The authoritative calendars match:
+60 warmup opens (2024-10-09..2024-12-31), 416 decision-to-next-open pairs. The unchanged scanner
+found 11,741 triggers, rejected 1,482 by same-security isolation, leaving 10,259 before industry
+concentration; 3,852 concentration rejections leave 6,407 candidates. No industry membership is
+missing. Application elapsed: 340.284 seconds; shared audit TMP was built once/reused/removed.
+No strategy results, targets, P2 fills, D, P6 mutation or formal DWD repair were produced.
+
+The independent acceptance review (`session-d62dcf7cb6fec4668fcad657`, corroborated by root
+`session-566767c04fd0451e3fd7d84f`) found two material qualifications still missing:
+
+- 35 opens from 2026-08-03..09-18 have 4,992/4,992 invalid bars each, totaling 174,720.
+  Frozen Daily source writes `price_basis='none'`; the actual retained producer filters
+  `UNADJUSTED` and preserves empty LEFT JOIN rows. Missing_bar=0 therefore does not mean actual
+  coverage. Zero projection differences faithfully preserve this defect. It is not established
+  raw DWD loss, legitimate suspension or a reason to shrink the fixed window.
+- The frozen candidate card requires T-close availability for each consumed family. 2025 has
+  1,250,718 late raw bars among 1,251,467 pairs; listing/security/state are all late. These counts
+  prove warehouse timing, not leakage or valid public availability. The recent visibility policy
+  checks effective time but lacks independent per-family economic availability evidence. The
+  development-only retrospective approval cannot silently qualify this recent window.
+
+Conclusion: **`PARTIAL_INPUT_QUALIFICATION`, B remains NO_PASS; D remains inactive.** Job success,
+artifact integrity, retained_input_requalified=true and candidate non-emptiness do not override that
+decision. Sealed outputs and A/C/C-R1/old negative receipts are preserved. Per Owner instruction,
+[#473](https://github.com/rv198-star/Quanthus/issues/473) owns unified adapter governance and
+[#474](https://github.com/rv198-star/Quanthus/issues/474) owns PIT/source qualification. Temporary
+research handling cannot close either issue or modify the original DWD/P6 path.
+
+### Bounded source adapter diagnostic
+
+The new input-only request `daily-adapter-probe.v1.json`, SHA
+`396b823a16ee28b2636b90a8b915f26ab6897cf2e0edd6b54ed5186a2ce78f3c`, freezes exact package/READY,
+bar and calendar identities from recovered source metadata: 35 packages / 70 payload files /
+846,352,085 bytes. All dates stay inside the deficient Daily suffix. OCI owns 33 packages; CN01
+owns exact Aug04/Aug05 packages unavailable on OCI. No broad filesystem search or package rebuild.
+
+It verifies the complete selected-node closure before any Parquet read, builds each package's 1d
+TMP once and reuses it for identity/calendar, basis, price validity and raw knowledge-time counts.
+Unknown basis remains fail closed. Raw times and values are never rewritten; publication is not
+inferred. Only aggregate receipts are emitted, no corrected bundle/candidate/economics/labels or
+formal B acceptance. One external attempt marker per node, wall 600 seconds, DuckDB 2 threads /
+2 GB, TMP 512 MiB, output 64 KiB. It is a new diagnostic, not a repeat of the spent formal request.
+At this checkpoint it has not executed. Original-data repair and any later B gate remain separate.
+
+Sixteen new synthetic cases and all 30 retained-input cases pass (46 total). Full `make check`:
+3,099 passed / 7 skipped / 41 existing failures in 118.68 seconds; failed IDs exactly equal the
+prior reviewed retained-entry check, with zero new IDs. Focused Ruff, planning and diff checks pass.
+This is engineering evidence, not a green full-repository check or source probe execution.
 
 ## P3: actual retained-input diagnosis
 

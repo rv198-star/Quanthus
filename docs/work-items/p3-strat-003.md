@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | Owner continuation active; temporary industry closure complete; retained-input B engineering reviewed; A/C/C-R1 preserved; B unaccepted; D NOT_RUN |
+| Delivery gate | Owner continuation active; formal retained B succeeded with PARTIAL_INPUT_QUALIFICATION; B unaccepted; Daily adapter/PIT gaps #473/#474; A/C/C-R1 preserved; D NOT_RUN |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |
@@ -118,6 +118,32 @@ The Owner explicitly required continued attempts after PR #419 merged at `a64a3f
 Live #317/#412 were reopened. Current Owner instructions permit OCI as an existing data node
 through NexusAgent; the #424-only SSH override is not used here.
 
+The preregistered formal PostgreSQL/event-queue B Job
+`job_5352d6c61af94a1aac4162a9a6a5d357` succeeded on 2026-10-03 at exact revision
+`92a70a7bc11b2df2da16cd00dbacdbd4877d6b8b` (PR #469 merged). Its durable single attempt is spent.
+Independent artifact verification passed, but the acceptance disposition is
+`PARTIAL_INPUT_QUALIFICATION`: **B remains NO_PASS and D is not active**. The 6,407 candidates,
+27-field exact equality, 60 warmup opens and 416 next-open pairs do not qualify deficient inputs.
+Final manifest SHA is `4a6557aad4416d9f86c184c2f57552d444093fbb2e76f4db942e02906887fcce`.
+
+Two concrete gaps are registered for unified governance. [#473](https://github.com/rv198-star/Quanthus/issues/473)
+tracks Daily `price_basis='none'` versus the retained producer's `UNADJUSTED` filter: all 4,992
+positions on each of the last 35 opens are invalid (174,720 total). LEFT JOIN placeholders explain
+why missing_bar=0 does not establish coverage. This proves a consumer mismatch, not absent raw DWD.
+[#474](https://github.com/rv198-star/Quanthus/issues/474) tracks missing per-family economic
+availability/PIT qualification. Raw-known-late timestamps remain preserved; they are neither
+automatic leakage proof nor permission to replace them with T-close.
+
+Current next action: the separate input-only `daily-adapter-probe.v1.json` freezes the exact
+35 original packages and 70 bar/calendar files (846,352,085 bytes). One aggregate diagnostic per
+node uses 33 OCI packages and two exact CN01 packages; it reports raw 1d coverage, basis/price
+validity and raw-time counts. This is a new diagnostic closure under the Owner's continued
+delegation, not a retry/rename of the spent retained request. It builds no corrected bundle or
+candidate, opens no economics/labels, and cannot qualify B, activate D, close data issues or
+mutate P6/formal data. Budget: 600 seconds per node, two DuckDB threads, 2 GB memory, 512 MiB TMP,
+64 KiB output, one attempt per node. The probe is not yet executed; frozen PIT gates still apply
+to any later corrected B proposal. See `../acceptance/p3-p5-input-recovery-20261003.md`.
+
 The exact retained candidate and accepted P4 A/B industry sources were recovered. A bounded
 isolated CLI inspection at `835dea9b5502f9dbe1f0830b538312bc8f0f4b9e` completed in 38 seconds:
 2,455,175 identity/date rows, 5,251 distinct securities, 5,249 in the decision window.
@@ -170,8 +196,8 @@ The three files total 3,573,178 bytes under private OCI
 `p3-p5-20261002/p3-temporary-industry-closure/attempt`. They are temporary static non-PIT
 concentration inputs, not a governed DWD repair. #470 remains open.
 
-Current next action: finish the retained-input engineering checks and versioned release gate,
-then submit one formal input-only B Job. The static mapping alone is not complete B input
+Historical S3 next action (now completed): finish the retained-input engineering checks and
+versioned release gate, then submit one formal input-only B Job. The static mapping alone is not complete B input
 qualification. #319 stays NO_PASS; B remains unaccepted and D is not active.
 
 The retained failed-job replay input also still exists. Metadata SHA for `replay/bundle.json` is
@@ -201,7 +227,7 @@ It has no single-Job claim filter; an extra `--once` Worker is not a safe substi
 route therefore needs a narrowly governed retained-input entry/allowlist, engineering review, and
 the existing event-worker-only versioned release gate before one new B Job. P6/replay-worker and
 their environment must remain unchanged. A private CLI or private SQLite Job must not be described
-as that formal B run. No new formal B has been submitted.
+as that formal B run. At that pre-release checkpoint no new formal B had been submitted.
 
 The narrow entry is now implemented in `p3_retained_input.py` and `p3_retained_audit.py`, under
 `config/research/p3-strat-003/retained-input.v1.json` (physical SHA
@@ -223,7 +249,8 @@ Thirty synthetic tests pass, including complete build/seal/recovery, exact proje
 missing whole-calendar days, overlapping availability reasons, map substitution after resealing,
 and parent timeout. Two independent read-only reviews passed; an independent synthetic comparison
 matched the existing replay-reader audit. These are engineering results only. Actual market-row
-qualification, candidate scanning, formal B acceptance and D remain unexecuted at this checkpoint.
+qualification and candidate scanning were unexecuted at that engineering checkpoint. They have
+since run as recorded above; formal B acceptance and D remain unaccepted/unexecuted.
 The existing event-worker-only release route requires a clean exact GitHub revision reachable from
 main; naming a new SHA in a Job cannot substitute for deploying that version.
 

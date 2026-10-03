@@ -440,3 +440,37 @@ def test_physical_timestamp_precision_cannot_be_normalized_away(inputs, tmp_path
     pq.write_table(source.cast(pa.schema(fields)), changed)
     with pytest.raises(ValueError, match="PHYSICAL_SCHEMA_DIFFERS"):
         basis.validate_physical_schema(changed)
+
+
+@pytest.mark.parametrize("timezone", ["UTC", "Etc/UTC", "Asia/Shanghai", "America/New_York"])
+@pytest.mark.parametrize("drift", [False, True])
+def test_preservation_is_independent_of_session_timezone(source, tmp_path, timezone, drift):
+    c, artifact = source
+    c.execute("SET TimeZone = ?", [timezone])
+    query = basis.prepare(c, "SELECT * FROM raw", artifact)
+    c.execute("CREATE TABLE candidate AS " + query)
+    if drift:
+        c.execute("UPDATE candidate SET knowledge_from=knowledge_from+INTERVAL 1 MICROSECOND")
+    output = tmp_path / "timezone.parquet"
+    c.execute(f"COPY candidate TO '{output}' (FORMAT PARQUET)")
+    before = output.read_bytes()
+    source_before = c.execute(
+        "SELECT epoch_us(knowledge_from),epoch_us(knowledge_to),"
+        "epoch_us(observation_start),epoch_us(observation_end) "
+        "FROM p10_basis_source ORDER BY " + basis.ORDER
+    ).fetchall()
+    if drift:
+        with pytest.raises(ValueError, match="SERIALIZED_SOURCE_DRIFT"):
+            basis.verify_preservation(c, output)
+    else:
+        assert basis.verify_preservation(c, output)["source_differences"] == 0
+    assert c.execute("SELECT current_setting('TimeZone')").fetchone()[0] == timezone
+    assert output.read_bytes() == before
+    assert (
+        c.execute(
+            "SELECT epoch_us(knowledge_from),epoch_us(knowledge_to),"
+            "epoch_us(observation_start),epoch_us(observation_end) "
+            "FROM p10_basis_source ORDER BY " + basis.ORDER
+        ).fetchall()
+        == source_before
+    )

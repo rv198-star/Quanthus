@@ -112,6 +112,9 @@ def verify_preservation(connection: Any, output: Path) -> dict[str, Any]:
     actual = iter(parquet.iter_batches(batch_size=65536))
     for expected in batches:
         observed = next(actual, sentinel)
+        if observed is not sentinel:
+            expected = _utc_timestamp_view(expected)
+            observed = _utc_timestamp_view(observed)
         if observed is sentinel or not expected.schema.equals(observed.schema):
             raise ValueError("P10_PRICE_BASIS_SERIALIZED_SCHEMA_OR_ROWS_DIFFER")
         index = observed.schema.get_field_index("price_basis")
@@ -136,6 +139,31 @@ def verify_preservation(connection: Any, output: Path) -> dict[str, Any]:
         "source_differences": 0,
         "method": "independent_arrow_exact_typed_readback",
     }
+
+
+def _utc_timestamp_view(batch: Any) -> Any:
+    """Ignore session-zone display metadata, preserving exact microsecond buffers.
+
+    DuckDB's TIMESTAMPTZ Arrow timezone follows the connection, whereas Parquet
+    readback uses UTC. Only these four aware microsecond fields may change their
+    display annotation. Physical output validation runs first; naive timestamps,
+    precision changes and every other schema difference still fail closed.
+    """
+    import pyarrow as pa
+
+    names = {"knowledge_from", "knowledge_to", "observation_start", "observation_end"}
+    for index, field in enumerate(batch.schema):
+        if (
+            field.name in names
+            and pa.types.is_timestamp(field.type)
+            and field.type.unit == "us"
+            and field.type.tz is not None
+        ):
+            canonical = pa.timestamp("us", tz="UTC")
+            batch = batch.set_column(
+                index, field.with_type(canonical), batch.column(index).view(canonical)
+            )
+    return batch
 
 
 def coverage(connection: Any, calendar: Path, status: Path, market_date: str) -> dict[str, Any]:

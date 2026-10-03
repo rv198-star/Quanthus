@@ -84,6 +84,7 @@ def test_consumers_keep_domain_ownership_and_record_three_business_choices(numbe
     assert all(word in payload["body"] for word in ["绕行", "暂时忽略", "接受已知限制"])
     assert "不冻结整条业务线" in payload["body"]
     assert "不得自行查源" in payload["body"]
+    assert "当前选择：暂时忽略" in payload["body"]
 
 
 def test_closed_history_and_unreviewed_consumer_issues_cannot_be_migrated() -> None:
@@ -103,7 +104,9 @@ def test_incomplete_notice_fails_instead_of_overwriting_original_evidence() -> N
         migration_payload(POLICY, issue, EPIC_URL, 88)
 
 
-@pytest.mark.parametrize("case", ["duplicate", "consumer_overlap", "auto_close", "missing_choice"])
+@pytest.mark.parametrize(
+    "case", ["duplicate", "consumer_overlap", "auto_close", "missing_choice", "invalid_choice"]
+)
 def test_invalid_ownership_policy_fails_before_remote_updates(tmp_path: Path, case: str) -> None:
     policy = copy.deepcopy(POLICY)
     if case == "duplicate":
@@ -112,6 +115,8 @@ def test_invalid_ownership_policy_fails_before_remote_updates(tmp_path: Path, ca
         policy["consumer_issues"][0]["number"] = 474
     elif case == "auto_close":
         policy["auto_close_epic"] = True
+    elif case == "invalid_choice":
+        policy["consumer_issues"][0]["selected_business_disposition"] = "repair_privately"
     else:
         del policy["business_dispositions"]["temporarily_ignore"]
     (tmp_path / "config").mkdir()

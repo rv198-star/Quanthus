@@ -85,6 +85,9 @@ automatically accepts research or activates training/production.
 
 P3 B and P5 B remain unaccepted. P3 D and P5 E/F are not activated by this ownership decision.
 Their required-data steps remain blocked, while permitted business engineering may continue.
+The recorded current choice for both consumers is `temporarily_ignore`: defer unqualified
+P3 B acceptance/D results and P5 B acceptance/E/F training/evaluation, retain honest existing
+diagnostics, and continue only previously authorized business/synthetic engineering.
 
 ## 5. Execution and invariants
 

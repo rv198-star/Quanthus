@@ -4,8 +4,8 @@
 | --- | --- |
 | Parent issue | #400 |
 | Milestone | #12 |
-| Current gate | A preserved; B source qualification and D synthetic recovery active; C partial; E/F/G NOT_RUN |
-| Current status | OWNER_CONTINUATION_INPUT_QUALIFICATION_IN_PROGRESS |
+| Current gate | A preserved; data work transferred to P10; B acceptance/E/F temporarily deferred; previously authorized C/D synthetic engineering only; G NOT_RUN |
+| Current status | BUSINESS_DISPOSITION_TEMPORARILY_IGNORE_UNQUALIFIED_INPUT_STEPS |
 | Governing design | `../design/lld/07-research-scoring/p5-stage-001.md` |
 | Frozen request | `../../config/research/p5-stage-001/request.v1.json` |
 | Frozen targets | `../../config/research/p5-stage-001/stage-targets.v1.json` |
@@ -66,6 +66,9 @@ disposition: register a data issue, choose bypass/temporary ignore/acceptance of
 and continue permitted business engineering. The required coordinate/window/ACTIVE/reference
 gates remain unaccepted and E/F inactive. See `../design/lld/12-permanent-data-line.md` and
 `config/data-ownership.v1.json`; issue registration does not stop the whole business line.
+Current business choice is **temporarily ignore** B acceptance and E/F training/evaluation until
+their existing inputs/reference gates pass. Previously authorized C/D synthetic engineering and
+research interfaces may continue; this choice does not activate training or accept a research gate.
 
 The Owner approved the frozen four-source proposal on 2026-10-03 and explicitly limited this task
 to temporary treatment; unified data repair belongs to the separate data workstream. Activation is

@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | Owner continuation active; formal retained B succeeded with PARTIAL_INPUT_QUALIFICATION; B unaccepted; Daily adapter/PIT gaps #473/#474; A/C/C-R1 preserved; D NOT_RUN |
+| Delivery gate | Business continuation only; data work transferred to P10; temporarily defer B acceptance/D results; PARTIAL_INPUT_QUALIFICATION retained; A/C/C-R1 preserved |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |
@@ -121,6 +121,9 @@ remain immutable. Their former next-source-action instructions no longer authori
 record bypass/temporary ignore/acceptance of a known limitation, and continue where the contract
 allows. #470/#473/#474 are P10 dependencies. The required B/PIT gate remains unaccepted and D
 inactive; no whole-line freeze or automatic research acceptance follows from issue routing.
+Current business choice is **temporarily ignore** the unqualified B acceptance/D result steps;
+retain existing diagnostics and continue only previously authorized business/synthetic engineering.
+This records a business disposition, not data repair or B/D acceptance.
 See `../design/lld/12-permanent-data-line.md` and `config/data-ownership.v1.json`.
 
 The Owner explicitly required continued attempts after PR #419 merged at `a64a3f3`.

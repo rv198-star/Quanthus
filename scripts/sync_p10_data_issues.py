@@ -75,11 +75,17 @@ def migration_payload(
         labels |= {*consumer["labels"], "status:blocked"}
         kind, owner = "consumer", consumer["owner"]
         dependencies = ", ".join(f"#{n}" for n in consumer["input_dependencies"])
+        choice = {
+            "bypass": "绕行",
+            "temporarily_ignore": "暂时忽略",
+            "accept_known_limitation": "接受已知限制",
+        }[consumer["selected_business_disposition"]]
         scope = (
             f"本 issue 保留 {owner} 业务与消费准入职责；数据问题只登记到 P10（{dependencies}），"
             "不得自行查源、补采、补正或维护临时数据修复。业务选择并记录绕行、暂时忽略或"
             "接受已知限制，聚焦业务本身。当前 blocked 仅指未满足既有硬门禁的步骤，"
             "不冻结整条业务线，也不改变已封存证据或自动开放训练/回测。"
+            f"当前选择：{choice}。{consumer['business_disposition_note']}"
         )
     notice = (
         f"<!-- quanthus-data-{kind}:{owner} policy={policy['policy_version']} -->\n"

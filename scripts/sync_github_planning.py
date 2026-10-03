@@ -902,6 +902,12 @@ def load_p10_policy(root: Path) -> dict[str, Any]:
         raise ValueError("invalid or duplicate P10 migration issue number")
     if set(numbers).intersection(item["number"] for item in policy["consumer_issues"]):
         raise ValueError("a consumer issue cannot also be migrated to P10")
+    if any(
+        item.get("selected_business_disposition") not in policy["business_dispositions"]
+        or not item.get("business_disposition_note")
+        for item in policy["consumer_issues"]
+    ):
+        raise ValueError("consumer issues must record a permitted business disposition")
     return policy
 
 

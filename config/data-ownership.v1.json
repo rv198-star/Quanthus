@@ -255,6 +255,8 @@
         "area:experts"
       ],
       "scope": "Retained B consumer admission and strategy-verification readiness only; source recovery and repair belongs to P10.",
+      "selected_business_disposition": "temporarily_ignore",
+      "business_disposition_note": "暂缓未通过输入门禁的 B 验收与 D 结果实验；保留既有诊断并继续原已获准的业务/合成工程。数据修复不再占用 P3，且本选择不构成 B/D 验收。",
       "data_dependent_status": "blocked"
     },
     {
@@ -269,6 +271,8 @@
         "area:ml"
       ],
       "scope": "Research corpus/split/reference qualification from P10-published inputs; no collection, backfill, source recovery or quality repair.",
+      "selected_business_disposition": "temporarily_ignore",
+      "business_disposition_note": "暂缓未通过输入/参照门禁的 B 验收及 E/F 训练评估；继续原已获准的 C/D 合成工程和研究接口工作。数据修复不再占用 P5，且本选择不启动训练或构成验收。",
       "data_dependent_status": "blocked"
     }
   ],

@@ -4,7 +4,8 @@ import hashlib
 import importlib.util
 import json
 import sys
-from datetime import date
+import time
+from datetime import date, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -474,3 +475,55 @@ def test_preservation_is_independent_of_session_timezone(source, tmp_path, timez
         ).fetchall()
         == source_before
     )
+
+
+@pytest.mark.parametrize("process_timezone", ["UTC", "Asia/Shanghai", "America/New_York"])
+@pytest.mark.parametrize("session_timezone", ["UTC", "Etc/UTC", "Asia/Shanghai"])
+def test_producer_preserves_shanghai_trading_day_across_timezones(
+    inputs, tmp_path, monkeypatch, process_timezone, session_timezone
+):
+    original_connect = duckdb.connect
+
+    def connect(*args, **kwargs):
+        connection = original_connect(*args, **kwargs)
+        connection.execute("SET TimeZone = ?", [session_timezone])
+        return connection
+
+    with monkeypatch.context() as patch:
+        patch.setenv("TZ", process_timezone)
+        time.tzset()
+        patch.setattr(duckdb, "connect", connect)
+        try:
+            root = tmp_path / "candidate"
+            build_daily_domain_increment(**inputs, output=root, price_basis_policy=basis.POLICY)
+            rows = pq.ParquetFile(bar(root)).read().to_pylist()
+            daily = next(row for row in rows if row["interval_size"] == "1d")
+            # Shanghai midnight belongs to August 3, although its UTC date is August 2.
+            assert daily["observation_start"] == datetime(2026, 8, 2, 16, tzinfo=timezone.utc)
+            assert daily["observation_end"] == datetime(2026, 8, 3, 16, tzinfo=timezone.utc)
+            manifest = json.loads((root / "manifest.json").read_text())
+            assert manifest["market_date"] == "2026-08-03"
+            calendar_path = next(
+                root.glob("payload/tradability_state/dwd_trading_calendar/**/*.parquet")
+            )
+            calendar = pq.ParquetFile(calendar_path).read().to_pylist()[0]
+            assert calendar["trade_date"] == date(2026, 8, 3)
+            assert calendar["open_at"] == datetime(2026, 8, 3, 1, 30, tzinfo=timezone.utc)
+            assert calendar["close_at"] == datetime(2026, 8, 3, 7, tzinfo=timezone.utc)
+            # The existing producer explicitly localizes naive source bars to Shanghai.
+            minute = next(row for row in rows if row["interval_size"] == "1m")
+            assert minute["observation_start"] == datetime(2026, 8, 3, 1, 30, tzinfo=timezone.utc)
+            assert minute["observation_end"] == datetime(2026, 8, 3, 1, 31, tzinfo=timezone.utc)
+        finally:
+            patch.undo()
+            time.tzset()
+
+
+@pytest.mark.parametrize(
+    "field", ["knowledge_from", "knowledge_to", "observation_start", "observation_end"]
+)
+def test_preservation_source_rejects_naive_timestamp_fields(source, field):
+    c, artifact = source
+    c.execute(f'ALTER TABLE raw ALTER COLUMN "{field}" TYPE TIMESTAMP')
+    with pytest.raises(ValueError, match="SOURCE_SCHEMA_UNKNOWN"):
+        basis.prepare(c, "SELECT * FROM raw", artifact)

@@ -88,6 +88,10 @@ keys from independently checksummed raw evidence.
 Raw files never receive in-place corrections. A source correction creates a new revision and
 new downstream snapshot id.
 
+The non-activated [P10 Daily price-basis candidate](01-data-foundation/daily-price-basis.md)
+addresses #473 through an explicit version of the existing Daily builder. Its candidate package
+cannot enter default CURRENT or consumer admission; source replacement and release remain gated.
+
 The ODS Base packaging, source precedence, completeness boundary, and recovery lifecycle are
 owned by [`01-data-foundation/ods-base.md`](01-data-foundation/ods-base.md). It is separate from
 the DWD/DWS history seed and from offline research bundles: the Base preserves accepted source
@@ -432,6 +436,16 @@ SHA-precondition pointer CAS. It also records accepted-ODS recovery copies, rest
 drills, and denies purge until every retention precondition passes. Production evidence for these
 paths, creation of an externally reviewed corrected release set, and failure-independent restore
 qualification remain open; code coverage alone does not authorize cutover or cleanup.
+
+Accepted-ODS recovery assessments verify each retained copy receipt against its existing
+SHA-named `copy-index` entry before counting failure domains. The index must bind the exact
+receipt bytes, copy id and root-relative path; missing, orphaned or inconsistent index entries
+and symbolic-link evidence fail closed. An interrupted receipt/index write is not recovery
+proof and must not be repaired by deriving a new index from untrusted receipt contents. This
+P10 / `OPS-HERMES-GC-001` (#310) evidence-integrity slice is covered by
+`tests/unit/test_accepted_ods_recovery_receipts.py`. It preserves the correction horizon and
+copy-only purge prohibition, does not re-enable the retired dual-lane runtime, and does not
+implement successful-cache GC, live copy revalidation, reference inventory or cleanup authority.
 
 ### 5.6 Monthly-complete DWD/DWS Base
 

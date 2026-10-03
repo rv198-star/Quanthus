@@ -76,6 +76,10 @@ P10 may deliver qualified supply, a bounded rejection or a formal unavailable di
 Consumers decide business treatment and their own acceptance; closing the source issue never
 automatically accepts research or activates training/production.
 
+The [Daily price-basis candidate](01-data-foundation/daily-price-basis.md) prepares #473 through
+the existing versioned Daily builder. Its explicit candidate kind cannot enter default CURRENT,
+mirroring or P6 admission; historical replacement and each consumer's acceptance remain separate.
+
 ## 4. Current consumer dependencies
 
 | Consumer | P10 data issues | Retained business responsibility |

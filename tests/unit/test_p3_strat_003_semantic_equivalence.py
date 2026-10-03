@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from datetime import date
 from pathlib import Path
 
@@ -113,20 +114,41 @@ def _package(
     return package, manifest_sha
 
 
-def test_probe_config_is_frozen_and_result_blind() -> None:
+def test_probe_config_is_frozen_and_result_blind(tmp_path, monkeypatch) -> None:
+    raw = json.loads(CONFIG.read_text())
+    legacy = ROOT / "tests/fixtures/p10/daily_domain.3382b63.py.txt"
+    bindings = [
+        raw["request"],
+        raw["source_runtime"],
+        raw["legacy_transport_contract"],
+        *raw["runtime_implementation"].values(),
+    ]
+    for binding in bindings:
+        target = tmp_path / binding["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source = (
+            legacy
+            if binding is raw["runtime_implementation"]["daily_domain"]
+            else (ROOT / binding["path"])
+        )
+        shutil.copyfile(source, target)
+    monkeypatch.setattr(probe, "find_project_root", lambda _: tmp_path)
     config = probe._load_config(CONFIG)
-
     assert config.boundary.market_date == date(2026, 8, 27)
     assert tuple(item.sentinel_id for item in config.sentinels) == (
         "pre_builder_change_overlap",
         "post_builder_change_overlap",
     )
-    assert config.raw["runtime_implementation"] == {
+    assert config.raw == raw
+    assert raw["missing_boundary"]["market_date"] == "2026-08-27"
+    assert tuple(item["sentinel_id"] for item in raw["sentinels"]) == (
+        "pre_builder_change_overlap",
+        "post_builder_change_overlap",
+    )
+    assert raw["runtime_implementation"] == {
         "daily_domain": {
             "path": "src/quanthus/pipelines/securities_warehouse/daily_domain.py",
-            "file_sha256": _sha(
-                ROOT / "src/quanthus/pipelines/securities_warehouse/daily_domain.py"
-            ),
+            "file_sha256": _sha(legacy),
         },
         "daily_ods_catalog": {
             "path": "src/quanthus/pipelines/securities_warehouse/daily_ods_catalog.py",
@@ -135,7 +157,7 @@ def test_probe_config_is_frozen_and_result_blind() -> None:
             ),
         },
     }
-    boundary = config.raw["missing_boundary"]
+    boundary = raw["missing_boundary"]
     assert boundary["source_identity_rule"] == "selected_cn01_release_self_verified"
     assert boundary["cross_source_physical_sha256_required"] is False
     assert boundary["required_ods_artifact"] == {
@@ -143,7 +165,7 @@ def test_probe_config_is_frozen_and_result_blind() -> None:
         "name": "financial_disclosures_delta",
         "row_count": 0,
     }
-    assert config.raw["boundaries"] == {
+    assert raw["boundaries"] == {
         "strategy_or_economic_results": False,
         "target_outcome_labels": False,
         "candidate_scoring": False,
@@ -151,6 +173,15 @@ def test_probe_config_is_frozen_and_result_blind() -> None:
         "mutate_p6": False,
         "job_local_output_only": True,
     }
+
+
+def test_frozen_probe_rejects_new_runtime_without_repinning():
+    # P10's new opt-in producer cannot reactivate the completed historical attempt.
+    with pytest.raises(ExpertEvaluationError, match="daily_domain implementation bytes differ"):
+        probe._load_config(CONFIG)
+    assert _sha(CONFIG) == (
+        "sha256:3dc2a1c1a8b54b84f35fdcb7d8e3e1845c13f0e37ad81aec2c3747bf856dbf64"
+    )
 
 
 def test_consumer_identity_ignores_audit_only_manifest_drift(tmp_path: Path) -> None:

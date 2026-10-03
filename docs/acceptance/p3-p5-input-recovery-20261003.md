@@ -75,6 +75,40 @@ This is recovered provenance, not independent reproduction or formal B qualifica
 still requires a versioned retained-input entry and the existing event-worker-only release gate;
 the current Worker does not load new source merely because a Job names a new revision.
 
+### Retained-input B engineering checkpoint
+
+The new narrow EventWorker entry binds `retained-input.v1.json`, physical SHA
+`b642509bd80bde69a5e765c5e8b7860e01b3643e33e576029e6788d343294ff4`: 52 files and 304,584,475
+bytes, with the original request, temporary activation, source-lineage receipt and exact calendar
+prerequisites. Source calendars were selected and byte-verified from package manifests without
+deserializing market rows. The Base prefix ends at 2026-07-31; all 35 selected daily members and
+the unique accepted Aug27 bridge remain explicit. The history/decision/execution window is unchanged.
+
+The Job verifies every admitted byte before row access, compares all 27 retained producer fields
+exactly, checks historical identity/calendar/next-open pairs, and reuses one job-local intermediate
+for coverage ledgers and the existing replay audit report. Only after these gates does it scan the
+unchanged outcome-blind candidate rule. Resource limits are 1,800 wall seconds, two DuckDB threads,
+6 GB DuckDB memory, 8 GiB TMP and 4 GiB output. An fsynced external attempt marker prevents an
+automatic second scan; the same Job may publish already sealed staging after interruption. The
+parent Worker also enforces the hard wall deadline.
+
+Thirty synthetic tests pass, including complete artifact construction and recovery, exact Decimal
+and identity drift, missing calendar days, reason overlap, resealed-map tampering and parent timeout.
+Two independent read-only implementation reviews passed, including comparison with the original
+reader's synthetic audit. The new scan TMP budget parameter retains existing defaults for other
+consumers. Its two catalog code-evidence bindings and derived catalog snapshot were refreshed from
+the actual source bytes; catalog entry/gap counts are unchanged.
+
+No formal B Job or actual retained market-row scan has run at this engineering checkpoint. B
+acceptance, D activation and governed DWD repair remain false; #470/#471/#472 remain open.
+
+Full `make check` at the reviewed retained-entry tree with `TMPDIR=/private/tmp`: 3,083 passed,
+7 skipped, 41 failed and zero errors (118.433 seconds). All 41 failed IDs are in the recorded
+56-failure baseline; no new failure remains. The catalog registration test binds the refreshed
+derived digest while the sealed E9 registration receipt remains unchanged. Full checks are still
+not green; existing frozen-runtime/macOS failures remain explicit. Focused Ruff and catalog
+projection verification pass. Logs/XML remain external under `retained-b-reviewed-check.*`.
+
 ## P5: verified three-table supply
 
 The later full per-session identity join succeeded at `2d73967`, Nexus

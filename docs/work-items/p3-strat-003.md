@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | Owner continuation active; B-R1 industry inspection complete with one unresolved security; A/C/C-R1 preserved; B unaccepted; D NOT_RUN |
+| Delivery gate | Owner continuation active; temporary industry closure complete; retained-input B engineering reviewed; A/C/C-R1 preserved; B unaccepted; D NOT_RUN |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |
@@ -170,8 +170,8 @@ The three files total 3,573,178 bytes under private OCI
 `p3-p5-20261002/p3-temporary-industry-closure/attempt`. They are temporary static non-PIT
 concentration inputs, not a governed DWD repair. #470 remains open.
 
-Current next action: qualify the retained replay/candidate source closure for S3, then freeze the
-new formal input-only B request and budget. The static mapping alone is not complete B input
+Current next action: finish the retained-input engineering checks and versioned release gate,
+then submit one formal input-only B Job. The static mapping alone is not complete B input
 qualification. #319 stays NO_PASS; B remains unaccepted and D is not active.
 
 The retained failed-job replay input also still exists. Metadata SHA for `replay/bundle.json` is
@@ -202,6 +202,30 @@ route therefore needs a narrowly governed retained-input entry/allowlist, engine
 the existing event-worker-only versioned release gate before one new B Job. P6/replay-worker and
 their environment must remain unchanged. A private CLI or private SQLite Job must not be described
 as that formal B run. No new formal B has been submitted.
+
+The narrow entry is now implemented in `p3_retained_input.py` and `p3_retained_audit.py`, under
+`config/research/p3-strat-003/retained-input.v1.json` (physical SHA
+`b642509bd80bde69a5e765c5e8b7860e01b3643e33e576029e6788d343294ff4`). It freezes 52 exact files,
+304,584,475 bytes: the retained bundle/candidate, the completed temporary industry mapping, the
+source-lineage receipt, and authoritative Base/daily calendars plus adjustment factors. The
+calendar suffix uses the recovered 35-member chain and only the already accepted Aug27 bridge.
+Scope remains 60 pre-2025 common open sessions and the original decision/execution end dates.
+
+The Job verifies all input bytes before any Parquet read, checks all 27 producer projection fields
+with exact Decimal comparison, rejects identity/calendar/pair-set drift, and builds one shared
+coverage intermediate for all ledgers and the replay report. It then scans the original projection
+under the unchanged outcome-blind rule and seals an input artifact. Budgets are 1,800 wall seconds,
+two DuckDB threads, 6 GB DuckDB memory, 8 GiB TMP and 4 GiB output. A durable external attempt
+marker permits one attempt; sealed staging may be recovered for the same Job without rerunning
+the scan. The parent Worker enforces the wall deadline even during a blocked native query.
+
+Thirty synthetic tests pass, including complete build/seal/recovery, exact projection drift,
+missing whole-calendar days, overlapping availability reasons, map substitution after resealing,
+and parent timeout. Two independent read-only reviews passed; an independent synthetic comparison
+matched the existing replay-reader audit. These are engineering results only. Actual market-row
+qualification, candidate scanning, formal B acceptance and D remain unexecuted at this checkpoint.
+The existing event-worker-only release route requires a clean exact GitHub revision reachable from
+main; naming a new SHA in a Job cannot substitute for deploying that version.
 
 ### Historical bounded closeout — 2026-10-02
 

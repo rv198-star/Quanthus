@@ -1,0 +1,762 @@
+{
+  "schema_version": "quanthus.p3-daily-adapter-probe.v1",
+  "state": "FROZEN_INPUT_ONLY_DIAGNOSTIC",
+  "authority": {
+    "owner_continue_quote": "继续",
+    "delegated_goal_quote": "我希望尽快完成P3和P5，并收敛，但我可能不太懂也不知道量化指标这些技术细节，所以我想全权委托你完成、",
+    "temporary_only_quote": "缺口需要登记issue，然后他统一修复数据，你现在的修复只能做临时处理",
+    "original_research_request": {
+      "path": "config/research/p3-strat-003/request.v1.json",
+      "sha256": "sha256:e1234e80857e012e2d125babba15fd4d0985cd0b38402d5737db0470d6be7c3b"
+    },
+    "data_issues": [
+      473,
+      474
+    ],
+    "old_retained_attempt_spent": true,
+    "old_request_reopened": false
+  },
+  "scope": {
+    "start": "2026-08-03",
+    "end": "2026-09-18",
+    "expected_sessions": 35,
+    "warmup_or_base_rows_read": false
+  },
+  "basis_contract": {
+    "producer_unadjusted_value": "none",
+    "legacy_consumer_value": "UNADJUSTED",
+    "interval_size": "1d",
+    "unknown_values": "fail_closed",
+    "raw_knowledge_times_preserved": true,
+    "public_availability_inferred": false
+  },
+  "budgets": {
+    "wall_seconds_per_node": 600,
+    "threads": 2,
+    "memory_limit": "2GB",
+    "tmp_limit": "512MiB",
+    "output_max_bytes": 65536,
+    "attempts_per_node": 1
+  },
+  "nodes": {
+    "OCI": {
+      "output": "/home/ubuntu/quanthus-research/p3-p5-20261002/daily-adapter-probe/oci/attempt",
+      "uid": 1001
+    },
+    "CN01": {
+      "output": "/var/tmp/quanthus-p3-daily-adapter-20261003-cn01/attempt",
+      "uid": 0
+    }
+  },
+  "packages": [
+    {
+      "market_date": "2026-08-03",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-03/825958b1287c-4c90bd8",
+      "manifest_sha256": "sha256:2112c0a2862f5bb9345ee98f71d192efb4e0b45b2ce9142eadfcd31905627a60",
+      "package_id": "dwd-daily-20260803-825958b1287c-4c90bd8",
+      "code_revision": "4c90bd8fc2f017cb42903bf701dc6452624e7725",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-03/part-00000.parquet",
+          "sha256": "sha256:d0e7c232faa61de8bea0ef7b14c18b8df4a6ddb911bc84ca7c052b2e226eb61e",
+          "size_bytes": 24014209
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-03/part-00000.parquet",
+          "sha256": "sha256:e9827f6d6bdebdce626296e46432d9e4931683d726d06286ddaa5c1fe2ae185d",
+          "size_bytes": 3865
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-04",
+      "node": "CN01",
+      "root": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-04/3bf7a75e5b4d-4c90bd8",
+      "manifest_sha256": "sha256:45a02713867f7e1ffa1b4ae61747675edd97b4fec3e25ff6cc1d8fda86439ee8",
+      "package_id": "dwd-daily-20260804-3bf7a75e5b4d-4c90bd8",
+      "code_revision": "4c90bd8fc2f017cb42903bf701dc6452624e7725",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-04/part-00000.parquet",
+          "sha256": "sha256:f68a18b766c2db14501e767b4210c64eed94f14819fd0cd80fff51bf197e8ddb",
+          "size_bytes": 23957018
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-04/part-00000.parquet",
+          "sha256": "sha256:47f8eb416c84eea1d5e2a773442cb55da5455fd58e6d418f22808a01ff473d25",
+          "size_bytes": 3863
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-05",
+      "node": "CN01",
+      "root": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-05/1e451e441164-4c90bd8",
+      "manifest_sha256": "sha256:de26088950e0e0b09c8fafd81f23163dcd71d517d7dae3c4dbbae3ea8d71161d",
+      "package_id": "dwd-daily-20260805-1e451e441164-4c90bd8",
+      "code_revision": "4c90bd8fc2f017cb42903bf701dc6452624e7725",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-05/part-00000.parquet",
+          "sha256": "sha256:686930e3cf4c57e60de2c32af7b6b97fdcef09487d6c13af59fc967bb133f5cc",
+          "size_bytes": 24312267
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-05/part-00000.parquet",
+          "sha256": "sha256:7d4ce97f6b8f4556b054c5eb0da494d49ad26cf77835570ecc4caa3d6bd6629b",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-06",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-06/827113f5d692-4c90bd8",
+      "manifest_sha256": "sha256:8ea2d56b32472fb32ecabb45ebd74269dc14173a0adcd535d0445f2eef25564f",
+      "package_id": "dwd-daily-20260806-827113f5d692-4c90bd8",
+      "code_revision": "4c90bd8fc2f017cb42903bf701dc6452624e7725",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-06/part-00000.parquet",
+          "sha256": "sha256:e7f6b9804bcbd8a097c2cf4ea1983656ef57037aafdfcda974d8ea5442dab46c",
+          "size_bytes": 24752687
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-06/part-00000.parquet",
+          "sha256": "sha256:385587365066711d6d633d4667e59ad1c3f5699e65e9a03585b58fc76b057b74",
+          "size_bytes": 3860
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-07",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-07/0bdfec315e45-4c90bd8",
+      "manifest_sha256": "sha256:e0f6c636e5233adbd87447bc48d7b43489b6398ebf2ed48044f675e547baf4d0",
+      "package_id": "dwd-daily-20260807-0bdfec315e45-4c90bd8",
+      "code_revision": "4c90bd8fc2f017cb42903bf701dc6452624e7725",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-07/part-00000.parquet",
+          "sha256": "sha256:67ab9acbdbbaa48beebfa5206617e759bf7bc3ac03d53f559c143f6ec693cce4",
+          "size_bytes": 24711528
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-07/part-00000.parquet",
+          "sha256": "sha256:3318c586e6fbbf7f7c410f2e6be9a3f8ae4e91808b508a62a0b7e0dc3f16ffdf",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-10",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-10/437286d30f46-4c90bd8",
+      "manifest_sha256": "sha256:09a05f49aac0eca4a0f55d9664d267a14410d582d058dde655f5a948e98323cb",
+      "package_id": "dwd-daily-20260810-437286d30f46-4c90bd8",
+      "code_revision": "4c90bd8fc2f017cb42903bf701dc6452624e7725",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-10/part-00000.parquet",
+          "sha256": "sha256:5e6140acbca2c5bf840ba2755621879737adddb6ed8850a738d918c0e6dff7e0",
+          "size_bytes": 24374537
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-10/part-00000.parquet",
+          "sha256": "sha256:9524f96ffd4aa06e32e14a23bc834c9566189141a1f3bca5289648d09d124681",
+          "size_bytes": 3861
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-11",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-11/2ccc22d78eaa-4c90bd8",
+      "manifest_sha256": "sha256:cbfced2e4289548a424847154ade2bfb2ea5cf1f0cefe8a2ef30cc8450265827",
+      "package_id": "dwd-daily-20260811-2ccc22d78eaa-4c90bd8",
+      "code_revision": "4c90bd8fc2f017cb42903bf701dc6452624e7725",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-11/part-00000.parquet",
+          "sha256": "sha256:df1cfd66b407d7a466dea1788467c87cd693c66c1eb1fb40f943f7e86ca6c810",
+          "size_bytes": 24480381
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-11/part-00000.parquet",
+          "sha256": "sha256:6a6db32ecfdb04eff22023d54e3ca9b88b9bdbbb9afc0ca427707d202c8fd988",
+          "size_bytes": 3861
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-12",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-12/5e3122027809-4c90bd8",
+      "manifest_sha256": "sha256:fbb27aeaeb9a2338b19a66d6eb87848cb032977bf3f7996ce48ee3892ef5bc88",
+      "package_id": "dwd-daily-20260812-5e3122027809-4c90bd8",
+      "code_revision": "4c90bd8fc2f017cb42903bf701dc6452624e7725",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-12/part-00000.parquet",
+          "sha256": "sha256:c961ab18c279f675b2952c15da111716128dba441f864ec86dab174559629387",
+          "size_bytes": 23869670
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-12/part-00000.parquet",
+          "sha256": "sha256:727f48aa2dd73c2dd7ec1251839af48e536e1ce8a93759ef3dd3df399ceec855",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-13",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-13/eac0caa2e6cf-004dc0d",
+      "manifest_sha256": "sha256:81f831c0ccd4bc04cacc57b92d06220981cc9f53d906b2bcb273fd6a19314076",
+      "package_id": "dwd-daily-20260813-eac0caa2e6cf-004dc0d",
+      "code_revision": "004dc0d3f737ba6236c67a7fb898d622218577b6",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-13/part-00000.parquet",
+          "sha256": "sha256:7190b62f74821e8a6394960a8982facaa2ee6954411be2c89cc2d74aa588ee0d",
+          "size_bytes": 24640860
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-13/part-00000.parquet",
+          "sha256": "sha256:cb9420de913200beccbab3dac7159e46f650dc5100386b3c3d5c818c417e713a",
+          "size_bytes": 3861
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-14",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-14/b53e2631bdbe-004dc0d",
+      "manifest_sha256": "sha256:9d5758ea3018bb0996d3798dacba1d8e2225fad9ee48c992190cf318c13b13f3",
+      "package_id": "dwd-daily-20260814-b53e2631bdbe-004dc0d",
+      "code_revision": "004dc0d3f737ba6236c67a7fb898d622218577b6",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-14/part-00000.parquet",
+          "sha256": "sha256:7718d03ae55e2e557a2002493c37a232218ae98501102c5268219dda6457a349",
+          "size_bytes": 24433605
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-14/part-00000.parquet",
+          "sha256": "sha256:f1ab7e327118f90ed8c7c85c518a7110fc6836b803ca3f6f5fac27fc46a87664",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-17",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-17/ae8312c895f6-004dc0d",
+      "manifest_sha256": "sha256:289976fffd2b45acbeec9bb20f2128a304207ae92ba40e04a6ffc5a0ac6d928e",
+      "package_id": "dwd-daily-20260817-ae8312c895f6-004dc0d",
+      "code_revision": "004dc0d3f737ba6236c67a7fb898d622218577b6",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-17/part-00000.parquet",
+          "sha256": "sha256:15d74eaa997ae1c468921d53e2f4b90d7d3133b7e89ae15c6c9935e8d4381f1d",
+          "size_bytes": 24205304
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-17/part-00000.parquet",
+          "sha256": "sha256:4f7938a7fd40e4134bf6af79039107122ecec0e68f5567e084a1e8ac5e54aaa8",
+          "size_bytes": 3863
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-18",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-18/a2d7d86e67e6-004dc0d",
+      "manifest_sha256": "sha256:1a8758dd839b312e4d7aeb91bf1e6be894143316deb13d1407a088fcc8f4baea",
+      "package_id": "dwd-daily-20260818-a2d7d86e67e6-004dc0d",
+      "code_revision": "004dc0d3f737ba6236c67a7fb898d622218577b6",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-18/part-00000.parquet",
+          "sha256": "sha256:65dc9293382e745ecb06b5a978397a542e28094f957b41d25802767e7d22dca2",
+          "size_bytes": 24448904
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-18/part-00000.parquet",
+          "sha256": "sha256:e7d8ee31ea55d1068003d79598fb204ac35b9527e6f790f420d3c5d219a133b8",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-19",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-19/f0122f68cde3-004dc0d",
+      "manifest_sha256": "sha256:5b3f3436e0815521d985c182c70c84aa3c1996fedc2de26b6951a6cc6b3257ae",
+      "package_id": "dwd-daily-20260819-f0122f68cde3-004dc0d",
+      "code_revision": "004dc0d3f737ba6236c67a7fb898d622218577b6",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-19/part-00000.parquet",
+          "sha256": "sha256:eaf24f0eebd5c1eaa13feb119f7fb2a843b41c64aa69338ece7e4e5a60b73043",
+          "size_bytes": 25001753
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-19/part-00000.parquet",
+          "sha256": "sha256:3f7287e6302269ecfb343d900adbf797c89d443b481779d01a436f2424deccc7",
+          "size_bytes": 3861
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-20",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-20/13f880286a37-004dc0d",
+      "manifest_sha256": "sha256:3f66cc932dbb2870582c4ad40d4d087d37ae5be65ff9122e716ace2d777d3dc4",
+      "package_id": "dwd-daily-20260820-13f880286a37-004dc0d",
+      "code_revision": "004dc0d3f737ba6236c67a7fb898d622218577b6",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-20/part-00000.parquet",
+          "sha256": "sha256:bc4acb5a49bc8e893ba0835d6b9306fdc28a8ac39c2a90d9eb62572fc9020965",
+          "size_bytes": 24471693
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-20/part-00000.parquet",
+          "sha256": "sha256:f818d8bcff342dd6bfdca9e29141dcd5a4b449726268df11dbd6e754faf285b6",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-21",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-21/7f3f7b5ad1c5-384c38c",
+      "manifest_sha256": "sha256:e4d27b3c7a3f1e75c30cde0854bf01aa8af6d51fd3d114e727a983ea606711a1",
+      "package_id": "dwd-daily-20260821-7f3f7b5ad1c5-384c38c",
+      "code_revision": "384c38c81e883a8e916f8ca2f2c8e9dd9f9d7713",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-21/part-00000.parquet",
+          "sha256": "sha256:902e84d91a0149442b02c3068ba80d5b108eb435e84653f47863801dac08024c",
+          "size_bytes": 24133633
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-21/part-00000.parquet",
+          "sha256": "sha256:bf91106c5c10891f5ece568b492fc2a852fdbf5ce116cceff3cec30988cd7836",
+          "size_bytes": 3857
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-24",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-24/95c0454a4391-29299c9",
+      "manifest_sha256": "sha256:a6588951acbf2b91f0730a391939315b99799f19fcf57f785334f215d13366c5",
+      "package_id": "dwd-daily-20260824-95c0454a4391-29299c9",
+      "code_revision": "29299c91708c1f6e256a4829f19f9d20a4444ed3",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-24/part-00000.parquet",
+          "sha256": "sha256:8f3683def9d790caf6b4de4b44dc2fdcb01590764fa28cc6a1c1dbd5f9ebabb4",
+          "size_bytes": 24566997
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-24/part-00000.parquet",
+          "sha256": "sha256:fb18f048cdcf7588df072b47ab290b5eef2e598701aca5406e1707fb4af8c3c8",
+          "size_bytes": 3860
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-25",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-25/250206f9ae1d-29299c9",
+      "manifest_sha256": "sha256:1f675be5a216055199bb573ecc24d09be9288c6208cd4be7a843ce3708e0199d",
+      "package_id": "dwd-daily-20260825-250206f9ae1d-29299c9",
+      "code_revision": "29299c91708c1f6e256a4829f19f9d20a4444ed3",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-25/part-00000.parquet",
+          "sha256": "sha256:43c04466e2f0f5c7231bee40cfec360d316b1f2d8b45dea182b25973aae83c48",
+          "size_bytes": 24391881
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-25/part-00000.parquet",
+          "sha256": "sha256:80d2a7f074a30366069e9e2bf91c0609ea28f2051128208092f2c4fbd9d685d7",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-26",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-26/f0892f5647cf-29299c9",
+      "manifest_sha256": "sha256:f738ce49662bee33e58b8ec2e942b59a7bf2d381f535ee33a0690e1a640fe9a0",
+      "package_id": "dwd-daily-20260826-f0892f5647cf-29299c9",
+      "code_revision": "29299c91708c1f6e256a4829f19f9d20a4444ed3",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-26/part-00000.parquet",
+          "sha256": "sha256:cdd274887efc1893aa115a940089ef4429472fbcf02714f13688d0dc2c00ecd0",
+          "size_bytes": 23987177
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-26/part-00000.parquet",
+          "sha256": "sha256:18c772d542957dc7a46a382bdc9c717e5a92da299e616a97e8fcaebd21c21de8",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-27",
+      "node": "OCI",
+      "root": "/data/event-runs/structure-runs/run_ab6d6afa749244299c29995968b21b84/missing-boundary/package",
+      "manifest_sha256": "sha256:484b86944daaaa674e27594be41501bd0ad2e48b49f422c5df0006d06c86fc79",
+      "package_id": "dwd-daily-20260827-96761ad23d6d-47fac8e",
+      "code_revision": "47fac8eb0af9184589dd323fdfdc3bd6d9de93c1",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-27/part-00000.parquet",
+          "sha256": "sha256:7d3fe6b8a3360984b921675d2072af3c2c199b5d19d28eb79327045ab5090183",
+          "size_bytes": 24027130
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-27/part-00000.parquet",
+          "sha256": "sha256:97873cb5c54d643b9d7a8f28542c07fb5fd668c6b9f74419995da25b8e0e27c6",
+          "size_bytes": 3861
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-28",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-28/084e0f74297b-f8f8330",
+      "manifest_sha256": "sha256:1544df7cdfc29f56556114abe9762ffb848d9a4207fa7661180605976165de9c",
+      "package_id": "dwd-daily-20260828-084e0f74297b-f8f8330",
+      "code_revision": "f8f83309e11815f37212fa87163ceccdaae3e0b4",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-28/part-00000.parquet",
+          "sha256": "sha256:83097a2864ca8b7069779f2e022c8133232bf8a0e6245c8631ac7e7568f1e72b",
+          "size_bytes": 23993651
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-28/part-00000.parquet",
+          "sha256": "sha256:9a88520c8c3e3a55b1737edd26b5d7376cef90077f5fd4cf572032c00a61697f",
+          "size_bytes": 3861
+        }
+      ]
+    },
+    {
+      "market_date": "2026-08-31",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-08-31/2cb5f15cb13f-f8f8330",
+      "manifest_sha256": "sha256:21ba655c360a7dc50bdbae4665f94c9be3fe9452e5b34f26c763ef869356fc46",
+      "package_id": "dwd-daily-20260831-2cb5f15cb13f-f8f8330",
+      "code_revision": "f8f83309e11815f37212fa87163ceccdaae3e0b4",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-08-31/part-00000.parquet",
+          "sha256": "sha256:fb2929ceeb6a78bd94101958dea441d5746ace0a465366ffe4449be5d474add7",
+          "size_bytes": 24352355
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-08-31/part-00000.parquet",
+          "sha256": "sha256:b1b74f2fffe4fc229192c38c58c04a6ed446667070a75ccdaab38012a8aedc45",
+          "size_bytes": 3861
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-01",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-01/592a695f232a-6d2d94a",
+      "manifest_sha256": "sha256:815b56c9322583fcaf1c8eeb9f3dd9101a8af9b2877d620a015716650bbe3bee",
+      "package_id": "dwd-daily-20260901-592a695f232a-6d2d94a",
+      "code_revision": "6d2d94a9296df27beca9567f63d3fb5e9ae55b6e",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-01/part-00000.parquet",
+          "sha256": "sha256:e0446b359e67e3aac3f8110aef8fda4c276b2393cfff2553d0278b2c0cfab716",
+          "size_bytes": 24055891
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-01/part-00000.parquet",
+          "sha256": "sha256:db3b0b4225e45caef0da807c2681081adc090878023e55c12675a948e75babd7",
+          "size_bytes": 3859
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-02",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-02/4bd15d9ebba1-6d2d94a",
+      "manifest_sha256": "sha256:b4ed1d2a48dad224b83cae51cc092c8690ce8a7d6986073f8d033b6a9a2a9eb0",
+      "package_id": "dwd-daily-20260902-4bd15d9ebba1-6d2d94a",
+      "code_revision": "6d2d94a9296df27beca9567f63d3fb5e9ae55b6e",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-02/part-00000.parquet",
+          "sha256": "sha256:59b4549afb65758f4fb256e2fd27036a8874c8da3adb301bf631e2dd66109f2a",
+          "size_bytes": 24001642
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-02/part-00000.parquet",
+          "sha256": "sha256:818c75dcfec867f544c1ef875487beeff9e20c3458f1b2d6f5692815831b1424",
+          "size_bytes": 3861
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-03",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-03/01fb35e66041-6d2d94a",
+      "manifest_sha256": "sha256:f1002164d461aa261f3da7c97025a1384092d7d87aab6e2a503dc07c01617102",
+      "package_id": "dwd-daily-20260903-01fb35e66041-6d2d94a",
+      "code_revision": "6d2d94a9296df27beca9567f63d3fb5e9ae55b6e",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-03/part-00000.parquet",
+          "sha256": "sha256:d160ee12103f8dbafec483254d335247159fea22004ccae1ac8cd6d2229c4a33",
+          "size_bytes": 24231499
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-03/part-00000.parquet",
+          "sha256": "sha256:d5f50a9f179b2b15d2d3259542b432d3c724adaca40d560ee5c309a0192197c6",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-04",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-04/fdf25e56b8ad-6d2d94a",
+      "manifest_sha256": "sha256:0b40a1e41604c009ceabb4676c0e3c69366ddfe756be175d4b53699d1318d90d",
+      "package_id": "dwd-daily-20260904-fdf25e56b8ad-6d2d94a",
+      "code_revision": "6d2d94a9296df27beca9567f63d3fb5e9ae55b6e",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-04/part-00000.parquet",
+          "sha256": "sha256:0f9f8049fd5e09c30bb0d70498c6d33da90b085877232065b4f84aa2bb1311a2",
+          "size_bytes": 24584177
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-04/part-00000.parquet",
+          "sha256": "sha256:3eea3a0a023c1ebbe757be9ec3879eaedb224a9d0e25f068b257b3061943361f",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-07",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-07/4b5b2f9e5712-6d2d94a",
+      "manifest_sha256": "sha256:fc717c1b36cd6f13c2c5bd8bbfb78efa3818e1f967d6daf1d0388690b3e0c760",
+      "package_id": "dwd-daily-20260907-4b5b2f9e5712-6d2d94a",
+      "code_revision": "6d2d94a9296df27beca9567f63d3fb5e9ae55b6e",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-07/part-00000.parquet",
+          "sha256": "sha256:feeeab115fa3cc083c2bb7d4b3fe06d676b91cc53755b3a4f0aa1b01182436ae",
+          "size_bytes": 23698794
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-07/part-00000.parquet",
+          "sha256": "sha256:be0d57357cd8ff477e05f784fd272f98f19c6b66bd0f4a9adc3db2d3818f19a5",
+          "size_bytes": 3863
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-08",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-08/e40ee64fd519-6d2d94a",
+      "manifest_sha256": "sha256:922a39e7f7a2ebe6ba0c9b5d511a63ca882293e8e628396bc2f22e099349ce8a",
+      "package_id": "dwd-daily-20260908-e40ee64fd519-6d2d94a",
+      "code_revision": "6d2d94a9296df27beca9567f63d3fb5e9ae55b6e",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-08/part-00000.parquet",
+          "sha256": "sha256:ba8169accb520d5e6d16705f6f64c780362feac7d688ed11cef70322ab7b23b3",
+          "size_bytes": 23955535
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-08/part-00000.parquet",
+          "sha256": "sha256:51e000e47bfc85496a33372c8e5ab343fef24528fa6029e0e6582ac532d606d0",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-09",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-09/6dbd535dad77-a248f66",
+      "manifest_sha256": "sha256:830ac387a8bdbc9721bbac1cc17213e5a627baddd1122848632cde98d4beb46d",
+      "package_id": "dwd-daily-20260909-6dbd535dad77-a248f66",
+      "code_revision": "a248f66d8c2573df277e165572fcd64b604100f5",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-09/part-00000.parquet",
+          "sha256": "sha256:416d9fb2520e9a339d8abe05f86e41e58d171df0de461bbfac6ae37ed8de6a3e",
+          "size_bytes": 23831955
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-09/part-00000.parquet",
+          "sha256": "sha256:ffefb781f84d198bb5358508930e717400b188f6b33e9b7b79f198a9ef31e351",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-10",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-10/0ce4b6dfb2d8-f97f90c",
+      "manifest_sha256": "sha256:da87f18d9d0c1a8ef9777ce779f4a97acd597dfef351b82851975350513017ad",
+      "package_id": "dwd-daily-20260910-0ce4b6dfb2d8-f97f90c",
+      "code_revision": "f97f90c8e8ef6d14877e54408cb6eb3698813d23",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-10/part-00000.parquet",
+          "sha256": "sha256:34db8a8b10106969bd8f34a07401c3a73b89f80fc90062d0be4f1cf1ab530be7",
+          "size_bytes": 23517750
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-10/part-00000.parquet",
+          "sha256": "sha256:a0f8d3425def5c1e7e2459256957c6d815fd7cf6349a3952e0f1f61f0b03d449",
+          "size_bytes": 3861
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-11",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-11/f536d90fb04d-f97f90c",
+      "manifest_sha256": "sha256:c122095ad5abdb87c517884fe6ead161638a42568a48a984b041be27ebd629d6",
+      "package_id": "dwd-daily-20260911-f536d90fb04d-f97f90c",
+      "code_revision": "f97f90c8e8ef6d14877e54408cb6eb3698813d23",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-11/part-00000.parquet",
+          "sha256": "sha256:6b176f57686a2fc04a08cd5f34a8359f5db1462b92d75bb9cea1eb995731d77c",
+          "size_bytes": 24677340
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-11/part-00000.parquet",
+          "sha256": "sha256:8a0227cdac3305794128f92b16daa98c8a9dfda520e99a4889f3687432744bda",
+          "size_bytes": 3859
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-14",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-14/48c85a8db0cf-c317fdb",
+      "manifest_sha256": "sha256:83cb87854bb65ecb5601d386248d7d04279f2d47a4c568686cb7c7a1168f8182",
+      "package_id": "dwd-daily-20260914-48c85a8db0cf-c317fdb",
+      "code_revision": "c317fdb2ac81e34b5571b9e1abde524da1c5b05b",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-14/part-00000.parquet",
+          "sha256": "sha256:20b77b4bee04dbcdb4eca7c6d175565468464631d2f4467858ef09786401fbe8",
+          "size_bytes": 23741875
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-14/part-00000.parquet",
+          "sha256": "sha256:a94b3d5afe1c74fd23fdd1ae44b99d1b877bedf62a895d02a59226cd6809b44c",
+          "size_bytes": 3862
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-15",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-15/9c7df81c3e06-c317fdb",
+      "manifest_sha256": "sha256:f2580a177deece0758f7e6a7b75f81cc280aada98f9a052bd0b43c32df0f55b4",
+      "package_id": "dwd-daily-20260915-9c7df81c3e06-c317fdb",
+      "code_revision": "c317fdb2ac81e34b5571b9e1abde524da1c5b05b",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-15/part-00000.parquet",
+          "sha256": "sha256:84a13facd6c0214fdcf7b1c5de5c104e7c6d799414eb06a6056a60e58d20a7c8",
+          "size_bytes": 23599952
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-15/part-00000.parquet",
+          "sha256": "sha256:5f64a18a9797dc6fa01f5277a2d20aa177a028056d5417732f4fe26027fbdfc2",
+          "size_bytes": 3861
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-16",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-16/996324770eea-c317fdb",
+      "manifest_sha256": "sha256:a80fb42e13894da82fedf02eeb7959f654e2d7721de443f97cc89b854badfbad",
+      "package_id": "dwd-daily-20260916-996324770eea-c317fdb",
+      "code_revision": "c317fdb2ac81e34b5571b9e1abde524da1c5b05b",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-16/part-00000.parquet",
+          "sha256": "sha256:7e0619ad96cf454ed54a2b7be4020594a78171409dca92497186b67cf2bb3826",
+          "size_bytes": 23809256
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-16/part-00000.parquet",
+          "sha256": "sha256:b683603a49d92734bb79d9def42cadcb2fda3dc3b3ab19ef748cd4f445a29aaf",
+          "size_bytes": 3863
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-17",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-17/134a855f5624-c317fdb",
+      "manifest_sha256": "sha256:175cb7dbda483da822085d3522d1fa7dfd2c879cd44204807452a736ad0611eb",
+      "package_id": "dwd-daily-20260917-134a855f5624-c317fdb",
+      "code_revision": "c317fdb2ac81e34b5571b9e1abde524da1c5b05b",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-17/part-00000.parquet",
+          "sha256": "sha256:d006016a7d3bdc0a0ddb7b2f0a5a88e032897c97e69b67f4ca2c274e34e4dd6e",
+          "size_bytes": 23756532
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-17/part-00000.parquet",
+          "sha256": "sha256:a71ce95ae400596888a0928800547e65b7010cf3cdc967d6d5665c834dd8ade5",
+          "size_bytes": 3863
+        }
+      ]
+    },
+    {
+      "market_date": "2026-09-18",
+      "node": "OCI",
+      "root": "/data/dwd-daily/packages/2026-09-18/5d789c21aac8-36c06d6",
+      "manifest_sha256": "sha256:c0599b680e89007f9818a59caf5db7e62a3d606fa9f51ddb980b6b0ee37b410c",
+      "package_id": "dwd-daily-20260918-5d789c21aac8-36c06d6",
+      "code_revision": "36c06d69c8f33a0b40bb41b72aad483cecfbdbf1",
+      "files": [
+        {
+          "path": "payload/security_market_observation/dwd_security_bar/market_date=2026-09-18/part-00000.parquet",
+          "sha256": "sha256:dcdd2f51cb47d5e0cfbfaa6f39967de8004ce9e973fe427a0dafad45bc657b5b",
+          "size_bytes": 23627496
+        },
+        {
+          "path": "payload/tradability_state/dwd_trading_calendar/market_date=2026-09-18/part-00000.parquet",
+          "sha256": "sha256:91dadf3890edc3675a77ab60d9146c0287453bd292eb04dfbd3a916b759a0c83",
+          "size_bytes": 3860
+        }
+      ]
+    }
+  ],
+  "outputs": {
+    "aggregate_counts_only": true,
+    "corrected_bundle": false,
+    "candidate_scan": false,
+    "strategy_or_labels": false,
+    "B_acceptance": false,
+    "D_activation": false,
+    "P6_or_formal_data_mutation": false
+  }
+}

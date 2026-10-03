@@ -9,6 +9,12 @@ nodes.
 | Current phase | P6 implementation open; P5 optional research deferred |
 | Gate source | `config/p3-gates.v1.json` |
 
+Permanent data ownership: P10 owns acquisition and shared quality/governance under
+[`design/lld/12-permanent-data-line.md`](design/lld/12-permanent-data-line.md) and
+`config/data-ownership.v1.json`. Other lines register issues and choose a disclosed business
+bypass, temporary ignore or acceptance of a known limitation; they do not recover or repair
+data. Historical evidence and existing safety/research/production gates remain unchanged.
+
 ## Current branch
 
 - P1 is accepted with the versioned C1 fail-closed condition.

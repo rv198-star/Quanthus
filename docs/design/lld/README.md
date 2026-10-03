@@ -56,6 +56,7 @@ module internals unless a named application port crosses that boundary.
 | `09-roadmap.md` | All | Delivery sequence | Phase gates, milestones, or stop rules |
 | `10-monitoring-attribution.md` | P2+ | Accepted event/funnel contracts, synthetic attribution closure, and first formal-strategy attribution release; recurring reports remain proposal-triggered | Decision or notification logs, hypothetical paths, funnels, or attribution |
 | `11-platform-kernel.md` | PK, orthogonal | PK1-PK4, Replay Worker, P4 Event Worker, and PK6 accepted; first-cutover Authoring not applicable | Authentication, API composition, jobs/workers, platform persistence, Web shell, QuantDinger extraction, or module recovery |
+| `12-permanent-data-line.md` | P10, permanent | Acquisition and shared data-quality/governance owner; business lines retain disposition and domain work | Data issue routing, source recovery/repair, publication or handoff |
 
 Detailed child files are added beneath a same-named module directory only after one module becomes
 too large to load usefully as a single node. The parent LLD remains the stable entry point and owns

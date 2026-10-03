@@ -24,6 +24,28 @@
 - The operator-assisted two-window profile, forward email transport, the full expert set, and the
   training layer remain blocked by their explicit phase and activation gates.
 
+## Permanent data ownership — P10
+
+- The Owner assigned acquisition and all shared data-quality/governance work to permanent P10 on
+  2026-10-03. Read `docs/design/lld/12-permanent-data-line.md` and
+  `config/data-ownership.v1.json`. P10 is a parallel standing line, not a sequential release gate.
+- Non-data business lines may only register a bounded P10 issue for data quality/governance;
+  they must not collect/backfill, hunt source archives, repair/supplement deficient inputs,
+  reinterpret PIT times or maintain a temporary quality pipeline.
+- After registration, choose and record a business bypass, temporary ignore or acceptance of a
+  known limitation. Keep business work moving where its contract permits. Stop only the affected
+  step that cannot meet an existing hard safety, PIT, partition or activation gate. A limitation
+  is not repaired/qualified data; do not invent evidence or silently alter frozen policies/windows.
+- Domain features, targets, scientific reference criteria, models, strategies and consumer
+  algorithms stay with their business line; shared data consistency/repair stays with P10.
+- P1 acceptance, frozen requests and prior temporary receipts remain immutable. Earlier P3/P5
+  temporary-source approvals do not authorize future data repair/recovery outside P10.
+- New data issues use `phase:P10`, `area:data`, `P10-DATA-*` ids. Preserve migrated numbers, titles,
+  evidence and subgroup gates; closed historical issues are not moved/reopened. P10's standing
+  epic stays open, and issue routing/closure never establishes consumer acceptance.
+- Existing execution/deployment safeguards remain. The #424 SSH override is task-scoped, not a
+  general P10 remote-access override.
+
 ## Current active task routing — P3-STRAT-003
 
 - `P3-STRAT-003` / #317 and B-R1 / #412 were reopened under the Owner's explicit continuation.
@@ -31,7 +53,8 @@
   OCI. The bounded inspection resolved 5,250 of 5,251 securities with zero source conflicts;
   the approved single-security source has now been composed into a temporary static mapping of all
   5,251 securities with zero missing/duplicate/conflicting identities. This is not full B acceptance.
-  Formal DWD repair stays with #470. B / #319 stays NO_PASS and unaccepted; D remains NOT_RUN.
+  Data recovery/repair stays with P10 #470/#473/#474. B / #319 stays NO_PASS and unaccepted;
+  D remains NOT_RUN.
   Preserve the earlier closeout as historical evidence, not the current routing instruction.
 - Purpose: compare existing Trend + Position Risk against a non-empty deterministic P4 baseline
   while P6 continues independently; P6 is not a predecessor and must not be mutated.
@@ -49,10 +72,10 @@
   authority; no P6 production mutation.
 - Negative, inconclusive, or unavailable historical evidence is a valid outcome. A green transport
   or unit test is not B acceptance.
-- The 2026-10-03 Owner activation in
-  `config/research/p3-p5-temporary-source-activation.v1.json` permits only the bound one-security
-  source qualification. This is temporary research input; formal industry repair belongs to #470.
-  Temporary success never closes the data issue or changes the historical NO_PASS/closeout.
+- The earlier 2026-10-03 activation and completed temporary evidence remain sealed in
+  `config/research/p3-p5-temporary-source-activation.v1.json`. P10 supersedes future P3 source
+  recovery/repair. #412 now owns consumer admission/business disposition only. Temporary success
+  never closes a data issue or accepts B; existing frozen gates still govern corrected B/D.
 
 ## Parallel research routing — P5-STAGE-001
 
@@ -72,10 +95,10 @@
   unchanged by the later successor activation.
 - A completion does not auto-start B/C/D. The current B continuation comes from the separate Owner
   instruction and live #402 activation, without authorizing training or widening source families.
-  The 2026-10-03 Owner activation in `config/research/p3-p5-temporary-source-activation.v1.json`
-  permits the four exact members in `input-closure-proposal.v1.json` for temporary qualification.
-  Formal data/lineage repair belongs to #471/#472; unresolved scope still blocks coordinate/window
-  qualification. Temporary success does not close data issues or accept B.
+  Earlier temporary activation and completed evidence remain sealed. P10 owns future source
+  recovery/quality repair under #471/#472. #402 owns research input, split, independent-reference
+  qualification and business disposition. Unresolved scope still blocks the required coordinate/
+  window gate; a disclosed limitation does not accept B or open training.
 - The successor receipt does not alter sealed A evidence. B must freeze an exact manifest before its
   first market-row read; C/D remain synthetic until their own gates. No protected 2022-2026 access,
   result-bearing training, P3-STRAT data-authority inheritance, P6 mutation, promotion or trading.

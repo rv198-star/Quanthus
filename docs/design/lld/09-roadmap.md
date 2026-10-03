@@ -18,6 +18,14 @@ and live operation. A later phase cannot compensate for an untrusted earlier pha
 | P5 | Optional research scoring layer | Beats rule baseline and passes promotion gate | P4; deferred and not a P6 predecessor |
 | P6 | Prospective Shadow and fixed-unit paper operation | Frozen behavior accumulates time-matured evidence; no notification or live-fill claims | P3/P4 and Expert Strategy MVP |
 | P7 | Operator-assisted small-capital operation | Every advice closes with an accepted actual/no-action report and reconciliation | P6 |
+| P10 | Permanent acquisition, shared data quality/governance and versioned supply | Each bounded repair/publication passes its own gates; standing line remains open | Parallel permanent line; P1 historical foundation retained |
+
+P10 owns acquisition and shared data-quality/governance issues. Other phases register a defect,
+choose a disclosed business bypass, temporary ignore or acceptance of a known limitation, and
+focus on domain work; they must not recover/backfill/repair inputs themselves. Stop only a step
+that cannot meet its existing hard gate. P10 is not a sequential release after P7 and does not
+accept P3/P5 or activate training/production. See
+[`12-permanent-data-line.md`](12-permanent-data-line.md) and ADR 0015.
 
 P5 research may run beside P6 frozen simulation but is optional and deferred; P6 does not wait for
 it. A development build cannot alter the active simulation policy.

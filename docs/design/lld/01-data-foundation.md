@@ -13,6 +13,7 @@
 | Dual-lane delivery | three-node shadow deployment, role-scoped historical ADS bootstrap, and final OCI operational ADS Base accepted; catalog-native consumer publication and cutover remain blocked pending their own evidence and `GO_FOR_CUTOVER` |
 | Product-bounded DWD model | ADR 0006/0007/0008/0009, `META-DATA-DWD-002`, `META-DATA-PIT-001`, `01-data-foundation/dwd-domain-model.md`; all 33 objects are released in independently audited `dwd-base-202607-v2.1`; one Base-bound correction is accepted, recurring weekly corrections remain open, rebuild/audit/promotion are node-independent, and generic DWS is deferred |
 | ODS/DWD reference | `01-data-foundation/ods-dwd-data-dictionary.md` and `01-data-foundation/ods-to-dwd-lineage.md` |
+| Permanent maintenance owner | P10 under ADR 0015 and `12-permanent-data-line.md`; P1 historical acceptance retained |
 
 ## 1. Goal
 
@@ -20,6 +21,12 @@ Produce a complete and replayable view of what the system could know at a histor
 date. No downstream module may read vendor frames directly.
 
 ## 2. Scope
+
+Physical data contracts and P1 historical acceptance remain here. From 2026-10-03 acquisition,
+shared quality/governance, maintenance and source recovery/repair belong to P10 under
+[`12-permanent-data-line.md`](12-permanent-data-line.md). Other lines only register data defects
+and choose a disclosed business bypass, temporary ignore or acceptance of a known limitation;
+they do not repair data. The source, schema, PIT, topology and release contracts below are unchanged.
 
 P1 includes SSE/SZSE daily bars from 2011 onward, security lifecycle, trading calendar,
 corporate actions, adjustment factors, tradability, historical ST state, board-specific price

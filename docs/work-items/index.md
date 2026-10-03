@@ -4,6 +4,22 @@ Stable ids are the join key between requirements, designs, code, tests, and GitH
 The GitHub issue title must begin with the id in brackets. Closing an issue requires links to
 acceptance evidence; closing an epic requires all blocking child ids to close.
 
+P10-DATA-000 is the permanent standing data epic and is excluded from automatic epic closure.
+Acquisition and shared quality/governance belong to P10 under
+[`../design/lld/12-permanent-data-line.md`](../design/lld/12-permanent-data-line.md).
+Legacy ids and historical rows below remain traceability, not permission for business lines to
+recover/repair data. The reviewed live routing inventory is `config/data-ownership.v1.json`.
+
+## P10 permanent data line
+
+| ID | Title | Depends on | Disposition |
+| --- | --- | --- | --- |
+| P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03 | open epic |
+
+#424 keeps its subgroup scope and execution gates. P3 #412 and P5 #402 retain input admission,
+research and explicit business disposition; source recovery/repair belongs to P10. They may
+continue permitted business work but their required-data gates remain unaccepted.
+
 ## Meta
 
 | ID | Title | State |
@@ -417,7 +433,7 @@ label fixture. Its internal proposal steps require separate authorization before
 | P3-STRAT-003 | Validate multi-expert incremental value on fixed recent history | P3-STRAT-002, P3-ATTR-001 | blocked pending B-R1 input closure; #317 reopened under Owner continuation; A/C/C-R1 preserved; `docs/work-items/p3-strat-003.md` current recovery checkpoint |
 | P3-STRAT-003-A | Freeze research request, four-way factorial, data authority and result rules | P3-STRAT-002, P3-ATTR-001 | closed by `docs/acceptance/p3-strat-003-a-preregistration-20260920.md`; #318; no 2025/2026 strategy-result read occurred |
 | P3-STRAT-003-B | Qualify immutable 2025-2026 inputs, PIT boundary and run isolation | P3-STRAT-003-A | closed `NO_PASS_STATIC_INDUSTRY_INPUT_COVERAGE`, not accepted; #319; no final input manifest; `docs/acceptance/p3-strat-003-b-input-qualification-20260921.md` |
-| P3-STRAT-003-B-R1 | Diagnose and correct the static-industry source binding without reopening B evidence | P3-STRAT-003-B, P3-STRAT-003-A | ready bounded recovery; #412 reopened; actual inspection resolves 5250/5251 securities with zero conflicts, 688287 remains unresolved; no B acceptance |
+| P3-STRAT-003-B-R1 | Diagnose and correct the static-industry source binding without reopening B evidence | P3-STRAT-003-B, P3-STRAT-003-A | blocked required-input gate; #412 retains consumer admission/business disposition only; completed temporary evidence preserved, P10 #470/#473/#474 own recovery/repair; no B acceptance |
 | P3-STRAT-003-C | Implement B/T/R/TR research control and exact four-variant runner | P3-STRAT-003-A | closed by `docs/acceptance/p3-strat-003-c-engineering-20260920.md`; #320; result-blind engineering accepted at `1fdce608` |
 | P3-STRAT-003-C-R1 | Decouple recent-history candidate input from the legacy Event+Outcome-Label outer Run | P3-STRAT-003-C | closed by `docs/acceptance/p3-strat-003-c-r1-outcome-blind-candidate-binding-20260920.md`; #385; no recent-history outcome access |
 | P3-STRAT-003-D | Execute primary recent-history batch and independent cold reproduction | P3-STRAT-003-B, P3-STRAT-003-C-R1 | closed NOT_RUN_INPUT_UNQUALIFIED; #321; B acceptance remains unsatisfied; no results or cold reproduction |

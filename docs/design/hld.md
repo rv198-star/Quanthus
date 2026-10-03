@@ -5,8 +5,8 @@
 | Design status | approved |
 | Delivery gate | not-applicable |
 | Current phase | P6 implementation open; P5 optional research deferred |
-| Version | 0.14 |
-| Effective date | 2026-09-06 |
+| Version | 0.15 |
+| Effective date | 2026-10-03 |
 | Governing policy | `config/p0-policy.v1.json` |
 | Governing gate | `config/p3-gates.v1.json` |
 | Platform gate | `config/platform-kernel-gates.v1.json` |
@@ -57,6 +57,17 @@ outside automated execution; no broker adapter exists in the near-term profile.
 | Report viewing | Checksum-gated read-only consumption of published attribution workspaces | Three-layer explanation views; never new analysis facts |
 | Platform Kernel | Identity, access, HTTP/OpenAPI transport, generic jobs, observability, and operator presentation | Authenticated requests and operational state; never financial truth |
 | Application ports | Translate platform requests into Quanthus-owned commands and queries | Typed results bound to authoritative Quanthus artifacts |
+
+### Permanent data ownership
+
+P10 permanently owns acquisition, ODS/DWD maintenance, shared data quality, source/PIT evidence,
+lineage, retention, publication and handoff. It runs beside the business lines; P1's accepted
+foundation remains unchanged. Other lines register quality/governance issues to P10 and choose
+a disclosed business bypass, temporary ignore or acceptance of a known limitation. They retain
+domain algorithms and input admission, but must not recover or repair data themselves. A defect
+does not automatically stop the whole line; stop only a step that cannot meet an existing hard
+safety, PIT, partition or activation gate. See ADR 0015 and
+[`12-permanent-data-line.md`](lld/12-permanent-data-line.md) for the ownership contract.
 
 ### Platform and domain authority
 

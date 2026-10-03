@@ -4,8 +4,8 @@
 | --- | --- |
 | Parent issue | #400 |
 | Milestone | #12 |
-| Current gate | A preserved; B source qualification and D synthetic recovery active; C partial; E/F/G NOT_RUN |
-| Current status | OWNER_CONTINUATION_INPUT_QUALIFICATION_IN_PROGRESS |
+| Current gate | A preserved; data work transferred to P10; B acceptance/E/F temporarily deferred; previously authorized C/D synthetic engineering only; G NOT_RUN |
+| Current status | BUSINESS_DISPOSITION_TEMPORARILY_IGNORE_UNQUALIFIED_INPUT_STEPS |
 | Governing design | `../design/lld/07-research-scoring/p5-stage-001.md` |
 | Frozen request | `../../config/research/p5-stage-001/request.v1.json` |
 | Frozen targets | `../../config/research/p5-stage-001/stage-targets.v1.json` |
@@ -57,6 +57,18 @@ Dependencies stay `A -> (B,C,D) -> E -> F -> G -> H`. Completion of A does not a
 successor.
 
 ## Current recovery checkpoint
+
+**Current ownership supersession, 2026-10-03:** P10 permanently owns source recovery, acquisition
+and data-quality/governance. Completed census/identity receipts and frozen activations below stay
+immutable; their prior source-recovery next actions are no longer P5 work. #471/#472 are P10
+dependencies. #402 retains research input, split/reference qualification and explicit business
+disposition: register a data issue, choose bypass/temporary ignore/acceptance of a known limitation
+and continue permitted business engineering. The required coordinate/window/ACTIVE/reference
+gates remain unaccepted and E/F inactive. See `../design/lld/12-permanent-data-line.md` and
+`config/data-ownership.v1.json`; issue registration does not stop the whole business line.
+Current business choice is **temporarily ignore** B acceptance and E/F training/evaluation until
+their existing inputs/reference gates pass. Previously authorized C/D synthetic engineering and
+research interfaces may continue; this choice does not activate training or accept a research gate.
 
 The Owner approved the frozen four-source proposal on 2026-10-03 and explicitly limited this task
 to temporary treatment; unified data repair belongs to the separate data workstream. Activation is
@@ -163,9 +175,11 @@ The final synthetic recovery code passed independent read-only review and 135 fo
 Full `make check`: 2,992 passed / 7 skipped / 56 failed; all 56 failed IDs match the prior baseline,
 with zero new failures. Full D acceptance is not inferred from these engineering results.
 
-Current next action: recover the exact original normalization manifest before the approved action
-prefix/coordinate stage. Further metadata-only checks on 2026-10-03 found no exact body in Nexus
-Recall, matching local Quanthus build records, the old OCI acceptance path or the inspected CN01
+Current P10 dependency: recover the exact original normalization manifest before the required
+action-prefix/coordinate gate. P5's next business action is to record bypass/temporary ignore/
+acceptance of the known limitation and continue permitted domain or synthetic engineering;
+source recovery/repair is no longer P5 work. Earlier metadata-only checks on 2026-10-03 found no
+exact body in Nexus Recall, matching local Quanthus build records, the old OCI acceptance path or the inspected CN01
 artifact roots. These are bounded lookup outcomes, not proof of global loss. RX6800 and Hermes
 are currently offline; the earlier development bundle points to an older revision and cannot
 substitute for the fixed v3 SHA. No source report/market payload was read to infer scope, no JSON

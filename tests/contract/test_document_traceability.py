@@ -16,7 +16,7 @@ from quanthus.policy import find_project_root
 from quanthus.research_adm import load_p4_research_adm_policy
 from scripts.sync_github_planning import CHAPTERS, work_items
 
-WORK_ITEM_ID_PATTERN = r"(?:META|P[1-7]|PK)-[A-Z0-9-]+-[0-9]{3}|[CS][0-9]+"
+WORK_ITEM_ID_PATTERN = r"(?:META|P(?:[1-7]|10)|PK)-[A-Z0-9-]+-[0-9]{3}|[CS][0-9]+"
 WORK_ITEM_ROW = re.compile(rf"^\|\s*({WORK_ITEM_ID_PATTERN})\s*\|")
 WORK_ITEM_TOKEN = re.compile(rf"(?<![A-Z0-9-])({WORK_ITEM_ID_PATTERN})(?![A-Z0-9-])")
 
@@ -1645,11 +1645,12 @@ class DocumentTraceabilityTests(unittest.TestCase):
                 "P3-LABEL-004",
                 "P3-DASH-001",
                 "P3-STRAT-003",
+                "P3-STRAT-003-B-R1",
             },
         )
         self.assertEqual(
             {item.stable_id for item in p3_items if item.status == "ready"},
-            {"P3-STRAT-003-B-R1"},
+            set(),
         )
         p012_closeout = json.loads(
             (root / "config/stage-learning/stage-atomic-proposition-p012-closeout.v1.json")

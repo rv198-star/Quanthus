@@ -1,0 +1,32 @@
+{
+  "schema_version": "quanthus.p3-p5-temporary-source-activation.v1",
+  "state": "ACTIVE_BOUNDED_TEMPORARY_QUALIFICATION",
+  "owner_approval_date": "2026-10-03",
+  "owner_approval_quote": "批准，但这意味着DWD数据存在缺失？",
+  "owner_followup_quote": "缺口需要登记issue，然后他统一修复数据，你现在的修复只能做临时处理",
+  "reviewed_revision": "313d5f0eaca4b930abb11f95dfbcc22de1a6638b",
+  "sources": {
+    "P3": {
+      "proposal_path": "config/research/p3-strat-003/single-security-industry-proposal.v1.json",
+      "proposal_sha256": "sha256:72127ad06b82a3d5ca087f30b308200183a1bbf2b475fc95df0f6ea38a9dd744",
+      "research_issue": 412,
+      "data_repair_issues": [470]
+    },
+    "P5": {
+      "proposal_path": "config/research/p5-stage-001/input-closure-proposal.v1.json",
+      "proposal_sha256": "sha256:ef0819b57e970f53f92629e55ff8533f2999e45b6cedb111cb279d7b09fa4a69",
+      "research_issue": 402,
+      "data_repair_issues": [471, 472]
+    }
+  },
+  "usage": "temporary_research_qualification_only",
+  "formal_data_repair_owner": "separate_data_workstream",
+  "storage": "isolated_private_research_artifacts; never Base, Daily, CURRENT or ADM",
+  "exit_condition": "When the data workstream publishes a governed replacement, freeze its exact closure and independently compare before use. Stop admitting temporary sources to new runs; preserve old audit evidence. No silent source swap or automatic replacement acceptance.",
+  "temporary_success_closes_data_issues": false,
+  "B_accepted": false,
+  "D_or_E_or_F_activated": false,
+  "P6_or_production_mutation": false,
+  "historical_closeout_rewritten": false,
+  "scope_expansion_beyond_bound_proposals": false
+}

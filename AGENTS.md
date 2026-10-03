@@ -26,15 +26,18 @@
 
 ## Current active task routing — P3-STRAT-003
 
-- `P3-STRAT-003` / #317 is closed for this generation as `invalid_execution_evidence` with
-  hypothesis support `inconclusive`. B / #319 remains NO_PASS and unaccepted. B-R1 / #412 ended
-  with bounded recovery-input-unavailable evidence; D / #321 is NOT_RUN_INPUT_UNQUALIFIED.
-  E / #322 accepted only the honest early failure closeout. No automatic B continuation remains.
+- `P3-STRAT-003` / #317 and B-R1 / #412 were reopened under the Owner's explicit continuation.
+  The exact retained candidate and sealed industry sources were recovered through NexusAgent on
+  OCI. The bounded inspection resolved 5,250 of 5,251 securities with zero source conflicts;
+  the approved single-security source has now been composed into a temporary static mapping of all
+  5,251 securities with zero missing/duplicate/conflicting identities. This is not full B acceptance.
+  Formal DWD repair stays with #470. B / #319 stays NO_PASS and unaccepted; D remains NOT_RUN.
+  Preserve the earlier closeout as historical evidence, not the current routing instruction.
 - Purpose: compare existing Trend + Position Risk against a non-empty deterministic P4 baseline
   while P6 continues independently; P6 is not a predecessor and must not be mutated.
 - Preserved state: A / #318, C / #320 and C-R1 / #385 accepted; B not accepted
   (`NO_PASS_STATIC_INDUSTRY_INPUT_COVERAGE`). Issue closure does not satisfy B/D acceptance.
-  See `docs/acceptance/p3-p5-bounded-closeout-20261002.md` before proposing any reopening.
+  See the work-item recovery checkpoint before the next bounded input action.
 - Before working on this line, read `docs/work-items/p3-strat-003.md`. For interrupted-session
   recovery, start with its `Current recovery checkpoint`, then expand only the sections needed for
   the task at hand.
@@ -46,13 +49,20 @@
   authority; no P6 production mutation.
 - Negative, inconclusive, or unavailable historical evidence is a valid outcome. A green transport
   or unit test is not B acceptance.
+- The 2026-10-03 Owner activation in
+  `config/research/p3-p5-temporary-source-activation.v1.json` permits only the bound one-security
+  source qualification. This is temporary research input; formal industry repair belongs to #470.
+  Temporary success never closes the data issue or changes the historical NO_PASS/closeout.
 
 ## Parallel research routing — P5-STAGE-001
 
-- `P5-STAGE-001` / #400 is closed for this generation as `INCONCLUSIVE`: input and independent
-  reference qualification were not established. A / #401 remains accepted preregistration-only;
-  B/C/D ended with unqualified inputs or partial synthetic engineering, not acceptance. E/F/G are
-  NOT_RUN; H / #408 accepted only the stop evidence. No automatic training/research continuation.
+- `P5-STAGE-001` / #400 and B / #402 were reopened under the Owner's explicit continuation for
+  exact input integrity, schema and listing/session census. The three-table 2012–2021 file set is
+  frozen in `config/research/p5-stage-001/input-census.v1.json` before row access.
+  A remains accepted preregistration-only; B is unqualified; C preserves partial engineering.
+  D / #404 is reopened only for synthetic orphan recovery under
+  `config/research/p5-stage-001/engineering-continuation.v1.json`; full D acceptance remains open.
+  E/F/G remain NOT_RUN. The prior closeout remains historical evidence.
 - Purpose: compare the existing rule/Stage surface with fixed simple baselines and one bounded learned
   temporal assessment over the layered 1..12 research vocabulary; it is not a top-1 Stage classifier.
 - Before working on this line, read `docs/work-items/p5-stage-001.md`, then the frozen request and
@@ -60,8 +70,12 @@
   `Current recovery checkpoint` and expand only what the current gate needs.
 - A permits docs/config/tests and synthetic contract cases only; that sealed predecessor boundary is
   unchanged by the later successor activation.
-- A completion does not auto-start B/C/D; the historical start came from the separate bounded owner
-  activation receipt. That generation is now closed; it is not standing authority to restart.
+- A completion does not auto-start B/C/D. The current B continuation comes from the separate Owner
+  instruction and live #402 activation, without authorizing training or widening source families.
+  The 2026-10-03 Owner activation in `config/research/p3-p5-temporary-source-activation.v1.json`
+  permits the four exact members in `input-closure-proposal.v1.json` for temporary qualification.
+  Formal data/lineage repair belongs to #471/#472; unresolved scope still blocks coordinate/window
+  qualification. Temporary success does not close data issues or accept B.
 - The successor receipt does not alter sealed A evidence. B must freeze an exact manifest before its
   first market-row read; C/D remain synthetic until their own gates. No protected 2022-2026 access,
   result-bearing training, P3-STRAT data-authority inheritance, P6 mutation, promotion or trading.

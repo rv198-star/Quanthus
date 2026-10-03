@@ -1296,6 +1296,7 @@ def iter_projected_candidate_series(
     allowed_security_ids: Sequence[str] | None = None,
     duckdb_memory_limit: str | None = None,
     duckdb_temp_directory: Path | None = None,
+    duckdb_max_temp_directory_size: str | None = None,
 ) -> Iterator[tuple[CandidateDailyInput, ...]]:
     """Stream one stable listing series at a time from the materialized projection."""
 
@@ -1311,6 +1312,10 @@ def iter_projected_candidate_series(
         connection.execute("SET preserve_insertion_order=true")
         if duckdb_memory_limit is not None:
             connection.execute(f"SET memory_limit={_sql_text(duckdb_memory_limit)}")
+        if duckdb_max_temp_directory_size is not None:
+            connection.execute(
+                f"SET max_temp_directory_size={_sql_text(duckdb_max_temp_directory_size)}"
+            )
         if duckdb_temp_directory is not None:
             duckdb_temp_directory.mkdir(parents=True, exist_ok=False)
             connection.execute(

@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | generation closed invalid_execution_evidence / inconclusive; A/C/C-R1 preserved; B unaccepted; B-R1 recovery stopped; D NOT_RUN; E stop review complete |
+| Delivery gate | Owner continuation active; temporary industry closure complete; retained-input B engineering reviewed; A/C/C-R1 preserved; B unaccepted; D NOT_RUN |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |
@@ -114,6 +114,121 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+The Owner explicitly required continued attempts after PR #419 merged at `a64a3f3`.
+Live #317/#412 were reopened. Current Owner instructions permit OCI as an existing data node
+through NexusAgent; the #424-only SSH override is not used here.
+
+The exact retained candidate and accepted P4 A/B industry sources were recovered. A bounded
+isolated CLI inspection at `835dea9b5502f9dbe1f0830b538312bc8f0f4b9e` completed in 38 seconds:
+2,455,175 identity/date rows, 5,251 distinct securities, 5,249 in the decision window.
+DWD covers 5,201; sealed P4 covers another 49 (47 in the decision window); zero source conflicts.
+One decision-window security, 688287, lacks a company industry membership in both admitted sources.
+Its absence also holds in the original 259-member supplement; no code-only substitution is used.
+The valid sequential 300114 -> 302132 ticker change is represented by dated listing bindings.
+
+The diagnostic manifest is `sha256:0afe3c451292e94bffa35c064585720ece936f2f858a897aa4dfbd1e8ef11123`;
+result digest `sha256:3a1d4b28b64498f9a89af9d6247878a091f528ee83a04fc0c002a3ab829d9965`.
+Artifact: OCI `/home/ubuntu/quanthus-research/p3-p5-20261002/diagnostic-v3/.staging/`
+`p3-b-r1-resume-20261002/inspection-835dea9-private-base`.
+This is an actual isolated diagnostic, not a formal platform B Job or B acceptance. Original source
+permissions were preserved; only exact industry members were copied into private job-local inputs.
+No candidate rebuild, strategy outcome, target label, P6 mutation or daily pipeline work occurred.
+
+The Owner approved the frozen one-security proposal on 2026-10-03, then required data gaps to be
+registered for unified repair by the separate data workstream. The separate activation receipt is
+`config/research/p3-p5-temporary-source-activation.v1.json`; the original proposal stays sealed.
+[Data issue #470](https://github.com/rv198-star/Quanthus/issues/470) tracks formal industry repair,
+including the 49 existing supplemental dependencies and the one residual. Any new source here is
+temporary, static non-PIT, private research evidence. It cannot modify Base/Daily/CURRENT or close
+the data issue. A governed replacement needs an exact closure and comparison before temporary
+sources exit new runs; preserve old audit receipts.
+
+The approved single query executed at `3d2ac91c02de819ee1e998349d87da9fec02fb39` through Nexus
+OCI session `session-b8e60ae67d4f9030de5fff08`, using an isolated BaoStock 0.9.3 dependency.
+Disposition: `QUALIFIED_TEMPORARY_STATIC_SOURCE`; one query, zero retries, 1.439 application seconds.
+Receipt SHA `b26177362b1da0f15a4f4612ffb4325e8bded039b1035443fed2c429176a428b`;
+captured response SHA `6883ab4e46add9770c79f49cdaec258bd5a80912612ddfadbcb40edbc3a2abfd`.
+Actual retrieval was `2026-10-02T17:55:56.775201+00:00` (2026-10-03 Asia/Shanghai), never backdated.
+Source evidence lives in private OCI `p3-p5-20261002/p3-temporary-source/attempt`, not DWD.
+The collector captured exact request, provider fields/rows and update date; server request-echo
+attributes were not retained. That extra audit suggestion is not an approved qualification gate
+and does not authorize a second query. The fixed attempt cannot be automatically reopened.
+
+The isolated S2 static-industry composition ran at `782b37e0c67996d163b172f5b605b560caee01a9`
+through Nexus OCI `session-e2238406ba64130c4fb872b7`. All 5,251 securities are covered:
+5,201 DWD + 49 sealed P4 + 1 approved temporary source; missing/duplicate/conflict counts are zero.
+The 5,249 decision-window denominator and dated code changes are preserved. Application time was
+5.028 seconds; each identity inventory was built once and reused. Twelve synthetic tests and an
+independent read-only implementation review passed. Execution verified the clean Git revision and
+every production/config file against a host-generated code receipt; outputs are fixed to a private
+owner-1001 root. No new network lookup, candidate rebuild/scoring, replay values or outcome access.
+
+Receipt SHA `2981ae78e2afffe638c610ce0c6545f84b4c489350e8b03e982939c7a7dcda3a`;
+mapping SHA `36dac5f6f941ddad05640a0f12d0f77555af8457d07a528e7b43d9a5af4b0280`;
+identity/provenance SHA `b27484490a201e54a4d44b84fccd7eedb41396170c3b81faff67d510b40534f9`.
+The three files total 3,573,178 bytes under private OCI
+`p3-p5-20261002/p3-temporary-industry-closure/attempt`. They are temporary static non-PIT
+concentration inputs, not a governed DWD repair. #470 remains open.
+
+Current next action: finish the retained-input engineering checks and versioned release gate,
+then submit one formal input-only B Job. The static mapping alone is not complete B input
+qualification. #319 stays NO_PASS; B remains unaccepted and D is not active.
+
+The retained failed-job replay input also still exists. Metadata SHA for `replay/bundle.json` is
+`5d592983f9d04ca78e65bdcc48ed95c6a90c116106b4c5760187cae2e6f11b8e`; bundle identity is
+`84f0e7dba9c5373e1b01f3c21ba254f6af4fadf8b11197f1e7226cf1d36b9a60`. All seven declared files
+(245,777,504 bytes) match their recorded physical checksums, verified through OCI session
+`session-a0435a2fc91ae14e0af6f20e`. This metadata/byte check did not deserialize market values,
+evaluate strategy economics, rebuild a candidate or reproduce the original failed Job. It provides
+a concrete retained-input option for the next bounded closure; no historical chain reconstruction
+or formal B/D continuation is implied by these file checks.
+
+The subsequent source investigation recovered the exact Base V2.1 predecessor chain without
+rebuilding any package. OCI retains the suffix; CN01 retains the exact Aug05/Aug04/Aug03 prefix.
+The actual target chain has 35 members through 2026-09-18, including only the already accepted
+Aug27 semantic bridge. All declared files total 870,036,020 bytes and matched their checksums.
+CN01 verification used Nexus and its existing passwordless sudo permission for fixed read-only
+paths; no mode/credential/service was changed. The initial unprivileged permission failures were
+resolved through that existing interface, not recorded as missing data. Old Base-v2 Aug04/Aug05
+entries in the historical 35-row inventory are a different branch and were not spliced into V2.1.
+External lineage receipt SHA `f270f66bacedc15de744a590841740247b394a3fd4164b8bf316f57c1435e9f7`;
+CN01 byte-check session `session-0dd82cb246f4a583508d4b23`, OCI
+`session-3050af1458f431228293fa46`. The target identity and sync timestamp match the retained bundle.
+This is recovered-source evidence, not independent reproduction of the failed Job.
+
+The existing EventWorker executes its deployed code and does not check out the Job's declared SHA.
+It has no single-Job claim filter; an extra `--once` Worker is not a safe substitute. The formal S3
+route therefore needs a narrowly governed retained-input entry/allowlist, engineering review, and
+the existing event-worker-only versioned release gate before one new B Job. P6/replay-worker and
+their environment must remain unchanged. A private CLI or private SQLite Job must not be described
+as that formal B run. No new formal B has been submitted.
+
+The narrow entry is now implemented in `p3_retained_input.py` and `p3_retained_audit.py`, under
+`config/research/p3-strat-003/retained-input.v1.json` (physical SHA
+`b642509bd80bde69a5e765c5e8b7860e01b3643e33e576029e6788d343294ff4`). It freezes 52 exact files,
+304,584,475 bytes: the retained bundle/candidate, the completed temporary industry mapping, the
+source-lineage receipt, and authoritative Base/daily calendars plus adjustment factors. The
+calendar suffix uses the recovered 35-member chain and only the already accepted Aug27 bridge.
+Scope remains 60 pre-2025 common open sessions and the original decision/execution end dates.
+
+The Job verifies all input bytes before any Parquet read, checks all 27 producer projection fields
+with exact Decimal comparison, rejects identity/calendar/pair-set drift, and builds one shared
+coverage intermediate for all ledgers and the replay report. It then scans the original projection
+under the unchanged outcome-blind rule and seals an input artifact. Budgets are 1,800 wall seconds,
+two DuckDB threads, 6 GB DuckDB memory, 8 GiB TMP and 4 GiB output. A durable external attempt
+marker permits one attempt; sealed staging may be recovered for the same Job without rerunning
+the scan. The parent Worker enforces the wall deadline even during a blocked native query.
+
+Thirty synthetic tests pass, including complete build/seal/recovery, exact projection drift,
+missing whole-calendar days, overlapping availability reasons, map substitution after resealing,
+and parent timeout. Two independent read-only reviews passed; an independent synthetic comparison
+matched the existing replay-reader audit. These are engineering results only. Actual market-row
+qualification, candidate scanning, formal B acceptance and D remain unexecuted at this checkpoint.
+The existing event-worker-only release route requires a clean exact GitHub revision reachable from
+main; naming a new SHA in a Job cannot substitute for deploying that version.
+
+### Historical bounded closeout — 2026-10-02
+
 The 2026-10-02 continuation completed the permitted early failure closeout under #317/#322.
 Outcome: `invalid_execution_evidence`; hypothesis support remains `inconclusive`.
 Bounded recovery disposition `DIAGNOSTIC_INPUT_UNAVAILABLE` describes the actual authorized
@@ -122,7 +237,7 @@ S2/S3/new formal B/D/cold reproduction are NOT_RUN. See
 `../acceptance/p3-p5-bounded-closeout-20261002.md` and
 `config/research/p3-p5-closeout-20261002.v1.json`.
 
-Current next action: none within this closed generation. #412 and #321 were closed with explicit
+Historical next action (superseded): none within that closed generation. #412 and #321 were closed with explicit
 stop/NOT_RUN reasons before #322's independent early review; #322 and #317 are now closed.
 No reconstruction or new source campaign starts automatically. Reopening needs a new bounded input proposal.
 

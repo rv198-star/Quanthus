@@ -54,8 +54,10 @@ def test_e9_catalog_snapshot_is_deterministic_additive_only() -> None:
     assert snapshot["entry_count"] == 761
     assert snapshot["counts_by_kind"]["semantic_concept"] == 34
     assert snapshot["gap_count"] == 10
+    # Code-evidence SHA bindings changed with the retained-input scan TMP budget.
+    # The sealed E9 registration and semantic population remain unchanged.
     assert snapshot["snapshot_digest"] == (
-        "sha256:a4d2753840003c8b43812b65d7c102c5901a4edada15d7ba8d67666886d25319"
+        "sha256:b2e138f4cf0f0bf99b238c4a82e950e1081fe3930a146b8934767b78e3f1fe50"
     )
     assert result["registration"]["catalog_entry_count"] == 761
     assert result["registration"]["semantic_concept_count"] == 34

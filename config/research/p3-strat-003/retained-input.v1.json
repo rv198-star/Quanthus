@@ -1,0 +1,469 @@
+{
+  "schema_version": "quanthus.p3-strat-003-retained-input.v1",
+  "work_item": "P3-STRAT-003-B-R1",
+  "state": "FROZEN_INPUT_ONLY",
+  "research_request": {
+    "path": "config/research/p3-strat-003/request.v1.json",
+    "sha256": "sha256:e1234e80857e012e2d125babba15fd4d0985cd0b38402d5737db0470d6be7c3b",
+    "semantic_digest": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde"
+  },
+  "activation": {
+    "path": "config/research/p3-p5-temporary-source-activation.v1.json",
+    "sha256": "sha256:398d515d53e020907f53531e317740f947b32e698fe4ba95c3164f0e06885d39"
+  },
+  "input_root": "/data/event-runs/research-inputs/p3-retained-b-20261003",
+  "scope": {
+    "history_start": "2024-10-09",
+    "warmup_open_sessions": 60,
+    "decision_start": "2025-01-01",
+    "decision_end": "2026-09-17",
+    "execution_end": "2026-09-18",
+    "base_through": "2026-07-31"
+  },
+  "files": [
+    {
+      "path": "replay/bundle.json",
+      "sha256": "sha256:5d592983f9d04ca78e65bdcc48ed95c6a90c116106b4c5760187cae2e6f11b8e",
+      "size_bytes": 5019,
+      "source": "/data/event-runs/.staging/job_313b915e82fd4865b32c1222c5b094f2/1/p3-strat-003-input/replay/bundle.json",
+      "role": "replay_manifest"
+    },
+    {
+      "path": "replay/tables/corporate_action_exceptions.parquet",
+      "sha256": "sha256:ffa9bcd144772e20f7ff20ea7827827667e3d80215af0db006a3853c8330cf2d",
+      "size_bytes": 21511,
+      "source": "/data/event-runs/.staging/job_313b915e82fd4865b32c1222c5b094f2/1/p3-strat-003-input/replay/tables/corporate_action_exceptions.parquet",
+      "role": "replay_dataset"
+    },
+    {
+      "path": "replay/tables/corporate_actions_normalized.parquet",
+      "sha256": "sha256:707a9ed43fac0a1fa406bb013b5fa1ed6099992b0133e7408ac09c9af7ae2495",
+      "size_bytes": 4491639,
+      "source": "/data/event-runs/.staging/job_313b915e82fd4865b32c1222c5b094f2/1/p3-strat-003-input/replay/tables/corporate_actions_normalized.parquet",
+      "role": "replay_dataset"
+    },
+    {
+      "path": "replay/tables/daily_ohlcv_none.parquet",
+      "sha256": "sha256:bbbd90aff7666e247a798baea575ebb84082941b012abe09d40e9ecda6f1b0df",
+      "size_bytes": 129962362,
+      "source": "/data/event-runs/.staging/job_313b915e82fd4865b32c1222c5b094f2/1/p3-strat-003-input/replay/tables/daily_ohlcv_none.parquet",
+      "role": "replay_dataset"
+    },
+    {
+      "path": "replay/tables/daily_universe.parquet",
+      "sha256": "sha256:342970d6d9594a061e11d2860e145589d64c566ede84015c5d0d4262cdcb7ffb",
+      "size_bytes": 36758019,
+      "source": "/data/event-runs/.staging/job_313b915e82fd4865b32c1222c5b094f2/1/p3-strat-003-input/replay/tables/daily_universe.parquet",
+      "role": "replay_dataset"
+    },
+    {
+      "path": "replay/tables/price_limit_execution_daily.parquet",
+      "sha256": "sha256:8c633ccb05ac48a1cd9ee87a9c5313cd85606777c05cf61d589dd18e7626d496",
+      "size_bytes": 74503608,
+      "source": "/data/event-runs/.staging/job_313b915e82fd4865b32c1222c5b094f2/1/p3-strat-003-input/replay/tables/price_limit_execution_daily.parquet",
+      "role": "replay_dataset"
+    },
+    {
+      "path": "replay/tables/security_code_validity.parquet",
+      "sha256": "sha256:2bed3a910081a98fa6c368b3ce47f89c7e6e70ea329c62706607bc919ee7244f",
+      "size_bytes": 38066,
+      "source": "/data/event-runs/.staging/job_313b915e82fd4865b32c1222c5b094f2/1/p3-strat-003-input/replay/tables/security_code_validity.parquet",
+      "role": "replay_dataset"
+    },
+    {
+      "path": "replay/tables/trading_calendar.parquet",
+      "sha256": "sha256:9bc6ede32cebb8e0cdea6bfc41f71619095fec5ae146d8140af88f90c2ec2e3e",
+      "size_bytes": 2299,
+      "source": "/data/event-runs/.staging/job_313b915e82fd4865b32c1222c5b094f2/1/p3-strat-003-input/replay/tables/trading_calendar.parquet",
+      "role": "replay_dataset"
+    },
+    {
+      "path": "candidate-daily.parquet",
+      "sha256": "sha256:7a7ffc385152c67ca8389cf3bde6b0dbff3f9bcfb659f63d28b7ce962d368699",
+      "size_bytes": 47852661,
+      "source": "/data/event-runs/.staging/job_313b915e82fd4865b32c1222c5b094f2/1/p3-strat-003-input/candidate-daily.parquet",
+      "role": "candidate_projection"
+    },
+    {
+      "path": "industry/receipt.json",
+      "sha256": "sha256:2981ae78e2afffe638c610ce0c6545f84b4c489350e8b03e982939c7a7dcda3a",
+      "size_bytes": 5314,
+      "source": "/home/ubuntu/quanthus-research/p3-p5-20261002/p3-temporary-industry-closure/attempt/receipt.json",
+      "role": "temporary_industry"
+    },
+    {
+      "path": "industry/static_industry_mapping.json",
+      "sha256": "sha256:36dac5f6f941ddad05640a0f12d0f77555af8457d07a528e7b43d9a5af4b0280",
+      "size_bytes": 890833,
+      "source": "/home/ubuntu/quanthus-research/p3-p5-20261002/p3-temporary-industry-closure/attempt/static_industry_mapping.json",
+      "role": "temporary_industry"
+    },
+    {
+      "path": "industry/identity-provenance.json",
+      "sha256": "sha256:b27484490a201e54a4d44b84fccd7eedb41396170c3b81faff67d510b40534f9",
+      "size_bytes": 2677031,
+      "source": "/home/ubuntu/quanthus-research/p3-p5-20261002/p3-temporary-industry-closure/attempt/identity-provenance.json",
+      "role": "temporary_industry"
+    },
+    {
+      "path": "source-lineage.json",
+      "sha256": "sha256:f270f66bacedc15de744a590841740247b394a3fd4164b8bf316f57c1435e9f7",
+      "size_bytes": 56950,
+      "source": "Nexus frozen receipt",
+      "role": "source_lineage"
+    },
+    {
+      "path": "factor.parquet",
+      "sha256": "sha256:390f089294fd75730caf12cf371c895246df425a7076392d5efb442da9650be8",
+      "size_bytes": 7071042,
+      "source": "/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1/payload/disclosure_company_event/dwd_adjustment_factor/part-events.parquet",
+      "role": "factor"
+    },
+    {
+      "path": "calendar/base-2024.parquet",
+      "sha256": "sha256:fbfd2150dbd8bfd63e64bd7778ca72cf472bd5946f38253deec95dc5cb89b81f",
+      "size_bytes": 42941,
+      "source": "/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1/payload/tradability_state/dwd_trading_calendar/trade_date_year=2024/part-00000.parquet",
+      "role": "base_calendar"
+    },
+    {
+      "path": "calendar/base-2025.parquet",
+      "sha256": "sha256:869a9a7f7c9061eb0423d777306e662967434b1c23db539d89f0f6ffd5956854",
+      "size_bytes": 42789,
+      "source": "/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1/payload/tradability_state/dwd_trading_calendar/trade_date_year=2025/part-00000.parquet",
+      "role": "base_calendar"
+    },
+    {
+      "path": "calendar/base-2026.parquet",
+      "sha256": "sha256:78125e454633170479cf1cbfc8f951c6d2d1a0b7d6a5bed0edd443b918e18a23",
+      "size_bytes": 27240,
+      "source": "/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1/payload/tradability_state/dwd_trading_calendar/trade_date_year=2026/part-00000.parquet",
+      "role": "base_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-03.parquet",
+      "sha256": "sha256:e9827f6d6bdebdce626296e46432d9e4931683d726d06286ddaa5c1fe2ae185d",
+      "size_bytes": 3865,
+      "source": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-03/825958b1287c-4c90bd8/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-03/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-04.parquet",
+      "sha256": "sha256:47f8eb416c84eea1d5e2a773442cb55da5455fd58e6d418f22808a01ff473d25",
+      "size_bytes": 3863,
+      "source": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-04/3bf7a75e5b4d-4c90bd8/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-04/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-05.parquet",
+      "sha256": "sha256:7d4ce97f6b8f4556b054c5eb0da494d49ad26cf77835570ecc4caa3d6bd6629b",
+      "size_bytes": 3862,
+      "source": "/srv/quanthus/dwd-dws-v2/daily/packages/2026-08-05/1e451e441164-4c90bd8/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-05/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-06.parquet",
+      "sha256": "sha256:385587365066711d6d633d4667e59ad1c3f5699e65e9a03585b58fc76b057b74",
+      "size_bytes": 3860,
+      "source": "/data/dwd-daily/packages/2026-08-06/827113f5d692-4c90bd8/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-06/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-07.parquet",
+      "sha256": "sha256:3318c586e6fbbf7f7c410f2e6be9a3f8ae4e91808b508a62a0b7e0dc3f16ffdf",
+      "size_bytes": 3862,
+      "source": "/data/dwd-daily/packages/2026-08-07/0bdfec315e45-4c90bd8/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-07/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-10.parquet",
+      "sha256": "sha256:9524f96ffd4aa06e32e14a23bc834c9566189141a1f3bca5289648d09d124681",
+      "size_bytes": 3861,
+      "source": "/data/dwd-daily/packages/2026-08-10/437286d30f46-4c90bd8/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-10/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-11.parquet",
+      "sha256": "sha256:6a6db32ecfdb04eff22023d54e3ca9b88b9bdbbb9afc0ca427707d202c8fd988",
+      "size_bytes": 3861,
+      "source": "/data/dwd-daily/packages/2026-08-11/2ccc22d78eaa-4c90bd8/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-11/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-12.parquet",
+      "sha256": "sha256:727f48aa2dd73c2dd7ec1251839af48e536e1ce8a93759ef3dd3df399ceec855",
+      "size_bytes": 3862,
+      "source": "/data/dwd-daily/packages/2026-08-12/5e3122027809-4c90bd8/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-12/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-13.parquet",
+      "sha256": "sha256:cb9420de913200beccbab3dac7159e46f650dc5100386b3c3d5c818c417e713a",
+      "size_bytes": 3861,
+      "source": "/data/dwd-daily/packages/2026-08-13/eac0caa2e6cf-004dc0d/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-13/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-14.parquet",
+      "sha256": "sha256:f1ab7e327118f90ed8c7c85c518a7110fc6836b803ca3f6f5fac27fc46a87664",
+      "size_bytes": 3862,
+      "source": "/data/dwd-daily/packages/2026-08-14/b53e2631bdbe-004dc0d/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-14/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-17.parquet",
+      "sha256": "sha256:4f7938a7fd40e4134bf6af79039107122ecec0e68f5567e084a1e8ac5e54aaa8",
+      "size_bytes": 3863,
+      "source": "/data/dwd-daily/packages/2026-08-17/ae8312c895f6-004dc0d/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-17/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-18.parquet",
+      "sha256": "sha256:e7d8ee31ea55d1068003d79598fb204ac35b9527e6f790f420d3c5d219a133b8",
+      "size_bytes": 3862,
+      "source": "/data/dwd-daily/packages/2026-08-18/a2d7d86e67e6-004dc0d/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-18/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-19.parquet",
+      "sha256": "sha256:3f7287e6302269ecfb343d900adbf797c89d443b481779d01a436f2424deccc7",
+      "size_bytes": 3861,
+      "source": "/data/dwd-daily/packages/2026-08-19/f0122f68cde3-004dc0d/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-19/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-20.parquet",
+      "sha256": "sha256:f818d8bcff342dd6bfdca9e29141dcd5a4b449726268df11dbd6e754faf285b6",
+      "size_bytes": 3862,
+      "source": "/data/dwd-daily/packages/2026-08-20/13f880286a37-004dc0d/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-20/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-21.parquet",
+      "sha256": "sha256:bf91106c5c10891f5ece568b492fc2a852fdbf5ce116cceff3cec30988cd7836",
+      "size_bytes": 3857,
+      "source": "/data/dwd-daily/packages/2026-08-21/7f3f7b5ad1c5-384c38c/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-21/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-24.parquet",
+      "sha256": "sha256:fb18f048cdcf7588df072b47ab290b5eef2e598701aca5406e1707fb4af8c3c8",
+      "size_bytes": 3860,
+      "source": "/data/dwd-daily/packages/2026-08-24/95c0454a4391-29299c9/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-24/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-25.parquet",
+      "sha256": "sha256:80d2a7f074a30366069e9e2bf91c0609ea28f2051128208092f2c4fbd9d685d7",
+      "size_bytes": 3862,
+      "source": "/data/dwd-daily/packages/2026-08-25/250206f9ae1d-29299c9/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-25/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-26.parquet",
+      "sha256": "sha256:18c772d542957dc7a46a382bdc9c717e5a92da299e616a97e8fcaebd21c21de8",
+      "size_bytes": 3862,
+      "source": "/data/dwd-daily/packages/2026-08-26/f0892f5647cf-29299c9/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-26/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-27.parquet",
+      "sha256": "sha256:97873cb5c54d643b9d7a8f28542c07fb5fd668c6b9f74419995da25b8e0e27c6",
+      "size_bytes": 3861,
+      "source": "/data/event-runs/structure-runs/run_ab6d6afa749244299c29995968b21b84/missing-boundary/package/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-27/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-28.parquet",
+      "sha256": "sha256:9a88520c8c3e3a55b1737edd26b5d7376cef90077f5fd4cf572032c00a61697f",
+      "size_bytes": 3861,
+      "source": "/data/dwd-daily/packages/2026-08-28/084e0f74297b-f8f8330/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-28/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-08-31.parquet",
+      "sha256": "sha256:b1b74f2fffe4fc229192c38c58c04a6ed446667070a75ccdaab38012a8aedc45",
+      "size_bytes": 3861,
+      "source": "/data/dwd-daily/packages/2026-08-31/2cb5f15cb13f-f8f8330/payload/tradability_state/dwd_trading_calendar/market_date=2026-08-31/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-01.parquet",
+      "sha256": "sha256:db3b0b4225e45caef0da807c2681081adc090878023e55c12675a948e75babd7",
+      "size_bytes": 3859,
+      "source": "/data/dwd-daily/packages/2026-09-01/592a695f232a-6d2d94a/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-01/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-02.parquet",
+      "sha256": "sha256:818c75dcfec867f544c1ef875487beeff9e20c3458f1b2d6f5692815831b1424",
+      "size_bytes": 3861,
+      "source": "/data/dwd-daily/packages/2026-09-02/4bd15d9ebba1-6d2d94a/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-02/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-03.parquet",
+      "sha256": "sha256:d5f50a9f179b2b15d2d3259542b432d3c724adaca40d560ee5c309a0192197c6",
+      "size_bytes": 3862,
+      "source": "/data/dwd-daily/packages/2026-09-03/01fb35e66041-6d2d94a/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-03/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-04.parquet",
+      "sha256": "sha256:3eea3a0a023c1ebbe757be9ec3879eaedb224a9d0e25f068b257b3061943361f",
+      "size_bytes": 3862,
+      "source": "/data/dwd-daily/packages/2026-09-04/fdf25e56b8ad-6d2d94a/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-04/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-07.parquet",
+      "sha256": "sha256:be0d57357cd8ff477e05f784fd272f98f19c6b66bd0f4a9adc3db2d3818f19a5",
+      "size_bytes": 3863,
+      "source": "/data/dwd-daily/packages/2026-09-07/4b5b2f9e5712-6d2d94a/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-07/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-08.parquet",
+      "sha256": "sha256:51e000e47bfc85496a33372c8e5ab343fef24528fa6029e0e6582ac532d606d0",
+      "size_bytes": 3862,
+      "source": "/data/dwd-daily/packages/2026-09-08/e40ee64fd519-6d2d94a/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-08/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-09.parquet",
+      "sha256": "sha256:ffefb781f84d198bb5358508930e717400b188f6b33e9b7b79f198a9ef31e351",
+      "size_bytes": 3862,
+      "source": "/data/dwd-daily/packages/2026-09-09/6dbd535dad77-a248f66/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-09/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-10.parquet",
+      "sha256": "sha256:a0f8d3425def5c1e7e2459256957c6d815fd7cf6349a3952e0f1f61f0b03d449",
+      "size_bytes": 3861,
+      "source": "/data/dwd-daily/packages/2026-09-10/0ce4b6dfb2d8-f97f90c/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-10/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-11.parquet",
+      "sha256": "sha256:8a0227cdac3305794128f92b16daa98c8a9dfda520e99a4889f3687432744bda",
+      "size_bytes": 3859,
+      "source": "/data/dwd-daily/packages/2026-09-11/f536d90fb04d-f97f90c/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-11/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-14.parquet",
+      "sha256": "sha256:a94b3d5afe1c74fd23fdd1ae44b99d1b877bedf62a895d02a59226cd6809b44c",
+      "size_bytes": 3862,
+      "source": "/data/dwd-daily/packages/2026-09-14/48c85a8db0cf-c317fdb/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-14/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-15.parquet",
+      "sha256": "sha256:5f64a18a9797dc6fa01f5277a2d20aa177a028056d5417732f4fe26027fbdfc2",
+      "size_bytes": 3861,
+      "source": "/data/dwd-daily/packages/2026-09-15/9c7df81c3e06-c317fdb/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-15/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-16.parquet",
+      "sha256": "sha256:b683603a49d92734bb79d9def42cadcb2fda3dc3b3ab19ef748cd4f445a29aaf",
+      "size_bytes": 3863,
+      "source": "/data/dwd-daily/packages/2026-09-16/996324770eea-c317fdb/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-16/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-17.parquet",
+      "sha256": "sha256:a71ce95ae400596888a0928800547e65b7010cf3cdc967d6d5665c834dd8ade5",
+      "size_bytes": 3863,
+      "source": "/data/dwd-daily/packages/2026-09-17/134a855f5624-c317fdb/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-17/part-00000.parquet",
+      "role": "daily_calendar"
+    },
+    {
+      "path": "calendar/daily-2026-09-18.parquet",
+      "sha256": "sha256:91dadf3890edc3675a77ab60d9146c0287453bd292eb04dfbd3a916b759a0c83",
+      "size_bytes": 3860,
+      "source": "/data/dwd-daily/packages/2026-09-18/5d789c21aac8-36c06d6/payload/tradability_state/dwd_trading_calendar/market_date=2026-09-18/part-00000.parquet",
+      "role": "daily_calendar"
+    }
+  ],
+  "expected": {
+    "bundle_digest": "sha256:84f0e7dba9c5373e1b01f3c21ba254f6af4fadf8b11197f1e7226cf1d36b9a60",
+    "candidate_rows": 2455175,
+    "candidate_securities": 5251,
+    "decision_securities": 5249,
+    "daily_package_count": 35,
+    "source_counts": {
+      "dwd_native": 5201,
+      "p4_sealed_reference": 49,
+      "temporary_static_source": 1
+    }
+  },
+  "budget": {
+    "wall_seconds": 1800,
+    "duckdb_threads": 2,
+    "duckdb_memory": "6GB",
+    "maximum_tmp_bytes": 8589934592,
+    "maximum_output_bytes": 4294967296,
+    "attempts": 1
+  },
+  "stage_graph": [
+    {
+      "stage": "verify_source_bytes",
+      "depends_on": [],
+      "lifecycle": "none"
+    },
+    {
+      "stage": "shared_retained_audit",
+      "depends_on": [
+        "verify_source_bytes"
+      ],
+      "lifecycle": "TMP"
+    },
+    {
+      "stage": "calendar_projection_and_coverage",
+      "depends_on": [
+        "shared_retained_audit"
+      ],
+      "lifecycle": "TMP_reuse"
+    },
+    {
+      "stage": "outcome_blind_candidate_scan",
+      "depends_on": [
+        "calendar_projection_and_coverage"
+      ],
+      "lifecycle": "private_research_artifact"
+    },
+    {
+      "stage": "seal_and_verify",
+      "depends_on": [
+        "outcome_blind_candidate_scan"
+      ],
+      "lifecycle": "immutable_private_research"
+    }
+  ],
+  "authority": {
+    "retained_input_requalification": true,
+    "candidate_projection_rebuild": false,
+    "daily_reconstruction": false,
+    "strategy_results": false,
+    "target_labels": false,
+    "execution": false,
+    "p6_mutation": false,
+    "formal_dwd_repair": false,
+    "data_issue_closure": false,
+    "D_activation": false
+  },
+  "temporary_source": {
+    "usage": "static_non_pit_concentration_only",
+    "repair_issue": 470,
+    "replacement": "new exact governed closure and comparison; preserve old receipts"
+  },
+  "acceptance": "independent B acceptance required after one versioned event-worker Job; no automatic D",
+  "source_lineage": {
+    "base_manifest_sha256": "sha256:541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b",
+    "correction_manifest_sha256": "sha256:4c8eeb5c0d74bbf2953f003364fd138832f15a5163254b710f9db8430767ffde",
+    "unique_aug27_bridge": true,
+    "original_execution_reproduced": false
+  },
+  "attempt_receipt": "/data/event-runs/research-attempts/p3-retained-b-20261003.json"
+}

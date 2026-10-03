@@ -1,0 +1,1800 @@
+{
+  "schema_version": "quanthus.p5-stage-001-input-census-request.v1",
+  "work_item": "P5-STAGE-001-B",
+  "state": "FROZEN_OUTCOME_BLIND_LISTING_SESSION_CENSUS_ONLY",
+  "activation_issue": 402,
+  "request_sha256": "sha256:37ca82557a1c0a538f5d7dd945536c54a9c6ceb022e1f8f400d4a1243bf1397b",
+  "target_set_sha256": "sha256:315fab9f7bd0304b418bc2a35f27e557a0f97b0c23b82b228f2754a386173d2f",
+  "base_manifest_sha256": "sha256:541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b",
+  "market_start": "2012-01-01",
+  "market_end": "2021-12-31",
+  "venues": {
+    "SSE": "venue_bec59e31eb6bb28111a10d7e6d2c689f",
+    "SZSE": "venue_8c0bd9088a0dc88f28e5e7fa8efdce87"
+  },
+  "selection_digest": "sha256:84edfba056bf1cf1378dce3b4eaf087e1d80d4309e2c24d9356fd2ddff83c668",
+  "files": [
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2012/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:00edbf3bdc6c7e781ab29f2a019c126cc9f4d0cd7088e64869d530a526357832",
+      "size_bytes": 2389599
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2012/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:cde6f9ec297912d868b739f5a842abcee16dca12e154ec223526dc30f8ff0ee4",
+      "size_bytes": 3205923
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2012/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:a809eeb7998a6bb01ab46d7a98c873fa2a25bdc4a1cc200fbd6807183f95a75d",
+      "size_bytes": 1807622
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2012/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:7bf670a8c05b4909b4e059af0284e1abcbeb9ffb2e9dd03bda9f44a03cd74be6",
+      "size_bytes": 2696356
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2012/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:bd28e1a11241e94fa565bdb94fbe6593c8a939d1f563fd3b6f72c4c9f89a5c71",
+      "size_bytes": 3436037
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2012/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:d684f5ee1744f87748e078e5c60350734ded49c513d758769641b5e91aa7f34b",
+      "size_bytes": 3112413
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2012/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:af89b3275939d2815bd07f30f5f25159e4b99cc388f69ba2d2f7a402a53ddf2b",
+      "size_bytes": 3391019
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2012/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:8bebc59bbe6b0dd6f24cc849627773b2eeaee1639d769a13dcda8ae8f04ca53c",
+      "size_bytes": 1938405
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2012/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:d8d2acc76bd2663bd791d7ed24e96c5570c7dcd9690a0b90d9d553c23a4be8fe",
+      "size_bytes": 1713504
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2012/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:a755e7d6c76f942d51ccee0b8da53b17eab9603bb432dd25edcf0806229a3117",
+      "size_bytes": 2839179
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2012/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:17471326690f936929ef32a3b4530bbf25e20a1400aef2ac87aa5c798fce2102",
+      "size_bytes": 1852829
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2012/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:f90473a214da1effb4679cacb29346892fd29ba02a560f7d04b001831b4d081b",
+      "size_bytes": 3359954
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2013/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:25fb4dc95a6421fced32860c037aac5d93c0a394aafd809123ca138cc1e7cd64",
+      "size_bytes": 3247738
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2013/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:c62c90e2f1befc8df0c59be5185cb87aa9dbde9a9f348ad14a147d1311b76e90",
+      "size_bytes": 2433395
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2013/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:4b31dcfe7a217be510621f974cb79b84bd3407134d4b85f777e4e5c4caaa4d09",
+      "size_bytes": 3336200
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2013/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:aff77c75a28d221cb1d3944c9a23c2a5ac663becea8bc1a5512b9b8e8a08a810",
+      "size_bytes": 1552446
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2013/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:9ca5f03e5b688490cae45241c32c4e865bfefd5f2c4f1569f551938dfaadf214",
+      "size_bytes": 1891626
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2013/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:e56a2a4d7adb0ef647e132b02248f87ef739a047c8f95d08b20ffd6aadf49428",
+      "size_bytes": 2779781
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2013/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:2679f453ec45bc6ed6f7c2fb6b5270821853fbef3bc59e0e699448a01dee2d97",
+      "size_bytes": 3540163
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2013/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:eab5683bc61b9ee6bbc5b76c00b104daced9721bafb5cbeb25fffb3855849e16",
+      "size_bytes": 3411388
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2013/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:66fb2721c48c1c41d121997b9e3cd0d101d79357712942213ae60a7e2907529f",
+      "size_bytes": 1643287
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2013/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:8e770db1ba277734c220ca85388a9bd0aea9376bf4a8197a7eaae8af92ffc8d4",
+      "size_bytes": 2944439
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2013/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:c8ee736d15e988abde5d1d9f071d1dd1ed12a338cca7bdf68be7d9d86b7f4557",
+      "size_bytes": 3366450
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2013/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:cc1b39219149826e6c5dfcc40c952360129a4690ad572c31215b91dbed462238",
+      "size_bytes": 3492810
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2014/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:41d729f01a9e86d47bf7e26bd58923b0066b7a24bb180f0014035e78b5308102",
+      "size_bytes": 1813637
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2014/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:d16fa16f22e1b4a67cf5908caa21861886acba713429fc55bb7ba766f994e820",
+      "size_bytes": 2706255
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2014/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:b1a80f0b25a2fce8078960881c2b56e528a6759b98f3129174560e3c11377a63",
+      "size_bytes": 3402129
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2014/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:42cc3dbbdc5d9b352be96305b1043bfedc925e1ab6c3ec7c9a816982bf296abe",
+      "size_bytes": 3431416
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2014/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:2a62c658766821165add55b49fefe75f9227b6b43aed37082e4ea939075be941",
+      "size_bytes": 3250300
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2014/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:f9945b2ea55c631562a0cd13204ef15794db82d7c78fcf40415699cdfc55c7a0",
+      "size_bytes": 3231039
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2014/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:ab938255f2c86f718cd3ba29bd77544714491c7cf5c0b9ad181c45e41e32ade4",
+      "size_bytes": 3642227
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2014/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:68762dcc46f80429c17af49b5cbfca2166b3395831ae9dac1b3295abd583ccaa",
+      "size_bytes": 3391090
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2014/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:e288bd859d64e68f74853dda1f936cce2bb90782880ccd5d517890774ad59dbf",
+      "size_bytes": 3431974
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2014/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:315edc426d369e2597827eedf916349947481ea224e2109572dfa0e9126e13fd",
+      "size_bytes": 1610049
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2014/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:31787278eec27a7df3e7dfb76e5eec83aaa7110a518d2a91a724433e449b9fae",
+      "size_bytes": 1781616
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2014/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:cdc96329f5134afbf2c5f42a2033896e5da473be73fdd81c36818365023554bd",
+      "size_bytes": 3761117
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2015/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:9422dabe78d0c2d8ad315eaa1fc6d3a092678e8ccc726e83306c23dac05e9ed0",
+      "size_bytes": 3328841
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2015/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:2be4900c093d5bce4c9a0418e7754d9ae2d35c1a705605e2e111d824248a9740",
+      "size_bytes": 2683741
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2015/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:ce3b17539f54204165ad240b1016ec9fc62563743daa35b2bc8a7dd4d08b7818",
+      "size_bytes": 2044355
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2015/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:f8c5511a85fe64bbda80da4a09e7aba39c2091befa0c7e8b14542668e5b3308b",
+      "size_bytes": 3625474
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2015/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:189b20facc02a9df804a356faca9c80cd9053364e97b91d0069a42ae36c8e3a9",
+      "size_bytes": 3564697
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2015/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:e97361b20f3d5cf592ab62f31dd5e8a552603adcb568b135ffa4344b52fc8a29",
+      "size_bytes": 2037381
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2015/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:837daa567928fa5d7db739cc7abee4358ea6a1fea866fc0757f799a81446a467",
+      "size_bytes": 2089127
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2015/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:5f877e1646613f4d4049f7f1ed99c1e031f9b352c3233a4a2274093e489c8e9c",
+      "size_bytes": 1985519
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2015/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:b77a9452bd304ba673fafb2e484a4a962225ad9ddcd946aa04db5963c076c2c3",
+      "size_bytes": 3401899
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2015/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:3bfca9717cb9f710f42cbf1dc2336b657eb4c37436cdcceb426b2187cff71456",
+      "size_bytes": 1649095
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2015/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:9ad52667e109e63f3483cb0bbb218dd389f49a73c9ff38a9841e4fe4d51b300e",
+      "size_bytes": 3627650
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2015/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:5505f5aef5f21590f0d2fca26e3bc119dfa16727782101efe3676b27791159eb",
+      "size_bytes": 4008216
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2016/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:5b74455bf95e4c40aece372f6080d99c7986264f3f77b96a84ecd67e01e87c92",
+      "size_bytes": 3573743
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2016/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:e721e5e2831e52fd1d4bb950506f6ae1168e559d2f42b627bd7c0844c1dc32f2",
+      "size_bytes": 3000945
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2016/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:886c0523d515e22049c487975a407899bb382bb5858a233ffb5f39ec7081627e",
+      "size_bytes": 4103149
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2016/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:76eaade82173a10ca37b6eb1f1afa154d009c74f25b3ddfca64d471d6d8aed3e",
+      "size_bytes": 1990095
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2016/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:e471db8dc95281fcf1aa3b41e4e05544cbbc20a5f42d3821a63c0847ad348af4",
+      "size_bytes": 3854348
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2016/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:ecee8767e3dd6185ff20d219128c60097ee6be533f3ad6edd7f6640b05c65304",
+      "size_bytes": 3726572
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2016/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:51d5c044c3ec2d9987965856b32cc81c1bc2f4007af9720a2bcc7827b030cfc4",
+      "size_bytes": 3860302
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2016/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:71c9789f53fa1c79dd24c3ede1465917d8002ac23eb2ec11b9309e525cb36359",
+      "size_bytes": 4200522
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2016/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:e387f3d2d03a1e736eb7396d01707212d5da335cf7e1de88d52cb7efa40615da",
+      "size_bytes": 3781103
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2016/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:682efefff011376d2f1af5ebc0446b98e08a3e1b675f4b5b837b5ce21532a979",
+      "size_bytes": 3125508
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2016/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:b380ce8f084684eb0e7965c612e0c2f2927ada1c60422e60217a9db9d6e873e6",
+      "size_bytes": 4192272
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2016/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:76683e8df296edc4d5fd95a6394f1021eae7c701d6a36d95f505788237728bf6",
+      "size_bytes": 2338057
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2017/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:eccee03c925d7d3bbca7fcea15b7230c02e51b2279256d056cd3e3dec9615b43",
+      "size_bytes": 3633954
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2017/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:512b142c0258a603a1a8d8055eab136ab0194d01d4ac43b5201214894ee63e99",
+      "size_bytes": 3621532
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2017/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:bc77b10e668074159dbb20ba772d5d0a58a52798503527564d7699baf41bb0b1",
+      "size_bytes": 4542148
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2017/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:f43b6dc3dafb2ff4bf0eff89d6b66b1be9a6a75b2c54fa0ce565b62f6a5a16c0",
+      "size_bytes": 3702594
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2017/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:3268f2ef7686d1a65c03dc45a8236ed277c43ab5307b38a58fe60694449613f2",
+      "size_bytes": 4021004
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2017/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:30efa99dfb294150cc1fe9a87c58e0653918097d7cd7ccd954cae0e55c210e89",
+      "size_bytes": 4438049
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2017/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:2d7c04b8fd68d45bd8bda6bcec164ad8738f2f7cd789e5637a5d0a1b228a2cfb",
+      "size_bytes": 4302016
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2017/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:6edcdc88b3c430618c38830120d370a5273286cf90166137d1cfc5f82fbfd2cc",
+      "size_bytes": 4828787
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2017/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:f6ad5007c255db64154d960ae1427eab31675d4fd6e29fee3edf1318f61c3cfc",
+      "size_bytes": 4425155
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2017/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:7a03d46a384fcc49ee55c25f29d6e7e298cebf29e88e450f7b44c7142a180b10",
+      "size_bytes": 3745964
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2017/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:2b18c849b20a6b674f20adcc529e3da16708a6dd15bc2f3fd1439095a500b5cf",
+      "size_bytes": 4741694
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2017/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:54b628d771e0cbffe305da38d7a83204a380f95f957536793960eaeadb506927",
+      "size_bytes": 4544244
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2018/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:bdf3bbb0db498a70062eadbef92156bce3cc2b07f6e6f28d841c505979c9eedd",
+      "size_bytes": 2673138
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2018/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:24cdd0f567e825e5588d15fec5acc7cb29c0597d0fbeba641d9b716610017cb7",
+      "size_bytes": 1835767
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2018/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:d5121a98785fc4968651b112b7fcd507ab3507002ad116245acae1bf157e73d6",
+      "size_bytes": 4843398
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2018/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:2dcef87c3f865004fb7ce3a0d6bfbf03a79416a2246e2374032f21daac5d0caa",
+      "size_bytes": 4056220
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2018/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:7edb71200b895d334958489d618dca758294c521969a434d30c285808ec44121",
+      "size_bytes": 4794181
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2018/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:5cdfcb3f52766208389b62e85b5532571f9dee6e029442499700cdf23061f8f7",
+      "size_bytes": 2475889
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2018/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:1c8829e41aecb1fa0725e280f5cf3285fa39fc2df0d29bee701769b434174192",
+      "size_bytes": 4767807
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2018/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:31cb204d7e694c17aba1cb4941d7157b1742495f3f37a8a68e0e7b4348d81405",
+      "size_bytes": 5017984
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2018/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:57a5820cb2ce6f73abc31f33d3043584226c3e69b202f20e3fdf7d09110f3c72",
+      "size_bytes": 4231019
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2018/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:9044dc1939e65c217f019f8ec5a449b4030d38116b92614e947463dbe350136f",
+      "size_bytes": 3978059
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2018/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:112b252aa59e02ce30f9b304db618f7515ff90663ec6e607c2bb9daae03ba32e",
+      "size_bytes": 4682008
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2018/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:da60e4a1d20dd73d39a2ab79f0ba41ba906e538782a7ab3d7a289b97b71c254e",
+      "size_bytes": 2507386
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2019/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:73c0acfca3218583709d6f9eae8c4022ce4ca5e14175cef343242110ad91124c",
+      "size_bytes": 4832150
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2019/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:0853814232e68e15ed8713f4598102d5cfed6feac63fc0543167ce72dc6104a3",
+      "size_bytes": 3376786
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2019/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:41fbf8a9becacc14cd9d1d94d56640e2030508f5ba151f095c5a2cdef6a971cd",
+      "size_bytes": 4739962
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2019/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:cf727d6cf1cebf02197563535afc4a2b4a10873f6ed2e047244116d184b4edda",
+      "size_bytes": 4824395
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2019/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:a418222171b10f4ea492a32aaf9ed507f87c6ea10c67837c34278b1830ce990d",
+      "size_bytes": 4392530
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2019/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:6f7212e9ff341cd5332e761e15b5bc7eb8ce44423a6b1a7183994308ffde109b",
+      "size_bytes": 2470090
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2019/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:02387317a3c0ce6e14b63722c91d082d110d8a68f3704426df43d9513e5ffee7",
+      "size_bytes": 2913238
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2019/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:405cc314da222b40f95c3df4a057ddebf5ff15820dac3dcede385cb8a7482588",
+      "size_bytes": 5007603
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2019/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:5a126bb45b452973c9d446c6767547eed55e741fd22dc352827067562b5acc42",
+      "size_bytes": 4727150
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2019/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:89457c18320725961d79ac402d7d9f414e220534b0c0b0642ef15e0f3ba30b5a",
+      "size_bytes": 4274067
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2019/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:e541b76eb656be77e6e3e4708398478e685ee322720ad0602b114d49701a2108",
+      "size_bytes": 4882376
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2019/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:b2480b0a26d56582d4810479be541aac89ab3e7b238b6c0034ab6f7b4432bfd0",
+      "size_bytes": 5046284
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:37868323566610acd7d703fd364d27a17d6a1de1df8ecae5694e917605472996",
+      "size_bytes": 3886331
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:8df0a841b8ac489ef73d7d47b9acf4324d24916065640f90381017bc42cfb358",
+      "size_bytes": 4829980
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:57733ea04862f34e2b81c7d933179908f833406b77d34e61fa26cdd0a9604d1b",
+      "size_bytes": 5298602
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:87137d26b8e82307b9bbe198a56f5b7860d539d700081178dc1c909a2516a615",
+      "size_bytes": 5117107
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:dcdb085d28189e803e07df8b3f826a9fbc9128672e8d039fc696b7a64a09ecb6",
+      "size_bytes": 4474621
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:7ab114c1584f423e1457dce6d63382ea7d7170e34beed5b356feb0aa60a3a013",
+      "size_bytes": 4865372
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:f9e39cd51b7db1f5081b2940f652842f73fdd22b3071284797c68667fac018c6",
+      "size_bytes": 3217784
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:47b2aede877367b9ddd01a09d178418dd50701f4f9625cc0d0130018a9240f9b",
+      "size_bytes": 3013474
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:c2691edbb2e89e7160c5d08ea1d158a597d2d7d8d2e11faa84bc64f45fca95ec",
+      "size_bytes": 5625032
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:3a16a0e2bb655439b84637247d821f7ca8d611c34dd2a86241d24e05897e6583",
+      "size_bytes": 4223238
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:a01286972ef95126dc571484be1a96062914c02e6cc6e853ed50ba07c03bb53e",
+      "size_bytes": 5379242
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:b18bca971fb416547a8afd2fdbc2b9826b4d7c22aabbff11809b61111dd9d580",
+      "size_bytes": 6021058
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:5e8b2ff8a1a54d330081a9feae00347bb9c542d4b17b8c4c33b7858981bcf5d6",
+      "size_bytes": 5309323
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:5512bf52fa071fe7a8ac1158a94ae5b11ce9813bdf21ac9f5372bdfc029273e2",
+      "size_bytes": 4149685
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:ea37dce7d3288dce3786eea916d7170ecf8b3d510394e0828b07b8f79f2a05e0",
+      "size_bytes": 5758270
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:0d9fab7c7897526dec157014a70b17c48c6f82d1e16051fe33189ba87e716e68",
+      "size_bytes": 5587494
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:b9ab479db8796c0e146baaca2a6a5d0167fcfe3cf6469469a04ced4c31ffcd23",
+      "size_bytes": 2860267
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:4d6e3e7f4e7d3626759f1dfd068eb5d00db88072752cea4eeeb93313fe1a1f41",
+      "size_bytes": 5724545
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:7932b36207b969f10bf6ac1a8ca01682a4cec9172e7ab39069aecebaf08dbad6",
+      "size_bytes": 6214490
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:e90428a7ccae530a5a22b960a88dec9f4b07179dce51573c7abc71ad9e174062",
+      "size_bytes": 3509686
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:4ca991014f9bd1fbfaa277a4e5af6e73885ebba75915fc216ce9e0aeccfadbe8",
+      "size_bytes": 3259994
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:1c637d00abb2e11c15678a064473d9862a2655f9cd8e195e77cbc608195bf614",
+      "size_bytes": 4693916
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:dc04f7d982ad589d1d9f13803120caafa58bff84ac0cad5d2bce8c08d6e6d41d",
+      "size_bytes": 6397000
+    },
+    {
+      "table": "dwd_security_bar",
+      "candidate_domain": "security_market_observation",
+      "path": "payload/security_market_observation/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:df26e46b3b123aafd2717a5415b271b006e2cd88f01fac29168c439da6c544c9",
+      "size_bytes": 3777343
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2012/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:1471e4981912043da7c3c60cc7ed540abee37d63fc22f3b77cf410421dca1539",
+      "size_bytes": 1628827
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2012/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:db0925ce57a1052a21944b6b25af9b768387be254621b7d4181d254f3516975e",
+      "size_bytes": 2282618
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2012/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:908df4860eda141b77f4116bff0211607aae25b5f1e6d2630d24686168516f2f",
+      "size_bytes": 2374690
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2012/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:a2984bd4657bebf0b43dfd67e6736c0f7c7f6fdae015ff3794627fa29a80a48f",
+      "size_bytes": 1992549
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2012/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:50fd2cdf938bd83e3cfda9f7412625dc54d6fc8eb692262edfcecebf9aed924b",
+      "size_bytes": 2408241
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2012/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:cd314a0883dfe10e06167e18dbd5e861aa71f15adaa2d49f043a3d4e1b36a915",
+      "size_bytes": 2234384
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2012/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:30ac75981382dded19525ec29b60a8116b7ce0eb2c44f3f69bd2dfb7b797521e",
+      "size_bytes": 2440600
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2012/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:02dbc62aaf3dbcacf666584f83157102a8194a05d0eea224fb1d4d1d6b9d3f4f",
+      "size_bytes": 2572795
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2012/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:db0a85102417b6bfada0d0c0e06c58c6f348e50e0d1eeb28975031992afb9dc3",
+      "size_bytes": 2280839
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2012/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:b8c5ff6920105ce821ab25dd975c06f9beab54718f5d46c323f9bcd45e879ba1",
+      "size_bytes": 2059357
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2012/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:9d06a8c452924e53fe7118ee1a2140a61172f466fad51b70d61788fc50db63bf",
+      "size_bytes": 2467406
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2012/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:b7c5422d616daf28a41866f3683ce2de4bdaf92c81f68fd829742294d812c4b9",
+      "size_bytes": 2368883
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2013/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:9836b5da739616a92e210ffe762111fe7063c142de41c4abc82f5b280021b526",
+      "size_bytes": 2279671
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2013/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:401b4367f87aafab109af0fe2921db18764af1ee6d5d97f67abf5b2eab734d0b",
+      "size_bytes": 1730505
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2013/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:e09e2345a5ea5a2ef62906754a02a06728875a71574e0e40ec5454602dfe1922",
+      "size_bytes": 2388291
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2013/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:6fb5c1ff4cd6b253c44f5e74df88ba5f5de93915addf529e6d3332925d467ba5",
+      "size_bytes": 2048070
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2013/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:e39a4de701bb88b22b6d018c726b09dbe27bbb1286d9d13ffae7ec7feae3cbc5",
+      "size_bytes": 2594755
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2013/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:3e907f7fb6fc6cf78c37b5207b0e63826663e6389372978384abfbd13338510a",
+      "size_bytes": 1956786
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2013/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:b13916530b02bd7dcf9b29190eb327814d39e1a0c4ce768ebbddcc523e1e1181",
+      "size_bytes": 2715906
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2013/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:5727f5cef0964988ca8600b572e3eb07ddb7bd7a2889df20450be9f8a03a965e",
+      "size_bytes": 2482504
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2013/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:cc06fdc0193f2bbc18b8d0657cfe040dd8410e3476cb95ddbf86b350905bdc74",
+      "size_bytes": 2277330
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2013/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:384ab598f3cac712431541a3f1d41a9508833e52be15e97a8fe1c779d281dfdc",
+      "size_bytes": 2063947
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2013/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:b74685c60639ff9651565628b157c000e05d5e2fc96f93ba848e03b048d7fe8e",
+      "size_bytes": 2386522
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2013/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:23208b591af7c841cf1dd75ba46b2a46b66ebe6eb77cf1458babef93b053c886",
+      "size_bytes": 2632941
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2014/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:150f431687858ba3d8ef7ed0da338fe778c287926601714747259179ccd7f325",
+      "size_bytes": 2537407
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2014/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:0a61fdd548a8a74965fc5232838b8fb6a2c9eceedb44af88b3ff1cbc853cd09f",
+      "size_bytes": 1985842
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2014/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:d72f384327394b9c782568744ee942cfd26267f96fbf3886d5cce6f570c11b1e",
+      "size_bytes": 2431220
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2014/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:c5951217bbf667dfa263958e39b33eb7d0267824eb4f5128e4c03bd578210300",
+      "size_bytes": 2428814
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2014/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:05694298ca58f7a0a5d65069d292d2adb9d53d600e03cc53513ec599ed1317f5",
+      "size_bytes": 2327354
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2014/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:057abbe484ce07dd5cc97a3653d572d9a44e5cdf4eaf3a30c7df746f1d2373b5",
+      "size_bytes": 2333201
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2014/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:0268940dadf020b18d0cbfe27b430ed01670d8d916d9691a180324dd100b2d5c",
+      "size_bytes": 2790712
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2014/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:fbe4c2f43a20bcacf4b1c4c7ac9b69ed4e649c2db3730aa1613b7fc17f44325b",
+      "size_bytes": 2458738
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2014/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:650c4ebe617921603bea7f74978eedae29b15bf71a461a629725e389a51e1360",
+      "size_bytes": 2467695
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2014/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:f2cc77e43293781918b66d32a8b686f0dc7ad6aae6f7402b57bc6596826202b0",
+      "size_bytes": 2149557
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2014/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:aa73518da0fdb3b7bc56f14c6e8dd9f88711da08f94783d12c0f11669de809ad",
+      "size_bytes": 2391873
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2014/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:2a346e4407be30002a52904ea7b93fa3b26f9dd00b35f2b93f1789ff0d19c23a",
+      "size_bytes": 2751876
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2015/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:a62d0ff10eb5bfc3949b901f4e74556df853c02a6b999304e50c0a5750ab1520",
+      "size_bytes": 2420638
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2015/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:b0a444fa68e489a0aa684ef0d5b76139cf982ce0e9d9c6b40725ed2b681c0ace",
+      "size_bytes": 1880596
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2015/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:bf7bba7949bf1df52ffa6cde6608dd6a5b278198d03fe7bf393773155ba2590b",
+      "size_bytes": 2734616
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2015/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:5881fffaf1bae15a8f5cb315b950ec46325658df079fcd97e59e2fa99b447f00",
+      "size_bytes": 2622679
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2015/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:0af85673d66c091e2de7a3b17226e19dcf4420906a882eebe0434e9e0ad1dc34",
+      "size_bytes": 2620335
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2015/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:2635cf17a32c406c4e85455a59b61debf92744e1758c2c52fb1dc83575e89ab5",
+      "size_bytes": 2751116
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2015/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:e97c8edb354b5647dc7b971efd97d41fd06d8f0140474339a79f3adca0fce50c",
+      "size_bytes": 2984768
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2015/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:b7616fd887435723c0513872ae37ee6e9df81f35bb127c487cb668ebd0171c98",
+      "size_bytes": 2831107
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2015/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:9b2580284c04f9c52cd21580cd768c424270464d5e1471405f3f3d5e76ed9063",
+      "size_bytes": 2737050
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2015/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:b59b2cf663410a2d2cdfa948b5a7db0b04a9d72db73db693cee5b757eaacc7f3",
+      "size_bytes": 2237258
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2015/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:6ac1771ff63169b494e4480c1b5d0bab39305f3263d4cb9b92c93b4c0586acde",
+      "size_bytes": 3008365
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2015/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:4288c588af5d5caf85e3d222203d2fbfe4ef96fe010d6a9db275bddf8599fc66",
+      "size_bytes": 3008353
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2016/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:ea853932ac279a5c8ed9d00d6ca5f4bdaa0754eb19b210532daec7ac54c8cfd1",
+      "size_bytes": 2647289
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2016/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:ce459cc4fe3f958c41ad677011631e38060c271089c130f3338074eabac6bcf5",
+      "size_bytes": 2140845
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2016/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:b44de063a80aa386106d25931606397e4cbb9b77129baad40acfb2e184f6aeb0",
+      "size_bytes": 3146091
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2016/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:ecf40d281cb87b720373d5e6bfc9b30b2c36d40e074071938d2a5a431686bbf7",
+      "size_bytes": 2681447
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2016/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:6ab0dbece92cc7e3b1f428b69b1a0ad517dff6f312da8db531b86b290821d7a9",
+      "size_bytes": 2826965
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2016/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:f16a2aed9d7f55526a93d9a6b4b1c22556e1ead9d27bcccad560d121b90b3c51",
+      "size_bytes": 2710188
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2016/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:d648cbd15f79317d148591218df2c10145aa03d84c2b775fd2be34103cbd5e3f",
+      "size_bytes": 2853776
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2016/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:cec9293a37a5f8fcb97e0a0d54efdcf2f64bb5503e3bb526fc64f76912a01ca9",
+      "size_bytes": 3188166
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2016/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:6d79b245a4e61bafc6f7508a7fbaad12b646b53a9964b7cbc0e9cf038589b3b6",
+      "size_bytes": 2804985
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2016/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:ee2352fd1a4097e3ccee90b4d4b0b71ca17e473daa385e14401e8d4546d5ae8b",
+      "size_bytes": 2261941
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2016/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:87a5e63bbf41002e102ca2aa6303efcecba28269dc7776a8171c935b844bd3b7",
+      "size_bytes": 3087848
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2016/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:68928113acd1add5a554123dcbb5e6bcf107f3805c2f9f0e38e53fb1f1c7edef",
+      "size_bytes": 3299290
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2017/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:0ea8d7e6ecf9b51243cd3ff264f900e12af900ca565cb79be3d5542755318d8b",
+      "size_bytes": 2618319
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2017/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:3efdbf55381bfcb7770e11254afdb452e94cdabdd7acda9789e922a517a91bc6",
+      "size_bytes": 2816663
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2017/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:b7e84fc5de09bf4d8962fd0809bd6a539524741f79fde51a5941528afd22167a",
+      "size_bytes": 3418115
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2017/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:459ff73c983078c900142773b63fdf0c74fe4749853063b4e06e79dfdfcf8afc",
+      "size_bytes": 2765235
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2017/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:e4aa82bfd81a649f0920a8910c55b7faa78044a856cf84126907166ae21f5d4e",
+      "size_bytes": 3066581
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2017/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:945debe73a1b509c09e2489b7907a55c8701639252185c43d336df616461f0f7",
+      "size_bytes": 3583271
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2017/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:4078c6bacbe17c714918f0993d4b41afc02e59f0a5cae1eb592dea3c97f84737",
+      "size_bytes": 3445034
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2017/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:1981e4f5caf25d68a11d5ef0b03b517d252e9e35b9208cac501e597a1d26e6d4",
+      "size_bytes": 3653616
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2017/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:3f3604d981ea817a4db30b5219810ff1166f80d34567bf2d944f85124acd593a",
+      "size_bytes": 3386824
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2017/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:476fdd9f252ed984855f7d16956cc88118c1dcbd02c2e173a1a202e3e02334b3",
+      "size_bytes": 2816430
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2017/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:1127d877f656e2ef6ab95c3f39b04a52dad07f3046aa94d80664b4150bad756f",
+      "size_bytes": 3628984
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2017/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:e5e15936f3d00daae347fc06d6bafb982c2a43a667324edb4d2ffa55225885d1",
+      "size_bytes": 3477349
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2018/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:6dcb47b58f60cd4ab17828122d2d0f5ab518f850cd4b54c404dec57e2c040920",
+      "size_bytes": 3701670
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2018/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:ea4a6d4806b245053a5be67c600eae4ff35bdc2c18b3a3c938128a0c7d9108f7",
+      "size_bytes": 2623863
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2018/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:ca13974038cc8479ec8de253fb0c88f5cf57570fbff6274a24b2e6e08d0bf093",
+      "size_bytes": 3887933
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2018/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:be5c64a555c4b1841e1e8a2b59132c86d10c069fd10e634272c6de45a92cdb62",
+      "size_bytes": 3193849
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2018/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:dc8e26040a733d52144a2b5bdbedff322715745bfc5094969fc7ff47840d8558",
+      "size_bytes": 3733043
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2018/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:9701a556d3c7a91c9f24051297c0528c69c635e6d2393037746174033572e7c1",
+      "size_bytes": 3396729
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2018/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:52c560c12e8aec64c52de3648b9656e4960029dbcb3ed9d60f70e7777c589b63",
+      "size_bytes": 3734756
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2018/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:cfff8526858bc891e151ca7927792a1777e3415cd8f199557d2b0e8e14dc7e2e",
+      "size_bytes": 3869366
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2018/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:41d2f2fc3cd32593725c3da8b744264cba12c82f07c446c9bac2af81b222cb13",
+      "size_bytes": 3269745
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2018/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:aa16ae8c9ef21d046537616ec98763a19a2cf90e47dc1bc18ecc1586a97c9493",
+      "size_bytes": 3073562
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2018/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:f6a3c0a2a85f06a868141b31a81a5db182404fc54d908029c73d0e20e1cad6ed",
+      "size_bytes": 3744843
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2018/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:cafc96a3560df45b63a8e21ea60dae7eb8465ef454d567e3eaba1a147a30e700",
+      "size_bytes": 3420719
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2019/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:cd6090017c39467b72e504f31326608cc82a7382d3f9a9e15be6ccd3453c5e60",
+      "size_bytes": 3878354
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2019/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:89bd99bfdaa5b96fbaf8b63d211bf2c6d48780f6e23ffbe03b7ebb161f526a45",
+      "size_bytes": 2674623
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2019/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:6f945bab2acfb84d50133490ee7aae957e71f7206e3de727fd410f951881a552",
+      "size_bytes": 3618283
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2019/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:2b68b00450fe347873dc75db4d9563995814f0a84f6e148a34761f0ec912fb42",
+      "size_bytes": 3805243
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2019/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:000e80eea61dc4f5834a226e1fde54fe4bf9cb260c8fde5e391e1df7e17f0f36",
+      "size_bytes": 3488719
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2019/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:1f72128ef1a708dcc6da7b984f345ba1b0b7350240555df69dc8e0a0c113b20d",
+      "size_bytes": 3485272
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2019/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:ebba9fd3371fbf17473df80a4bf10caecb6d72b6e0bbd4a166280a59341db4d4",
+      "size_bytes": 4034087
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2019/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:bfc307741bb4152e9924d8571482721244627af4de46cd0370aec81990a25ce5",
+      "size_bytes": 3888538
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2019/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:4e7e42f85d2c22d471352cfe46d265d06cdd4038b3ed5dc5045e9eb3848221e9",
+      "size_bytes": 3557817
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2019/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:34ad28d698468dc885dacc6b4d42a4133ab23684a1c38e0ca0d2461fb937ff86",
+      "size_bytes": 3415947
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2019/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:7aabca0fc1127aee61d24ac04ec52a42cae4c60fa190fa449094a9231fd7a358",
+      "size_bytes": 3816367
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2019/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:810e85ada87f3dcb4817e0a22cef94a10d40901e08c40a47a02ab3205088b9d0",
+      "size_bytes": 4023925
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2020/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:06db4d87e769d9d9273b398f8457e8112b5875488f005bb6438d23932eec030e",
+      "size_bytes": 2983996
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2020/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:951a078383b6d16b65bdadd6c4089cdb8ee0b678e8ee2ba8e20a878e107ee40c",
+      "size_bytes": 3901164
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2020/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:004c7b2d863342746a1cecf95cb8a84cbca06f3d374c1731b6081ea640e17703",
+      "size_bytes": 4076590
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2020/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:905fb1b539627c17970be98da136dae28b78d36968f51685feb12883ca08ab90",
+      "size_bytes": 4066249
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2020/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:71385137e9f821393da6ce1a4126f08d1fdf7afe3c71ed522e6acd64b4fa7fbb",
+      "size_bytes": 3616057
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2020/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:2cecbea747751fbd7b6931d983122be85dd7242289669e8042c2ea828b44848c",
+      "size_bytes": 3832024
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2020/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:5b62ed25512656491a2f82b3fd7856d3de7046a92ccd39ac9bbd28aa46e62fa1",
+      "size_bytes": 4506352
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2020/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:61789c68a1b48fbc9e56100aee1a846283b8c29000ecab54cdf17aa185186846",
+      "size_bytes": 4380091
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2020/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:5294dd9111e8b264f7f25bed37707ae0b45b6733fe588d2a6668c11ee729d607",
+      "size_bytes": 4596260
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2020/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:649c06dab500a0675afab69b3d8cb0778fd8f80aa9f4d1f2f5b5d7c512a05f50",
+      "size_bytes": 3366181
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2020/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:89a4d397c917803dda24424e6e2c2627aa3f20c6c50aa7c4365d8e7df83aa4d8",
+      "size_bytes": 4646320
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2020/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:1a210062ce97ef3a194795f2dc7ec655727d15f2e5073c138a9096ff4bc8899e",
+      "size_bytes": 5112411
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2021/observation_start_month=01/part-00000.parquet",
+      "sha256": "sha256:a1406a61c19f11af7855979344fecc8cd77466e2e5038852919a047517d23b23",
+      "size_bytes": 5051285
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2021/observation_start_month=02/part-00000.parquet",
+      "sha256": "sha256:9064d222a6e56a7b316ac0c5ee01cd50f32e93a6ccde335544b7eb69413d0a75",
+      "size_bytes": 3773604
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2021/observation_start_month=03/part-00000.parquet",
+      "sha256": "sha256:731b8a9ebfd6756418a8e0162a91b3b3487a50abccd736d2687ea37cdfcc2ff7",
+      "size_bytes": 5740456
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2021/observation_start_month=04/part-00000.parquet",
+      "sha256": "sha256:e57c42356caa3bbaa3994d797c62e03dcb297f634fd8ff359bd9a27fe19e509b",
+      "size_bytes": 5310944
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2021/observation_start_month=05/part-00000.parquet",
+      "sha256": "sha256:f3250bc19c9ea78ab629a16405cc65c07c8bf913075eb040e2fc75322453ab96",
+      "size_bytes": 4786420
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2021/observation_start_month=06/part-00000.parquet",
+      "sha256": "sha256:e282ff4487f46532e1e9eed78497b8de86479ec7553507d92df3571250e1b66b",
+      "size_bytes": 5566796
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2021/observation_start_month=07/part-00000.parquet",
+      "sha256": "sha256:8d111ac169197edde71fa426ef0f8953d67d35a5c18987398e903b29b62e9cd1",
+      "size_bytes": 5746086
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2021/observation_start_month=08/part-00000.parquet",
+      "sha256": "sha256:2c004743aecea3020d5301067b97bc57bca55bfae933932189276a4500727121",
+      "size_bytes": 5976080
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2021/observation_start_month=09/part-00000.parquet",
+      "sha256": "sha256:4b38dd54993321268473424071e31c8893f60a747df4a15887e67c8b93d5f3ab",
+      "size_bytes": 5515001
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2021/observation_start_month=10/part-00000.parquet",
+      "sha256": "sha256:d95320d4612e73b56701e26172a731cf8143d17bf875918f708e5ea31a6a2894",
+      "size_bytes": 4393678
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2021/observation_start_month=11/part-00000.parquet",
+      "sha256": "sha256:8e07743c411f1f1d25eacc6609c57c0bb2853c78dd094e9c821efb605082dafa",
+      "size_bytes": 5977962
+    },
+    {
+      "table": "dwd_tradability_state",
+      "candidate_domain": "tradability_state",
+      "path": "payload/tradability_state/dwd_tradability_state/observation_start_year=2021/observation_start_month=12/part-00000.parquet",
+      "sha256": "sha256:85146cc4d0b361225547a0d588105bd2244154d9b8eff3db1281f48e84100acd",
+      "size_bytes": 6413991
+    },
+    {
+      "table": "dwd_trading_calendar",
+      "candidate_domain": "trading_calendar",
+      "path": "payload/tradability_state/dwd_trading_calendar/trade_date_year=2012/part-00000.parquet",
+      "sha256": "sha256:45d5e270af5731867b1bc3d39fa8673f17912a826a18bfa18ac1818563384ecf",
+      "size_bytes": 32677
+    },
+    {
+      "table": "dwd_trading_calendar",
+      "candidate_domain": "trading_calendar",
+      "path": "payload/tradability_state/dwd_trading_calendar/trade_date_year=2013/part-00000.parquet",
+      "sha256": "sha256:ba49353913dfe8b13c9d8474829dd7b5f6ef1f8380563929c50e2765a37b9282",
+      "size_bytes": 32550
+    },
+    {
+      "table": "dwd_trading_calendar",
+      "candidate_domain": "trading_calendar",
+      "path": "payload/tradability_state/dwd_trading_calendar/trade_date_year=2014/part-00000.parquet",
+      "sha256": "sha256:cae47557fc3c1c8e1a34e6f2c47bf571c458ee6e1b6537da618dd0884692202c",
+      "size_bytes": 32801
+    },
+    {
+      "table": "dwd_trading_calendar",
+      "candidate_domain": "trading_calendar",
+      "path": "payload/tradability_state/dwd_trading_calendar/trade_date_year=2015/part-00000.parquet",
+      "sha256": "sha256:395af10d0ecc891017fc070e2d5ccedb4af7b47989dd40b7b721c5f5a90357b5",
+      "size_bytes": 32637
+    },
+    {
+      "table": "dwd_trading_calendar",
+      "candidate_domain": "trading_calendar",
+      "path": "payload/tradability_state/dwd_trading_calendar/trade_date_year=2016/part-00000.parquet",
+      "sha256": "sha256:e13b43ac25529d6abd13267d5682ab76a0918fe23575c003f17e83c53ae8a097",
+      "size_bytes": 32711
+    },
+    {
+      "table": "dwd_trading_calendar",
+      "candidate_domain": "trading_calendar",
+      "path": "payload/tradability_state/dwd_trading_calendar/trade_date_year=2017/part-00000.parquet",
+      "sha256": "sha256:d7e2e54049ca00714fcb3c6e84c0fbb2b8be24ea31a6379a39ea6041f92de709",
+      "size_bytes": 32629
+    },
+    {
+      "table": "dwd_trading_calendar",
+      "candidate_domain": "trading_calendar",
+      "path": "payload/tradability_state/dwd_trading_calendar/trade_date_year=2018/part-00000.parquet",
+      "sha256": "sha256:def00fa95f7c4dd29014ee4d08ab3d0721bbf2cbff92299849d98258e2343dae",
+      "size_bytes": 32612
+    },
+    {
+      "table": "dwd_trading_calendar",
+      "candidate_domain": "trading_calendar",
+      "path": "payload/tradability_state/dwd_trading_calendar/trade_date_year=2019/part-00000.parquet",
+      "sha256": "sha256:bc95d77da9cb35fe99569549efdd1c720a6932db49f924fa8abbd307b481a59f",
+      "size_bytes": 32637
+    },
+    {
+      "table": "dwd_trading_calendar",
+      "candidate_domain": "trading_calendar",
+      "path": "payload/tradability_state/dwd_trading_calendar/trade_date_year=2020/part-00000.parquet",
+      "sha256": "sha256:a4db1c9d85de1dcd2cc90f9c9d63574064f9614a6e0be070daa37a11e466f3bb",
+      "size_bytes": 36877
+    },
+    {
+      "table": "dwd_trading_calendar",
+      "candidate_domain": "trading_calendar",
+      "path": "payload/tradability_state/dwd_trading_calendar/trade_date_year=2021/part-00000.parquet",
+      "sha256": "sha256:9db4bb143543ee5f8d1ae9fe86d16694007bb40f9aac5b7de1d080558092801f",
+      "size_bytes": 42813
+    }
+  ],
+  "read_columns_purpose": "Identity/session/provenance census only; no OHLCV value projection, labels, predictions, strategy outcomes or training.",
+  "identity_limit": "Three tables cannot establish stable security identity, coordinate_epoch or ACTIVE control. Those capacities stay null pending separately bound accepted Facts.",
+  "pit_limit": "Warehouse-version-at-T is diagnostic only, not proof of public availability or accepted as-known feature input. Never forward-fill or select latest revision as historical truth.",
+  "stage_graph": [
+    {
+      "stage": "verify",
+      "depends_on": [],
+      "owns": "Exact selected file checksum/schema receipts"
+    },
+    {
+      "stage": "project",
+      "depends_on": [
+        "verify"
+      ],
+      "owns": "One immutable TMP column projection per source family"
+    },
+    {
+      "stage": "account",
+      "depends_on": [
+        "project"
+      ],
+      "owns": "Aggregated duplicates, session joins and PIT diagnostics; reuses TMP projections"
+    }
+  ],
+  "intermediate_lifecycle": "TMP; no cross-Job cache or ADM; remove with job staging temporary directory",
+  "resource_budget": {
+    "threads": 2,
+    "memory_limit_mib": 1024,
+    "maximum_temp_bytes": 4294967296,
+    "timeout_seconds": 600
+  },
+  "claim_ceiling": "Input supply census only; no B acceptance, ACTIVE population, reference eligibility, model training or P6 authority."
+}

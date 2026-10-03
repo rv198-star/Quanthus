@@ -4,8 +4,8 @@
 | --- | --- |
 | Parent issue | #400 |
 | Milestone | #12 |
-| Current gate | A preserved; B unqualified; C/D partial; E/F/G NOT_RUN; H stop review complete |
-| Current status | CLOSED_GENERATION_INCONCLUSIVE_INPUT_AND_REFERENCE_QUALIFICATION_UNESTABLISHED |
+| Current gate | A preserved; B source qualification and D synthetic recovery active; C partial; E/F/G NOT_RUN |
+| Current status | OWNER_CONTINUATION_INPUT_QUALIFICATION_IN_PROGRESS |
 | Governing design | `../design/lld/07-research-scoring/p5-stage-001.md` |
 | Frozen request | `../../config/research/p5-stage-001/request.v1.json` |
 | Frozen targets | `../../config/research/p5-stage-001/stage-targets.v1.json` |
@@ -58,6 +58,116 @@ successor.
 
 ## Current recovery checkpoint
 
+The Owner approved the frozen four-source proposal on 2026-10-03 and explicitly limited this task
+to temporary treatment; unified data repair belongs to the separate data workstream. Activation is
+recorded in `config/research/p3-p5-temporary-source-activation.v1.json` without editing the sealed
+proposal. [#471](https://github.com/rv198-star/Quanthus/issues/471) tracks original normalization
+manifest/source-closure availability; [#472](https://github.com/rv198-star/Quanthus/issues/472)
+tracks the 18,991 state-only slots as an investigation, not established missing bars. The 119-session
+F9 sidecar is a research-package limitation, not evidence of DWD history loss. Temporary qualification
+cannot close these data issues or mutate formal data. Missing original scope still prevents coordinate
+and 120-session-window qualification. A governed replacement needs a frozen closure and comparison
+before the temporary source exits new runs; retain prior audit evidence.
+
+The approved identity-only subset ran at `d115ea05cbf087fcd4b1746473c3d6032b05db22` through
+Nexus OCI `session-59d72502d2293e2738d16980`: both exact dimension members (541,560 bytes)
+verified; 4,679 historical listing rows and 4,679 linked security-version rows retained. No listing
+row completely lacks an overlapping security version. Two security IDs have multiple retained
+versions; this is neither per-session uniqueness nor an established defect. Both dimensions have
+knowledge_from `2026-08-03T23:59:00Z`, so no historical as-known claim follows.
+Receipt SHA `69e90f8912226ab84fbf916c551fa3a498c4bd2771ba930ffd018a3996c820f7` lives in private
+OCI `p3-p5-20261002/p5-census-runs/identity-d115ea0`. Each TMP was built once and reused;
+3,339,491 TMP bytes were removed after the 0.725-second application run. No action or market rows
+were consumed in this stage. Original normalization scope, coordinate/window and ACTIVE gates remain
+unestablished; #471/#472 stay open. Full check at this revision: 3,014 passed / 7 skipped / 56 failed,
+with the same 56 failure IDs as the earlier baseline. The seven new boundary tests also passed an
+independent read-only review.
+
+The per-session identity extension completed at `2d739679174e8ce9a44c9ac9c3bba0ebe14c5672`
+through OCI Nexus `session-0d8cd9c6c5e9cc65bd026fbd`: all 7,722,194 bar rows have exactly one
+admitted, date-aligned calendar/listing/security identity. Missing/ambiguous identity counts are zero;
+the two multi-version security IDs do not create ambiguity in this admitted session population.
+Receipt SHA `31f3670bb872f1373a94ed40d4144d87e3b92aa5ecd642c4863185fbc2a7138e`
+(14,740 bytes), private path `p5-census-runs/session-identity-2d73967/receipt.json`.
+Application time 518.736 seconds, within the unchanged 600-second limit; aggregate TMP
+1,364,297,412 bytes was removed. Each of the five narrow source tables was built once and shared.
+Only the aggregate receipt remains. No prices, actions, labels or protected-year payloads were read.
+This establishes retrospective session identity only: ACTIVE, action-prefix completeness,
+coordinate/window qualification and B acceptance remain unresolved. #471/#472 remain open.
+
+The first run at `28eccbf` reached receipt serialization but failed on a datetime value and left no
+accepted result. The corrected revision explicitly serializes dates and includes an end-to-end
+synthetic census/identity/receipt cleanup test; it did not enlarge the source/window/resource scope.
+Nineteen identity tests pass; the preceding session join implementation also passed independent
+read-only review. Full `make check` with the baseline `TMPDIR=/private/tmp`: 3,038 passed / 7 skipped /
+56 failed, with exactly the prior failure IDs and no new failures. A first check using macOS's
+symlinked temporary path had 31 additional path-alias failures; both receipts are retained.
+
+The Owner explicitly required continued attempts after PR #419 merged. Live #400/#402 were reopened
+for bounded input integrity, schema and listing/session census; E/F remain inactive. OCI is an
+available existing data node under the current Owner instructions; control remains NexusAgent.
+
+`config/research/p5-stage-001/input-census.v1.json` freezes the exact 250 selected Base members
+(120 daily bar, 120 tradability, 10 calendar), 824,617,539 bytes, for 2012–2021 before any payload
+read. Complete member-list digest:
+`sha256:84edfba056bf1cf1378dce3b4eaf087e1d80d4309e2c24d9356fd2ddff83c668`.
+The narrow census verifies the complete selected closure before schema/row access, projects only
+identity/session/provenance columns once into job-local TMP, and retains duplicates and unmatched
+connections. It does not infer stable security identity, coordinate epochs, ACTIVE control, labels
+or reference eligibility from tradability flags. Warehouse knowledge times remain diagnostic;
+they are never backdated to manufacture public as-known evidence.
+
+The exact census executed at `71864bcddfadfdcf5b2fa47ff56ead0fb7adb4ba` and finished in 97.32
+application seconds (127.07 seconds including container orchestration). Manifest:
+`sha256:119af99681a7ce2b2ee9620564b970fc5db7c1226f42c8f2fc6ca6dfd3e534de`.
+There are 7,722,194 bar rows, 7,741,185 state rows and 7,829 calendar rows; 7,722,194 date-aligned
+bar/state slots, 18,991 state-only slots, no duplicate business keys or orphan calendar joins.
+All three sources have warehouse knowledge_from `2026-08-03T23:59:00Z`; none proves a warehouse
+version known at the historical session close. No public as-known or ACTIVE qualification is inferred.
+Each source projection was built once; aggregate TMP was 1,193,029,632 bytes and removed after use.
+Source copies remain private immutable selected inputs, not a new Base or ADM publication.
+
+Accepted F9 A/B manifests are present at exact OCI event-volume paths. Their identical
+`source-inputs.jsonl` member digest is
+`sha256:85ca06b7b8ef5f5362f2a5d4b91d823f264b26005233dea936e89f0e499b7bac`.
+The bounded sidecar ran at `6c254d2053b9c28b12d1e8076d0759374d0ade22`, verifying both copies and
+parsing one. It has 357 members: three securities with 119 contiguous sessions each. No source-contained
+120-member identity window exists. This is not a full-population identity source or proof of global
+capacity shortage. Its manifest is
+`sha256:5a2a1cc24d962fb8fd5dd2b603fb7c15a20479d4b473447880b6707fd5542089`.
+
+The registered P014/P015/P020 and second-group publication contracts were then inspected. None
+retains a complete 120-session source closure: P014/P015 use 61-session windows, P020 keeps endpoint
+Trend facts, and second-group publishes only summary/candidate members. The early D pilot's history
+lacks daily security/listing/calendar/action identities. Matching an epoch string does not restore
+that missing evidence. This finding does not establish global data unavailability.
+
+`input-closure-proposal.v1.json` now binds two exact Base dimension members and the two accepted v3
+normalized-action/exception members from the existing OCI correction. Its manifest/READY match
+`4c8eeb5c0d74bbf2953f003364fd138832f15a5163254b710f9db8430767ffde`; no payload was read.
+The four members total 5,228,757 bytes. They physically include later years, so the proposal requires
+a fixed historical date/identity projection and intersecting exception controls before consumption.
+The separate 2026-10-03 activation above now permits temporary qualification of these exact members.
+Raw actions and unbound correction tradability are not substituted for accepted source semantics.
+Preserve the 120-session gate and ordinary ACTIVE controls. B is not accepted.
+
+The Owner's continuation instruction also reopens D / #404 for the unfinished synthetic claim
+recovery work under `engineering-continuation.v1.json`. The P5 execution and verifier inherit a
+worker lease, so a surviving child blocks new work after supervisor death. A completed orphan
+artifact is verified at the same revision; an incomplete artifact is retained and marked failed
+without replaying a fit. Cancel admission and the terminal commit share a short state lock. Legacy
+P5 claims with unknown ownership remain blocked. No existing worker has been deployed or changed.
+C remains partial, T1 is not admitted, and E/F remain inactive.
+
+The final synthetic recovery code passed independent read-only review and 135 focused tests.
+Full `make check`: 2,992 passed / 7 skipped / 56 failed; all 56 failed IDs match the prior baseline,
+with zero new failures. Full D acceptance is not inferred from these engineering results.
+
+Current next action: execute the approved bounded temporary source qualification, retaining the
+original-normalization-scope gate and routing formal repairs through #471/#472.
+
+### Historical bounded closeout — 2026-10-02
+
 The 2026-10-02 continuation completed the permitted early closeout. Conclusion:
 `INCONCLUSIVE` because this generation's input and independent-reference qualification were not
 established. It is not global data insufficiency or model ineffectiveness. See
@@ -71,7 +181,7 @@ does not require the old RX6800 package specifically. ACTIVE population, payload
 independent reference capacity remain unknown. C/D retain tested partial synthetic engineering;
 T1, real-data materialization and full Worker orphan recovery were not completed.
 
-Current next action: none within this closed generation. Do not restart asset searches or interpret
+Historical next action (superseded): none within that closed generation. Do not interpret
 any negative close as input acceptance. Reopening needs a new bounded qualified-reference/input proposal.
 
 ### Historical first recovery checkpoint — 2026-10-02

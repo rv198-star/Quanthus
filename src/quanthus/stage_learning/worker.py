@@ -3320,12 +3320,17 @@ class StageWorker:
                 capture_output=True,
                 timeout=timeout,
                 env=self._git_env(),
+                pass_fds=self._p5_guard_fds(),
             )
         except subprocess.CalledProcessError as exc:
             detail = (exc.stderr or exc.stdout or "").strip().splitlines()
             tail = detail[-1][:400] if detail else f"exit {exc.returncode}"
             action = " ".join(arguments[:2]) or "command"
             raise StageWorkerError(f"git {action} failed: {tail}") from exc
+
+    def _p5_guard_fds(self) -> tuple[int, ...]:
+        fd = getattr(self, "_p5_guard_fd", None)
+        return () if fd is None else (fd,)
 
     def _revision_admitted_locally(self, revision: str) -> bool:
         result = subprocess.run(
@@ -3342,6 +3347,7 @@ class StageWorker:
             capture_output=True,
             env=self._git_env(),
             timeout=30,
+            pass_fds=self._p5_guard_fds(),
         )
         return result.returncode == 0
 
@@ -3403,11 +3409,20 @@ class StageWorker:
             "exit_code": exit_code,
             "updated_at": _utc_now(),
         }
+        if job.kind == P5_SYNTHETIC_JOB and state in {"succeeded", "failed", "canceled"}:
+            from quanthus.stage_learning.p5_worker_recovery import commit_terminal
+
+            return commit_terminal(self, job, value)
         _atomic_json(self._status_path(job.job_id), value)
         return value
 
     def _claim_next(self) -> tuple[StageJob, Path] | None:
         for queued in sorted(self.paths.queue.glob("stage_*.json")):
+            try:
+                if _object(queued, "queued stage job").get("kind") == P5_SYNTHETIC_JOB:
+                    continue  # P5 uses an inherited lease, including across parent death.
+            except (FileNotFoundError, StageWorkerError):
+                pass  # Preserve the original claim/parse disposition for other kinds.
             claimed = self.paths.claimed / queued.name
             try:
                 os.replace(queued, claimed)
@@ -3451,6 +3466,7 @@ class StageWorker:
             ["git", "-C", str(worktree), "rev-parse", "HEAD"],
             text=True,
             timeout=10,
+            pass_fds=self._p5_guard_fds(),
         ).strip()
         if observed != job.code_revision:
             raise StageWorkerError("execution worktree revision differs")
@@ -3466,7 +3482,10 @@ class StageWorker:
             with suppress(subprocess.SubprocessError, OSError):
                 self._git("worktree", "prune", timeout=30)
 
-    def _verify_result(self, job: StageJob, job_run_root: Path, worktree: Path) -> dict[str, Any]:
+    def _verify_result(
+        self, job: StageJob, job_run_root: Path, worktree: Path, *,
+        claim_lock_fd: int | None = None,
+    ) -> dict[str, Any]:
         spec = _JOB_SPECS[job.kind]
         artifacts = sorted(
             path for path in job_run_root.glob(spec["artifact_glob"]) if path.is_dir()
@@ -3492,6 +3511,7 @@ class StageWorker:
             timeout=60,
             cwd=worktree,
             env=env,
+            pass_fds=() if claim_lock_fd is None else (claim_lock_fd,),
         )
         try:
             verified = json.loads(completed.stdout)
@@ -4218,7 +4238,7 @@ class StageWorker:
             }
         return result
 
-    def execute(self, job: StageJob) -> dict[str, Any]:
+    def execute(self, job: StageJob, *, claim_lock_fd: int | None = None) -> dict[str, Any]:
         started_at = _utc_now()
         self._write_status(job, state="running", stage="preparing", started_at=started_at)
         worktree: Path | None = None
@@ -4227,6 +4247,8 @@ class StageWorker:
         run_root.mkdir(parents=True, exist_ok=False)
         cancel_path = self.paths.cancel / job.job_id
         qualification_access_started = False
+        process: subprocess.Popen[bytes] | None = None
+        preserve_live_process = False
         try:
             worktree = self._prepare_worktree(job)
             if cancel_path.exists() or self.stopping:
@@ -4275,6 +4297,7 @@ class StageWorker:
                     stdout=log,
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
+                    pass_fds=() if claim_lock_fd is None else (claim_lock_fd,),
                 )
                 job_wall_seconds = int(spec.get("wall_seconds", self.wall_seconds))
                 deadline = time.monotonic() + job_wall_seconds
@@ -4322,7 +4345,18 @@ class StageWorker:
                     exit_code=exit_code,
                 )
             self._write_status(job, state="running", stage="verifying", started_at=started_at)
-            result_ref = self._verify_result(job, run_root, worktree)
+            if claim_lock_fd is None:
+                result_ref = self._verify_result(job, run_root, worktree)
+            else:
+                result_ref = self._verify_result(
+                    job, run_root, worktree, claim_lock_fd=claim_lock_fd,
+                )
+            if job.kind == P5_SYNTHETIC_JOB and (cancel_path.exists() or self.stopping):
+                return self._write_status(
+                    job, state="canceled", stage="terminal", started_at=started_at,
+                    completed_at=_utc_now(), error="cancel_requested_during_p5_verification",
+                    exit_code=exit_code,
+                )
             result_ref["log_path"] = str(log_path)
             return self._write_status(
                 job,
@@ -4334,6 +4368,16 @@ class StageWorker:
                 exit_code=0,
             )
         except Exception as exc:
+            if job.kind == P5_SYNTHETIC_JOB and process is not None:
+                try:
+                    self._terminate(process)
+                    if process.poll() is None:
+                        raise StageWorkerError("P5 process exit could not be confirmed")
+                except Exception as termination_error:
+                    preserve_live_process = True
+                    raise StageWorkerError(
+                        "P5 ownership unverified; claim/worktree retained"
+                    ) from termination_error
             return self._write_status(
                 job,
                 state="failed",
@@ -4343,14 +4387,23 @@ class StageWorker:
                 error=f"{type(exc).__name__}:{str(exc)[:500]}",
             )
         finally:
-            cancel_path.unlink(missing_ok=True)
+            if not preserve_live_process and job.kind != P5_SYNTHETIC_JOB:
+                cancel_path.unlink(missing_ok=True)
             if job.kind == STAGE_QUALIFICATION_JOB and not qualification_access_started:
                 with suppress(StageWorkerError):
                     _release_qualification_reservation(self.paths, job)
-            if worktree is not None:
+            if worktree is not None and not preserve_live_process:
                 self._remove_worktree(worktree)
 
     def run_once(self) -> dict[str, Any] | None:
+        from quanthus.stage_learning.p5_worker_recovery import BUSY
+        from quanthus.stage_learning.p5_worker_recovery import run_once as run_p5_once
+
+        result = run_p5_once(self)
+        if result is BUSY:
+            return None
+        if result is not None:
+            return result
         claimed = self._claim_next()
         if claimed is None:
             return None
@@ -8944,6 +8997,16 @@ def read_status(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
 
 def cancel_job(paths: StageWorkerPaths, job_id: str) -> dict[str, Any]:
     observed = read_status(paths, job_id)
+    if observed.get("kind") == P5_SYNTHETIC_JOB:
+        from quanthus.stage_learning.p5_worker_recovery import terminal_lock
+
+        with terminal_lock(paths, job_id):
+            observed = read_status(paths, job_id)
+            if observed.get("state") in {"succeeded", "failed", "canceled"}:
+                raise StageWorkerError("terminal stage job cannot be canceled")
+            paths.cancel.mkdir(parents=True, exist_ok=True)
+            (paths.cancel / job_id).touch(exist_ok=True)
+            return {**observed, "cancel_requested": True}
     if observed.get("state") in {"succeeded", "failed", "canceled"}:
         raise StageWorkerError("terminal stage job cannot be canceled")
     paths.cancel.mkdir(parents=True, exist_ok=True)

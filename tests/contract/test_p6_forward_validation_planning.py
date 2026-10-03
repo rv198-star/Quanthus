@@ -121,9 +121,9 @@ def test_p6_production_activation_closeout_preserves_the_frozen_acceptance_gate(
     status = (
         ROOT / "docs/acceptance/p6-activate001-production-activation-status-20260919.md"
     ).read_text(encoding="utf-8")
-    repair = (
-        ROOT / "docs/acceptance/p6-activate001-closeout-repair-20260919.md"
-    ).read_text(encoding="utf-8")
+    repair = (ROOT / "docs/acceptance/p6-activate001-closeout-repair-20260919.md").read_text(
+        encoding="utf-8"
+    )
     design_path = ROOT / P6_DESIGN_PATH
     design = design_path.read_text(encoding="utf-8")
     index = (ROOT / "docs/work-items/index.md").read_text(encoding="utf-8")
@@ -148,11 +148,15 @@ def test_p6_production_activation_closeout_preserves_the_frozen_acceptance_gate(
 
 def test_p5_is_deferred_without_becoming_a_p6_predecessor() -> None:
     items = work_items(ROOT)
-    p5_items = [item for item in items if item.phase == "P5"]
+    p5_items = [
+        item
+        for item in items
+        if item.phase == "P5" and not item.stable_id.startswith("P5-STAGE-001")
+    ]
     p6_items = [item for item in items if item.phase == "P6"]
 
     assert p5_items and all(item.status == "blocked" for item in p5_items)
-    assert all("P5-" not in item.dependencies for item in p6_items)
+    assert all("P5" not in item.dependencies for item in p6_items)
 
 
 def test_multi_expert_successor_review_selects_only_the_p6_entry_gate() -> None:

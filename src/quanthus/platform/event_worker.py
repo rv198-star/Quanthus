@@ -21,6 +21,11 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+from quanthus.expert_strategy.p3_retained_input import (
+    recover_retained_staging,
+    verify_retained_input_artifact,
+)
+from quanthus.expert_strategy.p3_retained_input import request as retained_input_request
 from quanthus.expert_strategy.p3_strat_003_industry_inspection import (
     verify_industry_inspection_artifact,
 )
@@ -81,6 +86,7 @@ _TREND_EVOLUTION_RUN_CONFIG = "config/structure-trend-evolution-qualification.v1
 _STRUCTURE_ORDER_RUN_CONFIG = "config/structure-order-qualification.v1.json"
 _P3_STRAT_003_INPUT_RUN_CONFIG = "config/research/p3-strat-003/input-qualification.v1.json"
 _P3_STRAT_003_INPUT_RUN_CONFIG_V2 = "config/research/p3-strat-003/input-qualification.v2.json"
+_P3_RETAINED_INPUT_RUN_CONFIG = "config/research/p3-strat-003/retained-input.v1.json"
 _P3_STRAT_003_INPUT_INSPECTION_RUN_CONFIG = (
     "config/research/p3-strat-003/input-inspection.v1.json"
 )
@@ -105,6 +111,7 @@ _STRUCTURE_RUN_CONFIGS = frozenset(
         _STRUCTURE_ORDER_RUN_CONFIG,
         _P3_STRAT_003_INPUT_RUN_CONFIG,
         _P3_STRAT_003_INPUT_RUN_CONFIG_V2,
+        _P3_RETAINED_INPUT_RUN_CONFIG,
         _P3_STRAT_003_INPUT_INSPECTION_RUN_CONFIG,
         _P3_STRAT_003_INDUSTRY_INSPECTION_RUN_CONFIG,
         _P3_STRAT_003_SEMANTIC_PROBE_RUN_CONFIG,
@@ -476,6 +483,7 @@ def _structure_request_digest(run_config: str) -> str:
         _STRUCTURE_ORDER_RUN_CONFIG: "quanthus.structure-order-qualification.v1",
         _P3_STRAT_003_INPUT_RUN_CONFIG: "quanthus.p3-strat-003-input-qualification.v1",
         _P3_STRAT_003_INPUT_RUN_CONFIG_V2: "quanthus.p3-strat-003-input-qualification.v2",
+        _P3_RETAINED_INPUT_RUN_CONFIG: "quanthus.p3-strat-003-retained-input.v1",
         _P3_STRAT_003_INPUT_INSPECTION_RUN_CONFIG: "quanthus.p3-strat-003-input-inspection.v1",
         _P3_STRAT_003_INDUSTRY_INSPECTION_RUN_CONFIG: (
             "quanthus.p3-strat-003-industry-inspection.v1"
@@ -1371,6 +1379,13 @@ class EventWorker:
             running_stage = "running-p3-strat-003-input-qualification"
             validating_stage = "validating-p3-strat-003-input"
             recovering_stage = "recovering-sealed-p3-strat-003-input"
+        elif run_config == _P3_RETAINED_INPUT_RUN_CONFIG:
+            verifier = verify_retained_input_artifact
+            module = "quanthus.expert_strategy.p3_retained_input"
+            artifact_name = "p3-retained-input"
+            running_stage = "running-p3-retained-input"
+            validating_stage = "validating-p3-retained-input"
+            recovering_stage = "recovering-sealed-p3-retained-input"
         elif run_config == _P3_STRAT_003_INPUT_INSPECTION_RUN_CONFIG:
             verifier = verify_input_inspection_artifact
             module = "quanthus.expert_strategy.p3_strat_003_input_inspection"
@@ -1478,6 +1493,22 @@ class EventWorker:
             recovering_stage = "recovering-sealed-structure-mvp-run"
         run_id = f"run_{job_id.removeprefix('job_')}"
         final = self.run_root / "structure-runs" / run_id
+        retained_wall_seconds = None
+        if run_config == _P3_RETAINED_INPUT_RUN_CONFIG:
+            retained_wall_seconds = retained_input_request(
+                _REPOSITORY_ROOT / run_config
+            )["budget"]["wall_seconds"]
+            if not final.exists():
+                prior = recover_retained_staging(
+                    self.run_root, job_id, generation, governed["code_revision"]
+                )
+                if prior is not None:
+                    self.store.update_claimed_job(
+                        job_id, generation, stage=recovering_stage, progress=95,
+                        progress_detail={"run_id": run_id, "reused_sealed_staging": True},
+                    )
+                    final.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(prior, final)
         if final.exists():
             result_ref = verifier(
                 final,
@@ -1553,10 +1584,18 @@ class EventWorker:
         with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
             process = subprocess.Popen(command, stdout=stdout, stderr=stderr)  # noqa: S603
         last_renewal = time.monotonic()
+        retained_deadline = (
+            last_renewal + retained_wall_seconds if retained_wall_seconds is not None else None
+        )
         canceled = False
         lost_lease = False
+        retained_timed_out = False
         while process.poll() is None:
             time.sleep(1)
+            if retained_deadline is not None and time.monotonic() >= retained_deadline:
+                retained_timed_out = True
+                _terminate(process, self.terminate_seconds)
+                break
             observed = self.store.get_job(job_id)
             if observed is None or observed.claim_generation != generation:
                 lost_lease = True
@@ -1575,6 +1614,12 @@ class EventWorker:
                     break
                 last_renewal = time.monotonic()
         if lost_lease:
+            return
+        if retained_timed_out:
+            self.store.finish_claimed_job(
+                job_id, generation, state="failed", result_ref=None,
+                error_reason="retained_input_wall_budget_exceeded_no_automatic_retry",
+            )
             return
         if canceled:
             self.store.finish_claimed_job(

@@ -120,7 +120,7 @@ dual-lane runtime bindings and one BaoStock version gate); Python 3.12 was fail-
 Web retains nine existing Node TypeScript-extension failures. Neither check is reported as green.
 The source diagnostic and its read-only implementation review do not qualify formal B.
 
-### Temporary Daily basis adaptation — preregistered next step
+### Temporary Daily basis adaptation — executed
 
 The Owner's continuing delegation and temporary-only boundary permit the new, distinct
 `temporary-daily-adapter.v1.json`. It binds the completed diagnostic receipts and exactly the same
@@ -150,7 +150,35 @@ Sixteen adapter synthetic cases pass; with diagnostic and retained cases, 63 tes
 Independent read-only review found and verified repairs to COPY parameter ordering and separate
 TMP/output accounting. Full `make check`: 3,116 passed / 7 skipped / 41 failed in 116.64 seconds,
 with exactly the prior 41 failure IDs and zero new IDs. Focused Ruff/planning/diff checks pass.
-Actual materialization remains pending here; the full repository check is not green.
+The full repository check is not green.
+
+Both new single materializations completed at `9d825e973f1a2b4e0a4171041813c3bc9c310762`
+through Nexus, using GitHub-distributed detached source worktrees and the unchanged production
+image for the isolated OCI runtime. CN01's existing isolated Python 3.10 preflight and the OCI
+Python 3.11 image each pass all 16 synthetic cases. No production worker was released.
+
+| Node | Actual session | Rows | Parquet bytes | Application seconds | Receipt SHA |
+| --- | --- | ---: | ---: | ---: | --- |
+| CN01 | `session-c380cce769e4d232a52e614f` | 9,984 | 564,767 | 0.639160 | `9420349db6cb4c0948118303befaa148116b478cb111329be96105e2f04417ae` |
+| OCI | `session-20e0552eb06b7325f1f5e0c6` | 164,736 | 9,478,265 | 4.976391 | `3e2fcdd1ca86223f5cd9d5ae144549cb59f4c5988fb83f9a9077afc823e1447d` |
+
+Combined verification proves all 35 unique original dates, 174,720 rows and 21 original columns
+with zero typed source differences after serialization. All raw timestamps remain late; 173
+zero-activity rows remain recorded. All 174,720 output rows are decision-unavailable. The private
+cache payloads total 10,043,032 bytes; the original selected closure remains 846,352,085 bytes.
+Fresh read-only SHA/size verification passed every one of the 35 published Parquet files. Local
+verification recomputed both receipt/result digests and complete cache identities, matched the
+exact date union and confirmed identical code-receipt digests on both nodes.
+Combined verification digest: `sha256:62c2b95ecd440a82f99d0cec428b5415ea9a06c2e82452cb429ed3e8a84aae1f`.
+Narrow TMP was built once per package, shared by all checks, and removed on both nodes.
+
+OCI first encountered a synthetic launcher error because the image's default entrypoint treated
+`sh` as a Quanthus subcommand. No market attempt marker/code receipt existed. The original
+`synthetic-tests.log` was retained; the corrected launcher explicitly overrides only its isolated
+container entrypoint and writes `synthetic-tests-verified.log`. Production configuration, source
+bytes, code and budgets were unchanged. This was preflight correction, not a market retry.
+Both actual materialization markers are now spent; no automatic repeat is authorized. #473/#474
+remain open; the temporary basis defect is handled, while source availability still prevents B/D.
 
 ## P3: actual retained-input diagnosis
 

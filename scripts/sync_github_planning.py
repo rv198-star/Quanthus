@@ -74,6 +74,7 @@ LABELS = (
     LabelSpec("priority:high", "E99695", "High-priority work in the released phase"),
     LabelSpec("priority:normal", "C5DEF5", "Normal planned work"),
     *(LabelSpec(f"phase:P{phase}", "0052CC", f"Delivery phase P{phase}") for phase in range(1, 8)),
+    LabelSpec("phase:P10", "006B75", "Permanent data acquisition, quality and governance line"),
     LabelSpec("phase:PK", "0B7285", "Orthogonal Platform Kernel engineering milestone"),
     LabelSpec("phase:meta", "6F42C1", "Cross-phase project governance"),
     LabelSpec("area:data", "BFDADC", "Point-in-time data foundation"),
@@ -93,6 +94,9 @@ LABELS = (
 PLATFORM_KERNEL_MILESTONE = "Platform Kernel Extraction"
 WORKER_RUNTIME_MILESTONE = "PostgreSQL Worker Runtime"
 EXPERT_STRATEGY_MILESTONE = "Expert Strategy Layer MVP"
+P10_DATA_MILESTONE = "P10 Permanent Data Line"
+P10_POLICY_PATH = "config/data-ownership.v1.json"
+P10_EPIC_ID = "P10-DATA-000"
 EXPERT_STRATEGY_DESIGN_PATH = "docs/design/lld/04-experts-aggregator/expert-strategy-layer.md"
 EXPERT_STRATEGY_IMPLEMENTATION_ROOT = "docs/design/lld/04-experts-aggregator/expert-strategy-layer"
 EXPERT_STRATEGY_REVIEW_PATH = (
@@ -397,21 +401,22 @@ P3_STRAT_003_IMPLEMENTATION_SPECS = {
     "P3-STRAT-003-B-R1": IssueImplementationSpec(
         design_path=P3_STRAT_003_DESIGN_PATH,
         approach=(
-            "Inspect retained failed-B identity/date columns and sealed industry sources under "
-            "the frozen diagnostic request; preserve the original B NO_PASS evidence."
+            "Own P3 consumer admission and explicit business bypass/temporary-ignore/known-"
+            "limitation disposition. Register data issues to P10; preserve completed diagnostics "
+            "and B NO_PASS. Source recovery and data repair are no longer P3 work."
         ),
         owned_paths=(
-            "config/research/p3-strat-003/industry-inspection.v1.json",
-            "src/quanthus/expert_strategy/p3_strat_003_industry_inspection.py",
+            "docs/work-items/p3-strat-003.md",
+            "consumer admission against config/research/p3-strat-003/request.v1.json",
         ),
         decision_gates=(
-            "Missing retained inputs yield DIAGNOSTIC_INPUT_UNAVAILABLE; candidate reconstruction "
-            "and replacement-source collection are forbidden.",
+            "P10 #470/#473/#474 own data supply; no consumer source hunt, "
+            "supplementation or repair.",
             "A completed inspection does not accept B or unlock D; P6 remains untouched.",
         ),
         verification=(
-            "Verify source identities and report candidate-event occurrences separately from "
-            "distinct-security coverage.",
+            "Record the chosen business disposition and its limits; qualify any P10 handoff "
+            "against the unchanged B/PIT contract before result-bearing work.",
             "No strategy/economic result or outcome label is read.",
         ),
     ),
@@ -742,6 +747,7 @@ PROGRAM_EPIC_IDS = frozenset(
         "P3-DICT-002",
         "P6-000",
         "P3-STAGE-001",
+        P10_EPIC_ID,
     }
 )
 
@@ -757,6 +763,7 @@ MILESTONES = (
     WORKER_RUNTIME_MILESTONE,
     EXPERT_STRATEGY_MILESTONE,
     P3_STRAT_003_MILESTONE,
+    P10_DATA_MILESTONE,
 )
 
 CHAPTERS = (
@@ -811,10 +818,23 @@ CHAPTERS = (
         PLATFORM_KERNEL_MILESTONE,
         "closed",
     ),
+    ChapterSpec(
+        "12",
+        "docs/design/lld/12-permanent-data-line.md",
+        "P10",
+        "data",
+        P10_DATA_MILESTONE,
+        "ready",
+    ),
 )
 
 PHASE_GATES = {
     "meta": "Active project governance; changes must preserve document and issue traceability.",
+    "P10": (
+        "Permanent acquisition and shared data-quality/governance ownership under ADR 0015. "
+        "Each child retains its gates; business lines register defects and choose disclosed "
+        "bypass, temporary ignore or acceptance of a known limitation without repairing data."
+    ),
     "P1": (
         "Conditionally accepted under p1-c1-conditional-20260725-v1; 4,173 C1 factor "
         "visibility exceptions remain fail-closed."
@@ -860,7 +880,29 @@ HIGH_IDS = {
     "P3-STRAT-003-A",
     "P6-000",
     "P6-GOV-001",
+    P10_EPIC_ID,
 }
+
+
+def load_p10_policy(root: Path) -> dict[str, Any]:
+    policy = json.loads((root / P10_POLICY_PATH).read_text(encoding="utf-8"))
+    if (
+        policy.get("schema_version") != "quanthus.data-ownership.v1"
+        or policy.get("line") != "P10"
+        or policy.get("lifecycle") != "permanent"
+        or policy.get("auto_close_epic") is not False
+        or policy.get("epic_stable_id") != P10_EPIC_ID
+        or set(policy.get("business_dispositions", {}))
+        != {"bypass", "temporarily_ignore", "accept_known_limitation"}
+    ):
+        raise ValueError("invalid permanent P10 ownership policy")
+    issues = policy["issue_migration"]["issues"]
+    numbers = [issue["number"] for issue in issues]
+    if len(numbers) != len(set(numbers)) or any(type(n) is not int or n < 1 for n in numbers):
+        raise ValueError("invalid or duplicate P10 migration issue number")
+    if set(numbers).intersection(item["number"] for item in policy["consumer_issues"]):
+        raise ValueError("a consumer issue cannot also be migrated to P10")
+    return policy
 
 
 def parse_table(lines: list[str], start: int) -> list[dict[str, str]]:
@@ -939,6 +981,7 @@ def index_rows(root: Path) -> list[dict[str, str]]:
     lines = path.read_text(encoding="utf-8").splitlines()
     wanted_sections = {
         "Meta": "meta",
+        "P10 permanent data line": "P10",
         "P1 data foundation": "P1",
         "P2 backtest and observability": "P2",
         "P3 rule-only vertical slice": "P3",
@@ -961,6 +1004,11 @@ def index_rows(root: Path) -> list[dict[str, str]]:
 
 def work_items(root: Path) -> list[WorkItem]:
     owners, _ = chapter_rows(root)
+    p10_legacy_ids = {
+        issue["stable_id"]
+        for issue in load_p10_policy(root)["issue_migration"]["issues"]
+        if issue["stable_id"] is not None
+    }
     items: list[WorkItem] = []
     for row in index_rows(root):
         stable_id = row["ID"]
@@ -986,13 +1034,17 @@ def work_items(root: Path) -> list[WorkItem]:
             status = "closed"
         else:
             status = "ready" if phase in {"P1", "P2", "P3"} else "blocked"
+        if stable_id in p10_legacy_ids and status != "closed":
+            phase = "P10"
         if stable_id in CRITICAL_IDS:
             priority = "critical"
         elif stable_id in HIGH_IDS:
             priority = "high"
         else:
             priority = "normal"
-        if phase == "meta":
+        if phase == "P10":
+            milestone = P10_DATA_MILESTONE
+        elif phase == "meta":
             milestone = None
         elif stable_id in P3_STRAT_003_IDS:
             milestone = P3_STRAT_003_MILESTONE
@@ -1062,6 +1114,12 @@ def task_body(item: WorkItem, repository: str) -> str:
         authority_note = (
             "\n\nThis is a bounded prospective-validation increment. It does not depend on P5 "
             "or authorize notification, broker connection, actual fills, or live capital."
+        )
+    elif item.phase == "P10":
+        authority_note = (
+            "\n\nOwnership/routing only: no automatic collection, deployment, cleanup or "
+            "consumer acceptance. Preserve immutable evidence and the child's execution gates. "
+            "P10-DATA-000 is permanent and must not be automatically closed."
         )
     if item.stable_id in IMPLEMENTATION_SPECS:
         implementation = IMPLEMENTATION_SPECS[item.stable_id]
@@ -1310,14 +1368,36 @@ class GitHub:
         labels: list[str],
         milestone: int | None,
     ) -> tuple[dict[str, Any], str]:
+        if (
+            existing is not None
+            and existing.get("state", "").casefold() == "closed"
+            and "phase:P10" in labels
+            and not title.startswith(f"[{P10_EPIC_ID}]")
+        ):
+            return existing, "reused"
         existing_labels = [] if existing is None else [item["name"] for item in existing["labels"]]
         unmanaged = [
             name for name in existing_labels if not name.startswith(MANAGED_LABEL_PREFIXES)
         ]
         desired_labels = sorted(set(labels + unmanaged))
         should_close = "status:closed" in desired_labels
+        if title.startswith(f"[{P10_EPIC_ID}]") and should_close:
+            raise ValueError("the permanent P10 epic cannot be automatically closed")
         existing_body = None if existing is None else existing.get("body")
         desired_body = body
+        if isinstance(existing_body, str) and "<!-- quanthus-data-owner:P10 " in existing_body:
+            # Migrated legacy issues keep live scope, evidence and release/status gates.
+            # A broad planning refresh may update ownership, never replace their history.
+            title = existing["title"]
+            desired_body = existing_body
+            desired_labels = sorted(
+                {name for name in existing_labels if not name.startswith("phase:")}
+                | {"phase:P10", "area:data"}
+            )
+            milestone = (existing.get("milestone") or {}).get("number", milestone)
+            should_close = False
+        elif isinstance(existing_body, str) and "<!-- quanthus-data-consumer:" in existing_body:
+            desired_body = existing_body
         if (
             isinstance(existing_body, str)
             and "<!-- quanthus-planning:v2 " in existing_body

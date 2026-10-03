@@ -1,0 +1,110 @@
+# LLD 12: Permanent P10 Data Line
+
+| Field | Value |
+| --- | --- |
+| Phase | P10; permanent and parallel to P1-P7 |
+| Design status | approved |
+| Delivery gate | open |
+| Owner authority | Explicit Owner instruction and follow-up, 2026-10-03 |
+| Governing decision | `../../architecture/adr-0015-permanent-p10-data-line.md` |
+| Ownership policy | `../../../config/data-ownership.v1.json` |
+| Parent | `../hld.md` |
+| Physical data contracts | `01-data-foundation.md` and its children |
+
+## 1. Purpose and ownership
+
+P10 permanently owns acquisition, shared data quality and data governance. It runs beside the
+business lines; it is not a tenth sequential release waiting for P7. P1 retains its accepted
+historical foundation and sealed evidence; ongoing collection, maintenance and quality work is P10.
+
+P10 owns provider qualification, collection, ODS/DWD builds and recovery, source semantics,
+coverage, identity, corporate-action corrections, PIT source evidence, shared numerical
+consistency, lineage, retention, immutable publication and data handoff. Temporary research data
+repair and source recovery are also P10 work. Physical contracts and topology remain in LLD 01
+and ADR 0007.
+
+P10 does not choose strategy rules, model architecture, target-label meaning, independent research
+reference criteria or promotion. Shared data-consistency #193 belongs to P10; feature domain
+definitions and changed consumer acceptance remain with the domain owner. P6 retains its access
+ledger and the business impact decision for a published correction; source repair belongs to P10.
+
+## 2. Business disposition instead of local repair
+
+Other lines declare inputs, perform minimal admission checks and implement domain features,
+cohorts, models, strategies and consumption logic. On a quality/governance finding they may only
+register a bounded P10 issue; they must not turn it into source hunting, collection, backfill,
+private supplementation, inferred values/times or publication of repaired data.
+
+After registering the issue, the business owner chooses and records one of three dispositions:
+
+| Choice | Permitted business action | Required record |
+| --- | --- | --- |
+| Bypass | Use an already admitted alternative or disable an optional capability | Issue, selected route, business impact and any new versioned business policy |
+| Temporarily ignore | Defer a nonessential affected capability and continue other business work | Issue, deferred scope and explicit unavailable status |
+| Accept known limitation | Continue a use allowed by the existing consumer contract with the defect/uncertainty disclosed | Issue, purpose, limitation, impact and evidence grade |
+
+No data issue automatically stops an entire business line. Only a step that cannot meet an existing
+hard safety, PIT, protected-partition or activation gate stops. Acceptance of a limitation is not
+repair or proof that missing evidence exists. Do not silently shrink a frozen window, infer a
+cutoff, invent labels or describe diagnostic/inconclusive evidence as qualified acceptance.
+Business owners retain research target/reference choices and remain focused on business value.
+
+Earlier P3/P5 temporary-source approvals and completed outputs remain sealed historical evidence.
+They do not authorize future repair/recovery outside P10. Existing immutable artifacts may be
+referenced only within their original authority and an explicit business disposition; full input
+qualification still needs a P10 versioned handoff and consumer acceptance. Do not reset attempts.
+
+## 3. Intake and versioned handoff
+
+New acquisition or data-quality/governance issues use `phase:P10`, `area:data` and `P10-DATA-*`
+ids. Existing open issues retain numbers, titles, evidence, execution gates and subgroup dependencies.
+The reviewed routing inventory and consumer exceptions are in the ownership policy. Closed issues
+and historical acceptance are not moved or reopened. Keyword matching or `area:data` alone cannot
+decide ownership.
+
+P10-DATA-000 is the standing coordination epic; it has no automatic closure or delivery due date.
+Bounded repair children may close with their own acceptance. #424 remains the ODS/DWD reliability
+subgroup with its original scope and operational gates.
+
+A qualified handoff binds source members/hashes, dates/universe, schema/source/policy versions,
+acquisition/publication/effective/knowledge clocks and evidence grade, coverage/exclusions,
+unresolved reasons, corrections/exceptions, authorized consumer purpose and partition boundaries,
+and required independent construction/verification. Replacing temporary sources needs comparison
+and retained old lineage. A path, HTTP success or successful Job is insufficient.
+
+P10 may deliver qualified supply, a bounded rejection or a formal unavailable disposition.
+Consumers decide business treatment and their own acceptance; closing the source issue never
+automatically accepts research or activates training/production.
+
+## 4. Current consumer dependencies
+
+| Consumer | P10 data issues | Retained business responsibility |
+| --- | --- | --- |
+| P3 #412 / #317 | #470 industry lineage, #473 canonical price basis, #474 historical availability | Choose/disclose business disposition, admit qualified B input if available, then apply existing strategy-comparison gates |
+| P5 #402 / #400 | #471 original normalization scope/lineage, #472 state-only slot classification | Choose/disclose business disposition; own research samples, split, coordinates, ACTIVE and independent reference under the existing P5 contract |
+
+P3 B and P5 B remain unaccepted. P3 D and P5 E/F are not activated by this ownership decision.
+Their required-data steps remain blocked, while permitted business engineering may continue.
+
+## 5. Execution and invariants
+
+GitHub remains normal code distribution and NexusAgent default remote control. The existing SSH
+override belongs only to #424, not all P10. Routing authorizes no deployment, timer activation,
+new collection, cleanup, credential change, Base mutation or P6 production change. Every child
+retains its execution gate.
+
+PIT cutoffs, windows, partitions and policies are unchanged. P1's 4,173 visibility exceptions stay
+fail closed. Missing/invalid data blocks new entries and alerts; it is not structural damage and
+must not force a sale. Batch DAGs, shared prerequisites, complete reuse identities and required
+independent cold construction remain governed.
+
+## 6. Work item and verification
+
+| ID | Title | Dependency | Acceptance evidence |
+| --- | --- | --- | --- |
+| P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03; P1 historical foundation retained | Ownership/routing contracts and verified live issue migration; bounded repairs/handoffs need separate evidence and standing epic remains open |
+
+Governed assets: `config/data-ownership.v1.json`, `scripts/sync_github_planning.py`,
+`scripts/sync_p10_data_issues.py`, `tests/contract/test_p10_data_ownership.py`, root `AGENTS.md`
+and the work-item index. Verify selective/idempotent migration, preserved closed history,
+consumer separation and P10 planning. Green contracts or issue movement do not accept data.

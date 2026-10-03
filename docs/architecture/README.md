@@ -28,6 +28,7 @@ a parallel current-state architecture.
 | `adr-0012-postgresql-worker-runtime.md` | PostgreSQL-backed static Worker Runtime for candidate replay and named heavy-analysis Jobs, including the P4 Event Worker extension | Changing Job transport, Worker topology, batch execution, warehouse-operation routing, or Run publication |
 | `adr-0013-p4-research-adm-and-legacy-ads-retirement.md` | Thin P4 Research ADM boundary and retirement policy for superseded ADS artifacts | Changing P4 application-data preparation, static research references, or ADS retirement/cleanup |
 | `adr-0014-time-first-structure-semantics.md` | Time-first evidence model, bounded semantic namespaces and staged Facts v2 coverage | Changing structure ontology/naming, clock views, legacy mapping or scope boundaries |
+| `adr-0015-permanent-p10-data-line.md` | Permanent acquisition, data-quality/governance and business disposition ownership | Routing data issues, recovery/repair or consumer handoff |
 
 ## Topic contracts
 

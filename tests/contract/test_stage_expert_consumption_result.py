@@ -107,7 +107,9 @@ def test_p3_expert_006_stays_closed_when_strategy_input_qualification_stops() ->
     ready_p3 = {
         item.stable_id for item in items.values() if item.phase == "P3" and item.status == "ready"
     }
-    assert ready_p3 == {"P3-STRAT-003-B-R1"}
+    assert ready_p3 == set()
+    assert items["P3-STRAT-003-B-R1"].phase == "P3"
+    assert items["P3-STRAT-003-B-R1"].status == "blocked"
     assert items["P3-STRAT-003-D"].status == "closed"
     assert "closed NOT_RUN_INPUT_UNQUALIFIED; #321" in (
         ROOT / "docs/work-items/index.md"

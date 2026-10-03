@@ -1,0 +1,294 @@
+{
+  "schema_version": "quanthus.data-ownership.v1",
+  "policy_version": "p10-permanent-data-line-20261003-v1",
+  "effective_date": "2026-10-03",
+  "design_status": "approved",
+  "owner_authority": "Owner explicitly assigned all acquisition and data-quality/governance issues to a permanent P10 line; other lines must not perform that work.",
+  "owner_request": "那我们单独把P10划成永久的数据线，把数据采集和质量治理的issue都交给P10去，而其他线不得折腾数据质量和数据治理",
+  "line": "P10",
+  "lifecycle": "permanent",
+  "sequential_phase": false,
+  "epic_stable_id": "P10-DATA-000",
+  "milestone": "P10 Permanent Data Line",
+  "auto_close_epic": false,
+  "governing_design": "docs/design/lld/12-permanent-data-line.md",
+  "decision": "docs/architecture/adr-0015-permanent-p10-data-line.md",
+  "p10_owns": [
+    "source acquisition and provider qualification",
+    "ODS/DWD construction, scheduled collection, recovery and mirroring",
+    "shared data-quality diagnosis, backfill, correction and exception disposition",
+    "security/calendar/action/price/status/industry coverage and consistency",
+    "raw source/version/publication evidence, PIT time semantics and missing manifest recovery",
+    "shared data-product numerical consistency, reproducibility, lineage and retention",
+    "versioned immutable data publication and consumer handoff"
+  ],
+  "consumer_lines_may": [
+    "declare required inputs and domain-specific applicability",
+    "verify published input identities and authorized scope at admission",
+    "register a bounded defect report and P10 dependency without repairing inputs",
+    "choose a business bypass, temporary ignore or acceptance of a known limitation after issue registration",
+    "accept or reject a P10 handoff against the consuming contract",
+    "develop domain features, targets, models, strategies and consumption logic from admitted inputs",
+    "continue business work that does not breach an existing hard safety/PIT/activation gate"
+  ],
+  "consumer_lines_must_not": [
+    "collect or backfill source data",
+    "search remote/local data archives as a source-recovery project",
+    "repair, impute, reinterpret or privately supplement deficient input data",
+    "change canonical source schemas, PIT availability evidence or data-quality policies",
+    "publish repaired data or maintain a parallel temporary quality pipeline",
+    "weaken cutoffs, windows, truth/reference or activation gates to avoid a P10 dependency"
+  ],
+  "prior_research_temporary_authority": {
+    "future_data_repair_and_recovery": "superseded_by_P10_ownership",
+    "sealed_configs_receipts_outputs": "preserve_immutable",
+    "new_consumer_runs_with_temporary_patches": "No new private data repair/recovery. Existing immutable artifacts may be referenced only within their original authority and an explicit business disposition; full qualification still needs a P10 versioned handoff and consumer acceptance."
+  },
+  "handoff_required": [
+    "exact immutable source/member inventory and hashes",
+    "scope, universe, source and schema versions",
+    "raw acquisition/publication/effective/knowledge clock semantics with evidence grade",
+    "coverage and exclusions with explicit unresolved reason codes",
+    "versioned correction policy and complete exception controls",
+    "consumer-purpose and sealed-partition access boundary",
+    "independent construction or verification required by the consuming gate",
+    "replacement comparison and retained lineage for prior temporary artifacts"
+  ],
+  "invariants": {
+    "PIT_cutoff_unchanged": true,
+    "missing_or_invalid_blocks_new_entries": true,
+    "missing_data_is_not_structural_damage": true,
+    "sealed_partitions_unchanged": true,
+    "P1_factor_exceptions_fail_closed": 4173,
+    "P3_P5_research_gates_unchanged": true,
+    "P6_production_mutation_authorized": false,
+    "deployment_or_collection_activation_authorized": false,
+    "issue_move_accepts_data_or_research": false,
+    "SSH_override_scope": "existing #424 programme only; not all P10 work"
+  },
+  "issue_migration": {
+    "state_scope": "open_only",
+    "preserve_numbers_titles_bodies_evidence_and_existing_dependencies": true,
+    "issues": [
+      {
+        "number": 37,
+        "title": "[META-DATA-PUBLISH-001] Implement OCI PostgreSQL publisher",
+        "stable_id": "META-DATA-PUBLISH-001",
+        "category": "data_publication_and_lifecycle"
+      },
+      {
+        "number": 41,
+        "title": "[META-DATA-PIPE-002] Retire the legacy weekly monolith and split Hermes ODS schedules",
+        "stable_id": "META-DATA-PIPE-002",
+        "category": "data_publication_and_lifecycle"
+      },
+      {
+        "number": 166,
+        "title": "[Cleanup][Data] Retire legacy ADS surfaces and reclaim storage",
+        "stable_id": null,
+        "category": "data_publication_and_lifecycle"
+      },
+      {
+        "number": 193,
+        "title": "[TECH-DEBT] Make Feature Panel overlap invariant across scope extensions",
+        "stable_id": null,
+        "category": "shared_data_consistency"
+      },
+      {
+        "number": 310,
+        "title": "[OPS-HERMES-GC-001] 修复 ODS 清理定时任务并补齐成功采集缓存周期回收",
+        "stable_id": "OPS-HERMES-GC-001",
+        "category": "data_publication_and_lifecycle"
+      },
+      {
+        "number": 311,
+        "title": "[OPS-HERMES-DWD-20260916] 修复 Hermes 2026-09-16 日构建失败并完成历史恢复",
+        "stable_id": "OPS-HERMES-DWD-20260916",
+        "category": "data_publication_and_lifecycle"
+      },
+      {
+        "number": 424,
+        "title": "[META-OPS-RELIABILITY-001] ODS/DWD 长期稳定性优化：技术评审、分批实施与运行验收",
+        "stable_id": "META-OPS-RELIABILITY-001",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 425,
+        "title": "[META-OPS-PROCESS-001] 修复每日编排超时后的进程残留，补齐真实故障回归",
+        "stable_id": "META-OPS-PROCESS-001",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 427,
+        "title": "[META-OPS-MINUTE-001] 修复分钟采集终态检查点丢失及异常资源清理",
+        "stable_id": "META-OPS-MINUTE-001",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 429,
+        "title": "META-OPS-MINUTE-002: opt-in bounded minute residual retry and shared attempt budget",
+        "stable_id": "META-OPS-MINUTE-002",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 431,
+        "title": "[META-OPS-ENV-001] 固定采集与测试运行环境，收敛 Hermes 依赖漂移",
+        "stable_id": "META-OPS-ENV-001",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 432,
+        "title": "[OPS][P1] 2026-09-22 CN01/Hermes ODS-DWD failure and CN01-to-OCI sync block",
+        "stable_id": null,
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 434,
+        "title": "[META-OPS-MINUTE-003] Enforce direct 5m provenance and fail-closed recovery",
+        "stable_id": "META-OPS-MINUTE-003",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 436,
+        "title": "[META-OPS-MINUTE-004] Qualify native 1m historical source and fail-closed receipts",
+        "stable_id": "META-OPS-MINUTE-004",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 439,
+        "title": "[META-OPS-TIMER-004] Prevent off-schedule Hermes ODS run on timer reactivation",
+        "stable_id": "META-OPS-TIMER-004",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 440,
+        "title": "[META-OPS-DATA-005] 2026-09-23 CN01 Tencent 1m daily-volume gate failure blocks DWD",
+        "stable_id": "META-OPS-DATA-005",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 453,
+        "title": "[ODS 1m] 禁止将缺失分钟自动填零后准入为完整来源",
+        "stable_id": null,
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 455,
+        "title": "[META-OPS-MINUTE-006] 防止合格1m整票候选与落盘内容不一致",
+        "stable_id": "META-OPS-MINUTE-006",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 456,
+        "title": "[META-OPS-MINUTE-005] 重构1m采集、准入、残余恢复与发布闭环",
+        "stable_id": "META-OPS-MINUTE-005",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 458,
+        "title": "[META-OPS-MINUTE-007] 统一付费1m审计与生产重放的最终精确准入",
+        "stable_id": "META-OPS-MINUTE-007",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 460,
+        "title": "[META-OPS-MINUTE-008] 闭合1m审计和重放的同Job封存参照输入",
+        "stable_id": "META-OPS-MINUTE-008",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 462,
+        "title": "[META-OPS-MINUTE-009] 用不可变raw建立当前版本1m资格账本与精确缺口",
+        "stable_id": "META-OPS-MINUTE-009",
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 466,
+        "title": "[P1] 1m 语义冲突误计入提供者熔断，冷拉在 325/4992 提前结束",
+        "stable_id": null,
+        "category": "ods_dwd_reliability"
+      },
+      {
+        "number": 470,
+        "title": "[META-DATA-GAP-001] 统一修复冻结行业关系覆盖缺口（688287 及研究补充依赖）",
+        "stable_id": "META-DATA-GAP-001",
+        "category": "research_source_gaps"
+      },
+      {
+        "number": 471,
+        "title": "[META-DATA-GAP-002] 恢复公司行动归一化 v3 原始 manifest 与可验证来源闭包",
+        "stable_id": "META-DATA-GAP-002",
+        "category": "research_source_gaps"
+      },
+      {
+        "number": 472,
+        "title": "[META-DATA-GAP-003] 核实 2012–2021 的 18,991 个有状态无行情记录并治理真实缺口",
+        "stable_id": "META-DATA-GAP-003",
+        "category": "research_source_gaps"
+      },
+      {
+        "number": 473,
+        "title": "[META-DATA-GAP-004] 统一治理 Daily price_basis 消费适配缺陷：P3 固定窗口 35 日全无效",
+        "stable_id": "META-DATA-GAP-004",
+        "category": "research_source_gaps"
+      },
+      {
+        "number": 474,
+        "title": "[META-DATA-GAP-005] 证明近期 P3 输入逐族经济可知性，区分仓库晚入库与历史 PIT 资格",
+        "stable_id": "META-DATA-GAP-005",
+        "category": "research_source_gaps"
+      }
+    ]
+  },
+  "consumer_issues": [
+    {
+      "number": 412,
+      "owner": "P3",
+      "input_dependencies": [
+        470,
+        473,
+        474
+      ],
+      "labels": [
+        "phase:P3",
+        "area:backtest",
+        "area:experts"
+      ],
+      "scope": "Retained B consumer admission and strategy-verification readiness only; source recovery and repair belongs to P10.",
+      "data_dependent_status": "blocked"
+    },
+    {
+      "number": 402,
+      "owner": "P5",
+      "input_dependencies": [
+        471,
+        472
+      ],
+      "labels": [
+        "phase:P5",
+        "area:ml"
+      ],
+      "scope": "Research corpus/split/reference qualification from P10-published inputs; no collection, backfill, source recovery or quality repair.",
+      "data_dependent_status": "blocked"
+    }
+  ],
+  "retained_consumer_examples": [
+    {
+      "number": 178,
+      "owner": "P4",
+      "scope": "accepted-package reuse in downstream research jobs; no source repair"
+    },
+    {
+      "number": 119,
+      "owner": "P6",
+      "scope": "prospective consumption access and impact disposition; source correction is P10 work"
+    }
+  ],
+  "owner_followup": "以后非数据线业务遇到数据质量/治理相关问题只能提issue，不得自行处理，业务要么选择绕行，要么选择暂时忽略或接受，聚焦业务问题本身。",
+  "business_dispositions": {
+    "bypass": "Use an already admitted alternative or disable an optional capability; record any business-policy change with a new version. Never substitute repaired data or silently shrink a frozen window.",
+    "temporarily_ignore": "Defer a nonessential data-dependent capability and continue unaffected business work; keep its issue and unavailable status visible.",
+    "accept_known_limitation": "Explicitly record purpose, limitation, impact and evidence grade for a business result allowed by its existing contract; never claim missing evidence is established or data is repaired/qualified."
+  },
+  "consumer_stop_rule": "Stop only the affected step when an existing hard safety, PIT, protected-partition or activation gate cannot be met. Registering a data issue does not automatically stop the whole business line."
+}

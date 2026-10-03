@@ -114,6 +114,15 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**Current ownership supersession, 2026-10-03:** P10 permanently owns all source recovery,
+acquisition, data-quality diagnosis/repair and availability evidence. The completed receipts below
+remain immutable. Their former next-source-action instructions no longer authorize P3 data work.
+#412 retains consumer admission and strategy business work: register a P10 issue, choose and
+record bypass/temporary ignore/acceptance of a known limitation, and continue where the contract
+allows. #470/#473/#474 are P10 dependencies. The required B/PIT gate remains unaccepted and D
+inactive; no whole-line freeze or automatic research acceptance follows from issue routing.
+See `../design/lld/12-permanent-data-line.md` and `config/data-ownership.v1.json`.
+
 The Owner explicitly required continued attempts after PR #419 merged at `a64a3f3`.
 Live #317/#412 were reopened. Current Owner instructions permit OCI as an existing data node
 through NexusAgent; the #424-only SSH override is not used here.
@@ -158,9 +167,11 @@ suffix has raw bars; #473 is a consumer adaptation defect, not evidence of absen
 Zero-activity rows retain their existing tradability gate; valid prices do not establish eligibility.
 The combined result digest is `sha256:69cb5e1626990f044ef2fc163ad016c81a2213b2d1d4a5ce6cc568a335eb9cb8`.
 Both successful attempts and the original pre-row failure are spent and preserved. No corrected
-bundle or candidate was built. Current next action: qualify per-family economic availability from
-existing bound source evidence before proposing a distinct corrected B; a price-basis alias alone
-cannot fix #474 or activate D. See `../acceptance/p3-p5-input-recovery-20261003.md`.
+bundle or candidate was built. Current P10 dependency: qualify per-family economic availability
+from bound source evidence before any distinct corrected B; a price-basis alias alone cannot fix
+#474 or activate D. P3's next business action is to record bypass/temporary ignore/acceptance of
+the known limitation and continue only permitted domain work. P3 does not investigate or repair
+the source. See `../acceptance/p3-p5-input-recovery-20261003.md`.
 
 The separately frozen `temporary-daily-adapter.v1.json` completed a temporary source adaptation
 under the Owner's continuing delegation. It retains all raw values/types/times/provenance and the
@@ -174,7 +185,8 @@ zero typed differences, 10,043,032 private Parquet bytes, all decision-unavailab
 hashes/cache/receipt identities and the 35-date union pass independent local verification. Both
 attempts are spent. Combined digest `sha256:62c2b95ecd440a82f99d0cec428b5415ea9a06c2e82452cb429ed3e8a84aae1f`.
 This completes temporary basis adaptation only; #474's original publication/version evidence is
-still needed before any distinct corrected B can run. No current P3/P5 research acceptance follows.
+still needed before any distinct corrected B can run. P10 owns obtaining that evidence; P3 chooses
+business disposition and consumer admission only. No current P3/P5 research acceptance follows.
 
 The exact retained candidate and accepted P4 A/B industry sources were recovered. A bounded
 isolated CLI inspection at `835dea9b5502f9dbe1f0830b538312bc8f0f4b9e` completed in 38 seconds:

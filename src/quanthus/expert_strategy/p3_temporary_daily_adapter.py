@@ -6,7 +6,6 @@ import argparse
 import json
 import os
 import re
-import signal
 import subprocess
 import tempfile
 import time
@@ -16,8 +15,9 @@ from typing import Any
 from quanthus.expert_evaluation.serialization import canonical_json_bytes, digest_value
 from quanthus.expert_strategy.p3_daily_adapter_probe import (
     ProbeBudgetExceeded,
+    _one_shot_attempt,
     _path,
-    _timeout,
+    _wall_alarm,
     _write,
     sha256,
     verify_packages,
@@ -64,6 +64,10 @@ def request(repo: Path, node: str) -> tuple[dict[str, Any], list[dict[str, Any]]
     settings = raw["nodes"][node]
     declared_receipt = Path(settings["diagnostic_receipt"])
     receipt_path = _path(declared_receipt.parent, declared_receipt.name)
+    # A terminal rejection wins even if success-receipt bytes escaped before fsync failed.
+    # lexists also rejects a dangling or unsafe symlink without following/reading it.
+    if os.path.lexists(receipt_path.parent.parent / "failure.json"):
+        raise ValueError("TEMPORARY_ADAPTER_DIAGNOSTIC_TERMINAL_FAILURE")
     if sha256(receipt_path) != settings["diagnostic_receipt_sha256"]:
         raise ValueError("TEMPORARY_ADAPTER_DIAGNOSTIC_DRIFT")
     receipt = json.loads(receipt_path.read_bytes())
@@ -264,88 +268,103 @@ def build(repo: Path, node: str, revision: str) -> dict[str, Any]:
         "scope": raw["scope"],
     }
     cache_digest = digest_value(identity)
-    _write(root / "attempt.json", {"identity": cache_digest, "maximum_attempts": 1})
     output = root / cache_digest.removeprefix("sha256:")
-    output.mkdir(mode=0o700)
-    started = time.monotonic()
-    handler = signal.signal(signal.SIGALRM, _timeout)
-    signal.alarm(raw["budgets"]["wall_seconds_per_node"])
-    try:
-        source_bytes = verify_packages(packages)
-        verified = time.monotonic()
-        import duckdb
+    marker_payload = {"identity": cache_digest, "maximum_attempts": 1}
+    receipt_identity = {
+        "cache_digest": cache_digest,
+        "config_sha256": CONFIG_SHA,
+        "code_revision": revision,
+        "code_receipt_sha256": identity["code_receipt_sha256"],
+        "node": node,
+    }
+    with _one_shot_attempt(
+        root / "attempt.json", marker_payload, output, receipt_identity
+    ) as failure:
+        failure["stage"] = "create_output"
+        output.mkdir(mode=0o700)
+        started = time.monotonic()
+        failure["stage"] = "install_wall_alarm"
+        with _wall_alarm(raw["budgets"]["wall_seconds_per_node"], failure):
+            failure["stage"] = "verify_source_bytes"
+            source_bytes = verify_packages(packages)
+            verified = time.monotonic()
+            failure["stage"] = "process_packages"
+            import duckdb
 
-        with tempfile.TemporaryDirectory(prefix="adapter-tmp-", dir=output) as temp:
-            c = duckdb.connect(":memory:")
-            try:
-                for k, v in (
-                    ("threads", raw["budgets"]["threads"]),
-                    ("memory_limit", raw["budgets"]["memory_limit"]),
-                    ("max_temp_directory_size", raw["budgets"]["tmp_limit"]),
-                    ("temp_directory", temp),
-                ):
-                    c.execute(f"SET {k}=?", [v])
-                daily = []
-                published_bytes = 0
-                for package in packages:
-                    daily.append(
-                        adapt_package(
-                            c, package, output / (package["market_date"] + ".parquet"), raw
+            with tempfile.TemporaryDirectory(prefix="adapter-tmp-", dir=output) as temp:
+                c = duckdb.connect(":memory:")
+                try:
+                    for k, v in (
+                        ("threads", raw["budgets"]["threads"]),
+                        ("memory_limit", raw["budgets"]["memory_limit"]),
+                        ("max_temp_directory_size", raw["budgets"]["tmp_limit"]),
+                        ("temp_directory", temp),
+                    ):
+                        c.execute(f"SET {k}=?", [v])
+                    daily = []
+                    published_bytes = 0
+                    for package in packages:
+                        failure["stage"] = "process_packages"
+                        daily.append(
+                            adapt_package(
+                                c, package, output / (package["market_date"] + ".parquet"), raw
+                            )
                         )
-                    )
-                    published_bytes += daily[-1]["size_bytes"]
-                    if published_bytes > raw["budgets"]["output_max_bytes_per_node"]:
-                        raise ProbeBudgetExceeded("TEMPORARY_ADAPTER_OUTPUT_BUDGET_EXCEEDED")
-                tmp_bytes = sum(p.stat().st_size for p in Path(temp).rglob("*") if p.is_file())
-            finally:
-                c.close()
-        result = {
-            "schema_version": "quanthus.p3-temporary-daily-adapter-receipt.v1",
-            "disposition": "TEMPORARY_BASIS_ADAPTED_PIT_UNQUALIFIED",
-            "identity": identity,
-            "cache_digest": cache_digest,
-            "output_root": str(output),
-            "daily": daily,
-            "rows": sum(d["rows"] for d in daily),
-            "source_differences": 0,
-            "decision_admissible_rows": 0,
-            "raw_times_changed": False,
-            "B_accepted": False,
-            "D_activated": False,
-            "P6_or_formal_data_mutated": False,
-            "candidate_scan_or_economics_or_labels": False,
-            "data_issues_closed": [],
-            "lifecycle": raw["lifecycle"],
-            "stages": [
-                {
-                    "stage": "verify_complete_source_bytes",
-                    "bytes": source_bytes,
-                    "files": len(packages) * 2,
-                    "elapsed_seconds": round(verified - started, 6),
-                },
-                {
-                    "stage": "adapt_and_compare_serialized_raw_values",
-                    "disposition": "one_tmp_per_package_reused_for_validation_copy_and_comparison",
-                    "rows": sum(d["rows"] for d in daily),
-                    "bytes": sum(d["size_bytes"] for d in daily),
-                    "tmp_bytes_at_close": tmp_bytes,
-                    "tmp_removed": True,
-                    "elapsed_seconds": round(time.monotonic() - verified, 6),
-                },
-            ],
-            "elapsed_seconds": round(time.monotonic() - started, 6),
-        }
-        result["result_digest"] = digest_value(result)
-        if (
-            published_bytes + len(canonical_json_bytes(result)) + 1
-            > raw["budgets"]["output_max_bytes_per_node"]
-        ):
-            raise ProbeBudgetExceeded("TEMPORARY_ADAPTER_OUTPUT_BUDGET_EXCEEDED")
-        _write(output / "receipt.json", result)
-        return result
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, handler)
+                        published_bytes += daily[-1]["size_bytes"]
+                        failure["stage"] = "check_output_budget"
+                        if published_bytes > raw["budgets"]["output_max_bytes_per_node"]:
+                            raise ProbeBudgetExceeded("TEMPORARY_ADAPTER_OUTPUT_BUDGET_EXCEEDED")
+                    tmp_bytes = sum(p.stat().st_size for p in Path(temp).rglob("*") if p.is_file())
+                finally:
+                    c.close()
+            result = {
+                "schema_version": "quanthus.p3-temporary-daily-adapter-receipt.v1",
+                "disposition": "TEMPORARY_BASIS_ADAPTED_PIT_UNQUALIFIED",
+                "identity": identity,
+                "cache_digest": cache_digest,
+                "output_root": str(output),
+                "daily": daily,
+                "rows": sum(d["rows"] for d in daily),
+                "source_differences": 0,
+                "decision_admissible_rows": 0,
+                "raw_times_changed": False,
+                "B_accepted": False,
+                "D_activated": False,
+                "P6_or_formal_data_mutated": False,
+                "candidate_scan_or_economics_or_labels": False,
+                "data_issues_closed": [],
+                "lifecycle": raw["lifecycle"],
+                "stages": [
+                    {
+                        "stage": "verify_complete_source_bytes",
+                        "bytes": source_bytes,
+                        "files": len(packages) * 2,
+                        "elapsed_seconds": round(verified - started, 6),
+                    },
+                    {
+                        "stage": "adapt_and_compare_serialized_raw_values",
+                        "disposition": (
+                            "one_tmp_per_package_reused_for_validation_copy_and_comparison"
+                        ),
+                        "rows": sum(d["rows"] for d in daily),
+                        "bytes": sum(d["size_bytes"] for d in daily),
+                        "tmp_bytes_at_close": tmp_bytes,
+                        "tmp_removed": True,
+                        "elapsed_seconds": round(time.monotonic() - verified, 6),
+                    },
+                ],
+                "elapsed_seconds": round(time.monotonic() - started, 6),
+            }
+            result["result_digest"] = digest_value(result)
+            failure["stage"] = "check_output_budget"
+            if (
+                published_bytes + len(canonical_json_bytes(result)) + 1
+                > raw["budgets"]["output_max_bytes_per_node"]
+            ):
+                raise ProbeBudgetExceeded("TEMPORARY_ADAPTER_OUTPUT_BUDGET_EXCEEDED")
+            failure["stage"] = "write_receipt"
+            _write(output / "receipt.json", result)
+            return result
 
 
 def main() -> int:

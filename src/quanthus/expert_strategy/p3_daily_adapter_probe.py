@@ -11,7 +11,8 @@ import signal
 import subprocess
 import tempfile
 import time
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -138,12 +139,162 @@ def _write(path: Path, payload: dict[str, Any]) -> None:
         os.close(descriptor)
 
 
+def _partial_output(output: Path) -> dict[str, Any]:
+    """Inventory metadata only; never follow links or read rejected payloads."""
+    result: dict[str, Any] = {
+        "root": str(output),
+        "disposition": "PRESERVED_UNQUALIFIED_DO_NOT_REUSE",
+        "entries": [],
+        "inventory_complete": False,
+    }
+    try:
+        if not output.exists():
+            result["inventory_complete"] = True
+            return result
+        if output.is_symlink() or not output.is_dir():
+            result["inspection_error"] = "OUTPUT_IS_NOT_A_REGULAR_DIRECTORY"
+            return result
+        # A bounded top-level inventory includes any residual TMP subtree by name.
+        with os.scandir(output) as entries:
+            for entry in entries:
+                if len(result["entries"]) == 128:
+                    result["inspection_error"] = "OUTPUT_INVENTORY_LIMIT"
+                    break
+                kind = (
+                    "symlink"
+                    if entry.is_symlink()
+                    else ("directory" if entry.is_dir(follow_symlinks=False) else "file")
+                )
+                result["entries"].append(
+                    {
+                        "path": entry.name,
+                        "kind": kind,
+                        "size_bytes": entry.stat(follow_symlinks=False).st_size,
+                    }
+                )
+            else:
+                result["inventory_complete"] = True
+    except OSError as error:
+        result["inspection_error"] = type(error).__name__
+    result["entries"].sort(key=lambda entry: entry["path"])
+    return result
+
+
+def _write_failure(path: Path, payload: dict[str, Any]) -> None:
+    """Publish a complete, fsynced control receipt without replacing old evidence."""
+    data = canonical_json_bytes(payload) + b"\n"
+    if len(data) > 65536:
+        raise ValueError("ADAPTER_FAILURE_RECEIPT_BUDGET_EXCEEDED")
+    descriptor, temporary = tempfile.mkstemp(prefix=".failure-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temporary, path)  # Exclusive publication: never replace a prior receipt.
+    finally:
+        os.unlink(temporary)
+    descriptor = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+@contextmanager
+def _one_shot_attempt(
+    marker: Path,
+    marker_payload: dict[str, Any],
+    output: Path,
+    identity: dict[str, Any],
+) -> Iterator[dict[str, str]]:
+    """Preserve a terminal rejection for every catchable failure after exclusive claim.
+
+    failure.json is control evidence beside the immutable marker, outside the unchanged
+    payload budget. Its presence invalidates every output, including a receipt whose
+    final fsync failed. No terminal receipt (e.g. SIGKILL/storage loss) is not success.
+    """
+    started = time.monotonic()
+    state = {"stage": "claim_attempt"}
+    stream = marker.open("xb")  # A spent attempt fails here without changing its evidence.
+    try:
+        with stream:
+            stream.write(canonical_json_bytes(marker_payload) + b"\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        descriptor = os.open(marker.parent, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        yield state
+    except BaseException as error:
+        reason = str(error)
+        result = {
+            "schema_version": "quanthus.p10-terminal-failure-receipt.v1",
+            "disposition": "REJECTED_UNQUALIFIED_PARTIAL_OUTPUT",
+            "attempt": marker_payload,
+            "identity": identity,
+            "attempt_consumed": True,
+            "retry_authorized": False,
+            "failure": {
+                "stage": state["stage"],
+                "exception_type": type(error).__name__,
+                "reason": reason[:2048],
+                "reason_truncated": len(reason) > 2048,
+                "cause": None
+                if error.__cause__ is None
+                else {
+                    "exception_type": type(error.__cause__).__name__,
+                    "reason": str(error.__cause__)[:2048],
+                },
+            },
+            "partial_output": _partial_output(output),
+            "elapsed_seconds": round(time.monotonic() - started, 6),
+            "B_accepted": False,
+            "D_activated": False,
+            "P6_or_formal_data_mutated": False,
+            "data_issues_closed": False,
+        }
+        result["result_digest"] = digest_value(result)
+        try:
+            _write_failure(marker.parent / "failure.json", result)
+        except BaseException as receipt_error:
+            # Retain the original terminal error and make receipt-storage failure explicit.
+            raise error from receipt_error
+        raise
+
+
 class ProbeBudgetExceeded(BaseException):
     """Stop this diagnostic without retrying its immutable attempt."""
 
 
 def _timeout(_signal: int, _frame: Any) -> None:
     raise ProbeBudgetExceeded("ADAPTER_PROBE_WALL_BUDGET_EXCEEDED")
+
+
+def _restore_alarm(handler: Any) -> None:
+    try:
+        signal.alarm(0)
+    finally:
+        signal.signal(signal.SIGALRM, handler)
+
+
+@contextmanager
+def _wall_alarm(seconds: int, failure: dict[str, str]) -> Iterator[None]:
+    handler = signal.signal(signal.SIGALRM, _timeout)
+    try:
+        signal.alarm(seconds)
+        yield
+    except BaseException as error:
+        try:
+            _restore_alarm(handler)
+        except BaseException as cleanup_error:
+            raise error from cleanup_error
+        raise
+    else:
+        failure["stage"] = "restore_wall_alarm"
+        _restore_alarm(handler)
 
 
 def _request(repo: Path, node: str, pre_read_recovery: bool) -> tuple[dict[str, Any], str]:
@@ -227,89 +378,91 @@ def build(
     if sha256(Path(__file__)) != receipt["files"][implementation]:
         raise ValueError("ADAPTER_LOADED_IMPLEMENTATION_DRIFT")
     marker = output.parent / "attempt.json"
-    _write(
-        marker,
-        {
-            "request_sha256": active_request_sha,
-            "code_revision": code_revision,
-            "node": node,
-            "maximum_attempts": 1,
-        },
-    )
-    output.mkdir(mode=0o700)
-    budgets = raw["budgets"]
-    started = time.monotonic()
-    prior_handler = signal.signal(signal.SIGALRM, _timeout)
-    signal.alarm(budgets["wall_seconds_per_node"])
-    try:
-        packages = [p for p in raw["packages"] if p["node"] == node]
-        total_bytes = verify_packages(packages)
-        verified_at = time.monotonic()
-        import duckdb
+    marker_payload = {
+        "request_sha256": active_request_sha,
+        "code_revision": code_revision,
+        "node": node,
+        "maximum_attempts": 1,
+    }
+    identity = {**marker_payload, "code_receipt_sha256": sha256(receipt_path)}
+    with _one_shot_attempt(marker, marker_payload, output, identity) as failure:
+        failure["stage"] = "create_output"
+        output.mkdir(mode=0o700)
+        budgets = raw["budgets"]
+        started = time.monotonic()
+        failure["stage"] = "install_wall_alarm"
+        with _wall_alarm(budgets["wall_seconds_per_node"], failure):
+            packages = [p for p in raw["packages"] if p["node"] == node]
+            failure["stage"] = "verify_source_bytes"
+            total_bytes = verify_packages(packages)
+            verified_at = time.monotonic()
+            failure["stage"] = "process_packages"
+            import duckdb
 
-        with tempfile.TemporaryDirectory(prefix="adapter-tmp-", dir=output) as staging:
-            connection = duckdb.connect(":memory:")
-            try:
-                for setting, value in (
-                    ("threads", budgets["threads"]),
-                    ("memory_limit", budgets["memory_limit"]),
-                    ("max_temp_directory_size", budgets["tmp_limit"]),
-                    ("temp_directory", staging),
-                ):
-                    connection.execute(f"SET {setting}=?", [value])
-                daily = [probe_package(connection, package) for package in packages]
-                tmp_bytes = sum(p.stat().st_size for p in Path(staging).rglob("*") if p.is_file())
-            finally:
-                connection.close()
-        aggregate = {k: sum(r[k] for r in daily) for k in daily[0] if k != "market_date"}
-        result = {
-            "schema_version": "quanthus.p3-daily-adapter-probe-receipt.v1",
-            "request_sha256": active_request_sha,
-            "original_request_sha256": REQUEST_SHA,
-            "pre_read_access_recovery": pre_read_recovery,
-            "code_revision": code_revision,
-            "node": node,
-            "disposition": "INPUT_ONLY_ADAPTER_EVIDENCE"
-            if aggregate["unknown_basis_rows"] == 0
-            else "NO_PASS_UNKNOWN_PRICE_BASIS",
-            "code_receipt_sha256": sha256(receipt_path),
-            "daily": daily,
-            "aggregate": aggregate,
-            "stages": [
-                {
-                    "stage": "verify_frozen_bytes",
-                    "files": len(packages) * 2,
-                    "bytes": total_bytes,
-                    "elapsed_seconds": round(verified_at - started, 6),
-                },
-                {
-                    "stage": "one_1d_tmp_per_package",
-                    "disposition": "built_once_reused_for_all_counts",
-                    "rows": aggregate["raw_1d_rows"],
-                    "tmp_bytes_at_close": tmp_bytes,
-                    "tmp_removed": True,
-                    "elapsed_seconds": round(time.monotonic() - verified_at, 6),
-                },
-            ],
-            "elapsed_seconds": round(time.monotonic() - started, 6),
-            "raw_times_changed": False,
-            "economic_availability_inferred": False,
-            "corrected_bundle_built": False,
-            "candidate_scan": False,
-            "strategy_or_labels": False,
-            "B_accepted": False,
-            "D_activated": False,
-            "P6_or_formal_data_mutated": False,
-            "data_issues_closed": False,
-        }
-        result["result_digest"] = digest_value(result)
-        if len(canonical_json_bytes(result)) + 1 > budgets["output_max_bytes"]:
-            raise ValueError("ADAPTER_OUTPUT_BUDGET_EXCEEDED")
-        _write(output / "receipt.json", result)
-        return result
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, prior_handler)
+            with tempfile.TemporaryDirectory(prefix="adapter-tmp-", dir=output) as staging:
+                connection = duckdb.connect(":memory:")
+                try:
+                    for setting, value in (
+                        ("threads", budgets["threads"]),
+                        ("memory_limit", budgets["memory_limit"]),
+                        ("max_temp_directory_size", budgets["tmp_limit"]),
+                        ("temp_directory", staging),
+                    ):
+                        connection.execute(f"SET {setting}=?", [value])
+                    daily = [probe_package(connection, package) for package in packages]
+                    tmp_bytes = sum(
+                        p.stat().st_size for p in Path(staging).rglob("*") if p.is_file()
+                    )
+                finally:
+                    connection.close()
+            aggregate = {k: sum(r[k] for r in daily) for k in daily[0] if k != "market_date"}
+            result = {
+                "schema_version": "quanthus.p3-daily-adapter-probe-receipt.v1",
+                "request_sha256": active_request_sha,
+                "original_request_sha256": REQUEST_SHA,
+                "pre_read_access_recovery": pre_read_recovery,
+                "code_revision": code_revision,
+                "node": node,
+                "disposition": "INPUT_ONLY_ADAPTER_EVIDENCE"
+                if aggregate["unknown_basis_rows"] == 0
+                else "NO_PASS_UNKNOWN_PRICE_BASIS",
+                "code_receipt_sha256": sha256(receipt_path),
+                "daily": daily,
+                "aggregate": aggregate,
+                "stages": [
+                    {
+                        "stage": "verify_frozen_bytes",
+                        "files": len(packages) * 2,
+                        "bytes": total_bytes,
+                        "elapsed_seconds": round(verified_at - started, 6),
+                    },
+                    {
+                        "stage": "one_1d_tmp_per_package",
+                        "disposition": "built_once_reused_for_all_counts",
+                        "rows": aggregate["raw_1d_rows"],
+                        "tmp_bytes_at_close": tmp_bytes,
+                        "tmp_removed": True,
+                        "elapsed_seconds": round(time.monotonic() - verified_at, 6),
+                    },
+                ],
+                "elapsed_seconds": round(time.monotonic() - started, 6),
+                "raw_times_changed": False,
+                "economic_availability_inferred": False,
+                "corrected_bundle_built": False,
+                "candidate_scan": False,
+                "strategy_or_labels": False,
+                "B_accepted": False,
+                "D_activated": False,
+                "P6_or_formal_data_mutated": False,
+                "data_issues_closed": False,
+            }
+            result["result_digest"] = digest_value(result)
+            failure["stage"] = "check_output_budget"
+            if len(canonical_json_bytes(result)) + 1 > budgets["output_max_bytes"]:
+                raise ValueError("ADAPTER_OUTPUT_BUDGET_EXCEEDED")
+            failure["stage"] = "write_receipt"
+            _write(output / "receipt.json", result)
+            return result
 
 
 def main(argv: Sequence[str] | None = None) -> int:

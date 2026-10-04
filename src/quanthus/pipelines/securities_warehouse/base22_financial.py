@@ -17,7 +17,7 @@ from typing import Any
 
 from .base22 import THROUGH, digest, partition
 from .base22_bounded import BoundedError, GlobalScan
-from .base22_outputs import financial_concept_versions, instant, knowledge_versions, write_partition
+from .base22_outputs import financial_concept_versions, instant, write_partition
 from .base22_precision import decimal_profile
 from .financial_reporting import (
     FinancialCompanyResolver,
@@ -176,7 +176,7 @@ def statement_batch(
             combined[table].extend(rows[table])
         evidence.append(item)
     for table in (TABLES[0], TABLES[2]):
-        combined[table] = knowledge_versions(combined[table], rules[table])
+        combined[table] = _statement_versions(combined[table], rules[table])
     combined[TABLES[1]] = financial_concept_versions(combined[TABLES[1]])
     return combined, {
         "contract_id": CONTRACT_ID,
@@ -186,6 +186,55 @@ def statement_batch(
         "source_observations_retained": len(evidence),
         "complete_native_union": "NOT_QUALIFIED",
     }
+
+
+def _statement_versions(rows: list[dict[str, Any]], rule: dict[str, Any]) -> list[dict[str, Any]]:
+    """Same governed revisions over normalized Arrow financial scalars.
+
+    Canonical hashes still own deterministic key order and equal-clock provenance
+    selection. Typed body equality avoids serializing/hashing an identical wide
+    row repeatedly for each weekly observation. Every caller first normalizes
+    values to the same pinned Arrow schema; this is not a general untyped merge.
+    """
+    if not rows:
+        return []
+    excluded = {
+        "record_source",
+        "source_record_id",
+        "source_revision",
+        "source_artifact_sha256",
+        "knowledge_from",
+        "knowledge_to",
+    }
+    fields = sorted(set(rows[0]) - excluded)
+    groups: dict[tuple[Any, ...], dict[datetime, tuple[tuple[Any, ...], dict[str, Any]]]] = {}
+    for row in rows:
+        key = tuple(row[k] for k in rule["business_key"])
+        clock = row["knowledge_from"]
+        body = tuple(row[f] for f in fields)
+        group = groups.setdefault(key, {})
+        if clock in group:
+            before_body, before = group[clock]
+            if before_body != body:
+                raise BoundedError("OBSERVATION_EQUAL_CLOCK_BODY_CONFLICT")
+            row = min((before, row), key=digest)
+        group[clock] = body, row
+    result = []
+    for key in sorted(groups, key=lambda k: digest(list(k))):
+        versions = []
+        previous: tuple[Any, ...] | None = None
+        for clock in sorted(groups[key]):
+            body, row = groups[key][clock]
+            if previous == body:
+                continue
+            versions.append(dict(row))
+            previous = body
+        for index, row in enumerate(versions):
+            row["knowledge_to"] = (
+                versions[index + 1]["knowledge_from"] if index + 1 < len(versions) else None
+            )
+            result.append(row)
+    return result
 
 
 def merge_concept_files(

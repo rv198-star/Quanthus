@@ -313,6 +313,11 @@ One batch accepts at most 64 envelopes and 32,768 projected rows per table. Its 
 knowledge-version and cumulative concept rules collapse unchanged rolling bodies, retain genuine
 changed versions and reject equal-clock conflicts. Every original observation remains in evidence;
 the complete-image assembler still owns global concepts and the native/cross-batch union.
+Financial batches compare bodies only after normalization to the pinned Arrow scalars. They
+retain the governed canonical key order and equal-clock provenance choice, while avoiding repeated
+wide-row JSON hashing for unchanged weekly observations. Typed concept evidence is ordered and
+merged once across every job-local file under the existing DuckDB memory/spill limits; counting
+and writing consume that compact materialization. Cross-file semantic conflicts fail before output.
 
 CN02 retains one eventual complete entity set plus one bounded partition/check TMP. An owned
 history partition can move into the final entity layout after its consumers finish; it must not

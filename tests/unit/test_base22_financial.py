@@ -20,7 +20,10 @@ from quanthus.pipelines.securities_warehouse.base22_bounded import (
     GlobalScan,
     Limits,
 )
-from quanthus.pipelines.securities_warehouse.base22_outputs import financial_concept_versions
+from quanthus.pipelines.securities_warehouse.base22_outputs import (
+    financial_concept_versions,
+    knowledge_versions,
+)
 from quanthus.pipelines.securities_warehouse.financial_reporting import (
     FinancialCompanyIdentity,
     FinancialCompanyResolver,
@@ -226,6 +229,29 @@ def test_equal_clock_conflicting_body_fails_without_choosing_source():
     ]
     with pytest.raises(RuntimeError, match="EQUAL_CLOCK_BODY_CONFLICT"):
         adapter.statement_batch([(first, source), (second, source)], resolver=resolver, rules=rules)
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_typed_financial_versions_match_governed_cross_source_rule(reverse):
+    raw, source, resolver = fixture("12.50000000000")
+    projected, _ = adapter.statement_observation(raw, source=source, resolver=resolver)
+    row = projected[adapter.TABLES[2]][0]
+    rows = [
+        row,
+        dict(row, source_artifact_sha256="sha256:" + "b" * 64),
+        dict(row, knowledge_from=datetime(2026, 8, 2, tzinfo=timezone.utc)),
+        dict(
+            row,
+            knowledge_from=datetime(2026, 8, 3, tzinfo=timezone.utc),
+            value_decimal=Decimal("13.0000000000"),
+        ),
+    ]
+    if reverse:
+        rows.reverse()
+    rule = json.loads(Path("config/pipelines/base22-independent-image.v1.json").read_bytes())[
+        "tables"
+    ][adapter.TABLES[2]]
+    assert adapter._statement_versions(rows, rule) == knowledge_versions(rows, rule)
 
 
 def test_batch_envelope_bound():

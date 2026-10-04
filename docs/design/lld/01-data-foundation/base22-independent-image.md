@@ -35,6 +35,25 @@ or whole-domain August coverage. Each missing prerequisite continues to block it
 
 The versioned assessment entry is:
 
+The Owner-approved holder precision preparation uses a separate opt-in contract,
+`config/pipelines/base22-holder-exact.v2.json`, implemented by `base22_holder_exact.py`
+and tested by `test_base22_holder_exact.py`. It appends nullable
+`average_holding_exact: decimal128(38,11)` to the pinned holder schema. The legacy
+`average_holding: decimal128(38,10)` and raw string remain. New observations populate
+each numeric column only when the raw value fits exactly; otherwise that column is
+NULL with hash-bound per-row unavailable evidence. A value outside both types, an
+invalid/nonfinite scalar, or an original float fails closed. The old 28-digit integer
+range can remain exact in the old column while the new column is unavailable.
+No quantization or context rounding occurs; sealed legacy outputs stay unchanged.
+
+The version binds the original parent contract and approved draft. Its cold scope
+verifier requires local contract copies, rechecks all typed values against raw tokens,
+precision evidence, partitions, lineage, keys and knowledge-version intervals, and
+rejects unknown versions. The v1 image entry and legacy adapter remain strict and do
+not select this version automatically. These bounded observation outputs do not grant
+source, complete-image, historical PIT or P3/P5/P6 admission; complete-image/native
+union and temporal-parent checks remain separate gates.
+
 ```sh
 PYTHONPATH=src .venv/bin/python -m quanthus.pipelines.securities_warehouse.base22_sources \
   --selection /absolute/path/to/frozen-selection.json --output /new/isolated/assessment-run

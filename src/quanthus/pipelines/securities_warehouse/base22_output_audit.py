@@ -12,6 +12,19 @@ from .base22_sources import _tree, physical_path
 
 
 def audit_observation_stage(root: Path, descriptor: dict[str, Any], config: Path) -> dict[str, Any]:
+    """Explicit new versions must pass their semantics, not just physical scans."""
+    if descriptor.get("schema_contract_id") is not None:
+        from .base22_holder_exact import CONTRACT_ID, audit_holder_exact_scope
+
+        if descriptor["schema_contract_id"] != CONTRACT_ID:
+            raise BoundedError("OBSERVATION_SCHEMA_CONTRACT_UNKNOWN")
+        return audit_holder_exact_scope(root, descriptor, config)
+    return _audit_observation_stage(root, descriptor, config)
+
+
+def _audit_observation_stage(
+    root: Path, descriptor: dict[str, Any], config: Path
+) -> dict[str, Any]:
     """No source-root opening, old-path fallback, network or value-bearing report.
 
     Each stage is a bounded explicit output scope. Native/source union, all33
@@ -27,6 +40,12 @@ def audit_observation_stage(root: Path, descriptor: dict[str, Any], config: Path
         raise BoundedError("OBSERVATION_DESCRIPTOR_INVALID")
     _, model, extension = load_contract(config)
     expected_schemas = schemas(model, extension)
+    if descriptor.get("schema_contract_id") is not None:
+        from .base22_holder_exact import CONTRACT_ID, TABLE, load_holder_contract
+
+        if descriptor["schema_contract_id"] != CONTRACT_ID:
+            raise BoundedError("OBSERVATION_SCHEMA_CONTRACT_UNKNOWN")
+        _, expected_schemas[TABLE] = load_holder_contract(config)
     seen = set()
     counts: dict[str, int] = {}
     scans = {}

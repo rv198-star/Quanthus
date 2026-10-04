@@ -96,6 +96,8 @@ The additive [Base 2.2 independent image engineering contract](01-data-foundatio
 prepares CN02-only synthetic construction and cold verification through the Shanghai business
 date 2026-08-31. The separate approved Phase2 scope permits bounded retained-source governance
 and observation outputs; full source qualification, complete-image acceptance and release remain gated.
+The linked child also owns the approved opt-in holder exact-column preparation, with the
+legacy model and sealed observations retained unchanged.
 
 The ODS Base packaging, source precedence, completeness boundary, and recovery lifecycle are
 owned by [`01-data-foundation/ods-base.md`](01-data-foundation/ods-base.md). It is separate from

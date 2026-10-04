@@ -62,6 +62,8 @@ def load_holder_contract(config: Path) -> tuple[dict[str, Any], Any]:
 
 
 def _columns(raw: Any) -> tuple[Decimal | None, Decimal | None, dict[str, Any], dict[str, Any]]:
+    import pyarrow as pa  # type: ignore[import-untyped]
+
     old = decimal_profile(raw, precision=38, scale=10)
     new = decimal_profile(raw, precision=38, scale=11)
     if old["classification"] == "NULL":
@@ -69,7 +71,15 @@ def _columns(raw: Any) -> tuple[Decimal | None, Decimal | None, dict[str, Any], 
     if not old["fits"] and not new["fits"]:
         raise BoundedError("HOLDER_EXACT_UNSUPPORTED_VALUE")
     value = Decimal(str(raw))
-    return value if old["fits"] else None, value if new["fits"] else None, old, new
+    # Bind row evidence to the declared physical scale, before hashing. Arrow's
+    # exact rescale rejects loss, ignores Decimal context and matches cold readback;
+    # the original token/precision/sign still lives unchanged in the raw string.
+    return (
+        pa.scalar(value, type=pa.decimal128(38, 10)).as_py() if old["fits"] else None,
+        pa.scalar(value, type=pa.decimal128(38, 11)).as_py() if new["fits"] else None,
+        old,
+        new,
+    )
 
 
 def holder_evidence(row: Mapping[str, Any]) -> dict[str, Any]:

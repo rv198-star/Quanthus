@@ -63,6 +63,8 @@ def test_version_specific_exact_columns_and_lossless_serialization(value, old_fi
     assert row["average_holding_exact"] == (expected if new_fits else None)
     assert row["knowledge_from"] == PARENT and row["published_at"] is None
     assert pa.Table.from_pylist([row], schema=schema).to_pylist() == [row]
+    restored = pa.Table.from_pylist([row], schema=schema).to_pylist()[0]
+    assert holder_evidence(restored) == holder_evidence(row)
     assert validate_holder_row(row) == holder_evidence(row)
     _, model, extension = load_contract(CONFIG)
     legacy = schemas(model, extension)[TABLE]

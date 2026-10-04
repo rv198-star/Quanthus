@@ -38,6 +38,10 @@ The contract lists every table's source families, business and knowledge-version
 field, partition rules, merge priority, reuse/rebuild reasons, coverage and missing disposition.
 The concrete job freezes its exact required partitions and expectations before scanning rows.
 Foreign keys require referential closure and containment by effective/knowledge intervals.
+The shared build/cold scan checks daily market bars against the referenced calendar's Shanghai
+business date. Where the model also declares a listing reference, the calendar venue must match
+a temporally visible referenced listing. Nullable index-calendar references remain nullable;
+this check does not prescribe common open/close windows for events or other tables.
 Unknown knowledge fails closed; known late timestamps remain late. Effective interval endpoints
 are retained even when they extend beyond August. Build time is recorded separately.
 
@@ -64,6 +68,12 @@ physically written; no hard links, symbolic links, runtime external views or sou
 are permitted. The verifier never opens an archived source root or requires ODS/correction/raw
 payloads to be available. It scans every table, checks its schema, all byte hashes, exact physical
 file/table/partition sets, counts, key uniqueness/census, temporal FK closure and semantic digests.
+Calendar and per-table August qualification evidence is copied into the image and bound to
+the exact archived raw-member identities. Both entry paths use the same offline plan validator:
+scope, quality dispositions, source roles/selections, partition census and August evidence remain
+mandatory after relocation. Row lineage is admitted only from that table's own `source_ids`.
+Zero-row Parquet files and directories participate in the physical partition comparison; a
+genuinely empty table has exactly its declared `empty/part-00000.parquet` partition.
 
 READY is written only after that scan. Failures retain a failed-attempt receipt and any completed
 history checkpoint. Repeated execution verifies sealed output without rewriting it; changed
@@ -73,6 +83,9 @@ The scan's elapsed/row/byte metrics and exact result are retained in the job att
 An abandoned lock requires separate inspection; this version never deletes an unknown writer's
 lock. TMP files are owned by the staging root and retained for failure review. Cleanup must target
 that job root under a separate explicit retention decision.
+Before any mkdir, lock, attempt or identity write, both the output and sibling `.<output>.job`
+must be physical paths without symbolic-link ancestors and disjoint in both directions from
+every source root. A valid existing staging directory retains normal checkpoint reuse.
 
 Tests copy and relocate the synthetic image twice, remove its disposable input/staging roots,
 and verify in a new isolated Python process with source-network and old-root reads prohibited.

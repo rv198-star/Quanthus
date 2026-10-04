@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import shutil
@@ -695,3 +696,313 @@ def test_runtime_change_is_a_miss_for_the_same_job_identity(fixture):
         pytest.raises(b.Base22Error, match="SEALED_OUTPUT_INPUT_CHANGED"),
     ):
         fixture.build()
+
+
+def _path_snapshot(root: Path) -> dict:
+    """Paths, file bytes and link destinations, including disposable staging targets."""
+    return {
+        path.relative_to(root).as_posix(): (
+            ("symlink", os.readlink(path))
+            if path.is_symlink()
+            else ("directory", None)
+            if path.is_dir()
+            else ("file", path.read_bytes())
+        )
+        for path in root.rglob("*")
+    }
+
+
+@pytest.mark.parametrize(
+    "source_id,layout",
+    [
+        (name, layout)
+        for name in ("history", "repair", "august")
+        for layout in ("equal", "contains_source", "inside_source")
+    ]
+    + [("history", "symlink")],
+)
+def test_staging_path_rejected_before_any_input_or_job_write(fixture, source_id, layout):
+    source = Path(fixture.plan["sources"][source_id]["root"])
+    job = fixture.output.with_name("." + fixture.output.name + ".job")
+    if layout in {"equal", "contains_source"}:
+        destination = job if layout == "equal" else job / "history-source"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(source, destination)
+        fixture.plan["sources"][source_id]["root"] = str(destination)
+    elif layout == "inside_source":
+        fixture.output = source / "candidate"
+    else:
+        target = fixture.root / "disposable-staging-target"
+        target.mkdir()
+        (target / "sentinel").write_bytes(b"must remain unchanged")
+        job.symlink_to(target, target_is_directory=True)
+    before = _path_snapshot(fixture.root)
+    try:
+        with pytest.raises(b.Base22Error, match="(OUTPUT|STAGING)_"):
+            fixture.build()
+    finally:
+        assert _path_snapshot(fixture.root) == before
+
+
+def _repack_synthetic_image(root: Path) -> None:
+    """Recompute all byte identities AND row/key summaries without validating semantics.
+
+    Only disposable test copies use this helper. A fully consistent envelope must
+    never hide the semantic defect that a cold verifier is expected to reject.
+    """
+    manifest = json.loads((root / "manifest.json").read_bytes())
+    plan = json.loads((root / "evidence/input-plan.json").read_bytes())
+    contract, model, extension = b.load_contract(root / "contract")
+    physical_schemas = b.schemas(model, extension)
+    with b._db(":memory:") as db:
+        for item in manifest["files"]:
+            path = root / item["path"]
+            item.update(b._file_record(root, path))
+            if "table" not in item:
+                continue
+            name = item["table"]
+            rows = list(b._rows(path, physical_schemas[name]))
+            item["row_count"] = len(rows)
+            for row in rows:
+                key = b.canonical([row[f] for f in contract["tables"][name]["version_key"]])
+                db.execute(
+                    "INSERT INTO rows VALUES (?,?,?,?,?)",
+                    (
+                        name,
+                        key.decode(),
+                        b.partition(row, contract["tables"][name]),
+                        b.canonical(row).decode(),
+                        "synthetic-repack",
+                    ),
+                )
+        manifest["tables"] = {name: b._summary(db, name) for name in physical_schemas}
+    manifest["semantic_digest"] = b.digest(manifest["tables"])
+    manifest["input_plan_digest"] = b.digest(plan)
+    _save(root / "manifest.json", manifest)
+    (root / "READY").write_text(b.file_sha(root / "manifest.json") + "\n")
+
+
+def _add_other_venue_session(fixture) -> str:
+    venue = copy.deepcopy(fixture.history["dwd_trading_venue"][0])
+    venue["venue_id"] = "other-venue"
+    fixture.history["dwd_trading_venue"].append(venue)
+    session = copy.deepcopy(fixture.history["dwd_trading_calendar"][0])
+    session.update(venue_id="other-venue", calendar_session_id="other-venue-july")
+    fixture.history["dwd_trading_calendar"].append(session)
+    return session["calendar_session_id"]
+
+
+@pytest.mark.parametrize("case", ["wrong_date", "wrong_venue", "correct"])
+@pytest.mark.parametrize("mode", ["build", "cold"])
+def test_daily_bar_calendar_date_and_listing_venue_closure(fixture, case, mode):
+    other = _add_other_venue_session(fixture)
+    fixture.refresh()
+    session = {
+        "wrong_date": "calendar-2026-08-03",
+        "wrong_venue": other,
+        "correct": "calendar-2026-07-31",
+    }[case]
+    if mode == "build":
+        fixture.history["dwd_security_bar"][0]["calendar_session_id"] = session
+        fixture.refresh()
+        run = fixture.build
+    else:
+        fixture.build()
+        root = fixture.root / "calendar-repacked"
+        shutil.copytree(fixture.output, root)
+        manifest = json.loads((root / "manifest.json").read_bytes())
+        item = next(
+            f
+            for f in manifest["files"]
+            if f.get("table") == "dwd_security_bar"
+            and "observation_start_month=7" in f["partition"]
+        )
+        path = root / item["path"]
+        rows = list(b._rows(path, fixture.schemas["dwd_security_bar"]))
+        rows[0]["calendar_session_id"] = session
+        pq.write_table(pa.Table.from_pylist(rows, schema=fixture.schemas["dwd_security_bar"]), path)
+        _repack_synthetic_image(root)
+
+        def run():
+            return b.verify_base22(root)
+
+    if case == "correct":
+        assert run()["through_date"] == "2026-08-31"
+    else:
+        with pytest.raises(b.Base22Error, match="CALENDAR_DATE_OR_VENUE_CLOSURE_FAILED"):
+            run()
+
+
+@pytest.mark.parametrize(
+    "case,reason",
+    [
+        ("empty_sources", "EXACT_TABLE_SOURCES_REQUIRED"),
+        ("unknown_source", "UNKNOWN_SOURCE_ID"),
+        ("unqualified_gate", "REAL_QUALITY_GATE_NOT_AUTHORIZED"),
+        ("wrong_purpose", "PLAN_SCOPE_OR_TABLE_SET_MISMATCH"),
+        ("other_table_source", "UNKNOWN_OR_CONFLICTING_SOURCE"),
+    ],
+)
+def test_cold_revalidates_offline_plan_and_per_table_sources(fixture, case, reason):
+    fixture.build()
+    root = fixture.root / "plan-repacked"
+    shutil.copytree(fixture.output, root)
+    path = root / "evidence/input-plan.json"
+    plan = json.loads(path.read_bytes())
+    if case == "empty_sources":
+        plan["tables"]["dwd_security"]["source_ids"] = []
+    elif case == "unknown_source":
+        plan["tables"]["dwd_security"]["source_ids"] = ["unknown"]
+    elif case == "unqualified_gate":
+        plan["quality_gates"]["471"]["status"] = "unqualified"
+    elif case == "wrong_purpose":
+        plan["purpose"] = "real_build"
+    else:
+        # A globally known raw member is not automatically admitted to this table.
+        plan["tables"]["dwd_security"]["source_ids"] = ["repair"]
+    _save(path, plan)
+    _repack_synthetic_image(root)
+    shutil.rmtree(fixture.root / "sources")
+    with (
+        mock.patch.object(b, "_verify_source", side_effect=AssertionError("external source read")),
+        pytest.raises(b.Base22Error, match=reason),
+    ):
+        b.verify_base22(root)
+
+
+def test_cold_rejects_row_lineage_admitted_only_to_another_table(fixture):
+    fixture.build()
+    root = fixture.root / "lineage-repacked"
+    shutil.copytree(fixture.output, root)
+    manifest = json.loads((root / "manifest.json").read_bytes())
+    item = next(f for f in manifest["files"] if f.get("table") == "dwd_security")
+    member = manifest["source_manifests"]["repair"]["raw_members"][0]
+    rows = list(b._rows(root / item["path"], fixture.schemas["dwd_security"]))
+    rows[0].update(
+        record_source=member["record_source"],
+        source_revision=member["source_revision"],
+        source_artifact_sha256=member["sha256"],
+    )
+    pq.write_table(
+        pa.Table.from_pylist(rows, schema=fixture.schemas["dwd_security"]), root / item["path"]
+    )
+    _repack_synthetic_image(root)
+    shutil.rmtree(fixture.root / "sources")
+    with pytest.raises(b.Base22Error, match="UNKNOWN_OR_CONFLICTING_SOURCE"):
+        b.verify_base22(root)
+
+
+@pytest.mark.parametrize("case", ["extra_zero_partition", "renamed_empty", "legal_empty"])
+def test_cold_checks_physical_partitions_even_without_rows(fixture, case):
+    empty_table = "dwd_quality_exception"
+    if case != "extra_zero_partition":
+        # Only synthetic fixture files are removed before declaring a genuinely empty table.
+        shutil.rmtree(fixture.root / "sources/history/payload" / empty_table)
+        fixture.history[empty_table] = []
+        fixture.refresh()
+        fixture.plan["tables"][empty_table]["required_partitions"] = {
+            "empty": {"rows": 0, "key_digest": "sha256:" + hashlib.sha256().hexdigest()}
+        }
+    fixture.build()
+    root = fixture.root / "partition-repacked"
+    shutil.copytree(fixture.output, root)
+    manifest = json.loads((root / "manifest.json").read_bytes())
+    if case == "extra_zero_partition":
+        name = "dwd_security_bar"
+        part = "interval_size=1d/observation_start_year=2026/observation_start_month=6"
+        path = root / "payload" / name / part / "part-00000.parquet"
+        path.parent.mkdir(parents=True)
+        pq.write_table(pa.Table.from_pylist([], schema=fixture.schemas[name]), path)
+        manifest["files"].append(
+            {**b._file_record(root, path), "table": name, "partition": part, "row_count": 0}
+        )
+    elif case == "renamed_empty":
+        item = next(f for f in manifest["files"] if f.get("table") == empty_table)
+        original = root / item["path"]
+        path = root / "payload" / empty_table / "all/part-00000.parquet"
+        path.parent.mkdir()
+        original.rename(path)
+        original.parent.rmdir()
+        item.update(path=path.relative_to(root).as_posix(), partition="all")
+    _save(root / "manifest.json", manifest)
+    _repack_synthetic_image(root)
+    if case == "legal_empty":
+        assert b.verify_base22(root)["tables"][empty_table]["rows"] == 0
+    else:
+        with pytest.raises(b.Base22Error, match="PHYSICAL_PARTITION_SET_MISMATCH"):
+            b.verify_base22(root)
+
+
+@pytest.mark.parametrize("mode", ["build", "cold"])
+def test_daily_calendar_uses_shanghai_date_and_preserves_the_instant(fixture, mode):
+    # UTC July 30 is already July 31 in Shanghai. The daily bar must use July 31.
+    instant = datetime(2026, 7, 30, 16, 30, tzinfo=timezone.utc)
+    if mode == "build":
+        fixture.history["dwd_security_bar"][0]["observation_start"] = instant
+        fixture.refresh()
+        result = fixture.build()
+        root = fixture.output
+    else:
+        fixture.build()
+        root = fixture.root / "shanghai-repacked"
+        shutil.copytree(fixture.output, root)
+        manifest = json.loads((root / "manifest.json").read_bytes())
+        item = next(
+            f
+            for f in manifest["files"]
+            if f.get("table") == "dwd_security_bar"
+            and "observation_start_month=7" in f["partition"]
+        )
+        rows = list(b._rows(root / item["path"], fixture.schemas["dwd_security_bar"]))
+        rows[0]["observation_start"] = instant
+        pq.write_table(
+            pa.Table.from_pylist(rows, schema=fixture.schemas["dwd_security_bar"]),
+            root / item["path"],
+        )
+        # A changed version key requires a correspondingly frozen key census.
+        _repack_synthetic_image(root)
+        manifest = json.loads((root / "manifest.json").read_bytes())
+        plan_path = root / "evidence/input-plan.json"
+        plan = json.loads(plan_path.read_bytes())
+        plan["tables"]["dwd_security_bar"]["required_partitions"] = {
+            key: {"rows": value["rows"], "key_digest": value["key_digest"]}
+            for key, value in manifest["tables"]["dwd_security_bar"]["partitions"].items()
+        }
+        _save(plan_path, plan)
+        _repack_synthetic_image(root)
+        result = b.verify_base22(root)
+    assert result["tables"]["dwd_security_bar"]["rows"] == 2
+    manifest = json.loads((root / "manifest.json").read_bytes())
+    item = next(
+        f
+        for f in manifest["files"]
+        if f.get("table") == "dwd_security_bar" and "observation_start_month=7" in f["partition"]
+    )
+    row = next(b._rows(root / item["path"], fixture.schemas["dwd_security_bar"]))
+    assert row["observation_start"] == instant
+    assert row["calendar_session_id"] == "calendar-2026-07-31"
+
+
+@pytest.mark.parametrize("case", ["absent", "changed"])
+def test_cold_requires_image_local_qualification_evidence(fixture, case):
+    fixture.build()
+    root = fixture.root / "evidence-repacked"
+    shutil.copytree(fixture.output, root)
+    manifest_path = root / "manifest.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    relative = "evidence/qualification/august/evidence/calendar.json"
+    path = root / relative
+    if case == "absent":
+        path.unlink()
+        manifest["files"] = [f for f in manifest["files"] if f["path"] != relative]
+        _save(manifest_path, manifest)
+        reason = "INDEPENDENT_FILE_REQUIRED"
+    else:
+        document = json.loads(path.read_bytes())
+        document["open_dates"] = []
+        _save(path, document)
+        reason = "QUALIFICATION_EVIDENCE_IDENTITY_MISMATCH"
+    _repack_synthetic_image(root)
+    shutil.rmtree(fixture.root / "sources")
+    with pytest.raises(b.Base22Error, match=reason):
+        b.verify_base22(root)

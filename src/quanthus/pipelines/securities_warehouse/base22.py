@@ -15,7 +15,7 @@ import shutil
 import sqlite3
 import sys
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path, PurePosixPath
@@ -352,19 +352,26 @@ def _admitted(sources: Mapping[str, Any]) -> set[tuple[str, str, str]]:
     }
 
 
-def _verify_source(binding: Mapping[str, Any]) -> dict[str, Any]:
-    root = Path(binding["root"])
-    manifest_path = _physical(root, "manifest.json")
-    manifest = _object(manifest_path)
+def _validate_source_declaration(binding: Mapping[str, Any], manifest: dict[str, Any]) -> None:
     if (
         manifest.get("schema_version") != 1
-        or file_sha(manifest_path) != binding["manifest_sha256"]
-        or _physical(root, "READY").read_text().strip() != binding["manifest_sha256"]
         or manifest.get("kind") != "base22_typed_projection_input"
         or manifest.get("purpose") != "synthetic_contract"
         or manifest.get("role") != binding["role"]
         or not binding.get("authority")
         or not manifest.get("raw_members")
+    ):
+        raise Base22Error("SOURCE_ADMISSION_MISMATCH")
+
+
+def _verify_source(binding: Mapping[str, Any]) -> dict[str, Any]:
+    root = Path(binding["root"])
+    manifest_path = _physical(root, "manifest.json")
+    manifest = _object(manifest_path)
+    _validate_source_declaration(binding, manifest)
+    if (
+        file_sha(manifest_path) != binding["manifest_sha256"]
+        or _physical(root, "READY").read_text().strip() != binding["manifest_sha256"]
     ):
         raise Base22Error("SOURCE_ADMISSION_MISMATCH")
     files = manifest["files"] + manifest["raw_members"]
@@ -374,7 +381,7 @@ def _verify_source(binding: Mapping[str, Any]) -> dict[str, Any]:
     return manifest
 
 
-def _freeze(plan: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
+def _validate_plan_scope(plan: dict[str, Any], contract: dict[str, Any]) -> None:
     if (
         plan.get("schema_version") != 1
         or plan.get("contract_id") != CONTRACT_ID
@@ -385,7 +392,22 @@ def _freeze(plan: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
         or set(plan.get("quality_gates", {})) != {str(i) for i in range(470, 475)}
     ):
         raise Base22Error("PLAN_SCOPE_OR_TABLE_SET_MISMATCH")
-    sources = {name: _verify_source(binding) for name, binding in plan["sources"].items()}
+
+
+def _validate_plan(
+    plan: dict[str, Any],
+    contract: dict[str, Any],
+    sources: dict[str, Any],
+    evidence: Callable[[str, str], dict[str, Any]],
+) -> None:
+    """Shared offline contract checks; only the evidence resolver selects a root."""
+    _validate_plan_scope(plan, contract)
+    if set(sources) != set(plan["sources"]):
+        raise Base22Error("SOURCE_MANIFEST_SET_MISMATCH")
+    for name, binding in plan["sources"].items():
+        if not _SAFE.fullmatch(name) or name in {".", ".."}:
+            raise Base22Error("SOURCE_ID_UNSAFE")
+        _validate_source_declaration(binding, sources[name])
     if not sources or {binding["role"] for binding in plan["sources"].values()} != {
         "history",
         "repair",
@@ -402,7 +424,7 @@ def _freeze(plan: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
         member["path"] for member in sources[calendar_source]["raw_members"]
     }:
         raise Base22Error("AUTHORITATIVE_CALENDAR_EVIDENCE_REQUIRED")
-    calendar = _object(_physical(Path(plan["sources"][calendar_source]["root"]), calendar_path))
+    calendar = evidence(calendar_source, calendar_path)
     if (
         calendar.get("kind") != "base22_authoritative_calendar_census"
         or calendar.get("through_date") != THROUGH.isoformat()
@@ -437,15 +459,15 @@ def _freeze(plan: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
             member["path"] for member in sources[source_id]["raw_members"]
         }:
             raise Base22Error("AUGUST_EVIDENCE_NOT_IN_SOURCE_CLOSURE")
-        evidence = _object(_physical(Path(plan["sources"][source_id]["root"]), relative))
+        declaration = evidence(source_id, relative)
         if (
-            evidence.get("table") != table
-            or evidence.get("through_date") != THROUGH.isoformat()
-            or evidence.get("mode") != disposition["mode"]
-            or not evidence.get("census_digest")
+            declaration.get("table") != table
+            or declaration.get("through_date") != THROUGH.isoformat()
+            or declaration.get("mode") != disposition["mode"]
+            or not declaration.get("census_digest")
             or (
                 disposition["mode"] == "no_change"
-                and evidence.get("no_required_changes") is not True
+                and declaration.get("no_required_changes") is not True
             )
         ):
             raise Base22Error("AUGUST_CHANGE_CENSUS_UNPROVEN")
@@ -463,7 +485,49 @@ def _freeze(plan: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
             and not projected_rows
         ):
             raise Base22Error("AUGUST_DISPOSITION_OUTPUT_MISMATCH")
+
+
+def _freeze(plan: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
+    _validate_plan_scope(plan, contract)
+    sources = {name: _verify_source(binding) for name, binding in plan["sources"].items()}
+    _validate_plan(
+        plan,
+        contract,
+        sources,
+        lambda name, relative: _object(_physical(Path(plan["sources"][name]["root"]), relative)),
+    )
     return sources
+
+
+def _qualification_members(plan: dict[str, Any]) -> list[tuple[str, str]]:
+    return sorted(
+        {
+            (plan["calendar_evidence"]["source_id"], plan["calendar_evidence"]["path"]),
+            *(
+                (
+                    entry["august_disposition"]["evidence_source"],
+                    entry["august_disposition"]["evidence_path"],
+                )
+                for entry in plan["tables"].values()
+            ),
+        }
+    )
+
+
+def _qualification_path(source_id: str, relative: str) -> str:
+    return "evidence/qualification/" + source_id + "/" + relative
+
+
+def _image_evidence(
+    root: Path, sources: dict[str, Any], name: str, relative: str
+) -> dict[str, Any]:
+    # Historical roots are archival strings. Evidence identities are checked against
+    # the exact archived source manifest, and bytes are read from the image only.
+    member = next(item for item in sources[name]["raw_members"] if item["path"] == relative)
+    path = _physical(root, _qualification_path(name, relative), independent=True)
+    if file_sha(path) != member["sha256"] or path.stat().st_size != member["size_bytes"]:
+        raise Base22Error("QUALIFICATION_EVIDENCE_IDENTITY_MISMATCH")
+    return _object(path)
 
 
 def _normalize_basis(row: dict[str, Any], source: dict[str, Any], stats: dict[str, int]) -> None:
@@ -592,6 +656,53 @@ def freeze_base22_plan(plan: dict[str, Any], contract: dict[str, Any]) -> dict[s
         raise Base22Error("INPUT_PLAN_UNREADABLE_OR_INVALID") from exc
 
 
+def _visible_reference(row: dict[str, Any], target: dict[str, Any], coordinate: Any) -> bool:
+    knowledge = row["knowledge_from"]
+    if isinstance(coordinate, date) and not isinstance(coordinate, datetime):
+        coordinate = datetime.combine(coordinate, datetime.min.time(), SHANGHAI)
+    return bool(
+        target["knowledge_from"] <= knowledge
+        and (target["knowledge_to"] is None or knowledge < target["knowledge_to"])
+        and (
+            "effective_from" not in target
+            or target["effective_from"] <= coordinate
+            and (target["effective_to"] is None or coordinate < target["effective_to"])
+        )
+    )
+
+
+def _calendar_reference_matches(
+    db: sqlite3.Connection,
+    row: dict[str, Any],
+    session: dict[str, Any],
+    table: dict[str, Any],
+    coordinate: Any,
+    physical_schemas: dict[str, Any],
+) -> bool:
+    # The model grants daily market bars a business-date coordinate; it does not
+    # grant every calendar-linked event a common open/close window or fill rule.
+    if (
+        table["time_profile"] == "market_observation"
+        and row.get("interval_size") == "1d"
+        and session["trade_date"] != business_date(row["observation_start"])
+    ):
+        return False
+    listing_fk = next((fk for fk in table["foreign_keys"] if fk["table"] == "dwd_listing"), None)
+    if listing_fk is None:
+        return True
+    for (document,) in db.execute(
+        "SELECT doc FROM refs WHERE t=? AND c=? AND v=?",
+        (listing_fk["table"], listing_fk["reference_column"], row[listing_fk["column"]]),
+    ):
+        listing = _decode(document, physical_schemas[listing_fk["table"]])
+        if (
+            _visible_reference(row, listing, coordinate)
+            and listing["venue_id"] == session["venue_id"]
+        ):
+            return True
+    return False
+
+
 def _scan_checks(
     db: sqlite3.Connection,
     plan: dict[str, Any],
@@ -651,30 +762,26 @@ def _scan_checks(
                 if value is None and fk["nullable"]:
                     continue
                 matched = False
+                calendar_mismatch = False
                 for (reference,) in db.execute(
                     "SELECT doc FROM refs WHERE t=? AND c=? AND v=?",
                     (fk["table"], fk["reference_column"], value),
                 ):
                     target = _decode(reference, physical_schemas[fk["table"]])
-                    knowledge = row["knowledge_from"]
                     coordinate = row[rule["cutoff_field"]]
-                    if isinstance(coordinate, date) and not isinstance(coordinate, datetime):
-                        coordinate = datetime.combine(coordinate, datetime.min.time(), SHANGHAI)
-                    if (
-                        target["knowledge_from"] <= knowledge
-                        and (target["knowledge_to"] is None or knowledge < target["knowledge_to"])
-                        and (
-                            "effective_from" not in target
-                            or target["effective_from"] <= coordinate
-                            and (
-                                target["effective_to"] is None
-                                or coordinate < target["effective_to"]
-                            )
-                        )
-                    ):
+                    if _visible_reference(row, target, coordinate):
+                        if fk[
+                            "table"
+                        ] == "dwd_trading_calendar" and not _calendar_reference_matches(
+                            db, row, target, table, coordinate, physical_schemas
+                        ):
+                            calendar_mismatch = True
+                            continue
                         matched = True
                         break
                 if not matched:
+                    if calendar_mismatch:
+                        raise Base22Error("CALENDAR_DATE_OR_VENUE_CLOSURE_FAILED:" + name)
                     raise Base22Error("FOREIGN_KEY_OR_TEMPORAL_CLOSURE_FAILED:" + name)
         summaries[name] = summary
     previous_key, previous_end = None, None
@@ -734,6 +841,39 @@ def _materialize(
     return files
 
 
+def _check_image_partitions(root: Path, manifest: dict[str, Any], plan: dict[str, Any]) -> None:
+    """Physical table/partition closure includes zero-row files and empty directories."""
+    expected = {
+        (name, part): name + "/" + part + "/part-00000.parquet"
+        for name, entry in plan["tables"].items()
+        for part in entry["required_partitions"]
+    }
+    declared = {}
+    for item in manifest["files"]:
+        if "table" not in item:
+            continue
+        key = (item["table"], item["partition"])
+        if key in declared or not item["path"].startswith("payload/"):
+            raise Base22Error("PHYSICAL_PARTITION_SET_MISMATCH")
+        declared[key] = item["path"].removeprefix("payload/")
+    payload = root / "payload"
+    directories = {
+        path.relative_to(payload).as_posix() for path in payload.rglob("*") if path.is_dir()
+    }
+    expected_directories = {
+        parent.as_posix()
+        for relative in expected.values()
+        for parent in PurePosixPath(relative).parents
+        if parent != PurePosixPath(".")
+    }
+    if (
+        declared != expected
+        or _inventory(payload) != set(expected.values())
+        or directories != expected_directories
+    ):
+        raise Base22Error("PHYSICAL_PARTITION_SET_MISMATCH")
+
+
 def _scan_image(
     root: Path,
     manifest: dict[str, Any],
@@ -746,8 +886,12 @@ def _scan_image(
     import tempfile
 
     physical_schemas = schemas(model, extension)
+    _check_image_partitions(root, manifest, plan)
     sources = manifest["source_manifests"]  # archival objects, never dereference their roots
-    admitted = _admitted(sources)
+    admitted = {
+        name: _admitted({source_id: sources[source_id] for source_id in entry["source_ids"]})
+        for name, entry in plan["tables"].items()
+    }
     with tempfile.TemporaryDirectory(prefix="base22-verify-", dir=scratch) as tmp:
         db = _db(Path(tmp) / "scan.sqlite")
         try:
@@ -763,7 +907,9 @@ def _scan_image(
                 for row in _rows(
                     _physical(root, item["path"], independent=True), physical_schemas[name]
                 ):
-                    _check_row(row, contract["tables"][name], physical_schemas[name], admitted)
+                    _check_row(
+                        row, contract["tables"][name], physical_schemas[name], admitted[name]
+                    )
                     if name == "dwd_security_bar" and row["price_basis"] != "UNADJUSTED":
                         raise Base22Error("CANONICAL_PRICE_BASIS_UNKNOWN")
                     key = canonical(
@@ -829,6 +975,14 @@ def verify_base22(root: Path, *, require_ready: bool = True) -> dict[str, Any]:
                 or _object(archived) != manifest["source_manifests"][source_id]
             ):
                 raise Base22Error("ARCHIVED_SOURCE_IDENTITY_MISMATCH")
+        _validate_plan(
+            plan,
+            contract,
+            manifest["source_manifests"],
+            lambda name, relative: _image_evidence(
+                root, manifest["source_manifests"], name, relative
+            ),
+        )
         summary = _scan_image(root, manifest, plan, contract, model, extension)
         if summary != manifest["tables"] or digest(summary) != manifest["semantic_digest"]:
             raise Base22Error("RECOMPUTED_SEMANTICS_MISMATCH")
@@ -863,6 +1017,24 @@ def build_base22(*, plan: dict[str, Any], config_root: Path, output: Path) -> di
     sources = envelope["source_manifests"]
     if not output.is_absolute() or output != output.resolve():
         raise Base22Error("OUTPUT_REQUIRES_PHYSICAL_ABSOLUTE_PATH")
+    job = output.with_name("." + output.name + ".job")
+    # Validate BOTH writable roots before mkdir, lock, attempt or identity writes.
+    # Existing physical staging is allowed only for the same job's checkpoint reuse.
+    for writable, label in ((output, "OUTPUT"), (job, "STAGING")):
+        if (
+            writable.is_symlink()
+            or writable != writable.resolve()
+            or any(parent.is_symlink() for parent in writable.parents)
+            or writable.exists()
+            and not writable.is_dir()
+        ):
+            raise Base22Error(label + "_REQUIRES_PHYSICAL_DIRECTORY")
+        if any(
+            writable.is_relative_to(Path(item["root"]).resolve())
+            or Path(item["root"]).resolve().is_relative_to(writable)
+            for item in plan["sources"].values()
+        ):
+            raise Base22Error(label + "_OVERLAPS_SOURCE")
     identity = digest(
         {
             "plan": plan,
@@ -876,20 +1048,12 @@ def build_base22(*, plan: dict[str, Any], config_root: Path, output: Path) -> di
             },
         }
     )
-    if output.is_symlink() or any(
-        output == Path(item["root"])
-        or output.is_relative_to(Path(item["root"]))
-        or Path(item["root"]).is_relative_to(output)
-        for item in plan["sources"].values()
-    ):
-        raise Base22Error("OUTPUT_OVERLAPS_SOURCE")
     if output.exists():
         result = verify_base22(output)
         if _object(output / "manifest.json")["job_identity"] != identity:
             raise Base22Error("SEALED_OUTPUT_INPUT_CHANGED")
         return result
     output.parent.mkdir(parents=True, exist_ok=True)
-    job = output.with_name("." + output.name + ".job")
     job.mkdir(exist_ok=True)
     lock = job / "LOCK"
     try:
@@ -1020,6 +1184,14 @@ def build_base22(*, plan: dict[str, Any], config_root: Path, output: Path) -> di
             shutil.copyfile(_physical(Path(binding["root"]), "manifest.json"), target)
             if file_sha(target) != binding["manifest_sha256"]:
                 raise Base22Error("SOURCE_MANIFEST_CHANGED_DURING_COPY")
+            files.append(_file_record(image, target))
+        for source_id, relative in _qualification_members(plan):
+            target = image / _qualification_path(source_id, relative)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(_physical(Path(plan["sources"][source_id]["root"]), relative), target)
+            # Bind copied qualification bytes to their original member identity now,
+            # rather than relying only on the later whole-source change check.
+            _image_evidence(image, sources, source_id, relative)
             files.append(_file_record(image, target))
         _write(image / "evidence/input-plan.json", plan)
         files.append(_file_record(image, image / "evidence/input-plan.json"))

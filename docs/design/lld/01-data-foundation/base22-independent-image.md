@@ -296,6 +296,20 @@ explicitly an observation-scope scan, not 33-table image, source qualification o
 Full native/source unions, revision priority, required domain closure, global relationships and
 all five data-quality gates remain mandatory before a complete candidate or final READY.
 
+The explicit `p10-base22-statement-envelope-exact-v1` projection in `base22_financial.py`
+shares one hash-verified decoded envelope across reports, concepts and facts. Its one-envelope
+limits are 1 MiB decompressed bytes and 4,096 items; exceeding them blocks that scope rather
+than trimming it. The unchanged public legacy expansion delegates to the same private row
+construction. The new projection separately classifies Decimal tokens without ambient context
+rounding: exact scalars use the existing Decimal(38,10), other original strings use the native
+text column, and genuine null/blank observations alone are nil. All original tokens stay in the
+local raw archive. Original JSON numeric scalars without an exact token block this route.
+Actual acquisition instants and representable aware publication instants are preserved;
+date-only publication remains unavailable and sub-microsecond loss blocks serialization.
+Local raw/identity reproduction verifies all three typed row sets and their safe evidence without
+opening source paths. These bounded outputs do not qualify an entire supplier universe, a native
+union, historical provider availability or a complete Base 2.2; those remain independent gates.
+
 CN02 retains one eventual complete entity set plus one bounded partition/check TMP. An owned
 history partition can move into the final entity layout after its consumers finish; it must not
 be copied as a second full history or linked to its original source. Exact move order, interruption

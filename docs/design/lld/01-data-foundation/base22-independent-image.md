@@ -335,3 +335,24 @@ ownership receipts, simultaneously live files, actual output expansion and globa
 spills must fit a freshly frozen device-specific budget. External full-image acceptance copies
 require a verified destination budget and separate transport/execution authority. A bounded local
 relocation check does not replace the two formal complete-image relocations and corruption tests.
+### Retained F10 dividend scope
+
+`base22_f10_dividend.py` defines `p10-base22-f10-dividend-exact-v1` for a new,
+bounded source family. It is independent of the missing legacy normalization
+revision and cannot restore or impersonate correction001. Only hash-verified
+`分红扩股` raw text is consumed, with at most 1 MiB and 512 dated blocks per
+envelope. Every dated block receives a safe disposition. Implemented standard
+per-ten plans with an explicit ex-dividend date produce exact per-share atoms;
+preferred-share notes, unsupported plans, unknown/conflicting dates and schema
+precision limits remain quarantined. No section or no block is not proof that
+there was no required change.
+
+The new key binds stock code, reporting coordinate and explicit ex-dividend
+date. Actual source acquisition and dated parent availability govern knowledge;
+provider acquisition and date-only publication remain unavailable. Original
+per-ten tokens are retained in the local raw archive and unit provenance. A
+local vocabulary view consumes the already normalized per-share atoms exactly
+once, preserving the immutable legacy vocabulary. No source priority over native
+or other provider observations is inferred. Native union, complete exception
+disposition, full raw scope qualification and cold reproduction remain separate
+delivery gates. Contract regressions live in `test_base22_f10_dividend.py`.

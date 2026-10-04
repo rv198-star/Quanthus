@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
 from .base22 import THROUGH, digest
 from .base22_bounded import BoundedError
-from .base22_outputs import instant
+from .base22_outputs import financial_concept_versions, instant, knowledge_versions
 from .base22_precision import decimal_profile
 from .financial_reporting import (
     FinancialCompanyResolver,
@@ -148,3 +149,39 @@ def verify_statement_observation(
     expected_rows, expected_evidence = statement_observation(raw, source=source, resolver=resolver)
     if rows != expected_rows or evidence != expected_evidence:
         raise BoundedError("FINANCIAL_RAW_TO_TYPED_OUTPUT_MISMATCH")
+
+
+def statement_batch(
+    envelopes: Iterable[tuple[dict[str, Any], FinancialStatementSource]],
+    *,
+    resolver: FinancialCompanyResolver,
+    rules: dict[str, dict[str, Any]],
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
+    """Merge one bounded observation group; preserve all input revision evidence.
+
+    Identical bodies do not gain new knowledge versions merely because they were
+    retrieved again. Changed bodies retain actual new clocks; equal-clock body
+    conflicts fail. Cross-batch/native union remains the complete image's owner.
+    """
+    combined: dict[str, list[dict[str, Any]]] = {table: [] for table in TABLES}
+    evidence: list[dict[str, Any]] = []
+    for raw, source in envelopes:
+        if len(evidence) >= 64:
+            raise BoundedError("FINANCIAL_BATCH_ENVELOPE_BOUND_FAILED")
+        rows, item = statement_observation(raw, source=source, resolver=resolver)
+        for table in TABLES:
+            if len(combined[table]) + len(rows[table]) > 32768:
+                raise BoundedError("FINANCIAL_BATCH_ROW_BOUND_FAILED")
+            combined[table].extend(rows[table])
+        evidence.append(item)
+    for table in (TABLES[0], TABLES[2]):
+        combined[table] = knowledge_versions(combined[table], rules[table])
+    combined[TABLES[1]] = financial_concept_versions(combined[TABLES[1]])
+    return combined, {
+        "contract_id": CONTRACT_ID,
+        "envelope_evidence": evidence,
+        "row_counts": {t: len(combined[t]) for t in TABLES},
+        "typed_rows_sha256": {t: digest(combined[t]) for t in TABLES},
+        "source_observations_retained": len(evidence),
+        "complete_native_union": "NOT_QUALIFIED",
+    }

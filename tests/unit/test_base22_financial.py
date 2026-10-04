@@ -193,6 +193,44 @@ def test_unknown_dated_company_stays_explicitly_unavailable():
     assert not evidence["historical_acceptance_asserted"]
 
 
+@pytest.mark.parametrize("changed", [False, True])
+def test_bounded_batch_retains_only_real_body_versions(changed):
+    first, source, resolver = fixture("12")
+    second, _, _ = fixture("13" if changed else "12")
+    second["acquired_at"] = "2026-08-02T10:24:43+08:00"
+    rules = json.loads(Path("config/pipelines/base22-independent-image.v1.json").read_bytes())[
+        "tables"
+    ]
+    rows, evidence = adapter.statement_batch(
+        [(first, source), (second, source)], resolver=resolver, rules=rules
+    )
+    facts = rows[adapter.TABLES[2]]
+    assert len(facts) == (2 if changed else 1)
+    assert evidence["source_observations_retained"] == 2
+    if changed:
+        assert facts[0]["knowledge_to"] == facts[1]["knowledge_from"]
+        assert facts[1]["knowledge_to"] is None
+
+
+def test_equal_clock_conflicting_body_fails_without_choosing_source():
+    first, source, resolver = fixture("12")
+    second, _, _ = fixture("13")
+    rules = json.loads(Path("config/pipelines/base22-independent-image.v1.json").read_bytes())[
+        "tables"
+    ]
+    with pytest.raises(RuntimeError, match="EQUAL_CLOCK_BODY_CONFLICT"):
+        adapter.statement_batch([(first, source), (second, source)], resolver=resolver, rules=rules)
+
+
+def test_batch_envelope_bound():
+    raw, source, resolver = fixture()
+    rules = json.loads(Path("config/pipelines/base22-independent-image.v1.json").read_bytes())[
+        "tables"
+    ]
+    with pytest.raises(BoundedError, match="BATCH_ENVELOPE_BOUND_FAILED"):
+        adapter.statement_batch([(raw, source)] * 65, resolver=resolver, rules=rules)
+
+
 @pytest.mark.parametrize("change", ["value", "time", "source", "rows", "evidence"])
 def test_repacked_semantic_attacks_rejected(change):
     raw, source, resolver = fixture()

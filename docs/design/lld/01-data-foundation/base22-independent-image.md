@@ -309,6 +309,10 @@ date-only publication remains unavailable and sub-microsecond loss blocks serial
 Local raw/identity reproduction verifies all three typed row sets and their safe evidence without
 opening source paths. These bounded outputs do not qualify an entire supplier universe, a native
 union, historical provider availability or a complete Base 2.2; those remain independent gates.
+One batch accepts at most 64 envelopes and 32,768 projected rows per table. Its existing governed
+knowledge-version and cumulative concept rules collapse unchanged rolling bodies, retain genuine
+changed versions and reject equal-clock conflicts. Every original observation remains in evidence;
+the complete-image assembler still owns global concepts and the native/cross-batch union.
 
 CN02 retains one eventual complete entity set plus one bounded partition/check TMP. An owned
 history partition can move into the final entity layout after its consumers finish; it must not

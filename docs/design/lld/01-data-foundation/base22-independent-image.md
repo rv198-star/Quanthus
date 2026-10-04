@@ -319,6 +319,15 @@ wide-row JSON hashing for unchanged weekly observations. Typed concept evidence 
 merged once across every job-local file under the existing DuckDB memory/spill limits; counting
 and writing consume that compact materialization. Cross-file semantic conflicts fail before output.
 
+The scoped index adapter `base22_index.py` matches each retained code to its exact dated native
+index identity and source release business date. It preserves actual acquisition instants and
+parent knowledge floors; an earlier source clock cannot validate a future bar. Every typed
+Decimal must retain the original value and source Float must round-trip its original bits. An
+unavailable original provider Decimal stays explicitly unavailable, with raw bytes retained;
+this is not historical supplier/PIT qualification. The native index model permits an unavailable
+calendar link, so the adapter neither invents an index venue nor applies listing/open-close rules.
+Its August observations still require native union and whole-image admission independently.
+
 CN02 retains one eventual complete entity set plus one bounded partition/check TMP. An owned
 history partition can move into the final entity layout after its consumers finish; it must not
 be copied as a second full history or linked to its original source. Exact move order, interruption

@@ -291,16 +291,18 @@ def test_global_concept_semantics_conflict_fails_before_output(tmp_path):
         pq.write_table(
             pa.Table.from_pylist([base, dict(base, concept_name="other name")], schema=schema), path
         )
-        with GlobalScan(budget) as scan:
-            with pytest.raises(BoundedError, match="SOURCE_SEMANTICS_CONFLICT"):
-                adapter.merge_concept_files(
-                    scan,
-                    [path],
-                    schema=schema,
-                    rule=rule,
-                    admitted=set(),
-                    output=budget.root / "merged.parquet",
-                )
+        with (
+            GlobalScan(budget) as scan,
+            pytest.raises(BoundedError, match="SOURCE_SEMANTICS_CONFLICT"),
+        ):
+            adapter.merge_concept_files(
+                scan,
+                [path],
+                schema=schema,
+                rule=rule,
+                admitted=set(),
+                output=budget.root / "merged.parquet",
+            )
         assert not (budget.root / "merged.parquet").exists()
 
 

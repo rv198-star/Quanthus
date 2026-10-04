@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import importlib
 import json
+import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from .base22 import canonical, digest, file_sha
@@ -131,3 +134,26 @@ def consume_history(budget: Budget, closure: dict[str, str], descriptor_sha: str
         "rows": sum(item["rows"] for item in descriptor["files"].values()),
         "bytes": sum(item["size_bytes"] for item in descriptor["files"].values()),
     }
+
+
+@contextmanager
+def consume_job_history(
+    budget: Budget, closure: dict[str, str], descriptor_sha: str
+) -> Iterator[dict[str, Any]]:
+    """Resume only the sealed job-local dependency, with whole-job resource accounting.
+
+    No generic cache/workspace adoption: job-root ownership, exact immutable file
+    set and the complete semantic closure must match before any downstream write.
+    Existing partial outputs count towards the same budget and are never removed.
+    The single controller must finish a stage before starting another consumer.
+    """
+    history = consume_history(budget, closure, descriptor_sha)
+    budget.check()
+    budget._thread = threading.Thread(target=budget._monitor, daemon=True)
+    budget._thread.start()
+    try:
+        yield history
+        budget.check()
+    finally:
+        budget._stop.set()
+        budget._thread.join()

@@ -4,12 +4,12 @@
 | --- | --- |
 | Parent | [Data foundation](../01-data-foundation.md) |
 | Design status | draft |
-| Delivery gate | open; synthetic image engineering and authorized real source assessment |
+| Delivery gate | open for authorized bounded observation outputs; complete image remains blocked by source, repair, coverage and capacity gates |
 | Owner | P10; Owner's CN02 engineering instruction, 2026-10-04 |
 | Data work | #470, #471, #472, #473, #474; no issue acceptance implied |
 | Contract | `config/pipelines/base22-independent-image.v1.json` |
-| Code | `src/quanthus/pipelines/securities_warehouse/base22.py`, `base22_sources.py`, `base22_bounded.py`, `base22_history.py`, `base22_capacity.py`, `base22_qualification.py`, `base22_august.py` |
-| Tests | `tests/unit/test_base22_independent_image.py`, `test_base22_real_sources.py`, `test_base22_bounded.py`, `test_base22_qualification.py` |
+| Code | `src/quanthus/pipelines/securities_warehouse/base22.py`, `base22_sources.py`, `base22_bounded.py`, `base22_history.py`, `base22_capacity.py`, `base22_qualification.py`, `base22_august.py`, `base22_outputs.py`, `base22_output_audit.py` |
+| Tests | `tests/unit/test_base22_independent_image.py`, `test_base22_real_sources.py`, `test_base22_bounded.py`, `test_base22_qualification.py`, `test_base22_outputs.py`, `test_base22_output_audit.py` |
 
 This additive construction contract implements an independent physical candidate through
 2026-08-31 by business date in Asia/Shanghai. The accepted July model, extension and production
@@ -208,7 +208,7 @@ make check PYTHON=.venv/bin/python
 
 `build_base22(plan=..., config_root=..., output=...)` is a pointerless synthetic API. For an
 already sealed candidate, `verify_base22(image_root)` needs only the image and installed ordinary
-code. There is no real-build, promotion, publication or synchronization CLI in this increment.
+code. There is no complete real-image, promotion, publication or synchronization CLI in this increment.
 
 The approved real governance/build scope must bind exact CN02 roots and manifest/member
 identities, existing read access, permitted row/date scope and a frozen isolated output/resource
@@ -232,3 +232,55 @@ compare exact image digests, independently cold-verify the transferred physical 
 old production package and pointer digest, then use the existing release/CAS/rollback gates.
 CN01 remains the baseline throughout preparation. September Daily packages must subsequently
 bind the exact accepted Base 2.2 manifest/content identity; they are not a dependency of reading it.
+
+## Authorized bounded observation outputs
+
+`base22_outputs.py` writes exact pre-frozen partitions of actual retained observations under
+the separate CN02 Phase2 authority. It reuses the governed announcement, corporate-action,
+ownership and financial adapters, while requiring actual acquisition clocks where available.
+Missing provider acquisition remains unknown. New tail and retrospective ST/calendar observations
+use their actual current warehouse observation time, with historical PIT admission withheld.
+The seven dividends have a separate handler; no production Daily date gate is relaxed.
+
+The shared job-local history contains independent physical identity/calendar lookup files,
+the exact new tail observations and the unchanged 4,173-item visibility ledger. Every downstream
+stage binds the same closure and descriptor through `consume_job_history`; it cannot replace
+that dependency with the final August image. Resume checks the original ownership root and
+complete immutable file set before any write. Partial/failing outputs still count against the
+job's allocation and filesystem floor. Source files and old attempts are never retired.
+
+Tail rows retain exact Decimal values and use only their dated listing and same-date/same-market
+calendar. Genuine nontrading/zero-activity observations have explicit quarantined key evidence;
+their presence does not authorize a tradability/gap mutation. Existing conflicting keys remain
+unchanged unless an exact source-priority decision is separately established. A repair observation
+is not an accepted historical child and cannot acquire a fabricated provider retrieval clock.
+
+For announcements, original observations are archived with every acquisition and source hash.
+Publication-coordinate revisions use the stable disclosure/subject identity as their revision
+entity. The physical model's business/version keys remain unchanged. Before parent identity is
+available, earlier body versions remain source evidence; only the latest genuinely acquired body
+becomes DWD-visible at parent availability. Later bodies close knowledge intervals across changed
+publication coordinates. Equal-source-clock conflicting bodies fail closed. No microsecond offset
+or earlier identity time is invented. A late July document remains in its July business partition.
+
+Weekly financial concepts use the governed cumulative earliest-effective-period revision rule.
+Source DATE-only publication remains a date observation and does not gain an actual public instant.
+Industry membership starts at its actual snapshot date; provider update dates never establish past
+PIT industry membership. Source-double market observations use an explicit shortest-decimal
+projection and reject precision that cannot fit Decimal(38,10) without rounding; this does not
+assert an unavailable original supplier Decimal. Raw bytes and numeric/time evidence remain bound.
+
+Each scope has an exact row/version/partition census, pinned schema, source identity, typed
+serialization readback and safe quality summaries. `base22_output_audit.py` verifies physical
+files and recomputes every typed column offline without reopening source roots. Its receipt is
+explicitly an observation-scope scan, not 33-table image, source qualification or consumer acceptance.
+Full native/source unions, revision priority, required domain closure, global relationships and
+all five data-quality gates remain mandatory before a complete candidate or final READY.
+
+CN02 retains one eventual complete entity set plus one bounded partition/check TMP. An owned
+history partition can move into the final entity layout after its consumers finish; it must not
+be copied as a second full history or linked to its original source. Exact move order, interruption
+ownership receipts, simultaneously live files, actual output expansion and global-check worst-case
+spills must fit a freshly frozen device-specific budget. External full-image acceptance copies
+require a verified destination budget and separate transport/execution authority. A bounded local
+relocation check does not replace the two formal complete-image relocations and corruption tests.

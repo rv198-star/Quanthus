@@ -271,18 +271,25 @@ def semantic_scan(
         if check:
             check()
         for i, column in enumerate(batch.columns):
-            if pa.types.is_string(column.type):
+            if (
+                pa.types.is_string(column.type)
+                or pa.types.is_large_string(column.type)
+                or pa.types.is_binary(column.type)
+                or pa.types.is_large_binary(column.type)
+            ):
                 hashes[i].update(
                     b"".join(
                         (-1).to_bytes(8, "little", signed=True)
                         if value is None
-                        else len(encoded := value.encode("utf-8")).to_bytes(
-                            8, "little", signed=True
-                        )
+                        else len(
+                            encoded := value if isinstance(value, bytes) else value.encode("utf-8")
+                        ).to_bytes(8, "little", signed=True)
                         + encoded
                         for value in column.to_pylist()
                     )
                 )
+            elif pa.types.is_null(column.type):
+                hashes[i].update((-1).to_bytes(8, "little", signed=True) * len(column))
             else:
                 valid = np.array(column.is_valid(), dtype=np.uint8)
                 if pa.types.is_boolean(column.type):
@@ -397,6 +404,7 @@ class GlobalScan:
         self.budget = budget
         temp = budget.destination(budget.root / "temp" / ("scan-" + str(time.time_ns())))
         temp.mkdir(parents=True, exist_ok=False)
+        self.temp = temp
         self.connection = duckdb.connect(
             config={
                 "memory_limit": str(budget.limits.memory_bytes) + "B",
@@ -459,7 +467,7 @@ class GlobalScan:
         # enter the same bucket across ALL physical partitions and files. Hash
         # collisions only co-locate keys: every check still compares full keys.
         # Prices/full row documents are never stored in this job-local TMP index.
-        index_root = self.budget.destination(self.budget.root / "temp" / ("keys-" + name))
+        index_root = self.budget.destination(self.temp / ("keys-" + name))
         index_root.mkdir(exist_ok=False)
         writers: dict[int, Any] = {}
         counts: dict[int, int] = {}

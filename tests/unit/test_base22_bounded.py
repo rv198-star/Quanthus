@@ -389,3 +389,45 @@ def test_bounded_exact_33_table_offline_model_closure(tmp_path, fault):
                 run()
         else:
             assert set(run()) == set(fixture.schemas)
+
+
+def test_failed_global_key_evidence_does_not_block_a_new_scan_attempt(tmp_path):
+    root = tmp_path / "job"
+    with b.Budget(root, [], limits()) as budget:
+        bad = member(root / "bad.parquet", records((1, 1)))
+        good = member(root / "good.parquet", records())
+        with b.GlobalScan(budget) as scan:
+            failed_temp = scan.temp
+            scan.add("t", [bad.path])
+            with pytest.raises(b.BoundedError, match="DUPLICATE"):
+                scan.keys("t", ["key"], ["key", "knowledge_from"])
+        retained = {str(p): file_sha(p) for p in failed_temp.rglob("*.parquet")}
+        assert retained
+        with b.GlobalScan(budget) as scan:
+            assert scan.temp != failed_temp
+            scan.add("t", [good.path])
+            scan.keys("t", ["key"], ["key", "knowledge_from"])
+        assert retained == {str(p): file_sha(p) for p in failed_temp.rglob("*.parquet")}
+
+
+def test_native_large_string_binary_and_null_streams_are_batch_independent(tmp_path):
+    schema = pa.schema(
+        [
+            ("large", pa.large_string()),
+            ("binary", pa.binary()),
+            ("large_binary", pa.large_binary()),
+            ("nil", pa.null()),
+        ]
+    )
+    table = pa.Table.from_arrays(
+        [
+            pa.array(["中文", None, "tail"], pa.large_string()),
+            pa.array([b"\x00\x01", None, b"z"], pa.binary()),
+            pa.array([b"a", None, b"\x00"], pa.large_binary()),
+            pa.nulls(3),
+        ],
+        schema=schema,
+    )
+    path = tmp_path / "native.parquet"
+    pq.write_table(table, path)
+    assert b.semantic_scan([path], schema, 1) == b.semantic_scan([path], schema, 3)

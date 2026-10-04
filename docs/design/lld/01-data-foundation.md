@@ -94,7 +94,8 @@ cannot enter default CURRENT or consumer admission; source replacement and relea
 
 The additive [Base 2.2 independent image engineering contract](01-data-foundation/base22-independent-image.md)
 prepares CN02-only synthetic construction and cold verification through the Shanghai business
-date 2026-08-31. Exact source qualification, real ODS adapters/builds and release remain unopened.
+date 2026-08-31. The separate approved Phase2 scope permits bounded retained-source governance
+and observation outputs; full source qualification, complete-image acceptance and release remain gated.
 
 The ODS Base packaging, source precedence, completeness boundary, and recovery lifecycle are
 owned by [`01-data-foundation/ods-base.md`](01-data-foundation/ods-base.md). It is separate from

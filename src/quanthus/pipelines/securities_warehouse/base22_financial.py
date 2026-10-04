@@ -12,11 +12,12 @@ from collections import Counter
 from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
-from .base22 import THROUGH, digest
-from .base22_bounded import BoundedError
-from .base22_outputs import financial_concept_versions, instant, knowledge_versions
+from .base22 import THROUGH, digest, partition
+from .base22_bounded import BoundedError, GlobalScan
+from .base22_outputs import financial_concept_versions, instant, knowledge_versions, write_partition
 from .base22_precision import decimal_profile
 from .financial_reporting import (
     FinancialCompanyResolver,
@@ -185,3 +186,81 @@ def statement_batch(
         "source_observations_retained": len(evidence),
         "complete_native_union": "NOT_QUALIFIED",
     }
+
+
+def merge_concept_files(
+    scan: GlobalScan,
+    files: list[Path],
+    *,
+    schema: Any,
+    rule: dict[str, Any],
+    admitted: set[tuple[str, str, str]],
+    output: Path,
+) -> dict[str, Any]:
+    """The governed cumulative concept rule across every bounded input file.
+
+    Typed concept evidence is a single job-local prerequisite. DuckDB performs
+    the global ordering under the existing memory/spill budget; Python keeps one
+    Arrow batch rather than all envelopes/concepts. No native history is changed.
+    """
+    scan.add("statement_concept_observations", files)
+    semantic = (
+        "taxonomy_namespace,taxonomy_version,concept_code,concept_name,"
+        "statement_type,data_type,period_type,balance_type"
+    )
+    scan.reject(
+        "SELECT 1 FROM statement_concept_observations GROUP BY financial_concept_id "
+        f"HAVING count(DISTINCT ROW({semantic}))<>1 LIMIT 1",
+        "FINANCIAL_CONCEPT_SOURCE_SEMANTICS_CONFLICT",
+    )
+    # Materialize this compact global prerequisite once. Counting and the writer
+    # consume it; they must not repeat the cross-file sort/merge.
+    scan.connection.execute(
+        """CREATE TEMP TABLE statement_concepts_merged AS
+        WITH at_clock AS (
+          SELECT *, row_number() OVER (
+            PARTITION BY financial_concept_id,knowledge_from
+            ORDER BY effective_from,source_record_id,source_artifact_sha256,
+                     record_source,source_revision) AS rn
+          FROM statement_concept_observations
+        ), cumulative AS (
+          SELECT * EXCLUDE(rn), min(effective_from) OVER (
+            PARTITION BY financial_concept_id ORDER BY knowledge_from
+            ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS prior_effective
+          FROM at_clock WHERE rn=1
+        ), revisions AS (
+          SELECT * EXCLUDE(prior_effective) FROM cumulative
+          WHERE prior_effective IS NULL OR effective_from<prior_effective
+        ) SELECT * EXCLUDE(knowledge_to), lead(knowledge_from) OVER (
+            PARTITION BY financial_concept_id ORDER BY knowledge_from) AS knowledge_to
+          FROM revisions"""
+    )
+    scan.budget.check()
+    census = scan.connection.execute("SELECT count(*) FROM statement_concepts_merged").fetchone()
+    if census is None:
+        raise BoundedError("FINANCIAL_GLOBAL_CONCEPT_CENSUS_UNAVAILABLE")
+    count = int(census[0])
+    if count == 0 or count > 32768:
+        raise BoundedError("FINANCIAL_GLOBAL_CONCEPT_SCOPE_BOUND_FAILED")
+    first = scan.connection.sql("SELECT * FROM statement_concepts_merged LIMIT 1").to_arrow_table()
+    part = partition(first.to_pylist()[0], rule)
+    reader = scan.connection.sql(
+        "SELECT * FROM statement_concepts_merged ORDER BY financial_concept_id,knowledge_from"
+    ).to_arrow_reader(scan.budget.limits.batch_rows)
+
+    def rows() -> Iterable[dict[str, Any]]:
+        for batch in reader:
+            yield from batch.to_pylist()
+            scan.budget.check()
+
+    return write_partition(
+        rows(),
+        table=TABLES[1],
+        expected_rows=count,
+        expected_partition=part,
+        schema=schema,
+        rule=rule,
+        admitted=admitted,
+        output=output,
+        budget=scan.budget,
+    )

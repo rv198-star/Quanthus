@@ -14,7 +14,13 @@ import pyarrow.parquet as pq
 import pytest
 
 from quanthus.pipelines.securities_warehouse import base22_financial as adapter
-from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError
+from quanthus.pipelines.securities_warehouse.base22_bounded import (
+    BoundedError,
+    Budget,
+    GlobalScan,
+    Limits,
+)
+from quanthus.pipelines.securities_warehouse.base22_outputs import financial_concept_versions
 from quanthus.pipelines.securities_warehouse.financial_reporting import (
     FinancialCompanyIdentity,
     FinancialCompanyResolver,
@@ -229,6 +235,73 @@ def test_batch_envelope_bound():
     ]
     with pytest.raises(BoundedError, match="BATCH_ENVELOPE_BOUND_FAILED"):
         adapter.statement_batch([(raw, source)] * 65, resolver=resolver, rules=rules)
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_global_concepts_across_independent_partition_files(tmp_path, reverse):
+    raw, source, resolver = fixture()
+    observations, _ = adapter.statement_observation(raw, source=source, resolver=resolver)
+    base = observations[adapter.TABLES[1]][0]
+    all_rows = [
+        dict(
+            base,
+            effective_from=datetime(year, 1, 1, tzinfo=timezone.utc),
+            knowledge_from=datetime(2026, 8, day, tzinfo=timezone.utc),
+            source_record_id=f"row-{day}",
+        )
+        for year, day in [(2019, 1), (2005, 2), (2010, 3)]
+    ]
+    rule = json.loads(Path("config/pipelines/base22-independent-image.v1.json").read_bytes())[
+        "tables"
+    ][adapter.TABLES[1]]
+    schema = financial_reporting_schemas()[adapter.TABLES[1]]
+    with Budget(tmp_path / "job", [], Limits(free_floor_bytes=1048576)) as budget:
+        files = []
+        for index, row in enumerate(all_rows):
+            path = budget.root / f"part-{index}.parquet"
+            pq.write_table(pa.Table.from_pylist([row], schema=schema), path)
+            files.append(path)
+        with GlobalScan(budget) as scan:
+            item = adapter.merge_concept_files(
+                scan,
+                list(reversed(files)) if reverse else files,
+                schema=schema,
+                rule=rule,
+                admitted={
+                    (base["record_source"], base["source_revision"], base["source_artifact_sha256"])
+                },
+                output=budget.root / "merged.parquet",
+            )
+        restored = pq.ParquetFile(budget.root / "merged.parquet").read().to_pylist()
+    assert restored == financial_concept_versions(all_rows)
+    assert item["rows"] == 2
+    assert all(file.stat().st_nlink == 1 for file in files)
+
+
+def test_global_concept_semantics_conflict_fails_before_output(tmp_path):
+    raw, source, resolver = fixture()
+    observations, _ = adapter.statement_observation(raw, source=source, resolver=resolver)
+    base = observations[adapter.TABLES[1]][0]
+    schema = financial_reporting_schemas()[adapter.TABLES[1]]
+    rule = json.loads(Path("config/pipelines/base22-independent-image.v1.json").read_bytes())[
+        "tables"
+    ][adapter.TABLES[1]]
+    with Budget(tmp_path / "job", [], Limits(free_floor_bytes=1048576)) as budget:
+        path = budget.root / "source.parquet"
+        pq.write_table(
+            pa.Table.from_pylist([base, dict(base, concept_name="other name")], schema=schema), path
+        )
+        with GlobalScan(budget) as scan:
+            with pytest.raises(BoundedError, match="SOURCE_SEMANTICS_CONFLICT"):
+                adapter.merge_concept_files(
+                    scan,
+                    [path],
+                    schema=schema,
+                    rule=rule,
+                    admitted=set(),
+                    output=budget.root / "merged.parquet",
+                )
+        assert not (budget.root / "merged.parquet").exists()
 
 
 @pytest.mark.parametrize("change", ["value", "time", "source", "rows", "evidence"])

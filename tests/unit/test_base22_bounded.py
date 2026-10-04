@@ -74,7 +74,18 @@ def test_stage_clock_reset_preserves_peaks_and_rejects_an_expired_stage(tmp_path
     assert budget.stage == "second" and budget.started == 9
 
 
-def test_silent_owned_child_stopped_at_budget_breach(tmp_path):
+def test_silent_owned_child_stopped_at_budget_breach(tmp_path, monkeypatch):
+    from quanthus.pipelines.securities_warehouse import base22_capacity as capacity
+
+    children = []
+    original_popen = capacity.subprocess.Popen
+
+    def tracked_popen(*args, **kwargs):
+        child = original_popen(*args, **kwargs)
+        children.append(child)
+        return child
+
+    monkeypatch.setattr(capacity.subprocess, "Popen", tracked_popen)
     start = time.monotonic()
     with (
         pytest.raises(b.BoundedError, match="STAGE_WALL_LIMIT_EXCEEDED"),
@@ -82,7 +93,9 @@ def test_silent_owned_child_stopped_at_budget_breach(tmp_path):
     ):
         guarded_child([sys.executable, "-c", "import time; time.sleep(60)"], budget.root, budget)
     assert time.monotonic() - start < 5
-    assert budget.error == "STAGE_WALL_LIMIT_EXCEEDED"
+    assert len(children) == 1 and children[0].poll() is not None
+    # The polling guard may detect the same breach before the monitor thread.
+    assert budget.error in {None, "STAGE_WALL_LIMIT_EXCEEDED"}
 
 
 def test_date_reference_coordinate_is_shanghai_midnight(tmp_path):

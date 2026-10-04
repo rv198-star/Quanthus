@@ -77,8 +77,12 @@ def _read_json(path: Path) -> tuple[dict[str, Any], str, tuple[int, int, int, in
 
 
 def _tree(root: Path) -> set[str]:
+    def scan_failed(error: OSError) -> None:
+        # os.walk otherwise suppresses scandir errors and returns a partial tree.
+        raise SourceAssessmentError("SOURCE_SCAN_FAILED") from error
+
     found: set[str] = set()
-    for directory, dirs, files in os.walk(root, followlinks=False):
+    for directory, dirs, files in os.walk(root, followlinks=False, onerror=scan_failed):
         for name in [*dirs, *files]:
             path = Path(directory) / name
             if path.is_symlink():
@@ -499,6 +503,7 @@ def run_assessment(selection_path: Path, output: Path) -> dict[str, Any]:
             not isinstance(item, dict)
             or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,100}", item.get("label", "")) is None
             or item["label"] in labels
+            or item["label"] in {"selection", "assessment"}
             or item.get("manifest_name") not in {"manifest.json", "release.json"}
             or not isinstance(item.get("root"), str)
             or not Path(item["root"]).is_absolute()

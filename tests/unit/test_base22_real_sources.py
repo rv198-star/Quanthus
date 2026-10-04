@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -62,6 +63,25 @@ def test_release_census_does_not_admit_source_or_emit_values(tmp_path: Path) -> 
     assert "unknown" not in json.dumps(report)
     assert "not_qualification" in report["assessment_kind"]
     assert "no source admission" in report["limitations"][-1]
+
+
+@pytest.mark.parametrize("error", [PermissionError, OSError])
+def test_tree_scan_errors_cannot_pass_complete_inventory(
+    tmp_path: Path, monkeypatch, error
+) -> None:
+    root = _fixture(tmp_path / "input")
+    walk = os.walk
+
+    def failed_walk(path, *, followlinks=False, onerror=None):
+        # Deterministic even as root: emulate scandir failing after all declared
+        # members were visited. Omitting onerror would falsely certify this tree.
+        yield from walk(path, followlinks=followlinks)
+        if onerror is not None:
+            onerror(error("disposable unreadable subtree"))
+
+    monkeypatch.setattr(os, "walk", failed_walk)
+    with pytest.raises(SourceAssessmentError, match="SOURCE_SCAN_FAILED"):
+        assess_package(root, manifest_name="release.json")
 
 
 @pytest.mark.parametrize("damage", ["missing", "byte", "extra"])
@@ -358,6 +378,43 @@ def test_real_selection_rejected_before_mkdir(tmp_path: Path, fault: str) -> Non
     with pytest.raises(SourceAssessmentError):
         run_assessment(selection, output)
     assert not output.exists()
+
+
+@pytest.mark.parametrize("label", ["selection", "assessment"])
+def test_reserved_assessment_labels_rejected_before_any_write(tmp_path: Path, label: str) -> None:
+    root = _fixture(tmp_path / "input")
+    selection = tmp_path / "frozen.json"
+    selection.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "purpose": "p10_base22_source_assessment",
+                "image_contract_sha256": CONTRACT_SHA,
+                "source_roots": [str(root)],
+                "packages": [
+                    {
+                        "label": label,
+                        "root": str(root),
+                        "manifest_name": "release.json",
+                        "expected_manifest_sha256": file_sha(root / "release.json"),
+                    }
+                ],
+            }
+        )
+    )
+    before = selection.read_bytes()
+    output = tmp_path / "new"
+    with pytest.raises(SourceAssessmentError, match="ASSESSMENT_MEMBER_INVALID"):
+        run_assessment(selection, output)
+    assert not output.exists()
+    existing = tmp_path / "existing"
+    existing.mkdir()
+    for name in ("selection.json", "assessment.json"):
+        (existing / name).write_bytes(b"retained evidence")
+    with pytest.raises(SourceAssessmentError, match="ASSESSMENT_MEMBER_INVALID"):
+        run_assessment(selection, existing)
+    assert selection.read_bytes() == before
+    assert all(p.read_bytes() == b"retained evidence" for p in existing.iterdir())
 
 
 def test_capacity_floor_does_not_sample_prices_or_ignore_missing_tables() -> None:

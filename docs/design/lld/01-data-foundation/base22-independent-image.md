@@ -8,8 +8,8 @@
 | Owner | P10; Owner's CN02 engineering instruction, 2026-10-04 |
 | Data work | #470, #471, #472, #473, #474; no issue acceptance implied |
 | Contract | `config/pipelines/base22-independent-image.v1.json` |
-| Code | `src/quanthus/pipelines/securities_warehouse/base22.py`, `base22_sources.py` |
-| Tests | `tests/unit/test_base22_independent_image.py`, `test_base22_real_sources.py` |
+| Code | `src/quanthus/pipelines/securities_warehouse/base22.py`, `base22_sources.py`, `base22_bounded.py`, `base22_history.py`, `base22_capacity.py`, `base22_qualification.py`, `base22_august.py` |
+| Tests | `tests/unit/test_base22_independent_image.py`, `test_base22_real_sources.py`, `test_base22_bounded.py`, `test_base22_qualification.py` |
 
 This additive construction contract implements an independent physical candidate through
 2026-08-31 by business date in Asia/Shanghai. The accepted July model, extension and production
@@ -44,7 +44,10 @@ The selection has `schema_version=1`, `purpose=p10_base22_source_assessment`, th
 `image_contract_sha256`, absolute `source_roots`, and `packages` with a unique safe `label`,
 absolute `root` (inside a frozen source root),
 `manifest_name` (`manifest.json` or `release.json`) and original `expected_manifest_sha256`.
-All source/output/selection path and symlink checks precede directory creation. Each invocation
+All source/output/selection path and symlink checks precede directory creation. Labels `selection`
+and `assessment` are reserved for fixed output files and fail before any directory write.
+Directory traversal errors fail closed; an unreadable subtree cannot certify a complete file set.
+Each invocation
 recomputes payload identities, keeps a failed package's evidence and continues independent
 packages. Existing output is never overwritten. Assessment results bind evaluator bytes and
 runtime, grant no candidate/consumer admission, and never write READY or a production pointer.
@@ -62,8 +65,66 @@ Real execution also requires a measured resource gate. The existing synthetic SQ
 stores a full canonical document per row and builds merge/verification indexes. Its minimum
 document-byte floor can be computed from the pinned schemas and verified footer census without
 sampling prices. Failure of even that conservative floor blocks using this engine for the real
-corpus. A partition-bounded immutable history implementation and independent verifier are still
-required; healthy partition reuse must preserve exact bytes/provenance inside the new image.
+corpus. Real adapter/admission integration with the bounded history and independent scan
+components is still required; healthy reuse must retain exact bytes/provenance in the new image.
+
+`base22_bounded.py` implements the partition storage and offline global scan components for
+that route. Healthy members use verified independent copies, attempting same-filesystem FICLONE
+only when supported. Unsupported/cross-device errors fall back to exclusive byte copies;
+other errors fail. Every successful file has a distinct inode, one link and recomputed full
+hash. A bounded Arrow writer rewrites one affected partition, retaining exact Decimal integers,
+schema, original timestamp instants and null/zero values. Local partial outputs survive failures;
+the primitive does not admit sources, merge unqualified repairs or write READY.
+`base22_history.py` seals that job's validated history files once with a complete source,
+configuration, policy, evaluator, schema, scope, universe and repair-evidence identity.
+Every consumer checks the same immutable file/descriptor hashes; input changes, extra files,
+incorrect footer counts/schema or damaged checkpoints fail without source/image fallback.
+This TMP has no cross-job cache lookup or consumer-admission authority.
+
+The global verifier projects **typed keys only**, once per table, into 64 job-local Parquet
+buckets. Equal business keys always share a bucket across all original files/partitions; full
+keys are compared, so hash collisions cannot hide duplicates. Knowledge-version overlap,
+model temporal foreign keys, Shanghai daily/state calendar dates, listing/calendar venues and
+table-specific source registries remain global checks. Physical partition/file/schema censuses
+include zero-row files. Successful key TMP is removed only from that unique job's owned index;
+failed indexes remain. Source trees use fail-closed traversal; disappearing live job spill files
+are a separate resource-census case, never permission to omit source files.
+
+Resource limits cover Arrow batches, DuckDB memory/spill, all retained job allocations, free
+space, RSS and elapsed time per stage. Stage transitions retain cumulative allocation/RSS
+peaks and cannot clear a breach. Silent owned cold children are terminated on a budget breach;
+the parent checks their RSS together with its own. `base22_capacity.py` consumes a preregistration:
+samples come from verified metadata before row access, with one filesystem/resource snapshot,
+paths, operations, concurrency, limits and acceptance frozen before execution. It measures
+logical/allocated output, typed key/sort TMP and peak resource use, source-safe CoW/cross-device
+probes and two independent sample copies in new network-isolated processes. A failed experiment
+is retained; a representation change gets a new registration with unchanged samples/criteria.
+An experimental 256 MiB limit does not describe CN02's available memory or set its formal
+construction budget. The bounded primitive defaults to 2 GiB DuckDB and a 4 GiB process RSS
+ceiling; each actual job must freeze its own limits. That budget includes full-image files,
+local evidence, the worst affected/global-index stages, copy retention and safety reserve.
+No average-row extrapolation or sample success grants the complete corpus a capacity PASS.
+
+`base22_qualification.py` freezes exact retained-tail missing/conflicting keys and old version
+digests and the full input/configuration/evaluator closure. Its new revision contract never
+asserts a historical accepted child or unavailable
+provider acquisition clock. Numeric conflicts retain the old value version; no unrelated key,
+historical clock or tradability flag can be silently replaced. Nontrading/zero observations keep
+their actual state/gap differences. The earlier 675-by-three 2021 subset measurement remains
+historical evidence even when its temporary files are unavailable; the longer current tail
+window has its own census. Rolling event contracts preserve every acquisition observation and
+body revision; identical bodies deduplicate without borrowing an earlier clock for a later body.
+Equal-instant body conflicts fail, including differently spelled time zones.
+
+`base22_august.py` adds a separate bounded dividends handler, leaving frozen Daily's nonempty
+unhandled-artifact gate intact. It maps the retained ex-dividend date alias, uses genuine
+provider/artifact acquisition and parent knowledge, and keeps date-only publication unavailable
+as an instant. Provider calendar dates may be serialized as dates or naive midnight; other timed
+values fail instead of being truncated. Decimal scale loss fails. September effective observations
+are excluded, while original date fields and null/zero classifications remain evidence. A typed
+row probe is not a full-domain projection: repaired-history binding, dated identities, action
+revision/term reconciliation, financial/ownership/industry/other weekly closure and exact all-table
+no-change evidence remain prerequisites of a qualified real image.
 
 Each source binds an exact manifest SHA, READY, role, authority and declared business cutoff.
 Its manifest inventories typed Parquet projections and their raw evidence members by full hash
@@ -87,7 +148,8 @@ this check does not prescribe common open/close windows for events or other tabl
 Unknown knowledge fails closed; known late timestamps remain late. Effective interval endpoints
 are retained even when they extend beyond August. Build time is recorded separately.
 
-Repaired history is materialized once into an immutable job-local SQLite stage (`TMP`), indexed
+In the frozen synthetic v1 route, repaired history is materialized once into an immutable
+job-local SQLite stage (`TMP`), indexed
 by complete version key. All August inputs bind its recomputed semantic digest. The same stage
 feeds the merge; no final August image is used as an August dependency. Arrow batches and the
 SQLite disk index bound memory. This is job-local reuse, not a cross-job cache or governed ADM.
@@ -148,8 +210,8 @@ make check PYTHON=.venv/bin/python
 already sealed candidate, `verify_base22(image_root)` needs only the image and installed ordinary
 code. There is no real-build, promotion, publication or synchronization CLI in this increment.
 
-Before a real source verification/build, approve only exact CN02 source roots and manifest/member
-identities, necessary read access, permitted row/date scope and a bounded isolated output/resource
+The approved real governance/build scope must bind exact CN02 roots and manifest/member
+identities, existing read access, permitted row/date scope and a frozen isolated output/resource
 budget. Source admission must prove the authoritative August calendar/all-domain census,
 weekend/rolling event keys, nonempty dividends handler and weekly closure; 21 daily packages
 alone are insufficient. Qualify #470's native 5,201 and exact 50 exceptions/dated aliases;
@@ -158,11 +220,14 @@ alone are insufficient. Qualify #470's native 5,201 and exact 50 exceptions/date
 basis and clock preservation; and #474's field-specific availability with unknowns unavailable
 and all 4,173 frozen factor exceptions preserved. Historical validation receipts are not files.
 
-The local audit report path was permission-denied during this task. No payloads were read and
-none of those real gates are declared passed. P3/P5/P6 admission remains separate.
+The earlier synthetic-only stage could not read the local audit report. The subsequent explicit
+CN02 Phase2 authority permits retained real data governance and isolated preparation; it does
+not change the frozen synthetic entry's execution scope. Physical source verification, bounded
+sample serialization and new source/revision contracts do not declare the real image, original
+normalization closure or #470–474 accepted. P3/P5/P6 admission remains separate.
 
-After qualification, a new authorized execution contract can enable bounded real adapters and
-isolation on CN02. Release, node synchronization and pointer changes require separate approval:
+After qualification, a versioned execution contract can enable bounded real adapters and
+isolation on CN02 within that approval. Release, synchronization and pointer changes remain separate:
 compare exact image digests, independently cold-verify the transferred physical copy, retain the
 old production package and pointer digest, then use the existing release/CAS/rollback gates.
 CN01 remains the baseline throughout preparation. September Daily packages must subsequently

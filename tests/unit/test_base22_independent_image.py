@@ -1006,3 +1006,82 @@ def test_cold_requires_image_local_qualification_evidence(fixture, case):
     shutil.rmtree(fixture.root / "sources")
     with pytest.raises(b.Base22Error, match=reason):
         b.verify_base22(root)
+
+
+@pytest.mark.parametrize("case", ["wrong_date", "wrong_venue", "correct"])
+@pytest.mark.parametrize("mode", ["build", "cold"])
+def test_tradability_calendar_date_without_interval_size(fixture, case, mode):
+    name = "dwd_tradability_state"
+    assert "interval_size" not in fixture.schemas[name].names
+    other = _add_other_venue_session(fixture)
+    fixture.refresh()
+    assert (
+        fixture.august["dwd_trading_calendar"][0]["venue_id"]
+        == (fixture.history["dwd_listing"][0]["venue_id"])
+    )
+    session = {
+        "wrong_date": "calendar-2026-08-03",
+        "wrong_venue": other,
+        "correct": "calendar-2026-07-31",
+    }[case]
+    # The correct case also proves UTC July 30 is July 31 in Shanghai.
+    instant = datetime(2026, 7, 30, 16, 30, tzinfo=timezone.utc) if case == "correct" else JULY
+    if mode == "build":
+        fixture.history[name][0].update(calendar_session_id=session, observation_start=instant)
+        fixture.refresh()
+        root = fixture.output
+        run = fixture.build
+    else:
+        fixture.build()
+        root = fixture.root / "tradability-repacked"
+        shutil.copytree(fixture.output, root)
+        manifest = json.loads((root / "manifest.json").read_bytes())
+        item = next(
+            f
+            for f in manifest["files"]
+            if f.get("table") == name and "observation_start_month=7" in f["partition"]
+        )
+        path = root / item["path"]
+        rows = list(b._rows(path, fixture.schemas[name]))
+        rows[0].update(calendar_session_id=session, observation_start=instant)
+        pq.write_table(pa.Table.from_pylist(rows, schema=fixture.schemas[name]), path)
+        _repack_synthetic_image(root)
+        # calendar_session_id belongs to BOTH business and version keys here.
+        # Update the frozen census too, so a key/hash mismatch cannot hide the bug.
+        manifest = json.loads((root / "manifest.json").read_bytes())
+        plan_path = root / "evidence/input-plan.json"
+        plan = json.loads(plan_path.read_bytes())
+        before = plan["tables"][name]["required_partitions"]
+        expected = {
+            part: {"rows": value["rows"], "key_digest": value["key_digest"]}
+            for part, value in manifest["tables"][name]["partitions"].items()
+        }
+        assert expected != before
+        plan["tables"][name]["required_partitions"] = expected
+        _save(plan_path, plan)
+        _repack_synthetic_image(root)
+        manifest = json.loads((root / "manifest.json").read_bytes())
+        assert b.digest(plan) == manifest["input_plan_digest"]
+        assert b.digest(manifest["tables"]) == manifest["semantic_digest"]
+        assert (root / "READY").read_text().strip() == b.file_sha(root / "manifest.json")
+        b._verify_files(root, manifest["files"], independent=True)
+        shutil.rmtree(fixture.root / "sources")
+
+        def run():
+            return b.verify_base22(root)
+
+    if case == "correct":
+        assert run()["tables"][name]["rows"] == 2
+        manifest = json.loads((root / "manifest.json").read_bytes())
+        item = next(
+            f
+            for f in manifest["files"]
+            if f.get("table") == name and "observation_start_month=7" in f["partition"]
+        )
+        row = next(b._rows(root / item["path"], fixture.schemas[name]))
+        assert row["observation_start"] == instant
+    else:
+        with pytest.raises(
+            b.Base22Error, match="^CALENDAR_DATE_OR_VENUE_CLOSURE_FAILED:dwd_tradability_state$"
+        ):
+            run()

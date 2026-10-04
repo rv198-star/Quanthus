@@ -38,8 +38,10 @@ The contract lists every table's source families, business and knowledge-version
 field, partition rules, merge priority, reuse/rebuild reasons, coverage and missing disposition.
 The concrete job freezes its exact required partitions and expectations before scanning rows.
 Foreign keys require referential closure and containment by effective/knowledge intervals.
-The shared build/cold scan checks daily market bars against the referenced calendar's Shanghai
-business date. Where the model also declares a listing reference, the calendar venue must match
+The shared build/cold scan checks daily market bars and `dwd_tradability_state` against the
+referenced calendar's Shanghai business date. Tradability state has no `interval_size`; its
+`observation_start` date must match `trade_date` independently of that field.
+Where the model also declares a listing reference, the calendar venue must match
 a temporally visible referenced listing. Nullable index-calendar references remain nullable;
 this check does not prescribe common open/close windows for events or other tables.
 Unknown knowledge fails closed; known late timestamps remain late. Effective interval endpoints

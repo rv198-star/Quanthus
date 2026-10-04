@@ -679,11 +679,12 @@ def _calendar_reference_matches(
     coordinate: Any,
     physical_schemas: dict[str, Any],
 ) -> bool:
-    # The model grants daily market bars a business-date coordinate; it does not
-    # grant every calendar-linked event a common open/close window or fill rule.
+    # Session-based tradability states have no interval_size; their calendar date
+    # still binds observation_start, as it does for daily market bars. This does
+    # not grant other calendar-linked events a common open/close window or fill rule.
     if (
         table["time_profile"] == "market_observation"
-        and row.get("interval_size") == "1d"
+        and (table["name"] == "dwd_tradability_state" or row.get("interval_size") == "1d")
         and session["trade_date"] != business_date(row["observation_start"])
     ):
         return False

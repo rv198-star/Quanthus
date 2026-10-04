@@ -356,3 +356,21 @@ once, preserving the immutable legacy vocabulary. No source priority over native
 or other provider observations is inferred. Native union, complete exception
 disposition, full raw scope qualification and cold reproduction remain separate
 delivery gates. Contract regressions live in `test_base22_f10_dividend.py`.
+### Negative governance ledger
+
+`base22_quality.py` defines `p10-base22-unavailable-governance-v1`. Exact original
+visibility exceptions and exact historical identities with unresolved industry
+source provenance may produce new `dwd_quality_exception` observations. These
+observations preserve unavailability and grant no positive industry, factor or
+consumer qualification. Detection and knowledge times belong to the actual new
+governance assessment. Original source fields, including its declared cutoff,
+remain unchanged in the local archive and evidence; the declared cutoff is not
+proof of historical information availability.
+
+Historical industry exceptions must match native listing/security identities and
+an actual listing end before the industry snapshot. Open listings or changed
+identities fail. A raw visibility key is explicitly identified as such, without
+inventing a native factor ID. The original P1 exceptions, research receipts and
+frozen consumer gates remain unchanged. Tests are in `test_base22_quality.py`;
+these negative observations cannot close #470/#474 or replace complete image
+qualification.

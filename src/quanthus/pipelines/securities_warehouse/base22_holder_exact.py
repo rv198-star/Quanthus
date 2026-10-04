@@ -62,7 +62,7 @@ def load_holder_contract(config: Path) -> tuple[dict[str, Any], Any]:
 
 
 def _columns(raw: Any) -> tuple[Decimal | None, Decimal | None, dict[str, Any], dict[str, Any]]:
-    import pyarrow as pa  # type: ignore[import-untyped]
+    import pyarrow as pa
 
     old = decimal_profile(raw, precision=38, scale=10)
     new = decimal_profile(raw, precision=38, scale=11)

@@ -4,12 +4,12 @@
 | --- | --- |
 | Parent | [Data foundation](../01-data-foundation.md) |
 | Design status | draft |
-| Delivery gate | open; synthetic engineering only |
+| Delivery gate | open; synthetic image engineering and authorized real source assessment |
 | Owner | P10; Owner's CN02 engineering instruction, 2026-10-04 |
 | Data work | #470, #471, #472, #473, #474; no issue acceptance implied |
 | Contract | `config/pipelines/base22-independent-image.v1.json` |
-| Code | `src/quanthus/pipelines/securities_warehouse/base22.py` |
-| Tests | `tests/unit/test_base22_independent_image.py` |
+| Code | `src/quanthus/pipelines/securities_warehouse/base22.py`, `base22_sources.py` |
+| Tests | `tests/unit/test_base22_independent_image.py`, `test_base22_real_sources.py` |
 
 This additive construction contract implements an independent physical candidate through
 2026-08-31 by business date in Asia/Shanghai. The accepted July model, extension and production
@@ -24,6 +24,46 @@ independent scan. The v1 entry accepts **synthetic typed domain projections only
 accept existing Daily packages or run provider/ODS transformations. Actual raw-to-domain adapters,
 source admission and evidence qualification remain prerequisites of a separately authorized real
 execution contract. A caller's `purpose` string cannot enable real execution in this version.
+
+The separately authorized CN02 second stage may read retained real ODS/DWD for P10 quality
+assessment. `base22_sources.py` adapts the actual July ODS content inventory, July DWD physical
+inventory, daily/weekly ODS release schema and legacy correction inventory without rewriting
+their contracts. It verifies original manifest bytes, READY, every member hash/size, physical
+file sets and every Parquet footer. The resulting assessment is **not** an admitted image plan:
+schema/count integrity cannot establish row semantics, source qualification, repair completion
+or whole-domain August coverage. Each missing prerequisite continues to block its affected step.
+
+The versioned assessment entry is:
+
+```sh
+PYTHONPATH=src .venv/bin/python -m quanthus.pipelines.securities_warehouse.base22_sources \
+  --selection /absolute/path/to/frozen-selection.json --output /new/isolated/assessment-run
+```
+
+The selection has `schema_version=1`, `purpose=p10_base22_source_assessment`, the exact
+`image_contract_sha256`, absolute `source_roots`, and `packages` with a unique safe `label`,
+absolute `root` (inside a frozen source root),
+`manifest_name` (`manifest.json` or `release.json`) and original `expected_manifest_sha256`.
+All source/output/selection path and symlink checks precede directory creation. Each invocation
+recomputes payload identities, keeps a failed package's evidence and continues independent
+packages. Existing output is never overwritten. Assessment results bind evaluator bytes and
+runtime, grant no candidate/consumer admission, and never write READY or a production pointer.
+
+Bounded adapter primitives compare rolling announcements by `(stock_code, ann_id)` and business
+body while retaining acquisition observations; conflicting revisions are not silently collapsed.
+The retained Baostock tail adapter requires its exact raw envelope/hash, unique dated keys,
+unadjusted flag and lossless Decimal(38,10) decoding. It preserves null/zero/status fields and
+does not invent missing acquisition or knowledge time or historical accepted-child authority.
+The governed `none` to `UNADJUSTED` daily-basis adapter leaves every other Arrow column unchanged,
+including Decimal precision and timestamp instants; unknown daily bases fail closed. These
+primitives do not implement every domain's real projection or admit corporate-action evidence.
+
+Real execution also requires a measured resource gate. The existing synthetic SQLite engine
+stores a full canonical document per row and builds merge/verification indexes. Its minimum
+document-byte floor can be computed from the pinned schemas and verified footer census without
+sampling prices. Failure of even that conservative floor blocks using this engine for the real
+corpus. A partition-bounded immutable history implementation and independent verifier are still
+required; healthy partition reuse must preserve exact bytes/provenance inside the new image.
 
 Each source binds an exact manifest SHA, READY, role, authority and declared business cutoff.
 Its manifest inventories typed Parquet projections and their raw evidence members by full hash

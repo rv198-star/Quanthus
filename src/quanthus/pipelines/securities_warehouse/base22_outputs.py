@@ -328,7 +328,7 @@ def industry_snapshot_observation(
                 "company_id": company_id,
                 "industry_node_id": node["industry_node_id"],
                 "membership_type": "PRIMARY_CLASSIFICATION",
-                "confidence": "SOURCE_DECLARED",
+                "confidence": None,
                 "source_declared_as_of": day,
             }
         ]

@@ -312,6 +312,15 @@ def test_industry_snapshot_starts_at_observed_snapshot_date_only():
         __import__("zoneinfo").ZoneInfo("Asia/Shanghai")
     ).date() == date(2026, 8, 1)
     assert row["source_declared_as_of"] == date(2026, 8, 1)
+    import pyarrow as pa
+
+    from quanthus.pipelines.securities_warehouse.base22 import load_contract, schemas
+
+    _, model, extension = load_contract(Path("config/pipelines"))
+    typed = pa.Table.from_pylist(
+        [row], schema=schemas(model, extension)["dwd_company_industry_membership"]
+    )
+    assert typed["confidence"].to_pylist() == [None]
 
 
 def test_st_retrospective_clock_is_not_package_built_at():

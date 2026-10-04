@@ -29,6 +29,23 @@ class WarehousePlanningError(RuntimeError):
     """Raised when an input package cannot produce a closed construction plan."""
 
 
+def freeze_base22_composite_plan(
+    *, plan: Mapping[str, Any], config_root: Path
+) -> dict[str, Any]:
+    """Freeze the separate synthetic Base 2.2 contract without relabeling July ODS.
+
+    The original single-ODS-base path and production Daily date gates are unchanged.
+    This envelope is an exact-input engineering receipt, not source qualification.
+    """
+    from quanthus.pipelines.securities_warehouse import base22
+
+    frozen = json.loads(base22.canonical(dict(plan)))
+    contract, _, _ = base22.load_contract(config_root)
+    sources = base22.freeze_base22_plan(frozen, contract)
+    return {"schema_version": 1, "kind": "base22_composite_plan",
+            "plan": frozen, "plan_digest": base22.digest(frozen), "source_manifests": sources}
+
+
 @dataclass(frozen=True)
 class InputPlanResult:
     root: Path

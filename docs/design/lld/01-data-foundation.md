@@ -92,6 +92,10 @@ The non-activated [P10 Daily price-basis candidate](01-data-foundation/daily-pri
 addresses #473 through an explicit version of the existing Daily builder. Its candidate package
 cannot enter default CURRENT or consumer admission; source replacement and release remain gated.
 
+The additive [Base 2.2 independent image engineering contract](01-data-foundation/base22-independent-image.md)
+prepares CN02-only synthetic construction and cold verification through the Shanghai business
+date 2026-08-31. Exact source qualification, real ODS adapters/builds and release remain unopened.
+
 The ODS Base packaging, source precedence, completeness boundary, and recovery lifecycle are
 owned by [`01-data-foundation/ods-base.md`](01-data-foundation/ods-base.md). It is separate from
 the DWD/DWS history seed and from offline research bundles: the Base preserves accepted source

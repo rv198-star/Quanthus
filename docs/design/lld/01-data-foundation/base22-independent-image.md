@@ -374,3 +374,9 @@ inventing a native factor ID. The original P1 exceptions, research receipts and
 frozen consumer gates remain unchanged. Tests are in `test_base22_quality.py`;
 these negative observations cannot close #470/#474 or replace complete image
 qualification.
+Global hash-key indexes coalesce small bucket intersections before writing
+Parquet row groups. Each bucket holds fewer than two configured batches; this
+bounds writer footer growth while retaining one global key projection, exact
+full-key comparisons across all physical partitions, and failed-index evidence.
+Memory/RSS/spill thresholds remain unchanged. The physical row-group regression
+is in `test_base22_bounded.py`.

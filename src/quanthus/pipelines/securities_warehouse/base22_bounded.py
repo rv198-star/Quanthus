@@ -455,6 +455,7 @@ class GlobalScan:
             raise BoundedError(reason)
 
     def keys(self, name: str, business_key: list[str], version_key: list[str]) -> None:
+        pa = importlib.import_module("pyarrow")
         pc = importlib.import_module("pyarrow.compute")
         pq = importlib.import_module("pyarrow.parquet")
 
@@ -471,6 +472,8 @@ class GlobalScan:
         index_root.mkdir(exist_ok=False)
         writers: dict[int, Any] = {}
         counts: dict[int, int] = {}
+        pending: dict[int, list[Any]] = {}
+        pending_rows: dict[int, int] = {}
         fields = list(dict.fromkeys([*version_key, "knowledge_to"]))
         projection = ",".join(identifier(field) for field in fields)
         projection_result = self.connection.execute(
@@ -481,6 +484,20 @@ class GlobalScan:
             if hasattr(projection_result, "to_arrow_reader")
             else projection_result.fetch_record_batch(self.budget.limits.batch_rows)
         )
+
+        def flush(bucket: int) -> None:
+            # Hash fan-out makes each incoming batch tiny in an individual bucket.
+            # Writing every intersection as a row group retains unbounded footer
+            # metadata in the 64 writers. Coalesce at most two bounded batches,
+            # keeping the key projection and full global comparisons unchanged.
+            chunks = pending[bucket]
+            self.budget.check(extra_rss=2 * sum(chunk.nbytes for chunk in chunks))
+            table = pa.Table.from_batches(chunks).combine_chunks()
+            self.budget.check(reserve=table.nbytes * 2)
+            writers[bucket].write_table(table, row_group_size=self.budget.limits.batch_rows)
+            pending[bucket] = []
+            pending_rows[bucket] = 0
+
         try:
             for batch in reader:
                 self.budget.check(reserve=batch.nbytes * 2)
@@ -493,8 +510,16 @@ class GlobalScan:
                             selected.schema,
                             compression="zstd",
                         )
-                    writers[bucket].write_batch(selected)
+                        pending[bucket] = []
+                        pending_rows[bucket] = 0
+                    pending[bucket].append(selected)
+                    pending_rows[bucket] += selected.num_rows
                     counts[bucket] = counts.get(bucket, 0) + selected.num_rows
+                    if pending_rows[bucket] >= self.budget.limits.batch_rows:
+                        flush(bucket)
+            for bucket in sorted(writers):
+                if pending_rows[bucket]:
+                    flush(bucket)
         finally:
             for writer in writers.values():
                 writer.close()

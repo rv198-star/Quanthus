@@ -410,6 +410,29 @@ def test_failed_global_key_evidence_does_not_block_a_new_scan_attempt(tmp_path):
         assert retained == {str(p): file_sha(p) for p in failed_temp.rglob("*.parquet")}
 
 
+def test_global_hash_index_coalesces_small_batches_into_bounded_row_groups(tmp_path):
+    """Physical footer growth must not scale with every bucket/batch intersection."""
+    with b.Budget(tmp_path / "job", [], limits(batch_rows=32)) as budget:
+        first = member(budget.root / "a.parquet", records(tuple(range(1024))))
+        with b.GlobalScan(budget) as scan:
+            scan.add("t", [first.path])
+            physical = []
+            reject = scan.reject
+
+            def inspect(sql, reason):
+                if reason == "GLOBAL_DUPLICATE_VERSION_KEY" and not physical:
+                    for path in (scan.temp / "keys-t").glob("*.parquet"):
+                        p = pq.ParquetFile(path)
+                        physical.append((p.metadata.num_rows, p.metadata.num_row_groups))
+                return reject(sql, reason)
+
+            scan.reject = inspect
+            scan.keys("t", ["key"], ["key", "knowledge_from"])
+            assert sum(rows for rows, groups in physical) == 1024
+            assert sum(groups for rows, groups in physical) <= 2 * (1024 // 32) + 64
+            assert scan.key_metrics["t"]["materializations"] == 1
+
+
 def test_native_large_string_binary_and_null_streams_are_batch_independent(tmp_path):
     schema = pa.schema(
         [

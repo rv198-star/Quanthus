@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from fractions import Fraction
 from typing import Any
 
 from .base22 import THROUGH, digest
@@ -134,5 +135,123 @@ def compare_action_observations(
         "right_true_knowledge_from": right["knowledge_from"],
         "source_priority_granted": False,
         "missing_date_inferred": False,
+        "original_normalization_restored": False,
+    }
+
+
+def compare_normalized_totals(
+    normalized: dict[str, Any],
+    action: dict[str, Any],
+    terms: list[dict[str, Any]],
+    *,
+    company_id: str,
+    security_id: str,
+) -> dict[str, Any]:
+    """Compare archived cash/combined-share totals to a real typed observation.
+
+    This is evidence comparison, not replay of a missing normalization manifest.
+    A combined old share ratio cannot prove the bonus/transfer allocation. An
+    unmentioned component is not a source zero; only an explicit normalized zero
+    can be compared to that absence, with the limitation recorded in the proof.
+    Dates, identities and raw closure must also be checked by the bounded caller.
+    """
+    values = [normalized.get(f) for f in ("cash_dividend_per_share", "bonus_share_ratio")]
+    expected = []
+    for value in values:
+        if not isinstance(value, Decimal) or not value.is_finite() or value < 0:
+            raise BoundedError("ACTION_TOTALS_EXACT_NONNEGATIVE_DECIMAL_REQUIRED")
+        expected.append(Fraction(*value.as_integer_ratio()))
+    required = (
+        "corporate_action_id",
+        "record_source",
+        "source_revision",
+        "knowledge_from",
+        "company_id",
+        "security_id",
+        "ex_date",
+        "action_status",
+    )
+    if any(f not in action for f in required) or any(
+        not isinstance(v, str) or not v for v in (company_id, security_id)
+    ):
+        raise BoundedError("ACTION_TOTALS_ACTION_OR_PARENT_FIELDS_INVALID")
+    day = normalized.get("effective_date")
+    if type(day) is not date or day > THROUGH or type(action.get("ex_date")) is not date:
+        raise BoundedError("ACTION_TOTALS_BUSINESS_DATE_INVALID")
+    clock = action.get("knowledge_from")
+    if not isinstance(clock, datetime) or clock.utcoffset() is None:
+        raise BoundedError("ACTION_TOTALS_TRUE_KNOWLEDGE_INSTANT_REQUIRED")
+    signatures = _terms(action, terms)
+    cash = Fraction(0)
+    shares = Fraction(0)
+    cash_present = shares_present = False
+    for (typ, option), (
+        currency,
+        amount,
+        numerator,
+        denominator,
+        subscription,
+    ) in signatures.items():
+        if option is not None or subscription is not None:
+            raise BoundedError("ACTION_TOTALS_UNSUPPORTED_OPTION_OR_SUBSCRIPTION")
+        if typ == "CASH_AMOUNT_PER_SHARE":
+            if (
+                currency != "CNY"
+                or amount is None
+                or amount < 0
+                or numerator is not None
+                or denominator is not None
+            ):
+                raise BoundedError("ACTION_TOTALS_CASH_UNIT_OR_FIELDS_INVALID")
+            cash = Fraction(amount)
+            cash_present = True
+        elif typ in {"BONUS_SHARES_PER_SHARE", "TRANSFER_SHARES_PER_SHARE"}:
+            if (
+                currency is not None
+                or amount is not None
+                or numerator is None
+                or denominator is None
+                or numerator < 0
+                or denominator <= 0
+            ):
+                raise BoundedError("ACTION_TOTALS_SHARE_UNIT_OR_FIELDS_INVALID")
+            shares += Fraction(numerator) / Fraction(denominator)
+            shares_present = True
+        else:
+            raise BoundedError("ACTION_TOTALS_UNSUPPORTED_TERM_TYPE")
+    unmentioned = []
+    if not cash_present:
+        unmentioned.append("cash")
+    if not shares_present:
+        unmentioned.append("combined_shares")
+    identity_equal = (
+        action.get("company_id") == company_id and action.get("security_id") == security_id
+    )
+    date_equal = action["ex_date"] == day
+    semantics_equal = action.get("action_status") == "IMPLEMENTED"
+    cash_equal, shares_equal = cash == expected[0], shares == expected[1]
+    return {
+        "contract_id": "p10-base22-normalized-total-comparison-v1",
+        "classification": "IDENTITY_OR_DATE_CONFLICT"
+        if not identity_equal or not date_equal
+        else "ACTION_STATUS_CONFLICT"
+        if not semantics_equal
+        else "EXACT_TOTAL_CONFLICT"
+        if not cash_equal or not shares_equal
+        else "SHARED_TOTALS_EQUAL_UNMENTIONED_ZERO_COMPONENT"
+        if unmentioned
+        else "SHARED_TOTALS_EQUAL",
+        "identity_equal": identity_equal,
+        "business_date_equal": date_equal,
+        "cash_total_equal": cash_equal,
+        "combined_share_ratio_equal": shares_equal,
+        "F10_unmentioned_components": unmentioned,
+        "unmentioned_component_changed_to_zero": False,
+        "bonus_transfer_allocation_proven": False,
+        "normalized_row_sha256": digest(normalized),
+        "actual_action_sha256": digest(action),
+        "actual_term_row_sha256": sorted(digest(row) for row in terms),
+        "actual_knowledge_from": clock,
+        "source_priority_granted": False,
         "original_normalization_restored": False,
     }

@@ -203,7 +203,7 @@ def audit_holder_revision_scope(
     from .base22_bounded import GlobalScan
     from .base22_holder_exact import TABLE, audit_holder_exact_scope, load_holder_contract
     from .base22_holder_native_exact import audit_native_holder_scope, load_native_holder_contract
-    from .base22_sources import _tree
+    from .base22_sources import _member, _tree
 
     if (
         descriptor.get("kind") != "isolated_later_holder_native_union_not_complete_base22"
@@ -217,7 +217,9 @@ def audit_holder_revision_scope(
         or descriptor.get("original_4173_visibility") != "UNCHANGED_UNAVAILABLE"
     ):
         raise BoundedError("HOLDER_REVISION_SCOPE_CONTRACT_INVALID")
-    stage = _physical(root, "observations/" + descriptor["label"])
+    stage = _member(root, "observations/" + descriptor["label"])
+    if not stage.is_dir():
+        raise BoundedError("HOLDER_REVISION_LOCAL_STAGE_DIRECTORY_REQUIRED")
     files = descriptor["physical_members"]
     if set(_tree(stage)) - {"OBSERVATIONS.json"} != set(files):
         raise BoundedError("HOLDER_REVISION_EXACT_PHYSICAL_MEMBER_SET_INVALID")
@@ -231,12 +233,12 @@ def audit_holder_revision_scope(
     contract, model, extension = load_contract(config)
     ss = schemas(model, extension)
     ss[TABLE] = exact
-    nr = root / descriptor["native_preparation_root"]
-    cr = root / descriptor["qualified_capture_root"]
-    for relative in [descriptor["native_preparation_root"], descriptor["qualified_capture_root"]]:
-        _physical(root, relative)
-    ndp = nr / descriptor["native_descriptor_path"]
-    cdp = cr / descriptor["capture_descriptor_path"]
+    nr = _member(root, descriptor["native_preparation_root"])
+    cr = _member(root, descriptor["qualified_capture_root"])
+    if not nr.is_dir() or not cr.is_dir():
+        raise BoundedError("HOLDER_REVISION_LOCAL_ARCHIVE_DIRECTORIES_REQUIRED")
+    ndp = _physical(nr, descriptor["native_descriptor_path"], independent=True)
+    cdp = _physical(cr, descriptor["capture_descriptor_path"], independent=True)
     if (
         file_sha(ndp) != descriptor["native_descriptor_sha256"]
         or file_sha(cdp) != descriptor["capture_descriptor_sha256"]
@@ -244,6 +246,8 @@ def audit_holder_revision_scope(
         raise BoundedError("HOLDER_REVISION_ARCHIVED_DESCRIPTOR_HASH_INVALID")
     native = json.loads(ndp.read_bytes())
     capture = json.loads(cdp.read_bytes())
+    _member(nr, "observations/" + native["label"])
+    _member(cr, "observations/" + capture["label"])
     audit_native_holder_scope(nr, native, budget)
     if capture.get("input_kind") != "retained_raw_governance":
         raise BoundedError("HOLDER_REVISION_REAL_RAW_CLOSURE_REQUIRED")

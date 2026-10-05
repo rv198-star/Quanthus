@@ -54,7 +54,8 @@ def test_shared_cash_and_source_zero_keep_unknown_allocation_and_all_originals()
     inputs = fixture()
     before = deepcopy(inputs)
     proof = compare(*inputs)
-    assert proof["classification"] == "SHARED_TOTALS_EQUAL_UNMENTIONED_ZERO_COMPONENT"
+    assert proof["classification"] == "SHARED_PRESENT_TOTALS_EQUAL_ZERO_COMPONENT_UNMENTIONED"
+    assert proof["combined_share_ratio_equal"] is None
     assert proof["F10_unmentioned_components"] == ["combined_shares"]
     assert not proof["bonus_transfer_allocation_proven"]
     assert not proof["unmentioned_component_changed_to_zero"]
@@ -89,6 +90,15 @@ def test_sub_quantum_numeric_conflict_is_never_rounded_away():
     result = compare(original, action, terms)
     assert result["classification"] == "EXACT_TOTAL_CONFLICT"
     assert not result["cash_total_equal"]
+
+
+def test_unmentioned_positive_component_is_unavailable_instead_of_a_zero_conflict():
+    original, action, terms = fixture()
+    original["bonus_share_ratio"] = Decimal("0.1")
+    proof = compare(original, action, terms)
+    assert proof["classification"] == "NORMALIZED_NONZERO_COMPONENT_UNAVAILABLE_IN_F10"
+    assert proof["combined_share_ratio_equal"] is None
+    assert proof["cash_total_equal"] is True
 
 
 @pytest.mark.parametrize("value", [None, 0.1, Decimal("NaN"), Decimal("-1")])

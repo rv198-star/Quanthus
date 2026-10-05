@@ -229,7 +229,11 @@ def compare_normalized_totals(
     )
     date_equal = action["ex_date"] == day
     semantics_equal = action.get("action_status") == "IMPLEMENTED"
-    cash_equal, shares_equal = cash == expected[0], shares == expected[1]
+    cash_equal = cash == expected[0] if cash_present else None
+    shares_equal = shares == expected[1] if shares_present else None
+    missing_nonzero = (not cash_present and expected[0] != 0) or (
+        not shares_present and expected[1] != 0
+    )
     return {
         "contract_id": "p10-base22-normalized-total-comparison-v1",
         "classification": "IDENTITY_OR_DATE_CONFLICT"
@@ -237,8 +241,10 @@ def compare_normalized_totals(
         else "ACTION_STATUS_CONFLICT"
         if not semantics_equal
         else "EXACT_TOTAL_CONFLICT"
-        if not cash_equal or not shares_equal
-        else "SHARED_TOTALS_EQUAL_UNMENTIONED_ZERO_COMPONENT"
+        if cash_equal is False or shares_equal is False
+        else "NORMALIZED_NONZERO_COMPONENT_UNAVAILABLE_IN_F10"
+        if missing_nonzero
+        else "SHARED_PRESENT_TOTALS_EQUAL_ZERO_COMPONENT_UNMENTIONED"
         if unmentioned
         else "SHARED_TOTALS_EQUAL",
         "identity_equal": identity_equal,

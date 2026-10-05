@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from .base22 import business_date, digest
@@ -129,3 +130,171 @@ def reconcile_tail_observation(
         evidence=proof,
     )
     return row, proof
+
+
+def audit_tail_governance_scope(root: Path) -> dict[str, Any]:
+    """Full local native reads and raw replay, with no source-path dereferencing."""
+    import json
+
+    import duckdb
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]
+
+    from .base22 import canonical, file_sha, load_contract, schemas
+    from .base22_bounded import semantic_scan
+    from .base22_sources import _tree, physical_path, tail_raw_projection
+
+    root = physical_path(root)
+    body = json.loads((root / "SCOPE.json").read_bytes())
+    if (
+        body.get("kind") != "sealed_negative_quality_scope_NOT_COMPLETE_BASE"
+        or body.get("contract_id") != CONTRACT_ID
+        or digest({k: v for k, v in body.items() if k != "identity"}) != body.get("identity")
+        or body.get("full_472_acceptance") is not False
+        or body.get("old_control_mutations") != 0
+    ):
+        raise BoundedError("TAIL_GOVERNANCE_DESCRIPTOR_INVALID")
+    _, model, extension = load_contract(root / "contract")
+    typed_schemas = schemas(model, extension)
+    paths: dict[str, list[Path]] = {}
+    scans = {}
+    physical = {"SCOPE.json", "PREWRITE.json", body["evidence_path"]}
+    for item in [*body["members"], *body["outputs"]]:
+        relative = item["path"]
+        path = physical_path(root / relative)
+        if root not in path.parents or relative in physical or path.stat().st_nlink != 1:
+            raise BoundedError("TAIL_GOVERNANCE_PHYSICAL_MEMBER_INVALID")
+        if path.stat().st_size != item["size_bytes"] or file_sha(path) != item["sha256"]:
+            raise BoundedError("TAIL_GOVERNANCE_MEMBER_HASH_MISMATCH")
+        physical.add(relative)
+        role = item.get("role", "dwd_quality_exception")
+        paths.setdefault(role, []).append(path)
+        table = "dwd_security_bar" if role == "new_bar" else role
+        if table in typed_schemas:
+            scan = semantic_scan([path], typed_schemas[table], batch_rows=256)
+            if scan["rows"] != item["rows"] or (
+                "semantic_scan" in item and item["semantic_scan"] != scan
+            ):
+                raise BoundedError("TAIL_GOVERNANCE_SCHEMA_CENSUS_MISMATCH")
+            scans[relative] = scan
+    if set(_tree(root)) != physical:
+        raise BoundedError("TAIL_GOVERNANCE_PHYSICAL_SET_MISMATCH")
+    if len(paths.get("raw_tail", [])) != 1:
+        raise BoundedError("TAIL_GOVERNANCE_RAW_CLOSURE_INVALID")
+    raw_item = next(item for item in body["members"] if item["role"] == "raw_tail")
+    raw = tail_raw_projection(paths["raw_tail"][0], raw_item["sha256"], body["stock_code"])
+    dates = body["exact_dates"]
+    if len(dates) != len(set(dates)) or len(dates) != 11:
+        raise BoundedError("TAIL_GOVERNANCE_EXACT_DATE_SCOPE_INVALID")
+    selected = {
+        str(row["trade_date"]): row for row in raw.to_pylist() if str(row["trade_date"]) in dates
+    }
+    if set(selected) != set(dates):
+        raise BoundedError("TAIL_GOVERNANCE_RAW_KEY_CLOSURE_INVALID")
+    connection = duckdb.connect(
+        config={
+            "threads": "1",
+            "memory_limit": "2GB",
+            "autoload_known_extensions": "false",
+            "autoinstall_known_extensions": "false",
+        }
+    )
+    proofs = []
+    expected_rows = []
+    try:
+        for table, files in paths.items():
+            if table in typed_schemas or table == "new_bar":
+                connection.read_parquet(
+                    [str(p) for p in files], hive_partitioning=False
+                ).create_view(table)
+        listings = (
+            connection.execute(
+                "SELECT * FROM dwd_listing WHERE listing_code=?", [body["stock_code"]]
+            )
+            .to_arrow_table()
+            .to_pylist()
+        )
+        if len(listings) != 1:
+            raise BoundedError("TAIL_GOVERNANCE_LISTING_CLOSURE_INVALID")
+        listing = listings[0]
+        for day in dates:
+            calendar = (
+                connection.execute(
+                    "SELECT * FROM dwd_trading_calendar WHERE venue_id=? AND trade_date=? "
+                    "AND session_type='REGULAR_DAY'",
+                    [listing["venue_id"], day],
+                )
+                .to_arrow_table()
+                .to_pylist()
+            )
+            bars = (
+                connection.execute(
+                    "SELECT * FROM new_bar WHERE listing_id=? "
+                    "AND CAST(timezone('Asia/Shanghai',observation_start) AS DATE)=?",
+                    [listing["listing_id"], day],
+                )
+                .to_arrow_table()
+                .to_pylist()
+            )
+            if len(calendar) != 1 or len(bars) != 1:
+                raise BoundedError("TAIL_GOVERNANCE_DATE_REFERENCE_CLOSURE_INVALID")
+            states = (
+                connection.execute(
+                    "SELECT * EXCLUDE(upper_price,lower_price) FROM dwd_tradability_state "
+                    "WHERE listing_id=? "
+                    "AND CAST(timezone('Asia/Shanghai',observation_start) AS DATE)=?",
+                    [listing["listing_id"], day],
+                )
+                .to_arrow_table()
+                .to_pylist()
+            )
+            gaps = (
+                connection.execute(
+                    "SELECT * FROM dwd_observation_gap WHERE listing_id=? AND interval_size='1d' "
+                    "AND CAST(timezone('Asia/Shanghai',affected_effective_at) AS DATE)=?",
+                    [listing["listing_id"], day],
+                )
+                .to_arrow_table()
+                .to_pylist()
+            )
+            row, proof = reconcile_tail_observation(
+                selected[day],
+                bar=bars[0],
+                listing=listing,
+                calendar=calendar[0],
+                states=states,
+                gaps=gaps,
+                detected_at=instant(body["detected_at"]),
+                source_sha256=raw_item["sha256"],
+            )
+            expected_rows.append(digest(row))
+            proofs.append(proof)
+    finally:
+        connection.close()
+    actual_rows = [
+        digest(row)
+        for p in paths["dwd_quality_exception"]
+        for batch in pq.ParquetFile(p).iter_batches(batch_size=256)
+        for row in batch.to_pylist()
+    ]
+    evidence_path = root / body["evidence_path"]
+    if file_sha(evidence_path) != body["evidence_sha256"]:
+        raise BoundedError("TAIL_GOVERNANCE_EVIDENCE_HASH_MISMATCH")
+    evidence = json.loads(evidence_path.read_bytes())
+    if (
+        sorted(actual_rows) != sorted(expected_rows)
+        or len(set(actual_rows)) != 11
+        or canonical(evidence["proofs"]) != canonical(proofs)
+    ):
+        raise BoundedError("TAIL_GOVERNANCE_RAW_REPLAY_OR_OUTPUT_MISMATCH")
+    return {
+        "status": "LOCAL_NATIVE_SCAN_AND_RAW_REPLAY_PASS_NOT_BASE22_ACCEPTANCE",
+        "scope_identity": body["identity"],
+        "quality_rows": len(actual_rows),
+        "raw_state_disagreements": sum(p["state_disagreement"] for p in proofs),
+        "consistent_nontrading_controls": sum(not p["state_disagreement"] for p in proofs),
+        "all_local_typed_scans": scans,
+        "state_mutations": 0,
+        "gap_resolutions": 0,
+        "provider_acquisition": None,
+        "source_paths_dereferenced": 0,
+    }

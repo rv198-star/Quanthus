@@ -435,3 +435,13 @@ contract. Tests are in `test_base22_f10_sources.py` and
 `test_base22_f10_dividend.py`. Original correction001 and consumer gates remain
 immutable; positive source qualification is limited to the exact declared raw
 scope and does not grant issue or whole-image acceptance.
+
+`base22_f10_replay.py` recomputes a bounded complete response from image-local
+raw categories and its original receipt, resolving each dividend block against
+the same local dated identities. It reconstructs exact typed values and the new
+knowledge floor, retaining all rejected-block dispositions. Cold controllers
+compare the resulting row hashes with every physical output and enforce global
+keys, lineage and parent/term closure separately. Repackaging file checksums or
+safe summaries cannot substitute for this raw replay. Its synthetic contracts
+are in `test_base22_f10_replay.py`; scope reproduction remains separate from
+complete Base 2.2 acceptance.

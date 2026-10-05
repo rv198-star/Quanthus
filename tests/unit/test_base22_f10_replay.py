@@ -125,3 +125,44 @@ def test_unknown_dated_identity_keeps_original_block_and_has_no_output():
         == "DATED_PARENT_UNKNOWN_DATED_IDENTITY"
     )
     assert proof["source_proofs"][0]["proof"]["dated_blocks"] == 1
+
+
+def test_replay_hashes_match_schema_serialization_without_losing_raw_precision(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    r, receipt, args = fixture()
+    before = copy.deepcopy((r, receipt))
+    out, proof = replay_f10_group([r], receipt, **args)
+    differs = False
+    for table, rows in out.items():
+        path = tmp_path / (table + ".parquet")
+        pq.write_table(pa.Table.from_pylist(rows, schema=args["schemas"][table]), path)
+        stored = pq.ParquetFile(path).read().to_pylist()
+        assert stored == rows  # Decimal values, nulls and time instants are exact.
+        differs |= [digest(row) for row in rows] != [digest(row) for row in stored]
+        assert proof["serialized_row_hashes"][table] == [digest(row) for row in stored]
+        assert proof["merged_row_hashes"][table] == [digest(row) for row in rows]
+    assert differs  # Fixed schema scale is a representation change, not a new value.
+    assert (r, receipt) == before
+    assert proof["source_proofs"][0]["proof"]["content_sha256"] == (
+        "sha256:" + r["content_sha256"]
+    )
+
+
+def test_serialized_replay_still_rejects_changed_value_or_knowledge(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    r, receipt, args = fixture()
+    out, proof = replay_f10_group([r], receipt, **args)
+    for table, field, replacement in (
+        ("dwd_corporate_action_term", "amount_per_share", 9),
+        ("dwd_corporate_action", "knowledge_from", datetime(2026, 7, 31, tzinfo=timezone.utc)),
+    ):
+        changed = copy.deepcopy(out[table])
+        changed[0][field] = replacement
+        path = tmp_path / (table + ".parquet")
+        pq.write_table(pa.Table.from_pylist(changed, schema=args["schemas"][table]), path)
+        hashes = [digest(row) for row in pq.ParquetFile(path).read().to_pylist()]
+        assert hashes != proof["serialized_row_hashes"][table]

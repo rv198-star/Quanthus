@@ -90,6 +90,17 @@ def replay_f10_group(
         )
     if rules is not None:
         projected = {table: knowledge_versions(rs, rules[table]) for table, rs in projected.items()}
+    # Parquet's fixed Decimal scale changes its textual representation. Keep the
+    # original row hashes as precision evidence and compare physical rows against
+    # the explicit schema representation, without changing values or instants.
+    import pyarrow as pa  # type: ignore[import-untyped]
+
+    serialized = {}
+    for table, rs in projected.items():
+        typed = pa.Table.from_pylist(rs, schema=schemas[table]).to_pylist()
+        if typed != rs:
+            raise BoundedError("F10_REPLAY_SERIALIZATION_VALUE_OR_TIME_CHANGED")
+        serialized[table] = [digest(row) for row in typed]
     proof = {
         "response_proof": response,
         "source_proofs": proofs,
@@ -98,6 +109,7 @@ def replay_f10_group(
         "merged_row_hashes": {
             table: [digest(row) for row in rs] for table, rs in projected.items()
         },
+        "serialized_row_hashes": serialized,
         "full_base22_or_legacy_acceptance": False,
     }
     return projected, proof

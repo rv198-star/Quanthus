@@ -445,3 +445,11 @@ keys, lineage and parent/term closure separately. Repackaging file checksums or
 safe summaries cannot substitute for this raw replay. Its synthetic contracts
 are in `test_base22_f10_replay.py`; scope reproduction remains separate from
 complete Base 2.2 acceptance.
+
+Replay retains both the original precision-sensitive row hashes and separate
+`serialized_row_hashes` computed in the pinned physical Arrow schema. Fixed
+Decimal scale padding may change a textual hash while preserving the exact value.
+Schema conversion must preserve every value, null and timestamp instant; the
+physical comparison never weakens the original raw-token precision evidence.
+Actual Parquet write/read regressions reject changed values and earlier knowledge
+even when all output checksums are repackaged.

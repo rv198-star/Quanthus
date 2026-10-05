@@ -124,6 +124,26 @@ ceiling; each actual job must freeze its own limits. That budget includes full-i
 local evidence, the worst affected/global-index stages, copy retention and safety reserve.
 No average-row extrapolation or sample success grants the complete corpus a capacity PASS.
 
+`base22_tail_union.py` implements the first native/source union scope: append-only missing
+daily-bar observations under `p10-base22-retained-tail-partition-union-v1` (#472). Its frozen
+proof binds every native/addition member, exact added business/version/row digests, repaired
+history, repair evidence, schema/rule and evaluator. It checks absence across all native
+knowledge versions in the affected partition before writing. Existing business keys, unknown
+bases, misplaced rows, changed inputs, repeated additions and changed evaluators fail closed.
+There is no conflict replacement or interval closing in this operation. Every native row is
+retained, followed by the exact frozen observations. Recomputed typed column streams over the
+inputs and output must match, including Decimal integers, nulls, zero and timestamp instants.
+The caller owns whole-scope global keys, listing/calendar/venue and source-registry checks.
+The regression suite is `tests/unit/test_base22_tail_union.py`.
+
+This is a retained governance observation union, not #472 or complete-image acceptance. Held
+turnover conflicts stay unchanged; nontrading/zero-activity observations retain their explicit
+quarantine evidence and cannot change state/gap or consumer entry gates. The union receipt
+grants no source, PIT or consumer admission and never writes READY. A complete-image plan must
+still include the local negative evidence, every other required table/domain and full budget.
+Its files may enter that later image only under a separately frozen job-ownership transfer;
+neither the old source nor its original history checkpoint may be linked or mutated.
+
 `base22_qualification.py` freezes exact retained-tail missing/conflicting keys and old version
 digests and the full input/configuration/evaluator closure. Its new revision contract never
 asserts a historical accepted child or unavailable

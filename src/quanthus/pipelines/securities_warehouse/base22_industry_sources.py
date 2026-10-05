@@ -55,9 +55,18 @@ def _semantic(document: dict[str, Any], field: str) -> None:
 
 
 def historical_rows(
-    receipt: dict[str, Any], hierarchy: dict[str, Any], hierarchy_sha256: str
+    receipt: dict[str, Any],
+    hierarchy: dict[str, Any],
+    hierarchy_sha256: str,
+    *,
+    selected_codes: set[str] | None = None,
 ) -> dict[str, dict[str, str]]:
-    """Check the recorded raw industry field as well as the resolved hierarchy."""
+    """Check the whole receipt structure, and qualify only the frozen selected keys.
+
+    Unselected source rows remain archived and unqualified. In particular a missing
+    original legacy field outside that scope cannot establish raw replay for the
+    whole receipt. Without a selection, all raw crosswalks must pass.
+    """
     _semantic(receipt, "content_digest")
     _require(
         receipt.get("schema_version") == "quanthus.p4-adm-industry-source-receipt.v1"
@@ -101,27 +110,35 @@ def historical_rows(
         except ValueError:
             raise SourceAssessmentError("INDUSTRY_ORIGINAL_DATE_INVALID") from None
         _require(update <= query, "INDUSTRY_ORIGINAL_FUTURE_UPDATE")
+        selected = selected_codes is None or code in selected_codes
         if row["resolution"] == "primary_csrc_2012_snapshot":
             _require(row["query_date"] == receipt["primary_query_date"], "INDUSTRY_QUERY_MISMATCH")
-            match = re.fullmatch(r"([A-Z]\d+)(.+)", row["provider_industry"])
-            _require(
-                match is not None and match.groups() == (leaf, row["industry_name"]),
-                "INDUSTRY_RAW_RESOLUTION_MISMATCH",
-            )
+            if selected:
+                match = re.fullmatch(r"([A-Z]\d+)(.+)", row["provider_industry"])
+                _require(
+                    match is not None and match.groups() == (leaf, row["industry_name"]),
+                    "INDUSTRY_RAW_RESOLUTION_MISMATCH",
+                )
         else:
             _require(
                 row["resolution"] == "legacy_csrc_name_crosswalk_to_2012"
                 and row["query_date"] == receipt["legacy_query_date"],
                 "INDUSTRY_QUERY_MISMATCH",
             )
-            normalized = _normalize_industry_name(row["provider_industry"].split("-")[-1])
-            matches = [k for k, v in leaves.items() if _normalize_industry_name(v) == normalized]
-            _require(matches == [leaf], "INDUSTRY_RAW_RESOLUTION_MISMATCH")
+            if selected:
+                normalized = _normalize_industry_name(row["provider_industry"].split("-")[-1])
+                matches = [
+                    k for k, v in leaves.items() if _normalize_industry_name(v) == normalized
+                ]
+                _require(matches == [leaf], "INDUSTRY_RAW_RESOLUTION_MISMATCH")
         result[code] = row
     _require(
         receipt.get("selected_security_count") == len(result) and list(result) == sorted(result),
         "INDUSTRY_ORIGINAL_SET_MISMATCH",
     )
+    if selected_codes is not None:
+        _require(selected_codes <= set(result), "INDUSTRY_SELECTED_SOURCE_MISSING")
+        return {k: v for k, v in result.items() if k in selected_codes}
     return result
 
 
@@ -161,7 +178,14 @@ def exact_industry_lineage(
         and len({r["security_id"] for r in identities}) == len(identities),
         "INDUSTRY_EXACT_FROZEN_SET_INVALID",
     )
-    original_rows = historical_rows(historical, hierarchy, input_closure["hierarchy"])
+    selected_codes = {r["listing_code"] for r in identities if r["source"] == "p4_sealed_reference"}
+    _require(len(selected_codes) == 49, "INDUSTRY_EXACT_SELECTED_CODE_SET_INVALID")
+    original_rows = historical_rows(
+        historical,
+        hierarchy,
+        input_closure["hierarchy"],
+        selected_codes=selected_codes,
+    )
     _semantic(static_receipt, "content_digest")
     _semantic(static_mapping, "artifact_digest")
     _require(
@@ -297,6 +321,10 @@ def exact_industry_lineage(
         "input_closure": input_closure,
         "new_observed_at": observed_at.isoformat(),
         "source_counts": dict(COUNTS),
+        "retained_historical_receipt_rows": historical["selected_security_count"],
+        "qualified_selected_historical_rows": len(original_rows),
+        "outside_frozen_exception_scope_rows_NOT_QUALIFIED": historical["selected_security_count"]
+        - len(original_rows),
         "exact_exceptions": evidence,
         "exact_exception_set_sha256": digest(evidence),
         "original_static_lineage": "PASS",

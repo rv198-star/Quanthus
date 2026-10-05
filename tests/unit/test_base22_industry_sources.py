@@ -248,3 +248,60 @@ def test_original_legacy_name_crosswalk_offline(fixture: dict[str, Any]) -> None
         ]
         == row
     )
+
+
+def test_nonselected_legacy_omission_does_not_qualify_whole_receipt(
+    fixture: dict[str, Any],
+) -> None:
+    """The recovered receipt may retain extra rows outside the frozen 49."""
+    extra = deepcopy(fixture["historical"]["source_rows"][0])
+    extra.update(
+        security_code="999999",
+        provider_industry="",
+        provider_update_date="2012-01-01",
+        query_date="2012-12-31",
+        resolution="legacy_csrc_name_crosswalk_to_2012",
+    )
+    fixture["historical"]["source_rows"].append(extra)
+    fixture["historical"]["selected_security_count"] = 50
+    fixture["historical"] = sealed(fixture["historical"], "content_digest")
+    fixture["static_receipt"]["historical_supplement"] = fixture["historical"]
+    fixture["static_receipt"] = sealed(fixture["static_receipt"], "content_digest")
+    fixture["static_mapping"]["source"]["source_revision"] = fixture["static_receipt"][
+        "content_digest"
+    ]
+    fixture["static_mapping"] = sealed(fixture["static_mapping"], "artifact_digest")
+    result = exact_industry_lineage(**fixture)
+    assert result["retained_historical_receipt_rows"] == 50
+    assert result["qualified_selected_historical_rows"] == 49
+    assert result["outside_frozen_exception_scope_rows_NOT_QUALIFIED"] == 1
+    assert result["formal_DWD_membership_admission"] == "NOT_GRANTED"
+
+
+def test_missing_selected_source_still_blocks(fixture: dict[str, Any]) -> None:
+    with pytest.raises(SourceAssessmentError, match="SELECTED_SOURCE_MISSING"):
+        historical_rows(
+            fixture["historical"],
+            fixture["hierarchy"],
+            fixture["input_closure"]["hierarchy"],
+            selected_codes={"999999"},
+        )
+
+
+def test_selected_legacy_original_field_omission_still_blocks(fixture: dict[str, Any]) -> None:
+    receipt = deepcopy(fixture["historical"])
+    row = receipt["source_rows"][0]
+    row.update(
+        provider_industry="",
+        provider_update_date="2012-01-01",
+        query_date="2012-12-31",
+        resolution="legacy_csrc_name_crosswalk_to_2012",
+    )
+    receipt = sealed(receipt, "content_digest")
+    with pytest.raises(SourceAssessmentError, match="RAW_RESOLUTION_MISMATCH"):
+        historical_rows(
+            receipt,
+            fixture["hierarchy"],
+            fixture["input_closure"]["hierarchy"],
+            selected_codes={row["security_code"]},
+        )

@@ -105,8 +105,14 @@ def test_invalid_frozen_inputs_fail_before_output(tmp_path, fault):
     if fault == "hash":
         incoming = [Member(incoming[0].path, "sha256:" + "b" * 64, incoming[0].size_bytes, 1)]
     if fault in {"rows", "bound"}:
-        incoming = [Member(incoming[0].path, incoming[0].sha256, incoming[0].size_bytes,
-                           2 if fault == "rows" else u.MAX_PROVIDER_ROWS + 1)]
+        incoming = [
+            Member(
+                incoming[0].path,
+                incoming[0].sha256,
+                incoming[0].size_bytes,
+                2 if fault == "rows" else u.MAX_PROVIDER_ROWS + 1,
+            )
+        ]
     if fault == "repeat":
         incoming = list(native)
     with Budget(tmp_path / "job", [tmp_path / "inputs"], Limits(free_floor_bytes=1)) as budget:

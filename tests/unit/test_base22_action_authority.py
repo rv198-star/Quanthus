@@ -91,3 +91,17 @@ def test_retrieval_instant_is_retained_without_becoming_provider_acquisition():
     _, proof = parse_implemented_action(raw(), source_row_ref="row", fetched_at=CLOCK.isoformat())
     assert proof["response_fetched_at"] == CLOCK
     assert proof["provider_acquisition"] is proof["publication_instant"] is None
+
+
+def test_retained_sql_midnight_date_encoding_is_not_a_publication_instant():
+    record, proof = parse_implemented_action(
+        raw(
+            EX_DIVIDEND_DATE="2026-07-25 00:00:00",
+            NOTICE_DATE="2026-07-20 00:00:00",
+            EQUITY_RECORD_DATE="2026-07-24 00:00:00",
+        ),
+        source_row_ref="retained SQL date",
+    )
+    assert record["ex_date"] == date(2026, 7, 25)
+    assert proof["notice_date"] == date(2026, 7, 20)
+    assert proof["publication_instant"] is None

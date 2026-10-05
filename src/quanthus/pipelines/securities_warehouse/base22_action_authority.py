@@ -24,9 +24,9 @@ SOURCE_FAMILY = "p10_retained_eastmoney_implementation"
 
 
 def _date_column(value: Any) -> date:
-    # Retained Eastmoney fields are business-date columns encoded as ISO strings.
+    # Retained Eastmoney fields are business-date columns encoded as ISO/SQL strings.
     # An optional midnight is serialization of the date, not an availability time.
-    if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:T00:00:00)?", value):
+    if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[T ]00:00:00)?", value):
         raise BoundedError("ACTION_AUTHORITY_DATE_COLUMN_INVALID")
     try:
         return date.fromisoformat(value[:10])

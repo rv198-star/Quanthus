@@ -151,3 +151,24 @@ def test_exact_typed_materialization_keeps_parent_time_and_never_double_divides(
     assert terms["BONUS_SHARES_PER_SHARE"]["ratio_numerator"] == Decimal("0.2")
     assert terms["TRANSFER_SHARES_PER_SHARE"]["ratio_numerator"] == Decimal("0.1")
     assert terms["CASH_AMOUNT_PER_SHARE"]["amount_per_share"] == Decimal("0.4123456789")
+
+
+def test_new_revision_knowledge_uses_real_observation_without_changing_values_or_source():
+    _, model, extension = load_contract(Path("config/pipelines"))
+    schema = schemas(model, extension)
+    vocab = json.loads(Path("config/pipelines/disclosure-event-vocabulary.v1.json").read_text())
+    source = raw()
+    rows, _ = parse(source)
+    parent = SimpleNamespace(company_id="c", security_id="s",
+                             knowledge_from=datetime(2026, 8, 4, tzinfo=timezone.utc))
+    kwargs = dict(acquired_at=source['acquired_at'], source_sha256='sha256:'+'a'*64,
+                  revision='new-retained-scope', parent=parent, vocabulary=vocab, schemas=schema)
+    old = materialize_dividend_record(rows[0], **kwargs)
+    observed = datetime(2026, 10, 5, 9, 35, 12, 123456, tzinfo=timezone.utc)
+    new = materialize_dividend_record(rows[0], observed_at=observed, **kwargs)
+    for table in old:
+        for before, after in zip(old[table], new[table], strict=True):
+            assert after['knowledge_from'] == observed
+            assert {k:v for k,v in before.items() if k != 'knowledge_from'} == {
+                k:v for k,v in after.items() if k != 'knowledge_from'}
+    assert source['acquired_at'] == '2026-08-01T12:01:02.123456+08:00'

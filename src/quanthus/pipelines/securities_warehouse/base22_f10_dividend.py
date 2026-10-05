@@ -196,11 +196,14 @@ def materialize_dividend_record(
     parent: Any,
     vocabulary: dict[str, Any],
     schemas: dict[str, Any],
+    observed_at: Any = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Project already exact per-share atoms, preserving real knowledge and clocks."""
     import pyarrow as pa  # type: ignore[import-untyped]
 
     knowledge = max(_clock(acquired_at), parent.knowledge_from)
+    if observed_at is not None:
+        knowledge = max(knowledge, _clock(observed_at))
     row = {**record, "built_at": knowledge}
     # The immutable old vocabulary maps per-ten shares. This input contract has
     # already converted exact per-ten tokens to per-share quantities once.

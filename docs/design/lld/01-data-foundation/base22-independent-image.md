@@ -414,3 +414,24 @@ bounds writer footer growth while retaining one global key projection, exact
 full-key comparisons across all physical partitions, and failed-index evidence.
 Memory/RSS/spill thresholds remain unchanged. The physical row-group regression
 is in `test_base22_bounded.py`.
+
+### Retained F10 response qualification and new repair observations
+
+`base22_f10_sources.py` binds every retained category in one security response to
+the original `collect_f10` receipt protocol: exact ordered UTF-8 concatenation,
+response count and bytes, per-category content hashes, security/request/date and
+provider revision. Missing, reordered, duplicate or changed categories and failed
+receipts fail closed. This is a complete selected response, not proof of an entire
+historical universe, provider publication time or old normalization restoration.
+No provider request is made during qualification.
+
+Original category clocks remain source observations. The collector's separate
+completion receipt and the actual new qualification observation remain distinct;
+provider acquisition is unavailable. New repair callers supply `observed_at` to
+`materialize_dividend_record`, so output knowledge cannot precede the actual new
+observation, source clock or parent knowledge. Original Decimal values, business
+dates and source evidence are unchanged. Existing callers retain their earlier
+contract. Tests are in `test_base22_f10_sources.py` and
+`test_base22_f10_dividend.py`. Original correction001 and consumer gates remain
+immutable; positive source qualification is limited to the exact declared raw
+scope and does not grant issue or whole-image acceptance.

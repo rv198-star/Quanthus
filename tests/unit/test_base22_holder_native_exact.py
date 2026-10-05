@@ -91,3 +91,110 @@ def test_native_contract_or_batch_mismatch_closed(tmp_path, fault):
             batch = batch.select(["raw_average_holding"])
         with pytest.raises(BoundedError):
             carry_native_holder_batch(batch, legacy_schema=legacy, contract_id=CONTRACT_ID)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        None,
+        "old-value",
+        "raw-text",
+        "exact-value",
+        "timestamp",
+        "lost-row",
+        "changed-input",
+        "wrong-schema",
+        "repeat",
+    ],
+)
+def test_partition_serialization_and_cold_comparison_preserve_all_old_atoms(tmp_path, fault):
+    from datetime import timedelta
+
+    import pyarrow.parquet as pq
+
+    from quanthus.pipelines.securities_warehouse.base22 import file_sha
+    from quanthus.pipelines.securities_warehouse.base22_bounded import Budget, Limits, Member
+    from quanthus.pipelines.securities_warehouse.base22_holder_native_exact import (
+        materialize_native_holder_partition,
+        validate_native_holder_partition,
+    )
+
+    _, legacy, exact = load_native_holder_contract(Path("config/pipelines"))
+    rows = []
+    for i, raw in enumerate(
+        ["123.1234567890123", "9999999999999999999999999999.1234567890123", None]
+    ):
+        row = _row(legacy)
+        row.update(
+            raw_average_holding=raw,
+            average_holding=Decimal("123.1234567890"),
+            source_record_id=str(i),
+        )
+        rows.append(row)
+    source = tmp_path / "source"
+    source.mkdir()
+    native = []
+    for i, group in enumerate([rows[:1], rows[1:]]):
+        p = source / (str(i) + ".parquet")
+        pq.write_table(pa.Table.from_pylist(group, schema=legacy), p)
+        native.append(Member(p, file_sha(p), p.stat().st_size, len(group)))
+    before = {m.path: m.path.read_bytes() for m in native}
+    if fault == "changed-input":
+        p = native[0].path
+        pq.write_table(
+            pa.Table.from_pylist(
+                [dict(rows[0], source_revision="mutated-before-build")], schema=legacy
+            ),
+            p,
+        )
+        before = {m.path: m.path.read_bytes() for m in native}
+    with Budget(tmp_path / "job", [source], Limits(free_floor_bytes=1)) as budget:
+        out = budget.root / "out.parquet"
+        if fault in ["changed-input", "wrong-schema"]:
+            with pytest.raises(BoundedError):
+                materialize_native_holder_partition(
+                    native,
+                    out,
+                    legacy_schema=legacy,
+                    exact_schema=legacy if fault == "wrong-schema" else exact,
+                    budget=budget,
+                )
+            assert not out.exists()
+        else:
+            receipt = materialize_native_holder_partition(
+                native, out, legacy_schema=legacy, exact_schema=exact, budget=budget
+            )
+            assert receipt["rows"] == 3
+            assert out.stat().st_nlink == 1
+            if fault in ["old-value", "raw-text", "exact-value", "timestamp", "lost-row"]:
+                actual = pq.ParquetFile(out).read().to_pylist()
+                if fault == "old-value":
+                    actual[0]["average_holding"] = Decimal("0")
+                if fault == "raw-text":
+                    actual[0]["raw_average_holding"] = "different-original-token"
+                if fault == "exact-value":
+                    actual[0]["average_holding_exact"] = Decimal("123.1234567890120")
+                if fault == "timestamp":
+                    actual[0]["knowledge_from"] += timedelta(microseconds=1)
+                if fault == "lost-row":
+                    actual = actual[:-1]
+                pq.write_table(pa.Table.from_pylist(actual, schema=exact), out)
+                with pytest.raises(BoundedError):
+                    validate_native_holder_partition(
+                        native, out, legacy_schema=legacy, exact_schema=exact, budget=budget
+                    )
+            elif fault == "repeat":
+                saved = out.read_bytes()
+                with pytest.raises(BoundedError, match="OUTPUT_EXISTS"):
+                    materialize_native_holder_partition(
+                        native, out, legacy_schema=legacy, exact_schema=exact, budget=budget
+                    )
+                assert out.read_bytes() == saved
+            else:
+                assert (
+                    validate_native_holder_partition(
+                        native, out, legacy_schema=legacy, exact_schema=exact, budget=budget
+                    )
+                    == 3
+                )
+    assert before == {p: p.read_bytes() for p in before}

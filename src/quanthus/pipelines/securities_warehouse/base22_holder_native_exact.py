@@ -15,9 +15,10 @@ from pathlib import Path
 from typing import Any
 
 from .base22 import file_sha, load_contract, schemas
-from .base22_bounded import BoundedError
+from .base22_bounded import BoundedError, Budget, Member, _batches, semantic_scan
 from .base22_holder_exact import TABLE
 from .base22_precision import decimal_profile
+from .base22_sources import _fingerprint
 
 CONTRACT_ID = "p10-base22-holder-native-exact-v3-preparation"
 CONTRACT = {
@@ -87,3 +88,103 @@ def carry_native_holder_batch(batch: Any, *, legacy_schema: Any, contract_id: st
         [*batch.columns, pa.array(exact, type=pa.decimal256(41, 13))],
         schema=legacy_schema.append(pa.field("average_holding_exact", pa.decimal256(41, 13))),
     )
+
+
+def validate_native_holder_partition(
+    native: list[Member], output: Path, *, legacy_schema: Any, exact_schema: Any, budget: Budget
+) -> int:
+    """Compare every old column and derived exact value, across file boundaries."""
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]
+
+    file = pq.ParquetFile(output)
+    if not file.schema_arrow.equals(exact_schema):
+        raise BoundedError("NATIVE_HOLDER_EXACT_OUTPUT_SCHEMA_INVALID")
+    source = iter(_batches([m.path for m in native], legacy_schema, 1024))
+    target = iter(file.iter_batches(batch_size=1024))
+    left, right = next(source, None), next(target, None)
+    left_pos = right_pos = total = 0
+    while left is not None and right is not None:
+        budget.check()
+        n = min(left.num_rows - left_pos, right.num_rows - right_pos)
+        expected = carry_native_holder_batch(
+            left.slice(left_pos, n), legacy_schema=legacy_schema, contract_id=CONTRACT_ID
+        )
+        if not expected.equals(right.slice(right_pos, n)):
+            raise BoundedError("NATIVE_HOLDER_OLD_COLUMNS_OR_EXACT_VALUE_CHANGED")
+        total += n
+        left_pos += n
+        right_pos += n
+        if left_pos == left.num_rows:
+            left, left_pos = next(source, None), 0
+        if right_pos == right.num_rows:
+            right, right_pos = next(target, None), 0
+    if left is not None or right is not None or total != sum(m.rows for m in native):
+        raise BoundedError("NATIVE_HOLDER_EXACT_ROW_CENSUS_MISMATCH")
+    return total
+
+
+def materialize_native_holder_partition(
+    native: list[Member],
+    output: Path,
+    *,
+    legacy_schema: Any,
+    exact_schema: Any,
+    budget: Budget,
+) -> dict[str, Any]:
+    """One exclusive, bounded native partition; old data only read, never linked."""
+    import os
+    import time
+
+    import pyarrow.parquet as pq
+
+    if not native or len({m.path for m in native}) != len(native):
+        raise BoundedError("NATIVE_HOLDER_PARTITION_INPUT_INVALID")
+    import pyarrow as pa
+
+    if not exact_schema.equals(
+        legacy_schema.append(pa.field("average_holding_exact", pa.decimal256(41, 13)))
+    ):
+        raise BoundedError("NATIVE_HOLDER_PARTITION_TARGET_SCHEMA_INVALID")
+    start = time.monotonic()
+    before = [m.verify() for m in native]
+    for m in native:
+        file = pq.ParquetFile(m.path)
+        if file.metadata.num_rows != m.rows or not file.schema_arrow.equals(legacy_schema):
+            raise BoundedError("NATIVE_HOLDER_PARTITION_INPUT_SCHEMA_OR_ROWS_INVALID")
+    output = budget.destination(output)
+    partial = output.with_name(output.name + ".partial")
+    if output.exists() or partial.exists():
+        raise BoundedError("NATIVE_HOLDER_PARTITION_OUTPUT_EXISTS")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with (
+        partial.open("xb") as stream,
+        pq.ParquetWriter(stream, exact_schema, compression="zstd") as writer,
+    ):
+        for batch in _batches([m.path for m in native], legacy_schema, 1024):
+            budget.check(reserve=batch.nbytes * 3)
+            writer.write_batch(
+                carry_native_holder_batch(
+                    batch, legacy_schema=legacy_schema, contract_id=CONTRACT_ID
+                )
+            )
+    rows = validate_native_holder_partition(
+        native, partial, legacy_schema=legacy_schema, exact_schema=exact_schema, budget=budget
+    )
+    if any(
+        _fingerprint(m.path) != fp or file_sha(m.path) != m.sha256
+        for m, fp in zip(native, before, strict=True)
+    ):
+        raise BoundedError("NATIVE_HOLDER_SOURCE_CHANGED")
+    os.link(partial, output)  # Atomic local no-overwrite seal; no source hard links.
+    partial.unlink()
+    budget.check()
+    return {
+        "rows": rows,
+        "sha256": file_sha(output),
+        "size_bytes": output.stat().st_size,
+        "allocated_bytes": output.stat().st_blocks * 512,
+        "semantic_scan": semantic_scan([output], exact_schema, check=budget.check),
+        "old_columns_and_native_raw_unchanged": True,
+        "seconds": time.monotonic() - start,
+        "source_or_consumer_admission": "NOT_GRANTED",
+    }

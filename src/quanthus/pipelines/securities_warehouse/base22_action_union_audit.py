@@ -141,7 +141,8 @@ def audit_selected_action_scope(
     if dict(actual) != dict(expected):
         raise BoundedError("ACTION_SELECTED_VALUES_CLOCKS_OR_KEYS_CHANGED")
     source_ids = [(i["record_source"], i["revision"], i["sha256"]) for i in donor["inputs"]]
-    with GlobalScan(budget) as scan:
+    reader_roots = [] if budget.root in root.parents or root == budget.root else [root]
+    with GlobalScan(budget, read_only_roots=reader_roots) as scan:
         for table in sorted(descriptor["output_rows"]):
             scan.add(
                 table,

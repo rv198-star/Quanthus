@@ -398,10 +398,26 @@ class GlobalScan:
     supplied by the offline image contract and remain mandatory.
     """
 
-    def __init__(self, budget: Budget):
+    def __init__(self, budget: Budget, *, read_only_roots: list[Path] | None = None):
         import duckdb
 
         self.budget = budget
+        # Cold images are existing immutable inputs, not newly allocated scratch.
+        # Keep the write destination guard strict. An explicitly supplied reader
+        # root must be a real kernel-readonly mount, disjoint from mutable TMP.
+        self.read_only_roots: list[Path] = []
+        for raw in read_only_roots or []:
+            root = physical_path(raw)
+            if (
+                not root.is_dir()
+                or root == budget.root
+                or root in budget.root.parents
+                or budget.root in root.parents
+                or root in self.read_only_roots
+                or not os.statvfs(root).f_flag & os.ST_RDONLY
+            ):
+                raise BoundedError("GLOBAL_READER_ROOT_NOT_ISOLATED_READONLY")
+            self.read_only_roots.append(root)
         temp = budget.destination(budget.root / "temp" / ("scan-" + str(time.time_ns())))
         temp.mkdir(parents=True, exist_ok=False)
         self.temp = temp
@@ -435,7 +451,9 @@ class GlobalScan:
         if not paths or name in self.tables:
             raise BoundedError("SCAN_TABLE_INVALID")
         for path in paths:
-            self.budget.destination(path)
+            path = physical_path(path)
+            if not any(root in path.parents for root in self.read_only_roots):
+                self.budget.destination(path)
             if path.stat().st_nlink != 1 or not path.is_file():
                 raise BoundedError("SCAN_LOCAL_INDEPENDENT_FILE_REQUIRED")
         self.connection.read_parquet([str(p) for p in paths], hive_partitioning=False).create_view(

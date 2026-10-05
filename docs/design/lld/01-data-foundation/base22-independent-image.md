@@ -144,6 +144,20 @@ still include the local negative evidence, every other required table/domain and
 Its files may enter that later image only under a separately frozen job-ownership transfer;
 neither the old source nor its original history checkpoint may be linked or mutated.
 
+`base22_tail_union_audit.py` verifies that retained scope using only image-local contracts,
+files, proofs, source registries and three archived raw shards. It recomputes whole-scope keys,
+knowledge versions, row/time rules and listing/calendar/venue closure. One bounded parent
+identity lookup is shared by all raw observations. Every added observation is regenerated from
+the original raw value and actual recorded knowledge instant, then compared in the physical
+Arrow schema. Decimal representation padding is not mistaken for numeric drift. Held original
+versions and regular/quarantined counts are rechecked. The cold regression suite,
+`tests/unit/test_base22_tail_union_audit.py`, removes synthetic source directories and also
+repackages changed evidence/hashes to prove that unknown sources, replacement purpose,
+date/venue errors and changed values still fail. A cold controller must additionally hide the
+original source/cache roots and deny network access at the OS level, including native readers.
+Scope verification cannot replace the complete 33-table image's two independent moves or its
+source/coverage/capacity admission.
+
 `base22_qualification.py` freezes exact retained-tail missing/conflicting keys and old version
 digests and the full input/configuration/evaluator closure. Its new revision contract never
 asserts a historical accepted child or unavailable

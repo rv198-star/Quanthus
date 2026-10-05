@@ -198,3 +198,161 @@ def test_partition_serialization_and_cold_comparison_preserve_all_old_atoms(tmp_
                     == 3
                 )
     assert before == {p: p.read_bytes() for p in before}
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        None,
+        "purpose",
+        "wrong-schema",
+        "rounded-exact",
+        "old-time",
+        "partition",
+        "empty-extra",
+        "dated-parent",
+        "unknown-lineage",
+    ],
+)
+def test_native_cold_scope_exact_physical_set_and_real_column_comparison(tmp_path, fault):
+    from datetime import datetime, timedelta, timezone
+
+    import pyarrow.parquet as pq
+
+    from quanthus.pipelines.securities_warehouse.base22 import (
+        digest,
+        file_sha,
+        load_contract,
+        schemas,
+    )
+    from quanthus.pipelines.securities_warehouse.base22_bounded import Budget, Limits, semantic_scan
+    from quanthus.pipelines.securities_warehouse.base22_holder_native_exact import (
+        audit_native_holder_scope,
+    )
+
+    _, legacy, exact = load_native_holder_contract(Path("config/pipelines"))
+    _, model, extension = load_contract(Path("config/pipelines"))
+    ss = schemas(model, extension)
+    ss["dwd_shareholder_count_observation"] = exact
+    table = "dwd_shareholder_count_observation"
+    with Budget(tmp_path / "job", [], Limits(free_floor_bytes=1)) as budget:
+        root = budget.root / "image"
+        stage = root / "observations/native-precision"
+        cfg = stage / "contract"
+        cfg.mkdir(parents=True)
+        names = [
+            "base22-holder-native-exact.v3.json",
+            "base22-independent-image.v1.json",
+            "dwd-domain-model.v1.json",
+            "dwd-domain-model.v1.1-extension.json",
+        ]
+        cfgsha = {}
+        for name in names:
+            shutil.copyfile(Path("config/pipelines") / name, cfg / name)
+            cfgsha[name] = file_sha(cfg / name)
+        row = _row(legacy)
+        row.update(
+            raw_average_holding="123.1234567890123",
+            average_holding=Decimal("123.1234567890"),
+            company_id="company",
+            security_id="security",
+        )
+        native = stage / "archives/native/period_end_year=2026/original.parquet"
+        native.parent.mkdir(parents=True)
+        old = pa.Table.from_pylist([row], schema=legacy)
+        pq.write_table(old, native)
+        archive = {
+            "path": str(native.relative_to(root)),
+            "sha256": file_sha(native),
+            "size_bytes": native.stat().st_size,
+            "rows": 1,
+            "role": "original_native_holder",
+            "partition": "period_end_year=2026",
+            "original_source_root": "/unreachable-archived-source",
+        }
+        actual = carry_native_holder_batch(
+            old.to_batches()[0], legacy_schema=legacy, contract_id=CONTRACT_ID
+        )
+        outs = actual.to_pylist()
+        if fault == "rounded-exact":
+            outs[0]["average_holding_exact"] = Decimal("123.1234567890120")
+        if fault == "old-time":
+            outs[0]["knowledge_from"] += timedelta(microseconds=1)
+        groups = {table: outs}
+        for t, key, value in [
+            ("dwd_listed_company", "company_id", "company"),
+            ("dwd_security", "security_id", "security"),
+        ]:
+            parent = _row(ss[t])
+            parent.update(
+                {
+                    key: value,
+                    "effective_from": datetime(2011, 1, 1, tzinfo=timezone.utc),
+                    "knowledge_from": datetime(2011, 1, 1, tzinfo=timezone.utc),
+                }
+            )
+            if fault == "dated-parent" and t == "dwd_security":
+                parent["effective_from"] = datetime(2026, 8, 5, tzinfo=timezone.utc)
+            groups[t] = [parent]
+        outputs = []
+        registry = {}
+        for t, rows in groups.items():
+            p = stage / "payload" / t / "period_end_year=2026" / "part.parquet"
+            p.parent.mkdir(parents=True)
+            schema = legacy if fault == "wrong-schema" and t == table else ss[t]
+            data = pa.Table.from_pylist(rows, schema=schema)
+            pq.write_table(data, p)
+            outputs.append(
+                {
+                    "table": t,
+                    "path": str(p.relative_to(root)),
+                    "partition": "period_end_year=2026",
+                    "rows": len(rows),
+                    "sha256": file_sha(p),
+                    "size_bytes": p.stat().st_size,
+                    "semantic_scan": semantic_scan([p], schema),
+                }
+            )
+            registry[t] = sorted(
+                {
+                    (r["record_source"], r["source_revision"], r["source_artifact_sha256"])
+                    for r in rows
+                }
+            )
+        if fault == "empty-extra":
+            pq.write_table(pa.Table.from_pylist([], schema=exact), stage / "payload/extra.parquet")
+        proof = {
+            "partition": "period_end_year=2025" if fault == "partition" else "period_end_year=2026",
+            "native_local_members": [archive["path"]],
+            "output_local_member": outputs[0]["path"],
+            "old_columns_unchanged": True,
+            "rows": 1,
+            "new_exact_rule": "exact_retained_native_decimal_text_else_null_only_for_source_null",
+        }
+        desc = {
+            "kind": "isolated_native_holder_exact_preparation_not_complete_base22",
+            "label": "native-precision",
+            "schema_contract_id": CONTRACT_ID,
+            "schema_contract_sha256": cfgsha[names[0]],
+            "contract_members": cfgsha,
+            "consumer_admission": "ADMITTED" if fault == "purpose" else "NOT_GRANTED",
+            "whole_image_schema_admission": "pending_final_candidate_review",
+            "whole33_acceptance": False,
+            "READY": False,
+            "outputs": outputs,
+            "output_rows": {t: len(r) for t, r in groups.items()},
+            "original_native_archives": [archive],
+            "exact_native_precision_proofs": [proof],
+            "source_registries": registry,
+            "precision_counts": {"rows": 1, "exact_finite": 1, "raw_source_null": 0},
+        }
+        if fault == "unknown-lineage":
+            desc["source_registries"][table] = [("unknown", "unknown", "sha256:" + "d" * 64)]
+        desc["identity"] = digest(desc)
+        if fault:
+            with pytest.raises(BoundedError):
+                audit_native_holder_scope(root, desc, budget)
+        else:
+            result = audit_native_holder_scope(root, desc, budget)
+            assert result["all_original_native_columns_and_exact13_values"] == "PASS"
+            assert result["complete_Base22"] is False

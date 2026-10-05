@@ -14,11 +14,11 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from .base22 import file_sha, load_contract, schemas
-from .base22_bounded import BoundedError, Budget, Member, _batches, semantic_scan
+from .base22 import _physical, digest, file_sha, load_contract, schemas
+from .base22_bounded import BoundedError, Budget, GlobalScan, Member, _batches, semantic_scan
 from .base22_holder_exact import TABLE
 from .base22_precision import decimal_profile
-from .base22_sources import _fingerprint
+from .base22_sources import _fingerprint, _tree
 
 CONTRACT_ID = "p10-base22-holder-native-exact-v3-preparation"
 CONTRACT = {
@@ -187,4 +187,188 @@ def materialize_native_holder_partition(
         "old_columns_and_native_raw_unchanged": True,
         "seconds": time.monotonic() - start,
         "source_or_consumer_admission": "NOT_GRANTED",
+    }
+
+
+def audit_native_holder_scope(
+    root: Path, descriptor: dict[str, Any], budget: Budget
+) -> dict[str, Any]:
+    """Full native table precision proof, exact local files and scoped references.
+
+    No prior source path, provider acquisition or publication time is inferred.
+    v3 preparation admission remains separate from final image/consumer acceptance.
+    """
+    if (
+        descriptor.get("kind") != "isolated_native_holder_exact_preparation_not_complete_base22"
+        or descriptor.get("identity")
+        != digest({k: v for k, v in descriptor.items() if k != "identity"})
+        or descriptor.get("schema_contract_id") != CONTRACT_ID
+        or descriptor.get("consumer_admission") != "NOT_GRANTED"
+        or descriptor.get("whole_image_schema_admission") != "pending_final_candidate_review"
+        or descriptor.get("whole33_acceptance") is not False
+        or descriptor.get("READY") is not False
+        or set(descriptor.get("output_rows", {})) != {TABLE, "dwd_security", "dwd_listed_company"}
+    ):
+        raise BoundedError("NATIVE_HOLDER_SCOPE_CONTRACT_INVALID")
+    stage = root / "observations" / descriptor["label"]
+    config = stage / "contract"
+    expected_configs = {
+        "base22-holder-native-exact.v3.json",
+        "base22-independent-image.v1.json",
+        "dwd-domain-model.v1.json",
+        "dwd-domain-model.v1.1-extension.json",
+    }
+    if (
+        set(descriptor["contract_members"]) != expected_configs
+        or set(_tree(config)) != expected_configs
+    ):
+        raise BoundedError("NATIVE_HOLDER_LOCAL_CONTRACT_SET_INVALID")
+    for name, sha in descriptor["contract_members"].items():
+        if (
+            file_sha(_physical(root, str((config / name).relative_to(root)), independent=True))
+            != sha
+        ):
+            raise BoundedError("NATIVE_HOLDER_LOCAL_CONTRACT_HASH_INVALID")
+    if (
+        descriptor["schema_contract_sha256"]
+        != descriptor["contract_members"]["base22-holder-native-exact.v3.json"]
+    ):
+        raise BoundedError("NATIVE_HOLDER_LOCAL_SCHEMA_BINDING_INVALID")
+    _, legacy, exact = load_native_holder_contract(config)
+    contract, model, extension = load_contract(config)
+    ss = schemas(model, extension)
+    ss[TABLE] = exact
+    archives = {a["path"]: a for a in descriptor["original_native_archives"]}
+    if len(archives) != len(descriptor["original_native_archives"]):
+        raise BoundedError("NATIVE_HOLDER_DUPLICATE_LOCAL_ARCHIVE")
+    for relative, item in archives.items():
+        if item["role"] != "original_native_holder":
+            raise BoundedError("NATIVE_HOLDER_ORIGINAL_ARCHIVE_ROLE_INVALID")
+        member = Member(
+            _physical(root, relative, independent=True),
+            item["sha256"],
+            item["size_bytes"],
+            item["rows"],
+        )
+        member.verify()
+    actual_archives = {
+        str((stage / "archives" / "native" / p).relative_to(root))
+        for p in _tree(stage / "archives" / "native")
+    }
+    if actual_archives != set(archives):
+        raise BoundedError("NATIVE_HOLDER_EXACT_PHYSICAL_ARCHIVE_SET_INVALID")
+    declared = set()
+    paths: dict[str, list[Path]] = {}
+    counts: dict[str, int] = {}
+    native_outputs = {}
+    for item in descriptor["outputs"]:
+        t, relative = item["table"], item["path"]
+        if t not in descriptor["output_rows"] or relative in declared:
+            raise BoundedError("NATIVE_HOLDER_OUTPUT_SET_INVALID")
+        path = _physical(root, relative, independent=True)
+        if file_sha(path) != item["sha256"] or path.stat().st_size != item["size_bytes"]:
+            raise BoundedError("NATIVE_HOLDER_OUTPUT_HASH_INVALID")
+        semantics = semantic_scan([path], ss[t], check=budget.check)
+        if semantics != item["semantic_scan"] or semantics["rows"] != item["rows"]:
+            raise BoundedError("NATIVE_HOLDER_RECOMPUTED_SEMANTICS_INVALID")
+        declared.add(relative)
+        paths.setdefault(t, []).append(path)
+        counts[t] = counts.get(t, 0) + semantics["rows"]
+        if t == TABLE:
+            native_outputs[relative] = item
+    if counts != descriptor["output_rows"] or declared != {
+        str((stage / "payload" / p).relative_to(root)) for p in _tree(stage / "payload")
+    }:
+        raise BoundedError("NATIVE_HOLDER_EXACT_PHYSICAL_OUTPUT_OR_ROWS_INVALID")
+    proofs = descriptor["exact_native_precision_proofs"]
+    if len(proofs) != len(native_outputs) or {p["output_local_member"] for p in proofs} != set(
+        native_outputs
+    ):
+        raise BoundedError("NATIVE_HOLDER_EXACT_PROOF_SET_INVALID")
+    used_archives = []
+    for proof in proofs:
+        members = []
+        for relative in proof["native_local_members"]:
+            item = archives[relative]
+            if item["partition"] != proof["partition"]:
+                raise BoundedError("NATIVE_HOLDER_PHYSICAL_PARTITION_PROOF_INVALID")
+            members.append(
+                Member(
+                    _physical(root, relative, independent=True),
+                    item["sha256"],
+                    item["size_bytes"],
+                    item["rows"],
+                )
+            )
+            used_archives.append(relative)
+        n = validate_native_holder_partition(
+            members,
+            _physical(root, proof["output_local_member"], independent=True),
+            legacy_schema=legacy,
+            exact_schema=exact,
+            budget=budget,
+        )
+        if (
+            n != proof["rows"]
+            or proof["new_exact_rule"] != CONTRACT["rule"]
+            or proof["old_columns_unchanged"] is not True
+        ):
+            raise BoundedError("NATIVE_HOLDER_PRECISION_PROOF_INVALID")
+        import pyarrow.compute as pc  # type: ignore[import-untyped]
+        import pyarrow.parquet as pq
+
+        if (
+            not proof["partition"].startswith("period_end_year=")
+            or proof["partition"] != native_outputs[proof["output_local_member"]]["partition"]
+        ):
+            raise BoundedError("NATIVE_HOLDER_PARTITION_COORDINATE_INVALID")
+        year = int(proof["partition"].split("=", 1)[1])
+        for batch in pq.ParquetFile(
+            _physical(root, proof["output_local_member"], independent=True)
+        ).iter_batches(columns=["period_end"], batch_size=1024):
+            if not pc.all(pc.equal(pc.year(batch.column(0)), year)).as_py():
+                raise BoundedError("NATIVE_HOLDER_ROW_PHYSICAL_PARTITION_MISMATCH")
+    if len(used_archives) != len(set(used_archives)) or set(used_archives) != set(archives):
+        raise BoundedError("NATIVE_HOLDER_EXACT_ARCHIVE_PROOF_MEMBERS_INVALID")
+    with GlobalScan(budget) as scan:
+        for t in sorted(paths):
+            scan.add(t, paths[t])
+            rule = contract["tables"][t]
+            scan.keys(t, rule["business_key"], rule["version_key"])
+            scan.row_rules(t, ss[t], rule)
+            scan.lineage(t, [tuple(v) for v in descriptor["source_registries"][t]])
+        for col, parent, key in [
+            ("company_id", "dwd_listed_company", "company_id"),
+            ("security_id", "dwd_security", "security_id"),
+        ]:
+            scan.reject(
+                f"SELECT 1 FROM {TABLE} r WHERE NOT EXISTS(SELECT 1 FROM {parent} p "
+                f"WHERE p.{key}=r.{col} AND p.knowledge_from<=r.knowledge_from "
+                "AND (p.knowledge_to IS NULL OR r.knowledge_from<p.knowledge_to) "
+                "AND CAST(timezone('Asia/Shanghai',p.effective_from) AS DATE)<=r.period_end "
+                "AND (p.effective_to IS NULL OR r.period_end<"
+                "CAST(timezone('Asia/Shanghai',p.effective_to) AS DATE))) LIMIT 1",
+                "NATIVE_HOLDER_DATED_PARENT_CLOSURE",
+            )
+        summary = scan.connection.execute(
+            f"SELECT COUNT(*),COUNT(average_holding_exact) FROM {TABLE}"
+        ).fetchone()
+        if summary is None:
+            raise BoundedError("NATIVE_HOLDER_PRECISION_COUNTS_UNAVAILABLE")
+        total, finite = summary
+        if descriptor["precision_counts"] != {
+            "rows": total,
+            "exact_finite": finite,
+            "raw_source_null": total - finite,
+        }:
+            raise BoundedError("NATIVE_HOLDER_PRECISION_COUNT_INVALID")
+    return {
+        "status": "OFFLINE_NATIVE_HOLDER_PRECISION_PREPARATION_PASS_NOT_IMAGE_OR_CONSUMER",
+        "scope_identity": descriptor["identity"],
+        "rows": counts,
+        "all_original_native_columns_and_exact13_values": "PASS",
+        "scoped_global_keys_dates_parents_lineage": "PASS",
+        "vendor_decimal_publication_provider_acquisition_or_PIT_qualification": False,
+        "whole_image_schema_admission": "pending_final_candidate_review",
+        "complete_Base22": False,
     }

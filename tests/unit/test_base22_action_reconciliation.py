@@ -95,6 +95,17 @@ def test_same_business_date_does_not_accept_conflicting_parent_identity():
     assert compare_action_observations(left, lt, right, rt)["classification"] == "IDENTITY_CONFLICT"
 
 
+def test_declared_future_payment_date_is_retained_without_extending_business_scope():
+    left, lt, right, rt = observations()
+    left["payment_date"] = right["payment_date"] = date(2026, 9, 3)
+    result = compare_action_observations(left, lt, right, rt)
+    assert result["classification"] == "SHARED_FACTS_EQUAL"
+    assert left["payment_date"] == right["payment_date"] == date(2026, 9, 3)
+    left["ex_date"] = right["ex_date"] = date(2026, 9, 1)
+    with pytest.raises(BoundedError, match="OUTSIDE_SCOPE"):
+        compare_action_observations(left, lt, right, rt)
+
+
 @pytest.mark.parametrize(
     "mutation", ["duplicate", "wrong_parent", "float", "nan", "missing", "empty"]
 )

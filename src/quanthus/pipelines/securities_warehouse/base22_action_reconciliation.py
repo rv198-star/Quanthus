@@ -95,7 +95,9 @@ def compare_action_observations(
             value = action[field]
             if field == "ex_date" and value is None:
                 raise BoundedError("ACTION_COMPARE_BUSINESS_DATE_REQUIRED")
-            if value is not None and (type(value) is not date or value > THROUGH):
+            if value is not None and (
+                type(value) is not date or (field == "ex_date" and value > THROUGH)
+            ):
                 raise BoundedError("ACTION_COMPARE_DATE_INVALID_OR_OUTSIDE_SCOPE")
     lterms, rterms = _terms(left, left_terms), _terms(right, right_terms)
     identity_equal = all(left[f] == right[f] for f in _IDENTITY)

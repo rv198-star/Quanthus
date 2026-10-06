@@ -24,7 +24,13 @@ from pathlib import Path
 from typing import Any
 
 from .base22 import THROUGH, file_sha
-from .base22_sources import _fingerprint, _tree, disjoint_output, physical_path
+from .base22_sources import (
+    SourceAssessmentError,
+    _fingerprint,
+    _tree,
+    disjoint_output,
+    physical_path,
+)
 
 FICLONE = 0x40049409
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -441,6 +447,8 @@ class GlobalScan:
         self.active_reference_batch: tuple[str, tuple[Path, ...]] | None = None
         self.key_metrics: dict[str, Any] = {}
         self._reference_maps: dict[tuple[str, str], str] = {}
+        self._reference_snapshots: dict[str, list[tuple[Path, tuple[int, int, int, int, int]]]] = {}
+        self._reference_batch_cache: dict[str, tuple[tuple[Path, ...], ...]] = {}
 
     def __enter__(self) -> GlobalScan:
         return self
@@ -644,9 +652,23 @@ class GlobalScan:
         Foreign-key existence is universal over children and independent of
         other children. Key/version uniqueness continues to use the entire
         original table in `keys`, never these per-reference views.
+        Prepare each immutable table once inside this scan. Reuse checks the
+        ordered physical inventory and file fingerprints, never an old job.
         """
         import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
+        def snapshot() -> list[tuple[Path, tuple[int, int, int, int, int]]]:
+            try:
+                return [(p, _fingerprint(physical_path(p))) for p in self.source_paths[name]]
+            except (OSError, SourceAssessmentError) as exc:
+                raise BoundedError("REFERENCE_BATCH_INPUT_CHANGED") from exc
+
+        before = snapshot()
+        if name in self._reference_batch_cache:
+            if before != self._reference_snapshots[name]:
+                raise BoundedError("REFERENCE_BATCH_INPUT_CHANGED")
+            self.budget.check()
+            return [list(paths) for paths in self._reference_batch_cache[name]]
         batches: list[list[Path]] = []
         current: list[Path] = []
         rows = size = 0
@@ -668,6 +690,10 @@ class GlobalScan:
             self.budget.check()
         if current:
             batches.append(current)
+        if snapshot() != before:
+            raise BoundedError("REFERENCE_BATCH_INPUT_CHANGED")
+        self._reference_snapshots[name] = before
+        self._reference_batch_cache[name] = tuple(tuple(paths) for paths in batches)
         return batches
 
     def structural_reference(self, name: str, column: str, target: str, reference: str) -> None:

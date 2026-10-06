@@ -674,6 +674,47 @@ def test_reference_batches_keep_all_global_parents_and_original_global_table(tmp
             assert scan.connection.execute("SELECT count(*) FROM parent").fetchone()[0] == n
 
 
+@pytest.mark.parametrize("change", [None, "bytes", "paths", "symlink"])
+def test_reference_batch_preparation_is_shared_only_for_unchanged_job_inputs(
+    tmp_path, monkeypatch, change
+):
+    with (
+        b.Budget(tmp_path / "job", [], limits()) as budget,
+        b.GlobalScan(budget) as scan,
+    ):
+        paths = [member(budget.root / f"child-{i}.parquet", records()).path for i in range(2)]
+        scan.add("child", paths)
+        opened = []
+        original = pq.ParquetFile
+
+        def observe(path, *args, **kwargs):
+            opened.append(path)
+            return original(path, *args, **kwargs)
+
+        monkeypatch.setattr(pq, "ParquetFile", observe)
+        prepared = scan._reference_batches("child")
+        assert opened == paths
+        if change == "bytes":
+            member(paths[0], records((8, 9)))
+        elif change == "paths":
+            scan.source_paths["child"] = list(reversed(paths))
+        elif change == "symlink":
+            replacement = member(budget.root / "replacement.parquet", records()).path
+            paths[0].unlink()
+            paths[0].symlink_to(replacement)
+        if change:
+            with pytest.raises(b.BoundedError, match="REFERENCE_BATCH_INPUT_CHANGED"):
+                scan._reference_batches("child")
+            if change == "symlink":
+                paths[0].unlink()
+        else:
+            reused = scan._reference_batches("child")
+            assert reused == prepared
+            reused[0].clear()
+            assert scan._reference_batches("child") == prepared
+        assert opened == paths
+
+
 @pytest.mark.parametrize("defect", [None, "missing", "nullable"])
 def test_structural_relocation_reference_uses_all_global_parent_keys_and_no_delimiter(
     tmp_path, defect

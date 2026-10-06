@@ -7,15 +7,18 @@ exchange responses, source acquisition, PIT availability or session hours.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Iterable
 from datetime import date, datetime, time, timedelta
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from .base22 import THROUGH, digest
-from .base22_bounded import BoundedError
+from .base22 import THROUGH, _physical, digest, file_sha, load_contract, partition, schemas
+from .base22_bounded import BoundedError, Budget, GlobalScan, semantic_scan
 from .base22_financial import _clock
+from .base22_sources import _tree
 from .disclosure_event import _stable_id
 
 CONTRACT_ID = "p10-base22-shared-calendar-observation-v1"
@@ -92,6 +95,117 @@ def calendar_union(
     }
     proof["identity"] = digest(proof)
     return out, proof
+
+
+def audit_calendar_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, Any]:
+    """Replay all selected local fragments and the one typed physical calendar."""
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]
+
+    if (
+        body.get("contract_id") != CONTRACT_ID
+        or body.get("identity") != digest({k: v for k, v in body.items() if k != "identity"})
+        or body.get("purpose") != "SHARED_CALENDAR_NEW_OBSERVATION_NOT_INDEPENDENT_EXCHANGE_PIT"
+        or body.get("complete_Base22") is not False
+        or body.get("READY") is not False
+        or body.get("historical_PIT_admission") is not False
+        or body.get("consumer_admission") != "NOT_GRANTED"
+    ):
+        raise BoundedError("CALENDAR_SCOPE_INVALID")
+    if set(_tree(root)) != {*body["physical_members"], "QUALIFICATION.json"}:
+        raise BoundedError("CALENDAR_EXACT_PHYSICAL_SET_CHANGED")
+    for rel, item in body["physical_members"].items():
+        p = _physical(root, rel, independent=True)
+        if file_sha(p) != item["sha256"] or p.stat().st_size != item["size_bytes"]:
+            raise BoundedError("CALENDAR_PHYSICAL_MEMBER_CHANGED")
+        budget.check()
+
+    def fragments() -> Iterable[tuple[str, list[dict[str, Any]]]]:
+        for source in body["sources"]:
+            manifest = _physical(root, source["local_manifest"], independent=True)
+            ready = _physical(root, source["local_READY"], independent=True)
+            if ready.read_text().strip() != file_sha(manifest):
+                raise BoundedError("CALENDAR_ORIGINAL_READY_IDENTITY_CHANGED")
+            meta = json.loads(manifest.read_bytes())
+            matches = [a for a in meta["artifacts"] if a["name"] == "trading_calendar"]
+            if len(matches) != 1 or matches[0]["sha256"] != source["raw_sha256"]:
+                raise BoundedError("CALENDAR_ORIGINAL_ARTIFACT_CLOSURE_CHANGED")
+            p = _physical(root, source["local_raw"], independent=True)
+            if file_sha(p) != source["raw_sha256"]:
+                raise BoundedError("CALENDAR_ORIGINAL_RAW_CHANGED")
+            yield source["raw_sha256"], pq.ParquetFile(p).read().to_pylist()
+            budget.check()
+
+    union, union_proof = calendar_union(fragments())
+    union_path = _physical(root, body["union_path"], independent=True)
+    stored_union = pq.ParquetFile(union_path).read().to_pylist()
+    if digest(union) != digest(stored_union) or digest(union_proof) != digest(body["union_proof"]):
+        raise BoundedError("CALENDAR_EXACT_RAW_UNION_OR_ORIGIN_CHANGED")
+    venue_path = _physical(root, body["venue_path"], independent=True)
+    venues = pq.ParquetFile(venue_path).read().to_pylist()
+    expected, proof = calendar_rows(
+        union,
+        venues,
+        observed_at=body["observed_at"],
+        source_sha256=file_sha(union_path),
+        revision=body["revision"],
+    )
+    if digest(proof) != digest(body["projection_proof"]):
+        raise BoundedError("CALENDAR_EXACT_PROJECTION_PROOF_CHANGED")
+    contract, model, extension = load_contract(root / "contract")
+    ss = schemas(model, extension)
+    if not pq.ParquetFile(venue_path).schema_arrow.equals(
+        ss["dwd_trading_venue"], check_metadata=False
+    ):
+        raise BoundedError("CALENDAR_NATIVE_VENUE_SCHEMA_CHANGED")
+    table = "dwd_trading_calendar"
+    item = body["output"]
+    path = _physical(root, item["path"], independent=True)
+    actual = pq.ParquetFile(path).read().to_pylist()
+    if digest(actual) != digest(expected) or len(actual) != 93:
+        raise BoundedError("CALENDAR_TYPED_RAW_REPLAY_CHANGED")
+    if any(partition(r, contract["tables"][table]) != item["partition"] for r in actual):
+        raise BoundedError("CALENDAR_EXACT_PHYSICAL_PARTITION_CHANGED")
+    summary = semantic_scan([path], ss[table], check=budget.check)
+    if summary != item["semantic_scan"]:
+        raise BoundedError("CALENDAR_TYPED_SUMMARY_CHANGED")
+    with GlobalScan(budget, read_only_roots=[root]) as scan:
+        scan.add(table, [path])
+        scan.keys(
+            table,
+            contract["tables"][table]["business_key"],
+            contract["tables"][table]["version_key"],
+        )
+        scan.row_rules(table, ss[table], contract["tables"][table])
+        scan.lineage(
+            table,
+            sorted(
+                {
+                    (r["record_source"], r["source_revision"], r["source_artifact_sha256"])
+                    for r in actual
+                }
+            ),
+        )
+        scan.add("dwd_trading_venue", [root / body["venue_path"]])
+        scan.reject(
+            """SELECT 1 FROM dwd_trading_calendar c WHERE NOT EXISTS(
+                SELECT 1 FROM dwd_trading_venue v WHERE v.venue_id=c.venue_id
+                AND v.knowledge_from<=c.knowledge_from
+                AND (v.knowledge_to IS NULL OR c.knowledge_from<v.knowledge_to)) LIMIT 1""",
+            "CALENDAR_VENUE_KNOWLEDGE_REFERENCE_CHANGED",
+        )
+    result = {
+        "status": "FULL_LOCAL_SHARED_CALENDAR_OBSERVATION_PASS_NOT_EXCHANGE_PIT_OR_BASE22",
+        "scope_identity": body["identity"],
+        "source_fragments": len(body["sources"]),
+        "exact_venue_day_rows": 93,
+        "semantic_scan": summary,
+        "union_identity": union_proof["identity"],
+        "unknown_provider_acquisition_preserved": True,
+        "unknown_session_hours_preserved": True,
+        "complete_Base22": False,
+    }
+    result["identity"] = digest(result)
+    return result
 
 
 def calendar_rows(

@@ -1,0 +1,25 @@
+{
+  "contract_id": "p10-base22-weekly-st-exact-native-reuse-v1",
+  "purpose": "P10 exact retained weekly capture/no-change native evidence",
+  "through_business_date": "2026-08-31",
+  "timezone": "Asia/Shanghai",
+  "required_original_closure": [
+    "META.json",
+    "events_audit.parquet",
+    "evidence/cninfo_st_events.parquet",
+    "gold_samples.json",
+    "ref_st_status_pit.parquet",
+    "unknown_by_year.json"
+  ],
+  "weekly_artifact_name": "st_announcement_trail",
+  "weekly_artifact_path_alias_is_not_another_source": "st_status_observation_revision.parquet",
+  "selected_capture_rule": "exact original body + unique original notice for proven event + exact native dated identity/body/lineage",
+  "unknown_rule": "UNKNOWN/BASELINE_NOT_PROVEN remains unchanged; no notice is invented",
+  "copy_rule": "full verified native entity bytes, independent inode; no source link or path fallback",
+  "capture_rule": "preserve all retained provider-reported clocks in local raw; missing original wire acquisition remains unknown",
+  "scope_limit": "selected releases and intervals only; unselected provider states and entire August coverage are separate gates",
+  "historical_PIT_admission": false,
+  "consumer_admission": "NOT_GRANTED",
+  "complete_Base22": false,
+  "READY": false
+}

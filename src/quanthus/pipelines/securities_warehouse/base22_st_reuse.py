@@ -9,12 +9,14 @@ an observation claim; it cannot recover an absent original wire acquisition.
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta, timezone
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from .base22 import THROUGH, digest
-from .base22_bounded import BoundedError
+from .base22 import THROUGH, _physical, digest, file_sha, load_contract, schemas
+from .base22_bounded import BoundedError, Budget, GlobalScan, semantic_scan
 from .base22_outputs import instant
+from .base22_sources import _tree
 
 CONTRACT_ID = "p10-base22-weekly-st-exact-native-reuse-v1"
 BODY_FIELDS = (
@@ -35,6 +37,12 @@ BODY_FIELDS = (
     "notes",
 )
 MIC = {"SSE": "XSHG", "SZSE": "XSHE", "BSE": "BJSE"}
+TABLE = "dwd_security_status_interval"
+TABLES = {TABLE, "dwd_listing", "dwd_security", "dwd_listed_company", "dwd_trading_venue"}
+ORIGINAL_SUFFIXES = {
+    "META.json", "events_audit.parquet", "evidence/cninfo_st_events.parquet",
+    "gold_samples.json", "ref_st_status_pit.parquet", "unknown_by_year.json",
+}
 
 
 def _day(value: Any, *, nullable: bool = False) -> date | None:
@@ -191,3 +199,164 @@ def qualify_capture(
     }
     proof["identity"] = digest(proof)
     return proof
+
+
+def audit_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, Any]:
+    """Image-local full copy/global/notice replay; archival paths are never opened."""
+    import json
+
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]
+
+    if (
+        body.get("contract_id") != CONTRACT_ID
+        or body.get("purpose") != "P10 exact retained weekly capture/no-change native evidence"
+        or body.get("identity") != digest({k: v for k, v in body.items() if k != "identity"})
+        or body.get("consumer_admission") != "NOT_GRANTED"
+        or any(
+            body.get(k) is not False
+            for k in ("READY", "complete_Base22", "historical_PIT_admission")
+        )
+        or body.get("evaluator_sha256") != file_sha(Path(__file__))
+        or set(body.get("outputs", {})) != TABLES
+    ):
+        raise BoundedError("ST_REUSE_OFFLINE_SCOPE_INVALID")
+    if _tree(root) != set(body["physical_members"]) | {"QUALIFICATION.json"}:
+        raise BoundedError("ST_REUSE_PHYSICAL_FILE_SET_CHANGED")
+    for rel, item in body["physical_members"].items():
+        path = _physical(root, rel, independent=True)
+        if path.stat().st_size != item["size_bytes"] or file_sha(path) != item["sha256"]:
+            raise BoundedError("ST_REUSE_PHYSICAL_HASH_CHANGED")
+
+    def document(rel: str) -> dict[str, Any]:
+        return dict(json.loads(_physical(root, rel, independent=True).read_bytes()))
+
+    def rows(rel: str, maximum: int) -> list[dict[str, Any]]:
+        file = pq.ParquetFile(_physical(root, rel, independent=True))
+        if file.metadata.num_rows > maximum:
+            raise BoundedError("ST_REUSE_LOCAL_SCOPE_ROW_BOUND")
+        budget.check()
+        return list(file.read().to_pylist())
+
+    c, model, extension = load_contract(root / "contract")
+    ss = schemas(model, extension)
+    native_manifest = document(body["original_native_manifest"])
+    ods_manifest = document(body["original_ods_manifest"])
+    prefix = "payload/source-evidence/st_status_pit_v1_1_20260725/"
+    expected_originals = {prefix + name for name in ORIGINAL_SUFFIXES}
+    if (
+        len(body["original_source_members"]) != len(expected_originals)
+        or {i["original_path"] for i in body["original_source_members"]} != expected_originals
+        or len(body["weekly_sources"]) != 4
+        or len({i["label"] for i in body["weekly_sources"]}) != 4
+    ):
+        raise BoundedError("ST_REUSE_EXACT_ORIGINAL_CLOSURE_OR_SELECTED_RELEASE_SET_CHANGED")
+    for item in body["original_source_members"]:
+        declarations = [
+            i for i in ods_manifest["content"]["files"] if i["path"] == item["original_path"]
+        ]
+        if len(declarations) != 1 or declarations[0]["sha256"] != file_sha(root / item["path"]):
+            raise BoundedError("ST_REUSE_ORIGINAL_ODS_MEMBER_IDENTITY_CHANGED")
+    scans, parents = {}, {}
+    for table, item in body["outputs"].items():
+        original_entries = [i for i in native_manifest["files"] if i["path"] == item["native_path"]]
+        path = _physical(root, item["path"], independent=True)
+        if len(original_entries) != 1 or original_entries[0]["sha256"] != file_sha(path):
+            raise BoundedError("ST_REUSE_NATIVE_ORIGINAL_BYTES_DIFFER")
+        scans[table] = semantic_scan([path], ss[table], batch_rows=1024, check=budget.check)
+        if scans[table] != item["semantic_scan"]:
+            raise BoundedError("ST_REUSE_NATIVE_TYPED_SUMMARY_CHANGED")
+        parents[table] = rows(item["path"], 65536)
+    original_rows = rows(body["original_intervals"], 8192)
+    original_by_id = {r["interval_id"]: r for r in original_rows}
+    native_rows = [r for r in parents[TABLE] if r["record_source"] == "st_status_pit"]
+    native_by_id = {r["source_record_id"].split("#interval_id=")[-1]: r for r in native_rows}
+    if len(original_by_id) != len(original_rows) or len(native_by_id) != len(native_rows):
+        raise BoundedError("ST_REUSE_ORIGINAL_OR_NATIVE_INTERVAL_NOT_UNIQUE")
+    events = rows(body["original_events"], 4096)
+    meta = document(body["original_meta"])
+    if (
+        meta.get("rows") != len(original_rows)
+        or meta.get("events_used") != len(events)
+        or meta.get("validate_ok") is not True
+        or "sha256:" + meta.get("sha256", "") != file_sha(root / body["original_intervals"])
+        or meta.get("gate") != body["preserved_original_gate"]
+    ):
+        raise BoundedError("ST_REUSE_ORIGINAL_METADATA_OR_GATE_CHANGED")
+    venues = {r["venue_id"]: r for r in parents["dwd_trading_venue"]}
+    proofs = []
+    for item in body["weekly_sources"]:
+        manifest = document(item["manifest"])
+        sha = file_sha(root / item["manifest"])
+        if (root / item["READY"]).read_text().strip() != sha:
+            raise BoundedError("ST_REUSE_LOCAL_READY_MISMATCH")
+        members = [a for a in manifest["artifacts"] if a["name"] == "st_announcement_trail"]
+        if len(members) != 1 or members[0]["sha256"] != file_sha(root / item["raw"]):
+            raise BoundedError("ST_REUSE_WEEKLY_DECLARED_MEMBER_CHANGED")
+        captures = rows(item["raw"], 512)
+        if (
+            len(captures) != item["rows"]
+            or len({r["interval_id"] for r in captures}) != len(captures)
+        ):
+            raise BoundedError("ST_REUSE_CAPTURE_KEY_CENSUS_CHANGED")
+        for capture in captures:
+            key = capture["interval_id"]
+            if key not in original_by_id or key not in native_by_id:
+                raise BoundedError("ST_REUSE_CAPTURE_NOT_IN_ORIGINAL_NATIVE")
+            original, native = original_by_id[key], native_by_id[key]
+            start_day = _day(original["effective_start"])
+            if start_day is None:
+                raise BoundedError("ST_REUSE_START_DATE_REQUIRED")
+            start = datetime.combine(start_day, time(), ZoneInfo("Asia/Shanghai"))
+            listings = [
+                listing for listing in parents["dwd_listing"]
+                if listing["listing_code"] == capture["stock_code"]
+                and listing["security_id"] == native["security_id"]
+                and venues[listing["venue_id"]]["mic_code"] == MIC[capture["exchange"]]
+                and listing["effective_from"] <= start
+                and (listing["effective_to"] is None or start < listing["effective_to"])
+                and listing["knowledge_from"] <= native["knowledge_from"]
+                and (
+                    listing["knowledge_to"] is None
+                    or native["knowledge_from"] < listing["knowledge_to"]
+                )
+            ]
+            if len(listings) != 1:
+                raise BoundedError("ST_REUSE_LOCAL_DATED_LISTING_NOT_UNIQUE")
+            proof = qualify_capture(
+                capture, original, native, events=events, listing=listings[0],
+                venue=venues[listings[0]["venue_id"]],
+                original_source_sha256=file_sha(root / body["original_intervals"]),
+                observed_at=instant(body["observed_at"]),
+            )
+            proofs.append({"release_id": manifest["release_id"], "proof": proof})
+    if digest(proofs) != body["capture_proofs_identity"]:
+        raise BoundedError("ST_REUSE_EXACT_CAPTURE_PROOFS_CHANGED")
+    with GlobalScan(budget) as scan:
+        for table in sorted(TABLES):
+            scan.add(table, [root / body["outputs"][table]["path"]])
+            rule = c["tables"][table]
+            scan.keys(table, rule["business_key"], rule["version_key"])
+            scan.row_rules(table, ss[table], rule)
+            scan.lineage(table, [tuple(x) for x in body["source_registries"][table]])
+        scan.references(
+            {"tables": [t for t in model["tables"] if t["name"] in TABLES]},
+            {"tables": {t: c["tables"][t] for t in TABLES}},
+        )
+    result = {
+        "status": "SCOPED_EXACT_ST_CAPTURE_NATIVE_REUSE_PASS_NOT_WHOLE_AUGUST_OR_BASE22",
+        "scope_identity": body["identity"],
+        "rows": {t: s["rows"] for t, s in scans.items()},
+        "native_typed_summaries": scans,
+        "capture_proofs_identity": digest(proofs),
+        "captures": len(proofs),
+        "unique_intervals": len({p["proof"]["original_body_sha256"] for p in proofs}),
+        "unknown_capture_observations": sum(p["proof"]["native_status_unknown"] for p in proofs),
+        "preserved_original_gate": meta["gate"],
+        "provider_states_outside_selected_captures_qualified": False,
+        "historical_PIT_admission": False,
+        "consumer_admission": "NOT_GRANTED",
+        "complete_Base22": False,
+        "native_source_bytes_unchanged": True,
+    }
+    result["identity"] = digest(result)
+    return result

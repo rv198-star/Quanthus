@@ -174,6 +174,16 @@ def audit_history_action_scope(root: Path, body: dict[str, Any], budget: Budget)
     expected.update(i["path"] for i in body["outputs"])
     if expected != set(body["physical_members"]):
         raise BoundedError("SUCCESSOR_HISTORY_REGISTERED_PHYSICAL_CLOSURE_CHANGED")
+    frozen_before = source_stage["all_before_stage_owned_members"]
+    expected_before = {
+        path
+        for path in expected
+        if not path.startswith(stage + "/") and path != "evidence/source-stage-qualified-r2.json"
+    }
+    if set(frozen_before) != expected_before or any(
+        body["physical_members"].get(path) != item for path, item in frozen_before.items()
+    ):
+        raise BoundedError("SUCCESSOR_HISTORY_IMMUTABLE_PREREQUISITE_CHANGED")
     raw = dict(reg["original_raw"], path="sources/original-canonical-actions.parquet")
     if raw != body["raw_member"]:
         raise BoundedError("SUCCESSOR_HISTORY_ORIGINAL_RAW_IDENTITY_CHANGED")

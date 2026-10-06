@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError
-from quanthus.pipelines.securities_warehouse.base22_calendar import calendar_rows
+from quanthus.pipelines.securities_warehouse.base22_calendar import calendar_rows, calendar_union
 
 
 def case():
@@ -92,3 +92,33 @@ def test_unknown_missing_and_duplicate_venues_rejected():
         calendar_rows(rows, venues[:-1], **args)
     with pytest.raises(BoundedError, match="EXACT_VENUE"):
         calendar_rows(rows, venues + [venues[0]], **args)
+
+
+def test_partial_windows_form_one_exact_union_with_preserved_observation_clocks():
+    rows, _, _ = case()
+    first = rows[:50]
+    second = [{**r, "built_at": r["built_at"] + timedelta(days=1)} for r in rows[40:]]
+    out, proof = calendar_union([("sha256:" + "a" * 64, first), ("sha256:" + "b" * 64, second)])
+    assert len(out) == 93
+    assert proof["same_flag_overlap_observations"] == 10
+    assert {r["built_at"] for r in out if r["exchange"] == "SSE"} == {rows[0]["built_at"]}
+    reversed_out, reversed_proof = calendar_union(
+        [("sha256:" + "b" * 64, second), ("sha256:" + "a" * 64, first)]
+    )
+    assert out == reversed_out and proof == reversed_proof
+
+
+@pytest.mark.parametrize("defect", ["flag", "duplicate", "missing", "sha"])
+def test_union_does_not_hide_conflict_missing_keys_or_unknown_member(defect):
+    rows, _, _ = case()
+    sha = "sha256:" + "a" * 64
+    incoming = [{**rows[0], "is_open": 1 - rows[0]["is_open"]}]
+    sources = [(sha, rows), ("sha256:" + "b" * 64, incoming)]
+    if defect == "duplicate":
+        sources = [(sha, rows + [rows[0]])]
+    elif defect == "missing":
+        sources = [(sha, rows[1:])]
+    elif defect == "sha":
+        sources = [("sha256:short", rows)]
+    with pytest.raises(BoundedError, match="CALENDAR_UNION"):
+        calendar_union(sources)

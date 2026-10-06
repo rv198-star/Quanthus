@@ -7,6 +7,8 @@ exchange responses, source acquisition, PIT availability or session hours.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Iterable
 from datetime import date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -21,6 +23,77 @@ EXCHANGE_MIC = {"SSE": "XSHG", "SZSE": "XSHE", "BSE": "BJSE"}
 AUGUST_START = date(2026, 8, 1)
 
 
+def calendar_union(
+    sources: Iterable[tuple[str, list[dict[str, Any]]]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Compose exact retained fragments; differing flags cannot be deduplicated.
+
+    An earlier archived built_at orders otherwise identical observations only.
+    Its timestamp is retained as warehouse evidence, never provider acquisition.
+    """
+    selected: dict[tuple[str, date, str], tuple[str, dict[str, Any]]] = {}
+    seen_members = set()
+    overlap = 0
+    for sha, rows in sources:
+        if re.fullmatch(r"sha256:[0-9a-f]{64}", sha) is None or sha in seen_members:
+            raise BoundedError("CALENDAR_UNION_EXACT_MEMBER_IDENTITY_REQUIRED")
+        seen_members.add(sha)
+        local = set()
+        for raw in rows:
+            day = raw["trade_date"]
+            if type(day) is not date:
+                raise BoundedError("CALENDAR_EXACT_BUSINESS_DATE_REQUIRED")
+            if not AUGUST_START <= day <= THROUGH:
+                continue
+            key = raw["exchange"], day, raw["session"]
+            if (
+                key in local
+                or raw["exchange"] not in EXCHANGE_MIC
+                or raw["session"] != "day"
+                or type(raw["is_open"]) is not int
+                or raw["is_open"] not in (0, 1)
+                or raw["source"] != "baostock.query_trade_dates"
+            ):
+                raise BoundedError("CALENDAR_UNION_RAW_KEY_FLAG_OR_SOURCE_INVALID")
+            local.add(key)
+            clock = _clock(raw["built_at"])
+            if key in selected:
+                prev_sha, prev = selected[key]
+                if (prev["is_open"], prev["source"]) != (raw["is_open"], raw["source"]):
+                    raise BoundedError("CALENDAR_UNION_CONFLICTING_OBSERVATIONS")
+                overlap += 1
+                if (clock, sha) >= (_clock(prev["built_at"]), prev_sha):
+                    continue
+            selected[key] = sha, raw
+    required = {
+        (ex, AUGUST_START + timedelta(days=n), "day") for ex in EXCHANGE_MIC for n in range(31)
+    }
+    if set(selected) != required:
+        raise BoundedError("CALENDAR_UNION_COMPLETE_93_KEYS_REQUIRED")
+    keys = sorted(selected)
+    out = [selected[k][1] for k in keys]
+    proof = {
+        "complete_members": sorted(seen_members),
+        "same_flag_overlap_observations": overlap,
+        "exact_union_rows": len(out),
+        "exact_union_row_sha256": digest(out),
+        "origins": [
+            {
+                "exchange": k[0],
+                "trade_date": k[1],
+                "session": k[2],
+                "original_member_sha256": selected[k][0],
+                "raw_row_sha256": digest(selected[k][1]),
+            }
+            for k in keys
+        ],
+        "source_conflict_priority_granted": False,
+        "provider_acquisition_inferred": False,
+    }
+    proof["identity"] = digest(proof)
+    return out, proof
+
+
 def calendar_rows(
     raw_rows: list[dict[str, Any]],
     venues: list[dict[str, Any]],
@@ -31,8 +104,8 @@ def calendar_rows(
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Materialize all 93 venue/day keys at the real new governance clock.
 
-    The caller freezes one actual complete August member and verifies the other
-    selected calendar members' overlap. built_at remains an archived warehouse
+    The caller freezes the exact union with physical original member pointers
+    and verifies all selected calendar members' overlap. built_at remains an archived warehouse
     clock; no provider acquisition or original exchange publication is inferred.
     """
     clock = _clock(observed_at)
@@ -48,7 +121,7 @@ def calendar_rows(
         by_mic[mic] = venue
     if set(by_mic) != set(EXCHANGE_MIC.values()):
         raise BoundedError("CALENDAR_ALL_THREE_VENUES_REQUIRED")
-    if not isinstance(source_sha256, str) or not source_sha256.startswith("sha256:"):
+    if re.fullmatch(r"sha256:[0-9a-f]{64}", source_sha256) is None:
         raise BoundedError("CALENDAR_SOURCE_IDENTITY_REQUIRED")
     if not revision:
         raise BoundedError("CALENDAR_SOURCE_REVISION_REQUIRED")

@@ -306,9 +306,38 @@ def audit_cash_restatement_scope(
             if summary != i["semantic_scan"]:
                 raise BoundedError("CASH_RESTATEMENT_OUTPUT_SUMMARY_CHANGED")
             scans[i["path"]] = summary
+    counts = _scan_cash_global(root, body, budget, contract, ss, rows)
+    if dict(counts) != body["output_rows"]:
+        raise BoundedError("CASH_RESTATEMENT_FULL_OUTPUT_ROW_CENSUS_CHANGED")
+    result = {
+        "status": "FULL_RAW_NEW_CASH_SCOPE_PASS_NOT_COMPLETE_HISTORY_OR_BASE22",
+        "scope_identity": body["identity"],
+        "selected_original_keys": len(selected),
+        "new_actions": len(expected["dwd_corporate_action"]),
+        "new_terms": len(expected["dwd_corporate_action_term"]),
+        "complete_F10_raw_replay": receipt,
+        "output_rows": dict(counts),
+        "all_output_semantic_scans": scans,
+        "old_cash_atoms_changed": 0,
+        "source_priority_granted": False,
+        "complete_Base22": False,
+    }
+    result["identity"] = digest(result)
+    return result
+
+
+def _scan_cash_global(
+    root: Path,
+    body: dict[str, Any],
+    budget: Budget,
+    contract: dict[str, Any],
+    ss: dict[str, Any],
+    rows: Any,
+) -> Counter[str]:
+    """Read the verified immutable image with a separate owned audit scratch."""
     counts: Counter[str] = Counter()
-    with GlobalScan(budget) as scan:
-        for table in expected:
+    with GlobalScan(budget, read_only_roots=[root]) as scan:
+        for table in ("dwd_corporate_action", "dwd_corporate_action_term"):
             paths = [root / i["path"] for i in body["outputs"] if i["table"] == table]
             scan.add(table, paths)
             rule = contract["tables"][table]
@@ -343,20 +372,4 @@ def audit_cash_restatement_scope(
             "AND a.source_artifact_sha256=t.source_artifact_sha256) LIMIT 1",
             "CASH_RESTATEMENT_GLOBAL_TERM_PARENT_VERSION_FAILED",
         )
-    if dict(counts) != body["output_rows"]:
-        raise BoundedError("CASH_RESTATEMENT_FULL_OUTPUT_ROW_CENSUS_CHANGED")
-    result = {
-        "status": "FULL_RAW_NEW_CASH_SCOPE_PASS_NOT_COMPLETE_HISTORY_OR_BASE22",
-        "scope_identity": body["identity"],
-        "selected_original_keys": len(selected),
-        "new_actions": len(expected["dwd_corporate_action"]),
-        "new_terms": len(expected["dwd_corporate_action_term"]),
-        "complete_F10_raw_replay": receipt,
-        "output_rows": dict(counts),
-        "all_output_semantic_scans": scans,
-        "old_cash_atoms_changed": 0,
-        "source_priority_granted": False,
-        "complete_Base22": False,
-    }
-    result["identity"] = digest(result)
-    return result
+    return counts

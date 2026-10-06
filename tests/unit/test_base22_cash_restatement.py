@@ -153,3 +153,61 @@ def test_complete_raw_semantic_receipt_cannot_hide_changes_in_runtime_metadata(c
         receipt["elapsed_seconds"] = -1
     with pytest.raises(BoundedError, match="RAW_REPLAY_RECEIPT"):
         _cash_replay_receipt(receipt)
+
+
+@pytest.mark.parametrize("defect", [None, "missing_company", "term_clock"])
+def test_offline_cash_global_reads_immutable_image_outside_audit_TMP(tmp_path, defect):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from quanthus.pipelines.securities_warehouse.base22 import file_sha, load_contract, schemas
+    from quanthus.pipelines.securities_warehouse.base22_bounded import Budget, Limits
+    from quanthus.pipelines.securities_warehouse.base22_cash_restatement import _scan_cash_global
+
+    root = tmp_path / "relocated-image"
+    root.mkdir()
+    contract, model, extension = load_contract(__import__("pathlib").Path("config/pipelines"))
+    ss = schemas(model, extension)
+    _, old, before, _, _, _ = fixture()
+    if defect == "term_clock":
+        before[0]["knowledge_from"] = before[0]["knowledge_from"].replace(year=2027)
+    body = {"outputs": [], "parents": {}}
+    for table, rows in [("dwd_corporate_action", [old]), ("dwd_corporate_action_term", before)]:
+        p = root / (table + ".parquet")
+        pq.write_table(pa.Table.from_pylist(rows, schema=ss[table]), p)
+        p.chmod(0o444)
+        body["outputs"].append({"table": table, "path": p.name, "rows": len(rows)})
+    for table, column, value in [
+        ("dwd_listed_company", "company_id", old["company_id"]),
+        ("dwd_security", "security_id", old["security_id"]),
+    ]:
+        p = root / (table + ".parquet")
+        pq.write_table(
+            pa.table(
+                {
+                    column: [
+                        "absent"
+                        if defect == "missing_company" and column == "company_id"
+                        else value
+                    ]
+                }
+            ),
+            p,
+        )
+        p.chmod(0o444)
+        body["parents"][table] = [{"path": p.name}]
+    hashes = {p.name: file_sha(p) for p in root.iterdir()}
+
+    def rows(item):
+        return pq.ParquetFile(root / item["path"]).read().to_pylist()
+
+    with Budget(tmp_path / "audit-TMP", [root], Limits(free_floor_bytes=1)) as budget:
+        if defect is None:
+            assert _scan_cash_global(root, body, budget, contract, ss, rows) == {
+                "dwd_corporate_action": 1,
+                "dwd_corporate_action_term": 1,
+            }
+        else:
+            with pytest.raises(BoundedError, match="GLOBAL_ENTITY_PARENT|GLOBAL_TERM_PARENT"):
+                _scan_cash_global(root, body, budget, contract, ss, rows)
+    assert hashes == {p.name: file_sha(p) for p in root.iterdir()}

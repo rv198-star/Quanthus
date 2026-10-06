@@ -201,7 +201,13 @@ def qualify_capture(
     return proof
 
 
-def audit_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, Any]:
+def audit_scope(
+    root: Path,
+    body: dict[str, Any],
+    budget: Budget,
+    *,
+    descriptor_name: str = "QUALIFICATION.json",
+) -> dict[str, Any]:
     """Image-local full copy/global/notice replay; archival paths are never opened."""
     import json
 
@@ -220,7 +226,9 @@ def audit_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, A
         or set(body.get("outputs", {})) != TABLES
     ):
         raise BoundedError("ST_REUSE_OFFLINE_SCOPE_INVALID")
-    if _tree(root) != set(body["physical_members"]) | {"QUALIFICATION.json"}:
+    if Path(descriptor_name).name != descriptor_name or not descriptor_name:
+        raise BoundedError("ST_REUSE_DESCRIPTOR_NAME_INVALID")
+    if _tree(root) != set(body["physical_members"]) | {descriptor_name}:
         raise BoundedError("ST_REUSE_PHYSICAL_FILE_SET_CHANGED")
     for rel, item in body["physical_members"].items():
         path = _physical(root, rel, independent=True)
@@ -331,7 +339,7 @@ def audit_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, A
             proofs.append({"release_id": manifest["release_id"], "proof": proof})
     if digest(proofs) != body["capture_proofs_identity"]:
         raise BoundedError("ST_REUSE_EXACT_CAPTURE_PROOFS_CHANGED")
-    with GlobalScan(budget) as scan:
+    with GlobalScan(budget, read_only_roots=[root]) as scan:
         for table in sorted(TABLES):
             scan.add(table, [root / body["outputs"][table]["path"]])
             rule = c["tables"][table]

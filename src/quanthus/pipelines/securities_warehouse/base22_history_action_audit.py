@@ -98,11 +98,15 @@ def audit_history_action_scope(root: Path, body: dict[str, Any], budget: Budget)
     import pyarrow.parquet as pq
 
     verify_local_closure(root, body, budget.check)
+    stage = body.get("repair_stage")
+    if stage != "history-rewrite-r2":
+        raise BoundedError("SUCCESSOR_HISTORY_REPAIR_STAGE_UNKNOWN")
     reg = _json(root, "evidence/source-history-registration.json")
-    code = _json(root, "evidence/execution-code-closure.json")
-    plan = _json(root, "evidence/actual-history-write-registration.json")
-    safe = _json(root, "evidence/full-history-safe-conservation.json")
-    for value in (reg, code, plan, safe):
+    code = _json(root, stage + "/evidence/execution-code-closure.json")
+    plan = _json(root, stage + "/evidence/actual-history-write-registration.json")
+    safe = _json(root, stage + "/evidence/full-history-safe-conservation.json")
+    source_stage = _json(root, "evidence/source-stage-qualified-r2.json")
+    for value in (reg, code, plan, safe, source_stage):
         if value["identity"] != digest({k: v for k, v in value.items() if k != "identity"}):
             raise BoundedError("SUCCESSOR_HISTORY_LOCAL_EVIDENCE_IDENTITY_CHANGED")
     if (
@@ -117,15 +121,19 @@ def audit_history_action_scope(root: Path, body: dict[str, Any], budget: Budget)
         or safe["identity"] != body["full_safe_conservation_identity"]
         or set(body["source_dependencies"]) != {"EM", "F10", "factor", "quantity"}
         or set(body["output_rows"]) != set(TABLES)
+        or source_stage["source_registration_identity"] != reg["identity"]
+        or source_stage["identity"] != code["qualified_source_stage_identity"]
     ):
         raise BoundedError("SUCCESSOR_HISTORY_INPUT_CODE_SCOPE_CLOSURE_CHANGED")
     expected = {
         "sources/original-canonical-actions.parquet",
         "evidence/source-history-registration.json",
         "evidence/execution-code-closure.json",
-        "evidence/actual-history-write-registration.json",
-        "evidence/full-history-safe-conservation.json",
-        "evidence/successor-proofs-safe.json",
+        "evidence/source-stage-qualified-r2.json",
+        stage + "/evidence/execution-code-closure.json",
+        stage + "/evidence/actual-history-write-registration.json",
+        stage + "/evidence/full-history-safe-conservation.json",
+        stage + "/evidence/successor-proofs-safe.json",
     }
     donors = {}
     for label, item in reg["inputs"].items():
@@ -182,7 +190,11 @@ def audit_history_action_scope(root: Path, body: dict[str, Any], budget: Budget)
         )
         receipts[label] = receipt
         loaded[label] = actions, terms
-    if receipts != body["source_replays"] or receipts != safe["source_replays"]:
+    if (
+        receipts != body["source_replays"]
+        or receipts != safe["source_replays"]
+        or receipts != source_stage["complete_raw_replays"]
+    ):
         raise BoundedError("SUCCESSOR_HISTORY_COMPLETE_RAW_REPLAY_CHANGED")
 
     def frozen(name: str) -> Any:
@@ -287,7 +299,7 @@ def audit_history_action_scope(root: Path, body: dict[str, Any], budget: Budget)
             for row in typed:
                 adds[t][partition(row, contract["tables"][t])].append(row)
         budget.check()
-    stored = json.loads((root / "evidence/successor-proofs-safe.json").read_bytes())
+    stored = json.loads((root / stage / "evidence/successor-proofs-safe.json").read_bytes())
     if proof_hashes != [digest(p) for p in stored]:
         raise BoundedError("SUCCESSOR_HISTORY_RECOMPUTED_RAW_BEFORE_NEW_PROOF_CHANGED")
 
@@ -341,7 +353,7 @@ def audit_history_action_scope(root: Path, body: dict[str, Any], budget: Budget)
                 if len(old) > MAX_PARTITION_ROWS:
                     raise BoundedError("SUCCESSOR_HISTORY_PARTITION_BOUND_EXCEEDED")
             out = output_map[t, part]
-            if out["path"] != f"payload/{t}/{part}/part-history.parquet":
+            if out["path"] != f"{stage}/payload/{t}/{part}/part-history.parquet":
                 raise BoundedError("SUCCESSOR_HISTORY_PHYSICAL_PARTITION_PATH_CHANGED")
             after = list(_rows(root, out, budget))
             selected_here = {

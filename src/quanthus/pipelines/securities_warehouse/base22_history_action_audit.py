@@ -212,6 +212,25 @@ def audit_history_action_scope(root: Path, body: dict[str, Any], budget: Budget)
         or len(chosen) != reg["expected_required_scope"]["positive_new_canonical_versions"]
     ):
         raise BoundedError("SUCCESSOR_HISTORY_EXACT_SELECTED_AND_HELD_KEYS_CHANGED")
+    clock = instant(body["observed_at"])
+    semantic = digest(
+        {
+            "source_registration_identity": reg["identity"],
+            "code_closure_identity": code["identity"],
+            "configuration_SHA256": reg["configuration_SHA256"],
+            "complete_source_replays": receipts,
+            "selected_exact_raw_source_keys_sha256": digest(sorted(chosen)),
+            "held_exact_original_keys_sha256": digest(held),
+            "observed_at": clock,
+        }
+    )
+    if (
+        body["revision"] != CONTRACT_ID + ":" + semantic
+        or body["revision"] != plan["revision"]
+        or body["observed_at"] != plan["observed_at"]
+        or safe["actual_new_knowledge"] != body["observed_at"]
+    ):
+        raise BoundedError("SUCCESSOR_HISTORY_REVISION_SEMANTIC_CLOSURE_CHANGED")
     raw_index: dict[str, dict[str, Any]] = {}
     for row in _rows(root, raw, budget):
         if row["action_id"] in raw_index or len(raw_index) >= MAX_PARTITION_ROWS:
@@ -234,7 +253,6 @@ def audit_history_action_scope(root: Path, body: dict[str, Any], budget: Budget)
                 before_entities[key] = row
     if set(before_entities) != set(wanted):
         raise BoundedError("SUCCESSOR_HISTORY_ORIGINAL_ENTITY_CLOSURE_MISSING")
-    clock = instant(body["observed_at"])
     adds: dict[str, Any] = {t: defaultdict(list) for t in TABLES}
     proof_hashes = []
     for parent, key in wanted.items():

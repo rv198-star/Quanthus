@@ -654,8 +654,8 @@ class GlobalScan:
         max_bytes = self.budget.limits.memory_bytes // 8
         for path in self.source_paths[name]:
             count, length = pq.ParquetFile(path).metadata.num_rows, path.stat().st_size
-            if count > max_rows or length > max_bytes:
-                raise BoundedError("REFERENCE_MEMBER_EXCEEDS_BOUNDED_BATCH")
+            # A larger existing file forms its own lazy native scan; its
+            # columnar reader streams batches under the same memory/RSS gates.
             if current and (
                 len(current) >= 256 or rows + count > max_rows or size + length > max_bytes
             ):

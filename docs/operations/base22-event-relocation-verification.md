@@ -37,6 +37,7 @@ every listing venue/version remains eligible under the original conditions.
 Child batches retain all global parents and never replace whole-table key/version
 checks. Batch membership is deterministic from frozen physical members and
 actual footers (at most 256 files, 64 reader batches of rows, and one eighth of
-the registered DuckDB memory in compressed source bytes). An oversized member
-fails before that reference stage. Existing memory, RSS, spill and time gates
+the registered DuckDB memory in compressed source bytes). A larger existing single file forms its own
+lazy native columnar scan under the same memory/RSS/spill guards; it is not
+rewritten or fully materialized merely to satisfy a batch row estimate. Existing memory, RSS, spill and time gates
 continue to apply; failed attempts are retained rather than reclassified.

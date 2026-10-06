@@ -662,19 +662,15 @@ def test_reference_batches_keep_all_global_parents_and_original_global_table(tmp
             return original(sql, reason)
 
         scan.reject = observe
-        if defect:
-            with pytest.raises(
-                b.BoundedError,
-                match="GLOBAL_FOREIGN_KEY"
-                if defect != "oversized"
-                else "REFERENCE_MEMBER_EXCEEDS_BOUNDED_BATCH",
-            ):
+        if defect == "late-batch-missing":
+            with pytest.raises(b.BoundedError, match="GLOBAL_FOREIGN_KEY"):
                 scan.references(model, contract)
         else:
             scan.references(model, contract)
         assert scan.connection.execute("SELECT count(*) FROM child").fetchone()[0] == n
+        assert len(queried) == (1 if defect == "oversized" else 2)
         if defect != "oversized":
-            assert len(queried) == 2 and len(scan._reference_maps) == 1
+            assert len(scan._reference_maps) == 1
             assert scan.connection.execute("SELECT count(*) FROM parent").fetchone()[0] == n
 
 

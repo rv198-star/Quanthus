@@ -460,10 +460,11 @@ def test_streaming_references_preserve_existential_temporal_and_venue_rules(tmp_
         scan.reject = observe
         if variant in {"stable_versions", "mixed_venues"}:
             scan.references(fixture.model, fixture.contract)
-            assert any("NOT EXISTS" in q for q in queries) == (variant == "mixed_venues")
+            assert queries  # Both stable and mixed venue histories keep existential semantics.
         else:
             with pytest.raises(b.BoundedError, match="GLOBAL_FOREIGN_KEY_DATE_VENUE"):
                 scan.references(fixture.model, fixture.contract)
+
 
 def test_global_hash_index_coalesces_small_batches_into_bounded_row_groups(tmp_path):
     """Physical footer growth must not scale with every bucket/batch intersection."""
@@ -509,3 +510,93 @@ def test_native_large_string_binary_and_null_streams_are_batch_independent(tmp_p
     path = tmp_path / "native.parquet"
     pq.write_table(table, path)
     assert b.semantic_scan([path], schema, 1) == b.semantic_scan([path], schema, 3)
+
+
+@pytest.mark.parametrize(
+    "variant", ["valid_version", "missing_version", "nullable_reference", "reuse"]
+)
+def test_reference_parent_lists_force_key_join_and_keep_complete_versions(tmp_path, variant):
+    from datetime import timedelta
+
+    first = datetime(2026, 8, 3, tzinfo=timezone.utc)
+    parent = (
+        records((1, 2))
+        .append_column("effective_from", pa.array([first - timedelta(days=1)] * 2))
+        .append_column(
+            "effective_to",
+            pa.array([None, first + timedelta(days=1)], pa.timestamp("us", tz="UTC")),
+        )
+    )
+    if variant in {"valid_version", "missing_version"}:
+        another = parent.slice(0, 1).set_column(
+            parent.schema.get_field_index("knowledge_from"),
+            "knowledge_from",
+            pa.array([first - timedelta(days=2)], pa.timestamp("us", tz="UTC")),
+        )
+        if variant == "missing_version":
+            another = another.set_column(
+                another.schema.get_field_index("effective_to"),
+                "effective_to",
+                pa.array([first - timedelta(days=2)], pa.timestamp("us", tz="UTC")),
+            )
+        parent = parent.set_column(
+            parent.schema.get_field_index("knowledge_from"),
+            "knowledge_from",
+            pa.array([first + timedelta(days=1)] * 2, pa.timestamp("us", tz="UTC")),
+        )
+        parent = pa.concat_tables([parent, another])
+    child = records((1,)).append_column("observation_start", pa.array([first]))
+    if variant == "nullable_reference":
+        child = child.set_column(
+            child.schema.get_field_index("key"), "key", pa.array([None], pa.int64())
+        )
+    model = {
+        "tables": [
+            {"name": "parent", "foreign_keys": []},
+            {
+                "name": "child",
+                "time_profile": "market_observation",
+                "foreign_keys": [
+                    {
+                        "column": "key",
+                        "table": "parent",
+                        "reference_column": "key",
+                        "nullable": variant == "nullable_reference",
+                    }
+                ],
+            },
+        ]
+    }
+    contract = {
+        "tables": {
+            "parent": {"cutoff_field": "effective_from"},
+            "child": {"cutoff_field": "observation_start"},
+        }
+    }
+    with b.Budget(tmp_path / "job", [], limits()) as budget, b.GlobalScan(budget) as scan:
+        for name, table in [("parent", parent), ("child", child)]:
+            m = member(budget.root / (name + ".parquet"), table)
+            scan.add(name, [m.path])
+        plans = []
+        original = scan.reject
+
+        def prove_plan(sql, reason):
+            plans.append(scan.connection.execute("EXPLAIN " + sql).fetchone()[1])
+            return original(sql, reason)
+
+        scan.reject = prove_plan
+        if variant == "missing_version":
+            with pytest.raises(b.BoundedError, match="GLOBAL_FOREIGN_KEY_DATE_VENUE"):
+                scan.references(model, contract)
+        else:
+            scan.references(model, contract)
+        assert plans and all("BLOCKWISE_NL_JOIN" not in p and "DELIM_JOIN" not in p for p in plans)
+        assert any("HASH_JOIN" in p for p in plans)
+        if variant == "reuse":
+            first_maps = dict(scan._reference_maps)
+            first_storage = b.storage_census(budget.root)
+            scan.references(model, contract)
+            assert (
+                scan._reference_maps == first_maps
+                and b.storage_census(budget.root) == first_storage
+            )

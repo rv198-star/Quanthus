@@ -438,6 +438,7 @@ class GlobalScan:
         budget._connections.append(self.connection)
         self.tables: set[str] = set()
         self.key_metrics: dict[str, Any] = {}
+        self._reference_maps: dict[tuple[str, str], str] = {}
 
     def __enter__(self) -> GlobalScan:
         return self
@@ -596,6 +597,43 @@ class GlobalScan:
             "TABLE_ROW_LINEAGE_CLOSURE_FAILED",
         )
 
+    def _reference_map(self, target: str, reference_column: str) -> str:
+        """One compact temporal parent per key, shared by every in-job child.
+
+        A join condition containing nullable interval ends can make DuckDB
+        choose a blockwise nested loop even when an equality key is present.
+        Joining the exact key alone, then filtering its complete version list,
+        keeps the original existential semantics without a child delimiter or
+        a child-row materialization. No protected financial fields are copied.
+        """
+        identity = (target, reference_column)
+        if identity not in self._reference_maps:
+            columns = {
+                r[0] for r in self.connection.execute("DESCRIBE " + identifier(target)).fetchall()
+            }
+            fields = sorted(
+                columns
+                & {
+                    "knowledge_from",
+                    "knowledge_to",
+                    "effective_from",
+                    "effective_to",
+                    "venue_id",
+                    "trade_date",
+                }
+            )
+            record = ",".join(identifier(f) + ":=" + identifier(f) for f in fields)
+            name = identifier("reference_versions_" + target + "_" + reference_column)
+            self.budget.check()
+            self.connection.execute(
+                f"CREATE TEMP TABLE {name} AS SELECT {identifier(reference_column)} "
+                f"AS parent_key,list(struct_pack({record})) AS versions FROM {identifier(target)} "
+                f"GROUP BY {identifier(reference_column)}"
+            )
+            self.budget.check()
+            self._reference_maps[identity] = name
+        return self._reference_maps[identity]
+
     def references(self, model: Mapping[str, Any], contract: Mapping[str, Any]) -> None:
         tables = {t["name"]: t for t in model["tables"]}
         if self.tables != set(tables) or self.tables != set(contract["tables"]):
@@ -608,7 +646,6 @@ class GlobalScan:
                 for row in self.connection.execute("DESCRIBE " + identifier(name)).fetchall()
             )
             if source_types[field] == "DATE":
-                # Model DATE fields denote Shanghai business-date midnight, not UTC midnight.
                 coordinate = f"timezone('Asia/Shanghai',CAST({coordinate} AS TIMESTAMP))"
             for fk in table["foreign_keys"]:
                 column = "r." + identifier(fk["column"])
@@ -625,7 +662,7 @@ class GlobalScan:
                         f" AND t.effective_from<={coordinate} AND "
                         f"(t.effective_to IS NULL OR {coordinate}<t.effective_to)"
                     )
-                listing = None
+                join = ""
                 if fk["table"] == "dwd_trading_calendar":
                     if table["time_profile"] == "market_observation":
                         daily = (
@@ -639,62 +676,28 @@ class GlobalScan:
                         (f for f in table["foreign_keys"] if f["table"] == "dwd_listing"), None
                     )
                     if listing:
+                        parent = self._reference_map("dwd_listing", listing["reference_column"])
+                        join = (
+                            f"LEFT JOIN {parent} lv ON lv.parent_key="
+                            f"r.{identifier(listing['column'])} "
+                        )
+                        # Includes every listing version and its venue, including
+                        # mixed venues for one ID; no stable-venue assumption or
+                        # uniform open/close rule is added to the model.
                         temporal += (
-                            f" AND EXISTS (SELECT 1 FROM dwd_listing l WHERE "
-                            f"l.{identifier(listing['reference_column'])}="
-                            f"r.{identifier(listing['column'])} AND l.venue_id=t.venue_id "
-                            "AND l.knowledge_from<=r.knowledge_from AND "
-                            "(l.knowledge_to IS NULL OR r.knowledge_from<l.knowledge_to) "
+                            " AND coalesce(length(list_filter(lv.versions,l -> "
+                            "l.venue_id=t.venue_id AND l.knowledge_from<=r.knowledge_from "
+                            "AND (l.knowledge_to IS NULL OR r.knowledge_from<l.knowledge_to) "
                             f"AND l.effective_from<={coordinate} AND "
-                            f"(l.effective_to IS NULL OR {coordinate}<l.effective_to))"
+                            f"(l.effective_to IS NULL OR {coordinate}<l.effective_to)))>0,FALSE)"
                         )
+                parent = self._reference_map(fk["table"], fk["reference_column"])
                 predicate = f"{column} IS NOT NULL AND " if fk["nullable"] else ""
-                reason = "GLOBAL_FOREIGN_KEY_DATE_VENUE_CLOSURE_FAILED:" + name
-                join = ""
-                if listing is not None:
-                    # Prove the optimization's premise from the whole parent,
-                    # rather than assuming one eligible listing/version per ID.
-                    # Mixed venues keep the original existential semantics.
-                    lkey = identifier(listing["reference_column"])
-                    stable = self.connection.execute(
-                        f"SELECT 1 FROM dwd_listing GROUP BY {lkey} HAVING "
-                        "count(DISTINCT venue_id)<>1 OR count(*)<>count(venue_id) LIMIT 1"
-                    ).fetchone() is None
-                    if not stable:
-                        self.reject(
-                            f"SELECT 1 FROM {identifier(name)} r WHERE {predicate}NOT EXISTS "
-                            f"(SELECT 1 FROM {target} t WHERE "
-                            f"t.{identifier(fk['reference_column'])}={column} "
-                            f"AND {temporal}) LIMIT 1",
-                            reason,
-                        )
-                        continue
-                    # The dated listing proof remains mandatory; the venue map
-                    # is shared across its versions only after the stable proof.
-                    self.reject(
-                        f"SELECT 1 FROM {identifier(name)} r LEFT JOIN dwd_listing l ON "
-                        f"l.{lkey}=r.{identifier(listing['column'])} AND "
-                        "l.knowledge_from<=r.knowledge_from AND "
-                        "(l.knowledge_to IS NULL OR r.knowledge_from<l.knowledge_to) AND "
-                        f"l.effective_from<={coordinate} AND "
-                        f"(l.effective_to IS NULL OR {coordinate}<l.effective_to) "
-                        f"WHERE {predicate}l.{lkey} IS NULL LIMIT 1",
-                        reason,
-                    )
-                    start = temporal.index(" AND EXISTS (SELECT 1 FROM dwd_listing l WHERE ")
-                    temporal = temporal[:start] + " AND t.venue_id=lv.venue_id"
-                    join = (
-                        f"LEFT JOIN (SELECT DISTINCT {lkey},venue_id FROM dwd_listing) lv ON "
-                        f"lv.{lkey}=r.{identifier(listing['column'])} "
-                    )
-                # An anti-filter over a left join streams the child. Correlated
-                # NOT EXISTS can materialize every distinct child clock/date in
-                # a delimiter join, exceeding spill limits on historical bars.
                 self.reject(
-                    f"SELECT 1 FROM {identifier(name)} r {join}LEFT JOIN {target} t ON "
-                    f"t.{identifier(fk['reference_column'])}={column} AND {temporal} "
-                    f"WHERE {predicate}t.{identifier(fk['reference_column'])} IS NULL LIMIT 1",
-                    reason,
+                    f"SELECT 1 FROM {identifier(name)} r {join}LEFT JOIN {parent} p "
+                    f"ON p.parent_key={column} WHERE {predicate}(p.parent_key IS NULL OR "
+                    f"length(list_filter(p.versions,t -> {temporal}))=0) LIMIT 1",
+                    "GLOBAL_FOREIGN_KEY_DATE_VENUE_CLOSURE_FAILED:" + name,
                 )
 
     def row_rules(self, name: str, schema: Any, rule: Mapping[str, Any]) -> None:

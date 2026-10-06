@@ -1,6 +1,7 @@
 """Synthetic complete financial scope, never real financial scalars."""
 
 import os
+import shutil
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -207,3 +208,44 @@ def test_count_or_unproven_partition_rule_cannot_replace_exact_contract(
         layout["dwd_financial_fact"][0]["rows"] = 33
     with pytest.raises((BoundedError, KeyError)):
         audit(tmp_path, root, layout, monkeypatch, **changes)
+
+
+def test_native_flat_company_layout_preserves_all_original_global_checks(tmp_path, monkeypatch):
+    root, layout = fixture(tmp_path)
+    table = "dwd_listed_company"
+    item = layout[table][0]
+    dest = root / "payload" / RULES[table]["domain"] / (table + ".parquet")
+    (root / item["path"]).rename(dest)
+    item["path"] = dest.relative_to(root).as_posix()
+    result = audit(tmp_path, root, layout, monkeypatch)
+    assert result["complete_global_parent_versions"] and result["partition_rows"][table] == {
+        "unpartitioned": 1
+    }
+
+
+@pytest.mark.parametrize("fault", ["domain", "name", "year-table"])
+def test_flat_layout_never_accepts_wrong_domain_name_or_partitioned_fact(
+    tmp_path, monkeypatch, fault
+):
+    root, layout = fixture(tmp_path)
+    table = "dwd_financial_fact" if fault == "year-table" else "dwd_listed_company"
+    item = layout[table][0]
+    domain = "unknown" if fault == "domain" else RULES[table]["domain"]
+    name = "renamed.parquet" if fault == "name" else table + ".parquet"
+    dest = root / "payload" / domain / name
+    dest.parent.mkdir(exist_ok=True)
+    (root / item["path"]).rename(dest)
+    item["path"] = dest.relative_to(root).as_posix()
+    with pytest.raises(BoundedError, match="PHYSICAL_TABLE_OR_PARTITION_MISMATCH"):
+        audit(tmp_path, root, layout, monkeypatch)
+
+
+def test_flat_and_directory_company_duplicate_still_fails_global_keys(tmp_path, monkeypatch):
+    root, layout = fixture(tmp_path)
+    table = "dwd_listed_company"
+    original = layout[table][0]
+    dest = root / "payload" / RULES[table]["domain"] / (table + ".parquet")
+    shutil.copyfile(root / original["path"], dest)
+    layout[table].append({**original, "path": dest.relative_to(root).as_posix()})
+    with pytest.raises(BoundedError, match="GLOBAL_DUPLICATE_VERSION_KEY"):
+        audit(tmp_path, root, layout, monkeypatch)

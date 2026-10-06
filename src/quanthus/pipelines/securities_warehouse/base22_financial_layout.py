@@ -63,11 +63,14 @@ def audit_financial_layout(
                 raise BoundedError("FINANCIAL_LAYOUT_DUPLICATE_OR_EXTERNAL_MEMBER")
             prefix = "payload/" + rules[table]["domain"] + "/" + table + "/"
             tail = rel.removeprefix(prefix).split("/")
-            if (
-                not rel.startswith(prefix)
-                or (table in YEAR_TABLES and (len(tail) != 2 or tail[0] != part))
-                or (table not in YEAR_TABLES and len(tail) != 1)
-            ):
+            flat = (
+                table not in YEAR_TABLES
+                and rel == "payload/" + rules[table]["domain"] + "/" + table + ".parquet"
+            )
+            directory = rel.startswith(prefix) and (
+                len(tail) == 2 and tail[0] == part if table in YEAR_TABLES else len(tail) == 1
+            )
+            if not (flat or directory):
                 raise BoundedError("FINANCIAL_LAYOUT_PHYSICAL_TABLE_OR_PARTITION_MISMATCH")
             if (
                 type(item["rows"]) is not int

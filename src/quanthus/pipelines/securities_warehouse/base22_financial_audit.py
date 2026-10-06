@@ -139,6 +139,55 @@ def _object(root: Path, relative: str) -> dict[str, Any]:
     return value
 
 
+def _scan_financial_global(
+    root: Path,
+    outputs: dict[Any, dict[str, Any]],
+    parents: dict[str, list[Path]],
+    budget: Budget,
+    contract: dict[str, Any],
+    schemas: dict[str, Any],
+    admitted: set[tuple[str, str, str]],
+) -> None:
+    """Validate the immutable image with a separate, bounded mutable spill root."""
+    with GlobalScan(budget, read_only_roots=[root]) as scan:
+        for table in TABLES:
+            scan.add(table, [root / i["path"] for i in outputs.values() if i["table"] == table])
+            rule = contract["tables"][table]
+            scan.keys(table, rule["business_key"], rule["version_key"])
+            scan.row_rules(table, schemas[table], rule)
+            scan.lineage(table, sorted(admitted))
+        scan.add("dwd_listed_company", parents["dwd_listed_company"])
+        scan.reject(
+            "SELECT 1 FROM dwd_financial_report r WHERE NOT EXISTS("
+            "SELECT 1 FROM dwd_listed_company p WHERE p.company_id=r.company_id "
+            "AND p.knowledge_from<=r.knowledge_from "
+            "AND (p.knowledge_to IS NULL OR r.knowledge_from<p.knowledge_to) "
+            "AND p.effective_from<=timezone('Asia/Shanghai',CAST(r.period_end AS TIMESTAMP)) "
+            "AND (p.effective_to IS NULL OR "
+            "timezone('Asia/Shanghai',CAST(r.period_end AS TIMESTAMP))<p.effective_to)) LIMIT 1",
+            "FINANCIAL_DATED_NATIVE_COMPANY_CLOSURE_FAILED",
+        )
+        for parent, column in [
+            (TABLES[0], "financial_report_id"),
+            (TABLES[1], "financial_concept_id"),
+        ]:
+            scan.reject(
+                f"SELECT 1 FROM dwd_financial_fact f WHERE NOT EXISTS(SELECT 1 FROM {parent} p "
+                f"WHERE p.{column}=f.{column} AND p.knowledge_from<=f.knowledge_from "
+                "AND (p.knowledge_to IS NULL OR f.knowledge_from<p.knowledge_to)) LIMIT 1",
+                "FINANCIAL_LOCAL_GLOBAL_REFERENCE_CLOSURE_FAILED",
+            )
+        scan.reject(
+            "SELECT 1 FROM dwd_financial_fact f WHERE NOT EXISTS("
+            "SELECT 1 FROM dwd_financial_report r "
+            "WHERE r.financial_report_id=f.financial_report_id AND r.period_end=f.period_end) "
+            "OR NOT EXISTS(SELECT 1 FROM dwd_financial_concept c "
+            "WHERE c.financial_concept_id=f.financial_concept_id AND "
+            "c.effective_from<=timezone('Asia/Shanghai',CAST(f.period_end AS TIMESTAMP))) LIMIT 1",
+            "FINANCIAL_GLOBAL_PERIOD_REFERENCE_CLOSURE_FAILED",
+        )
+
+
 def audit_financial_raw_scope(
     root: Path,
     body: dict[str, Any],
@@ -363,43 +412,7 @@ def audit_financial_raw_scope(
         or admitted != {(i["record_source"], i["revision"], i["sha256"]) for i in body["inputs"]}
     ):
         raise BoundedError("FINANCIAL_RAW_REPLAY_COMPLETE_CENSUS_CHANGED")
-    with GlobalScan(budget) as scan:
-        for table in TABLES:
-            scan.add(table, [root / i["path"] for i in outputs.values() if i["table"] == table])
-            rule = contract["tables"][table]
-            scan.keys(table, rule["business_key"], rule["version_key"])
-            scan.row_rules(table, schemas[table], rule)
-            scan.lineage(table, sorted(admitted))
-        scan.add("dwd_listed_company", parents["dwd_listed_company"])
-        scan.reject(
-            "SELECT 1 FROM dwd_financial_report r WHERE NOT EXISTS("
-            "SELECT 1 FROM dwd_listed_company p WHERE p.company_id=r.company_id "
-            "AND p.knowledge_from<=r.knowledge_from "
-            "AND (p.knowledge_to IS NULL OR r.knowledge_from<p.knowledge_to) "
-            "AND p.effective_from<=timezone('Asia/Shanghai',CAST(r.period_end AS TIMESTAMP)) "
-            "AND (p.effective_to IS NULL OR "
-            "timezone('Asia/Shanghai',CAST(r.period_end AS TIMESTAMP))<p.effective_to)) LIMIT 1",
-            "FINANCIAL_DATED_NATIVE_COMPANY_CLOSURE_FAILED",
-        )
-        for parent, column in [
-            (TABLES[0], "financial_report_id"),
-            (TABLES[1], "financial_concept_id"),
-        ]:
-            scan.reject(
-                f"SELECT 1 FROM dwd_financial_fact f WHERE NOT EXISTS(SELECT 1 FROM {parent} p "
-                f"WHERE p.{column}=f.{column} AND p.knowledge_from<=f.knowledge_from "
-                "AND (p.knowledge_to IS NULL OR f.knowledge_from<p.knowledge_to)) LIMIT 1",
-                "FINANCIAL_LOCAL_GLOBAL_REFERENCE_CLOSURE_FAILED",
-            )
-        scan.reject(
-            "SELECT 1 FROM dwd_financial_fact f WHERE NOT EXISTS("
-            "SELECT 1 FROM dwd_financial_report r "
-            "WHERE r.financial_report_id=f.financial_report_id AND r.period_end=f.period_end) "
-            "OR NOT EXISTS(SELECT 1 FROM dwd_financial_concept c "
-            "WHERE c.financial_concept_id=f.financial_concept_id AND "
-            "c.effective_from<=timezone('Asia/Shanghai',CAST(f.period_end AS TIMESTAMP))) LIMIT 1",
-            "FINANCIAL_GLOBAL_PERIOD_REFERENCE_CLOSURE_FAILED",
-        )
+    _scan_financial_global(root, outputs, parents, budget, contract, schemas, admitted)
     if any(file_sha(root / p) != sha for p, sha in physical_hashes.items()):
         raise BoundedError("FINANCIAL_RAW_REPLAY_INPUT_CHANGED_DURING_VERIFICATION")
     result = {

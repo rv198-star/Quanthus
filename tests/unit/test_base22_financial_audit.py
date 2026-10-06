@@ -118,3 +118,80 @@ def test_compact_prefix_matches_whole_merge_under_interleaved_source_clocks(orde
         sink.add({TABLES[0]: [], TABLES[1]: [source[n]], TABLES[2]: []})
     sink.finish()
     assert seen[0][3] == financial_concept_versions(source)
+
+
+@pytest.mark.parametrize("defect", [None, "missing_company", "missing_concept", "duplicate"])
+def test_financial_global_reads_separate_readonly_image_and_keeps_closure(
+    tmp_path, monkeypatch, defect
+):
+    import os
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from quanthus.pipelines.securities_warehouse.base22 import file_sha
+    from quanthus.pipelines.securities_warehouse.base22_bounded import Budget, Limits
+    from quanthus.pipelines.securities_warehouse.base22_financial_audit import (
+        _scan_financial_global,
+    )
+    from quanthus.pipelines.securities_warehouse.financial_reporting import (
+        financial_reporting_schemas,
+    )
+
+    contract, _, _ = load_contract(Path("config/pipelines"))
+    _, rows = sample()
+    if defect == "missing_concept":
+        rows[TABLES[2]][0]["financial_concept_id"] = "absent-concept"
+    if defect == "duplicate":
+        rows[TABLES[2]].append(deepcopy(rows[TABLES[2]][0]))
+    root = tmp_path / "relocated-readonly-image"
+    root.mkdir()
+    ss = financial_reporting_schemas()
+    outputs = {}
+    for table in TABLES:
+        path = root / (table + ".parquet")
+        pq.write_table(pa.Table.from_pylist(rows[table], schema=ss[table]), path)
+        path.chmod(0o444)
+        outputs[table] = {"path": path.name, "table": table}
+    company = root / "company.parquet"
+    pq.write_table(
+        pa.table(
+            {
+                "company_id": ["absent" if defect == "missing_company" else "company-1"],
+                "effective_from": [datetime(1991, 1, 1, tzinfo=timezone.utc)],
+                "effective_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+                "knowledge_from": [datetime(1991, 1, 1, tzinfo=timezone.utc)],
+                "knowledge_to": pa.array([None], type=pa.timestamp("us", tz="UTC")),
+            }
+        ),
+        company,
+    )
+    company.chmod(0o444)
+    before = {p.name: file_sha(p) for p in root.iterdir()}
+    real_statvfs = os.statvfs
+    # Only a synthetic RO flag here; the real harness uses a kernel RO bind.
+    monkeypatch.setattr(
+        os,
+        "statvfs",
+        lambda p: SimpleNamespace(f_flag=os.ST_RDONLY)
+        if Path(p) == root
+        else real_statvfs(p),
+    )
+    admitted = {
+        (r["record_source"], r["source_revision"], r["source_artifact_sha256"])
+        for rs in rows.values()
+        for r in rs
+    }
+    with Budget(tmp_path / "audit-TMP", [root], Limits(free_floor_bytes=1)) as budget:
+        if defect is None:
+            _scan_financial_global(
+                root, outputs, {"dwd_listed_company": [company]}, budget, contract, ss, admitted
+            )
+        else:
+            with pytest.raises(BoundedError, match="CLOSURE_FAILED|DUPLICATE"):
+                _scan_financial_global(
+                    root, outputs, {"dwd_listed_company": [company]}, budget, contract, ss, admitted
+                )
+    assert before == {p.name: file_sha(p) for p in root.iterdir()}

@@ -113,3 +113,43 @@ def test_conflict_or_incomplete_term_set_cannot_be_admitted(change):
         )
     with pytest.raises(BoundedError, match="CASH_RESTATEMENT"):
         bind(c)
+
+
+def test_whole_raw_receipt_reproduces_semantics_without_requiring_same_elapsed_time():
+    from quanthus.pipelines.securities_warehouse.base22_cash_restatement import _cash_replay_receipt
+
+    content = {
+        "scope": "FULL_F10_RAW_RECEIPT_TYPED_REPLAY_NOT_PIT",
+        "response_groups": 4992,
+        "raw_category_rows": 79872,
+        "source_identity": "sha256:" + "b" * 64,
+    }
+    receipt = {**content, "identity": digest(content)}
+    timed = {**receipt, "elapsed_seconds": 141.37}
+    assert _cash_replay_receipt(timed) == _cash_replay_receipt(receipt)
+    assert timed["elapsed_seconds"] == 141.37
+
+
+@pytest.mark.parametrize("change", ["count", "source", "identity", "unknown", "negative_time"])
+def test_complete_raw_semantic_receipt_cannot_hide_changes_in_runtime_metadata(change):
+    from quanthus.pipelines.securities_warehouse.base22_cash_restatement import _cash_replay_receipt
+
+    content = {
+        "scope": "FULL_F10_RAW_RECEIPT_TYPED_REPLAY_NOT_PIT",
+        "response_groups": 4992,
+        "raw_category_rows": 79872,
+        "source_identity": "sha256:" + "b" * 64,
+    }
+    receipt = {**content, "identity": digest(content), "elapsed_seconds": 1.0}
+    if change == "count":
+        receipt["raw_category_rows"] += 1
+    elif change == "source":
+        receipt["source_identity"] = "sha256:" + "c" * 64
+    elif change == "identity":
+        receipt["identity"] = "sha256:" + "d" * 64
+    elif change == "unknown":
+        receipt["ignored_raw_proofs"] = True
+    else:
+        receipt["elapsed_seconds"] = -1
+    with pytest.raises(BoundedError, match="RAW_REPLAY_RECEIPT"):
+        _cash_replay_receipt(receipt)

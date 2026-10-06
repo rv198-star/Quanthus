@@ -8,6 +8,7 @@ raw/receipt dependency before using the returned binding.
 from __future__ import annotations
 
 import json
+import math
 from collections import Counter, defaultdict
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -27,6 +28,29 @@ from .base22_sources import _tree
 from .disclosure_event import _stable_id
 
 CONTRACT_ID = "p10-base22-md-exact-cash-restatement-v1"
+
+
+def _cash_replay_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
+    """Verify every replay semantic field; elapsed time is retained telemetry."""
+    required = {"scope", "response_groups", "raw_category_rows", "source_identity", "identity"}
+    if (
+        not required <= set(receipt) <= required | {"elapsed_seconds"}
+        or receipt.get("scope") != "FULL_F10_RAW_RECEIPT_TYPED_REPLAY_NOT_PIT"
+        or not _sha(receipt.get("source_identity"))
+        or any(
+            type(receipt.get(k)) is not int or receipt[k] <= 0
+            for k in ("response_groups", "raw_category_rows")
+        )
+    ):
+        raise BoundedError("CASH_RESTATEMENT_RAW_REPLAY_RECEIPT_INVALID")
+    if "elapsed_seconds" in receipt:
+        elapsed = receipt["elapsed_seconds"]
+        if type(elapsed) not in (int, float) or not math.isfinite(elapsed) or elapsed < 0:
+            raise BoundedError("CASH_RESTATEMENT_RAW_REPLAY_RECEIPT_TIME_INVALID")
+    semantic = {k: v for k, v in receipt.items() if k != "elapsed_seconds"}
+    if semantic["identity"] != digest({k: v for k, v in semantic.items() if k != "identity"}):
+        raise BoundedError("CASH_RESTATEMENT_RAW_REPLAY_RECEIPT_IDENTITY_CHANGED")
+    return semantic
 
 
 def cash_restatement_binding(
@@ -161,7 +185,10 @@ def audit_cash_restatement_scope(
         )
     ):
         raise BoundedError("CASH_RESTATEMENT_SCOPE_INVALID")
-    if set(_tree(root)) != {*body["physical_members"], "QUALIFICATION.json"}:
+    descriptor_name = body.get("descriptor_name", "QUALIFICATION.json")
+    if descriptor_name not in {"QUALIFICATION.json", "QUALIFICATION.r2.json"}:
+        raise BoundedError("CASH_RESTATEMENT_DESCRIPTOR_REVISION_UNKNOWN")
+    if set(_tree(root)) != {*body["physical_members"], descriptor_name}:
         raise BoundedError("CASH_RESTATEMENT_EXACT_LOCAL_FILE_SET_CHANGED")
     for rel, item in body["physical_members"].items():
         p = _physical(root, rel, independent=True)
@@ -196,7 +223,7 @@ def audit_cash_restatement_scope(
     ):
         raise BoundedError("CASH_RESTATEMENT_DONOR_SOURCE_IDENTITY_CHANGED")
     receipt, actions, terms = replay_f10_source(donor_root, donor_body, budget)
-    if receipt != body["complete_F10_raw_replay"]:
+    if _cash_replay_receipt(receipt) != _cash_replay_receipt(body["complete_F10_raw_replay"]):
         raise BoundedError("CASH_RESTATEMENT_COMPLETE_DONOR_RAW_REPLAY_CHANGED")
 
     def rows(item: dict[str, Any]) -> list[dict[str, Any]]:

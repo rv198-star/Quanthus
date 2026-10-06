@@ -393,8 +393,15 @@ def audit_fixture(root, body, tmp_path):
         return m.audit_scope(root, body, budget)
 
 
-def test_complete_scope_cold_reprojection_and_global_closure(tmp_path, monkeypatch):
+@pytest.mark.parametrize("decoded", [False, True])
+def test_complete_scope_cold_reprojection_and_global_closure(tmp_path, monkeypatch, decoded):
     root, body, _, _ = scope_fixture(tmp_path, monkeypatch)
+    if decoded:
+        import json
+
+        from quanthus.pipelines.securities_warehouse.base22 import canonical
+
+        body = json.loads(canonical(body))
     result = audit_fixture(root, body, tmp_path)
     assert result["rows"] == {m.TABLES[0]: 4, m.TABLES[1]: 1}
     assert result["source_runtime_reads"] == 0 and result["complete_Base22"] is False
@@ -463,3 +470,19 @@ def test_resealed_scope_rejects_semantic_and_source_failures(tmp_path, monkeypat
     reseal()
     with pytest.raises(BoundedError, match=reason):
         audit_fixture(root, body, tmp_path)
+
+
+def test_proof_array_is_independent_of_source_dictionary_order():
+    val, va, ss = valuation_case()
+    idx, ia, _ = index_case()
+    kw = {
+        "day": va["day"],
+        "listings": [va["listing"]],
+        "calendars": [va["calendar"]],
+        "indexes": [ia["index"]],
+        "observed_at": va["observed_at"],
+        "sources": {t: {"sha256": va["source_sha"], "revision": va["revision"]} for t in m.TABLES},
+        "ss": ss,
+    }
+    raw = {m.TABLES[0]: [val], m.TABLES[1]: [idx]}
+    assert m.project_day(raw, **kw) == m.project_day(dict(reversed(list(raw.items()))), **kw)

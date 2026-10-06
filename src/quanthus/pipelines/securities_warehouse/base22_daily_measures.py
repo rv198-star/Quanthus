@@ -252,7 +252,10 @@ def project_day(
         indexes_by_code.setdefault(p["index_code"], []).append(p)
     proofs = []
     seen = set()
-    for t, rows in raw.items():
+    # JSON object sorting and provider member insertion order must not reorder
+    # the semantic proof array in a fresh independent process.
+    for t in TABLES:
+        rows = raw[t]
         for r in rows:
             code = r.get("stock_code") if t == TABLES[0] else r.get("index_code")
             if not isinstance(code, str) or not code:

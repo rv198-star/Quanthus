@@ -186,11 +186,7 @@ def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> 
         for t in TABLES:
             for fk in by_name[t].get("foreign_keys", []):
                 child, parent, pk = fk["column"], fk["table"], fk["reference_column"]
-                scan.reject(
-                    f'SELECT 1 FROM "{t}" r WHERE r."{child}" IS NOT NULL AND NOT EXISTS '
-                    f'(SELECT 1 FROM "{parent}" p WHERE p."{pk}"=r."{child}") LIMIT 1',
-                    "RELOCATION_MODEL_FOREIGN_KEY_MISSING",
-                )
+                scan.structural_reference(t, child, parent, pk)
         scan.reject(
             "SELECT 1 FROM dwd_disclosure_subject WHERE "
             "(CASE WHEN security_id IS NULL THEN 0 ELSE 1 END)+"

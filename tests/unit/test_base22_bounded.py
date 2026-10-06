@@ -600,3 +600,121 @@ def test_reference_parent_lists_force_key_join_and_keep_complete_versions(tmp_pa
                 scan._reference_maps == first_maps
                 and b.storage_census(budget.root) == first_storage
             )
+
+
+@pytest.mark.parametrize("defect", [None, "late-batch-missing", "oversized"])
+def test_reference_batches_keep_all_global_parents_and_original_global_table(tmp_path, defect):
+    from datetime import timedelta
+
+    n = 66
+    first = datetime(2026, 8, 3, tzinfo=timezone.utc)
+    parent = (
+        records(tuple(range(n)))
+        .append_column("effective_from", pa.array([first - timedelta(days=1)] * n))
+        .append_column("effective_to", pa.array([None] * n, pa.timestamp("us", tz="UTC")))
+    )
+    child = records(tuple(reversed(range(n)))).append_column(
+        "observation_start", pa.array([first] * n)
+    )
+    if defect == "late-batch-missing":
+        child = child.set_column(
+            child.schema.get_field_index("key"),
+            "key",
+            pa.array(list(reversed(range(1, n))) + [999]),
+        )
+    model = {
+        "tables": [
+            {"name": "parent", "foreign_keys": []},
+            {
+                "name": "child",
+                "time_profile": "market_observation",
+                "foreign_keys": [
+                    {
+                        "column": "key",
+                        "table": "parent",
+                        "reference_column": "key",
+                        "nullable": False,
+                    }
+                ],
+            },
+        ]
+    }
+    contract = {
+        "tables": {
+            "parent": {"cutoff_field": "effective_from"},
+            "child": {"cutoff_field": "observation_start"},
+        }
+    }
+    with (
+        b.Budget(tmp_path / "job", [], limits(batch_rows=1)) as budget,
+        b.GlobalScan(budget) as scan,
+    ):
+        p = member(budget.root / "parent.parquet", parent)
+        scan.add("parent", [p.path])
+        pieces = [child] if defect == "oversized" else [child.slice(0, 33), child.slice(33)]
+        paths = [member(budget.root / f"child-{i}.parquet", t).path for i, t in enumerate(pieces)]
+        scan.add("child", paths)
+        queried = []
+        original = scan.reject
+
+        def observe(sql, reason):
+            queried.append(sql)
+            return original(sql, reason)
+
+        scan.reject = observe
+        if defect:
+            with pytest.raises(
+                b.BoundedError,
+                match="GLOBAL_FOREIGN_KEY"
+                if defect != "oversized"
+                else "REFERENCE_MEMBER_EXCEEDS_BOUNDED_BATCH",
+            ):
+                scan.references(model, contract)
+        else:
+            scan.references(model, contract)
+        assert scan.connection.execute("SELECT count(*) FROM child").fetchone()[0] == n
+        if defect != "oversized":
+            assert len(queried) == 2 and len(scan._reference_maps) == 1
+            assert scan.connection.execute("SELECT count(*) FROM parent").fetchone()[0] == n
+
+
+@pytest.mark.parametrize("defect", [None, "missing", "nullable"])
+def test_structural_relocation_reference_uses_all_global_parent_keys_and_no_delimiter(
+    tmp_path, defect
+):
+    parent = records(tuple(range(66)))
+    keys = list(reversed(range(66)))
+    if defect == "missing":
+        keys[-1] = 999
+    child = records(tuple(keys))
+    if defect == "nullable":
+        child = child.set_column(
+            child.schema.get_field_index("key"), "key", pa.array(keys[:-1] + [None], pa.int64())
+        )
+    with (
+        b.Budget(tmp_path / "job", [], limits(batch_rows=1)) as budget,
+        b.GlobalScan(budget) as scan,
+    ):
+        p = member(budget.root / "parent.parquet", parent)
+        scan.add("parent", [p.path])
+        paths = [
+            member(budget.root / f"child-{i}.parquet", child.slice(i * 33, 33)).path
+            for i in range(2)
+        ]
+        scan.add("child", paths)
+        plans = []
+        original = scan.reject
+
+        def observe(sql, reason):
+            plans.append(scan.connection.execute("EXPLAIN " + sql).fetchone()[1])
+            return original(sql, reason)
+
+        scan.reject = observe
+        if defect == "missing":
+            with pytest.raises(b.BoundedError, match="RELOCATION_MODEL_FOREIGN_KEY_MISSING"):
+                scan.structural_reference("child", "key", "parent", "key")
+        else:
+            scan.structural_reference("child", "key", "parent", "key")
+        assert len(plans) == 2
+        assert all("HASH_JOIN" in p and "DELIM_JOIN" not in p for p in plans)
+        assert scan.connection.execute("SELECT count(*) FROM child").fetchone()[0] == 66

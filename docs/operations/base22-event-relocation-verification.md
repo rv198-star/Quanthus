@@ -28,3 +28,15 @@ identities, complete file census, device capacity, operation order, and budgets
 before writing. Successful previous checks may only be reused with their exact
 scope and byte identities. A time or spill failure is not a data corruption
 finding and is never converted to a passing receipt.
+
+Existence-only event links now join exact global parent keys using bounded
+physical child batches. This does not add temporal or supplier authority to the
+relocation scope. Full temporal graph verification remains separate. Its compact
+parent version maps are materialized once per referenced identity and reused;
+every listing venue/version remains eligible under the original conditions.
+Child batches retain all global parents and never replace whole-table key/version
+checks. Batch membership is deterministic from frozen physical members and
+actual footers (at most 256 files, 64 reader batches of rows, and one eighth of
+the registered DuckDB memory in compressed source bytes). An oversized member
+fails before that reference stage. Existing memory, RSS, spill and time gates
+continue to apply; failed attempts are retained rather than reclassified.

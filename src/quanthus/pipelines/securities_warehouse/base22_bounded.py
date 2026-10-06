@@ -437,6 +437,8 @@ class GlobalScan:
         # is provided. Cold acceptance additionally denies sources and network.
         budget._connections.append(self.connection)
         self.tables: set[str] = set()
+        self.source_paths: dict[str, list[Path]] = {}
+        self.active_reference_batch: tuple[str, tuple[Path, ...]] | None = None
         self.key_metrics: dict[str, Any] = {}
         self._reference_maps: dict[tuple[str, str], str] = {}
 
@@ -461,6 +463,7 @@ class GlobalScan:
             name
         )
         self.tables.add(name)
+        self.source_paths[name] = list(paths)
 
     def reject(self, sql: str, reason: str) -> None:
         self.budget.check()
@@ -634,6 +637,55 @@ class GlobalScan:
             self._reference_maps[identity] = name
         return self._reference_maps[identity]
 
+    def _reference_batches(self, name: str) -> list[list[Path]]:
+        """Bound only the child scan; parents remain globally complete.
+
+        These physical batches create views, not another row materialization.
+        Foreign-key existence is universal over children and independent of
+        other children. Key/version uniqueness continues to use the entire
+        original table in `keys`, never these per-reference views.
+        """
+        import pyarrow.parquet as pq  # type: ignore[import-untyped]
+
+        batches: list[list[Path]] = []
+        current: list[Path] = []
+        rows = size = 0
+        max_rows = 64 * self.budget.limits.batch_rows
+        max_bytes = self.budget.limits.memory_bytes // 8
+        for path in self.source_paths[name]:
+            count, length = pq.ParquetFile(path).metadata.num_rows, path.stat().st_size
+            if count > max_rows or length > max_bytes:
+                raise BoundedError("REFERENCE_MEMBER_EXCEEDS_BOUNDED_BATCH")
+            if current and (
+                len(current) >= 256 or rows + count > max_rows or size + length > max_bytes
+            ):
+                batches.append(current)
+                current = []
+                rows = size = 0
+            current.append(path)
+            rows += count
+            size += length
+            self.budget.check()
+        if current:
+            batches.append(current)
+        return batches
+
+    def structural_reference(self, name: str, column: str, target: str, reference: str) -> None:
+        """Existence-only typed relocation rule, without adding temporal authority."""
+        parent = self._reference_map(target, reference)
+        for paths in self._reference_batches(name):
+            self.active_reference_batch = (name, tuple(paths))
+            child = "reference_child_" + name
+            self.connection.read_parquet(
+                [str(p) for p in paths], hive_partitioning=False
+            ).create_view(child, replace=True)
+            self.reject(
+                f"SELECT 1 FROM {identifier(child)} r LEFT JOIN {parent} p "
+                f"ON p.parent_key=r.{identifier(column)} WHERE "
+                f"r.{identifier(column)} IS NOT NULL AND p.parent_key IS NULL LIMIT 1",
+                "RELOCATION_MODEL_FOREIGN_KEY_MISSING",
+            )
+
     def references(self, model: Mapping[str, Any], contract: Mapping[str, Any]) -> None:
         tables = {t["name"]: t for t in model["tables"]}
         if self.tables != set(tables) or self.tables != set(contract["tables"]):
@@ -647,6 +699,7 @@ class GlobalScan:
             )
             if source_types[field] == "DATE":
                 coordinate = f"timezone('Asia/Shanghai',CAST({coordinate} AS TIMESTAMP))"
+            batches = self._reference_batches(name) if table["foreign_keys"] else []
             for fk in table["foreign_keys"]:
                 column = "r." + identifier(fk["column"])
                 target = identifier(fk["table"])
@@ -693,12 +746,18 @@ class GlobalScan:
                         )
                 parent = self._reference_map(fk["table"], fk["reference_column"])
                 predicate = f"{column} IS NOT NULL AND " if fk["nullable"] else ""
-                self.reject(
-                    f"SELECT 1 FROM {identifier(name)} r {join}LEFT JOIN {parent} p "
-                    f"ON p.parent_key={column} WHERE {predicate}(p.parent_key IS NULL OR "
-                    f"length(list_filter(p.versions,t -> {temporal}))=0) LIMIT 1",
-                    "GLOBAL_FOREIGN_KEY_DATE_VENUE_CLOSURE_FAILED:" + name,
-                )
+                for paths in batches:
+                    self.active_reference_batch = (name, tuple(paths))
+                    child = identifier("reference_child_" + name)
+                    self.connection.read_parquet(
+                        [str(p) for p in paths], hive_partitioning=False
+                    ).create_view("reference_child_" + name, replace=True)
+                    self.reject(
+                        f"SELECT 1 FROM {child} r {join}LEFT JOIN {parent} p "
+                        f"ON p.parent_key={column} WHERE {predicate}(p.parent_key IS NULL OR "
+                        f"length(list_filter(p.versions,t -> {temporal}))=0) LIMIT 1",
+                        "GLOBAL_FOREIGN_KEY_DATE_VENUE_CLOSURE_FAILED:" + name,
+                    )
 
     def row_rules(self, name: str, schema: Any, rule: Mapping[str, Any]) -> None:
         pa = importlib.import_module("pyarrow")

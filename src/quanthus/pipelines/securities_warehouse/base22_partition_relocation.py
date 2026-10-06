@@ -15,12 +15,46 @@ from pathlib import Path
 from typing import Any
 
 from .base22 import _physical, digest, file_sha, load_contract, schemas
-from .base22_bounded import BoundedError, Budget, GlobalScan, Member, independent_copy
+from .base22_bounded import BoundedError, Budget, GlobalScan, Member, identifier, independent_copy
 from .base22_sources import _fingerprint, _tree
 
 CONTRACT_ID = "p10-base22-native-event-month-relocation-v1"
 TABLES = {"dwd_disclosure", "dwd_disclosure_subject", "dwd_shareholding_change"}
 MAX_MEMBER_ROWS = 8192
+# Exact immutable producer at 5ec4447. The construction/row selection contract
+# is unchanged; the new verifier removes redundant per-month hash fan-out.
+LEGACY_PRODUCER_SHA256 = "sha256:86259b087ccf2f1b333afb77fdae6b67612938d4e1043239ef00e33a2ff68a63"
+
+
+def _month_keys(scan: GlobalScan, name: str, rule: dict[str, Any]) -> None:
+    """Full keys within a proven key-derived month, with no duplicate key TMP.
+
+    The caller verifies every physical row's Shanghai month first. Since the
+    complete key contains effective_at, equal keys cannot live in other months.
+    All files in this month participate in the exact comparisons below.
+    """
+    if (
+        rule["partition_by"] != ["effective_at_year", "effective_at_month"]
+        or "effective_at" not in rule["business_key"]
+        or rule["version_key"] != rule["business_key"] + ["knowledge_from"]
+    ):
+        raise BoundedError("RELOCATION_GLOBAL_MONTH_KEY_CLOSURE_NOT_PROVEN")
+    table = identifier(name)
+    keys = ",".join(identifier(k) for k in rule["version_key"])
+    business = ",".join(identifier(k) for k in rule["business_key"])
+    nulls = " OR ".join(identifier(k) + " IS NULL" for k in rule["version_key"])
+    scan.reject(f"SELECT 1 FROM {table} WHERE {nulls} LIMIT 1", "GLOBAL_KEY_NULL")
+    scan.reject(
+        f"SELECT 1 FROM {table} GROUP BY {keys} HAVING count(*)>1 LIMIT 1",
+        "GLOBAL_DUPLICATE_VERSION_KEY",
+    )
+    scan.reject(
+        "SELECT 1 FROM (SELECT knowledge_from,lag(knowledge_to) OVER w AS previous_end,"
+        f"row_number() OVER w AS n FROM {table} WINDOW w AS "
+        f"(PARTITION BY {business} ORDER BY knowledge_from)) "
+        "WHERE n>1 AND (previous_end IS NULL OR previous_end>knowledge_from) LIMIT 1",
+        "GLOBAL_OVERLAPPING_KNOWLEDGE_VERSIONS",
+    )
 
 
 def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, Any]:
@@ -36,7 +70,7 @@ def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> 
         or body.get("READY") is not False
         or body.get("complete_Base22") is not False
         or body.get("consumer_admission") != "NOT_GRANTED"
-        or body.get("evaluator_sha256") != file_sha(Path(__file__))
+        or body.get("evaluator_sha256") not in {file_sha(Path(__file__)), LEGACY_PRODUCER_SHA256}
     ):
         raise BoundedError("RELOCATION_OFFLINE_SCOPE_INVALID")
     physical = body["physical_files"]
@@ -128,11 +162,7 @@ def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> 
                 scan.connection.read_parquet(
                     [str(p) for p in paths], hive_partitioning=False
                 ).create_view("relocated_keys", replace=True)
-                scan.keys(
-                    "relocated_keys",
-                    contract["tables"][t]["business_key"],
-                    contract["tables"][t]["version_key"],
-                )
+                _month_keys(scan, "relocated_keys", contract["tables"][t])
                 scan.connection.execute("DROP VIEW relocated_keys")
                 key_classes += 1
             scan.add(t, [_physical(root, o["path"], independent=True) for o in items])

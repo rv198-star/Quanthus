@@ -245,7 +245,9 @@ def test_september_business_observation_rejected_before_output(tmp_path):
         )
 
 
-@pytest.mark.parametrize("defect", [None, "missing", "corrupt", "empty_extra", "date", "source"])
+@pytest.mark.parametrize(
+    "defect", [None, "missing", "corrupt", "empty_extra", "date", "source", "legacy", "producer"]
+)
 def test_complete_local_offline_relocation_scope(tmp_path, monkeypatch, defect):
     import json
     import os
@@ -338,6 +340,27 @@ def test_complete_local_offline_relocation_scope(tmp_path, monkeypatch, defect):
         "parents": parents,
         "inherited_native_lineage": inherited,
     }
+    if defect == "legacy":
+        from quanthus.pipelines.securities_warehouse.base22_partition_relocation import (
+            LEGACY_PRODUCER_SHA256,
+        )
+
+        identities = {}
+        for plan in plans:
+            previous = plan["identity"]
+            plan["evaluator_sha256"] = LEGACY_PRODUCER_SHA256
+            plan["identity"] = digest({k: v for k, v in plan.items() if k != "identity"})
+            identities[previous] = plan["identity"]
+        for receipt in receipts:
+            receipt["plan_identity"] = identities[receipt["plan_identity"]]
+            receipt["identity"] = digest({k: v for k, v in receipt.items() if k != "identity"})
+        for name, values in [("plans", plans), ("receipts", receipts)]:
+            (root / "evidence" / (name + ".jsonl")).write_bytes(
+                b"".join(canonical(v) + b"\n" for v in values)
+            )
+        body["evaluator_sha256"] = LEGACY_PRODUCER_SHA256
+    if defect == "producer":
+        body["evaluator_sha256"] = "sha256:" + "0" * 64
     if defect in ["date", "source"]:
         t = plans[0]["table"]
         rows = pq.ParquetFile(target).read().to_pylist()
@@ -372,8 +395,51 @@ def test_complete_local_offline_relocation_scope(tmp_path, monkeypatch, defect):
     )
     decoded = json.loads(canonical(body))
     with Budget(tmp_path / "audit", [root], Limits(free_floor_bytes=1)) as budget:
-        if defect is None:
+        if defect in [None, "legacy"]:
             assert audit_relocation_scope(root, decoded, budget)["rows"] == {t: 1 for t in TABLES}
         else:
             with pytest.raises(BoundedError):
                 audit_relocation_scope(root, decoded, budget)
+
+
+@pytest.mark.parametrize("defect", [None, "duplicate", "overlap", "null", "not_key_derived"])
+def test_key_derived_month_checks_all_files_and_exact_versions(tmp_path, defect):
+    from datetime import timedelta
+
+    from quanthus.pipelines.securities_warehouse.base22_bounded import GlobalScan
+    from quanthus.pipelines.securities_warehouse.base22_partition_relocation import _month_keys
+
+    clock = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    first = {"id": "synthetic", "effective_at": clock, "knowledge_from": clock,
+             "knowledge_to": clock + timedelta(days=1)}
+    second = dict(first, knowledge_from=clock + timedelta(days=1), knowledge_to=None)
+    if defect == "duplicate":
+        second = dict(first)
+    elif defect == "overlap":
+        first["knowledge_to"] = None
+    elif defect == "null":
+        second["knowledge_from"] = None
+    rule = {"business_key": ["id", "effective_at"],
+            "version_key": ["id", "effective_at", "knowledge_from"],
+            "partition_by": ["effective_at_year", "effective_at_month"]}
+    if defect == "not_key_derived":
+        rule["business_key"] = ["id"]
+        rule["version_key"] = ["id", "knowledge_from"]
+    schema = pa.schema([("id", pa.string()), *[
+        (f, pa.timestamp("us", tz="UTC"))
+        for f in ["effective_at", "knowledge_from", "knowledge_to"]
+    ]])
+    with Budget(tmp_path / "job", [], Limits(free_floor_bytes=1)) as budget:
+        paths = []
+        for n, row in enumerate([first, second]):
+            p = budget.root / (str(n) + ".parquet")
+            pq.write_table(pa.Table.from_pylist([row], schema=schema), p)
+            paths.append(p)
+        with GlobalScan(budget) as scan:
+            scan.add("month", paths)
+            if defect:
+                with pytest.raises(BoundedError, match="GLOBAL_|MONTH_KEY_CLOSURE"):
+                    _month_keys(scan, "month", rule)
+            else:
+                _month_keys(scan, "month", rule)
+                assert not list(scan.temp.rglob("*.parquet"))

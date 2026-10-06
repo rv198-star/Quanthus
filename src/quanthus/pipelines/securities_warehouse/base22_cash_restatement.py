@@ -47,7 +47,10 @@ def cash_restatement_binding(
     """
     try:
         raw_cash = Decimal(str(raw.get("cash_per_share")))
-        raw_shares = [Decimal(str(raw.get(f))) for f in ("bonus_shares", "transfer_shares")]
+        raw_shares = [
+            Decimal(str(raw[f])) if raw[f] is not None else None
+            for f in ("bonus_shares", "transfer_shares")
+        ]
     except InvalidOperation as exc:
         raise BoundedError("CASH_RESTATEMENT_ORIGINAL_SCALAR_UNKNOWN") from exc
     if (
@@ -55,7 +58,7 @@ def cash_restatement_binding(
         or raw.get("progress") != "实施"
         or not raw_cash.is_finite()
         or raw_cash <= 0
-        or any(not v.is_finite() or v != 0 for v in raw_shares)
+        or any(v is not None and (not v.is_finite() or v != 0) for v in raw_shares)
         or any(donor.get(k) != before.get(k) for k in IDENTITY)
         or any(
             a.get("action_type") != "CASH_DIVIDEND" or a.get("action_status") != "IMPLEMENTED"
@@ -124,6 +127,9 @@ def cash_restatement_binding(
         "qualified_action_sha256": digest(donor),
         "qualified_term_rows_sha256": sorted(digest(r) for r in donor_terms),
         "original_before_terms_sha256": sorted(digest(r) for r in before_terms),
+        "original_unavailable_share_fields": [
+            f for f in ("bonus_shares", "transfer_shares") if raw[f] is None
+        ],
         "disposition": "UNCONTESTED_RAW_SOURCE_BOUND_SUCCESSOR",
         "exact_shared_cash_atoms": True,
         "cash_source_priority_granted": False,
@@ -162,7 +168,10 @@ def audit_cash_restatement_scope(
         if file_sha(p) != item["sha256"] or p.stat().st_size != item["size_bytes"]:
             raise BoundedError("CASH_RESTATEMENT_LOCAL_MEMBER_CHANGED")
         budget.check()
-    reg = json.loads((root / "evidence/write-registration.json").read_bytes())
+    if body.get("repair_stage") != "cash-rewrite-r2":
+        raise BoundedError("CASH_RESTATEMENT_REPAIR_STAGE_UNKNOWN")
+    stage = body["repair_stage"]
+    reg = json.loads((root / stage / "evidence/write-registration.json").read_bytes())
     if (
         reg["identity"] != body["registration_identity"]
         or reg["identity"] != digest({k: v for k, v in reg.items() if k != "identity"})
@@ -242,7 +251,7 @@ def audit_cash_restatement_scope(
         expected["dwd_corporate_action"].append(a)
         expected["dwd_corporate_action_term"].extend(ts)
         proofs[key] = {"cash_binding": binding, "canonical_revision": proof}
-    saved = json.loads((root / "evidence/new-version-proofs-safe.json").read_bytes())
+    saved = json.loads((root / stage / "evidence/new-version-proofs-safe.json").read_bytes())
     if digest(saved) != digest(proofs):
         raise BoundedError("CASH_RESTATEMENT_EXACT_SAFE_PROOFS_CHANGED")
     scans = {}

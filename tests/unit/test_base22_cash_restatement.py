@@ -62,6 +62,16 @@ def test_exact_same_cash_is_new_source_evidence_without_priority():
     assert binding["historical_PIT_admission"] is False
 
 
+def test_unknown_original_share_components_remain_unknown_in_cash_only_successor():
+    c = fixture()
+    c[0]["bonus_shares"] = c[0]["transfer_shares"] = None
+    before = deepcopy(c)
+    binding = bind(c)
+    assert c == before
+    assert binding["original_unavailable_share_fields"] == ["bonus_shares", "transfer_shares"]
+    assert len(c[4]) == 1 and c[4][0]["term_type"] == "CASH_AMOUNT_PER_SHARE"
+
+
 @pytest.mark.parametrize(
     "change",
     [

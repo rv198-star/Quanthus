@@ -192,6 +192,7 @@ def test_source_symlink_and_output_escape_leave_input_unchanged(tmp_path):
             rule=rule,
             original_partition="all",
         )
+
     plan = plan_relocation(
         member,
         table="dwd_disclosure",
@@ -213,3 +214,153 @@ def test_source_symlink_and_output_escape_leave_input_unchanged(tmp_path):
         )
     assert not (member.path.parent / "escape").exists()
     assert member.path.read_bytes() == before
+
+
+def test_september_business_observation_rejected_before_output(tmp_path):
+    schema, member, rule, _ = fixture(tmp_path)
+    rows = pq.ParquetFile(member.path).read().to_pylist()
+    rows[0]["effective_at"] = datetime(2026, 8, 31, 17, tzinfo=timezone.utc)
+    pq.write_table(pa.Table.from_pylist(rows, schema=schema), member.path)
+    updated = Member(member.path, file_sha(member.path), member.path.stat().st_size, 2)
+    with pytest.raises(BoundedError, match="BUSINESS_CUTOFF_EXCEEDED"):
+        plan_relocation(
+            updated,
+            table="dwd_disclosure",
+            schema=schema,
+            rule=rule,
+            original_partition="effective_at_year=2026/effective_at_month=8",
+        )
+
+
+@pytest.mark.parametrize("defect", [None, "missing", "corrupt", "empty_extra", "date", "source"])
+def test_complete_local_offline_relocation_scope(tmp_path, monkeypatch, defect):
+    import json
+    import os
+    import shutil
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    from quanthus.pipelines.securities_warehouse.base22 import (
+        canonical,
+        digest,
+        load_contract,
+        schemas,
+    )
+    from quanthus.pipelines.securities_warehouse.base22_partition_relocation import (
+        CONTRACT_ID,
+        TABLES,
+        audit_relocation_scope,
+    )
+    from tests.unit.test_base22_independent_image import _row
+
+    source = tmp_path / "original"
+    source.mkdir()
+    root = tmp_path / "sealed"
+    contract, model, extension = load_contract(Path("config/pipelines"))
+    ss = schemas(model, extension)
+    plans, receipts, inherited = [], [], {}
+    with Budget(root, [source], Limits(free_floor_bytes=1)) as budget:
+        for t in sorted(TABLES):
+            row = _row(ss[t], datetime(2020, 12, 31, 17, tzinfo=timezone.utc))
+            if t == "dwd_disclosure_subject":
+                row["security_id"] = "security"
+            path = source / (t + ".parquet")
+            pq.write_table(pa.Table.from_pylist([row], schema=ss[t]), path)
+            member = Member(path, file_sha(path), path.stat().st_size, 1)
+            plan = plan_relocation(
+                member,
+                table=t,
+                schema=ss[t],
+                rule=contract["tables"][t],
+                original_partition="effective_at_year=2020/effective_at_month=12",
+            )
+            plans.append(plan)
+            receipts.append(
+                relocate_member(
+                    member,
+                    proof=plan,
+                    schema=ss[t],
+                    rule=contract["tables"][t],
+                    output=root / "payload",
+                    budget=budget,
+                )
+            )
+            inherited[t] = [
+                [row[k] for k in ["record_source", "source_revision", "source_artifact_sha256"]]
+            ]
+        parents = {}
+        for t in [
+            "dwd_security",
+            "dwd_listed_company",
+            "dwd_corporate_action",
+            "dwd_financial_report",
+        ]:
+            path = root / "parents" / (t + ".parquet")
+            path.parent.mkdir(exist_ok=True)
+            pq.write_table(pa.Table.from_pylist([_row(ss[t])], schema=ss[t]), path)
+            parents[t] = [{"path": str(path.relative_to(root)), "rows": 1}]
+        (root / "contract").mkdir()
+        for name in [
+            "base22-independent-image.v1.json",
+            "dwd-domain-model.v1.json",
+            "dwd-domain-model.v1.1-extension.json",
+        ]:
+            shutil.copyfile(Path("config/pipelines") / name, root / "contract" / name)
+        (root / "evidence").mkdir()
+        (root / "evidence/plans.jsonl").write_bytes(b"".join(canonical(p) + b"\n" for p in plans))
+        (root / "evidence/receipts.jsonl").write_bytes(
+            b"".join(canonical(r) + b"\n" for r in receipts)
+        )
+    target = root / receipts[0]["files"][0]["path"]
+    body = {
+        "contract_id": CONTRACT_ID,
+        "purpose": "EXACT_NATIVE_TYPED_RELOCATION_NOT_RAW_OR_PIT",
+        "evaluator_sha256": file_sha(
+            Path(__import__(audit_relocation_scope.__module__, fromlist=["x"]).__file__)
+        ),
+        "READY": False,
+        "complete_Base22": False,
+        "consumer_admission": "NOT_GRANTED",
+        "relocated_table_rows": {t: 1 for t in TABLES},
+        "parents": parents,
+        "inherited_native_lineage": inherited,
+    }
+    if defect in ["date", "source"]:
+        t = plans[0]["table"]
+        rows = pq.ParquetFile(target).read().to_pylist()
+        if defect == "date":
+            rows[0]["effective_at"] = datetime(2020, 12, 15, tzinfo=timezone.utc)
+        else:
+            rows[0]["source_revision"] = "unknown-new-source"
+        pq.write_table(pa.Table.from_pylist(rows, schema=ss[t]), target)
+        receipts[0]["files"][0]["sha256"] = file_sha(target)
+        receipts[0]["identity"] = digest({k: v for k, v in receipts[0].items() if k != "identity"})
+        (root / "evidence/receipts.jsonl").write_bytes(
+            b"".join(canonical(r) + b"\n" for r in receipts)
+        )
+    if defect == "empty_extra":
+        pq.write_table(
+            pa.Table.from_pylist([], schema=ss[plans[0]["table"]]), root / "payload/extra.parquet"
+        )
+    body["physical_files"] = {
+        str(p.relative_to(root)): file_sha(p) for p in root.rglob("*") if p.is_file()
+    }
+    body["identity"] = digest(body)
+    (root / "QUALIFICATION.json").write_bytes(canonical(body))
+    if defect == "missing":
+        target.unlink()
+    if defect == "corrupt":
+        target.write_bytes(b"corrupt")
+    real = os.statvfs
+    monkeypatch.setattr(
+        os,
+        "statvfs",
+        lambda p: SimpleNamespace(f_flag=os.ST_RDONLY) if Path(p) == root else real(p),
+    )
+    decoded = json.loads(canonical(body))
+    with Budget(tmp_path / "audit", [root], Limits(free_floor_bytes=1)) as budget:
+        if defect is None:
+            assert audit_relocation_scope(root, decoded, budget)["rows"] == {t: 1 for t in TABLES}
+        else:
+            with pytest.raises(BoundedError):
+                audit_relocation_scope(root, decoded, budget)

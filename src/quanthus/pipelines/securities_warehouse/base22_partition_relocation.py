@@ -8,17 +8,177 @@ This scope proves physical relocation only, never raw admission or historical PI
 from __future__ import annotations
 
 import importlib
+import json
 import os
 from pathlib import Path
 from typing import Any
 
-from .base22 import digest, file_sha
-from .base22_bounded import BoundedError, Budget, Member, independent_copy
-from .base22_sources import _fingerprint
+from .base22 import _physical, digest, file_sha, load_contract, schemas
+from .base22_bounded import BoundedError, Budget, GlobalScan, Member, independent_copy
+from .base22_sources import _fingerprint, _tree
 
 CONTRACT_ID = "p10-base22-native-event-month-relocation-v1"
 TABLES = {"dwd_disclosure", "dwd_disclosure_subject", "dwd_shareholding_change"}
 MAX_MEMBER_ROWS = 8192
+
+
+def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, Any]:
+    """Verify only local native typed relocation; archived source paths are strings.
+
+    Original raw admission and historical PIT are explicitly outside this proof.
+    The caller must pin the qualification descriptor digest independently.
+    """
+    if (
+        body.get("contract_id") != CONTRACT_ID
+        or body.get("identity") != digest({k: v for k, v in body.items() if k != "identity"})
+        or body.get("purpose") != "EXACT_NATIVE_TYPED_RELOCATION_NOT_RAW_OR_PIT"
+        or body.get("READY") is not False
+        or body.get("complete_Base22") is not False
+        or body.get("consumer_admission") != "NOT_GRANTED"
+        or body.get("evaluator_sha256") != file_sha(Path(__file__))
+    ):
+        raise BoundedError("RELOCATION_OFFLINE_SCOPE_INVALID")
+    physical = body["physical_files"]
+    if set(_tree(root)) != set(physical) | {"QUALIFICATION.json"}:
+        raise BoundedError("RELOCATION_PHYSICAL_FILE_SET_CHANGED")
+    for relative, sha in physical.items():
+        budget.check()
+        if file_sha(_physical(root, relative, independent=True)) != sha:
+            raise BoundedError("RELOCATION_PHYSICAL_HASH_CHANGED")
+    contract, model, extension = load_contract(root / "contract")
+    ss = schemas(model, extension)
+    plans: set[str] = set()
+    totals: dict[str, int] = {}
+    moves: dict[str, int] = {}
+    outputs: dict[str, list[dict[str, Any]]] = {}
+    pq = importlib.import_module("pyarrow.parquet")
+    for relative in ["evidence/plans.jsonl", "evidence/receipts.jsonl"]:
+        _physical(root, relative, independent=True)
+    expected: dict[str, dict[str, Any]] = {}
+    with (root / "evidence/plans.jsonl").open() as stream:
+        for line in stream:
+            p = json.loads(line)
+            t = p["table"]
+            if (
+                t not in TABLES
+                or p["contract_id"] != CONTRACT_ID
+                or p["identity"] != digest({k: v for k, v in p.items() if k != "identity"})
+                or p["identity"] in plans
+                or p["evaluator_sha256"] != body["evaluator_sha256"]
+                or p["schema_and_rule_sha256"]
+                != digest({"schema": str(ss[t]), "rule": contract["tables"][t]})
+                or p["semantic_changes_allowed"] != []
+                or p["consumer_admission"] != "NOT_GRANTED"
+                or sum(r["rows"] for r in p["routes"]) != p["input"]["rows"]
+            ):
+                raise BoundedError("RELOCATION_LOCAL_FROZEN_PLAN_INVALID")
+            plans.add(p["identity"])
+            expected[p["identity"]] = p
+    seen = set()
+    with (root / "evidence/receipts.jsonl").open() as stream:
+        for line in stream:
+            r = json.loads(line)
+            p = expected[r["plan_identity"]]
+            if (
+                r["identity"] != digest({k: v for k, v in r.items() if k != "identity"})
+                or r["plan_identity"] in seen
+                or r["all_typed_values_exact"] is not True
+                or r["source_unchanged"] is not True
+                or r["READY"] is not False
+                or r["original_rows"] != p["input"]["rows"]
+                or [(o["partition"], o["rows"], o["indices_sha256"]) for o in r["files"]]
+                != [(o["partition"], o["rows"], o["indices_sha256"]) for o in p["routes"]]
+            ):
+                raise BoundedError("RELOCATION_LOCAL_TYPED_RECEIPT_INVALID")
+            seen.add(r["plan_identity"])
+            t = p["table"]
+            totals[t] = totals.get(t, 0) + r["original_rows"]
+            moves[t] = moves.get(t, 0) + r["wrong_partition_rows"]
+            outputs.setdefault(t, []).extend(r["files"])
+    if seen != plans or set(outputs) != TABLES or totals != body["relocated_table_rows"]:
+        raise BoundedError("RELOCATION_COMPLETE_PLAN_RECEIPT_CENSUS_CHANGED")
+    files = [o["path"] for os_ in outputs.values() for o in os_]
+    if len(files) != len(set(files)) or set(files) != {
+        p for p in physical if p.startswith("payload/")
+    }:
+        raise BoundedError("RELOCATION_EXACT_TYPED_FILE_SET_CHANGED")
+    key_classes = 0
+    with GlobalScan(budget, read_only_roots=[root]) as scan:
+        for t, items in outputs.items():
+            groups: dict[str, list[Path]] = {}
+            for item in items:
+                path = _physical(root, item["path"], independent=True)
+                file = pq.ParquetFile(path)
+                if (
+                    file_sha(path) != item["sha256"]
+                    or file.metadata.num_rows != item["rows"]
+                    or not file.schema_arrow.equals(ss[t])
+                    or item["partition"] not in item["path"]
+                ):
+                    raise BoundedError("RELOCATION_TYPED_SCHEMA_OR_CENSUS_CHANGED")
+                for batch in file.iter_batches(batch_size=budget.limits.batch_rows):
+                    if any(f.nullable is False and batch.column(f.name).null_count for f in ss[t]):
+                        raise BoundedError("RELOCATION_REQUIRED_FIELD_NULL")
+                    if set(_groups(batch)) != {item["partition"]}:
+                        raise BoundedError("RELOCATION_SHANGHAI_PHYSICAL_MONTH_INVALID")
+                    budget.check()
+                groups.setdefault(item["partition"], []).append(path)
+            for paths in groups.values():
+                scan.connection.read_parquet(
+                    [str(p) for p in paths], hive_partitioning=False
+                ).create_view("relocated_keys", replace=True)
+                scan.keys(
+                    "relocated_keys",
+                    contract["tables"][t]["business_key"],
+                    contract["tables"][t]["version_key"],
+                )
+                scan.connection.execute("DROP VIEW relocated_keys")
+                key_classes += 1
+            scan.add(t, [_physical(root, o["path"], independent=True) for o in items])
+            scan.lineage(t, [tuple(x) for x in body["inherited_native_lineage"][t]])
+            scan.reject(
+                f'SELECT 1 FROM "{t}" WHERE effective_at >= '
+                "TIMESTAMPTZ '2026-09-01T00:00:00+08:00' OR "
+                "(knowledge_to IS NOT NULL AND knowledge_to<=knowledge_from) LIMIT 1",
+                "RELOCATION_BUSINESS_CUTOFF_OR_KNOWLEDGE_INTERVAL_INVALID",
+            )
+        for t, items in body["parents"].items():
+            paths = []
+            for item in items:
+                path = _physical(root, item["path"], independent=True)
+                f = pq.ParquetFile(path)
+                if f.metadata.num_rows != item["rows"] or not f.schema_arrow.equals(ss[t]):
+                    raise BoundedError("RELOCATION_LOCAL_PARENT_SCHEMA_OR_ROWS_INVALID")
+                paths.append(path)
+            scan.add(t, paths)
+        by_name = {t["name"]: t for t in model["tables"]}
+        for t in TABLES:
+            for fk in by_name[t].get("foreign_keys", []):
+                child, parent, pk = fk["column"], fk["table"], fk["reference_column"]
+                scan.reject(
+                    f'SELECT 1 FROM "{t}" r WHERE r."{child}" IS NOT NULL AND NOT EXISTS '
+                    f'(SELECT 1 FROM "{parent}" p WHERE p."{pk}"=r."{child}") LIMIT 1',
+                    "RELOCATION_MODEL_FOREIGN_KEY_MISSING",
+                )
+        scan.reject(
+            "SELECT 1 FROM dwd_disclosure_subject WHERE "
+            "(CASE WHEN security_id IS NULL THEN 0 ELSE 1 END)+"
+            "(CASE WHEN corporate_action_id IS NULL THEN 0 ELSE 1 END)+"
+            "(CASE WHEN financial_report_id IS NULL THEN 0 ELSE 1 END)<>1 LIMIT 1",
+            "RELOCATION_SUBJECT_IDENTIFIER_CONSTRAINT",
+        )
+    receipt = {
+        "status": "FULL_LOCAL_NATIVE_TYPED_RELOCATION_PASS_NOT_RAW_PIT_OR_BASE22",
+        "scope_identity": body["identity"],
+        "rows": totals,
+        "relocated_rows": moves,
+        "key_derived_partition_classes": key_classes,
+        "source_runtime_dereferences": 0,
+        "raw_source_admission": False,
+        "historical_PIT_admission": False,
+        "complete_Base22": False,
+    }
+    return {**receipt, "identity": digest(receipt)}
 
 
 def _groups(data: Any) -> dict[str, list[int]]:
@@ -32,6 +192,8 @@ def _groups(data: Any) -> dict[str, list[int]]:
     years, months = pc.year(local).to_pylist(), pc.month(local).to_pylist()
     groups: dict[str, list[int]] = {}
     for index, (year, month) in enumerate(zip(years, months, strict=True)):
+        if (year, month) > (2026, 8):
+            raise BoundedError("RELOCATION_BUSINESS_CUTOFF_EXCEEDED")
         key = f"effective_at_year={year}/effective_at_month={month}"
         groups.setdefault(key, []).append(index)
     return groups

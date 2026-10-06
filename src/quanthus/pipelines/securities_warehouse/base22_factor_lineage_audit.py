@@ -14,7 +14,12 @@ from .base22_factor_lineage import CONTRACT_ID, TABLES, replay_factor_lineage
 from .base22_sources import _tree
 from .financial_reporting import financial_company_resolver_from_listed_company_rows
 
-PARENTS = ("dwd_listed_company", "dwd_security", "dwd_security_identifier")
+PARENTS = (
+    "dwd_listed_company",
+    "dwd_security",
+    "dwd_security_identifier",
+    "dwd_trading_venue",
+)
 ROLES = (*TABLES, *PARENTS, "adjustment_factors_pit", "factor_pit_exceptions")
 VOCABULARY_SHA = "sha256:9196a3c0dad1e35f7f873a652d7782734938f432d08c5cacb3d49ab2cba90577"
 PURPOSE = "COMPLETE_NATIVE_FACTOR_COPY_WITH_RAW_BINDING_NOT_PIT_OR_BASE_ADMISSION"
@@ -158,8 +163,28 @@ def audit_native_factor_scope(
             scan.row_rules(table, ss[table], rule)
             scan.keys(table, rule["business_key"], rule["version_key"])
             summaries[table] = semantic_scan([m.path], ss[table], batch_rows=1024)
+        # This exact model relationship permits null. Full raw replay above
+        # proves EVERY retained input is SOURCE_EVIDENCE with a null action ID.
+        # No fabricated empty parent table is needed for an unused optional edge.
+        scan.reject(
+            "SELECT 1 FROM dwd_adjustment_factor_input "
+            "WHERE corporate_action_id IS NOT NULL OR input_type<>'SOURCE_EVIDENCE' LIMIT 1",
+            "NATIVE_FACTOR_UNQUALIFIED_ACTION_DEPENDENCY",
+        )
+        scoped_model = []
+        for entry in model["tables"]:
+            if entry["name"] not in scoped:
+                continue
+            if entry["name"] == TABLES[1]:
+                entry = {
+                    **entry,
+                    "foreign_keys": [
+                        fk for fk in entry["foreign_keys"] if fk["column"] != "corporate_action_id"
+                    ],
+                }
+            scoped_model.append(entry)
         scan.references(
-            {"tables": [t for t in model["tables"] if t["name"] in scoped]},
+            {"tables": scoped_model},
             {"tables": {t: contract["tables"][t] for t in scoped}},
         )
     if summaries != descriptor["native_semantic_scans"]:

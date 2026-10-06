@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from datetime import timedelta
+from itertools import permutations
 from pathlib import Path
 
 import pytest
@@ -89,3 +90,31 @@ def test_unexpected_table_and_excessive_group_fail_closed():
         sink.add({**rows, "unknown_table": []})
     with pytest.raises(BoundedError, match="GROUP_ROW_BOUND"):
         sink.add({**rows, TABLES[2]: rows[TABLES[2]] * 32769})
+
+
+def test_repeated_nonextending_concept_clocks_do_not_accumulate():
+    rules, rows = sample()
+    sink = FinancialReplaySink(rules, lambda *args: None, flush_rows=1)
+    for n in range(8):
+        later = deepcopy(rows[TABLES[1]])
+        for row in later:
+            row["knowledge_from"] += timedelta(days=n)
+        sink.add({TABLES[0]: [], TABLES[1]: later, TABLES[2]: []})
+        assert len(sink.concepts) == len(rows[TABLES[1]])
+
+
+@pytest.mark.parametrize("order", list(permutations(range(4))))
+def test_compact_prefix_matches_whole_merge_under_interleaved_source_clocks(order):
+    rules, rows = sample()
+    source = []
+    for clock, offset in [(0, 0), (1, 20), (2, -30), (1, -10)]:
+        row = deepcopy(rows[TABLES[1]][0])
+        row["knowledge_from"] += timedelta(days=clock)
+        row["effective_from"] += timedelta(days=offset)
+        source.append(row)
+    seen = []
+    sink = FinancialReplaySink(rules, lambda *args: seen.append(args), flush_rows=1)
+    for n in order:
+        sink.add({TABLES[0]: [], TABLES[1]: [source[n]], TABLES[2]: []})
+    sink.finish()
+    assert seen[0][3] == financial_concept_versions(source)

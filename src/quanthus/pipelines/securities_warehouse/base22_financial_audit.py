@@ -90,8 +90,15 @@ class FinancialReplaySink:
 
             if key not in self.concepts or order(row) < order(self.concepts[key]):
                 self.concepts[key] = dict(row)
-            if len(self.concepts) > MAX_GROUP_ROWS:
-                raise BoundedError("FINANCIAL_GLOBAL_CONCEPT_SCOPE_BOUND_FAILED")
+        # A discarded nonextending row cannot become a revision by adding more
+        # observations: the cumulative earliest effective date can only move
+        # backwards. The deterministic equal-clock minimum is retained too.
+        # Keep the sufficient prefix, while semantics and every input proof are
+        # still checked. This avoids accumulating one unchanged clock per fetch.
+        prefix = financial_concept_versions(self.concepts.values())
+        self.concepts = {(r["financial_concept_id"], r["knowledge_from"]): r for r in prefix}
+        if len(self.concepts) > MAX_GROUP_ROWS:
+            raise BoundedError("FINANCIAL_GLOBAL_CONCEPT_SCOPE_BOUND_FAILED")
 
     def flush(self) -> None:
         concepts = financial_concept_versions(self.buffers[TABLES[1]])

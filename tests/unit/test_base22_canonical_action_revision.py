@@ -8,6 +8,7 @@ from quanthus.pipelines.securities_warehouse.base22 import digest
 from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError
 from quanthus.pipelines.securities_warehouse.base22_canonical_action_revision import (
     CONTRACT_ID,
+    choose_successor_sources,
     revise_canonical_action,
     validate_revision_partition,
 )
@@ -98,6 +99,7 @@ def case():
     binding = {
         "source_scope_identity": "sha256:" + "c" * 64,
         "raw_replay_receipt_sha256": "sha256:" + "d" * 64,
+        "original_raw_member_sha256": old["source_artifact_sha256"],
         "original_raw_row_sha256": digest(raw),
         "qualified_action_sha256": digest(candidate),
         "qualified_term_rows_sha256": sorted([digest(qualified_term)]),
@@ -282,3 +284,73 @@ def test_new_term_type_may_be_added_but_old_term_is_retained_with_closed_interva
         [old], after, {old["corporate_action_id"]}, [new], observed_at=c[5], action=False
     )
     assert result["old_atoms_changed_except_selected_interval_end"] == 0
+
+
+def test_source_selection_explicitly_holds_cash_and_prelisting_and_uses_exact_old_key():
+    c = case()
+    rows = [
+        {
+            "action_id": "positive",
+            "effective_date": c[0]["ex_date"],
+            "authority_source_row_ref": "actual-raw-ref",
+        },
+        {
+            "action_id": "cash",
+            "effective_date": c[0]["ex_date"],
+            "authority_source_row_ref": "actual-raw-ref2",
+        },
+        {
+            "action_id": "early",
+            "effective_date": c[0]["ex_date"],
+            "authority_source_row_ref": "actual-raw-ref3",
+        },
+    ]
+    selected, held = choose_successor_sources(
+        rows,
+        {
+            "EM": ({"positive": c[2]}, {c[2]["corporate_action_id"]: c[3]}),
+            "F10": ({}, {}),
+            "factor": ({}, {}),
+        },
+        {},
+        cash_conflicts={"cash"},
+        prelisting={"early"},
+    )
+    assert list(selected) == ["positive"]
+    assert held == {
+        "cash": "CASH_SOURCE_PRIORITY_UNAVAILABLE",
+        "early": "BEFORE_FIRST_LISTED_COMPANY_IDENTITY",
+    }
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing_raw_key", "other_date", "missing_terms", "unknown_held", "duplicate_required"],
+)
+def test_complete_required_key_scope_cannot_shorten_or_infer(mutation):
+    c = case()
+    rows = [
+        {
+            "action_id": "positive",
+            "effective_date": c[0]["ex_date"],
+            "authority_source_row_ref": "actual-raw-ref",
+        }
+    ]
+    sources = {
+        "EM": ({"positive": c[2]}, {c[2]["corporate_action_id"]: c[3]}),
+        "F10": ({}, {}),
+        "factor": ({}, {}),
+    }
+    conflicts = set()
+    if mutation == "missing_raw_key":
+        sources["EM"][0].clear()
+    elif mutation == "other_date":
+        c[2]["ex_date"] = date(2019, 6, 4)
+    elif mutation == "missing_terms":
+        sources["EM"][1].clear()
+    elif mutation == "unknown_held":
+        conflicts.add("outside-scope")
+    elif mutation == "duplicate_required":
+        rows.append(dict(rows[0]))
+    with pytest.raises(BoundedError):
+        choose_successor_sources(rows, sources, {}, cash_conflicts=conflicts, prelisting=set())

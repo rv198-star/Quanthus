@@ -81,6 +81,8 @@ def revise_canonical_action(
         or binding.get("old_manifest_restored") is not False
         or not _sha(binding.get("source_scope_identity"))
         or not _sha(binding.get("raw_replay_receipt_sha256"))
+        or not _sha(binding.get("original_raw_member_sha256"))
+        or before.get("source_artifact_sha256") != binding["original_raw_member_sha256"]
         or binding.get("original_raw_row_sha256") != digest(original_raw)
         or binding.get("qualified_action_sha256") != digest(qualified_action)
         or binding.get("qualified_term_rows_sha256") != sorted(digest(r) for r in qualified_terms)
@@ -156,6 +158,83 @@ def revise_canonical_action(
     }
     proof["identity"] = digest(proof)
     return new_action, terms, proof
+
+
+def choose_successor_sources(
+    required_rows: Iterable[dict[str, Any]],
+    sources: dict[str, tuple[dict[str, dict[str, Any]], dict[str, list[dict[str, Any]]]]],
+    f10_bindings: dict[str, dict[str, Any]],
+    *,
+    cash_conflicts: set[str],
+    prelisting: set[str],
+) -> tuple[dict[str, tuple[str, dict[str, Any], list[dict[str, Any]]]], dict[str, str]]:
+    """Complete exact old-key disposition, without a same-date or priority guess.
+
+    The caller supplies physically frozen raw-replayed sources and original
+    lineage. Multiple F10 keys may collapse only if every non-ID field and term
+    atom is identical, including actual clocks and optional date nullness.
+    """
+    if cash_conflicts & prelisting or set(sources) != {"EM", "F10", "factor"}:
+        raise BoundedError("CANONICAL_ACTION_EXACT_SOURCE_SCOPE_INVALID")
+    selected = {}
+    held = {}
+    seen: set[str] = set()
+    for old in required_rows:
+        key = old["action_id"]
+        if not isinstance(key, str) or key in seen or len(seen) >= MAX_PARTITION_ROWS:
+            raise BoundedError("CANONICAL_ACTION_REQUIRED_KEY_DUPLICATE_OR_BOUND_EXCEEDED")
+        seen.add(key)
+        if key in cash_conflicts:
+            held[key] = "CASH_SOURCE_PRIORITY_UNAVAILABLE"
+            continue
+        if key in prelisting:
+            held[key] = "BEFORE_FIRST_LISTED_COMPANY_IDENTITY"
+            continue
+        if old["authority_source_row_ref"] is not None:
+            label = "EM"
+            action = sources[label][0].get(key)
+        elif key in f10_bindings:
+            label = "F10"
+            bound = f10_bindings[key]
+            if (
+                bound["status"]
+                != "SHARED_PRESENT_TOTALS_CONFIRMED_ZERO_COMPONENT_REMAINS_UNMENTIONED"
+            ):
+                raise BoundedError("CANONICAL_ACTION_F10_SHARED_FACTS_NOT_QUALIFIED")
+            alternatives = []
+            for source_key, _ in bound["key"]["F10_bound_source_records"]:
+                donor = sources[label][0].get(source_key)
+                if donor is None:
+                    raise BoundedError("CANONICAL_ACTION_REQUIRED_F10_RAW_KEY_MISSING")
+                terms = sources[label][1].get(donor["corporate_action_id"], [])
+                omit_action = {"corporate_action_id", "source_record_id"}
+                omit_terms = {"corporate_action_id", "corporate_action_term_id", "source_record_id"}
+                signature = digest(
+                    [
+                        {k: v for k, v in donor.items() if k not in omit_action},
+                        sorted(
+                            digest({k: v for k, v in r.items() if k not in omit_terms})
+                            for r in terms
+                        ),
+                    ]
+                )
+                alternatives.append((source_key, donor, signature))
+            if not alternatives or len({a[2] for a in alternatives}) != 1:
+                raise BoundedError("CANONICAL_ACTION_MULTIPLE_F10_FACTS_OR_CLOCKS_CONFLICT")
+            # Stable ID ordering is permitted only after exact fact/clock equality.
+            action = min(alternatives, key=lambda item: item[0])[1]
+        else:
+            label = "factor"
+            action = sources[label][0].get(key)
+        if action is None or str(action["ex_date"]) != str(old["effective_date"]):
+            raise BoundedError("CANONICAL_ACTION_REQUIRED_RAW_DATED_SOURCE_CLOSURE_MISSING")
+        terms = sources[label][1].get(action["corporate_action_id"], [])
+        if not terms:
+            raise BoundedError("CANONICAL_ACTION_REQUIRED_RAW_TERM_CLOSURE_MISSING")
+        selected[key] = label, action, terms
+    if not cash_conflicts <= seen or not prelisting <= seen:
+        raise BoundedError("CANONICAL_ACTION_HELD_KEY_OUTSIDE_EXACT_REQUIRED_SCOPE")
+    return selected, held
 
 
 def validate_revision_partition(

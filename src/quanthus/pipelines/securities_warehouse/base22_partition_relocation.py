@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -220,6 +221,14 @@ def plan_relocation(
     before = _fingerprint(member.path)
     data = _input(member, schema).read(columns=["effective_at"])
     groups = _groups(data)
+    match = re.fullmatch(
+        r"effective_at_year=([0-9]+)/effective_at_month=([0-9]+)", original_partition
+    )
+    if match is None or not 1 <= int(match[2]) <= 12:
+        raise BoundedError("RELOCATION_ORIGINAL_MONTH_COORDINATE_INVALID")
+    # Padding is a legacy physical spelling, not a different business month.
+    # The original path remains verbatim in the pinned member identity.
+    original_partition = f"effective_at_year={int(match[1])}/effective_at_month={int(match[2])}"
     if _fingerprint(member.path) != before or file_sha(member.path) != member.sha256:
         raise BoundedError("RELOCATION_SOURCE_CHANGED")
     body = {

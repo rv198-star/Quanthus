@@ -109,6 +109,19 @@ def test_healthy_member_is_independent_exact_byte_copy(tmp_path, table):
         assert dest.stat().st_ino != member.path.stat().st_ino
 
 
+def test_legacy_zero_padded_month_is_same_coordinate(tmp_path):
+    schema, member, rule, _ = fixture(tmp_path, wrong=False)
+    plan = plan_relocation(
+        member,
+        table="dwd_disclosure",
+        schema=schema,
+        rule=rule,
+        original_partition="effective_at_year=02020/effective_at_month=012",
+    )
+    assert plan["original_partition"] == "effective_at_year=2020/effective_at_month=12"
+    assert plan["wrong_partition_rows"] == 0
+
+
 @pytest.mark.parametrize("mutation", ["route", "count", "identity"])
 def test_plan_changes_fail_before_output(tmp_path, mutation):
     schema, member, rule, _ = fixture(tmp_path)

@@ -264,7 +264,9 @@ def audit_cash_restatement_scope(
             action=table == "dwd_corporate_action",
         )
         for i in items:
-            summary = semantic_scan([root / i["path"]], ss[table], batch_rows=1024, check=budget.check)
+            summary = semantic_scan(
+                [root / i["path"]], ss[table], batch_rows=1024, check=budget.check
+            )
             if summary != i["semantic_scan"]:
                 raise BoundedError("CASH_RESTATEMENT_OUTPUT_SUMMARY_CHANGED")
             scans[i["path"]] = summary
@@ -290,7 +292,11 @@ def audit_cash_restatement_scope(
             ("dwd_listed_company", "company_id"),
             ("dwd_security", "security_id"),
         ]:
-            scan.references("dwd_corporate_action", parent, [(column, column)])
+            scan.reject(
+                "SELECT 1 FROM dwd_corporate_action a WHERE NOT EXISTS("
+                f"SELECT 1 FROM {parent} p WHERE p.{column}=a.{column}) LIMIT 1",
+                "CASH_RESTATEMENT_GLOBAL_ENTITY_PARENT_FAILED",
+            )
         scan.reject(
             "SELECT 1 FROM dwd_corporate_action_term t WHERE NOT EXISTS("
             "SELECT 1 FROM dwd_corporate_action a "

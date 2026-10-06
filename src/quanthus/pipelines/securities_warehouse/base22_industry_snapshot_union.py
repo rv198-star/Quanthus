@@ -23,7 +23,7 @@ CONTRACT_ID = "p10-base22-retained-industry-snapshot-native-union-v1"
 TABLE = "dwd_company_industry_membership"
 TABLES = {
     TABLE, "dwd_industry_scheme", "dwd_industry_node", "dwd_listed_company",
-    "dwd_security", "dwd_security_identifier",
+    "dwd_security", "dwd_security_identifier", "dwd_trading_venue",
 }
 MAX_RAW_ROWS = 8192
 
@@ -66,7 +66,13 @@ def project_snapshot(
     return output
 
 
-def audit_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, Any]:
+def audit_scope(
+    root: Path,
+    body: dict[str, Any],
+    budget: Budget,
+    *,
+    descriptor_name: str = "QUALIFICATION.json",
+) -> dict[str, Any]:
     """Reproduce all retained raw snapshots and scan the full native union offline."""
     import pyarrow as pa  # type: ignore[import-untyped]
     import pyarrow.parquet as pq  # type: ignore[import-untyped]
@@ -83,7 +89,9 @@ def audit_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, A
         or len(body.get("weekly_sources", [])) != 4
     ):
         raise BoundedError("INDUSTRY_SNAPSHOT_OFFLINE_SCOPE_INVALID")
-    if _tree(root) != set(body["physical_members"]) | {"QUALIFICATION.json"}:
+    if Path(descriptor_name).name != descriptor_name or not descriptor_name:
+        raise BoundedError("INDUSTRY_SNAPSHOT_DESCRIPTOR_NAME_INVALID")
+    if _tree(root) != set(body["physical_members"]) | {descriptor_name}:
         raise BoundedError("INDUSTRY_SNAPSHOT_PHYSICAL_FILE_SET_CHANGED")
     for rel, item in body["physical_members"].items():
         p = _physical(root, rel, independent=True)

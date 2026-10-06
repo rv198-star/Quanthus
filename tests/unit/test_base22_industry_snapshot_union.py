@@ -87,3 +87,15 @@ def test_business_date_never_defaults_to_the_provider_update_date():
     assert row["effective_from"] == datetime(2026, 8, 7, 16, tzinfo=timezone.utc)
     assert row["source_declared_as_of"] == date(2026, 8, 8)
     assert raw[0]["provider_update_date"] == "2026-07-27"
+
+
+def test_offline_entity_set_closes_every_foreign_key_in_the_locked_model():
+    import json
+    from pathlib import Path
+
+    from quanthus.pipelines.securities_warehouse.base22_industry_snapshot_union import TABLES
+
+    model = json.loads(Path("config/pipelines/dwd-domain-model.v1.json").read_bytes())
+    for table in model["tables"]:
+        if table["name"] in TABLES:
+            assert {f["table"] for f in table["foreign_keys"]} <= TABLES

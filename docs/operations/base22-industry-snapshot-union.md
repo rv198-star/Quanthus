@@ -7,7 +7,8 @@ update date is retained in raw evidence and never substituted for the snapshot
 date. Acquisition and the original dated parent knowledge floor are preserved.
 These are static snapshots, not inferred historical PIT industry facts.
 
-The same immutable six-table native dependency supplies all four weekly adapters.
+The same immutable seven-table native dependency supplies all four weekly adapters,
+including the venue parent of security identifiers.
 The output carries independent physical files, every selected manifest/READY/raw
 source, the original membership and full input/code/configuration identities.
 Offline verification reconstructs all snapshots from the local raw files, compares

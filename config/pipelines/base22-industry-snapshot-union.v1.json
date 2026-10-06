@@ -1,0 +1,16 @@
+{
+  "contract_id": "p10-base22-retained-industry-snapshot-native-union-v1",
+  "purpose": "P10 dated static industry snapshot native union",
+  "through_business_date": "2026-08-31",
+  "timezone": "Asia/Shanghai",
+  "native_rule": "all 5201 original memberships and exact scheme/node/dated-company identity remain unchanged",
+  "snapshot_rule": "snapshot market_date only; exact industry code/name/classification; no provider_update_date or current-to-past backfill",
+  "knowledge_rule": "retained acquisition and dated parent floor preserved; raw provider update date remains raw evidence, not historical PIT admission",
+  "priority_rule": "append distinct snapshot business keys only; duplicate/conflicting same key fails; no native replacement",
+  "required_local_closure": "full selected manifests/READY/raw files, original native manifest/membership and one immutable six-table entity dependency",
+  "missing_rule": "nonempty unknown node/date/identity/source fails; no empty replacement",
+  "historical_PIT_admission": false,
+  "consumer_admission": "NOT_GRANTED",
+  "complete_Base22": false,
+  "READY": false
+}

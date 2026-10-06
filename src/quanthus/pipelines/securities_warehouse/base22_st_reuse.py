@@ -287,7 +287,7 @@ def audit_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, A
     for item in body["weekly_sources"]:
         manifest = document(item["manifest"])
         sha = file_sha(root / item["manifest"])
-        if (root / item["READY"]).read_text().strip() != sha:
+        if manifest.get("status") != "ready" or (root / item["READY"]).read_text().strip() != sha:
             raise BoundedError("ST_REUSE_LOCAL_READY_MISMATCH")
         members = [a for a in manifest["artifacts"] if a["name"] == "st_announcement_trail"]
         if len(members) != 1 or members[0]["sha256"] != file_sha(root / item["raw"]):

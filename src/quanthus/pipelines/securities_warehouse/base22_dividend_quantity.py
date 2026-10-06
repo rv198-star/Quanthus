@@ -13,7 +13,7 @@ from quanthus.corporate_action_normalization import _digest as raw_digest
 from .base22 import THROUGH, digest
 from .base22_bounded import BoundedError
 from .base22_financial import _clock
-from .disclosure_event import _action_coordinate, _decimal, _stable_id
+from .disclosure_event import _action_coordinate, _decimal, _provider_timestamp, _stable_id
 
 CONTRACT_ID = "p10-base22-native-dividend-perten-ratio-revision-v1"
 FIELDS = {
@@ -148,22 +148,90 @@ def correct_dividend_quantity(
     return new, proof
 
 
+def correct_dividend_action_type(
+    raw: dict[str, Any],
+    before: dict[str, Any],
+    *,
+    raw_sha256: str,
+    observed_at: Any,
+    revision: str,
+) -> dict[str, Any]:
+    """Version the same parent event's evidenced cash/bonus/transfer composition.
+
+    The old builder defaulted every dividend source event to CASH_DIVIDEND. This
+    dependent correction retains status, identity and business coordinate, and
+    does not arbitrate between providers or change any cash amount.
+    """
+    action_id, key = dividend_raw_identity(raw)
+    effective, _ = _action_coordinate(dict(raw, ex_date=raw.get("ex_dividend_date")))
+    progress = raw.get("progress")
+    statuses = {"实施": "IMPLEMENTED", "预案": "PROPOSED", "不分配": "NO_DISTRIBUTION"}
+    status = statuses.get(progress) if isinstance(progress, str) else None
+    if (
+        before.get("corporate_action_id") != action_id
+        or before.get("source_record_id") != key
+        or before.get("record_source") != "dividend_history"
+        or before.get("source_artifact_sha256") != raw_sha256
+        or status is None
+        or before.get("action_status") != status
+        or before.get("effective_at") != _provider_timestamp(effective, "original business date")
+        or before.get("knowledge_to") is not None
+        or re.fullmatch(re.escape(CONTRACT_ID) + r":sha256:[0-9a-f]{64}", revision) is None
+    ):
+        raise BoundedError("DIVIDEND_QUANTITY_PARENT_EXACT_BINDING_INVALID")
+    values = {}
+    for field in ("dividend_per_share", "bonus_shares", "transfer_shares"):
+        try:
+            value = _decimal(raw.get(field), "retained action composition")
+        except (ValueError, RuntimeError) as exc:
+            raise BoundedError("DIVIDEND_QUANTITY_PARENT_RAW_NUMBER_INVALID") from exc
+        if value is None or value < 0 or isinstance(raw.get(field), bool):
+            raise BoundedError("DIVIDEND_QUANTITY_PARENT_COMPOSITION_UNKNOWN")
+        if value > 0:
+            values[field] = value
+    if not any(field in values for field in ("bonus_shares", "transfer_shares")):
+        raise BoundedError("DIVIDEND_QUANTITY_PARENT_NO_SHARE_CORRECTION")
+    typ = (
+        "MIXED_DISTRIBUTION"
+        if len(values) > 1
+        else (
+            "BONUS_SHARE_DISTRIBUTION" if "bonus_shares" in values else "CAPITAL_RESERVE_TRANSFER"
+        )
+    )
+    clock = _clock(observed_at)
+    if clock <= before["knowledge_from"]:
+        raise BoundedError("DIVIDEND_QUANTITY_PARENT_CLOCK_NOT_LATER")
+    return {
+        **before,
+        "action_type": typ,
+        "announced_at": None,
+        "source_revision": revision,
+        "knowledge_from": clock,
+        "knowledge_to": None,
+    }
+
+
 def validate_quantity_versions(
     before_rows: Iterable[dict[str, Any]],
     after_rows: Iterable[dict[str, Any]],
     corrections: dict[tuple[Any, ...], dict[str, Any]],
+    *,
+    action: bool = False,
 ) -> dict[str, Any]:
     """Exact bounded partition conservation; no new source can overwrite old atoms."""
     expected = {}
     selected = set()
     count = 0
+    fields = (
+        ("corporate_action_id", "effective_at")
+        if action
+        else ("corporate_action_id", "corporate_action_term_id", "effective_at")
+    )
     for old in before_rows:
         count += 1
         if count > MAX_PARTITION_ROWS:
             raise BoundedError("DIVIDEND_QUANTITY_PARTITION_SCOPE_EXCEEDED")
-        key = tuple(
-            old[k] for k in ("corporate_action_id", "corporate_action_term_id", "effective_at")
-        )
+        key = tuple(old[k] for k in fields)
         version = (*key, old["knowledge_from"])
         if version in expected:
             raise BoundedError("DIVIDEND_QUANTITY_DUPLICATE_BEFORE_VERSION")
@@ -187,15 +255,7 @@ def validate_quantity_versions(
         total += 1
         if total > MAX_PARTITION_ROWS * 2:
             raise BoundedError("DIVIDEND_QUANTITY_OUTPUT_SCOPE_EXCEEDED")
-        version = tuple(
-            row[k]
-            for k in (
-                "corporate_action_id",
-                "corporate_action_term_id",
-                "effective_at",
-                "knowledge_from",
-            )
-        )
+        version = tuple(row[k] for k in (*fields, "knowledge_from"))
         if expected.pop(version, None) != digest(row):
             raise BoundedError("DIVIDEND_QUANTITY_UNAUTHORIZED_ATOM_OR_KEY_CHANGE")
     if expected or total != count + len(corrections):

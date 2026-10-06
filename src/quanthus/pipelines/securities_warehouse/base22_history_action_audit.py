@@ -395,8 +395,9 @@ def audit_history_action_scope(root: Path, body: dict[str, Any], budget: Budget)
             """SELECT 1 FROM dwd_corporate_action_term t WHERE NOT EXISTS
             (SELECT 1 FROM dwd_corporate_action a WHERE a.corporate_action_id=t.corporate_action_id
              AND a.knowledge_from=t.knowledge_from
-             AND a.knowledge_to IS NOT DISTINCT FROM t.knowledge_to
+             AND a.effective_at=t.effective_at
              AND a.record_source=t.record_source AND a.source_revision=t.source_revision
+             AND a.source_record_id=t.source_record_id
              AND a.source_artifact_sha256=t.source_artifact_sha256) LIMIT 1""",
             "SUCCESSOR_HISTORY_TERM_EXACT_SOURCE_KNOWLEDGE_PARENT_FAILED",
         )

@@ -625,6 +625,7 @@ class GlobalScan:
                         f" AND t.effective_from<={coordinate} AND "
                         f"(t.effective_to IS NULL OR {coordinate}<t.effective_to)"
                     )
+                listing = None
                 if fk["table"] == "dwd_trading_calendar":
                     if table["time_profile"] == "market_observation":
                         daily = (
@@ -648,11 +649,52 @@ class GlobalScan:
                             f"(l.effective_to IS NULL OR {coordinate}<l.effective_to))"
                         )
                 predicate = f"{column} IS NOT NULL AND " if fk["nullable"] else ""
+                reason = "GLOBAL_FOREIGN_KEY_DATE_VENUE_CLOSURE_FAILED:" + name
+                join = ""
+                if listing is not None:
+                    # Prove the optimization's premise from the whole parent,
+                    # rather than assuming one eligible listing/version per ID.
+                    # Mixed venues keep the original existential semantics.
+                    lkey = identifier(listing["reference_column"])
+                    stable = self.connection.execute(
+                        f"SELECT 1 FROM dwd_listing GROUP BY {lkey} HAVING "
+                        "count(DISTINCT venue_id)<>1 OR count(*)<>count(venue_id) LIMIT 1"
+                    ).fetchone() is None
+                    if not stable:
+                        self.reject(
+                            f"SELECT 1 FROM {identifier(name)} r WHERE {predicate}NOT EXISTS "
+                            f"(SELECT 1 FROM {target} t WHERE "
+                            f"t.{identifier(fk['reference_column'])}={column} "
+                            f"AND {temporal}) LIMIT 1",
+                            reason,
+                        )
+                        continue
+                    # The dated listing proof remains mandatory; the venue map
+                    # is shared across its versions only after the stable proof.
+                    self.reject(
+                        f"SELECT 1 FROM {identifier(name)} r LEFT JOIN dwd_listing l ON "
+                        f"l.{lkey}=r.{identifier(listing['column'])} AND "
+                        "l.knowledge_from<=r.knowledge_from AND "
+                        "(l.knowledge_to IS NULL OR r.knowledge_from<l.knowledge_to) AND "
+                        f"l.effective_from<={coordinate} AND "
+                        f"(l.effective_to IS NULL OR {coordinate}<l.effective_to) "
+                        f"WHERE {predicate}l.{lkey} IS NULL LIMIT 1",
+                        reason,
+                    )
+                    start = temporal.index(" AND EXISTS (SELECT 1 FROM dwd_listing l WHERE ")
+                    temporal = temporal[:start] + " AND t.venue_id=lv.venue_id"
+                    join = (
+                        f"LEFT JOIN (SELECT DISTINCT {lkey},venue_id FROM dwd_listing) lv ON "
+                        f"lv.{lkey}=r.{identifier(listing['column'])} "
+                    )
+                # An anti-filter over a left join streams the child. Correlated
+                # NOT EXISTS can materialize every distinct child clock/date in
+                # a delimiter join, exceeding spill limits on historical bars.
                 self.reject(
-                    f"""SELECT 1 FROM {identifier(name)} r WHERE {predicate}NOT EXISTS
-                    (SELECT 1 FROM {target} t WHERE t.{identifier(fk["reference_column"])}={column}
-                     AND {temporal}) LIMIT 1""",
-                    "GLOBAL_FOREIGN_KEY_DATE_VENUE_CLOSURE_FAILED:" + name,
+                    f"SELECT 1 FROM {identifier(name)} r {join}LEFT JOIN {target} t ON "
+                    f"t.{identifier(fk['reference_column'])}={column} AND {temporal} "
+                    f"WHERE {predicate}t.{identifier(fk['reference_column'])} IS NULL LIMIT 1",
+                    reason,
                 )
 
     def row_rules(self, name: str, schema: Any, rule: Mapping[str, Any]) -> None:

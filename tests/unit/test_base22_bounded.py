@@ -410,6 +410,61 @@ def test_failed_global_key_evidence_does_not_block_a_new_scan_attempt(tmp_path):
         assert retained == {str(p): file_sha(p) for p in failed_temp.rglob("*.parquet")}
 
 
+@pytest.mark.parametrize(
+    "variant", ["stable_versions", "mixed_venues", "future_clock", "future_effective", "company"]
+)
+def test_streaming_references_preserve_existential_temporal_and_venue_rules(tmp_path, variant):
+    from copy import deepcopy
+    from datetime import timedelta
+
+    from tests.unit.test_base22_independent_image import Fixture
+
+    fixture = Fixture(tmp_path / "synthetic")
+    rows = deepcopy(fixture.history)
+    listing = rows["dwd_listing"][0]
+    if variant in {"stable_versions", "mixed_venues"}:
+        another = dict(
+            listing, knowledge_from=listing["knowledge_from"] + timedelta(microseconds=1)
+        )
+        if variant == "mixed_venues":
+            another["venue_id"] = "other-venue"
+            rows["dwd_trading_venue"].append(
+                dict(rows["dwd_trading_venue"][0], venue_id="other-venue")
+            )
+        rows["dwd_listing"].append(another)
+        for name in ("dwd_security_bar", "dwd_tradability_state"):
+            rows[name][0]["knowledge_from"] += timedelta(microseconds=2)
+    elif variant == "future_clock":
+        listing["knowledge_from"] += timedelta(days=1)
+    elif variant == "future_effective":
+        listing["effective_from"] = rows["dwd_security_bar"][0]["observation_start"] + timedelta(
+            days=1
+        )
+    else:
+        rows["dwd_listed_company"][0]["knowledge_from"] += timedelta(days=1)
+    with (
+        b.Budget(tmp_path / "job", [fixture.root], limits()) as budget,
+        b.GlobalScan(budget) as scan,
+    ):
+        for table, schema in fixture.schemas.items():
+            path = budget.root / (table + ".parquet")
+            member(path, pa.Table.from_pylist(rows[table], schema=schema))
+            scan.add(table, [path])
+        queries = []
+        original = scan.reject
+
+        def observe(sql, reason):
+            queries.append(sql)
+            return original(sql, reason)
+
+        scan.reject = observe
+        if variant in {"stable_versions", "mixed_venues"}:
+            scan.references(fixture.model, fixture.contract)
+            assert any("NOT EXISTS" in q for q in queries) == (variant == "mixed_venues")
+        else:
+            with pytest.raises(b.BoundedError, match="GLOBAL_FOREIGN_KEY_DATE_VENUE"):
+                scan.references(fixture.model, fixture.contract)
+
 def test_global_hash_index_coalesces_small_batches_into_bounded_row_groups(tmp_path):
     """Physical footer growth must not scale with every bucket/batch intersection."""
     with b.Budget(tmp_path / "job", [], limits(batch_rows=32)) as budget:

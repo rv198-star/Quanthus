@@ -94,7 +94,7 @@ def _actual(root: Path, body: dict[str, Any], budget: Budget) -> Any:
 
 
 def _subtract(rows: dict[str, list[dict[str, Any]]], hashes: Any, ss: Any) -> None:
-    import pyarrow as pa  # type: ignore[import-untyped]
+    import pyarrow as pa
 
     for table, items in rows.items():
         typed = pa.Table.from_pylist(items, schema=ss[table]).to_pylist()
@@ -223,7 +223,7 @@ def replay_f10_source(
     root: Path, body: dict[str, Any], budget: Budget
 ) -> tuple[dict[str, Any], Any, Any]:
     """Replay complete actual category groups and receipts; original clocks only."""
-    import pyarrow.parquet as pq  # type: ignore[import-untyped]
+    import pyarrow.parquet as pq
 
     stage = root / "observations/f10-dividend"
     audit_observation_stage(root, body, stage / "contract")

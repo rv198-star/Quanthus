@@ -156,7 +156,11 @@ def test_complete_raw_semantic_receipt_cannot_hide_changes_in_runtime_metadata(c
 
 
 @pytest.mark.parametrize("defect", [None, "missing_company", "term_clock"])
-def test_offline_cash_global_reads_immutable_image_outside_audit_TMP(tmp_path, defect):
+def test_offline_cash_global_reads_immutable_image_outside_audit_TMP(tmp_path, monkeypatch, defect):
+    import os
+    from pathlib import Path
+    from types import SimpleNamespace
+
     import pyarrow as pa
     import pyarrow.parquet as pq
 
@@ -166,7 +170,7 @@ def test_offline_cash_global_reads_immutable_image_outside_audit_TMP(tmp_path, d
 
     root = tmp_path / "relocated-image"
     root.mkdir()
-    contract, model, extension = load_contract(__import__("pathlib").Path("config/pipelines"))
+    contract, model, extension = load_contract(Path("config/pipelines"))
     ss = schemas(model, extension)
     _, old, before, _, _, _ = fixture()
     if defect == "term_clock":
@@ -197,6 +201,16 @@ def test_offline_cash_global_reads_immutable_image_outside_audit_TMP(tmp_path, d
         p.chmod(0o444)
         body["parents"][table] = [{"path": p.name}]
     hashes = {p.name: file_sha(p) for p in root.iterdir()}
+    real_statvfs = os.statvfs
+    # Unit fixture models only the RO flag. The actual cold harness proves the
+    # private kernel RO bind, original-source hiding and native reader denials.
+    monkeypatch.setattr(
+        os,
+        "statvfs",
+        lambda path: SimpleNamespace(f_flag=os.ST_RDONLY)
+        if Path(path) == root
+        else real_statvfs(path),
+    )
 
     def rows(item):
         return pq.ParquetFile(root / item["path"]).read().to_pylist()

@@ -60,7 +60,8 @@ def _month_keys(scan: GlobalScan, name: str, rule: dict[str, Any]) -> None:
 
 
 def _structural_references(
-    scan: GlobalScan, name: str, foreign_keys: list[dict[str, Any]]
+    scan: GlobalScan, name: str, foreign_keys: list[dict[str, Any]],
+    *, parent_keys: dict[tuple[str, str], str] | None = None, subject_rule: bool = False,
 ) -> int:
     """One bounded child scan checks every existing structural foreign key.
 
@@ -69,15 +70,32 @@ def _structural_references(
     rereading each small physical child file once per foreign key. This remains
     existence-only relocation verification, with no new PIT/interval authority.
     """
-    if not foreign_keys:
+    if not foreign_keys and not subject_rule:
         return 0
+    parent_keys = {} if parent_keys is None else parent_keys
     joins, missing = [], []
     for n, fk in enumerate(foreign_keys):
-        parent = scan._reference_map(fk["table"], fk["reference_column"])
+        key = (fk["table"], fk["reference_column"])
+        if key not in parent_keys:
+            parent = identifier("relocation_parent_keys_" + key[0] + "_" + key[1])
+            scan.budget.check()
+            scan.connection.execute(
+                f"CREATE TEMP TABLE {parent} AS SELECT DISTINCT "
+                f"{identifier(key[1])} AS parent_key FROM {identifier(key[0])}"
+            )
+            scan.budget.check()
+            parent_keys[key] = parent
+        parent = parent_keys[key]
         alias = identifier("reference_parent_" + str(n))
         column = "r." + identifier(fk["column"])
         joins.append(f"LEFT JOIN {parent} {alias} ON {alias}.parent_key={column}")
         missing.append(f"({column} IS NOT NULL AND {alias}.parent_key IS NULL)")
+    if subject_rule:
+        missing.append(
+            "((CASE WHEN r.security_id IS NULL THEN 0 ELSE 1 END)+"
+            "(CASE WHEN r.corporate_action_id IS NULL THEN 0 ELSE 1 END)+"
+            "(CASE WHEN r.financial_report_id IS NULL THEN 0 ELSE 1 END)<>1)"
+        )
     batches = scan._reference_batches(name)
     child = "reference_child_" + name
     for paths in batches:
@@ -88,9 +106,34 @@ def _structural_references(
         scan.reject(
             f"SELECT 1 FROM {identifier(child)} r " + " ".join(joins)
             + " WHERE " + " OR ".join(missing) + " LIMIT 1",
-            "RELOCATION_MODEL_FOREIGN_KEY_MISSING",
+            "RELOCATION_MODEL_FOREIGN_KEY_MISSING_OR_SUBJECT_IDENTIFIER_CONSTRAINT",
         )
     return len(batches)
+
+
+def _lineage_and_cutoff(
+    scan: GlobalScan, name: str, admitted: list[tuple[str, str, str]]
+) -> None:
+    """One child scan retains the existing source, cutoff and interval checks."""
+    import pyarrow as pa  # type: ignore[import-untyped]
+
+    if not admitted:
+        raise BoundedError("TABLE_SOURCE_CLOSURE_EMPTY")
+    registry = "relocation_admitted_" + name
+    scan.connection.register(registry, pa.table({
+        "record_source": [a[0] for a in admitted],
+        "source_revision": [a[1] for a in admitted],
+        "source_artifact_sha256": [a[2] for a in admitted],
+    }))
+    scan.reject(
+        f"SELECT 1 FROM {identifier(name)} r LEFT JOIN {identifier(registry)} a "
+        "ON r.record_source=a.record_source AND r.source_revision=a.source_revision "
+        "AND r.source_artifact_sha256=a.source_artifact_sha256 WHERE "
+        "r.source_record_id IS NULL OR r.source_record_id='' OR a.record_source IS NULL OR "
+        "r.effective_at >= TIMESTAMPTZ '2026-09-01T00:00:00+08:00' OR "
+        "(r.knowledge_to IS NOT NULL AND r.knowledge_to<=r.knowledge_from) LIMIT 1",
+        "RELOCATION_LINEAGE_OR_BUSINESS_CUTOFF_INVALID",
+    )
 
 
 def audit_relocation_scope(
@@ -217,13 +260,7 @@ def audit_relocation_scope(
                 key_classes += 1
             report("complete_global_key_versions_verified", table=t, classes=len(groups))
             scan.add(t, [_physical(root, o["path"], independent=True) for o in items])
-            scan.lineage(t, [tuple(x) for x in body["inherited_native_lineage"][t]])
-            scan.reject(
-                f'SELECT 1 FROM "{t}" WHERE effective_at >= '
-                "TIMESTAMPTZ '2026-09-01T00:00:00+08:00' OR "
-                "(knowledge_to IS NOT NULL AND knowledge_to<=knowledge_from) LIMIT 1",
-                "RELOCATION_BUSINESS_CUTOFF_OR_KNOWLEDGE_INTERVAL_INVALID",
-            )
+            _lineage_and_cutoff(scan, t, [tuple(x) for x in body["inherited_native_lineage"][t]])
             report("lineage_and_business_cutoff_verified", table=t)
         for t, items in body["parents"].items():
             paths = []
@@ -235,19 +272,16 @@ def audit_relocation_scope(
                 paths.append(path)
             scan.add(t, paths)
         by_name = {t["name"]: t for t in model["tables"]}
+        parent_keys: dict[tuple[str, str], str] = {}
         for t in sorted(TABLES):
             foreign_keys = by_name[t].get("foreign_keys", [])
             report("global_structural_references_started", table=t, relations=len(foreign_keys))
-            queries = _structural_references(scan, t, foreign_keys)
+            queries = _structural_references(
+                scan, t, foreign_keys, parent_keys=parent_keys,
+                subject_rule=t == "dwd_disclosure_subject",
+            )
             report("global_structural_references_verified", table=t,
                    relations=len(foreign_keys), bounded_child_queries=queries)
-        scan.reject(
-            "SELECT 1 FROM dwd_disclosure_subject WHERE "
-            "(CASE WHEN security_id IS NULL THEN 0 ELSE 1 END)+"
-            "(CASE WHEN corporate_action_id IS NULL THEN 0 ELSE 1 END)+"
-            "(CASE WHEN financial_report_id IS NULL THEN 0 ELSE 1 END)<>1 LIMIT 1",
-            "RELOCATION_SUBJECT_IDENTIFIER_CONSTRAINT",
-        )
     report("full_local_relocation_verified")
     receipt = {
         "status": "FULL_LOCAL_NATIVE_TYPED_RELOCATION_PASS_NOT_RAW_PIT_OR_BASE22",

@@ -488,7 +488,7 @@ def test_fused_structural_references_scan_children_once_against_global_parents(t
             pq.write_table(child.slice(i * 33, 33), p)
             paths.append(p)
         scan.add("child", paths)
-        plans, queries = [], []
+        plans, queries, parent_keys = [], [], {}
         reject = scan.reject
 
         def inspect(sql, reason):
@@ -499,11 +499,91 @@ def test_fused_structural_references_scan_children_once_against_global_parents(t
         scan.reject = inspect
         if defect in ["first", "second"]:
             with pytest.raises(BoundedError, match="RELOCATION_MODEL_FOREIGN_KEY_MISSING"):
-                _structural_references(scan, "child", refs)
+                _structural_references(scan, "child", refs, parent_keys=parent_keys)
         else:
-            _structural_references(scan, "child", refs)
+            _structural_references(scan, "child", refs, parent_keys=parent_keys)
         assert len(queries) == 2
         assert all("HASH_JOIN" in plan and "DELIM_JOIN" not in plan
                    and "BLOCKWISE_NL_JOIN" not in plan for plan in plans)
-        assert len(scan._reference_maps) == (1 if defect == "same_parent" else 2)
+        assert len(parent_keys) == (1 if defect == "same_parent" else 2)
+        assert not scan._reference_maps
         assert scan.connection.execute("SELECT count(*) FROM child").fetchone()[0] == n
+
+
+@pytest.mark.parametrize("bad", [None, "missing", "null", "two_subjects"])
+def test_compact_global_parent_keys_reused_and_subject_rule_preserved(tmp_path, bad):
+    from quanthus.pipelines.securities_warehouse.base22_bounded import GlobalScan
+    from quanthus.pipelines.securities_warehouse.base22_partition_relocation import (
+        _structural_references,
+    )
+    from tests.unit.test_base22_bounded import records
+
+    refs = [{"column": "security_id", "table": "parent", "reference_column": "key"}]
+    keys = {}
+    with (Budget(tmp_path / "job", [], Limits(batch_rows=1, free_floor_bytes=1)) as budget,
+          GlobalScan(budget) as scan):
+        parent = records((0, 1, 1, 2))
+        p = budget.root / "parent.parquet"
+        pq.write_table(parent, p)
+        scan.add("parent", [p])
+        for name in ["first", "second"]:
+            child = pa.table({"security_id": [0, 999 if bad == "missing" else 2],
+                              "corporate_action_id": pa.array(
+                                  [None, 1 if bad == "two_subjects" else None], pa.int64()),
+                              "financial_report_id": pa.array([None, None], pa.int64())})
+            if bad == "null":
+                child = child.set_column(0, "security_id", pa.array([0, None], pa.int64()))
+            path = budget.root / (name + ".parquet")
+            pq.write_table(child, path)
+            scan.add(name, [path])
+            if bad:
+                with pytest.raises(BoundedError, match="FOREIGN_KEY_MISSING|SUBJECT_IDENTIFIER"):
+                    _structural_references(scan, name, refs, parent_keys=keys, subject_rule=True)
+            else:
+                assert _structural_references(
+                    scan, name, refs, parent_keys=keys, subject_rule=True
+                ) == 1
+        assert len(keys) == 1
+        keymap = next(iter(keys.values()))
+        assert scan.connection.execute("SELECT count(*) FROM " + keymap).fetchone()[0] == 3
+        fields = [r[0] for r in scan.connection.execute("DESCRIBE " + keymap).fetchall()]
+        assert fields == ["parent_key"]
+        assert not scan._reference_maps  # no unused temporal-list materialization
+
+
+@pytest.mark.parametrize("bad", [None, "source", "row_id", "cutoff", "interval", "empty_registry"])
+def test_fused_lineage_cutoff_retains_shanghai_boundary_and_unknowns(tmp_path, bad):
+    from quanthus.pipelines.securities_warehouse.base22_bounded import GlobalScan
+    from quanthus.pipelines.securities_warehouse.base22_partition_relocation import (
+        _lineage_and_cutoff,
+    )
+
+    clock = datetime(2026, 8, 31, 15, 59, 59, 999999, tzinfo=timezone.utc)
+    row = {"effective_at": clock, "knowledge_from": clock, "knowledge_to": None,
+           "source_record_id": "synth", "record_source": "synthetic",
+           "source_revision": "one", "source_artifact_sha256": "sha256:" + "a" * 64}
+    admitted = [(row["record_source"], row["source_revision"], row["source_artifact_sha256"])]
+    if bad == "source":
+        row["source_revision"] = "unknown"
+    elif bad == "row_id":
+        row["source_record_id"] = ""
+    elif bad == "cutoff":
+        row["effective_at"] = datetime(2026, 8, 31, 16, tzinfo=timezone.utc)
+    elif bad == "interval":
+        row["knowledge_to"] = row["knowledge_from"]
+    elif bad == "empty_registry":
+        admitted = []
+    schema = pa.schema([(f, pa.timestamp("us", tz="UTC")) for f in
+                        ["effective_at", "knowledge_from", "knowledge_to"]] +
+                       [(f, pa.string()) for f in ["source_record_id", "record_source",
+                                                   "source_revision", "source_artifact_sha256"]])
+    with (Budget(tmp_path / "job", [], Limits(free_floor_bytes=1)) as budget,
+          GlobalScan(budget) as scan):
+        path = budget.root / "one.parquet"
+        pq.write_table(pa.Table.from_pylist([row], schema=schema), path)
+        scan.add("synthetic", [path])
+        if bad:
+            with pytest.raises(BoundedError, match="LINEAGE_OR_BUSINESS|SOURCE_CLOSURE_EMPTY"):
+                _lineage_and_cutoff(scan, "synthetic", admitted)
+        else:
+            _lineage_and_cutoff(scan, "synthetic", admitted)

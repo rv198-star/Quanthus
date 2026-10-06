@@ -443,3 +443,67 @@ def test_key_derived_month_checks_all_files_and_exact_versions(tmp_path, defect)
             else:
                 _month_keys(scan, "month", rule)
                 assert not list(scan.temp.rglob("*.parquet"))
+
+
+@pytest.mark.parametrize("defect", [None, "first", "second", "nullable", "same_parent"])
+def test_fused_structural_references_scan_children_once_against_global_parents(tmp_path, defect):
+    from quanthus.pipelines.securities_warehouse.base22_bounded import GlobalScan
+    from quanthus.pipelines.securities_warehouse.base22_partition_relocation import (
+        _structural_references,
+    )
+    from tests.unit.test_base22_bounded import records
+
+    n = 66
+    keys = list(reversed(range(n)))
+    other = keys if defect == "same_parent" else [k + 100 for k in keys]
+    if defect == "first":
+        keys[-1] = 999
+    elif defect == "second":
+        other[-1] = 999
+    elif defect == "nullable":
+        other[-1] = None
+    refs = [
+        {"column": "key", "table": "first_parent", "reference_column": "key"},
+        {
+            "column": "other",
+            "table": "first_parent" if defect == "same_parent" else "second_parent",
+            "reference_column": "key",
+        },
+    ]
+    with (
+        Budget(tmp_path / "job", [], Limits(batch_rows=1, free_floor_bytes=1)) as budget,
+        GlobalScan(budget) as scan,
+    ):
+        for table, start in [("first_parent", 0), ("second_parent", 100)]:
+            parent_paths = []
+            for i in range(2):
+                p = budget.root / f"{table}-{i}.parquet"
+                pq.write_table(records(tuple(range(start + i * 33, start + (i + 1) * 33))), p)
+                parent_paths.append(p)
+            scan.add(table, parent_paths)
+        child = records(tuple(keys)).append_column("other", pa.array(other, pa.int64()))
+        paths = []
+        for i in range(2):
+            p = budget.root / f"child-{i}.parquet"
+            pq.write_table(child.slice(i * 33, 33), p)
+            paths.append(p)
+        scan.add("child", paths)
+        plans, queries = [], []
+        reject = scan.reject
+
+        def inspect(sql, reason):
+            queries.append(sql)
+            plans.append(scan.connection.execute("EXPLAIN " + sql).fetchone()[1])
+            return reject(sql, reason)
+
+        scan.reject = inspect
+        if defect in ["first", "second"]:
+            with pytest.raises(BoundedError, match="RELOCATION_MODEL_FOREIGN_KEY_MISSING"):
+                _structural_references(scan, "child", refs)
+        else:
+            _structural_references(scan, "child", refs)
+        assert len(queries) == 2
+        assert all("HASH_JOIN" in plan and "DELIM_JOIN" not in plan
+                   and "BLOCKWISE_NL_JOIN" not in plan for plan in plans)
+        assert len(scan._reference_maps) == (1 if defect == "same_parent" else 2)
+        assert scan.connection.execute("SELECT count(*) FROM child").fetchone()[0] == n

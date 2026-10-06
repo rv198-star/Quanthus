@@ -11,6 +11,8 @@ import importlib
 import json
 import os
 import re
+import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -57,12 +59,57 @@ def _month_keys(scan: GlobalScan, name: str, rule: dict[str, Any]) -> None:
     )
 
 
-def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, Any]:
+def _structural_references(
+    scan: GlobalScan, name: str, foreign_keys: list[dict[str, Any]]
+) -> int:
+    """One bounded child scan checks every existing structural foreign key.
+
+    Every parent map contains its complete global key set with one row per key.
+    Combining left joins preserves each original nullable-reference test without
+    rereading each small physical child file once per foreign key. This remains
+    existence-only relocation verification, with no new PIT/interval authority.
+    """
+    if not foreign_keys:
+        return 0
+    joins, missing = [], []
+    for n, fk in enumerate(foreign_keys):
+        parent = scan._reference_map(fk["table"], fk["reference_column"])
+        alias = identifier("reference_parent_" + str(n))
+        column = "r." + identifier(fk["column"])
+        joins.append(f"LEFT JOIN {parent} {alias} ON {alias}.parent_key={column}")
+        missing.append(f"({column} IS NOT NULL AND {alias}.parent_key IS NULL)")
+    batches = scan._reference_batches(name)
+    child = "reference_child_" + name
+    for paths in batches:
+        scan.active_reference_batch = (name, tuple(paths))
+        scan.connection.read_parquet(
+            [str(p) for p in paths], hive_partitioning=False
+        ).create_view(child, replace=True)
+        scan.reject(
+            f"SELECT 1 FROM {identifier(child)} r " + " ".join(joins)
+            + " WHERE " + " OR ".join(missing) + " LIMIT 1",
+            "RELOCATION_MODEL_FOREIGN_KEY_MISSING",
+        )
+    return len(batches)
+
+
+def audit_relocation_scope(
+    root: Path, body: dict[str, Any], budget: Budget,
+    *, progress: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
     """Verify only local native typed relocation; archived source paths are strings.
 
     Original raw admission and historical PIT are explicitly outside this proof.
     The caller must pin the qualification descriptor digest independently.
     """
+    started = time.monotonic()
+
+    def report(stage: str, **counts: Any) -> None:
+        budget.check()
+        if progress:
+            progress({"stage": stage, "elapsed_seconds": time.monotonic() - started, **counts})
+
+    report("verify_scope_identity")
     if (
         body.get("contract_id") != CONTRACT_ID
         or body.get("identity") != digest({k: v for k, v in body.items() if k != "identity"})
@@ -80,6 +127,7 @@ def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> 
         budget.check()
         if file_sha(_physical(root, relative, independent=True)) != sha:
             raise BoundedError("RELOCATION_PHYSICAL_HASH_CHANGED")
+    report("complete_physical_hashes_verified", files=len(physical))
     contract, model, extension = load_contract(root / "contract")
     ss = schemas(model, extension)
     plans: set[str] = set()
@@ -137,6 +185,7 @@ def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> 
         p for p in physical if p.startswith("payload/")
     }:
         raise BoundedError("RELOCATION_EXACT_TYPED_FILE_SET_CHANGED")
+    report("complete_frozen_plan_receipt_census_verified", files=len(files))
     key_classes = 0
     with GlobalScan(budget, read_only_roots=[root]) as scan:
         for t, items in outputs.items():
@@ -158,6 +207,7 @@ def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> 
                         raise BoundedError("RELOCATION_SHANGHAI_PHYSICAL_MONTH_INVALID")
                     budget.check()
                 groups.setdefault(item["partition"], []).append(path)
+            report("typed_schema_month_verified", table=t, files=len(items), rows=totals[t])
             for paths in groups.values():
                 scan.connection.read_parquet(
                     [str(p) for p in paths], hive_partitioning=False
@@ -165,6 +215,7 @@ def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> 
                 _month_keys(scan, "relocated_keys", contract["tables"][t])
                 scan.connection.execute("DROP VIEW relocated_keys")
                 key_classes += 1
+            report("complete_global_key_versions_verified", table=t, classes=len(groups))
             scan.add(t, [_physical(root, o["path"], independent=True) for o in items])
             scan.lineage(t, [tuple(x) for x in body["inherited_native_lineage"][t]])
             scan.reject(
@@ -173,6 +224,7 @@ def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> 
                 "(knowledge_to IS NOT NULL AND knowledge_to<=knowledge_from) LIMIT 1",
                 "RELOCATION_BUSINESS_CUTOFF_OR_KNOWLEDGE_INTERVAL_INVALID",
             )
+            report("lineage_and_business_cutoff_verified", table=t)
         for t, items in body["parents"].items():
             paths = []
             for item in items:
@@ -183,10 +235,12 @@ def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> 
                 paths.append(path)
             scan.add(t, paths)
         by_name = {t["name"]: t for t in model["tables"]}
-        for t in TABLES:
-            for fk in by_name[t].get("foreign_keys", []):
-                child, parent, pk = fk["column"], fk["table"], fk["reference_column"]
-                scan.structural_reference(t, child, parent, pk)
+        for t in sorted(TABLES):
+            foreign_keys = by_name[t].get("foreign_keys", [])
+            report("global_structural_references_started", table=t, relations=len(foreign_keys))
+            queries = _structural_references(scan, t, foreign_keys)
+            report("global_structural_references_verified", table=t,
+                   relations=len(foreign_keys), bounded_child_queries=queries)
         scan.reject(
             "SELECT 1 FROM dwd_disclosure_subject WHERE "
             "(CASE WHEN security_id IS NULL THEN 0 ELSE 1 END)+"
@@ -194,6 +248,7 @@ def audit_relocation_scope(root: Path, body: dict[str, Any], budget: Budget) -> 
             "(CASE WHEN financial_report_id IS NULL THEN 0 ELSE 1 END)<>1 LIMIT 1",
             "RELOCATION_SUBJECT_IDENTIFIER_CONSTRAINT",
         )
+    report("full_local_relocation_verified")
     receipt = {
         "status": "FULL_LOCAL_NATIVE_TYPED_RELOCATION_PASS_NOT_RAW_PIT_OR_BASE22",
         "scope_identity": body["identity"],

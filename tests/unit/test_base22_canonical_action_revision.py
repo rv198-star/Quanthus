@@ -163,6 +163,9 @@ def test_new_source_version_keeps_old_entity_and_exact_atoms():
         "bad_number",
         "explicit_publication",
         "known_at_missing",
+        "raw_key_as_event_alias",
+        "raw_action_identity_changed",
+        "raw_action_identity_missing",
     ],
 )
 def test_unqualified_or_misbound_source_cannot_revise(mutation):
@@ -212,6 +215,17 @@ def test_unqualified_or_misbound_source_cannot_revise(mutation):
         candidate["announced_at"] = old["knowledge_from"]
     elif mutation == "known_at_missing":
         candidate["knowledge_from"] = None
+    elif mutation == "raw_key_as_event_alias":
+        old["corporate_action_id"] = _stable_id(
+            "corporate_action", "corporate_actions", raw["source_row_key"]
+        )
+        old["source_record_id"] = raw["source_row_key"]
+    elif mutation == "raw_action_identity_changed":
+        raw["action_id"] = "another-event"
+        binding["original_raw_row_sha256"] = digest(raw)
+    elif mutation == "raw_action_identity_missing":
+        del raw["action_id"]
+        binding["original_raw_row_sha256"] = digest(raw)
     with pytest.raises(BoundedError):
         project(c)
 

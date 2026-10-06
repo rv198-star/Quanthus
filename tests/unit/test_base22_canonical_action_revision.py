@@ -25,7 +25,7 @@ def case():
         "stock_code": "000001",
         "action_id": "original-action",
     }
-    aid = _stable_id("corporate_action", "corporate_actions", raw["source_row_key"])
+    aid = _stable_id("corporate_action", "corporate_actions", raw["action_id"])
     old = {
         "corporate_action_id": aid,
         "company_id": "company",
@@ -38,7 +38,7 @@ def case():
         "action_status": "IMPLEMENTED",
         "announced_at": old_clock,
         "record_source": "corporate_actions",
-        "source_record_id": raw["source_row_key"],
+        "source_record_id": raw["action_id"],
         "source_revision": "native-r13",
         "source_artifact_sha256": "sha256:" + "a" * 64,
         "knowledge_from": old_clock,

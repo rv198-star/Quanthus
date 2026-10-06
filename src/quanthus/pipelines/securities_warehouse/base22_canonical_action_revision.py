@@ -60,7 +60,9 @@ def revise_canonical_action(
     term IDs, real new knowledge time and explicit successor revision. Missing
     donor terms are left missing; a zero in another source cannot fill them.
     """
-    original_key = original_raw.get("source_row_key")
+    # The native model's materialize_corporate_action_rows prioritizes action_id.
+    # source_row_key is preserved raw provenance, not an alias for the event ID.
+    original_key = original_raw.get("action_id")
     if (
         not isinstance(original_key, str)
         or not original_key

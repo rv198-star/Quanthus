@@ -237,7 +237,7 @@ def audit_history_action_scope(root: Path, body: dict[str, Any], budget: Budget)
             raise BoundedError("SUCCESSOR_HISTORY_RAW_DUPLICATE_OR_BOUND_EXCEEDED")
         raw_index[row["action_id"]] = row
     wanted = {
-        _stable_id("corporate_action", "corporate_actions", raw_index[k]["source_row_key"]): k
+        _stable_id("corporate_action", "corporate_actions", raw_index[k]["action_id"]): k
         for k in chosen
     }
     quantity = donors["quantity"]

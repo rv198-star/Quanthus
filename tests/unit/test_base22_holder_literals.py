@@ -94,3 +94,22 @@ def test_explicit_missing_percentage_stays_null_without_becoming_zero(token):
     assert row["holding_percentage"] is None
     assert row["raw_holding_percentage"] == token
     assert proof["percentage_basis_counts"] == {"EXPLICIT_NULL": 1}
+
+
+@pytest.mark.parametrize("border", ["｜续名｜｜", "｜续名｜｜｜"])
+def test_empty_extra_borders_in_a_name_continuation_preserve_the_complete_name(border):
+    body = HOLDERS.replace("└", border + "\n└")
+    with pytest.raises(BoundedError, match="UNACCOUNTED"):
+        project(raw(body, "股东研究"))
+    rows, _ = literal(body)
+    row = rows["dwd_shareholding_observation"][0]
+    assert row["shareholder_source_name"] == "合成股东续名"
+    assert row["holding_quantity"] == Decimal("12345.67")
+    assert row["holding_percentage"] == Decimal("1.123456789012")
+
+
+def test_an_orphan_continuation_and_a_real_cell_never_become_empty_border_layout():
+    for line in ["｜孤立名称｜｜", "｜另一个股东｜｜1%｜"]:
+        body = HOLDERS.replace("｜合成股东｜", line + "\n｜合成股东｜")
+        with pytest.raises(BoundedError, match="HOLDER_LITERAL"):
+            literal(body)

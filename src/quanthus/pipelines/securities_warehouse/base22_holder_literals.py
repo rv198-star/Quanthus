@@ -69,7 +69,14 @@ def _holder_view(content: str) -> tuple[str, list[dict[str, Any]]]:
             if current is not None:
                 finish()
                 current = None
-            selected.append(line)
+            # The legacy lexical parser already strips empty outer borders and
+            # joins this name continuation. Normalize only empty layout cells
+            # for the independent census too; real cells and orphan names still
+            # fail its active-matrix/pending-row checks.
+            if 1 < len(cells) < 4 and cells[0] and not any(cells[1:]):
+                selected.append("｜" + cells[0] + "｜")
+            else:
+                selected.append(line)
     finish()
     return "\n".join(selected), separate
 

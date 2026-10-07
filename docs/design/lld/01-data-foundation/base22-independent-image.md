@@ -593,3 +593,16 @@ handled separately before full category/domain acceptance. Original bytes and
 acquisition remain unchanged. Frozen ownership modules and old qualification
 receipts are preserved; this adapter alone grants no native union, historical
 PIT, complete August closure or consumer admission.
+
+`base22_holder_floor_revision.py` defines the separate
+`p10-holder-parent-floor-repair-v2` transition. It requires the exact holder
+business/version keys, at most 128 native keys, and 2..8 real captures from one
+provider, stock and category. Every capture must reproduce the complete selected
+key set; the original native body and source identity must reproduce exactly.
+Exactly one changed capture can precede the shared parent floor, and all later
+retained bodies must agree. Unknown clocks, denominators, identities or later
+conflicts block qualification. The old native row remains and is closed only at
+the real new governance clock; its original literal basis is retained. A repaired
+row has a new contract/closure identity and grants no old acceptance, historical
+PIT, complete category coverage or consumer admission. Its independent replay
+binds typed originals, raw sources and the exact canonical input artifact.

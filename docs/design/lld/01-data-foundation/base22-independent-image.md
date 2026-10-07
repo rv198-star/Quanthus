@@ -690,3 +690,24 @@ Separate nonempty change blocks likewise remain unqualified. The new profile
 changes no frozen projector, native history or consumer gate. Native conflict
 qualification and knowledge-version repair are required before any source atom
 enters a complete domain/image; this source scope does not grant August closure.
+
+`p10-base22-holder-original-column-text-restoration-v1` is a bounded successor
+for selected native keys whose original raw text reproduces the exact old native
+body under the frozen parser. The column parser must restore exactly one
+classification field; all numerical cells and other body fields stay unchanged.
+Every retained later same-provider observation must agree with the restored
+original, and original plus later actual acquisitions provide distinct witnesses.
+The new version begins at the actual governance observation; the original atom
+is retained with only its knowledge interval closed. Conflicting later bodies,
+unknown acquisition, missing original closure or numerical changes stay held.
+
+The stage graph is frozen selection and full source hashes -> independent local
+raw/identity/selected-native/selected-weekly TMP -> one replay per selected stock
+-> exact qualified old/new pairs and explicit held keys. All in-job consumers
+share this TMP. The scoped output owns its evidence and has no external paths
+to dereference. Its offline verifier repeats original and weekly parsing, source
+clock closure, exact group census and serialized atoms under the complete code
+closure. Two moves, native source/network denial and disposable faults remain
+required. This selected repair output does not publish a complete native union,
+qualify separate holder-change/comment domains, admit historical PIT or release
+the complete August image. Those gates remain independent and fail closed.

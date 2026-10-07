@@ -57,7 +57,11 @@ def parse_literal_label_cash(
     # The predecessor allows an omitted day suffix. It must not interpret the
     # first two digits of a malformed three-digit day as a matching date here.
     for match in _EX_DATE.finditer(normalized):
-        if match.end() < len(normalized) and normalized[match.end()].isdigit():
+        if (
+            not match[0].endswith("日")
+            and match.end() < len(normalized)
+            and normalized[match.end()].isdigit()
+        ):
             raise BoundedError("NOTICE_LITERAL_LABEL_DATE_TOKEN_BOUNDARY_INVALID")
     atom = parse_adjusted_current_scheme_cash(
         viewed, stock_code=stock_code, ex_date=ex_date, publisher_title=publisher_title

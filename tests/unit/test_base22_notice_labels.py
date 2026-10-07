@@ -111,6 +111,12 @@ def test_extra_literal_profile_is_explicit_and_default_remains_frozen():
     assert evidence["contract_id"] == CONTRACT_ID
 
 
+def test_complete_day_suffix_separates_a_following_numbered_heading():
+    body = text().replace("除权除息日", "除权（除息）日")
+    body += "\n3.现金红利发放办法"
+    assert parse(body)["cash_per_share"] == Decimal("0.15")
+
+
 def test_label_atom_keeps_exact_before_versions_and_real_acquisition():
     from tests.unit.test_base22_notice_restatement import case, project
 

@@ -606,3 +606,19 @@ the real new governance clock; its original literal basis is retained. A repaire
 row has a new contract/closure identity and grants no old acceptance, historical
 PIT, complete category coverage or consumer admission. Its independent replay
 binds typed originals, raw sources and the exact canonical input artifact.
+
+`base22_holder_rolling_revision.py` adds the separate opt-in
+`p10-holder-four-frame-floor-repair-v3` successor; v2 and its receipts remain
+unchanged. This exact scope requires 80 native atoms and three or more real
+same-provider captures. Every capture must publish four dated frames, both
+top-ten types and ranks 1..10. A changed window may replace only its oldest
+frame with a newer frame and retain the other three dates. Retained frames
+require the same exact business keys. A selected older key may be absent only
+before the oldest fully published date; absence is neither deletion, zero nor
+no-change evidence. At least two real later captures must agree on each repair.
+The original source/body/floor reproduces exactly, later present bodies must
+agree, and all original clocks and literal bases remain archived. Newer-window
+atoms are separately reported; this repair does not qualify their native union
+or the separate nonempty change-table domain. Old native versions close only
+at the actual new governance clock. Full local raw/typed replay, exact whole
+group census, complete input bytes and global union checks remain required.

@@ -296,7 +296,8 @@ def test_extra_sources_replay_original_members_and_only_originally_held_captures
             if n in {3, 4} and defect != "accepted-duplicate":
                 body_text = (
                     r["content"].removesuffix("└")
-                    + "｜变动日期｜股东名称｜持股数｜变动股数｜变动后｜变动后占｜变动类型｜\n｜2026-08-01｜另一个合成法人｜1万｜-1万｜0｜0%｜变动｜\n└"
+                    + "｜变动日期｜股东名称｜持股数｜变动股数｜变动后｜变动后占｜变动类型｜\n"
+                    + "｜2026-08-01｜另一个合成法人｜1万｜-1万｜0｜0%｜变动｜\n└"
                 )
                 r = raw(body_text, "股东研究")
                 r["acquired_at"] = s["raw"]["acquired_at"]

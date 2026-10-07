@@ -495,3 +495,14 @@ receive held dispositions without static alias backfill. Decimal values, origina
 and timestamp instants survive typed serialization. Whole-category scope, cross-file global
 versions, raw replay, native union and independent cold acceptance remain separate gates.
 Tests are in `test_base22_f10_ownership.py`; an empty or partial output cannot establish coverage.
+
+`base22_ownership_audit.py` replays every archived raw category and its safe disposition using
+the same deterministic partition sink as construction. One outer table border is removed;
+empty interior columns retain their position. Empty layout rows cannot hide unnamed numeric
+cells. Original Decimal values, nulls and clocks are compared against actual Parquet atoms,
+then physical inventory and column summaries are recomputed. Repacked hashes cannot replace
+this comparison. Each sink holds at most 8,192 rows and writes at most 2,048 rows per shard.
+The source-observation scope explicitly leaves native union, global knowledge-version closure
+and whole-domain coverage unqualified. Percentage qualifiers such as `占A股` retain their raw
+meaning and remain held until their denominator contract is qualified; the legacy `PERCENT`
+vocabulary is not silently expanded. Regressions are in `test_base22_ownership_audit.py`.

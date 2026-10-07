@@ -670,3 +670,23 @@ held. Exact local physical inventory/schema/rows/atoms/summaries and two cold
 moves are source-scope acceptance only. Native versions/global keys/FK/lineage,
 complete August coverage, raw category closure and final whole-image acceptance
 remain explicit downstream gates; no default frozen ownership module is changed.
+
+The separate `p10-base22-weekly-column-ownership-source-v3` profile uses
+`base22_holder_column_continuation.py` only for exact retained five-column
+holder headers (plus the unchanged four-column synthetic contract). A text-only
+continuation in column three is joined to the preceding numeric row's original
+classification; an optional column-zero name fragment joins the same row.
+Every modeled quantity/percentage cell remains byte-exact in an ordered ledger,
+with exact typed Decimal and true clock checks. Numeric continuation, unknown or
+truncated header, orphan text and empty-name numeric rows remain fail-closed;
+no shareholder identity or share-class priority is inferred.
+
+The immutable raw/parent TMP feeds one source projection and explicit accounting,
+then all consumers share that scoped output. The offline column auditor replays
+all local raw, every typed shard, held disposition and continuation count under
+independent cold mode. Nonempty `增减情况(股)` cells have source-cell hash/count
+and NOT_GRANTED admission; they do not become modeled shareholding changes.
+Separate nonempty change blocks likewise remain unqualified. The new profile
+changes no frozen projector, native history or consumer gate. Native conflict
+qualification and knowledge-version repair are required before any source atom
+enters a complete domain/image; this source scope does not grant August closure.

@@ -25,6 +25,7 @@ from .base22_cash_restatement import _scan_cash_global
 from .base22_financial import _clock
 from .base22_notice_action import CONTRACT_ID as PARSER_CONTRACT
 from .base22_notice_action import select_notice_cash_candidates
+from .base22_notice_adjustment import CONTRACT_ID as ADJUSTMENT_CONTRACT
 from .base22_notice_scheme import CONTRACT_ID as SCHEME_CONTRACT
 from .base22_precision import decimal_profile
 from .base22_sources import _tree
@@ -68,7 +69,8 @@ def restate_notice_cash(
         or raw.get("progress") != "实施"
         or before.get("action_type") != "CASH_DIVIDEND"
         or before.get("action_status") != "IMPLEMENTED"
-        or notice_atom.get("contract_id") not in {PARSER_CONTRACT, SCHEME_CONTRACT}
+        or notice_atom.get("contract_id")
+        not in {PARSER_CONTRACT, SCHEME_CONTRACT, ADJUSTMENT_CONTRACT}
         or notice_atom.get("stock_code") != raw.get("stock_code")
         or notice_atom.get("ex_date") != raw["ex_date"]
         or notice_atom.get("currency") != "CNY"

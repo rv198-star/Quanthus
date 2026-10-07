@@ -68,3 +68,24 @@ def test_unrelated_old_plan_or_global_guard_failure_cannot_grant_priority(defect
         text = text.replace("变更为每10股", "变更为每100股")
     with pytest.raises(RuntimeError):
         parse(text)
+
+
+def test_profile_is_explicit_and_the_default_still_rejects_conflicting_old_rate():
+    from quanthus.pipelines.securities_warehouse.base22_notice_action import (
+        select_notice_cash_candidates,
+    )
+    from quanthus.pipelines.securities_warehouse.base22_notice_adjustment import CONTRACT_ID
+
+    target = {"action_id": "synthetic", "stock_code": "002001", "ex_date": "2026-07-10"}
+    doc = {
+        "document_id": "synthetic-doc",
+        "target_action_ids": ["synthetic"],
+        "publisher_title": "2025年度权益分派实施公告",
+        "publisher_security_code": "002001",
+        "text": notice(),
+    }
+    selected, _ = select_notice_cash_candidates([target], [doc])
+    assert selected == {}
+    selected, evidence = select_notice_cash_candidates([target], [doc], parser_profile=CONTRACT_ID)
+    assert selected["synthetic"]["atom"]["cash_per_share"] == Decimal("0.117")
+    assert evidence["contract_id"] == CONTRACT_ID

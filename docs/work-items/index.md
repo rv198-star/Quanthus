@@ -15,6 +15,16 @@ recover/repair data. The reviewed live routing inventory is `config/data-ownersh
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03 | open epic |
+| P10-DATA-BASE22-000 | Base 2.2 独立基准镜像：领域闭合、隔离构建与最终验收 | P10-DATA-000; [four-principle programme](base22-build.md) | open finite programme; #480; complete candidate/acceptance pending |
+| P10-DATA-BASE22-010 | 闭合剩余公司行动60键并物化完整领域修复 | P10-DATA-BASE22-000 | #481; 60 original keys remain |
+| P10-DATA-BASE22-020 | 闭合股东208冲突及weekly非空领域并完成原生合并 | P10-DATA-BASE22-000 | #482; 208 conflicts and source-domain closure remain |
+| P10-DATA-BASE22-030 | 闭合normalization原证据或有资格完整新revision | P10-DATA-BASE22-010; legacy #471 retained | #483; exact original evidence/full successor pending |
+| P10-DATA-BASE22-040 | 补齐42个August分钟release原始价格口径证据 | P10-DATA-BASE22-000; legacy #473 retained | #484; 42 releases have missing original metadata |
+| P10-DATA-BASE22-050 | 闭合权威August日历、上市身份和状态生命周期 | P10-DATA-BASE22-000 | #485; whole-market evidence pending |
+| P10-DATA-BASE22-060 | 完成精确33表August覆盖账本与领域集成 | P10-DATA-BASE22-010, P10-DATA-BASE22-020, P10-DATA-BASE22-030, P10-DATA-BASE22-040, P10-DATA-BASE22-050 | #486; independent qualified integration may continue |
+| P10-DATA-BASE22-070 | 冻结完整预算并构建CN02实体独立候选 | P10-DATA-BASE22-060 | #487; full candidate not built |
+| P10-DATA-BASE22-080 | 完成整份镜像两次独立冷验收和损坏负测 | P10-DATA-BASE22-070 | #488; whole-image acceptance not run |
+| P10-DATA-BASE22-090 | 准备精确版本发布、同步和回滚方案 | P10-DATA-BASE22-080 for final identity | #489; preparation only, production execution requires Owner confirmation |
 
 #424 keeps its subgroup scope and execution gates. P3 #412 and P5 #402 retain input admission,
 research and explicit business disposition; source recovery/repair belongs to P10. They may

@@ -144,15 +144,18 @@ def select_notice_cash_candidates(
     """
     from .base22_notice_adjustment import CONTRACT_ID as ADJUSTMENT_CONTRACT
     from .base22_notice_adjustment import parse_adjusted_current_scheme_cash
+    from .base22_notice_labels import CONTRACT_ID as LABEL_CONTRACT
+    from .base22_notice_labels import parse_literal_label_cash
     from .base22_notice_scheme import CONTRACT_ID as SCHEME_CONTRACT
     from .base22_notice_scheme import parse_current_scheme_cash
 
-    if parser_profile not in {CONTRACT_ID, SCHEME_CONTRACT, ADJUSTMENT_CONTRACT}:
+    if parser_profile not in {CONTRACT_ID, SCHEME_CONTRACT, ADJUSTMENT_CONTRACT, LABEL_CONTRACT}:
         raise BoundedError("NOTICE_VERSIONED_PARSER_PROFILE_UNKNOWN")
     parser = {
         CONTRACT_ID: parse_implemented_notice_cash,
         SCHEME_CONTRACT: parse_current_scheme_cash,
         ADJUSTMENT_CONTRACT: parse_adjusted_current_scheme_cash,
+        LABEL_CONTRACT: parse_literal_label_cash,
     }[parser_profile]
     indexed = {r["action_id"]: r for r in targets}
     if len(indexed) != len(targets) or not 0 < len(targets) <= 256:

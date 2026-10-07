@@ -26,6 +26,7 @@ from .base22_financial import _clock
 from .base22_notice_action import CONTRACT_ID as PARSER_CONTRACT
 from .base22_notice_action import select_notice_cash_candidates
 from .base22_notice_adjustment import CONTRACT_ID as ADJUSTMENT_CONTRACT
+from .base22_notice_labels import CONTRACT_ID as LABEL_CONTRACT
 from .base22_notice_pdf import CONTRACT_ID as PDF_CONTRACT
 from .base22_notice_pdf import decode_proven_notice
 from .base22_notice_scheme import CONTRACT_ID as SCHEME_CONTRACT
@@ -72,7 +73,7 @@ def restate_notice_cash(
         or before.get("action_type") != "CASH_DIVIDEND"
         or before.get("action_status") != "IMPLEMENTED"
         or notice_atom.get("contract_id")
-        not in {PARSER_CONTRACT, SCHEME_CONTRACT, ADJUSTMENT_CONTRACT}
+        not in {PARSER_CONTRACT, SCHEME_CONTRACT, ADJUSTMENT_CONTRACT, LABEL_CONTRACT}
         or notice_atom.get("stock_code") != raw.get("stock_code")
         or notice_atom.get("ex_date") != raw["ex_date"]
         or notice_atom.get("currency") != "CNY"

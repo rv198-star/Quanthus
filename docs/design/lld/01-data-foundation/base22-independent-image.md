@@ -568,3 +568,14 @@ Original acquisitions remain unchanged in local raw evidence. The offline union 
 requalifies this exact transition, requires the entire original group and consumes every
 declared repair. This grants neither historical PIT nor whole-domain/consumer acceptance.
 Tests are in `test_base22_ownership_floor_revision.py`.
+
+`base22_notice_labels.py` adds the explicit
+`p10-base22-issuer-literal-field-labels-v4` parser profile. It recognizes only the
+spelled-out `除权(除息)日` label and identical repeated security-code labels.
+The original PDF/text remains immutable; a hashed parser view preserves every
+numeric token in order, then runs the complete predecessor implementation,
+identity, date, currency, gross-cash and current-scheme guards. Malformed
+three-digit days fail instead of being parsed as a matching prefix. This profile
+does not resolve cash conflicts, security classes, unknown times or unlabelled
+tables. Default legacy parsing remains unchanged. The scoped offline verifier
+reproduces this profile from the local original PDF before accepting any output.

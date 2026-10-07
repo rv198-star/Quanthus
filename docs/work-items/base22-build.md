@@ -123,6 +123,14 @@ A 股实施方案读取明示人民币含税现金，保留原证券与除息日
 金额被忽略而仅识别旧计划。数字序列保持，日期和金额不计算、不补造；残缺表头、
 冲突日期、税后/外币及同一当前范围内冲突现金继续拒绝。V6/V7 冻结行为及默认入口不变。
 
+#481 的 opt-in `p10-base22-literal-current-and-declared-combined-cash-v10` 由
+`base22_notice_literal_statement.py` 定义。V9 已合格原子保持，补充完整当前实施句子和
+明示合并实施方案的原生标签；仅读取明确含税人民币每股或每十股金额。不是选择最后/
+最大金额，不按历史分项求和。存在明示合并实施方案时，其来源声明与各分项区分；
+董事会旧计划保留为原始证据。截断句子、币种未知、其他当前调整、不同当前声明、
+差异化股东权益或未经明确排除的境外范围仍拒绝。完整 primary 一致性与全部原始
+数值/日期/时刻的无损保存保持；该 opt-in profile 不改变默认现金解析入口。
+
 #481 的候选 `p10-base22-primary-issuer-literal-class-terms-revision-v1` 使用
 `config/pipelines/base22-issuer-class-terms.v1.json`、`base22_notice_class_terms.py`
 和 `base22_notice_class_revision.py`。正文明确、完整且相互一致的实施条款可以按原始

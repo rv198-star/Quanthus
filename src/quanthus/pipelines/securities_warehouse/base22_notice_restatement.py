@@ -32,6 +32,8 @@ from .base22_notice_domestic_scope import CONTRACT_ID as DOMESTIC_SCOPE_CONTRACT
 from .base22_notice_equivalent_scope import CONTRACT_ID as EQUIVALENT_SCOPE_CONTRACT
 from .base22_notice_implementation_labels import CONTRACT_ID as IMPLEMENTATION_LABEL_CONTRACT
 from .base22_notice_labels import CONTRACT_ID as LABEL_CONTRACT
+from .base22_notice_literal_statement import CONTRACT_ID as LITERAL_STATEMENT_CONTRACT
+from .base22_notice_literal_statement import select_literal_cash_candidates
 from .base22_notice_pdf import CONTRACT_ID as PDF_CONTRACT
 from .base22_notice_pdf import decode_proven_notice
 from .base22_notice_scheme import CONTRACT_ID as SCHEME_CONTRACT
@@ -88,6 +90,7 @@ def restate_notice_cash(
             EQUIVALENT_SCOPE_CONTRACT,
             DATE_LAYOUT_CONTRACT,
             DOMESTIC_SCOPE_CONTRACT,
+            LITERAL_STATEMENT_CONTRACT,
         }
         or notice_atom.get("stock_code") != raw.get("stock_code")
         or notice_atom.get("ex_date") != raw["ex_date"]
@@ -362,11 +365,12 @@ def audit_notice_restatement_scope(
             }
         )
         budget.check()
-    selected, selection = select_notice_cash_candidates(
-        targets,
-        documents,
-        parser_profile=body.get("parser_profile", PARSER_CONTRACT),
-    )
+    if body.get("parser_profile") == LITERAL_STATEMENT_CONTRACT:
+        selected, selection = select_literal_cash_candidates(targets, documents)
+    else:
+        selected, selection = select_notice_cash_candidates(
+            targets, documents, parser_profile=body.get("parser_profile", PARSER_CONTRACT)
+        )
     if selection != body["selection_evidence"]:
         raise BoundedError("NOTICE_RESTATEMENT_RECOMPUTED_SELECTION_CHANGED")
     if set(body["bindings"]) != set(selected):

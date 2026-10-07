@@ -636,3 +636,15 @@ conflicts outside the explicit repair still fail, and the offline verifier
 reconstructs all output shards and full selected lineage/FK/interval checks.
 Raw nonempty change blocks and other predecessor category holds remain separate
 unqualified gates; a valid union does not establish whole-August coverage.
+
+`base22_notice_implementation_labels.py` adds explicit opt-in
+`p10-base22-issuer-company-implementation-label-v5`. Only a literal
+company/year `权益分派实施方案` declaration label is equivalent to its
+already-implemented company scheme label. The hashed parser view preserves
+every numeric token and runs the full predecessor identity/date/currency,
+current-section, gross-cash and exact-precision guards. It does not combine
+annual/interim schemes, select a conflicting amount, treat a proposal as
+implementation or grant source priority. Original text and actual acquisition
+remain bound; the original default and earlier parser profiles are preserved.
+Offline notice replay must opt into this profile and reconstruct the atom
+from the local original PDF, before any typed restatement or native merge.

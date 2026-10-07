@@ -102,7 +102,11 @@ def version_batches(
                 if len(rows) >= MAX_VERSIONS_PER_KEY:
                     raise BoundedError("OWNERSHIP_VERSION_GROUP_BOUND_INVALID")
                 rows.append(row)
-            budget.check()
+            # The background monitor and each Arrow/write batch perform the
+            # complete physical census. Do not rescan thousands of archived
+            # files for every business key; propagate any monitored breach now.
+            if budget.error:
+                raise BoundedError(budget.error)
             yield ownership_versions(rows, rule)
 
 

@@ -46,6 +46,9 @@ REPLAY_MODULES = (
     "base22_notice_pdf.py",
     "base22_notice_action.py",
     "base22_notice_current_scope.py",
+    "base22_notice_implementation_labels.py",
+    "base22_notice_labels.py",
+    "base22_notice_adjustment.py",
     "base22_notice_scheme.py",
     "disclosure_event.py",
 )
@@ -304,6 +307,7 @@ def audit_class_revision_scope(root: Path, body: dict[str, Any], budget: Budget)
         or registration["identity"] != body["registration_identity"]
         or registration["UTC"] != body["observed_at"]
         or registration["exact_targets"] != sorted(t["action_id"] for t in body["targets"])
+        or registration["exact_documents"] != sorted(d["document_id"] for d in body["documents"])
     ):
         raise BoundedError("CLASS_REVISION_FROZEN_SELECTION_CHANGED")
 
@@ -322,6 +326,18 @@ def audit_class_revision_scope(root: Path, body: dict[str, Any], budget: Budget)
 
     targets = body["targets"]
     ids = {t["action_id"] for t in targets}
+    original_selection = json.loads(
+        (root / "evidence/frozen-document-target-selection-safe.json").read_bytes()
+    )
+    if digest(original_selection) != registration["document_target_selection_sha256"]:
+        raise BoundedError("CLASS_REVISION_ORIGINAL_DOCUMENT_SELECTION_CHANGED")
+    expected_documents = {
+        d["document_id"]: sorted(set(d["target_action_ids"]) & ids)
+        for d in original_selection
+        if set(d["target_action_ids"]) & ids
+    }
+    if expected_documents != {d["document_id"]: d["target_action_ids"] for d in body["documents"]}:
+        raise BoundedError("CLASS_REVISION_COMPLETE_ORIGINAL_DOCUMENT_SET_CHANGED")
     rr = [r for r in rows(body["raw_member"]) if r["action_id"] in ids]
     raw = {r["action_id"]: r for r in rr}
     br = rows(body["before"][TABLES[0]])

@@ -123,6 +123,23 @@ A 股实施方案读取明示人民币含税现金，保留原证券与除息日
 金额被忽略而仅识别旧计划。数字序列保持，日期和金额不计算、不补造；残缺表头、
 冲突日期、税后/外币及同一当前范围内冲突现金继续拒绝。V6/V7 冻结行为及默认入口不变。
 
+#481 的候选 `p10-base22-primary-issuer-literal-class-terms-revision-v1` 使用
+`config/pipelines/base22-issuer-class-terms.v1.json`、`base22_notice_class_terms.py`
+和 `base22_notice_class_revision.py`。正文明确、完整且相互一致的实施条款可以按原始
+股东类别分别生成含税人民币每股现金项；每个类别的明示零值也保留。不以虚拟除息额、
+平均现金、补偿算式或其他类别的金额充当一般现金项，不推断实际股东成员或上市券类别。
+候选 `term_type` 以 `SOURCE_CLASS_GROSS_CASH_` 加明示来源角色区分，物理 schema
+保持；类别不是选项，`option_id` 仍为空。精确旧 action/term 只关闭知识区间，新增
+完整类别组使用真实治理时间，旧原子保留；未知公告时刻与非现金项不补造。
+逐键所有 retained primary 正文必须可裁定且一致，不能只挑一份成功正文。
+本地 PDF、publisher 回复、实际 acquisition、raw/before、配置、代码、身份父表与
+允许变更集合随实体封存；两次冷验收重新从本地 PDF 构建全部条款并验 schema、键、
+知识区间、外键、来源与规范化摘要。全镜像集成及消费者准入仍为独立门槛。
+
+股东分项完整性只认可原文实际关闭边框。此前解析视图为分离变化表插入的边界仅用于
+诊断，不能替代真实完整矩阵；缺物理结束、未知非空行均 held。姓名折行可含原表
+布局空列，不添加数字或排名。每次该语义改变重新物化和重放受影响的分项来源及迁移。
+
 ## Current recovery checkpoint
 
 工作区 `/root/Quanthus/.worktrees/base22-standalone`；分支 `codex/base22-standalone`。

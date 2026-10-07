@@ -124,11 +124,13 @@ def _matrix(lines: list[str], *, floating: bool) -> tuple[list[dict[str, Any]], 
             header = cells
             continue
         if not cells or not any(cells):
+            if header is not None and line.strip() and not line.strip().startswith(("├", "┌", "│")):
+                raise BoundedError("HOLDER_COMPONENT_NONEMPTY_ROW_UNACCOUNTED")
             # A separator closes adjacency; empty layout cells do not name a holder.
             if groups and line.strip().startswith(("├", "┌", "└")):
                 previous_numeric = False
             continue
-        if header is None or len(cells) not in {len(header), 1}:
+        if header is None:
             raise BoundedError("HOLDER_COMPONENT_NONEMPTY_ROW_UNACCOUNTED")
         numeric = len(cells) == len(header) and _QUANTITY.fullmatch(cells[1].replace(",", ""))
         if numeric:
@@ -164,7 +166,7 @@ def _matrix(lines: list[str], *, floating: bool) -> tuple[list[dict[str, Any]], 
             if len(header) == 5 and cells[4]:
                 comments.append(digest(cells[4]))
             previous_numeric = True
-        elif groups and cells[0] and (len(cells) == 1 or not any(cells[1:])):
+        elif groups and cells[0] and not any(cells[1:]):
             for row in groups[-1]:
                 row["name"] += cells[0]
             wraps += 1
@@ -238,8 +240,11 @@ def project_holder_components(
     ):
         raise BoundedError("HOLDER_COMPONENT_RAW_OR_CONTRACT_BINDING_INVALID")
     acquisition = _clock(raw.get("acquired_at"))
-    view, separate = _holder_view(content)
-    lines = view.splitlines()
+    _, separate = _holder_view(content)
+    # The predecessor view inserts a synthetic closing marker at an unrelated
+    # change header. It is diagnostic only here: completeness needs the actual
+    # original physical closing border, not a parser-view marker.
+    lines = content.splitlines()
     starts = [n for n, line in enumerate(lines) if _DATE.search(line)]
     if not starts or len(starts) > 256:
         raise BoundedError("HOLDER_COMPONENT_NO_DATED_MATRIX_OR_BOUND_EXCEEDED")

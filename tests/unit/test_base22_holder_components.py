@@ -121,6 +121,14 @@ def test_partial_tail_cannot_be_granted_but_previous_complete_matrix_is_accounte
     assert proof["whole_category"] == "HELD"
 
 
+def test_separate_change_header_is_not_a_real_closing_border():
+    rows, proof = project(
+        BODY.removesuffix("└") + "｜日期｜股东名称｜持股数｜变动股数｜变动后｜变动比例｜备注｜"
+    )
+    assert rows[TABLE] == []
+    assert proof["frames"][0]["reason"] == "HOLDER_COMPONENT_MATRIX_INCOMPLETE"
+
+
 def test_floating_category_does_not_inherit_a_blank_numeric_share_class():
     rows, proof = project(BODY.replace("十大股东情况", "十大流通股东情况"))
     assert rows[TABLE] == []

@@ -76,6 +76,11 @@ Base 2.2 是完整、修复后的实体镜像，业务日期 Asia/Shanghai <=202
 本地闭包离线重算；全局精确选择、schema 和序列化原子必须匹配。
 上述是有界领域规则，不代表所有 weekly 非空类别或完整 Base 2.2 已验收。
 
+#481 的后继 `p10-base22-explicit-equivalent-company-scope-v7` 保留 V6 行为，另处理
+正文明确的“方案的实施调整为”、同义季度/分配标签、相同代码的带原始空白重复打印，
+及四列标签齐全的交易所日期表换行。完整数字序列、原期间及日期保留；未知标签、
+不同证券重复、缺列/冲突日期和分别声明的多期金额仍拒绝，不求和、不添加身份或时间。
+
 ## Current recovery checkpoint
 
 工作区 `/root/Quanthus/.worktrees/base22-standalone`；分支 `codex/base22-standalone`。

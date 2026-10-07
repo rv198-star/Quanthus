@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import subprocess
 import xml.etree.ElementTree as ET
+from collections import Counter
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -27,10 +28,29 @@ def clean_proven_page_footers(layout: str, bbox: str) -> tuple[str, dict[str, An
     """Preserve all characters except exactly proven isolated footer digits."""
     if len(layout.encode()) > MAX_TEXT_BYTES or len(bbox.encode()) > MAX_BBOX_BYTES:
         raise BoundedError("NOTICE_PDF_DECODE_BYTE_BOUND_INVALID")
+    # Poppler can emit a retained font control glyph as literal U+0001 inside
+    # word text, which XML 1.0 cannot parse. Keep it exactly, including in layout;
+    # only shield it while parsing markup. Controls in geometry/markup still fail.
+    marker = "P10_NOTICE_LITERAL_XML_CONTROL_"
+    if marker in bbox:
+        raise BoundedError("NOTICE_PDF_BBOX_CONTROL_MARKER_COLLISION")
+    controls = Counter(re.findall(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", bbox))
+    shielded = re.sub(
+        r"[\x00-\x08\x0b\x0c\x0e-\x1f]", lambda m: marker + format(ord(m[0]), "04X") + "_END", bbox
+    )
     try:
-        root = ET.fromstring(bbox)
+        root = ET.fromstring(shielded)
     except ET.ParseError:
         raise BoundedError("NOTICE_PDF_BBOX_UNREADABLE") from None
+    for element in root.iter():
+        if any(marker in v for v in element.attrib.values()) or marker in (element.tail or ""):
+            raise BoundedError("NOTICE_PDF_BBOX_CONTROL_OUTSIDE_WORD_TEXT")
+        if marker in (element.text or ""):
+            if element.tag != "{" + _NS["p"] + "}word":
+                raise BoundedError("NOTICE_PDF_BBOX_CONTROL_OUTSIDE_WORD_TEXT")
+            element.text = re.sub(
+                marker + r"([0-9A-F]{4})_END", lambda m: chr(int(m[1], 16)), element.text or ""
+            )
     pages = root.findall(".//p:page", _NS)
     chunks = layout.split("\f")
     if chunks and not chunks[-1].strip():
@@ -104,6 +124,9 @@ def clean_proven_page_footers(layout: str, bbox: str) -> tuple[str, dict[str, An
         "removed_footer_digit_count": sum(len(str(n)) for n in removed),
         "body_digits_changed": False,
         "body_order_changed": False,
+        "retained_XML_control_glyphs": {
+            "U+" + format(ord(c), "04X"): n for c, n in controls.items()
+        },
         "footer_geometry": {str(n): [str(v) for v in candidates[n][2]] for n in removed},
         "historical_time_or_value_inference": False,
     }

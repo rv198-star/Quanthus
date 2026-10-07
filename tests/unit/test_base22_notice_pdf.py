@@ -71,3 +71,18 @@ def test_body_number_equal_to_page_number_at_another_location_is_preserved():
     cleaned, proof = clean_proven_page_footers(text, bbox())
     assert "重要数量\n1\n" in cleaned and "其它数量2\n" in cleaned
     assert proof["removed_page_footers"] == [1, 2]
+
+
+def test_poppler_control_glyph_in_word_is_retained_without_losing_other_body_digits():
+    text = "body\x01数量1.230000\n1\n\fbody\n2\n\f"
+    xml = bbox().replace(">body</word>", ">body\x01</word>")
+    cleaned, proof = clean_proven_page_footers(text, xml)
+    assert "body\x01数量1.230000" in cleaned and proof["removed_page_footers"] == [1, 2]
+    assert proof["retained_XML_control_glyphs"] == {"U+0001": 2}
+
+
+def test_control_glyph_cannot_be_silently_repaired_inside_geometry():
+    with pytest.raises(RuntimeError):
+        clean_proven_page_footers(
+            "body\n1\n\fbody\n2\n\f", bbox().replace('width="595"', 'width="59\x015"')
+        )

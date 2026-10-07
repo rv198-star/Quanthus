@@ -148,6 +148,8 @@ def select_notice_cash_candidates(
     from .base22_notice_current_scope import parse_current_scope_cash
     from .base22_notice_date_layout import CONTRACT_ID as DATE_LAYOUT_CONTRACT
     from .base22_notice_date_layout import parse_exdate_layout_cash
+    from .base22_notice_domestic_scope import CONTRACT_ID as DOMESTIC_SCOPE_CONTRACT
+    from .base22_notice_domestic_scope import parse_domestic_scope_cash
     from .base22_notice_equivalent_scope import CONTRACT_ID as EQUIVALENT_SCOPE_CONTRACT
     from .base22_notice_equivalent_scope import parse_equivalent_scope_cash
     from .base22_notice_implementation_labels import CONTRACT_ID as IMPLEMENTATION_LABEL_CONTRACT
@@ -166,6 +168,7 @@ def select_notice_cash_candidates(
         CURRENT_SCOPE_CONTRACT,
         EQUIVALENT_SCOPE_CONTRACT,
         DATE_LAYOUT_CONTRACT,
+        DOMESTIC_SCOPE_CONTRACT,
     }:
         raise BoundedError("NOTICE_VERSIONED_PARSER_PROFILE_UNKNOWN")
     parser = {
@@ -177,6 +180,7 @@ def select_notice_cash_candidates(
         CURRENT_SCOPE_CONTRACT: parse_current_scope_cash,
         EQUIVALENT_SCOPE_CONTRACT: parse_equivalent_scope_cash,
         DATE_LAYOUT_CONTRACT: parse_exdate_layout_cash,
+        DOMESTIC_SCOPE_CONTRACT: parse_domestic_scope_cash,
     }[parser_profile]
     indexed = {r["action_id"]: r for r in targets}
     if len(indexed) != len(targets) or not 0 < len(targets) <= 256:

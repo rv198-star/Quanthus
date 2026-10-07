@@ -28,6 +28,7 @@ from .base22_notice_action import select_notice_cash_candidates
 from .base22_notice_adjustment import CONTRACT_ID as ADJUSTMENT_CONTRACT
 from .base22_notice_current_scope import CONTRACT_ID as CURRENT_SCOPE_CONTRACT
 from .base22_notice_date_layout import CONTRACT_ID as DATE_LAYOUT_CONTRACT
+from .base22_notice_domestic_scope import CONTRACT_ID as DOMESTIC_SCOPE_CONTRACT
 from .base22_notice_equivalent_scope import CONTRACT_ID as EQUIVALENT_SCOPE_CONTRACT
 from .base22_notice_implementation_labels import CONTRACT_ID as IMPLEMENTATION_LABEL_CONTRACT
 from .base22_notice_labels import CONTRACT_ID as LABEL_CONTRACT
@@ -86,6 +87,7 @@ def restate_notice_cash(
             CURRENT_SCOPE_CONTRACT,
             EQUIVALENT_SCOPE_CONTRACT,
             DATE_LAYOUT_CONTRACT,
+            DOMESTIC_SCOPE_CONTRACT,
         }
         or notice_atom.get("stock_code") != raw.get("stock_code")
         or notice_atom.get("ex_date") != raw["ex_date"]

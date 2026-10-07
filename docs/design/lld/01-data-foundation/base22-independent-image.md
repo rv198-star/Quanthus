@@ -528,3 +528,17 @@ manifest, reconstructs every output atom, and applies global keys, intervals, li
 selected model's full parent closure. Source replay and a correct union do not waive unresolved
 category or complete-August coverage gates. Tests include actual kernel-readonly synthetic cold
 processes and fully repacked atom, extra-partition, missing-native and foreign-key defects.
+
+`base22_ownership_floor_revision.py` adds the narrow
+`p10-ownership-parent-floor-repair-v1` successor. Actual captures from one provider can
+have different acquisition instants yet receive the same parent identity knowledge floor.
+That does not authorize an equal-clock priority guess. An exact native atom must first
+reproduce from its bound original raw member. Exactly one later changed pre-floor capture
+and every retained later capture must agree on its business atoms. Missing acquisition,
+another provider, a conflicting later body or an unmatched native atom blocks the repair.
+The original version is retained and closed only at the real new governance observation;
+the new source-bound version uses that new clock, not the historical parent floor.
+Original acquisitions remain unchanged in local raw evidence. The offline union verifier
+requalifies this exact transition, requires the entire original group and consumes every
+declared repair. This grants neither historical PIT nor whole-domain/consumer acceptance.
+Tests are in `test_base22_ownership_floor_revision.py`.

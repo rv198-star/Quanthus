@@ -19,7 +19,9 @@ from .base22_bounded import BoundedError, Budget, GlobalScan, identifier, semant
 from .base22_f10_ownership import TABLES
 from .base22_outputs import knowledge_versions
 from .base22_ownership_audit import OwnershipReplaySink, audit_ownership_observations
+from .base22_ownership_floor_revision import apply_floor_revision, replay_floor_evidence
 from .base22_sources import _tree
+from .financial_reporting import financial_company_resolver_from_listed_company_rows
 
 CONTRACT_ID = "p10-base22-open-ownership-observation-versions-v1"
 MAX_VERSIONS_PER_KEY = 64
@@ -53,6 +55,7 @@ def version_batches(
     budget: Budget,
     *,
     read_only_roots: list[Path] | None = None,
+    qualified_floor_revisions: dict[str, Any] | None = None,
 ) -> Iterator[list[dict[str, Any]]]:
     """Global typed sort spills within the frozen budget; each key is bounded."""
     import pyarrow as pa  # type: ignore[import-untyped]
@@ -65,6 +68,7 @@ def version_batches(
     ):
         raise BoundedError("OWNERSHIP_VERSION_TABLE_OR_KEY_CONTRACT_INVALID")
     with GlobalScan(budget, read_only_roots=read_only_roots) as scan:
+        applied_floor_revisions = set()
         scan.add(table, paths)
         scan.connection.execute("SET TimeZone='UTC'")
         if any(
@@ -107,7 +111,20 @@ def version_batches(
             # files for every business key; propagate any monitored breach now.
             if budget.error:
                 raise BoundedError(budget.error)
-            yield ownership_versions(rows, rule)
+            correction = (qualified_floor_revisions or {}).get(
+                digest([rows[0][k] for k in key_fields])
+            )
+            if correction is not None:
+                if table != TABLES[0]:
+                    raise BoundedError("OWNERSHIP_FLOOR_TABLE_SCOPE_INVALID")
+                applied_floor_revisions.add(correction["business_key_sha256"])
+            yield (
+                apply_floor_revision(rows, rule, correction)
+                if correction is not None
+                else ownership_versions(rows, rule)
+            )
+        if applied_floor_revisions != set(qualified_floor_revisions or {}):
+            raise BoundedError("OWNERSHIP_FLOOR_QUALIFIED_REVISION_NOT_CONSUMED")
 
 
 def audit_ownership_union(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, Any]:
@@ -139,6 +156,34 @@ def audit_ownership_union(root: Path, body: dict[str, Any], budget: Budget) -> d
         raise BoundedError("OWNERSHIP_UNION_RAW_SCOPE_IDENTITY_CHANGED")
     contract, model, extension = load_contract(observations / "contract")
     ss = schemas(model, extension)
+    floor_proof = None
+    if "floor_revision_evidence" in body:
+        # This is a distinct, raw-reproduced new-knowledge successor, never an
+        # exemption from the predecessor's equal-clock conflict check.
+        parent_rows = {}
+        for t in ("dwd_security", "dwd_security_identifier"):
+            items = obs["parents"][t]
+            if sum(i["rows"] for i in items) > 32768:
+                raise BoundedError("OWNERSHIP_FLOOR_LOCAL_PARENT_BOUND_INVALID")
+            parent_rows[t] = [
+                r
+                for i in items
+                for r in pq.ParquetFile(_physical(observations, i["path"], independent=True))
+                .read()
+                .to_pylist()
+            ]
+        resolver = financial_company_resolver_from_listed_company_rows(
+            parent_rows["dwd_security"], parent_rows["dwd_security_identifier"]
+        )
+        floor_proof = replay_floor_evidence(
+            root,
+            body["floor_revision_evidence"],
+            resolver=resolver,
+            rule=contract["tables"][TABLES[0]],
+            schema=ss[TABLES[0]],
+        )
+        if floor_proof["identity"] != body["floor_revision_identity"]:
+            raise BoundedError("OWNERSHIP_FLOOR_QUALIFIED_IDENTITY_CHANGED")
     original = _physical(root, body["original_native_manifest"], independent=True)
     if file_sha(original) != body["original_native_manifest_sha256"]:
         raise BoundedError("OWNERSHIP_UNION_ORIGINAL_MANIFEST_CHANGED")
@@ -178,6 +223,12 @@ def audit_ownership_union(root: Path, body: dict[str, Any], budget: Budget) -> d
             ):
                 budget.check()
                 source_lineage[table].update(tuple(r.values()) for r in batch.to_pylist())
+    if floor_proof:
+        source_lineage[TABLES[0]].update(
+            (r["record_source"], r["source_revision"], r["source_artifact_sha256"])
+            for i in floor_proof["revisions"].values()
+            for r in i["output"]
+        )
     outputs = {(i["table"], i["partition"], i["number"]): i for i in body["outputs"]}
     if len(outputs) != len(body["outputs"]) or {k[0] for k in outputs} != selected:
         raise BoundedError("OWNERSHIP_UNION_EXACT_OUTPUT_TABLE_SET_CHANGED")
@@ -209,6 +260,9 @@ def audit_ownership_union(root: Path, body: dict[str, Any], budget: Budget) -> d
             ss[table],
             budget,
             read_only_roots=[root],
+            qualified_floor_revisions=(
+                floor_proof["revisions"] if floor_proof and table == TABLES[0] else None
+            ),
         ):
             sink.add({table: rows})
     sink.finish()

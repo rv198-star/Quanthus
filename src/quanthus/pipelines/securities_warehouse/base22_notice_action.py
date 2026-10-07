@@ -130,7 +130,10 @@ def parse_implemented_notice_cash(
 
 
 def select_notice_cash_candidates(
-    targets: list[dict[str, Any]], documents: Iterable[dict[str, Any]]
+    targets: list[dict[str, Any]],
+    documents: Iterable[dict[str, Any]],
+    *,
+    parser_profile: str = CONTRACT_ID,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
     """All primary implementation candidates must agree; opinions grant no priority.
 
@@ -139,6 +142,16 @@ def select_notice_cash_candidates(
     that key even if another document parses. Ancillary opinions stay disclosed.
     Returned atoms are private; only the disposition evidence is safe to export.
     """
+    from .base22_notice_scheme import CONTRACT_ID as SCHEME_CONTRACT
+    from .base22_notice_scheme import parse_current_scheme_cash
+
+    if parser_profile not in {CONTRACT_ID, SCHEME_CONTRACT}:
+        raise BoundedError("NOTICE_VERSIONED_PARSER_PROFILE_UNKNOWN")
+    parser = (
+        parse_current_scheme_cash
+        if parser_profile == SCHEME_CONTRACT
+        else parse_implemented_notice_cash
+    )
     indexed = {r["action_id"]: r for r in targets}
     if len(indexed) != len(targets) or not 0 < len(targets) <= 256:
         raise BoundedError("NOTICE_EXACT_TARGET_SET_INVALID")
@@ -162,8 +175,9 @@ def select_notice_cash_candidates(
             try:
                 if document["publisher_security_code"] != target["stock_code"]:
                     raise BoundedError("NOTICE_PUBLISHER_SECURITY_IDENTITY_MISMATCH")
-                atom = parse_implemented_notice_cash(
-                    document["text"], stock_code=target["stock_code"],
+                atom = parser(
+                    document["text"],
+                    stock_code=target["stock_code"],
                     ex_date=date.fromisoformat(target["ex_date"]),
                     publisher_title=document["publisher_title"],
                 )
@@ -188,7 +202,7 @@ def select_notice_cash_candidates(
             selected[key] = sorted(atoms, key=lambda a: a["document_id"])[0]
             dispositions[key] = "EXACT_PRIMARY_ISSUER_CASH_ONLY"
     evidence = {
-        "contract_id": CONTRACT_ID,
+        "contract_id": parser_profile,
         "exact_target_keys": sorted(indexed),
         "exact_documents": sorted(seen),
         "document_dispositions": diagnostics,

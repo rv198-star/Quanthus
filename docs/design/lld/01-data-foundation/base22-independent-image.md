@@ -483,6 +483,16 @@ remain explicit acceptance modes. These new revisions do not restore the origina
 manifest, qualify historical PIT, admit consumers, or complete the 33-table image.
 Regressions are in `test_base22_notice_action.py` and `test_base22_notice_restatement.py`.
 
+`base22_notice_scheme.py` adds the explicit
+`p10-base22-issuer-current-implementation-section-v2` selector profile. The default predecessor
+profile is preserved. Every existing whole-document identity, implementation, date, currency
+and exact-precision guard runs first. Only its cash-uniqueness failure may be resolved by an
+explicitly headed current scheme with a leading company/year scheme declaration. An approved
+old plan, an arbitrary matching paragraph, conflicting current sections or an unparseable other
+primary still blocks the key. No last/largest-rate rule, currency inference or earlier knowledge
+is introduced. The new source scope declares this profile and offline replay reproduces it from
+the original PDFs. Tests are in `test_base22_notice_scheme.py`.
+
 ### Weekly F10 capital and top-holder observations
 
 `base22_f10_ownership.py` defines `p10-base22-weekly-f10-ownership-exact-v1` for the existing

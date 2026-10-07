@@ -25,6 +25,7 @@ from .base22_cash_restatement import _scan_cash_global
 from .base22_financial import _clock
 from .base22_notice_action import CONTRACT_ID as PARSER_CONTRACT
 from .base22_notice_action import select_notice_cash_candidates
+from .base22_notice_scheme import CONTRACT_ID as SCHEME_CONTRACT
 from .base22_precision import decimal_profile
 from .base22_sources import _tree
 from .disclosure_event import _stable_id
@@ -67,7 +68,7 @@ def restate_notice_cash(
         or raw.get("progress") != "实施"
         or before.get("action_type") != "CASH_DIVIDEND"
         or before.get("action_status") != "IMPLEMENTED"
-        or notice_atom.get("contract_id") != PARSER_CONTRACT
+        or notice_atom.get("contract_id") not in {PARSER_CONTRACT, SCHEME_CONTRACT}
         or notice_atom.get("stock_code") != raw.get("stock_code")
         or notice_atom.get("ex_date") != raw["ex_date"]
         or notice_atom.get("currency") != "CNY"
@@ -90,8 +91,10 @@ def restate_notice_cash(
         ]
     except InvalidOperation:
         raise BoundedError("NOTICE_RESTATEMENT_RAW_SCALAR_INVALID") from None
-    if not raw_cash.is_finite() or raw_cash <= 0 or any(
-        v is not None and (not v.is_finite() or v != 0) for v in shares
+    if (
+        not raw_cash.is_finite()
+        or raw_cash <= 0
+        or any(v is not None and (not v.is_finite() or v != 0) for v in shares)
     ):
         raise BoundedError("NOTICE_RESTATEMENT_NONCASH_SCOPE_NOT_QUALIFIED")
     if (
@@ -130,9 +133,8 @@ def restate_notice_cash(
     for term in before_terms:
         typ = term.get("term_type")
         if (
-            typ not in {
-                "CASH_AMOUNT_PER_SHARE", "BONUS_SHARES_PER_SHARE", "TRANSFER_SHARES_PER_SHARE"
-            }
+            typ
+            not in {"CASH_AMOUNT_PER_SHARE", "BONUS_SHARES_PER_SHARE", "TRANSFER_SHARES_PER_SHARE"}
             or typ in seen
             or term.get("corporate_action_id") != before["corporate_action_id"]
             or term.get("corporate_action_term_id")
@@ -160,7 +162,8 @@ def restate_notice_cash(
         ):
             raise BoundedError("NOTICE_RESTATEMENT_NONCASH_SCOPE_NOT_QUALIFIED")
     if (
-        len(cash) != 1 or not cash[0]["amount_per_share"].is_finite()
+        len(cash) != 1
+        or not cash[0]["amount_per_share"].is_finite()
         or cash[0]["amount_per_share"] <= 0
     ):
         raise BoundedError("NOTICE_RESTATEMENT_EXACT_BEFORE_CASH_REQUIRED")
@@ -180,9 +183,7 @@ def restate_notice_cash(
         context.prec = 64
         context.traps[Inexact] = True
         physical_amount = amount.quantize(Decimal("1e-10"))
-    term = {
-        **cash[0], **{k: new[k] for k in SOURCE_VERSION}, "amount_per_share": physical_amount
-    }
+    term = {**cash[0], **{k: new[k] for k in SOURCE_VERSION}, "amount_per_share": physical_amount}
     actions = [{**before, "knowledge_to": clock}, new]
     terms = [{**t, "knowledge_to": clock} for t in before_terms] + [term]
     proof = {
@@ -222,10 +223,14 @@ def decode_local_notice(pdf: Path, destination: Path) -> str:
 
     result = subprocess.run(
         ["/usr/bin/pdftotext", "-layout", "-enc", "UTF-8", str(pdf), str(destination)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30, preexec_fn=limits,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=30,
+        preexec_fn=limits,
     )
     if (
-        result.returncode or not destination.is_file()
+        result.returncode
+        or not destination.is_file()
         or not 0 < destination.stat().st_size <= 1024**2
     ):
         raise BoundedError("NOTICE_REPLAY_PDF_DECODE_FAILED")
@@ -249,10 +254,15 @@ def audit_notice_restatement_scope(
         or body.get("identity") != digest({k: v for k, v in body.items() if k != "identity"})
         or body.get("priority_id") != PRIORITY_ID
         or body.get("consumer_admission") != "NOT_GRANTED"
-        or any(body.get(k) is not False for k in (
-            "READY", "complete_Base22", "historical_PIT_admission",
-            "old_normalization_manifest_restored"
-        ))
+        or any(
+            body.get(k) is not False
+            for k in (
+                "READY",
+                "complete_Base22",
+                "historical_PIT_admission",
+                "old_normalization_manifest_restored",
+            )
+        )
         or file_sha(Path("/usr/bin/pdftotext")) != body.get("pdftotext_sha256")
     ):
         raise BoundedError("NOTICE_RESTATEMENT_LOCAL_SCOPE_INVALID")
@@ -272,9 +282,10 @@ def audit_notice_restatement_scope(
         if (
             physical.metadata.num_rows != item["rows"]
             or item["rows"] > 65536
-            or (item.get("table") in ss and not physical.schema_arrow.equals(
-                ss[item["table"]], check_metadata=False
-            ))
+            or (
+                item.get("table") in ss
+                and not physical.schema_arrow.equals(ss[item["table"]], check_metadata=False)
+            )
         ):
             raise BoundedError("NOTICE_RESTATEMENT_SCHEMA_OR_ROW_BOUND_CHANGED")
         return physical.read().to_pylist()  # type: ignore[no-any-return]
@@ -289,8 +300,11 @@ def audit_notice_restatement_scope(
     for term in rows(body["before"][TABLES[1]]):
         before_terms[term["corporate_action_id"]].append(term)
     if (
-        set(raw) != ids or set(before) != ids or len(ids) != len(targets)
-        or len(raw) != len(raw_rows) or len(before) != len(before_rows)
+        set(raw) != ids
+        or set(before) != ids
+        or len(ids) != len(targets)
+        or len(raw) != len(raw_rows)
+        or len(before) != len(before_rows)
     ):
         raise BoundedError("NOTICE_RESTATEMENT_EXACT_OLD_RAW_SCOPE_CHANGED")
     for target in targets:
@@ -311,13 +325,21 @@ def audit_notice_restatement_scope(
         text = decode_local_notice(root / doc["PDF"], destination)
         if file_sha(destination) != doc["text_sha256"]:
             raise BoundedError("NOTICE_RESTATEMENT_ORIGINAL_PDF_TEXT_CHANGED")
-        documents.append({
-            "document_id": doc["document_id"], "target_action_ids": doc["target_action_ids"],
-            "publisher_security_code": str(detail["secCode"]),
-            "publisher_title": detail["announcementTitle"], "text": text,
-        })
+        documents.append(
+            {
+                "document_id": doc["document_id"],
+                "target_action_ids": doc["target_action_ids"],
+                "publisher_security_code": str(detail["secCode"]),
+                "publisher_title": detail["announcementTitle"],
+                "text": text,
+            }
+        )
         budget.check()
-    selected, selection = select_notice_cash_candidates(targets, documents)
+    selected, selection = select_notice_cash_candidates(
+        targets,
+        documents,
+        parser_profile=body.get("parser_profile", PARSER_CONTRACT),
+    )
     if selection != body["selection_evidence"]:
         raise BoundedError("NOTICE_RESTATEMENT_RECOMPUTED_SELECTION_CHANGED")
     if set(body["bindings"]) != set(selected):
@@ -339,8 +361,12 @@ def audit_notice_restatement_scope(
             raise BoundedError("NOTICE_RESTATEMENT_SELECTED_DOCUMENT_BINDING_CHANGED")
         try:
             actions, terms, proof = restate_notice_cash(
-                raw[key], before[key], before_terms[before[key]["corporate_action_id"]],
-                candidate["atom"], binding=binding, observed_at=body["observed_at"],
+                raw[key],
+                before[key],
+                before_terms[before[key]["corporate_action_id"]],
+                candidate["atom"],
+                binding=binding,
+                observed_at=body["observed_at"],
                 revision=body["revision"],
             )
         except BoundedError as exc:
@@ -366,9 +392,10 @@ def audit_notice_restatement_scope(
         actual = rows(item)
         if any(partition(r, contract["tables"][table]) != part for r in actual):
             raise BoundedError("NOTICE_RESTATEMENT_OUTPUT_PARTITION_INVALID")
-        if semantic_scan(
-            [root / item["path"]], ss[table], check=budget.check
-        ) != item["semantic_scan"]:
+        if (
+            semantic_scan([root / item["path"]], ss[table], check=budget.check)
+            != item["semantic_scan"]
+        ):
             raise BoundedError("NOTICE_RESTATEMENT_OUTPUT_SUMMARY_CHANGED")
         counts[table] += len(actual)
         observed[table].update(digest(r) for r in actual)
@@ -377,11 +404,15 @@ def audit_notice_restatement_scope(
     _scan_cash_global(root, body, budget, contract, ss, rows)
     receipt = {
         "status": "PRIMARY_ISSUER_RAW_PDF_TYPED_REPLAY_PASS_NOT_COMPLETE_BASE22",
-        "scope_identity": body["identity"], "exact_documents": len(documents),
-        "new_canonical_knowledge_versions": len(reproduced), "output_rows": dict(counts),
+        "scope_identity": body["identity"],
+        "exact_documents": len(documents),
+        "new_canonical_knowledge_versions": len(reproduced),
+        "output_rows": dict(counts),
         "cash_changed_keys": sum(p["cash_changed"] for p in reproduced.values()),
-        "cash_only_held": held, "global_keys_parents_time_lineage": "PASS",
-        "historical_PIT_admission": False, "complete_Base22": False,
+        "cash_only_held": held,
+        "global_keys_parents_time_lineage": "PASS",
+        "historical_PIT_admission": False,
+        "complete_Base22": False,
     }
     receipt["identity"] = digest(receipt)
     return receipt

@@ -21,7 +21,6 @@ from .base22_precision import decimal_profile
 from .financial_reporting import FinancialCompanyResolver
 from .ownership_capital import (
     _effective_start,
-    _table_cells,
     ownership_capital_schemas,
     parse_f10_capital_structure,
     parse_f10_shareholding_tables,
@@ -32,6 +31,18 @@ TABLES = ("dwd_share_capital_observation", "dwd_shareholding_observation")
 CATEGORIES = {"股本结构": TABLES[0], "股东研究": TABLES[1]}
 _QUANTITY = re.compile(r"[+-]?(?:\d+(?:\.\d+)?)(?:亿股?|万股?|股)?")
 _PERCENT = re.compile(r"[+-]?\d+(?:\.\d+)?%?")
+
+
+def _cells(line: str) -> list[str]:
+    """Remove one outer border, preserving empty interior/leading columns."""
+    if "｜" not in line:
+        return []
+    value = line.strip()
+    if value.startswith("｜"):
+        value = value[1:]
+    if value.endswith("｜"):
+        value = value[:-1]
+    return [cell.strip() for cell in value.split("｜")]
 
 
 def _modeled_cell_census(content: str, category: str) -> dict[str, int]:
@@ -46,6 +57,7 @@ def _modeled_cell_census(content: str, category: str) -> dict[str, int]:
     dates: list[str] = []
     holder_header = re.compile(r"截至日期：\d{4}-\d{2}-\d{2}\s+十大(?:流通)?股东情况")
     pending = False
+    dated_holder_table = False
     for line in content.splitlines():
         if category == "股本结构":
             if "【1.股本结构】" in line:
@@ -53,13 +65,18 @@ def _modeled_cell_census(content: str, category: str) -> dict[str, int]:
                 continue
             if active and re.match(r"【[2-9]", line.strip()):
                 break
-            cells = _table_cells(line)
+            cells = _cells(line)
             if not active or not cells:
                 continue
             if cells[0].startswith("单位"):
                 dates = cells[1:]
                 continue
-            if not cells[0] or not any(cells[1:]):
+            if not any(cells):
+                counts["blank_structural_rows"] += 1
+                continue
+            if not cells[0] and any(cells[1:]):
+                raise BoundedError("OWNERSHIP_NONEMPTY_CAPITAL_MATRIX_CELL_UNACCOUNTED")
+            if not any(cells[1:]):
                 continue
             if not dates or len(cells) != len(dates) + 1:
                 raise BoundedError("OWNERSHIP_NONEMPTY_CAPITAL_MATRIX_CELL_UNACCOUNTED")
@@ -73,14 +90,19 @@ def _modeled_cell_census(content: str, category: str) -> dict[str, int]:
         else:
             if holder_header.search(line):
                 active, pending = False, False
+                dated_holder_table = True
                 continue
-            cells = _table_cells(line)
-            if cells and cells[0] == "股东名称":
+            cells = _cells(line)
+            if dated_holder_table and cells and cells[0] == "股东名称":
                 active, pending = True, False
                 continue
             if active and line.strip().startswith("└"):
                 active = False
+                dated_holder_table = False
             if not active or not cells:
+                continue
+            if not any(cells):
+                counts["blank_structural_rows"] += 1
                 continue
             if len(cells) == 1 and cells[0] and pending:
                 counts["continuation_rows"] += 1

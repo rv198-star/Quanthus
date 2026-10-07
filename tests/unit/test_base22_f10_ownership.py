@@ -106,3 +106,22 @@ def test_named_holder_with_missing_quantity_is_held_not_silently_dropped():
     content = HOLDERS.replace("└", "｜另一个股东｜-｜1%｜普通股｜\n└")
     with pytest.raises(BoundedError, match="UNACCOUNTED"):
         project(raw(content, "股东研究"))
+
+
+def test_empty_layout_rows_do_not_block_nonempty_holder_observations():
+    content = HOLDERS.replace("└", "｜｜｜｜｜\n└")
+    rows, proof = project(raw(content, "股东研究"))
+    assert len(rows["dwd_shareholding_observation"]) == 1
+    assert proof["modeled_cell_census"]["blank_structural_rows"] == 1
+
+
+def test_undated_nonmodeled_header_cannot_capture_a_later_dated_table():
+    prefix = "｜股东名称｜说明｜备注｜其他｜\n｜未建模控制信息｜-｜-｜-｜\n└\n"
+    rows, _ = project(raw(prefix + HOLDERS, "股东研究"))
+    assert len(rows["dwd_shareholding_observation"]) == 1
+
+
+def test_capital_quantity_without_component_name_is_not_silently_dropped():
+    content = CAPITAL.replace("【2.股本变动】", "｜｜1万｜\n【2.股本变动】")
+    with pytest.raises(BoundedError, match="UNACCOUNTED"):
+        project(raw(content))

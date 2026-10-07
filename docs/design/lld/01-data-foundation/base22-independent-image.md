@@ -579,3 +579,17 @@ three-digit days fail instead of being parsed as a matching prefix. This profile
 does not resolve cash conflicts, security classes, unknown times or unlabelled
 tables. Default legacy parsing remains unchanged. The scoped offline verifier
 reproduces this profile from the local original PDF before accepting any output.
+
+`base22_holder_literals.py` is a separate, opt-in
+`p10-base22-holder-literal-percentage-basis-v2` source adapter. Its percentage is
+the exact provider numeral, with the literal `占A股` denominator retained in
+`raw_holding_percentage` and counted in source evidence. It does not convert
+that numerator to a total-capital percentage or erase the original basis.
+Unknown B/H/other denominators, out-of-range/nonexact values and malformed cells
+fail. An exact separate holding-change header closes only the modeled top-holder
+matrix in a hashed parser view; the nonempty original change block gets its own
+hash/count and `NOT_GRANTED` admission for `dwd_shareholding_change`. It must be
+handled separately before full category/domain acceptance. Original bytes and
+acquisition remain unchanged. Frozen ownership modules and old qualification
+receipts are preserved; this adapter alone grants no native union, historical
+PIT, complete August closure or consumer admission.

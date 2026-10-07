@@ -648,3 +648,25 @@ implementation or grant source priority. Original text and actual acquisition
 remain bound; the original default and earlier parser profiles are preserved.
 Offline notice replay must opt into this profile and reconstruct the atom
 from the local original PDF, before any typed restatement or native merge.
+
+### Literal weekly scope successor and stage ownership
+
+`base22_weekly_holder_literals.py` and `base22_weekly_literal_audit.py` define the
+separate opt-in `p10-base22-weekly-literal-ownership-source-v2` scope. Its graph is
+verified immutable original four-week raw/parent TMP -> one literal source
+projection TMP and per-row accounting -> separately qualified native version
+union -> conditional complete-image assembly. The source producer parses each
+retained category once and shares the immutable typed scope with all consumers;
+explicit independent cold replay reconstructs it rather than claiming a cache
+hit. This is job-local governance TMP, not ADM or whole-domain publication.
+
+Capital retains the complete original projector contract. Holder atoms use the
+explicit literal-basis adapter, including exact Decimal numerals, explicit
+null/zero classes, real acquisition/knowledge clocks and held dates. Every
+nonempty separate change block retains its hash/count and NOT_GRANTED admission;
+the full raw accountant must reproduce these counts as well as every source
+row disposition and typed shard. Other malformed/unsupported categories remain
+held. Exact local physical inventory/schema/rows/atoms/summaries and two cold
+moves are source-scope acceptance only. Native versions/global keys/FK/lineage,
+complete August coverage, raw category closure and final whole-image acceptance
+remain explicit downstream gates; no default frozen ownership module is changed.

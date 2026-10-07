@@ -493,6 +493,18 @@ primary still blocks the key. No last/largest-rate rule, currency inference or e
 is introduced. The new source scope declares this profile and offline replay reproduces it from
 the original PDFs. Tests are in `test_base22_notice_scheme.py`.
 
+`base22_notice_adjustment.py` prepares the separate
+`p10-base22-issuer-explicit-current-scheme-adjustment-v3` profile. All predecessor
+guards run first. Only a conflicting cash rate inside an explicitly identified
+current scheme can be reconsidered. A literal completed `分派方案由 ... 变更为 ...`
+relation must bind two exact gross cash clauses with the same per-share unit.
+Only that relation's old clause is excluded from the current-rate census; every
+remaining current clause must agree. Both original clauses and the entire relation
+remain hash-bound. Proposals, unlinked old rates, different units, conflicting
+current rates and failed identity/date/currency guards stay held. This profile
+does not automatically enter any source scope or change the default parser.
+Tests are in `test_base22_notice_adjustment.py`.
+
 ### Weekly F10 capital and top-holder observations
 
 `base22_f10_ownership.py` defines `p10-base22-weekly-f10-ownership-exact-v1` for the existing

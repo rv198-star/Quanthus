@@ -506,3 +506,15 @@ The source-observation scope explicitly leaves native union, global knowledge-ve
 and whole-domain coverage unqualified. Percentage qualifiers such as `占A股` retain their raw
 meaning and remain held until their denominator contract is qualified; the legacy `PERCENT`
 vocabulary is not silently expanded. Regressions are in `test_base22_ownership_audit.py`.
+
+`base22_ownership_versions.py` defines `p10-base22-open-ownership-observation-versions-v1`.
+It accepts individually qualified open native/source observations, globally sorts their typed
+business keys within the registered spill budget, and retains at most 64 observations per key.
+Equal-clock conflicting bodies fail. Changed bodies close the preceding version only at the
+real successor clock; identical bodies retain separate immutable source evidence. Closed native
+intervals fail this narrow contract instead of being reopened. Its offline union verifier
+replays the full local raw scope, checks every original native member against the archived
+manifest, reconstructs every output atom, and applies global keys, intervals, lineage and the
+selected model's full parent closure. Source replay and a correct union do not waive unresolved
+category or complete-August coverage gates. Tests include actual kernel-readonly synthetic cold
+processes and fully repacked atom, extra-partition, missing-native and foreign-key defects.

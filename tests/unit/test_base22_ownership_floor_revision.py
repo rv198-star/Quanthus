@@ -131,7 +131,9 @@ def test_the_transition_requires_the_exact_complete_original_group(defect):
         apply_floor_revision(rows, rule, revision)
 
 
-@pytest.mark.parametrize("defect", [None, "repacked-proof", "raw-body", "unconsumed-key"])
+@pytest.mark.parametrize(
+    "defect", [None, "repacked-proof", "raw-body", "unconsumed-key", "artifact"]
+)
 def test_actual_parquet_and_global_sort_reproduce_only_local_qualified_atoms(tmp_path, defect):
     import pyarrow as pa
     import pyarrow.parquet as pq
@@ -159,7 +161,23 @@ def test_actual_parquet_and_global_sort_reproduce_only_local_qualified_atoms(tmp
         "raw_inputs": members,
         "observed_at": observed.isoformat(),
         "qualification": "proof.json",
+        "input_artifact": "input.json",
     }
+    closure = {
+        k: v
+        for k, v in proof.items()
+        if k
+        not in {
+            "input_identity",
+            "revisions",
+            "historical_PIT_admission",
+            "consumer_admission",
+            "identity",
+        }
+    }
+    (root / "input.json").write_bytes(canonical(closure))
+    if defect == "artifact":
+        (root / "input.json").write_bytes(canonical(closure) + b"\n")
     if defect == "repacked-proof":
         proof["revisions"][next(iter(proof["revisions"]))]["output"][1]["raw_value"] += "0"
         proof["identity"] = digest({k: v for k, v in proof.items() if k != "identity"})
@@ -169,7 +187,7 @@ def test_actual_parquet_and_global_sort_reproduce_only_local_qualified_atoms(tmp
         pq.write_table(pa.Table.from_pylist([changed]), root / "raw-1.parquet")
         members[1]["raw_row_sha256"] = digest(changed)
     (root / "proof.json").write_bytes(canonical(proof) + b"\n")
-    if defect in {"repacked-proof", "raw-body"}:
+    if defect in {"repacked-proof", "raw-body", "artifact"}:
         with pytest.raises(RuntimeError):
             replay_floor_evidence(root, item, resolver=resolver, rule=rule, schema=schema)
         return

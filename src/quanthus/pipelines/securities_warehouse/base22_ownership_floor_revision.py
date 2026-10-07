@@ -199,6 +199,11 @@ def replay_floor_evidence(
     proof = qualify_floor_revisions(
         native, sources, resolver=resolver, rule=rule, observed_at=_clock(item["observed_at"])
     )
+    if (
+        file_sha(_physical(root, item["input_artifact"], independent=True))
+        != proof["input_identity"]
+    ):
+        raise BoundedError("OWNERSHIP_FLOOR_EXACT_INPUT_ARTIFACT_CHANGED")
     expected = _physical(root, item["qualification"], independent=True).read_bytes()
     if expected != canonical(proof) + b"\n":
         raise BoundedError("OWNERSHIP_FLOOR_REPRODUCED_QUALIFICATION_CHANGED")

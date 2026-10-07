@@ -164,3 +164,190 @@ def test_repacked_proof_and_omitted_capture_cannot_bypass_exact_whole_group():
     changed["output"][1]["holding_quantity"] += 1
     with pytest.raises(RuntimeError):
         apply_floor_revision(group, rule, changed)
+
+
+@pytest.mark.parametrize(
+    "defect", [None, "raw-repacked", "input-artifact", "native-repacked", "typed-atom"]
+)
+def test_real_local_parquet_replay_and_bounded_global_sort_reject_repacked_changes(
+    tmp_path, defect
+):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from quanthus.pipelines.securities_warehouse.base22 import canonical
+    from quanthus.pipelines.securities_warehouse.base22_bounded import Budget, Limits
+    from quanthus.pipelines.securities_warehouse.base22_holder_rolling_revision import (
+        replay_floor_evidence,
+    )
+    from quanthus.pipelines.securities_warehouse.base22_holder_versions import version_batches
+    from quanthus.pipelines.securities_warehouse.ownership_capital import ownership_capital_schemas
+
+    native, sources, incoming, resolver, rule, observed = fixture()
+    schema = ownership_capital_schemas()["dwd_shareholding_observation"]
+    proof = qualify_floor_revisions(
+        native, sources, resolver=resolver, rule=rule, observed_at=observed
+    )
+    root = tmp_path / "job"
+    limits = Limits(allocated_bytes=64 * 1024**2, temp_bytes=32 * 1024**2, free_floor_bytes=1)
+    with Budget(root, [], limits) as budget:
+        pq.write_table(pa.Table.from_pylist(native, schema=schema), root / "native.parquet")
+        members = []
+        for n, s in enumerate(sources):
+            name = f"raw-{n}.parquet"
+            pq.write_table(pa.Table.from_pylist([s["raw"]]), root / name)
+            members.append(
+                {
+                    "path": name,
+                    "source_sha256": s["source_sha256"],
+                    "raw_row_sha256": digest(s["raw"]),
+                }
+            )
+        closure = {
+            k: v
+            for k, v in proof.items()
+            if k
+            not in {
+                "input_identity",
+                "revisions",
+                "historical_PIT_admission",
+                "consumer_admission",
+                "identity",
+            }
+        }
+        (root / "input.json").write_bytes(canonical(closure))
+        (root / "proof.json").write_bytes(canonical(proof) + b"\n")
+        item = {
+            "native_before": "native.parquet",
+            "raw_inputs": members,
+            "observed_at": observed.isoformat(),
+            "qualification": "proof.json",
+            "input_artifact": "input.json",
+        }
+        paths = [root / "native.parquet"]
+        for n, rows in enumerate(incoming):
+            p = root / f"typed-{n}.parquet"
+            pq.write_table(pa.Table.from_pylist(rows, schema=schema), p)
+            paths.append(p)
+        if defect == "raw-repacked":
+            r = sources[-1]["raw"]
+            changed = raw(r["content"].replace("1.234567万", "2.345678万", 1), "股东研究")
+            changed["acquired_at"] = r["acquired_at"]
+            pq.write_table(pa.Table.from_pylist([changed]), root / members[-1]["path"])
+            members[-1]["raw_row_sha256"] = digest(changed)
+        elif defect == "input-artifact":
+            (root / "input.json").write_bytes(canonical(closure) + b" ")
+        elif defect == "native-repacked":
+            native[0]["holding_quantity"] += 1
+            pq.write_table(pa.Table.from_pylist(native, schema=schema), paths[0])
+        elif defect == "typed-atom":
+            incoming[0][0]["holding_quantity"] += 1
+            pq.write_table(pa.Table.from_pylist(incoming[0], schema=schema), paths[1])
+
+        def evaluate():
+            replay = replay_floor_evidence(root, item, resolver=resolver, rule=rule, schema=schema)
+            return [
+                r
+                for group in version_batches(
+                    "dwd_shareholding_observation",
+                    paths,
+                    rule,
+                    schema,
+                    budget,
+                    qualified_floor_revisions=replay["revisions"],
+                )
+                for r in group
+            ]
+
+        if defect is not None:
+            with pytest.raises(RuntimeError):
+                evaluate()
+        else:
+            result = evaluate()
+            assert len(result) == 180  # 80 retained, 80 new-clock repairs, 20 new-window atoms.
+            assert sum(r["knowledge_to"] is not None for r in result) == 80
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [None, "source-member", "raw-binding", "typed-atom", "extra-index", "accepted-duplicate"],
+)
+def test_extra_sources_replay_original_members_and_only_originally_held_captures(tmp_path, defect):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from quanthus.pipelines.securities_warehouse.base22_bounded import Budget, Limits
+    from quanthus.pipelines.securities_warehouse.base22_holder_versions import (
+        replay_extra_holder_sources,
+    )
+    from quanthus.pipelines.securities_warehouse.ownership_capital import ownership_capital_schemas
+
+    _, sources, _, resolver, _, _ = fixture()
+    schema = ownership_capital_schemas()["dwd_shareholding_observation"]
+    obs = {"raw_local_members": [], "source_members": []}
+    body = {"floor_revision_evidence": {"raw_inputs": []}, "extra_holder_sources": []}
+    limits = Limits(allocated_bytes=64 * 1024**2, temp_bytes=32 * 1024**2, free_floor_bytes=1)
+    with Budget(tmp_path / "job", [], limits) as budget:
+        root = budget.root
+        observations = root / "observations"
+        observations.mkdir()
+        for n, s in enumerate(sources):
+            r = s["raw"]
+            if n in {3, 4} and defect != "accepted-duplicate":
+                body_text = (
+                    r["content"].removesuffix("└")
+                    + "｜变动日期｜股东名称｜持股数｜变动股数｜变动后｜变动后占｜变动类型｜\n｜2026-08-01｜另一个合成法人｜1万｜-1万｜0｜0%｜变动｜\n└"
+                )
+                r = raw(body_text, "股东研究")
+                r["acquired_at"] = s["raw"]["acquired_at"]
+            name = f"raw-{n}.parquet"
+            pq.write_table(pa.Table.from_pylist([r]), root / name)
+            body["floor_revision_evidence"]["raw_inputs"].append(
+                {"path": name, "raw_row_sha256": digest(r), "source_sha256": s["source_sha256"]}
+            )
+            if n:
+                day = r["acquired_at"][:10]
+                pq.write_table(pa.Table.from_pylist([r]), observations / name)
+                obs["raw_local_members"].append({"path": name, "source_day": day})
+                obs["source_members"].append({"day": day, "member": {"sha256": s["source_sha256"]}})
+            if n in {3, 4}:
+                typed, proof = holder_observation(
+                    r, source_sha256=s["source_sha256"], resolver=resolver
+                )
+                name = f"extra-{n}.parquet"
+                pq.write_table(
+                    pa.Table.from_pylist(typed["dwd_shareholding_observation"], schema=schema),
+                    root / name,
+                )
+                body["extra_holder_sources"].append(
+                    {"source_index": n, "path": name, "projection_identity": proof["identity"]}
+                )
+        if defect == "source-member":
+            obs["source_members"][0]["member"]["sha256"] = "sha256:" + "f" * 64
+        elif defect == "raw-binding":
+            pq.write_table(
+                pa.Table.from_pylist([sources[2]["raw"]]), observations / "raw-1.parquet"
+            )
+        elif defect == "typed-atom":
+            p = root / "extra-3.parquet"
+            rows = pq.ParquetFile(p).read().to_pylist()
+            rows[0]["holding_quantity"] += 1
+            pq.write_table(pa.Table.from_pylist(rows, schema=schema), p)
+        elif defect == "extra-index":
+            body["extra_holder_sources"][0]["source_index"] = 2
+
+        def evaluate():
+            return replay_extra_holder_sources(
+                root, body, observations, obs, resolver, schema, budget
+            )
+
+        if defect is not None:
+            with pytest.raises(RuntimeError):
+                evaluate()
+        else:
+            paths, report = evaluate()
+            assert len(paths) == 2
+            assert report["separate_change_domain"] == "NOT_GRANTED"
+            assert [i["predecessor"] for i in report["linked_original_captures"]] == [
+                "QUALIFIED_TYPED_ATOMS_UNCHANGED"
+            ] * 2 + ["HELD_NONEMPTY_RAW_CATEGORY"] * 2

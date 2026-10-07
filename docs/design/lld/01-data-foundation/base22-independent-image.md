@@ -622,3 +622,17 @@ atoms are separately reported; this repair does not qualify their native union
 or the separate nonempty change-table domain. Old native versions close only
 at the actual new governance clock. Full local raw/typed replay, exact whole
 group census, complete input bytes and global union checks remain required.
+
+`base22_holder_versions.py` is an explicit opt-in native-union successor,
+`p10-base22-literal-holder-native-versions-v2`. The frozen predecessor still
+replays its full selected raw scope and holds. Five exact same-provider raw
+captures qualify the separate rolling repair; the four August atoms must match
+the predecessor's local raw members. The first two typed captures must be
+unchanged, and only the two previously held last-week captures add literal
+typed files. The complete original native file closure and 80-key repair are
+replayed before globally sorting all native, predecessor and extra atoms.
+Every business group is bounded, every declared repair is consumed, equal-clock
+conflicts outside the explicit repair still fail, and the offline verifier
+reconstructs all output shards and full selected lineage/FK/interval checks.
+Raw nonempty change blocks and other predecessor category holds remain separate
+unqualified gates; a valid union does not establish whole-August coverage.

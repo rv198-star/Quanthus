@@ -46,11 +46,15 @@ def test_unknown_denominator_invalid_scalar_and_precision_stay_blocked(token):
         literal(HOLDERS.replace("1.123456789012%", token))
 
 
-def test_exact_change_table_header_has_separate_unqualified_domain_accounting():
-    other = (
-        "｜日期｜股东名称｜持股数｜变动股数｜变动后｜变动比例｜备注｜\n"
-        "｜2026-08-01｜合成法人｜1万｜-1万｜0｜0%｜变动｜\n└"
-    )
+@pytest.mark.parametrize(
+    "header",
+    [
+        "｜日期｜股东名称｜持股数｜变动股数｜变动后｜变动比例｜备注｜",
+        "｜变动日期｜股东名称｜持股数｜变动股数｜变动后｜变动后占｜变动类型｜",
+    ],
+)
+def test_exact_change_table_header_has_separate_unqualified_domain_accounting(header):
+    other = header + "\n｜2026-08-01｜合成法人｜1万｜-1万｜0｜0%｜变动｜\n└"
     body = HOLDERS.removesuffix("└") + other
     with pytest.raises(BoundedError, match="UNACCOUNTED"):
         project(raw(body, "股东研究"))
@@ -63,6 +67,14 @@ def test_exact_change_table_header_has_separate_unqualified_domain_accounting():
 
 def test_an_unknown_header_inside_a_holder_matrix_cannot_hide_missing_cells():
     body = HOLDERS.removesuffix("└") + "｜日期｜未知列｜不明数据｜另一列｜\n└"
+    with pytest.raises(BoundedError, match="HOLDER_LITERAL"):
+        literal(body)
+
+
+def test_a_partial_change_header_with_unknown_columns_does_not_close_the_matrix():
+    body = (
+        HOLDERS.removesuffix("└") + "｜日期｜股东名称｜持股数｜变动股数｜变动后｜未知列｜其他｜\n└"
+    )
     with pytest.raises(BoundedError, match="HOLDER_LITERAL"):
         literal(body)
 

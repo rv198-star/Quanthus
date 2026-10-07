@@ -30,6 +30,10 @@ CONTRACT_ID = "p10-base22-holder-literal-percentage-basis-v2"
 TABLE = "dwd_shareholding_observation"
 _PERCENT = re.compile(r"(?P<number>\d+(?:\.\d+)?)%?(?P<basis>\s+占A股)?")
 _DATES = re.compile(r"截至日期：\d{4}-\d{2}-\d{2}\s+十大(?:流通)?股东情况")
+_CHANGE_HEADERS = {
+    ("日期", "股东名称", "持股数", "变动股数", "变动后", "变动比例", "备注"),
+    ("变动日期", "股东名称", "持股数", "变动股数", "变动后", "变动后占", "变动类型"),
+}
 
 
 def _holder_view(content: str) -> tuple[str, list[dict[str, Any]]]:
@@ -54,7 +58,7 @@ def _holder_view(content: str) -> tuple[str, list[dict[str, Any]]]:
 
     for line in lines:
         cells = _cells(line)
-        if cells[:5] == ["日期", "股东名称", "持股数", "变动股数", "变动后"] and len(cells) >= 6:
+        if tuple(cells) in _CHANGE_HEADERS:
             finish()
             current = [line]
             # This is a hashed parser-view boundary, never a rewritten source.

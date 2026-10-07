@@ -453,3 +453,45 @@ Schema conversion must preserve every value, null and timestamp instant; the
 physical comparison never weakens the original raw-token precision evidence.
 Actual Parquet write/read regressions reject changed values and earlier knowledge
 even when all output checksums are repackaged.
+
+### Bounded primary issuer cash supplementation
+
+Under the separately approved fixed official-notice supplement, `base22_notice_action.py`
+implements `p10-base22-mainland-issuer-implemented-cash-notice-v1`. Every candidate binds the
+original retained URI, publisher detail identity, exact original PDF, actual new acquisition,
+dated security and ex-date. The grammar requires implementation status and explicit gross CNY
+per-one/per-ten units. An unresolved primary implementation or conflicting primary cash atom
+blocks its key; ancillary opinions grant no source priority. Mixed share/currency scope,
+unsupported dates/units and excessive precision stay held. Raw bodies remain private.
+
+`base22_notice_restatement.py` implements the separate
+`p10-base22-primary-issuer-cash-restatement-v1` successor. Its explicit
+`issuer-implemented-gross-cny-cash-over-normalized-and-aggregator-v1` priority applies only to
+qualified issuer gross cash, not other action terms or three retained price-tail conflicts.
+It preserves the exact old versions, closes only their knowledge intervals, and adds a cash-only
+version at the real new governance observation, no earlier than actual acquisition. Unknown
+share components remain absent; nonzero share observations require their separate qualification.
+Inherited event coordinates retain old raw/before lineage. Date-only publication does not gain
+a public instant. Preexisting raw/typed differences are disclosed, not silently equated.
+
+The fixed scale-ten cash column permits exact padding only; significant rounding fails. Raw
+numeric tokens and original body hashes remain bound. The offline verifier re-decodes every
+selected original PDF, reconstructs all candidate dispositions, source bindings and typed
+allowed changes, and scans global keys, time/lineage and parents using image-local files.
+Kernel source/network denial, two physical relocations/new processes and disposable faults
+remain explicit acceptance modes. These new revisions do not restore the original normalization
+manifest, qualify historical PIT, admit consumers, or complete the 33-table image.
+Regressions are in `test_base22_notice_action.py` and `test_base22_notice_restatement.py`.
+
+### Weekly F10 capital and top-holder observations
+
+`base22_f10_ownership.py` defines `p10-base22-weekly-f10-ownership-exact-v1` for the existing
+modeled capital matrix and dated top-holder tables. It consumes one retained category at a time,
+verifies content/source hashes and real source clocks, parses once, and independently accounts
+for modeled numeric cells. Malformed nonempty cells, ambiguous units and unsupported precision
+fail closed; explicit blanks are disclosed. Every business date resolves through the same
+immutable native history identities. Missing/prelisting identity and post-August business dates
+receive held dispositions without static alias backfill. Decimal values, original lexical units
+and timestamp instants survive typed serialization. Whole-category scope, cross-file global
+versions, raw replay, native union and independent cold acceptance remain separate gates.
+Tests are in `test_base22_f10_ownership.py`; an empty or partial output cannot establish coverage.

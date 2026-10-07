@@ -26,6 +26,8 @@ from .base22_financial import _clock
 from .base22_notice_action import CONTRACT_ID as PARSER_CONTRACT
 from .base22_notice_action import select_notice_cash_candidates
 from .base22_notice_adjustment import CONTRACT_ID as ADJUSTMENT_CONTRACT
+from .base22_notice_pdf import CONTRACT_ID as PDF_CONTRACT
+from .base22_notice_pdf import decode_proven_notice
 from .base22_notice_scheme import CONTRACT_ID as SCHEME_CONTRACT
 from .base22_precision import decimal_profile
 from .base22_sources import _tree
@@ -266,6 +268,8 @@ def audit_notice_restatement_scope(
             )
         )
         or file_sha(Path("/usr/bin/pdftotext")) != body.get("pdftotext_sha256")
+        or body.get("decoder_profile", "legacy-pdftotext-layout-v1")
+        not in {"legacy-pdftotext-layout-v1", PDF_CONTRACT}
     ):
         raise BoundedError("NOTICE_RESTATEMENT_LOCAL_SCOPE_INVALID")
     if set(_tree(root)) != set(body["physical_members"]) | {"QUALIFICATION.json"}:
@@ -324,7 +328,12 @@ def audit_notice_restatement_scope(
         if str(detail["announcementId"]) != doc["document_id"]:
             raise BoundedError("NOTICE_RESTATEMENT_PUBLISHER_DOCUMENT_CHANGED")
         destination = budget.root / (doc["document_id"] + ".txt")
-        text = decode_local_notice(root / doc["PDF"], destination)
+        if body.get("decoder_profile") == PDF_CONTRACT:
+            text, decode_evidence = decode_proven_notice(root / doc["PDF"], destination)
+            if decode_evidence["identity"] != doc.get("decode_evidence_identity"):
+                raise BoundedError("NOTICE_RESTATEMENT_PROVEN_PDF_DECODE_CHANGED")
+        else:
+            text = decode_local_notice(root / doc["PDF"], destination)
         if file_sha(destination) != doc["text_sha256"]:
             raise BoundedError("NOTICE_RESTATEMENT_ORIGINAL_PDF_TEXT_CHANGED")
         documents.append(

@@ -505,6 +505,20 @@ current rates and failed identity/date/currency guards stay held. This profile
 does not automatically enter any source scope or change the default parser.
 Tests are in `test_base22_notice_adjustment.py`.
 
+`base22_notice_pdf.py` defines the optional
+`p10-base22-notice-bbox-proven-page-footers-v2` decode profile. Flattened text can
+join a page counter to a date split across pages; the original PDF can still be
+correct. This profile removes only isolated centered bottom ordinal footers proved
+by consecutive PDF pages and matching final layout lines. Every other body digit,
+date, unit, character and order remains unchanged. A lone numeric token is not
+proof. Page-set, geometry or layout disagreement fails closed. Both original
+layout and bbox identities, removed page ordinals and cleaned text are recorded.
+The default decoder is preserved. A scope must explicitly opt in; its offline
+verifier regenerates both representations from local original PDFs and checks the
+exact decode evidence before source selection. Prior selections must be rechecked
+for changed atoms; a successful text replay alone is not source or image acceptance.
+Regressions are in `test_base22_notice_pdf.py`.
+
 ### Weekly F10 capital and top-holder observations
 
 `base22_f10_ownership.py` defines `p10-base22-weekly-f10-ownership-exact-v1` for the existing

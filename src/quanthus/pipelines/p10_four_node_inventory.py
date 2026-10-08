@@ -12,7 +12,7 @@ import argparse
 import hashlib
 import json
 import os
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -131,7 +131,7 @@ def collect_local(node: str) -> dict[str, Any]:
         "daily_core": None,
         "minute_v1": None,
         "CN02_isolated_candidate": None,
-        "environment_inspected_at": None,
+        "environment_inspected_at": datetime.now(timezone.utc).isoformat(),
     }
     if node == "CN02":
         result["CN02_isolated_candidate"] = {
@@ -185,7 +185,7 @@ def compare_four_nodes(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
         "kind": "quanthus_p10_four_node_readonly_date_census",
         "core_reconciliation": core,
         "full_four_node_production_mirror_asserted": False,
-        "all_current_daily_core_producers_verified": (
+        "latest_core_pointers_and_package_presence_qualified": (
             core["CN01"] == "DATED_SOURCE_PRESENT"
             and core["Hermes"] == "DATED_SOURCE_PRESENT"
             and matching

@@ -26,6 +26,10 @@
 
 ## Permanent data ownership — P10
 
+- Data quality serves reliable business decisions, not theoretical absolute precision.
+  Match requirements to the declared use, actual risk and repair cost. A local, noncritical
+  defect must not unconditionally block delivery of other qualified data. Record its affected
+  scope and permitted uses; preserve source truth, PIT and existing versioned consumer gates.
 - The Owner assigned acquisition and all shared data-quality/governance work to permanent P10 on
   2026-10-03. Read `docs/design/lld/12-permanent-data-line.md` and
   `config/data-ownership.v1.json`. P10 is a parallel standing line, not a sequential release gate.

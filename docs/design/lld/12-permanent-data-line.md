@@ -30,6 +30,16 @@ ledger and the business impact decision for a published correction; source repai
 
 ## 2. Business disposition instead of local repair
 
+The Owner's 2026-10-08 warehouse principle is decision reliability rather than theoretical
+absolute precision. Requirements must fit the declared use, actual decision risk and repair cost.
+A local, noncritical defect does not unconditionally block other qualified deliveries. P10 records
+the affected tables/keys/fields, source evidence, permitted and unavailable uses, business impact
+and the smallest useful repair. A use that needs unavailable precision remains unavailable while
+unaffected qualified scopes continue. Source units, identity, dates and actual knowledge clocks
+remain truthful; accepting a disclosed limitation does not invent evidence or silently amend a
+frozen consumer gate. New tolerance or source-comparison rules require a versioned contract with
+the applicable use and evidence, rather than treating provider differences as universal corruption.
+
 Other lines declare inputs, perform minimal admission checks and implement domain features,
 cohorts, models, strategies and consumption logic. On a quality/governance finding they may only
 register a bounded P10 issue; they must not turn it into source hunting, collection, backfill,

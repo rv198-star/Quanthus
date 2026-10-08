@@ -56,6 +56,7 @@ def test_all_four_node_records_do_not_conflate_cn02_with_prod(tmp_path: Path) ->
     assert outcomes["core_reconciliation"]["OCI_exact_CN01_mirror"] == "PASS"
     assert outcomes["core_reconciliation"]["CN02"].startswith("ISOLATED_BASE")
     assert outcomes["latest_core_pointers_and_package_presence_qualified"]
+    assert not outcomes["all_market_dates_deep_verified"]
     assert not outcomes["full_four_node_production_mirror_asserted"]
 
 
@@ -104,3 +105,11 @@ def test_four_node_inputs_must_be_distinct_not_three_producers(tmp_path: Path) -
         compare_four_nodes(
             [{"node": "CN01", "daily_core": _core(tmp_path / "cn01", hash_source="CN01")}]
         )
+
+
+def test_manifest_presence_is_not_deep_package_qualification(tmp_path: Path) -> None:
+    root = tmp_path / "not-real-package"
+    _core(root, hash_source="fixture-only")
+    evidence = daily_snapshot(root=root, deep_verify=True)
+    assert not evidence["deep_verified_market_dates"]
+    assert set(evidence["deep_payload_verification_failures"]) == set(DAYS)

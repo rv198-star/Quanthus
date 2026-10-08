@@ -255,7 +255,7 @@ def build(
                     missing_total += (
                         len(result.missing_stamps) if result.grade != "SUSPENDED" else 0
                     )
-                    if len(preview) < 22 and result.grade not in {"R0", "SUSPENDED"}:
+                    if len(preview) < 22 and result.grade in {"R2", "R3"}:
                         preview.append(
                             {"symbol": code, "grade": result.grade, "reason": result.reason}
                         )

@@ -152,8 +152,15 @@ def evaluate(
                         receipt = "QUALITY_NOT_READY"
                     elif terminal == "bounded_maturity_probe_incomplete":
                         receipt = None
-                    elif terminal == "grade_qualified" and receipt == "RESEARCH_READY_LOSS_AWARE":
-                        receipt = "GRADE_RECORDED"
+                    elif terminal == "grade_qualified":
+                        if receipt == "RESEARCH_READY_LOSS_AWARE":
+                            receipt = "GRADE_RECORDED"
+                        elif receipt == "PARTIAL_COVERAGE_NO_RESEARCH_READY":
+                            receipt = "QUALITY_NOT_READY"
+                        else:
+                            receipt = None
+                    elif terminal == "historical_source_change_requires_separate_quality_authority":
+                        receipt = "QUALITY_NOT_READY"
                     else:
                         receipt = None
                 elif terminal == "partial_source_capture_not_published":

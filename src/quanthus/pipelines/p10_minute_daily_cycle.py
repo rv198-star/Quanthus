@@ -139,6 +139,16 @@ def run_t(
     stages=math.ceil(len(codes)/50)
     attempts=[]
     for index in range(stages):
+        # Reserve one last bounded 600-second atomic warehouse build.
+        # Otherwise a final source shard can consume the entire 60-minute
+        # start budget, leaving genuine captured rows unpublished.
+        ledger_path = journal / f"{target}-T.json"
+        if ledger_path.exists():
+            ledger = json.loads(ledger_path.read_text())
+            consumed = float(ledger["cumulative_processing_seconds"])
+            if consumed >= 3000:
+                attempts.append("reserved_budget_for_warehouse_build")
+                break
         output=stage/f"shard-{index:03}"
         command=[
             sys.executable,"-m","quanthus.providers.p10_native_m1_shard_capture",

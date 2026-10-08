@@ -97,6 +97,12 @@ P10 #492/#493 后续高成本探源转为具体消费者影响驱动的有界任
 质量分级/消费契约（#495）与日级发布解耦（#496）必须分别验收；治理接受
 ≠ 代码/部署/数据/研究消费者验收。
 
+## 2B. 1m 时间预算与下一交易日补全（Owner 2026-10-09）
+
+将 1m 视为 **可选、独立、按实际消费者价值投入**的数据产品。日常 T 目标 30 分钟、单日硬上限 60 分钟；下一权威交易日 T+1 **另给上一交易日 60 分钟累计预算**用于来源成熟/修订验证和定向补全，每个目标交易日跨 T/T+1 最多 120 分钟。日级核心不继承 1m 失败。T+1 检查真实目标日期分钟语义变更，不能用供应商滚动 HTTP 响应全体 SHA 变化冒充分钟修订，也不能重复整市场抓同一错误源。
+
+R0/R1 按用途准入；R2 真实观测及缺陷标签允许入正式仓库，受限消费；R3 原始数据仅在独立隔离区，拒绝正式 ODS/DWD。运行与账本状态、幂等锁、交易日历、累计预算、T+1 截止、后置修订版本化的验收依 [ADR 0016](../../architecture/adr-0016-value-proportional-warehouse-quality.md) 和 [#505](https://github.com/rv198-star/Quanthus/issues/505)；R2/R3 物理准入依 [#503](https://github.com/rv198-star/Quanthus/issues/503)。**治理通过不等于服务定时器已经启用或旧 V1 已完成切换。**
+
 ## 3. Intake and versioned handoff
 
 New acquisition or data-quality/governance issues use `phase:P10`, `area:data` and `P10-DATA-*`

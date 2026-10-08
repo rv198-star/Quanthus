@@ -155,11 +155,36 @@ def test_r2_for_critical_session_missing() -> None:
     assert item.reason == "missing_in_critical_session_window"
 
 
-def test_r2_for_missing_auction_even_full_grid() -> None:
+def test_missing_auction_is_only_r1_with_all_real_regular_and_native_5m() -> None:
     raw, total = _sparse_raw(absent={DAY.replace("-", "") + "0930"})
     item = assess(symbol=SYMBOL, day=DAY, raw=raw, shares=total, close=10, traded=True)
     assert item.grade == "R2"
-    assert item.reason == "no_original_auction_bar"
+    assert item.reason == "missing_native_auction_witness_pending"
+    admitted = assess(
+        symbol=SYMBOL,
+        day=DAY,
+        raw=raw,
+        shares=total,
+        close=10,
+        traded=True,
+        m5_raw=_matching_m5_with_sparse(raw),
+    )
+    assert admitted.grade == "R1"
+    assert len(admitted.rows) == 240
+    assert admitted.auction_source_observed is False
+    assert "auction" in admitted.reason
+    assert admitted.disposition()["permitted_use"] == "non_execution_gap_aware_research_only"
+
+def test_no_auction_with_missing_regular_remains_r2() -> None:
+    raw, total = _sparse_raw(
+        absent={DAY.replace("-", "") + "0930", DAY.replace("-", "") + "1023"}
+    )
+    admitted = assess(
+        symbol=SYMBOL, day=DAY, raw=raw, shares=total, close=10,
+        traded=True, m5_raw=_matching_m5_with_sparse(raw)
+    )
+    assert admitted.grade == "R2"
+    assert admitted.reason == "missing_auction_and_regular_minutes"
 
 
 def test_r3_for_matured_volume_or_close_mismatch() -> None:

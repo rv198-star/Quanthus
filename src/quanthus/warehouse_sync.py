@@ -21,6 +21,10 @@ from quanthus.pipelines.securities_warehouse import (
     DailyDomainBuildError,
     verify_daily_domain_increment,
 )
+from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (
+    DAILY_CORE_PRODUCT_SCOPE,
+    LEGACY_PRODUCT_SCOPE,
+)
 
 
 class WarehouseSyncError(RuntimeError):
@@ -153,9 +157,23 @@ def _remote_path(relative: str) -> str:
     return f"{remote_root}/{relative}"
 
 
-def _validate_pointer(pointer: Mapping[str, object], market_date: date) -> tuple[Path, str]:
-    if pointer.get("kind") != "cn01_daily_dwd_current":
-        raise WarehouseSyncError("remote DWD CURRENT kind is invalid")
+def _validate_pointer(
+    pointer: Mapping[str, object],
+    market_date: date,
+    product_scope: str = LEGACY_PRODUCT_SCOPE,
+) -> tuple[Path, str]:
+    if product_scope == DAILY_CORE_PRODUCT_SCOPE:
+        if (
+            pointer.get("kind") != "cn01_daily_core_dwd_current"
+            or pointer.get("schema_version") != 2
+            or pointer.get("product_scope") != DAILY_CORE_PRODUCT_SCOPE
+        ):
+            raise WarehouseSyncError("remote daily-core DWD CURRENT identity is invalid")
+    elif product_scope == LEGACY_PRODUCT_SCOPE:
+        if pointer.get("kind") != "cn01_daily_dwd_current":
+            raise WarehouseSyncError("remote DWD CURRENT kind is invalid")
+    else:
+        raise WarehouseSyncError("unknown DWD product scope")
     if pointer.get("market_date") != market_date.isoformat():
         raise WarehouseSyncError("remote DWD CURRENT does not match requested market date")
     raw_manifest = pointer.get("manifest_path")
@@ -177,8 +195,18 @@ def _validate_pointer(pointer: Mapping[str, object], market_date: date) -> tuple
     return package_relative, package_id
 
 
-def _local_current(local_root: Path) -> dict[str, object] | None:
-    path = local_root / "CURRENT.json"
+def _pointer_filename(product_scope: str) -> str:
+    if product_scope == DAILY_CORE_PRODUCT_SCOPE:
+        return "CURRENT_DAILY_CORE.json"
+    if product_scope == LEGACY_PRODUCT_SCOPE:
+        return "CURRENT.json"
+    raise WarehouseSyncError("unknown DWD product scope")
+
+
+def _local_current(
+    local_root: Path, product_scope: str = LEGACY_PRODUCT_SCOPE
+) -> dict[str, object] | None:
+    path = local_root / _pointer_filename(product_scope)
     return _object(path) if path.exists() else None
 
 
@@ -205,8 +233,19 @@ def _ensure_monotonic(
     return True
 
 
-def sync_latest(*, local_root: Path, market_date: date | None = None) -> WarehouseSyncResult:
+def sync_latest(
+    *,
+    local_root: Path,
+    market_date: date | None = None,
+    product_scope: str = LEGACY_PRODUCT_SCOPE,
+) -> WarehouseSyncResult:
+    pointer_name = _pointer_filename(product_scope)
     local_root = local_root.resolve()
+    if product_scope == DAILY_CORE_PRODUCT_SCOPE:
+        if (local_root / "CURRENT.json").exists():
+            raise WarehouseSyncError("daily-core cannot overwrite legacy OCI DWD root")
+        if os.environ.get("QUANTHUS_CN01_DWD_REMOTE_ROOT") != "products/daily-core":
+            raise WarehouseSyncError("daily-core requires its explicit read-only remote subroot")
     local_root.mkdir(parents=True, exist_ok=True)
     expected_date = market_date or datetime.now(ZoneInfo("Asia/Shanghai")).date()
     _, _, remote_user, _, _, ssh = _ssh_command()
@@ -215,10 +254,10 @@ def sync_latest(*, local_root: Path, market_date: date | None = None) -> Warehou
         fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX)
         staging = Path(tempfile.mkdtemp(prefix=".cn01-dwd-sync-", dir=local_root))
         try:
-            remote_current = staging / "CURRENT.json"
+            remote_current = staging / pointer_name
             try:
                 _run_rsync(
-                    source=f"{remote_user}@{remote_host}:{_remote_path('CURRENT.json')}",
+                    source=f"{remote_user}@{remote_host}:{_remote_path(pointer_name)}",
                     destination=remote_current,
                     ssh=ssh,
                 )
@@ -256,7 +295,9 @@ def sync_latest(*, local_root: Path, market_date: date | None = None) -> Warehou
                     code=code,
                 )
             try:
-                package_relative, package_id = _validate_pointer(pointer, source_date)
+                package_relative, package_id = _validate_pointer(
+                    pointer, source_date, product_scope
+                )
             except WarehouseSyncError as exc:
                 raise WarehouseSyncError(
                     f"CN01 DWD CURRENT package binding is invalid: {exc}",
@@ -290,6 +331,15 @@ def sync_latest(*, local_root: Path, market_date: date | None = None) -> Warehou
                     f"CN01 DWD package failed verification: {exc}",
                     code="source_package_invalid",
                 ) from exc
+            product_manifest = _object(staged_package / "manifest.json")
+            if product_scope == DAILY_CORE_PRODUCT_SCOPE:
+                if (
+                    product_manifest.get("kind") != "cn01_daily_core_dwd_increment"
+                    or product_manifest.get("product_scope") != DAILY_CORE_PRODUCT_SCOPE
+                ):
+                    raise WarehouseSyncError("source DWD is not the declared daily-core product")
+            elif product_manifest.get("kind") != "cn01_daily_dwd_domain_increment":
+                raise WarehouseSyncError("legacy DWD source package contract changed")
             if (
                 pointer.get("package_id") != result.package_id
                 or pointer.get("manifest_sha256") != result.manifest_sha256
@@ -297,7 +347,7 @@ def sync_latest(*, local_root: Path, market_date: date | None = None) -> Warehou
             ):
                 raise WarehouseSyncError("remote DWD CURRENT does not bind the package manifest")
             local_package = local_root / package_relative
-            local_pointer = _local_current(local_root)
+            local_pointer = _local_current(local_root, product_scope)
             changed = _ensure_monotonic(local_pointer, pointer, source_date)
             if local_package.exists():
                 try:
@@ -313,7 +363,7 @@ def sync_latest(*, local_root: Path, market_date: date | None = None) -> Warehou
                 local_package.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(staged_package, local_package)
             if changed:
-                _atomic_bytes(local_root / "CURRENT.json", remote_current.read_bytes())
+                _atomic_bytes(local_root / pointer_name, remote_current.read_bytes())
             receipt = {
                 "schema_version": 1,
                 "kind": "oci_cn01_dwd_daily_sync",
@@ -325,6 +375,10 @@ def sync_latest(*, local_root: Path, market_date: date | None = None) -> Warehou
                 "changed": changed,
                 "synced_at": datetime.now(ZoneInfo("UTC")).isoformat(),
             }
+            if product_scope == DAILY_CORE_PRODUCT_SCOPE:
+                receipt["schema_version"] = 2
+                receipt["kind"] = "oci_cn01_daily_core_dwd_sync"
+                receipt["product_scope"] = DAILY_CORE_PRODUCT_SCOPE
             _atomic_bytes(
                 local_root / "receipts" / source_date.isoformat() / f"{result.package_id}.json",
                 json.dumps(
@@ -378,9 +432,7 @@ def _read_pending_target(local_root: Path) -> date | None:
         ) from exc
 
 
-def _resolve_pending_target(
-    *, local_root: Path, requested_date: date | None
-) -> date:
+def _resolve_pending_target(*, local_root: Path, requested_date: date | None) -> date:
     pending = _read_pending_target(local_root)
     if pending is not None:
         if requested_date is not None and requested_date != pending:
@@ -452,6 +504,11 @@ def _write_failure_receipt(
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--local-root", type=Path, required=True)
+    parser.add_argument(
+        "--product-scope",
+        choices=(LEGACY_PRODUCT_SCOPE, DAILY_CORE_PRODUCT_SCOPE),
+        default=LEGACY_PRODUCT_SCOPE,
+    )
     parser.add_argument("--market-date")
     parser.add_argument("--wait-seconds", type=int, default=0)
     parser.add_argument("--poll-seconds", type=int, default=60)
@@ -478,14 +535,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     while True:
         attempts += 1
         try:
-            result = sync_latest(local_root=local_root, market_date=expected_date)
+            if args.product_scope == LEGACY_PRODUCT_SCOPE:
+                # Preserve legacy caller/testing surface and original deployment contract.
+                result = sync_latest(
+                    local_root=local_root,
+                    market_date=expected_date,
+                )
+            else:
+                result = sync_latest(
+                    local_root=local_root,
+                    market_date=expected_date,
+                    product_scope=args.product_scope,
+                )
             break
         except WarehouseSyncError as exc:
             # The OCI wall clock is only a start time. A stale prior-day pointer is an
             # expected wait condition until CN01 publishes today's READY-gated DWD package.
-            waitable_can_wait = (
-                exc.code in _WAITABLE_ERROR_CODES and time.monotonic() < deadline
-            )
+            waitable_can_wait = exc.code in _WAITABLE_ERROR_CODES and time.monotonic() < deadline
             transient_can_retry = attempts < args.max_attempts
             if not waitable_can_wait and not transient_can_retry:
                 failure = exc

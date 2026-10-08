@@ -20,10 +20,12 @@ from pathlib import Path
 from typing import Any
 
 from .base22 import CONTRACT_SHA, EXTENSION_SHA, MODEL_SHA, _physical, digest, file_sha, schemas
-from .base22_bounded import BoundedError, Budget, GlobalScan, identifier
+from .base22_bounded import BoundedError, Budget, GlobalScan, Limits
 from .base22_delivery import HARD_CHECKS, PURPOSE, assess_delivery, validate_contract
 from .base22_holder_component_union import check_component_global_keys
+from .base22_native_coordinates import check_decoded, predicates
 from .base22_native_keys import NativeGlobalScan
+from .base22_native_transfer import OwnedTransfer
 from .base22_sources import _fingerprint, _member, _tree, disjoint_output, physical_path
 
 KIND = "dwd_base22_native_purpose_qualified_candidate_v2"
@@ -161,7 +163,13 @@ def _normalized_batches(paths: list[Path], schema: Any, rows: int) -> Iterator[A
 
 
 def typed_summary(
-    paths: list[Path], schema: Any, *, check: Callable[[], None], batch_rows: int = 8192
+    paths: list[Path],
+    schema: Any,
+    *,
+    check: Callable[[], None],
+    batch_rows: int = 8192,
+    part: str | None = None,
+    rule: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Scan every value without converting protected prices to Python documents.
 
@@ -173,6 +181,8 @@ def typed_summary(
     count = 0
     for batch in _normalized_batches(paths, schema.remove_metadata(), batch_rows):
         check()
+        if part is not None and rule is not None:
+            check_decoded(batch, part, rule)
         data = batch.serialize().to_pybytes()
         h.update(len(data).to_bytes(8, "big"))
         h.update(data)
@@ -202,7 +212,6 @@ def check_partition_coordinates(
     rows: int,
 ) -> None:
     """Vectorized date-only projection, never a full historical Python row loop."""
-    pa = importlib.import_module("pyarrow")
     if not rows:
         if part != "empty":
             raise BoundedError("NATIVE_IMAGE_EMPTY_PARTITION_CHANGED")
@@ -211,27 +220,13 @@ def check_partition_coordinates(
         if part != "all":
             raise BoundedError("NATIVE_IMAGE_FLAT_PARTITION_CHANGED")
         return
-    labels = [p.split("=", 1) for p in part.split("/")]
-    if any(len(p) != 2 for p in labels) or [p[0] for p in labels] != rule["partition_by"]:
-        raise BoundedError("NATIVE_IMAGE_PARTITION_LABEL_CHANGED")
-    predicates = []
-    for field, value in labels:
-        if field.endswith(("_year", "_month")):
-            source, unit = field.rsplit("_", 1)
-            expr = identifier(source)
-            if pa.types.is_timestamp(schema.field(source).type):
-                expr = "timezone('Asia/Shanghai'," + expr + ")"
-            expr = unit + "(" + expr + ")"
-        else:
-            expr = identifier(field)
-        literal = "'" + value.replace("'", "''") + "'"
-        predicates.append(f"CAST({expr} AS VARCHAR) IS DISTINCT FROM {literal}")
+    expressions = predicates(part, rule, schema)
     view = "image_partition_coordinates"
     scan.connection.read_parquet([str(p) for p in paths], hive_partitioning=False).create_view(
         view, replace=True
     )
     scan.reject(
-        "SELECT 1 FROM " + view + " WHERE " + " OR ".join(predicates) + " LIMIT 1",
+        "SELECT 1 FROM " + view + " WHERE " + " OR ".join(expressions) + " LIMIT 1",
         "NATIVE_IMAGE_PARTITION_COORDINATE_CHANGED",
     )
     scan.connection.execute("DROP VIEW " + view)
@@ -269,6 +264,7 @@ def materialize_native_image(
     rss_limit: int,
     wall_seconds: int,
     config_root: Path,
+    owned_reuse: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Copy pinned independent entities; leave a materialization, never write READY.
 
@@ -304,6 +300,57 @@ def materialize_native_image(
         if file_sha(p) != sha or json.loads(p.read_bytes()) != value:
             raise BoundedError("NATIVE_IMAGE_FROZEN_CONFIGURATION_CHANGED")
         configuration_bytes[name] = p.read_bytes()
+    transfer = (
+        OwnedTransfer(plan=plan, output=output, kind=KIND, **owned_reuse) if owned_reuse else None
+    )
+    # Project all physical coordinates before copying an expensive full image.
+    # Parquet range statistics accelerate this preflight; cold decoded batches
+    # still independently prove every row's coordinates.
+    preflight_root = disjoint_output(
+        output.parent / ("." + output.name + ".partition-preflight"), list(roots.values())
+    )
+    with (
+        Budget(
+            preflight_root,
+            list(roots.values()),
+            Limits(
+                allocated_bytes=min(allocated_limit, 64 * 1024**2),
+                temp_bytes=min(allocated_limit, 64 * 1024**2),
+                free_floor_bytes=free_floor,
+                rss_bytes=rss_limit,
+                wall_seconds=wall_seconds,
+            ),
+        ) as preflight_budget,
+        NativeGlobalScan(preflight_budget) as scan,
+    ):
+        pq = importlib.import_module("pyarrow.parquet")
+        for table, entry in sorted(plan["tables"].items()):
+            preflight_budget.begin_stage("physical-partition-preflight-" + table)
+            parts: dict[str, list[Path]] = {}
+            counts: Counter[str] = Counter()
+            for item in entry["files"]:
+                path = _member(roots[item["source_id"]], item["path"])
+                pf = pq.ParquetFile(path)
+                if (
+                    not pf.schema_arrow.equals(expected_schemas[table], check_metadata=False)
+                    or pf.metadata.num_rows != item["rows"]
+                ):
+                    raise BoundedError("NATIVE_IMAGE_INPUT_SCHEMA_OR_ROWS_CHANGED")
+                parts.setdefault(item["partition"], []).append(path)
+                counts[item["partition"]] += item["rows"]
+            for part, paths in parts.items():
+                check_partition_coordinates(
+                    scan,
+                    paths=paths,
+                    part=part,
+                    rule=rules["tables"][table],
+                    schema=expected_schemas[table],
+                    rows=counts[part],
+                )
+            print(
+                json.dumps({"input_partitions_preflight": table, "files": len(entry["files"])}),
+                flush=True,
+            )
     started, allocated = time.monotonic(), 0
 
     def guard(reserve: int = 0) -> None:
@@ -333,6 +380,8 @@ def materialize_native_image(
         with (output / "contract" / name).open("xb") as stream:
             stream.write(data)
     _write(output / "evidence/limitations.json", limitations)
+    if transfer is not None:
+        _write(output / "evidence/owned-transfer-registration.json", transfer.registration)
     for sid, data in descriptor_bytes.items():
         p = output / "evidence/sources" / (sid + ".json")
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -359,17 +408,25 @@ def materialize_native_image(
             target.parent.mkdir(parents=True, exist_ok=True)
             guard(math.ceil(item["size_bytes"] / 4096) * 4096)
             h, copied = hashlib.sha256(), 0
-            with source.open("rb") as src, target.open("xb") as dst:
-                while data := src.read(1024 * 1024):
-                    if copied + len(data) > item["size_bytes"]:
-                        raise BoundedError("NATIVE_IMAGE_INPUT_GREW")
-                    dst.write(data)
-                    h.update(data)
-                    copied += len(data)
-                    guard()
+            if transfer is not None and (item["source_id"], item["path"]) in transfer.files:
+                if file_sha(source) != item["sha256"]:
+                    raise BoundedError("NATIVE_IMAGE_INPUT_CHANGED_BEFORE_TRANSFER")
+                if not transfer.move(item, target):
+                    raise BoundedError("NATIVE_OWNED_TRANSFER_UNEXPECTED_MISS")
+                copied, actual_hash = item["size_bytes"], file_sha(target)
+            else:
+                with source.open("rb") as src, target.open("xb") as dst:
+                    while data := src.read(1024 * 1024):
+                        if copied + len(data) > item["size_bytes"]:
+                            raise BoundedError("NATIVE_IMAGE_INPUT_GREW")
+                        dst.write(data)
+                        h.update(data)
+                        copied += len(data)
+                        guard()
+                actual_hash = "sha256:" + h.hexdigest()
             allocated += target.stat().st_blocks * 512
             if (
-                "sha256:" + h.hexdigest() != item["sha256"]
+                actual_hash != item["sha256"]
                 or copied != item["size_bytes"]
                 or _fingerprint(source) != before
                 or target.stat().st_nlink != 1
@@ -519,7 +576,9 @@ def audit_native_image(root: Path, budget: Budget) -> dict[str, Any]:
                     rows=counts[part],
                 )
             summaries[table] = {
-                part: typed_summary(files, ss[table], check=budget.check)
+                part: typed_summary(
+                    files, ss[table], check=budget.check, part=part, rule=rules["tables"][table]
+                )
                 for part, files in parts.items()
             }
             print(json.dumps({"audited_table": table, "rows": sum(counts.values())}), flush=True)

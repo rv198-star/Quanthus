@@ -204,6 +204,47 @@ def _native_fixture(tmp_path, *, intraday_bar=False):
     return f, config, source, plan
 
 
+def test_mixed_shanghai_month_input_fails_before_materialization_directory(tmp_path):
+    f, config, source, plan = _native_fixture(tmp_path, intraday_bar=True)
+    table = "dwd_security_bar"
+    path = source / (table + ".parquet")
+    original = pq.read_table(path)
+    rows = original.to_pylist() * 2
+    for index, row in enumerate(rows):
+        row["observation_start"] = datetime(2026, 7, 31, 15 + index, tzinfo=timezone.utc)
+        row["observation_end"] = row["observation_start"].replace(minute=1)
+    pq.write_table(pa.Table.from_pylist(rows, schema=original.schema), path)
+    item = plan["tables"][table]["files"][0]
+    item.update(rows=2, size_bytes=path.stat().st_size, sha256=legacy.file_sha(path))
+    plan["tables"][table].update(rows=2, expected_partition_rows={item["partition"]: 2})
+    manifest = json.loads((source / "manifest.json").read_bytes())
+    for member in manifest["files"]:
+        if member["path"] == path.name:
+            member["sha256"] = item["sha256"]
+    (source / "manifest.json").write_text(json.dumps(manifest))
+    plan["sources"]["fixture"]["descriptor_sha256"] = legacy.file_sha(source / "manifest.json")
+    before = path.read_bytes()
+    output = tmp_path / "must-not-exist"
+    with pytest.raises(BoundedError, match="NATIVE_IMAGE_PARTITION_COORDINATE_CHANGED"):
+        n.materialize_native_image(
+            plan=plan,
+            rules=f.contract,
+            contract=json.loads((config / "base22-delivery.v2.json").read_bytes()),
+            model=f.model,
+            extension=f.extension,
+            limitations=[],
+            local_evidence={},
+            output=output,
+            allocated_limit=64 * 1024**2,
+            free_floor=1,
+            rss_limit=4 * 1024**3,
+            wall_seconds=30,
+            config_root=config,
+        )
+    assert not output.exists()
+    assert path.read_bytes() == before
+
+
 @pytest.mark.parametrize(
     "intraday_bar,affected", [(False, "dwd_security_bar"), (True, "dwd_tradability_state")]
 )

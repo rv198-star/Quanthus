@@ -127,6 +127,52 @@ def test_unknown_percentage_denominator_stays_unknown_and_plans_stay_held():
     assert not rows[TABLE] and proof["held_blocks"] == 1
 
 
+def test_literal_employee_scheme_change_is_not_a_forecast_because_its_name_contains_plan():
+    rows, proof = project(BODY.replace("二级市场卖出", "员工持股计划"))
+    assert len(rows[TABLE]) == 1
+    assert rows[TABLE][0]["change_type"] == "员工持股计划"
+    assert proof["held_blocks"] == 0
+
+
+def test_type_and_name_wraps_preserve_all_original_text_without_new_data_rows():
+    text = BODY.replace("｜二级市场卖出｜\n└", "｜可交换债券换｜\n｜｜完整名称｜｜｜｜｜股｜\n└")
+    rows, _ = project(text)
+    assert rows[TABLE][0]["change_type"] == "可交换债券换股"
+    assert rows[TABLE][0]["shareholder_source_name"] == "合成股东完整名称"
+
+
+def test_exact_empty_section_is_source_scoped_evidence_and_unknown_body_is_held():
+    rows, proof = project("【3.股东持股变动】\n暂无数据\n【4.股东变化】\n其他非空领域")
+    assert not rows[TABLE]
+    assert proof["source_declared_empty_sections"] == 1
+    assert proof["held_blocks"] == 0
+    _, held = project("【3.股东持股变动】\n未解析非空数据\n【4.股东变化】")
+    assert held["held_blocks"] == 1
+    assert held["blocks"][0]["reason"] == "HOLDER_CHANGE_NONEMPTY_SECTION_HEADER_UNQUALIFIED"
+
+
+def test_real_changed_observation_closes_interval_and_unchanged_evidence_does_not_fake_revision():
+    from datetime import timedelta
+
+    from quanthus.pipelines.securities_warehouse.base22_outputs import knowledge_versions
+
+    rows, _ = project()
+    first = rows[TABLE][0]
+    unchanged = {**first, "knowledge_from": first["knowledge_from"] + timedelta(days=7)}
+    changed = {
+        **first,
+        "knowledge_from": first["knowledge_from"] + timedelta(days=21),
+        "post_holding": Decimal("7501.0000000000"),
+        "raw_post_holding": "7501",
+    }
+    original = deepcopy([first, unchanged, changed])
+    actual = knowledge_versions(
+        [first, unchanged, changed], {"business_key": ["shareholding_change_id"]}
+    )
+    assert actual == [{**first, "knowledge_to": changed["knowledge_from"]}, changed]
+    assert [first, unchanged, changed] == original
+
+
 def test_replay_closure_includes_all_recursive_local_imports():
     import ast
     from pathlib import Path
@@ -182,3 +228,57 @@ def test_changed_raw_member_is_rejected_before_interpreting_its_payload(tmp_path
     }
     with pytest.raises(BoundedError, match="HOLDER_CHANGE_ORIGINAL_RAW_MEMBER_CHANGED"):
         replay_change_sources(tmp_path, body, None, None)
+
+
+@pytest.mark.parametrize("case", ["correct", "equal_clock_conflict", "fifth_observation"])
+def test_global_version_sort_closes_across_physical_files_without_changing_atoms(tmp_path, case):
+    import shutil
+    from pathlib import Path
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from quanthus.pipelines.securities_warehouse.base22 import file_sha, load_contract, schemas
+    from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError, Budget, Limits
+    from quanthus.pipelines.securities_warehouse.base22_holder_change_source import (
+        change_version_batches,
+    )
+    from quanthus.pipelines.securities_warehouse.base22_sources import SourceAssessmentError
+
+    _, model, extension = load_contract(Path("config/pipelines"))
+    schema = schemas(model, extension)[TABLE]
+    root = tmp_path / "owned-job"
+    limits = Limits(allocated_bytes=64 * 1024**2, temp_bytes=32 * 1024**2, free_floor_bytes=1)
+    with Budget(root, [], limits) as budget:
+        shutil.copytree(Path("config/pipelines"), root / "contract")
+        atoms, originals = {}, []
+        for n, day in enumerate(("2026-08-01", "2026-08-08", "2026-08-22", "2026-08-29")):
+            data = raw(BODY if n < 2 else BODY.replace("7500", "7501"), "股东研究")
+            data["acquired_at"] = day + "T08:00:03.123456+08:00"
+            rows, _ = project_change_tables(
+                data, source_sha256="sha256:" + "a" * 64, resolver=resolve()
+            )
+            if case == "equal_clock_conflict" and n == 2:
+                rows[TABLE][0]["knowledge_from"] = originals[0]["knowledge_from"]
+            if case == "fifth_observation" and n == 3:
+                rows[TABLE].append(deepcopy(rows[TABLE][0]))
+            originals.extend(rows[TABLE])
+            path = root / (day + ".parquet")
+            pq.write_table(pa.Table.from_pylist(rows[TABLE], schema=schema), path)
+            atoms[day] = {"path": path.name}
+        before = {day: file_sha(root / i["path"]) for day, i in atoms.items()}
+        if case == "correct":
+            actual = [row for batch in change_version_batches(root, atoms, budget) for row in batch]
+            assert actual == [
+                {**originals[0], "knowledge_to": originals[2]["knowledge_from"]},
+                originals[2],
+            ]
+        else:
+            reason = (
+                "EQUAL_CLOCK_BODY_CONFLICT"
+                if case == "equal_clock_conflict"
+                else "GROUP_BOUND_EXCEEDED"
+            )
+            with pytest.raises((BoundedError, SourceAssessmentError), match=reason):
+                list(change_version_batches(root, atoms, budget))
+        assert before == {day: file_sha(root / i["path"]) for day, i in atoms.items()}

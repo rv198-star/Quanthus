@@ -11,17 +11,20 @@ import hashlib
 import json
 import re
 from collections import Counter, defaultdict
+from collections.abc import Iterator
 from datetime import date
 from decimal import Decimal, Inexact, localcontext
+from itertools import groupby
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from .base22 import THROUGH, _physical, canonical, digest, file_sha, load_contract, schemas
-from .base22_bounded import BoundedError, Budget, GlobalScan
+from .base22_bounded import BoundedError, Budget, GlobalScan, identifier
 from .base22_f10_ownership import _cells
 from .base22_financial import _clock
 from .base22_holder_literals import _CHANGE_HEADERS
+from .base22_outputs import knowledge_versions
 from .base22_precision import decimal_profile
 from .base22_sources import _tree
 from .financial_reporting import (
@@ -149,8 +152,9 @@ def project_change_tables(
                     if units is not None or pending:
                         raise BoundedError("HOLDER_CHANGE_SOURCE_UNIT_HEADER_CONFLICT")
                     units = cells
-                elif pending and not cells[0] and cells[1] and not any(cells[2:]):
+                elif pending and not cells[0] and not any(cells[2:6]) and (cells[1] or cells[6]):
                     pending[-1][1] += cells[1]
+                    pending[-1][6] += cells[6]
                 elif _DAY.fullmatch(cells[0]):
                     pending.append(cells)
                 else:
@@ -165,7 +169,12 @@ def project_change_tables(
                     continue
                 if day > acquired.astimezone(ZoneInfo("Asia/Shanghai")).date():
                     raise BoundedError("HOLDER_CHANGE_FUTURE_OBSERVATION_STATUS_UNPROVED")
-                if not cells[1] or not cells[6] or re.search(r"拟|计划|预计|意向", cells[6]):
+                if (
+                    not cells[1]
+                    or not cells[6]
+                    or cells[6] != "员工持股计划"
+                    and re.search(r"拟|计划|预计|意向", cells[6])
+                ):
                     raise BoundedError(
                         "HOLDER_CHANGE_SOURCE_ACTUAL_HOLDER_AND_CHANGE_KIND_REQUIRED"
                     )
@@ -258,8 +267,29 @@ def project_change_tables(
         else:
             output.append(values[0][0])
             counts["exact_duplicate_source_rows"] += len(values) - 1
-    if not starts and re.search(r"【\d+\.股东持股变动】", content):
-        counts["held_blocks"] += 1
+    if not starts:
+        sections = [
+            n
+            for n, line in enumerate(lines)
+            if re.fullmatch(r"【\d+\.股东持股变动】", line.strip())
+        ]
+        for n in sections:
+            end = next(
+                (k for k in range(n + 1, len(lines)) if re.match(r"【\d+\.", lines[k].strip())),
+                len(lines),
+            )
+            body = [line.strip() for line in lines[n + 1 : end] if line.strip()]
+            if body == ["暂无数据"]:
+                counts["source_declared_empty_sections"] += 1
+            else:
+                counts["held_blocks"] += 1
+                blocks.append(
+                    {
+                        "status": "HELD_NOT_EMPTY_COVERAGE",
+                        "reason": "HOLDER_CHANGE_NONEMPTY_SECTION_HEADER_UNQUALIFIED",
+                        "original_block_sha256": digest("\n".join(lines[n:end])),
+                    }
+                )
     proof = {
         "contract_id": CONTRACT_ID,
         "raw_row_sha256": digest(raw),
@@ -274,6 +304,7 @@ def project_change_tables(
         "held_natural_keys": counts["held_natural_keys"],
         "exact_duplicate_source_rows": counts["exact_duplicate_source_rows"],
         "excluded_after_cutoff_rows": counts["excluded_after_cutoff_rows"],
+        "source_declared_empty_sections": counts["source_declared_empty_sections"],
         "whole_change_scope": "HELD_NOT_EMPTY_COVERAGE"
         if counts["held_blocks"] or counts["held_natural_keys"]
         else "COMPLETE_SELECTED_CHANGE_TABLES"
@@ -357,8 +388,9 @@ def replay_change_sources(
                     "held_natural_keys",
                     "exact_duplicate_source_rows",
                     "excluded_after_cutoff_rows",
+                    "source_declared_empty_sections",
                 ):
-                    counts[field] += proof[field]
+                    counts[field] += proof.get(field, 0)
                 for block in proof["blocks"]:
                     if block["status"] != "EXACT_COMPLETE_SOURCE_CHANGE_TABLE":
                         held[block["reason"]] += 1
@@ -372,6 +404,48 @@ def replay_change_sources(
     }
     result["identity"] = digest(result)
     return result
+
+
+def change_version_batches(
+    root: Path, atoms: dict[str, Any], budget: Budget
+) -> Iterator[list[dict[str, Any]]]:
+    """Sort four source observations globally; bound each key to four versions.
+
+    All original source atoms stay in the image. Only the next actual changed
+    source observation closes an interval. No provider priority is granted.
+    """
+    import pyarrow.parquet as pq
+
+    contract, model, extension = load_contract(root / "contract")
+    rule, schema = contract["tables"][TABLE], schemas(model, extension)[TABLE]
+    if set(atoms) != {"2026-08-01", "2026-08-08", "2026-08-22", "2026-08-29"}:
+        raise BoundedError("HOLDER_CHANGE_VERSION_EXACT_SCOPE_REQUIRED")
+    paths = [_physical(root, i["path"], independent=True) for i in atoms.values()]
+    if any(not pq.ParquetFile(p).schema_arrow.equals(schema, check_metadata=False) for p in paths):
+        raise BoundedError("HOLDER_CHANGE_VERSION_SOURCE_SCHEMA_CHANGED")
+    with GlobalScan(budget, read_only_roots=None if root == budget.root else [root]) as scan:
+        scan.add(TABLE, paths)
+        scan.reject(
+            f"SELECT 1 FROM {TABLE} WHERE knowledge_to IS NOT NULL LIMIT 1",
+            "HOLDER_CHANGE_VERSION_SOURCE_MUST_REMAIN_OPEN",
+        )
+        order = ",".join(identifier(k) for k in rule["business_key"] + ["knowledge_from"])
+        reader = scan.connection.execute(f"SELECT * FROM {TABLE} ORDER BY {order}").to_arrow_reader(
+            1024
+        )
+
+        def source() -> Iterator[dict[str, Any]]:
+            for batch in reader:
+                budget.check(reserve=batch.nbytes * 2)
+                yield from batch.cast(schema, safe=True).to_pylist()
+
+        for _, group in groupby(source(), key=lambda r: tuple(r[k] for k in rule["business_key"])):
+            rows: list[dict[str, Any]] = []
+            for row in group:
+                if len(rows) >= 4:
+                    raise BoundedError("HOLDER_CHANGE_VERSION_GROUP_BOUND_EXCEEDED")
+                rows.append(row)
+            yield knowledge_versions(rows, rule)
 
 
 def audit_change_source_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, Any]:
@@ -408,6 +482,7 @@ def audit_change_source_scope(root: Path, body: dict[str, Any], budget: Budget) 
         predecessor["identity"] != digest({k: v for k, v in predecessor.items() if k != "identity"})
         or predecessor["identity"] != body["source_identity"]
         or body["raw_inputs"] != predecessor["raw_local_members"]
+        or body["parents"] != predecessor["parents"]
     ):
         raise BoundedError("HOLDER_CHANGE_OFFLINE_EXACT_SOURCE_SELECTION_CHANGED")
     registration = json.loads((root / "evidence/write-registration.json").read_bytes())
@@ -421,7 +496,7 @@ def audit_change_source_scope(root: Path, body: dict[str, Any], budget: Budget) 
     contract, model, extension = load_contract(root / "contract")
     ss = schemas(model, extension)
     streams, proofs = {}, {}
-    for day, item in body["outputs"].items():
+    for day, item in body["source_atoms"].items():
         physical = pq.ParquetFile(root / item["path"])
         if (
             not physical.schema_arrow.equals(ss[TABLE], check_metadata=False)
@@ -465,6 +540,30 @@ def audit_change_source_scope(root: Path, body: dict[str, Any], budget: Budget) 
     finally:
         for stream in proofs.values():
             stream.close()
+    version_streams = {}
+    for day, item in body["outputs"].items():
+        physical = pq.ParquetFile(root / item["path"])
+        if (
+            not physical.schema_arrow.equals(ss[TABLE], check_metadata=False)
+            or physical.metadata.num_rows != item["rows"]
+        ):
+            raise BoundedError("HOLDER_CHANGE_OFFLINE_VERSION_SCHEMA_OR_COUNT_CHANGED")
+        version_streams[day] = (
+            r for batch in physical.iter_batches(1024) for r in batch.to_pylist()
+        )
+    day_by_sha = {i["original_member_sha256"]: i["source_day"] for i in body["raw_inputs"]}
+    version_counts: Counter[str] = Counter()
+    for expected in change_version_batches(root, body["source_atoms"], budget):
+        for row in expected:
+            day = day_by_sha[row["source_artifact_sha256"]]
+            if next(version_streams[day], None) != row:
+                raise BoundedError("HOLDER_CHANGE_OFFLINE_SOURCE_VERSION_ATOMS_CHANGED")
+            version_counts[day] += 1
+    if (
+        any(next(s, None) is not None for s in version_streams.values())
+        or {d: version_counts[d] for d in body["outputs"]} != body["version_rows_by_source_day"]
+    ):
+        raise BoundedError("HOLDER_CHANGE_OFFLINE_EXTRA_SOURCE_VERSIONS_OR_COUNTS_CHANGED")
     with GlobalScan(budget, read_only_roots=[root]) as scan:
         paths = [root / i["path"] for i in body["outputs"].values()]
         scan.add(TABLE, paths)
@@ -486,7 +585,8 @@ def audit_change_source_scope(root: Path, body: dict[str, Any], budget: Budget) 
     return {
         "status": "ALL_LOCAL_RAW_CHANGE_GLOBAL_SCHEMA_TIME_PARENT_REPLAY_PASS_NOT_NATIVE_UNION",
         "scope_identity": body["identity"],
-        "typed_rows": replay["counts"]["typed_rows"],
+        "typed_rows": sum(version_counts.values()),
+        "original_source_atoms": replay["counts"]["typed_rows"],
         "raw_rows": replay["counts"]["holder_raw_rows"],
         "consumer_admission": "NOT_GRANTED",
         "complete_Base22": False,

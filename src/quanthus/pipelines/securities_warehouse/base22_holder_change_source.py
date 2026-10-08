@@ -8,27 +8,54 @@ historical knowledge, a legacy source alias or a cross-provider event priority.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from collections import Counter, defaultdict
 from datetime import date
 from decimal import Decimal, Inexact, localcontext
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from .base22 import THROUGH, digest
-from .base22_bounded import BoundedError
+from .base22 import THROUGH, _physical, canonical, digest, file_sha, load_contract, schemas
+from .base22_bounded import BoundedError, Budget, GlobalScan
 from .base22_f10_ownership import _cells
 from .base22_financial import _clock
 from .base22_holder_literals import _CHANGE_HEADERS
 from .base22_precision import decimal_profile
-from .financial_reporting import FinancialCompanyResolver
+from .base22_sources import _tree
+from .financial_reporting import (
+    FinancialCompanyResolver,
+    financial_company_resolver_from_listed_company_rows,
+)
 from .ownership_capital import _effective_start, _stable_holder_key, _stable_id
 
 CONTRACT_ID = "p10-base22-complete-retained-holder-change-source-v1"
 TABLE = "dwd_shareholding_change"
+CONFIG = "base22-holder-change-source.v1.json"
+REPLAY_MODULES = (
+    "base22.py",
+    "base22_august.py",
+    "base22_bounded.py",
+    "base22_f10_ownership.py",
+    "base22_financial.py",
+    "base22_holder_change_source.py",
+    "base22_holder_literals.py",
+    "base22_outputs.py",
+    "base22_precision.py",
+    "base22_sources.py",
+    "daily_price_basis.py",
+    "disclosure_event.py",
+    "financial_reporting.py",
+    "ownership_capital.py",
+)
 _QUANTITY = re.compile(r"(?P<n>[+-]?\d+(?:\.\d+)?)(?P<u>亿股?|万股?|股)?")
 _RATIO = re.compile(r"[+-]?\d+(?:\.\d+)?%?")
 _DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def _share_header(token: str) -> bool:
+    return bool(re.fullmatch(r"(?:持股数)?\(股\)|股", token))
 
 
 def _quantity(token: str, *, explicit_share_unit: bool, signed: bool) -> Decimal | None:
@@ -148,13 +175,19 @@ def project_change_tables(
                 # Retain before quantity in the source atom proof; the native
                 # model has no shares-before column. Do not derive a delta.
                 _quantity(
-                    cells[2], explicit_share_unit=bool(units and "股" in units[2]), signed=False
+                    cells[2],
+                    explicit_share_unit=bool(units and _share_header(units[2])),
+                    signed=False,
                 )
                 changed = _quantity(
-                    cells[3], explicit_share_unit=bool(units and "股" in units[3]), signed=True
+                    cells[3],
+                    explicit_share_unit=bool(units and _share_header(units[3])),
+                    signed=True,
                 )
                 after = _quantity(
-                    cells[4], explicit_share_unit=bool(units and "股" in units[4]), signed=False
+                    cells[4],
+                    explicit_share_unit=bool(units and _share_header(units[4])),
+                    signed=False,
                 )
                 ratio = _ratio(
                     cells[5],
@@ -194,7 +227,11 @@ def project_change_tables(
                     "raw_post_holding": cells[4],
                     "post_holding_unit": "SHARE" if after is not None else None,
                     "raw_post_percentage": cells[5] if header[5] == "变动后占" else None,
-                    "post_percentage_unit": "PERCENT_OF_SOURCE_TOTAL_SHARES"
+                    "post_percentage_unit": (
+                        "PERCENT_OF_SOURCE_TOTAL_SHARES"
+                        if units and "总股本" in units[5]
+                        else "SOURCE_DECLARED_POST_PERCENT_BASIS_UNAVAILABLE"
+                    )
                     if ratio is not None and header[5] == "变动后占"
                     else None,
                     "parser_version": CONTRACT_ID,
@@ -252,3 +289,205 @@ def project_change_tables(
     }
     proof["identity"] = digest(proof)
     return {TABLE: output}, proof
+
+
+def replay_change_sources(
+    root: Path, body: dict[str, Any], budget: Budget, consume: Any
+) -> dict[str, Any]:
+    """Exactly one source parse per raw; share parent materialization once."""
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]
+
+    _, model, extension = load_contract(root / "contract")
+    ss = schemas(model, extension)
+    parents = {}
+    for name in ("dwd_security", "dwd_security_identifier"):
+        items = body["parents"][name]
+        if sum(i["rows"] for i in items) > 32768:
+            raise BoundedError("HOLDER_CHANGE_PARENT_SCOPE_BOUND_INVALID")
+        parent_rows = []
+        for item in items:
+            physical = pq.ParquetFile(_physical(root, item["path"], independent=True))
+            if physical.metadata.num_rows != item["rows"] or not physical.schema_arrow.equals(
+                ss[name], check_metadata=False
+            ):
+                raise BoundedError("HOLDER_CHANGE_PARENT_SCHEMA_OR_COUNT_CHANGED")
+            parent_rows.extend(physical.read().to_pylist())
+        parents[name] = parent_rows
+    resolver = financial_company_resolver_from_listed_company_rows(
+        parents["dwd_security"], parents["dwd_security_identifier"]
+    )
+    counts: Counter[str] = Counter()
+    held: Counter[str] = Counter()
+    if len(body["raw_inputs"]) != 4 or {i["source_day"] for i in body["raw_inputs"]} != {
+        "2026-08-01",
+        "2026-08-08",
+        "2026-08-22",
+        "2026-08-29",
+    }:
+        raise BoundedError("HOLDER_CHANGE_FOUR_EXACT_RETAINED_WEEKS_REQUIRED")
+    for item in body["raw_inputs"]:
+        raw_path = _physical(root, item["path"], independent=True)
+        if file_sha(raw_path) != item["sha256"]:
+            raise BoundedError("HOLDER_CHANGE_ORIGINAL_RAW_MEMBER_CHANGED")
+        physical = pq.ParquetFile(raw_path)
+        if (
+            not 0 < item["rows"] <= 10000
+            or physical.metadata.num_rows != item["rows"]
+            or raw_path.stat().st_size > 128 * 1024**2
+        ):
+            raise BoundedError("HOLDER_CHANGE_RAW_SCOPE_BOUND_OR_COUNT_CHANGED")
+        seen = set()
+        for batch in physical.iter_batches(16):
+            budget.check()
+            for raw in batch.to_pylist():
+                if raw["category"] == "股本结构":
+                    counts["capital_raw_reused_elsewhere"] += 1
+                    continue
+                if raw["category"] != "股东研究" or raw["stock_code"] in seen:
+                    raise BoundedError("HOLDER_CHANGE_EXACT_CATEGORY_OR_UNIQUE_SECURITY_CHANGED")
+                seen.add(raw["stock_code"])
+                output, proof = project_change_tables(
+                    raw, source_sha256=item["original_member_sha256"], resolver=resolver
+                )
+                counts["holder_raw_rows"] += 1
+                counts["source_tables"] += proof["exact_change_tables"]
+                counts["typed_rows"] += len(output[TABLE])
+                for field in (
+                    "held_blocks",
+                    "held_natural_keys",
+                    "exact_duplicate_source_rows",
+                    "excluded_after_cutoff_rows",
+                ):
+                    counts[field] += proof[field]
+                for block in proof["blocks"]:
+                    if block["status"] != "EXACT_COMPLETE_SOURCE_CHANGE_TABLE":
+                        held[block["reason"]] += 1
+                consume(item, raw["stock_code"], output[TABLE], proof)
+        if len(seen) != 4992:
+            raise BoundedError("HOLDER_CHANGE_FROZEN_SECURITY_SELECTION_CHANGED")
+    result = {
+        "counts": dict(counts),
+        "held_reason_counts": dict(held),
+        "scope": "SOURCE_ATOMS_ONLY_NATIVE_VERSION_UNION_AND_COVERAGE_SEPARATE",
+    }
+    result["identity"] = digest(result)
+    return result
+
+
+def audit_change_source_scope(root: Path, body: dict[str, Any], budget: Budget) -> dict[str, Any]:
+    """Full original raw replay, typed rows, global keys, time, lineage and parents."""
+    import pyarrow.parquet as pq
+
+    if (
+        body.get("contract_id") != CONTRACT_ID
+        or body.get("purpose") != "COMPLETE_RETAINED_CHANGE_TABLE_SOURCE_ATOMS_NOT_NATIVE_UNION"
+        or body.get("identity") != digest({k: v for k, v in body.items() if k != "identity"})
+        or body.get("READY") is not False
+        or body.get("complete_Base22") is not False
+        or body.get("consumer_admission") != "NOT_GRANTED"
+        or set(body.get("code_closure", {})) != set(REPLAY_MODULES)
+        or set(_tree(root)) != set(body["physical_members"]) | {"QUALIFICATION.json"}
+    ):
+        raise BoundedError("HOLDER_CHANGE_OFFLINE_DESCRIPTOR_OR_PHYSICAL_SET_CHANGED")
+    for name, sha in body["code_closure"].items():
+        if file_sha(Path(__file__).with_name(name)) != sha:
+            raise BoundedError("HOLDER_CHANGE_OFFLINE_CODE_CHANGED")
+    for rel, member in body["physical_members"].items():
+        physical = _physical(root, rel, independent=True)
+        if (
+            physical.stat().st_size != member["size_bytes"]
+            or file_sha(physical) != member["sha256"]
+        ):
+            raise BoundedError("HOLDER_CHANGE_OFFLINE_MEMBER_CHANGED")
+        budget.check()
+    frozen_config = Path(__file__).resolve().parents[4] / "config/pipelines" / CONFIG
+    if (root / "contract" / CONFIG).read_bytes() != frozen_config.read_bytes():
+        raise BoundedError("HOLDER_CHANGE_OFFLINE_CONFIG_CHANGED")
+    predecessor = json.loads((root / "evidence/predecessor-scope.json").read_bytes())
+    if (
+        predecessor["identity"] != digest({k: v for k, v in predecessor.items() if k != "identity"})
+        or predecessor["identity"] != body["source_identity"]
+        or body["raw_inputs"] != predecessor["raw_local_members"]
+    ):
+        raise BoundedError("HOLDER_CHANGE_OFFLINE_EXACT_SOURCE_SELECTION_CHANGED")
+    registration = json.loads((root / "evidence/write-registration.json").read_bytes())
+    if (
+        registration["identity"]
+        != digest({k: v for k, v in registration.items() if k != "identity"})
+        or registration["identity"] != body["registration_identity"]
+        or registration["source_identity"] != body["source_identity"]
+    ):
+        raise BoundedError("HOLDER_CHANGE_OFFLINE_WRITE_REGISTRATION_CHANGED")
+    contract, model, extension = load_contract(root / "contract")
+    ss = schemas(model, extension)
+    streams, proofs = {}, {}
+    for day, item in body["outputs"].items():
+        physical = pq.ParquetFile(root / item["path"])
+        if (
+            not physical.schema_arrow.equals(ss[TABLE], check_metadata=False)
+            or physical.metadata.num_rows != item["rows"]
+        ):
+            raise BoundedError("HOLDER_CHANGE_OFFLINE_TYPED_SCHEMA_OR_COUNT_CHANGED")
+        streams[day] = (r for batch in physical.iter_batches(1024) for r in batch.to_pylist())
+        proofs[day] = (root / item["proof_path"]).open("rb")
+
+    admitted: set[tuple[str, str, str]] = set()
+
+    def compare(
+        item: dict[str, Any], code: str, expected: list[dict[str, Any]], proof: dict[str, Any]
+    ) -> None:
+        day = item["source_day"]
+        try:
+            recorded = json.loads(next(proofs[day]))
+            actual = [next(streams[day]) for _ in expected]
+        except (StopIteration, ValueError):
+            raise BoundedError("HOLDER_CHANGE_OFFLINE_REPLAY_STREAM_TRUNCATED") from None
+        if (
+            recorded != {"stock_code": code, "proof": json.loads(canonical(proof))}
+            or actual != expected
+        ):
+            raise BoundedError("HOLDER_CHANGE_OFFLINE_RAW_OR_TYPED_ATOMS_CHANGED")
+        admitted.update(
+            (r["record_source"], r["source_revision"], r["source_artifact_sha256"])
+            for r in expected
+        )
+        budget.check()
+
+    try:
+        replay = replay_change_sources(root, body, budget, compare)
+        sentinel = object()
+        if (
+            any(next(s, sentinel) is not sentinel for s in streams.values())
+            or any(next(s, sentinel) is not sentinel for s in proofs.values())
+            or replay != body["replay_summary"]
+        ):
+            raise BoundedError("HOLDER_CHANGE_OFFLINE_EXTRA_ROWS_OR_SCOPE_CHANGED")
+    finally:
+        for stream in proofs.values():
+            stream.close()
+    with GlobalScan(budget, read_only_roots=[root]) as scan:
+        paths = [root / i["path"] for i in body["outputs"].values()]
+        scan.add(TABLE, paths)
+        rule = contract["tables"][TABLE]
+        scan.keys(TABLE, rule["business_key"], rule["version_key"])
+        scan.row_rules(TABLE, ss[TABLE], rule)
+        scan.lineage(TABLE, sorted(admitted))
+        for parent, items in body["parents"].items():
+            scan.add(parent, [root / i["path"] for i in items])
+        for parent, field in (
+            ("dwd_listed_company", "company_id"),
+            ("dwd_security", "security_id"),
+        ):
+            scan.reject(
+                f"SELECT 1 FROM {TABLE} c WHERE NOT EXISTS(SELECT 1 FROM {parent} p "
+                f"WHERE p.{field}=c.{field}) LIMIT 1",
+                "HOLDER_CHANGE_OFFLINE_PARENT_CLOSURE_FAILED",
+            )
+    return {
+        "status": "ALL_LOCAL_RAW_CHANGE_GLOBAL_SCHEMA_TIME_PARENT_REPLAY_PASS_NOT_NATIVE_UNION",
+        "scope_identity": body["identity"],
+        "typed_rows": replay["counts"]["typed_rows"],
+        "raw_rows": replay["counts"]["holder_raw_rows"],
+        "consumer_admission": "NOT_GRANTED",
+        "complete_Base22": False,
+    }

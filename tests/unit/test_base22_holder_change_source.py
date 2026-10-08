@@ -110,3 +110,75 @@ def test_zero_and_explicit_null_are_not_collapsed_or_imputed():
     rows, _ = project(BODY.replace("-1.25万", "0").replace("7500", "-"))
     assert rows[TABLE][0]["share_change"] == Decimal(0)
     assert rows[TABLE][0]["post_holding"] is None
+
+
+def test_scaled_header_is_not_silently_treated_as_a_single_share():
+    rows, proof = project(BODY.replace("(股)", "(万股)").replace("-1.25万", "-12500"))
+    assert not rows[TABLE]
+    assert proof["held_blocks"] == 1
+
+
+def test_unknown_percentage_denominator_stays_unknown_and_plans_stay_held():
+    rows, _ = project(BODY.replace("总股本比例(%)", "比例(%)"))
+    assert (
+        rows[TABLE][0]["post_percentage_unit"] == "SOURCE_DECLARED_POST_PERCENT_BASIS_UNAVAILABLE"
+    )
+    rows, proof = project(BODY.replace("二级市场卖出", "减持计划"))
+    assert not rows[TABLE] and proof["held_blocks"] == 1
+
+
+def test_replay_closure_includes_all_recursive_local_imports():
+    import ast
+    from pathlib import Path
+
+    from quanthus.pipelines.securities_warehouse.base22_holder_change_source import REPLAY_MODULES
+
+    directory = Path("src/quanthus/pipelines/securities_warehouse")
+    queue, seen = ["base22_holder_change_source"], set()
+    while queue:
+        name = queue.pop()
+        path = directory / (name + ".py")
+        if name in seen or not path.is_file():
+            continue
+        seen.add(name)
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module:
+                queue.append(node.module.split(".")[0])
+    assert {n + ".py" for n in seen} == set(REPLAY_MODULES)
+
+
+def test_changed_raw_member_is_rejected_before_interpreting_its_payload(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from quanthus.pipelines.securities_warehouse.base22 import load_contract, schemas
+    from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError
+    from quanthus.pipelines.securities_warehouse.base22_holder_change_source import (
+        replay_change_sources,
+    )
+
+    monkeypatch.setattr(
+        "quanthus.pipelines.securities_warehouse.base22_holder_change_source."
+        "financial_company_resolver_from_listed_company_rows",
+        lambda *_: resolve(),
+    )
+
+    _, model, extension = load_contract(Path("config/pipelines"))
+    ss = schemas(model, extension)
+    (tmp_path / "contract").symlink_to(Path("config/pipelines").resolve(), target_is_directory=True)
+    parents = {}
+    for name in ("dwd_security", "dwd_security_identifier"):
+        pq.write_table(pa.Table.from_pylist([], schema=ss[name]), tmp_path / (name + ".parquet"))
+        parents[name] = [{"path": name + ".parquet", "rows": 0}]
+    pq.write_table(pa.table({"unapproved": ["never interpreted"]}), tmp_path / "raw.parquet")
+    body = {
+        "parents": parents,
+        "raw_inputs": [
+            {"source_day": d, "path": "raw.parquet", "rows": 1, "sha256": "sha256:" + "a" * 64}
+            for d in ("2026-08-01", "2026-08-08", "2026-08-22", "2026-08-29")
+        ],
+    }
+    with pytest.raises(BoundedError, match="HOLDER_CHANGE_ORIGINAL_RAW_MEMBER_CHANGED"):
+        replay_change_sources(tmp_path, body, None, None)

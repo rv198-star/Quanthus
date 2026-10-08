@@ -35,7 +35,9 @@ ALLOWED_DATES = ("2026-09-24", "2026-09-28", "2026-09-29", "2026-09-30", "2026-1
 
 
 def _bytes(obj: object) -> bytes:
-    return (json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n").encode("ascii")
+    return (
+        json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
+    ).encode("ascii")
 
 
 def _sha(path: Path) -> str:
@@ -238,8 +240,7 @@ def publish(
         or summary["source_mode"] != mode
         or summary["provider"] != "tencent_mkline_m1"
         or summary["raw_source_root"] != str(raw_source)
-        or (research_dwd / "READY").exists()
-        != (summary["status"] == "RESEARCH_READY_LOSS_AWARE")
+        or (research_dwd / "READY").exists() != (summary["status"] == "RESEARCH_READY_LOSS_AWARE")
     ):
         raise ValueError("research quality source or READY mismatch")
 

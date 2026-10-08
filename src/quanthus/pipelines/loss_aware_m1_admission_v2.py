@@ -486,9 +486,11 @@ def build_v2(
             for code in sorted(original):
                 old_grade = original[code]
                 record = _status_record(old_grade, source)
-                if (states[code] == "0") != (record["quality_grade"] == "SUSPENDED"):
-                    if record["quality_grade"] != "R3":
-                        raise ValueError("no-trade/source-grade discrepancy")
+                if (
+                    (states[code] == "0") != (record["quality_grade"] == "SUSPENDED")
+                    and record["quality_grade"] != "R3"
+                ):
+                    raise ValueError("no-trade/source-grade discrepancy")
                 stream.write(_bytes(record).decode("ascii"))
                 status[code] = record
                 if record["formally_ingested"]:

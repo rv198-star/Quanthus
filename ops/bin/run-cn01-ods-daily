@@ -30,6 +30,7 @@ from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (  # noqa:
 )
 from quanthus.pipelines.source_maturity import source_maturity_deferred  # noqa: E402
 from quanthus.pipelines.trading_maturity import (  # noqa: E402
+    NonTradingSessionDate,
     minute_maturity_eligible,
     verified_next_session,
 )
@@ -440,6 +441,10 @@ def main() -> int:
             defer_one_minute = not minute_maturity_eligible(
                 market_date, datetime.now(SHANGHAI), maturity_evidence
             )
+        except NonTradingSessionDate:
+            # Let existing explicit closed-session lane receipts control a
+            # non-trading date; do not turn holidays into false source alarms.
+            defer_one_minute = False
         except (OSError, RuntimeError, ValueError) as exc:
             print(
                 json.dumps(
@@ -616,8 +621,10 @@ def main() -> int:
                 "manifest_sha256": verified.manifest_sha256,
             }
         pending_by_lane = {job.lane: job for job in pending}
-        if defer_one_minute and "intraday-1m" in pending_by_lane:
-            del pending_by_lane["intraday-1m"]
+        if defer_one_minute:
+            # A previously published minute READY is not T+1 admission on T;
+            # hold that lane even if old release discovery found a legacy READY.
+            pending_by_lane.pop("intraday-1m", None)
             state["lanes"]["intraday-1m"] = {
                 "status": "deferred_source_maturity",
                 "reason": "next_trading_session_minute_maturity_not_due",

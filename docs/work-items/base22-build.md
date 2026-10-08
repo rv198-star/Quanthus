@@ -201,6 +201,14 @@ T+n 只是源文注释，不推算交易日历。新年度公告角色仍需批�
 
 ## Current recovery checkpoint
 
+#481 opt-in `p10-base22-literal-current-A-and-printed-combined-gross-v17` 只读取
+明确实施的当前 A 股含税现金对象。原文合计字段与 A 股总比例一致时采用原文
+合计，不通过分项加总、除息摊薄额或支付净额生成数值；年度与季度合并表头另需
+完整两项含税方案及原文免代扣机构金额证明。不同股东范围不得折成一个数值。
+H 股观察分别由原文排除声明、历史批准章节的总股本字段或完整境外税务引用段
+分类并绑定原文哈希；未知 H 股范围继续 held，境外权益不获资格。当前 A 股声明、
+准确日期、原单位、全 primary 一致性和真实新知识时刻由构建与离线重放共用。
+
 工作区 `/root/Quanthus/.worktrees/base22-standalone`；分支 `codex/base22-standalone`。
 本轮开始前完整 HEAD `da9c1e2a95951274103142c1f3782d61baee6cbb`。
 运行期恢复从 `artifacts/base22-phase2-financial-20261004T220048Z/continuation-checkpoint.json`

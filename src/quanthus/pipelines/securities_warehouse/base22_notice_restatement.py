@@ -48,6 +48,8 @@ from .base22_notice_literal_statement import CONTRACT_ID as LITERAL_STATEMENT_CO
 from .base22_notice_literal_statement import select_literal_cash_candidates
 from .base22_notice_pdf import CONTRACT_ID as PDF_CONTRACT
 from .base22_notice_pdf import decode_proven_notice
+from .base22_notice_printed_current import CONTRACT_ID as PRINTED_CURRENT_CONTRACT
+from .base22_notice_printed_current import select_printed_current_candidates
 from .base22_notice_scheme import CONTRACT_ID as SCHEME_CONTRACT
 from .base22_precision import decimal_profile
 from .base22_sources import _tree
@@ -109,6 +111,7 @@ def restate_notice_cash(
             EXACT_IDENTITY_CONTRACT,
             H_REFERENCE_CONTRACT,
             SELECTED_AB_CONTRACT,
+            PRINTED_CURRENT_CONTRACT,
         }
         or notice_atom.get("stock_code") != raw.get("stock_code")
         or notice_atom.get("ex_date") != raw["ex_date"]
@@ -383,7 +386,9 @@ def audit_notice_restatement_scope(
             }
         )
         budget.check()
-    if body.get("parser_profile") == SELECTED_AB_CONTRACT:
+    if body.get("parser_profile") == PRINTED_CURRENT_CONTRACT:
+        selected, selection = select_printed_current_candidates(targets, documents)
+    elif body.get("parser_profile") == SELECTED_AB_CONTRACT:
         selected, selection = select_a_b_cash_candidates(targets, documents)
     elif body.get("parser_profile") == H_REFERENCE_CONTRACT:
         selected, selection = select_h_excluded_cash_candidates(targets, documents)

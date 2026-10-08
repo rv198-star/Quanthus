@@ -43,6 +43,7 @@ def daily_snapshot(
     *,
     root: Path,
     days: tuple[str, ...] = DAYS,
+    deep_verify: bool = False,
 ) -> dict[str, Any]:
     pointer = root / "CURRENT_DAILY_CORE.json"
     result: dict[str, Any] = {
@@ -52,6 +53,8 @@ def daily_snapshot(
         "current_manifest_sha256": None,
         "market_dates_with_physical_package": [],
         "dates_with_missing_package": [],
+        "deep_verified_market_dates": {},
+        "deep_payload_verification_failures": {},
     }
     for day in days:
         candidates = list((root / "packages" / day).glob("*/manifest.json"))
@@ -59,6 +62,31 @@ def daily_snapshot(
             result["market_dates_with_physical_package"].append(day)
         else:
             result["dates_with_missing_package"].append(day)
+        if deep_verify and candidates:
+            from quanthus.pipelines.securities_warehouse.daily_core_domain import (
+                verify_daily_domain_increment,
+            )
+            valid = []
+            failures = []
+            for member in sorted(candidates):
+                try:
+                    verified = verify_daily_domain_increment(member.parent)
+                    if verified.market_date.isoformat() != day:
+                        raise ValueError("wrong-date DWD package")
+                    valid.append({
+                        "manifest_sha256": verified.manifest_sha256,
+                        "content_digest": verified.content_digest,
+                        "row_counts": dict(verified.row_counts),
+                    })
+                except (OSError, ValueError, RuntimeError, KeyError) as exc:
+                    failures.append(f"{member.parent.name}:{type(exc).__name__}")
+            if len(valid) == 1 and not failures:
+                result["deep_verified_market_dates"][day] = valid[0]
+            else:
+                result["deep_payload_verification_failures"][day] = {
+                    "verified_candidates": len(valid),
+                    "rejected_candidates": failures,
+                }
     if not pointer.is_file():
         return result
     payload = json.loads(pointer.read_text())
@@ -140,7 +168,7 @@ def collect_local(node: str) -> dict[str, Any]:
         return result
     root = _daily_root(node)
     assert root is not None
-    result["daily_core"] = daily_snapshot(root=root)
+    result["daily_core"] = daily_snapshot(root=root, deep_verify=True)
     if node == "CN01":
         result["minute_v1"] = minute_research_snapshot(
             Path("/srv/quanthus/dwd-dws-v2/intraday/products/loss-aware-1m-v1")
@@ -190,6 +218,12 @@ def compare_four_nodes(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
             and matching
         ),
         "CN02_remains_isolated": True,
+        "all_market_dates_deep_verified": all(
+            set((known[n].get("daily_core") or {}).get(
+                "deep_verified_market_dates", {}
+            )) == set(DAYS)
+            for n in ("CN01", "Hermes", "OCI")
+        ),
     }
 
 

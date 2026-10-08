@@ -189,3 +189,71 @@ def test_tampering_formal_data_fails_manifest_sha(
     (pkg/"ods"/"raw"/"000001.json.gz").write_bytes(b"tampered")
     with pytest.raises(ValueError,match="checksum"):
         live.verify(pkg)
+
+
+def _development_daily() -> tuple[dict, dict]:
+    codes = [f"{i:06}" for i in range(4992)]
+    values = {code: {"volume": Decimal(1), "close": Decimal(10)} for code in codes}
+    values["000001"]["volume"] = Decimal(24000)
+    return values, {code: "1" for code in codes}
+
+
+def test_late_genuine_minute_revision_regrades_in_new_immutable_product(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    daily, statuses = _development_daily()
+    monkeypatch.setattr(live, "_reference", lambda p, d: (daily, SHA, statuses))
+    original = tmp_path / "original"
+    revision = tmp_path / "tplus1"
+    product = tmp_path / "research"
+    # Original has 241 rows and therefore volume 24100 shares -> R3
+    # relative to the exact daily 24000. The revised source has one
+    # genuinely missing original minute, total 24000 -> restricted R2.
+    _save_source(original, "000001", native())
+    first = live.build(
+        day=DAY, daily_release=tmp_path, capture_root=original, product_root=product,
+    )
+    assert first["quality_grades"]["R3"] == 4992
+    old_package = next((product / "packages" / DAY).iterdir())
+    before = (old_package / "manifest.json").read_bytes()
+    second_native = native(missing=expected_times(DAY)[45])
+    _save_source(revision, "000001", second_native)
+    updated = live.build(
+        day=DAY, daily_release=tmp_path, capture_root=revision,
+        prior_capture_root=original, product_root=product,
+    )
+    assert updated["quality_grades"]["R2"] == 1
+    assert updated["quality_grades"]["R3"] == 4991
+    assert updated["grade_rows"]["R2"] == 240
+    assert updated["manifest_sha256"] != first["manifest_sha256"]
+    assert (old_package / "manifest.json").read_bytes() == before
+    packages = list((product / "packages" / DAY).iterdir())
+    assert len(packages) == 2
+    assert len(list((product / "date-status" / DAY).glob("*.json"))) == 2
+    newer = next(p for p in packages if p != old_package)
+    report = json.loads((newer / "quality-summary.json").read_text())
+    assert report["date_slice_revised_securities"] == ["000001"]
+    assert live.verify(old_package)["quality_grades"]["R3"] == 4992
+    assert live.verify(newer)["quality_grades"]["R2"] == 1
+
+
+def test_rolling_vendor_other_day_change_never_creates_false_correction(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    daily, statuses = _development_daily()
+    daily["000001"]["volume"] = Decimal(24100)
+    monkeypatch.setattr(live, "_reference", lambda p, d: (daily, SHA, statuses))
+    original = tmp_path / "original"
+    amendment = tmp_path / "apparent"
+    product = tmp_path / "research"
+    _save_source(original, "000001", native())
+    first = live.build(
+        day=DAY, daily_release=tmp_path, capture_root=original, product_root=product,
+    )
+    _save_source(amendment, "000001", native(more_other_date=True))
+    second = live.build(
+        day=DAY, daily_release=tmp_path, capture_root=amendment,
+        prior_capture_root=original, product_root=product,
+    )
+    assert second["manifest_sha256"] == first["manifest_sha256"]
+    assert len(list((product / "packages" / DAY).iterdir())) == 1

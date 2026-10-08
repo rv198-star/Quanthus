@@ -129,7 +129,11 @@ def test_tplus1_active_bounded_operation_deferred(tmp_path: Path) -> None:
     d = tmp_path / "ops"
     d.mkdir()
     (d / "2026-10-08-T_plus_1.json").write_text(json.dumps({
-        "inflight_operation": {"id": "bounded"},
+        "inflight_operation": {
+            "id": "bounded",
+            "started_at": "2026-10-09T11:45:00+08:00",
+            "timeout_seconds": 600,
+        },
     }))
     record = _run(
         tmp_path, "minute_Tplus1",
@@ -159,3 +163,21 @@ def test_trading_day_status_is_required_no_undated_emails(tmp_path: Path) -> Non
             phase_root=tmp_path / "ops",
             at=datetime(2026, 10, 8, 21, 50, tzinfo=CST),
         )
+
+
+def test_crashed_stale_inflight_cannot_suppress_email_forever(tmp_path: Path) -> None:
+    d = tmp_path / "ops"
+    d.mkdir()
+    (d / "2026-10-08-T_plus_1.json").write_text(json.dumps({
+        "inflight_operation": {
+            "id": "dead",
+            "started_at": "2026-10-09T10:30:00+08:00",
+            "timeout_seconds": 600,
+        },
+    }))
+    result = _run(
+        tmp_path, "minute_Tplus1",
+        at=datetime(2026, 10, 9, 11, 50, tzinfo=CST),
+    )
+    assert result["status"] == "failure"
+    assert result["mail_event"] == "p10_cn01_minute_tplus1_failed"

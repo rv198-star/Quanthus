@@ -197,6 +197,7 @@ def run_t(
 
 def _atomic_array(path: Path, rows: list[dict]) -> None:
     # A tiny explicit array file, with atomic rename after fsync.
+    path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         if json.loads(path.read_text()) != rows:
             raise ValueError("calendar attempt changed between shards")

@@ -1219,3 +1219,119 @@ def test_tplus1_recovery_skips_request_until_verified_next_trading_session(
     assert payload["status"] == "pending_next_trading_session"
     assert payload["next_session"] == evidence.next_session.isoformat()
     assert not (tmp_path / "shadow").exists()
+
+
+def test_tplus1_ignores_existing_legacy_t0_1m_ready(tmp_path: Path, capsys) -> None:
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    from quanthus.pipelines.trading_maturity import NextSessionEvidence
+
+    module = _load_orchestrator_module()
+    day = datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    evidence = NextSessionEvidence(day + timedelta(days=1), "synthetic", "a" * 64)
+    existing = SimpleNamespace(
+        release=SimpleNamespace(
+            release_id="old-same-day-1m-release",
+            artifacts=(),
+        ),
+        release_dir=tmp_path / "previous-1m",
+        manifest_sha256="sha256:" + "a" * 64,
+    )
+    called = []
+
+    def _ready(jobs, **kwargs):
+        called.extend(job.lane for job in jobs)
+        return {
+            job.lane: {"status": "ready", "returncode": 0, "attempts": 1, "logs": []}
+            for job in jobs
+        }
+
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_ENV_FILE": str(tmp_path / "absent.env"),
+        "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+        "ASTOCK_HOME": str(tmp_path / "home"),
+    }
+    with (
+        patch.dict(os.environ, env),
+        patch.object(
+            sys,
+            "argv",
+            [
+                str(ORCHESTRATOR),
+                "--market-date",
+                day.isoformat(),
+                "--minute-maturity-policy",
+                "next-trading-day",
+            ],
+        ),
+        patch.object(module, "verified_next_session", return_value=evidence),
+        patch.object(
+            module,
+            "find_ready_daily_ods_lanes",
+            return_value={"intraday_1m": existing},
+        ),
+        patch.object(module, "_run_group", side_effect=_ready),
+    ):
+        assert module.main() == 3
+    state = json.loads(capsys.readouterr().out)
+    assert state["status"] == "deferred_source_maturity"
+    assert state["lanes"]["intraday-1m"]["status"] == "deferred_source_maturity"
+    assert "intraday-1m" not in called
+    assert state["catalog"]["status"] == "deferred_source_maturity"
+    assert state["dwd"]["status"] == "deferred_source_maturity"
+
+
+def test_tplus1_respects_verified_closed_exchange_session(tmp_path: Path, capsys) -> None:
+    from quanthus.pipelines.trading_maturity import NonTradingSessionDate
+
+    module = _load_orchestrator_module()
+    day = date(2026, 9, 25)
+    called = []
+
+    def _closed(jobs, **kwargs):
+        called.extend(job.lane for job in jobs)
+        return {
+            job.lane: {
+                "status": ("ready" if job.lane == "calendar-daily-events" else "closed_session"),
+                "returncode": 0,
+                "attempts": 1,
+                "logs": [],
+            }
+            for job in jobs
+        }
+
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_ENV_FILE": str(tmp_path / "absent.env"),
+        "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+        "ASTOCK_HOME": str(tmp_path / "home"),
+    }
+    with (
+        patch.dict(os.environ, env),
+        patch.object(
+            sys,
+            "argv",
+            [
+                str(ORCHESTRATOR),
+                "--market-date",
+                day.isoformat(),
+                "--minute-maturity-policy",
+                "next-trading-day",
+            ],
+        ),
+        patch.object(
+            module,
+            "verified_next_session",
+            side_effect=NonTradingSessionDate("verified T market closed"),
+        ),
+        patch.object(module, "find_ready_daily_ods_lanes", return_value={}),
+        patch.object(module, "_run_group", side_effect=_closed),
+    ):
+        assert module.main() == 0
+    state = json.loads(capsys.readouterr().out)
+    assert state["status"] == "closed_session"
+    assert state["dwd"]["status"] == "not_applicable_closed_session"
+    assert len(called) == 4
+    assert not list((tmp_path / "shadow/orchestrator/daily" / day.isoformat()).glob("*/READY"))

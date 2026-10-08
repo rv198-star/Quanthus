@@ -1,0 +1,11 @@
+[Unit]
+Description=P10 cn01-core verified data/quality email checkpoint
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 23:45:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=false
+Unit=quanthus-p10-deadline@cn01-core.service
+
+[Install]
+WantedBy=timers.target

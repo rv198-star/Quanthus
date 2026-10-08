@@ -80,6 +80,24 @@ An inability to prove material impact is not proof of safety for a precision-sen
 
 Track core data product availability and latency, per-product admitted coverage and explicit degraded/unavailable gaps, impact on protected decisions, number of consumers blocked, recovery/test effort, provider/network costs and the number of repeated attempts. Keep denominator and exceptions visible. Do not present raw HTTP success, source-level correctness, and consumer acceptance as the same state.
 
+## 2026-10-09 Owner addendum — 1m T/T+1 采集预算与停止条件
+
+**正式批准：** source-native 1m 是辅助、独立、按消费者价值投入的数据产品；1m 精度问题不得使合格日级核心或其他独立产品停止交付。执行范围由 [P10 #505](https://github.com/rv198-star/Quanthus/issues/505) 和版本化政策 `config/pipelines/minute-daily-tplus1-budget.v1.json` 约束，运行时部署需要独立验收。
+
+| 处理阶段 | 预算 | 目标 | 允许结束状态 |
+| --- | --- | --- | --- |
+| **T 交易日** | 30 分钟常规目标；**60 分钟累计硬上限** | 源原始采集、基本真实性/质量核验、R0/R1/R2/R3 分级及分产品交付 | 合格数据按用途入库、剩余质量缺陷公开 |
+| **T+1 下一交易日** | 对 **T 数据额外累计最多 60 分钟** | 验证来源是否发生后置修订；仅对有新证据的受影响股票定向补采、重新分级和版本化更正 | 合格修订另出新版本；没有新来源证据时提前停止 |
+| **超过 T+1** | 无默认自动追加 | 仅有明确消费者价值和新证据才单开定向恢复 | 保留 R2 质量债、R3 不准入，不无限重试 |
+
+**每个目标交易日总计最多 120 分钟（T 最多 60 + 独立 T+1 最多 60）；在连续交易日的稳态运行中，同一个自然日可能同时执行本日 T 与上一交易日 T+1，各自账本独立。** 按权威交易日历计算 T+1，休市/周末顺延。时间包含请求、退避、重试、见证、构建和验收，跨进程及重启累加，不允许通过多开实例或再次触发清零。
+
+T+1 **先做 12–24 只跨市场、有代表性、包含已知异常的 source-maturity canary**，判断目标交易日的原生分钟观测是否真正变化。提供方历史接口返回滚动近 800 根时，完整 HTTP 响应 SHA 变化 **不等于指定交易日被修订**：必须同时比较绑定到 `market_date+security` 的原生分钟记录/观测 SHA、真实缺口、日期成交量与收盘价。来源未实际修订或无法增加资格时，记录并立即停止，不能用剩余预算反复扫同一数据。
+
+**质量/存储边界维持 Owner 2026-10-09 的明确决议**：R0/R1 允许按用途入库；R2 **允许保留真实观测入正式仓库，逐证券记录缺陷、时间戳、SHA、PIT 和限制，默认不作为常规研究合格信号**；R3 **不入正式 ODS/DWD 的原始响应或 OHLCV**，仅保留隔离区证据和拒绝元信息。现有封存 V1 不可为了适用该规则而重写，执行新规则须通过 [#503](https://github.com/rv198-star/Quanthus/issues/503) 的 V2 版本验收。严格 240 根、PIT、P3/P5 冻结权限与 P6 决策不受影响。
+
+每运行满 10 个交易日复盘 T/T+1 累计耗时、来源真实修订率、R2/R3 变化、消费者实际受益和正常日级 SLA；调整预算须单独版本化，不因争取清零而无限延长。
+
 ## Consequences and change control
 
 - P10 is the sole source-qualification/warehouse engineering owner; business owners define admission sensitivity and accept products only under their own contracts (ADR 0015).

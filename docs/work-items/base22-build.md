@@ -174,6 +174,13 @@ publisher metadata 不改。A 股公告须同时明示 H 股派发不适用才�
 不是实施正文，不能因标题或传输成功授予资格。全部单位、日期、primary 一致性及
 原始时刻/数字保持门槛仍适用，不授予 H/B 股条款、汇率或消费者准入。
 
+#481 的 opt-in `p10-base22-exact-publisher-header-and-explicit-A-scope-v14` 只在
+原 publisher 证券代码与原文首个非空行“六位代码 + 年度公告序号”完全相同时标注
+解析视图的代码标签，不建立通用别名或用 metadata 替代正文身份。明确 A 股对象且
+原文明说 H 股现金操作不适用时，仅对应排除句的 H 股标签作范围区分，其他 H 股
+条款仍参与拒绝门槛。原文数字、PDF、publisher 回复保持；日期、人民币单位、完整
+primary 一致性及新知识版本检查不变。原默认 profile 和已封存输出不受替换。
+
 ## Current recovery checkpoint
 
 工作区 `/root/Quanthus/.worktrees/base22-standalone`；分支 `codex/base22-standalone`。

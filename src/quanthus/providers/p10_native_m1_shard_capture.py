@@ -251,10 +251,22 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--shard-index", type=int, required=True)
     parser.add_argument("--shard-size", type=int, default=50)
+    parser.add_argument("--codes-file", type=Path)
     args = parser.parse_args()
     codes, manifest_sha = verified_daily_universe(
         args.market_ods_release, args.market_date
     )
+    if args.codes_file:
+        subset = json.loads(args.codes_file.read_text())
+        if (
+            not isinstance(subset, list)
+            or len(subset) < 1
+            or len(subset) > 50
+            or len(set(subset)) != len(subset)
+            or not set(subset) <= set(codes)
+        ):
+            raise ValueError("bounded canary code selection outside verified daily source")
+        codes = sorted(subset)
     outcome = capture_shard(
         codes=codes, market_date=args.market_date,
         market_manifest_sha=manifest_sha, output=args.output,

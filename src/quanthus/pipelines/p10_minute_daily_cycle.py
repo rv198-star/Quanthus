@@ -255,7 +255,7 @@ def _original_for(
 def run_tplus1(
     *,
     target: date, rows: list[dict], journal: Path,
-    releases: Path, capture: Path,
+    releases: Path, capture: Path, product: Path,
 ) -> dict[str, Any]:
     verified=find_market_ods(releases,target)
     codes,_=verified_daily_universe(verified,target)
@@ -300,10 +300,35 @@ def run_tplus1(
             gzip.decompress(current.read_bytes()),code,target
         )[1]
         (changed if original_hash!=observed_hash else unchanged).append(code)
-    if result["status"]=="cutoff_reached" or unavailable:
+    correction = None
+    if result["status"] not in {"success", "already_recorded"} or unavailable:
         disposition="bounded_maturity_probe_incomplete"
+    elif changed and target < date(2026, 10, 9):
+        # Historical 10/08 remains bound to its sealed V2/forensic identity.
+        # A newly observed source requires a separately versioned #502 review.
+        disposition="historical_source_change_requires_separate_quality_authority"
     elif changed:
-        disposition="source_changed_requires_new_versioned_quality_requalification"
+        correction = _run(
+            journal=journal,
+            calendar_file=calendar_file,
+            target=target,
+            phase="T_plus_1",
+            operation_id="warehouse-immutable-correction",
+            command=[
+                sys.executable,
+                "-m", "quanthus.pipelines.p10_minute_live_warehouse",
+                "--market-date",target.isoformat(),
+                "--market-ods-release",str(verified),
+                "--capture-root",str(stage),
+                "--prior-capture-root",str(capture/target.isoformat()/"T-v1"),
+                "--product-root",str(product),
+            ],
+        )
+        disposition=(
+            "grade_qualified"
+            if correction["status"] in {"success", "already_recorded"}
+            else "source_changed_requires_new_versioned_quality_requalification"
+        )
     else:
         disposition="source_unchanged_stopped"
     _phase_receipt(journal,target,"T_plus_1",disposition)
@@ -314,6 +339,7 @@ def run_tplus1(
         "changed_count":len(changed),"unchanged_count":len(unchanged),
         "unavailable_count":len(unavailable),"changed_codes":changed,
         "source_revisions_only_not_grade_promotion":True,
+        "correction":correction,
     }
 
 
@@ -353,6 +379,7 @@ def main() -> int:
             result=run_tplus1(
                 target=target,rows=rows,journal=opts.journal,
                 releases=opts.releases,capture=opts.capture,
+                product=opts.product,
             )
     print(json.dumps(result,ensure_ascii=False,sort_keys=True))
     return 0

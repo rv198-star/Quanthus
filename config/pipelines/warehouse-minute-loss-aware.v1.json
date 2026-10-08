@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "policy_id": "quanthus-1m-research-loss-aware-v1",
+  "authority": "ADR-0016 / P10-DATA-WH-001 issue #495 / explicit Owner recovery 2026-10-08",
+  "product": "intraday-1m-research-loss-aware-v1",
+  "data_origin": "source-native Tencent m1 with archived unmodified raw response bytes and explicit exchange-clock convention",
+  "scope": [
+    "2026-09-24",
+    "2026-09-28",
+    "2026-09-29",
+    "2026-09-30",
+    "2026-10-08"
+  ],
+  "coverage": {
+    "min_traded_security_fraction": "0.99",
+    "min_board_traded_security_fraction": "0.98",
+    "suspended_excluded_from_traded_denominator": true
+  },
+  "grades": {
+    "R0": {
+      "observed_regular_minutes": 240,
+      "requires_auction_observation": true,
+      "daily_volume": "exact",
+      "daily_close": "cent_exact",
+      "source_native_no_fabrication": true
+    },
+    "R1": {
+      "minimum_missing_actual_minutes": 0,
+      "maximum_missing_actual_minutes": 5,
+      "requires_auction_observation": false,
+      "requires_native_5m_bucket_witness": true,
+      "all_48_native_5m_buckets_exact": true,
+      "allowed_critical_missing_minutes": 0,
+      "daily_volume": "exact",
+      "daily_close": "cent_exact",
+      "no_generated_ohlc": true,
+      "auction_absence_exception": "Only if all 240 regular minutes actually observed, daily shares and close exact, source native 5m all 48 buckets conserve; record auction_source_observed=false, never fabricate auction OHLC, forbid auction-dependent consumers."
+    },
+    "R2": {
+      "status": "PARTIAL_ARCHIVE_EXCLUDED_FROM_REGULAR_RESEARCH",
+      "preserve_source_evidence": true
+    },
+    "R3": {
+      "status": "INVALID_OR_UNAVAILABLE_EXCLUDED",
+      "preserve_provenance_and_rejection_reason": true
+    }
+  },
+  "critical_boundaries": [
+    "09:31-09:35",
+    "11:26-11:30",
+    "13:01-13:05",
+    "14:56-15:00"
+  ],
+  "consumers": {
+    "allowed": [
+      "offline_development_research_excluding_missing_windows",
+      "explicitly_gap_aware_1m_indicators_using_one_source_semantics"
+    ],
+    "forbidden": [
+      "strict_240_source_required",
+      "exact_execution_simulation",
+      "tick_level_trade_reconstruction",
+      "minute_amount_vwap_without_amount",
+      "mixed_vendor_same_clock_cross_section_without_semantic_mapping",
+      "retroactive_pit_asof_prior_to_capture",
+      "protected_research_or_production_automatic_activation",
+      "auction_sensitive_replay_for_R1_missing_native_0930"
+    ]
+  },
+  "source_semantics": {
+    "provider": "tencent_mkline_m1",
+    "timestamp_rule": "native_vendor_session_label_do_not_silently_shift_Shenzhen",
+    "opening_auction": "09:30 explicit independent observed row; never pretend it is regular 09:31",
+    "stock_volume_units": "STAR_688_689=shares; other_SH_SZ=lots_100_shares",
+    "amount": "not_available_not_inferred",
+    "prior_2026_09_24_dual_vendor_conflict": "tracked_not_arbitrated"
+  },
+  "release": {
+    "distinct_from_legacy_four_lane_ready": true,
+    "distinct_from_daily_core_ready": true,
+    "source_raw_sha256_mandatory": true,
+    "daily_reference_release_sha256_mandatory": true,
+    "source_asof_capture_time_mandatory": true,
+    "partial_dates_can_publish_quality_report_without_ready": true,
+    "old_sealed_assets_immutable": true
+  }
+}

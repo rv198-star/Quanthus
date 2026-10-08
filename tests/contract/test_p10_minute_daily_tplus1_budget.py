@@ -50,7 +50,7 @@ def test_tplus1_uses_exchange_calendar_not_weekdays() -> None:
 def test_tplus1_revision_probe_inspects_target_day_only() -> None:
     policy = _policy()
     phase = policy["per_target_market_date"]["T_plus_1"]
-    assert 12 <= phase["source_maturity_probe_min_symbols"]
+    assert phase["source_maturity_probe_min_symbols"] >= 12
     assert phase["source_maturity_probe_max_symbols"] == 24
     assert "target_market_date_native_1m_observation_digest" in phase[
         "source_revision_comparison"
@@ -65,7 +65,7 @@ def test_quality_route_never_promotes_r3_or_rejects_stored_r2() -> None:
     policy = _policy()
     grades = policy["grade_admission"]
     assert "formal_ODS_DWD" in grades["R2"]
-    assert "defect" in grades["R2"]
+    assert "quality_reasons" in grades["R2"]
     assert "no_formal_ODS_DWD" in grades["R3"]
     assert policy["independence"]["daily_core_unblocked_by_1m"]
     assert policy["independence"]["legacy_four_lane_unchanged"]

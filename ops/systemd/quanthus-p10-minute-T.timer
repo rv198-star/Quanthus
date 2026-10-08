@@ -1,0 +1,11 @@
+[Unit]
+Description=P10 minute T verified trading-day bounded session at 20:30 CST
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 20:30:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=false
+Unit=quanthus-p10-minute@T.service
+
+[Install]
+WantedBy=timers.target

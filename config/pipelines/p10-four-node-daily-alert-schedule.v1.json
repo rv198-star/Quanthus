@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "policy_id": "p10-four-node-daily-calendar-and-alerts-v1",
+  "authority": "Owner 2026-10-09; #508; P10 budget v2 and ADR0016",
+  "timezone": "Asia/Shanghai",
+  "date_semantics": "authoritative_exchange_calendar_SSE_SZSE_verified_not_weekday_only",
+  "scope_through": "2026-10-08",
+  "node_roles": {
+    "CN01": {
+      "role": "primary_producer_daily_core_and_optional_1m_v2",
+      "daily_core_authority": true,
+      "minute_research_producer": true,
+      "independent_daily": true
+    },
+    "Hermes": {
+      "role": "independent_daily_core_producer_and_source_qualification_witness",
+      "daily_core_authority": true,
+      "independent_daily": true,
+      "minute_research_producer": false
+    },
+    "OCI": {
+      "role": "mirror_exact_CN01_daily_core_manifest",
+      "daily_core_authority": false,
+      "mirror_of": "CN01",
+      "minute_mirror_enabled": false
+    },
+    "CN02": {
+      "role": "isolated_historical_base22_and_repair_candidate",
+      "daily_core_authority": false,
+      "production_mirror_assumed": false,
+      "mirror_write_forbidden_without_separate_contract": true,
+      "known_isolated_root": "/srv/agentdock/AgentDock/data/quanthus-daily-sync-20261003"
+    }
+  },
+  "schedule": {
+    "daily_core": {
+      "market_date_phase": "T",
+      "producer_first_live_cycle": "18:30",
+      "existing_shadow_Hermes_market_ods": "17:30",
+      "bounded_retry_times": [
+        "20:30",
+        "22:30"
+      ],
+      "existing_next_calendar_reconciliation": [
+        "08:30",
+        "12:30"
+      ],
+      "latest_cycle_timeout_seconds": 3700,
+      "failure_email_at": "23:45",
+      "mail_severity_if_not_ready": "CRITICAL",
+      "mail_grace_seconds_after_latest_cycle_max": 900
+    },
+    "minute_T": {
+      "market_date_phase": "T",
+      "start_time": "20:30",
+      "target_new_operation_admission_seconds": 1800,
+      "new_operation_cutoff_cumulative_seconds": 3600,
+      "max_admitted_atomic_operation_seconds": 600,
+      "estimated_final_completion": "21:40",
+      "failure_email_at": "21:50",
+      "quality_alert_if_unqualified_research": true,
+      "no_failure_email_for_valid_R2": true,
+      "coexistence_guard": "do_not_activate_if_legacy_hermes_ods_intraday_1m_timer_or_maturity_recovery_would_write_same_product"
+    },
+    "minute_Tplus1": {
+      "market_date_phase": "T_plus_1",
+      "first_subsequent_verified_market_session_only": true,
+      "start_time": "10:30",
+      "source_maturity_canary_count_min": 12,
+      "source_maturity_canary_count_max": 24,
+      "new_operation_cutoff_cumulative_seconds": 3600,
+      "max_admitted_atomic_operation_seconds": 600,
+      "estimated_final_completion": "11:40",
+      "failure_email_at": "11:50",
+      "quality_alert_if_unqualified_research": true,
+      "no_failure_email_if_source_unchanged_with_truthful_disposition": true,
+      "never_full_market_repeat_solely_for_rolling_HTTP_SHA_change": true
+    },
+    "OCI_daily_core_mirror": {
+      "existing_timer": "hourly minute 50",
+      "expected_last_sync_start": "23:50",
+      "service_max_runtime_seconds": 1800,
+      "failure_email_next_calendar_day_at": "00:35",
+      "mirror_accepted_only_when_exact_CN01_manifest_sha256_match": true
+    },
+    "CN02_isolated_audit": {
+      "no_automatic_market_date_mirror_until_role_confirmed": true,
+      "do_not_start_production_collector": true,
+      "no_failure_email_until_explicitly_authorized_consumption": true
+    }
+  },
+  "email": {
+    "provider_env_file": "/etc/quanthus/dwd-notification.env",
+    "reuse_transport": "quanthus.warehouse_notifications via existing QUANTHUS_RESEND env",
+    "no_credentials_in_config": true,
+    "single_email_per_node_market_date_phase_failure_digest": true,
+    "success_is_verified_manifest_not_HTTP200": true,
+    "failure_definition": [
+      "required_daily_core_not_READY_by_latest_cycle_checkpoint",
+      "required_OCI_mirror_not_exact_CN01_digest_by_email_checkpoint",
+      "minute_run_crashed_or_receipt_missing_by_checkpoint",
+      "minute_explicit_quality_nonready_one_daily_warning_not_one_per_security"
+    ],
+    "not_failure": [
+      "suspended_no_trade",
+      "R2_admitted_with_known_defects",
+      "Tplus1_unchanged_vendor_with_valid_stopped_receipt",
+      "calendar_closed_day"
+    ],
+    "production_activation": "not_enabled_until_CN01_Hermes_OCI_CN02_role_readonly_audit_and_Linux_shadows_pass"
+  },
+  "rollout": {
+    "min_data_cutoff": "2026-10-08",
+    "code_quality_gate": "R2_R3_v2_#503_physical_replay_pass",
+    "source_authenticity_no_synthetic_minutes": true,
+    "legacy_ODS_DWD_four_lane_frozen": true,
+    "old_v1_1m_immutable": true,
+    "P3_P5_P6_activation_forbidden": true
+  }
+}

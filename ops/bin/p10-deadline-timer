@@ -1,0 +1,19 @@
+#!/bin/sh
+# Versioned P10 source-scoped Resend notifier. No secret on command line.
+set -eu
+case "${1:-}" in
+  cn01-core) node=CN01; phase=daily_core ;;
+  hermes-core) node=Hermes; phase=daily_core ;;
+  oci-mirror) node=OCI; phase=oci_mirror ;;
+  cn01-minute-T) node=CN01; phase=minute_T ;;
+  cn01-minute-Tplus1) node=CN01; phase=minute_Tplus1 ;;
+  *) echo "unsupported P10 notification job" >&2; exit 2 ;;
+esac
+if [ -x /root/work/Quanthus/.venv-p1/bin/python ]; then
+  py=/root/work/Quanthus/.venv-p1/bin/python
+elif [ -x /opt/quanthus/warehouse-current/.venv/bin/python ]; then
+  py=/opt/quanthus/warehouse-current/.venv/bin/python
+else
+  echo "pinned Python runtime missing" >&2; exit 2
+fi
+exec "$py" -m quanthus.pipelines.p10_deadline_cycle --node "$node" --phase "$phase" --send

@@ -245,7 +245,33 @@ def assess(
         elif vtotal != daily_shares:
             kwargs["reason"] = "unmatured_or_incorrect_minute_daily_share_volume"
         elif not kwargs["auction_source_observed"]:
-            kwargs.update(grade="R2", reason="no_original_auction_bar")
+            # Tencent can omit a standalone 09:30 auction observation even when
+            # all 240 regular native minutes and all daily shares are present.
+            # A complete regular session is usable for NON-auction research
+            # only after native same-vendor 5m proves every 5m volume bucket.
+            # Never fabricate the absent 09:30 or claim auction-level truth.
+            if missing:
+                kwargs.update(grade="R2", reason="missing_auction_and_regular_minutes")
+            elif m5_raw is None:
+                kwargs.update(grade="R2", reason="missing_native_auction_witness_pending")
+            else:
+                try:
+                    witness_sha = verify_native_m5(
+                        m1=observed,
+                        m5_raw=m5_raw,
+                        symbol=symbol,
+                        day=day,
+                        daily_shares=daily_shares,
+                        daily_close=daily_close,
+                    )
+                except ValueError:
+                    kwargs.update(grade="R2", reason="native_5m_auction_volume_bucket_mismatch")
+                else:
+                    kwargs.update(
+                        grade="R1",
+                        reason="unobserved_native_auction_240_real_regular_minutes_48_bucket_witness",
+                        witness_sha256=witness_sha,
+                    )
         elif not missing:
             kwargs.update(grade="R0", reason="native_240_observed_source_minutes")
         elif len(missing) > 5:

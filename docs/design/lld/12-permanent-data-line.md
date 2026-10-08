@@ -40,6 +40,13 @@ remain truthful; accepting a disclosed limitation does not invent evidence or si
 frozen consumer gate. New tolerance or source-comparison rules require a versioned contract with
 the applicable use and evidence, rather than treating provider differences as universal corruption.
 
+Base 2.2 uses the opt-in `p10-base22-purpose-qualified-delivery-v2` contract for its isolated
+governance mirror. Its assembler retains pinned native/qualified entities and binds scoped
+unavailable uses to local evidence; missing legacy reproduction or supplier authority does not
+universally stop unrelated physical delivery. Exact physical/semantic integrity, independent cold
+acceptance and all frozen consumer gates remain mandatory. The complete scope, interfaces and
+receipts are routed through [the Base 2.2 work item](../../work-items/base22-build.md).
+
 Other lines declare inputs, perform minimal admission checks and implement domain features,
 cohorts, models, strategies and consumption logic. On a quality/governance finding they may only
 register a bounded P10 issue; they must not turn it into source hunting, collection, backfill,

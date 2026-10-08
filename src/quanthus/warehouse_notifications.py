@@ -74,6 +74,43 @@ EVENTS = {
         "heading": "OCI DWD 增量同步失败",
         "failure": True,
     },
+    "p10_cn01_daily_core_failed": {
+        "node": "CN01",
+        "stage": "P10日级核心",
+        "heading": "CN01 日级核心交付未达标",
+        "failure": True,
+    },
+    "p10_hermes_daily_core_failed": {
+        "node": "Hermes",
+        "stage": "P10日级核心",
+        "heading": "Hermes 日级核心交付未达标",
+        "failure": True,
+    },
+    "p10_oci_daily_core_mirror_failed": {
+        "node": "OCI",
+        "stage": "P10日级核心镜像",
+        "heading": "OCI 日级核心同步未达标",
+        "failure": True,
+    },
+    "p10_cn01_minute_t_failed": {
+        "node": "CN01",
+        "stage": "P10 1m T采集",
+        "heading": "CN01 当日分钟采集未完成",
+        "failure": True,
+    },
+    "p10_cn01_minute_tplus1_failed": {
+        "node": "CN01",
+        "stage": "P10 1m T+1",
+        "heading": "CN01 次交易日分钟修订未完成",
+        "failure": True,
+    },
+    "p10_cn01_minute_quality_degraded": {
+        "node": "CN01",
+        "stage": "P10 1m质量",
+        "heading": "CN01 分钟研究级质量降级提示",
+        "failure": True,
+        "status_label": "质量降级",
+    },
 }
 
 
@@ -207,7 +244,13 @@ def _email_html(
         ("节点", node),
         ("阶段", stage),
         ("交易日", market_date.isoformat()),
-        ("状态", "失败" if EVENTS[event]["failure"] else "成功"),
+        (
+            "状态",
+            str(EVENTS[event].get(
+                "status_label",
+                "失败" if EVENTS[event]["failure"] else "成功",
+            )),
+        ),
     ]
     if result is not None:
         details.extend(
@@ -276,7 +319,7 @@ def _send_resend(
             "subject": (
                 f"[Quanthus][{EVENTS[event]['node']}][{EVENTS[event]['stage']}] "
                 f"{market_date.isoformat()} "
-                f"{'失败' if EVENTS[event]['failure'] else '成功'}"
+                f"{EVENTS[event].get('status_label', '失败' if EVENTS[event]['failure'] else '成功')}"
             ),
             "html": _email_html(
                 event=event,

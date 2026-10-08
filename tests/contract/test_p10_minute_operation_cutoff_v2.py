@@ -18,10 +18,19 @@ def test_owner_v2_cutoff_is_about_new_operations_not_absolute_finish() -> None:
     p = json.loads(POLICY_PATH.read_text())
     assert p["schema_version"] == 2
     assert p["supersedes_policy_id"] == "p10-1m-daily-and-tplus1-bounded-ops-v1"
-    assert p["per_target_market_date"]["T"]["routine_target_new_operation_admission_seconds"] == 1800
+    assert (
+        p["per_target_market_date"]["T"]["routine_target_new_operation_admission_seconds"]
+        == 1800
+    )
     assert p["per_target_market_date"]["T"]["new_operation_admission_cutoff_seconds"] == 3600
-    assert p["per_target_market_date"]["T_plus_1"]["new_operation_admission_cutoff_seconds"] == 3600
-    assert p["per_target_market_date"]["combined_new_operation_admission_window_seconds"] == 7200
+    assert (
+        p["per_target_market_date"]["T_plus_1"]["new_operation_admission_cutoff_seconds"]
+        == 3600
+    )
+    assert (
+        p["per_target_market_date"]["combined_new_operation_admission_window_seconds"]
+        == 7200
+    )
     assert p["per_target_market_date"]["combined_window_is_not_hard_wall_completion_deadline"]
     assert p["atomic_operation"]["already_started_operation_finalization_allowed_after_cutoff"]
     assert p["atomic_operation"]["max_operation_timeout_seconds"] == 600
@@ -136,7 +145,13 @@ def test_new_version_rejects_old_v1_policy(tmp_path: Path) -> None:
 
 def test_policy_records_pending_drain_and_forbids_prequeued_work() -> None:
     p = json.loads(POLICY_PATH.read_text())
-    assert p["atomic_operation"]["queueing_or_reserving_future_operations_before_cutoff_is_not_real_start"]
+    assert (
+        p["atomic_operation"][
+            "queueing_or_reserving_future_operations_before_cutoff_is_not_real_start"
+        ]
+    )
     assert p["atomic_operation"]["no_new_retry_or_next_shard_after_cutoff"]
-    assert p["atomic_operation"]["atomic_commit_and_invariant_verification_within_same_admitted_operation"]
+    assert (
+        p["atomic_operation"]["atomic_commit_and_invariant_verification_within_same_admitted_operation"]
+    )
     assert p["immutable_accounting"]["account_post_cutoff_tail_in_actual_elapsed"]

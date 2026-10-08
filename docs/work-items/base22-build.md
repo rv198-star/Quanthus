@@ -290,3 +290,12 @@ H 股观察分别由原文排除声明、历史批准章节的总股本字段或
 检查日志；检查须区分已跑/失败/跳过/未跑。基线不变的已合格范围不重复报为新进展。
 新快照必须明确补采/访问/规则所缺项，只阻塞受影响步骤。只读交接根下全新子目录
 存 UTF-8 diff/handoff/checks/日志/安全摘要/SHA256SUMS，不含真实 payload 或凭据。
+
+#482 的 `p10-base22-exact-current-raw-holder-column-restoration-v1` 单独绑定当前
+开放原生行的同一原始成员、原文和真实 acquisition，以冻结旧解析器精确重现旧行，
+再用 v2 的完整单一分项框解释原文列标题。只允许 holder_category/share_nature
+文字列恢复；数量、比例及其原始文字、单位、业务时间和其他字段均不变。多分项、
+截断、未知时刻、无法重现当前行及任意数值变动拒绝。没有旧/新供应商优先级，
+修复用实际治理时刻生成新知识版本；原行和已经关闭的历史区间保留。
+实现及回归：`base22_holder_current_columns.py` 与
+`tests/unit/test_base22_holder_current_columns.py`；完整 weekly/native 集成独立验收。

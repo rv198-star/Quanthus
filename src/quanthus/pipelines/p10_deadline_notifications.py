@@ -76,11 +76,19 @@ def evaluate(
             if p.is_file():
                 state = json.loads(p.read_text())
                 inflight = state.get("inflight_operation") is not None
-                if not inflight and state.get("operations"):
-                    if receipt is None:
+                disposition = state.get("terminal_disposition")
+                if not inflight and disposition == "source_unchanged_stopped":
+                    receipt = "SOURCE_UNCHANGED_STOPPED"
+                elif not inflight and disposition == "grade_qualified":
+                    if receipt == "RESEARCH_READY_LOSS_AWARE":
                         receipt = "GRADE_RECORDED"
+                elif not inflight and not disposition:
+                    # Starting a probe alone cannot count as finishing T+1.
+                    receipt = None
             elif receipt == "RESEARCH_READY_LOSS_AWARE":
                 receipt = "GRADE_RECORDED"
+            else:
+                receipt = None
     status = classify_alert(
         kind=phase, checked_at=at, checkpoint=checkpoint,
         receipt_status=receipt, processing_inflight=inflight,
@@ -104,7 +112,11 @@ def evaluate(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--node", choices=("CN01", "Hermes", "OCI"), required=True)
-    parser.add_argument("--phase", choices=("daily_core", "oci_mirror", "minute_T", "minute_Tplus1"), required=True)
+    parser.add_argument(
+        "--phase",
+        choices=("daily_core", "oci_mirror", "minute_T", "minute_Tplus1"),
+        required=True,
+    )
     parser.add_argument("--market-date", type=date.fromisoformat, required=True)
     parser.add_argument("--calendar-file", type=Path, required=True)
     parser.add_argument("--daily-root", type=Path, required=True)

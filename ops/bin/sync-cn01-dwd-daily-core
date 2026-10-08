@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+"""Sync only the explicitly versioned daily-core product into a separate OCI root."""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+
+from quanthus.warehouse_sync import main  # noqa: E402
+
+if __name__ == "__main__":
+    # Existing CN01 read-only SSH jail exposes this separate product under
+    # products/daily-core. Refuse any other root inside sync_latest.
+    os.environ.setdefault("QUANTHUS_CN01_DWD_REMOTE_ROOT", "products/daily-core")
+    raise SystemExit(
+        main(
+            [
+                "--local-root",
+                os.environ.get(
+                    "QUANTHUS_OCI_DWD_DAILY_CORE_ROOT",
+                    "/home/ubuntu/data/quanthus/dwd-daily-core",
+                ),
+                "--product-scope",
+                "daily-core-v1",
+                *sys.argv[1:],
+            ]
+        )
+    )

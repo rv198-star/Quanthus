@@ -25,15 +25,16 @@
       "source_native_no_fabrication": true
     },
     "R1": {
-      "minimum_missing_actual_minutes": 1,
+      "minimum_missing_actual_minutes": 0,
       "maximum_missing_actual_minutes": 5,
-      "requires_auction_observation": true,
+      "requires_auction_observation": false,
       "requires_native_5m_bucket_witness": true,
       "all_48_native_5m_buckets_exact": true,
       "allowed_critical_missing_minutes": 0,
       "daily_volume": "exact",
       "daily_close": "cent_exact",
-      "no_generated_ohlc": true
+      "no_generated_ohlc": true,
+      "auction_absence_exception": "Only if all 240 regular minutes actually observed, daily shares and close exact, source native 5m all 48 buckets conserve; record auction_source_observed=false, never fabricate auction OHLC, forbid auction-dependent consumers."
     },
     "R2": {
       "status": "PARTIAL_ARCHIVE_EXCLUDED_FROM_REGULAR_RESEARCH",
@@ -62,7 +63,8 @@
       "minute_amount_vwap_without_amount",
       "mixed_vendor_same_clock_cross_section_without_semantic_mapping",
       "retroactive_pit_asof_prior_to_capture",
-      "protected_research_or_production_automatic_activation"
+      "protected_research_or_production_automatic_activation",
+      "auction_sensitive_replay_for_R1_missing_native_0930"
     ]
   },
   "source_semantics": {

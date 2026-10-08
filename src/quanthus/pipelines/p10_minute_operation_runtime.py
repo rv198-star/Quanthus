@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any, Sequence
 from zoneinfo import ZoneInfo
 
-from quanthus.pipelines.p10_operating_schedule import next_trade_day, start_at
+from quanthus.pipelines.p10_operating_schedule import start_at
 from quanthus.providers.minute_operation_cutoff import new_operation
 
 CST = ZoneInfo("Asia/Shanghai")

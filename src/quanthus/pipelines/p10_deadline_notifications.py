@@ -145,7 +145,10 @@ def evaluate(
                 if name == "T_plus_1":
                     if terminal == "source_unchanged_stopped":
                         receipt = "SOURCE_UNCHANGED_STOPPED"
-                    elif terminal == "source_changed_requires_new_versioned_quality_requalification":
+                    elif (
+                        terminal
+                        == "source_changed_requires_new_versioned_quality_requalification"
+                    ):
                         receipt = "QUALITY_NOT_READY"
                     elif terminal == "bounded_maturity_probe_incomplete":
                         receipt = None

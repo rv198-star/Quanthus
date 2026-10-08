@@ -66,8 +66,8 @@ def merge_current_columns_partition(
         "new_governance_versions": len(grouped),
         "already_closed_intervals_rewritten": False,
         "all_other_atoms_unchanged": True,
-        "input_row_census": dict(Counter(digest(r) for r in original)),
-        "output_row_census": dict(Counter(digest(r) for r in actual)),
+        "input_row_census_sha256": digest(dict(Counter(digest(r) for r in original))),
+        "output_row_census_sha256": digest(dict(Counter(digest(r) for r in actual))),
     }
     proof["identity"] = digest(proof)
     return actual, proof

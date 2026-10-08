@@ -16,6 +16,9 @@ from pathlib import Path
 from quanthus.pipelines.p10_deadline_notifications import evaluate
 from quanthus.pipelines.p10_minute_daily_cycle import calendar_for, resolve_target
 from quanthus.pipelines.p10_operating_schedule import SHANGHAI
+from quanthus.pipelines.securities_warehouse.daily_core_ods_catalog import (
+    DAILY_CORE_PRODUCT_SCOPE,
+)
 from quanthus.warehouse_notifications import send_daily_event
 from quanthus.warehouse_sync import (
     WarehouseSyncError,
@@ -23,9 +26,6 @@ from quanthus.warehouse_sync import (
     _run_rsync,
     _ssh_command,
     _validate_pointer,
-)
-from quanthus.pipelines.securities_warehouse.daily_core_ods_catalog import (
-    DAILY_CORE_PRODUCT_SCOPE,
 )
 
 

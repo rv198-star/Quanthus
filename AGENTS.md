@@ -184,3 +184,14 @@
 - Preserve node-local read-only/deployment boundaries and current approved interfaces when
   NexusAgent operates on remote nodes. Do not revive retired OCI-specific tunnels, credentials,
   users, or host assumptions as a workaround.
+
+### P10 daily-core implementation and rollout scope (2026-10-08)
+
+Owner has explicitly authorized the new-standard restart with 2026-09-24 as baseline.
+See `docs/work-items/p10-daily-core-20260924-recovery.md` (from repository root) and
+`config/pipelines/warehouse-quality-policy.v1.json`. The opt-in `daily-core-v1` product
+requires market and calendar/event ODS only, publishes seven DWD tables with 1d bars,
+and uses `CURRENT_DAILY_CORE.json` plus immutable dated descriptors. It does not
+change the old four-lane CURRENT, assert 1m/5m acceptance, or activate P6/training.
+Dedicated CN01/Hermes daily-core services and OCI core-only mirroring are allowed
+after their baseline, physical-source, contract and runtime verification.

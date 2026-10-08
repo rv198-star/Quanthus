@@ -1,0 +1,11 @@
+[Unit]
+Description=Quanthus OCI daily-core mirror refresh
+
+[Timer]
+OnCalendar=*-*-* *:50:00 Asia/Shanghai
+RandomizedDelaySec=30
+Persistent=true
+Unit=oci-daily-core-sync.service
+
+[Install]
+WantedBy=timers.target

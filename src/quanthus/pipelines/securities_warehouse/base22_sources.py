@@ -93,7 +93,9 @@ def _tree(root: Path) -> set[str]:
     return found
 
 
-def _layout(manifest: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def _layout(
+    manifest: dict[str, Any], *, ods_business_window: tuple[date, date] | None = None
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     kind = manifest.get("kind")
     if kind == "quanthus_ods_base_bundle" and manifest.get("schema_version") == 1:
         content = manifest["content"]
@@ -160,7 +162,8 @@ def _layout(manifest: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, A
 
         # Validate the existing release contract without changing its gates.
         OdsRelease.from_dict(manifest)
-        if not date(2026, 8, 1) <= date.fromisoformat(manifest["market_date"]) <= THROUGH:
+        start, through = ods_business_window or (date(2026, 8, 1), THROUGH)
+        if not start <= date.fromisoformat(manifest["market_date"]) <= through:
             raise SourceAssessmentError("SOURCE_BUSINESS_DATE_OUTSIDE_SCOPE")
         files = [dict(x, path=x["relative_path"]) for x in manifest["artifacts"]]
         return files, {
@@ -181,6 +184,7 @@ def assess_package(
     *,
     manifest_name: str = "manifest.json",
     expected_manifest_sha256: str | None = None,
+    ods_business_window: tuple[date, date] | None = None,
 ) -> dict[str, Any]:
     """Hash every declared member and census every parquet footer, without row output.
 
@@ -188,6 +192,13 @@ def assess_package(
     semantics, PIT, coverage, repair admission, or a usable independent image.
     Mismatches retain evidence and do not prevent assessing other packages.
     """
+    if ods_business_window is not None and (
+        not isinstance(ods_business_window, tuple)
+        or len(ods_business_window) != 2
+        or any(type(value) is not date for value in ods_business_window)
+        or ods_business_window[0] > ods_business_window[1]
+    ):
+        raise SourceAssessmentError("INVALID_ODS_BUSINESS_WINDOW")
     pq = importlib.import_module("pyarrow.parquet")
 
     root = physical_path(root)
@@ -199,7 +210,7 @@ def assess_package(
     ready_stat = _fingerprint(ready)
     if ready.read_text(encoding="ascii").strip() != manifest_sha:
         raise SourceAssessmentError("READY_MISMATCH")
-    files, identity = _layout(manifest)
+    files, identity = _layout(manifest, ods_business_window=ods_business_window)
     if not isinstance(files, list) or not files:
         raise SourceAssessmentError("EMPTY_FILE_INVENTORY")
     inventory: list[dict[str, Any]] = []

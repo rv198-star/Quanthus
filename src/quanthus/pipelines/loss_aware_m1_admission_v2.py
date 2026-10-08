@@ -357,6 +357,47 @@ def verify_v2(root: Path) -> dict[str, Any]:
     }
 
 
+def _release_receipt(
+    *,
+    day: str,
+    result: dict[str, Any],
+    counts: Counter[str],
+    destination: Path,
+    root: Path,
+) -> dict[str, Any]:
+    return {
+        "schema_version": 2,
+        "market_date": day,
+        "product_scope": PRODUCT,
+        "manifest_sha256": result["source_sha256"],
+        "package": destination.relative_to(root).as_posix(),
+        "research_ready": result["research_ready"],
+        "R2_stored_restricted": counts["R2"],
+        "R3_source_excluded": counts["R3"],
+        "source_safety": "R3 original raw remains only in prior forensic v1 root",
+        "published_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _advance_research_pointer(root: Path, receipt: dict[str, Any]) -> bool:
+    """Repair a missed pointer commit without regressing sealed research dates."""
+    if not receipt["research_ready"]:
+        return False
+    pointer = root / "CURRENT_RESEARCH_1M_V2.json"
+    incoming = date.fromisoformat(receipt["market_date"])
+    if pointer.exists():
+        previous = json.loads(pointer.read_text())
+        previous_date = date.fromisoformat(previous["market_date"])
+        if previous_date > incoming:
+            return False
+        if previous_date == incoming:
+            if previous.get("manifest_sha256") != receipt["manifest_sha256"]:
+                raise ValueError("existing research pointer has same-date digest conflict")
+            return False
+    _write(pointer, receipt)
+    return True
+
+
 def build_v2(
     *,
     day: str,
@@ -399,13 +440,40 @@ def build_v2(
     ).hexdigest()[:16]
     destination = output_root / "packages" / day / revision
     status_file = output_root / "date-status" / f"{day}.json"
-    if destination.exists() or status_file.exists():
-        if not destination.exists() or not status_file.exists():
-            raise ValueError("partial versioned research publication, require bounded recovery")
-        receipt = json.loads(status_file.read_text())
-        if receipt.get("manifest_sha256") != _sha(destination / "manifest.json"):
-            raise ValueError("existing immutable date status/manifest disagrees")
-        return verify_v2(destination)
+    if destination.exists():
+        checked = verify_v2(destination)
+        stored_manifest = json.loads((destination / "manifest.json").read_text())
+        if (
+            checked["market_date"] != day
+            or stored_manifest["v1_research_release_manifest_sha256"]
+            != _sha(old_dwd / "manifest.json")
+            or stored_manifest["daily_reference_manifest_sha256"] != daily_sha
+            or stored_manifest["policy_sha256"] != _sha(POLICY)
+            or stored_manifest["quality_restriction_count"] != counts["R2"]
+            or stored_manifest["rejected_source_count"] != counts["R3"]
+        ):
+            raise ValueError("partial v2 package does not match frozen source bindings")
+        if status_file.exists():
+            receipt = json.loads(status_file.read_text())
+            if (
+                receipt.get("market_date") != day
+                or receipt.get("manifest_sha256") != checked["source_sha256"]
+                or receipt.get("package") != destination.relative_to(output_root).as_posix()
+                or receipt.get("research_ready") is not checked["research_ready"]
+            ):
+                raise ValueError("existing immutable date status/manifest disagrees")
+        else:
+            # Source-backed immutable package commit succeeded; rebuild missing
+            # metadata, without touching the already sealed ODS/DWD members.
+            receipt = _release_receipt(
+                day=day, result=checked, counts=counts,
+                destination=destination, root=output_root,
+            )
+            _write(status_file, receipt)
+        _advance_research_pointer(output_root, receipt)
+        return checked
+    if status_file.exists():
+        raise ValueError("date-status exists but sealed v2 data package is missing")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix=".r2-v2-", dir=destination.parent))
@@ -557,26 +625,12 @@ def build_v2(
         shutil.rmtree(work, ignore_errors=True)
         raise
     result = verify_v2(destination)
-    receipt = {
-        "schema_version": 2,
-        "market_date": day,
-        "product_scope": PRODUCT,
-        "manifest_sha256": result["source_sha256"],
-        "package": destination.relative_to(output_root).as_posix(),
-        "research_ready": result["research_ready"],
-        "R2_stored_restricted": counts["R2"],
-        "R3_source_excluded": counts["R3"],
-        "source_safety": "R3 original raw remains only in prior forensic v1 root",
-        "published_at": datetime.now(timezone.utc).isoformat(),
-    }
+    receipt = _release_receipt(
+        day=day, result=result, counts=counts,
+        destination=destination, root=output_root,
+    )
     _write(status_file, receipt)
-    if research_ready:
-        pointer = output_root / "CURRENT_RESEARCH_1M_V2.json"
-        if pointer.is_file():
-            previous = json.loads(pointer.read_text())
-            if date.fromisoformat(previous["market_date"]) >= date.fromisoformat(day):
-                raise ValueError("v2 research pointer cannot retreat or overwrite accepted history")
-        _write(pointer, receipt)
+    _advance_research_pointer(output_root, receipt)
     return result
 
 

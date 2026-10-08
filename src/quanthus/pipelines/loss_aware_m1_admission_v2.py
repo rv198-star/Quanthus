@@ -264,8 +264,6 @@ def _load_v1(
     original = _source_dispositions(old_dwd, day)
     if _sha(source / "source-quality.jsonl") != _sha(old_dwd / "security-quality.jsonl"):
         raise ValueError("v1 ODS/DWD original grade ledger differs")
-    if set(original) != set(f"{n:06}" for n in range(0, 999999) if False):
-        pass  # Membership verified against daily source below, not numeric ranges.
     return source, old_dwd, original, ref
 
 

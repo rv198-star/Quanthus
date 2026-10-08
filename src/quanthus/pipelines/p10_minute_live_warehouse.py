@@ -220,6 +220,7 @@ def _inventory(root: Path) -> list[dict[str, Any]]:
 
 def build(
     *, day: str, daily_release: Path, capture_root: Path, product_root: Path,
+    prior_capture_root: Path | None = None,
 ) -> dict[str, Any]:
     import pyarrow as pa
     import pyarrow.parquet as pq
@@ -231,6 +232,34 @@ def build(
         capture_root=capture_root, day=day, daily_sha=daily_sha,
         securities=set(market),
     )
+    changed_source_codes: list[str] = []
+    if prior_capture_root is not None:
+        # T+1 is a *correction*, not a replacement of sealed T originals.
+        # Overlay only newly observed genuine target-date revisions. A rolling
+        # HTTP SHA difference outside that date is never correction evidence.
+        prior_index = _source_index(
+            capture_root=prior_capture_root, day=day, daily_sha=daily_sha,
+            securities=set(market),
+        )
+        merged = dict(prior_index)
+        for code, (path, receipt) in index.items():
+            if not receipt:
+                continue
+            old = prior_index.get(code)
+            if old is not None and old[1]:
+                before_raw = gzip.decompress(old[0].read_bytes())
+                after_raw = gzip.decompress(path.read_bytes())
+                before_digest = target_date_records(
+                    before_raw, code, date.fromisoformat(day)
+                )[1]
+                after_digest = target_date_records(
+                    after_raw, code, date.fromisoformat(day)
+                )[1]
+                if before_digest == after_digest:
+                    continue
+            merged[code] = (path, receipt)
+            changed_source_codes.append(code)
+        index = merged
     # An immutable product may record partial source supply; missing securities
     # become explicit R3 rejection metadata, not fabricated minute rows.
     candidate_digest=_sha(_encode([
@@ -343,6 +372,10 @@ def build(
             "source_ods_manifest_sha256":daily_sha,
             "quality_limits":"R2 storage only; default consumer requires R0/R1",
             "source_capture_root":str(capture_root),
+            "prior_source_capture_root":(
+                str(prior_capture_root) if prior_capture_root is not None else None
+            ),
+            "date_slice_revised_securities":changed_source_codes,
             "pit":"original_actual_acquisition_time_not_retroactive_as_known",
         }
         _write(stage/"quality-summary.json",_encode(summary))
@@ -446,6 +479,7 @@ def main() -> int:
     parser.add_argument("--market-date")
     parser.add_argument("--market-ods-release",type=Path)
     parser.add_argument("--capture-root",type=Path)
+    parser.add_argument("--prior-capture-root",type=Path)
     parser.add_argument("--product-root",type=Path)
     parser.add_argument("--verify-package",type=Path)
     args=parser.parse_args()
@@ -457,6 +491,7 @@ def main() -> int:
     print(json.dumps(build(
         day=args.market_date,daily_release=args.market_ods_release,
         capture_root=args.capture_root,product_root=args.product_root,
+        prior_capture_root=args.prior_capture_root,
     ),sort_keys=True))
     return 0
 

@@ -135,6 +135,9 @@ def _save_source(root: Path, code: str, raw: bytes) -> None:
         "status": "raw_saved",
         "source_market_ods_sha256": SHA,
         "raw_sha256": hashlib.sha256(raw).hexdigest(),
+        "target_date_observation_sha256": live.target_date_records(
+            raw, code, date.fromisoformat(DAY)
+        )[1],
         "captured_at": "2026-10-09T14:00:00+00:00",
     }))
 

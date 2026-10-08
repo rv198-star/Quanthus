@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from quanthus.pipelines.loss_aware_m1_admission_v2 import (
+    _advance_research_pointer,
     _research_ready,
     _status_record,
     _validate_r2_native,
@@ -258,3 +259,46 @@ def test_v2_fails_if_r2_actual_source_raw_missing(tmp_path: Path) -> None:
     (root / "ods" / "raw" / "000001.json.gz").unlink()
     with pytest.raises(ValueError):
         verify_v2(root)
+
+
+def _receipt(day: str, digest: str = "sha256:foo", *, ready: bool = True) -> dict:
+    return {
+        "market_date": day,
+        "manifest_sha256": digest,
+        "research_ready": ready,
+    }
+
+
+def test_v2_replay_repairs_missing_pointer_and_does_not_regress(tmp_path: Path) -> None:
+    original = _receipt("2026-09-24")
+    assert _advance_research_pointer(tmp_path, original)
+    pointer = tmp_path / "CURRENT_RESEARCH_1M_V2.json"
+    first_bytes = pointer.read_bytes()
+    assert not _advance_research_pointer(tmp_path, original)
+    assert pointer.read_bytes() == first_bytes
+    # A later sealed date may advance the consumer, but recovering an earlier
+    # already-accepted package cannot move it back in time.
+    later = _receipt("2026-09-29", digest="sha256:bar")
+    assert _advance_research_pointer(tmp_path, later)
+    advanced_bytes = pointer.read_bytes()
+    assert not _advance_research_pointer(tmp_path, original)
+    assert pointer.read_bytes() == advanced_bytes
+
+
+def test_v2_rejects_same_date_conflicting_manifest(tmp_path: Path) -> None:
+    assert _advance_research_pointer(tmp_path, _receipt("2026-09-29"))
+    with pytest.raises(ValueError, match="same-date digest conflict"):
+        _advance_research_pointer(
+            tmp_path, _receipt("2026-09-29", digest="sha256:different")
+        )
+
+
+def test_v2_nonready_day_never_advances_research_current(tmp_path: Path) -> None:
+    before = _receipt("2026-09-30")
+    assert _advance_research_pointer(tmp_path, before)
+    pointer = tmp_path / "CURRENT_RESEARCH_1M_V2.json"
+    old = pointer.read_bytes()
+    assert not _advance_research_pointer(
+        tmp_path, _receipt("2026-10-08", ready=False)
+    )
+    assert pointer.read_bytes() == old

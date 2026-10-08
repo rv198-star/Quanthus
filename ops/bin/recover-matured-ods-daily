@@ -26,6 +26,12 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 from quanthus.pipelines.source_maturity import source_maturity_deferred  # noqa: E402
+from quanthus.pipelines.trading_maturity import (  # noqa: E402
+    NextSessionEvidence,
+    minute_maturity_eligible,
+    overdue_on_next_session,
+    verified_next_session,
+)
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 SOURCE_MATURITY_DEFERRED = 3
@@ -162,9 +168,17 @@ def _overdue_marker(root: Path, market_date: date) -> Path:
     return root / "recovery/matured-1m" / market_date.isoformat() / "tplus1-overdue.json"
 
 
-def _is_overdue(market_date: date, now: datetime, cutoff: time) -> bool:
-    """The T+1 alert is distinct from the still-open dated backfill queue."""
+def _is_overdue(
+    market_date: date,
+    now: datetime,
+    cutoff: time,
+    *,
+    evidence: NextSessionEvidence | None = None,
+) -> bool:
+    """Only a verified next trading session can own trading-day T+1 alert."""
 
+    if evidence is not None:
+        return overdue_on_next_session(market_date, now, cutoff, evidence)
     return now >= datetime.combine(market_date + timedelta(days=1), cutoff, SHANGHAI)
 
 
@@ -218,6 +232,11 @@ def main() -> int:
     parser.add_argument("--market-date", type=date.fromisoformat)
     parser.add_argument("--recovery-window-seconds", type=int, default=10800)
     parser.add_argument("--tplus1-cutoff", type=time.fromisoformat, default=time(17, 40))
+    parser.add_argument(
+        "--minute-maturity-policy",
+        choices=("same-day-probe", "next-trading-day"),
+        default=os.environ.get("QUANTHUS_ODS_MINUTE_MATURITY_POLICY", "same-day-probe"),
+    )
     args = parser.parse_args()
     if args.recovery_window_seconds <= 0:
         parser.error("--recovery-window-seconds must be positive")
@@ -242,6 +261,33 @@ def main() -> int:
         return 0
     run_root = shadow_root / "orchestrator/daily" / market_date.isoformat()
     overdue = _overdue_marker(shadow_root, market_date)
+    maturity_evidence = None
+    if args.minute_maturity_policy == "next-trading-day":
+        try:
+            maturity_evidence = verified_next_session(market_date)
+            if not minute_maturity_eligible(market_date, datetime.now(SHANGHAI), maturity_evidence):
+                print(
+                    json.dumps(
+                        {
+                            "status": "pending_next_trading_session",
+                            "market_date": market_date.isoformat(),
+                            "next_session": maturity_evidence.next_session.isoformat(),
+                            "calendar_sha256": maturity_evidence.calendar_sha256,
+                        }
+                    )
+                )
+                return 0
+        except (OSError, RuntimeError, ValueError) as exc:
+            print(
+                json.dumps(
+                    {
+                        "status": "blocked_trading_calendar_unverified",
+                        "market_date": market_date.isoformat(),
+                        "error": type(exc).__name__,
+                    }
+                )
+            )
+            return 2
 
     orchestrator = Path(
         os.environ.get("QUANTHUS_ODS_DAILY_ORCHESTRATOR", str(ROOT / "ops/bin/run-cn01-ods-daily"))
@@ -252,11 +298,18 @@ def main() -> int:
         market_date.isoformat(),
         "--recovery-window-seconds",
         str(args.recovery_window_seconds),
+        "--minute-maturity-policy",
+        args.minute_maturity_policy,
     ]
     ods_rc = _run([*common, "--ods-only"])
     if ods_rc == SOURCE_MATURITY_DEFERRED:
         if (
-            _is_overdue(market_date, datetime.now(SHANGHAI), args.tplus1_cutoff)
+            _is_overdue(
+                market_date,
+                datetime.now(SHANGHAI),
+                args.tplus1_cutoff,
+                evidence=maturity_evidence,
+            )
             and not overdue.is_file()
         ):
             notification_rc = _notify_overdue(

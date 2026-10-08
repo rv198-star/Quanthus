@@ -1,0 +1,19 @@
+[Unit]
+Description=Quanthus P10 verified market-data deadline notice (%i)
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/opt/quanthus/p10-minute-current/ops/bin/p10-deadline-timer
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/quanthus/dwd-notification.env
+Environment=PYTHONPATH=/opt/quanthus/p10-minute-current/src
+WorkingDirectory=/opt/quanthus/p10-minute-current
+ExecStart=/opt/quanthus/p10-minute-current/ops/bin/p10-deadline-timer %i
+TimeoutStartSec=2min
+NoNewPrivileges=true
+UMask=0027
+StandardOutput=journal
+StandardError=journal

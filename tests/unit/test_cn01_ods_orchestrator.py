@@ -1091,3 +1091,131 @@ raise SystemExit(0)
     assert context["status"] == "failed"
     assert context["market_date"] == "2026-08-04"
     assert context["run_path"] == str(run_roots[0])
+
+
+def test_tplus1_mode_stages_three_lanes_without_fetching_same_day_1m(
+    tmp_path: Path, capsys
+) -> None:
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    from quanthus.pipelines.trading_maturity import NextSessionEvidence
+
+    module = _load_orchestrator_module()
+    today = datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    evidence = NextSessionEvidence(today + timedelta(days=1), "synthetic_calendar", "a" * 64)
+    calls: list[str] = []
+
+    def _ready_lanes(jobs, **kwargs):
+        calls.extend(job.lane for job in jobs)
+        return {
+            job.lane: {"status": "ready", "returncode": 0, "attempts": 1, "logs": []}
+            for job in jobs
+        }
+
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_ENV_FILE": str(tmp_path / "absent.env"),
+        "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+        "ASTOCK_HOME": str(tmp_path / "home"),
+    }
+    with (
+        patch.dict(os.environ, env),
+        patch.object(
+            sys,
+            "argv",
+            [
+                str(ORCHESTRATOR),
+                "--market-date",
+                today.isoformat(),
+                "--minute-maturity-policy",
+                "next-trading-day",
+            ],
+        ),
+        patch.object(module, "verified_next_session", return_value=evidence),
+        patch.object(module, "find_ready_daily_ods_lanes", return_value={}),
+        patch.object(module, "_run_group", side_effect=_ready_lanes),
+    ):
+        assert module.main() == 3
+    state = json.loads(capsys.readouterr().out)
+    assert state["status"] == "deferred_source_maturity"
+    assert state["lanes"]["intraday-1m"]["status"] == "deferred_source_maturity"
+    assert state["lanes"]["intraday-1m"]["attempts"] == 0
+    assert state["catalog"]["status"] == "deferred_source_maturity"
+    assert state["dwd"]["status"] == "deferred_source_maturity"
+    assert state["minute_maturity_calendar"]["next_session"] == evidence.next_session.isoformat()
+    assert sorted(calls) == ["calendar-daily-events", "intraday-5m", "market-daily-core"]
+    assert not list(
+        (tmp_path / "shadow" / "orchestrator" / "daily" / today.isoformat()).glob("*/READY")
+    )
+
+
+def test_tplus1_mode_rejects_unverified_calendar_before_writing_state(
+    tmp_path: Path, capsys
+) -> None:
+    module = _load_orchestrator_module()
+    today = datetime.now().date()
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_ENV_FILE": str(tmp_path / "absent.env"),
+        "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+        "ASTOCK_HOME": str(tmp_path / "home"),
+    }
+    with (
+        patch.dict(os.environ, env),
+        patch.object(
+            sys,
+            "argv",
+            [
+                str(ORCHESTRATOR),
+                "--market-date",
+                today.isoformat(),
+                "--minute-maturity-policy",
+                "next-trading-day",
+            ],
+        ),
+        patch.object(
+            module, "verified_next_session", side_effect=RuntimeError("provider unavailable")
+        ),
+    ):
+        assert module.main() == 2
+    assert json.loads(capsys.readouterr().out)["status"] == "blocked_trading_calendar_unverified"
+    assert not (tmp_path / "shadow").exists()
+
+
+def test_tplus1_recovery_skips_request_until_verified_next_trading_session(
+    tmp_path: Path, capsys
+) -> None:
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    from quanthus.pipelines.trading_maturity import NextSessionEvidence
+
+    module = _load_maturity_recovery_module()
+    today = datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    evidence = NextSessionEvidence(today + timedelta(days=1), "synthetic_calendar", "b" * 64)
+    env = {
+        "HERMES_ODS_NODE_ID": "cn01",
+        "HERMES_ODS_SHADOW_ROOT": str(tmp_path / "shadow"),
+    }
+    with (
+        patch.dict(os.environ, env),
+        patch.object(
+            sys,
+            "argv",
+            [
+                str(MATURITY_RECOVERY),
+                "--market-date",
+                today.isoformat(),
+                "--minute-maturity-policy",
+                "next-trading-day",
+            ],
+        ),
+        patch.object(module, "verified_next_session", return_value=evidence),
+        patch.object(module, "_run", side_effect=AssertionError("must not start an ODS job")),
+    ):
+        assert module.main() == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "pending_next_trading_session"
+    assert payload["next_session"] == evidence.next_session.isoformat()
+    assert not (tmp_path / "shadow").exists()

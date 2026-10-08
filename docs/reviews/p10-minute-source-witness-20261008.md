@@ -70,6 +70,12 @@ The residual codes are:
 
 This is **not** merely a stale T+1 delay problem: neither existing paid source nor historical Sina supplies all 20 current-contract full 1m securities.
 
+### Cross-market six-security third-source negative control
+
+A separate October 8 Sino raw canary examined high-liquidity 000001, 002460, 300750, 600000, 600010 and 688001. All returned 238 dated rows. These bars are **not interchangeable** with either of the original 240-bar providers: on the 238 same-clock observations, exact per-minute volume agrees with Tencent or paid on only 4 to 85 timestamps (depending on symbol). Three Shenzhen liquid samples match the independent day-total volume, but the Shanghai samples do not: 600000 misses 50,100 shares, 600010 misses 88,900, STAR 688001 misses 7,039 relative to sealed daily. Differences include the closing auction representation.
+
+Therefore even when Sina gives an accurate total and last close for the 20 illiquid hard gaps, it must not be used to vote for a winning vendor on 2,672 conflicts. Its own volume/clock convention requires independent qualification and complete source-period evidence. Receipt: minute-semantic-diagnosis/2026-09-24-sina-third-witness-20261008/cross_venue_three_source_observations.json. No publication authorized.
+
 ## 4. Required P10 authority decisions and shortest honest route
 
 ### A. Semantic decision for 2,672

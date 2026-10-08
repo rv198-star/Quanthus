@@ -13,7 +13,6 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -44,7 +43,9 @@ def _critical(grid: tuple[str, ...]) -> frozenset[str]:
     return frozenset((*grid[:5], *grid[115:120], *grid[120:125], *grid[-5:]))
 
 
-def _source_rows(raw: bytes, symbol: str, day: str, *, period: str) -> tuple[dict[str, dict[str, Decimal]], str]:
+def _source_rows(
+    raw: bytes, symbol: str, day: str, *, period: str
+) -> tuple[dict[str, dict[str, Decimal]], str]:
     if not CODE.fullmatch(symbol) or day not in TARGET:
         raise ValueError("source stock/date identity invalid")
     doc = json.loads(raw)
@@ -157,7 +158,9 @@ class LossAssessment:
             "auction_source_observed": self.auction_source_observed,
             "source_semantic_disagreement": self.source_semantic_disagreement,
             "amount_quality": "source_absent_no_amount_based_consumers",
-            "permitted_use": "non_execution_gap_aware_research_only" if self.grade in {"R0","R1"} else "archive_only",
+            "permitted_use": "non_execution_gap_aware_research_only"
+            if self.grade in {"R0", "R1"}
+            else "archive_only",
             "strict_240_source_qualified": False,
         }
 
@@ -176,24 +179,40 @@ def assess(
     """Never accept missing OHLC as an observed minute, even when volume is zero."""
     if day not in TARGET or not CODE.fullmatch(symbol):
         raise ValueError("outside frozen research product universe")
-    if cross_source_status not in {"known_semantic_conflict","single_qualified_source","not_independently_compared"}:
+    if cross_source_status not in {
+        "known_semantic_conflict",
+        "single_qualified_source",
+        "not_independently_compared",
+    }:
         raise ValueError("unknown source-comparison state")
     daily_shares, daily_close = _decimal(shares, "daily shares"), _decimal(close, "daily close")
     if daily_shares < 0:
         raise ValueError("negative sealed daily volume")
     kwargs: dict[str, Any] = {
-        "symbol": symbol, "day": day,
-        "grade": "R3", "reason": "no_original_source",
-        "raw_sha256": None, "native_count": 0, "observed_regular": 0,
-        "missing_stamps": _grid(day), "critical_gap": True,
-        "daily_share_delta": None, "daily_close_delta": None,
-        "witness_sha256": None, "auction_source_observed": False,
+        "symbol": symbol,
+        "day": day,
+        "grade": "R3",
+        "reason": "no_original_source",
+        "raw_sha256": None,
+        "native_count": 0,
+        "observed_regular": 0,
+        "missing_stamps": _grid(day),
+        "critical_gap": True,
+        "daily_share_delta": None,
+        "daily_close_delta": None,
+        "witness_sha256": None,
+        "auction_source_observed": False,
         "source_semantic_disagreement": cross_source_status,
         "rows": (),
     }
     if not traded:
         if daily_shares == 0:
-            kwargs.update(grade="SUSPENDED", reason="sealed_daily_no_trade", missing_stamps=(), critical_gap=False)
+            kwargs.update(
+                grade="SUSPENDED",
+                reason="sealed_daily_no_trade",
+                missing_stamps=(),
+                critical_gap=False,
+            )
         else:
             kwargs["reason"] = "suspended_with_positive_daily_volume"
         return LossAssessment(**kwargs)
@@ -209,19 +228,19 @@ def assess(
         missing = tuple(t for t in grid if t not in observed)
         kwargs.update(
             native_count=len(observed),
-            observed_regular=len(grid)-len(missing),
+            observed_regular=len(grid) - len(missing),
             missing_stamps=missing,
             critical_gap=any(t in _critical(grid) for t in missing),
-            auction_source_observed=(day.replace("-","") + "0930") in observed,
+            auction_source_observed=(day.replace("-", "") + "0930") in observed,
             rows=tuple(sorted(observed.items())),
         )
         vtotal = sum((v["volume"] for v in observed.values()), Decimal(0))
         kwargs["daily_share_delta"] = str(vtotal - daily_shares)
         terminal = observed.get(grid[-1])
-        kwargs["daily_close_delta"] = (
-            str(terminal["close"] - daily_close) if terminal else None
-        )
-        if terminal is None or terminal["close"].quantize(Decimal("0.01")) != daily_close.quantize(Decimal("0.01")):
+        kwargs["daily_close_delta"] = str(terminal["close"] - daily_close) if terminal else None
+        if terminal is None or terminal["close"].quantize(Decimal("0.01")) != daily_close.quantize(
+            Decimal("0.01")
+        ):
             kwargs["reason"] = "source_missing_or_wrong_terminal_close"
         elif vtotal != daily_shares:
             kwargs["reason"] = "unmatured_or_incorrect_minute_daily_share_volume"
@@ -238,13 +257,21 @@ def assess(
         else:
             try:
                 witness_sha = verify_native_m5(
-                    m1=observed, m5_raw=m5_raw, symbol=symbol, day=day,
-                    daily_shares=daily_shares, daily_close=daily_close,
+                    m1=observed,
+                    m5_raw=m5_raw,
+                    symbol=symbol,
+                    day=day,
+                    daily_shares=daily_shares,
+                    daily_close=daily_close,
                 )
             except ValueError:
                 kwargs.update(grade="R2", reason="native_5m_volume_bucket_mismatch")
             else:
-                kwargs.update(grade="R1", reason="at_most_five_sparse_minutes_with_48_native_m5_bucket_conservation", witness_sha256=witness_sha)
+                kwargs.update(
+                    grade="R1",
+                    reason="at_most_five_sparse_minutes_with_48_native_m5_bucket_conservation",
+                    witness_sha256=witness_sha,
+                )
     except (ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
         kwargs.update(grade="R3", reason=f"invalid_source: {str(exc)[:160]}", rows=())
     return LossAssessment(**kwargs)

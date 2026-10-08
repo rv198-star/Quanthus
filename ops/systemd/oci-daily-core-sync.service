@@ -1,0 +1,19 @@
+[Unit]
+Description=Quanthus OCI dated daily-core product mirror
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+EnvironmentFile=-/etc/quanthus/t-close-plus-5h.env
+EnvironmentFile=/etc/quanthus/oci-daily-core-sync.env
+WorkingDirectory=/opt/quanthus/daily-core-current
+ExecStart=/opt/quanthus/warehouse-current/.venv/bin/python /opt/quanthus/daily-core-current/ops/bin/sync-cn01-dwd-daily-core --published-only
+TimeoutStartSec=1800
+KillMode=control-group
+UMask=0027
+Nice=5
+StandardOutput=journal
+StandardError=journal

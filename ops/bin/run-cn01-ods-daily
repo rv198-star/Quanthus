@@ -26,6 +26,8 @@ from quanthus.pipelines.process_control import (  # noqa: E402
     terminate_process_group,
 )
 from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (  # noqa: E402
+    DAILY_CORE_PRODUCT_SCOPE,
+    LEGACY_PRODUCT_SCOPE,
     find_ready_daily_ods_lanes,
 )
 from quanthus.pipelines.source_maturity import source_maturity_deferred  # noqa: E402
@@ -370,12 +372,26 @@ def main() -> int:
         help="give a retry an explicit market acquisition window from its start time",
     )
     parser.add_argument(
+        "--product-scope",
+        choices=(LEGACY_PRODUCT_SCOPE, DAILY_CORE_PRODUCT_SCOPE),
+        default=LEGACY_PRODUCT_SCOPE,
+        help="explicit consumer-scoped daily-core; legacy four-lane is unchanged",
+    )
+    parser.add_argument(
+        "--bootstrap-prior-pointer",
+        type=Path,
+        help="one-time read-only 2026-09-23 legacy pointer for 2026-09-24 daily-core recovery",
+    )
+    parser.add_argument(
         "--ods-only",
         action="store_true",
         help="seal the ODS lanes and catalog without starting the daily DWD build",
     )
     args = parser.parse_args()
 
+    is_core = args.product_scope == DAILY_CORE_PRODUCT_SCOPE
+    if args.bootstrap_prior_pointer and not is_core:
+        parser.error("legacy bootstrap pointer requires daily-core-v1 product")
     node_id = os.environ.get("HERMES_ODS_NODE_ID", "cn01").strip().lower()
     if re.fullmatch(r"[a-z][a-z0-9-]*", node_id) is None:
         parser.error("HERMES_ODS_NODE_ID must be a normalized node id")
@@ -433,25 +449,47 @@ def main() -> int:
         else None
     )
     run_id = started.strftime("%Y%m%dT%H%M%S%fZ")
-    run_root = shadow_root / "orchestrator" / "daily" / market_date.isoformat() / run_id
-    log_root = run_root / "logs"
-    catalog_root = Path(
-        os.environ.get(
-            "HERMES_ODS_DAILY_CATALOG_ROOT",
-            str(shadow_root / "catalogs/daily" / market_date.isoformat() / run_id),
-        )
+    run_root = (
+        shadow_root
+        / "orchestrator"
+        / ("daily-core" if is_core else "daily")
+        / market_date.isoformat()
+        / run_id
     )
+    log_root = run_root / "logs"
+    if is_core:
+        catalog_root = Path(
+            os.environ.get(
+                "HERMES_ODS_DAILY_CORE_CATALOG_ROOT",
+                str(shadow_root / "catalogs/daily-core" / market_date.isoformat() / run_id),
+            )
+        )
+    else:
+        catalog_root = Path(
+            os.environ.get(
+                "HERMES_ODS_DAILY_CATALOG_ROOT",
+                str(shadow_root / "catalogs/daily" / market_date.isoformat() / run_id),
+            )
+        )
     run_root.mkdir(parents=True, exist_ok=False)
     os.environ["HERMES_ODS_NODE_ID"] = node_id
     os.environ.setdefault("HERMES_ODS_ENV_FILE", f"/etc/quanthus/{node_id}-ods-lane.env")
-    notification_context_path = shadow_root / "orchestrator/daily/notification-context.json"
+    notification_context_path = shadow_root / (
+        "orchestrator/daily-core/notification-context.json"
+        if is_core
+        else "orchestrator/daily/notification-context.json"
+    )
     notification_context: dict[str, Any] = {
         "schema_version": 1,
         "kind": "ods_daily_orchestration_notification_context",
         "market_date": market_date.isoformat(),
         "node": "CN01" if node_id == "cn01" else node_id.title(),
         "stage": "ods_to_dwd_build",
-        "unit": f"{node_id}-ods-daily-orchestrator.service",
+        "unit": (
+            f"{node_id}-ods-daily-core-orchestrator.service"
+            if is_core
+            else f"{node_id}-ods-daily-orchestrator.service"
+        ),
         "run_path": str(run_root),
         "error_code": "orchestrator_failed",
         "error": "ODS-to-DWD orchestrator did not reach READY",
@@ -473,8 +511,8 @@ def main() -> int:
         "started_at": _iso(started),
     }
     state: dict[str, Any] = {
-        "schema_version": 1,
-        "kind": "ods_daily_orchestration",
+        "schema_version": 2 if is_core else 1,
+        "kind": "ods_daily_core_orchestration" if is_core else "ods_daily_orchestration",
         "node": node_id,
         "mode": "ods_only" if args.ods_only else "ods_to_dwd",
         **common,
@@ -483,6 +521,12 @@ def main() -> int:
         "catalog": None,
         "dwd": None,
     }
+    if is_core:
+        state["product_scope"] = DAILY_CORE_PRODUCT_SCOPE
+        state["excluded_optional_lanes"] = {
+            "intraday-1m": "not_part_of_daily_core_no_formal_minute_ready_claim",
+            "intraday-5m": "not_part_of_daily_core_separate_archive",
+        }
 
     daily_group = [
         LaneJob(
@@ -549,6 +593,9 @@ def main() -> int:
             poll_seconds=poll_seconds,
         ),
     ]
+    if is_core:
+        # This product does not acquire, infer, or require either minute lane.
+        daily_group = daily_group[:2]
     if time.monotonic() < deadline:
         existing = find_ready_daily_ods_lanes(
             release_root=release_root,
@@ -624,13 +671,25 @@ def main() -> int:
                 "logs": [],
             }
 
-    closed_session = all(
-        state["lanes"].get(lane, {}).get("status") == "closed_session"
-        for lane in ("market-daily-core", "intraday-5m", "intraday-1m")
-    ) and state["lanes"].get("calendar-daily-events", {}).get("status") == "ready"
-    lane_success = all(item.get("status") == "ready" for item in state["lanes"].values())
-    source_deferred = not lane_success and source_maturity_deferred(
-        state["lanes"], shadow_root=shadow_root, market_date=market_date
+    required_closed_lanes = (
+        ("market-daily-core",) if is_core else ("market-daily-core", "intraday-5m", "intraday-1m")
+    )
+    closed_session = (
+        all(
+            state["lanes"].get(lane, {}).get("status") == "closed_session"
+            for lane in required_closed_lanes
+        )
+        and state["lanes"].get("calendar-daily-events", {}).get("status") == "ready"
+    )
+    lane_success = len(state["lanes"]) == len(daily_group) and all(
+        item.get("status") == "ready" for item in state["lanes"].values()
+    )
+    source_deferred = (
+        not is_core
+        and not lane_success
+        and source_maturity_deferred(
+            state["lanes"], shadow_root=shadow_root, market_date=market_date
+        )
     )
     if closed_session:
         state["catalog"] = {"status": "not_applicable_closed_session"}
@@ -646,6 +705,8 @@ def main() -> int:
             "--output",
             str(catalog_root),
         ]
+        if is_core:
+            catalog_command += ["--product-scope", DAILY_CORE_PRODUCT_SCOPE]
         catalog_rc, catalog_log = _run_command(
             catalog_command,
             log_path=log_root / "catalog.log",
@@ -672,12 +733,22 @@ def main() -> int:
                     str(ROOT / "config/releases/v2-build202607.json"),
                 )
             )
-            dwd_daily_root = Path(
-                os.environ.get(
-                    "QUANTHUS_DWD_DAILY_ROOT",
-                    "/srv/quanthus/dwd-dws-v2/daily",
+            if is_core:
+                dwd_daily_root = Path(
+                    os.environ.get(
+                        "QUANTHUS_DWD_DAILY_CORE_ROOT",
+                        "/srv/quanthus/dwd-dws-v2/daily/products/daily-core",
+                    )
                 )
-            )
+                if dwd_daily_root.resolve() == Path("/srv/quanthus/dwd-dws-v2/daily").resolve():
+                    raise ValueError("daily-core may not write legacy daily DWD root")
+            else:
+                dwd_daily_root = Path(
+                    os.environ.get(
+                        "QUANTHUS_DWD_DAILY_ROOT",
+                        "/srv/quanthus/dwd-dws-v2/daily",
+                    )
+                )
             if not args.ods_only:
                 dwd_command = [
                     str(dwd_python),
@@ -693,6 +764,13 @@ def main() -> int:
                     "--daily-root",
                     str(dwd_daily_root),
                 ]
+                if is_core:
+                    dwd_command += ["--product-scope", DAILY_CORE_PRODUCT_SCOPE]
+                    if args.bootstrap_prior_pointer is not None:
+                        dwd_command += [
+                            "--bootstrap-prior-pointer",
+                            str(args.bootstrap_prior_pointer),
+                        ]
                 dwd_rc, dwd_log = _run_command(
                     dwd_command,
                     log_path=log_root / "dwd-daily-build.log",

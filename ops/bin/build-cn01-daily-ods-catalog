@@ -22,10 +22,19 @@ def main() -> int:
     parser.add_argument("--release-root", type=Path, required=True)
     parser.add_argument("--market-date", type=date.fromisoformat, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--product-scope",
+        choices=("legacy-four-lane-v1", "daily-core-v1"),
+        default="legacy-four-lane-v1",
+        help="versioned consumer product; existing four-lane remains default",
+    )
     args = parser.parse_args()
     try:
         result = build_daily_ods_catalog(
-            release_root=args.release_root, market_date=args.market_date, output=args.output
+            release_root=args.release_root,
+            market_date=args.market_date,
+            output=args.output,
+            product_scope=args.product_scope,
         )
     except (DailyOdsCatalogError, OSError, ValueError) as exc:
         print(f"CN01 daily ODS catalog failed: {exc}", file=sys.stderr)

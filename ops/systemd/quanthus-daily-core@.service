@@ -1,0 +1,20 @@
+[Unit]
+Description=Quanthus daily-core independent collection and bounded catch-up (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=-/etc/quanthus/%i-ods-lane.env
+EnvironmentFile=-/etc/quanthus/%i-dwd.env
+EnvironmentFile=/etc/quanthus/%i-daily-core.env
+WorkingDirectory=/opt/quanthus/daily-core-current
+ExecStart=/usr/bin/env ${QUANTHUS_DAILY_CORE_PYTHON} /opt/quanthus/daily-core-current/ops/bin/run-daily-core-cycle --max-sessions 2 --max-wall-seconds 3600
+TimeoutStartSec=3700
+KillMode=control-group
+Nice=5
+UMask=0027
+StandardOutput=journal
+StandardError=journal

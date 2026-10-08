@@ -181,6 +181,14 @@ publisher metadata 不改。A 股公告须同时明示 H 股派发不适用才�
 条款仍参与拒绝门槛。原文数字、PDF、publisher 回复保持；日期、人民币单位、完整
 primary 一致性及新知识版本检查不变。原默认 profile 和已封存输出不受替换。
 
+#481 的 opt-in `p10-base22-literal-A-entitlement-H-reference-closure-v15` 对完整 H 股
+引用逐项判角色：原文明确不适用的现金操作、证券身份表头、指向香港交易所另一公告的
+非金额引用。必须同时有明示 A 股对象和 H 股排除；不能隐藏 H 股金额、每股权益、
+税务或未知非空范围，B 股/外币仍拒绝。不改变原 PDF、metadata、数字或时刻。
+明示年度嵌入每股含税人民币现金句、字面“除权（除息）日”标签采用共享身份/精确日期
+门槛；冲突金额或 primary 仍 held，绝不计算分项合计、虚拟除息额或未知汇率。
+构建和离线原 PDF 重放使用同一 profile；这是来源范围资格，不是消费者准入。
+
 ## Current recovery checkpoint
 
 工作区 `/root/Quanthus/.worktrees/base22-standalone`；分支 `codex/base22-standalone`。

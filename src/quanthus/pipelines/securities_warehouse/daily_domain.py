@@ -1,4 +1,4 @@
-"""Build one immutable DWD domain increment from a sealed four-lane ODS catalog."""
+"""Build a versioned immutable DWD increment from a sealed ODS product catalog."""
 
 # ruff: noqa: E501
 
@@ -11,13 +11,16 @@ import shutil
 import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 from quanthus.pipelines.contracts import OdsReleaseError, verify_ods_release
 from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (
+    DAILY_CORE_PRODUCT_SCOPE,
+    LEGACY_PRODUCT_SCOPE,
     DailyOdsCatalogError,
+    _daily_core_quality_sha256,
     verify_daily_ods_catalog,
 )
 
@@ -272,6 +275,58 @@ def _prior_binding(pointer: Path | None, market_date: date, base_through: date) 
     }
 
 
+def _verify_daily_core_calendar_continuity(
+    calendar_path: Path,
+    *,
+    after: date,
+    target: date,
+    parquet: Any,
+) -> None:
+    """Do not silently advance a daily-only product over unbuilt open sessions.
+
+    The source's own SHA/READY was already verified by the ODS catalog, but
+    missing or disagreeing exchange calendar rows must fail closed. We require
+    continuous market-date coverage and check both SSE/SZSE independently.
+    """
+    try:
+        rows = parquet.read_table(
+            calendar_path, columns=["exchange", "trade_date", "is_open", "session"]
+        ).to_pylist()
+    except (OSError, ValueError, KeyError) as exc:
+        raise DailyDomainBuildError("daily-core calendar provenance is unreadable") from exc
+    sessions: dict[date, dict[str, int]] = {}
+    for row in rows:
+        day = row.get("trade_date")
+        venue = row.get("exchange")
+        if not isinstance(day, date) or day <= after or day > target:
+            continue
+        if venue not in ("SSE", "SZSE") or row.get("session") != "day":
+            continue
+        if day in sessions and venue in sessions[day]:
+            raise DailyDomainBuildError("duplicate daily-core exchange session")
+        flag = row.get("is_open")
+        if flag not in (0, 1) or isinstance(flag, bool):
+            raise DailyDomainBuildError("unverified daily-core exchange calendar status")
+        sessions.setdefault(day, {})[venue] = int(flag)
+    cursor = after + timedelta(days=1)
+    while cursor <= target:
+        pair = sessions.get(cursor)
+        if pair is None or set(pair) != {"SSE", "SZSE"}:
+            raise DailyDomainBuildError(
+                f"daily-core trading calendar date coverage missing: {cursor}"
+            )
+        if pair["SSE"] != pair["SZSE"]:
+            raise DailyDomainBuildError(f"daily-core SSE/SZSE status disagreement: {cursor}")
+        if cursor == target:
+            if pair["SSE"] != 1:
+                raise DailyDomainBuildError("daily-core target is not an open session")
+        elif pair["SSE"] == 1:
+            raise DailyDomainBuildError(
+                f"daily-core would silently skip required open session: {cursor}"
+            )
+        cursor += timedelta(days=1)
+
+
 def build_daily_domain_increment(
     *,
     catalog_root: Path,
@@ -321,8 +376,31 @@ def build_daily_domain_increment(
     trading_calendar_path, trading_calendar_artifact = _artifact(
         selected, "market_daily_core", "trading_calendar"
     )
-    minute_path, minute_artifact = _artifact(selected, "intraday_1m", "intraday_bars")
-    five_path, five_artifact = _artifact(selected, "intraday_5m", "intraday_bars")
+    product_scope = catalog.get("product_scope", LEGACY_PRODUCT_SCOPE)
+    if product_scope not in {LEGACY_PRODUCT_SCOPE, DAILY_CORE_PRODUCT_SCOPE}:
+        raise DailyDomainBuildError("unsupported daily data product scope")
+    if product_scope == DAILY_CORE_PRODUCT_SCOPE:
+        _verify_daily_core_calendar_continuity(
+            trading_calendar_path,
+            after=covered_after,
+            target=market_date,
+            parquet=pq,
+        )
+    # A daily-core consumer declares NO dependency on intraday bars. We do not
+    # replace the 1m source with guessed zeros, hidden 5m input, or an empty
+    # 240-bar array. Other consumers must keep using the full legacy contract.
+    bar_sources: list[tuple[Path, Any, str, str]] = [
+        (daily_path, daily_artifact, "1d", "INTERVAL 0 SECOND"),
+    ]
+    if product_scope == LEGACY_PRODUCT_SCOPE:
+        minute_path, minute_artifact = _artifact(selected, "intraday_1m", "intraday_bars")
+        five_path, five_artifact = _artifact(selected, "intraday_5m", "intraday_bars")
+        bar_sources.extend(
+            [
+                (minute_path, minute_artifact, "1m", "INTERVAL 1 MINUTE"),
+                (five_path, five_artifact, "5m", "INTERVAL 5 MINUTE"),
+            ]
+        )
     announcements_path, announcements_artifact = _artifact(
         selected, "calendar_daily_events", "announcements_delta"
     )
@@ -353,9 +431,7 @@ def build_daily_domain_increment(
         connection.execute(
             f"CREATE VIEW base_market_index AS SELECT * FROM {_path_relation(market_index_files)}"
         )
-        connection.execute(
-            f"CREATE VIEW base_venue AS SELECT * FROM {_path_relation(venue_files)}"
-        )
+        connection.execute(f"CREATE VIEW base_venue AS SELECT * FROM {_path_relation(venue_files)}")
 
         calendar_session_id = _stable_id_sql(
             "calendar_session", "v.venue_id", "CAST(o.trade_date AS VARCHAR)", _sql("day")
@@ -390,11 +466,7 @@ def build_daily_domain_increment(
         )
 
         bar_parts = []
-        for path, artifact, interval, subtract in (
-            (daily_path, daily_artifact, "1d", "INTERVAL 0 SECOND"),
-            (minute_path, minute_artifact, "1m", "INTERVAL 1 MINUTE"),
-            (five_path, five_artifact, "5m", "INTERVAL 5 MINUTE"),
-        ):
+        for path, artifact, interval, subtract in bar_sources:
             if interval == "1d":
                 raw_start = "CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai'"
                 raw_end = f"({raw_start}) + INTERVAL 1 DAY"
@@ -570,10 +642,14 @@ def build_daily_domain_increment(
                 "SELECT count(*) FROM read_parquet(?) WHERE trade_date=cast(? AS DATE)",
                 [str(trading_calendar_path), market_date.isoformat()],
             ).fetchone()[0],
-            "dwd_security_bar": connection.execute(
-                "SELECT (SELECT count(*) FROM read_parquet(?))+(SELECT count(*) FROM read_parquet(?))+(SELECT count(*) FROM read_parquet(?))",
-                [str(daily_path), str(minute_path), str(five_path)],
-            ).fetchone()[0],
+            "dwd_security_bar": sum(
+                int(
+                    connection.execute(
+                        "SELECT count(*) FROM read_parquet(?)", [str(item[0])]
+                    ).fetchone()[0]
+                )
+                for item in bar_sources
+            ),
             "dwd_security_valuation": connection.execute(
                 "SELECT count(*)*4 FROM read_parquet(?)", [str(valuation_path)]
             ).fetchone()[0],
@@ -623,8 +699,12 @@ def build_daily_domain_increment(
             f"{catalog['catalog_digest'][7:19]}-{code_revision[:7]}"
         )
         manifest = {
-            "schema_version": 1,
-            "kind": "cn01_daily_dwd_domain_increment",
+            "schema_version": 2 if product_scope == DAILY_CORE_PRODUCT_SCOPE else 1,
+            "kind": (
+                "cn01_daily_core_dwd_increment"
+                if product_scope == DAILY_CORE_PRODUCT_SCOPE
+                else "cn01_daily_dwd_domain_increment"
+            ),
             "package_id": package_id,
             "build_id": config["build_id"],
             "market_date": market_date.isoformat(),
@@ -649,6 +729,32 @@ def build_daily_domain_increment(
             "files": files,
             "content_digest": content_digest,
         }
+        if product_scope == DAILY_CORE_PRODUCT_SCOPE:
+            manifest["product_scope"] = DAILY_CORE_PRODUCT_SCOPE
+            manifest["quality_policy"] = "p10-business-value-warehouse-quality.v1"
+            manifest["quality_policy_sha256"] = _daily_core_quality_sha256()
+            manifest["consumable_intervals"] = ["1d"]
+            manifest["unavailable_products"] = {
+                "intraday_1m": "not_part_of_daily_core_not_qualified_as_daily",
+                "intraday_5m": "not_part_of_daily_core_independently_qualified",
+            }
+            audit["product_scope"] = DAILY_CORE_PRODUCT_SCOPE
+            audit["consumable_intervals"] = ["1d"]
+            _write_atomic(audit_path, audit)
+            # Audit content changed: compute its new SHA and content digest,
+            # while keeping the original v1 construction byte-identical.
+            files = [
+                {
+                    "path": path.relative_to(work).as_posix(),
+                    "sha256": _sha256(path),
+                    "size_bytes": path.stat().st_size,
+                }
+                for path in sorted(item for item in work.rglob("*") if item.is_file())
+            ]
+            manifest["files"] = files
+            manifest["content_digest"] = (
+                "sha256:" + hashlib.sha256(_canonical_bytes(files)).hexdigest()
+            )
         _write_atomic(work / "manifest.json", manifest)
         _write_atomic(work / "READY", (_sha256(work / "manifest.json") + "\n").encode("ascii"))
         os.replace(work, output)
@@ -668,7 +774,28 @@ def verify_daily_domain_increment(root: Path) -> DailyDomainResult:
         ready = (root / "READY").read_text(encoding="ascii").strip()
     except OSError as exc:
         raise DailyDomainBuildError("daily DWD READY is unreadable") from exc
-    if ready != manifest_sha or manifest.get("kind") != "cn01_daily_dwd_domain_increment":
+    if ready != manifest_sha:
+        raise DailyDomainBuildError("daily DWD manifest or READY differs")
+    if manifest.get("kind") == "cn01_daily_core_dwd_increment":
+        if (
+            manifest.get("schema_version") != 2
+            or manifest.get("product_scope") != DAILY_CORE_PRODUCT_SCOPE
+            or manifest.get("consumable_intervals") != ["1d"]
+            or manifest.get("quality_policy") != "p10-business-value-warehouse-quality.v1"
+            or manifest.get("quality_policy_sha256") != _daily_core_quality_sha256()
+            or set(manifest.get("selected_releases", {}))
+            != {"market_daily_core", "calendar_daily_events"}
+            or manifest.get("unavailable_products")
+            != {
+                "intraday_1m": "not_part_of_daily_core_not_qualified_as_daily",
+                "intraday_5m": "not_part_of_daily_core_independently_qualified",
+            }
+        ):
+            raise DailyDomainBuildError("daily-core DWD source/product contract differs")
+    elif (
+        manifest.get("kind") != "cn01_daily_dwd_domain_increment"
+        or manifest.get("schema_version") != 1
+    ):
         raise DailyDomainBuildError("daily DWD manifest or READY differs")
     expected = set()
     payload_bytes = 0
@@ -712,13 +839,21 @@ def advance_daily_current(*, package: Path, pointer: Path) -> None:
     result = verify_daily_domain_increment(package)
     pointer.parent.mkdir(parents=True, exist_ok=True)
     relative = os.path.relpath(result.root / "manifest.json", pointer.parent.resolve())
+    manifest = _object(result.root / "manifest.json")
+    is_core = manifest["kind"] == "cn01_daily_core_dwd_increment"
+    if is_core and pointer.name != "CURRENT_DAILY_CORE.json":
+        raise DailyDomainBuildError("daily-core product must not overwrite legacy CURRENT")
+    if not is_core and pointer.name == "CURRENT_DAILY_CORE.json":
+        raise DailyDomainBuildError("legacy DWD must not overwrite daily-core CURRENT")
     descriptor = {
-        "schema_version": 1,
-        "kind": "cn01_daily_dwd_current",
+        "schema_version": 2 if is_core else 1,
+        "kind": "cn01_daily_core_dwd_current" if is_core else "cn01_daily_dwd_current",
         "package_id": result.package_id,
         "market_date": result.market_date.isoformat(),
         "manifest_path": relative,
         "manifest_sha256": result.manifest_sha256,
         "content_digest": result.content_digest,
     }
+    if is_core:
+        descriptor["product_scope"] = DAILY_CORE_PRODUCT_SCOPE
     _write_atomic(pointer, descriptor)

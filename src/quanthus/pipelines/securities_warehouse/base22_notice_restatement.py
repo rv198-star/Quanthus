@@ -25,6 +25,8 @@ from .base22_cash_restatement import _scan_cash_global
 from .base22_financial import _clock
 from .base22_notice_a_scope import CONTRACT_ID as A_CURRENT_SCOPE_CONTRACT
 from .base22_notice_a_scope import select_a_cash_candidates
+from .base22_notice_ab_scope import CONTRACT_ID as SELECTED_AB_CONTRACT
+from .base22_notice_ab_scope import select_a_b_cash_candidates
 from .base22_notice_action import CONTRACT_ID as PARSER_CONTRACT
 from .base22_notice_action import select_notice_cash_candidates
 from .base22_notice_adjustment import CONTRACT_ID as ADJUSTMENT_CONTRACT
@@ -106,6 +108,7 @@ def restate_notice_cash(
             ISSUER_SCHEDULE_CONTRACT,
             EXACT_IDENTITY_CONTRACT,
             H_REFERENCE_CONTRACT,
+            SELECTED_AB_CONTRACT,
         }
         or notice_atom.get("stock_code") != raw.get("stock_code")
         or notice_atom.get("ex_date") != raw["ex_date"]
@@ -380,7 +383,9 @@ def audit_notice_restatement_scope(
             }
         )
         budget.check()
-    if body.get("parser_profile") == H_REFERENCE_CONTRACT:
+    if body.get("parser_profile") == SELECTED_AB_CONTRACT:
+        selected, selection = select_a_b_cash_candidates(targets, documents)
+    elif body.get("parser_profile") == H_REFERENCE_CONTRACT:
         selected, selection = select_h_excluded_cash_candidates(targets, documents)
     elif body.get("parser_profile") == EXACT_IDENTITY_CONTRACT:
         selected, selection = select_exact_identity_candidates(targets, documents)

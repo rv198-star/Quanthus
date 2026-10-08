@@ -189,6 +189,16 @@ primary 一致性及新知识版本检查不变。原默认 profile 和已封存
 门槛；冲突金额或 primary 仍 held，绝不计算分项合计、虚拟除息额或未知汇率。
 构建和离线原 PDF 重放使用同一 profile；这是来源范围资格，不是消费者准入。
 
+#481 的 opt-in `p10-base22-selected-literal-A-gross-currency-and-market-date-v16`
+仅裁定原文已明示的 A 股现金对象。publisher 代码与首个原文代码须完全相同，完整
+当前含税方案与明示 A 股普通栏（或“单位：元”之后、B 股栏之前的税前/税后双栏）
+须一致；分别写明 A/B 对象和日期的共同人民币方案保留原单位。双代码表头不建立
+通用别名。B 股美元/港币支付及其他原始观察随完整原文保留，但不换算、不授予资格。
+A 日期仅来自完整交易所列头、明确共同日期或独立 A 股字段；B 日期不得代用，
+T+n 只是源文注释，不推算交易日历。新年度公告角色仍需批准、本次实施声明和完整
+日程；缺单位、未裁定非空范围、冲突 primary 或不可精确表示数值继续 held。
+这份限域来源资格不证明全市场闭包，也不恢复原 normalization revision。
+
 ## Current recovery checkpoint
 
 工作区 `/root/Quanthus/.worktrees/base22-standalone`；分支 `codex/base22-standalone`。

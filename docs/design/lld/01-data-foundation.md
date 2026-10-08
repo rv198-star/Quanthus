@@ -28,6 +28,14 @@ shared quality/governance, maintenance and source recovery/repair belong to P10 
 and choose a disclosed business bypass, temporary ignore or acceptance of a known limitation;
 they do not repair data. The source, schema, PIT, topology and release contracts below are unchanged.
 
+**P10 数仓质量与发布依赖的现行上位原则：** 2026-10-08 接受
+[ADR 0016](../../architecture/adr-0016-value-proportional-warehouse-quality.md)：
+数据质量按实际消费者用途、业务风险和修复成本裁决，非关键分钟缺口
+不得无条件阻断其他独立合格的数据产品。下述 P1 历史验收与物理合约、
+PIT 及不可变发布边界仍保持原状；四 Lane READY 的生产解耦属于
+[P10 #496](https://github.com/rv198-star/Quanthus/issues/496) 的单独工程评审/发布，
+并**未**由 ADR 0016 自动改成新的生产 READY 条件。
+
 P1 includes SSE/SZSE daily bars from 2011 onward, security lifecycle, trading calendar,
 corporate actions, adjustment factors, tradability, historical ST state, board-specific price
 limits, delisted securities, static level-one industry mapping, and snapshot manifests.

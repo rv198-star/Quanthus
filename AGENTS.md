@@ -46,6 +46,29 @@
 - Existing execution/deployment safeguards remain. The #424 SSH override is task-scoped, not a
   general P10 remote-access override.
 
+### Warehouse quality iron law — Owner 2026-10-08
+
+- **Business value over absolute precision.** Follow
+  [ADR 0016](docs/architecture/adr-0016-value-proportional-warehouse-quality.md)
+  and P10 LLD 12 §2A before changing warehouse admission, supplier qualification or
+  data-release topology. A rule must name its real product, consumer, required resolution,
+  material decision risk and cost before becoming a global blocking gate.
+- **Isolate noncritical defects.** Failure of optional/archive-only 1m data must not
+  unconditionally block independently qualified daily-core data. Never describe unavailable,
+  ambiguous or incomplete minute products as READY. Current legacy four-lane READY remains
+  in force until a separately approved versioned product/consumer design and rollout (#496).
+- **Hard truth still wins.** Preserve security/date/unit/price-basis identity, raw SHA/lineage,
+  PIT and protected windows, source-observed versus derived, no fabricated minute OHLC or
+  residual shares, and strict strategy/trading activation gates. No source-priority vote
+  merely because vendor bars disagree; consumers requiring true high-precision input fail closed.
+- **Cost- and impact-bounded investigation.** Record affected consumers, measurable signal
+  impact, finite sampling/time/request budget and stop condition. If further precision has no
+  demonstrated material beneficiary, retain the open quality debt and restore higher-value
+  engineering. Never endlessly replay identical raw/source requests.
+- P10 #495 governs quality tiers and traceable exceptions; #496 governs daily/minute release
+  decoupling. Neither this documentation nor a diagnosed source issue authorizes changing
+  sealed evidence, deployment, disabled timers, DWD/OCI publication or prior acceptances.
+
 ## Current active task routing — P3-STRAT-003
 
 - `P3-STRAT-003` / #317 and B-R1 / #412 were reopened under the Owner's explicit continuation.

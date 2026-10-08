@@ -44,7 +44,7 @@ def _raw(*, period: str = "m1", missing: set[str] | None = None,
 
 def _sparse_raw(*, absent: set[str]) -> tuple[bytes, int]:
     rows=[]
-    for index,stamp in enumerate(([DAY.replace("-","")+"0930"]+list(_grid(DAY))):
+    for index,stamp in enumerate([DAY.replace("-","")+"0930"]+list(_grid(DAY))):
         if stamp in absent:
             continue
         volume = "0" if stamp in {DAY.replace("-","")+"1023", DAY.replace("-","")+"1024"} else "1"
@@ -100,8 +100,6 @@ def test_wrong_five_minute_bucket_does_not_pass_even_if_total_matches() -> None:
     bars[1][5]=str(Decimal(bars[1][5])-1)
     wrong=json.dumps(doc).encode()
     with pytest.raises(ValueError,match="bucket-volume"):
-        observed={t:{"open":Decimal(v[1]),"close":Decimal(v[2]),"high":Decimal(v[3]),"low":Decimal(v[4]),"volume":Decimal(v[5])*100}
-            for t,*v in []}
         # Direct per-bucket proof is required; no daily-total majority vote.
         from quanthus.providers.loss_aware_m1 import _source_rows
         native,_=_source_rows(raw,SYMBOL,DAY,period="m1")

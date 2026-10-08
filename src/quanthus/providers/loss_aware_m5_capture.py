@@ -109,7 +109,10 @@ def collect(
                 traded=states[code] != "0",
                 cross_source_status=comparison,
             )
-            if grade.reason != "same_vendor_native_5m_witness_pending":
+            if grade.reason not in {
+                "same_vendor_native_5m_witness_pending",
+                "missing_native_auction_witness_pending",
+            }:
                 raise ValueError(f"not a bounded R1 candidate: {code}/{grade.reason}")
             m1, _ = _source_rows(raw, code, day, period="m1")
             path = output / f"{code}.json.gz"

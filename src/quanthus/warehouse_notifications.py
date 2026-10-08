@@ -312,6 +312,11 @@ def _send_resend(
         timeout = float(os.environ.get("QUANTHUS_RESEND_TIMEOUT_SECONDS", "15"))
     except ValueError as exc:
         raise WarehouseNotificationError("QUANTHUS_RESEND_TIMEOUT_SECONDS must be numeric") from exc
+    outcome_text = (
+        str(EVENTS[event]["status_label"])
+        if "status_label" in EVENTS[event]
+        else ("失败" if EVENTS[event]["failure"] else "成功")
+    )
     body = _canonical_bytes(
         {
             "from": sender,
@@ -319,7 +324,7 @@ def _send_resend(
             "subject": (
                 f"[Quanthus][{EVENTS[event]['node']}][{EVENTS[event]['stage']}] "
                 f"{market_date.isoformat()} "
-                f"{EVENTS[event].get('status_label', '失败' if EVENTS[event]['failure'] else '成功')}"
+                f"{outcome_text}"
             ),
             "html": _email_html(
                 event=event,

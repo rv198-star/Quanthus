@@ -22,6 +22,10 @@ FIRST_PROBE_AT = time(10, 10)
 MAX_CALENDAR_DAYS = 45
 
 
+class NonTradingSessionDate(ValueError):
+    """BaoStock explicitly marks the requested date as closed for trading."""
+
+
 @dataclass(frozen=True)
 class NextSessionEvidence:
     next_session: date
@@ -43,7 +47,7 @@ def resolve_next_session(
         if actual != expected:
             raise ValueError("trading calendar has missing, duplicate or unordered dates")
         if actual == market_date and raw[1] != "1":
-            raise ValueError("requested market date is not an exchange trading session")
+            raise NonTradingSessionDate("requested market date is not an exchange trading session")
         verified.append((actual.isoformat(), raw[1]))
         if actual > market_date and raw[1] == "1":
             next_session = actual

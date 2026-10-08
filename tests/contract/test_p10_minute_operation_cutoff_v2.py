@@ -151,7 +151,7 @@ def test_policy_records_pending_drain_and_forbids_prequeued_work() -> None:
         ]
     )
     assert p["atomic_operation"]["no_new_retry_or_next_shard_after_cutoff"]
-    assert (
-        p["atomic_operation"]["atomic_commit_and_invariant_verification_within_same_admitted_operation"]
-    )
+    assert p["atomic_operation"][
+        "atomic_commit_and_invariant_verification_within_same_admitted_operation"
+    ]
     assert p["immutable_accounting"]["account_post_cutoff_tail_in_actual_elapsed"]

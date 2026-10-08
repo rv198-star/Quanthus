@@ -195,10 +195,10 @@ def capture_shard(
             saved += 1
             unchanged += 1
             continue
-        if raw_file.exists():
+        if raw_file.exists() or (output / "failures" / f"{code}.json").exists():
             raise ValueError(
-                "source original raw exists without matching sealed receipt; "
-                "requires a new versioned attempt, not an overwrite"
+                "unfinished original source/failure evidence exists; "
+                "use a new versioned retry attempt, never overwrite history"
             )
         try:
             raw = fetcher(code, identity["anchor"])

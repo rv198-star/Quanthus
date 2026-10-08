@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from quanthus.pipelines.loss_aware_m1_research import _board, _reference
+from quanthus.providers.p10_native_m1_shard_capture import target_date_records
 from quanthus.providers.tencent_m1_normalize import expected_times
 
 KIND = "p10_loss_aware_1m_live_source_grade_v1"
@@ -270,6 +271,11 @@ def build(
                             raw=gzip.decompress(path.read_bytes())
                             if receipt["raw_sha256"]!=hashlib.sha256(raw).hexdigest():
                                 raise ValueError("source original digest no longer matches receipt")
+                            if (
+                                target_date_records(raw,code,date.fromisoformat(day))[1]
+                                != receipt["target_date_observation_sha256"]
+                            ):
+                                raise ValueError("source target-date digest differs from receipt")
                             acquired=receipt["captured_at"]
                     quality,bars=assess_native(
                         code=code,day=day,raw=raw,
@@ -285,7 +291,8 @@ def build(
                     if quality["formally_ingested"]:
                         # Copy authentic response into *formal* source ODS only
                         # for R0/R1/R2; rejected original source stays outside.
-                        assert raw is not None
+                        if raw is None:
+                            raise ValueError("admitted original source bytes unexpectedly absent")
                         copied=stage/"ods"/"raw"/f"{code}.json.gz"
                         shutil.copyfile(index[code][0],copied)
                         acquired_count+=1

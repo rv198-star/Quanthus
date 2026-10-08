@@ -1,5 +1,6 @@
 """Literal populations and units never become a guessed uniform entitlement."""
 
+from collections import Counter
 from copy import deepcopy
 from datetime import date
 from decimal import Decimal
@@ -117,6 +118,10 @@ def test_mixed_uses_literal_money_per_ten_and_share_ratios_without_sum_or_averag
     assert actions[1]["action_type"] == "MIXED_DISTRIBUTION"
     assert len({t["corporate_action_term_id"] for t in new}) == 4
     assert all(t["option_id"] is None for t in new)
+    _, model, extension = load_contract(Path("config/pipelines"))
+    ss = schemas(model, extension)
+    physical = pa.Table.from_pylist(terms, schema=ss["dwd_corporate_action_term"]).to_pylist()
+    assert Counter(digest(r) for r in physical) == Counter(digest(r) for r in terms)
 
 
 @pytest.mark.parametrize(

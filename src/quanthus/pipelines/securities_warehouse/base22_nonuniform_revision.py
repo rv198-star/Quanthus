@@ -12,7 +12,7 @@ import re
 import unicodedata
 from collections import Counter, defaultdict
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, Inexact, localcontext
 from pathlib import Path
 from typing import Any
 
@@ -210,14 +210,22 @@ def _literal_terms(proof: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
             or not proof["population_witnesses"].get(role[1])
         ):
             raise BoundedError("NONUNIFORM_LITERAL_UNIT_PRECISION_OR_POPULATION_INVALID")
+        # Fixed physical Decimal columns use scale 10. Retain original token and
+        # scale in the source proof; this exact serialization normalization must
+        # also happen in the independent expected-row census.
+        with localcontext() as context:
+            context.prec = 64
+            context.traps[Inexact] = True
+            stored_value = value.quantize(Decimal("1e-10"))
+            stored_denominator = Decimal(spec[2]).quantize(Decimal("1e-10"))
         out.append(
             (
                 PREFIX + spec[0],
                 {
                     "currency": None if is_transfer else "CNY",
-                    "amount_per_share": value if spec[2] == 1 else None,
-                    "ratio_numerator": value if spec[2] != 1 else None,
-                    "ratio_denominator": Decimal(spec[2]) if spec[2] != 1 else None,
+                    "amount_per_share": stored_value if spec[2] == 1 else None,
+                    "ratio_numerator": stored_value if spec[2] != 1 else None,
+                    "ratio_denominator": stored_denominator if spec[2] != 1 else None,
                     "option_id": None,
                     "subscription_price": None,
                 },

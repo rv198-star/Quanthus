@@ -199,6 +199,18 @@ T+n 只是源文注释，不推算交易日历。新年度公告角色仍需批�
 日程；缺单位、未裁定非空范围、冲突 primary 或不可精确表示数值继续 held。
 这份限域来源资格不证明全市场闭包，也不恢复原 normalization revision。
 
+#481 的候选 `p10-base22-native-literal-nonuniform-terms-v1` 由
+`config/pipelines/base22-nonuniform-terms.v1.json` 和 `base22_nonuniform_revision.py`
+定义。它消费同一不可变字面来源准备，复核当前方案的最终类别声明；完整的股份基数、
+具名/公众对象、现金/转增及原文另列的总结范围各自保存。每股原现金保持 Decimal；
+每十股条款以原金额/股数分母保存，不能把每十股金额填进每股列，也不求和或推算补偿。
+物理 schema 不变，新的候选 term_type 明示原文类别和税口径未知。
+未明示税前口径的来源声明只获得字面表示资格，`general_gross_cash_qualified=false`，
+不能计作通用含税现金修复完成；消费者仍 NOT_GRANTED。旧 action/完整 term 组只关闭
+知识区间，新版本使用真实治理/获取时间；原人口范围、未知 publication 与原子保留。
+独立冷验收重解原 PDF，核对 before/raw、全部新旧序列化行、schema、键、分区和父引用。
+该候选契约不改变原统一现金/类别契约或冻结消费者门槛。
+
 ## Current recovery checkpoint
 
 #481 `p10-base22-nonuniform-literal-source-facts-preparation-v1` 将已保留正文的

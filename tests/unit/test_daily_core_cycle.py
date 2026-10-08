@@ -34,3 +34,17 @@ def test_missing_or_ambiguous_calendar_stops_recovery(rows: list) -> None:
 
 def test_completed_date_has_no_duplicate_attempt() -> None:
     assert pending_market_dates(date(2026, 9, 24), date(2026, 9, 24), []) == []
+
+
+def test_p3_frozen_warehouse_files_remain_byte_identical() -> None:
+    import hashlib
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    probe = root / "config/research/p3-strat-003/semantic-equivalence-probe.v1.json"
+    data = json.loads(probe.read_text())
+    assert len(data["runtime_implementation"]) == 2
+    for binding in data["runtime_implementation"].values():
+        raw = (root / binding["path"]).read_bytes()
+        assert "sha256:" + hashlib.sha256(raw).hexdigest() == binding["file_sha256"]

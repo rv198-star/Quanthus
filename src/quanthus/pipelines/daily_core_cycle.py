@@ -17,7 +17,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from quanthus.pipelines.securities_warehouse.daily_domain import verify_daily_domain_increment
+from quanthus.pipelines.securities_warehouse.daily_core_domain import verify_daily_domain_increment
 from quanthus.providers.trading_calendar import fetch_baostock_calendar
 
 ROOT = Path(__file__).resolve().parents[3]

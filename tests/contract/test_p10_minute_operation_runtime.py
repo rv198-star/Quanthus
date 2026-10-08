@@ -11,7 +11,9 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from quanthus.pipelines.p10_minute_operation_runtime import (
-    _load_state, _atomic, run_one,
+    _atomic,
+    _load_state,
+    run_one,
 )
 
 CST = ZoneInfo("Asia/Shanghai")

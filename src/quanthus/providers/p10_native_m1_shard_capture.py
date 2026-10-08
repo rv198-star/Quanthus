@@ -16,9 +16,10 @@ import json
 import os
 import re
 import time
+from collections.abc import Callable
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib import parse, request
 
 from quanthus.pipelines.contracts import verify_ods_release

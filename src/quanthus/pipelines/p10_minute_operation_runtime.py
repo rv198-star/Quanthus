@@ -21,9 +21,10 @@ import signal
 import subprocess
 import sys
 import time
+from collections.abc import Sequence
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from quanthus.pipelines.p10_operating_schedule import start_at

@@ -8,8 +8,11 @@ establish equality. A failed TMP index and its evidence are retained.
 
 from __future__ import annotations
 
+from datetime import datetime, time, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
+from .base22 import THROUGH
 from .base22_bounded import GlobalScan, identifier, storage_census
 
 
@@ -20,6 +23,19 @@ class NativeGlobalScan(GlobalScan):
         # external-file cache on top of the registered 2 GiB DuckDB working set.
         self.connection.execute("SET enable_external_file_cache=false")
         self.connection.execute("SET partitioned_write_max_open_files=8")
+
+    def _cutoff_predicate(self, cutoff: str, field: Any) -> str:
+        import pyarrow as pa  # type: ignore[import-untyped]
+
+        if pa.types.is_timestamp(field.type) and field.type.tz is not None:
+            # Shanghai business-date <= THROUGH is precisely an instant before
+            # the next Shanghai midnight. Retain original clocks and the legacy
+            # verdict, while enabling Parquet range pruning without row-wise ICU.
+            upper = datetime.combine(
+                THROUGH + timedelta(days=1), time(), tzinfo=ZoneInfo("Asia/Shanghai")
+            ).astimezone(timezone.utc)
+            return f"{cutoff}>=TIMESTAMPTZ '{upper.isoformat()}'"
+        return super()._cutoff_predicate(cutoff, field)
 
     def keys(self, name: str, business_key: list[str], version_key: list[str]) -> None:
         table = identifier(name)

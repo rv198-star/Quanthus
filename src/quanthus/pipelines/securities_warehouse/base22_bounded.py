@@ -785,22 +785,24 @@ class GlobalScan:
                         "GLOBAL_FOREIGN_KEY_DATE_VENUE_CLOSURE_FAILED:" + name,
                     )
 
-    def row_rules(self, name: str, schema: Any, rule: Mapping[str, Any]) -> None:
+    def _cutoff_predicate(self, cutoff: str, field: Any) -> str:
         pa = importlib.import_module("pyarrow")
+        expr = (
+            f"CAST(timezone('Asia/Shanghai',{cutoff}) AS DATE)"
+            if pa.types.is_timestamp(field.type)
+            else cutoff
+        )
+        return f"{expr}>DATE '{THROUGH.isoformat()}'"
 
+    def row_rules(self, name: str, schema: Any, rule: Mapping[str, Any]) -> None:
         table = identifier(name)
         required = " OR ".join(identifier(f.name) + " IS NULL" for f in schema if not f.nullable)
         if required:
             self.reject(f"SELECT 1 FROM {table} WHERE {required} LIMIT 1", "REQUIRED_FIELD_UNKNOWN")
         cutoff = identifier(rule["cutoff_field"])
         field = schema.field(rule["cutoff_field"])
-        expr = (
-            f"CAST(timezone('Asia/Shanghai',{cutoff}) AS DATE)"
-            if pa.types.is_timestamp(field.type)
-            else cutoff
-        )
         self.reject(
-            f"SELECT 1 FROM {table} WHERE {expr}>DATE '{THROUGH.isoformat()}' LIMIT 1",
+            f"SELECT 1 FROM {table} WHERE {self._cutoff_predicate(cutoff, field)} LIMIT 1",
             "BUSINESS_DATE_AFTER_CUTOFF",
         )
         for start, end in [

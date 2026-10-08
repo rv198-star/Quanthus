@@ -1,0 +1,20 @@
+[Unit]
+Description=Quanthus P10 native 1m bounded capture/quality (%i)
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/opt/quanthus/p10-minute-current/src/quanthus/pipelines/p10_minute_daily_cycle.py
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/quanthus/p10-minute-current
+Environment=PYTHONPATH=/opt/quanthus/p10-minute-current/src
+ExecStart=/root/work/Quanthus/.venv-p1/bin/python -m quanthus.pipelines.p10_minute_daily_cycle --phase %i
+TimeoutStartSec=75min
+KillMode=control-group
+NoNewPrivileges=true
+UMask=0027
+Nice=10
+StandardOutput=journal
+StandardError=journal

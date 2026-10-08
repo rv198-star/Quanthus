@@ -83,3 +83,22 @@ def test_mixed_cash_and_transfer_retain_original_per_ten_units_and_scope():
     ]:
         with pytest.raises(BoundedError):
             parse_nonuniform_facts(doc(broken), TARGET)
+
+
+def test_literal_numbered_note_is_a_separate_printed_scope_recap_not_a_third_plan_item():
+    text = (
+        "证券代码:600001\n本公司2011年半年度权益分派方案为:\n"
+        "1、原有股份扣除非公开发行新增股份,每10股派0.125元(含税)。\n"
+        "2、以公司现有总股本为基数,向全体股东每10股派1元(含税),"
+        "同时,以资本公积金向全体股东每10股转增10股。"
+        "注:以上1、2项合计共向原文具名范围每10股转增10股派发现金0.5625元(含税)。\n"
+        "二、权益登记日与除权除息日\n除权除息日为2026年8月3日。"
+    )
+    result = parse_nonuniform_facts(doc(text), TARGET)
+    assert len(result["facts"]) == 4
+    assert result["facts"][-1]["kind"] == "DECLARED_PRINTED_SCOPE_RECAP_CASH"
+    assert result["facts"][-1]["literal_numeric_token"] == "0.5625"
+    assert result["aggregate_computed"] is False
+    assert result["canonical_DWD_repair_qualified"] is False
+    with pytest.raises(BoundedError):
+        parse_nonuniform_facts(doc(text.replace("以上1、2项合计共向", "未知来源事项")), TARGET)

@@ -98,7 +98,10 @@ def parse_nonuniform_facts(document: dict[str, Any], target: dict[str, Any]) -> 
         if not begin or not end or begin.end() >= end.start():
             raise BoundedError("NONUNIFORM_FACTS_COMPLETE_MIXED_PLAN_BOUNDARY_REQUIRED")
         block = normalized[begin.end() : end.start()]
-        items = re.split(r"(?<!\d)[12]、", block)
+        component_block, note_marker, note = block.partition("注:以上1、2项合计共向")
+        if "注:" in component_block:
+            raise BoundedError("NONUNIFORM_FACTS_NONEMPTY_NOTE_SCOPE_UNACCOUNTED")
+        items = re.split(r"(?<!\d)[12]、", component_block)
         if (
             len(items) != 3
             or "非公开发行" not in items[1]
@@ -106,7 +109,8 @@ def parse_nonuniform_facts(document: dict[str, Any], target: dict[str, Any]) -> 
             or "向全体股东" not in items[2]
         ):
             raise BoundedError("NONUNIFORM_FACTS_EXACT_NUMBERED_POPULATION_SCOPE_REQUIRED")
-        cash, shares = list(_MIXED_CASH.finditer(block)), list(_TRANSFER.finditer(block))
+        cash = list(_MIXED_CASH.finditer(component_block))
+        shares = list(_TRANSFER.finditer(component_block))
         if (
             len(cash) != 2
             or len(shares) != 1
@@ -140,6 +144,27 @@ def parse_nonuniform_facts(document: dict[str, Any], target: dict[str, Any]) -> 
                     "literal_unit": "SHARES" if claim is shares[0] else "MAINLAND_SOURCE_YUAN",
                     "tax_basis": "NOT_APPLICABLE" if claim is shares[0] else "EXPLICIT_GROSS",
                     "original_claim_sha256": digest(claim[0]),
+                }
+            )
+        if note_marker:
+            recap = re.search(
+                rf"每(?P<denominator>10|1)股转增(?P<shares>{_NUMBER})股派发现金"
+                rf"(?P<amount>{_NUMBER})元\(含税(?:\)|[,，])",
+                note,
+            )
+            if not recap or "注:" in note:
+                raise BoundedError("NONUNIFORM_FACTS_EXACT_PRINTED_SCOPE_RECAP_REQUIRED")
+            facts.append(
+                {
+                    "kind": "DECLARED_PRINTED_SCOPE_RECAP_CASH",
+                    "source_population_role": "LITERAL_PRINTED_COMBINED_SCOPE_RECAP",
+                    "source_population_literal": None,
+                    "source_population_witness_sha256": digest(note_marker + note),
+                    "literal_numeric_token": recap["amount"],
+                    "literal_denominator": int(recap["denominator"]),
+                    "literal_unit": "MAINLAND_SOURCE_YUAN",
+                    "tax_basis": "EXPLICIT_GROSS",
+                    "original_claim_sha256": digest(recap[0]),
                 }
             )
         mode = "MIXED_LITERAL_COMPONENTS_NOT_COMPUTED_COMBINED_ENTITLEMENT"

@@ -160,6 +160,12 @@ A 股实施方案读取明示人民币含税现金，保留原证券与除息日
 缺正向对象、方案内混合范围或冲突 primary 仍拒绝；旧 V10 原子保持。新版本与离线
 PDF 重放使用同一显式 profile，原默认入口、知识时刻和消费者冻结规则不变。
 
+#481 的 opt-in `p10-base22-literal-gross-label-and-declared-A-combined-cash-v12`
+处理现金含税标签之间的明示逗号/换行，以及原文明确排除 H 股操作、同时指定全体 A 股
+的实施方案。在后一种范围内，“每股分配比例”的人民币含税合计必须与当前方案原文
+“两项合计”完全一致；不计算分项和，也不把总现金/虚拟除息额当每股权益。未知当前
+调整、缺单位/正向对象/排除证据、截断或冲突 primary 仍拒绝。旧 profile 保持不变。
+
 ## Current recovery checkpoint
 
 工作区 `/root/Quanthus/.worktrees/base22-standalone`；分支 `codex/base22-standalone`。

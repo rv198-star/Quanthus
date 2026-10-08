@@ -91,3 +91,46 @@ def test_immutable_calendar_array_never_rewritten(tmp_path: Path) -> None:
     with pytest.raises(ValueError,match="changed"):
         _atomic_array(out,[{"trade_date":"2026-10-09","is_open":"0"}])
     assert json.loads(out.read_text())==rows
+
+
+def test_t_reserves_final_warehouse_operation_before_sixty_minute_cutoff(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    from quanthus.pipelines import p10_minute_daily_cycle as cycle
+
+    target = date(2026, 10, 9)
+    journal = tmp_path / "journal"
+    capture = tmp_path / "capture"
+    codes = [f"{i:06}" for i in range(4992)]
+    rows = [
+        {"trade_date": target.isoformat(), "is_open": "1"},
+    ]
+    monkeypatch.setattr(cycle, "find_market_ods", lambda releases, day: tmp_path)
+    monkeypatch.setattr(
+        cycle, "verified_daily_universe",
+        lambda path, day: (codes, "sha256:" + "a" * 64),
+    )
+    operations = []
+
+    def fake_run(**kwargs):
+        operations.append(kwargs["operation_id"])
+        if kwargs["operation_id"] == "capture-000":
+            receipts = capture / str(target) / "T-v1" / "shard-000" / "receipts"
+            receipts.mkdir(parents=True)
+            (receipts / "000001.json").write_text("{}")
+            (journal / f"{target}-T.json").write_text(json.dumps({
+                "cumulative_processing_seconds": 3001,
+                "operations": [],
+                "policy_id": "p10-1m-daily-and-tplus1-bounded-ops-v2",
+            }))
+        return {"status": "success"}
+
+    monkeypatch.setattr(cycle, "_run", fake_run)
+    result = cycle.run_t(
+        target=target, rows=rows, journal=journal,
+        releases=tmp_path, capture=capture, product=tmp_path / "product",
+    )
+    assert operations == ["capture-000", "warehouse-build"]
+    assert result["status"] == "success"
+    ledger = json.loads((journal / f"{target}-T.json").read_text())
+    assert ledger["terminal_disposition"] == "source_grade_warehouse_published"

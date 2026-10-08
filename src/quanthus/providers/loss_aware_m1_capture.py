@@ -27,7 +27,9 @@ EXPECTED_DATES = ("2026-09-24", "2026-09-28", "2026-09-29", "2026-09-30", "2026-
 
 
 def _canonical(value: object) -> bytes:
-    return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n").encode("ascii")
+    return (
+        json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
+    ).encode("ascii")
 
 
 def _write(path: Path, value: object) -> None:
@@ -50,7 +52,9 @@ def read_universe(release_root: Path) -> tuple[list[str], dict[str, str]]:
     arts = {x.name: x for x in v.release.artifacts}
     daily = arts["daily_ohlcv_none_delta"]
     path = release_root / daily.relative_path
-    names = [str(row["stock_code"]) for row in pq.read_table(path, columns=["stock_code"]).to_pylist()]
+    names = [
+        str(row["stock_code"]) for row in pq.read_table(path, columns=["stock_code"]).to_pylist()
+    ]
     if len(names) != 4992 or len(set(names)) != 4992:
         raise ValueError("unexpected market-universe size or duplicated securities")
     if any(re.fullmatch(r"[0-9]{6}", x) is None for x in names):
@@ -167,8 +171,10 @@ def capture(
             symbol = ("sh" if code.startswith("6") else "sz") + code
             query = f"{symbol},m1,{'' if anchor == 'latest' else anchor},800"
             receipt: dict[str, Any] = {
-                "stock_code": code, "provider": "tencent_mkline_m1",
-                "request_param": query, "dates": list(dates),
+                "stock_code": code,
+                "provider": "tencent_mkline_m1",
+                "request_param": query,
+                "dates": list(dates),
                 "captured_at": datetime.now(timezone.utc).isoformat(),
                 "status": "source_error",
             }
@@ -182,13 +188,15 @@ def capture(
                     resp.raise_for_status()
                     raw = resp.content
                     counts = parse_source(raw, code, dates)
-                    receipt.update({
-                        "status": "raw_saved",
-                        "raw_sha256": hashlib.sha256(raw).hexdigest(),
-                        "raw_bytes": len(raw),
-                        "native_day_row_counts": counts,
-                        "attempts": trial,
-                    })
+                    receipt.update(
+                        {
+                            "status": "raw_saved",
+                            "raw_sha256": hashlib.sha256(raw).hexdigest(),
+                            "raw_bytes": len(raw),
+                            "native_day_row_counts": counts,
+                            "attempts": trial,
+                        }
+                    )
                     temp = raw_path.with_name(f".{code}.{os.getpid()}.tmp")
                     with temp.open("xb") as stream:
                         with gzip.GzipFile(fileobj=stream, mode="wb", mtime=0) as zipped:
@@ -209,7 +217,18 @@ def capture(
             if receipt["status"] != "raw_saved":
                 errors += 1
             if (finished + errors) % 100 == 0:
-                print(json.dumps({"captured": finished, "errors": errors, "per_date_rows_present": per_date, "elapsed_seconds": round(time.monotonic() - started, 1)}, sort_keys=True), flush=True)
+                print(
+                    json.dumps(
+                        {
+                            "captured": finished,
+                            "errors": errors,
+                            "per_date_rows_present": per_date,
+                            "elapsed_seconds": round(time.monotonic() - started, 1),
+                        },
+                        sort_keys=True,
+                    ),
+                    flush=True,
+                )
             if errors >= max_errors:
                 stopped = "provider_error_circuit_breaker"
                 break
@@ -243,10 +262,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-errors", type=int, default=20)
     args = parser.parse_args(argv)
     result = capture(
-        release_root=args.release_root, output=args.output, window=args.window,
-        anchor=args.anchor, dates=tuple(args.dates),
-        max_symbols=args.max_symbols, min_interval=args.min_interval,
-        budget_seconds=args.budget_seconds, max_errors=args.max_errors,
+        release_root=args.release_root,
+        output=args.output,
+        window=args.window,
+        anchor=args.anchor,
+        dates=tuple(args.dates),
+        max_symbols=args.max_symbols,
+        min_interval=args.min_interval,
+        budget_seconds=args.budget_seconds,
+        max_errors=args.max_errors,
     )
     print(json.dumps(result, sort_keys=True), flush=True)
     return 0 if result["status"] == "complete" and result["source_errors"] == 0 else 2

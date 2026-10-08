@@ -1,14 +1,16 @@
-"""P10 deadline alerts; no mail is sent without the explicit --send flag.
+"""P10 bounded failure and one-per-day quality notices.
 
-A known R2 is not a failure; valid NOT_READY is one daily quality notice.
-Do not send on exchange holidays, before the checkpoint or during in-flight work.
+Default dry-run; --send calls the existing idempotent Resend warehouse mailer.
+Exchange-closed dates, not-yet-due checkpoints and live bounded finalization
+are never interpreted as pipeline failures.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -26,6 +28,68 @@ EVENTS = {
 }
 
 
+def _minute_disposition(root: Path, target: date) -> str | None:
+    """Require a dated, SHA-bound admission; a bare JSON READY isn't enough."""
+    day = target.isoformat()
+    ongoing = root / "date-status" / day
+    if ongoing.is_dir():
+        receipts = sorted(
+            ongoing.glob("*.json"), key=lambda item: item.stat().st_mtime_ns,
+            reverse=True,
+        )
+        for receipt in receipts:
+            obj = json.loads(receipt.read_text())
+            if obj.get("market_date") != day:
+                raise ValueError("published minute quality date differs")
+            expected = obj.get("manifest_sha256")
+            files = list((root / "packages" / day).glob("*/manifest.json"))
+            matches = [
+                path for path in files if path.is_file()
+                and "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest() == expected
+            ]
+            if len(matches) != 1:
+                raise ValueError("minute quality receipt lacks exact sealed source manifest")
+            if not (matches[0].parent / "SEALED").is_file():
+                raise ValueError("minute grade product not sealed")
+            return (
+                "RESEARCH_READY_LOSS_AWARE"
+                if obj.get("research_ready") is True
+                else "PARTIAL_COVERAGE_NO_RESEARCH_READY"
+            )
+    legacy = root / "date-status" / f"{day}.json"
+    if legacy.is_file():
+        obj = json.loads(legacy.read_text())
+        if obj.get("market_date") != day:
+            raise ValueError("minute legacy date status wrong market date")
+        return (
+            "RESEARCH_READY_LOSS_AWARE"
+            if obj.get("research_ready") is True
+            else "PARTIAL_COVERAGE_NO_RESEARCH_READY"
+            if obj.get("research_ready") is False
+            else None
+        )
+    return None
+
+
+def _bounded_inflight(
+    state: dict, now: datetime,
+) -> bool:
+    pending = state.get("inflight_operation")
+    if pending is None:
+        return False
+    start = datetime.fromisoformat(str(pending["started_at"]))
+    if start.tzinfo is None:
+        raise ValueError("unbound operation start timezone")
+    timeout = int(pending.get("timeout_seconds", 600))
+    if not 1 <= timeout <= 600:
+        raise ValueError("invalid in-flight atomic operation deadline")
+    # A dead process must not suppress its failure email forever. Allow the
+    # independent operation timeout and a bounded termination/reporting grace.
+    return now.astimezone(timezone.utc) <= (
+        start.astimezone(timezone.utc) + timedelta(seconds=timeout + 45)
+    )
+
+
 def evaluate(
     *,
     node: str,
@@ -37,6 +101,7 @@ def evaluate(
     phase_root: Path,
     at: datetime,
     cn01_sha: str | None = None,
+    historical_minute_root: Path | None = None,
 ) -> dict:
     if (node, phase) not in EVENTS:
         raise ValueError("node is not qualified for this P10 alert phase")
@@ -51,7 +116,10 @@ def evaluate(
     exact_mirror = None
     if phase == "daily_core":
         current = daily_snapshot(root=daily_root)
-        if current["pointer_verified"] and current["pointer_market_date"] == target.isoformat():
+        if (
+            current["pointer_verified"]
+            and current["pointer_market_date"] == target.isoformat()
+        ):
             receipt = "READY_VERIFIED"
     elif phase == "oci_mirror":
         current = daily_snapshot(root=daily_root)
@@ -62,48 +130,48 @@ def evaluate(
             and current["current_manifest_sha256"] == cn01_sha
         )
     else:
-        release = minute_root / "date-status" / (target.isoformat() + ".json")
-        if release.exists():
-            quality = json.loads(release.read_text())
-            if quality.get("market_date") != target.isoformat():
-                raise ValueError("minute quality receipt wrong market date")
-            if quality.get("research_ready") is True:
-                receipt = "RESEARCH_READY_LOSS_AWARE"
-            elif quality.get("research_ready") is False:
-                receipt = "PARTIAL_COVERAGE_NO_RESEARCH_READY"
-        if phase == "minute_Tplus1":
-            p = phase_root / (target.isoformat() + "-T_plus_1.json")
-            if p.is_file():
-                state = json.loads(p.read_text())
-                inflight = state.get("inflight_operation") is not None
-                disposition = state.get("terminal_disposition")
-                if not inflight and disposition == "source_unchanged_stopped":
-                    receipt = "SOURCE_UNCHANGED_STOPPED"
-                elif not inflight and disposition == "grade_qualified":
-                    if receipt == "RESEARCH_READY_LOSS_AWARE":
-                        receipt = "GRADE_RECORDED"
-                elif not inflight and not disposition:
-                    # Starting a probe alone cannot count as finishing T+1.
-                    receipt = None
-            elif receipt == "RESEARCH_READY_LOSS_AWARE":
-                receipt = "GRADE_RECORDED"
-            else:
+        receipt = _minute_disposition(minute_root, target)
+        if receipt is None and historical_minute_root is not None:
+            receipt = _minute_disposition(historical_minute_root, target)
+        name = "T" if phase == "minute_T" else "T_plus_1"
+        state_path = phase_root / f"{target.isoformat()}-{name}.json"
+        if state_path.is_file():
+            state = json.loads(state_path.read_text())
+            inflight = _bounded_inflight(state, at)
+            if state.get("inflight_operation") is not None and not inflight:
                 receipt = None
-    status = classify_alert(
+            elif not inflight:
+                terminal = state.get("terminal_disposition")
+                if name == "T_plus_1":
+                    if terminal == "source_unchanged_stopped":
+                        receipt = "SOURCE_UNCHANGED_STOPPED"
+                    elif terminal == "source_changed_requires_new_versioned_quality_requalification":
+                        receipt = "QUALITY_NOT_READY"
+                    elif terminal == "bounded_maturity_probe_incomplete":
+                        receipt = None
+                    elif terminal == "grade_qualified" and receipt == "RESEARCH_READY_LOSS_AWARE":
+                        receipt = "GRADE_RECORDED"
+                    else:
+                        receipt = None
+                elif terminal == "partial_source_capture_not_published":
+                    receipt = None
+        elif phase == "minute_Tplus1":
+            receipt = None
+    outcome = classify_alert(
         kind=phase, checked_at=at, checkpoint=checkpoint,
         receipt_status=receipt, processing_inflight=inflight,
         exact_cn01_mirror=exact_mirror,
     )
     return {
-        "kind": "p10_deadline_check_v1",
+        "kind": "p10_deadline_check_v2",
         "node": node,
         "phase": phase,
         "market_date": target.isoformat(),
         "checkpoint": checkpoint.isoformat(),
-        "status": status,
+        "status": outcome,
         "mail_event": (
-            "p10_cn01_minute_quality_degraded" if status == "quality_warning"
-            else EVENTS[(node, phase)] if status == "failure"
+            "p10_cn01_minute_quality_degraded" if outcome == "quality_warning"
+            else EVENTS[(node, phase)] if outcome == "failure"
             else None
         ),
     }
@@ -121,6 +189,7 @@ def main() -> int:
     parser.add_argument("--calendar-file", type=Path, required=True)
     parser.add_argument("--daily-root", type=Path, required=True)
     parser.add_argument("--minute-root", type=Path, required=True)
+    parser.add_argument("--historical-minute-root", type=Path)
     parser.add_argument("--phase-state-root", type=Path, required=True)
     parser.add_argument("--mail-state-root", type=Path, required=True)
     parser.add_argument("--cn01-manifest-sha")
@@ -130,6 +199,7 @@ def main() -> int:
         node=args.node, phase=args.phase, target=args.market_date,
         calendar=json.loads(args.calendar_file.read_text()),
         daily_root=args.daily_root, minute_root=args.minute_root,
+        historical_minute_root=args.historical_minute_root,
         phase_root=args.phase_state_root, at=datetime.now(CST),
         cn01_sha=args.cn01_manifest_sha,
     )
@@ -138,7 +208,7 @@ def main() -> int:
             event=result["mail_event"], daily_root=args.daily_root,
             market_date=args.market_date, state_root=args.mail_state_root,
             error=(
-                "research_grade_not_ready_known_source_defects"
+                "source_native_1m_research_NOT_READY_despite_admitted_R2"
                 if result["status"] == "quality_warning"
                 else "P10_required_delivery_not_verified_at_checkpoint"
             ),

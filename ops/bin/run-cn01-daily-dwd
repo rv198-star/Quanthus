@@ -23,6 +23,10 @@ from quanthus.pipelines.securities_warehouse import (  # noqa: E402
     build_daily_ods_catalog,
     verify_daily_domain_increment,
 )
+from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (  # noqa: E402
+    DAILY_CORE_PRODUCT_SCOPE,
+    LEGACY_PRODUCT_SCOPE,
+)
 
 
 def _seal_for_read_only_sync(root: Path) -> None:
@@ -41,6 +45,16 @@ def main() -> int:
     parser.add_argument("--base", type=Path, required=True)
     parser.add_argument("--release-config", type=Path, required=True)
     parser.add_argument("--daily-root", type=Path, required=True)
+    parser.add_argument(
+        "--product-scope",
+        choices=(LEGACY_PRODUCT_SCOPE, DAILY_CORE_PRODUCT_SCOPE),
+        default=LEGACY_PRODUCT_SCOPE,
+    )
+    parser.add_argument(
+        "--bootstrap-prior-pointer",
+        type=Path,
+        help="explicit read-only legacy 2026-09-23 prior for first daily-core restore",
+    )
     args = parser.parse_args()
     market_date = (
         datetime.strptime(args.market_date, "%Y-%m-%d").date()
@@ -48,7 +62,29 @@ def main() -> int:
         else datetime.now(ZoneInfo("Asia/Shanghai")).date()
     )
     try:
-        current = args.daily_root / "CURRENT.json"
+        is_core = args.product_scope == DAILY_CORE_PRODUCT_SCOPE
+        if is_core and (args.daily_root / "CURRENT.json").exists():
+            raise DailyDomainBuildError("daily-core root already contains legacy CURRENT")
+        current = args.daily_root / ("CURRENT_DAILY_CORE.json" if is_core else "CURRENT.json")
+        prior_pointer = current
+        if args.bootstrap_prior_pointer is not None:
+            if not is_core or current.exists() or market_date.isoformat() != "2026-09-24":
+                raise DailyDomainBuildError(
+                    "legacy-prior bootstrap is permitted only for the first 2026-09-24 daily-core build"
+                )
+            prior = json.loads(args.bootstrap_prior_pointer.read_text(encoding="ascii"))
+            if (
+                prior.get("kind") != "cn01_daily_dwd_current"
+                or prior.get("market_date") != "2026-09-23"
+            ):
+                raise DailyDomainBuildError(
+                    "bootstrap prior is not the pinned 2026-09-23 legacy DWD"
+                )
+            prior_pointer = args.bootstrap_prior_pointer
+        elif is_core and not current.exists():
+            raise DailyDomainBuildError(
+                "daily-core first build needs explicit approved prior pointer; no Base-era gap skip"
+            )
         if current.exists():
             descriptor = json.loads(current.read_text(encoding="ascii"))
             if descriptor.get("market_date") == market_date.isoformat():
@@ -67,6 +103,7 @@ def main() -> int:
             release_root=args.release_root,
             market_date=market_date,
             output=args.daily_root / "catalogs" / market_date.isoformat(),
+            product_scope=args.product_scope,
         )
         output = (
             args.daily_root
@@ -81,7 +118,7 @@ def main() -> int:
             release_config=args.release_config,
             output=output,
             code_revision=revision,
-            prior_pointer=current,
+            prior_pointer=prior_pointer,
         )
         _seal_for_read_only_sync(result.root)
         advance_daily_current(package=result.root, pointer=current)

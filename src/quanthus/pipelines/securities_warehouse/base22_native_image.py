@@ -23,6 +23,7 @@ from .base22 import CONTRACT_SHA, EXTENSION_SHA, MODEL_SHA, _physical, digest, f
 from .base22_bounded import BoundedError, Budget, GlobalScan, identifier
 from .base22_delivery import HARD_CHECKS, PURPOSE, assess_delivery, validate_contract
 from .base22_holder_component_union import check_component_global_keys
+from .base22_native_keys import NativeGlobalScan
 from .base22_sources import _fingerprint, _member, _tree, disjoint_output, physical_path
 
 KIND = "dwd_base22_native_purpose_qualified_candidate_v2"
@@ -452,7 +453,7 @@ def audit_native_image(root: Path, budget: Budget) -> dict[str, Any]:
     if (root / "manifest.json").exists():
         declared |= {"manifest.json", "READY"}
     summaries = {}
-    with GlobalScan(budget, read_only_roots=[root]) as scan:
+    with NativeGlobalScan(budget, read_only_roots=[root]) as scan:
         for table in sorted(ss):
             budget.begin_stage("whole-table-" + table)
             entry = record["layout"][table]

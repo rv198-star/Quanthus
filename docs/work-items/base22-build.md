@@ -56,6 +56,12 @@ Owner 于 2026-10-08 补充数仓最高原则：质量以业务决策可靠性�
 `MATERIALIZATION.json` 不代表 READY；READY 仅代表候选构建通过，完整独立验收与
 Owner 最终验收另有收据。此版本不自动接入 P3/P5/P6 或改变任何生产接口。
 
+完整原生镜像的键索引由 `base22_native_keys.py` 在 DuckDB 内进行一次 typed key
+projection 和 64 桶物化，限制同时打开的 writer；逐桶比较完整业务/版本键和知识
+区间。既有 `base22_bounded.py` 及领域收据保持。此表示层修复避免 Python 64 路
+decoded buffers 与全镜像元数据同时存活；保留原 2 GiB DuckDB / 4 GiB RSS 停止
+门槛、失败 TMP 和完整数据检查，不以资源失败豁免数据完整性。
+
 Base 2.2 是完整、修复后的实体镜像，业务日期 Asia/Shanghai <=2026-08-31。
 锁定完整 33 表准确集合及必需历史/August 分区。运行只需镜像和普通代码，
 无旧 Base、Daily、ODS、correction、旧路径、缓存或来源网络依赖。

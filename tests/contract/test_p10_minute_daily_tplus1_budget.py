@@ -65,7 +65,7 @@ def test_quality_route_never_promotes_r3_or_rejects_stored_r2() -> None:
     policy = _policy()
     grades = policy["grade_admission"]
     assert "formal_ODS_DWD" in grades["R2"]
-    assert "defect" in grades["R2"]
+    assert "quality_reasons" in grades["R2"]
     assert "no_formal_ODS_DWD" in grades["R3"]
     assert policy["independence"]["daily_core_unblocked_by_1m"]
     assert policy["independence"]["legacy_four_lane_unchanged"]

@@ -29,6 +29,10 @@ from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (  # noqa:
     find_ready_daily_ods_lanes,
 )
 from quanthus.pipelines.source_maturity import source_maturity_deferred  # noqa: E402
+from quanthus.pipelines.trading_maturity import (  # noqa: E402
+    minute_maturity_eligible,
+    verified_next_session,
+)
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 UTC = timezone.utc
@@ -374,6 +378,12 @@ def main() -> int:
         action="store_true",
         help="seal the ODS lanes and catalog without starting the daily DWD build",
     )
+    parser.add_argument(
+        "--minute-maturity-policy",
+        choices=("same-day-probe", "next-trading-day"),
+        default=os.environ.get("QUANTHUS_ODS_MINUTE_MATURITY_POLICY", "same-day-probe"),
+        help="next-trading-day defers real 1m acquisition until a verified trading session",
+    )
     args = parser.parse_args()
 
     node_id = os.environ.get("HERMES_ODS_NODE_ID", "cn01").strip().lower()
@@ -421,6 +431,26 @@ def main() -> int:
     dwd_python = Path(os.environ.get("QUANTHUS_DWD_PYTHON", str(ROOT / ".venv-p1/bin/python")))
     if not dwd_python.is_file():
         dwd_python = Path(sys.executable)
+
+    maturity_evidence = None
+    defer_one_minute = False
+    if args.minute_maturity_policy == "next-trading-day":
+        try:
+            maturity_evidence = verified_next_session(market_date)
+            defer_one_minute = not minute_maturity_eligible(
+                market_date, datetime.now(SHANGHAI), maturity_evidence
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            print(
+                json.dumps(
+                    {
+                        "status": "blocked_trading_calendar_unverified",
+                        "market_date": market_date.isoformat(),
+                        "error": type(exc).__name__,
+                    }
+                )
+            )
+            return 2
 
     started = _now()
     if args.recovery_window_seconds is not None:
@@ -477,6 +507,16 @@ def main() -> int:
         "kind": "ods_daily_orchestration",
         "node": node_id,
         "mode": "ods_only" if args.ods_only else "ods_to_dwd",
+        "minute_maturity_policy": args.minute_maturity_policy,
+        "minute_maturity_calendar": (
+            {
+                "source": maturity_evidence.source,
+                "next_session": maturity_evidence.next_session.isoformat(),
+                "sha256": maturity_evidence.calendar_sha256,
+            }
+            if maturity_evidence is not None
+            else None
+        ),
         **common,
         "status": "acquiring",
         "lanes": {},
@@ -576,6 +616,15 @@ def main() -> int:
                 "manifest_sha256": verified.manifest_sha256,
             }
         pending_by_lane = {job.lane: job for job in pending}
+        if defer_one_minute and "intraday-1m" in pending_by_lane:
+            del pending_by_lane["intraday-1m"]
+            state["lanes"]["intraday-1m"] = {
+                "status": "deferred_source_maturity",
+                "reason": "next_trading_session_minute_maturity_not_due",
+                "attempts": 0,
+                "returncode": None,
+                "logs": [],
+            }
         # Only the event lane is independent. The market and minute lanes share
         # pve_market_api, so run them in a deliberate order instead of lock racing.
         for lane_group in (
@@ -624,13 +673,27 @@ def main() -> int:
                 "logs": [],
             }
 
-    closed_session = all(
-        state["lanes"].get(lane, {}).get("status") == "closed_session"
-        for lane in ("market-daily-core", "intraday-5m", "intraday-1m")
-    ) and state["lanes"].get("calendar-daily-events", {}).get("status") == "ready"
+    closed_session = (
+        all(
+            state["lanes"].get(lane, {}).get("status") == "closed_session"
+            for lane in ("market-daily-core", "intraday-5m", "intraday-1m")
+        )
+        and state["lanes"].get("calendar-daily-events", {}).get("status") == "ready"
+    )
     lane_success = all(item.get("status") == "ready" for item in state["lanes"].values())
-    source_deferred = not lane_success and source_maturity_deferred(
-        state["lanes"], shadow_root=shadow_root, market_date=market_date
+    explicit_trading_session_defer = (
+        defer_one_minute
+        and state["lanes"].get("intraday-1m", {}).get("status") == "deferred_source_maturity"
+        and all(
+            state["lanes"].get(lane, {}).get("status") == "ready"
+            for lane in ("market-daily-core", "calendar-daily-events", "intraday-5m")
+        )
+    )
+    source_deferred = not lane_success and (
+        explicit_trading_session_defer
+        or source_maturity_deferred(
+            state["lanes"], shadow_root=shadow_root, market_date=market_date
+        )
     )
     if closed_session:
         state["catalog"] = {"status": "not_applicable_closed_session"}
@@ -709,9 +772,14 @@ def main() -> int:
         state["catalog"] = {"status": "deferred_source_maturity"}
         state["dwd"] = {"status": "deferred_source_maturity"}
         state["deferred_reason"] = (
-            "Tencent 1m source failed exact qualification or a complete scan's "
-            "daily volume/close checks; "
-            "awaiting date-bounded maturity recovery"
+            "1m collection scheduled for next verified trading-session maturity; "
+            "no same-day source request was made"
+            if explicit_trading_session_defer
+            else (
+                "Tencent 1m source failed exact qualification or a complete scan's "
+                "daily volume/close checks; "
+                "awaiting date-bounded maturity recovery"
+            )
         )
     elif not lane_success:
         state["catalog"] = {"status": "blocked_by_lane_failure"}

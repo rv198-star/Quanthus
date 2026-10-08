@@ -195,6 +195,11 @@ def capture_shard(
             saved += 1
             unchanged += 1
             continue
+        if raw_file.exists():
+            raise ValueError(
+                "source original raw exists without matching sealed receipt; "
+                "requires a new versioned attempt, not an overwrite"
+            )
         try:
             raw = fetcher(code, identity["anchor"])
             observed, observed_sha = target_date_records(raw, code, market_date)

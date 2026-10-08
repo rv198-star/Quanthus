@@ -134,13 +134,7 @@ def run_t(
     if not codes or len(codes)!=4992:
         raise ValueError("unqualified T-day population")
     calendar_file=journal / f"{target}-calendar.json"
-    if not calendar_file.exists():
-        _atomic(calendar_file,{"rows":rows})
-    # Operation runner expects an array, so seal an identical date-specific
-    # array rather than an object.
-    if json.loads(calendar_file.read_text()) != rows:
-        calendar_file.unlink()
-        _atomic_array(calendar_file, rows)
+    _atomic_array(calendar_file,rows)
 
     stage=capture/target.isoformat()/"T-v1"
     stages=math.ceil(len(codes)/50)
@@ -193,18 +187,17 @@ def run_t(
 
 
 def _atomic_array(path: Path, rows: list[dict]) -> None:
-    from quanthus.pipelines.p10_minute_operation_runtime import _atomic as write
     # A tiny explicit array file, with atomic rename after fsync.
     if path.exists():
         if json.loads(path.read_text()) != rows:
             raise ValueError("calendar attempt changed between shards")
         return
     text=json.dumps(rows,sort_keys=True,separators=(",",":"))+"\n"
-    tmp=path.with_name(f".{path.name}.temp")
+    import os
+    tmp=path.with_name(f".{path.name}.{os.getpid()}.tmp")
     with tmp.open("x") as handle:
         handle.write(text)
         handle.flush()
-        import os
         os.fsync(handle.fileno())
     tmp.replace(path)
 

@@ -166,6 +166,14 @@ PDF 重放使用同一显式 profile，原默认入口、知识时刻和消费�
 “两项合计”完全一致；不计算分项和，也不把总现金/虚拟除息额当每股权益。未知当前
 调整、缺单位/正向对象/排除证据、截断或冲突 primary 仍拒绝。旧 profile 保持不变。
 
+#481 的 opt-in `p10-base22-retained-issuer-explicit-distribution-schedule-v13` 区分
+已保留的“利润分派实施公告”等字面标题与真正缺正文。无“实施”二字的分红公告仅在
+原文明确股东大会已批准、本次分派日程、登记/除息日等条件齐备时取得解析角色，原始
+publisher metadata 不改。A 股公告须同时明示 H 股派发不适用才排除对应范围；含税
+标签后紧接“扣税后”的句号只作字面分隔。预计安排及明说正式实施公告将另发的提示
+不是实施正文，不能因标题或传输成功授予资格。全部单位、日期、primary 一致性及
+原始时刻/数字保持门槛仍适用，不授予 H/B 股条款、汇率或消费者准入。
+
 ## Current recovery checkpoint
 
 工作区 `/root/Quanthus/.worktrees/base22-standalone`；分支 `codex/base22-standalone`。

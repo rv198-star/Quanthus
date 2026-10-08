@@ -35,6 +35,8 @@ from .base22_notice_equivalent_scope import CONTRACT_ID as EQUIVALENT_SCOPE_CONT
 from .base22_notice_gross_layout import CONTRACT_ID as GROSS_LAYOUT_CONTRACT
 from .base22_notice_gross_layout import select_gross_layout_candidates
 from .base22_notice_implementation_labels import CONTRACT_ID as IMPLEMENTATION_LABEL_CONTRACT
+from .base22_notice_issuer_titles import CONTRACT_ID as ISSUER_SCHEDULE_CONTRACT
+from .base22_notice_issuer_titles import select_issuer_schedule_candidates
 from .base22_notice_labels import CONTRACT_ID as LABEL_CONTRACT
 from .base22_notice_literal_statement import CONTRACT_ID as LITERAL_STATEMENT_CONTRACT
 from .base22_notice_literal_statement import select_literal_cash_candidates
@@ -97,6 +99,7 @@ def restate_notice_cash(
             LITERAL_STATEMENT_CONTRACT,
             A_CURRENT_SCOPE_CONTRACT,
             GROSS_LAYOUT_CONTRACT,
+            ISSUER_SCHEDULE_CONTRACT,
         }
         or notice_atom.get("stock_code") != raw.get("stock_code")
         or notice_atom.get("ex_date") != raw["ex_date"]
@@ -371,7 +374,9 @@ def audit_notice_restatement_scope(
             }
         )
         budget.check()
-    if body.get("parser_profile") == GROSS_LAYOUT_CONTRACT:
+    if body.get("parser_profile") == ISSUER_SCHEDULE_CONTRACT:
+        selected, selection = select_issuer_schedule_candidates(targets, documents)
+    elif body.get("parser_profile") == GROSS_LAYOUT_CONTRACT:
         selected, selection = select_gross_layout_candidates(targets, documents)
     elif body.get("parser_profile") == A_CURRENT_SCOPE_CONTRACT:
         selected, selection = select_a_cash_candidates(targets, documents)

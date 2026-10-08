@@ -10,12 +10,12 @@ from pathlib import Path
 
 import pytest
 
-from quanthus.pipelines.securities_warehouse.daily_domain import (
+from quanthus.pipelines.securities_warehouse.daily_core_domain import (
     DailyDomainBuildError,
     advance_daily_current,
     verify_daily_domain_increment,
 )
-from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (
+from quanthus.pipelines.securities_warehouse.daily_core_ods_catalog import (
     DAILY_CORE_PRODUCT_SCOPE,
     DailyOdsCatalogError,
     _canonical_bytes,
@@ -158,7 +158,7 @@ def _empty_core_package(tmp_path: Path) -> Path:
     import pyarrow as pa
     import pyarrow.parquet as pq
 
-    from quanthus.pipelines.securities_warehouse.daily_domain import _TABLE_KEYS
+    from quanthus.pipelines.securities_warehouse.daily_core_domain import _TABLE_KEYS
 
     counts = {}
     for name in _TABLE_KEYS:
@@ -482,7 +482,7 @@ def test_oci_daily_core_rejects_source_or_target_path_confusion(
 def test_daily_core_never_skips_open_session_or_unverified_calendar(
     after: str, target: str, sessions: list, error: str | None
 ) -> None:
-    from quanthus.pipelines.securities_warehouse.daily_domain import (
+    from quanthus.pipelines.securities_warehouse.daily_core_domain import (
         _verify_daily_core_calendar_continuity,
     )
 

@@ -25,7 +25,7 @@ from quanthus.pipelines.process_control import (  # noqa: E402
     ProcessGroupCleanupError,
     terminate_process_group,
 )
-from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (  # noqa: E402
+from quanthus.pipelines.securities_warehouse.daily_core_ods_catalog import (  # noqa: E402
     DAILY_CORE_PRODUCT_SCOPE,
     LEGACY_PRODUCT_SCOPE,
     find_ready_daily_ods_lanes,

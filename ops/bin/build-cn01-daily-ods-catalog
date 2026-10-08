@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from quanthus.pipelines.securities_warehouse import (  # noqa: E402
+from quanthus.pipelines.securities_warehouse.daily_core_ods_catalog import (  # noqa: E402
     DailyOdsCatalogError,
     build_daily_ods_catalog,
 )

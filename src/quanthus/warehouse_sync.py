@@ -17,11 +17,11 @@ from datetime import date, datetime
 from pathlib import Path, PurePosixPath
 from zoneinfo import ZoneInfo
 
-from quanthus.pipelines.securities_warehouse import (
+from quanthus.pipelines.securities_warehouse.daily_core_domain import (
     DailyDomainBuildError,
     verify_daily_domain_increment,
 )
-from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (
+from quanthus.pipelines.securities_warehouse.daily_core_ods_catalog import (
     DAILY_CORE_PRODUCT_SCOPE,
     LEGACY_PRODUCT_SCOPE,
 )

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "policy_id": "p10-business-value-warehouse-quality.v1",
+  "authority": "ADR-0016",
+  "work_items": ["P10-DATA-WH-001", "P10-DATA-WH-002"],
+  "hard_invariants": [
+    "exact_security_and_trading_session_identity",
+    "original_raw_and_manifest_sha256_lineage",
+    "PIT_knowledge_cutoff_and_protected_partitions",
+    "correct_unadjusted_price_basis_and_share_units",
+    "source_observed_never_derived_unless_separately_authorized",
+    "no_fabricated_minute_ohlc_or_share_residual_allocation",
+    "consumer_specific_required_inputs_fail_closed"
+  ],
+  "product_scopes": {
+    "daily-core-v1": {
+      "status": "implemented_opt_in",
+      "requires": ["market_daily_core", "calendar_daily_events"],
+      "excludes_as_optional": ["intraday_1m", "intraday_5m"],
+      "allowed_interval_sizes": ["1d"],
+      "source_readiness": "required_lane_immutable_ready_and_same_schedule_identity",
+      "publish_separately_from_legacy": true,
+      "legacy_pointer_compatible": false,
+      "consumer": "daily_market_warehouse_only"
+    },
+    "intraday-5m-archive-v1": {
+      "status": "legacy_independent_lane_not_in_daily_core",
+      "requires": ["intraday_5m"],
+      "allowed_interval_sizes": ["5m"],
+      "consumer": "explicit_intraday_5m_only"
+    },
+    "intraday-1m-strict-v1": {
+      "status": "legacy_strict_not_relaxed",
+      "requires": ["intraday_1m"],
+      "allowed_interval_sizes": ["1m"],
+      "observed_240_minutes_required": true,
+      "double_source_semantic_conflict_blocks": true,
+      "consumer": "precision_sensitive_1m_only"
+    }
+  },
+  "release_control": {
+    "legacy_four_lane_catalog_is_unchanged": true,
+    "accepted_base_and_prior_history_are_immutable": true,
+    "daily_core_requires_explicit_product_selection_and_new_pointer": true,
+    "no_implicit_OCD_OCI_mirror_or_timer_activation": true,
+    "quality_debt_retained": true
+  }
+}

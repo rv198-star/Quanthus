@@ -24,7 +24,7 @@ from quanthus.warehouse_sync import (
     _ssh_command,
     _validate_pointer,
 )
-from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (
+from quanthus.pipelines.securities_warehouse.daily_core_ods_catalog import (
     DAILY_CORE_PRODUCT_SCOPE,
 )
 

@@ -23,6 +23,8 @@ from .base22_bounded import BoundedError, Budget, semantic_scan
 from .base22_canonical_action_revision import SOURCE_VERSION, _sha
 from .base22_cash_restatement import _scan_cash_global
 from .base22_financial import _clock
+from .base22_notice_a_scope import CONTRACT_ID as A_CURRENT_SCOPE_CONTRACT
+from .base22_notice_a_scope import select_a_cash_candidates
 from .base22_notice_action import CONTRACT_ID as PARSER_CONTRACT
 from .base22_notice_action import select_notice_cash_candidates
 from .base22_notice_adjustment import CONTRACT_ID as ADJUSTMENT_CONTRACT
@@ -91,6 +93,7 @@ def restate_notice_cash(
             DATE_LAYOUT_CONTRACT,
             DOMESTIC_SCOPE_CONTRACT,
             LITERAL_STATEMENT_CONTRACT,
+            A_CURRENT_SCOPE_CONTRACT,
         }
         or notice_atom.get("stock_code") != raw.get("stock_code")
         or notice_atom.get("ex_date") != raw["ex_date"]
@@ -365,7 +368,9 @@ def audit_notice_restatement_scope(
             }
         )
         budget.check()
-    if body.get("parser_profile") == LITERAL_STATEMENT_CONTRACT:
+    if body.get("parser_profile") == A_CURRENT_SCOPE_CONTRACT:
+        selected, selection = select_a_cash_candidates(targets, documents)
+    elif body.get("parser_profile") == LITERAL_STATEMENT_CONTRACT:
         selected, selection = select_literal_cash_candidates(targets, documents)
     else:
         selected, selection = select_notice_cash_candidates(

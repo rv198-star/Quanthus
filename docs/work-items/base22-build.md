@@ -154,6 +154,12 @@ A 股实施方案读取明示人民币含税现金，保留原证券与除息日
 诊断，不能替代真实完整矩阵；缺物理结束、未知非空行均 held。姓名折行可含原表
 布局空列，不添加数字或排名。每次该语义改变重新物化和重放受影响的分项来源及迁移。
 
+#481 的 opt-in `p10-base22-explicit-A-current-scheme-cash-v11` 仅在完整当前“分配方案”
+明确声明全体 A 股股东、人民币和本次实施对象，且该方案没有 H/B 股或外币范围时，
+区分其他章节的 H 股税务说明。原始全文及数字序列不变，其他市场条款不获资格。
+缺正向对象、方案内混合范围或冲突 primary 仍拒绝；旧 V10 原子保持。新版本与离线
+PDF 重放使用同一显式 profile，原默认入口、知识时刻和消费者冻结规则不变。
+
 ## Current recovery checkpoint
 
 工作区 `/root/Quanthus/.worktrees/base22-standalone`；分支 `codex/base22-standalone`。

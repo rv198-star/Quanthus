@@ -201,6 +201,15 @@ T+n 只是源文注释，不推算交易日历。新年度公告角色仍需批�
 
 ## Current recovery checkpoint
 
+#481 `p10-base22-nonuniform-literal-source-facts-preparation-v1` 将已保留正文的
+公众股/原三家具名股东和现金/转增分项做有界字段物化。源文本未声明税前口径时
+明确保留 `SOURCE_NOT_EXPLICITLY_DECLARED`，不借用公众股税务说明到具名股东。
+混合分派保留原文每十股单位、编号分项和各自股份基数证明，不相加、不摊薄，
+也不推断真实成员。全原件、本地 raw/before、真实新获取/处理时刻和逐文件代码
+身份绑定并可无源重放；这属于类型化来源准备，`canonical_DWD_repair_qualified`
+始终为 false。版本化非统一 term 模型及原生实体修复仍是单独未完成门槛，不能
+据字段文件存在就把三个键或完整镜像标为合格。旧模型及消费者冻结门槛不变。
+
 #481 opt-in `p10-base22-literal-current-A-and-printed-combined-gross-v17` 只读取
 明确实施的当前 A 股含税现金对象。原文合计字段与 A 股总比例一致时采用原文
 合计，不通过分项加总、除息摊薄额或支付净额生成数值；年度与季度合并表头另需

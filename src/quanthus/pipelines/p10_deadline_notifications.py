@@ -144,7 +144,14 @@ def evaluate(
                 terminal = state.get("terminal_disposition")
                 if name == "T_plus_1":
                     if terminal == "source_unchanged_stopped":
-                        receipt = "SOURCE_UNCHANGED_STOPPED"
+                        # A correct stop means no wasted repoll, NOT an
+                        # upgrade of a still-R3 product into a ready day.
+                        if receipt == "RESEARCH_READY_LOSS_AWARE":
+                            receipt = "SOURCE_UNCHANGED_STOPPED"
+                        elif receipt == "PARTIAL_COVERAGE_NO_RESEARCH_READY":
+                            receipt = "QUALITY_NOT_READY"
+                        else:
+                            receipt = None
                     elif (
                         terminal
                         == "source_changed_requires_new_versioned_quality_requalification"

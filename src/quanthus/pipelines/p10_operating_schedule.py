@@ -75,7 +75,8 @@ def start_at(
     if phase == "minute_T":
         return _date_time(target, policy["schedule"]["minute_T"]["start_time"])
     if phase == "minute_Tplus1":
-        following = next_trade_day(target, rows)
+        # Source maturity uses the calendar day after T, including weekends.
+        following = target + timedelta(days=1)
         return _date_time(following, policy["schedule"]["minute_Tplus1"]["start_time"])
     raise ValueError("unknown P10 operating phase")
 
@@ -95,7 +96,7 @@ def alert_checkpoint(
     if kind == "minute_T":
         return _date_time(target, policy["schedule"]["minute_T"]["failure_email_at"])
     if kind == "minute_Tplus1":
-        next_day = next_trade_day(target, rows)
+        next_day = target + timedelta(days=1)
         return _date_time(next_day, policy["schedule"]["minute_Tplus1"]["failure_email_at"])
     if kind == "oci_mirror":
         next_calendar_day = target + timedelta(days=1)

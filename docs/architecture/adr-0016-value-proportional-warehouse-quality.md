@@ -100,6 +100,14 @@ T+1 **先做 12–24 只跨市场、有代表性、包含已知异常的 source-
 
 每运行满 10 个交易日复盘 T/T+1 的实际累计耗时、超过准入截止的收尾耗时、来源真实修订率、R2/R3 变化、消费者实际受益和正常日级 SLA；调整预算须单独版本化，不因争取清零而无限延长。
 
+## 2026-10-10 Owner correction — calendar-day T+1 and actual repair
+
+This decision supersedes the 2026-10-09 *next-exchange-session* timing only, not the accepted 60-minute admission budget or quality gates. T must be verified as an open exchange trading day, but its T+1 maturity recovery is scheduled at 10:30 on the **next calendar day**, including Saturdays and holidays. A verified target T is not created for nontrading dates. Deadline warning checks likewise move to the next calendar day, with one message per target date and phase.
+
+T+1 first compares 12–24 date-bound canaries. Genuine target-date revisions trigger one bounded, identity-bound pass over the affected R2/R3 cohort (50-security max atomic shards, each independently timeout-bounded) and versioned source-grade publication. An unchanged vendor response does not authorize a speculative repoll. The research-ready gate remains R0/R1 >=99% overall and >=98% per board; R2 storage is not R0/R1 research acceptance and R3 never enters formal ODS/DWD.
+
+The 2026-10-08 historical V1/V2 and old T+1 ledger are immutable. Owner-authorized one-off recovery retains their SHA-bound source receipts and charged elapsed budget, publishes a distinct `loss-aware-1m-historical-correction-v1` version and reports its actual R distribution. Neither a successful collection exit nor a sealed quality package is by itself Research READY. The warning email must display acquisition execution, published-grade distribution, R3 reasons and consumer readiness separately.
+
 ## Consequences and change control
 
 - P10 is the sole source-qualification/warehouse engineering owner; business owners define admission sensitivity and accept products only under their own contracts (ADR 0015).

@@ -18,8 +18,8 @@
       "routine_target_new_operation_admission_seconds": 1800
     },
     "T_plus_1": {
-      "phase": "first_subsequent_verified_exchange_trading_session",
-      "eligible_after": "verified_next_exchange_trading_day_and_source_maturity_probe",
+      "phase": "calendar_day_after_verified_market_T",
+      "eligible_after": "calendar_day_after_verified_market_T_and_source_maturity_probe",
       "allowed": "target_date_only_recheck_source_revision_and_bounded_remedial_correction",
       "split_across_checks_allowed": true,
       "window_not_reset_by_retry_or_midnight": true,
@@ -28,7 +28,7 @@
       "source_revision_comparison": "per_symbol_target_market_date_native_1m_observation_digest_not_full_rolling_800_bar_response_sha256",
       "narrow_repoll_only_after": "proved_target_date_revision_or_new_reliable_source_evidence",
       "no_new_evidence_action": "stop_without_spending_remaining_budget",
-      "next_trade_day_reference": "authoritative_trading_calendar_not_weekday_arithmetic",
+      "recovery_date_semantics": "next_calendar_day_of_verified_market_T_including_weekends",
       "new_operation_admission_cutoff_seconds": 3600,
       "cutoff_semantics": "reject_new_operation_at_or_after_3600_seconds_of_cumulative_phase_execution",
       "admitted_inflight_operation_can_finish": true,

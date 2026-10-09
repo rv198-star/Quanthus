@@ -64,7 +64,7 @@
     },
     "minute_Tplus1": {
       "market_date_phase": "T_plus_1",
-      "first_subsequent_verified_market_session_only": true,
+      "next_calendar_day_of_verified_market_T": true,
       "start_time": "10:30",
       "source_maturity_canary_count_min": 12,
       "source_maturity_canary_count_max": 24,

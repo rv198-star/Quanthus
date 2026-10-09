@@ -85,7 +85,8 @@ def audit_holder_scope(root: Path, budget: Budget) -> dict[str, Any]:
             or manifest["release_id"] != source["release"]
             or file_sha(raw_path) != source["sha256"]
             or pq.ParquetFile(raw_path).metadata.num_rows != source["rows"]
-            or not any(a["name"] == "shareholder_count_revision" and a["sha256"] == source["sha256"]
+            or not any(a["name"] == "shareholder_count" and a["sha256"] == source["sha256"]
+                       and a["relative_path"] == source["path"]
                        for a in manifest["artifacts"])
         ):
             raise BoundedError("SEPTEMBER_HOLDER_ORIGINAL_SOURCE_CHANGED")

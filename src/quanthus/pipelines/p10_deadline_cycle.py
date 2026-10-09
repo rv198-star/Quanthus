@@ -17,11 +17,15 @@ from pathlib import Path
 
 from quanthus.pipelines.p10_deadline_notifications import evaluate
 from quanthus.pipelines.p10_minute_daily_cycle import calendar_for, resolve_target
+from quanthus.pipelines.p10_minute_delivery_mail import assess_minute_delivery
 from quanthus.pipelines.p10_operating_schedule import SHANGHAI
 from quanthus.pipelines.securities_warehouse.daily_core_ods_catalog import (
     DAILY_CORE_PRODUCT_SCOPE,
 )
-from quanthus.warehouse_notifications import send_daily_event
+from quanthus.warehouse_notifications import (
+    send_daily_event,
+    send_minute_delivery_outcome,
+)
 from quanthus.warehouse_sync import (
     WarehouseSyncError,
     _remote_path,
@@ -172,18 +176,67 @@ def main() -> int:
             peer_sha = _source_cn01_daily_digest(target)
         except (OSError, ValueError, WarehouseSyncError) as exc:
             source_error = f"CN01 live source unavailable: {type(exc).__name__}"
-    result=evaluate(
-        node=args.node,phase=args.phase,target=target,
-        calendar=calendar,daily_root=daily,
-        minute_root=minute,phase_root=phases,
-        historical_minute_root=Path(
-            "/srv/quanthus/dwd-dws-v2/intraday/products/loss-aware-1m-v2"
-        ) if args.node=="CN01" else None,
-        at=now,cn01_sha=peer_sha,
-    )
+    minute_phase = args.node=="CN01" and args.phase in {
+        "minute_T", "minute_Tplus1",
+    }
+    if minute_phase:
+        result=assess_minute_delivery(
+            target=target,phase=args.phase,at=now,calendar=calendar,
+            minute_root=minute,phase_root=phases,
+        )
+    else:
+        result=evaluate(
+            node=args.node,phase=args.phase,target=target,
+            calendar=calendar,daily_root=daily,
+            minute_root=minute,phase_root=phases,
+            historical_minute_root=Path(
+                "/srv/quanthus/dwd-dws-v2/intraday/products/loss-aware-1m-v2"
+            ) if args.node=="CN01" else None,
+            at=now,cn01_sha=peer_sha,
+        )
     if source_error:
         result["source_recheck"] = source_error
-    if args.send and result.get("mail_event"):
+    if args.send and minute_phase and result.get("mail_event"):
+        grade=result.get("grade")
+        try:
+            detail=minute_mail_snapshot(
+                target=target,minute_root=minute,
+                phase_root=phases,phase=args.phase,
+            )
+        except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+            detail={}
+        passed=result["status"]=="pass"
+        detail.update({
+            "node":"CN01",
+            "stage":args.phase,
+            "executed_phase":"T" if args.phase=="minute_T" else "T+1",
+            "delivery_verdict":"PASS" if passed else "FAIL",
+            "delivery_reason":result.get("reason") or (
+                "R3=0；正式封存和R2受限存储均已验证"
+            ),
+            "publication_status":(
+                "封存包 SHA 与真实 ODS/DWD 已验证" if grade else "无可验证正式分级包"
+            ),
+            "quality_distribution":(
+                " / ".join(f"{key}={grade['grades'][key]}" for key in
+                         ("R0","R1","R2","R3","SUSPENDED"))
+                if grade else "不可验证"
+            ),
+            "research_qualification":(
+                "READY" if grade["research_ready"]
+                else "NOT READY" if grade is not None else "未验证"
+            ),
+            "grade_manifest_sha256":(
+                grade["manifest_sha256"] if grade else "缺失或验证失败"
+            ),
+            "source_revised_count":str(grade["revised_count"]) if grade else "未验证",
+        })
+        result["delivery"]=send_minute_delivery_outcome(
+            market_date=target,phase=args.phase,passed=passed,
+            state_root=args.notification_state_root,
+            context=detail,reason=result.get("reason"),
+        )
+    elif args.send and result.get("mail_event"):
         detail=(
             minute_mail_snapshot(
                 target=target,minute_root=minute,

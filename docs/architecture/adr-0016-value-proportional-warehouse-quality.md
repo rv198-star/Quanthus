@@ -108,6 +108,30 @@ T+1 first compares 12–24 date-bound canaries. Genuine target-date revisions tr
 
 The 2026-10-08 historical V1/V2 and old T+1 ledger are immutable. Owner-authorized one-off recovery retains their SHA-bound source receipts and charged elapsed budget, publishes a distinct `loss-aware-1m-historical-correction-v1` version and reports its actual R distribution. Neither a successful collection exit nor a sealed quality package is by itself Research READY. The warning email must display acquisition execution, published-grade distribution, R3 reasons and consumer readiness separately.
 
+## 2026-10-10 Owner minute email acceptance — terminal PASS / FAIL
+
+For CN01 P10 minute T (21:50) and T+1 (11:50), produce one explicit
+outcome email per verified target trading-date and phase, PASS **or** FAIL.
+Do not use the ambiguous "quality degradation" as the final verdict and
+do not silently suppress genuine PASS. Defer while a genuinely bounded
+operation is still in flight; duplicate 22:10/12:10 checkpoints reuse the
+same logical notification identity, irrespective of the verdict.
+
+Minute **delivery PASS** requires a finished verified phase ledger and
+physically verified date-bound immutable package (SEALED, manifest SHA,
+4,992 security-grade records, actual R0/R1/R2 source bytes and Parquet,
+no R3 source bytes), and no remaining R3 securities. Legitimate R2
+storage with disclosed defects is delivery PASS. Outstanding R3, missing
+ledger, invalid source/package or incomplete terminal operation is FAIL.
+An unchanged T+1 vendor maturity canary does not pass if R3 remains.
+
+Report Research READY as an independent strict R0/R1 consumer gate.
+An R2-restricted delivery PASS can be Research NOT READY. Email subject
+must include trade date, T/T+1, PASS/FAIL; body includes grade counts,
+research qualification, actual source/warehouse evidence and reason.
+Never backdate prior email results, overwrite frozen source versions or
+automatically activate protected P3/P5/P6 consumers.
+
 ## Consequences and change control
 
 - P10 is the sole source-qualification/warehouse engineering owner; business owners define admission sensitivity and accept products only under their own contracts (ADR 0015).

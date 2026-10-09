@@ -8,10 +8,24 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from quanthus.pipelines.securities_warehouse.base22 import digest, load_contract, schemas
-from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError
+from quanthus.pipelines.securities_warehouse.base22 import (
+    canonical,
+    digest,
+    file_sha,
+    load_contract,
+    partition,
+    schemas,
+)
+from quanthus.pipelines.securities_warehouse.base22_bounded import (
+    BoundedError,
+    Budget,
+    Limits,
+    semantic_scan,
+)
 from quanthus.pipelines.securities_warehouse.base23_retained_core import (
+    CONTRACT_ID,
     QUALIFICATION,
+    audit_retained_scope,
     reobserve_partition,
 )
 from tests.unit.test_base23_core import run_day, september_case
@@ -142,3 +156,236 @@ def test_retained_typed_measures_preserve_decimal_null_zero_and_business_times(t
     pq.write_table(pa.Table.from_pylist(output, schema=ss[table]), path)
     assert pq.ParquetFile(path).read().to_pylist() == output
     assert rows == before
+
+
+def synthetic_scope(root):
+    """Full original package, exact parents and pinned output proof, all synthetic."""
+    import json
+    import shutil
+
+    from quanthus.pipelines.securities_warehouse.base22_sources import _tree
+
+    raw, args = retained_case("dwd_security_bar")
+    contract, model, extension = load_contract(Path("config/pipelines"))
+    ss = schemas(model, extension)
+    root.mkdir()
+    for name in [
+        "base22-independent-image.v1.json",
+        "dwd-domain-model.v1.json",
+        "dwd-domain-model.v1.1-extension.json",
+    ]:
+        (root / "contract").mkdir(exist_ok=True)
+        shutil.copyfile(Path("config/pipelines") / name, root / "contract" / name)
+
+    def write(rel, rows, table):
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pq.write_table(pa.Table.from_pylist(rows, schema=ss[table]), path)
+        return path
+
+    lineage = {
+        "record_source": "synthetic-parent",
+        "source_record_id": "synthetic",
+        "source_revision": "v1",
+        "source_artifact_sha256": digest(["parent"]),
+    }
+    listing = {
+        **lineage,
+        **args["listings"][0],
+        "security_id": "security-one",
+        "board_code": "MAIN",
+        "lot_size": 100,
+    }
+    args["listings"] = [listing]
+    index = {
+        **lineage,
+        "knowledge_from": listing["knowledge_from"],
+        "knowledge_to": None,
+        "effective_from": listing["effective_from"],
+        "effective_to": None,
+        "index_id": "index-one",
+        "index_code": "sh.000001",
+        "index_name": "synthetic",
+        "base_currency": "CNY",
+        "methodology_version": None,
+    }
+    args["indexes"] = [index]
+    calendar = {
+        **lineage,
+        **args["qualified_calendars"][0],
+        "observation_start": raw["observation_start"],
+        "observation_end": raw["observation_end"],
+        "open_at": None,
+        "close_at": None,
+        "calendar_reason": None,
+    }
+    args["qualified_calendars"] = [calendar]
+    args["original_calendars"] = [calendar]
+    parents = {}
+    for table, rows in {
+        "dwd_listing": [listing],
+        "dwd_market_index": [index],
+        "dwd_trading_calendar": [calendar],
+    }.items():
+        rel = "parents/" + table + ".parquet"
+        write(rel, rows, table)
+        parents[table] = rel
+    rows_by_table = {
+        "dwd_security_bar": [raw],
+        "dwd_tradability_state": [retained_case("dwd_tradability_state")[0]],
+        "dwd_index_bar": [
+            {
+                **{k: v for k, v in raw.items() if k in ss["dwd_index_bar"].names},
+                "index_id": "index-one",
+                "calendar_session_id": None,
+            }
+        ],
+        "dwd_security_valuation": [
+            {
+                **{k: v for k, v in raw.items() if k in ss["dwd_security_valuation"].names},
+                "security_id": "security-one",
+                "measure_type": "pb",
+                "measure_value": None,
+                "currency": None,
+                "methodology": "provider_reported",
+                "fiscal_basis": "ttm_or_reported",
+            }
+        ],
+    }
+    sources, files, counts = {}, [], {}
+    for table, rows in {**rows_by_table, "dwd_trading_calendar": [calendar]}.items():
+        rel = "original/payload/" + table + "/part.parquet"
+        path = write(rel, rows, table)
+        counts[table] = len(rows)
+        files.append(
+            {
+                "path": rel.removeprefix("original/"),
+                "sha256": file_sha(path),
+                "size_bytes": path.stat().st_size,
+            }
+        )
+        if table != "dwd_trading_calendar":
+            sources[table] = {"path": rel, "sha256": file_sha(path)}
+    manifest = {
+        "kind": "cn01_daily_dwd_domain_increment",
+        "schema_version": 1,
+        "package_id": "synthetic-retained",
+        "market_date": str(args["day"]),
+        "files": files,
+        "content_digest": digest(files),
+        "row_counts": counts,
+    }
+    (root / "original/manifest.json").write_bytes(canonical(manifest))
+    manifest_sha = file_sha(root / "original/manifest.json")
+    (root / "original/READY").write_text(manifest_sha + "\n")
+    history_parents = {
+        t: {"archive_path": "payload/" + t + ".parquet", "sha256": file_sha(root / parents[t])}
+        for t in ["dwd_listing", "dwd_market_index"]
+    }
+    history = {
+        "layout": {
+            t: {"files": [{"path": v["archive_path"], "sha256": v["sha256"]}]}
+            for t, v in history_parents.items()
+        }
+    }
+    (root / "history.json").write_bytes(canonical(history))
+    calendar_scope = {
+        "source_qualification": "RETAINED_BYTE_VERIFIED_GOVERNANCE_NOT_PROVIDER_PIT",
+        "calendar_projection_proof": {"full_month_coverage": True},
+        "physical_members": {
+            "payload/calendar.parquet": {"sha256": file_sha(root / parents["dwd_trading_calendar"])}
+        },
+    }
+    calendar_scope["identity"] = digest(calendar_scope)
+    (root / "calendar.json").write_bytes(canonical(calendar_scope))
+    plan = {
+        "purpose": CONTRACT_ID,
+        "qualification": QUALIFICATION,
+        "original_raw_core_recovered": False,
+        "provider_acquisition": None,
+        "source_ids_by_table": {t: [v["sha256"]] for t, v in sources.items()},
+        "package_manifest_sha256": manifest_sha,
+        "history_materialization_sha256": file_sha(root / "history.json"),
+        "calendar_scope_sha256": file_sha(root / "calendar.json"),
+    }
+    body = {
+        "contract_id": CONTRACT_ID,
+        "input_closure": plan,
+        "input_digest": digest(plan),
+        "projection_module_sha256": file_sha(
+            Path("src/quanthus/pipelines/securities_warehouse/base23_retained_core.py")
+        ),
+        "business_date": str(args["day"]),
+        "observed_at": args["observed_at"],
+        "original_manifest": "original/manifest.json",
+        "original_calendar": "original/payload/dwd_trading_calendar/part.parquet",
+        "history_materialization": "history.json",
+        "history_parents": history_parents,
+        "calendar_scope": "calendar.json",
+        "calendar_archive_path": "payload/calendar.parquet",
+        "parents": parents,
+        "sources": sources,
+        "outputs": {},
+        "proofs": {},
+        "complete_Base23": False,
+        "READY": False,
+        "consumer_admission": "NOT_GRANTED",
+    }
+    for table, source in sources.items():
+        rows = pq.ParquetFile(root / source["path"]).read().to_pylist()
+        args.update(
+            table=table,
+            schema=ss[table],
+            rule=contract["tables"][table],
+            member_sha256=source["sha256"],
+            package_manifest_sha256=manifest_sha,
+            input_digest=body["input_digest"],
+        )
+        output, proof = reobserve_partition(rows, **args)
+        part = partition(output[0], contract["tables"][table])
+        rel = f"payload/{table}/{part}/part.parquet"
+        path = write(rel, output, table)
+        body["outputs"][table] = {
+            "path": rel,
+            "partition": part,
+            "semantic_scan": semantic_scan([path], ss[table]),
+        }
+        rel = "proof-" + table + ".json"
+        (root / rel).write_bytes(canonical(proof))
+        body["proofs"][table] = rel
+    body["physical_members"] = {
+        rel: {"sha256": file_sha(root / rel), "size_bytes": (root / rel).stat().st_size}
+        for rel in _tree(root)
+    }
+    body["identity"] = digest(body)
+    (root / "SCOPE.json").write_bytes(canonical(body))
+    assert json.loads((root / "SCOPE.json").read_bytes())["identity"] == body["identity"]
+    return body
+
+
+def test_complete_retained_scope_offline_replay_and_fully_rewrapped_empty_fault(tmp_path):
+    import shutil
+
+    root = tmp_path / "scope"
+    body = synthetic_scope(root)
+    with Budget(tmp_path / "audit", [root], Limits(free_floor_bytes=1)) as budget:
+        receipt = audit_retained_scope(root, budget)
+    assert receipt["original_raw_core_recovered"] is False
+    assert len(receipt["summaries"]) == 4
+    copy = tmp_path / "disposable"
+    shutil.copytree(root, copy, copy_function=shutil.copyfile)
+    rel = "payload/dwd_tradability_state/observation_start_month=2026-10/empty.parquet"
+    path = copy / rel
+    path.parent.mkdir(parents=True)
+    _, model, extension = load_contract(copy / "contract")
+    schema = schemas(model, extension)["dwd_tradability_state"]
+    pq.write_table(pa.Table.from_pylist([], schema=schema), path)
+    body["physical_members"][rel] = {"sha256": file_sha(path), "size_bytes": path.stat().st_size}
+    body.pop("identity")
+    body["identity"] = digest(body)
+    (copy / "SCOPE.json").write_bytes(canonical(body))
+    with (
+        Budget(tmp_path / "audit-fault", [copy], Limits(free_floor_bytes=1)) as budget,
+        pytest.raises(BoundedError, match="PHYSICAL_PARTITION_SET"),
+    ):
+        audit_retained_scope(copy, budget)

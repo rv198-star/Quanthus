@@ -278,9 +278,11 @@ def audit_retained_scope(root: Path, budget: Budget) -> dict[str, Any]:
         if not relative.endswith(".parquet"):
             continue
         tables = [name for name in original["row_counts"] if f"/{name}/" in "/" + relative]
-        if len(tables) != 1 or pq.ParquetFile(package / relative).metadata.num_rows != original[
-            "row_counts"
-        ][tables[0]]:
+        if (
+            len(tables) != 1
+            or pq.ParquetFile(package / relative).metadata.num_rows
+            != original["row_counts"][tables[0]]
+        ):
             raise BoundedError("RETAINED_CORE_ORIGINAL_ROW_CENSUS_CHANGED")
 
     def read(rel: str, bound: int) -> list[dict[str, Any]]:
@@ -321,9 +323,9 @@ def audit_retained_scope(root: Path, budget: Budget) -> dict[str, Any]:
         != "RETAINED_BYTE_VERIFIED_GOVERNANCE_NOT_PROVIDER_PIT"
         or calendar_scope.get("calendar_projection_proof", {}).get("full_month_coverage")
         is not True
-        or calendar_scope.get("physical_members", {}).get(body["calendar_archive_path"], {}).get(
-            "sha256"
-        )
+        or calendar_scope.get("physical_members", {})
+        .get(body["calendar_archive_path"], {})
+        .get("sha256")
         != file_sha(root / body["parents"]["dwd_trading_calendar"])
     ):
         raise BoundedError("RETAINED_CORE_QUALIFIED_CALENDAR_MEMBERSHIP_CHANGED")

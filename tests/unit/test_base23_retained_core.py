@@ -363,7 +363,9 @@ def synthetic_scope(root):
     return body
 
 
-def test_complete_retained_scope_offline_replay_and_fully_rewrapped_empty_fault(tmp_path, monkeypatch):
+def test_complete_retained_scope_offline_replay_and_fully_rewrapped_empty_fault(
+    tmp_path, monkeypatch
+):
     import os
     import shutil
     from types import SimpleNamespace
@@ -376,9 +378,11 @@ def test_complete_retained_scope_offline_replay_and_fully_rewrapped_empty_fault(
     monkeypatch.setattr(
         os,
         "statvfs",
-        lambda path: SimpleNamespace(f_flag=os.ST_RDONLY)
-        if Path(path) in {root, copy}
-        else real_statvfs(path),
+        lambda path: (
+            SimpleNamespace(f_flag=os.ST_RDONLY)
+            if Path(path) in {root, copy}
+            else real_statvfs(path)
+        ),
     )
     body = synthetic_scope(root)
     with Budget(tmp_path / "audit", [root], Limits(free_floor_bytes=1)) as budget:

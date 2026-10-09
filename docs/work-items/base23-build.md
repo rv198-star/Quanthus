@@ -65,8 +65,6 @@ precise file set and schemas are checked before costly projection. Unknown or
 nonempty unsupported domains remain visible. Even the necessary source coverage
 PASS is not row/source/33-domain qualification and never creates a candidate READY.
 
-## Storage and retirement
-
 ## Retained core domain continuation
 
 `base23_core.py` and `base23_core_audit.py` implement an explicitly bounded
@@ -77,7 +75,11 @@ currently contains 69 venue/date keys through September 23, with zero conflictin
 flags; 21 month-end keys are unavailable. Missing dates are recorded, not generated.
 This intermediate is not the complete 33-table product and has no candidate READY.
 
-Revision equality compares every raw atom except acquisition. Identical captures
+The v2 revision rule compares every business atom while separately preserving
+both actual acquisition and archived build clocks. The actual September 23 pair
+has identical business values/flags for all 4,992 keys; only those two clocks
+differ. The v1 partial output and its overstrict held evidence remain historical.
+Identical captures
 retain every actual acquisition and use the earliest real capture for one output;
 conflicting atoms have no implicit priority and are held. Package creation time,
 promoted flags and unavailable accepted-child/provider clocks are not acceptance.

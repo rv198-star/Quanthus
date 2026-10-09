@@ -132,13 +132,19 @@ def test_unrepresentable_scalar_holds_only_its_family_without_exception_value():
 
 def test_revisions_keep_true_acquisition_and_hold_conflicting_values():
     raw, _, _ = september_case()
-    later = {**raw, "acquired_at": "2026-09-03T20:30:00+08:00"}
+    raw["built_at"] = "2026-09-03T19:31:00+08:00"
+    later = {
+        **raw,
+        "acquired_at": "2026-09-03T20:30:00+08:00",
+        "built_at": "2026-09-03T20:31:00+08:00",
+    }
     source1 = ("sha256:" + "1" * 64, "r1", [raw])
     source2 = ("sha256:" + "2" * 64, "r2", [later])
     selected, held, proof = revision_union([source2, source1])
     assert len(selected) == 1 and not held and proof["identical_revision_overlap"] == 1
     assert selected[0]["raw"]["acquired_at"] == raw["acquired_at"]
     assert len(selected[0]["observations"]) == 2
+    assert len({p["archived_built_at"] for p in selected[0]["observations"]}) == 2
     assert revision_union([source1, source2]) == (selected, held, proof)
     changed = {**later, "amount": 123.25}
     selected, held, _ = revision_union([source1, (source2[0], source2[1], [changed])])

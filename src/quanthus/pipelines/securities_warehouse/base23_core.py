@@ -23,7 +23,8 @@ from .base22_status import MAX_DAY_ROWS, resolve_status_listing
 from .base23_sources import START, THROUGH
 from .disclosure_event import _stable_id
 
-CONTRACT_ID = "p10-base23-retained-core-observations-v1"
+CONTRACT_ID = "p10-base23-retained-core-observations-v2"
+CAPTURE_FIELDS = {"acquired_at", "built_at"}
 BAR = "daily_ohlcv_none_delta"
 STATUS = "daily_status_observation_delta"
 TABLES = {BAR: "dwd_security_bar", STATUS: "dwd_tradability_state"}
@@ -45,8 +46,9 @@ def revision_union(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     """Exact same observations may share output; contested atoms get no priority.
 
-    Only acquisition is excluded from equality: every actual capture remains an
-    archived observation. Identical observations select the earliest actual
+    Acquisition and archived build clocks are capture metadata. Every original
+    atom stays in local raw and both clocks stay in the proof. Identical
+    business observations select the earliest actual
     acquisition, never created_at/promoted/accepted-child inference. A differing
     atom holds that whole code/day in this family. Unknown acquisition fails.
     """
@@ -75,11 +77,17 @@ def revision_union(
                 "member_sha256": v["sha256"],
                 "revision": v["revision"],
                 "acquired_at": v["raw"]["acquired_at"],
+                "archived_built_at": v["raw"].get("built_at"),
             }
             for v in values
         ]
         if (
-            len({digest({k: v for k, v in x["raw"].items() if k != "acquired_at"}) for x in values})
+            len(
+                {
+                    digest({k: v for k, v in x["raw"].items() if k not in CAPTURE_FIELDS})
+                    for x in values
+                }
+            )
             != 1
         ):
             held.append(

@@ -72,3 +72,26 @@ def test_future_actual_capture_is_rejected():
     raw["acquired_at"] = "2026-10-10T00:00:00+08:00"
     with pytest.raises(RuntimeError, match="CAPTURE_AFTER_GOVERNANCE"):
         adapter.statement_observation(raw, source=source, resolver=resolver, observed_at=observed)
+
+
+def test_latest_selection_uses_actual_capture_not_package_order():
+    sources = [{"sha256": "sha256:" + c * 64, "rows": 1, "release": "release-" + c}
+               for c in "ab"]
+    a = dict(member_sha256=sources[0]["sha256"], ordinal=0,
+             identity_key=["000001", "balance_sheet", "p", "s", "v"],
+             original_raw_acquired_at="2026-09-01T00:00:00+08:00",
+             complete_envelope_fingerprint="sha256:" + "c" * 64)
+    b = dict(a, member_sha256=sources[1]["sha256"],
+             original_raw_acquired_at="2026-09-05T00:00:00+08:00")
+    selected = adapter.select_latest_changes([b, a], sources)
+    assert selected[0]["member_sha256"] == b["member_sha256"]
+    assert selected == adapter.select_latest_changes([a, b], list(reversed(sources)))
+    equal = dict(b, original_raw_acquired_at=a["original_raw_acquired_at"])
+    same = adapter.select_latest_changes([a, equal], sources)
+    assert same == adapter.select_latest_changes([equal, a], sources)
+    assert same[0]["release"] == next(s["release"] for s in sources
+                                     if s["sha256"] == same[0]["member_sha256"])
+    conflict = dict(b, original_raw_acquired_at=a["original_raw_acquired_at"],
+                    complete_envelope_fingerprint="sha256:" + "d" * 64)
+    with pytest.raises(RuntimeError, match="EQUAL_CLOCK_BODY_CONFLICT"):
+        adapter.select_latest_changes([a, conflict], sources)

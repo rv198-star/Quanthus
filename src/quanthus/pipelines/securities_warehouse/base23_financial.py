@@ -31,6 +31,45 @@ CONTRACT_ID = "p10-base23-retained-exact-statement-observations-v1"
 QUALIFICATION = "COMPLETE_RETAINED_STATEMENT_ENVELOPE_NOT_PROVIDER_PIT"
 
 
+def select_latest_changes(
+    changes: list[dict[str, Any]], sources: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Latest real capture within one unchanged provider/source identity.
+
+    The complete earlier captures stay archived. Different source identities
+    cannot overwrite one another; contradictory equal clocks require evidence.
+    """
+    if not changes or len(changes) > 32768:
+        raise BoundedError("SEPTEMBER_STATEMENT_CHANGE_SELECTION_BOUND")
+    by_sha = {s["sha256"]: s for s in sources}
+    if len(by_sha) != len(sources):
+        raise BoundedError("SEPTEMBER_STATEMENT_SOURCE_IDENTITIES_AMBIGUOUS")
+    grouped: dict[tuple[str, ...], dict[datetime, dict[str, Any]]] = {}
+    seen = set()
+    for item in changes:
+        sha, ordinal = item["member_sha256"], item["ordinal"]
+        if (
+            sha not in by_sha or type(ordinal) is not int
+            or not 0 <= ordinal < by_sha[sha]["rows"] or (sha, ordinal) in seen
+            or len(item["identity_key"]) != 5
+        ):
+            raise BoundedError("SEPTEMBER_STATEMENT_CHANGE_SOURCE_CENSUS_INVALID")
+        seen.add((sha, ordinal))
+        key = tuple(item["identity_key"])
+        clock = _clock(item["original_raw_acquired_at"])
+        clocks = grouped.setdefault(key, {})
+        if clock in clocks:
+            if (clocks[clock]["complete_envelope_fingerprint"]
+                    != item["complete_envelope_fingerprint"]):
+                raise BoundedError("SEPTEMBER_STATEMENT_EQUAL_CLOCK_BODY_CONFLICT")
+            chosen = min((clocks[clock], item), key=digest)
+        else:
+            chosen = item
+        clocks[clock] = dict(chosen)
+    selected = [grouped[key][max(grouped[key])] for key in sorted(grouped)]
+    return [dict(i, release=by_sha[i["member_sha256"]]["release"]) for i in selected]
+
+
 def statement_observation(
     raw: dict[str, Any], *, source: FinancialStatementSource,
     resolver: FinancialCompanyResolver, observed_at: datetime,
@@ -97,6 +136,7 @@ def statement_observation(
     proof = {
         "contract_id": CONTRACT_ID, "complete_envelope_fingerprint":
         declared["complete_envelope_fingerprint"],
+        "original_identity_key": declared["identity_key"],
         "source_member_sha256": source.source_sha256, "source_revision": source.source_revision,
         "raw_payload_sha256": raw["raw_payload_sha256"],
         "original_raw_acquired_at": raw["acquired_at"], "actual_acquisition_instant": acquired,

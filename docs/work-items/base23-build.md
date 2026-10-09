@@ -25,16 +25,45 @@ runtime old-path fallback is allowed. The new mirror must stand alone.
 ## Current recovery checkpoint
 
 Design status: approved continuation under the Owner's Base 2.3 instruction.
-Delivery gate: open; the complete successor image and whole acceptance are not yet produced.
+Engineering delivery: complete for the declared P10 governance purpose, with
+nineteen disclosed limitations. Owner final acceptance and consumer admission are separate.
 
 The current CN02 worktree is `/root/Quanthus/.worktrees/base22-standalone`, branch
 `codex/base22-standalone`. Recover from
-`artifacts/base23-cn01-recovery-20261009T051245Z-7e719b3/current-recovery-checkpoint.json`
-and its single current gap ledger. Older source-preparation observations below are
+`artifacts/base23-cn01-recovery-20261009T051245Z-7e719b3/complete-materialization-result-safe.json`
+and the final handoff at
+`/srv/agentdock/AgentDock/base22-review-afe2526/base23-final-20261009T162931Z-40b7bbd/handoff.md`.
+The older mutable checkpoint's top-level seven-table/READY-false labels are stale;
+its final whole-acceptance receipt and immutable handoff govern the finished build.
+Older source-preparation observations below are
 historical; September 24/28/29/30 and a complete retained 90-key venue calendar have
 since been recovered. All 21 supported daily sessions now have scoped daily bars,
 status, valuation and index outputs. BSE authority and complete listing coverage
 remain disclosed limitations, not inferred from the 90 calendar keys.
+
+The physical image is
+`/srv/quanthus-base22-data/delivery/base23-20260930-20261009T105406Z-40b7bbd/image`:
+exactly 33 tables, 459,940,348 rows and 86,434 Parquet files. Manifest SHA256 is
+`64670948c8b3bdfaf43b60ac509810eb7c07411f9930969f35b50c60a6cff880`, content digest
+`d044884326cd42904c998d5815a1ffef965fa792c2aedd8cbd125e69364660bd`.
+Primary and two whole new-process, source/network-denied relocations passed with
+the same semantic scan identity. Missing-file and byte-corruption faults failed
+closed only in disposable copies. Do not reinterpret the historical scoped READY
+false receipts below as current whole-image failure.
+
+The Owner's October 10 continuation prioritizes low-cost repairs and defers medium/
+high-cost source recovery. `base23_calendar_authority.py` qualifies only business
+date flags from pinned complete SSE/SZSE/BSE notices; it does not recover original
+acquisition, listing completeness, session hours or consumer acceptance.
+`base23_dividend_units.py` adds only explicit standalone per-ten plans containing
+literal share units. Missing cash remains absent, unsupported tax/currency remains
+unavailable, and all new rows use actual governance observation rather than
+invented historical PIT. `base23_low_cost_audit.py` replays independent additive
+packages with exact files, atoms, partitions, global keys and parent references.
+These packages are separate from the sealed mirror. Original mirror bytes,
+nineteen disclosures and frozen consumer policy remain immutable. Read the newest
+`base23-low-cost-*` handoff/current disposition for actual supplement outcomes;
+engineering implementation alone is not a completed repair receipt.
 
 Financial statements and quarterly observations, exact holder counts, changed
 capital/holder literal frames, dated static industry and implemented literal

@@ -8,6 +8,7 @@ changes. Every real clock and original member is retained by the scope owner.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import date
 from typing import Any
@@ -28,11 +29,12 @@ FIELDS = {
 }
 
 
-def statement_fingerprint(raw: dict[str, Any]) -> dict[str, Any]:
-    """Decode one bounded original body once and return value-free hashes.
+def declared_statement_identity(raw: dict[str, Any]) -> dict[str, Any]:
+    """Hash the declaration for an already hash-qualified baseline member.
 
-    Equality is usable only against separately qualified native raw provenance.
-    No native fact is rewritten or claimed accepted by this function.
+    This function does not verify compressed bytes. The caller must bind the
+    exact complete member to its prior raw qualification before baseline reuse.
+    Incoming members still require ``statement_fingerprint`` below.
     """
     if set(raw) != FIELDS:
         raise BoundedError("STATEMENT_RECONFIRMATION_EXACT_SCHEMA_REQUIRED")
@@ -57,10 +59,16 @@ def statement_fingerprint(raw: dict[str, Any]) -> dict[str, Any]:
         or type(raw["period_count"]) is not int or raw["period_count"] < 0
     ):
         raise BoundedError("STATEMENT_RECONFIRMATION_PERIOD_CENSUS_INVALID")
-    envelope = decode_financial_envelope(raw, max_raw_bytes=MAX_RAW_BYTES)
-    periods = list(iter_statement_reports(envelope))
-    if len(periods) != raw["period_count"]:
-        raise BoundedError("STATEMENT_RECONFIRMATION_PERIOD_CENSUS_INVALID")
+    if (
+        type(raw["raw_payload_bytes"]) is not int
+        or not 0 < raw["raw_payload_bytes"] <= MAX_RAW_BYTES
+        or not isinstance(raw["raw_payload_sha256"], str)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", raw["raw_payload_sha256"]) is None
+    ):
+        raise BoundedError("STATEMENT_RECONFIRMATION_RAW_DECLARATION_INVALID")
+    packed = raw["raw_payload_gzip"]
+    if not isinstance(packed, bytes) or not packed:
+        raise BoundedError("STATEMENT_RECONFIRMATION_COMPRESSION_REPRESENTATION_INVALID")
     metadata = {k: v for k, v in raw.items()
                 if k not in {"acquired_at", "market_date", "raw_payload_gzip"}}
     return {
@@ -69,11 +77,31 @@ def statement_fingerprint(raw: dict[str, Any]) -> dict[str, Any]:
                               ("stock_code", "statement_type", "provider_source",
                                "source", "source_revision")),
         "complete_envelope_fingerprint": digest(metadata),
-        "verified_raw_payload_sha256": raw["raw_payload_sha256"],
-        "report_body_sha256s": {period: digest(body) for period, body, _ in periods},
+        "declared_raw_payload_sha256": raw["raw_payload_sha256"],
+        "compressed_representation_sha256": "sha256:" + hashlib.sha256(packed).hexdigest(),
         "raw_acquired_at": raw["acquired_at"],
         "acquisition_instant": clock,
         "wrapper_capture_date": raw["market_date"],
         "provider_availability_asserted": False,
         "native_admission_asserted": False,
+        "complete_envelope_bytes_verified_here": False,
     }
+
+
+def statement_fingerprint(raw: dict[str, Any]) -> dict[str, Any]:
+    """Decode one incoming bounded body once and return value-free hashes.
+
+    Equality is usable only against separately qualified native raw provenance.
+    No native fact is rewritten or claimed accepted by this function.
+    """
+    proof = declared_statement_identity(raw)
+    envelope = decode_financial_envelope(raw, max_raw_bytes=MAX_RAW_BYTES)
+    periods = list(iter_statement_reports(envelope))
+    if len(periods) != raw["period_count"]:
+        raise BoundedError("STATEMENT_RECONFIRMATION_PERIOD_CENSUS_INVALID")
+    return dict(
+        proof,
+        verified_raw_payload_sha256=raw["raw_payload_sha256"],
+        report_body_sha256s={period: digest(body) for period, body, _ in periods},
+        complete_envelope_bytes_verified_here=True,
+    )

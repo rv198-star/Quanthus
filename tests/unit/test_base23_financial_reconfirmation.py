@@ -4,11 +4,13 @@ import ast
 import gzip
 import hashlib
 import json
+from unittest.mock import patch
 
 import pytest
 
 from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError
 from quanthus.pipelines.securities_warehouse.base23_financial_reconfirmation import (
+    declared_statement_identity,
     statement_fingerprint,
 )
 from quanthus.pipelines.securities_warehouse.financial_reporting import FinancialReportingBuildError
@@ -40,6 +42,7 @@ def test_capture_only_reconfirmation_keeps_clocks_and_precision():
     after["raw_payload_gzip"] = repr(gzip.compress(body, mtime=2)).encode()
     a, b = statement_fingerprint(before), statement_fingerprint(after)
     assert a["complete_envelope_fingerprint"] == b["complete_envelope_fingerprint"]
+    assert a["compressed_representation_sha256"] != b["compressed_representation_sha256"]
     assert a["report_body_sha256s"] == b["report_body_sha256s"]
     assert a["acquisition_instant"].microsecond == 123456
     assert a["raw_acquired_at"] != b["raw_acquired_at"]
@@ -60,6 +63,18 @@ def test_business_or_source_metadata_changes_are_not_ignored(field, value):
 def test_precision_change_changes_body_identity():
     a, b = statement_fingerprint(fixture()), statement_fingerprint(fixture("1.00000000000"))
     assert a["report_body_sha256s"] != b["report_body_sha256s"]
+
+
+def test_baseline_metadata_reuse_is_not_an_incoming_raw_validation():
+    raw = fixture()
+    with patch("quanthus.pipelines.securities_warehouse.base23_financial_reconfirmation."
+               "decode_financial_envelope", side_effect=AssertionError("redundant decode")):
+        declared = declared_statement_identity(raw)
+    checked = statement_fingerprint(raw)
+    assert declared["complete_envelope_fingerprint"] == checked["complete_envelope_fingerprint"]
+    assert not declared["complete_envelope_bytes_verified_here"]
+    assert checked["complete_envelope_bytes_verified_here"]
+    assert not declared["native_admission_asserted"]
 
 
 def test_corrupt_bytes_cannot_reuse_declared_body_hash():

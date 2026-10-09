@@ -67,6 +67,32 @@ PASS is not row/source/33-domain qualification and never creates a candidate REA
 
 ## Storage and retirement
 
+## Retained core domain continuation
+
+`base23_core.py` and `base23_core_audit.py` implement an explicitly bounded
+September intermediate for calendar, unadjusted daily bars and provider status.
+The August adapters are unchanged. A single immutable physical listing/venue and
+calendar dependency serves all available days. Actual retained calendar evidence
+currently contains 69 venue/date keys through September 23, with zero conflicting
+flags; 21 month-end keys are unavailable. Missing dates are recorded, not generated.
+This intermediate is not the complete 33-table product and has no candidate READY.
+
+Revision equality compares every raw atom except acquisition. Identical captures
+retain every actual acquisition and use the earliest real capture for one output;
+conflicting atoms have no implicit priority and are held. Package creation time,
+promoted flags and unavailable accepted-child/provider clocks are not acceptance.
+Unsupported values affect their own family, never silently round or flip status.
+Offline replay checks image-local original manifests/READY/member hashes, exact
+parent membership, all typed rows, physical partitions including empty files,
+global versions and same Shanghai day/venue for both bar and status. Any missing
+scope evidence, altered qualification or extra physical payload fails closed.
+
+Real outputs, new-process/copy/fault receipts and per-device capacity are recorded
+under `base23-core-domain-*`; only a finished receipt establishes a result.
+Use the newest current gap ledger rather than the source-only checkpoint's tests.
+
+## Storage and retirement
+
 Register one UTC snapshot for every actual mount/device, memory/inodes, existing
 failed artifacts, new writes, scratch and independent copy. Do not count ext4
 reflink savings or confuse logical image size with peak usage. Source-only

@@ -34,9 +34,10 @@ def fixture():
 
 
 def mirror(authority):
-    venues = [{"venue_id": x, "exchange_code": x} for x in a._ISSUERS]
+    venues = [{"venue_id": venue, "mic_code": mic, "timezone": "Asia/Shanghai"}
+              for mic, venue in a._MIC_VENUES.items()]
     rows = [{"venue_id": r["exchange_code"], "trade_date": r["trade_date"],
-             "is_open": r["is_open"], "session_type": "day",
+             "is_open": r["is_open"], "session_type": "REGULAR_DAY",
              "knowledge_from": "retained-real-time", "open_at": None} for r in authority["rows"]]
     return rows, venues
 
@@ -46,6 +47,7 @@ def test_complete_three_venue_authority_and_all_versions_preserve_unknown_times(
     proof = a.derive_date_authority(config, docs)
     rows, venues = mirror(proof)
     rows.append(copy.deepcopy(rows[0]))  # A second retained knowledge version is checked too.
+    rows[-1]["session_type"] = "day"  # Explicit successor label, same date-only contract.
     before = copy.deepcopy(rows)
     result = a.compare_retained_calendar(proof, rows, venues)
     assert result["distinct_venue_dates"] == 183

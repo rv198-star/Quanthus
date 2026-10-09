@@ -28,6 +28,7 @@ _ISSUERS = {
     "BSE": ("www.bse.cn", "北京证券交易所", "北证公告〔2025〕58号"),
 }
 _HOLIDAYS = {"元旦", "春节", "清明节", "劳动节", "端午节", "中秋节", "国庆节"}
+_MIC_VENUES = {"XSHG": "SSE", "XSHE": "SZSE", "BJSE": "BSE"}
 
 
 class _NoticeText(HTMLParser):
@@ -140,9 +141,10 @@ def compare_retained_calendar(
     """Compare every retained knowledge version; validate exact business-date closure."""
     by_id = {}
     for row in venues:
-        if row["venue_id"] in by_id or row["exchange_code"] not in _ISSUERS:
+        if (row["venue_id"] in by_id or row.get("mic_code") not in _MIC_VENUES
+                or row.get("timezone") != "Asia/Shanghai"):
             raise BoundedError("CALENDAR_AUTHORITY_VENUE_IDENTITY_INVALID")
-        by_id[row["venue_id"]] = row["exchange_code"]
+        by_id[row["venue_id"]] = _MIC_VENUES[row["mic_code"]]
     if set(by_id.values()) != set(_ISSUERS) or len(by_id) != 3:
         raise BoundedError("CALENDAR_AUTHORITY_VENUE_IDENTITY_INVALID")
     expected = {(r["exchange_code"], r["trade_date"]): r["is_open"] for r in authority["rows"]}
@@ -154,7 +156,8 @@ def compare_retained_calendar(
         day = date.fromisoformat(str(row["trade_date"]))
         if not START <= day <= THROUGH:
             continue
-        if row.get("session_type") != "day" or row.get("venue_id") not in by_id:
+        if (row.get("session_type") not in {"REGULAR_DAY", "day"}
+                or row.get("venue_id") not in by_id):
             raise BoundedError("CALENDAR_AUTHORITY_REFERENCED_VENUE_OR_SESSION_INVALID")
         key = by_id[row["venue_id"]], str(day)
         if type(row.get("is_open")) is not bool or row["is_open"] != expected[key]:

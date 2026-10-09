@@ -157,7 +157,9 @@ def project_unit_scope(
     return result, summary
 
 
-def audit_low_cost_scope(root: Path, budget: Budget) -> dict[str, Any]:
+def audit_low_cost_scope(
+    root: Path, budget: Budget, *, require_ready: bool = True,
+) -> dict[str, Any]:
     import pyarrow.parquet as pq
 
     body = json.loads(_physical(root, "SCOPE.json", independent=True).read_bytes())
@@ -179,9 +181,10 @@ def audit_low_cost_scope(root: Path, budget: Budget) -> dict[str, Any]:
     for module, sha in closure["code_closure"].items():
         if Path(module).name != module or file_sha(code_dir / module) != sha:
             raise BoundedError("LOW_COST_CODE_CLOSURE_CHANGED")
-    if _tree(root) != {"SCOPE.json", "READY", *body["physical_members"]}:
+    markers = {"SCOPE.json", "READY"} if require_ready else {"SCOPE.json"}
+    if _tree(root) != {*markers, *body["physical_members"]}:
         raise BoundedError("LOW_COST_PHYSICAL_SET_CHANGED")
-    if (root / "READY").read_text().strip() != file_sha(root / "SCOPE.json"):
+    if require_ready and (root / "READY").read_text().strip() != file_sha(root / "SCOPE.json"):
         raise BoundedError("LOW_COST_READY_IDENTITY_CHANGED")
     for relative, item in body["physical_members"].items():
         path = _physical(root, relative, independent=True)

@@ -26,6 +26,34 @@ runtime old-path fallback is allowed. The new mirror must stand alone.
 
 ### October 10 necessary-repair continuation
 
+The next integration job is
+`artifacts/base23-repaired-integration-20261009T202009Z-fee65b7/`.
+`base23_repaired_image.py` explicitly binds both qualified action tables and their
+unchanged parent entities to image-local raw replay before the full native scan.
+The accepted native/schema evaluator remains byte-identical, so the existing
+action scope's dependency hashes remain valid. An evidence-only replay is never
+the 33-table acceptance. Medium/high-cost unavailable sources retain their
+purpose-specific restrictions; the continuation does not open supplier capture.
+
+The Owner declined further capacity on October 10. Before any whole-image write,
+freeze a two-device budget with one complete **unsealed job-owned TMP** at a time.
+Each relocation physically copies and hashes a member to a new independent inode,
+durably records restoration/ownership, then retires only that member of the
+successfully checked owned TMP. Two complete new-process source-denied scans remain
+mandatory; this is neither rename-based relocation nor a cache acceptance.
+Preserve original sources, sealed Base 2.2/2.3 and unexpected failed attempts.
+Only after both scans and restored disposable negative probes may the final
+image's manifest/READY be sealed. An interrupted or failed relocation retains its
+journal and all surviving bytes and does not claim completion.
+
+The finished financial history TMP may be considered for retirement only after
+fresh, complete byte-equivalence/restoration proof against the already retained
+failed copy and its verified consumption by accepted Base 2.2. Keep its contracts,
+qualification, all receipts and the failed copy; do not delete unique source or
+evidence bytes. A missing or conflicting recovery member blocks retirement.
+Current capacity and actual dispositions come from this job's receipts, not a
+claim that an earlier budget already fits.
+
 Continue the same CN02 worktree and branch. The next checkpoint is
 `artifacts/base23-necessary-repairs-20261009T190319Z-7186fda/`.
 `base23_action_merge.py` admits complete new action observations using bounded

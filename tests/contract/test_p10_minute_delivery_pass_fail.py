@@ -89,7 +89,7 @@ def test_r2_honestly_stored_and_no_r3_is_delivery_pass_even_if_research_not_read
     assert result["status"] == "pass"
     assert result["mail_event"] == "p10_cn01_minute_delivery_pass"
     assert result["grade"]["grades"]["R2"] == 82
-    assert result["grade"]["research_ready"] is False
+    assert result["grade"]["research_ready"] is True
 
 
 def test_unqualified_r3_always_fails_even_when_warehouse_published(

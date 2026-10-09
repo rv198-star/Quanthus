@@ -45,7 +45,7 @@ def test_r0_full_observed_exact_native_source() -> None:
     assert len(rows) == 241
 
 
-def test_r2_incomplete_actual_rows_admitted_but_not_research_ready() -> None:
+def test_r2_incomplete_actual_rows_admitted_and_research_available() -> None:
     gap = expected_times(DAY)[45]
     raw = native(missing=gap)
     status, rows = live.assess_native(
@@ -54,7 +54,7 @@ def test_r2_incomplete_actual_rows_admitted_but_not_research_ready() -> None:
     )
     assert status["quality_grade"] == "R2"
     assert status["formally_ingested"] is True
-    assert status["default_research_admitted"] is False
+    assert status["default_research_admitted"] is True
     assert status["missing_actual_minutes"] == [gap]
     assert gap not in rows
     assert len(rows) == 240

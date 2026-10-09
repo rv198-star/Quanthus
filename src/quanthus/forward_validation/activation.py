@@ -24,6 +24,7 @@ from quanthus.forward_validation.contracts import ForwardValidationContractError
 from quanthus.forward_validation.serialization import digest_value
 
 _RUNTIME_SCHEMA = "quanthus.p6-prospective-runtime.v1"
+_RUNTIME_R1_SCHEMA = "quanthus.p6-prospective-runtime-r1.v1"
 _MANDATE_SCHEMA = "quanthus.p6-owner-activation-mandate.v1"
 _ACTIVATION_SCHEMA = "quanthus.p6-activation-decision.v1"
 _ENTRY_DIGEST = "sha256:3c9356e49dbdd6356754b42cfd34af11949289121454a05bdbf0c0ff2aebaa18"
@@ -110,6 +111,12 @@ class P6ProspectiveRuntimeConfig:
     history_calendar_days: int
     minimum_feature_sessions: int
     candidate_history_sessions: int
+    daily_product_scope: str = "legacy-four-lane"
+    legacy_daily_root: Path | None = None
+    daily_core_first_date: date | None = None
+    legacy_bridge_market_date: date | None = None
+    legacy_bridge_package_id: str | None = None
+    legacy_bridge_manifest_sha256: str | None = None
 
 
 @dataclass(frozen=True)
@@ -174,10 +181,13 @@ class P6ActivationDecision:
 def load_prospective_runtime_config(path: Path, *, root: Path) -> P6ProspectiveRuntimeConfig:
     root = root.resolve()
     raw = _object(path, "P6 prospective runtime")
+    is_r1 = raw.get("schema_version") == _RUNTIME_R1_SCHEMA
     if (
-        raw.get("schema_version") != _RUNTIME_SCHEMA
+        (raw.get("schema_version") != _RUNTIME_SCHEMA and not is_r1)
         or raw.get("work_item") != "P6-ACTIVATE-001"
-        or raw.get("state") != "FROZEN_PRE_ACTIVATION_RUNTIME"
+        or raw.get("state") != (
+            "FROZEN_PRE_ACTIVATION_RUNTIME_R1" if is_r1 else "FROZEN_PRE_ACTIVATION_RUNTIME"
+        )
     ):
         fail("activation_runtime_drift", "prospective runtime identity differs")
     expected_bindings = {
@@ -244,17 +254,48 @@ def load_prospective_runtime_config(path: Path, *, root: Path) -> P6ProspectiveR
     base_root = Path(str(seed.get("base_root"))).resolve()
     correction_root = Path(str(seed.get("correction_root"))).resolve()
     env_name = str(daily.get("root_env"))
-    if env_name != "QUANTHUS_P6_DWD_DAILY_ROOT":
-        fail("activation_runtime_drift", "daily root environment differs")
+    legacy_daily_root: Path | None = None
+    core_first_date: date | None = None
+    legacy_bridge_date: date | None = None
+    bridge_id: str | None = None
+    bridge_sha: str | None = None
+    if is_r1:
+        if (
+            env_name != "QUANTHUS_P6_DWD_DAILY_CORE_ROOT"
+            or daily.get("default_root") != "/data/dwd-daily-core"
+            or daily.get("package_kind") != "cn01_daily_core_dwd_increment"
+            or daily.get("product_scope") != "daily-core-v1"
+            or daily.get("chain_rule") != "daily_core_bridge_to_exact_legacy_predecessor"
+            or daily.get("legacy_root_env") != "QUANTHUS_P6_DWD_DAILY_ROOT"
+            or daily.get("legacy_default_root") != "/data/dwd-daily"
+            or daily.get("daily_core_first_date") != "2026-09-24"
+            or daily.get("legacy_bridge_date") != "2026-09-23"
+            or daily.get("legacy_bridge_package_id")
+               != "dwd-daily-20260923-31d9d426a212-ac89bfd"
+            or daily.get("legacy_bridge_manifest_sha256")
+               != "sha256:233d046d7d2300d46572565921089d638c078548368cada3caccd500db6671ee"
+        ):
+            fail("activation_runtime_drift", "P6-R1 daily-core source/bridge contract differs")
+        core_first_date = date(2026, 9, 24)
+        legacy_bridge_date = date(2026, 9, 23)
+        bridge_id = str(daily["legacy_bridge_package_id"])
+        bridge_sha = str(daily["legacy_bridge_manifest_sha256"])
+        legacy_daily_root = Path(
+            os.environ.get("QUANTHUS_P6_DWD_DAILY_ROOT", "/data/dwd-daily")
+        ).resolve()
+    elif (
+        env_name != "QUANTHUS_P6_DWD_DAILY_ROOT"
+        or daily.get("package_kind") != "cn01_daily_dwd_domain_increment"
+        or daily.get("chain_rule") != "target_to_base_exact_prior_manifest_chain"
+    ):
+        fail("activation_runtime_drift", "legacy prospective daily contract differs")
     daily_root = Path(os.environ.get(env_name, str(daily.get("default_root")))).resolve()
     if (
-        daily.get("package_kind") != "cn01_daily_dwd_domain_increment"
-        or daily.get("chain_rule") != "target_to_base_exact_prior_manifest_chain"
-        or daily.get("successful_ready_package_implies_deferred_daily_artifacts_empty") is not True
+        daily.get("successful_ready_package_implies_deferred_daily_artifacts_empty") is not True
         or set(daily.get("required_target_tables", ()))
         != {"dwd_trading_calendar", "dwd_security_bar", "dwd_tradability_state"}
     ):
-        fail("activation_runtime_drift", "prospective daily contract differs")
+        fail("activation_runtime_drift", "prospective daily required tables differ")
     mapping = Path(str(reference.get("static_industry_mapping"))).resolve()
     mapping_sha = _digest(reference.get("static_industry_mapping_sha256"), "static industry sha")
     if (
@@ -316,6 +357,12 @@ def load_prospective_runtime_config(path: Path, *, root: Path) -> P6ProspectiveR
         history_calendar_days=int(view["history_calendar_days"]),
         minimum_feature_sessions=int(view["minimum_feature_sessions"]),
         candidate_history_sessions=int(view["candidate_history_sessions"]),
+        daily_product_scope="daily-core-v1" if is_r1 else "legacy-four-lane",
+        legacy_daily_root=legacy_daily_root,
+        daily_core_first_date=core_first_date,
+        legacy_bridge_market_date=legacy_bridge_date,
+        legacy_bridge_package_id=bridge_id,
+        legacy_bridge_manifest_sha256=bridge_sha,
     )
 
 

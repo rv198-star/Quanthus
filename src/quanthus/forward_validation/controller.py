@@ -211,15 +211,15 @@ def _mount_is_read_only(path: Path) -> bool:
 
 
 def _dwd_mounts_read_only(runtime: P6ProspectiveRuntimeConfig) -> bool:
-    return all(
-        _mount_is_read_only(path)
-        for path in (
-            runtime.historical_base_root,
-            runtime.correction_root,
-            runtime.daily_root,
-            runtime.static_industry_mapping,
-        )
-    )
+    required_mounts = [
+        runtime.historical_base_root,
+        runtime.correction_root,
+        runtime.daily_root,
+        runtime.static_industry_mapping,
+    ]
+    if runtime.legacy_daily_root is not None:
+        required_mounts.append(runtime.legacy_daily_root)
+    return all(_mount_is_read_only(path) for path in required_mounts)
 
 
 def _disabled_rehearsal_job(
@@ -291,13 +291,9 @@ def _rollback_receipt(
     code_revision: str,
     rehearsal_manifest_digest: str,
     observed_at: datetime,
+    runtime_sha256: str | None = None,
 ) -> tuple[dict[str, object], str]:
-    official_jobs = [
-        job
-        for job in store.list_jobs(P6_FORWARD_CYCLE_JOB, 100)
-        if isinstance(job.input_ref, dict)
-        and job.input_ref.get("mode") == "official_cycle"
-    ]
+    official_jobs = _official_jobs(store, runtime_sha256=runtime_sha256)
     if official_jobs:
         raise RuntimeError("p6_rollback_drill_found_pre_activation_official_job")
     semantic: dict[str, object] = {
@@ -390,13 +386,25 @@ def _publish_enabled_decision(
 def _visibility_from_sync_receipt(
     daily_root: Path,
     pointer: dict[str, Any],
+    *,
+    product_scope: str = "legacy-four-lane",
 ) -> dict[str, object]:
     market_date = str(pointer.get("market_date", ""))
     package_id = str(pointer.get("package_id", ""))
     receipt_path = daily_root / "receipts" / market_date / f"{package_id}.json"
     sync = _load(receipt_path, "p6_dwd_sync_receipt")
+    expected_kind = (
+        "oci_cn01_daily_core_dwd_sync"
+        if product_scope == "daily-core-v1" else "oci_cn01_dwd_daily_sync"
+    )
+    if product_scope not in {"daily-core-v1", "legacy-four-lane"}:
+        raise RuntimeError("p6_dwd_product_scope_unknown")
     if (
-        sync.get("kind") != "oci_cn01_dwd_daily_sync"
+        sync.get("kind") != expected_kind
+        or (product_scope == "daily-core-v1" and (
+            sync.get("schema_version") != 2
+            or sync.get("product_scope") != "daily-core-v1"
+        ))
         or sync.get("market_date") != market_date
         or sync.get("package_id") != package_id
         or sync.get("manifest_sha256") != pointer.get("manifest_sha256")
@@ -412,33 +420,42 @@ def _visibility_from_sync_receipt(
         "content_digest": str(pointer["content_digest"]),
         "ready_observed_at": synced_at.astimezone(timezone.utc).isoformat(),
         "consumer_visible_at": synced_at.astimezone(timezone.utc).isoformat(),
-        "source_node": "oci-cn01-dwd-sync",
+        "source_node": (
+            "oci-cn01-daily-core-sync" if product_scope == "daily-core-v1"
+            else "oci-cn01-dwd-sync"
+        ),
     }
     return {**semantic, "receipt_digest": digest_value(semantic)}
 
 
-def _official_jobs(store: PlatformStore) -> list[Any]:
+def _official_jobs(
+    store: PlatformStore, *, runtime_sha256: str | None = None
+) -> list[Any]:
     return [
         job
         for job in store.list_jobs(P6_FORWARD_CYCLE_JOB, 100)
         if isinstance(job.input_ref, dict)
         and job.input_ref.get("mode") == "official_cycle"
+        and (
+            runtime_sha256 is None
+            or job.input_ref.get("runtime_sha256") == runtime_sha256
+        )
     ]
 
 
-def _latest_official_success(store: PlatformStore):
+def _latest_official_success(store: PlatformStore, runtime_sha256: str | None = None):
     candidates = [
         job
-        for job in _official_jobs(store)
+        for job in _official_jobs(store, runtime_sha256=runtime_sha256)
         if job.state == "succeeded" and isinstance(job.result_ref, dict)
     ]
     return max(candidates, key=lambda item: item.completed_at or item.updated_at) if candidates else None
 
 
-def _first_official_success(store: PlatformStore):
+def _first_official_success(store: PlatformStore, runtime_sha256: str | None = None):
     candidates = [
         job
-        for job in _official_jobs(store)
+        for job in _official_jobs(store, runtime_sha256=runtime_sha256)
         if job.state == "succeeded" and isinstance(job.result_ref, dict)
     ]
     if not candidates:
@@ -501,12 +518,10 @@ def _first_official_reproduction_complete(job: Any, primary: Any) -> bool:
     return True
 
 
-def _official_active(store: PlatformStore) -> bool:
+def _official_active(store: PlatformStore, runtime_sha256: str | None = None) -> bool:
     return any(
-        isinstance(job.input_ref, dict)
-        and job.input_ref.get("mode") == "official_cycle"
-        and job.state in {"queued", "running"}
-        for job in store.list_jobs(P6_FORWARD_CYCLE_JOB, 100)
+        job.state in {"queued", "running"}
+        for job in _official_jobs(store, runtime_sha256=runtime_sha256)
     )
 
 
@@ -517,11 +532,30 @@ def _submit_current_official(
     activation_payload: dict[str, object],
     now: datetime,
 ):
-    if _official_active(store):
+    # An unresolved official failure forbids advancing to a later market date. In
+    # particular, never resubmit the old idempotency key with a fresh consumed_at.
+    failed = [
+        job for job in _official_jobs(store, runtime_sha256=runtime.config_sha256)
+        if job.state in {"failed", "canceled"}
+    ]
+    if failed:
+        return min(failed, key=lambda job: (str(job.input_ref.get("market_date")), job.created_at))
+    if _official_active(store, runtime.config_sha256):
         return None
-    pointer = _load(runtime.daily_root / "CURRENT.json", "p6_dwd_current")
+    pointer_name = (
+        "CURRENT_DAILY_CORE.json" if runtime.daily_product_scope == "daily-core-v1"
+        else "CURRENT.json"
+    )
+    pointer = _load(runtime.daily_root / pointer_name, "p6_dwd_current")
+    expected_kind = (
+        "cn01_daily_core_dwd_current"
+        if runtime.daily_product_scope == "daily-core-v1" else "cn01_daily_dwd_current"
+    )
     if (
-        pointer.get("kind") != "cn01_daily_dwd_current"
+        pointer.get("kind") != expected_kind
+        or (runtime.daily_product_scope == "daily-core-v1"
+            and (pointer.get("schema_version") != 2
+                 or pointer.get("product_scope") != "daily-core-v1"))
         or not isinstance(pointer.get("market_date"), str)
         or not isinstance(pointer.get("package_id"), str)
         or not isinstance(pointer.get("manifest_sha256"), str)
@@ -536,7 +570,7 @@ def _submit_current_official(
     ).date()
     if market_date <= activation_market_date:
         return None
-    previous = _latest_official_success(store)
+    previous = _latest_official_success(store, runtime.config_sha256)
     if previous is not None:
         previous_market_date = str(previous.input_ref.get("market_date"))
         if previous_market_date == market_date.isoformat():
@@ -553,7 +587,9 @@ def _submit_current_official(
     else:
         prior_run_id = None
         prior_manifest = None
-    visibility = _visibility_from_sync_receipt(runtime.daily_root, pointer)
+    visibility = _visibility_from_sync_receipt(
+        runtime.daily_root, pointer, product_scope=runtime.daily_product_scope
+    )
     value = OfficialCycleJobInput(
         cycle_id=f"p6-official-{market_date.isoformat()}",
         runtime_sha256=runtime.config_sha256,
@@ -594,14 +630,25 @@ def controller_tick(
     instant = now or datetime.now(timezone.utc)
     runtime = load_prospective_runtime_config(runtime_path, root=repository_root)
     mandate = load_owner_activation_mandate(mandate_path, runtime=runtime)
-    activation_root = p6_forward_run_root.resolve() / "activation"
+    # R1 has a fresh append-only activation namespace; the old September 2026
+    # decision and failed official Job receipts cannot become R1 evidence.
+    if runtime.daily_product_scope == "daily-core-v1":
+        previous_official = [
+            job for job in _official_jobs(store)
+            if job.input_ref.get("runtime_sha256") != runtime.config_sha256
+        ]
+        if any(job.state == "succeeded" for job in previous_official):
+            raise RuntimeError("p6_r1_predecessor_official_evidence_exists")
+    activation_root = p6_forward_run_root.resolve() / (
+        "activation-r1" if runtime.daily_product_scope == "daily-core-v1" else "activation"
+    )
     active = _activation_current(
         activation_root,
         runtime=runtime,
         mandate_digest=mandate.mandate_digest,
     )
     if active is not None and active[0].get("deployment_revision") != code_revision:
-        if _official_jobs(store):
+        if _official_jobs(store, runtime_sha256=runtime.config_sha256):
             raise RuntimeError("p6_post_evidence_revision_drift")
         # Before the first official observation, a maintenance revision may rebind activation only
         # by replaying every predeclared gate. The prior decision remains immutable and CURRENT
@@ -631,6 +678,7 @@ def controller_tick(
             code_revision=code_revision,
             rehearsal_manifest_digest=rehearsal_manifest,
             observed_at=instant,
+            runtime_sha256=runtime.config_sha256,
         )
         active = _publish_enabled_decision(
             activation_root=activation_root,
@@ -642,7 +690,7 @@ def controller_tick(
             now=instant,
         )
     payload, decision_digest = active
-    first_official = _first_official_success(store)
+    first_official = _first_official_success(store, runtime.config_sha256)
     reproduction = None
     if first_official is not None:
         reproduction = _first_official_reproduction_job(store, first_official)
@@ -662,7 +710,7 @@ def controller_tick(
         now=instant,
     )
     return {
-        "state": "enabled",
+        "state": "blocked_unresolved_official_job" if job is not None and job.state in {"failed", "canceled"} else "enabled",
         "activation_decision_digest": decision_digest,
         "job_id": None if job is None else job.job_id,
         "job_state": None if job is None else job.state,

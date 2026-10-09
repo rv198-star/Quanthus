@@ -58,6 +58,7 @@ from quanthus.forward_validation.data_boundary import (
     make_access_ledger_entry,
     verify_prospective_dwd_release,
 )
+from quanthus.forward_validation.package_locator import resolve_daily_package
 from quanthus.forward_validation.paper_ledger import (
     PaperLedgerState,
     initial_paper_ledger,
@@ -453,16 +454,16 @@ def _activation(
 def _release(
     job_input: OfficialCycleJobInput, runtime: P6ProspectiveRuntimeConfig
 ) -> ProspectiveDwdRelease:
-    package = (
-        runtime.daily_root
-        / "packages"
-        / job_input.market_date.isoformat()
-        / job_input.package_id
-    ).resolve()
-    if runtime.daily_root.resolve() not in package.parents:
-        fail("path_escape", "daily DWD package")
+    package = resolve_daily_package(
+        runtime.daily_root,
+        job_input.market_date,
+        job_input.package_id,
+        manifest_sha256=job_input.manifest_sha256,
+    )
     receipt = load_visibility_receipt(job_input.visibility_receipt)
-    release = verify_prospective_dwd_release(package, receipt)
+    release = verify_prospective_dwd_release(
+        package, receipt, product_scope=runtime.daily_product_scope
+    )
     if (
         release.manifest_sha256 != job_input.manifest_sha256
         or release.content_digest != job_input.content_digest

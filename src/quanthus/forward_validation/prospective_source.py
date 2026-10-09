@@ -37,8 +37,12 @@ from quanthus.forward_validation.data_boundary import (
     ProspectiveDwdRelease,
     classify_release_admission,
 )
+from quanthus.forward_validation.package_locator import resolve_daily_package
 from quanthus.forward_validation.serialization import canonical_json_bytes, digest_value
 from quanthus.industry_mapping import StaticIndustryMapping, load_static_industry_mapping
+from quanthus.pipelines.securities_warehouse.daily_core_domain import (
+    verify_daily_domain_increment as verify_daily_core_increment,
+)
 from quanthus.pipelines.securities_warehouse.daily_domain import (
     DailyDomainBuildError,
     verify_daily_domain_increment,
@@ -346,11 +350,29 @@ def _verify_seed(config: P6ProspectiveRuntimeConfig) -> None:
         fail("prospective_seed_identity_drift", "Base/correction identity differs")
 
 
-def _chain_package(config: P6ProspectiveRuntimeConfig, market_date: date, package_id: str) -> Path:
-    root = (config.daily_root / "packages" / market_date.isoformat() / package_id).resolve()
-    if config.daily_root.resolve() not in root.parents:
-        fail("path_escape", "prospective daily package")
-    return root
+def _chain_package(
+    config: P6ProspectiveRuntimeConfig, market_date: date, package_id: str, manifest_sha256: str
+) -> Path:
+    source = config.daily_root
+    if config.daily_product_scope == "daily-core-v1":
+        if config.daily_core_first_date is None or config.legacy_daily_root is None:
+            fail("p6_daily_core_bridge_invalid", "missing exact cutover configuration")
+        if market_date < config.daily_core_first_date:
+            source = config.legacy_daily_root
+            if (
+                market_date == config.legacy_bridge_market_date
+                and (
+                    package_id != config.legacy_bridge_package_id
+                    or manifest_sha256 != config.legacy_bridge_manifest_sha256
+                )
+            ):
+                fail("p6_daily_core_bridge_drift", "cutover prior identity differs")
+    try:
+        return resolve_daily_package(
+            source, market_date, package_id, manifest_sha256=manifest_sha256
+        )
+    except ForwardValidationContractError as exc:
+        fail("prospective_daily_chain_gap", str(exc))
 
 
 def load_daily_chain(
@@ -359,16 +381,34 @@ def load_daily_chain(
     _verify_seed(config)
     if config.daily_root.resolve() not in target.package_root.resolve().parents:
         fail("path_escape", "target DWD package is outside prospective daily root")
+    if (
+        config.daily_product_scope == "daily-core-v1"
+        and (config.daily_core_first_date is None or target.market_date < config.daily_core_first_date)
+    ):
+        fail("p6_daily_core_scope_drift", "target must be a post-cutover core release")
     cursor = target.package_root.resolve()
     observed: list[P6DailyChainPackage] = []
     seen: set[tuple[date, str]] = set()
     while True:
-        try:
-            verified = verify_daily_domain_increment(cursor)
-        except DailyDomainBuildError as exc:
-            raise ForwardValidationContractError("dwd_release_verification_failed", str(exc)) from exc
         manifest_path = cursor / "manifest.json"
         raw = _object(manifest_path, "daily DWD manifest")
+        is_core_date = (
+            config.daily_product_scope == "daily-core-v1"
+            and config.daily_core_first_date is not None
+            and date.fromisoformat(str(raw.get("market_date"))) >= config.daily_core_first_date
+        )
+        if (
+            is_core_date and raw.get("kind") != "cn01_daily_core_dwd_increment"
+            or not is_core_date and raw.get("kind") != "cn01_daily_dwd_domain_increment"
+        ):
+            fail("p6_daily_chain_product_drift", "date/product does not match frozen cutover")
+        try:
+            verified = (
+                verify_daily_core_increment(cursor) if is_core_date
+                else verify_daily_domain_increment(cursor)
+            )
+        except DailyDomainBuildError as exc:
+            raise ForwardValidationContractError("dwd_release_verification_failed", str(exc)) from exc
         key = (verified.market_date, verified.package_id)
         if key in seen:
             fail("prospective_daily_chain_cycle", verified.package_id)
@@ -397,6 +437,16 @@ def load_daily_chain(
             prior_date = date.fromisoformat(str(prior.get("market_date")))
             if prior_date >= verified.market_date:
                 fail("prospective_daily_chain_invalid", "prior date does not precede package")
+            if (
+                config.daily_product_scope == "daily-core-v1"
+                and verified.market_date == config.daily_core_first_date
+                and (
+                    prior_date != config.legacy_bridge_market_date
+                    or prior_id != config.legacy_bridge_package_id
+                    or prior_sha != config.legacy_bridge_manifest_sha256
+                )
+            ):
+                fail("p6_daily_core_bridge_drift", "cutover first package does not bind approved legacy predecessor")
         observed.append(
             P6DailyChainPackage(
                 root=cursor,
@@ -415,7 +465,7 @@ def load_daily_chain(
                 fail("prospective_daily_chain_gap", "first daily package does not advance Base")
             break
         assert prior_date is not None and prior_id is not None and prior_sha is not None
-        next_root = _chain_package(config, prior_date, prior_id)
+        next_root = _chain_package(config, prior_date, prior_id, prior_sha)
         if not next_root.is_dir() or _sha(next_root / "manifest.json") != prior_sha:
             fail("prospective_daily_chain_gap", f"missing prior package {prior_id}")
         cursor = next_root
@@ -484,12 +534,13 @@ def _build_bundle(
     try:
         connection.execute("SET threads=1")
         connection.execute("SET preserve_insertion_order=false")
+        allowed_basis = "none" if config.daily_product_scope == "daily-core-v1" else "UNADJUSTED"
         connection.execute(
             f"""
             CREATE VIEW p6_listing AS SELECT * FROM read_parquet({_sql_path(listings)}) WHERE knowledge_to IS NULL;
             CREATE VIEW p6_security AS SELECT * FROM read_parquet({_sql_path(securities)}) WHERE knowledge_to IS NULL;
             CREATE VIEW p6_daily_bar AS SELECT * FROM read_parquet({_sql_paths(bar_paths)})
-              WHERE interval_size='1d' AND price_basis='UNADJUSTED';
+              WHERE interval_size='1d' AND price_basis='{allowed_basis}';
             CREATE VIEW p6_daily_state AS SELECT * FROM read_parquet({_sql_paths(state_paths)});
             CREATE VIEW p6_daily_calendar AS SELECT * FROM read_parquet({_sql_paths(calendar_paths)});
             """

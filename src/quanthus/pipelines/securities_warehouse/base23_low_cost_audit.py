@@ -7,6 +7,7 @@ The earlier sealed image and its consumer/knowledge qualifications are unchanged
 from __future__ import annotations
 
 import json
+import os
 import sys
 from collections import Counter
 from pathlib import Path
@@ -216,7 +217,8 @@ def audit_low_cost_scope(
         wanted = {i["path"].removeprefix("payload/") for t in TABLES for i in body["outputs"][t]}
         if _tree(root / "payload") != wanted:
             raise BoundedError("LOW_COST_EXACT_PARTITION_SET_CHANGED")
-        with GlobalScan(budget) as scan:
+        reader_roots = [root] if os.statvfs(root).f_flag & os.ST_RDONLY else None
+        with GlobalScan(budget, read_only_roots=reader_roots) as scan:
             for table in TABLES:
                 expected: dict[str, list[dict[str, Any]]] = {}
                 for row in output[table]:

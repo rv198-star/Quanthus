@@ -132,6 +132,33 @@ research qualification, actual source/warehouse evidence and reason.
 Never backdate prior email results, overwrite frozen source versions or
 automatically activate protected P3/P5/P6 consumers.
 
+## 2026-10-10 Owner final READY simplification — R2 is sufficient
+
+The accepted current P10 1m research **READY** minimum is R2, with **R3=0
+for every traded security**, genuine source observations, complete 4,992
+security-status population, and verified immutable manifest/SEALED, SHA,
+ODS source bytes and DWD original bars. Suspend-only securities are not
+part of the traded denominator. No global R0/R1 99% coverage requirement,
+board 98% requirement, or case-by-case R2 approval gate remains.
+
+This supersedes the earlier two-layer Data READY vs strict Research READY
+language in this ADR and the *research usage* paragraphs of the old
+R2-storage V2 scope. **Delivery PASS and Research READY now share one
+qualification verdict**. R2 is valid for ordinary gap-aware
+non-execution research without extra approval. R0/R1/R2 remain distinct
+quality labels, with true missing source timestamps and auction defects.
+R3 still never enters formal ODS/DWD. Strict-240 or protected P3/P5/P6
+consumers keep their own existing factual/source/execution contracts,
+not a new universal R2 signoff.
+
+Policy: `config/pipelines/p10-minute-r2-ready.v1.json` and the
+`p10-1m-r2-minimum-ready-v1` runtime. Prior frozen V1/V2 packages and
+manifests are immutable evidence of the old interpretation; evaluate
+their authentic grades with a versioned successor, never rewrite their
+historical seals, knowledge-time or quality defect records. New
+products embed the new policy ID, direct R2 research admission and READY
+from R3=0. T/T+1 notification PASS/FAIL and READY use the same gate.
+
 ## Consequences and change control
 
 - P10 is the sole source-qualification/warehouse engineering owner; business owners define admission sensitivity and accept products only under their own contracts (ADR 0015).

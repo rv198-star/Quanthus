@@ -1,9 +1,9 @@
 """Strict PASS/FAIL minute-delivery evidence for CN01 T and calendar-day T+1.
 
-A truthful minute *delivery* PASS means the immutable source-grade product
-contains all traded securities in R0/R1/R2, with R3=0, verified physical
-source/Parquet/manifest custody and a completed phase. It does NOT certify
-the stricter R0/R1-only Research READY consumer qualification.
+The single minute READY verdict requires immutable SHA/SEALED and actual
+R0/R1/R2 physical records with zero R3 among traded securities. R2 can be
+used by quality-aware research directly, without additional approval;
+strict minute-exact algorithms inspect missing bars/quality grade themselves.
 """
 
 from __future__ import annotations
@@ -16,6 +16,12 @@ from typing import Any
 
 from quanthus.pipelines.p10_deadline_notifications import _bounded_inflight
 from quanthus.pipelines.p10_minute_live_warehouse import verify
+from quanthus.pipelines.p10_minute_readiness import (
+    POLICY_ID as READY_POLICY_ID,
+)
+from quanthus.pipelines.p10_minute_readiness import (
+    ready_after_verified_storage,
+)
 from quanthus.pipelines.p10_operating_schedule import (
     alert_checkpoint,
 )
@@ -75,9 +81,17 @@ def verified_minute_grade(root: Path, target: date) -> dict[str, Any]:
     revised = manifest.get("date_slice_revised_securities", [])
     if not isinstance(revised, list):
         raise ValueError("minute_grade_revised_cohort_invalid")
+    effective_ready = ready_after_verified_storage(
+        grades,admitted_raw=verified["admitted_raw"]
+    )
     return {
         "grades": {g: grades.get(g, 0) for g in GRADE_KEYS},
-        "research_ready": verified["research_ready"],
+        # Existing sealed v1 products carry historical, stricter READY
+        # metadata; derive current policy from physically VERIFIED grades
+        # rather than altering the old immutable manifest.
+        "research_ready": effective_ready,
+        "sealed_legacy_research_ready": verified["research_ready"],
+        "readiness_policy_id": READY_POLICY_ID,
         "manifest_sha256": manifest_sha,
         "revised_count": len(revised),
         "package": str(package),
@@ -155,6 +169,8 @@ def assess_minute_delivery(
             reason = f"minute_verified_product_unavailable:{type(exc).__name__}:{str(exc)[:120]}"
     if grade is not None and not reason and grade["grades"]["R3"]:
         reason = f"R3_unqualified_securities:{grade['grades']['R3']}"
+    if grade is not None and not reason and not grade["research_ready"]:
+        reason = "minimum_R2_READINESS_not_met"
     passed = reason is None and grade is not None
     return {
         **base,

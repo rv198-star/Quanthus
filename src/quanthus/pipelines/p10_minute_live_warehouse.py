@@ -24,12 +24,19 @@ from pathlib import Path
 from typing import Any
 
 from quanthus.pipelines.loss_aware_m1_research import _board, _reference
+from quanthus.pipelines.p10_minute_readiness import (
+    POLICY_ID as READY_POLICY_ID,
+)
+from quanthus.pipelines.p10_minute_readiness import (
+    ready_after_verified_storage,
+)
 from quanthus.providers.p10_native_m1_shard_capture import target_date_records
 from quanthus.providers.tencent_m1_normalize import expected_times
 
 KIND = "p10_loss_aware_1m_live_source_grade_v1"
 PRODUCT = "intraday-1m-loss-aware-ongoing-v1"
 HISTORICAL_PRODUCT = "intraday-1m-loss-aware-historical-correction-v1"
+HISTORICAL_READY_PRODUCT = "intraday-1m-loss-aware-historical-correction-v2"
 SOURCE_KIND = "p10_tencent_native_m1_raw_capture_shard"
 SIX = re.compile(r"[0-9]{6}\Z")
 ONE = Decimal("1")
@@ -159,19 +166,16 @@ def assess_native(
         if not missing and state["auction_source_observed"]:
             grade,reason="R0","native_240_and_auction_observed_exact_daily"
         else:
-            # Genuine native rows, complete daily shares and close. Without
-            # 5m bucket proof this is NOT R1 and cannot be used by the default
-            # minute research consumer.
+            # Genuine native rows with consistent daily shares and close.
+            # R2 carries honest missing-minute/auction defects into research;
+            # callers requiring full 240 bars still filter the real grade.
             grade,reason="R2","native_incomplete_or_unwitnessed_restricted"
         state.update(
             quality_grade=grade,
             quality_reason=reason,
             formally_ingested=True,
-            default_research_admitted=(grade=="R0"),
-            allowed_consumer=(
-                "gap_aware_non_execution_development" if grade=="R0"
-                else "explicit_r2_review_only"
-            ),
+            default_research_admitted=True,
+            allowed_consumer="gap_aware_non_execution_development",
         )
         return state,bars
     except (ValueError,KeyError,TypeError,json.JSONDecodeError) as exc:
@@ -299,7 +303,10 @@ def build(
     if historical != (historical_forensic_root is not None):
         raise ValueError("historical corrections require an explicit independent baseline")
     if historical and (
-        product_root.name!="loss-aware-1m-historical-correction-v1"
+        product_root.name not in {
+            "loss-aware-1m-historical-correction-v1",
+            "loss-aware-1m-historical-correction-v2",
+        }
         or prior_capture_root is not None
     ):
         raise ValueError("historical V1/V2 products are immutable; use new correction product")
@@ -348,7 +355,7 @@ def build(
     # An immutable product may record partial source supply; missing securities
     # become explicit R3 rejection metadata, not fabricated minute rows.
     candidate_digest=_sha(_encode([
-        day,daily_sha,historic_baseline_sha,
+        day,daily_sha,historic_baseline_sha,READY_POLICY_ID,
         sorted((code, row.get("raw_sha256"))
             for code,(_,row) in index.items())
     ]))[7:23]
@@ -457,25 +464,33 @@ def build(
         finally:
             writer.close()
         traded=sum(grades.values())-grades["SUSPENDED"]
-        coverage=Decimal(grades["R0"]+grades["R1"])/Decimal(traded)
-        cohort=all(
-            Decimal(k["R0"]+k["R1"])/Decimal(
-                sum(k.values())-k["SUSPENDED"]
-            )>=Decimal("0.98")
-            for k in board.values()
-            if sum(k.values())>k["SUSPENDED"]
+        source_grade_coverage=(
+            Decimal(grades["R0"]+grades["R1"])/Decimal(traded)
         )
-        ready=coverage>=Decimal("0.99") and cohort
+        ready=ready_after_verified_storage(
+            grades,admitted_raw=acquired_count
+        )
+        readiness_coverage=Decimal(acquired_count)/Decimal(traded)
         summary={
             "kind":KIND,"market_date":day,
-            "product_scope":HISTORICAL_PRODUCT if historical else PRODUCT,
+            "product_scope":(
+                HISTORICAL_READY_PRODUCT if historical
+                and product_root.name=="loss-aware-1m-historical-correction-v2"
+                else HISTORICAL_PRODUCT if historical else PRODUCT
+            ),
             "historical_baseline_manifest_sha256":historic_baseline_sha,
+            "readiness_policy_id":READY_POLICY_ID,
             "grades":dict(grades),
             "rows_per_grade":dict(rows),"research_ready":bool(ready),
             "admitted_raw":acquired_count,"R3_formal_originals":0,
-            "source_grade_coverage":str(coverage),
+            "source_grade_coverage":str(source_grade_coverage),
+            "readiness_coverage":str(readiness_coverage),
+            "board_grades":{name:dict(group) for name,group in board.items()},
             "source_ods_manifest_sha256":daily_sha,
-            "quality_limits":"R2 storage only; default consumer requires R0/R1",
+            "quality_limits":(
+                "R2 genuine observed rows admitted to gap-aware research; "
+                "per-security missing minutes and auction quality remain visible"
+            ),
             "source_capture_root":str(capture_root),
             "prior_source_capture_root":(
                 str(prior_capture_root) if prior_capture_root is not None else None
@@ -511,10 +526,16 @@ def verify(root: Path) -> dict[str, Any]:
     manifest=json.loads(manifest_path.read_text())
     if (
         manifest.get("kind")!=KIND
-        or manifest.get("product_scope") not in {PRODUCT,HISTORICAL_PRODUCT}
+        or manifest.get("product_scope") not in {
+            PRODUCT,HISTORICAL_PRODUCT,HISTORICAL_READY_PRODUCT
+        }
         or (
             manifest.get("product_scope")==HISTORICAL_PRODUCT
             and root.parent.parent.parent.name!="loss-aware-1m-historical-correction-v1"
+        )
+        or (
+            manifest.get("product_scope")==HISTORICAL_READY_PRODUCT
+            and root.parent.parent.parent.name!="loss-aware-1m-historical-correction-v2"
         )
     ):
         raise ValueError("wrong product scope/lineage")
@@ -574,6 +595,18 @@ def verify(root: Path) -> dict[str, Any]:
             raise ValueError("R3 or suspended raw entered formal warehouse")
     if dict(grade_rows)!=manifest["rows_per_grade"]:
         raise ValueError("Parquet observed-source grade row count differs")
+    if manifest.get("readiness_policy_id")==READY_POLICY_ID:
+        ready=ready_after_verified_storage(
+            manifest["grades"],admitted_raw=manifest["admitted_raw"]
+        )
+        if manifest.get("research_ready") is not ready:
+            raise ValueError("sealed minute READY differs from R2 minimum-grade contract")
+        if any(
+            status["quality_grade"] in {"R0","R1","R2"}
+            and status["default_research_admitted"] is not True
+            for status in statuses.values()
+        ):
+            raise ValueError("new ready contract cannot exclude genuine R2 research")
     return {
         "market_date":manifest["market_date"],
         "product_scope":manifest["product_scope"],
@@ -583,6 +616,7 @@ def verify(root: Path) -> dict[str, Any]:
         "research_ready":manifest["research_ready"],
         "admitted_raw":manifest["admitted_raw"],
         "R3_rejected":manifest["grades"].get("R3",0),
+        "readiness_policy_id":manifest.get("readiness_policy_id"),
     }
 
 

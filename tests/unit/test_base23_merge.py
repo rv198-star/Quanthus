@@ -9,6 +9,7 @@ import pytest
 from quanthus.pipelines.securities_warehouse.base22 import digest
 from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError
 from quanthus.pipelines.securities_warehouse.base23_merge import (
+    SCOPES,
     close_sparse_batch,
     prior_closure,
     scope_outputs,
@@ -97,3 +98,17 @@ def test_repacked_unqualified_or_conflicting_scope_refused(damage):
     body["identity"] = digest({k: v for k, v in body.items() if k != "identity"})
     with pytest.raises(BoundedError):
         scope_outputs(body)
+
+
+def test_reviewed_industry_flat_union_includes_unchanged_exact_parent_set():
+    body = scope()
+    body["contract_id"] = "p10-base23-retained-dated-static-industry-v1"
+    del body["days"]
+    body["outputs"] = {t: {"path": f"payload/{t}/all/part-000000.parquet",
+                            "semantic_scan": {"rows": 3}} for t in SCOPES[body["contract_id"]]}
+    body["physical_members"] = {i["path"]: {"sha256": "sha256:"+"a"*64, "size_bytes": 100}
+                                for i in body["outputs"].values()}
+    body["identity"] = digest({k: v for k, v in body.items() if k != "identity"})
+    outputs = scope_outputs(body)
+    assert set(outputs) == SCOPES[body["contract_id"]]
+    assert {i["partition"] for v in outputs.values() for i in v} == {"all"}

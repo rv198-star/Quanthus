@@ -21,7 +21,10 @@ SCOPES = {
         {"dwd_security_bar", "dwd_tradability_state", "dwd_security_valuation", "dwd_index_bar"},
     "p10-base23-retained-daily-measures-v1": {"dwd_security_valuation", "dwd_index_bar"},
     "p10-base23-retained-cninfo-latest-capture-v1": {"dwd_disclosure", "dwd_disclosure_subject"},
-    "p10-base23-retained-dated-static-industry-v1": {"dwd_company_industry_membership"},
+    "p10-base23-retained-dated-static-industry-v1": {
+        "dwd_company_industry_membership", "dwd_industry_node", "dwd_industry_scheme",
+        "dwd_listed_company", "dwd_security", "dwd_security_identifier", "dwd_trading_venue",
+    },
     "p10-base23-retained-exact-statement-observations-v1":
         {"dwd_financial_report", "dwd_financial_fact", "dwd_financial_concept"},
     "p10-base23-retained-exact-quarterly-observations-v1":
@@ -59,18 +62,23 @@ def scope_outputs(body: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
                 path = item["path"]
                 member = physical.get(path, {})
                 rows = item.get("rows", item.get("semantic_scan", {}).get("rows"))
+                part = item.get("partition")
+                if contract == "p10-base23-retained-dated-static-industry-v1":
+                    if path != f"payload/{table}/all/part-000000.parquet":
+                        raise BoundedError("SEPTEMBER_MERGE_INDUSTRY_EXACT_FLAT_LAYOUT_CHANGED")
+                    part = "all"
                 if (not path.startswith("payload/"+table+"/") or path in seen
                     or any(p in {"", ".", ".."} for p in path.split("/"))
                     or not isinstance(rows, int) or isinstance(rows, bool) or rows <= 0
                     or not member.get("sha256") or member.get("size_bytes", 0) <= 0
                     or item.get("sha256", member["sha256"]) != member["sha256"]
                     or item.get("size_bytes", member["size_bytes"]) != member["size_bytes"]
-                    or not item.get("partition")):
+                    or not part):
                     raise BoundedError("SEPTEMBER_MERGE_UNDECLARED_SCOPE_MEMBER")
                 seen.add(path)
                 normalized.setdefault(table, []).append({
                     **item, "sha256": member["sha256"], "size_bytes": member["size_bytes"],
-                    "rows": rows,
+                    "rows": rows, "partition": part,
                 })
     if set(normalized) != SCOPES[contract]:
         raise BoundedError("SEPTEMBER_MERGE_EXACT_SCOPE_TABLE_SET_INVALID")

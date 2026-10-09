@@ -25,9 +25,33 @@ runtime old-path fallback is allowed. The new mirror must stand alone.
 ## Current recovery checkpoint
 
 Same worktree `/root/Quanthus/.worktrees/base22-standalone`, branch
-`codex/base22-standalone`. Read the newest `base23-source-preparation-*` local
-registration, source reports, current gap ledger and handoff. Never use an earlier
+`codex/base22-standalone`. Read the newest `base23-core-domain-*` and
+`base23-cn01-recovery-*` local registrations, source reports, current gap ledger
+and handoff. Never use an earlier
 assessment or READY as proof of present payload integrity or month-end completeness.
+
+The completed v2 three-table intermediate has scope identity
+`4c0d67f015397a5efad722bd8b09e0f35c5c8e3e72ba3b50550a5359216847ad`:
+69 calendar rows and 79,872 rows each for daily bars and tradability. Two independent
+physical copies passed full image-local replay in new processes, with matching
+acceptance identity
+`c7104654f628becebb90525608947ae5876ff062f206dd7541176f8895555da7`.
+Native Arrow/DuckDB source-denial probes and traced execution recorded zero old-source
+reads and zero network calls after the probes. Six disposable faults failed with
+their registered reason codes. The combined cold receipt is
+`7f3dd8841d66f5e85ec22d2d4c564cfdda1e52cc45fe1b5f6144946d5194c04b`.
+This qualifies the declared intermediate, not the complete 33-table Base 2.3.
+
+On October 9 the Owner confirmed September 24 through month-end archives on CN01
+and restored the temporary forwarded SSH agent. Trusted batch authentication now
+works for the previously authorized CN01 and Hermes read-only source queries.
+CN01 contains September 24, 28, 29 and 30 daily-core packages; an existing archive
+also contains October 8, which is excluded from September materialization. Hermes
+has retained raw core/event releases for these four dates and a September 25
+closed-day release. Freeze actual revision/member identities before copying or
+qualification. CN01 and Hermes revisions differ; that alone is neither loss nor
+corruption. The earlier local source gap remains historical evidence, not a claim
+that these dates are globally absent or require new provider collection.
 
 The October 4 audit has 77 exact September ODS READY locations: 18 core, 18 event,
 21 1m revisions, 18 5m and 2 weekly. These are package counts, not trading days or
@@ -42,7 +66,7 @@ hash, file-set and footer/schema checks: 2,241,056,978 bytes. This does not qual
 the rows or domains. Eighteen core packages represent 16 trading dates, a
 calendar-only September 19 package and two September 23 revisions.
 
-Current local inventory needs September 24, 28, 29 and 30 core/event sources.
+The October 8 local inventory needed September 24, 28, 29 and 30 core/event sources.
 September 16 DWD exists in both retained lanes, but its selected original core ODS
 release `hermes-market-daily-core-20260916-1317670Z-v2`, manifest SHA256
 `930b4a78062cc0473a60265ace46926509cb32c71f79c9d09d3c9b0f6c2b6861`,
@@ -125,8 +149,10 @@ Two complete independent new-process relocations, native source/network denial a
 missing/corrupt-file negative checks remain mandatory. No production action follows
 merely from a successful candidate.
 
-The current preparation checks ran 200 focused tests and all 5,300 repository
-tests successfully, with 21 skips and 48 warnings in the full run. Focused lint and
-types passed; repository lint retained its existing 216 failures. September domain
-projection, complete candidate construction, cold relocation and fault acceptance
-are not run and are not covered by those engineering results.
+The v2 core checks ran 275 focused tests and `make check PYTHON=.venv/bin/python`
+with 5,317 passed, 21 skipped and 48 warnings. Focused lint and types passed;
+repository lint retained its existing 216 failures. Python 3.12 was not run in this
+environment. The three-table projection, two independent relocations and scoped
+fault acceptance have their own finished real receipts above. The remaining
+domains and complete 33-table successor construction/acceptance remain unfinished;
+unit tests and the intermediate receipts do not establish their acceptance.

@@ -8,11 +8,13 @@ historical interval cannot be rewritten by a new observation.
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
-from .base22 import digest
-from .base22_bounded import BoundedError
+from .base22 import digest, file_sha
+from .base22_bounded import BoundedError, Budget, Member
 from .base22_financial import _clock
+from .base22_sources import _fingerprint
 
 SCOPES = {
     "p10-base23-retained-core-observations-v2":
@@ -132,4 +134,59 @@ def close_sparse_batch(
     for name in batch.schema.names:
         if name != "knowledge_to" and not result.column(name).equals(batch.column(name)):
             raise BoundedError("SEPTEMBER_MERGE_ORIGINAL_TYPED_ATOM_CHANGED")
+    return result
+
+
+def rewrite_knowledge_file(
+    member: Member, output: Path, *, schema: Any,
+    closures: list[tuple[int, datetime]], budget: Budget,
+) -> dict[str, Any]:
+    """Stream one exact affected file; no full-row index or numeric conversion."""
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]
+
+    positions = [p for p, _ in closures]
+    if (not positions or positions != sorted(set(positions))
+        or any(type(p) is not int or not 0 <= p < member.rows for p in positions)):
+        raise BoundedError("SEPTEMBER_MERGE_FILE_CLOSURE_CENSUS_INVALID")
+    before = member.verify()
+    pf = pq.ParquetFile(member.path)
+    if (pf.metadata.num_rows != member.rows
+        or not pf.schema_arrow.equals(schema, check_metadata=False)):
+        raise BoundedError("SEPTEMBER_MERGE_SOURCE_SCHEMA_OR_CENSUS_CHANGED")
+    output = budget.destination(output)
+    if output.exists():
+        raise BoundedError("SEPTEMBER_MERGE_OUTPUT_ALREADY_EXISTS")
+    budget.check(reserve=member.size_bytes)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    offset = consumed = 0
+    # Exclusive output, never an old file. A failed write remains unqualified TMP.
+    with output.open("xb") as stream, pq.ParquetWriter(
+        stream, schema, compression="zstd",
+    ) as writer:
+        for batch in pf.iter_batches(batch_size=budget.limits.batch_rows):
+            end = consumed
+            while end < len(closures) and closures[end][0] < offset+batch.num_rows:
+                end += 1
+            updated = close_sparse_batch(
+                batch, row_offset=offset, closures=closures[consumed:end],
+            )
+            budget.check(reserve=updated.nbytes*2)
+            writer.write_batch(updated, row_group_size=budget.limits.batch_rows)
+            offset += batch.num_rows
+            consumed = end
+    if (offset != member.rows or consumed != len(closures)
+        or _fingerprint(member.path) != before or file_sha(member.path) != member.sha256
+        or output.stat().st_nlink != 1 or pq.ParquetFile(output).metadata.num_rows != member.rows):
+        raise BoundedError("SEPTEMBER_MERGE_SOURCE_OR_TYPED_ROW_CENSUS_CHANGED")
+    budget.check()
+    result = {
+        "source_sha256": member.sha256, "source_rows": member.rows,
+        "rows": member.rows, "sha256": file_sha(output),
+        "size_bytes": output.stat().st_size, "allocated_bytes": output.stat().st_blocks*512,
+        "closed_open_knowledge_versions": len(closures),
+        "row_position_clock_closure_sha256": digest(closures),
+        "changed_fields": ["knowledge_to"], "all_other_typed_atoms": "UNCHANGED",
+        "source_file_unchanged": True, "READY": False,
+    }
+    result["identity"] = digest(result)
     return result

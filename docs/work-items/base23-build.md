@@ -24,6 +24,53 @@ runtime old-path fallback is allowed. The new mirror must stand alone.
 
 ## Current recovery checkpoint
 
+Design status: approved continuation under the Owner's Base 2.3 instruction.
+Delivery gate: open; the complete successor image and whole acceptance are not yet produced.
+
+The current CN02 worktree is `/root/Quanthus/.worktrees/base22-standalone`, branch
+`codex/base22-standalone`. Recover from
+`artifacts/base23-cn01-recovery-20261009T051245Z-7e719b3/current-recovery-checkpoint.json`
+and its single current gap ledger. Older source-preparation observations below are
+historical; September 24/28/29/30 and a complete retained 90-key venue calendar have
+since been recovered. All 21 supported daily sessions now have scoped daily bars,
+status, valuation and index outputs. BSE authority and complete listing coverage
+remain disclosed limitations, not inferred from the 90 calendar keys.
+
+Financial statements and quarterly observations, exact holder counts, changed
+capital/holder literal frames, dated static industry and implemented literal
+dividends have local complete source replay receipts. These are reusable inputs,
+not a complete image or consumer acceptance. Original unavailable clocks, incomplete
+frames, unsupported action/summary units and missing source revisions stay unavailable.
+The current source-bound merge assessment identifies 535 historical files, totaling
+1,083,617,535 compressed bytes, whose open knowledge intervals need exact closure.
+Every matched current version has the same provider namespace, with no closed-interval
+overlap or nonnew successor. The assessment is not a write/capacity or whole-image PASS.
+
+`base23_merge.py` performs sparse Arrow closure: only registered `knowledge_to`
+positions change; Decimal256, nulls, zeros, original timestamps and all other atoms
+stay unchanged. Do not route complete rows through a SQL decimal conversion. Reuse
+the entire already qualified static-industry union; do not append its unchanged
+identity parents as new observations. Incoming repeated calendar versions retain
+their actual knowledge windows so earlier daily children continue to have valid parents.
+
+The explicit successor `config/pipelines/base23-delivery.v1.json`,
+`base23_native_image.py` and `base23_native_keys.py` preserve the August producer,
+all eleven structural requirements, nullable holder component keys, the exact
+holder column and permanent frozen protections. The cutoff becomes September 30
+only in the successor. Source-qualified changed domains are merged in bounded
+files; unchanged historical files are copied independently. Whole physical scans,
+global keys/references, two complete independent source/network-denied relocations
+and disposable corruption/missing-file negatives remain required once the final
+image is assembled. Scoped receipts do not waive any of these requirements.
+
+Develop with focused regressions, then run the repository checks and whole acceptance
+once the domain/merge rules stabilize. Query historical dates only when the date
+field is part of the exact business key; reuse one Parquet binding and retire the
+successful per-table query connection. This avoids repeated metadata retention
+without changing the registered 2 GiB SQL / 4 GiB application RSS limits.
+
+### Earlier preparation checkpoint (historical)
+
 Same worktree `/root/Quanthus/.worktrees/base22-standalone`, branch
 `codex/base22-standalone`. Read the newest `base23-core-domain-*` and
 `base23-cn01-recovery-*` local registrations, source reports, current gap ledger

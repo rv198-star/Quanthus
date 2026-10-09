@@ -1,0 +1,60 @@
+{
+  "contract_id": "p10-base23-purpose-qualified-delivery-v1",
+  "purpose": "p10_governance_baseline_with_disclosed_coverage",
+  "business_through": "2026-09-30",
+  "business_timezone": "Asia/Shanghai",
+  "predecessor_contract": "p10-base22-purpose-qualified-delivery-v2",
+  "model_sha256": "sha256:7ccfbebbe8f06622363228cfa85abca23adb1b4ff8f5fff8c6c07cbc8d633dd7",
+  "extension_sha256": "sha256:b34a9b60fec803cbc8f14fda12694dbe2a4f28972f8a9784f9cf12bce1159cb1",
+  "required_structural_checks": [
+    "exact_physical_tables_partitions_files",
+    "all_file_hashes",
+    "physical_schema",
+    "global_keys_and_knowledge_versions",
+    "business_cutoff_and_original_times",
+    "calendar_date_and_venue",
+    "foreign_keys_and_table_source_closure",
+    "recomputed_typed_partition_summaries",
+    "registered_capacity",
+    "two_independent_source_denied_cold_runs",
+    "missing_and_corrupt_fail_closed"
+  ],
+  "schema_successors": {
+    "dwd_shareholder_count_observation": {
+      "additive_column": "average_holding_exact",
+      "arrow_type": "decimal256(41,13)",
+      "nullable": true,
+      "legacy_column_retained": "average_holding"
+    },
+    "dwd_shareholding_observation": {
+      "additional_nullable_business_key_fields": [
+        "share_nature",
+        "holding_percentage_unit"
+      ]
+    }
+  },
+  "governance_read_use": "governance_baseline",
+  "restricted_uses": [
+    "trading_entry",
+    "historical_pit",
+    "canonical_adjusted_price",
+    "cross_provider_exact_price",
+    "complete_holder_matrix",
+    "complete_market_coverage",
+    "original_revision_reproduction"
+  ],
+  "permanent_protections": {
+    "original_visibility_unavailable": 4173,
+    "tail_conflicts": "KEEP_OLD_THREE_KEYS_PENDING_AUTHORITY",
+    "consumer_admission": "NOT_GRANTED",
+    "source_truth_or_PIT_inference": false,
+    "frozen_policy_changes": false
+  },
+  "delivery_rule": "Qualified native and repaired entities may be delivered with image-local, evidence-bound limitations. A limitation blocks its affected uses and scope, never counts as repaired data, and does not by itself block unrelated qualified entities. Structural integrity remains mandatory.",
+  "readiness": {
+    "MATERIALIZED": "All selected physical entities exist; not yet independently accepted.",
+    "READY": "Structural build checks passed; candidate only.",
+    "ACCEPTANCE": "Separate complete cold receipts; Owner final acceptance and production switch remain separate."
+  },
+  "transition_rule": "Reuse exact independently verified Base 2.2 files; close only registered open knowledge intervals for qualified new observations. Preserve original atoms and closed intervals. Retain scope-specific unavailable source observations and all frozen consumer gates; no completeness is inferred from physical table count."
+}

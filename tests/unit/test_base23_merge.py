@@ -4,14 +4,21 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
-from quanthus.pipelines.securities_warehouse.base22 import digest
-from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError
+from quanthus.pipelines.securities_warehouse.base22 import digest, file_sha
+from quanthus.pipelines.securities_warehouse.base22_bounded import (
+    BoundedError,
+    Budget,
+    Limits,
+    Member,
+)
 from quanthus.pipelines.securities_warehouse.base23_merge import (
     SCOPES,
     close_sparse_batch,
     prior_closure,
+    rewrite_knowledge_file,
     scope_outputs,
 )
 
@@ -112,3 +119,39 @@ def test_reviewed_industry_flat_union_includes_unchanged_exact_parent_set():
     outputs = scope_outputs(body)
     assert set(outputs) == SCOPES[body["contract_id"]]
     assert {i["partition"] for v in outputs.values() for i in v} == {"all"}
+
+
+def test_real_parquet_sparse_rewrite_keeps_independent_source_and_precision(tmp_path):
+    source = tmp_path / "source.parquet"
+    original = table()
+    pq.write_table(original, source)
+    before = source.read_bytes()
+    member = Member(source, file_sha(source), source.stat().st_size, 3)
+    with Budget(tmp_path / "job", [source], Limits(
+        batch_rows=2, free_floor_bytes=1, allocated_bytes=16*1024**2, temp_bytes=8*1024**2,
+    )) as budget:
+        output = budget.root / "closed.parquet"
+        receipt = rewrite_knowledge_file(member, output, schema=original.schema,
+                                        closures=[(0, T1), (2, T1)], budget=budget)
+        expected = close_sparse_batch(original, row_offset=0, closures=[(0, T1), (2, T1)])
+        assert pq.ParquetFile(output).read().equals(expected)
+        assert source.read_bytes() == before
+        assert output.stat().st_ino != source.stat().st_ino
+        assert receipt["closed_open_knowledge_versions"] == 2
+        with pytest.raises(BoundedError, match="OUTPUT_ALREADY_EXISTS"):
+            rewrite_knowledge_file(member, output, schema=original.schema,
+                                   closures=[(0, T1)], budget=budget)
+
+
+def test_bad_sparse_target_rejected_before_file_creation(tmp_path):
+    source = tmp_path / "source.parquet"
+    pq.write_table(table(), source)
+    before = source.read_bytes()
+    member = Member(source, file_sha(source), source.stat().st_size, 3)
+    with Budget(tmp_path / "job", [source], Limits(free_floor_bytes=1)) as budget:
+        output = budget.root / "bad.parquet"
+        with pytest.raises(BoundedError, match="FILE_CLOSURE_CENSUS_INVALID"):
+            rewrite_knowledge_file(member, output, schema=table().schema,
+                                   closures=[(3, T1)], budget=budget)
+        assert not output.exists()
+        assert source.read_bytes() == before

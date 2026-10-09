@@ -1,8 +1,8 @@
 [Unit]
-Description=P10 minute T+1 prior-market-day source maturity at 10:30 CST
+Description=P10 minute T+1 calendar-day-after-market source maturity at 10:30 CST
 
 [Timer]
-OnCalendar=Mon..Fri *-*-* 10:30:00 Asia/Shanghai
+OnCalendar=*-*-* 10:30:00 Asia/Shanghai
 AccuracySec=1min
 Persistent=false
 Unit=quanthus-p10-minute@T_plus_1.service

@@ -77,6 +77,16 @@ def test_expected_start_and_email_checkpoints_in_china_time() -> None:
     )
 
 
+def test_calendar_day_tplus1_timer_units_include_saturday() -> None:
+    root = CONFIG_PATH.resolve().parents[2]
+    timer=(root / "ops/systemd/quanthus-p10-minute-Tplus1.timer").read_text()
+    alert=(root / "ops/systemd/quanthus-p10-alert-cn01-minute-Tplus1.timer").read_text()
+    assert "OnCalendar=*-*-* 10:30:00 Asia/Shanghai" in timer
+    assert "OnCalendar=*-*-* 11:50:00 Asia/Shanghai" in alert
+    assert "OnCalendar=*-*-* 12:10:00 Asia/Shanghai" in alert
+    assert "Mon..Fri" not in timer+alert
+
+
 def test_friday_minute_maturity_executes_on_saturday() -> None:
     calendar = _golden_week()
     target=date(2026,10,9)

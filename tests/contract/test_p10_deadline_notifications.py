@@ -107,7 +107,7 @@ def test_tplus1_probe_without_terminal_quality_disposition_is_failure(
     assert record["mail_event"] == "p10_cn01_minute_tplus1_failed"
 
 
-def test_tplus1_source_unchanged_stop_is_successful_disposition(
+def test_tplus1_unchanged_source_does_not_hide_r3_quality_warning(
     tmp_path: Path,
 ) -> None:
     _minute(tmp_path, research_ready=False)
@@ -121,7 +121,25 @@ def test_tplus1_source_unchanged_stop_is_successful_disposition(
         tmp_path, "minute_Tplus1",
         at=datetime(2026, 10, 9, 11, 50, tzinfo=CST),
     )
-    assert record["status"] == "success"
+    assert record["status"] == "quality_warning"
+    assert record["mail_event"] == "p10_cn01_minute_quality_degraded"
+
+
+def test_tplus1_unchanged_source_is_silent_only_for_ready_product(
+    tmp_path: Path,
+) -> None:
+    _minute(tmp_path, research_ready=True)
+    ops=tmp_path/"ops"
+    ops.mkdir()
+    (ops/"2026-10-08-T_plus_1.json").write_text(json.dumps({
+        "terminal_disposition":"source_unchanged_stopped",
+        "inflight_operation":None,
+    }))
+    record=_run(
+        tmp_path,"minute_Tplus1",
+        at=datetime(2026,10,9,11,50,tzinfo=CST),
+    )
+    assert record["status"]=="success"
     assert record["mail_event"] is None
 
 

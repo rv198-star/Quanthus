@@ -363,16 +363,28 @@ def synthetic_scope(root):
     return body
 
 
-def test_complete_retained_scope_offline_replay_and_fully_rewrapped_empty_fault(tmp_path):
+def test_complete_retained_scope_offline_replay_and_fully_rewrapped_empty_fault(tmp_path, monkeypatch):
+    import os
     import shutil
+    from types import SimpleNamespace
 
     root = tmp_path / "scope"
+    copy = tmp_path / "disposable"
+    real_statvfs = os.statvfs
+    # Synthetic semantic test only. Real acceptance uses readonly kernel mounts
+    # in new mount/network namespaces and native source-denial trace evidence.
+    monkeypatch.setattr(
+        os,
+        "statvfs",
+        lambda path: SimpleNamespace(f_flag=os.ST_RDONLY)
+        if Path(path) in {root, copy}
+        else real_statvfs(path),
+    )
     body = synthetic_scope(root)
     with Budget(tmp_path / "audit", [root], Limits(free_floor_bytes=1)) as budget:
         receipt = audit_retained_scope(root, budget)
     assert receipt["original_raw_core_recovered"] is False
     assert len(receipt["summaries"]) == 4
-    copy = tmp_path / "disposable"
     shutil.copytree(root, copy, copy_function=shutil.copyfile)
     rel = "payload/dwd_tradability_state/observation_start_month=2026-10/empty.parquet"
     path = copy / rel

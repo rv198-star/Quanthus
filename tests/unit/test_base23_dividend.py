@@ -109,3 +109,22 @@ def test_latest_true_capture_and_equal_clock_conflict():
     after["acquired_at"] = before["acquired_at"]
     with pytest.raises(BoundedError, match="EQUAL_CAPTURE_BODY_CONFLICT"):
         latest_literal_captures([(before, bind(before)), (after, bind(after))])
+
+
+@pytest.mark.parametrize("conflict", [False, True])
+def test_repeated_event_blocks_are_deduplicated_or_all_held(conflict):
+    row = raw()
+    block = row["content"].split("\n【增发】")[0].removeprefix("【分红】\n")
+    if conflict:
+        block = block.replace("4.123456789", "2.5")
+    row["content"] = row["content"].replace("【增发】", block+"\n【增发】")
+    row["content_sha256"] = "sha256:"+hashlib.sha256(row["content"].encode()).hexdigest()
+    rows, proof = project(row)
+    assert len(proof["blocks"]) == 2
+    if conflict:
+        assert not any(rows.values())
+        assert proof["conflicting_event_keys"] == 1
+        assert proof["held_typed_records"][0]["reason"].startswith("SAME_LITERAL_EVENT_CONFLICT")
+    else:
+        assert len(rows["dwd_corporate_action"]) == 1
+        assert proof["identical_repeated_event_blocks"] == 1

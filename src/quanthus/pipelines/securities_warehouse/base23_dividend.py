@@ -249,6 +249,9 @@ def dividend_observation(
     records, evidence = parse_september_dividend_content(raw)
     output: dict[str, list[dict[str, Any]]] = {t: [] for t in TABLES}
     holds: list[dict[str, Any]] = []
+    events: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    conflicts: set[str] = set()
+    identical_repeats = 0
     for record in records:
         if record["ex_date"] > captured.astimezone(ZoneInfo("Asia/Shanghai")).date():
             holds.append({"parsed_record_sha256": digest(record),
@@ -267,12 +270,27 @@ def dividend_observation(
             revision=revision, parent=parent, vocabulary=vocabulary, schemas=schemas,
             observed_at=observed,
         )
-        for table, rows in projected.items():
+        key = projected["dwd_corporate_action"][0]["corporate_action_id"]
+        if key in events:
+            if events[key] == projected:
+                identical_repeats += 1
+            else:
+                conflicts.add(key)
+                holds.append({"event_key_sha256": digest(key),
+                              "reason": "SAME_LITERAL_EVENT_CONFLICT_NO_SOURCE_PRIORITY"})
+        else:
+            events[key] = projected
+    for key in sorted(events):
+        if key in conflicts:
+            continue
+        for table, rows in events[key].items():
             output[table].extend(rows)
     evidence.update({
         "source_member_sha256": source_sha256, "source_revision": revision,
         "original_raw_acquired_at": raw["acquired_at"], "governance_observed_at": observed,
         "held_typed_records": holds, "typed_rows": {t: len(r) for t, r in output.items()},
+        "identical_repeated_event_blocks": identical_repeats,
+        "conflicting_event_keys": len(conflicts),
         "typed_rows_sha256": digest(output), "provider_PIT_qualified": False,
         "other_F10_sections_admitted": False, "native_history_changed": False,
         "publication_time_inferred": False, "READY": False,

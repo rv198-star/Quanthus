@@ -35,6 +35,13 @@ def audit_industry_scope(root: Path, budget: Budget) -> dict[str, Any]:
         raise BoundedError("SEPTEMBER_INDUSTRY_SCOPE_INVALID")
     if _tree(root) != {"SCOPE.json", *body["physical_members"]}:
         raise BoundedError("SEPTEMBER_INDUSTRY_EXACT_PHYSICAL_FILES_CHANGED")
+    expected_payload = {f"{t}/all/part-000000.parquet" for t in TABLES}
+    if (
+        _tree(root / "payload") != expected_payload
+        or any(i["path"] != "payload/" + t + "/all/part-000000.parquet"
+               for t, i in body["outputs"].items())
+    ):
+        raise BoundedError("SEPTEMBER_INDUSTRY_EXACT_PHYSICAL_TABLE_PARTITION_SET_CHANGED")
     for rel, item in body["physical_members"].items():
         p = _physical(root, rel, independent=True)
         if p.stat().st_size != item["size_bytes"] or file_sha(p) != item["sha256"]:

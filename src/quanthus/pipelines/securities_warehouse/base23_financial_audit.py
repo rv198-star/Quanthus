@@ -43,6 +43,14 @@ def audit_financial_scope(root: Path, budget: Budget) -> dict[str, Any]:
         raise BoundedError("SEPTEMBER_STATEMENT_SCOPE_UNQUALIFIED")
     if _tree(root) != {"SCOPE.json", *body["physical_members"]}:
         raise BoundedError("SEPTEMBER_STATEMENT_PHYSICAL_FILE_SET_CHANGED")
+    expected_payload = {i["path"].removeprefix("payload/")
+                        for t in TABLES for i in body["outputs"][t]}
+    if (
+        _tree(root / "payload") != expected_payload
+        or any(i["path"] != f"payload/{t}/{i['partition']}/part-{i['number']:06d}.parquet"
+               for t in TABLES for i in body["outputs"][t])
+    ):
+        raise BoundedError("SEPTEMBER_STATEMENT_PHYSICAL_TABLE_PARTITION_SET_CHANGED")
     for rel, item in body["physical_members"].items():
         p = _physical(root, rel, independent=True)
         if p.stat().st_size != item["size_bytes"] or file_sha(p) != item["sha256"]:

@@ -3,10 +3,10 @@
 T: actual verified post-close market ODS -> <=50-source capture shards ->
 independent source-native quality/DWD; no source-perfect 240 dependency.
 
-T+1: read actual prior exchange trading day, sample 12-24 R2/R3 canaries,
+T+1: read yesterday's verified market T, sample 12-24 R2/R3 canaries,
 compare *dated observation* digests vs immutable T original source.
-If unchanged, finish without a second full-market poll. If changed, record
-an explicit correction candidate for a separately versioned qualification.
+If unchanged, finish without a second full-market poll. If genuinely changed,
+recapture the affected R2/R3 cohort and publish a versioned quality correction.
 Never replace old source, product or decision artifacts.
 
 Every atomic step passes the persistent 60m new-operation admission gate.
@@ -26,7 +26,7 @@ from typing import Any
 
 from quanthus.pipelines.contracts import verify_ods_release
 from quanthus.pipelines.p10_minute_operation_runtime import _atomic, run_one
-from quanthus.pipelines.p10_operating_schedule import SHANGHAI, next_trade_day, start_at
+from quanthus.pipelines.p10_operating_schedule import SHANGHAI, start_at
 from quanthus.providers.p10_native_m1_shard_capture import (
     target_date_records,
     verified_daily_universe,
@@ -58,22 +58,17 @@ def resolve_target(now: datetime, phase: str, rows: list[dict[str, str]]) -> dat
         raise ValueError("market schedule requires timezone")
     today = now.astimezone(SHANGHAI).date()
     cal = {date.fromisoformat(r["trade_date"]):str(r["is_open"]) for r in rows}
-    if cal.get(today) != "1":
-        return None
     if phase == "T":
-        return today
+        return today if cal.get(today) == "1" else None
     if phase != "T_plus_1":
         raise ValueError("invalid source capture phase")
+    # T+1 source maturity is the next CALENDAR day.  The target T must
+    # be an exchange trading day; the recovery/execution day need not be.
+    # Thus Friday's source is checked Saturday, not postponed to Monday.
     candidate = today - timedelta(days=1)
-    for _ in range(15):
-        if candidate not in cal:
-            raise ValueError("cannot infer T+1 from missing upstream trading calendar")
-        if cal[candidate] == "1":
-            if next_trade_day(candidate, rows) != today:
-                raise ValueError("T+1 calendar bound incorrect")
-            return candidate
-        candidate -= timedelta(days=1)
-    raise ValueError("no previous exchange trading day")
+    if candidate not in cal:
+        raise ValueError("T+1 preceding target day missing from verified calendar")
+    return candidate if cal[candidate] == "1" else None
 
 
 def find_market_ods(releases: Path, target: date) -> Path:
@@ -213,7 +208,7 @@ def _atomic_array(path: Path, rows: list[dict]) -> None:
 
 
 def _old_original_root(
-    target: date, capture: Path,
+    target: date, capture: Path, product: Path | None = None,
 ) -> tuple[Path, dict[str, dict[str, Any]]]:
     # Prefer existing original actual T capture; historic 10/08 uses
     # independently verified immutable original Tencent v1 custody.
@@ -226,11 +221,25 @@ def _old_original_root(
         )}
         return V1_FORENSIC/status["source_ods_path"]/"raw",grades
     stage=capture/target.isoformat()/"T-v1"
-    quality={}
-    for p in stage.glob("shard-*/receipts/*.json"):
-        code=p.stem
-        quality[code]={"stock_code":code,"quality_grade":"R2"}
-    return stage,quality
+    if product is None:
+        raise ValueError("T+1 requires the sealed T-grade product")
+    receipt_dir=product/"date-status"/target.isoformat()
+    receipts=sorted(receipt_dir.glob("*.json"),key=lambda x:x.stat().st_mtime_ns)
+    if not receipts:
+        raise ValueError("T+1 cannot find sealed T-grade receipt")
+    receipt=json.loads(receipts[0].read_text())
+    from quanthus.pipelines.p10_minute_live_warehouse import verify
+    package=product/"packages"/target.isoformat()/receipts[0].stem
+    exact=verify(package)
+    if (
+        exact["market_date"]!=target.isoformat()
+        or exact["manifest_sha256"]!=receipt.get("manifest_sha256")
+    ):
+        raise ValueError("T+1 original grade not bound to sealed manifest")
+    grades={row["stock_code"]:row for row in (
+        json.loads(line) for line in (package/"quality-status.jsonl").read_text().splitlines()
+    )}
+    return stage,grades
 
 
 def _balanced_canaries(
@@ -263,6 +272,58 @@ def _original_for(
     return None
 
 
+def _capture_revision_cohort(
+    *, target: date, grades: dict[str, dict[str, Any]],
+    canaries: list[str], stage: Path, verified: Path, journal: Path,
+    calendar_file: Path,
+) -> dict[str, Any]:
+    """After a true date-bound canary change, poll the affected cohort once.
+
+    Canary receipts are reused, not requested twice. Each bounded shard gets
+    its own durable operation id and per-operation timeout. Original T bytes
+    remain immutable; the warehouse will overlay genuinely changed sources.
+    """
+    remaining=sorted(
+        code for code,quality in grades.items()
+        if quality.get("quality_grade") in {"R2","R3"} and code not in canaries
+    )
+    selected=stage/"selected-revisions.json"
+    _atomic_array(selected,remaining)
+    attempted=0
+    failed=0
+    cutoff=False
+    for index in range(math.ceil(len(remaining)/50)):
+        ledger_path=journal/f"{target}-T_plus_1.json"
+        if ledger_path.is_file() and float(json.loads(
+            ledger_path.read_text()
+        ).get("cumulative_processing_seconds",0))>=3000:
+            cutoff=True
+            break  # Reserve final 600 seconds for independent publication.
+        result=_run(
+            journal=journal,calendar_file=calendar_file,
+            target=target,phase="T_plus_1",
+            operation_id=f"revision-{index:03}",
+            command=[
+                sys.executable,"-m","quanthus.providers.p10_native_m1_shard_capture",
+                "--market-date",target.isoformat(),
+                "--market-ods-release",str(verified),
+                "--output",str(stage/f"shard-{index+100:03}"),
+                "--shard-index",str(index),"--shard-size","50",
+                "--codes-file",str(selected),
+            ],
+        )
+        if result["status"]=="cutoff_reached":
+            cutoff=True
+            break
+        attempted+=1
+        if result["status"] not in {"success","already_recorded"}:
+            failed+=1
+    return {
+        "target_count":len(remaining),"shards_attempted":attempted,
+        "failed_shards":failed,"cutoff_reached":cutoff,
+    }
+
+
 def run_tplus1(
     *,
     target: date, rows: list[dict], journal: Path,
@@ -270,7 +331,7 @@ def run_tplus1(
 ) -> dict[str, Any]:
     verified=find_market_ods(releases,target)
     codes,_=verified_daily_universe(verified,target)
-    old_root,grades=_old_original_root(target,capture)
+    old_root,grades=_old_original_root(target,capture,product)
     canaries=_balanced_canaries(codes,grades)
     if len(canaries)<12 or len(canaries)>24:
         raise ValueError("T+1 source maturity canaries inadequate")
@@ -312,6 +373,7 @@ def run_tplus1(
         )[1]
         (changed if original_hash!=observed_hash else unchanged).append(code)
     correction = None
+    revision_cohort = None
     if result["status"] not in {"success", "already_recorded"} or unavailable:
         disposition="bounded_maturity_probe_incomplete"
     elif changed and target < date(2026, 10, 9):
@@ -319,6 +381,11 @@ def run_tplus1(
         # A newly observed source requires a separately versioned #502 review.
         disposition="historical_source_change_requires_separate_quality_authority"
     elif changed:
+        revision_cohort=_capture_revision_cohort(
+            target=target,grades=grades,canaries=canaries,
+            stage=stage,verified=verified,journal=journal,
+            calendar_file=calendar_file,
+        )
         correction = _run(
             journal=journal,
             calendar_file=calendar_file,
@@ -349,7 +416,8 @@ def run_tplus1(
         "T_plus_1_phase":result["status"],
         "changed_count":len(changed),"unchanged_count":len(unchanged),
         "unavailable_count":len(unavailable),"changed_codes":changed,
-        "source_revisions_only_not_grade_promotion":True,
+        "source_revisions_only_not_grade_promotion":correction is None,
+        "revision_cohort":revision_cohort,
         "correction":correction,
     }
 

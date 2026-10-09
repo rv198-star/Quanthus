@@ -30,12 +30,13 @@ def _days(start: date, end: date, open_dates: set[date]) -> list[dict]:
     return out
 
 
-def test_Tplus1_next_open_day_after_national_day_holidays() -> None:
+def test_Tplus1_requires_yesterday_market_T_not_next_open_session() -> None:
     rows=_days(
         date(2026,9,30), date(2026,10,8),
         {date(2026,9,30),date(2026,10,8)},
     )
-    assert resolve_target(datetime(2026,10,8,10,31,tzinfo=CST),"T_plus_1",rows)==date(2026,9,30)
+    assert resolve_target(datetime(2026,10,8,10,31,tzinfo=CST),"T_plus_1",rows) is None
+    assert resolve_target(datetime(2026,10,1,10,31,tzinfo=CST),"T_plus_1",rows)==date(2026,9,30)
     assert resolve_target(datetime(2026,10,8,20,31,tzinfo=CST),"T",rows)==date(2026,10,8)
 
 
@@ -53,6 +54,8 @@ def test_non_trading_day_skips_without_unqualified_source_use() -> None:
         {date(2026,10,8),date(2026,10,9)},
     )
     assert resolve_target(datetime(2026,10,10,20,30,tzinfo=CST),"T",rows) is None
+    assert resolve_target(datetime(2026,10,10,10,30,tzinfo=CST),"T_plus_1",rows)==date(2026,10,9)
+    assert resolve_target(datetime(2026,10,11,10,30,tzinfo=CST),"T_plus_1",rows) is None
 
 
 def test_missing_calendar_holiday_row_not_guessed() -> None:
@@ -60,7 +63,7 @@ def test_missing_calendar_holiday_row_not_guessed() -> None:
         date(2026,9,30),date(2026,10,8),
         {date(2026,9,30),date(2026,10,8)},
     )
-    rows=[r for r in rows if r["trade_date"]!="2026-10-03"]
+    rows=[r for r in rows if r["trade_date"]!="2026-10-07"]
     with pytest.raises(ValueError,match="missing"):
         resolve_target(datetime(2026,10,8,10,31,tzinfo=CST),"T_plus_1",rows)
 

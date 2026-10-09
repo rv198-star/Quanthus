@@ -101,7 +101,7 @@ EVENTS = {
     "p10_cn01_minute_tplus1_failed": {
         "node": "CN01",
         "stage": "P10 1m T+1",
-        "heading": "CN01 次交易日分钟修订未完成",
+        "heading": "CN01 下一自然日分钟修订未完成",
         "failure": True,
     },
     "p10_cn01_minute_quality_degraded": {
@@ -269,6 +269,13 @@ def _email_html(
         "unit": "systemd unit",
         "run_path": "运行路径",
         "error_code": "错误分类",
+        "executed_phase": "采集阶段",
+        "collection_status": "采集执行",
+        "publication_status": "分级数据发布",
+        "quality_distribution": "证券质量分布",
+        "quality_reasons": "R3主要原因",
+        "research_qualification": "最终研究资格",
+        "tplus1_state": "补数终态",
     }
     for key, label in context_labels.items():
         value = context.get(key)
@@ -317,6 +324,11 @@ def _send_resend(
         if "status_label" in EVENTS[event]
         else ("失败" if EVENTS[event]["failure"] else "成功")
     )
+    mail_context=context or {}
+    if event=="p10_cn01_minute_quality_degraded":
+        phase=str(mail_context.get("executed_phase") or mail_context.get("stage") or "1m")
+        qualification=str(mail_context.get("research_qualification") or "未验证")
+        outcome_text=f"{phase} {qualification} 质量降级"
     body = _canonical_bytes(
         {
             "from": sender,

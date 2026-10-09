@@ -8,8 +8,10 @@ When activated by a systemd timer, '--send' uses the existing Resend secrets.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import tempfile
+from collections import Counter
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -59,6 +61,62 @@ def _roots(node: str) -> tuple[Path, Path, Path]:
     minute=Path("/srv/quanthus/dwd-dws-v2/intraday/products/loss-aware-1m-ongoing-v1")
     phases=Path("/srv/quanthus/dwd-dws-v2/intraday/operations/p10-minute")
     return daily,minute,phases
+
+
+def minute_mail_snapshot(
+    *, target: date, minute_root: Path, phase_root: Path, phase: str,
+) -> dict[str, str]:
+    """Human-readable facts from an exact sealed grade, never raw HTTP success."""
+    context: dict[str,str] = {}
+    day=target.isoformat()
+    dated=minute_root/"date-status"/day
+    receipts=sorted(dated.glob("*.json"),key=lambda p:p.stat().st_mtime_ns,reverse=True)
+    if receipts:
+        receipt=json.loads(receipts[0].read_text())
+        package=minute_root/"packages"/day/receipts[0].stem
+        manifest=package/"manifest.json"
+        if (
+            manifest.is_file() and (package/"SEALED").is_file()
+            and receipt.get("market_date")==day
+            and receipt.get("manifest_sha256")==(
+                "sha256:"+hashlib.sha256(manifest.read_bytes()).hexdigest()
+            )
+            and (package/"SEALED").read_text().strip()==receipt["manifest_sha256"]
+        ):
+            grades=receipt.get("quality_grades",{})
+            context["quality_distribution"]=" / ".join(
+                f"{g}={int(grades.get(g,0))}"
+                for g in ("R0","R1","R2","R3","SUSPENDED")
+            )
+            context["research_qualification"]=(
+                "READY" if receipt.get("research_ready") is True else "NOT READY"
+            )
+            reasons=Counter()
+            for line in (package/"quality-status.jsonl").read_text().splitlines():
+                value=json.loads(line)
+                if value.get("quality_grade")=="R3":
+                    reasons[str(value.get("quality_reason"))]+=1
+            context["quality_reasons"]="; ".join(
+                f"{why}: {n}" for why,n in reasons.most_common(3)
+            ) or "无R3"
+            context["publication_status"]="已封存分级包；是否可研究以 READY 单独判断"
+    label="T" if phase=="minute_T" else "T_plus_1"
+    ledger=phase_root/f"{day}-{label}.json"
+    if ledger.is_file():
+        state=json.loads(ledger.read_text())
+        ops=state.get("operations",[])
+        captures=[op for op in ops if str(op.get("operation_id","")).startswith(
+            "capture-" if label=="T" else "revision-"
+        )]
+        context["collection_status"]=(
+            f"任务执行：{sum(op.get('outcome')=='success' for op in captures)}成功/"
+            f"{sum(op.get('outcome')=='failed' for op in captures)}失败"
+        )
+        context["tplus1_state"]=str(state.get("terminal_disposition","未形成最终修订"))
+        context["executed_phase"]=label
+    if "quality_distribution" not in context:
+        context["research_qualification"]="未发现经过验证的正式分钟质量包"
+    return context
 
 
 def _source_cn01_daily_digest(target: date) -> str:
@@ -126,6 +184,13 @@ def main() -> int:
     if source_error:
         result["source_recheck"] = source_error
     if args.send and result.get("mail_event"):
+        detail=(
+            minute_mail_snapshot(
+                target=target,minute_root=minute,
+                phase_root=phases,phase=args.phase,
+            )
+            if args.phase in {"minute_T","minute_Tplus1"} else {}
+        )
         delivery=send_daily_event(
             event=result["mail_event"],
             daily_root=daily,market_date=target,
@@ -138,7 +203,7 @@ def main() -> int:
                     or "P10_required_node_product_missing_or_unverified_at_checkpoint"
                 )
             ),
-            context={"node":args.node,"stage":args.phase},
+            context={"node":args.node,"stage":args.phase,**detail},
         )
         result["delivery"]=delivery
     else:

@@ -261,7 +261,7 @@ def main() -> int:
         if (
             not isinstance(subset, list)
             or len(subset) < 1
-            or len(subset) > 50
+            or len(subset) > len(codes)
             or len(set(subset)) != len(subset)
             or not set(subset) <= set(codes)
         ):

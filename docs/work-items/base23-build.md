@@ -24,6 +24,52 @@ runtime old-path fallback is allowed. The new mirror must stand alone.
 
 ## Current recovery checkpoint
 
+### October 10 necessary-repair continuation
+
+Continue the same CN02 worktree and branch. The next checkpoint is
+`artifacts/base23-necessary-repairs-20261009T190319Z-7186fda/`.
+`base23_action_merge.py` admits complete new action observations using bounded
+key/clock metadata. Different action IDs at the same security/effective coordinate
+are held without supplier arbitration, even if their action types differ. A new
+observation of the same qualified identity closes only registered open knowledge
+intervals and its entire old term set; monetary atoms are never converted through
+an SQL/JSON row representation. `base23_action_scope.py` copies healthy native
+files independently and retains local original inputs for offline admission and
+typed-difference replay, global keys/references and physical-directory checks.
+This is a two-table governance intermediate, not a complete replacement Base.
+
+The actual native union retains 183,803 action rows and 304,216 term rows, adding
+1,767 qualified nonoverlapping actions and 3,314 terms. It holds 6,743 incoming
+economic-coordinate overlaps instead of double-counting them. The old image and
+1,403 selected source files remain unchanged. The current product is
+`domain-output-r3`; consult `action-cold-results-safe.r3.json` for its completed
+independent acceptance rather than older unsealed/r2 states. The required final
+handoff includes one current disposition ledger and actual check logs. An absent
+receipt is pending acceptance, never an inferred PASS.
+
+Required-source screening found four unknown-tax-basis terms on three claims:
+000598 (2011-08-16) and 600025 (2019-07-05, 2020-06-19). Literal representation
+is already retained; gross-tax/PIT authority remains unavailable. The exact missing
+implementation claims are 601390 / `3818517cb0d384db872eada9` (2026-07-31) and
+601088 / `d0ea0fc481c43085f2004655` (2017-07-10). This corrects the swapped security
+names in earlier ROI prose without rewriting that archival report. The previously
+authorized 169-notice collection is exhausted; no further collection occurred.
+
+The retained lifecycle/status tables have no new August/September effective
+intervals. Valid structural knowledge intervals do not establish original provider
+availability or an authoritative full-market lifecycle denominator. Keep the original
+4,173 visibility exceptions, three KEEP_OLD turnover conflicts, historical industry
+exceptions and all P3/P5/P6 admission gates. These exact source-limited uses remain
+unavailable while unrelated qualified governance output can continue.
+
+Register complete-image and independent-copy capacity separately. Current receipts
+include all new job products and failed attempts, both filesystem devices and one
+UTC snapshot. The remaining recoverable Base 2.1 allocation is metadata-only until
+fresh source/backup hashes and usage checks permit any retirement. Do not credit it
+as free space or create a new whole candidate before its execution and independent
+acceptance budget passes. No new whole image, source retirement, cross-node transfer,
+production mutation or consumer activation is implied by the scoped product.
+
 Design status: approved continuation under the Owner's Base 2.3 instruction.
 Engineering delivery: complete for the declared P10 governance purpose, with
 nineteen disclosed limitations. Owner final acceptance and consumer admission are separate.

@@ -180,6 +180,19 @@ def freeze_monthly_plan(selection: dict[str, Any], contract: dict[str, Any]) -> 
     return result
 
 
+def _check_image_write_space(output: Path, budget: Any, reserve: int) -> None:
+    # Budget owns audit TMP, not a separately registered physical image. Keep its
+    # memory/temp/time checks and reserve image bytes on the actual output device.
+    budget.check()
+    existing = output
+    while not existing.exists():
+        existing = existing.parent
+    fs = os.statvfs(existing)
+    floor = getattr(getattr(budget, "limits", None), "free_floor_bytes", 0)
+    if fs.f_bavail * fs.f_frsize - reserve < floor:
+        raise MonthlyOdsError("MONTHLY_ODS_OUTPUT_FREE_FLOOR")
+
+
 def materialize_monthly(plan: dict[str, Any], output: Path, budget: Any) -> dict[str, Any]:
     """Only after task-specific capacity passes; independently copy original bytes."""
     sources = [Path(s["archive_source_root"]) for s in plan["sources"]]
@@ -189,7 +202,9 @@ def materialize_monthly(plan: dict[str, Any], output: Path, budget: Any) -> dict
         raise FileExistsError("MONTHLY_ODS_OUTPUT_ALREADY_EXISTS")
     if digest({k: v for k, v in plan.items() if k != "identity"}) != plan["identity"]:
         raise MonthlyOdsError("MONTHLY_ODS_PLAN_CHANGED")
-    budget.check(reserve=sum(f["size_bytes"] for f in plan["files"]))
+    _check_image_write_space(
+        output, budget, sum(f["size_bytes"] for f in plan["files"]) + len(canonical(plan)) + 4096
+    )
     for source in plan["sources"]:
         expected = {m["original_path"] for m in source["members"]} | {
             source["manifest_name"],
@@ -208,11 +223,15 @@ def materialize_monthly(plan: dict[str, Any], output: Path, budget: Any) -> dict
     for item in plan["files"]:
         p = physical_path(Path(item["archive_source_path"]))
         q = _member(output, item["path"])
-        budget.check(reserve=item["size_bytes"])
+        _check_image_write_space(output, budget, item["size_bytes"])
         q.parent.mkdir(parents=True, exist_ok=True)
         with p.open("rb") as src, q.open("xb") as dst:
+            copied = 0
             for chunk in iter(lambda: src.read(1024 * 1024), b""):
-                budget.check(reserve=len(chunk))
+                copied += len(chunk)
+                if copied > item["size_bytes"]:
+                    raise MonthlyOdsError("MONTHLY_ODS_SOURCE_SIZE_EXCEEDED")
+                _check_image_write_space(output, budget, len(chunk))
                 dst.write(chunk)
             dst.flush()
             os.fsync(dst.fileno())
@@ -242,8 +261,10 @@ def materialize_monthly(plan: dict[str, Any], output: Path, budget: Any) -> dict
     materialization["identity"] = digest(
         {k: v for k, v in materialization.items() if k != "identity"}
     )
+    encoded = canonical(materialization) + b"\n"
+    _check_image_write_space(output, budget, len(encoded))
     with (output / "MATERIALIZATION.json").open("xb") as f:
-        f.write(canonical(materialization) + b"\n")
+        f.write(encoded)
         f.flush()
         os.fsync(f.fileno())
     return audit_monthly(output, budget, expected_contract_digest=plan["contract_sha256"])

@@ -151,7 +151,10 @@ remain immutable and their complete-minute acceptance is not claimed by this sco
 identities, business-date/role coverage, schema evidence and file closure before
 writing. A job-specific immutable contract binds the tracked policy and each
 freshly qualified original revision; these source inventories remain run evidence,
-not repository data. All physical seed members, selected daily/event/weekly/minute
+not repository data. Audit TMP quotas apply to that scratch directory; independent
+image writes reserve the frozen member and evidence bytes on the destination
+filesystem, preserve its free-space floor, and reject a growing source before
+exceeding its frozen member size. All physical seed members, selected daily/event/weekly/minute
 raw revisions and original manifests are independently copied into one image.
 Preserved source-root strings are archival provenance and never runtime inputs.
 Multiple retained revisions stay distinct; no implicit numerical merge or source

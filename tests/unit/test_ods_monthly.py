@@ -8,6 +8,7 @@ import subprocess
 import sys
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -15,6 +16,7 @@ import pytest
 
 from quanthus.pipelines import ods_monthly as mod
 from quanthus.pipelines.securities_warehouse.base22 import canonical, digest, file_sha
+from quanthus.pipelines.securities_warehouse.base22_bounded import Budget, Limits
 
 
 class SyntheticBudget:
@@ -115,6 +117,51 @@ def repack_plan(root, transform):
     x["frozen_plan_identity"] = digest(frozen)
     x["identity"] = digest({k: v for k, v in x.items() if k != "identity"})
     p.write_bytes(canonical(x))
+
+
+def test_real_scratch_budget_is_not_the_independent_image_write_budget(inputs, tmp_path):
+    _, contract, plan = inputs
+    sources = [Path(s["archive_source_root"]) for s in plan["sources"]]
+    assert sum(f["size_bytes"] for f in plan["files"]) > 1024
+    with Budget(
+        tmp_path / "bounded-audit-TMP",
+        sources,
+        Limits(allocated_bytes=1024, temp_bytes=1024, free_floor_bytes=1),
+    ) as budget:
+        result = mod.materialize_monthly(plan, tmp_path / "image", budget)
+        assert result["original_manifest_closure"] == "PASS"
+        assert result["file_bytes"] > budget.limits.allocated_bytes
+        assert budget.peak["allocated_bytes"] <= budget.limits.allocated_bytes
+        assert (
+            mod.audit_monthly(tmp_path / "image", budget, expected_contract_digest=digest(contract))
+            == result
+        )
+
+
+def test_image_destination_free_floor_is_checked_before_mkdir(inputs, tmp_path, monkeypatch):
+    _, _, plan = inputs
+    budget = SyntheticBudget()
+    budget.limits = SimpleNamespace(free_floor_bytes=8192)
+    monkeypatch.setattr(mod.os, "statvfs", lambda _: SimpleNamespace(f_bavail=8192, f_frsize=1))
+    output = tmp_path / "image"
+    with pytest.raises(mod.MonthlyOdsError, match="MONTHLY_ODS_OUTPUT_FREE_FLOOR"):
+        mod.materialize_monthly(plan, output, budget)
+    assert not output.exists()
+
+
+def test_growing_disposable_source_never_exceeds_frozen_member_write_bytes(inputs, tmp_path):
+    _, _, plan = inputs
+    first = plan["files"][0]
+
+    class GrowingSourceBudget(SyntheticBudget):
+        def begin_stage(self, name):
+            with Path(first["archive_source_path"]).open("ab") as stream:
+                stream.write(b"synthetic growth" * 1024)
+
+    output = tmp_path / "image"
+    with pytest.raises(mod.MonthlyOdsError, match="MONTHLY_ODS_SOURCE_SIZE_EXCEEDED"):
+        mod.materialize_monthly(plan, output, GrowingSourceBudget())
+    assert (output / first["path"]).stat().st_size <= first["size_bytes"]
 
 
 def test_independent_raw_bytes_decimal_unknown_and_original_clocks(inputs, tmp_path):

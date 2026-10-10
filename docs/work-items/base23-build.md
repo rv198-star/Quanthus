@@ -24,6 +24,33 @@ runtime old-path fallback is allowed. The new mirror must stand alone.
 
 ## Current recovery checkpoint
 
+### October 10 release scope and follow-on versions
+
+The Owner proposed closing Base 2.3 for the current daily purpose and moving the
+four lower-priority packages to a possible 2.3.1 or the next monthly 2.4. Keep
+financial-summary extensions, complete shareholder matrices/change equivalence,
+full-market listing/status coverage and August/September intraday qualification
+outside the required 2.3 closeout. They are optional P10 follow-on work, prioritized
+by a concrete consumer need, decision risk, available evidence and repair cost;
+there is no commitment to complete all four before either successor delivery.
+
+The complete `af1df80` mirror remains independently verified. The two necessary
+follow-on packages described below have qualified domain outputs but are not yet
+integrated into that complete mirror. The selected closeout keeps their integration
+and whole-image/cold acceptance in the 2.3 scope; this version plan is not evidence
+that those steps, publication or production switching have occurred. The fresh
+capacity gate still applies. No sealed image retirement is implied by this plan.
+
+A 2.3.1 would retain the Asia/Shanghai business-date cutoff of 2026-09-30 and
+publish a new immutable manifest/content identity for qualified corrections.
+Base 2.4 would extend business dates through 2026-10-31, subject to actual source
+coverage and its own build/acceptance gates. Carry only qualified improvements
+into either successor, preserve original clocks and superseded values, and keep
+one current disposition ledger for incomplete fields/keys and unavailable uses.
+Neither patch nor monthly naming qualifies historical PIT, all-market or intraday
+uses, changes frozen consumer gates, or authorizes new collection, code publication,
+deployment, cross-node transfer or CURRENT/production synchronization.
+
 ### October 10 two necessary packages
 
 The retained complete repaired image is the `af1df80` delivery at

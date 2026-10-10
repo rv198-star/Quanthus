@@ -119,6 +119,51 @@ def repack_plan(root, transform):
     p.write_bytes(canonical(x))
 
 
+def test_wide_parquet_native_audit_bounds_decoded_batches(inputs, tmp_path, monkeypatch):
+    selection, contract, _ = inputs
+    root = Path(selection["selected"][0]["root"])
+    source = root / "payload/reference.parquet"
+    rows = 256
+    pq.write_table(
+        pa.table({"id": list(range(rows)), "wide": ["x" * 512 * 1024] * rows}),
+        source,
+        row_group_size=16,
+    )
+    manifest = json.loads((root / "manifest.json").read_bytes())
+    entry = manifest["content"]["files"][0]
+    entry.update(size_bytes=source.stat().st_size, sha256=file_sha(source))
+    manifest["content_digest"] = digest(manifest["content"])
+    (root / "manifest.json").write_bytes(canonical(manifest))
+    old = selection["selected"][0]["manifest_sha256"]
+    new = file_sha(root / "manifest.json")
+    selection["selected"][0]["manifest_sha256"] = new
+    (root / "READY").write_text(new + "\n")
+    contract["historical_seed"]["manifest_sha256"] = new
+    contract["admitted_sources"][new] = contract["admitted_sources"].pop(old)
+    plan = mod.freeze_monthly_plan(selection, contract)
+    original = pq.ParquetFile.iter_batches
+    observed = []
+
+    def guard(file, *args, **kwargs):
+        for batch in original(file, *args, **kwargs):
+            observed.append(batch.nbytes)
+            assert batch.nbytes <= 65 * 1024**2
+            yield batch
+
+    monkeypatch.setattr(pq.ParquetFile, "iter_batches", guard)
+    image = tmp_path / "wide-image"
+    built = mod.materialize_monthly(plan, image, SyntheticBudget())
+    assert observed and sum(x > 1024 for x in observed) > 1
+    census = built["native_census"]["payload/reference.parquet"]
+    assert census["rows"] == rows
+    assert census["max_batch_rows"] == 16
+    assert census["max_batch_bytes"] <= 65 * 1024**2
+    assert (
+        mod.audit_monthly(image, SyntheticBudget(), expected_contract_digest=digest(contract))
+        == built
+    )
+
+
 def test_real_scratch_budget_is_not_the_independent_image_write_budget(inputs, tmp_path):
     _, contract, plan = inputs
     sources = [Path(s["archive_source_root"]) for s in plan["sources"]]

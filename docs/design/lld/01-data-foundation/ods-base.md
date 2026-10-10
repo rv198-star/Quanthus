@@ -169,7 +169,13 @@ in effect. Native raw integrity does not qualify those uses or curated DWD repai
 
 Cold verification reads only image-local original manifests, contract and plan,
 rechecks exact physical closure and every hash, decodes all native Parquet fields
-with typed summaries and verifies SQLite integrity. Two independent physical
+with typed summaries and verifies SQLite integrity. Native decoding preserves
+original row-group boundaries within the existing 16,384-row cap, disables
+Parquet read-ahead, closes each reader and hashes IPC buffers without an extra
+Python byte copy. The summary records actual maximum decoded batch rows/bytes;
+wide raw JSON groups must not be combined into a multi-GiB batch. The registered
+RSS/TMP/free-space thresholds remain unchanged, and a single oversized group or
+row still fails closed rather than being skipped. Two independent physical
 ownership relocations and new processes deny old source roots/cache/network;
 missing/corrupt disposable probes fail closed and all bytes are restored before
 READY is written last. The same offline evaluator also accepts the final sealed

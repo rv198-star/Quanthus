@@ -270,6 +270,39 @@ def materialize_monthly(plan: dict[str, Any], output: Path, budget: Any) -> dict
     return audit_monthly(output, budget, expected_contract_digest=plan["contract_sha256"])
 
 
+def _native_parquet_census(path: Path, budget: Any) -> dict[str, Any]:
+    """Decode all typed fields without joining wide original row groups."""
+    pa = importlib.import_module("pyarrow")
+    pq = importlib.import_module("pyarrow.parquet")
+    typed = hashlib.sha256()
+    seen_rows = max_batch_rows = max_batch_bytes = 0
+    with pq.ParquetFile(path, pre_buffer=False, buffer_size=65536) as reader:
+        expected_rows = reader.metadata.num_rows
+        typed.update(reader.schema_arrow.serialize().to_pybytes())
+        for group in range(reader.num_row_groups):
+            for batch in reader.iter_batches(
+                batch_size=16384, row_groups=[group], use_threads=False
+            ):
+                budget.check()
+                sink = pa.BufferOutputStream()
+                with pa.ipc.new_stream(sink, batch.schema) as writer:
+                    writer.write_batch(batch)
+                typed.update(sink.getvalue())
+                seen_rows += batch.num_rows
+                max_batch_rows = max(max_batch_rows, batch.num_rows)
+                max_batch_bytes = max(max_batch_bytes, batch.nbytes)
+                budget.check()
+    if seen_rows != expected_rows:
+        raise MonthlyOdsError("MONTHLY_ODS_FULL_NATIVE_ROW_CENSUS_CHANGED")
+    return {
+        "rows": seen_rows,
+        "typed_ipc_sha256": "sha256:" + typed.hexdigest(),
+        "batch_boundary": "original_row_group",
+        "max_batch_rows": max_batch_rows,
+        "max_batch_bytes": max_batch_bytes,
+    }
+
+
 def audit_monthly(root: Path, budget: Any, *, expected_contract_digest: str) -> dict[str, Any]:
     """Offline raw-byte/schema and original-manifest closure; no source-root access."""
     root = physical_path(root)
@@ -413,8 +446,6 @@ def audit_monthly(root: Path, budget: Any, *, expected_contract_digest: str) -> 
     if any(not set(contract["calendar_authority"]["open_dates"]) <= covered[r] for r in covered):
         raise MonthlyOdsError("MONTHLY_ODS_REQUIRED_DAILY_ROLE_MISSING")
     # All cheap policy/manifest/namespace gates precede the expensive full-byte pass.
-    pa = importlib.import_module("pyarrow")
-    pq = importlib.import_module("pyarrow.parquet")
     census = {}
     for f in plan["files"]:
         p = _member(root, f["path"])
@@ -429,27 +460,10 @@ def audit_monthly(root: Path, budget: Any, *, expected_contract_digest: str) -> 
             meta = _parquet_metadata(p, tuple(f["metadata"]["date_bounds"]))
             if meta != f["metadata"]:
                 raise MonthlyOdsError("MONTHLY_ODS_NATIVE_SCHEMA_CHANGED")
-            # Decode every native field without converting prices/clocks through JSON,
-            # Python floats or per-row dictionaries. IPC binds exact typed values;
-            # batch size and current runtime remain fixed for cold reproducibility.
-            typed = hashlib.sha256()
-            seen_rows = 0
-            reader = pq.ParquetFile(p)
-            typed.update(reader.schema_arrow.serialize().to_pybytes())
-            for batch in reader.iter_batches(batch_size=16384, use_threads=False):
-                budget.check()
-                sink = pa.BufferOutputStream()
-                with pa.ipc.new_stream(sink, batch.schema) as writer:
-                    writer.write_batch(batch)
-                typed.update(sink.getvalue().to_pybytes())
-                seen_rows += batch.num_rows
-            if seen_rows != meta["row_count"]:
+            native = _native_parquet_census(p, budget)
+            if native["rows"] != meta["row_count"]:
                 raise MonthlyOdsError("MONTHLY_ODS_FULL_NATIVE_ROW_CENSUS_CHANGED")
-            census[f["path"]] = {
-                "rows": seen_rows,
-                "schema_sha256": meta["schema_sha256"],
-                "typed_ipc_sha256": "sha256:" + typed.hexdigest(),
-            }
+            census[f["path"]] = {**native, "schema_sha256": meta["schema_sha256"]}
         elif f["format"] == "sqlite":
             _sqlite_metadata(p)
     result = {

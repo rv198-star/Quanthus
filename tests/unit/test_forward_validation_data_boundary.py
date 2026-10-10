@@ -53,7 +53,14 @@ def _fake_release(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     package = tmp_path / "daily"
     package.mkdir()
     (package / "manifest.json").write_text(
-        json.dumps({"code_revision": "a" * 40}), encoding="utf-8"
+        json.dumps(
+            {
+                "code_revision": "a" * 40,
+                "kind": "cn01_daily_dwd_domain_increment",
+                "schema_version": 1,
+            }
+        ),
+        encoding="utf-8",
     )
     receipt = load_visibility_receipt(_visibility_payload())
     result = DailyDomainResult(
@@ -98,9 +105,7 @@ def test_deep_verified_release_must_match_visibility_binding(
     assert release.code_revision == "a" * 40
     assert release.visibility.package_id == release.package_id
 
-    wrong = load_visibility_receipt(
-        _visibility_payload(content_digest="sha256:" + "3" * 64)
-    )
+    wrong = load_visibility_receipt(_visibility_payload(content_digest="sha256:" + "3" * 64))
     with pytest.raises(ForwardValidationContractError, match="visibility_binding_mismatch"):
         verify_prospective_dwd_release(release.package_root, wrong)
 
@@ -203,3 +208,46 @@ def test_correction_is_new_identity_and_never_rewrites_prior_evidence() -> None:
             rationale="no semantic effect",
             recorded_at=datetime(2026, 9, 19, 12, tzinfo=UTC),
         )
+
+
+def test_daily_core_profile_requires_schema2_and_its_own_deep_verifier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quanthus.pipelines.securities_warehouse import daily_core_domain
+
+    package = tmp_path / "core"
+    package.mkdir()
+    manifest = {
+        "schema_version": 2,
+        "kind": "cn01_daily_core_dwd_increment",
+        "product_scope": "daily-core-v1",
+        "consumable_intervals": ["1d"],
+        "code_revision": "a" * 40,
+    }
+    (package / "manifest.json").write_text(json.dumps(manifest))
+    receipt = load_visibility_receipt(_visibility_payload())
+    verified = DailyDomainResult(
+        root=package,
+        package_id=receipt.package_id,
+        market_date=receipt.market_date,
+        manifest_sha256=receipt.manifest_sha256,
+        content_digest=receipt.content_digest,
+        row_counts={"dwd_security_bar": 1},
+        payload_bytes=123,
+    )
+    calls: list[Path] = []
+    monkeypatch.setattr(
+        daily_core_domain,
+        "verify_daily_domain_increment",
+        lambda root: (calls.append(root), verified)[1],
+    )
+    release = verify_prospective_dwd_release(package, receipt, product_scope="daily-core-v1")
+    assert calls == [package]
+    assert release.visibility.receipt_digest == receipt.receipt_digest
+
+    with pytest.raises(ForwardValidationContractError, match="legacy_product_drift"):
+        verify_prospective_dwd_release(package, receipt, product_scope="legacy-four-lane")
+    manifest["consumable_intervals"] = ["1m", "1d"]
+    (package / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(ForwardValidationContractError, match="p6_daily_core_product_drift"):
+        verify_prospective_dwd_release(package, receipt, product_scope="daily-core-v1")

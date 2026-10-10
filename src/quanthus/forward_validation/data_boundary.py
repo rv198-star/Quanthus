@@ -338,12 +338,35 @@ def load_visibility_receipt(payload: Mapping[str, object]) -> DwdVisibilityRecei
 def verify_prospective_dwd_release(
     package_root: Path,
     visibility: DwdVisibilityReceipt,
+    *,
+    product_scope: str = "legacy-four-lane",
 ) -> ProspectiveDwdRelease:
+    manifest = _load_json(package_root / "manifest.json")
+    if product_scope == "daily-core-v1":
+        if (
+            manifest.get("schema_version") != 2
+            or manifest.get("kind") != "cn01_daily_core_dwd_increment"
+            or manifest.get("product_scope") != "daily-core-v1"
+            or manifest.get("consumable_intervals") != ["1d"]
+        ):
+            fail("p6_daily_core_product_drift", "non-core or non-daily DWD is not eligible")
+        from quanthus.pipelines.securities_warehouse.daily_core_domain import (
+            verify_daily_domain_increment as verify_core_increment,
+        )
+        verifier = verify_core_increment
+    elif product_scope == "legacy-four-lane":
+        if (
+            manifest.get("kind") != "cn01_daily_dwd_domain_increment"
+            or manifest.get("schema_version") != 1
+        ):
+            fail("p6_legacy_product_drift", "legacy P6 cannot silently consume daily-core")
+        verifier = verify_daily_domain_increment
+    else:
+        fail("p6_daily_product_unknown", product_scope)
     try:
-        verified = verify_daily_domain_increment(package_root)
+        verified = verifier(package_root)
     except DailyDomainBuildError as exc:
         raise ForwardValidationContractError("dwd_release_verification_failed", str(exc)) from exc
-    manifest = _load_json(package_root / "manifest.json")
     code_revision = _require_sha40(manifest.get("code_revision"), "manifest.code_revision")
     observed = (
         verified.package_id,

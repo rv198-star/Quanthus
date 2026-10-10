@@ -502,3 +502,139 @@ def test_controller_submits_current_ready_package_only_after_enabled_decision(
         activation["decision_digest"]
     )
     assert job.input_ref["prior_run_id"] is None
+
+def test_failed_official_job_blocks_resubmission_and_later_dates(tmp_path: Path) -> None:
+    runtime = load_prospective_runtime_config(RUNTIME, root=ROOT)
+    mandate = load_owner_activation_mandate(MANDATE, runtime=runtime)
+    activation = make_activation_decision_payload(
+        runtime=runtime,
+        mandate=mandate,
+        decision_id="p6-test-existing-failed",
+        state="enabled",
+        decision_at=datetime(2026, 9, 18, 9, tzinfo=UTC),
+        deployment_revision="a" * 40,
+        disabled_rehearsal_manifest_digest="sha256:" + "2" * 64,
+        rollback_drill_digest="sha256:" + "3" * 64,
+    )
+    upstream = InMemoryPlatformStore()
+    succeeded = _store_succeeded_first_official(upstream, _official_input(runtime, activation))
+    failed = replace(
+        succeeded, state="failed", result_ref=None, error_reason="p6_forward_child_exit_1"
+    )
+    store = InMemoryPlatformStore()
+    store.create_job(failed)
+    unavailable_root = replace(runtime, daily_root=tmp_path / "not-accessed")
+    for moment in (datetime(2026, 9, 23, 12, tzinfo=UTC), datetime(2026, 9, 24, 12, tzinfo=UTC)):
+        returned = controller._submit_current_official(
+            store,
+            runtime=unavailable_root,
+            activation_payload=activation,
+            now=moment,
+        )
+        assert returned is not None
+        assert returned.job_id == failed.job_id
+        assert returned.state == "failed"
+        assert len(store.list_jobs(P6_FORWARD_CYCLE_JOB, 100)) == 1
+
+
+def test_daily_core_controller_binds_schema2_sync_receipt_without_legacy_alias(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import hashlib
+
+    from quanthus.forward_validation.package_locator import resolve_daily_package
+
+    root = tmp_path / "core"
+    day = "2026-10-12"
+    package_id = "dwd-daily-20261012-aaaaaaaaaaaa-bbbbbbb"
+    entry = root / "packages" / day / "aaaaaaaaaaaa-bbbbbbb"
+    entry.mkdir(parents=True)
+    manifest = json.dumps({"package_id": package_id, "market_date": day}).encode()
+    (entry / "manifest.json").write_bytes(manifest)
+    manifest_sha = "sha256:" + hashlib.sha256(manifest).hexdigest()
+    pointer = {
+        "kind": "cn01_daily_core_dwd_current",
+        "schema_version": 2,
+        "product_scope": "daily-core-v1",
+        "market_date": day,
+        "package_id": package_id,
+        "manifest_path": f"packages/{day}/aaaaaaaaaaaa-bbbbbbb/manifest.json",
+        "manifest_sha256": manifest_sha,
+        "content_digest": "sha256:" + "3" * 64,
+    }
+    (root / "CURRENT_DAILY_CORE.json").write_text(json.dumps(pointer))
+    receipt_dir = root / "receipts" / day
+    receipt_dir.mkdir(parents=True)
+    receipt = {
+        "kind": "oci_cn01_daily_core_dwd_sync",
+        "schema_version": 2,
+        "product_scope": "daily-core-v1",
+        "market_date": day,
+        "package_id": package_id,
+        "manifest_sha256": manifest_sha,
+        "content_digest": pointer["content_digest"],
+        "synced_at": "2026-10-12T11:30:00+00:00",
+    }
+    (receipt_dir / (package_id + ".json")).write_text(json.dumps(receipt))
+    value = controller._visibility_from_sync_receipt(root, pointer, product_scope="daily-core-v1")
+    assert value["source_node"] == "oci-cn01-daily-core-sync"
+    assert value["package_id"] == package_id
+    assert (
+        resolve_daily_package(
+            root,
+            datetime.fromisoformat(day).date(),
+            package_id,
+            manifest_sha256=manifest_sha,
+            manifest_path=pointer["manifest_path"],
+        )
+        == entry
+    )
+    with pytest.raises(RuntimeError, match="sync_receipt_binding_mismatch"):
+        controller._visibility_from_sync_receipt(root, pointer, product_scope="legacy-four-lane")
+
+    runtime = load_prospective_runtime_config(
+        ROOT / "config/forward-validation/activation/p6-prospective-runtime-r1.v1.json",
+        root=ROOT,
+    )
+    runtime = replace(runtime, daily_root=root)
+    mandate = load_owner_activation_mandate(
+        MANDATE, runtime=load_prospective_runtime_config(RUNTIME, root=ROOT)
+    )
+    original = load_prospective_runtime_config(RUNTIME, root=ROOT)
+    # The payload must be R1-runtime bound, but an old legacy Job can never
+    # participate in R1's idempotency, progress or budget counters.
+    r1_mandate = replace(mandate, runtime_sha256=runtime.config_sha256)
+    activation = make_activation_decision_payload(
+        runtime=runtime, mandate=r1_mandate, decision_id="r1-test",
+        state="enabled", decision_at=datetime(2026, 10, 9, 6, tzinfo=UTC),
+        deployment_revision="a" * 40,
+        disabled_rehearsal_manifest_digest="sha256:" + "2" * 64,
+        rollback_drill_digest="sha256:" + "3" * 64,
+    )
+    store = InMemoryPlatformStore()
+    monkeypatch.setattr(controller, "_actor_user_id", lambda _store: "usr_test")
+    monkeypatched_original = _official_input(
+        original,
+        make_activation_decision_payload(
+            runtime=original,
+            mandate=mandate,
+            decision_id="legacy-test-2",
+            state="enabled",
+            decision_at=datetime(2026, 9, 19, 6, tzinfo=UTC),
+            deployment_revision="a" * 40,
+            disabled_rehearsal_manifest_digest="sha256:" + "2" * 64,
+            rollback_drill_digest="sha256:" + "3" * 64,
+        ),
+    )
+    old_store = InMemoryPlatformStore()
+    old_job = _store_succeeded_first_official(old_store, monkeypatched_original)
+    store.create_job(replace(old_job, state="failed", result_ref=None))
+    job = controller._submit_current_official(
+        store,
+        runtime=runtime,
+        activation_payload=activation,
+        now=datetime(2026, 10, 12, 11, 35, tzinfo=UTC),
+    )
+    assert job is not None and job.state == "queued"
+    assert job.input_ref["runtime_sha256"] == runtime.config_sha256
+    assert len(store.list_jobs(P6_FORWARD_CYCLE_JOB, 100)) == 2

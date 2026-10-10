@@ -138,3 +138,38 @@ staging has no `READY` and cannot advance `BASE_CURRENT.json`.
 The ODS Base is a reconstruction and recovery seed, not a daily merge target. Normal post-Base ODS
 remains immutable daily release files. A later compaction creates a new Base revision; it never
 appends into or edits an existing Base.
+
+## 6. Base 2.3 current-daily-purpose compaction
+
+The Owner authorized paired ODS/DWD Base 2.3 packaging through 2026-09-30 and
+purpose-specific delivery of qualified data while deferring noncritical unavailable
+uses. The successor `config/pipelines/ods-base23-daily-compaction.v1.json` governs
+this explicit current-daily reconstruction seed; the final July policies above
+remain immutable and their complete-minute acceptance is not claimed by this scope.
+
+`src/quanthus/pipelines/ods_monthly.py` freezes the exact original seed and release
+identities, business-date/role coverage, schema evidence and file closure before
+writing. A job-specific immutable contract binds the tracked policy and each
+freshly qualified original revision; these source inventories remain run evidence,
+not repository data. All physical seed members, selected daily/event/weekly/minute
+raw revisions and original manifests are independently copied into one image.
+Preserved source-root strings are archival provenance and never runtime inputs.
+Multiple retained revisions stay distinct; no implicit numerical merge or source
+priority is introduced. Original knowledge/acquisition times and unknown values
+stay unchanged. Actual build/seal times are separate from the business cutoff.
+
+Every authoritative open date requires the complete daily core and event artifact
+sets. The exact unavailable minute date/frequency roles are disclosed in the
+versioned contract and block minute completeness/execution qualification. Existing
+financial/shareholder, lifecycle, historical PIT and consumer restrictions remain
+in effect. Native raw integrity does not qualify those uses or curated DWD repair.
+
+Cold verification reads only image-local original manifests, contract and plan,
+rechecks exact physical closure and every hash, decodes all native Parquet fields
+with typed summaries and verifies SQLite integrity. Two independent physical
+ownership relocations and new processes deny old source roots/cache/network;
+missing/corrupt disposable probes fail closed and all bytes are restored before
+READY is written last. The same offline evaluator also accepts the final sealed
+envelope and recomputes its summary from local evidence. Contract tests live in
+`tests/unit/test_ods_monthly.py`. Publication binds exact ODS/DWD identities and
+independent receipts; no legacy CURRENT or consumer gate is changed here.

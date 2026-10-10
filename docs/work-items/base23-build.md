@@ -24,6 +24,37 @@ runtime old-path fallback is allowed. The new mirror must stand alone.
 
 ## Current recovery checkpoint
 
+### October 10 two necessary packages
+
+The retained complete repaired image is the `af1df80` delivery at
+`artifacts/base23-repaired-integration-20261009T202009Z-fee65b7/image`.
+Its manifest is `54a9069ab187fe80a7607f99135a710a1c18fd6c15e7cbbf3ef913944213c123`;
+its whole engineering acceptance does not qualify every disclosed use. Preserve
+that seal, the earlier seals and all source/failed evidence.
+
+The Owner requested the two necessary follow-on packages. Recover from
+`artifacts/base23-required-packages-current.json`, then this job's registration,
+current domain receipt and disposition table. `base23_required.py` prepares
+dated provider-observation qualification and exact original-entity share-unit
+successor versions. `base23_required_scope.py` repeats those projections from
+physical local sources; a READY domain product is never a complete Base 2.3.
+The opt-in contract is `config/pipelines/base23-required-packages.v1.json`.
+
+Date authority is limited to pinned complete exchange notices. Conflicts between
+explicit dated provider observations and old suspension intervals block affected
+new entries without forcing sales, inferring resume dates or changing provider
+flags. Share-unit correction needs complete original raw/identity, an explicit
+per-ten contract, an exact before/raw match and locally replayed corroboration.
+Preserve cash, old values, business coordinates and original source times. A
+factor-ten resemblance or same-date event match alone never grants a correction,
+source priority or cross-provider alias. New knowledge uses actual observation.
+
+Complete-image reintegration remains conditional on a fresh whole execution and
+two-relocation budget, full native/global scans and source/network-denied cold
+acceptance. Existing input hashes and scoped completion do not substitute for
+that acceptance. No new capture, retirement of sealed images, production change,
+PIT reconstruction or consumer-policy relaxation is authorized by this checkpoint.
+
 ### October 10 necessary-repair continuation
 
 The next integration job is

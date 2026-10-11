@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import ast
+import difflib
 import hashlib
 import json
 import shutil
@@ -13,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BASELINE = "3d74d1f43000e8b9b2d0b938cb48c1026a993781"
+RUNTIME_PACKAGE = "/usr/local/lib/python3.11/site-packages/quanthus"
 BASE_IMAGES = {
     "api": "sha256:65f35068b6467fd58148a865e0c1421d3a9fef2dc2b8404a4226a1cbb7fb64d8",
     "event-worker": "sha256:3477f9201848cf5ff26ade4ddd1971296bf2def5aba99886667b89595c4efa3d",
@@ -53,6 +56,45 @@ def sha(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def source_patch(project: Path, revision: str, name: str) -> bytes:
+    if name != "src/quanthus/event_library/physical_scan.py":
+        return run(["git", "diff", BASELINE, revision, "--", name], cwd=project)
+    before = run(["git", "show", f"{BASELINE}:{name}"], cwd=project).decode()
+    after = (project / name).read_text()
+    old_nodes = ast.parse(before).body
+    new_nodes = ast.parse(after).body
+
+    def selected(node: ast.AST) -> bool:
+        return (
+            isinstance(node, ast.ImportFrom) and node.module == "quanthus.event_library.source"
+        ) or (
+            isinstance(node, ast.FunctionDef)
+            and node.name in {"_table_paths", "build_physical_event_scan"}
+        )
+
+    old = [node for node in old_nodes if selected(node)]
+    new = [node for node in new_nodes if selected(node)]
+    if len(old) != 3 or len(new) != 3:
+        raise RuntimeError("native physical-scan edit boundaries differ")
+    lines = before.splitlines(keepends=True)
+    new_lines = after.splitlines(keepends=True)
+    for original, replacement in reversed(list(zip(old, new, strict=True))):
+        lines[original.lineno - 1 : original.end_lineno] = new_lines[
+            replacement.lineno - 1 : replacement.end_lineno
+        ]
+    minimal = "".join(lines)
+    if ast.dump(ast.parse(minimal)) != ast.dump(ast.parse(after)):
+        raise RuntimeError("physical-scan minimal patch would omit a semantic change")
+    return "".join(
+        difflib.unified_diff(
+            before.splitlines(keepends=True),
+            minimal.splitlines(keepends=True),
+            fromfile=f"a/{name}",
+            tofile=f"b/{name}",
+        )
+    ).encode()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kind", choices=tuple(BASE_IMAGES), required=True)
@@ -71,6 +113,29 @@ def main() -> int:
     actual = json.loads(run(["docker", "image", "inspect", base_image]))[0]
     if actual["Id"] != base_image:
         raise RuntimeError("pinned base image identity differs")
+    runtime = (
+        run(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "--network=none",
+                "--read-only",
+                "--memory=512m",
+                "-e",
+                "PYTHONDONTWRITEBYTECODE=1",
+                "--entrypoint",
+                "python",
+                base_image,
+                "-c",
+                "import pathlib,quanthus; print(pathlib.Path(quanthus.__file__).parent)",
+            ]
+        )
+        .decode()
+        .strip()
+    )
+    if runtime != RUNTIME_PACKAGE:
+        raise RuntimeError("pinned image runtime package path differs")
     configs = {}
     for name in CONFIGS:
         path = project / name
@@ -94,6 +159,7 @@ def main() -> int:
         "base_image": base_image,
         "image_tag": tag,
         "production_changed": False,
+        "runtime_package": runtime,
         "contracts": configs,
         "files": {},
     }
@@ -110,7 +176,13 @@ def main() -> int:
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 run(["docker", "cp", f"{container}:/app/{name}", str(destination)])
                 before = sha(destination)
-                patch = run(["git", "diff", BASELINE, revision, "--", name], cwd=project)
+                installed = context / "installed-preimage"
+                relative = name.removeprefix("src/quanthus/")
+                run(["docker", "cp", f"{container}:{runtime}/{relative}", str(installed)])
+                if installed.read_bytes() != destination.read_bytes():
+                    raise RuntimeError(f"source/runtime preimages differ: {name}")
+                installed.unlink()
+                patch = source_patch(project, revision, name)
                 if not patch.strip():
                     raise RuntimeError(f"selected overlay has no versioned change: {name}")
                 run(["git", "apply", "--check", "-"], cwd=overlay, data=patch)
@@ -118,23 +190,29 @@ def main() -> int:
                 report["files"][name] = {
                     "before": before,
                     "after": sha(destination),
-                    "mode": "patch",
+                    "mode": "strict_patch",
+                    "source_runtime_preimages_equal": True,
+                    "patch_sha256": "sha256:" + hashlib.sha256(patch).hexdigest(),
                 }
             for name in additions:
                 destination = overlay / name
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 existing = context / "existing-module"
-                copied = subprocess.run(
-                    ["docker", "cp", f"{container}:/app/{name}", str(existing)],
-                    capture_output=True,
-                    check=False,
-                )
-                if copied.returncode == 0:
-                    if existing.read_bytes() != (project / name).read_bytes():
-                        raise RuntimeError(
-                            f"new task module already exists with different bytes: {name}"
-                        )
-                    existing.unlink()
+                relative = name.removeprefix("src/quanthus/")
+                for location in (f"/app/{name}", f"{runtime}/{relative}"):
+                    copied = subprocess.run(
+                        ["docker", "cp", f"{container}:{location}", str(existing)],
+                        capture_output=True,
+                        check=False,
+                    )
+                    if copied.returncode == 0:
+                        if existing.read_bytes() != (project / name).read_bytes():
+                            raise RuntimeError(
+                                f"new task module already exists with different bytes: {location}"
+                            )
+                        existing.unlink()
+                    elif b"could not find the file" not in copied.stderr.lower():
+                        raise RuntimeError(f"could not establish absent task module: {location}")
                 shutil.copyfile(project / name, destination)
                 report["files"][name] = {"after": sha(destination), "mode": "new_task_module"}
             for name in CONFIGS:
@@ -148,6 +226,7 @@ def main() -> int:
         (context / "Dockerfile").write_text(
             f"FROM {base_image}\n"
             "COPY overlay/ /app/\n"
+            f"COPY overlay/src/quanthus/ {runtime}/\n"
             f'LABEL org.quanthus.base23.overlay-revision="{revision}"\n'
             f'LABEL org.quanthus.base23.base-image="{base_image}"\n'
         )

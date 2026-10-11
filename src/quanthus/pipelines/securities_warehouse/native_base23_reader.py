@@ -82,6 +82,19 @@ class NativeBase23:
 
 def read_native_parent_references(root: Path, config: Mapping[str, Any]) -> NativeBase23:
     """Verify metadata once and physically hash the five declared parent tables."""
+    return read_native_tables(root, config, PARENT_TABLES)
+
+
+def read_native_tables(
+    root: Path, config: Mapping[str, Any], tables: tuple[str, ...]
+) -> NativeBase23:
+    """Verify an explicit consumer table closure against sealed native metadata.
+
+    This verifies source bytes, not consumer admission. The caller must separately
+    validate its purpose-specific source and projection receipts.
+    """
+    if not tables or len(tables) != len(set(tables)):
+        raise NativeBase23Error("native consumer table closure is invalid")
     root = root.resolve()
     manifest_path = _member(root, "manifest.json")
     manifest = _object(manifest_path)
@@ -121,7 +134,7 @@ def read_native_parent_references(root: Path, config: Mapping[str, Any]) -> Nati
         raise NativeBase23Error("native table layout is absent")
     paths: dict[str, tuple[Path, ...]] = {}
     seen: set[str] = set()
-    for table in PARENT_TABLES:
+    for table in tables:
         entry = layout.get(table, {})
         files = entry.get("files") if isinstance(entry, dict) else None
         if not isinstance(files, list) or not files:

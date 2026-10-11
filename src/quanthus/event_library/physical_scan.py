@@ -42,7 +42,11 @@ from quanthus.event_library.scan import (
     partition_executable_entries,
     scan_forward_candidate_series,
 )
-from quanthus.event_library.source import EventScanSourcePolicy, load_event_scan_source_policy
+from quanthus.event_library.source import (
+    EventScanSourcePolicy,
+    event_scan_release_path,
+    load_event_scan_source_policy,
+)
 from quanthus.event_library.splits import SplitPolicy, load_split_policy
 from quanthus.industry_mapping import (
     StaticIndustryMapping,
@@ -176,6 +180,10 @@ def _safe_relative(value: object) -> PurePosixPath:
 
 
 def _table_paths(dwd_root: Path, table: str) -> tuple[Path, ...]:
+    if (dwd_root / "MATERIALIZATION.json").is_file():
+        from quanthus.backtest.native_dwd_source import physical_paths
+
+        return physical_paths(dwd_root, table)
     try:
         manifest = json.loads((dwd_root / "manifest.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -819,9 +827,7 @@ def materialize_p4_research_adm(
         source_policy=source_policy,
         output_path=output_root / adm_policy.assets["static_industry_mapping"],
         source_receipt_path=source_receipt_path,
-        hierarchy_path=(
-            project_root / adm_policy.historical_industry_reference.hierarchy_path
-        ),
+        hierarchy_path=(project_root / adm_policy.historical_industry_reference.hierarchy_path),
         historical_reference=adm_policy.historical_industry_reference,
         bs_module=None,
     )
@@ -839,8 +845,7 @@ def materialize_p4_research_adm(
             for reason, count in sorted(coverage_audit["missing_reason_counts"].items())
         )
         missing_codes = ",".join(
-            str(item["listing_code"])
-            for item in coverage_audit["missing_securities"]
+            str(item["listing_code"]) for item in coverage_audit["missing_securities"]
         )
         raise PhysicalEventScanError(
             "P4 static industry projection does not cover full candidate-security universe: "
@@ -998,9 +1003,7 @@ def _contiguous_weight_buckets(
         minimum = cuts[-1] + 1
         maximum = len(weighted) - (workers - boundary)
         position = bisect_left(cumulative, desired, minimum, maximum + 1)
-        choices = tuple(
-            cut for cut in (position - 1, position) if minimum <= cut <= maximum
-        )
+        choices = tuple(cut for cut in (position - 1, position) if minimum <= cut <= maximum)
         cuts.append(min(choices, key=lambda cut: (abs(cumulative[cut] - desired), cut)))
     cuts.append(len(weighted))
     return tuple(
@@ -1084,9 +1087,7 @@ def _source_evidence_digest_values(
     )
 
 
-def _source_evidence_digest(
-    row: Mapping[str, Any], source_policy: EventScanSourcePolicy
-) -> str:
+def _source_evidence_digest(row: Mapping[str, Any], source_policy: EventScanSourcePolicy) -> str:
     return _source_evidence_digest_values(
         source_policy=source_policy,
         security_id=row["dwd_security_id"],
@@ -1128,9 +1129,7 @@ def _projected_knowledge_cutoff(
         source_policy.historical_visibility.project_candidate_knowledge(
             table="dwd_listing",
             session_close=close_at,
-            effective_from=_aware(
-                row["dwd_listing_effective_from"], "dwd_listing_effective_from"
-            ),
+            effective_from=_aware(row["dwd_listing_effective_from"], "dwd_listing_effective_from"),
         ),
     ]
     if row.get("adjustment_effective") is True:
@@ -1173,9 +1172,7 @@ def _candidate_input(
         low_price=_decimal(row.get("low_price")),
         close_price=_decimal(row.get("close_price")),
         turnover=_decimal(row.get("turnover")),
-        is_tradable=(
-            bool(row["is_tradable"]) if row.get("is_tradable") is not None else None
-        ),
+        is_tradable=(bool(row["is_tradable"]) if row.get("is_tradable") is not None else None),
         listing_sessions=int(row["listing_sessions"]),
         adjustment_effective=(
             bool(row["adjustment_effective"])
@@ -1318,9 +1315,7 @@ def iter_projected_candidate_series(
             )
         if duckdb_temp_directory is not None:
             duckdb_temp_directory.mkdir(parents=True, exist_ok=False)
-            connection.execute(
-                f"SET temp_directory={_sql_path(duckdb_temp_directory.resolve())}"
-            )
+            connection.execute(f"SET temp_directory={_sql_path(duckdb_temp_directory.resolve())}")
         selected_security_ids: tuple[str, ...] | None = None
         selection_clause = ""
         if allowed_security_ids is not None:
@@ -1376,9 +1371,7 @@ def iter_projected_candidate_series(
                     candidate.session_date,
                 )
                 if previous_sort_key is not None and sort_key < previous_sort_key:
-                    raise PhysicalEventScanError(
-                        "projected candidate physical order differs"
-                    )
+                    raise PhysicalEventScanError("projected candidate physical order differs")
                 previous_sort_key = sort_key
                 observed_security_ids.add(candidate.security_id)
                 key = (
@@ -1397,9 +1390,7 @@ def iter_projected_candidate_series(
         if selected_security_ids is not None and tuple(sorted(observed_security_ids)) != (
             selected_security_ids
         ):
-            raise PhysicalEventScanError(
-                "candidate projection contiguous security range differs"
-            )
+            raise PhysicalEventScanError("candidate projection contiguous security range differs")
     finally:
         connection.close()
 
@@ -1809,10 +1800,9 @@ def build_physical_event_scan(
 
     if not code_revision.strip():
         raise ValueError("code_revision must not be empty")
-    root = find_project_root(source_policy_path)
     source_policy = load_event_scan_source_policy(
         source_policy_path,
-        release_path=root / "config/releases/v2-build202607.json",
+        release_path=event_scan_release_path(source_policy_path),
         provider_path=provider_config_path,
     )
     card = load_candidate_rule_card(rule_card_path)
@@ -1851,9 +1841,7 @@ def build_physical_event_scan(
                     "adm-materialization",
                     {
                         "terminal": True,
-                        "elapsed_seconds": round(
-                            runtime_clock.perf_counter() - adm_started, 3
-                        ),
+                        "elapsed_seconds": round(runtime_clock.perf_counter() - adm_started, 3),
                         "rows": projection.row_count,
                         "bytes": _tree_bytes(projection.root),
                     },

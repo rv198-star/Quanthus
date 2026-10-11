@@ -174,6 +174,7 @@ from quanthus.pipelines import (
     write_candidate_current,
     write_epoch_current,
 )
+from quanthus.platform.data_runtime import resolve_cli_source_defaults
 from quanthus.policy import ConfigurationError, P0Policy, find_project_root, load_policy
 from quanthus.price_limits import (
     PriceLimitBuildError,
@@ -619,12 +620,12 @@ def _parser() -> argparse.ArgumentParser:
     p4_event_scan.add_argument(
         "--source-policy",
         type=Path,
-        default=Path("config/p4-event-scan-source.research.v1.json"),
+        default=None,
     )
     p4_event_scan.add_argument(
         "--provider-config",
         type=Path,
-        default=Path("config/replay-data-provider.development.v2.json"),
+        default=None,
     )
     p4_event_scan.add_argument(
         "--rule-card",
@@ -652,12 +653,12 @@ def _parser() -> argparse.ArgumentParser:
     p4_labeled_event_scan.add_argument(
         "--source-policy",
         type=Path,
-        default=Path("config/p4-event-scan-source.research.v1.json"),
+        default=None,
     )
     p4_labeled_event_scan.add_argument(
         "--provider-config",
         type=Path,
-        default=Path("config/replay-data-provider.development.v2.json"),
+        default=None,
     )
     p4_labeled_event_scan.add_argument(
         "--rule-card",
@@ -695,12 +696,12 @@ def _parser() -> argparse.ArgumentParser:
     p4_reported_event_scan.add_argument(
         "--source-policy",
         type=Path,
-        default=Path("config/p4-event-scan-source.research.v1.json"),
+        default=None,
     )
     p4_reported_event_scan.add_argument(
         "--provider-config",
         type=Path,
-        default=Path("config/replay-data-provider.development.v2.json"),
+        default=None,
     )
     p4_reported_event_scan.add_argument(
         "--rule-card",
@@ -747,7 +748,7 @@ def _parser() -> argparse.ArgumentParser:
     p4_label_corpus.add_argument(
         "--provider-config",
         type=Path,
-        default=Path("config/replay-data-provider.development.v2.json"),
+        default=None,
     )
     p4_label_corpus.add_argument(
         "--outcome-card",
@@ -782,7 +783,7 @@ def _parser() -> argparse.ArgumentParser:
     p4_report.add_argument(
         "--provider-config",
         type=Path,
-        default=Path("config/replay-data-provider.development.v2.json"),
+        default=None,
     )
     p4_report.add_argument(
         "--feature-registry",
@@ -1207,6 +1208,7 @@ def _print_p1_acceptance(report: P1AcceptanceReport, *, as_json: bool) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        resolve_cli_source_defaults(args)
         if args.command == "doctor":
             _doctor(
                 load_policy(args.policy),

@@ -28,6 +28,17 @@ reference criteria or promotion. Shared data-consistency #193 belongs to P10; fe
 definitions and changed consumer acceptance remain with the domain owner. P6 retains its access
 ledger and the business impact decision for a published correction; source repair belongs to P10.
 
+### OCI native Base 2.3 transition (Owner 2026-10-12)
+
+[P10-DATA-BASE23-OCI-001](../../work-items/base23-oci-consumer-migration.md)
+owns the approved transition of new OCI API/event/replay inputs and daily-core parent
+references to the exact native image through 2026-09-30. A distinct source contract and
+new independently verified canonical input baseline preserve historical frozen contracts.
+The exact original normalization attachment keeps its sealed parent; a separately pinned
+continuation proves the state preimages. Source `NOT_GRANTED` and protected research/P6
+gates remain unchanged. Production activation and retention remain pending the work item's
+consumer, maintenance and first-scheduled-sync receipts. Cloud recoverability now uses the Owner-confirmed CN01 verification; this OCI line must not repeat the remaining archive checks.
+
 ## 2. Business disposition instead of local repair
 
 Other lines declare inputs, perform minimal admission checks and implement domain features,
@@ -149,6 +160,7 @@ independent cold construction remain governed.
 | ID | Title | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03; P1 historical foundation retained | Ownership/routing contracts and verified live issue migration; bounded repairs/handoffs need separate evidence and standing epic remains open |
+| P10-DATA-BASE23-OCI-001 | Migrate OCI new consumers to native Base 2.3 | Owner decisions 2026-10-11/12; native source and continuation proofs | [Versioned migration work item](../../work-items/base23-oci-consumer-migration.md), real canonical input receipt, actual consumer and first scheduled sync acceptance; retain old contracts and unique unbacked-up data |
 
 Governed assets: `config/data-ownership.v1.json`, `scripts/sync_github_planning.py`,
 `scripts/sync_p10_data_issues.py`, `tests/contract/test_p10_data_ownership.py`, root `AGENTS.md`

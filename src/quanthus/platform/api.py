@@ -28,6 +28,7 @@ from quanthus.platform.candidate_approval import (
     CandidateApprovalService,
     public_candidate_approval_event,
 )
+from quanthus.platform.data_runtime import replay_provider_path
 from quanthus.platform.identity import (
     AuthenticatedPrincipal,
     AuthenticationError,
@@ -234,8 +235,7 @@ def _structure_facts_review_sample(
         key=lambda row: (str(row.get("security_code", "")), str(row.get("market_date", ""))),
     )
     by_security = {
-        code: [row for row in rows if row.get("security_code") == code]
-        for code in security_order
+        code: [row for row in rows if row.get("security_code") == code] for code in security_order
     }
     selected: list[dict[str, Any]] = []
     selected_keys: set[tuple[str, str]] = set()
@@ -253,14 +253,17 @@ def _structure_facts_review_sample(
     for code in security_order:
         add_first(
             code,
-            lambda row: row.get("episode_status") == "active"
-            and row.get("episode_age_sessions") == 0,
+            lambda row: (
+                row.get("episode_status") == "active" and row.get("episode_age_sessions") == 0
+            ),
         )
         add_first(
             code,
-            lambda row: row.get("episode_status") == "active"
-            and isinstance(row.get("episode_age_sessions"), int)
-            and int(row["episode_age_sessions"]) >= 1,
+            lambda row: (
+                row.get("episode_status") == "active"
+                and isinstance(row.get("episode_age_sessions"), int)
+                and int(row["episode_age_sessions"]) >= 1
+            ),
         )
         add_first(code, lambda row: row.get("episode_status") == "ended")
 
@@ -269,8 +272,7 @@ def _structure_facts_review_sample(
             row
             for row in by_security[code]
             if row.get("available") is True
-            and (str(row.get("security_code")), str(row.get("market_date")))
-            not in selected_keys
+            and (str(row.get("security_code")), str(row.get("market_date"))) not in selected_keys
         ]
         for code in security_order
     }
@@ -640,8 +642,7 @@ class PlatformHttpApp:
         try:
             if (
                 not _STRUCTURE_MVP_SEED_RECEIPT.is_file()
-                or _STRUCTURE_MVP_SEED_RECEIPT.stat().st_size
-                > _STRUCTURE_MVP_RECEIPT_MAX_BYTES
+                or _STRUCTURE_MVP_SEED_RECEIPT.stat().st_size > _STRUCTURE_MVP_RECEIPT_MAX_BYTES
             ):
                 return {"status": "seed_receipt_unavailable"}
             receipt = json.loads(_STRUCTURE_MVP_SEED_RECEIPT.read_text(encoding="utf-8"))
@@ -649,8 +650,7 @@ class PlatformHttpApp:
             return {"status": "seed_receipt_invalid"}
         if (
             not isinstance(receipt, dict)
-            or receipt.get("schema_version")
-            != "quanthus.structure-mvp-qualification-seed.v1"
+            or receipt.get("schema_version") != "quanthus.structure-mvp-qualification-seed.v1"
             or receipt.get("status") not in {"submitted", "rejected"}
         ):
             return {"status": "seed_receipt_invalid"}
@@ -703,13 +703,9 @@ class PlatformHttpApp:
         }
         if len(runs) == 2 and all(item.get("state") == "succeeded" for item in runs):
             result_match = runs[0].get("result_digest") == runs[1].get("result_digest")
-            adm_match = runs[0].get("adm_manifest_digest") == runs[1].get(
-                "adm_manifest_digest"
-            )
+            adm_match = runs[0].get("adm_manifest_digest") == runs[1].get("adm_manifest_digest")
             response["reproduced"] = bool(result_match and adm_match)
-            response["result_digest"] = (
-                runs[0].get("result_digest") if result_match else None
-            )
+            response["result_digest"] = runs[0].get("result_digest") if result_match else None
             response["adm_manifest_digest"] = (
                 runs[0].get("adm_manifest_digest") if adm_match else None
             )
@@ -1203,7 +1199,7 @@ class PlatformHttpApp:
         input_ref = {
             "scope_start": "2012-01-04",
             "scope_end": "2021-12-30",
-            "provider_config": "config/replay-data-provider.development.v2.json",
+            "provider_config": replay_provider_path(),
             "candidate_set": "current-five",
             "reason": reason,
             "expected_active_runs": {

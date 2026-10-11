@@ -55,7 +55,7 @@ def test_e9_catalog_snapshot_is_deterministic_additive_only() -> None:
     # Code-evidence SHA bindings changed with the native Base 2.3 input reader.
     # The sealed E9 registration and semantic population remain unchanged.
     assert snapshot["snapshot_digest"] == (
-        "sha256:542a28ffc135f3e60454756cb23cb8c742faddfdad8ae798ff883c715b30c374"
+        "sha256:110f2e1413c2eceb7767e7aef3397b18ce705dd96bd40eb180aff5a6d083d458"
     )
     assert result["registration"]["catalog_entry_count"] == 761
     assert result["registration"]["semantic_concept_count"] == 34

@@ -21,7 +21,7 @@
     }
   },
   "daily_core_parent_reference": {
-    "status": "pending",
+    "status": "accepted",
     "product_scope": "daily-core-v1",
     "governance_use": "governance_baseline",
     "tables": [
@@ -32,8 +32,14 @@
       "dwd_trading_venue"
     ],
     "trading_or_research_admission": false,
-    "acceptance_receipts": [],
-    "note": "Populate only with separately verified complete cold receipts and the accepted bounded consumer disposition; source image NOT_GRANTED remains unchanged."
+    "acceptance_receipts": [
+      "sha256:780a8eb1c6f8277f2f6412dae221cd977bf58c473e8f234e4d0659a75e8e704a",
+      "sha256:9dd641b10f2503e81b285ef623acb522e53997e698f660c9a2489c72338fa2b0",
+      "sha256:b13b939435bdf735642f8027ca9b38ac7f892b08a81a197faa066396355fbb8c",
+      "sha256:4ba2751deda988ea73b90e58a5c2b120e16c69a34061daf0f84f859f0e9d84dd",
+      "sha256:fe8d2f842c866e411daa93020b103357b4109b0b1ce2648a27fc13a994344def"
+    ],
+    "note": "Purpose-limited OCI daily-core parent reference accepted using the verified independent cold receipts, native parent scan and October key closure, under the Owner migration decision. Native source NOT_GRANTED and historical increments remain unchanged; no trading or research activation."
   },
   "daily_core_transition": {
     "policy": "preserve_existing_october_bytes_and_old_base_lineage",
@@ -41,14 +47,19 @@
       "sha256:77dddd0ea29ac0783291970fb0c34e9a0debb16e6f328ddcf6758aad692f0172": {
         "market_date": "2026-10-09",
         "base_manifest_sha256": "sha256:541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b"
+      },
+      "sha256:c15a771f2072b05a376aec36c2a4dbffbcd8d54b0a8b1765dd1a265ed69d9cef": {
+        "market_date": "2026-10-08",
+        "base_manifest_sha256": "sha256:541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b"
       }
     },
-    "note": "Exact retained CN01/OCI prior identity observed; core bytes are deeply verified again before use. Hermes needs a fresh node verification and exact prior entry. Overall native parent admission remains pending."
+    "note": "Exact retained OCI October 8 and 9 manifests and parent-key closure were verified in the referenced acceptance record. Preserve their old Base lineage and all bytes. This release grants no authority to operate another node."
   },
   "paired_manifest_sha256": "sha256:71a52c1be7266b4ad6843b1e94d7920a4e22384422b0d171b6199f1ec725c5d8",
   "consumer_migration": {
     "work_item": "P10-DATA-BASE23-OCI-001",
     "source_contract": "config/replay-data-provider.base23.v1.json",
-    "delivery_status": "pending_projection_and_operational_acceptance"
+    "delivery_status": "input_accepted_pending_consumer_runtime",
+    "native_projection_receipt_sha256": "sha256:bf819bfe08a149678332ece216203c352ed8463621b86698ab8ec1e52e23af51"
   }
 }

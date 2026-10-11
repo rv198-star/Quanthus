@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "authority": "governed_research_adm_asset_registry",
   "evidence_sha256": {
-    "src/quanthus/backtest/direct_dwd_provider.py": "sha256:11ca6cddd048629ddaec903da2515c1a93ff39b2bd8204d27838530eaaf88894",
+    "src/quanthus/backtest/direct_dwd_provider.py": "sha256:93206a1e97f22ce82604e3327f46322e2eb17626dadfccce8da5128043fa8973",
     "src/quanthus/event_library/physical_scan.py": "sha256:7f0eec70fb3ad75c1bc0af48e1280b0dcfc0ae4b169cc245ce33431a21066d8b",
     "src/quanthus/structure_intelligence.py": "sha256:b4c23a9843160b6c3383e8efb35d7215aead933bf5797629db200e029bb69506",
     "src/quanthus/structure_facts.py": "sha256:829c520886fb242bedd1d3e4b1ab06b54457a3c82829a94b9a6e6acf040a201e"

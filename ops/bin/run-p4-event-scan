@@ -22,13 +22,9 @@ if [ -n "$(git -C "$REPOSITORY_ROOT" status --porcelain --untracked-files=no)" ]
     exit 2
 fi
 
-export QUANTHUS_REPLAY_PROVIDER_DWD_ROOT=${QUANTHUS_REPLAY_PROVIDER_DWD_ROOT:-/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1}
-export QUANTHUS_REPLAY_PROVIDER_DWD_CORRECTION_ROOT=${QUANTHUS_REPLAY_PROVIDER_DWD_CORRECTION_ROOT:-/srv/quanthus/dwd-dws-v2.1/corrections/dwd-base-202607-v2.1-correction-20260813-001}
 
 cd "$REPOSITORY_ROOT"
 PYTHONPATH=src "$PYTHON" -m quanthus run-p4-event-scan \
-    --source-policy config/p4-event-scan-source.research.v1.json \
-    --provider-config config/replay-data-provider.development.v2.json \
     --rule-card config/p4-candidate-price-volume-transition.research.v1.json \
     --split-policy config/p4-event-split-policy.research.v1.json \
     --code-revision "$REVISION" \

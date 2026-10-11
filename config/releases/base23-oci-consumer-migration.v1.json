@@ -111,7 +111,7 @@
   "acceptance": {
     "source_receipts": "reused_verified",
     "correction_attachment": "verified",
-    "native_projection": "pending",
+    "native_projection": "accepted",
     "consumer_runtime": "pending",
     "maintenance": "not_started",
     "post_cutover_sync": "not_started",
@@ -125,5 +125,15 @@
     "prior_oci_verified_archives": 5,
     "requires_oci_nine_of_nine": false,
     "unique_unbacked_up_data_must_be_retained": true
+  },
+  "native_projection_evidence": {
+    "qualified_at_beijing": "2026-10-12T03:18:08.215998+08:00",
+    "code_revision": "70a9bac49f72698b97e383da8cbe1fc44bfc17eb",
+    "canonical_receipt_sha256": "sha256:bf819bfe08a149678332ece216203c352ed8463621b86698ab8ec1e52e23af51",
+    "qualification_report": "native-input-qualification-70a9bac-20261011T1906Z.json",
+    "qualification_report_sha256": "sha256:04cc9abce8b4b72ddaac85f6fff8a4a8551a8475e33f05e68ece284e4971211a",
+    "two_independent_materializations_match": true,
+    "temporary_payloads_removed": true,
+    "strategy_or_research_job_executed": false
   }
 }

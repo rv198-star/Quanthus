@@ -44,7 +44,23 @@ The remaining probe expects daily_domain SHA-256
 both pre-migration HEAD `3d74d1f` and this worktree contain
 `d21f0e1b84696a882ede67eb1d895e99020659bc0e33b2195469e3d2a63ca241`.
 That frozen research contract remains unchanged and is not admitted by this migration.
-The real native canonical receipt is still pending the operator input-only qualification;
+The real native canonical receipt passed two independent constructions at 03:18:08 Beijing;
 `scripts/qualify_native_base23_input.py` measures a candidate, removes its TMP payload,
 then independently rebuilds through the normal admitted reader before retaining the receipt.
 No production source flag, container, timer or old payload has been changed.
+
+
+## Production image and historical-contract boundary
+
+The retained P3 semantic-equivalence probe is dispatched only for its explicitly frozen research run configuration. The old single-security DWD conformance module, product research catalog evidence, and admitted #148 expert evaluation likewise describe historical source bindings. They are not a requirement to keep the old physical Base mounted or to rerun research during this migration. Their sealed evidence remains readable; a new native-source research request must retain its own scientific admission boundary. Generic new replay and event inputs select the independent Base 2.3 contracts.
+
+`scripts/build_base23_consumer_overlays.py` applies only versioned native-input patches to each pinned deployed image and rejects nonmatching patches. It keeps inherited entrypoints, environment, P6 code and other deployed changes. Candidate images are built without publishing or changing running containers. Source and correction mounts are supplied read-only during separate acceptance.
+
+The first OCI qualification at 02:55 Beijing stopped at the operator-added 2 GiB spill cap before a canonical receipt existed. No service changed. Commit `70a9bac49f72698b97e383da8cbe1fc44bfc17eb` permits bounded 6 GiB native spill and requires at least 9 GiB of temporary space for this input-only qualification. Its native tests passed (9 tests). The retry uses an isolated memory-backed TMP directory with more than 18 GiB host memory available at admission; ordinary production spill remains disk-backed within the existing worker memory limits.
+
+
+## Native input accepted, 2026-10-12 03:18 Beijing
+
+The OCI input-only qualification at `70a9bac49f72698b97e383da8cbe1fc44bfc17eb` passed. Both independent constructions produced bundle `sha256:8c84fbc03224023e82364870613394ed3d4edcb47d9451b7c3e3395004a1cc01` and provider lineage `sha256:e4af1bc4e5c097d7c17567b6e9332052bd8a9e942c4ab1829fb6584508017655`. Each contains seven input tables and 24,812,729 total rows; the daily bars, universe and execution constraints each have 8,260,825 rows. All nine known new non-null bars were observed with their raw 2026 source knowledge times retained. This is retrospective input qualification, not historical publication proof or research acceptance.
+
+The canonical receipt SHA-256 is `bf819bfe08a149678332ece216203c352ed8463621b86698ab8ec1e52e23af51`; the full qualification record `native-input-qualification-70a9bac-20261011T1906Z.json` is `04cc9abce8b4b72ddaac85f6fff8a4a8551a8475e33f05e68ece284e4971211a`. Temporary payloads were removed. The updated native/provider/catalog/documentation focused suite passed 55 tests. Image, maintenance, first scheduled sync and retirement remain separate pending gates. The generic P4 wrapper now delegates provider and source selection to the versioned CLI defaults instead of forcing a legacy Base path.

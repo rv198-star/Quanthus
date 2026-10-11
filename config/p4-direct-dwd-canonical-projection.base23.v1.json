@@ -1,0 +1,99 @@
+{
+  "canonical_bundle_digest": "sha256:8c84fbc03224023e82364870613394ed3d4edcb47d9451b7c3e3395004a1cc01",
+  "datasets": {
+    "corporate_action_exceptions": {
+      "canonical_file_bytes": 14343,
+      "canonical_file_sha256": "sha256:ed04e7be28b16bf750dd426aa380d7b40dd001ed8b44040601c525d3834ad0e3",
+      "logical_digest": null,
+      "row_count": 78
+    },
+    "corporate_actions_normalized": {
+      "canonical_file_bytes": 2251387,
+      "canonical_file_sha256": "sha256:4592eae3fc8cdb1c99c51f8b1639ea905737025011bc23738c5fcb12e35c4fd4",
+      "logical_digest": null,
+      "row_count": 19288
+    },
+    "daily_ohlcv_none": {
+      "canonical_file_bytes": 366800537,
+      "canonical_file_sha256": "sha256:d577906b3f728dbf6e4ef9913d8e0f3bba44c4bfc78fad14ccf154531698dcdd",
+      "logical_digest": {
+        "algorithm": "duckdb-hash-order-v1",
+        "column_count": 35,
+        "columns_digest": "sha256:1e70e87fe27acd30192993aeb279ea65da9bbf87a6d8dbc0c85b8dd2dabcfb4a",
+        "duckdb_version": "v1.5.5",
+        "hash_sum_i128": "76205871427291108219527757",
+        "hash_xor_u64": "10956444618113836153",
+        "order_weighted_hash_sum_i128": "314786556112559525079658632313968",
+        "row_count": 8260825
+      },
+      "row_count": 8260825
+    },
+    "daily_universe": {
+      "canonical_file_bytes": 67489155,
+      "canonical_file_sha256": "sha256:6e7d638031d967d4353d0e2c30f26afc501a4b1978f387ad83a470bb3a871bbb",
+      "logical_digest": {
+        "algorithm": "duckdb-hash-order-v1",
+        "column_count": 18,
+        "columns_digest": "sha256:671e2f84f199de3a1c047ec220b23ac18e2a5e23698741c9abf144b4ba5ac783",
+        "duckdb_version": "v1.5.5",
+        "hash_sum_i128": "76193073188724530800858435",
+        "hash_xor_u64": "6987268794589185303",
+        "order_weighted_hash_sum_i128": "314664216939395869393300316191721",
+        "row_count": 8260825
+      },
+      "row_count": 8260825
+    },
+    "price_limit_execution_daily": {
+      "canonical_file_bytes": 185195773,
+      "canonical_file_sha256": "sha256:bb36ba5ad63d04248b5f5869359063bf8f63441cdddefb360f3424c00f20cd7a",
+      "logical_digest": {
+        "algorithm": "duckdb-hash-order-v1",
+        "column_count": 43,
+        "columns_digest": "sha256:4995b817f5c287cf13c0c8de3c08e638de01f2ddc0701055e5070923b89724fb",
+        "duckdb_version": "v1.5.5",
+        "hash_sum_i128": "76199684079235128879862135",
+        "hash_xor_u64": "16689388392921288521",
+        "order_weighted_hash_sum_i128": "314747964706231218991796710733887",
+        "row_count": 8260825
+      },
+      "row_count": 8260825
+    },
+    "security_code_validity": {
+      "canonical_file_bytes": 38066,
+      "canonical_file_sha256": "sha256:2bed3a910081a98fa6c368b3ce47f89c7e6e70ea329c62706607bc919ee7244f",
+      "logical_digest": null,
+      "row_count": 5538
+    },
+    "trading_calendar": {
+      "canonical_file_bytes": 4165,
+      "canonical_file_sha256": "sha256:adbf1bafed245c38f6f23fc1d349bf8e637306b9c7c27213d9114c7cad9b4c5a",
+      "logical_digest": null,
+      "row_count": 5350
+    }
+  },
+  "dwd_authority": {
+    "content_digest": "sha256:f5b1c35e9d60874a5daa8ce36f50d8d4edf62317075e3f223d344a1eb7292608",
+    "manifest_sha256": "sha256:6991d0c9440d4117c3dfdd3375e2267d0e43174203fc834751c9476cd7598206",
+    "package_id": "dwd-base-202609-v2.3",
+    "relationship_to_replay_source": "direct-job-local-source",
+    "through_date": "2026-09-30"
+  },
+  "dwd_correction": {
+    "content_digest": "sha256:1c1d1f4ea906797255fbc71cc3915bb905e51e7aea202d27042e33692b72e9da",
+    "correction_id": "dwd-base-202607-v2.1-correction-20260813-001",
+    "manifest_sha256": "sha256:4c8eeb5c0d74bbf2953f003364fd138832f15a5163254b710f9db8430767ffde"
+  },
+  "history_start": "2011-01-01",
+  "materializer_version": "direct-dwd-native-base23-v1",
+  "provider_config_digest": "sha256:395f1a8d6b79458332088460991bb1210c0f941ca835993d253ded62ff6d869d",
+  "provider_lineage_digest": "sha256:e4af1bc4e5c097d7c17567b6e9332052bd8a9e942c4ab1829fb6584508017655",
+  "receipt_id": "native-base23-development-20261012-v1",
+  "schema_version": "quanthus.direct-dwd-canonical-projection.v1",
+  "scope": {
+    "decision_end": "2021-12-30",
+    "decision_start": "2012-01-04",
+    "execution_end": "2021-12-31",
+    "partition": "development",
+    "reader_role": "development_research"
+  }
+}

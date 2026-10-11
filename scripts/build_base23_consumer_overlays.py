@@ -11,11 +11,22 @@ import json
 import shutil
 import subprocess
 import tempfile
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
 BASELINE = "3d74d1f43000e8b9b2d0b938cb48c1026a993781"
 RUNTIME_PACKAGE = "/usr/local/lib/python3.11/site-packages/quanthus"
+DUCKDB_WHEEL = {
+    "filename": "duckdb-1.5.5-cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl",
+    "url": (
+        "https://files.pythonhosted.org/packages/6f/1d/"
+        "9840179c2607b90523a2884a129c4d4e6dbdc1178ba62a976c1043beba88/"
+        "duckdb-1.5.5-cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl"
+    ),
+    "sha256": "2e72f9e1a4f90a5c8483ad4d540e495bf0834ba61c360b52499a573d7ed62a3f",
+    "bytes": 19366574,
+}
 BASE_IMAGES = {
     "api": "sha256:65f35068b6467fd58148a865e0c1421d3a9fef2dc2b8404a4226a1cbb7fb64d8",
     "event-worker": "sha256:3477f9201848cf5ff26ade4ddd1971296bf2def5aba99886667b89595c4efa3d",
@@ -145,6 +156,34 @@ def main() -> int:
     receipt = json.loads((project / CONFIGS[2]).read_text())
     if receipt.get("materializer_version") != "direct-dwd-native-base23-v1":
         raise RuntimeError("native input qualification is absent")
+    observed_duckdb = None
+    if args.kind != "api":
+        expected = {
+            value["logical_digest"]["duckdb_version"]
+            for value in receipt["datasets"].values()
+            if value["logical_digest"] is not None
+        }
+        if expected != {"v1.5.5"}:
+            raise RuntimeError("native canonical engine differs from the pinned build dependency")
+        observed_duckdb = (
+            run(
+                [
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--network=none",
+                    "--read-only",
+                    "--memory=512m",
+                    "--entrypoint",
+                    "python",
+                    base_image,
+                    "-c",
+                    "import importlib.metadata as m; print(m.version('duckdb'))",
+                ]
+            )
+            .decode()
+            .strip()
+        )
     patches = ["src/quanthus/platform/api.py"] if args.kind == "api" else list(COMMON_PATCHES)
     if args.kind == "event-worker":
         patches.append("src/quanthus/platform/event_worker.py")
@@ -160,6 +199,7 @@ def main() -> int:
         "image_tag": tag,
         "production_changed": False,
         "runtime_package": runtime,
+        "base_duckdb_version": observed_duckdb,
         "contracts": configs,
         "files": {},
     }
@@ -223,9 +263,35 @@ def main() -> int:
             run(["docker", "rm", container])
         for path in overlay.rglob("*.py"):
             compile(path.read_text(), str(path), "exec")
+        dependency_layer = ""
+        if observed_duckdb is not None and observed_duckdb != "1.5.5":
+            if args.kind != "event-worker" or observed_duckdb != "1.5.6":
+                raise RuntimeError("unreviewed base image dependency difference")
+            with urllib.request.urlopen(DUCKDB_WHEEL["url"], timeout=60) as response:
+                wheel_bytes = response.read()
+            if (
+                len(wheel_bytes) != DUCKDB_WHEEL["bytes"]
+                or hashlib.sha256(wheel_bytes).hexdigest() != DUCKDB_WHEEL["sha256"]
+            ):
+                raise RuntimeError("pinned native DuckDB wheel integrity differs")
+            wheel = context / str(DUCKDB_WHEEL["filename"])
+            wheel.write_bytes(wheel_bytes)
+            destination = "/tmp/" + wheel.name
+            install = (
+                "import pathlib,subprocess,sys; "
+                "subprocess.run([sys.executable,'-m','pip','install','--no-index','--no-deps',"
+                "'--no-cache-dir','--force-reinstall'," + repr(destination) + "],check=True); "
+                "pathlib.Path(" + repr(destination) + ").unlink()"
+            )
+            dependency_layer = (
+                f"COPY {wheel.name} {destination}\n"
+                + "RUN "
+                + json.dumps(["python", "-c", install])
+                + "\n"
+            )
+            report["pinned_duckdb_wheel"] = DUCKDB_WHEEL
         (context / "Dockerfile").write_text(
-            f"FROM {base_image}\n"
-            "COPY overlay/ /app/\n"
+            f"FROM {base_image}\n" + dependency_layer + "COPY overlay/ /app/\n"
             f"COPY overlay/src/quanthus/ {runtime}/\n"
             f'LABEL org.quanthus.base23.overlay-revision="{revision}"\n'
             f'LABEL org.quanthus.base23.base-image="{base_image}"\n'
@@ -237,6 +303,29 @@ def main() -> int:
         report["build_output_sha256"] = "sha256:" + hashlib.sha256(build_output).hexdigest()
     result = json.loads(run(["docker", "image", "inspect", tag]))[0]
     report["image_id"] = result["Id"]
+    if args.kind != "api":
+        installed_version = (
+            run(
+                [
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--network=none",
+                    "--read-only",
+                    "--memory=512m",
+                    "--entrypoint",
+                    "python",
+                    tag,
+                    "-c",
+                    "import importlib.metadata as m; print(m.version('duckdb'))",
+                ]
+            )
+            .decode()
+            .strip()
+        )
+        if installed_version != "1.5.5":
+            raise RuntimeError("candidate image cannot reproduce the canonical input engine")
+        report["canonical_engine_version"] = installed_version
     for field in ("Entrypoint", "Cmd", "User", "WorkingDir", "Env", "Healthcheck"):
         if result["Config"].get(field) != actual["Config"].get(field):
             raise RuntimeError(

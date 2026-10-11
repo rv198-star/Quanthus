@@ -47,6 +47,15 @@ def main() -> int:
     else:
         import duckdb
 
+        expected_versions = {
+            value["logical_digest"]["duckdb_version"]
+            for value in receipt["datasets"].values()
+            if value["logical_digest"] is not None
+        }
+        if expected_versions != {"v" + duckdb.__version__}:
+            raise RuntimeError("consumer DuckDB differs from the qualified canonical engine")
+        result["duckdb_version"] = duckdb.__version__
+
         from quanthus.backtest.data_provider import load_replay_data_provider_config
         from quanthus.backtest.native_dwd_source import physical_paths
         from quanthus.event_library.source import load_event_scan_source_policy

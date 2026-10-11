@@ -68,7 +68,9 @@ def main() -> int:
             provider_path=project / provider_path,
         )
         release = json.loads((project / "config/releases/base23-oci-consumers.v1.json").read_text())
-        native = read_native_tables(config.dwd_root, release, ("dwd_listing",))
+        native = read_native_tables(
+            config.dwd_root, release, ("dwd_listing", "dwd_trading_calendar")
+        )
         for path in (config.dwd_root, config.correction_root):
             if not os.statvfs(path).f_flag & os.ST_RDONLY:
                 raise RuntimeError("candidate source mount is not read-only")
@@ -83,18 +85,23 @@ def main() -> int:
             connection.execute("SET threads=1")
             rows = connection.execute(
                 "SELECT listing.listing_code, "
-                "CAST(CAST(bar.observation_start AS DATE) AS VARCHAR), "
+                "CAST(calendar.trade_date AS VARCHAR), "
                 "CAST(bar.close AS VARCHAR), CAST(bar.knowledge_from AS VARCHAR) "
                 "FROM read_parquet(?) bar JOIN read_parquet(?) listing USING (listing_id) "
+                "JOIN read_parquet(?) calendar "
+                "ON calendar.calendar_session_id=bar.calendar_session_id "
+                "AND calendar.venue_id=listing.venue_id "
                 "WHERE listing.listing_code IN ('000919','600805','600810') "
                 "AND listing.knowledge_to IS NULL AND bar.knowledge_to IS NULL "
+                "AND calendar.knowledge_to IS NULL "
                 "AND bar.interval_size='1d' AND bar.price_basis='UNADJUSTED' "
-                "AND CAST(bar.observation_start AS DATE) "
+                "AND calendar.trade_date "
                 "BETWEEN DATE '2019-03-27' AND DATE '2019-03-29' "
-                "ORDER BY listing.listing_code, bar.observation_start",
+                "ORDER BY listing.listing_code, calendar.trade_date",
                 [
                     [str(p) for p in physical_paths(config.dwd_root, "dwd_security_bar")],
                     [str(p) for p in native.table_paths["dwd_listing"]],
+                    [str(p) for p in native.table_paths["dwd_trading_calendar"]],
                 ],
             ).fetchall()
         finally:

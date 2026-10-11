@@ -70,7 +70,7 @@ def main() -> int:
     temporary_parent = args.temporary_parent.resolve(strict=True)
     disk_free = shutil.disk_usage(project).free
     memory_free = shutil.disk_usage(temporary_parent).free
-    if disk_free < 4 * 1024**3 or memory_free < 4 * 1024**3:
+    if disk_free < 4 * 1024**3 or memory_free < 9 * 1024**3:
         raise RuntimeError("qualification reserve is insufficient")
     config = load_replay_data_provider_config(
         project / "config/replay-data-provider.base23.v1.json"

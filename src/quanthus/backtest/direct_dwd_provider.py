@@ -340,7 +340,8 @@ class _ProjectionConnections:
             connection.execute("SET preserve_insertion_order=false")
             connection.execute(f"SET temp_directory={_sql_path(spill)}")
             if (self._payload.parent / "MATERIALIZATION.json").is_file():
-                connection.execute("SET max_temp_directory_size='2GiB'")
+                # Bound native spill while allowing the measured full-window join.
+                connection.execute("SET max_temp_directory_size='6GiB'")
             connection.execute(
                 f"""
                 CREATE VIEW dwd_security AS

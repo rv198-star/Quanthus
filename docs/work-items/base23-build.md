@@ -34,17 +34,36 @@ change or consumer-gate relaxation follows from this selection.
 
 Recover the current bounded job from
 `artifacts/base231-financial-ownership-20261012T091741Z-c1d85aa/registration.json`.
-The initial source assessment verified 94 physical files and 9,384,436,249 bytes;
-this is a member-byte assessment, not domain acceptance. Actual projection and
-cold receipts, when produced, own completion. The new minimal adapters and
-source-contained replay contract are described in
-`docs/design/lld/01-data-foundation/dwd-domain-model.md` and
-`config/pipelines/base231-domains.v1.json`.
+The fixed source assessment verified 94 physical files and 9,384,436,249 bytes.
+The qualified, self-contained five-table domain bundle is
+`/srv/quanthus-base22-data/delivery/base231-financial-ownership-20261012T091741Z-c1d85aa/domains/qualified-financial-ownership-v2`,
+manifest `78d090892f436577f3b7b50a4cf6f951e3814ac55a351e699ab5b27cef6b49c6`,
+identity `fc7f07c8210b0b8216e6903d9700ec9118e62a5be1eb0603a07e5212109b1f2f`.
+It contains 49,900 reports, 32 literal concepts, 798,400 financial facts,
+386,466 holder observations and 20,108 separate source change atoms.
+`domain-cold-summary.v2.json` records two independent relocations/new processes,
+full local-source reproduction, zero source/network events after entry, and
+missing/corrupt-file fail-closed checks. Original sources and seals stay unchanged.
+This is qualified literal domain completion, not a complete Base 2.3.1 release.
 
-Preserve unresolved unit/clock authority in financial deltas, incomplete holder
-matrices and unproven transaction equivalence. Qualify independently supported
-literal observations without replacing those gaps by generic empty coverage or
-opening historical PIT. A domain output is not a released Base 2.3.1 mirror.
+One additive integration TMP contains the three financial outputs plus 186 safe
+holder additions. Non-additive frame differences remain isolated. The exact-source
+representation successor `holder-representation-TMP-v4` closes and preserves
+8,347 old component versions and emits 8,347 new knowledge versions across 922
+frames, only where unique coordinates, original member/body/provider identity and
+all values agree. Distinct archival revision labels are retained, not interpreted
+as different original bytes. Its own offline replay/cold receipts are separate
+from the five-table bundle and never substitute for whole-mirror acceptance.
+
+Use this job's `current-gaps.json` as the single active disposition table. Latest
+retained F10 capture is September 5; the September 30 business ceiling does not
+claim month-end weekly freshness. Hold 110 invalid financial date headers and
+unqualified financial-delta units/clocks; incomplete holder matrices and
+transaction identities/equivalence also remain unqualified. The original 4,173
+visibility exceptions, prior tail-conflict dispositions and consumer freezes are
+unchanged. No source collection, push, production switch or complete patch mirror
+has occurred. Current receipts, focused/full-check logs and readonly handoff own
+actual completion; superseded experiments stay historical, not active gaps.
 
 ### October 10 release scope and follow-on versions
 

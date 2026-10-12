@@ -573,6 +573,17 @@ duplicate ratio-basis components. Future source-date claims remain isolated, and
 unproven change atoms are not merged. This TMP is not a published data product or
 a substitute for the complete 33-table mirror and cold acceptance.
 
+`base231_holder_revision.py` separately repairs a uniquely matched component
+when original member hash, body identity, provider, every scalar and all
+non-representation fields are identical. It preserves distinct archival revision
+labels; labels do not override exact content identity. Both coarse coordinates
+must have one component, preventing ambiguous split-component matches. The old
+open knowledge interval closes at the actual successor governance clock while
+its values and provenance remain intact; missing other holders do not imply
+exits. The successor records only representation fields from the complete
+certified source matrix. Its TMP has offline physical/hash checks and bounded
+reproduction, not whole-image or transaction-equivalence acceptance.
+
 | ID | Work | Current state | Acceptance evidence |
 | --- | --- | --- | --- |
 | `META-DATA-DWD-002` | Build the product-bounded seven-domain DWD Base V2 | 33 DWD objects accepted; recurring daily maintenance active; generic DWS deferred | `config/releases/v2-build202607.json`, package manifest, script tests, and build receipts |

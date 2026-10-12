@@ -57,6 +57,16 @@ def test_source_spacer_rows_have_exact_width_and_no_fabricated_fact():
     assert proof["held_frames"][0]["reason"] == "FINANCIAL_SUMMARY_BLANK_ROW_WIDTH_INVALID"
 
 
+def test_audit_opinion_continuation_is_accounted_without_becoming_numeric_fact():
+    body = BODY.replace("├────┤", "├────┤\n｜审计意见｜标准无保留｜标准无保留｜\n｜｜意见｜意见｜")
+    rows, proof = project(body)
+    assert len(rows["dwd_financial_fact"]) == 6 and not proof["held_frames"]
+    assert proof["unsupported_cells"] == 2
+    body = BODY.replace("├────┤", "├────┤\n｜净利润(元)｜1｜2｜\n｜｜3｜4｜")
+    rows, proof = project(body)
+    assert not rows["dwd_financial_fact"] and proof["held_frames"]
+
+
 def test_truncated_frame_is_held_without_losing_another_complete_frame():
     body = BODY.replace("【盈利能力指标】", "") + (
         "┌────┐\n｜财务指标｜2025-12-31｜\n｜净利润(元)｜2｜\n"

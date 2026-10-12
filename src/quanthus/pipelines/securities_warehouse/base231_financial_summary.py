@@ -142,6 +142,12 @@ def _matrix(lines: list[str]) -> tuple[list[date], list[tuple[str, list[str]]]]:
             days = [date.fromisoformat(v) for v in cells[1:]]
             if len(set(days)) != len(days) or len(days) > 16:
                 raise BoundedError("FINANCIAL_SUMMARY_DATE_HEADER_INVALID")
+        elif (days and len(cells) == len(days) + 1 and not cells[0]
+              and records and records[-1][0] == "审计意见"):
+            # Original opinion text wraps vertically under an empty label. It
+            # remains an accounted unsupported field, never a numeric fact.
+            label, opinion_values = records[-1]
+            records[-1] = (label, [a + b for a, b in zip(opinion_values, cells[1:], strict=True)])
         elif not days or len(cells) != len(days) + 1 or not cells[0]:
             raise BoundedError("FINANCIAL_SUMMARY_NONEMPTY_ROW_UNACCOUNTED")
         elif records and not any(cells[1:]):

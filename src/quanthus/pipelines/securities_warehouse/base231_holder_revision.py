@@ -24,7 +24,7 @@ def revision_views(scan: GlobalScan) -> None:
     unchanged = " AND ".join("o." + k + " IS NOT DISTINCT FROM n." + k
                              for k in schemas()[HOLDING].names if k not in excluded)
     provenance = " AND ".join("o." + k + " IS NOT DISTINCT FROM n." + k for k in (
-        "record_source", "source_record_id", "source_artifact_sha256", "source_revision"))
+        "record_source", "source_record_id", "source_artifact_sha256"))
     condition = (unchanged + " AND " + provenance
                  + " AND o.knowledge_to IS NULL AND n.knowledge_to IS NULL"
                  + " AND n.knowledge_from>o.knowledge_from")

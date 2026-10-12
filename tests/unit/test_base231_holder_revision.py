@@ -65,3 +65,9 @@ def test_closed_history_preserves_every_old_field_except_interval_end(tmp_path):
     selected, _ = compare(tmp_path, [old], [new], configure=revision_views,
                           view='representation_closed_old')
     assert selected == [dict(old, knowledge_to=new['knowledge_from'])]
+
+
+def test_archive_revision_label_change_does_not_change_exact_original_bytes(tmp_path):
+    old, new = changed()
+    new['source_revision'] = 'retained-archive-label-with-same-member-and-body'
+    assert run(tmp_path, [old], [new])[0] == [new]

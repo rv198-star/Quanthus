@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import subprocess
+import time
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -70,6 +72,50 @@ def failure(
         return record
 
 
+def _daily_service_started_at() -> float | None:
+    try:
+        started = (
+            int(
+                subprocess.check_output(
+                    [
+                        "systemctl",
+                        "show",
+                        "quanthus-daily-core@cn01.service",
+                        "--property=ExecMainStartTimestampMonotonic",
+                        "--value",
+                    ],
+                    text=True,
+                    timeout=5,
+                    stderr=subprocess.DEVNULL,
+                ).strip()
+            )
+            / 1_000_000
+        )
+        return time.time() - (time.monotonic() - started) if started > 0 else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def _daily_failure_target(now: datetime, path: Path) -> tuple[date, str]:
+    fallback = (now.date(), "运行日期（目标交易日未确定）")
+    service_start = _daily_service_started_at()
+    if service_start is None:
+        return fallback
+    try:
+        state = object_at(path)
+        started = datetime.fromisoformat(state["started_at"])
+        if (
+            started.tzinfo is None
+            or not service_start - 1 <= started.timestamp() <= now.timestamp()
+        ):
+            return fallback
+        failures = [item for item in state.get("attempts", []) if item.get("returncode")]
+        candidate = failures[-1]["market_date"] if failures else state.get("active_market_date")
+        return (date.fromisoformat(candidate), "交易日") if candidate else fallback
+    except (OSError, ValueError, TypeError, KeyError):
+        return fallback
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--daily-cycle-failure", action="store_true", required=True)
@@ -78,19 +124,7 @@ def main() -> int:
     from quanthus.pipelines.p10_complete_daily_cycle import DAILY, JOURNAL
     from quanthus.pipelines.p10_complete_daily_schedule import CST
 
-    today = datetime.now(CST).date()
-    target = today
-    label = "运行日期（目标交易日未确定）"
-    state_path = DAILY / "operations/LATEST.json"
-    if state_path.exists():
-        state = object_at(state_path)
-        started = datetime.fromisoformat(state["started_at"])
-        if started.date() == today:
-            failures = [item for item in state.get("attempts", []) if item.get("returncode")]
-            candidate = failures[-1]["market_date"] if failures else state.get("active_market_date")
-            if candidate:
-                target = date.fromisoformat(candidate)
-                label = "交易日"
+    target, label = _daily_failure_target(datetime.now(CST), DAILY / "operations/LATEST.json")
     record = failure(
         day=target,
         stage="daily_cycle",

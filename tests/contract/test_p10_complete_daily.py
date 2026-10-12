@@ -656,6 +656,7 @@ def test_minute_deadline_reports_late_seal_even_when_quality_passes(
             {
                 "package_path": str(package),
                 "manifest_sha256": file_digest(package / "manifest.json"),
+                "first_verified_published_at": "2026-10-13T05:00:02+00:00",
             },
         )
     result = deadline.evaluate(
@@ -665,6 +666,29 @@ def test_minute_deadline_reports_late_seal_even_when_quality_passes(
         product=tmp_path / "minute",
     )
     assert result["status"] == "failed"
+
+    for interval, package in [("1m", m1), ("5m", m5)]:
+        manifest = json.loads((package / "manifest.json").read_text())
+        manifest["sealed_at"] = "2026-10-13T04:59:58+00:00"
+        atomic(package / "manifest.json", manifest)
+        (package / "READY").write_text(file_digest(package / "manifest.json") + "\n")
+        atomic(
+            tmp_path / "minute" / interval / "date-pointers" / f"{DAY}.json",
+            {
+                "package_path": str(package),
+                "manifest_sha256": file_digest(package / "manifest.json"),
+                "first_verified_published_at": "2026-10-13T04:59:59+00:00",
+            },
+        )
+    assert (
+        deadline.evaluate(
+            stage="minutes",
+            now=datetime(2026, 10, 13, 13, 5, tzinfo=schedule.CST),
+            rows=calendar(),
+            product=tmp_path / "minute",
+        )["status"]
+        == "passed"
+    )
 
 
 def test_daily_cycle_failure_mail_uses_actual_failed_target(
@@ -683,9 +707,36 @@ def test_daily_cycle_failure_mail_uses_actual_failed_target(
     )
     monkeypatch.setattr(cycle, "DAILY", tmp_path / "daily")
     monkeypatch.setattr(cycle, "JOURNAL", tmp_path / "journal")
+    monkeypatch.setattr(
+        notifications,
+        "_daily_service_started_at",
+        lambda: datetime.now(schedule.CST).timestamp() - 10,
+    )
     observed = []
     monkeypatch.setattr(notifications, "failure", lambda **kwargs: observed.append(kwargs) or {})
     monkeypatch.setattr(sys, "argv", ["notification", "--daily-cycle-failure"])
     assert notifications.main() == 0
     assert observed[0]["day"] == date(2026, 10, 9)
     assert observed[0]["context"]["market_date_label"] == "交易日"
+
+
+def test_daily_failure_stale_or_malformed_context_uses_explicit_unresolved_date(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    now = datetime.now(schedule.CST)
+    monkeypatch.setattr(notifications, "_daily_service_started_at", lambda: now.timestamp() - 10)
+    path = tmp_path / "LATEST.json"
+    atomic(
+        path,
+        {
+            "started_at": (now - timedelta(hours=1)).isoformat(),
+            "attempts": [{"market_date": "2026-10-09", "returncode": 2}],
+        },
+    )
+    for mode in ("stale", "malformed", "missing"):
+        if mode == "malformed":
+            path.write_text("{bad json")
+        if mode == "missing":
+            path.unlink()
+        day, label = notifications._daily_failure_target(now, path)
+        assert day == now.date() and "运行日期" in label and "未确定" in label

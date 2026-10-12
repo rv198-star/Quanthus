@@ -31,8 +31,9 @@ EXPECTED = {"dwd_financial_report": 19, "dwd_financial_concept": 0, "dwd_financi
 def select_absent(scan: GlobalScan, table: str, schema: Any) -> dict[str, int]:
     """Keep equal source atoms unchanged; any ambiguous overlap fails closed.
 
-    Governance observation clocks may differ between two parser runs. Every
-    other field, including original source identity, time and Decimal, must
+    Governance observation clocks may differ between two parser runs. Concepts
+    retain the approved cumulative earliest period when a subset starts later.
+    Other fields, including original source identity, time and Decimal, must
     agree. There is no last-writer-wins policy or inferred provider acquisition.
     """
     key = KEYS[table]
@@ -48,7 +49,19 @@ def select_absent(scan: GlobalScan, table: str, schema: Any) -> dict[str, int]:
             f'HAVING count(*)>1 OR "{key}" IS NULL LIMIT 1',
             "SPARSE_IMAGE_AMBIGUOUS_IDENTIFIER",
         )
-    fields = [n for n in schema.names if n not in {"knowledge_from", "knowledge_to"}]
+    excluded = {"knowledge_from", "knowledge_to"}
+    if table == "dwd_financial_concept":
+        # The accepted concept rule retains the cumulative earliest period.
+        # A two-member source subset may start later without revising that
+        # broader definition. An earlier start needs a real new version.
+        excluded.add("effective_from")
+        scan.reject(
+            f'SELECT 1 FROM {new} n JOIN {old} o USING("{key}") '
+            "WHERE n.effective_from IS NULL OR o.effective_from IS NULL "
+            "OR n.effective_from<o.effective_from LIMIT 1",
+            "SPARSE_IMAGE_CONCEPT_REQUIRES_EARLIER_PERIOD_REVISION",
+        )
+    fields = [n for n in schema.names if n not in excluded]
     conflict = " OR ".join(f'n."{n}" IS DISTINCT FROM o."{n}"' for n in fields)
     scan.reject(
         f'SELECT 1 FROM {new} n JOIN {old} o USING("{key}") WHERE {conflict} LIMIT 1',

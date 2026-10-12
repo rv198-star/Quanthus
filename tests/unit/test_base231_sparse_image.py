@@ -157,3 +157,47 @@ def test_changed_parent_plan_fails_even_if_all_new_scope_hashes_match(tmp_path, 
     (tmp_path / "SCOPE.json").write_bytes(canonical(scope))
     with pytest.raises(RuntimeError, match="PARENT_PLAN_CHANGED"):
         adapter.validate_local_scope(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "new_start,expected",
+    [
+        (NEW, None),
+        (OLD, None),
+        (datetime(2026, 1, 1, tzinfo=timezone.utc), "EARLIER_PERIOD_REVISION"),
+    ],
+)
+def test_concept_subset_reuses_cumulative_earliest_definition(tmp_path, new_start, expected):
+    table = "dwd_financial_concept"
+    schema = pa.schema(
+        [
+            ("financial_concept_id", pa.string()),
+            ("concept_name", pa.string()),
+            ("effective_from", pa.timestamp("us", tz="UTC")),
+        ]
+    )
+    with (
+        Budget(tmp_path / "job", [], Limits(free_floor_bytes=1024**2)) as budget,
+        GlobalScan(budget) as scan,
+    ):
+        for name, start in [("prior_" + table, OLD), ("sparse_" + table, new_start)]:
+            p = budget.root / (name + ".parquet")
+            pq.write_table(
+                pa.Table.from_pylist(
+                    [
+                        {
+                            "financial_concept_id": "same-definition",
+                            "concept_name": "literal",
+                            "effective_from": start,
+                        }
+                    ],
+                    schema=schema,
+                ),
+                p,
+            )
+            scan.add(name, [p])
+        if expected:
+            with pytest.raises(RuntimeError, match=expected):
+                adapter.select_absent(scan, table, schema)
+        else:
+            assert adapter.select_absent(scan, table, schema)["new_identifiers"] == 0

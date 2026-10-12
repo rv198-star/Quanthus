@@ -584,6 +584,18 @@ exits. The successor records only representation fields from the complete
 certified source matrix. Its TMP has offline physical/hash checks and bounded
 reproduction, not whole-image or transaction-equivalence acceptance.
 
+`base231_image.py` defines the patch integration and whole-image acceptance mode.
+It reproduces additive selection and exact-original-body representation repairs
+from image-local immutable inputs, pairs every authorized old interval end with
+its successor, and preserves all other old atoms. Financial additions retain
+their separate namespace; 29 unaffected tables must match the exact predecessor
+file/partition hashes. The 33-table native evaluator is unchanged and follows
+inherited repair qualification and patch replay. A new 2.3.1 manifest and READY
+are written only after full structural checks; two source/network-denied cold
+relocations and missing/corrupt faults remain separate mandatory acceptance.
+Local unresolved domains retain scoped use limits, not an unconditional veto
+on unrelated qualified patch data.
+
 | ID | Work | Current state | Acceptance evidence |
 | --- | --- | --- | --- |
 | `META-DATA-DWD-002` | Build the product-bounded seven-domain DWD Base V2 | 33 DWD objects accepted; recurring daily maintenance active; generic DWS deferred | `config/releases/v2-build202607.json`, package manifest, script tests, and build receipts |

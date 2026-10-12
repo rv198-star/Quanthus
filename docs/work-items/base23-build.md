@@ -65,6 +65,16 @@ unchanged. No source collection, push, production switch or complete patch mirro
 has occurred. Current receipts, focused/full-check logs and readonly handoff own
 actual completion; superseded experiments stay historical, not active gaps.
 
+The Owner directed continuation through the remaining integration/whole-mirror
+acceptance, rather than stopping at the domain handoff. The patch integrates
+qualified financial additions, 186 holder additions and 8,347 representation
+successor versions, keeping other records/uses unchanged. `base231_image.py`
+binds these exact allowed changes and inherited action qualification to the
+complete native 33-table verifier. A new per-device capacity registration and
+unique isolated image/copies precede execution; actual whole-image receipts, not
+the earlier domain result, establish completion. No push, deployment, CURRENT
+change or supplier collection follows from this continuation.
+
 ### October 10 release scope and follow-on versions
 
 The Owner proposed closing Base 2.3 for the current daily purpose and moving the

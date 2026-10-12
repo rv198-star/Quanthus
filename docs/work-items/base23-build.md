@@ -24,6 +24,42 @@ runtime old-path fallback is allowed. The new mirror must stand alone.
 
 ## Current recovery checkpoint
 
+### October 12 whole-mirror integration acceptance
+
+The selected qualified patch is now integrated into the complete isolated
+33-table DWD 2.3.1 image through 2026-09-30 Asia/Shanghai:
+`/srv/quanthus-base22-data/delivery/base231-whole-image-20261012T122601Z-70984a5/image`.
+Manifest SHA256 `sha256:ecc52ff2ac9b88b5b7146e00b6c53160e2d4cce895d6d71a0dc7e2527a945930`;
+content digest `sha256:194630541fbb7db368725c59b0e545ad6a51845293cf22ef86be5b0e1a4aea0c`;
+whole acceptance identity `sha256:9b7cc555828c0a70f0f2ab3f54d550d19b857a7a3e0257f38e69c336d13cc258`.
+Execution commit was `70984a5be85f58bd44899dc8adeec8dd2d2bd448`. Recover exact receipts from
+`artifacts/base231-whole-image-20261012T122601Z-70984a5/whole-independent-acceptance-safe.json`.
+All 460,803,838 rows were checked through the full native schema/partition,
+global key/version, lineage, time/calendar and reference path. Three independent
+physical data images/new processes reproduced inherited repairs and exact patch
+selection, with old sources/caches hidden and network disabled. Two relocations
+and disposable missing/corrupt negatives passed; the final immutable manifest
+and READY were written last and exact headers added to the audited copies.
+The image-local gap ledger is the immutable assembly qualification snapshot;
+use the new handoff current-gaps.json and these completed receipts for current
+integration status. Prior NOT_BUILT/TMP statuses below are retained history.
+
+Added 49,900 reports, 32 literal concepts, 798,400 facts, 186 holder components
+and 8,347 same-original-source representation knowledge versions, closing only
+the paired 8,347 old intervals without changing old scalar values/provenance.
+Other 29 tables retain exact physical predecessor identities. Provider PIT,
+canonical financial units, incomplete/mixed-provenance shareholder matrices,
+transaction equivalence and later September F10 freshness remain limited.
+The 20,108 source change atoms are evidence only, never merged/netted as proven
+transactions. 4,173 unavailable visibility exceptions and earlier tail decisions
+remain unchanged. Existing ODS 2.3 raw identity is unchanged; this DWD patch is
+not an independently newly acquired ODS 2.3.1 release. No push, cloud upload,
+CURRENT/deployment or consumer-admission change occurred; Owner review is separate.
+
+Actual venv `make check`: 5,738 passed, 21 skipped, 62 warnings. Focused 69 tests,
+new-module lint and strict typing passed. Preserve 216 existing repository lint
+failures and the initial system-Python missing-dependency collection failure.
+
 ### October 12 selected Base 2.3.1 packages
 
 The Owner selected financial-summary extensions and complete shareholder

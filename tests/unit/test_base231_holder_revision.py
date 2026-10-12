@@ -35,7 +35,7 @@ def test_same_artifact_but_different_body_identity_is_not_representation_repair(
     assert run(tmp_path, [old], [new])[0] == []
 
 
-def test_changed_scalar_holds_the_entire_frame(tmp_path):
+def test_changed_scalar_cannot_be_repaired(tmp_path):
     old, new = changed()
     new['holding_quantity'] += 1
     assert run(tmp_path, [old], [new])[0] == []
@@ -56,7 +56,8 @@ def test_prior_closed_or_nonforward_knowledge_is_not_reopened(tmp_path):
 def test_missing_old_holder_cannot_be_disposed_as_exit(tmp_path):
     old, new = changed()
     missing = dict(old, holder_rank=2, shareholder_source_name='另一合成股东')
-    assert run(tmp_path, [old, missing], [new])[0] == []
+    selected, _ = run(tmp_path, [old, missing], [new])
+    assert selected == [new]  # Missing holder remains unchanged; no inferred exit.
 
 
 def test_closed_history_preserves_every_old_field_except_interval_end(tmp_path):

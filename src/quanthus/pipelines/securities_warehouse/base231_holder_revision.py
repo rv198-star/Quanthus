@@ -1,6 +1,6 @@
 """Same-original-body holder representation repair, never value priority.
 
-Only frames whose old latest components match unique new coordinates, exact
+Only components whose old latest records match unique new coordinates, exact
 original artifact/body identity and all scalar/text fields may gain a new
 representation version. Old open rows close at the real governance clock; their
 values and provenance remain intact. This is a bounded integration TMP.
@@ -28,43 +28,46 @@ def revision_views(scan: GlobalScan) -> None:
     condition = (unchanged + " AND " + provenance
                  + " AND o.knowledge_to IS NULL AND n.knowledge_to IS NULL"
                  + " AND n.knowledge_from>o.knowledge_from")
-    frame_match = " AND ".join("o." + k + " IS NOT DISTINCT FROM f." + k for k in FRAME)
-    frame_new = " AND ".join("n." + k + " IS NOT DISTINCT FROM f." + k for k in FRAME)
-    # Materialize this one scoped dependency once. Correlated re-expansion of
-    # prior window/sort views consumed unnecessary memory on real frames.
+    # The complete new source matrix is already certified. Repair only a
+    # uniquely matched component; other old components stay untouched. No
+    # absence is converted into an exit and no entire mixed-provenance frame is
+    # replaced. One scoped typed dependency serves both output views.
     scan.connection.execute("CREATE TEMP TABLE representation_prior AS SELECT * "
                             "FROM prior_holding WHERE __n=1")
     scan.connection.execute("CREATE TEMP TABLE representation_next AS SELECT * FROM next_holding")
-    keys = ",".join("o." + k for k in COMPONENT_KEYS)
-    scan.connection.execute("CREATE TEMP TABLE representation_matches AS SELECT " + keys
-                            + ",count(*) FILTER(WHERE " + condition + ") AS __matches "
-                            "FROM representation_prior o LEFT JOIN representation_next n ON "
-                            + match + " GROUP BY " + keys)
-    scan.connection.execute("CREATE TEMP TABLE representation_candidates AS SELECT * "
-                            "FROM held_frames")
-    clock_join = " AND ".join("c." + k + " IS NOT DISTINCT FROM f." + k for k in FRAME)
-    clock_cols = ",".join(FRAME)
-    scan.connection.execute("CREATE TEMP TABLE representation_clocks AS SELECT " + clock_cols
-                            + ",min(knowledge_from) AS __clock,max(knowledge_from) AS __last "
-                            "FROM representation_next GROUP BY " + clock_cols)
-    scan.connection.execute("CREATE TEMP TABLE representation_safe_frames AS SELECT f.*,c.__clock "
-                            "FROM representation_candidates f JOIN representation_clocks c ON "
-                            + clock_join + " WHERE c.__clock=c.__last AND NOT EXISTS(SELECT 1 "
-                            "FROM representation_matches o WHERE " + frame_match
-                            + " AND o.__matches<>1) AND NOT EXISTS(SELECT 1 "
-                            "FROM representation_next n WHERE " + frame_new
-                            + " AND NOT EXISTS(SELECT 1 FROM representation_prior o WHERE "
-                            + frame_match + " AND " + provenance + "))")
+    coarse_cols = ",".join(coarse)
+    scan.connection.execute("CREATE TEMP TABLE representation_old_census AS SELECT " + coarse_cols
+                            + ",count(*) AS __count FROM representation_prior GROUP BY "
+                            + coarse_cols)
+    scan.connection.execute("CREATE TEMP TABLE representation_new_census AS SELECT " + coarse_cols
+                            + ",count(*) AS __count FROM representation_next GROUP BY "
+                            + coarse_cols)
+    count_old = " AND ".join("o." + k + " IS NOT DISTINCT FROM x." + k for k in coarse)
+    count_new = " AND ".join("n." + k + " IS NOT DISTINCT FROM y." + k for k in coarse)
+    changed = " OR ".join("o." + k + " IS DISTINCT FROM n." + k for k in (
+        "share_nature", "holder_category", "holding_percentage_unit"))
+    old_keys = ",".join("o." + k for k in COMPONENT_KEYS)
+    scan.connection.execute("CREATE TEMP TABLE representation_pairs AS SELECT " + old_keys
+                            + ",n.knowledge_from AS __clock FROM representation_prior o JOIN "
+                            "representation_next n ON " + match + " JOIN representation_old_census "
+                            "x ON " + count_old + " JOIN representation_new_census y ON " + count_new
+                            + " WHERE x.__count=1 AND y.__count=1 AND " + condition
+                            + " AND (" + changed + ")")
+    frame_cols = ",".join(FRAME)
+    scan.connection.execute("CREATE TEMP VIEW representation_safe_frames AS SELECT DISTINCT "
+                            + frame_cols + " FROM representation_pairs")
+    pairs_new = " AND ".join("n." + k + " IS NOT DISTINCT FROM f." + k for k in coarse)
+    pairs_old = " AND ".join("o." + k + " IS NOT DISTINCT FROM f." + k for k in COMPONENT_KEYS)
     names = schemas()[HOLDING].names
     columns = ",".join("n." + k for k in names)
     scan.connection.execute("CREATE TEMP VIEW representation_revisions AS SELECT " + columns
-                            + " FROM representation_next n JOIN representation_safe_frames f ON "
-                            + frame_new)
+                            + " FROM representation_next n JOIN representation_pairs f ON "
+                            + pairs_new)
     columns_old = ",".join("f.__clock AS knowledge_to" if k == "knowledge_to"
                            else "o." + k for k in names)
     scan.connection.execute("CREATE TEMP VIEW representation_closed_old AS SELECT " + columns_old
-                            + " FROM representation_prior o JOIN representation_safe_frames f ON "
-                            + frame_match)
+                            + " FROM representation_prior o JOIN representation_pairs f ON "
+                            + pairs_old)
 
 
 def replay_representation_tmp(root: Path, budget: Budget) -> dict[str, Any]:

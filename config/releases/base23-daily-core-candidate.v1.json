@@ -1,0 +1,49 @@
+{
+  "schema_version": 3,
+  "kind": "quanthus_base_build_release",
+  "build_id": "V2.3-Build20260930",
+  "display_name": "Base 2.3 native daily-core parent-reference candidate",
+  "release_status": "pending_target_acceptance",
+  "through_date": "2026-09-30",
+  "layers": {
+    "dwd": {
+      "package_id": "dwd-base-202609-v2.3",
+      "format": "native_base23",
+      "manifest_sha256": "sha256:6991d0c9440d4117c3dfdd3375e2267d0e43174203fc834751c9476cd7598206",
+      "content_digest": "sha256:f5b1c35e9d60874a5daa8ce36f50d8d4edf62317075e3f223d344a1eb7292608",
+      "materialization_sha256": "sha256:c3c1eed800ea9180498c4bef1c98bf89f1f15d0f400e7dbc74a10a700f401da5"
+    },
+    "ods": {
+      "package_id": "ods-base-202609-v2.3-20261010T094453Z-a240455-r2-31f9f72-r3-de0df76",
+      "format": "ods_base_bundle",
+      "manifest_sha256": "sha256:74d57fa5ce944a673a961f5f89ea58f497d3f3b288846841fbb7ab5d1fda3a2b",
+      "content_digest": "sha256:b940bdf91bf2e99337eba2f685de7ac019f4c0e59e28846e81e29b34808c4f2b"
+    }
+  },
+  "daily_core_parent_reference": {
+    "status": "pending",
+    "product_scope": "daily-core-v1",
+    "governance_use": "governance_baseline",
+    "tables": [
+      "dwd_listing",
+      "dwd_security",
+      "dwd_trading_calendar",
+      "dwd_market_index",
+      "dwd_trading_venue"
+    ],
+    "trading_or_research_admission": false,
+    "acceptance_receipts": [],
+    "note": "Populate only with separately verified complete cold receipts and the accepted bounded consumer disposition; source image NOT_GRANTED remains unchanged."
+  },
+  "daily_core_transition": {
+    "policy": "preserve_existing_october_bytes_and_old_base_lineage",
+    "accepted_prior_manifests": {
+      "sha256:77dddd0ea29ac0783291970fb0c34e9a0debb16e6f328ddcf6758aad692f0172": {
+        "market_date": "2026-10-09",
+        "base_manifest_sha256": "sha256:541c2684b4eb53199e5f09c596c43d1fb37ed5bd8395c686404a95796dece08b"
+      }
+    },
+    "note": "Exact retained CN01/OCI prior identity observed; core bytes are deeply verified again before use. Hermes needs a fresh node verification and exact prior entry. Overall native parent admission remains pending."
+  },
+  "paired_manifest_sha256": "sha256:71a52c1be7266b4ad6843b1e94d7920a4e22384422b0d171b6199f1ec725c5d8"
+}

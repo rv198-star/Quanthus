@@ -26,7 +26,7 @@ from quanthus.event_library.physical_scan import (
 )
 from quanthus.event_library.rule_card import load_candidate_rule_card
 from quanthus.event_library.scan import scan_candidate_series_shard
-from quanthus.event_library.source import load_event_scan_source_policy
+from quanthus.event_library.source import event_scan_release_path, load_event_scan_source_policy
 from quanthus.event_library.splits import load_split_policy
 from quanthus.feature_registry import load_feature_registry
 from quanthus.policy import find_project_root
@@ -126,12 +126,10 @@ def _merge(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _scan(payload: Mapping[str, Any], project_root: Path) -> dict[str, Any]:
-    projection = load_p4_research_adm(
-        Path(str(payload["adm_root"])), project_root=project_root
-    )
+    projection = load_p4_research_adm(Path(str(payload["adm_root"])), project_root=project_root)
     source = load_event_scan_source_policy(
         _project_path(payload["source_policy"], project_root),
-        release_path=project_root / "config/releases/v2-build202607.json",
+        release_path=event_scan_release_path(_project_path(payload["source_policy"], project_root)),
         provider_path=_project_path(payload["provider_config"], project_root),
     )
     card = load_candidate_rule_card(_project_path(payload["rule_card"], project_root))
@@ -244,6 +242,5 @@ def execute_event_shard_task(payload: Mapping[str, Any]) -> dict[str, Any]:
         **result,
         "kind": kind,
         "wall_seconds": round(time.perf_counter() - started, 3),
-        "process_peak_rss_bytes": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
-        * 1024,
+        "process_peak_rss_bytes": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) * 1024,
     }

@@ -16,6 +16,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from quanthus.backtest import native_dwd_source
 from quanthus.backtest.benchmark import BenchmarkCurve, load_benchmark_curve
 from quanthus.backtest.historical_bundle import HistoricalReplayBundle
 from quanthus.backtest.historical_frames import HistoricalReplayFrameReader
@@ -50,6 +51,27 @@ _DAILY_MERGE_PRIORITY = (
     "trading_calendar",
 )
 _CANONICAL_PROJECTION_RECEIPT = "config/p4-direct-dwd-canonical-projection.v1.json"
+
+
+def _materializer_version(config: Any | None) -> str:
+    if config is not None and native_dwd_source.is_native(config):
+        return native_dwd_source.MATERIALIZER_VERSION
+    return MATERIALIZER_VERSION
+
+
+def _canonical_receipt_path(config: Any | None) -> Path:
+    if config is not None and native_dwd_source.is_native(config):
+        return find_project_root(config.path) / native_dwd_source.CANONICAL_RECEIPT
+    return find_project_root() / _CANONICAL_PROJECTION_RECEIPT
+
+
+def _native_lineage(config: Any) -> dict[str, str]:
+    if not native_dwd_source.is_native(config):
+        return {}
+    options = native_dwd_source.native_options(config)
+    return {"native_correction_continuation_sha256": options["continuation"]["sha256"]}
+
+
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _NONNEGATIVE_INTEGER = re.compile(r"^(0|[1-9][0-9]*)$")
 _LOGICAL_PROJECTION_DATASETS = frozenset(
@@ -205,9 +227,7 @@ def _validated_logical_digest(value: object, dataset: str) -> dict[str, Any] | N
             )
         )
     ):
-        raise ConfigurationError(
-            f"direct DWD canonical logical evidence is invalid for {dataset}"
-        )
+        raise ConfigurationError(f"direct DWD canonical logical evidence is invalid for {dataset}")
     return dict(value)
 
 
@@ -303,6 +323,12 @@ class _ProjectionConnections:
         self._connection: Any | None = None
         self._spill: Path | None = None
 
+    def _source_paths(self, table: str, legacy_relative: str) -> str:
+        if (self._payload.parent / "MATERIALIZATION.json").is_file():
+            paths = native_dwd_source.physical_paths(self._payload.parent, table)
+            return "[" + ",".join(_sql_path(path) for path in paths) + "]"
+        return _sql_path(self._payload / legacy_relative)
+
     def open(self, projection: str, *, memory_limit: str = DUCKDB_MEMORY_LIMIT) -> Any:
         self.close()
         spill = self._root / f".duckdb-materialize-spill-{projection}"
@@ -313,23 +339,27 @@ class _ProjectionConnections:
             connection.execute("SET threads=1")
             connection.execute("SET preserve_insertion_order=false")
             connection.execute(f"SET temp_directory={_sql_path(spill)}")
+            if (self._payload.parent / "MATERIALIZATION.json").is_file():
+                # Bound native spill while allowing the measured full-window join.
+                connection.execute("SET max_temp_directory_size='6GiB'")
             connection.execute(
                 f"""
                 CREATE VIEW dwd_security AS
                 SELECT * FROM read_parquet({
-                    _sql_path(self._payload / "listed_company/dwd_security.parquet")
+                    self._source_paths("dwd_security", "listed_company/dwd_security.parquet")
                 })
                 WHERE knowledge_to IS NULL;
                 CREATE VIEW dwd_listing AS
                 SELECT * FROM read_parquet({
-                    _sql_path(self._payload / "listed_company/dwd_listing.parquet")
+                    self._source_paths("dwd_listing", "listed_company/dwd_listing.parquet")
                 })
                 WHERE knowledge_to IS NULL;
                 CREATE VIEW dwd_bar AS
                 SELECT * FROM read_parquet(
                   {
-                    _sql_path(
-                        self._payload / "security_market_observation/dwd_security_bar/**/*.parquet"
+                    self._source_paths(
+                        "dwd_security_bar",
+                        "security_market_observation/dwd_security_bar/**/*.parquet",
                     )
                 },
                   hive_partitioning=true
@@ -341,7 +371,10 @@ class _ProjectionConnections:
                 CREATE VIEW dwd_calendar AS
                 SELECT * FROM read_parquet(
                   {
-                    _sql_path(self._payload / "tradability_state/dwd_trading_calendar/**/*.parquet")
+                    self._source_paths(
+                        "dwd_trading_calendar",
+                        "tradability_state/dwd_trading_calendar/**/*.parquet",
+                    )
                 },
                   hive_partitioning=true
                 )
@@ -363,8 +396,9 @@ class _ProjectionConnections:
                 CREATE VIEW dwd_state AS
                 SELECT base.* FROM read_parquet(
                   {
-                    _sql_path(
-                        self._payload / "tradability_state/dwd_tradability_state/**/*.parquet"
+                    self._source_paths(
+                        "dwd_tradability_state",
+                        "tradability_state/dwd_tradability_state/**/*.parquet",
                     )
                 },
                   hive_partitioning=true
@@ -758,9 +792,7 @@ def _materialize(
         required_datasets = (
             _DAILY_PARTITIONED_DATASETS
             if allow_empty_non_partitioned
-            else tuple(
-                name for name in DATASETS if name != "corporate_action_exceptions"
-            )
+            else tuple(name for name in DATASETS if name != "corporate_action_exceptions")
         )
         if any(counts[name] <= 0 for name in required_datasets):
             raise ConfigurationError("direct DWD materialization produced an empty required table")
@@ -934,14 +966,8 @@ def assemble_direct_dwd_projection(
             )
             for name in DATASETS
         }
-        if any(
-            counts[name] <= 0
-            for name in DATASETS
-            if name != "corporate_action_exceptions"
-        ):
-            raise ConfigurationError(
-                "merged direct DWD shards produced an empty required table"
-            )
+        if any(counts[name] <= 0 for name in DATASETS if name != "corporate_action_exceptions"):
+            raise ConfigurationError("merged direct DWD shards produced an empty required table")
         try:
             import duckdb
         except ModuleNotFoundError as exc:
@@ -1026,12 +1052,9 @@ def materialize_sharded_direct_dwd(
                 for spec in execution_specs
             )
             completed = tuple(future.result() for future in futures)
-        by_partition = {
-            partition_id: counts for partition_id, counts, _elapsed in completed
-        }
+        by_partition = {partition_id: counts for partition_id, counts, _elapsed in completed}
         elapsed_by_partition = {
-            partition_id: round(elapsed, 3)
-            for partition_id, _counts, elapsed in completed
+            partition_id: round(elapsed, 3) for partition_id, _counts, elapsed in completed
         }
         if set(by_partition) != {spec.partition_id for spec in specs}:
             raise ConfigurationError("direct DWD shard completion set differs")
@@ -1052,11 +1075,7 @@ def materialize_sharded_direct_dwd(
                     merge_direct_dwd_date_partitions,
                     name,
                     tuple(
-                        str(
-                            partition_paths[spec.partition_id]
-                            / "tables"
-                            / f"{name}.parquet"
-                        )
+                        str(partition_paths[spec.partition_id] / "tables" / f"{name}.parquet")
                         for spec in specs
                     ),
                     str(tables / f"{name}.parquet"),
@@ -1074,22 +1093,14 @@ def materialize_sharded_direct_dwd(
 
         counts = {
             name: (
-                sum(
-                    by_partition[spec.partition_id][name] for spec in specs
-                )
+                sum(by_partition[spec.partition_id][name] for spec in specs)
                 if name in _DAILY_PARTITIONED_DATASETS
                 else by_partition[specs[-1].partition_id][name]
             )
             for name in DATASETS
         }
-        if any(
-            counts[name] <= 0
-            for name in DATASETS
-            if name != "corporate_action_exceptions"
-        ):
-            raise ConfigurationError(
-                "merged direct DWD shards produced an empty required table"
-            )
+        if any(counts[name] <= 0 for name in DATASETS if name != "corporate_action_exceptions"):
+            raise ConfigurationError("merged direct DWD shards produced an empty required table")
         if progress is not None:
             progress(
                 "dwd-shard-merge-ready",
@@ -1109,6 +1120,12 @@ def _direct_dwd_authority(
     assert config.benchmark_path is not None and config.benchmark_sha256 is not None
     assert config.industry_path is not None and config.industry_sha256 is not None
     assert config.history_start is not None
+    if native_dwd_source.is_native(config):
+        native, correction_identity, correction = native_dwd_source.verify_source(config)
+        native_dwd_source.require_canonical_admission(config)
+        if progress is not None:
+            progress("native-dwd-authority-validated", native.binding)
+        return dict(config.dwd_identity), correction_identity, correction
     dwd_manifest_path = config.dwd_root / "manifest.json"
     correction_manifest_path = config.correction_root / "manifest.json"
     dwd_manifest = _object(dwd_manifest_path, "DWD manifest")
@@ -1165,7 +1182,7 @@ def _bind_canonical_projection_identity(
     actual_dwd: Mapping[str, Any],
     actual_correction: Mapping[str, Any],
 ) -> tuple[HistoricalReplayBundle, str, str]:
-    receipt_path = find_project_root() / _CANONICAL_PROJECTION_RECEIPT
+    receipt_path = _canonical_receipt_path(config)
     receipt = _object(receipt_path, "direct DWD canonical projection receipt")
     expected_fields = {
         "schema_version",
@@ -1189,7 +1206,7 @@ def _bind_canonical_projection_identity(
         raise ConfigurationError("direct DWD canonical projection receipt id is invalid")
     bindings = {
         "provider_config_digest": config.digest,
-        "materializer_version": MATERIALIZER_VERSION,
+        "materializer_version": _materializer_version(config),
         "history_start": config.history_start.isoformat(),
         "scope": config.scope.to_dict(),
         "dwd_authority": dict(actual_dwd),
@@ -1292,6 +1309,7 @@ def _validate_parent_canonical_projection_authority(
     *,
     actual_dwd: Mapping[str, Any],
     actual_correction: Mapping[str, Any],
+    config: Any | None = None,
 ) -> tuple[str, str, str]:
     """Bind a bounded derivative projection to the accepted canonical parent authority.
 
@@ -1301,7 +1319,7 @@ def _validate_parent_canonical_projection_authority(
     physical/content identity and must be independently reproduced by its consumer qualification.
     """
 
-    receipt_path = find_project_root() / _CANONICAL_PROJECTION_RECEIPT
+    receipt_path = _canonical_receipt_path(config)
     receipt = _object(receipt_path, "direct DWD canonical projection receipt")
     expected_fields = {
         "schema_version",
@@ -1326,7 +1344,7 @@ def _validate_parent_canonical_projection_authority(
     if (
         not isinstance(receipt_id, str)
         or not receipt_id.strip()
-        or receipt.get("materializer_version") != MATERIALIZER_VERSION
+        or receipt.get("materializer_version") != _materializer_version(config)
         or receipt.get("dwd_authority") != dict(actual_dwd)
         or receipt.get("dwd_correction") != dict(actual_correction)
         or not isinstance(canonical_bundle_digest, str)
@@ -1338,7 +1356,7 @@ def _validate_parent_canonical_projection_authority(
     return canonical_bundle_digest, _sha256(receipt_path), receipt_id
 
 
-def _materialized_direct_dwd_session(
+def _physical_direct_dwd_bundle(
     config: Any,
     *,
     root: Path,
@@ -1346,17 +1364,17 @@ def _materialized_direct_dwd_session(
     actual_dwd: Mapping[str, Any],
     actual_correction: Mapping[str, Any],
     correction_manifest: Mapping[str, Any],
-    temporary: tempfile.TemporaryDirectory[str] | None,
-    projection_binding: str = "canonical",
-) -> Any:
-    from quanthus.backtest.data_provider import ReplayDataSession
-
+) -> tuple[HistoricalReplayBundle, dict[str, str]]:
+    """Construct physical identity for both qualification and admitted reads."""
     if root.is_symlink() or not root.is_dir() or set(counts) != set(DATASETS):
         raise ConfigurationError("materialized direct DWD projection is invalid")
     files = {name: _sha256(root / "tables" / f"{name}.parquet") for name in DATASETS}
-    created_at = datetime.fromisoformat(
-        str(correction_manifest["built_at"]).replace("Z", "+00:00")
-    )
+    created_at_text = correction_manifest["built_at"]
+    if native_dwd_source.is_native(config):
+        created_at_text = native_dwd_source.native_options(config)["projection_created_at"]
+    created_at = datetime.fromisoformat(str(created_at_text).replace("Z", "+00:00"))
+    if created_at.tzinfo is None or created_at.utcoffset() is None:
+        raise ConfigurationError("direct DWD projection creation clock must be aware")
     snapshot = SnapshotRef(
         market_date=date.fromisoformat(str(actual_dwd["through_date"])),
         knowledge_cutoff=datetime.combine(
@@ -1365,21 +1383,20 @@ def _materialized_direct_dwd_session(
             tzinfo=created_at.tzinfo,
         ),
         source_revision=(
-            f"{MATERIALIZER_VERSION}|{actual_dwd['package_id']}|"
+            f"{_materializer_version(config)}|{actual_dwd['package_id']}|"
             f"{actual_correction['correction_id']}|retrospective-record-view"
         ),
-        snapshot_id=(
-            f"job-local-{actual_dwd['package_id']}-{actual_correction['correction_id']}"
-        ),
+        snapshot_id=(f"job-local-{actual_dwd['package_id']}-{actual_correction['correction_id']}"),
     )
     manifests = tuple(
         DatasetManifest(
             dataset=name,
-            version=MATERIALIZER_VERSION,
+            version=_materializer_version(config),
             source_revisions={
                 "dwd_package_id": str(actual_dwd["package_id"]),
                 "dwd_correction_id": str(actual_correction["correction_id"]),
                 "pit_evidence": "retrospective_dwd_record_view",
+                **_native_lineage(config),
             },
             row_count=int(counts[name]),
             partitions=(f"tables/{name}.parquet",),
@@ -1396,6 +1413,30 @@ def _materialized_direct_dwd_session(
         universe_policy_version="dwd-current-listing-state-v1",
         datasets=manifests,
     )
+    return physical_bundle, files
+
+
+def _materialized_direct_dwd_session(
+    config: Any,
+    *,
+    root: Path,
+    counts: Mapping[str, int],
+    actual_dwd: Mapping[str, Any],
+    actual_correction: Mapping[str, Any],
+    correction_manifest: Mapping[str, Any],
+    temporary: tempfile.TemporaryDirectory[str] | None,
+    projection_binding: str = "canonical",
+) -> Any:
+    from quanthus.backtest.data_provider import ReplayDataSession
+
+    physical_bundle, files = _physical_direct_dwd_bundle(
+        config,
+        root=root,
+        counts=counts,
+        actual_dwd=actual_dwd,
+        actual_correction=actual_correction,
+        correction_manifest=correction_manifest,
+    )
     if projection_binding == "canonical":
         bundle, expected_lineage_digest, canonical_receipt_sha256 = (
             _bind_canonical_projection_identity(
@@ -1409,13 +1450,14 @@ def _materialized_direct_dwd_session(
         )
         materialized_content_digest = bundle.digest
         lineage = {
-            "materializer_version": MATERIALIZER_VERSION,
+            "materializer_version": _materializer_version(config),
             "history_start": config.history_start.isoformat(),
             "dwd": dict(actual_dwd),
             "correction": dict(actual_correction),
             "benchmark_sha256": config.benchmark_sha256,
             "industry_sha256": config.industry_sha256,
             "materialized_content_digest": materialized_content_digest,
+            **_native_lineage(config),
         }
         provider_lineage_digest = _digest(lineage)
         if provider_lineage_digest != expected_lineage_digest:
@@ -1431,6 +1473,7 @@ def _materialized_direct_dwd_session(
         ) = _validate_parent_canonical_projection_authority(
             actual_dwd=actual_dwd,
             actual_correction=actual_correction,
+            config=config,
         )
         bundle = physical_bundle
         materialized_content_digest = bundle.digest
@@ -1440,13 +1483,14 @@ def _materialized_direct_dwd_session(
             "parent_canonical_projection_receipt_sha256": parent_canonical_receipt_sha256,
             "provider_config_digest": config.digest,
             "scope": config.scope.to_dict(),
-            "materializer_version": MATERIALIZER_VERSION,
+            "materializer_version": _materializer_version(config),
             "history_start": config.history_start.isoformat(),
             "dwd": dict(actual_dwd),
             "correction": dict(actual_correction),
             "benchmark_sha256": config.benchmark_sha256,
             "industry_sha256": config.industry_sha256,
             "materialized_content_digest": materialized_content_digest,
+            **_native_lineage(config),
         }
         provider_lineage_digest = _digest(lineage)
         projection_identity = {
@@ -1469,13 +1513,14 @@ def _materialized_direct_dwd_session(
             "benchmark_sha256": config.benchmark_sha256,
             "industry_sha256": config.industry_sha256,
         },
-        "materializer_version": MATERIALIZER_VERSION,
+        "materializer_version": _materializer_version(config),
         "history_start": config.history_start.isoformat(),
         "materialized_rows": dict(counts),
         "materialized_content_digest": materialized_content_digest,
         "materialized_physical_digest": physical_bundle.physical_digest,
         **projection_identity,
         "provider_lineage_digest": provider_lineage_digest,
+        **_native_lineage(config),
         "point_in_time": {
             "strategy_cutoff_enforced": True,
             "decision_at_close_execution_at_next_open": True,
@@ -1509,9 +1554,7 @@ def open_materialized_direct_dwd_session(
     """Open a verified generation-bound projection without rebuilding it."""
 
     config.scope.authorize(scope_start, scope_end)
-    actual_dwd, actual_correction, correction_manifest = _direct_dwd_authority(
-        config, progress
-    )
+    actual_dwd, actual_correction, correction_manifest = _direct_dwd_authority(config, progress)
     return _materialized_direct_dwd_session(
         config,
         root=root.resolve(),
@@ -1537,9 +1580,7 @@ def open_bounded_direct_dwd_session(
     """
 
     config.scope.authorize(scope_start, scope_end)
-    actual_dwd, actual_correction, correction_manifest = _direct_dwd_authority(
-        config, progress
-    )
+    actual_dwd, actual_correction, correction_manifest = _direct_dwd_authority(config, progress)
     temporary = tempfile.TemporaryDirectory(prefix="quanthus-direct-dwd-bounded-")
     root = Path(temporary.name)
     try:
@@ -1574,9 +1615,7 @@ def open_direct_dwd_session(
     progress: Callable[[str, Mapping[str, Any]], None] | None = None,
 ) -> Any:
     config.scope.authorize(scope_start, scope_end)
-    actual_dwd, actual_correction, correction_manifest = _direct_dwd_authority(
-        config, progress
-    )
+    actual_dwd, actual_correction, correction_manifest = _direct_dwd_authority(config, progress)
 
     temporary = tempfile.TemporaryDirectory(prefix="quanthus-direct-dwd-")
     root = Path(temporary.name)

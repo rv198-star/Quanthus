@@ -1,0 +1,139 @@
+{
+  "schema_version": "quanthus.base23-oci-consumer-migration.v1",
+  "work_item": "P10-DATA-BASE23-OCI-001",
+  "design_status": "approved",
+  "delivery_gate": "blocked",
+  "decision_time_beijing": "2026-10-12T01:06:00+08:00",
+  "decision": "New OCI replay/event runs use an independently versioned native Base 2.3 source contract and new input-projection baseline. Historical contracts and research conclusions remain immutable.",
+  "replaces": "The unresolved native-successor-versus-frozen-view choice recorded in replay-compatibility-decision-20261011T1612Z.json; retaining an exact old-input compatibility view is not selected.",
+  "maintenance_authorized_at_beijing": "2026-10-11T22:59:00+08:00",
+  "semantic_change": {
+    "evidence": "frozen-projection-specific-delta-20261011T1610Z.json",
+    "evidence_sha256": "63e56392cd7f3ef0bcbfcbee3045f53458281a7dd218e57f4292ed98ad2cc1d9",
+    "scope": "2019-03",
+    "changed_input_rows": 9,
+    "securities": [
+      "000919",
+      "600805",
+      "600810"
+    ],
+    "dates": [
+      "2019-03-27",
+      "2019-03-28",
+      "2019-03-29"
+    ],
+    "example": {
+      "security": "000919",
+      "date": "2019-03-27",
+      "old_close": null,
+      "native_close": "7.9300000000"
+    },
+    "not_a_full_window_difference_count": true
+  },
+  "source": {
+    "package_id": "dwd-base-202609-v2.3",
+    "through_date": "2026-09-30",
+    "manifest_sha256": "sha256:6991d0c9440d4117c3dfdd3375e2267d0e43174203fc834751c9476cd7598206",
+    "materialization_sha256": "sha256:c3c1eed800ea9180498c4bef1c98bf89f1f15d0f400e7dbc74a10a700f401da5",
+    "content_digest": "sha256:f5b1c35e9d60874a5daa8ce36f50d8d4edf62317075e3f223d344a1eb7292608",
+    "physical_directory": "dwd-base-20260930-v2.3"
+  },
+  "purpose": "development retrospective input consumption only; preserve existing strategy cutoff and next-open execution semantics, no per-decision raw publication proof",
+  "correction": {
+    "original_manifest_sha256": "sha256:4c8eeb5c0d74bbf2953f003364fd138832f15a5163254b710f9db8430767ffde",
+    "normalization_manifest_sha256": "sha256:eb770d29f9f4f77dc109c47f6f8c2d3f8950915fd0af3b7e88d933f6f293a5db",
+    "continuation": "Exact original normalization and exception bytes plus explicitly qualified state overlay; never reparent or rewrite the sealed original correction manifest.",
+    "state_preimages_verified": 398108,
+    "native_state_files_byte_matched": 428,
+    "term_conflicts": "178 values differ from both old preimage and correction; one native key absent. Raw action/term/deletion overlays are not transplanted."
+  },
+  "new_runtime_contracts": {
+    "provider": "config/replay-data-provider.base23.v1.json",
+    "source_policy": "config/p4-event-scan-source.base23.v1.json",
+    "projection_receipt": "config/p4-direct-dwd-canonical-projection.base23.v1.json"
+  },
+  "invariants": {
+    "old_contracts_immutable": true,
+    "old_results_immutable": true,
+    "native_manifest_immutable": true,
+    "no_global_admission_toggle": true,
+    "no_p6_or_strategy_execution": true,
+    "no_cn01_or_hermes_operations": true,
+    "no_credentials_or_auth_changes": true,
+    "no_data_via_mac": true
+  },
+  "verification_dag": [
+    {
+      "stage": "source_and_correction",
+      "lifecycle": "evidence",
+      "reuse": "sealed native full-file/cold receipts, exact correction attachment, state preimage census"
+    },
+    {
+      "stage": "native_input_projection",
+      "lifecycle": "TMP",
+      "owner": "versioned direct DWD materializer",
+      "consumers": [
+        "replay",
+        "event"
+      ],
+      "acceptance": "new exact native input receipt and independent verification; no reuse of old canonical digest"
+    },
+    {
+      "stage": "consumer_integration",
+      "lifecycle": "code",
+      "consumers": [
+        "API submission",
+        "event worker",
+        "replay worker",
+        "daily-core mirror"
+      ],
+      "acceptance": "actual runtime contract and mounts, historical catalog lineage preserved"
+    },
+    {
+      "stage": "cutover",
+      "lifecycle": "operations",
+      "preconditions": [
+        "all purpose receipts accepted",
+        "retained local rollback and user-confirmed cloud recoverability basis recorded",
+        "fresh idle jobs and leases"
+      ],
+      "acceptance": "authorized maintenance, actual reads after switch, first scheduled daily-core sync"
+    },
+    {
+      "stage": "retirement",
+      "lifecycle": "operations",
+      "preconditions": [
+        "cutover acceptance complete"
+      ],
+      "acceptance": "remove only recoverable old payload and known duplicates; preserve unique data and evidence"
+    }
+  ],
+  "acceptance": {
+    "source_receipts": "reused_verified",
+    "correction_attachment": "verified",
+    "native_projection": "accepted",
+    "consumer_runtime": "pending",
+    "maintenance": "not_started",
+    "post_cutover_sync": "not_started",
+    "cleanup": "not_started",
+    "old_cloud_backup_recoverability": "user_confirmed_cn01_verified_not_independently_reverified_by_oci"
+  },
+  "recovery_basis": {
+    "status": "user_confirmed_cn01_verified",
+    "independent_oci_reverification": false,
+    "remaining_cloud_retries_authorized": false,
+    "prior_oci_verified_archives": 5,
+    "requires_oci_nine_of_nine": false,
+    "unique_unbacked_up_data_must_be_retained": true
+  },
+  "native_projection_evidence": {
+    "qualified_at_beijing": "2026-10-12T03:18:08.215998+08:00",
+    "code_revision": "70a9bac49f72698b97e383da8cbe1fc44bfc17eb",
+    "canonical_receipt_sha256": "sha256:bf819bfe08a149678332ece216203c352ed8463621b86698ab8ec1e52e23af51",
+    "qualification_report": "native-input-qualification-70a9bac-20261011T1906Z.json",
+    "qualification_report_sha256": "sha256:04cc9abce8b4b72ddaac85f6fff8a4a8551a8475e33f05e68ece284e4971211a",
+    "two_independent_materializations_match": true,
+    "temporary_payloads_removed": true,
+    "strategy_or_research_job_executed": false
+  }
+}

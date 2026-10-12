@@ -15,6 +15,7 @@ recover/repair data. The reviewed live routing inventory is `config/data-ownersh
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03 | open epic |
+| P10-DATA-BASE23-OCI-001 | [Migrate OCI new consumers to native Base 2.3 with a new input baseline](base23-oci-consumer-migration.md) | Owner decisions 2026-10-11/12; immutable source and continuation proofs | approved design; consumer and operational acceptance pending |
 
 #424 keeps its subgroup scope and execution gates. P3 #412 and P5 #402 retain input admission,
 research and explicit business disposition; source recovery/repair belongs to P10. They may

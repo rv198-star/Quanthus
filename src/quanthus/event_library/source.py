@@ -6,17 +6,20 @@ import json
 import os
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from quanthus.backtest import native_dwd_source
+from quanthus.backtest.data_provider import load_replay_data_provider_config
 from quanthus.event_library.contracts import require_sha256_digest, sha256_digest
 from quanthus.pipelines.securities_warehouse.domain_base import (
     DomainBaseError,
     DomainBaseResult,
     verify_domain_base,
 )
+from quanthus.policy import ConfigurationError, find_project_root
 
 
 class EventScanSourceError(ValueError):
@@ -117,8 +120,7 @@ def _exact_keys(value: Mapping[str, Any], expected: set[str], path: str) -> None
 
 def _unique_text_tuple(value: object, path: str) -> tuple[str, ...]:
     items = tuple(
-        _text(item, f"{path}[{index}]")
-        for index, item in enumerate(_sequence(value, path))
+        _text(item, f"{path}[{index}]") for index, item in enumerate(_sequence(value, path))
     )
     if not items or len(items) != len(set(items)):
         raise EventScanSourceError(f"{path} must contain unique non-empty values")
@@ -141,10 +143,14 @@ class DwdBaseBinding:
     def __post_init__(self) -> None:
         require_sha256_digest(self.manifest_sha256, "base_release.manifest_sha256")
         require_sha256_digest(self.content_digest, "base_release.content_digest")
-        if self.kind != "dwd_domain_base_package":
-            raise EventScanSourceError("P4 source must be a DWD domain Base package")
-        if self.package_id != "dwd-base-202607-v2.1":
-            raise EventScanSourceError("P4 source must bind the accepted DWD Base V2.1 package")
+        expected = {
+            "dwd-base-202607-v2.1": "dwd_domain_base_package",
+            "dwd-base-202609-v2.3": native_dwd_source.KIND,
+        }
+        if expected.get(self.package_id) != self.kind:
+            raise EventScanSourceError(
+                "P4 source must bind an explicit supported DWD Base identity"
+            )
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -381,17 +387,28 @@ class EventScanSourcePolicy:
     semantic_digest: str
 
     def __post_init__(self) -> None:
-        if self.schema_version != "2.0.0":
-            raise EventScanSourceError("event scan source schema_version must be 2.0.0")
+        native = self.base_release.kind == native_dwd_source.KIND
+        if self.schema_version != ("3.0.0" if native else "2.0.0"):
+            raise EventScanSourceError("event scan source schema_version differs from its Base")
         if _SEMVER_PATTERN.fullmatch(self.policy_version) is None:
             raise EventScanSourceError(
                 "event scan source policy_version must use semantic versioning"
             )
         if self.status != _EXPECTED_STATUS:
             raise EventScanSourceError("P4 scan source must remain development-only")
-        if self.authority != _EXPECTED_AUTHORITY:
-            raise EventScanSourceError("P4 scan authority must be DWD V2.1 plus correction-001")
-        if self.provider_config != "config/replay-data-provider.development.v2.json":
+        expected_authority = (
+            "direct_dwd_native_v2_3_with_qualified_correction_continuation"
+            if native
+            else _EXPECTED_AUTHORITY
+        )
+        if self.authority != expected_authority:
+            raise EventScanSourceError("P4 scan authority differs from its explicit Base contract")
+        expected_provider = (
+            "config/replay-data-provider.base23.v1.json"
+            if native
+            else "config/replay-data-provider.development.v2.json"
+        )
+        if self.provider_config != expected_provider:
             raise EventScanSourceError(
                 "P4 scan must reuse the accepted direct DWD provider contract"
             )
@@ -489,6 +506,17 @@ class EventScanSourcePolicy:
         return root.resolve()
 
 
+def event_scan_release_path(source_path: Path) -> Path:
+    """Choose a pinned release from an already validated source policy."""
+    policy = load_event_scan_source_policy(source_path)
+    relative = (
+        "config/releases/base23-oci-consumers.v1.json"
+        if policy.base_release.kind == native_dwd_source.KIND
+        else "config/releases/v2-build202607.json"
+    )
+    return find_project_root(source_path) / relative
+
+
 def _validate_release_config(policy: EventScanSourcePolicy, release_path: Path) -> None:
     try:
         value = json.loads(release_path.read_text(encoding="utf-8"))
@@ -511,7 +539,9 @@ def _validate_release_config(policy: EventScanSourcePolicy, release_path: Path) 
         expected.through_date.isoformat(),
     )
     if observed != required:
-        raise EventScanSourceError("P4 source policy disagrees with the V2.1 release authority")
+        raise EventScanSourceError(
+            "P4 source policy disagrees with its versioned release authority"
+        )
 
 
 def _validate_provider_config(policy: EventScanSourcePolicy, provider_path: Path) -> None:
@@ -573,6 +603,10 @@ def _validate_provider_config(policy: EventScanSourcePolicy, provider_path: Path
             "P4 legacy industry mapping digest differs from the direct DWD provider"
         )
     materialization = _mapping(provider.get("materialization"), "replay_provider.materialization")
+    if policy.base_release.kind == native_dwd_source.KIND and (
+        materialization.get("source_layout") != native_dwd_source.LAYOUT
+    ):
+        raise EventScanSourceError("native P4 source requires the native provider layout")
     if (
         materialization.get("record_view") != "retrospective_dwd_record_view"
         or materialization.get("per_decision_publication_proven") is not False
@@ -708,9 +742,7 @@ def load_event_scan_source_policy(
             manifest_sha256=_text(
                 correction["manifest_sha256"], "correction_release.manifest_sha256"
             ),
-            content_digest=_text(
-                correction["content_digest"], "correction_release.content_digest"
-            ),
+            content_digest=_text(correction["content_digest"], "correction_release.content_digest"),
         ),
         development_partition=DevelopmentPartition(
             start=_date(development["start"], "development_partition.start"),
@@ -718,9 +750,7 @@ def load_event_scan_source_policy(
         ),
         historical_visibility=HistoricalVisibilityPolicy(
             status=_text(historical["status"], "historical_visibility.status"),
-            projection_id=_text(
-                historical["projection_id"], "historical_visibility.projection_id"
-            ),
+            projection_id=_text(historical["projection_id"], "historical_visibility.projection_id"),
             per_decision_publication_proven=historical["per_decision_publication_proven"] is True,
             rules=tuple(rules),
             forbidden_shortcuts=_unique_text_tuple(
@@ -758,9 +788,42 @@ def verify_event_scan_base(
     *,
     environment: Mapping[str, str] | None = None,
 ) -> DomainBaseResult:
-    """Deeply verify the exact physical DWD Base V2.1 selected for the scan."""
+    """Verify the selected immutable source and its explicit consumer table closure."""
 
     root = policy.resolve_runtime_root(environment)
+    if policy.base_release.kind == native_dwd_source.KIND:
+        provider_path = find_project_root(policy.path) / policy.provider_config
+        _validate_provider_config(policy, provider_path)
+        config = load_replay_data_provider_config(provider_path)
+        config = replace(
+            config, dwd_root=root, correction_root=policy.resolve_correction_root(environment)
+        )
+        try:
+            native, _, _ = native_dwd_source.verify_source(config)
+            native_dwd_source.require_canonical_admission(config)
+        except (OSError, ConfigurationError) as exc:
+            raise EventScanSourceError(
+                "native P4 source or continuation verification failed"
+            ) from exc
+        missing = set(policy.required_tables).difference(native.table_paths)
+        if missing:
+            raise EventScanSourceError(f"native P4 source lacks verified tables: {sorted(missing)}")
+        files = [path for paths in native.table_paths.values() for path in paths]
+        rows = sum(
+            entry["rows"]
+            for table in native.table_paths
+            for entry in native.manifest["summaries"][table].values()
+        )
+        return DomainBaseResult(
+            root=root,
+            package_id=str(native.binding["package_id"]),
+            manifest_sha256=str(native.binding["manifest_sha256"]),
+            content_digest=str(native.binding["content_digest"]),
+            table_count=len(native.table_paths),
+            row_count=rows,
+            payload_bytes=sum(path.stat().st_size for path in files),
+            payload_file_count=len(files),
+        )
     try:
         result = verify_domain_base(root)
     except (OSError, DomainBaseError) as exc:

@@ -1,0 +1,119 @@
+{
+  "schema_version": "3.0.0",
+  "policy_id": "p4-event-source.direct-dwd-native-v2.3-retrospective",
+  "policy_version": "3.0.0",
+  "status": "approved_development_only",
+  "authority": "direct_dwd_native_v2_3_with_qualified_correction_continuation",
+  "provider_config": "config/replay-data-provider.base23.v1.json",
+  "runtime_root_env": "QUANTHUS_REPLAY_PROVIDER_DWD_ROOT",
+  "correction_root_env": "QUANTHUS_REPLAY_PROVIDER_DWD_CORRECTION_ROOT",
+  "base_release": {
+    "package_id": "dwd-base-202609-v2.3",
+    "manifest_sha256": "sha256:6991d0c9440d4117c3dfdd3375e2267d0e43174203fc834751c9476cd7598206",
+    "content_digest": "sha256:f5b1c35e9d60874a5daa8ce36f50d8d4edf62317075e3f223d344a1eb7292608",
+    "kind": "dwd_base23_native_purpose_qualified_candidate_v1",
+    "through_date": "2026-09-30"
+  },
+  "correction_release": {
+    "correction_id": "dwd-base-202607-v2.1-correction-20260813-001",
+    "manifest_sha256": "sha256:4c8eeb5c0d74bbf2953f003364fd138832f15a5163254b710f9db8430767ffde",
+    "content_digest": "sha256:1c1d1f4ea906797255fbc71cc3915bb905e51e7aea202d27042e33692b72e9da"
+  },
+  "development_partition": {
+    "start": "2012-01-01",
+    "end": "2021-12-31"
+  },
+  "historical_visibility": {
+    "status": "approved_development_retrospective",
+    "projection_id": "p4-economic-availability-development-v1",
+    "per_decision_publication_proven": false,
+    "projection_rules": [
+      {
+        "table": "dwd_security_bar",
+        "usage": "candidate_signal_input",
+        "economic_availability": "session_close",
+        "raw_knowledge_retained": true
+      },
+      {
+        "table": "dwd_listing",
+        "usage": "eligibility_input",
+        "economic_availability": "effective_interval_at_session_close",
+        "raw_knowledge_retained": true
+      },
+      {
+        "table": "dwd_security",
+        "usage": "eligibility_input",
+        "economic_availability": "effective_interval_at_session_close",
+        "raw_knowledge_retained": true
+      },
+      {
+        "table": "dwd_trading_calendar",
+        "usage": "session_coordinate",
+        "economic_availability": "session_close",
+        "raw_knowledge_retained": true
+      },
+      {
+        "table": "dwd_tradability_state",
+        "usage": "eligibility_input",
+        "economic_availability": "session_close_after_correction_overlay",
+        "raw_knowledge_retained": true
+      },
+      {
+        "table": "dwd_price_limit_regime",
+        "usage": "t_plus_1_execution_input",
+        "economic_availability": "effective_interval_at_execution_open",
+        "raw_knowledge_retained": true
+      },
+      {
+        "table": "dwd_adjustment_factor",
+        "usage": "candidate_exclusion_only",
+        "economic_availability": "effective_date_conservative_exclusion",
+        "raw_knowledge_retained": true
+      }
+    ],
+    "forbidden_shortcuts": [
+      "use_raw_dwd_reconstruction_time_as_t_close_visibility",
+      "drop_raw_knowledge_from_from_projection_lineage",
+      "reuse_legacy_ads_or_historical_bundle_as_p4_authority",
+      "open_non_development_partition"
+    ],
+    "forbidden_uses": [
+      "arbitration",
+      "permanent_blind",
+      "simulation",
+      "governance_admission",
+      "execution_authorization"
+    ]
+  },
+  "static_industry_reference": {
+    "version": "static-level1-concentration-research-v1",
+    "usage": "static_non_pit_concentration_only",
+    "authority": "p4_adm_dwd_plus_checksum_bound_historical_industry",
+    "source_tables": [
+      "dwd_company_industry_membership",
+      "dwd_industry_node"
+    ]
+  },
+  "daily_increment_mode": "disabled_for_initial_development_scan",
+  "forbidden_sources": [
+    "legacy_dual_lane_dwd",
+    "legacy_dual_lane_dws",
+    "legacy_operational_ads",
+    "legacy_strategy_or_portable_ads",
+    "legacy_release_set",
+    "mutable_current_pointer"
+  ],
+  "required_tables": [
+    "dwd_security",
+    "dwd_listing",
+    "dwd_trading_calendar",
+    "dwd_security_bar",
+    "dwd_tradability_state",
+    "dwd_price_limit_regime",
+    "dwd_adjustment_factor",
+    "dwd_company_industry_membership",
+    "dwd_industry_node"
+  ],
+  "decision_reference": "P10-DATA-BASE23-OCI-001; Owner 2026-10-12 01:06 Asia/Shanghai",
+  "semantic_digest": "sha256:bb8a26a3f8a962bd8f38376b4d1577919afe91176cba36eebe8a3ba0588f454a"
+}

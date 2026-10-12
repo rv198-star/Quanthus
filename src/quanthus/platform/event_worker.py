@@ -41,6 +41,7 @@ from quanthus.expert_strategy.p3_strat_003_semantic_equivalence import (
 from quanthus.expert_strategy.stage_semantic_consumption import (
     verify_stage_expert_consumption_artifact,
 )
+from quanthus.platform.data_runtime import event_source_policy_path, replay_provider_path
 from quanthus.platform.jobs import P4_EVENT_SCAN_JOB, STRUCTURE_MVP_JOB, DurableJobQueue
 from quanthus.platform.persistence import PlatformStore, PostgresPlatformStore
 from quanthus.policy import find_project_root
@@ -87,9 +88,7 @@ _STRUCTURE_ORDER_RUN_CONFIG = "config/structure-order-qualification.v1.json"
 _P3_STRAT_003_INPUT_RUN_CONFIG = "config/research/p3-strat-003/input-qualification.v1.json"
 _P3_STRAT_003_INPUT_RUN_CONFIG_V2 = "config/research/p3-strat-003/input-qualification.v2.json"
 _P3_RETAINED_INPUT_RUN_CONFIG = "config/research/p3-strat-003/retained-input.v1.json"
-_P3_STRAT_003_INPUT_INSPECTION_RUN_CONFIG = (
-    "config/research/p3-strat-003/input-inspection.v1.json"
-)
+_P3_STRAT_003_INPUT_INSPECTION_RUN_CONFIG = "config/research/p3-strat-003/input-inspection.v1.json"
 _P3_STRAT_003_INDUSTRY_INSPECTION_RUN_CONFIG = (
     "config/research/p3-strat-003/industry-inspection.v1.json"
 )
@@ -121,9 +120,7 @@ _STRUCTURE_RUN_CONFIGS = frozenset(
 # Backward-compatible name retained for the technical-MVP qualification seeder/tests.
 _STRUCTURE_RUN_CONFIG = _STRUCTURE_MVP_RUN_CONFIG
 _STRUCTURE_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_MVP_QUALIFICATION_SEED"
-_STRUCTURE_ECONOMIC_QUALIFICATION_SEED_ENV = (
-    "QUANTHUS_STRUCTURE_ECONOMIC_QUALIFICATION_SEED"
-)
+_STRUCTURE_ECONOMIC_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_ECONOMIC_QUALIFICATION_SEED"
 _STRUCTURE_FACTS_QUALIFICATION_SEED_ENV = "QUANTHUS_STRUCTURE_FACTS_QUALIFICATION_SEED"
 _STRUCTURE_FACT_ROW_FIELDS = frozenset(
     {
@@ -166,8 +163,8 @@ _EXTERNAL_MCP_ACTOR_USER_ID = "usr_18c14af81a06cf878f177579efec3727"
 _STRUCTURE_QUALIFICATION_SEED_RECEIPT = "structure-qualification-seed.json"
 _REPOSITORY_ROOT = find_project_root()
 _EXPECTED_INPUT = {
-    "source_policy": "config/p4-event-scan-source.research.v1.json",
-    "provider_config": "config/replay-data-provider.development.v2.json",
+    "source_policy": event_source_policy_path(),
+    "provider_config": replay_provider_path(),
     "rule_card": "config/p4-candidate-price-volume-transition.research.v1.json",
     "split_policy": "config/p4-event-split-policy.research.v1.json",
     "outcome_card": "config/p4-event-outcome-label.research.v1.json",
@@ -300,19 +297,18 @@ def _seed_structure_mvp_qualification_jobs(
     }
     jobs: list[str] = []
     for suffix in ("a", "b"):
-        stable_job_id = "job_" + hashlib.sha256(
-            f"{STRUCTURE_MVP_JOB}:{code_revision}:{suffix}".encode()
-        ).hexdigest()[:32]
+        stable_job_id = (
+            "job_"
+            + hashlib.sha256(f"{STRUCTURE_MVP_JOB}:{code_revision}:{suffix}".encode()).hexdigest()[
+                :32
+            ]
+        )
         job, _created = queue.submit(
             kind=STRUCTURE_MVP_JOB,
             actor_user_id=actor_user_id,
-            idempotency_key=(
-                f"structure-mvp-qualification-v2-{suffix}-{code_revision[:12]}"
-            ),
+            idempotency_key=(f"structure-mvp-qualification-v2-{suffix}-{code_revision[:12]}"),
             input_ref=input_ref,
-            concurrency_key=(
-                f"structure-mvp:qualification-v2-{suffix}:{code_revision[:12]}"
-            ),
+            concurrency_key=(f"structure-mvp:qualification-v2-{suffix}:{code_revision[:12]}"),
             requested_job_id=stable_job_id,
         )
         if job.kind != STRUCTURE_MVP_JOB or job.input_ref != input_ref:
@@ -344,22 +340,20 @@ def _seed_structure_economic_qualification_jobs(
     }
     jobs: list[str] = []
     for suffix in ("a", "b"):
-        stable_job_id = "job_" + hashlib.sha256(
-            (
-                f"{STRUCTURE_MVP_JOB}:{_STRUCTURE_ECONOMIC_RUN_CONFIG}:"
-                f"{code_revision}:{suffix}"
-            ).encode()
-        ).hexdigest()[:32]
+        stable_job_id = (
+            "job_"
+            + hashlib.sha256(
+                (
+                    f"{STRUCTURE_MVP_JOB}:{_STRUCTURE_ECONOMIC_RUN_CONFIG}:{code_revision}:{suffix}"
+                ).encode()
+            ).hexdigest()[:32]
+        )
         job, _created = queue.submit(
             kind=STRUCTURE_MVP_JOB,
             actor_user_id=actor_user_id,
-            idempotency_key=(
-                f"structure-economic-qualification-v1-{suffix}-{code_revision[:12]}"
-            ),
+            idempotency_key=(f"structure-economic-qualification-v1-{suffix}-{code_revision[:12]}"),
             input_ref=input_ref,
-            concurrency_key=(
-                f"structure-economic:qualification-v1-{suffix}:{code_revision[:12]}"
-            ),
+            concurrency_key=(f"structure-economic:qualification-v1-{suffix}:{code_revision[:12]}"),
             requested_job_id=stable_job_id,
         )
         if job.kind != STRUCTURE_MVP_JOB or job.input_ref != input_ref:
@@ -391,22 +385,20 @@ def _seed_structure_facts_qualification_jobs(
     }
     jobs: list[str] = []
     for suffix in ("a", "b"):
-        stable_job_id = "job_" + hashlib.sha256(
-            (
-                f"{STRUCTURE_MVP_JOB}:{_STRUCTURE_FACTS_RUN_CONFIG}:"
-                f"{code_revision}:{suffix}"
-            ).encode()
-        ).hexdigest()[:32]
+        stable_job_id = (
+            "job_"
+            + hashlib.sha256(
+                (
+                    f"{STRUCTURE_MVP_JOB}:{_STRUCTURE_FACTS_RUN_CONFIG}:{code_revision}:{suffix}"
+                ).encode()
+            ).hexdigest()[:32]
+        )
         job, _created = queue.submit(
             kind=STRUCTURE_MVP_JOB,
             actor_user_id=actor_user_id,
-            idempotency_key=(
-                f"structure-facts-qualification-v1-{suffix}-{code_revision[:12]}"
-            ),
+            idempotency_key=(f"structure-facts-qualification-v1-{suffix}-{code_revision[:12]}"),
             input_ref=input_ref,
-            concurrency_key=(
-                f"structure-facts:qualification-v1-{suffix}:{code_revision[:12]}"
-            ),
+            concurrency_key=(f"structure-facts:qualification-v1-{suffix}:{code_revision[:12]}"),
             requested_job_id=stable_job_id,
         )
         if job.kind != STRUCTURE_MVP_JOB or job.input_ref != input_ref:
@@ -586,10 +578,9 @@ def _verify_structure_mvp_artifact(
         ]
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("structure_mvp_adm_rows_invalid") from exc
-    if (
-        len(row_values) != int(adm_manifest.get("row_count", -1))
-        or _canonical_digest(row_values) != adm_manifest.get("content_digest")
-    ):
+    if len(row_values) != int(adm_manifest.get("row_count", -1)) or _canonical_digest(
+        row_values
+    ) != adm_manifest.get("content_digest"):
         raise RuntimeError("structure_mvp_adm_content_digest_mismatch")
     return {
         "artifact_ref": str(root.resolve()),
@@ -624,8 +615,7 @@ def _verify_structure_economic_artifact(
         raise RuntimeError("structure_economic_artifact_unreadable") from exc
     if (
         not isinstance(manifest, dict)
-        or manifest.get("schema_version")
-        != "quanthus.structure-economic-artifact-manifest.v1"
+        or manifest.get("schema_version") != "quanthus.structure-economic-artifact-manifest.v1"
         or manifest.get("research_only") is not True
         or manifest.get("execution_authorized") is not False
         or manifest.get("code_revision") != code_revision
@@ -749,8 +739,7 @@ def _verify_structure_facts_artifact(
         raise RuntimeError("structure_facts_artifact_unreadable") from exc
     if (
         not isinstance(manifest, dict)
-        or manifest.get("schema_version")
-        != "quanthus.structure-facts-artifact-manifest.v1"
+        or manifest.get("schema_version") != "quanthus.structure-facts-artifact-manifest.v1"
         or manifest.get("research_only") is not True
         or manifest.get("execution_authorized") is not False
         or manifest.get("code_revision") != code_revision
@@ -822,14 +811,12 @@ def _verify_structure_facts_artifact(
         ]
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("structure_facts_rows_invalid") from exc
-    if (
-        len(row_values) != int(adm_manifest.get("row_count", -1))
-        or _canonical_digest(row_values) != adm_manifest.get("content_digest")
-    ):
+    if len(row_values) != int(adm_manifest.get("row_count", -1)) or _canonical_digest(
+        row_values
+    ) != adm_manifest.get("content_digest"):
         raise RuntimeError("structure_facts_content_digest_mismatch")
     if any(
-        not isinstance(row, dict) or set(row) != _STRUCTURE_FACT_ROW_FIELDS
-        for row in row_values
+        not isinstance(row, dict) or set(row) != _STRUCTURE_FACT_ROW_FIELDS for row in row_values
     ):
         raise RuntimeError("structure_facts_row_schema_invalid")
     return {
@@ -1212,9 +1199,7 @@ def _validate_run_directory(
     if report_result.candidate_events != event_result.candidate_events:
         raise RuntimeError("comparison_report_event_count_mismatch")
     three_class_events = (
-        label_result.positive_events
-        + label_result.neutral_events
-        + label_result.failure_events
+        label_result.positive_events + label_result.neutral_events + label_result.failure_events
     )
     if report_result.three_class_events != three_class_events:
         raise RuntimeError("comparison_report_three_class_count_mismatch")
@@ -1495,16 +1480,19 @@ class EventWorker:
         final = self.run_root / "structure-runs" / run_id
         retained_wall_seconds = None
         if run_config == _P3_RETAINED_INPUT_RUN_CONFIG:
-            retained_wall_seconds = retained_input_request(
-                _REPOSITORY_ROOT / run_config
-            )["budget"]["wall_seconds"]
+            retained_wall_seconds = retained_input_request(_REPOSITORY_ROOT / run_config)["budget"][
+                "wall_seconds"
+            ]
             if not final.exists():
                 prior = recover_retained_staging(
                     self.run_root, job_id, generation, governed["code_revision"]
                 )
                 if prior is not None:
                     self.store.update_claimed_job(
-                        job_id, generation, stage=recovering_stage, progress=95,
+                        job_id,
+                        generation,
+                        stage=recovering_stage,
+                        progress=95,
                         progress_detail={"run_id": run_id, "reused_sealed_staging": True},
                     )
                     final.parent.mkdir(parents=True, exist_ok=True)
@@ -1617,7 +1605,10 @@ class EventWorker:
             return
         if retained_timed_out:
             self.store.finish_claimed_job(
-                job_id, generation, state="failed", result_ref=None,
+                job_id,
+                generation,
+                state="failed",
+                result_ref=None,
                 error_reason="retained_input_wall_budget_exceeded_no_automatic_retry",
             )
             return
@@ -1727,11 +1718,7 @@ class EventWorker:
         command: tuple[str, ...] = (
             sys.executable,
             "-m",
-            (
-                "quanthus.event_library.sharded_batch"
-                if self.shard_target
-                else "quanthus"
-            ),
+            ("quanthus.event_library.sharded_batch" if self.shard_target else "quanthus"),
             *(("run-p4-reported-event-scan",) if not self.shard_target else ()),
             "--source-policy",
             governed["source_policy"],
@@ -1799,10 +1786,7 @@ class EventWorker:
                 progress_mtime_ns = progress_path.stat().st_mtime_ns
             except OSError:
                 progress_mtime_ns = None
-            if (
-                progress_mtime_ns is not None
-                and progress_mtime_ns != last_progress_mtime_ns
-            ):
+            if progress_mtime_ns is not None and progress_mtime_ns != last_progress_mtime_ns:
                 receipt = _load_progress_receipt(progress_path)
                 last_progress_mtime_ns = progress_mtime_ns
                 if receipt is not None:
@@ -1877,9 +1861,7 @@ class EventWorker:
         if report_result.candidate_events != event_result.candidate_events:
             raise RuntimeError("comparison_report_event_count_mismatch")
         three_class_events = (
-            label_result.positive_events
-            + label_result.neutral_events
-            + label_result.failure_events
+            label_result.positive_events + label_result.neutral_events + label_result.failure_events
         )
         if report_result.three_class_events != three_class_events:
             raise RuntimeError("comparison_report_three_class_count_mismatch")
@@ -1977,9 +1959,7 @@ def main(argv: list[str] | None = None) -> int:
                     reason=str(exc),
                 )
         print(f"structure qualification seed rejected: {exc}", file=sys.stderr)
-    economic_seed_value = os.environ.get(
-        _STRUCTURE_ECONOMIC_QUALIFICATION_SEED_ENV, "0"
-    )
+    economic_seed_value = os.environ.get(_STRUCTURE_ECONOMIC_QUALIFICATION_SEED_ENV, "0")
     try:
         _seed_structure_economic_qualification_jobs(
             store,

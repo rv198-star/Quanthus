@@ -38,9 +38,7 @@ def test_e9_registers_reserved_measurement_without_runtime_binding() -> None:
     assert concept.registration == "reserved"
 
     blueprint = load(BLUEPRINT)
-    bindings = {
-        item["concept_id"]: item for item in blueprint["semantic_runtime_bindings"]
-    }
+    bindings = {item["concept_id"]: item for item in blueprint["semantic_runtime_bindings"]}
     assert CONCEPT not in bindings
     row = next(item for item in blueprint["capabilities"] if item["id"] == "B6-PATH")
     assert row["implementation_status"] == "implemented_unqualified"
@@ -54,10 +52,10 @@ def test_e9_catalog_snapshot_is_deterministic_additive_only() -> None:
     assert snapshot["entry_count"] == 761
     assert snapshot["counts_by_kind"]["semantic_concept"] == 34
     assert snapshot["gap_count"] == 10
-    # Code-evidence SHA bindings changed with the retained-input scan TMP budget.
+    # Code-evidence SHA bindings changed with the native Base 2.3 input reader.
     # The sealed E9 registration and semantic population remain unchanged.
     assert snapshot["snapshot_digest"] == (
-        "sha256:b2e138f4cf0f0bf99b238c4a82e950e1081fe3930a146b8934767b78e3f1fe50"
+        "sha256:110f2e1413c2eceb7767e7aef3397b18ce705dd96bd40eb180aff5a6d083d458"
     )
     assert result["registration"]["catalog_entry_count"] == 761
     assert result["registration"]["semantic_concept_count"] == 34

@@ -39,7 +39,7 @@ from quanthus.event_library.reported_batch import (
 from quanthus.event_library.rule_card import load_candidate_rule_card
 from quanthus.event_library.scan import CandidateScanShard
 from quanthus.event_library.shard_tasks import TASK_SCHEMA
-from quanthus.event_library.source import load_event_scan_source_policy
+from quanthus.event_library.source import event_scan_release_path, load_event_scan_source_policy
 from quanthus.event_library.splits import load_split_policy
 from quanthus.feature_registry import load_feature_registry
 from quanthus.platform.jobs import input_digest
@@ -63,10 +63,7 @@ def _schedule_analysis_payloads(
     panel_payloads: Sequence[dict[str, Any]],
     scan_payloads: Sequence[dict[str, Any]],
 ) -> tuple[dict[str, Any], ...]:
-    if (
-        len(panel_payloads) != 2
-        or len(scan_payloads) != CANDIDATE_ANALYSIS_PARTITIONS
-    ):
+    if len(panel_payloads) != 2 or len(scan_payloads) != CANDIDATE_ANALYSIS_PARTITIONS:
         raise RuntimeError("sharded analysis topology differs")
     return (
         panel_payloads[0],
@@ -190,9 +187,7 @@ class ShardedBatch:
             observed = self.store.list_job_shards(self.job_id, stage)
             failed = next((item for item in observed if item.state == "failed"), None)
             if failed is not None:
-                raise RuntimeError(
-                    f"event_shard_failed:{failed.shard_id}:{failed.error_reason}"
-                )
+                raise RuntimeError(f"event_shard_failed:{failed.shard_id}:{failed.error_reason}")
             completed = sum(item.state == "succeeded" for item in observed)
             if completed != last_complete:
                 fraction = completed / len(records)
@@ -259,9 +254,7 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
             }
             for spec in sorted(specs, key=lambda item: item.output_end, reverse=True)
         )
-        date_results = batch.dispatch(
-            "dwd-date", date_payloads, progress_start=6, progress_end=34
-        )
+        date_results = batch.dispatch("dwd-date", date_payloads, progress_start=6, progress_end=34)
         by_partition = {
             str(payload["partition_id"]): result
             for payload, result in zip(date_payloads, date_results, strict=True)
@@ -310,8 +303,7 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
             "dwd-merge", merge_payloads, progress_start=35, progress_end=43
         )
         merged_paths = {
-            str(result["dataset"]): Path(str(result["output"]))
-            for result in merge_results
+            str(result["dataset"]): Path(str(result["output"])) for result in merge_results
         }
         stages.append(
             _stage_receipt(
@@ -360,7 +352,7 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
         ) as session:
             source = load_event_scan_source_policy(
                 (project / args.source_policy).resolve(),
-                release_path=project / "config/releases/v2-build202607.json",
+                release_path=event_scan_release_path((project / args.source_policy).resolve()),
                 provider_path=provider_path,
             )
             card = load_candidate_rule_card((project / args.rule_card).resolve())
@@ -374,9 +366,7 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
                 provider_identity=session.identity,
                 output_root=package_staging / "adm",
             )
-            buckets = plan_candidate_security_buckets(
-                projection, CANDIDATE_ANALYSIS_PARTITIONS
-            )
+            buckets = plan_candidate_security_buckets(projection, CANDIDATE_ANALYSIS_PARTITIONS)
             scan_payloads = tuple(
                 {
                     "schema_version": TASK_SCHEMA,
@@ -434,9 +424,7 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
                     ("report", _DECISION_END),
                 )
             )
-            analysis_payloads = _schedule_analysis_payloads(
-                panel_payloads, scan_payloads
-            )
+            analysis_payloads = _schedule_analysis_payloads(panel_payloads, scan_payloads)
             analysis_started = time.perf_counter()
             analysis_results = batch.dispatch(
                 "analysis",
@@ -445,9 +433,7 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
                 progress_end=80,
             )
             analysis_elapsed = time.perf_counter() - analysis_started
-            scheduled_results = tuple(
-                zip(analysis_payloads, analysis_results, strict=True)
-            )
+            scheduled_results = tuple(zip(analysis_payloads, analysis_results, strict=True))
             panel_results = tuple(
                 result
                 for payload, result in scheduled_results
@@ -459,9 +445,7 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
                 if payload["kind"] == "candidate-scan"
             )
             panels = tuple(
-                JobLocalFeaturePanel.from_receipt(
-                    _read_object(Path(str(result["receipt"])))
-                )
+                JobLocalFeaturePanel.from_receipt(_read_object(Path(str(result["receipt"]))))
                 for result in panel_results
             )
             label_panel, report_panel = panels
@@ -557,8 +541,7 @@ def run_sharded_batch(args: argparse.Namespace) -> None:
         runtime = {
             "schema_version": REPORTED_BATCH_RUNTIME_SCHEMA,
             "total_elapsed_seconds": round(time.perf_counter() - started, 3),
-            "max_rss_bytes": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
-            * 1024,
+            "max_rss_bytes": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) * 1024,
             "memory": _memory_sample(),
             "provider_config_digest": provider_config.digest,
             "feature_registry_digest": registry.digest,

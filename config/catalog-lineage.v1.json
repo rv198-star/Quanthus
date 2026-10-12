@@ -4,7 +4,7 @@
   "coverage": "展示已登记的静态加工依赖，不是某次运行的实际消费记录。每个 DWD 字段都会标明字段级证明状态：有精确证据时展示字段加工链；尚未登记字段映射时仅展示所属表已证明的加工上下文并明确不可视为字段映射。未画出的字段连线不代表没有其他依赖。",
   "evidence": {
     "market": {"path":"src/quanthus/pipelines/securities_warehouse/market_observation.py","sha256":"sha256:5b72512cd75c9ee0d2ef17f89174b6e9a044dd354be904b7f20364bbdd6a561f","locator":"_bar_query"},
-    "provider": {"path":"src/quanthus/backtest/direct_dwd_provider.py","sha256":"sha256:08fb354bb3386661c20ea19f0de3afd7aadc450cc55c1a6c03cb2241fc3ad063","locator":"daily_ohlcv_none.parquet"},
+    "provider": {"path":"src/quanthus/backtest/direct_dwd_provider.py","sha256":"sha256:93206a1e97f22ce82604e3327f46322e2eb17626dadfccce8da5128043fa8973","locator":"daily_ohlcv_none.parquet"},
     "panel": {"path":"src/quanthus/backtest/baseline_research.py","sha256":"sha256:3a3a31010dba64a1fe10fd8500fc4ae96fa6286a421752efc54cbd79b210bff1","locator":"_feature_panel_query"},
     "structure": {"path":"src/quanthus/structure_v2.py","sha256":"sha256:29693a9cf81545e8e7e34db7e5f5403f5e7f782c4d845b8cc64f700390121158","locator":"build_structure_v2"},
     "admission": {"path":"src/quanthus/structure_v2_run.py","sha256":"sha256:ce4d9ea947e5009e362422073503602ef7bef8b30a9970f72eca2b919cda7734","locator":"extract_admissions"},
@@ -12,7 +12,7 @@
     "consumer": {"path":"src/quanthus/structure_v2_consumer.py","sha256":"sha256:6870f9d1d4d2cbc6e27706b4e85998c961cb16458cc1b5d9ef7c0fb770fe4bb2","locator":"StructureV2CompatibilityExpert"},
     "factor_materialization": {"path":"src/quanthus/pipelines/securities_warehouse/disclosure_event.py","sha256":"sha256:99d456309d352527ab4ca78a0e95d809a087f3743af96f9464bf2471f52ec53f","locator":"materialize_adjustment_factor_rows"},
     "factor_interval": {"path":"src/quanthus/pipelines/securities_warehouse/disclosure_event.py","sha256":"sha256:99d456309d352527ab4ca78a0e95d809a087f3743af96f9464bf2471f52ec53f","locator":"close_adjustment_factor_intervals"},
-    "event_factor": {"path":"src/quanthus/event_library/physical_scan.py","sha256":"sha256:c965abab5320807ebcd1f0ca8ae97a27bcb7d6c10c04bd6e33f2fb532b5cfaab","locator":"factor_boundary AS"}
+    "event_factor": {"path":"src/quanthus/event_library/physical_scan.py","sha256":"sha256:7f0eec70fb3ad75c1bc0af48e1280b0dcfc0ae4b169cc245ce33431a21066d8b","locator":"factor_boundary AS"}
   },
   "market_field_mapping": {"open":"open","high":"high","low":"low","close":"close","volume":"volume","amount":"turnover"},
   "source_labels": {

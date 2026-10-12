@@ -182,3 +182,52 @@ READY is written last. The same offline evaluator also accepts the final sealed
 envelope and recomputes its summary from local evidence. Contract tests live in
 `tests/unit/test_ods_monthly.py`. Publication binds exact ODS/DWD identities and
 independent receipts; no legacy CURRENT or consumer gate is changed here.
+
+## 7. Monthly warehouse source read admission
+
+Design status: approved implementation under the Owner's October 12 ODS completion
+instruction. Delivery gate: open; the source adapter's engineering evidence and
+target-node deployment/cutover evidence are distinct.
+
+The July Base already declares `reconstruction_seed=true` and
+`execution_authorized=false`. These fields describe the ODS layer's role and lack
+of trading authority, rather than making reconstruction impossible. The monthly
+seal's `consumer_admission=NOT_GRANTED` does not grant any consumer purpose by
+publication alone. Admission for an explicit warehouse source read is recorded by
+the successor `ods-base23-warehouse-input.v1.json` contract and a fresh adapter
+receipt; it does not edit that immutable seal or grant trading, research, financial,
+shareholder, lifecycle or minute-use qualification.
+
+`ods_monthly_input.open_monthly_input` binds the complete image identity, model,
+contract and original independent-copy receipts before the expensive scan. It
+reuses the existing native raw audit once per admission, requires unchanged local
+file fingerprints and contract/model/envelope bytes across that scan, and maps the
+original seed dataset IDs and each original release's artifact descriptions to
+image-local files. The archive roots are never opened. Every retained raw revision
+stays separate, including multiple releases for one role/date. A release creation
+clock cannot establish provider acquisition or priority. Unknown/nonempty artifacts
+fail classification before the expensive pass. Unknown original clocks remain
+unknown; late observations are constrained by the explicit observation cutoff and
+never backdated to the monthly business cutoff.
+
+The ordinary verifier has an explicit `--monthly-consumer-contract` branch;
+`--policy` continues to invoke the frozen July verifier. Warehouse input planning
+has an explicit `monthly_base` mode, a pinned consumer contract and a bounded audit
+scratch root. It emits the ordinary immutable plan/ledger files with a new input
+kind, raw revision retention rule, preserved source clocks and purpose restrictions.
+It does not relabel this plan as a legacy July `base` plan or pass it to an unchanged
+July executor. The model coverage matrix describes source availability, not the
+qualification of every derived table. Capacity estimates remain planning estimates,
+not permission to materialize a new complete DWD image.
+
+The source read API resolves only declared members, rechecks their hash/size and
+independent inode before returning a native read path, and never falls back to an
+old Base or a supplier directory. New-process relocated-image regression tests and
+real-image native admission cover this path. Production daily acquisition does not
+read an ODS Base to collect new observations; the DWD Base reader and post-September
+increment binding are separate interfaces. This source admission cannot establish
+a paired production switch or turn older increments into Base 2.3 increments.
+
+Operations are in `docs/operations/ods-base-runbook.md`; regressions are in
+`tests/unit/test_ods_monthly_input.py`. GitHub code distribution, target recovery,
+paired consumer compatibility and authorized switch/rollback remain explicit steps.

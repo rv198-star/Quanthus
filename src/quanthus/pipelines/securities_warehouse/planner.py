@@ -60,7 +60,7 @@ class InputPlanResult:
     capacity_sufficient: bool
 
 
-_MODES = {"base", "daily", "weekly", "correction", "backfill"}
+_MODES = {"base", "daily", "weekly", "correction", "backfill", "monthly_base"}
 _MODEL_STATUSES = {"approved_for_scripted_build_implementation"}
 _MAPPING_GROUPS = (
     "static_sources",
@@ -841,8 +841,11 @@ def _financial_uncompressed_bytes(
     total = 0
     for path in paths:
         try:
-            values = pq.read_table(path, columns=["raw_payload_bytes"])["raw_payload_bytes"]
-            total += sum(int(value.as_py() or 0) for value in values)
+            with pq.ParquetFile(path) as parquet:
+                for batch in parquet.iter_batches(
+                    batch_size=16384, columns=["raw_payload_bytes"], use_threads=False
+                ):
+                    total += sum(int(value.as_py() or 0) for value in batch.column(0))
         except (OSError, KeyError, TypeError, ValueError, pa.ArrowException) as exc:
             raise WarehousePlanningError(f"cannot read financial capacity hint: {path}") from exc
     return total
@@ -1029,6 +1032,8 @@ def build_input_plan(
     through_date: str | None = None,
     capacity_root: Path | None = None,
     input_identity_override: Path | None = None,
+    monthly_consumer_contract: Path | None = None,
+    monthly_budget: Any | None = None,
 ) -> InputPlanResult:
     """Verify one immutable ODS package and publish its deterministic build plan."""
 
@@ -1036,6 +1041,15 @@ def build_input_plan(
     started_ns = time.perf_counter_ns()
     if mode not in _MODES:
         raise WarehousePlanningError(f"unsupported build mode: {mode}")
+    if mode == "monthly_base":
+        if monthly_consumer_contract is None or monthly_budget is None:
+            raise WarehousePlanningError("monthly mode requires a pinned contract and audit budget")
+        if input_identity_override is not None or market_date is not None:
+            raise WarehousePlanningError(
+                "monthly mode cannot reinterpret a legacy identity or date"
+            )
+    elif monthly_consumer_contract is not None or monthly_budget is not None:
+        raise WarehousePlanningError("monthly inputs require explicit monthly_base mode")
     if _SAFE_ID.fullmatch(run_id) is None or _SAFE_ID.fullmatch(runtime_id) is None:
         raise WarehousePlanningError("run_id and runtime_id must be safe identifiers")
     if _REVISION.fullmatch(code_revision) is None:
@@ -1056,11 +1070,37 @@ def build_input_plan(
                 "knowledge_cutoff precedes the frozen input identity authority"
             )
     package_root = ods_package.resolve()
+    if mode == "monthly_base":
+        from quanthus.pipelines.securities_warehouse.base22_sources import (
+            disjoint_output,
+            physical_path,
+        )
+
+        package_root = physical_path(ods_package)
+        output = disjoint_output(output, [package_root])
     base_manifest_path = package_root / "manifest.json"
     release_manifest_path = package_root / "release.json"
 
     try:
-        if base_manifest_path.is_file():
+        if mode == "monthly_base":
+            from quanthus.pipelines.ods_monthly import MonthlyOdsError
+            from quanthus.pipelines.ods_monthly_input import open_monthly_input
+
+            try:
+                monthly = open_monthly_input(
+                    root=package_root,
+                    contract_path=monthly_consumer_contract,  # type: ignore[arg-type]
+                    model_path=model_path,
+                    budget=monthly_budget,
+                    knowledge_cutoff=cutoff,
+                )
+            except MonthlyOdsError as exc:
+                raise WarehousePlanningError(str(exc)) from exc
+            records = monthly.records
+            input_identity = monthly.identity
+            if selected_through_date and selected_through_date != input_identity["through_date"]:
+                raise WarehousePlanningError("requested through_date differs from the monthly ODS")
+        elif base_manifest_path.is_file():
             if mode != "base":
                 raise WarehousePlanningError(f"{mode} mode requires an ODS release, not a Base")
             verified = verify_ods_base_rollup(package_root, deep=True)
@@ -1111,6 +1151,11 @@ def build_input_plan(
     coverage, domain_plan = _coverage(records, model)
     if mode == "base":
         _validate_base_coverage(coverage, domain_plan)
+    if mode == "monthly_base":
+        coverage["scope_statement"] = (
+            "original source availability and model mappings; "
+            "not row-level domain/use qualification"
+        )
     output_parent = output.resolve().parent
     output_parent.mkdir(parents=True, exist_ok=True)
     selected_capacity_root = (capacity_root or output_parent).resolve()
@@ -1169,6 +1214,13 @@ def build_input_plan(
     }
     if override_identity is not None:
         semantic_plan["input_identity_override"] = override_identity
+    if mode == "monthly_base":
+        # Do not apply July fill-only/weekly precedence to retained raw revisions.
+        semantic_plan["source_precedence"] = {
+            "revision_rule": input_identity["revision_rule"],
+            "implicit_source_priority": False,
+            "row_level_repair_and_domain_qualification": "REQUIRED_IN_SEPARATE_DOMAIN_STAGE",
+        }
     plan_digest = _canonical_digest(semantic_plan)
     input_plan = {
         "schema_version": 1,

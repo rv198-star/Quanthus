@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "kind": "ods_monthly_warehouse_input_contract",
+  "contract_id": "p10-ods-base23-warehouse-input-v1",
+  "purpose": "WAREHOUSE_RAW_RECONSTRUCTION",
+  "business_timezone": "Asia/Shanghai",
+  "permitted_uses": ["WAREHOUSE_RAW_RECONSTRUCTION"],
+  "execution_authorized": false,
+  "research_admission": "NOT_GRANTED",
+  "revision_rule": "RETAIN_ORIGINAL_REVISIONS_NO_IMPLICIT_PRECEDENCE",
+  "model_sha256": "sha256:7ccfbebbe8f06622363228cfa85abca23adb1b4ff8f5fff8c6c07cbc8d633dd7",
+  "image": {
+    "bundle_id": "ods-base-202609-v2.3-20261010T094453Z-a240455-r2-31f9f72-r3-de0df76",
+    "manifest_sha256": "sha256:74d57fa5ce944a673a961f5f89ea58f497d3f3b288846841fbb7ab5d1fda3a2b",
+    "content_digest": "sha256:b940bdf91bf2e99337eba2f685de7ac019f4c0e59e28846e81e29b34808c4f2b",
+    "policy_sha256": "sha256:8c33046a358b135ffe382e05c9c4e66fe1243f3503727d8beefe8644e3e9c33f",
+    "scan_identity": "sha256:d7e98626c2a22fcd180675db0316982874cb60f644b6de3eacefbe0c5f14d7a4",
+    "through_date": "2026-09-30"
+  }
+}

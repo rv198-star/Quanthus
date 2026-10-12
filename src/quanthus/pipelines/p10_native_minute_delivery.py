@@ -36,6 +36,13 @@ KIND = "p10_source_native_minute_delivery_v1"
 ALLOWED = {"R0", "R1", "R2"}
 
 
+def publish_pointer(product_root: Path, result: dict[str, Any]) -> None:
+    path = product_root / "date-pointers" / f"{result['market_date']}.json"
+    if path.exists() and object_at(path).get("manifest_sha256") == result["manifest_sha256"]:
+        return
+    atomic(path, {**result, "first_verified_published_at": datetime.now(timezone.utc).isoformat()})
+
+
 def freeze_reference(
     release: Path,
     day: str,
@@ -346,7 +353,9 @@ def build(
     )
     destination = product_root / "packages" / ref["market_date"] / closure[7:23]
     if destination.exists():
-        return verify(destination)
+        result = verify(destination)
+        publish_pointer(product_root, result)
+        return result
     destination.parent.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".minute-", dir=destination.parent))
     schema = minute_schema()
@@ -421,7 +430,7 @@ def build(
         result = verify(stage)
         os.replace(stage, destination)
         result["package_path"] = str(destination)
-        atomic(product_root / "date-pointers" / f"{ref['market_date']}.json", result)
+        publish_pointer(product_root, result)
         return result
     except BaseException:
         shutil.rmtree(stage, ignore_errors=True)

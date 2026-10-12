@@ -8,10 +8,10 @@ Type=oneshot
 User=root
 Group=root
 WorkingDirectory=/opt/quanthus/data-delivery-current
-Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src
+Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src:/opt/quanthus/p10-minute-deps/baostock-0.9.4
 Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=/etc/quanthus/t-close-plus-5h.env
-ExecStart=/opt/quanthus/warehouse-current/.venv-p1/bin/python -m quanthus.pipelines.p10_complete_daily_deadline --stage mirror
+ExecStart=/opt/quanthus/warehouse-current/.venv/bin/python -m quanthus.pipelines.p10_complete_daily_deadline --stage mirror
 TimeoutStartSec=5min
 MemoryMax=512M
 CPUQuota=100%

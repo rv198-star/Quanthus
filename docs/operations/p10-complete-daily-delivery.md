@@ -9,7 +9,7 @@ Policy: `config/pipelines/p10-complete-daily.v1.json`.
 
 | Product/stage | Target and start | Checkpoint | Failure action |
 | --- | --- | --- | --- |
-| Daily ODS and independent DWD | T, existing daily-core cycle | Daily ODS 23:45 | Existing attempt alerts plus sealed-ODS watchdog |
+| Daily ODS and independent DWD | T, existing daily-core cycle | Daily ODS 23:45 | Service failure hook plus sealed-ODS watchdog |
 | Native 1m and 5m ODS/DWD | T, next authoritative trading day 10:30, sealed daily ODS first | 13:00 | Mail; R3 stays quarantined; joint publication held |
 | Complete DWD | Immediately after both required minutes qualify and daily DWD exists | 13:20 | Mail; previous complete pointer retained |
 | OCI exact complete mirror | Poll every two minutes, advance as soon as source publishes | 14:00 independent watchdog | Mail; previous admitted input retained |
@@ -58,7 +58,9 @@ fields, exact `QUANTHUS_CN01_DWD_REMOTE_ROOT=products/complete-daily`, and
    values in public receipts. Validate new unit definitions with systemd-analyze.
 4. CN01 disable old minute T/Tplus1 and their old minute alert timers only after confirming
    no old minute service is in flight. Point `data-delivery-current` to the new release;
-   install/enable complete cycle and independent ODS/minute/DWD checkpoints. Existing
+   install/enable complete cycle and independent ODS/minute/DWD checkpoints plus the
+   daily-core instance's OnFailure drop-in. The hook reads exact failed target metadata;
+   if unavailable it labels the date as an execution date, not an inferred trade date. Existing
    daily-core timers, its 3d74 producer checkout and weekly corrections remain intact.
 5. OCI install complete mirror plus independent 14:00 watchdog. Prepare allowlisted env
    and export root. Build the three narrow consumer overlays from pinned preimages;

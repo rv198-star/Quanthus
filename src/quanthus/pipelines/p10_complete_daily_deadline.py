@@ -59,6 +59,18 @@ def evaluate(
                 package = _package(product / interval, target)
                 if package is None or verify_minute(package)["research_ready"] is not True:
                     raise ValueError("required native minute product unbuilt or R3 nonzero")
+                manifest = json.loads((package / "manifest.json").read_text())
+                pointer = json.loads(
+                    (product / interval / "date-pointers" / f"{target}.json").read_text()
+                )
+                if (
+                    max(
+                        datetime.fromisoformat(manifest["sealed_at"]),
+                        datetime.fromisoformat(pointer["first_verified_published_at"]),
+                    )
+                    > deadline
+                ):
+                    raise ValueError("required native minute product sealed after deadline")
         elif stage == "complete":
             receipt = accepted(complete, target)
             if datetime.fromisoformat(receipt["verified_at"]) > deadline:

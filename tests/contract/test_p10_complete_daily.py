@@ -596,3 +596,96 @@ def test_native5m_capture_uses_observed_sdk_strings_and_immutable_original(
     raw = gzip.decompress((tmp_path / "raw/000001.json.gz").read_bytes())
     assert json.loads(raw)["rows"][0][6] == "10.5"
     assert minute.native_m5(raw, "000001", DAY)["202610121500"]["close"] == Decimal("10.5")
+
+
+def test_canary_source_admission_stops_at_13_but_grade_can_drain(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from unittest.mock import Mock
+
+    atomic(tmp_path / "calendar.json", calendar())
+    clock = Mock()
+    clock.now.return_value = datetime(2026, 10, 13, 13, 5, tzinfo=schedule.CST)
+    monkeypatch.setattr(cycle, "datetime", clock)
+    runner = Mock(return_value={"status": "synthetic_success"})
+    monkeypatch.setattr(cycle, "run_one", runner)
+    args = {
+        "journal": tmp_path,
+        "calendar": tmp_path / "calendar.json",
+        "target": date.fromisoformat(DAY),
+        "command": ["/usr/bin/true"],
+    }
+    for operation in ("repair-canary-1230", "initial-capture-000", "repair-capture-001"):
+        assert cycle._operation(**args, operation=operation)["status"] == "cutoff_reached"
+    assert not runner.called
+    assert cycle._operation(**args, operation="initial-grade")["status"] == "synthetic_success"
+
+
+def test_installed_policy_config_resolves_from_application_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import importlib.util
+
+    app = tmp_path / "app"
+    (app / "config/pipelines").mkdir(parents=True)
+    (app / "pyproject.toml").write_text('[project]\nname="synthetic-app"\n')
+    shutil.copyfile(schedule.CONFIG, app / "config/pipelines/p10-complete-daily.v1.json")
+    installed = tmp_path / "site-packages/quanthus/pipelines/p10_complete_daily_schedule.py"
+    installed.parent.mkdir(parents=True)
+    shutil.copyfile(schedule.__file__, installed)
+    monkeypatch.chdir(app)
+    spec = importlib.util.spec_from_file_location("synthetic_installed_schedule", installed)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert app / "config/pipelines/p10-complete-daily.v1.json" == module.CONFIG
+    assert module.policy()["minimum_minute_grade"] == "R2"
+
+
+def test_minute_deadline_reports_late_seal_even_when_quality_passes(
+    members: tuple, tmp_path: Path
+) -> None:
+    _, m1, m5 = members
+    for interval, package in [("1m", m1), ("5m", m5)]:
+        manifest = json.loads((package / "manifest.json").read_text())
+        manifest["sealed_at"] = "2026-10-13T05:00:01+00:00"
+        atomic(package / "manifest.json", manifest)
+        (package / "READY").write_text(file_digest(package / "manifest.json") + "\n")
+        atomic(
+            tmp_path / "minute" / interval / "date-pointers" / f"{DAY}.json",
+            {
+                "package_path": str(package),
+                "manifest_sha256": file_digest(package / "manifest.json"),
+            },
+        )
+    result = deadline.evaluate(
+        stage="minutes",
+        now=datetime(2026, 10, 13, 13, 5, tzinfo=schedule.CST),
+        rows=calendar(),
+        product=tmp_path / "minute",
+    )
+    assert result["status"] == "failed"
+
+
+def test_daily_cycle_failure_mail_uses_actual_failed_target(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import sys
+
+    today = datetime.now(schedule.CST).date()
+    atomic(
+        tmp_path / "daily/operations/LATEST.json",
+        {
+            "started_at": datetime.now(schedule.CST).isoformat(),
+            "through_date": str(today),
+            "attempts": [{"market_date": "2026-10-09", "returncode": 2}],
+        },
+    )
+    monkeypatch.setattr(cycle, "DAILY", tmp_path / "daily")
+    monkeypatch.setattr(cycle, "JOURNAL", tmp_path / "journal")
+    observed = []
+    monkeypatch.setattr(notifications, "failure", lambda **kwargs: observed.append(kwargs) or {})
+    monkeypatch.setattr(sys, "argv", ["notification", "--daily-cycle-failure"])
+    assert notifications.main() == 0
+    assert observed[0]["day"] == date(2026, 10, 9)
+    assert observed[0]["context"]["market_date_label"] == "交易日"

@@ -8,12 +8,12 @@ Type=oneshot
 User=root
 Group=root
 WorkingDirectory=/opt/quanthus/data-delivery-current
-Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src
+Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src:/opt/quanthus/p10-minute-deps/baostock-0.9.4
 Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=/etc/quanthus/oci-daily-core-sync.env
 EnvironmentFile=/etc/quanthus/t-close-plus-5h.env
 EnvironmentFile=/etc/quanthus/oci-complete-daily-sync.env
-ExecStart=/opt/quanthus/warehouse-current/.venv-p1/bin/python -m quanthus.pipelines.p10_complete_daily_sync
+ExecStart=/opt/quanthus/warehouse-current/.venv/bin/python -m quanthus.pipelines.p10_complete_daily_sync
 TimeoutStartSec=20min
 MemoryMax=3G
 CPUQuota=200%

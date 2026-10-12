@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime, time, timedelta
-from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from quanthus.pipelines.p10_operating_schedule import _market_dates, next_trade_day
+from quanthus.policy import find_project_root
 
 CST = ZoneInfo("Asia/Shanghai")
 POLICY_ID = "p10-trading-day-complete-daily-v1"
-CONFIG = Path(__file__).resolve().parents[3] / "config/pipelines/p10-complete-daily.v1.json"
+CONFIG = find_project_root() / "config/pipelines/p10-complete-daily.v1.json"
 
 
 def policy() -> dict[str, Any]:

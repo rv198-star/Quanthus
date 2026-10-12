@@ -38,21 +38,35 @@ class WarehouseNotificationError(RuntimeError):
 
 
 EVENTS = {
+    "p10_cn01_daily_cycle_failed": {
+        "node": "CN01",
+        "stage": "日频ODS/DWD任务",
+        "heading": "CN01日频ODS/DWD任务失败",
+        "failure": True,
+    },
     "p10_cn01_daily_ods_failed": {
-        "node": "CN01", "stage": "T日 ODS日频", "heading": "CN01 T日 ODS日频采集失败",
+        "node": "CN01",
+        "stage": "T日 ODS日频",
+        "heading": "CN01 T日 ODS日频采集失败",
         "failure": True,
     },
     "p10_cn01_native_minutes_failed": {
-        "node": "CN01", "stage": "T+1交易日 ODS分钟",
-        "heading": "CN01 T+1交易日 1m/5m采集或质量未达标", "failure": True,
+        "node": "CN01",
+        "stage": "T+1交易日 ODS分钟",
+        "heading": "CN01 T+1交易日 1m/5m采集或质量未达标",
+        "failure": True,
     },
     "p10_cn01_complete_daily_failed": {
-        "node": "CN01", "stage": "T+1完整 DWD",
-        "heading": "CN01 T+1完整 DWD构建未完成", "failure": True,
+        "node": "CN01",
+        "stage": "T+1完整 DWD",
+        "heading": "CN01 T+1完整 DWD构建未完成",
+        "failure": True,
     },
     "p10_oci_complete_daily_failed": {
-        "node": "OCI", "stage": "T+1完整 DWD同步",
-        "heading": "OCI T+1完整 DWD同步或消费者接入未完成", "failure": True,
+        "node": "OCI",
+        "stage": "T+1完整 DWD同步",
+        "heading": "OCI T+1完整 DWD同步或消费者接入未完成",
+        "failure": True,
     },
     "cn01_dwd_completed": {
         "node": "CN01",
@@ -276,10 +290,12 @@ def _email_html(
         (str(context.get("market_date_label", "交易日")), market_date.isoformat()),
         (
             "状态",
-            str(EVENTS[event].get(
-                "status_label",
-                "失败" if EVENTS[event]["failure"] else "成功",
-            )),
+            str(
+                EVENTS[event].get(
+                    "status_label",
+                    "失败" if EVENTS[event]["failure"] else "成功",
+                )
+            ),
         ),
     ]
     if result is not None:
@@ -362,11 +378,11 @@ def _send_resend(
         if "status_label" in EVENTS[event]
         else ("失败" if EVENTS[event]["failure"] else "成功")
     )
-    mail_context=context or {}
-    if event=="p10_cn01_minute_quality_degraded":
-        phase=str(mail_context.get("executed_phase") or mail_context.get("stage") or "1m")
-        qualification=str(mail_context.get("research_qualification") or "未验证")
-        outcome_text=f"{phase} {qualification} 质量降级"
+    mail_context = context or {}
+    if event == "p10_cn01_minute_quality_degraded":
+        phase = str(mail_context.get("executed_phase") or mail_context.get("stage") or "1m")
+        qualification = str(mail_context.get("research_qualification") or "未验证")
+        outcome_text = f"{phase} {qualification} 质量降级"
     subject_stage = EVENTS[event]["stage"]
     if event in {"p10_cn01_minute_delivery_pass", "p10_cn01_minute_delivery_fail"}:
         phase = str(mail_context.get("executed_phase") or "")
@@ -604,10 +620,7 @@ def send_minute_delivery_outcome(
         raise WarehouseNotificationError("invalid CN01 minute email phase")
     if context.get("delivery_verdict") != ("PASS" if passed else "FAIL"):
         raise WarehouseNotificationError("minute email verdict/context differ")
-    event = (
-        "p10_cn01_minute_delivery_pass" if passed
-        else "p10_cn01_minute_delivery_fail"
-    )
+    event = "p10_cn01_minute_delivery_pass" if passed else "p10_cn01_minute_delivery_fail"
     key_material = f"quanthus-p10-minute-outcome-v1\x1fCN01\x1f{phase}\x1f{market_date}"
     key = hashlib.sha256(key_material.encode("ascii")).hexdigest()
     record_root = state_root / "minute-delivery-v1"
@@ -622,32 +635,42 @@ def send_minute_delivery_outcome(
             return {**recorded, "status": "skipped"}
         try:
             sent = _send_resend(
-                event=event, market_date=market_date, key=key,
-                pointer=None, result=None,
+                event=event,
+                market_date=market_date,
+                key=key,
+                pointer=None,
+                result=None,
                 error=reason if not passed else None,
                 context={"node": "CN01", "stage": phase, **context},
             )
         except Exception as exc:
             error_code = (
-                exc.code if isinstance(exc, WarehouseNotificationError)
+                exc.code
+                if isinstance(exc, WarehouseNotificationError)
                 else "minute_notification_failed"
             )
             _atomic_json(
                 record_root / "failures" / f"{key}.json",
                 {
                     "kind": "p10_minute_delivery_notice_failure_v1",
-                    "phase": phase, "market_date": market_date.isoformat(),
-                    "error_code": error_code, "error": _bounded_error(exc),
+                    "phase": phase,
+                    "market_date": market_date.isoformat(),
+                    "error_code": error_code,
+                    "error": _bounded_error(exc),
                     "failed_at": datetime.now(timezone.utc).isoformat(),
                 },
             )
             raise
         receipt: dict[str, object] = {
             "kind": "p10_minute_delivery_notice_v1",
-            "phase": phase, "market_date": market_date.isoformat(),
-            "event": event, "verdict": "PASS" if passed else "FAIL",
-            "status": "sent", "sent_at": datetime.now(timezone.utc).isoformat(),
-            "idempotency_key": key, "delivery_reason": reason,
+            "phase": phase,
+            "market_date": market_date.isoformat(),
+            "event": event,
+            "verdict": "PASS" if passed else "FAIL",
+            "status": "sent",
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "idempotency_key": key,
+            "delivery_reason": reason,
             "grade_manifest_sha256": context.get("grade_manifest_sha256"),
             **sent,
         }

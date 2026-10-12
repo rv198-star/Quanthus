@@ -84,6 +84,10 @@ def calendar_rows(today: date, cache: Path) -> list[dict[str, Any]]:
 def _operation(
     *, journal: Path, calendar: Path, target: date, operation: str, command: list[str]
 ) -> dict[str, Any]:
+    if ("capture" in operation or "canary" in operation) and datetime.now(CST) >= checkpoint(
+        target, "minute_deadline", json.loads(calendar.read_text())
+    ):
+        return {"status": "cutoff_reached", "reason": "new_source_operation_after_13:00"}
     return run_one(
         state_root=journal,
         calendar_file=calendar,

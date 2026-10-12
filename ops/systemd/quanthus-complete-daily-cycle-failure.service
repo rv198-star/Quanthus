@@ -1,0 +1,16 @@
+[Unit]
+Description=CN01 independent daily ODS/DWD service failure email
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/quanthus/data-delivery-current
+Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src:/opt/quanthus/p10-minute-deps/baostock-0.9.4
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=/etc/quanthus/dwd-notification.env
+ExecStart=/root/work/Quanthus/.venv-p1/bin/python -m quanthus.pipelines.p10_complete_daily_notifications --daily-cycle-failure
+TimeoutStartSec=2min
+MemoryMax=512M
+NoNewPrivileges=true
+UMask=0027

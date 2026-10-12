@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import argparse
 import fcntl
+import json
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -13,6 +15,7 @@ from quanthus.pipelines.p10_delivery_common import atomic, digest, encoded, obje
 
 EVENTS = {
     "daily_ods": "p10_cn01_daily_ods_failed",
+    "daily_cycle": "p10_cn01_daily_cycle_failed",
     "minutes": "p10_cn01_native_minutes_failed",
     "complete": "p10_cn01_complete_daily_failed",
     "mirror": "p10_oci_complete_daily_failed",
@@ -65,3 +68,40 @@ def failure(
         }
         atomic(path, record)
         return record
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--daily-cycle-failure", action="store_true", required=True)
+    args = parser.parse_args()
+    del args
+    from quanthus.pipelines.p10_complete_daily_cycle import DAILY, JOURNAL
+    from quanthus.pipelines.p10_complete_daily_schedule import CST
+
+    today = datetime.now(CST).date()
+    target = today
+    label = "运行日期（目标交易日未确定）"
+    state_path = DAILY / "operations/LATEST.json"
+    if state_path.exists():
+        state = object_at(state_path)
+        started = datetime.fromisoformat(state["started_at"])
+        if started.date() == today:
+            failures = [item for item in state.get("attempts", []) if item.get("returncode")]
+            candidate = failures[-1]["market_date"] if failures else state.get("active_market_date")
+            if candidate:
+                target = date.fromisoformat(candidate)
+                label = "交易日"
+    record = failure(
+        day=target,
+        stage="daily_cycle",
+        state_root=JOURNAL / "notifications",
+        reason="independent daily ODS/DWD service failed; inspect its stage record; "
+        "this alert does not imply both acquisition and build failed",
+        context={"market_date_label": label, "error_code": "daily_cycle_service_failed"},
+    )
+    print(json.dumps(record, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -247,7 +247,7 @@ def rclone(
         "--timeout",
         "60s",
         "--drive-chunk-size",
-        "16Mi",
+        "16M",
         "--checkers",
         "1",
         "--transfers",

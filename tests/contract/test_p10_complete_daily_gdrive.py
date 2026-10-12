@@ -231,6 +231,25 @@ def test_path_trigger_and_recovery_timer_are_independent_of_producer():
     assert "data-delivery-current" not in service
 
 
+def test_rclone_uses_chunk_suffix_supported_by_installed_old_version(tmp_path: Path, monkeypatch):
+    commands = []
+
+    def fake(command, **kwargs):
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(archive.subprocess, "run", fake)
+    archive.rclone(
+        ["lsd", "gdrive:"],
+        config=tmp_path / "config",
+        proxy="http://127.0.0.1:19082",
+        policy=archive.object_at(archive.POLICY_PATH),
+        until=time.monotonic() + 30,
+    )
+    command = commands[0]
+    assert command[command.index("--drive-chunk-size") + 1] == "16M"
+
+
 def test_same_date_revision_is_frozen_before_pack(complete: Path, tmp_path: Path):
     with pytest.raises(archive.ArchiveError, match="source_revision_changed_retry"):
         archive.freeze(

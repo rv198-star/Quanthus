@@ -526,6 +526,36 @@ Mandatory gates include:
 
 ## 12. Review state and work item
 
+The opt-in September patch contract `config/pipelines/base231-domains.v1.json`
+adds source-literal F10 major financial indicators without changing the native
+33-table schemas or earlier seals. `base231_f10_selection.py` makes one
+metadata-only selection shared by financial and holder consumers: latest actual
+capture per provider, stock and category, with same-clock body conflicts held.
+An older capture remains retained evidence; selecting a snapshot is not a
+historical revision priority or an assertion of unchanged omitted periods.
+
+`base231_financial_summary.py` preserves explicit yuan/per-share/percentage
+labels, original tokens, source blocks and real capture times. A yuan label does
+not establish CNY; a source display value is not provider-original precision.
+Values not representable exactly in the frozen decimal column remain literal
+text, and publication/availability is never inferred. New financial concepts
+have a separate source-scoped namespace and use actual governance knowledge time.
+
+`base231_holder_scope.py` certifies complete literal matrices at their governed
+component grain. Missing ranks do not establish exits or full issuer top-ten
+coverage. Its September change parser leaves the frozen August evaluator intact;
+unrecognized, incomplete and internally conflicting blocks remain evidence-bound
+holds. Same holder/date/value does not establish transaction equivalence: that
+requires qualified original provider event and disclosure identities.
+
+`base231_domain_pack.py` seals independent, locally replayable domain projections,
+with complete retained F10 files, referential parents, configuration and evaluator
+identities. Offline acceptance recomputes the selection, projection, typed
+summaries, complete physical file set and global keys/references. Its READY is
+domain completion only. Native reconciliation, whole-mirror acceptance and
+consumer admission remain separate; 4,173 unavailable visibility exceptions,
+old tail-conflict dispositions and all consumer freezes stay intact.
+
 | ID | Work | Current state | Acceptance evidence |
 | --- | --- | --- | --- |
 | `META-DATA-DWD-002` | Build the product-bounded seven-domain DWD Base V2 | 33 DWD objects accepted; recurring daily maintenance active; generic DWS deferred | `config/releases/v2-build202607.json`, package manifest, script tests, and build receipts |

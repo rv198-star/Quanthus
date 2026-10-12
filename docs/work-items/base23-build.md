@@ -24,6 +24,28 @@ runtime old-path fallback is allowed. The new mirror must stand alone.
 
 ## Current recovery checkpoint
 
+### October 12 selected Base 2.3.1 packages
+
+The Owner selected financial-summary extensions and complete shareholder
+matrices/change equivalence, retaining the 2026-09-30 business cutoff. Work stays
+in the original CN02 worktree. Full-market lifecycle and intraday qualification
+are outside this continuation. No new collection, code publication, production
+change or consumer-gate relaxation follows from this selection.
+
+Recover the current bounded job from
+`artifacts/base231-financial-ownership-20261012T091741Z-c1d85aa/registration.json`.
+The initial source assessment verified 94 physical files and 9,384,436,249 bytes;
+this is a member-byte assessment, not domain acceptance. Actual projection and
+cold receipts, when produced, own completion. The new minimal adapters and
+source-contained replay contract are described in
+`docs/design/lld/01-data-foundation/dwd-domain-model.md` and
+`config/pipelines/base231-domains.v1.json`.
+
+Preserve unresolved unit/clock authority in financial deltas, incomplete holder
+matrices and unproven transaction equivalence. Qualify independently supported
+literal observations without replacing those gaps by generic empty coverage or
+opening historical PIT. A domain output is not a released Base 2.3.1 mirror.
+
 ### October 10 release scope and follow-on versions
 
 The Owner proposed closing Base 2.3 for the current daily purpose and moving the

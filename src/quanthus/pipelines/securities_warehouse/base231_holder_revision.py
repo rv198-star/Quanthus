@@ -50,7 +50,8 @@ def revision_views(scan: GlobalScan) -> None:
     scan.connection.execute("CREATE TEMP TABLE representation_pairs AS SELECT " + old_keys
                             + ",n.knowledge_from AS __clock FROM representation_prior o JOIN "
                             "representation_next n ON " + match + " JOIN representation_old_census "
-                            "x ON " + count_old + " JOIN representation_new_census y ON " + count_new
+                            "x ON " + count_old + " JOIN representation_new_census y ON "
+                            + count_new
                             + " WHERE x.__count=1 AND y.__count=1 AND " + condition
                             + " AND (" + changed + ")")
     frame_cols = ",".join(FRAME)

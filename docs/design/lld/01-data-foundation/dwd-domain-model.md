@@ -556,6 +556,14 @@ domain completion only. Native reconciliation, whole-mirror acceptance and
 consumer admission remain separate; 4,173 unavailable visibility exceptions,
 old tail-conflict dispositions and all consumer freezes stay intact.
 
+The real-source successor envelope in `base231_source_qualification.py` adds
+exact retained ODS/DWD manifest and verified supply-catalog pins, and proves each
+copied raw member and parent against those identities. Source reproduction alone
+does not admit arbitrary rehashed source files or replace qualification evidence.
+The envelope preserves the inner domain seal during job-owned physical transfer
+and relocation; source strings remain archival. This still grants neither
+transaction equivalence nor whole Base/consumer acceptance.
+
 | ID | Work | Current state | Acceptance evidence |
 | --- | --- | --- | --- |
 | `META-DATA-DWD-002` | Build the product-bounded seven-domain DWD Base V2 | 33 DWD objects accepted; recurring daily maintenance active; generic DWS deferred | `config/releases/v2-build202607.json`, package manifest, script tests, and build receipts |

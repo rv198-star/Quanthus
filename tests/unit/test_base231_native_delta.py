@@ -15,7 +15,7 @@ from tests.unit.test_base23_ownership import BODY, project
 from tests.unit.test_base231_domain_pack import LIMITS
 
 
-def compare(tmp_path, old, new):
+def compare(tmp_path, old, new, *, configure=holder_views, view="holder_additions"):
     with Budget(tmp_path / "job", [], LIMITS) as budget:
         for name, rows in [("old", old), ("new", new)]:
             pq.write_table(pa.Table.from_pylist(rows, schema=schemas()[HOLDING]),
@@ -23,8 +23,8 @@ def compare(tmp_path, old, new):
         with GlobalScan(budget) as scan:
             scan.add("old_holding", [budget.root / "old.parquet"])
             scan.add("new_holding", [budget.root / "new.parquet"])
-            holder_views(scan)
-            result = scan.connection.execute("SELECT * FROM holder_additions").fetch_arrow_table()
+            configure(scan)
+            result = scan.connection.execute("SELECT * FROM " + view).fetch_arrow_table()
             held = scan.connection.execute("SELECT count(*) FROM held_frames").fetchone()[0]
     return result.to_pylist(), held
 

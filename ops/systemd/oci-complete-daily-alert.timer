@@ -1,0 +1,11 @@
+[Unit]
+Description=OCI complete DWD visibility checkpoint at 14:00 Shanghai
+
+[Timer]
+OnCalendar=*-*-* 14:00:00 Asia/Shanghai
+Persistent=true
+AccuracySec=1s
+Unit=oci-complete-daily-alert.service
+
+[Install]
+WantedBy=timers.target

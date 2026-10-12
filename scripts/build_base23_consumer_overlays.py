@@ -44,12 +44,19 @@ COMMON_ADDITIONS = (
     "src/quanthus/backtest/native_dwd_source.py",
     "src/quanthus/pipelines/securities_warehouse/native_base23_reader.py",
 )
+DELIVERY_ADDITIONS = (
+    "src/quanthus/platform/complete_daily_source.py",
+    "src/quanthus/pipelines/p10_delivery_common.py",
+    "src/quanthus/pipelines/p10_complete_daily_schedule.py",
+    "src/quanthus/pipelines/p10_operating_schedule.py",
+)
 RUNTIME = "src/quanthus/platform/data_runtime.py"
 CONFIGS = (
     "config/replay-data-provider.base23.v1.json",
     "config/p4-event-scan-source.base23.v1.json",
     "config/p4-direct-dwd-canonical-projection.base23.v1.json",
     "config/releases/base23-oci-consumers.v1.json",
+    "config/pipelines/p10-complete-daily.v1.json",
 )
 
 
@@ -188,6 +195,20 @@ def main() -> int:
     if args.kind == "event-worker":
         patches.append("src/quanthus/platform/event_worker.py")
     additions = [RUNTIME] + ([] if args.kind == "api" else list(COMMON_ADDITIONS))
+    for name in DELIVERY_ADDITIONS:
+        present = (
+            subprocess.run(
+                ["git", "cat-file", "-e", f"{BASELINE}:{name}"],
+                cwd=project,
+                capture_output=True,
+                check=False,
+            ).returncode
+            == 0
+        )
+        if present and run(["git", "diff", BASELINE, revision, "--", name], cwd=project).strip():
+            patches.append(name)
+        else:
+            additions.append(name)
     tag = f"quanthus/base23-{args.kind}:{revision[:12]}"
     report = {
         "schema_version": "quanthus.base23-consumer-overlay.v1",

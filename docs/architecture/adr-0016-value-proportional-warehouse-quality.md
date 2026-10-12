@@ -161,6 +161,28 @@ from R3=0. T/T+1 notification PASS/FAIL and READY use the same gate.
 
 ## Consequences and change control
 
+### 2026-10-13 Owner instruction — complete T+1 trading-day delivery
+
+The Owner authorized repair of the CN01-to-OCI complete Daily path and confirmed
+`config/pipelines/p10-complete-daily.v1.json`: T daily ODS seals independently;
+native 1m/5m collection starts at 10:30 on the **next authoritative trading day**,
+only after that T's market/event daily ODS seal. Minute qualification is checked
+at 13:00, complete DWD at 13:20, and exact OCI visibility at 14:00 Shanghai.
+Advance dependent stages as soon as their prerequisites pass. A failed attempt
+or missed checkpoint sends one deduplicated failure email per target day/stage.
+
+This is a versioned successor to the calendar-day T+1 runtime, not a rewrite of
+its frozen receipts. Independent `daily-core-v1` continues; joint delivery requires
+both native intervals to reach minimum R2 with R3=0. Preserve actual gaps,
+acquisition/visibility knowledge times, immutable Base 2.3 identity and protected
+consumer gates. New joint products begin with the actual Base23-bound daily
+2026-10-12; earlier Base21-bound increments require a separately built correction.
+The consumer purpose is gap-aware non-execution development; no execution,
+strict historical research, training, or P3/P5/P6 activation is granted.
+
+Operating and rollback procedure:
+[`../operations/p10-complete-daily-delivery.md`](../operations/p10-complete-daily-delivery.md).
+
 - P10 is the sole source-qualification/warehouse engineering owner; business owners define admission sensitivity and accept products only under their own contracts (ADR 0015).
 - #495 owns quality grades/manifest/consumer matrix and impact-cost policy; #496 owns independently buildable daily-core readiness and safe DWD publication, after real dependency inventory. Neither is implemented by documentation alone.
 - Source research #492/#493 becomes **impact-led and bounded**: preserve open forensic evidence and only resume expensive precision recovery when demanded by a specific consumer or new independent source capability. Do not close facts simply because a lower-grade product may be usable.

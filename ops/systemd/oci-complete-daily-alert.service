@@ -1,0 +1,20 @@
+[Unit]
+Description=OCI independent complete DWD deadline watchdog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/quanthus/data-delivery-current
+Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=/etc/quanthus/t-close-plus-5h.env
+ExecStart=/opt/quanthus/warehouse-current/.venv-p1/bin/python -m quanthus.pipelines.p10_complete_daily_deadline --stage mirror
+TimeoutStartSec=5min
+MemoryMax=512M
+CPUQuota=100%
+KillMode=control-group
+NoNewPrivileges=true
+UMask=0027

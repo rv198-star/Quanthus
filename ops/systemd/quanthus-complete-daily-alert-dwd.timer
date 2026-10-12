@@ -1,0 +1,10 @@
+[Unit]
+Description=CN01 T+1 complete DWD deadline
+
+[Timer]
+OnCalendar=*-*-* 13:20:00 Asia/Shanghai
+Persistent=true
+Unit=quanthus-complete-daily-alert@complete.service
+
+[Install]
+WantedBy=timers.target

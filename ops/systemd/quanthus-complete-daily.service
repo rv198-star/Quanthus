@@ -1,0 +1,28 @@
+[Unit]
+Description=CN01 T+1 trading-day native 1m/5m and complete DWD
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/opt/quanthus/data-delivery-current/ops/bin/run-complete-daily-cycle
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/quanthus/data-delivery-current
+Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=QUANTHUS_COMPLETE_DAILY_EXPORT_GROUP=quanthus-dwd-ro
+EnvironmentFile=/etc/quanthus/dwd-notification.env
+ExecStart=/root/work/Quanthus/.venv-p1/bin/python /opt/quanthus/data-delivery-current/ops/bin/run-complete-daily-cycle
+TimeoutStartSec=110min
+MemoryMax=2300M
+CPUQuota=150%
+KillMode=control-group
+NoNewPrivileges=true
+UMask=0027
+Nice=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

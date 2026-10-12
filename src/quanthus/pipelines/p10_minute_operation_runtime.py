@@ -55,7 +55,7 @@ def _calendar(path: Path) -> list[dict[str, Any]]:
 
 
 def _load_state(
-    path: Path, target: date, phase: str
+    path: Path, target: date, phase: str, *, policy_id: str = POLICY_ID,
 ) -> dict[str, Any]:
     if path.exists():
         data = json.loads(path.read_text())
@@ -63,7 +63,7 @@ def _load_state(
             data.get("schema_version") != 1
             or data.get("market_date") != target.isoformat()
             or data.get("phase") != phase
-            or data.get("policy_id") != POLICY_ID
+            or data.get("policy_id") != policy_id
             or not isinstance(data.get("cumulative_processing_seconds"), (int, float))
             or not isinstance(data.get("operations"), list)
         ):
@@ -71,7 +71,7 @@ def _load_state(
         return data
     return {
         "schema_version": 1,
-        "policy_id": POLICY_ID,
+        "policy_id": policy_id,
         "market_date": target.isoformat(),
         "phase": phase,
         "cumulative_processing_seconds": 0.0,
@@ -97,6 +97,7 @@ def run_one(
     argv: Sequence[str],
     timeout_seconds: int,
     now: datetime | None = None,
+    policy_id: str = POLICY_ID,
 ) -> dict[str, Any]:
     if (
         phase not in PHASE_TO_SCHEDULE
@@ -110,7 +111,14 @@ def run_one(
     if timeout_seconds < 1 or timeout_seconds > 600:
         raise ValueError("P10 atomic operation must have 1..600s own timeout")
     rows = _calendar(calendar_file)
-    planned = start_at(market_date, PHASE_TO_SCHEDULE[phase], rows)
+    if policy_id == POLICY_ID:
+        planned = start_at(market_date, PHASE_TO_SCHEDULE[phase], rows)
+    elif policy_id == "p10-trading-day-complete-daily-v1" and phase == "T_plus_1":
+        from quanthus.pipelines.p10_complete_daily_schedule import checkpoint
+
+        planned = checkpoint(market_date, "minute_start", rows)
+    else:
+        raise ValueError("unknown versioned operation schedule")
     actual = (now or datetime.now(CST)).astimezone(CST)
     if actual < planned or actual.date() != planned.date():
         raise ValueError("operation outside authorized calendar trading-day phase")
@@ -119,7 +127,7 @@ def run_one(
     state_file = state_root / f"{base}.json"
     with (state_root / f"{base}.lock").open("a+") as locked:
         fcntl.flock(locked.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        ledger = _load_state(state_file, market_date, phase)
+        ledger = _load_state(state_file, market_date, phase, policy_id=policy_id)
         prior = next(
             (r for r in ledger["operations"] if r["operation_id"] == operation_id),
             None,

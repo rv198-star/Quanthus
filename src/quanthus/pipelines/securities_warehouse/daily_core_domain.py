@@ -26,6 +26,16 @@ from quanthus.pipelines.securities_warehouse.daily_domain import (
     DailyDomainBuildError,
     DailyDomainResult,
 )
+from quanthus.pipelines.securities_warehouse.native_base23_reader import (
+    KIND as NATIVE_BASE23_KIND,
+)
+from quanthus.pipelines.securities_warehouse.native_base23_reader import (
+    NativeBase23,
+    NativeBase23Error,
+    read_native_parent_references,
+    require_daily_core_parent_admission,
+    verify_native_prior_transition,
+)
 
 _TABLE_KEYS = {
     "dwd_trading_calendar": ("venue_id", "trade_date", "session_type"),
@@ -120,7 +130,13 @@ def _write_atomic(path: Path, value: object) -> None:
         raise
 
 
-def _base_files(base_root: Path, manifest: Mapping[str, Any], table: str) -> list[Path]:
+def _base_files(
+    base_root: Path,
+    manifest: Mapping[str, Any] | NativeBase23,
+    table: str,
+) -> list[Path]:
+    if isinstance(manifest, NativeBase23):
+        return manifest.files(table)
     result = []
     for raw in manifest.get("files", []):
         if not isinstance(raw, Mapping):
@@ -224,8 +240,19 @@ def _path_relation(paths: Sequence[Path]) -> str:
     return "read_parquet([" + ",".join(_sql(str(path)) for path in paths) + "])"
 
 
-def _verify_base(base_root: Path, release_config: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def _verify_base(
+    base_root: Path,
+    release_config: Path,
+) -> tuple[dict[str, Any] | NativeBase23, dict[str, Any]]:
     manifest = _object(base_root / "manifest.json")
+    config = _object(release_config)
+    if manifest.get("kind") == NATIVE_BASE23_KIND:
+        try:
+            native = read_native_parent_references(base_root, config)
+            require_daily_core_parent_admission(config)
+        except NativeBase23Error as exc:
+            raise DailyDomainBuildError(str(exc)) from exc
+        return native, config
     manifest_sha = _sha256(base_root / "manifest.json")
     try:
         ready = (base_root / "READY").read_text(encoding="ascii").strip()
@@ -337,8 +364,28 @@ def build_daily_domain_increment(
     catalog, selected = _read_catalog(catalog_root.resolve(), release_root)
     market_date = date.fromisoformat(catalog["market_date"])
     base_manifest, config = _verify_base(base_root, release_config.resolve())
+    if (
+        isinstance(base_manifest, NativeBase23)
+        and catalog.get("product_scope") != DAILY_CORE_PRODUCT_SCOPE
+    ):
+        raise DailyDomainBuildError("native Base parent references require daily-core-v1")
     base_through = date.fromisoformat(str(config["through_date"]))
     covered_after, prior = _prior_binding(prior_pointer, market_date, base_through)
+    base_transition = None
+    if isinstance(base_manifest, NativeBase23) and prior is not None:
+        assert prior_pointer is not None
+        descriptor = _object(prior_pointer)
+        prior_path = _safe_path(prior_pointer.parent.resolve(), descriptor.get("manifest_path"))
+        verify_daily_domain_increment(prior_path.parent)
+        try:
+            base_transition = verify_native_prior_transition(
+                native=base_manifest,
+                config=config,
+                prior=_object(prior_path),
+                prior_sha256=prior["manifest_sha256"],
+            )
+        except NativeBase23Error as exc:
+            raise DailyDomainBuildError(str(exc)) from exc
     if market_date <= covered_after:
         raise DailyDomainBuildError("daily market_date does not advance Base or CURRENT")
     if len(code_revision) != 40 or any(ch not in "0123456789abcdef" for ch in code_revision):
@@ -699,11 +746,15 @@ def build_daily_domain_increment(
             "code_revision": code_revision,
             "catalog_digest": catalog["catalog_digest"],
             "catalog_sha256": _sha256(catalog_root / "catalog.json"),
-            "base": {
-                "package_id": base_manifest["package_id"],
-                "manifest_sha256": _sha256(base_root / "manifest.json"),
-                "content_digest": base_manifest["content_digest"],
-            },
+            "base": (
+                dict(base_manifest.binding)
+                if isinstance(base_manifest, NativeBase23)
+                else {
+                    "package_id": base_manifest["package_id"],
+                    "manifest_sha256": _sha256(base_root / "manifest.json"),
+                    "content_digest": base_manifest["content_digest"],
+                }
+            ),
             "prior": prior,
             "selected_releases": {
                 name: {
@@ -716,6 +767,9 @@ def build_daily_domain_increment(
             "files": files,
             "content_digest": content_digest,
         }
+        if isinstance(base_manifest, NativeBase23):
+            manifest["base"] = dict(base_manifest.binding)
+            manifest["base_transition"] = base_transition
         if product_scope == DAILY_CORE_PRODUCT_SCOPE:
             manifest["product_scope"] = DAILY_CORE_PRODUCT_SCOPE
             manifest["quality_policy"] = "p10-business-value-warehouse-quality.v1"

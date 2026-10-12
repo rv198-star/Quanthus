@@ -20,16 +20,6 @@ from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (
     DailyOdsCatalogError,
     verify_daily_ods_catalog,
 )
-from quanthus.pipelines.securities_warehouse.native_base23_reader import (
-    KIND as NATIVE_BASE23_KIND,
-)
-from quanthus.pipelines.securities_warehouse.native_base23_reader import (
-    NativeBase23,
-    NativeBase23Error,
-    read_native_parent_references,
-    require_daily_core_parent_admission,
-    verify_native_prior_transition,
-)
 
 
 class DailyDomainBuildError(RuntimeError):
@@ -140,11 +130,7 @@ def _write_atomic(path: Path, value: object) -> None:
         raise
 
 
-def _base_files(
-    base_root: Path, manifest: Mapping[str, Any] | NativeBase23, table: str
-) -> list[Path]:
-    if isinstance(manifest, NativeBase23):
-        return manifest.files(table)
+def _base_files(base_root: Path, manifest: Mapping[str, Any], table: str) -> list[Path]:
     result = []
     for raw in manifest.get("files", []):
         if not isinstance(raw, Mapping):
@@ -248,17 +234,8 @@ def _path_relation(paths: Sequence[Path]) -> str:
     return "read_parquet([" + ",".join(_sql(str(path)) for path in paths) + "])"
 
 
-def _verify_base(
-    base_root: Path, release_config: Path
-) -> tuple[dict[str, Any] | NativeBase23, dict[str, Any]]:
+def _verify_base(base_root: Path, release_config: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     manifest = _object(base_root / "manifest.json")
-    if manifest.get("kind") == NATIVE_BASE23_KIND:
-        config = _object(release_config)
-        try:
-            require_daily_core_parent_admission(config)
-            return read_native_parent_references(base_root, config), config
-        except NativeBase23Error as exc:
-            raise DailyDomainBuildError(str(exc)) from exc
     manifest_sha = _sha256(base_root / "manifest.json")
     try:
         ready = (base_root / "READY").read_text(encoding="ascii").strip()
@@ -314,38 +291,12 @@ def build_daily_domain_increment(
         if output == source_root or output.is_relative_to(source_root):
             raise DailyDomainBuildError(f"daily output must be outside the {label} root")
     if output.exists():
-        existing = verify_daily_domain_increment(output)
-        requested = _object(release_config).get("layers", {}).get("dwd", {})
-        if requested.get("format") == "native_base23":
-            existing_base = _object(output / "manifest.json").get("base", {})
-            if existing_base.get("manifest_sha256") != requested.get("manifest_sha256"):
-                raise DailyDomainBuildError(
-                    "existing daily increment retains a different Base binding"
-                )
-        return existing
+        return verify_daily_domain_increment(output)
     catalog, selected = _read_catalog(catalog_root.resolve(), release_root)
     market_date = date.fromisoformat(catalog["market_date"])
     base_manifest, config = _verify_base(base_root, release_config.resolve())
     base_through = date.fromisoformat(str(config["through_date"]))
     covered_after, prior = _prior_binding(prior_pointer, market_date, base_through)
-    base_transition = None
-    if isinstance(base_manifest, NativeBase23):
-        if catalog.get("product_scope") != DAILY_CORE_PRODUCT_SCOPE:
-            raise DailyDomainBuildError("native Base parent references require daily-core-v1")
-        if prior is not None:
-            assert prior_pointer is not None
-            descriptor = _object(prior_pointer)
-            prior_path = _safe_path(prior_pointer.parent.resolve(), descriptor.get("manifest_path"))
-            verify_daily_domain_increment(prior_path.parent)
-            try:
-                base_transition = verify_native_prior_transition(
-                    native=base_manifest,
-                    config=config,
-                    prior=_object(prior_path),
-                    prior_sha256=prior["manifest_sha256"],
-                )
-            except NativeBase23Error as exc:
-                raise DailyDomainBuildError(str(exc)) from exc
     if market_date <= covered_after:
         raise DailyDomainBuildError("daily market_date does not advance Base or CURRENT")
     if len(code_revision) != 40 or any(ch not in "0123456789abcdef" for ch in code_revision):
@@ -681,9 +632,7 @@ def build_daily_domain_increment(
             "code_revision": code_revision,
             "catalog_digest": catalog["catalog_digest"],
             "catalog_sha256": _sha256(catalog_root / "catalog.json"),
-            "base": dict(base_manifest.binding)
-            if isinstance(base_manifest, NativeBase23)
-            else {
+            "base": {
                 "package_id": base_manifest["package_id"],
                 "manifest_sha256": _sha256(base_root / "manifest.json"),
                 "content_digest": base_manifest["content_digest"],
@@ -700,34 +649,6 @@ def build_daily_domain_increment(
             "files": files,
             "content_digest": content_digest,
         }
-        if product_scope == DAILY_CORE_PRODUCT_SCOPE:
-            manifest["product_scope"] = DAILY_CORE_PRODUCT_SCOPE
-            manifest["quality_policy"] = "p10-business-value-warehouse-quality.v1"
-            manifest["quality_policy_sha256"] = _daily_core_quality_sha256()
-            manifest["consumable_intervals"] = ["1d"]
-            manifest["unavailable_products"] = {
-                "intraday_1m": "not_part_of_daily_core_not_qualified_as_daily",
-                "intraday_5m": "not_part_of_daily_core_see_separate_product_status",
-            }
-            audit["product_scope"] = DAILY_CORE_PRODUCT_SCOPE
-            audit["consumable_intervals"] = ["1d"]
-            _write_atomic(audit_path, audit)
-            # Audit content changed: compute its new SHA and content digest,
-            # while keeping the original v1 construction byte-identical.
-            files = [
-                {
-                    "path": path.relative_to(work).as_posix(),
-                    "sha256": _sha256(path),
-                    "size_bytes": path.stat().st_size,
-                }
-                for path in sorted(item for item in work.rglob("*") if item.is_file())
-            ]
-            manifest["files"] = files
-            manifest["content_digest"] = (
-                "sha256:" + hashlib.sha256(_canonical_bytes(files)).hexdigest()
-            )
-        if base_transition is not None:
-            manifest["base_transition"] = base_transition
         _write_atomic(work / "manifest.json", manifest)
         _write_atomic(work / "READY", (_sha256(work / "manifest.json") + "\n").encode("ascii"))
         os.replace(work, output)

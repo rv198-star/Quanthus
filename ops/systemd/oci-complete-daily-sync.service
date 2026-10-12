@@ -1,0 +1,26 @@
+[Unit]
+Description=OCI exact CN01 complete DWD mirror and consumer visibility
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/quanthus/data-delivery-current
+Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=/etc/quanthus/oci-daily-core-sync.env
+EnvironmentFile=/etc/quanthus/t-close-plus-5h.env
+EnvironmentFile=/etc/quanthus/oci-complete-daily-sync.env
+ExecStart=/opt/quanthus/warehouse-current/.venv-p1/bin/python -m quanthus.pipelines.p10_complete_daily_sync
+TimeoutStartSec=20min
+MemoryMax=3G
+CPUQuota=200%
+KillMode=control-group
+NoNewPrivileges=true
+UMask=0027
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

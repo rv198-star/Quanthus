@@ -1,0 +1,10 @@
+[Unit]
+Description=CN01 T daily ODS failure deadline
+
+[Timer]
+OnCalendar=*-*-* 23:45:00 Asia/Shanghai
+Persistent=true
+Unit=quanthus-complete-daily-alert@daily_ods.service
+
+[Install]
+WantedBy=timers.target

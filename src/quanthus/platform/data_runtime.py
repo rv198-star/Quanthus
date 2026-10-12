@@ -10,9 +10,36 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from quanthus.policy import ConfigurationError, find_project_root
+
+if TYPE_CHECKING:
+    from quanthus.platform.complete_daily_source import CompleteDailySource
+
+
+def complete_daily_source() -> CompleteDailySource:
+    """Explicit latest-data entry; never widens frozen replay/event default windows."""
+    from quanthus.platform.complete_daily_source import CompleteDailySource
+
+    root = os.environ.get("QUANTHUS_COMPLETE_DAILY_ROOT")
+    if not root:
+        raise ConfigurationError("qualified complete Daily consumer root is not configured")
+    return CompleteDailySource(Path(root))
+
+
+def complete_daily_health() -> dict[str, Any] | None:
+    if not os.environ.get("QUANTHUS_COMPLETE_DAILY_ROOT"):
+        return None
+    try:
+        return complete_daily_source().admission()
+    except (OSError, ValueError, KeyError):
+        return {
+            "status": "not_admitted",
+            "required_intervals": ["1d", "1m", "5m"],
+            "execution_authorized": False,
+            "reason": "qualified_joint_product_not_yet_available",
+        }
 
 
 def native_consumers_enabled() -> bool:

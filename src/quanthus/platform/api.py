@@ -28,7 +28,7 @@ from quanthus.platform.candidate_approval import (
     CandidateApprovalService,
     public_candidate_approval_event,
 )
-from quanthus.platform.data_runtime import replay_provider_path
+from quanthus.platform.data_runtime import complete_daily_health, replay_provider_path
 from quanthus.platform.identity import (
     AuthenticatedPrincipal,
     AuthenticationError,
@@ -802,6 +802,9 @@ class PlatformHttpApp:
             "role": "api",
             "manifest": self.manifest.version,
         }
+        complete_daily = complete_daily_health()
+        if complete_daily is not None:
+            payload["complete_daily_source"] = complete_daily
         qualification = self._structure_mvp_qualification_health()
         if qualification is not None:
             payload["structure_mvp_qualification"] = qualification

@@ -1,0 +1,10 @@
+[Unit]
+Description=CN01 T+1 native minutes R2 minimum/R3 zero deadline
+
+[Timer]
+OnCalendar=*-*-* 13:00:00 Asia/Shanghai
+Persistent=true
+Unit=quanthus-complete-daily-alert@minutes.service
+
+[Install]
+WantedBy=timers.target

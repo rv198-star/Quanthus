@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quanthus.pipelines.securities_warehouse.daily_domain import (
+from quanthus.pipelines.securities_warehouse.daily_core_domain import (
     DailyDomainBuildError,
     _base_files,
     _verify_base,
@@ -219,7 +219,7 @@ def test_native_parent_reader_cannot_enable_legacy_minute_product(native):
     root, _, _, _ = native
     output = root.parent / "new-daily"
     with patch(
-        "quanthus.pipelines.securities_warehouse.daily_domain._read_catalog",
+        "quanthus.pipelines.securities_warehouse.daily_core_domain._read_catalog",
         return_value=({"market_date": "2026-10-08"}, {}),
     ), pytest.raises(DailyDomainBuildError, match="require daily-core-v1"):
         build_daily_domain_increment(

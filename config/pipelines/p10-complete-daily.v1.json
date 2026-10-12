@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "policy_id": "p10-trading-day-complete-daily-v1",
+  "timezone": "Asia/Shanghai",
+  "baseline_market_date": "2026-10-12",
+  "required_intervals": ["1d", "1m", "5m"],
+  "minute_start": "10:30",
+  "minute_deadline": "13:00",
+  "complete_deadline": "13:20",
+  "mirror_deadline": "14:00",
+  "daily_ods_deadline": "23:45",
+  "minimum_minute_grade": "R2",
+  "maximum_R3": 0,
+  "source_providers": {"1m": "tencent-mkline-m1", "5m": "baostock-native-5m"},
+  "operation_budget_seconds_per_interval": 3600,
+  "operation_timeout_seconds": 600,
+  "reserved_grade_seconds_per_interval": 600,
+  "native_5m_required": true,
+  "consumer_purpose": "gap_aware_non_execution_development",
+  "execution_authorized": false,
+  "knowledge_time": "actual_source_acquisition_never_backdated",
+  "failure_mail": "stage_attempt_failure_or_deadline_once_per_date_and_stage"
+}

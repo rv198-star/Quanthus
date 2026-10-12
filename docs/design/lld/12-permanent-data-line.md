@@ -118,6 +118,22 @@ R0/R1 按用途准入；R2 真实观测及缺陷标签允许入正式仓库，�
 
 ## 3. Intake and versioned handoff
 
+### Current complete Daily handoff (Owner 2026-10-13)
+
+The versioned successor `p10-trading-day-complete-daily-v1` implements the Owner's
+next-trading-day repair instruction in [ADR 0016](../../architecture/adr-0016-value-proportional-warehouse-quality.md).
+Shared T daily market/event ODS is materialized once per Job, before native 1m/5m
+acquisition. Both intervals have persistent bounded budgets and real R0/R1/R2/R3
+status; R3 originals remain in quarantine. Independently admitted 1d continues.
+Only a physically verified joint 1d/1m/5m product with both R3 counts zero enters
+`CURRENT_COMPLETE_DAILY.json`; OCI copies exact immutable members before publishing
+its visibility receipt. Consumers request intervals explicitly and respect actual
+OCI visibility cutoff. Historical source and protected consumers stay gated.
+
+Runtime config: `config/pipelines/p10-complete-daily.v1.json`; contracts:
+`tests/contract/test_p10_complete_daily.py`; [operations](../../operations/p10-complete-daily-delivery.md).
+Deployment evidence and the first real scheduled delivery must be recorded separately.
+
 New acquisition or data-quality/governance issues use `phase:P10`, `area:data` and `P10-DATA-*`
 ids. Existing open issues retain numbers, titles, evidence, execution gates and subgroup dependencies.
 The reviewed routing inventory and consumer exceptions are in the ownership policy. Closed issues

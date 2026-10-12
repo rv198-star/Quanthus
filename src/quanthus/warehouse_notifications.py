@@ -38,6 +38,22 @@ class WarehouseNotificationError(RuntimeError):
 
 
 EVENTS = {
+    "p10_cn01_daily_ods_failed": {
+        "node": "CN01", "stage": "T日 ODS日频", "heading": "CN01 T日 ODS日频采集失败",
+        "failure": True,
+    },
+    "p10_cn01_native_minutes_failed": {
+        "node": "CN01", "stage": "T+1交易日 ODS分钟",
+        "heading": "CN01 T+1交易日 1m/5m采集或质量未达标", "failure": True,
+    },
+    "p10_cn01_complete_daily_failed": {
+        "node": "CN01", "stage": "T+1完整 DWD",
+        "heading": "CN01 T+1完整 DWD构建未完成", "failure": True,
+    },
+    "p10_oci_complete_daily_failed": {
+        "node": "OCI", "stage": "T+1完整 DWD同步",
+        "heading": "OCI T+1完整 DWD同步或消费者接入未完成", "failure": True,
+    },
     "cn01_dwd_completed": {
         "node": "CN01",
         "stage": "DWD构建",
@@ -257,7 +273,7 @@ def _email_html(
     details: list[tuple[str, str]] = [
         ("节点", node),
         ("阶段", stage),
-        ("交易日", market_date.isoformat()),
+        (str(context.get("market_date_label", "交易日")), market_date.isoformat()),
         (
             "状态",
             str(EVENTS[event].get(
@@ -294,6 +310,10 @@ def _email_html(
         "delivery_reason": "判定原因",
         "source_revised_count": "源数据修订证券数",
         "grade_manifest_sha256": "质量包 manifest SHA-256",
+        "required_intervals": "所需数据频率",
+        "deadline": "交付截止时间",
+        "target_next_trade_day": "T+1交易日",
+        "policy_id": "运行规则版本",
     }
     for key, label in context_labels.items():
         value = context.get(key)

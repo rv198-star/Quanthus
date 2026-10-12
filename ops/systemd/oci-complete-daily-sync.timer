@@ -1,0 +1,11 @@
+[Unit]
+Description=OCI complete DWD poll; T+1 deadline 14:00
+
+[Timer]
+OnCalendar=*-*-* 10..14:00/2:00 Asia/Shanghai
+OnCalendar=*-*-* 15..23:50:00 Asia/Shanghai
+Persistent=true
+Unit=oci-complete-daily-sync.service
+
+[Install]
+WantedBy=timers.target

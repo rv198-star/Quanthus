@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""Run the pinned GitHub release's complete Daily Job."""
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "src"))
+from quanthus.pipelines.p10_complete_daily_cycle import main  # noqa: E402
+
+if __name__ == "__main__":
+    if subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT):
+        raise SystemExit("delivery checkout has tracked changes; exact release identity required")
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    sys.argv += ["--code-revision", revision]
+    raise SystemExit(main())

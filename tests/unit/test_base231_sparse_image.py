@@ -1,5 +1,7 @@
 """Financial source atoms cannot overwrite history during sparse integration."""
 
+import hashlib
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -201,3 +203,54 @@ def test_concept_subset_reuses_cumulative_earliest_definition(tmp_path, new_star
                 adapter.select_absent(scan, table, schema)
         else:
             assert adapter.select_absent(scan, table, schema)["new_identifiers"] == 0
+
+
+def context(block="original-first", **changes):
+    body = {
+        "currency": None,
+        "source_block_sha256": block,
+        "source_content_sha256": "original-body",
+        "source_literal_label": "literal",
+        "source_literal_token": "1.00000000001",
+        "unit_authority": "SOURCE_LITERAL",
+    }
+    body.update(changes)
+    text = json.dumps(body, sort_keys=True)
+    return text, hashlib.sha256(text.encode()).hexdigest()
+
+
+def test_both_equivalent_blocks_require_original_raw_body_authority():
+    old, old_hash = context()
+    new, new_hash = context("original-second")
+    assert adapter.validate_context_pair(
+        "source",
+        old,
+        new,
+        old_hash,
+        new_hash,
+        {("source", "original-body"): {"original-first", "original-second"}},
+    )
+
+
+@pytest.mark.parametrize("mode", ["token", "unit", "body", "unknown-block", "hash"])
+def test_raw_block_equivalence_cannot_hide_values_units_body_or_unproven_hash(mode):
+    old, old_hash = context()
+    edits = {
+        "token": {"source_literal_token": "1.00000000002"},
+        "unit": {"unit_authority": "INFERRED"},
+        "body": {"source_content_sha256": "another-body"},
+    }
+    new, new_hash = context(
+        "unknown" if mode == "unknown-block" else "original-second", **edits.get(mode, {})
+    )
+    if mode == "hash":
+        new_hash = "forged"
+    with pytest.raises(RuntimeError, match="UNPROVEN_OR_DIFFERENT_RAW_CONTEXT"):
+        adapter.validate_context_pair(
+            "source",
+            old,
+            new,
+            old_hash,
+            new_hash,
+            {("source", "original-body"): {"original-first", "original-second"}},
+        )

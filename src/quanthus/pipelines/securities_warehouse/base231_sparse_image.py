@@ -8,6 +8,7 @@ scans all native tables. Archived source roots are never opened.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -28,7 +29,84 @@ KEYS = {t: t.removeprefix("dwd_") + "_id" for t in financial_reporting_schemas()
 EXPECTED = {"dwd_financial_report": 19, "dwd_financial_concept": 0, "dwd_financial_fact": 304}
 
 
-def select_absent(scan: GlobalScan, table: str, schema: Any) -> dict[str, int]:
+def validate_context_pair(
+    source: str,
+    old: str,
+    new: str,
+    old_hash: str,
+    new_hash: str,
+    authority: dict[tuple[str, str], set[str]],
+) -> bool:
+    """Keep old provenance when two actual raw blocks state the same exact atom."""
+    fields = {
+        "currency",
+        "source_block_sha256",
+        "source_content_sha256",
+        "source_literal_label",
+        "source_literal_token",
+        "unit_authority",
+    }
+    try:
+        a, b = json.loads(old), json.loads(new)
+        if (
+            set(a) != fields
+            or set(b) != fields
+            or old_hash != hashlib.sha256(old.encode()).hexdigest()
+            or new_hash != hashlib.sha256(new.encode()).hexdigest()
+        ):
+            raise ValueError
+        blocks = authority.get((source, a["source_content_sha256"]), set())
+        first, second = a.pop("source_block_sha256"), b.pop("source_block_sha256")
+        if canonical(a) != canonical(b) or first not in blocks or second not in blocks:
+            raise ValueError
+    except (ValueError, TypeError, KeyError) as exc:
+        raise BoundedError("SPARSE_IMAGE_UNPROVEN_OR_DIFFERENT_RAW_CONTEXT") from exc
+    return bool(first != second)
+
+
+def original_block_authority(sparse: Path, budget: Budget) -> dict[tuple[str, str], set[str]]:
+    """Read registered repaired bodies once, preserving original frame bytes."""
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]
+
+    from .base231_financial_summary import _frames
+
+    inventory = json.loads((sparse / "INPUTS.json").read_bytes())
+    wanted: dict[str, dict[int, str]] = {}
+    with (sparse / "projection/repair-proofs.jsonl").open() as stream:
+        for line in stream:
+            row = json.loads(line)
+            wanted.setdefault(row["member"], {})[row["ordinal"]] = row["proof"][
+                "original_content_sha256"
+            ]
+    authority: dict[tuple[str, str], set[str]] = {}
+    for member in inventory["raw_members"]:
+        ordinals = wanted.get(member["path"], {})
+        index = 0
+        for batch in pq.ParquetFile(sparse / member["path"]).iter_batches(
+            batch_size=16, columns=["content", "content_sha256"]
+        ):
+            budget.check(reserve=batch.nbytes * 2)
+            for raw in batch.to_pylist():
+                if index in ordinals:
+                    sha = "sha256:" + hashlib.sha256(raw["content"].encode()).hexdigest()
+                    if sha != ordinals[index] or sha != raw["content_sha256"]:
+                        raise BoundedError("SPARSE_IMAGE_ORIGINAL_BODY_CHANGED")
+                    blocks = {digest("\n".join(lines)) for lines in _frames(raw["content"])}
+                    authority.setdefault((member["sha256"], sha), set()).update(blocks)
+                    del ordinals[index]
+                index += 1
+        if ordinals:
+            raise BoundedError("SPARSE_IMAGE_REQUIRED_ORIGINAL_BODY_MISSING")
+    return authority
+
+
+def select_absent(
+    scan: GlobalScan,
+    table: str,
+    schema: Any,
+    *,
+    block_authority: dict[tuple[str, str], set[str]] | None = None,
+) -> dict[str, int]:
     """Keep equal source atoms unchanged; any ambiguous overlap fails closed.
 
     Governance observation clocks may differ between two parser runs. Concepts
@@ -40,7 +118,7 @@ def select_absent(scan: GlobalScan, table: str, schema: Any) -> dict[str, int]:
     prior, new = "prior_" + table, "sparse_" + table
     old = "overlap_" + table
     scan.connection.execute(
-        f"CREATE VIEW {old} AS SELECT o.* FROM {prior} o "
+        f"CREATE TEMP TABLE {old} AS SELECT o.* FROM {prior} o "
         f'WHERE o."{key}" IN (SELECT "{key}" FROM {new})'
     )
     for view in [new]:
@@ -50,6 +128,25 @@ def select_absent(scan: GlobalScan, table: str, schema: Any) -> dict[str, int]:
             "SPARSE_IMAGE_AMBIGUOUS_IDENTIFIER",
         )
     excluded = {"knowledge_from", "knowledge_to"}
+    variants = 0
+    if table == "dwd_financial_fact" and block_authority is not None:
+        excluded.update({"dimensions_json", "context_hash"})
+        reader = scan.connection.execute(
+            f"SELECT n.source_artifact_sha256,o.dimensions_json AS old_dims,"
+            f"n.dimensions_json AS new_dims,o.context_hash AS old_context,"
+            f'n.context_hash AS new_context FROM {new} n JOIN {old} o USING("{key}")'
+        ).to_arrow_reader(scan.budget.limits.batch_rows)
+        for batch in reader:
+            scan.budget.check()
+            for row in batch.to_pylist():
+                variants += validate_context_pair(
+                    row["source_artifact_sha256"],
+                    row["old_dims"],
+                    row["new_dims"],
+                    row["old_context"],
+                    row["new_context"],
+                    block_authority,
+                )
     if table == "dwd_financial_concept":
         # The accepted concept rule retains the cumulative earliest period.
         # A two-member source subset may start later without revising that
@@ -69,18 +166,21 @@ def select_absent(scan: GlobalScan, table: str, schema: Any) -> dict[str, int]:
     )
     scan.connection.execute(
         f"CREATE VIEW absent_{table} AS SELECT n.* FROM {new} n "
-        f"WHERE NOT EXISTS(SELECT 1 FROM {prior} o "
+        f"WHERE NOT EXISTS(SELECT 1 FROM {old} o "
         f'WHERE n."{key}"=o."{key}")'
     )
     result = scan.connection.execute(
         f"SELECT (SELECT count(*) FROM {new}), (SELECT count(*) FROM absent_{table})"
     ).fetchone()
     assert result is not None
-    return {
+    counts = {
         "source_rows": result[0],
         "new_identifiers": result[1],
         "equal_existing_identifiers": result[0] - result[1],
     }
+    if block_authority is not None:
+        counts["proven_original_block_variants_reused"] = variants
+    return counts
 
 
 def project_delta(
@@ -97,12 +197,16 @@ def project_delta(
         "layout"
     ]
     ss = financial_reporting_schemas()
+    original = (prior_descriptor.parent if prior_descriptor else before) / "manifest.json"
+    if file_sha(sparse / "manifest.json") != SPARSE or file_sha(original) != PREDECESSOR:
+        raise BoundedError("SPARSE_IMAGE_ORIGINAL_AUTHORITY_CHANGED")
+    authority = original_block_authority(sparse, budget)
     outputs, census = {}, {}
     with GlobalScan(budget, read_only_roots=read_only_roots) as scan:
         for table, schema in ss.items():
             scan.add("prior_" + table, [_member(before, m["path"]) for m in layout[table]["files"]])
             scan.add("sparse_" + table, [sparse / "projection" / (table + ".parquet")])
-            census[table] = select_absent(scan, table, schema)
+            census[table] = select_absent(scan, table, schema, block_authority=authority)
             if census[table]["new_identifiers"] != EXPECTED[table]:
                 raise BoundedError("SPARSE_IMAGE_EXACT_ALLOWED_KEY_CENSUS_CHANGED")
             if EXPECTED[table]:

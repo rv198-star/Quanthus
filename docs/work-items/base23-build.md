@@ -24,6 +24,40 @@ runtime old-path fallback is allowed. The new mirror must stand alone.
 
 ## Current recovery checkpoint
 
+### October 13 capacity recovery and exact sparse financial integration
+
+The Owner explicitly allowed further disk cleanup. Two completed independent
+whole-image acceptance copies were retired only after all 92,130 members in
+each were rehashed and proved byte-identical to the retained whole image. Their
+headers, restoration inventory, cold receipts and failure evidence are retained
+in `artifacts/base231-capacity-recovery-20261012T173153Z-faeb9b2/` and the original
+whole-image job. Approximately 39.6 GB of allocated file bytes were recovered;
+both mounts then had approximately 44 GB available. No source or current image
+was deleted. This explicitly supersedes those completed copies' former retention
+rule, not the retention of sources, the current image or failed attempts.
+
+`base231_sparse_image.py` is a separate successor evaluator. It leaves all
+previously sealed evaluators byte-identical, selects absent financial identifiers
+against the complete predecessor, rejects conflicting original atoms, and
+reuses every equal existing observation without replacing its knowledge clock.
+Expected additions are exactly 19 reports and 304 facts; all 16 concepts exist.
+Only those two tables may receive new physical files. All 33 tables, inherited
+repairs, original sparse source replay and the exact allowed delta still require
+independent whole-image verification. A scope or a materialized image without
+those receipts is not a new accepted mirror.
+
+The new capacity layout retains the previous accepted image, one new candidate
+and one rotating physical acceptance copy. Each successful relocated copy may
+be retired only after its complete receipt and restoration proof are retained;
+the next relocation uses fresh independent files and a new process. Failed
+evidence is never recycled. The 8 GiB floor and 2 GiB DuckDB / 4 GiB RSS limits
+remain; write budgets and device snapshots must be frozen before each batch.
+
+The three evidence-limited domains remain scoped limitations: truncated holder
+matrices/change equivalence, stale all-market lifecycle authority, and original
+minute semantics. This financial integration neither qualifies those uses nor
+changes frozen consumer gates or production.
+
 ### October 13 jointly organized four-package continuation
 
 The Owner approved one shared source classification across the four follow-on

@@ -85,3 +85,60 @@ production continues during rollback. Do not repoint old Daily or change sealed 
 Any new complete pointer/visibility stays for audit but is inaccessible to restored
 consumers; a rollback is not a reason to backdate or relabel it. Check independent
 daily timers/current and container health again, and record the rollback receipt.
+
+## GDrive complete Daily archive (Owner 2026-10-13)
+
+Work item: P10-DATA-COMPLETE-GDRIVE-001. Independent policy:
+`config/pipelines/p10-complete-daily-gdrive.v1.json`.
+
+A systemd path watch on the complete product's dated-pointer directory starts
+`quanthus-gdrive-complete-daily.service` after immutable joint publication. A 15-minute
+recovery timer handles missed events/retries. It reads only admitted 1d/1m/5m complete
+packages, reuses the exact CN01 semantic receipt, and rereads physical hashes. It does
+not collect sources, scan Base, rebuild Daily, change producer/OCI pointers or block
+OCI delivery. R2 and R3=0 remain the existing joint product admission requirement.
+
+Destination is `quanthus-dwd/daily-archives/cn01-complete-v1/T/manifest-sha256/`.
+The dedicated folder ID is pinned in the archive policy. Ordinary `.tar.zst`, precise
+source pointer/receipt, archive metadata and SHA256SUMS preserve the full immutable
+package including native minutes and provenance. Cloud READY is copied only after
+size/MD5 verification of every archive/metadata file and read back before local success.
+Its time is an archive operation time, not a historical PIT/consumer visibility claim.
+A fresh restore must verify SHA256SUMS, manifest/READY and physical inventory, then run
+complete-product verification in an isolated directory before any explicit publication.
+
+CN02's existing upload credential has `drive.file` scope. The dedicated archive folder
+was created using that credential and moved under the existing `daily-archives` using
+Drive's folder API; scope and sharing remain unchanged. The loopback OAuth adapter uses
+that credential rather than the shared rclone client project, whose quota failed during
+inspection. Private credentials stay mode 0600 below `/etc/quanthus/gdrive-complete-v1`.
+`quanthus-gdrive-complete-oauth.service` listens only on 127.0.0.1:3397. The archive
+release alone lives at `/opt/quanthus/gdrive-complete-current`; producer and OCI releases
+remain separately pinned.
+
+CN02's actual route names are US.Stlaure and US.WePC. The persistent
+`quanthus-gdrive-proxy.service` routes loopback HTTP 19082 to US.Stlaure and 19083 to
+US.WePC. Each archive tries Stlaure first; transport failure can use WePC. A shared
+quota/expired-token failure does not retry the same account through another proxy.
+No credentials or supplier rows appear in operational logs.
+
+Per run: at most two attempted packages, 40-minute total budget, 10-minute subprocess
+limits and 15-minute per-route budget; at most three attempts per immutable identity
+per UTC day, with a 28-day recovery window. Budget exhaustion is retained, not reset
+by the path/recovery timer. Every invocation still considers new eligible days after
+exhausted older attempts. Scratch retains 4 GiB device reserve and bounds package and
+archive to 4 GiB each; no second full source snapshot is made. Failed archives remain
+in private state for bounded resumption. Success removes only that private temporary
+upload directory. No cloud history, Base, published Daily or source quarantine is deleted.
+GDrive failure sends its own deduplicated failure email, leaving independent daily and
+OCI delivery available. Failed email delivery is recorded for retry.
+
+Before activation save unit/link states in a private rollback directory, validate units,
+verify the scoped folder and both routes, and run a synthetic archive/upload/fresh
+restore under `_acceptance/`. Label this separately from the first real market archive.
+Disable only the OCI legacy GDrive backup timer once idle: its script still binds the
+old Base and is not the complete-product archive. Preserve its code, state and cloud
+history. Rollback stops the new path/timer, drains bounded uploads, restores saved link
+and unit states, and restores the legacy timer only to its exact prior state. Check
+producer/OCI SHAs, daily timers and pointers after rollback. An old backup's success
+cannot substitute for the new complete archive.

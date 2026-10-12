@@ -1,0 +1,21 @@
+{
+  "policy_id": "p10-complete-daily-gdrive-v1",
+  "source_product": "p10-trading-day-complete-daily-v1",
+  "drive_root_folder_id": "1lZE0wle1nDZu47ag6H7Ma_hwwxcXwtGO",
+  "remote_prefix": "",
+  "display_destination": "quanthus-dwd/daily-archives/cn01-complete-v1",
+  "required_intervals": ["1d", "1m", "5m"],
+  "primary_proxy": {"name": "US.Stlaure", "url": "http://127.0.0.1:19082"},
+  "fallback_proxy": {"name": "US.WePC", "url": "http://127.0.0.1:19083"},
+  "disk_reserve_bytes": 4294967296,
+  "max_package_bytes": 4294967296,
+  "max_archive_bytes": 4294967296,
+  "max_attempts_per_utc_day": 3,
+  "max_packages_per_run": 2,
+  "max_backlog_days": 28,
+  "command_timeout_seconds": 600,
+  "route_timeout_seconds": 900,
+  "job_timeout_seconds": 2400,
+  "delete_remote": false,
+  "failure_blocks_oci": false
+}

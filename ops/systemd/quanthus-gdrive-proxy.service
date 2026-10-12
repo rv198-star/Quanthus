@@ -1,0 +1,17 @@
+[Unit]
+Description=CN01 GDrive US.Stlaure primary and US.WePC fallback HTTP proxies
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/lib/quanthus-gdrive/xray run -config /etc/quanthus/gdrive-complete-v1/xray.json
+Restart=on-failure
+RestartSec=5s
+MemoryMax=192M
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -134,6 +134,13 @@ Runtime config: `config/pipelines/p10-complete-daily.v1.json`; contracts:
 `tests/contract/test_p10_complete_daily.py`; [operations](../../operations/p10-complete-daily-delivery.md).
 Deployment evidence and the first real scheduled delivery must be recorded separately.
 
+Owner 2026-10-13 also authorizes the independent complete-Daily GDrive archive
+(`p10-complete-daily-gdrive-v1`). Joint publication starts the archive using US.Stlaure
+first, then US.WePC on transport failure. Archive receipts preserve exact product/Base
+identity and actual operation time; cloud failure never withdraws an admitted Daily
+or blocks the independent OCI mirror. The scoped writer folder and rollback are owned
+by the same [operations guide](../../operations/p10-complete-daily-delivery.md).
+
 New acquisition or data-quality/governance issues use `phase:P10`, `area:data` and `P10-DATA-*`
 ids. Existing open issues retain numbers, titles, evidence, execution gates and subgroup dependencies.
 The reviewed routing inventory and consumer exceptions are in the ownership policy. Closed issues

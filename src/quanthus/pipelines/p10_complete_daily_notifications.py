@@ -16,6 +16,7 @@ from quanthus.pipelines.p10_complete_daily_schedule import POLICY_ID
 from quanthus.pipelines.p10_delivery_common import atomic, digest, encoded, object_at
 
 EVENTS = {
+    "gdrive": "p10_cn01_complete_daily_gdrive_failed",
     "daily_ods": "p10_cn01_daily_ods_failed",
     "daily_cycle": "p10_cn01_daily_cycle_failed",
     "minutes": "p10_cn01_native_minutes_failed",

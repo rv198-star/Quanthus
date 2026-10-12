@@ -24,6 +24,76 @@ runtime old-path fallback is allowed. The new mirror must stand alone.
 
 ## Current recovery checkpoint
 
+### October 13 jointly organized four-package continuation
+
+The Owner approved one shared source classification across the four follow-on
+packages, prioritizing financial summaries, shareholder matrices/change
+equivalence and full-market lifecycle together. Minute semantics receive an early
+independent evidence gate. This successor instruction expands the earlier
+two-package selection below; it does not change the September 30 business cutoff,
+authorize new acquisition, admit consumers or mutate the accepted whole image.
+
+Recover this run from
+`artifacts/base231-joint-domains-20261012T165224Z-555fba6/registration.json`.
+The client date is October 13 Asia/Shanghai; run names use actual UTC October 12.
+All 184 fixed members / 3,194,688,592 bytes were rehashed against the retained
+ODS catalog. These members comprise eight F10 files, 44 security masters,
+44 acquisition stock lists, six weekly lifecycle files and 82 minute metadata
+bodies. Member integrity is not full-market or minute semantic qualification.
+
+The 110 previously held financial headers all contain valid dated columns plus
+explicit `-` undated placeholders. The versioned sparse adapter accounts for
+every original cell, holds undated observations and emits only dated cells from
+previously invalid frames. It preserves original file/body/block identities,
+literal units, exact Decimal tokens and clocks; no original source is edited.
+The original frozen literal evaluator remains byte-identical. Actual output:
+162 reports, 16 concepts and 2,592 facts. Against the accepted literal domain,
+143 reports, all 16 concepts and 2,288 facts already exist; every overlapping
+fact's value/unit/source/period/publication atom agrees. Net additions are
+19 reports and 304 facts, with no authority to replace old values. Prelisting
+identity holds remain (5,072 additional cells in these recovered frames).
+
+Source-bound independent domain replay, two physical relocations/new processes,
+kernel-readonly inputs, hidden original sources/caches, no network and
+disposable missing/corrupt negatives passed. The sparse domain identity is
+`sha256:5a36ba101c6f6524797989ef602bcd34535cff6a1a892e597f836a0be1f8371a`.
+Use `sparse-build-safe.json` / `sparse-cold-summary-safe.json` for exact identities
+and receipts. This domain is not yet integrated into a successor whole mirror.
+
+An immutable shared identity TMP retains 11,735 literal rows across the only two
+distinct security snapshots, dated July 23 and July 25. Every weekly lifecycle
+file repeats the July 25 snapshot; September wrapper dates do not refresh it.
+The only business identity difference between the two snapshots is `920238`.
+Neither snapshot proves an August/September complete-market denominator.
+All 1,108 held shareholder matrices lack a complete closing boundary in the
+original selected body; older or partial observations do not prove a latest
+complete matrix or an exit. The 82 minute metadata bodies have collection/scope
+claims but lack qualified original adjustment-mode, deployed-code and field
+precision/time authority. No actual minute price rows were read in this gate.
+Absence is restricted to the selected local catalog, not all possible archives.
+
+`current-gaps.json` is this run's single current disposition ledger. Healthy
+accepted outputs remain reusable under exact identities. Do not subtract repaired
+component counts from held-frame counts or turn literal identity TMP into an ADM.
+Do not infer canonical financial currency, prelisting company continuity,
+transaction equivalence, missing PIT times or intraday admission.
+
+The new whole-image write gate was not met: both devices lack space for another
+complete physical image plus the measured full-check TMP and 8 GiB floor.
+`whole-successor-capacity-safe.json` records same-UTC device-specific snapshots,
+existing job allocations, a one-image lower bound and the stronger measured-TMP
+reference; relocation copies are an additional budget. No sealed prior image,
+retained cold copy, source or failed evidence was removed. The previously accepted
+33-table whole image remains complete and unchanged; a qualified small domain is
+not another complete release. Continue from actual outputs and exact missing
+authority, rather than restarting old whole-image acceptance or repeating probes.
+
+For the jointly organized successor above, focused checks passed 115 tests
+(14 warnings), including 27 new regressions. New-module Ruff/strict mypy passed.
+Venv `make check` passed 5,765 tests, with 21 skipped and 62 warnings;
+whole-repository Ruff still reports the original 216 failures. Python 3.12,
+Web-specific checks and a new full-mirror run were not performed.
+
 ### October 12 whole-mirror integration acceptance
 
 The selected qualified patch is now integrated into the complete isolated

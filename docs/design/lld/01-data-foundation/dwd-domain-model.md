@@ -564,6 +564,15 @@ The envelope preserves the inner domain seal during job-owned physical transfer
 and relocation; source strings remain archival. This still grants neither
 transaction equivalence nor whole Base/consumer acceptance.
 
+`base231_native_delta.py` prepares an additive job-local integration TMP. New
+financial concepts are source-namespaced; existing financial values are not
+replaced. A holder frame may add missing components only when all existing latest
+components are an identical subset of the certified new frame. Differences or
+absent old components hold that whole frame, preventing inferred exits and
+duplicate ratio-basis components. Future source-date claims remain isolated, and
+unproven change atoms are not merged. This TMP is not a published data product or
+a substitute for the complete 33-table mirror and cold acceptance.
+
 | ID | Work | Current state | Acceptance evidence |
 | --- | --- | --- | --- |
 | `META-DATA-DWD-002` | Build the product-bounded seven-domain DWD Base V2 | 33 DWD objects accepted; recurring daily maintenance active; generic DWS deferred | `config/releases/v2-build202607.json`, package manifest, script tests, and build receipts |

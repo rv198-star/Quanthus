@@ -77,6 +77,8 @@ def projected_rows(member: Path, interval: str, mapping: dict[str, dict[str, Any
         )
     }
     provider = "tencent-mkline-m1" if interval == "1m" else "baostock-native-5m"
+    # One immutable member identity shared by every projected row in this pass.
+    source_revision = provider + "@" + file_digest(member / "manifest.json")[7:19]
     for batch in pq.ParquetFile(member / "minute-real-observed.parquet").iter_batches(
         batch_size=20000
     ):
@@ -97,7 +99,7 @@ def projected_rows(member: Path, interval: str, mapping: dict[str, dict[str, Any
             yield {
                 "record_source": provider,
                 "source_record_id": f"{code}.json.gz#code={code}&ts={row['source_ts']}",
-                "source_revision": provider + "@" + file_digest(member / "manifest.json")[7:19],
+                "source_revision": source_revision,
                 "source_artifact_sha256": row["raw_sha256"],
                 "knowledge_from": knowledge,
                 "knowledge_to": None,

@@ -279,6 +279,33 @@ def members(tmp_path: Path) -> tuple[Path, Path, Path]:
     return synthetic_daily(tmp_path / "daily"), paths[0], paths[1]
 
 
+@pytest.mark.parametrize("interval,index", [("1m", 1), ("5m", 2)])
+def test_projection_hashes_immutable_manifest_once_per_member(
+    members: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch, interval: str, index: int
+) -> None:
+    member = members[index]
+    mapping, _ = full.daily_mapping(members[0], DAY)
+    manifest = member / "manifest.json"
+    expected_revision = (
+        "tencent-mkline-m1" if interval == "1m" else "baostock-native-5m"
+    ) + "@" + file_digest(manifest)[7:19]
+    original = full.file_digest
+    calls = []
+
+    def counted(path: Path) -> str:
+        if path == manifest:
+            calls.append(path)
+        return original(path)
+
+    monkeypatch.setattr(full, "file_digest", counted)
+    rows = list(full.projected_rows(member, interval, mapping))
+    assert len(rows) == (2 if interval == "1m" else 1)
+    assert len(calls) == 1
+    assert {row["source_revision"] for row in rows} == {expected_revision}
+    assert all(isinstance(row["close"], Decimal) for row in rows)
+    assert all(row["knowledge_from"].tzinfo is not None for row in rows)
+
+
 def test_tplus1_skips_weekend_and_holiday_and_missing_calendar_blocks() -> None:
     rows = calendar()
     assert schedule.target_for(datetime(2026, 10, 12, 10, 30, tzinfo=schedule.CST), rows) == date(

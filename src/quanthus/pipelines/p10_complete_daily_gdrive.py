@@ -37,7 +37,7 @@ from quanthus.pipelines.p10_delivery_common import (
 from quanthus.policy import find_project_root
 
 SOURCE = Path("/srv/quanthus/dwd-dws-v2/daily/products/complete-daily")
-STATE = Path("/var/lib/quanthus/gdrive-complete-v1")
+STATE = Path("/var/lib/quanthus/gdrive-complete-v2")
 CONFIG = Path("/etc/quanthus/gdrive-complete-v1/rclone.conf")
 POLICY_PATH = find_project_root() / "config/pipelines/p10-complete-daily-gdrive.v1.json"
 

@@ -13,7 +13,7 @@ Environment=PYTHONPATH=/opt/quanthus/gdrive-complete-current/src
 Environment=PYTHONDONTWRITEBYTECODE=1
 EnvironmentFile=/etc/quanthus/dwd-notification.env
 ExecStart=/root/work/Quanthus/.venv-p1/bin/python /opt/quanthus/gdrive-complete-current/ops/bin/run-gdrive-complete-daily
-TimeoutStartSec=45min
+TimeoutStartSec=255min
 MemoryMax=512M
 CPUQuota=75%
 KillMode=control-group

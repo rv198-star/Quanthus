@@ -238,7 +238,7 @@ def main() -> int:
     from quanthus.pipelines.p10_complete_daily_schedule import CST
 
     if args.archive_service_failure:
-        state = Path("/var/lib/quanthus/gdrive-complete-v1")
+        state = Path("/var/lib/quanthus/gdrive-complete-v2")
         target, label = _archive_failure_target(datetime.now(CST), state)
         record = failure(
             day=target,

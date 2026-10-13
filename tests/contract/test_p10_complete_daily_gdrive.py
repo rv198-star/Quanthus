@@ -32,6 +32,20 @@ def test_no_complete_pointer_does_not_archive_or_notify(tmp_path: Path, monkeypa
     assert result["eligible"] == 0 and result["results"] == []
 
 
+def test_source_bound_archive_has_finite_large_transfer_budget_and_separate_namespace() -> None:
+    policy = archive.object_at(archive.POLICY_PATH)
+    assert policy["policy_id"] == "p10-complete-daily-gdrive-v2"
+    assert policy["remote_prefix"] == "source-bound-v2"
+    assert policy["command_timeout_seconds"] == 7200
+    assert policy["route_timeout_seconds"] == 7500
+    assert policy["job_timeout_seconds"] == 15000
+    assert policy["max_packages_per_run"] == 1
+    assert policy["disk_reserve_bytes"] == 4 * 1024**3
+    assert policy["required_intervals"] == ["1d", "1m", "5m"]
+    assert policy["primary_proxy"]["name"] == "US.Stlaure"
+    assert policy["delete_remote"] is False
+
+
 def test_missing_member_R3_or_legacy_base_cannot_be_archived(
     complete: Path, monkeypatch, tmp_path: Path
 ) -> None:
@@ -356,3 +370,19 @@ def test_scoped_oauth_refresh_uses_primary_then_fallback_and_cache(tmp_path: Pat
     assert tokens.refresh()["refresh_token"] == "synthetic-refresh"
     assert tokens.refresh()["access_token"] == "synthetic-token"
     assert routes == ["http://127.0.0.1:19082", "http://127.0.0.1:19083"]
+
+
+def test_v2_state_is_separate_and_all_mail_queues_remain_replayed():
+    assert str(archive.STATE) == "/var/lib/quanthus/gdrive-complete-v2"
+    assert str(archive.CONFIG) == "/etc/quanthus/gdrive-complete-v1/rclone.conf"
+    root = archive.POLICY_PATH.parents[2]
+    hook = (root / "src/quanthus/pipelines/p10_complete_daily_notifications.py").read_text()
+    assert 'state = Path("/var/lib/quanthus/gdrive-complete-v2")' in hook
+    replay = (root / "ops/systemd/quanthus-complete-daily-mail-retry.service").read_text()
+    for queue in (
+        "/srv/quanthus/dwd-dws-v2/intraday/operations/complete-daily-v1/notifications",
+        "/var/lib/quanthus/gdrive-complete-v1/notifications",
+        "/var/lib/quanthus/gdrive-complete-v2/notifications",
+        "/var/lib/quanthus/acquisition-continuation-v1/notifications",
+    ):
+        assert "--retry-state " + queue in replay

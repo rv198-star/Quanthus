@@ -141,7 +141,10 @@ def _company(rows: dict[str, list[dict[str, Any]]], code: str, day: date) -> tup
 
 
 def disclosure_candidates(
-    rows: list[dict[str, Any]], previous: dict[str, dict[str, Any]], covered_after: date
+    rows: list[dict[str, Any]],
+    previous: dict[str, dict[str, Any]],
+    covered_after: date,
+    previous_source: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Only old-business-date new/changed documents; fresh daily rows stay in daily-core."""
     selected = []
@@ -157,11 +160,57 @@ def disclosure_candidates(
         if prior is None:
             selected.append({**row, "correction_kind": "late_observation"})
         elif any(
-            str(prior[field]) != str(row[field])
+            str(baseline[field]) != str(row[field])
+            for baseline in (prior, (previous_source or {}).get(str(row["ann_id"]), prior))
             for field in ("title", "publish_time", "announce_date")
         ):
             selected.append({**row, "correction_kind": "metadata_revision"})
     return selected
+
+
+def _source_observation(core: Path, day: str, manifest: dict[str, Any]) -> dict[str, Any] | None:
+    """Bind prior ODS observations too: a missed intermediate change may revert."""
+    if "catalog_sha256" not in manifest:
+        return None
+    from quanthus.pipelines.contracts import verify_ods_release
+
+    catalog_path = core / "catalogs" / day / "catalog.json"
+    if file_digest(catalog_path) != manifest["catalog_sha256"]:
+        raise ValueError("disclosure prior ODS catalog binding differs")
+    catalog = object_at(catalog_path)
+    lane = next(item for item in catalog["lanes"] if item["lane"] == "calendar_daily_events")
+    shadow = Path(
+        os.environ.get("HERMES_ODS_SHADOW_ROOT", "/root/work/astock/data/shadow/cn01-ods-v1")
+    )
+    release = safe_path(shadow / "releases", lane["release_path"])
+    if verify_ods_release(release).manifest_sha256 != lane["release_manifest_sha256"]:
+        raise ValueError("disclosure prior ODS release binding differs")
+    source = release / "artifacts/announcements_delta.parquet"
+    return {
+        "market_date": day,
+        "catalog_sha256": manifest["catalog_sha256"],
+        "release_manifest_sha256": lane["release_manifest_sha256"],
+        "path": str(source),
+        "sha256": file_digest(source),
+    }
+
+
+def _previous_source_disclosures(core: Path, through: date) -> dict[str, dict[str, Any]]:
+    import pyarrow.parquet as pq
+
+    latest = {}
+    for pointer in sorted((core / "date-pointers").glob("*.json")):
+        if pointer.stem >= through.isoformat():
+            continue
+        value = object_at(pointer)
+        manifest_path = safe_path(core, value["manifest_path"])
+        if file_digest(manifest_path) != value["manifest_sha256"]:
+            raise ValueError("disclosure prior daily binding differs")
+        observation = _source_observation(core, pointer.stem, object_at(manifest_path))
+        if observation:
+            for row in pq.ParquetFile(observation["path"]).read().to_pylist():
+                latest[str(row["ann_id"])] = row
+    return latest
 
 
 def _history_bindings(core: Path, products: Path, through: date) -> list[dict[str, Any]]:
@@ -197,6 +246,10 @@ def _history_bindings(core: Path, products: Path, through: date) -> list[dict[st
                     "covered_after_date": manifest.get("covered_after_date"),
                 }
             )
+            if kind == "daily" and value["market_date"] < through.isoformat():
+                result[-1]["source_observation"] = _source_observation(
+                    core, value["market_date"], manifest
+                )
     return result
 
 
@@ -267,6 +320,7 @@ def _write_disclosures(
         pq.ParquetFile(source).read().to_pylist(),
         _previous_disclosures(core, products, market_date),
         market_date,
+        _previous_source_disclosures(core, market_date),
     )
     source_sha = file_digest(source)
     rows, subjects, held = [], [], []
@@ -347,6 +401,45 @@ def _write_disclosures(
     }
 
 
+def _compact_concept_witnesses(stage: Path, original: Path, schema: Any) -> int:
+    """Preserve every observation; reduce only the existing projection's sort input."""
+    import duckdb
+    import pyarrow.parquet as pq
+
+    con = duckdb.connect()
+    con.execute("SET threads=1")
+    con.execute("SET memory_limit='512MB'")
+    con.execute("SET max_temp_directory_size='128MB'")
+    con.execute("SET temp_directory=?", [str(stage / ".compact")])
+    try:
+        con.from_parquet(str(original)).create_view("original")
+        conflict = con.execute(
+            "SELECT financial_concept_id FROM (SELECT DISTINCT financial_concept_id, "
+            "taxonomy_namespace,taxonomy_version,concept_code,concept_name,statement_type,"
+            "data_type,period_type,balance_type FROM original) GROUP BY financial_concept_id "
+            "HAVING count(*)<>1 LIMIT 1"
+        ).fetchone()
+        if conflict:
+            raise ValueError("WEEKLY_CONCEPT_SOURCE_SEMANTICS_CONFLICT")
+        witnesses = (
+            con.execute(
+                "SELECT witness.* FROM (SELECT arg_min(t, ROW(effective_from,source_record_id,"
+                "source_artifact_sha256,record_source,source_revision)) AS witness "
+                "FROM original t GROUP BY financial_concept_id,knowledge_from) "
+                "ORDER BY witness.financial_concept_id,witness.knowledge_from"
+            )
+            .to_arrow_table()
+            .cast(schema)
+        )
+        path = stage / "staging/concepts/part-00-000000.parquet"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pq.write_table(witnesses, path, compression="zstd")
+        return int(witnesses.num_rows)
+    finally:
+        con.close()
+        shutil.rmtree(stage / ".compact", ignore_errors=True)
+
+
 def _write_financial(
     stage: Path,
     *,
@@ -385,6 +478,8 @@ def _write_financial(
     source_sha = file_digest(source)
     try:
         for batch in pq.ParquetFile(source).iter_batches(batch_size=16):
+            if shutil.disk_usage(stage).free < 4 * 1024**3 + 64 * 1024**2:
+                raise ValueError("weekly continuation reserve exhausted")
             for original in batch.to_pylist():
                 key = (original["security_id"], original["provider_source"])
                 receipt = wanted.get(key)
@@ -436,9 +531,13 @@ def _write_financial(
         raise ValueError("WEEKLY_THREE_STATEMENT_MATRIX_INCOMPLETE")
     # Use the existing source-evidence and concept-revision projection once per Job.
     concepts = paths["dwd_financial_concept"]
-    concept_stage = stage / "staging/concepts/part-00-000000.parquet"
-    concept_stage.parent.mkdir(parents=True)
-    os.replace(concepts, concept_stage)
+    concept_observations = stage / "evidence/financial-concept-observations/part-00000.parquet"
+    concept_observations.parent.mkdir(parents=True)
+    os.replace(concepts, concept_observations)
+    concept_observation_count = counts["dwd_financial_concept"]
+    concept_witness_count = _compact_concept_witnesses(
+        stage, concept_observations, schemas["dwd_financial_concept"]
+    )
     counts["dwd_financial_concept"] = _finalize_concepts(stage, {}, schemas)
     os.replace(
         stage / "payload/financial_reporting/dwd_financial_concept/part-00000.parquet", concepts
@@ -484,6 +583,8 @@ def _write_financial(
         "literal_source_native_only": True,
         "canonical_and_historical_pit_admission": False,
         "raw_reused_without_supplier_requests": True,
+        "concept_original_observations": concept_observation_count,
+        "concept_projection_witnesses": concept_witness_count,
         "unavailable_domains": ["F10", "shareholder_complete_matrix"],
     }
 
@@ -634,6 +735,18 @@ def build(
                 frozen_receipts = stage / "sources" / receipts.name
                 if file_digest(frozen_receipts) != inputs["receipts_sha256"]:
                     raise ValueError("receipts changed during freeze")
+            for record in history:
+                observation = record.get("source_observation")
+                if observation:
+                    frozen = (
+                        stage
+                        / "sources/disclosure-history"
+                        / (observation["market_date"] + ".parquet")
+                    )
+                    frozen.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(observation["path"], frozen)
+                    if file_digest(frozen) != observation["sha256"]:
+                        raise ValueError("prior ODS changed during freeze")
             audit = (
                 _write_disclosures(
                     stage,

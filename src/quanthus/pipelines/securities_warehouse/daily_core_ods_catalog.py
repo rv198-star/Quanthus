@@ -121,6 +121,30 @@ def _select_lane(release_root: Path, market_date: date, lane: str) -> OdsVerific
                 and release.market_date == market_date
                 and release.release_id.startswith(release_prefix)
             ):
+                if os.environ.get(
+                    "HERMES_ODS_PREVENTION_POLICY"
+                ) == "p10-acquisition-prevention-v1" and lane in {
+                    "market_daily_core",
+                    "calendar_daily_events",
+                }:
+                    artifacts = {a.name: a for a in release.artifacts}
+                    if (
+                        not {"source_universe", "acquisition_quality", "original_responses"}
+                        <= artifacts.keys()
+                    ):
+                        continue
+                    universe = json.loads(
+                        (item / artifacts["source_universe"].relative_path).read_text()
+                    )
+                    quality = json.loads(
+                        (item / artifacts["acquisition_quality"].relative_path).read_text()
+                    )
+                    if (
+                        universe.get("policy_id") != "p10-acquisition-prevention-v1"
+                        or universe.get("market_date") != market_date.isoformat()
+                        or quality.get("policy_id") != "p10-acquisition-prevention-v1"
+                    ):
+                        continue
                 candidates.append(verified)
     if not candidates:
         raise DailyOdsCatalogError(f"required ODS lane is absent or not READY: {lane}")

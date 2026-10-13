@@ -160,31 +160,44 @@ def run(*, mode: str, day: date, revision: str, state: Path = STATE) -> dict[str
                 result["domains"]["disclosure"] = {
                     key: item[key] for key in ("manifest_sha256", "content_digest", "audit")
                 }
-                if (release / "artifacts/acquisition_quality.json").exists():
-                    quality = object_at(release / "artifacts/acquisition_quality.json")
-                    unknown = [
-                        entry
-                        for entry in quality["datasets"]
-                        if entry.get("current_refresh_proven") is False
-                    ]
-                    if unknown:
-                        result["excluded_domains"] = [entry["dataset"] for entry in unknown]
-                        failure(
-                            day=day,
-                            stage="acquisition_quality",
-                            state_root=state / "notifications",
-                            reason=(
-                                "SOURCE_NOT_REFRESHED: affected domains remain excluded; "
-                                "qualified daily core continues"
-                            ),
-                            context={
-                                "blocked_domains": result["excluded_domains"],
-                                "daily_core_blocked": False,
-                                "market_date_label": "自然日公告日期"
-                                if mode == "natural-day"
-                                else "交易日",
-                            },
+                quality_releases = [release]
+                if mode == "daily":
+                    for lane in cat["lanes"]:
+                        candidate = safe_path(shadow / "releases", lane["release_path"])
+                        if candidate != release:
+                            if (
+                                verify_ods_release(candidate).manifest_sha256
+                                != lane["release_manifest_sha256"]
+                            ):
+                                raise ValueError("daily quality source changed")
+                            quality_releases.append(candidate)
+                unknown: list[dict[str, Any]] = []
+                for quality_release in quality_releases:
+                    if (quality_release / "artifacts/acquisition_quality.json").exists():
+                        quality = object_at(quality_release / "artifacts/acquisition_quality.json")
+                        unknown.extend(
+                            entry
+                            for entry in quality["datasets"]
+                            if entry.get("current_refresh_proven") is False
                         )
+                if unknown:
+                    result["excluded_domains"] = sorted({entry["dataset"] for entry in unknown})
+                    failure(
+                        day=day,
+                        stage="acquisition_quality",
+                        state_root=state / "notifications",
+                        reason=(
+                            "SOURCE_NOT_REFRESHED: affected domains remain excluded; "
+                            "qualified daily core continues"
+                        ),
+                        context={
+                            "blocked_domains": result["excluded_domains"],
+                            "daily_core_blocked": False,
+                            "market_date_label": "自然日公告日期"
+                            if mode == "natural-day"
+                            else "交易日",
+                        },
+                    )
             if mode == "weekly":
                 source = latest_financial_attempt(shadow, day)
                 item = build(

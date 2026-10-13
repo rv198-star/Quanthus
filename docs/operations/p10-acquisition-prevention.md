@@ -6,6 +6,10 @@ Target-session membership, IPO/outdate metadata and CNINFO issuer identifiers ar
 
 Base and dated products remain immutable. New listing identities sit in new Daily reference files. Unknown issuer identity or ticker reuse fails construction. Disclosure corrections retain current knowledge versions; body revisions remain unknown without body hashes. Weekly financial continuation reuses all three statement envelopes and matching receipts through the existing adapter, without F10/shareholder or canonical unit/PIT admission.
 
+Disclosure comparison binds both earlier DWD and original ODS observations. A source change that reverts to an older DWD value is still retained. Financial concept projection preserves all original observations, checks their semantics, and passes equivalent per-concept/time witnesses to the existing revision projection, avoiding a full observation sort. Weekly DWD waits for an in-flight weekly ODS producer to finish.
+
+Prevention-enabled ODS selection and new minute references reject old releases without target-day universe and original-response evidence. For a same-date universe migration, build an isolated new daily-core root from the verified previous-date pointer, then switch the configured root only after that fresh daily product passes. Keep the original root as the rollback source; never relabel its old population as a refresh.
+
 Complete 1d/1m/5m products carry verified domain supplements. Minimum R2 and R3=0 remain mandatory for joint release. OCI reads supplements under complete-product admission and actual visibility time. Daily pointer watcher/retry, closed-date announcements and weekly continuation run automatically. Outer failure hooks and queued-mail replay cover timeouts and transport failures.
 
 ## Deployment and rollback

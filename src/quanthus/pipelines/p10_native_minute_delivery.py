@@ -56,6 +56,11 @@ def freeze_reference(
     market, sha, statuses = _reference(release, day)
     manifest = object_at(release / "release.json")
     artifacts = {item["name"]: item for item in manifest["artifacts"]}
+    if (
+        os.environ.get("HERMES_ODS_PREVENTION_POLICY") == "p10-acquisition-prevention-v1"
+        and "source_universe" not in artifacts
+    ):
+        raise ValueError("target daily prerequisite lacks refreshed acquisition universe")
     for name in ("daily_ohlcv_none_delta", "daily_status_observation_delta"):
         path = release / artifacts[name]["relative_path"]
         parquet = pq.ParquetFile(path)

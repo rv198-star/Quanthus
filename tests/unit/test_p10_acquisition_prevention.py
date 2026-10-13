@@ -83,6 +83,126 @@ def test_late_and_metadata_revisions_only_not_old_snapshot_duplicates() -> None:
         disclosure_candidates([rows[0], rows[0]], {}, date(2026, 10, 9))
 
 
+def test_source_reversion_is_kept_even_when_old_dwd_matches_current() -> None:
+    row = {
+        "stock_code": "000001",
+        "ann_id": "reverted",
+        "title": "synthetic",
+        "publish_time": "2026-10-08 16:32:29",
+        "announce_date": "2026-10-08",
+    }
+    old_dwd = {"reverted": row}
+    previous_source = {"reverted": {**row, "publish_time": "2026-10-08 16:32:30"}}
+    selected = disclosure_candidates([row], old_dwd, date(2026, 10, 12), previous_source)
+    assert selected[0]["correction_kind"] == "metadata_revision"
+    assert selected[0]["publish_time"] == row["publish_time"]
+
+
+def test_prevention_cannot_reuse_old_ready_without_refreshed_source_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from quanthus.pipelines.securities_warehouse import daily_core_ods_catalog as catalogs
+
+    day = date(2026, 10, 13)
+    path = tmp_path / "daily/2026-10-13/legacy"
+    path.mkdir(parents=True)
+    release = SimpleNamespace(
+        schedule="daily",
+        market_date=day,
+        created_at="synthetic",
+        release_id="hermes-market-daily-core-synthetic",
+        artifacts=[],
+    )
+    checked = SimpleNamespace(release=release)
+    monkeypatch.setattr(catalogs, "verify_ods_release", lambda p: checked)
+    monkeypatch.delenv("HERMES_ODS_PREVENTION_POLICY", raising=False)
+    assert "market_daily_core" in catalogs.find_ready_daily_ods_lanes(
+        release_root=tmp_path, market_date=day
+    )
+    monkeypatch.setenv("HERMES_ODS_PREVENTION_POLICY", POLICY)
+    assert "market_daily_core" not in catalogs.find_ready_daily_ods_lanes(
+        release_root=tmp_path, market_date=day
+    )
+    release.artifacts = [
+        SimpleNamespace(name=n, relative_path=Path(n + ".json"))
+        for n in ["source_universe", "acquisition_quality", "original_responses"]
+    ]
+    for n in ["source_universe", "acquisition_quality"]:
+        (path / (n + ".json")).write_text(
+            json.dumps({"policy_id": POLICY, "market_date": str(day)})
+        )
+    assert "market_daily_core" in catalogs.find_ready_daily_ods_lanes(
+        release_root=tmp_path, market_date=day
+    )
+
+
+def test_new_minute_job_refuses_legacy_daily_universe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quanthus.pipelines import p10_native_minute_delivery as minutes
+
+    (tmp_path / "release.json").write_text(json.dumps({"artifacts": []}))
+    monkeypatch.setattr(minutes, "_reference", lambda *args: ({}, "synthetic", {}))
+    monkeypatch.setenv("HERMES_ODS_PREVENTION_POLICY", POLICY)
+    with pytest.raises(ValueError, match="refreshed acquisition universe"):
+        minutes.freeze_reference(tmp_path, "2026-10-13", tmp_path / "reference.json")
+
+
+def test_compacted_concept_projection_matches_full_original_projection(tmp_path: Path) -> None:
+    from datetime import datetime, timezone
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from quanthus.pipelines.p10_domain_continuation import _compact_concept_witnesses
+    from quanthus.pipelines.securities_warehouse.financial_reporting import (
+        _finalize_concepts,
+        financial_reporting_schemas,
+    )
+
+    schemas = financial_reporting_schemas()
+    schema = schemas["dwd_financial_concept"]
+    base = {name: None for name in schema.names}
+    base.update(
+        record_source="synthetic",
+        source_revision="v1",
+        source_artifact_sha256="a" * 64,
+        financial_concept_id="concept",
+        taxonomy_namespace="synthetic",
+        taxonomy_version="v1",
+        concept_code="field",
+        concept_name="field",
+        statement_type="balance",
+        data_type="provider_native_scalar",
+        period_type="instant",
+    )
+    values = []
+    for acquired, starts in [(10, [8, 9, 8]), (11, [7, 8]), (12, [9, 10])]:
+        for n, start in enumerate(starts):
+            values.append(
+                {
+                    **base,
+                    "source_record_id": str(n),
+                    "knowledge_from": datetime(2026, 10, acquired, tzinfo=timezone.utc),
+                    "effective_from": datetime(2026, 9, start, tzinfo=timezone.utc),
+                }
+            )
+    original = tmp_path / "raw.parquet"
+    pq.write_table(pa.Table.from_pylist(values, schema=schema), original)
+    full, compact = tmp_path / "full", tmp_path / "compact"
+    path = full / "staging/concepts/part-00-000000.parquet"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(original.read_bytes())
+    compact.mkdir()
+    assert _compact_concept_witnesses(compact, original, schema) == 3
+    assert _finalize_concepts(full, {}, schemas) == _finalize_concepts(compact, {}, schemas) == 2
+    relative = "payload/financial_reporting/dwd_financial_concept/part-00000.parquet"
+    assert pq.ParquetFile(full / relative).read().equals(pq.ParquetFile(compact / relative).read())
+    assert pq.ParquetFile(original).metadata.num_rows == 7
+
+
 def test_new_reference_binds_dynamic_universe_not_lower_fixed_threshold(tmp_path: Path) -> None:
     from quanthus.pipelines.p10_complete_daily_schedule import POLICY_ID
 

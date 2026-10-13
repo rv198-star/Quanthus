@@ -228,6 +228,7 @@ def main() -> int:
     mode.add_argument("--daily-cycle-failure", action="store_true")
     mode.add_argument("--archive-service-failure", action="store_true")
     mode.add_argument("--mirror-service-failure", action="store_true")
+    mode.add_argument("--mirror-service-stop", action="store_true")
     mode.add_argument("--continuation-service-failure", choices=("daily", "weekly", "natural-day"))
     mode.add_argument("--retry-state", action="append", type=Path)
     args = parser.parse_args()
@@ -246,7 +247,14 @@ def main() -> int:
     from quanthus.pipelines.p10_complete_daily_cycle import DAILY, JOURNAL
     from quanthus.pipelines.p10_complete_daily_schedule import CST
 
-    if args.mirror_service_failure:
+    if args.mirror_service_stop:
+        result = os.environ.get("SERVICE_RESULT")
+        if result is None:
+            raise ValueError("mirror stop hook requires systemd SERVICE_RESULT")
+        if result == "success":
+            print(json.dumps({"status": "notification_not_required", "service_result": result}))
+            return 0
+    if args.mirror_service_failure or args.mirror_service_stop:
         from quanthus.pipelines.p10_complete_daily_sync import CACHE, LOCAL
 
         now = datetime.now(CST)

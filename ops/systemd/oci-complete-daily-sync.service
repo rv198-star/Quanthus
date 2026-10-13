@@ -2,7 +2,6 @@
 Description=OCI exact CN01 complete DWD mirror and consumer visibility
 After=network-online.target
 Wants=network-online.target
-OnFailure=oci-complete-daily-sync-failure.service
 
 [Service]
 Type=oneshot
@@ -15,7 +14,9 @@ EnvironmentFile=/etc/quanthus/oci-daily-core-sync.env
 EnvironmentFile=/etc/quanthus/t-close-plus-5h.env
 EnvironmentFile=/etc/quanthus/oci-complete-daily-sync.env
 ExecStart=/opt/quanthus/warehouse-current/.venv/bin/python -m quanthus.pipelines.p10_complete_daily_sync
+ExecStopPost=-/opt/quanthus/warehouse-current/.venv/bin/python -m quanthus.pipelines.p10_complete_daily_notifications --mirror-service-stop
 TimeoutStartSec=20min
+TimeoutStopSec=5min
 MemoryMax=3G
 CPUQuota=200%
 KillMode=control-group

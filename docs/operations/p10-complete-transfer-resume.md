@@ -10,7 +10,11 @@ trading-date job continues across the following trading date and closed calendar
 days before starting its new target. All targets still require the authoritative
 T+1 trading-day start checkpoint, including future pending dates.
 The two-minute mirror timer runs overnight; each service attempt remains bounded
-to 20 minutes. Service timeout triggers durable failure email, independently
+to 20 minutes. A same-attempt ExecStopPost hook checks systemd SERVICE_RESULT
+and records durable failure email before the timer can restart that service.
+The earlier external OnFailure hook could observe the next attempt's start time
+and mislabel an old target as the execution date; it is removed from this unit.
+Successful stops send no failure mail. Failure mail is independently
 retried by the existing five-minute mail timer.
 
 An exact previously visible or privately cached local file can seed a new package

@@ -34,7 +34,7 @@ def seed_verified_files(root: Path, package: Path, manifest: dict[str, Any]) -> 
     cached = sorted((root / CACHE / "packages").glob("*/*/manifest.json"))
     if len(cached) > 28:
         raise ValueError("private mirror cache exceeds bounded predecessor budget")
-    candidates.extend(path.parent for path in cached if path.parent != package)
+    candidates.extend(path.parent for path in cached)
     for item in manifest["files"]:
         relative = item["path"]
         target = safe_path(package, relative)
@@ -42,6 +42,10 @@ def seed_verified_files(root: Path, package: Path, manifest: dict[str, Any]) -> 
             continue
         for candidate in candidates:
             source = safe_path(candidate, relative)
+            if not source.is_file():
+                # --delay-updates retains even complete files here after timeout.
+                partial = Path(relative).parent / ".rsync-partial" / Path(relative).name
+                source = safe_path(candidate, partial.as_posix())
             if not source.is_file():
                 continue
             if source.stat().st_size != item["bytes"] or file_digest(source) != item["sha256"]:

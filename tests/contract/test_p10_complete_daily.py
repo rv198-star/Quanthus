@@ -759,6 +759,24 @@ def test_mirror_private_cache_reuse_requires_actual_incoming_hash(tmp_path: Path
     assert not (bad / item["path"]).exists()
 
 
+def test_complete_delayed_partial_can_seed_only_after_exact_hash(tmp_path: Path) -> None:
+    root = tmp_path / "oci"
+    old = root / mirror.CACHE / "packages" / DAY / "old"
+    partial = old / "payload" / ".rsync-partial" / "data.parquet"
+    partial.parent.mkdir(parents=True)
+    partial.write_bytes(b"exact sealed bytes")
+    atomic(old / "manifest.json", {"files": []})
+    item = {"path": "payload/data.parquet", "bytes": 18, "sha256": file_digest(partial)}
+    incoming = root / mirror.CACHE / "packages" / DAY / "new"
+    incoming.mkdir(parents=True)
+    mirror.seed_verified_files(root, incoming, {"files": [item]})
+    assert (incoming / item["path"]).stat().st_ino == partial.stat().st_ino
+    bad = incoming.parent / "bad"
+    bad.mkdir()
+    mirror.seed_verified_files(root, bad, {"files": [{**item, "sha256": "sha256:" + "0" * 64}]})
+    assert not (bad / item["path"]).exists()
+
+
 def test_closed_day_main_resumes_due_pending_but_waits_for_future(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -792,8 +810,9 @@ def test_closed_day_main_resumes_due_pending_but_waits_for_future(
 
 
 @pytest.mark.parametrize("fresh", [True, False])
+@pytest.mark.parametrize("mode", ["--mirror-service-failure", "--mirror-service-stop"])
 def test_mirror_failure_mail_uses_only_current_service_pending_target(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fresh: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fresh: bool, mode: str
 ) -> None:
     import sys
 
@@ -815,12 +834,38 @@ def test_mirror_failure_mail_uses_only_current_service_pending_target(
     monkeypatch.setattr(mirror, "LOCAL", tmp_path)
     monkeypatch.setattr(notifications, "datetime", Clock)
     monkeypatch.setattr(notifications, "_service_started_at", lambda _: now.timestamp() - 20)
-    monkeypatch.setattr(sys, "argv", ["notifications", "--mirror-service-failure"])
+    monkeypatch.setenv("SERVICE_RESULT", "timeout")
+    monkeypatch.setattr(sys, "argv", ["notifications", mode])
     records = []
     monkeypatch.setattr(notifications, "failure", lambda **kw: records.append(kw) or {})
     assert notifications.main() == 0
     assert records[0]["stage"] == "mirror"
     assert records[0]["day"] == (date.fromisoformat(DAY) if fresh else now.date())
+
+
+def test_mirror_stop_hook_is_in_same_attempt_and_success_sends_no_mail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import sys
+
+    monkeypatch.setenv("SERVICE_RESULT", "success")
+    monkeypatch.setattr(sys, "argv", ["notifications", "--mirror-service-stop"])
+    monkeypatch.setattr(
+        notifications, "failure", lambda **_: pytest.fail("success sent failure mail")
+    )
+    assert notifications.main() == 0
+    unit = (schedule.CONFIG.parents[2] / "ops/systemd/oci-complete-daily-sync.service").read_text()
+    assert "OnFailure=" not in unit
+    assert "ExecStopPost=-" in unit and "--mirror-service-stop" in unit
+
+
+def test_mirror_stop_hook_without_service_result_is_not_a_failure_drill(monkeypatch):
+    import sys
+
+    monkeypatch.delenv("SERVICE_RESULT", raising=False)
+    monkeypatch.setattr(sys, "argv", ["notifications", "--mirror-service-stop"])
+    with pytest.raises(ValueError, match="SERVICE_RESULT"):
+        notifications.main()
 
 
 

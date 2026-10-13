@@ -102,3 +102,31 @@ def verify_capture(path: Path) -> dict[str, Any]:
     ):
         raise ValueError("RESPONSE_CLOCK_REGRESSION")
     return envelope
+
+
+def suspended_status(
+    row: list[str], *, code: str, provider_code: str, day: str, observed_at: str
+) -> dict[str, Any] | None:
+    """A proven suspension may lack volume/amount; never invent a price bar."""
+    if len(row) < 12 or row[0] != day or row[1] != provider_code:
+        raise ValueError("MARKET_RESPONSE_IDENTITY_DIFFERS")
+    if row[10] not in {"0", "1"} or row[11] not in {"0", "1"}:
+        raise ValueError("MARKET_STATUS_MISSING")
+    if row[10] != "0" or all(token.strip() for token in row[2:8]):
+        return None
+    for token in row[2:8]:
+        decimal_token(token)
+    stamp = datetime.fromisoformat(observed_at)
+    if stamp.tzinfo is None:
+        raise ValueError("SUSPENSION_CLOCK_NAIVE")
+    return {
+        "security_id": code,
+        "stock_code": code,
+        "market_date": day,
+        "date": day,
+        "tradestatus": "0",
+        "isST": row[11],
+        "source": "baostock.query_history_k_data_plus",
+        "acquired_at": observed_at,
+        "built_at": observed_at,
+    }

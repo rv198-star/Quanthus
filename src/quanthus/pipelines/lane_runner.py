@@ -1231,6 +1231,15 @@ def _baostock_fetch_day(
                 numeric = decimal_token if prevention_enabled() else _fnum
                 if prevention_enabled():
                     try:
+                        from quanthus.providers.acquisition_evidence import suspended_status
+
+                        suspension = suspended_status(
+                            raw, code=code, provider_code=bs_code, day=day,
+                            observed_at=acquired_at,
+                        )
+                        if suspension is not None:
+                            status_by_code[code] = suspension
+                            continue
                         for token in raw[2:8]:
                             decimal_token(token, required=True)
                         if len(raw) < 12 or raw[10] not in {"0", "1"} or raw[11] not in {"0", "1"}:

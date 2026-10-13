@@ -238,12 +238,14 @@ def main() -> int:
     from quanthus.pipelines.p10_complete_daily_schedule import CST
 
     if args.archive_service_failure:
-        state = Path("/var/lib/quanthus/gdrive-complete-v2")
+        from quanthus.pipelines.p10_complete_daily_gdrive import MAIL_STATE, STATE
+
+        state = STATE
         target, label = _archive_failure_target(datetime.now(CST), state)
         record = failure(
             day=target,
             stage="gdrive",
-            state_root=state / "notifications",
+            state_root=MAIL_STATE,
             reason="complete DWD GDrive service failed or timed out; "
             "inspect its bounded archive log",
             context={

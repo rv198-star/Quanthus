@@ -37,7 +37,10 @@ from quanthus.pipelines.p10_delivery_common import (
 from quanthus.policy import find_project_root
 
 SOURCE = Path("/srv/quanthus/dwd-dws-v2/daily/products/complete-daily")
-STATE = Path("/var/lib/quanthus/gdrive-complete-v2")
+STATE = Path("/var/lib/quanthus/gdrive-complete-v3")
+# The notification key is global per target day/stage, so all archive revisions
+# must share its durable request, lock and actual provider receipt.
+MAIL_STATE = Path("/var/lib/quanthus/gdrive-complete-v1/notifications")
 CONFIG = Path("/etc/quanthus/gdrive-complete-v1/rclone.conf")
 POLICY_PATH = find_project_root() / "config/pipelines/p10-complete-daily-gdrive.v1.json"
 
@@ -222,6 +225,16 @@ def rclone(
     until: float,
     output: bool = False,
 ) -> str:
+    chunk = policy["drive_chunk_size_bytes"]
+    io_timeout = policy["transfer_io_timeout_seconds"]
+    if (
+        type(chunk) is not int
+        or chunk < 256 * 1024
+        or chunk % (256 * 1024)
+        or type(io_timeout) is not int
+        or not 1 <= io_timeout <= policy["command_timeout_seconds"]
+    ):
+        raise ArchiveError("invalid_versioned_transfer_profile")
     remaining = min(policy["command_timeout_seconds"], int(until - time.monotonic()))
     if remaining < 1:
         raise ArchiveError("archive_transfer_budget_exhausted")
@@ -252,9 +265,9 @@ def rclone(
         "--contimeout",
         "15s",
         "--timeout",
-        "60s",
+        f"{io_timeout}s",
         "--drive-chunk-size",
-        "16M",
+        f"{chunk // (1024**2)}M" if chunk % (1024**2) == 0 else f"{chunk // 1024}k",
         "--checkers",
         "1",
         "--transfers",
@@ -438,7 +451,7 @@ def run(
                         failure(
                             day=day,
                             stage="gdrive",
-                            state_root=state / "notifications",
+                            state_root=MAIL_STATE,
                             reason="qualified complete DWD GDrive archive failed; "
                             "independent daily and OCI delivery continue",
                             context=record,

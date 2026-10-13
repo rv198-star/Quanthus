@@ -94,6 +94,57 @@ def test_core_two_verified_lanes_do_not_require_fake_1m_or_5m(tmp_path: Path) ->
         build_daily_ods_catalog(release_root=releases, market_date=date(2026, 9, 24), output=target)
 
 
+def test_cached_catalog_checks_exact_bound_sources_under_prevention(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import shutil
+
+    day = date(2026, 10, 13)
+    root = tmp_path / "releases"
+    monkeypatch.delenv("HERMES_ODS_PREVENTION_POLICY", raising=False)
+    sources = [
+        write_release(root, str(day), prefix)
+        for prefix in ["hermes-market-daily-core-", "hermes-calendar-daily-events-"]
+    ]
+    old = tmp_path / "old-catalog"
+    kwargs = {"release_root": root, "market_date": day, "product_scope": DAILY_CORE_PRODUCT_SCOPE}
+    build_daily_ods_catalog(**kwargs, output=old)
+    original_catalog = (old / "catalog.json").read_bytes()
+    for source in sources:
+        fresh = source.with_name(source.name + "-fresh")
+        shutil.copytree(source, fresh)
+        manifest = json.loads((fresh / "release.json").read_text())
+        manifest["release_id"] += "-fresh"
+        manifest["created_at"] = "2026-10-13T11:00:00+00:00"
+        for name in ["source_universe", "acquisition_quality", "original_responses"]:
+            artifact = fresh / "artifacts" / (name + ".json")
+            artifact.write_text(
+                json.dumps({"policy_id": "p10-acquisition-prevention-v1", "market_date": str(day)})
+            )
+            manifest["artifacts"].append(
+                {
+                    "name": name,
+                    "relative_path": artifact.relative_to(fresh).as_posix(),
+                    "sha256": sha(artifact.read_bytes()),
+                    "size_bytes": artifact.stat().st_size,
+                    "source_revision": "synthetic-v1",
+                    "knowledge_cutoff": manifest["created_at"],
+                }
+            )
+        raw = json.dumps(manifest, sort_keys=True).encode()
+        (fresh / "release.json").write_bytes(raw)
+        (fresh / "READY").write_text(sha(raw) + "\n")
+    monkeypatch.setenv("HERMES_ODS_PREVENTION_POLICY", "p10-acquisition-prevention-v1")
+    with pytest.raises(DailyOdsCatalogError, match="cached catalog source fails"):
+        build_daily_ods_catalog(**kwargs, output=old)
+    assert (old / "catalog.json").read_bytes() == original_catalog
+    new = tmp_path / "new-catalog"
+    accepted = build_daily_ods_catalog(**kwargs, output=new)
+    assert build_daily_ods_catalog(**kwargs, output=new) == accepted
+    monkeypatch.delenv("HERMES_ODS_PREVENTION_POLICY")
+    assert build_daily_ods_catalog(**kwargs, output=old).market_date == day
+
+
 @pytest.mark.parametrize("missing", ["market", "event"])
 def test_required_daily_lanes_still_block(tmp_path: Path, missing: str) -> None:
     releases = tmp_path / "releases"

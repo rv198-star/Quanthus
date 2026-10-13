@@ -34,7 +34,6 @@ from quanthus.pipelines.p10_delivery_common import (
     file_digest,
     object_at,
     safe_path,
-    verify_seal,
 )
 from quanthus.pipelines.p10_minute_daily_cycle import calendar_for, find_market_ods
 from quanthus.pipelines.p10_minute_operation_runtime import run_one
@@ -45,7 +44,9 @@ from quanthus.pipelines.p10_native_minute_delivery import (
     source_index,
     verify,
 )
+from quanthus.pipelines.securities_warehouse.daily_core_domain import verify_daily_domain_increment
 from quanthus.pipelines.securities_warehouse.daily_core_ods_catalog import _select_lane
+from quanthus.pipelines.securities_warehouse.daily_domain import DailyDomainBuildError
 from quanthus.providers.p10_native_m1_shard_capture import target_date_records
 
 ROOT = Path("/srv/quanthus/dwd-dws-v2")
@@ -70,9 +71,18 @@ def sealed_daily_sources(
             or file_digest(package / "manifest.json") != pointer.get("manifest_sha256")
         ):
             raise ValueError("dated daily source binding identity differs")
-        manifest = verify_seal(package, "cn01_daily_core_dwd_increment")
-        if manifest["market_date"] != str(target):
-            raise ValueError("dated daily source binding date differs")
+        try:
+            checked_daily = verify_daily_domain_increment(package)
+        except DailyDomainBuildError as exc:
+            raise ValueError(f"dated daily binding invalid: {exc}") from exc
+        manifest = object_at(package / "manifest.json")
+        if (
+            manifest.get("kind") != "cn01_daily_core_dwd_increment"
+            or manifest["market_date"] != str(target)
+            or checked_daily.package_id != pointer.get("package_id")
+            or checked_daily.content_digest != pointer.get("content_digest")
+        ):
+            raise ValueError("dated daily source binding date or content identity differs")
         selected = manifest["selected_releases"]
         sources = {}
         for lane, prefix in (

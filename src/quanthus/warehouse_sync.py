@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 import shutil
@@ -233,6 +234,63 @@ def _ensure_monotonic(
     return True
 
 
+def _approved_daily_core_revision(
+    local_root: Path,
+    local: Mapping[str, object],
+    remote: Mapping[str, object],
+    manifest: Mapping[str, object],
+) -> dict[str, object]:
+    """Admit only the exact Owner-authorized revision; generic replacements fail."""
+    policy_path = Path(__file__).resolve().parents[2] / (
+        "config/pipelines/p10-daily-core-mirror-revisions.v1.json"
+    )
+    policy = _object(policy_path)
+    revisions = policy.get("revisions")
+    if not isinstance(revisions, list):
+        raise WarehouseSyncError("daily-core revision policy has no exact revisions")
+    approved = next(
+        (
+            item
+            for item in revisions
+            if isinstance(item, dict) and item.get("old") == local and item.get("new") == remote
+        ),
+        None,
+    )
+    if (
+        policy.get("kind") != "p10_exact_daily_core_mirror_revisions_v1"
+        or approved is None
+        or approved.get("old_package_retained") is not True
+        or approved.get("normal_immutable_publication_gate_unchanged") is not True
+        or local.get("market_date") != remote.get("market_date")
+    ):
+        raise WarehouseSyncError("same-date CN01 DWD revision is not explicitly authorized")
+    day = date.fromisoformat(str(local["market_date"]))
+    relative, _ = _validate_pointer(local, day, DAILY_CORE_PRODUCT_SCOPE)
+    old_package = local_root / relative
+    try:
+        checked = verify_daily_domain_increment(old_package)
+    except (DailyDomainBuildError, OSError, ValueError) as exc:
+        raise WarehouseSyncError("authorized daily-core revision old package is invalid") from exc
+    if checked.manifest_sha256 != local.get(
+        "manifest_sha256"
+    ) or checked.content_digest != local.get("content_digest"):
+        raise WarehouseSyncError("authorized daily-core revision old package differs")
+    old_manifest = _object(old_package / "manifest.json")
+    if old_manifest.get("base") != manifest.get("base") or old_manifest.get(
+        "prior"
+    ) != manifest.get("prior"):
+        raise WarehouseSyncError("authorized daily-core revision base or predecessor differs")
+    return {
+        "kind": policy["kind"],
+        "policy_sha256": "sha256:" + hashlib.sha256(policy_path.read_bytes()).hexdigest(),
+        "old": dict(local),
+        "new": dict(remote),
+        "difference_acceptance": approved["difference_acceptance"],
+        "source_revision_observed_at": approved["at"],
+        "old_package_retained": True,
+    }
+
+
 def sync_latest(
     *,
     local_root: Path,
@@ -358,9 +416,23 @@ def sync_latest(
                 raise WarehouseSyncError("remote DWD CURRENT does not bind the package manifest")
             local_package = local_root / package_relative
             local_pointer = _local_current(local_root, product_scope)
-            changed = _ensure_monotonic(local_pointer, pointer, source_date)
-            if product_scope == DAILY_CORE_PRODUCT_SCOPE and changed:
+            revision = None
+            if (
+                product_scope == DAILY_CORE_PRODUCT_SCOPE
+                and local_pointer is not None
+                and local_pointer.get("market_date") == source_date.isoformat()
+                and local_pointer.get("manifest_sha256") != pointer.get("manifest_sha256")
+            ):
+                revision = _approved_daily_core_revision(
+                    local_root, local_pointer, pointer, product_manifest
+                )
+                changed = True
+            else:
+                changed = _ensure_monotonic(local_pointer, pointer, source_date)
+            if product_scope == DAILY_CORE_PRODUCT_SCOPE and changed and revision is None:
                 source_prior = product_manifest.get("prior") or {}
+                if not isinstance(source_prior, dict):
+                    raise WarehouseSyncError("daily-core source predecessor is invalid")
                 if local_pointer is not None:
                     if source_prior.get("manifest_sha256") != local_pointer.get("manifest_sha256"):
                         raise WarehouseSyncError("daily-core mirror would skip its prior product")
@@ -379,8 +451,6 @@ def sync_latest(
             else:
                 local_package.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(staged_package, local_package)
-            if changed:
-                _atomic_bytes(local_root / pointer_name, remote_current.read_bytes())
             receipt = {
                 "schema_version": 1,
                 "kind": "oci_cn01_dwd_daily_sync",
@@ -396,13 +466,28 @@ def sync_latest(
                 receipt["schema_version"] = 2
                 receipt["kind"] = "oci_cn01_daily_core_dwd_sync"
                 receipt["product_scope"] = DAILY_CORE_PRODUCT_SCOPE
+                if revision is not None:
+                    receipt["revision_admission"] = revision
+            receipt_path = (
+                local_root / "receipts" / source_date.isoformat() / (f"{result.package_id}.json")
+            )
+            if receipt_path.exists() and _object(receipt_path).get("revision_admission"):
+                existing_receipt = _object(receipt_path)
+                if any(
+                    existing_receipt.get(key) != receipt[key]
+                    for key in ("market_date", "package_id", "manifest_sha256", "content_digest")
+                ):
+                    raise WarehouseSyncError("existing revision receipt identity differs")
+                receipt = existing_receipt
             _atomic_bytes(
-                local_root / "receipts" / source_date.isoformat() / f"{result.package_id}.json",
+                receipt_path,
                 json.dumps(
                     receipt, ensure_ascii=True, separators=(",", ":"), sort_keys=True
                 ).encode("ascii")
                 + b"\n",
             )
+            if changed:
+                _atomic_bytes(local_root / pointer_name, remote_current.read_bytes())
             return WarehouseSyncResult(
                 market_date=source_date,
                 package_id=result.package_id,
@@ -561,7 +646,7 @@ def sync_published_daily_core(*, local_root: Path, limit: int = 10) -> dict[str,
                     "changed": item.changed,
                 }
             )
-        result = {
+        result: dict[str, object] = {
             "status": "published_daily_core_synced",
             "product_scope": DAILY_CORE_PRODUCT_SCOPE,
             "records": records,

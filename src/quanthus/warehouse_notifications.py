@@ -38,6 +38,12 @@ class WarehouseNotificationError(RuntimeError):
 
 
 EVENTS = {
+    "p10_cn01_complete_daily_gdrive_failed": {
+        "node": "CN01",
+        "stage": "完整 DWD GDrive归档",
+        "heading": "CN01完整 DWD GDrive归档失败",
+        "failure": True,
+    },
     "p10_cn01_daily_cycle_failed": {
         "node": "CN01",
         "stage": "日频ODS/DWD任务",

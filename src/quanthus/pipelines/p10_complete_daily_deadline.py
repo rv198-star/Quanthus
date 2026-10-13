@@ -120,6 +120,7 @@ def main() -> int:
             stage=args.stage,
             state_root=notification_state,
             reason=f"authoritative calendar/artifact watchdog failed: {type(exc).__name__}",
+            context={"market_date_label": "运行日期（目标交易日未确定）"},
         )
         raise
     if result["status"] == "failed":

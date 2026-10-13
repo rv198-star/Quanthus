@@ -118,3 +118,29 @@ class CompleteDailySource:
                     if row.get("quality_grade", "R0") not in {"R0", "R1", "R2"}:
                         raise ValueError("rejected minute row reached consumer")
                     yield row
+
+    def iter_domain_rows(self, *, table: str, knowledge_cutoff: datetime) -> Any:
+        """Explicit source-native versions; no canonical/execution/PIT upgrade implied."""
+        import pyarrow.parquet as pq
+        from quanthus.pipelines.p10_domain_continuation import verify as verify_domain
+
+        if table not in {"dwd_disclosure", "dwd_disclosure_subject", "dwd_financial_report",
+            "dwd_financial_concept", "dwd_financial_fact"} or knowledge_cutoff.tzinfo is None:
+            raise ValueError("unsupported domain table or naive cutoff")
+        admission = self.admission()
+        if knowledge_cutoff < datetime.fromisoformat(admission["first_verified_visible_at"]):
+            raise ValueError("domain product was not visible at requested OCI cutoff")
+        package = Path(admission["package"])
+        manifest = object_at(package / "manifest.json")
+        for key, sha in manifest.get("domain_manifest_sha256", {}).items():
+            root = safe_path(package, "domains/" + key)
+            domain = verify_domain(root)
+            if domain["manifest_sha256"] != sha:
+                raise ValueError("consumer domain identity differs")
+            member = root / "payload" / table / "part-00000.parquet"
+            if not member.exists():
+                continue
+            for batch in pq.ParquetFile(member).iter_batches(batch_size=20000):
+                for row in batch.to_pylist():
+                    if row["knowledge_from"] <= knowledge_cutoff:
+                        yield row

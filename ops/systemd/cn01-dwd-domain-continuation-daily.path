@@ -1,0 +1,9 @@
+[Unit]
+Description=Reconcile disclosure corrections after daily core publication
+
+[Path]
+PathChanged=/srv/quanthus/dwd-dws-v2/daily/products/daily-core/CURRENT_DAILY_CORE.json
+Unit=cn01-dwd-domain-continuation@daily.service
+
+[Install]
+WantedBy=multi-user.target

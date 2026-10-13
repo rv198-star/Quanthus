@@ -1,0 +1,9 @@
+[Unit]
+Description=CN01 non-trading-date announcements and immutable DWD corrections
+[Timer]
+OnCalendar=*-*-* 18:35:00 Asia/Shanghai
+OnCalendar=*-*-* 22:35:00 Asia/Shanghai
+Unit=cn01-dwd-domain-continuation@natural-day.service
+Persistent=true
+[Install]
+WantedBy=timers.target

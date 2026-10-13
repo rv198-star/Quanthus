@@ -85,6 +85,12 @@ def freeze_reference(
             for code, row in sorted(market.items())
         },
     }
+    if "source_universe" in artifacts:
+        universe = object_at(release / artifacts["source_universe"]["relative_path"])
+        ref["kind"] = "p10_complete_daily_job_reference_v2"
+        ref["universe_digest"] = universe["universe_digest"]
+        ref["universe_manifest_sha256"] = artifacts["source_universe"]["sha256"]
+        ref["universe_policy_id"] = universe["policy_id"]
     ref["reference_digest"] = digest(encoded(ref))
     if destination.exists():
         if object_at(destination) != ref:
@@ -98,12 +104,21 @@ def reference(path: Path) -> dict[str, Any]:
     value = object_at(path)
     content = {key: item for key, item in value.items() if key != "reference_digest"}
     codes = value.get("securities", {})
+    legacy = value.get("kind") == "p10_complete_daily_job_reference_v1"
+    dynamic = value.get("kind") == "p10_complete_daily_job_reference_v2"
+    if dynamic and (
+        value.get("universe_policy_id") != "p10-acquisition-prevention-v1"
+        or value.get("universe_digest") != digest(encoded(sorted(codes)))
+        or not str(value.get("universe_manifest_sha256", "")).startswith("sha256:")
+    ):
+        raise ValueError("versioned dynamic universe identity differs")
     if (
-        value.get("kind") != "p10_complete_daily_job_reference_v1"
+        not (legacy or dynamic)
         or value.get("policy_id") != POLICY_ID
         or value.get("reference_digest") != digest(encoded(content))
-        or value.get("population") != 4992
-        or len(codes) != 4992
+        or (legacy and value.get("population") != 4992)
+        or not codes
+        or len(codes) != value.get("population")
         or any(len(code) != 6 or not code.isdigit() for code in codes)
         or any(row.get("tradestatus") not in {"0", "1"} for row in codes.values())
     ):
@@ -422,7 +437,7 @@ def build(
                 "source_ods_manifest_sha256": ref["source_ods_manifest_sha256"],
                 "grades": dict(grades),
                 "rows_per_grade": dict(row_counts),
-                "research_ready": grades["R3"] == 0 and sum(grades.values()) == 4992,
+                "research_ready": grades["R3"] == 0 and sum(grades.values()) == ref["population"],
                 "execution_authorized": False,
                 "sealed_at": datetime.now(timezone.utc).isoformat(),
             },

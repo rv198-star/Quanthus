@@ -1,0 +1,21 @@
+[Unit]
+Description=CN01 source-bound DWD continuation (%i)
+After=network-online.target
+Wants=network-online.target
+OnFailure=cn01-dwd-domain-continuation-failure@%i.service
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/etc/quanthus/cn01-ods-lane.env
+EnvironmentFile=/etc/quanthus/cn01-dwd.env
+EnvironmentFile=/etc/quanthus/cn01-daily-core.env
+EnvironmentFile=/etc/quanthus/cn01-acquisition-prevention.env
+EnvironmentFile=/etc/quanthus/dwd-notification.env
+WorkingDirectory=/opt/quanthus/daily-core-current
+ExecStart=/opt/quanthus/daily-core-current/ops/bin/run-p10-acquisition-continuation --mode %i
+TimeoutStartSec=3700
+KillMode=control-group
+Nice=5
+UMask=0027
+

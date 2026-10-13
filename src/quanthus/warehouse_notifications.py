@@ -38,6 +38,18 @@ class WarehouseNotificationError(RuntimeError):
 
 
 EVENTS = {
+    "p10_cn01_weekly_continuation_failed": {
+        "node": "CN01",
+        "stage": "周频 DWD 接续",
+        "heading": "CN01周频 DWD 接续失败",
+        "failure": True,
+    },
+    "p10_cn01_acquisition_quality_failed": {
+        "node": "CN01",
+        "stage": "采集端来源检查",
+        "heading": "CN01采集端来源缺口",
+        "failure": True,
+    },
     "p10_cn01_complete_daily_gdrive_failed": {
         "node": "CN01",
         "stage": "完整 DWD GDrive归档",

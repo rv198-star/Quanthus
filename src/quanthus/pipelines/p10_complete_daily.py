@@ -62,7 +62,17 @@ def daily_mapping(root: Path, day: str) -> tuple[dict[str, dict[str, Any]], Any]
             ):
                 raise ValueError("daily mapping lacks exact date/security/none identity")
             result[match[1]] = row
-    if len(result) != 4992 or schema is None:
+    manifest = object_at(root / "manifest.json")
+    universe = manifest.get("acquisition_universe")
+    expected = set(universe["codes"]) if universe else None
+    if universe and (
+        universe.get("market_date") != day
+        or universe.get("policy_id") != "p10-acquisition-prevention-v1"
+        or universe.get("universe_digest") != digest(encoded(sorted(expected)))
+        or universe.get("population") != len(expected)
+    ):
+        raise ValueError("daily DWD universe identity differs")
+    if schema is None or (set(result) != expected if expected is not None else len(result) != 4992):
         raise ValueError("daily DWD listing/session mapping population differs")
     return result, schema
 
@@ -157,6 +167,25 @@ def build(
     import pyarrow.parquet as pq
 
     daily_manifest, daily_result, mapping, schema = _check_daily(daily)
+    from quanthus.pipelines.p10_domain_continuation import verify as verify_domain
+
+    domain_packages = []
+    domain_root = os.environ.get("QUANTHUS_DOMAIN_CONTINUATION_ROOT")
+    if domain_root:
+        for domain in ("disclosure", "financial"):
+            root = Path(domain_root) / domain
+            pointers = [path for path in sorted((root / "date-pointers").glob("*.json"))
+                if path.stem <= daily_manifest["market_date"]]
+            if domain == "financial":
+                pointers = pointers[-1:]
+            for path in pointers:
+                pointer = object_at(path)
+                package = safe_path(root, pointer["manifest_path"]).parent
+                checked = verify_domain(package)
+                if checked["manifest_sha256"] != pointer["manifest_sha256"]:
+                    raise ValueError("complete domain pointer identity differs")
+                domain_packages.append((domain + "-" + path.stem, package, checked))
+    domain_identities = {key: value["manifest_sha256"] for key, _path, value in domain_packages}
     require_revision(code_revision)
     verified = {interval: verify_minute(path) for interval, path in {"1m": m1, "5m": m5}.items()}
     source_sha = daily_manifest["selected_releases"]["market_daily_core"]["manifest_sha256"]
@@ -194,6 +223,7 @@ def build(
             if (
                 old["member_manifest_sha256"] == identities
                 and old["code_revision"] == code_revision
+                and old.get("domain_manifest_sha256", {}) == domain_identities
             ):
                 return old
             # Same-day revisions bind the previous version, never overwrite its bytes.
@@ -201,7 +231,7 @@ def build(
             "dwd-complete-"
             + daily_manifest["market_date"].replace("-", "")
             + "-"
-            + digest(encoded([identities, code_revision, binding, file_digest(policy_path())]))[
+            + digest(encoded([identities, domain_identities, code_revision, binding, file_digest(policy_path())]))[
                 7:23
             ]
         )
@@ -212,7 +242,7 @@ def build(
             return result
         destination.parent.mkdir(parents=True, exist_ok=True)
         bytes_needed = sum(
-            p.stat().st_size for member in (daily, m1, m5) for p in member.rglob("*") if p.is_file()
+            p.stat().st_size for member in (daily, m1, m5, *(path for _key, path, _value in domain_packages)) for p in member.rglob("*") if p.is_file()
         )
         if shutil.disk_usage(output_root).free < 4 * 1024**3 + 3 * bytes_needed:
             raise ValueError("complete Daily insufficient staging space plus 4 GiB reserve")
@@ -221,6 +251,8 @@ def build(
         try:
             for interval, source_member in {"1d": daily, "1m": m1, "5m": m5}.items():
                 shutil.copytree(source_member, stage / "members" / interval)
+            for key, package, _value in domain_packages:
+                shutil.copytree(package, stage / "domains" / key)
             target = stage / MINUTE_FILE
             target.parent.mkdir(parents=True, exist_ok=True)
             projection_schema = minute_dwd_schema(schema)
@@ -250,6 +282,8 @@ def build(
                     "policy_sha256": file_digest(policy_path()),
                     "base": daily_manifest["base"],
                     "member_manifest_sha256": identities,
+                    "domain_manifest_sha256": domain_identities,
+                    "all_business_domains_complete": False,
                     "prior": binding,
                     "consumable_intervals": ["1d", "1m", "5m"],
                     "minute_row_counts": dict(counts),
@@ -295,6 +329,12 @@ def verify(root: Path) -> dict[str, Any]:
     import pyarrow.parquet as pq
 
     manifest = verify_seal(root, KIND)
+    from quanthus.pipelines.p10_domain_continuation import verify as verify_domain
+
+    for key, sha in manifest.get("domain_manifest_sha256", {}).items():
+        domain = verify_domain(safe_path(root, "domains/" + key))
+        if domain["manifest_sha256"] != sha or domain["market_date"] > manifest["market_date"]:
+            raise ValueError("complete physical domain identity differs")
     require_revision(manifest.get("code_revision"))
     if (
         manifest.get("schema_version") != 1
@@ -370,6 +410,7 @@ def verify(root: Path) -> dict[str, Any]:
         "consumable_intervals": manifest["consumable_intervals"],
         "minute_quality_grades": manifest["minute_quality_grades"],
         "prior": manifest["prior"],
+        "domain_manifest_sha256": manifest.get("domain_manifest_sha256", {}),
     }
 
 

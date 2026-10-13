@@ -191,7 +191,43 @@ def _audit_non_output_daily_artifacts(
     """Account for recognized ODS-only inputs and fail closed on deferred non-empty inputs."""
 
     audited: list[dict[str, Any]] = []
+    scoped_exclusions = {}
+    for lane, value in selected.items():
+        quality = value["artifacts"].get("acquisition_quality")
+        if quality:
+            ledger = _object(quality[0])
+            policy_path = (
+                Path(__file__).resolve().parents[4]
+                / "config/pipelines/p10-acquisition-prevention.v1.json"
+            )
+            policy = _object(policy_path)
+            if ledger.get("policy_id") != policy["policy_id"] or ledger.get(
+                "policy_sha256"
+            ) != _sha256(policy_path):
+                raise DailyDomainBuildError("acquisition quality policy differs")
+            for entry in ledger["datasets"]:
+                if entry["dataset"] in policy["daily_core_excluded_domains"]:
+                    if (
+                        entry.get("current_refresh_proven") is not False
+                        or entry.get("watermark_advanced") is not False
+                    ):
+                        raise DailyDomainBuildError(
+                            "excluded source falsely claims current refresh"
+                        )
+                    scoped_exclusions[lane, entry["dataset"]] = entry
+                    audited.append(
+                        {
+                            "lane": lane,
+                            "artifact": entry["dataset"],
+                            "disposition": "unknown_source_excluded_from_daily_core",
+                            "reason": entry["reason_code"],
+                            "row_count": entry["projection_rows"],
+                            "blocked_uses": entry["blocked_uses"],
+                        }
+                    )
     for (lane, name), reason in sorted(_RECOGNIZED_ODS_ONLY_DAILY_ARTIFACTS.items()):
+        if (lane, name) in scoped_exclusions:
+            continue
         path, artifact = _artifact(selected, lane, name)
         row_count = int(parquet.ParquetFile(path).metadata.num_rows)
         audited.append(
@@ -206,6 +242,8 @@ def _audit_non_output_daily_artifacts(
         )
 
     for lane, name in _DEFERRED_DAILY_ARTIFACTS:
+        if (lane, name) in scoped_exclusions:
+            continue
         path, _artifact_contract = _artifact(selected, lane, name)
         row_count = int(parquet.ParquetFile(path).metadata.num_rows)
         if row_count:
@@ -453,6 +491,18 @@ def build_daily_domain_increment(
     connection.execute("SET preserve_insertion_order=true")
     connection.execute("SET memory_limit='2GB'")
     try:
+        universe_artifact = selected["market_daily_core"]["artifacts"].get("source_universe")
+        if universe_artifact:
+            from quanthus.pipelines.securities_warehouse.base23_identity_overlay import build_overlay
+
+            master, master_artifact = _artifact(selected, "market_daily_core", "security_master")
+            overlay = build_overlay(universe=_object(universe_artifact[0]), master=master,
+                listings=[row for path in listing_files for row in pq.ParquetFile(path).read().to_pylist()],
+                venues=[row for path in venue_files for row in pq.ParquetFile(path).read().to_pylist()],
+                output=work, source_sha256=str(master_artifact.sha256))
+            if "dwd_listing" in overlay:
+                listing_files = [*listing_files, overlay["dwd_listing"]]
+                security_files = [*security_files, overlay["dwd_security"]]
         connection.execute(
             f"CREATE VIEW base_listing AS SELECT * FROM {_path_relation(listing_files)}"
         )
@@ -718,6 +768,13 @@ def build_daily_domain_increment(
         }
         audit_path = work / "audit.json"
         _write_atomic(audit_path, audit)
+        acquisition_universe = None
+        universe_artifact = selected["market_daily_core"]["artifacts"].get("source_universe")
+        if universe_artifact:
+            acquisition_universe = _object(universe_artifact[0])
+            if acquisition_universe.get("market_date") != market_date.isoformat() or acquisition_universe.get("policy_id") != "p10-acquisition-prevention-v1":
+                raise DailyDomainBuildError("daily universe has wrong date/policy")
+            _write_atomic(work / "source-universe.json", acquisition_universe)
         files = []
         for path in sorted(item for item in work.rglob("*") if item.is_file()):
             files.append(
@@ -770,6 +827,8 @@ def build_daily_domain_increment(
         if isinstance(base_manifest, NativeBase23):
             manifest["base"] = dict(base_manifest.binding)
             manifest["base_transition"] = base_transition
+        if acquisition_universe:
+            manifest["acquisition_universe"] = acquisition_universe
         if product_scope == DAILY_CORE_PRODUCT_SCOPE:
             manifest["product_scope"] = DAILY_CORE_PRODUCT_SCOPE
             manifest["quality_policy"] = "p10-business-value-warehouse-quality.v1"

@@ -1,0 +1,8 @@
+[Unit]
+Description=CN01 qualified weekly financial DWD after ODS attempts
+[Timer]
+OnCalendar=Sat *-*-* 09..16:05:00 Asia/Shanghai
+Unit=cn01-dwd-domain-continuation@weekly.service
+Persistent=true
+[Install]
+WantedBy=timers.target

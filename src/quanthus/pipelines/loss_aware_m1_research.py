@@ -80,12 +80,27 @@ def _reference(release: Path, day: str) -> tuple[dict[str, dict[str, Any]], str,
     ).to_pylist()
     daily = {str(r["stock_code"]): r for r in daily_rows}
     statuses = {str(r["stock_code"]): str(r["tradestatus"]) for r in status_rows}
+    expected_codes = None
+    if "source_universe" in arts:
+        from quanthus.pipelines.p10_delivery_common import digest, encoded, object_at
+
+        universe = object_at(release / arts["source_universe"].relative_path)
+        expected_codes = set(universe["codes"])
+        if (
+            universe.get("policy_id") != "p10-acquisition-prevention-v1"
+            or universe.get("market_date") != day
+            or len(expected_codes) != universe.get("population")
+            or digest(encoded(sorted(expected_codes))) != universe.get("universe_digest")
+        ):
+            raise ValueError("source target-date universe identity differs")
+    population = len(expected_codes) if expected_codes is not None else 4992
     if (
-        len(daily) != 4992
-        or len(daily_rows) != 4992
-        or len(statuses) != 4992
-        or len(status_rows) != 4992
+        len(daily) != population
+        or len(daily_rows) != population
+        or len(statuses) != population
+        or len(status_rows) != population
         or set(daily) != set(statuses)
+        or (expected_codes is not None and set(daily) != expected_codes)
         or any(s not in {"0", "1"} for s in statuses.values())
     ):
         raise ValueError("source daily universe/identity/status mismatch")

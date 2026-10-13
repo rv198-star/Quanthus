@@ -18,7 +18,14 @@ if [[ -f "$ENV_FILE" ]]; then
   set +a
 fi
 
+if [[ "$NODE_ID_FOR_ENV" == "cn01" && -f /etc/quanthus/cn01-acquisition-prevention.env ]]; then
+  set -a
+  source /etc/quanthus/cn01-acquisition-prevention.env
+  set +a
+fi
 : "${ASTOCK_ROOT:=/root/work/astock}"
+# The node env must not substitute an older collector after choosing this release.
+export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
 : "${ASTOCK_HOME:=${ASTOCK_ROOT}/data}"
 : "${HERMES_ODS_SHADOW_ROOT:=${ASTOCK_HOME}/shadow/hermes-ods-v1}"
 : "${HERMES_ODS_CALENDAR:=${ASTOCK_HOME}/ref_trading_calendar.parquet}"

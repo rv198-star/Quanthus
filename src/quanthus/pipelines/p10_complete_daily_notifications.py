@@ -18,6 +18,8 @@ from quanthus.pipelines.p10_complete_daily_schedule import POLICY_ID
 from quanthus.pipelines.p10_delivery_common import atomic, digest, encoded, object_at
 
 EVENTS = {
+    "weekly": "p10_cn01_weekly_continuation_failed",
+    "acquisition_quality": "p10_cn01_acquisition_quality_failed",
     "gdrive": "p10_cn01_complete_daily_gdrive_failed",
     "daily_ods": "p10_cn01_daily_ods_failed",
     "daily_cycle": "p10_cn01_daily_cycle_failed",
@@ -31,6 +33,8 @@ def _notification_key(day: date, stage: str, context: dict[str, Any]) -> str:
     identity = [POLICY_ID, day.isoformat(), stage]
     if str(context.get("market_date_label", "")).startswith("运行日期"):
         identity.append("execution_date_unresolved")
+    if context.get("isolated_failure_drill"):
+        identity.append(str(context["isolated_failure_drill"]))
     return digest(encoded(identity))[7:]
 
 
@@ -220,6 +224,7 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--daily-cycle-failure", action="store_true")
     mode.add_argument("--archive-service-failure", action="store_true")
+    mode.add_argument("--continuation-service-failure", choices=("daily", "weekly", "natural-day"))
     mode.add_argument("--retry-state", action="append", type=Path)
     args = parser.parse_args()
     if args.retry_state:
@@ -237,6 +242,29 @@ def main() -> int:
     from quanthus.pipelines.p10_complete_daily_cycle import DAILY, JOURNAL
     from quanthus.pipelines.p10_complete_daily_schedule import CST
 
+    if args.continuation_service_failure:
+        from datetime import timedelta
+
+        target = datetime.now(CST).date()
+        if args.continuation_service_failure == "weekly":
+            target -= timedelta(days=(target.weekday() - 5) % 7)
+        record = failure(
+            day=target,
+            stage="weekly"
+            if args.continuation_service_failure == "weekly"
+            else "acquisition_quality",
+            state_root=Path("/var/lib/quanthus/acquisition-continuation-v1/notifications"),
+            reason=(
+                "automatic domain continuation service failed or timed out; "
+                "inspect retained run evidence"
+            ),
+            context={
+                "market_date_label": "运行日期（目标交易日未确定）",
+                "mode": args.continuation_service_failure,
+            },
+        )
+        print(json.dumps(record, sort_keys=True))
+        return 0
     if args.archive_service_failure:
         state = Path("/var/lib/quanthus/gdrive-complete-v1")
         target, label = _archive_failure_target(datetime.now(CST), state)

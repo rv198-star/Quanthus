@@ -19,6 +19,7 @@ import json
 import os
 import shutil
 import sys
+import tarfile
 import tempfile
 import time
 from collections.abc import Mapping, Sequence
@@ -38,8 +39,24 @@ from quanthus.pipelines.schedule_contracts import (
     ScheduleContractError,
     load_schedule_contract,
 )
+from quanthus.providers.acquisition_evidence import (
+    POLICY as PREVENTION_POLICY,
+)
+from quanthus.providers.acquisition_evidence import (
+    capture as capture_response,
+)
+from quanthus.providers.acquisition_evidence import (
+    clock as response_clock,
+)
+from quanthus.providers.acquisition_evidence import (
+    decimal_token,
+)
+from quanthus.providers.acquisition_evidence import (
+    enabled as prevention_enabled,
+)
 from quanthus.providers.baostock_transport import set_socket_timeout
 from quanthus.providers.minute_recovery import load_minute_recovery_policy
+from quanthus.providers.security_universe import refresh as refresh_universe
 from quanthus.providers.trading_calendar import (
     CalendarRefreshError,
     refresh_calendar,
@@ -292,6 +309,8 @@ class DatasetStatus:
     detail: str | None = None
     path: str | None = None
     source_request: str | None = None
+    acquisition_state: str | None = None
+    reason_code: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -306,6 +325,8 @@ class DatasetStatus:
             "detail": self.detail,
             "path": self.path,
             "source_request": self.source_request,
+            "acquisition_state": self.acquisition_state,
+            "reason_code": self.reason_code,
         }
 
 
@@ -514,6 +535,13 @@ def _run_configured_provider_collector(
         or os.environ.get("ASTOCK_MINUTE_PYTHON")
         or sys.executable
     )
+    stock_list_path = paths.home / "stock_list.parquet"
+    if prevention_enabled() and lane_id == "weekly-corrections":
+        source_days = _last_n_sessions(paths.calendar, market_date, 1)
+        if not source_days:
+            raise LaneRunError("WEEKLY_UNIVERSE_TRADING_DATE_MISSING")
+        universe_root, _universe = refresh_universe(home=paths.home, day=source_days[0])
+        stock_list_path = universe_root / "stock_list.parquet"
     values = {
         "output": str(output),
         "receipts": str(receipts_output),
@@ -521,7 +549,7 @@ def _run_configured_provider_collector(
         "python": sys.executable,
         "fundamentals_python": fundamentals_python,
         "tdx_python": tdx_python,
-        "stock_list": str(paths.home / "stock_list.parquet"),
+        "stock_list": str(stock_list_path),
         "market_date": market_date.isoformat(),
         "window_start": window_start.isoformat(),
         "statement_periods": (
@@ -1023,6 +1051,7 @@ def _baostock_query_day_with_retry(
         rows: list[list[str]] = []
         error_code = "provider_exception"
         error_msg = "unknown provider exception"
+        request_started_at = response_clock()
         try:
             response = bs.query_history_k_data_plus(
                 code,
@@ -1041,6 +1070,33 @@ def _baostock_query_day_with_retry(
             error_code = "provider_exception"
             error_msg = str(exc)
 
+        if prevention_enabled():
+            capture_response(
+                request={
+                    "provider": "baostock",
+                    "api": "query_history_k_data_plus",
+                    "code": code,
+                    "fields": fields,
+                    "start_date": day,
+                    "end_date": day,
+                    "frequency": "d",
+                    "adjustflag": "3",
+                    "attempt": attempt,
+                    "representation": "lossless_sdk_strings",
+                },
+                raw=json.dumps(
+                    {
+                        "fields": fields.split(","),
+                        "rows": rows,
+                        "error_code": error_code,
+                        "error_msg": error_msg,
+                    },
+                    sort_keys=True,
+                ).encode(),
+                started_at=request_started_at,
+                completed_at=response_clock(),
+                status=error_code,
+            )
         if error_code == "0" and rows:
             return rows, error_code, error_msg, attempt, retry_errors
         if error_code == "0":
@@ -1080,9 +1136,7 @@ def _baostock_fetch_day(
     if missing_set_retry_delay_seconds < 0:
         raise LaneRunError("missing_set_retry_delay_seconds must be non-negative")
     day = market_date.isoformat()
-    login_attempts = _baostock_login_with_retry(
-        bs, socket_timeout_seconds=socket_timeout_seconds
-    )
+    login_attempts = _baostock_login_with_retry(bs, socket_timeout_seconds=socket_timeout_seconds)
     fields = (
         "date,code,open,high,low,close,volume,amount,turn,pctChg,tradestatus,isST,"
         "peTTM,pbMRQ,psTTM,pcfNcfTTM"
@@ -1122,6 +1176,7 @@ def _baostock_fetch_day(
                     "fields": fields,
                 }
                 started = time.monotonic()
+                request_started_at = response_clock()
                 rows, err, msg, attempts, retry_errors = _baostock_query_day_with_retry(
                     bs,
                     code=bs_code,
@@ -1130,6 +1185,25 @@ def _baostock_fetch_day(
                     socket_timeout_seconds=socket_timeout_seconds,
                 )
                 acquired_at = _now_sh_iso()
+                raw_receipt = (
+                    capture_response(
+                        request={**request, "representation": "lossless_sdk_strings"},
+                        raw=json.dumps(
+                            {
+                                "fields": fields.split(","),
+                                "rows": rows,
+                                "error_code": err,
+                                "error_msg": msg,
+                            },
+                            sort_keys=True,
+                        ).encode(),
+                        started_at=request_started_at,
+                        completed_at=response_clock(),
+                        status=err,
+                    )
+                    if prevention_enabled()
+                    else {}
+                )
                 matching = next((row for row in rows if row and str(row[0]) == day), None)
                 if err == "0" and matching is None:
                     err = "target_date_missing"
@@ -1145,6 +1219,7 @@ def _baostock_fetch_day(
                         "duration_seconds": round(time.monotonic() - started, 3),
                         "attempts": attempts,
                         "initial_login_attempts": login_attempts,
+                        "raw_receipt": raw_receipt,
                         "retry_errors": retry_errors,
                         "scan_round": scan_round,
                     }
@@ -1153,29 +1228,45 @@ def _baostock_fetch_day(
                     next_missing.append(code)
                     continue
                 raw = matching
+                numeric = decimal_token if prevention_enabled() else _fnum
+                if prevention_enabled():
+                    try:
+                        for token in raw[2:8]:
+                            decimal_token(token, required=True)
+                        if len(raw) < 12 or raw[10] not in {"0", "1"} or raw[11] not in {"0", "1"}:
+                            raise ValueError("MARKET_STATUS_MISSING")
+                    except ValueError as exc:
+                        next_missing.append(code)
+                        log_rows[-1]["response_error_code"] = "invalid_numeric_or_status"
+                        log_rows[-1]["response_error_msg"] = str(exc)
+                        continue
                 # fields order matches `fields`
                 bars_by_code[code] = {
                     "security_id": code,
                     "stock_code": code,
                     "market_date": day,
                     "date": day,
-                    "open": _fnum(raw[2]),
-                    "high": _fnum(raw[3]),
-                    "low": _fnum(raw[4]),
-                    "close": _fnum(raw[5]),
-                    "volume": _fnum(raw[6], 0.0) or 0.0,
-                    "amount": _fnum(raw[7], 0.0) or 0.0,
-                    "turnover_rate": _fnum(raw[8]),
-                    "pct_change": _fnum(raw[9]),
+                    "open": numeric(raw[2]),
+                    "high": numeric(raw[3]),
+                    "low": numeric(raw[4]),
+                    "close": numeric(raw[5]),
+                    "volume": numeric(raw[6])
+                    if prevention_enabled()
+                    else (_fnum(raw[6], 0.0) or 0.0),
+                    "amount": numeric(raw[7])
+                    if prevention_enabled()
+                    else (_fnum(raw[7], 0.0) or 0.0),
+                    "turnover_rate": numeric(raw[8]),
+                    "pct_change": numeric(raw[9]),
                     "adj_mode": "none",
                     "adj_version": "baostock.adjustflag=3.v1",
                     "source": "baostock.query_history_k_data_plus.adjustflag=3",
                     "acquired_at": acquired_at,
                     "built_at": acquired_at,
-                    "_valuation_pe_ttm": _fnum(raw[12] if len(raw) > 12 else None),
-                    "_valuation_pb": _fnum(raw[13] if len(raw) > 13 else None),
-                    "_valuation_ps_ttm": _fnum(raw[14] if len(raw) > 14 else None),
-                    "_valuation_pcf_ttm": _fnum(raw[15] if len(raw) > 15 else None),
+                    "_valuation_pe_ttm": numeric(raw[12] if len(raw) > 12 else None),
+                    "_valuation_pb": numeric(raw[13] if len(raw) > 13 else None),
+                    "_valuation_ps_ttm": numeric(raw[14] if len(raw) > 14 else None),
+                    "_valuation_pcf_ttm": numeric(raw[15] if len(raw) > 15 else None),
                 }
                 status_by_code[code] = {
                     "security_id": code,
@@ -1208,9 +1299,7 @@ def _baostock_fetch_index_day(
     import baostock as bs
 
     day = market_date.isoformat()
-    login_attempts = _baostock_login_with_retry(
-        bs, socket_timeout_seconds=socket_timeout_seconds
-    )
+    login_attempts = _baostock_login_with_retry(bs, socket_timeout_seconds=socket_timeout_seconds)
     fields = "date,code,open,high,low,close,volume,amount,pctChg"
     rows_out: list[dict[str, Any]] = []
     log_rows: list[dict[str, Any]] = []
@@ -1252,17 +1341,25 @@ def _baostock_fetch_index_day(
             if err != "0":
                 continue
             for raw in rows:
+                numeric = decimal_token if prevention_enabled() else _fnum
+                if prevention_enabled():
+                    for token in raw[2:8]:
+                        decimal_token(token, required=True)
                 rows_out.append(
                     {
                         "index_code": index_code,
                         "date": str(raw[0]),
-                        "open": _fnum(raw[2]),
-                        "high": _fnum(raw[3]),
-                        "low": _fnum(raw[4]),
-                        "close": _fnum(raw[5]),
-                        "volume": _fnum(raw[6], 0.0) or 0.0,
-                        "amount": _fnum(raw[7], 0.0) or 0.0,
-                        "pct_chg": _fnum(raw[8]),
+                        "open": numeric(raw[2]),
+                        "high": numeric(raw[3]),
+                        "low": numeric(raw[4]),
+                        "close": numeric(raw[5]),
+                        "volume": numeric(raw[6])
+                        if prevention_enabled()
+                        else (_fnum(raw[6], 0.0) or 0.0),
+                        "amount": numeric(raw[7])
+                        if prevention_enabled()
+                        else (_fnum(raw[7], 0.0) or 0.0),
+                        "pct_chg": numeric(raw[8]),
                         "source": "baostock.query_history_k_data_plus.adjustflag=3",
                         "acquired_at": acquired_at,
                     }
@@ -1535,7 +1632,13 @@ def _build_market_open(
     recovery_deadline_at: datetime | None = None,
 ) -> list[DatasetStatus]:
     mode = _acquire_mode()
-    codes = _universe_from_stock_list(paths.home)
+    universe_root = None
+    if mode == "provider" and prevention_enabled():
+        os.environ["HERMES_ODS_RAW_CAPTURE_ROOT"] = str(landing / "original-responses")
+        universe_root, universe = refresh_universe(home=paths.home, day=market_date)
+        codes = universe["codes"]
+    else:
+        codes = _universe_from_stock_list(paths.home)
     if not codes:
         return [
             DatasetStatus(
@@ -1583,9 +1686,7 @@ def _build_market_open(
             bars, status_rows, stock_log_rows = _baostock_fetch_day(
                 codes,
                 market_date,
-                missing_set_retry_rounds=int(
-                    provider_readiness["missing_set_retry_rounds"]
-                ),
+                missing_set_retry_rounds=int(provider_readiness["missing_set_retry_rounds"]),
                 missing_set_retry_delay_seconds=float(
                     provider_readiness["missing_set_retry_delay_seconds"]
                 ),
@@ -1611,9 +1712,7 @@ def _build_market_open(
             index_rows = [
                 {
                     **row,
-                    "index_code": _canonical_index_code(
-                        row.get("index_code") or row.get("code")
-                    ),
+                    "index_code": _canonical_index_code(row.get("index_code") or row.get("code")),
                 }
                 for row in index_rows
             ]
@@ -1724,8 +1823,7 @@ def _build_market_open(
         )
     valuation_fields = ("pe_ttm", "pb", "ps_ttm", "pcf_ttm", "total_mv")
     if not any(
-        any(row.get(field) is not None for field in valuation_fields)
-        for row in valuation_rows
+        any(row.get(field) is not None for field in valuation_fields) for row in valuation_rows
     ):
         valuation.status = "failed"
         valuation.detail = "all valuation fields are null; READY withheld"
@@ -1734,10 +1832,18 @@ def _build_market_open(
     for name, source, artifact in (
         (
             "security_master",
-            paths.home / "ref_security_master.parquet",
+            universe_root / "security_master.parquet"
+            if universe_root
+            else paths.home / "ref_security_master.parquet",
             "ref_security_master.parquet",
         ),
-        ("stock_list", paths.home / "stock_list.parquet", "stock_list.parquet"),
+        (
+            "stock_list",
+            universe_root / "stock_list.parquet"
+            if universe_root
+            else paths.home / "stock_list.parquet",
+            "stock_list.parquet",
+        ),
         ("trading_calendar", paths.calendar, "ref_trading_calendar.parquet"),
     ):
         datasets.append(
@@ -1775,8 +1881,7 @@ def _build_market_open(
         require_rows=True,
     )
     observed_indices = {
-        _canonical_index_code(row.get("index_code") or row.get("code"))
-        for row in index_rows
+        _canonical_index_code(row.get("index_code") or row.get("code")) for row in index_rows
     }
     missing_indices = sorted(set(INDEX_CODES) - observed_indices)
     if missing_indices:
@@ -1834,9 +1939,7 @@ def _build_market_open(
                 "recovery_deadline_at": (
                     recovery_deadline_at.isoformat() if recovery_deadline_at else None
                 ),
-                "excluded_from_collection_window_experiment": (
-                    recovery_deadline_at is not None
-                ),
+                "excluded_from_collection_window_experiment": (recovery_deadline_at is not None),
                 "metrics": _market_acquisition_metrics(log_rows),
                 "requests": log_rows,
                 "source_revision": rev,
@@ -2001,8 +2104,7 @@ def _cninfo_fetch_announcements(
 
     Path(os.environ.get("ASTOCK_ROOT") or "/root/work/astock") / "toolkit"
     org_map_path = (
-        Path(os.environ.get("ASTOCK_HOME") or "/root/work/astock/data")
-        / "cninfo_orgid_map.json"
+        Path(os.environ.get("ASTOCK_HOME") or "/root/work/astock/data") / "cninfo_orgid_map.json"
     )
     org_map: dict[str, str] = {}
     if org_map_path.is_file():
@@ -2010,13 +2112,21 @@ def _cninfo_fetch_announcements(
             org_map = json.loads(org_map_path.read_text(encoding="utf-8"))
         except Exception:
             org_map = {}
+    if prevention_enabled():
+        source_day = os.environ.get("HERMES_ODS_UNIVERSE_SOURCE_DATE", end.isoformat())
+        fresh_map = (
+            Path(os.environ["ASTOCK_HOME"])
+            / "source-universe-v1"
+            / source_day
+            / "cninfo_orgid_map.json"
+        )
+        org_map = json.loads(fresh_map.read_text())
 
     url = "http://www.cninfo.com.cn/new/hisAnnouncement/query"
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Referer": (
-            "http://www.cninfo.com.cn/new/commonUrl/pageOfSearch"
-            "?url=disclosure/list/search"
+            "http://www.cninfo.com.cn/new/commonUrl/pageOfSearch?url=disclosure/list/search"
         ),
     }
     session = requests.Session()
@@ -2066,7 +2176,28 @@ def _cninfo_fetch_announcements(
                             "sortType": "",
                             "isHLtitle": "false",
                         }
+                        request_started_at = response_clock()
                         resp = session.post(url, data=payload, headers=headers, timeout=30)
+                        response_completed_at = response_clock()
+                        if prevention_enabled():
+                            acquired_at = response_completed_at
+                        raw_receipt = (
+                            capture_response(
+                                request={
+                                    "provider": "cninfo",
+                                    "url": url,
+                                    "form": payload,
+                                    "scan_round": scan_round,
+                                    "attempt": attempt,
+                                },
+                                raw=resp.content,
+                                started_at=request_started_at,
+                                completed_at=response_completed_at,
+                                status=str(resp.status_code),
+                            )
+                            if prevention_enabled()
+                            else {}
+                        )
                         if resp.status_code != 200:
                             raise RuntimeError(f"HTTP {resp.status_code}")
                         body = resp.json()
@@ -2080,7 +2211,7 @@ def _cninfo_fetch_announcements(
                             try:
                                 from datetime import datetime as _dt
 
-                                pub = _dt.fromtimestamp(int(ts_ms) / 1000).strftime(
+                                pub = _dt.fromtimestamp(int(ts_ms) / 1000, tz=SH).strftime(
                                     "%Y-%m-%d %H:%M:%S"
                                 )
                             except Exception:
@@ -2100,9 +2231,16 @@ def _cninfo_fetch_announcements(
                                     ),
                                     "source": "cninfo.hisAnnouncement",
                                     "acquired_at": acquired_at,
+                                    "raw_response_sha256": raw_receipt.get("raw_sha256"),
+                                    "response_completed_at": response_completed_at
+                                    if prevention_enabled()
+                                    else None,
+                                    "body_sha256": None,
                                 }
                             )
                         has_more = bool(body.get("hasMore"))
+                        if has_more and not batch:
+                            raise RuntimeError("pagination empty page with hasMore=true")
                         if has_more and page == 40:
                             raise RuntimeError("pagination limit reached with hasMore=true")
                         if not has_more or not batch:
@@ -2202,7 +2340,15 @@ def _build_calendar_events(
 
     # Announcements: provider = cninfo live; local = sqlite/db or parquet with disclose keys
     if mode == "provider":
-        codes = _universe_from_stock_list(paths.home)
+        if prevention_enabled():
+            os.environ["HERMES_ODS_RAW_CAPTURE_ROOT"] = str(landing / "original-responses")
+            source_day = date.fromisoformat(
+                os.environ.get("HERMES_ODS_UNIVERSE_SOURCE_DATE", market_date.isoformat())
+            )
+            universe_root, universe = refresh_universe(home=paths.home, day=source_day)
+            codes = universe["codes"]
+        else:
+            codes = _universe_from_stock_list(paths.home)
         if codes:
             ann_rows, ann_logs = _cninfo_fetch_announcements(
                 codes=codes,
@@ -2227,9 +2373,7 @@ def _build_calendar_events(
             lookback_days=(market_date - start).days,
         )
         log_rows.extend(ann_logs)
-        failed_requests = [
-            row for row in ann_logs if str(row.get("response_error_code")) != "0"
-        ]
+        failed_requests = [row for row in ann_logs if str(row.get("response_error_code")) != "0"]
         for row in ann_rows:
             pub = str(row.get("publish_time") or row.get("announce_date") or "")
             if pub and (observed_max is None or pub > observed_max):
@@ -2414,7 +2558,8 @@ def _build_calendar_events(
                 )
                 continue
             for row in rows:
-                row["acquired_at"] = acquired_at
+                if not prevention_enabled():
+                    row["acquired_at"] = acquired_at
                 for key in keys:
                     value = row.get(key)
                     if value is None:
@@ -2456,8 +2601,7 @@ def _build_calendar_events(
             "input_watermark": input_wm,
             "lookback_days": lookback,
             "note": (
-                "ex_date/effective retained as business fields; "
-                "filter uses disclose keys first"
+                "ex_date/effective retained as business fields; filter uses disclose keys first"
             ),
         }
         acquired_at = _now_sh_iso()
@@ -3924,9 +4068,7 @@ def _build_after_hours_fixed_price(
     ]
 
 
-_DIRECT_5M_PROVIDERS = frozenset(
-    {"mootdx-native-kline", "sina-minute-jsonp", "baostock-native-5m"}
-)
+_DIRECT_5M_PROVIDERS = frozenset({"mootdx-native-kline", "sina-minute-jsonp", "baostock-native-5m"})
 
 
 def _direct_5m_provenance_error(raw_home: Path, universe: Sequence[str]) -> str | None:
@@ -4524,6 +4666,140 @@ def _evaluate_mandatory(
     return "ready", None
 
 
+def _prepare_prevention(
+    *,
+    landing: Path,
+    datasets: list[DatasetStatus],
+    mandatory: set[str],
+    lane_id: str,
+    market_date: date,
+) -> tuple[list[DatasetStatus], set[str]]:
+    """Versioned scope isolates unrefreshed domains without calling them fresh READY."""
+    from quanthus.providers.acquisition_evidence import verify_capture
+    from quanthus.providers.security_universe import verify as verify_universe
+
+    policy_path = (
+        Path(__file__).resolve().parents[3] / "config/pipelines/p10-acquisition-prevention.v1.json"
+    )
+    policy = json.loads(policy_path.read_text())
+    if (
+        policy["policy_id"] != PREVENTION_POLICY
+        or policy["snapshot_projection_is_current_acquisition"] is not False
+    ):
+        raise LaneRunError("prevention policy differs")
+    excluded = set(policy["daily_core_excluded_domains"])
+    state_rows = []
+    result = []
+    for item in datasets:
+        if item.name in excluded:
+            state_rows.append(
+                {
+                    "dataset": item.name,
+                    "state": "unknown",
+                    "reason_code": (
+                        "NONEMPTY_DATASET_UNHANDLED" if item.row_count else "SOURCE_NOT_REFRESHED"
+                    ),
+                    "projection_rows": item.row_count,
+                    "projection_sha256": item.sha256,
+                    "current_refresh_proven": False,
+                    "watermark_advanced": False,
+                    "blocked_uses": [item.name],
+                    "daily_core_blocked": False,
+                }
+            )
+            item.name = "local_projection_evidence_" + item.name
+            item.acquisition_state = "unknown_source_not_refreshed"
+            item.reason_code = state_rows[-1]["reason_code"]
+            item.watermark = None
+            item.detail = "physical projection only; not current acquisition or no-change evidence"
+        else:
+            state_rows.append(
+                {
+                    "dataset": item.name,
+                    "state": (
+                        "changed" if item.status == "ready" and item.row_count else "unknown"
+                    ),
+                    "physical_status": item.status,
+                    "row_count": item.row_count,
+                    "daily_core_blocked": item.status != "ready",
+                }
+            )
+        result.append(item)
+    source_day = date.fromisoformat(
+        os.environ.get("HERMES_ODS_UNIVERSE_SOURCE_DATE", market_date.isoformat())
+    )
+    root = Path(os.environ["ASTOCK_HOME"]) / "source-universe-v1" / source_day.isoformat()
+    universe = verify_universe(root, source_day)
+    raw_root = landing / "original-responses"
+    raw_root.mkdir(exist_ok=True)
+    for name in universe["files"]:
+        if name.endswith(".json.gz"):
+            shutil.copyfile(root / name, raw_root / name)
+    raw_files = sorted(raw_root.glob("*.json.gz"))
+    if not raw_files:
+        raise LaneRunError("RAW_CLOSURE_MISSING")
+    receipts = []
+    for path in raw_files:
+        verify_capture(path)
+        receipts.append({"path": path.name, "sha256": _sha256(path), "bytes": path.stat().st_size})
+    archive = landing / "original-responses.tar.gz"
+    with tarfile.open(archive, "w:gz") as handle:
+        for path in raw_files:
+            handle.add(path, arcname=path.name, recursive=False)
+    result.append(
+        DatasetStatus(
+            name="original_responses",
+            status="ready",
+            path=str(archive),
+            sha256=_sha256(archive),
+            row_count=len(raw_files),
+            source_revision=PREVENTION_POLICY,
+            knowledge_cutoff=_now_sh_iso(),
+        )
+    )
+    result.append(
+        _seal_json_dataset(
+            name="source_universe",
+            payload=universe,
+            landing=landing,
+            source_revision=PREVENTION_POLICY,
+            knowledge_cutoff=universe["warehouse_observed_at"],
+            watermark=market_date.isoformat(),
+        )
+    )
+    quality = {
+        "policy_id": PREVENTION_POLICY,
+        "policy_sha256": _sha256(policy_path),
+        "lane": lane_id,
+        "market_date": market_date.isoformat(),
+        "datasets": state_rows,
+        "raw_members": receipts,
+        "original_responses_sha256": _sha256(archive),
+        "universe_digest": universe["universe_digest"],
+        "population": universe["population"],
+        "collector_sha": os.environ.get("QUANTHUS_COLLECTOR_SHA"),
+        "all_business_domains_complete": False,
+        "historical_pit_authorized": False,
+    }
+    result.append(
+        _seal_json_dataset(
+            name="acquisition_quality",
+            payload=quality,
+            landing=landing,
+            source_revision=PREVENTION_POLICY,
+            knowledge_cutoff=_now_sh_iso(),
+            watermark=market_date.isoformat(),
+        )
+    )
+    queue = landing.parents[4] / "prevention-gaps" / market_date.isoformat() / (lane_id + ".json")
+    _atomic_json(queue, quality)
+    return result, (mandatory - excluded) | {
+        "acquisition_quality",
+        "source_universe",
+        "original_responses",
+    }
+
+
 def _publish(
     *,
     schedule: str,
@@ -4543,6 +4819,20 @@ def _publish(
     """Publish only when all mandatory datasets are ready. READY is last."""
 
     mandatory = _mandatory_set(lane_id, closed=closed, stream=stream)
+    datasets = list(datasets)
+    if (
+        prevention_enabled()
+        and _acquire_mode() == "provider"
+        and not closed
+        and lane_id in {"market-daily-core", "calendar-daily-events"}
+    ):
+        datasets, mandatory = _prepare_prevention(
+            landing=landing,
+            datasets=datasets,
+            mandatory=mandatory,
+            lane_id=lane_id,
+            market_date=market_date,
+        )
     # lane_status artifact must exist before publish and be checksummed
     lane_status_payload = {
         "lane_id": lane_id,
@@ -4602,8 +4892,7 @@ def _publish(
 
     suffix = f"-{stream}" if stream else ""
     release_id = (
-        f"hermes-{lane_id}{suffix}-{market_date.strftime('%Y%m%d')}-"
-        f"{attempt_id[-8:]}-v2"
+        f"hermes-{lane_id}{suffix}-{market_date.strftime('%Y%m%d')}-{attempt_id[-8:]}-v2"
     ).replace("/", "-")
     spec = {
         "schema_version": 1,
@@ -4617,18 +4906,11 @@ def _publish(
         "artifacts": artifacts,
     }
     if stream:
-        release_dir = (
-            release_root / schedule / stream / market_date.isoformat() / attempt_id
-        )
+        release_dir = release_root / schedule / stream / market_date.isoformat() / attempt_id
     elif lane_id == "market-daily-core" or schedule != "daily":
         release_dir = release_root / schedule / market_date.isoformat() / attempt_id
     else:
-        release_dir = (
-            release_root
-            / schedule
-            / market_date.isoformat()
-            / f"{lane_id}-{attempt_id}"
-        )
+        release_dir = release_root / schedule / market_date.isoformat() / f"{lane_id}-{attempt_id}"
     spec_path = landing / "release-spec.json"
     _atomic_json(spec_path, spec)
     try:
@@ -4636,9 +4918,11 @@ def _publish(
             spec_path=spec_path,
             output=release_dir,
             before_ready=(
-                lambda: _inject_failure(failure_injection_stage, "transfer")
-                if failure_injection_stage == "transfer"
-                else None
+                lambda: (
+                    _inject_failure(failure_injection_stage, "transfer")
+                    if failure_injection_stage == "transfer"
+                    else None
+                )
             ),
         )
     except OdsReleaseError as exc:
@@ -4746,14 +5030,12 @@ def run_lane(
         )
     else:
         attempt_dir = (
-            resolved.shadow_root
-            / "attempts"
-            / lane_id
-            / market_date.isoformat()
-            / attempt_id
+            resolved.shadow_root / "attempts" / lane_id / market_date.isoformat() / attempt_id
         )
     attempt_dir.mkdir(parents=True, exist_ok=False)
     landing = attempt_dir / "landing"
+    if prevention_enabled():
+        os.environ["HERMES_ODS_RAW_CAPTURE_ROOT"] = str(landing / "original-responses")
     landing.mkdir(parents=True, exist_ok=True)
     result = LaneRunResult(
         lane_id=lane_id,
@@ -4771,9 +5053,7 @@ def run_lane(
         recovery_deadline_at=recovery_deadline_at,
     )
     _atomic_json(attempt_dir / "attempt.json", result.to_dict())
-    failure_injection_stage = _failure_injection_stage(
-        shadow_root=resolved.shadow_root
-    )
+    failure_injection_stage = _failure_injection_stage(shadow_root=resolved.shadow_root)
 
     lock_name = {
         "market-daily-core": "market-daily-core.lock",
@@ -4809,18 +5089,14 @@ def run_lane(
         if lane_id in {"market-daily-core", "intraday-archive"}:
             acquire_mode = _acquire_mode()
             if acquire_mode == "provider" and force_preflight is None:
-                calendar_output = (
-                    landing / "preflight" / "ref_trading_calendar.parquet"
-                )
+                calendar_output = landing / "preflight" / "ref_trading_calendar.parquet"
                 try:
                     refresh = refresh_calendar(
                         source=resolved.calendar,
                         output=calendar_output,
                         target_date=market_date,
                         lookback_days=int(
-                            lane["session_preflight"]["calendar_refresh"][
-                                "lookback_calendar_days"
-                            ]
+                            lane["session_preflight"]["calendar_refresh"]["lookback_calendar_days"]
                         ),
                     )
                 except CalendarRefreshError as exc:
@@ -4857,10 +5133,7 @@ def run_lane(
             result.preflight = preflight
             if preflight == "missing_or_disagree":
                 result.status = "failed"
-                result.detail = (
-                    "calendar missing or SSE/SZSE disagree; "
-                    "no provider calls; no READY"
-                )
+                result.detail = "calendar missing or SSE/SZSE disagree; no provider calls; no READY"
                 result.finished_at = _now()
                 _atomic_json(attempt_dir / "attempt.json", result.to_dict())
                 _atomic_json(attempt_dir / "datasets.json", {"datasets": []})
@@ -4911,9 +5184,7 @@ def run_lane(
                     knowledge_cutoff=knowledge_cutoff,
                     provider_readiness=lane.get("provider_readiness"),
                     completion_deadline=str(lane.get("completion_deadline") or ""),
-                    collection_window_experiment=lane.get(
-                        "collection_window_experiment"
-                    ),
+                    collection_window_experiment=lane.get("collection_window_experiment"),
                     recovery_deadline_at=recovery_deadline_at,
                 )
                 result.datasets = datasets
@@ -5109,9 +5380,9 @@ def run_lane(
                     observed = None
                     if meta and meta.path:
                         try:
-                            observed = json.loads(
-                                Path(meta.path).read_text(encoding="utf-8")
-                            ).get("observed_maximum")
+                            observed = json.loads(Path(meta.path).read_text(encoding="utf-8")).get(
+                                "observed_maximum"
+                            )
                         except Exception:
                             observed = None
                     _commit_watermark(

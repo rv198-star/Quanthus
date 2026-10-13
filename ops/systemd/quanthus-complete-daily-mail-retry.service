@@ -10,7 +10,7 @@ Group=root
 WorkingDirectory=/opt/quanthus/data-delivery-current
 EnvironmentFile=/etc/quanthus/dwd-notification.env
 Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src
-ExecStart=/root/work/Quanthus/.venv-p1/bin/python -m quanthus.pipelines.p10_complete_daily_notifications --retry-state /srv/quanthus/dwd-dws-v2/intraday/operations/complete-daily-v1/notifications --retry-state /var/lib/quanthus/gdrive-complete-v1/notifications
+ExecStart=/root/work/Quanthus/.venv-p1/bin/python -m quanthus.pipelines.p10_complete_daily_notifications --retry-state /srv/quanthus/dwd-dws-v2/intraday/operations/complete-daily-v1/notifications --retry-state /var/lib/quanthus/gdrive-complete-v1/notifications --retry-state /var/lib/quanthus/acquisition-continuation-v1/notifications
 TimeoutStartSec=10min
 MemoryMax=512M
 CPUQuota=100%

@@ -1,0 +1,12 @@
+[Unit]
+Description=CN01 domain continuation failure mail (%i)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/etc/quanthus/dwd-notification.env
+Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src
+ExecStart=/root/work/Quanthus/.venv-p1/bin/python -m quanthus.pipelines.p10_complete_daily_notifications --continuation-service-failure %i
+TimeoutStartSec=2min
+UMask=0077

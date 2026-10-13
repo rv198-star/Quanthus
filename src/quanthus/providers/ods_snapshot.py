@@ -8,6 +8,7 @@ the lane runner. Missing or unreadable sources fail closed.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -78,9 +79,7 @@ def _as_date(value: Any) -> date | None:
         return None
 
 
-def _row_in_window(
-    row: dict[str, Any], keys: tuple[str, ...], start: date, end: date
-) -> bool:
+def _row_in_window(row: dict[str, Any], keys: tuple[str, ...], start: date, end: date) -> bool:
     for key in keys:
         day = _as_date(row.get(key))
         if day is not None and start <= day <= end:
@@ -142,9 +141,7 @@ def collect(
         raise FileNotFoundError(f"source missing for {dataset}: {source}")
 
     raw_rows = _read_rows(source)
-    selected = [
-        dict(row) for row in raw_rows if _row_in_window(dict(row), date_keys, start, end)
-    ]
+    selected = [dict(row) for row in raw_rows if _row_in_window(dict(row), date_keys, start, end)]
     acquired_at = datetime.now().astimezone().isoformat(timespec="seconds")
     for row in selected:
         row.update(
@@ -166,6 +163,15 @@ def collect(
         "selected_row_count": len(selected),
         "acquired_at": acquired_at,
         "provider": f"quanthus.ods-snapshot/{dataset}",
+        "acquisition_kind": "local_projection",
+        "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        "source_refreshed": False,
+        "source_snapshot_as_of": None,
+        "source_freshness_status": "unknown",
+        "reason_code": "SOURCE_NOT_REFRESHED",
+        "current_no_change_proven": False,
+        "projection_observed_at": acquired_at,
+        "provider_acquisition_at": None,
     }
     output.with_suffix(output.suffix + ".meta.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",

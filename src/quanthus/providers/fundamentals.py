@@ -39,8 +39,7 @@ from quanthus.providers.minute_tdx import tdx_client
 
 PROVIDER_REVISION = "quanthus-fundamentals-provider-v1"
 SINA_STATEMENT_URL = (
-    "https://quotes.sina.cn/cn/api/openapi.php/"
-    "CompanyFinanceService.getFinanceReport2022"
+    "https://quotes.sina.cn/cn/api/openapi.php/CompanyFinanceService.getFinanceReport2022"
 )
 STATEMENT_TYPES = {
     "fzb": "balance_sheet",
@@ -379,9 +378,7 @@ def _statement_request(
     }
     started = time.monotonic()
     acquired_at = now_shanghai_iso()
-    request_json = json.dumps(
-        {"url": SINA_STATEMENT_URL, "params": params}, sort_keys=True
-    )
+    request_json = json.dumps({"url": SINA_STATEMENT_URL, "params": params}, sort_keys=True)
     try:
         response = get(
             SINA_STATEMENT_URL,
@@ -389,6 +386,16 @@ def _statement_request(
             headers={"User-Agent": "Mozilla/5.0", "Referer": "https://finance.sina.com.cn/"},
             timeout=30,
         )
+        from quanthus.providers.acquisition_evidence import capture, clock, enabled
+
+        if enabled():
+            capture(
+                request=json.loads(request_json),
+                raw=bytes(response.content),
+                started_at=acquired_at,
+                completed_at=clock(),
+                status=str(response.status_code),
+            )
         if int(response.status_code) != 200:
             raise RuntimeError(f"HTTP {response.status_code}")
         raw = bytes(response.content)
@@ -653,13 +660,11 @@ def _read_receipts(path: Path) -> list[dict[str, Any]]:
 
 
 def _payload_json(row: Mapping[str, Any]) -> dict[str, Any]:
-    payload = row.get("raw_payload_gzip")
-    if not isinstance(payload, (bytes, bytearray, memoryview)):
-        raise ValueError("financial statement row has no compressed raw payload")
-    decoded = json.loads(gzip.decompress(bytes(payload)))
-    if not isinstance(decoded, dict):
-        raise ValueError("financial statement payload root is not an object")
-    return decoded
+    from quanthus.pipelines.securities_warehouse.financial_reporting import (
+        decode_financial_envelope,
+    )
+
+    return dict(json.loads(decode_financial_envelope(row).raw_payload))
 
 
 def derive_financial_quarterly(

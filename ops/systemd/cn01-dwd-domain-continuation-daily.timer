@@ -1,0 +1,10 @@
+[Unit]
+Description=Retry disclosure continuation without repeating collection
+
+[Timer]
+OnCalendar=*-*-* 08..23:40:00 Asia/Shanghai
+Unit=cn01-dwd-domain-continuation@daily.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

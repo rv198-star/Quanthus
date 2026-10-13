@@ -168,6 +168,8 @@ def _text(value: object, field: str) -> str:
 def _unpack_byte_literal(value: object) -> bytes:
     if not isinstance(value, (bytes, bytearray, memoryview)):
         raise FinancialReportingBuildError("raw_payload_gzip must be bytes")
+    if bytes(value).startswith(b"\x1f\x8b"):
+        return bytes(value)
     try:
         decoded = ast.literal_eval(bytes(value).decode("ascii"))
     except (SyntaxError, UnicodeDecodeError, ValueError) as exc:

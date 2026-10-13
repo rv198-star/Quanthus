@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+REVISION="$(git -C "$ROOT" rev-parse HEAD)"
+exec "${QUANTHUS_DAILY_CORE_PYTHON:-/root/work/Quanthus/.venv-p1/bin/python}" -m quanthus.pipelines.p10_acquisition_continuation --code-revision "$REVISION" "$@"

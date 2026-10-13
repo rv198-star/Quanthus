@@ -71,7 +71,19 @@ def write_parquet(rows: Sequence[Mapping[str, Any]], path: Path, schema: Any) ->
     except ModuleNotFoundError as exc:  # pragma: no cover - deployment dependency
         raise RuntimeError("pyarrow is required by ODS provider collectors") from exc
 
-    normalized = [{str(key): jsonable(value) for key, value in row.items()} for row in rows]
+    # JSON formatting turns bytes into a Python repr and corrupts compressed payloads.
+    binary_fields = {field.name for field in schema if pa.types.is_binary(field.type)}
+    normalized = [
+        {
+            str(key): (
+                bytes(value)
+                if key in binary_fields and isinstance(value, (bytes, bytearray, memoryview))
+                else jsonable(value)
+            )
+            for key, value in row.items()
+        }
+        for row in rows
+    ]
     table = pa.Table.from_pylist(normalized, schema=schema)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + f".tmp.{os.getpid()}")

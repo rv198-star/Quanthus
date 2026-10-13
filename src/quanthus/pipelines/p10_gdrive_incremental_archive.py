@@ -46,7 +46,13 @@ def delta_reference(
             "cloud_ready_confirmed_at"
         ):
             raise ValueError("archive dependency has no actual cloud confirmation")
-        if datetime.fromisoformat(done["cloud_ready_confirmed_at"]).tzinfo is None:
+        confirmed = done["cloud_ready_confirmed_at"]
+        if (
+            datetime.fromisoformat(
+                confirmed.removesuffix("Z") + "+00:00" if confirmed.endswith("Z") else confirmed
+            ).tzinfo
+            is None
+        ):
             raise ValueError("archive dependency confirmation has no timezone")
         if done["market_date"] > day:
             continue

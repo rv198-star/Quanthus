@@ -181,3 +181,25 @@ def test_unresolved_date_pending_replays_the_same_namespace(tmp_path, monkeypatc
         )
     assert notices.retry_pending(tmp_path)["remaining"] == 0
     assert calls[0] == calls[1]
+
+
+def test_watchdog_calendar_failure_marks_unresolved_execution_date(monkeypatch):
+    import sys
+
+    from quanthus.pipelines import p10_complete_daily_deadline as watchdog
+
+    calls = []
+
+    def unavailable(*_):
+        raise ValueError("synthetic calendar failure")
+
+    monkeypatch.setattr(watchdog, "calendar_rows", unavailable)
+    monkeypatch.setattr(watchdog, "failure", lambda **kw: calls.append(kw) or {})
+    monkeypatch.setattr(sys, "argv", ["watchdog", "--stage", "complete"])
+    with pytest.raises(ValueError):
+        watchdog.main()
+    call = calls[0]
+    assert call["context"]["market_date_label"] == "运行日期（目标交易日未确定）"
+    assert notices._notification_key(
+        call["day"], call["stage"], call["context"]
+    ) != notices._notification_key(call["day"], call["stage"], {})

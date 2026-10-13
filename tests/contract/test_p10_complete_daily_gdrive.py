@@ -99,6 +99,23 @@ def test_space_reserve_cannot_be_lowered_silently(complete: Path, tmp_path: Path
         )
 
 
+def test_archive_budget_uses_actual_run_device_and_retains_local_mail_reserve(monkeypatch):
+    state, run = Path("/local/state"), Path("/nas/run")
+    reserve = 4 * 1024**3
+    free = {state: reserve + 1, run: reserve + 1024}
+    monkeypatch.setattr(
+        archive.shutil, "disk_usage", lambda p: shutil._ntuple_diskusage(0, 0, free[p])
+    )
+    archive.check_archive_space(state, run, 1024, reserve)
+    free[run] -= 1
+    with pytest.raises(archive.ArchiveError, match="scratch_insufficient"):
+        archive.check_archive_space(state, run, 1024, reserve)
+    free[run] += 1
+    free[state] = reserve - 1
+    with pytest.raises(archive.ArchiveError, match="control_state_insufficient"):
+        archive.check_archive_space(state, run, 1024, reserve)
+
+
 def test_primary_first_fallback_then_marker_last(tmp_path: Path, monkeypatch):
     upload = tmp_path / "upload"
     upload.mkdir()

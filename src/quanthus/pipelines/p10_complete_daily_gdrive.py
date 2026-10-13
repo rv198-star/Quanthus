@@ -46,6 +46,14 @@ class ArchiveError(RuntimeError):
     """Safe error code only; do not log credentials, API responses or market rows."""
 
 
+def check_archive_space(state: Path, run: Path, upper_bound: int, reserve: int) -> None:
+    """Tar uses the run device; local control/mail state retains its own reserve."""
+    if shutil.disk_usage(run).free < reserve + upper_bound:
+        raise ArchiveError("archive_scratch_insufficient_with_4GiB_reserve")
+    if shutil.disk_usage(state).free < reserve:
+        raise ArchiveError("archive_control_state_insufficient_with_4GiB_reserve")
+
+
 def md5(path: Path) -> str:
     value = hashlib.md5(usedforsecurity=False)
     with path.open("rb") as handle:
@@ -110,8 +118,7 @@ def freeze(
     if size > policy["max_package_bytes"] or upper_bound > policy["max_archive_bytes"]:
         raise ArchiveError("complete_package_exceeds_archive_budget")
     run.mkdir(parents=True, exist_ok=True)
-    if shutil.disk_usage(state).free < policy["disk_reserve_bytes"] + upper_bound:
-        raise ArchiveError("archive_scratch_insufficient_with_4GiB_reserve")
+    check_archive_space(state, run, upper_bound, policy["disk_reserve_bytes"])
     upload = run / "upload"
     upload.mkdir(exist_ok=True)
     archive_name = f"dwd-complete-{day}-{key[:16]}.tar.zst"

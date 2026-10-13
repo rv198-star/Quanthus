@@ -2,6 +2,7 @@
 Description=OCI exact CN01 complete DWD mirror and consumer visibility
 After=network-online.target
 Wants=network-online.target
+OnFailure=oci-complete-daily-sync-failure.service
 
 [Service]
 Type=oneshot

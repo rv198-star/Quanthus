@@ -656,6 +656,174 @@ def test_mirror_recovers_exact_missed_revision_and_keeps_first_visibility(
     )
 
 
+def test_mirror_interruption_retains_private_partial_and_resumes_same_cache(
+    members: tuple, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    daily, m1, m5 = members
+    source_root = tmp_path / "source"
+    full.build(daily=daily, m1=m1, m5=m5, output_root=source_root, code_revision=REVISION)
+    monkeypatch.setenv("QUANTHUS_CN01_DWD_REMOTE_ROOT", mirror.REMOTE)
+    monkeypatch.setattr(mirror, "_ssh_command", lambda: ("cn01", "22", "reader", "", "", "ssh"))
+    interrupted = [True]
+    targets = []
+
+    def transfer(*, source: str, destination: Path, ssh: str, extra: tuple = ()) -> None:
+        local = source_root / source.split(mirror.REMOTE + "/", 1)[1]
+        if local.is_dir():
+            targets.append(destination)
+            if interrupted[0]:
+                victim = next(local.rglob("*.parquet"))
+                partial = destination / victim.relative_to(local)
+                partial.parent.mkdir(parents=True, exist_ok=True)
+                partial.write_bytes(victim.read_bytes()[:10])
+                interrupted[0] = False
+                raise mirror.WarehouseSyncError("interrupted", code="transfer_failed")
+            shutil.copytree(local, destination, dirs_exist_ok=True)
+        else:
+            shutil.copyfile(local, destination)
+
+    monkeypatch.setattr(mirror, "_run_rsync", transfer)
+    target = tmp_path / "oci"
+    with pytest.raises(mirror.WarehouseSyncError):
+        mirror.sync(root=target, target=date.fromisoformat(DAY))
+    assert targets[0].exists()
+    assert (target / mirror.CACHE / "pending.json").exists()
+    assert not (target / full.POINTER).exists()
+    assert not (target / "visibility").exists()
+    result = mirror.sync(root=target, target=date.fromisoformat(DAY))
+    assert result["status"] == "synced" and targets[0] == targets[1]
+    assert not (target / mirror.CACHE / "pending.json").exists()
+
+
+def test_mirror_reuses_only_exact_sealed_local_files(
+    members: tuple, tmp_path: Path
+) -> None:
+    daily, m1, m5 = members
+    root = tmp_path / "oci"
+    full.build(daily=daily, m1=m1, m5=m5, output_root=root, code_revision=REVISION)
+    pointer = json.loads((root / full.POINTER).read_text())
+    old = (root / pointer["manifest_path"]).parent
+    manifest = json.loads((old / "manifest.json").read_text())
+    incoming = root / mirror.CACHE / "incoming"
+    incoming.mkdir(parents=True)
+    mirror.seed_verified_files(root, incoming, manifest)
+    victim = next(item for item in manifest["files"] if item["path"].endswith(".parquet"))
+    old_file, new_file = old / victim["path"], incoming / victim["path"]
+    assert new_file.stat().st_ino == old_file.stat().st_ino
+    assert file_digest(new_file) == victim["sha256"]
+    assert not (incoming / "READY").exists()
+    changed = root / mirror.CACHE / "changed"
+    changed.mkdir()
+    expected = {**manifest, "files": [{**victim, "sha256": "sha256:" + "0" * 64}]}
+    mirror.seed_verified_files(root, changed, expected)
+    assert not (changed / victim["path"]).exists()
+
+
+def test_pending_mirror_job_continues_across_next_trading_date(tmp_path: Path) -> None:
+    atomic(
+        tmp_path / mirror.CACHE / "pending.json",
+        {"kind": "oci_resumable_complete_sync_v1", "market_date": DAY},
+    )
+    assert mirror.pending_target(tmp_path, date(2026, 10, 13)) == date.fromisoformat(DAY)
+    assert mirror.pending_target(tmp_path, None) == date.fromisoformat(DAY)
+
+
+def test_future_pending_still_waits_for_authoritative_checkpoint(tmp_path: Path) -> None:
+    atomic(
+        tmp_path / mirror.CACHE / "pending.json",
+        {"kind": "oci_resumable_complete_sync_v1", "market_date": "2026-10-13"},
+    )
+    target = mirror.pending_target(tmp_path, None)
+    assert target == date(2026, 10, 13)
+    rows = calendar()
+    # This remains the same gate used by main before sync, including on closed days.
+    assert datetime(2026, 10, 13, 23, tzinfo=schedule.CST) < schedule.checkpoint(
+        target, "minute_start", rows
+    )
+
+
+def test_mirror_private_cache_reuse_requires_actual_incoming_hash(tmp_path: Path) -> None:
+    root = tmp_path / "oci"
+    old = root / mirror.CACHE / "packages" / DAY / "old"
+    old.mkdir(parents=True)
+    atomic(old / "manifest.json", {"files": []})
+    (old / "data.parquet").write_bytes(b"exact sealed bytes")
+    item = {"path": "data.parquet", "bytes": 18, "sha256": file_digest(old / "data.parquet")}
+    incoming = root / mirror.CACHE / "packages" / DAY / "new"
+    incoming.mkdir(parents=True)
+    mirror.seed_verified_files(root, incoming, {"files": [item]})
+    assert (incoming / item["path"]).stat().st_ino == (old / item["path"]).stat().st_ino
+    bad = incoming.parent / "bad"
+    bad.mkdir()
+    mirror.seed_verified_files(root, bad, {"files": [{**item, "sha256": "sha256:" + "0" * 64}]})
+    assert not (bad / item["path"]).exists()
+
+
+def test_closed_day_main_resumes_due_pending_but_waits_for_future(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sys
+
+    class ClosedDay(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 10, 17, 12, tzinfo=schedule.CST)
+
+    root = tmp_path / "oci"
+    root.mkdir()
+    calendar_file = tmp_path / "calendar.json"
+    calendar_file.write_text(json.dumps(calendar()))
+    monkeypatch.setattr(mirror, "datetime", ClosedDay)
+    monkeypatch.setattr(
+        sys, "argv", ["sync", "--local-root", str(root), "--calendar-file", str(calendar_file)]
+    )
+    calls = []
+    monkeypatch.setattr(
+        mirror, "sync", lambda **kwargs: calls.append(kwargs["target"]) or {"status": "synced"}
+    )
+    pending = root / mirror.CACHE / "pending.json"
+    atomic(pending, {"kind": "oci_resumable_complete_sync_v1", "market_date": "2026-10-15"})
+    assert mirror.main() == 0
+    assert calls == [date(2026, 10, 15)]
+    # Friday's T+1 is Monday; a Saturday attempt must not start it early.
+    atomic(pending, {"kind": "oci_resumable_complete_sync_v1", "market_date": "2026-10-16"})
+    assert mirror.main() == 0
+    assert calls == [date(2026, 10, 15)]
+
+
+@pytest.mark.parametrize("fresh", [True, False])
+def test_mirror_failure_mail_uses_only_current_service_pending_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fresh: bool
+) -> None:
+    import sys
+
+    now = datetime(2026, 10, 14, 1, tzinfo=schedule.CST)
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now
+
+    atomic(
+        tmp_path / mirror.CACHE / "pending.json",
+        {
+            "kind": "oci_resumable_complete_sync_v1",
+            "market_date": DAY,
+            "started_at": (now - timedelta(seconds=10 if fresh else 60)).isoformat(),
+        },
+    )
+    monkeypatch.setattr(mirror, "LOCAL", tmp_path)
+    monkeypatch.setattr(notifications, "datetime", Clock)
+    monkeypatch.setattr(notifications, "_service_started_at", lambda _: now.timestamp() - 20)
+    monkeypatch.setattr(sys, "argv", ["notifications", "--mirror-service-failure"])
+    records = []
+    monkeypatch.setattr(notifications, "failure", lambda **kw: records.append(kw) or {})
+    assert notifications.main() == 0
+    assert records[0]["stage"] == "mirror"
+    assert records[0]["day"] == (date.fromisoformat(DAY) if fresh else now.date())
+
+
+
 def test_independent_oci_deadline_rejects_missing_and_late_visibility(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

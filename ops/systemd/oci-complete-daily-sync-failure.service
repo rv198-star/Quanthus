@@ -1,0 +1,12 @@
+[Unit]
+Description=OCI durable mirror service timeout and failure mail
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/etc/quanthus/t-close-plus-5h.env
+Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src
+ExecStart=/opt/quanthus/warehouse-current/.venv/bin/python -m quanthus.pipelines.p10_complete_daily_notifications --mirror-service-failure
+TimeoutStartSec=5min
+UMask=0077

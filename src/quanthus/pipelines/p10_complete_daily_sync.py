@@ -7,7 +7,6 @@ import fcntl
 import json
 import os
 import shutil
-import tempfile
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -17,18 +16,61 @@ from quanthus.pipelines.p10_complete_daily_cycle import calendar_rows
 from quanthus.pipelines.p10_complete_daily_notifications import failure
 from quanthus.pipelines.p10_complete_daily_schedule import CST, checkpoint, policy, target_for
 from quanthus.pipelines.p10_delivery_common import COMPLETE_POINTER as POINTER
-from quanthus.pipelines.p10_delivery_common import atomic, file_digest, object_at
+from quanthus.pipelines.p10_delivery_common import atomic, file_digest, object_at, safe_path
 from quanthus.warehouse_sync import WarehouseSyncError, _run_rsync, _ssh_command
 
 REMOTE = "products/complete-daily"
 LOCAL = Path("/home/ubuntu/data/quanthus/dwd-complete-daily")
+CACHE = ".complete-sync-cache-v1"
+
+
+def seed_verified_files(root: Path, package: Path, manifest: dict[str, Any]) -> None:
+    """Reuse exact immutable local files; changed or unverified bytes still transfer."""
+    pointer = root / POINTER
+    candidates = []
+    if pointer.exists():
+        candidates.append(safe_path(root, object_at(pointer)["manifest_path"]).parent)
+    # Only inspect this job's bounded package cache, never arbitrary local directories.
+    cached = sorted((root / CACHE / "packages").glob("*/*/manifest.json"))
+    if len(cached) > 28:
+        raise ValueError("private mirror cache exceeds bounded predecessor budget")
+    candidates.extend(path.parent for path in cached if path.parent != package)
+    for item in manifest["files"]:
+        relative = item["path"]
+        target = safe_path(package, relative)
+        if target.exists():
+            continue
+        for candidate in candidates:
+            source = safe_path(candidate, relative)
+            if not source.is_file():
+                continue
+            if source.stat().st_size != item["bytes"] or file_digest(source) != item["sha256"]:
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            from quanthus.pipelines.p10_complete_daily import copy_sealed_file
+
+            copy_sealed_file(str(source), str(target))
+            break
+
+
+def pending_target(root: Path, target: date | None) -> date | None:
+    path = root / CACHE / "pending.json"
+    if not path.exists():
+        return target
+    pending = object_at(path)
+    day = date.fromisoformat(pending["market_date"])
+    if pending.get("kind") != "oci_resumable_complete_sync_v1" or day < date.fromisoformat(
+        policy()["baseline_market_date"]
+    ):
+        raise ValueError("invalid persistent mirror job")
+    return day if target is None or day < target else target
 
 
 def _copy_immutable(
     *, pointer: dict[str, Any], target: date, stage: Path, source: str, ssh: str
 ) -> tuple[Path, dict[str, Any]]:
     relative = _validate_pointer(pointer, target)
-    package = stage / relative
+    package = safe_path(stage, relative.as_posix())
     package.mkdir(parents=True, exist_ok=True)
     _run_rsync(
         source=f"{source}/{relative.as_posix()}/manifest.json",
@@ -41,11 +83,12 @@ def _copy_immutable(
     required = sum(item["bytes"] for item in manifest["files"])
     if required < 0 or shutil.disk_usage(stage).free < required + 4 * 1024**3:
         raise ValueError("OCI lacks exact package staging budget plus 4 GiB reserve")
+    seed_verified_files(stage.parent, package, manifest)
     _run_rsync(
         source=f"{source}/{relative.as_posix()}/",
         destination=package,
         ssh=ssh,
-        extra=("--exclude=/READY",),
+        extra=("--exclude=/READY", "--compress"),
     )
     _run_rsync(
         source=f"{source}/{relative.as_posix()}/READY", destination=package / "READY", ssh=ssh
@@ -149,7 +192,8 @@ def sync(*, root: Path, target: date) -> dict[str, Any]:
     source = f"{user}@{host}:{REMOTE}"
     with (root / ".mirror.lock").open("a+") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        stage = Path(tempfile.mkdtemp(prefix=".complete-sync-", dir=root))
+        stage = safe_path(root, CACHE)
+        stage.mkdir(mode=0o700, exist_ok=True)
         try:
             incoming = stage / "pointer.json"
             try:
@@ -162,12 +206,21 @@ def sync(*, root: Path, target: date) -> dict[str, Any]:
                 raise
             pointer = object_at(incoming)
             relative = _validate_pointer(pointer, target)
+            atomic(
+                stage / "pending.json",
+                {
+                    "kind": "oci_resumable_complete_sync_v1",
+                    "market_date": str(target),
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
             existing = root / "date-pointers" / f"{target}.json"
             visibility = root / "visibility" / f"{target}-{pointer['manifest_sha256'][7:23]}.json"
             if existing.exists() and object_at(existing) == pointer and visibility.exists():
                 # Reuse unchanged acceptance instead of rehashing every poll.
                 receipt = object_at(visibility)
                 if receipt.get("manifest_sha256") == pointer["manifest_sha256"]:
+                    (stage / "pending.json").unlink(missing_ok=True)
                     return {"status": "already_verified", **receipt}
             package, actual = _copy_immutable(
                 pointer=pointer, target=target, stage=stage, source=source, ssh=ssh
@@ -193,9 +246,11 @@ def sync(*, root: Path, target: date) -> dict[str, Any]:
             else:
                 os.replace(package, destination)
             receipt = _publish_visible(root, destination, actual)
+            (stage / "pending.json").unlink(missing_ok=True)
             return {"status": "synced", **receipt, "minute_row_counts": actual["minute_row_counts"]}
         finally:
-            shutil.rmtree(stage, ignore_errors=True)
+            # Interrupted transfers keep their private partials, never a consumer pointer.
+            (stage / "pointer.json").unlink(missing_ok=True)
 
 
 def main() -> int:
@@ -213,7 +268,7 @@ def main() -> int:
             if args.calendar_file
             else calendar_rows(now.date(), args.local_root / "calendars")
         )
-        target = target or target_for(now, rows)
+        target = target or pending_target(args.local_root, target_for(now, rows))
         if target is None or target < date.fromisoformat(policy()["baseline_market_date"]):
             result = {"status": "no_eligible_trading_day"}
         elif now < checkpoint(target, "minute_start", rows):

@@ -227,6 +227,7 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--daily-cycle-failure", action="store_true")
     mode.add_argument("--archive-service-failure", action="store_true")
+    mode.add_argument("--mirror-service-failure", action="store_true")
     mode.add_argument("--continuation-service-failure", choices=("daily", "weekly", "natural-day"))
     mode.add_argument("--retry-state", action="append", type=Path)
     args = parser.parse_args()
@@ -245,6 +246,32 @@ def main() -> int:
     from quanthus.pipelines.p10_complete_daily_cycle import DAILY, JOURNAL
     from quanthus.pipelines.p10_complete_daily_schedule import CST
 
+    if args.mirror_service_failure:
+        from quanthus.pipelines.p10_complete_daily_sync import CACHE, LOCAL
+
+        now = datetime.now(CST)
+        target, label = now.date(), "运行日期（目标交易日未确定）"
+        try:
+            pending = object_at(LOCAL / CACHE / "pending.json")
+            started = datetime.fromisoformat(pending["started_at"])
+            service_start = _service_started_at("oci-complete-daily-sync.service")
+            if (
+                service_start is not None
+                and started.tzinfo is not None
+                and service_start - 1 <= started.timestamp() <= now.timestamp()
+            ):
+                target, label = date.fromisoformat(pending["market_date"]), "交易日"
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        record = failure(
+            day=target,
+            stage="mirror",
+            state_root=LOCAL / "notifications",
+            reason="complete DWD mirror service failed or timed out; private partials retained",
+            context={"market_date_label": label, "unit": "oci-complete-daily-sync.service"},
+        )
+        print(json.dumps(record, sort_keys=True))
+        return 0
     if args.continuation_service_failure:
         from datetime import timedelta
 

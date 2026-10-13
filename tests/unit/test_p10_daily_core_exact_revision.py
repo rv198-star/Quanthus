@@ -101,9 +101,7 @@ def test_other_revisions_or_changed_local_evidence_remain_blocked(tmp_path, monk
 def test_actual_native_revision_sync_and_retry_preserve_first_receipt(tmp_path, monkeypatch):
     import shutil
 
-    from quanthus.pipelines.securities_warehouse.daily_core_domain import (
-        verify_daily_domain_increment,
-    )
+    verify_daily_domain_increment = sync.verify_daily_domain_increment
 
     from tests.unit.test_p10_daily_core_product import _canonical_bytes, _empty_core_package, sha
 

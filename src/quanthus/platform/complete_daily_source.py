@@ -122,6 +122,7 @@ class CompleteDailySource:
     def iter_domain_rows(self, *, table: str, knowledge_cutoff: datetime) -> Any:
         """Explicit source-native versions; no canonical/execution/PIT upgrade implied."""
         import pyarrow.parquet as pq
+
         from quanthus.pipelines.p10_domain_continuation import verify as verify_domain
 
         if table not in {"dwd_disclosure", "dwd_disclosure_subject", "dwd_financial_report",

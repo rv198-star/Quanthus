@@ -39,9 +39,14 @@ minute R2 floor / R3 exclusion, actual knowledge times and source seals stay unc
    code, policy, state or immutable cloud objects while it is running.
 3. After confirmation, preserve the old release link, units and receipt. Pause
    only archive path/timer activation while no archive job is active.
-4. Point `/opt/quanthus/gdrive-complete-current` at the reviewed v4 exact checkout;
-   restore activation. v4 state is `/var/lib/quanthus/gdrive-complete-v4`;
-   mail continues to use the global v1 target-day/stage ledger.
+4. Install the independent `quanthus-gdrive-de-proxy.service` and its root-only
+   local configuration, then validate DE using a real synthetic upload/download.
+   Preserve old unit snapshots. With archive activation paused and the old job idle,
+   point `/opt/quanthus/gdrive-complete-current` at the reviewed v4 exact checkout,
+   install the archive/OAuth unit dependencies from that checkout, and restart OAuth
+   so future token refresh also prefers DE. Restore path/timer activation last.
+   v4 state is `/var/lib/quanthus/gdrive-complete-v4`; mail continues to use the global
+   v1 target-day/stage ledger. Never restart the US proxy in an active upload.
 5. Check first thin archive CLOUD_READY readback and repeat-run reuse, then next
    T+1 actual delivery. Do not pre-accept tomorrow's supplier run.
 6. If dependencies, restored identity or cloud confirmation differ, stop archive
@@ -51,7 +56,10 @@ minute R2 floor / R3 exclusion, actual knowledge times and source seals stay unc
 ## Resource and acceptance boundary
 
 The existing 4 GiB scratch reserve and 4 GiB package/archive ceilings remain.
-US.Stlaure is primary, US.WePC fallback. Existing finite transfer/job budgets,
+Owner changed the preferred route on 2026-10-14: DE.Stlaure is primary on loopback
+19084, US.WePC fallback on 19083. The old US.Stlaure entry on 19082 remains available
+for its in-flight upload. DE has a separate Xray process/configuration; neither
+credentials nor local private configuration enter Git. Existing finite transfer/job budgets,
 three attempts per UTC day, one package per run and durable failure mail remain.
 Synthetic Linux native restoration proves engineering closure. First actual
 cloud confirmation and next trading-day execution are separate runtime receipts.

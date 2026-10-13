@@ -5,7 +5,7 @@
   "remote_prefix": "source-bound-v4",
   "display_destination": "quanthus-dwd/daily-archives/cn01-complete-v1",
   "required_intervals": ["1d", "1m", "5m"],
-  "primary_proxy": {"name": "US.Stlaure", "url": "http://127.0.0.1:19082"},
+  "primary_proxy": {"name": "DE.Stlaure", "url": "http://127.0.0.1:19084"},
   "fallback_proxy": {"name": "US.WePC", "url": "http://127.0.0.1:19083"},
   "disk_reserve_bytes": 4294967296,
   "max_package_bytes": 4294967296,

@@ -1,7 +1,7 @@
 [Unit]
 Description=CN01 complete DWD Google Drive scoped credential refresh
-After=network-online.target quanthus-gdrive-proxy.service
-Wants=network-online.target quanthus-gdrive-proxy.service
+After=network-online.target quanthus-gdrive-proxy.service quanthus-gdrive-de-proxy.service
+Wants=network-online.target quanthus-gdrive-proxy.service quanthus-gdrive-de-proxy.service
 
 [Service]
 Type=simple

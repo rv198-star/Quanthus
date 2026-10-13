@@ -44,7 +44,12 @@ def test_source_bound_archive_has_finite_large_transfer_budget_and_separate_name
     assert policy["max_packages_per_run"] == 1
     assert policy["disk_reserve_bytes"] == 4 * 1024**3
     assert policy["required_intervals"] == ["1d", "1m", "5m"]
-    assert policy["primary_proxy"]["name"] == "US.Stlaure"
+    assert policy["primary_proxy"] == {
+        "name": "DE.Stlaure", "url": "http://127.0.0.1:19084"
+    }
+    assert policy["fallback_proxy"] == {
+        "name": "US.WePC", "url": "http://127.0.0.1:19083"
+    }
     assert policy["delete_remote"] is False
 
 
@@ -155,7 +160,7 @@ def test_primary_first_fallback_then_marker_last(tmp_path: Path, monkeypatch):
     result = archive.transfer(
         upload, report, tmp_path / "config", policy, job_until=time.monotonic() + 30
     )
-    assert calls[0] == ("http://127.0.0.1:19082", "copy")
+    assert calls[0] == ("http://127.0.0.1:19084", "copy")
     assert [x[1] for x in calls] == ["copy", "copy", "check", "copyto", "cat"]
     assert result["proxy"] == "US.WePC"
 
@@ -210,7 +215,7 @@ def test_shared_quota_does_not_retry_other_proxy(tmp_path: Path, monkeypatch):
             archive.object_at(archive.POLICY_PATH),
             job_until=time.monotonic() + 30,
         )
-    assert calls == ["http://127.0.0.1:19082"]
+    assert calls == ["http://127.0.0.1:19084"]
 
 
 def test_retry_budget_and_failure_mail_dedup(complete: Path, tmp_path: Path, monkeypatch):
@@ -409,7 +414,21 @@ def test_scoped_oauth_refresh_uses_primary_then_fallback_and_cache(tmp_path: Pat
     tokens = bridge.Tokens()
     assert tokens.refresh()["refresh_token"] == "synthetic-refresh"
     assert tokens.refresh()["access_token"] == "synthetic-token"
-    assert routes == ["http://127.0.0.1:19082", "http://127.0.0.1:19083"]
+    assert routes == ["http://127.0.0.1:19084", "http://127.0.0.1:19083"]
+
+
+def test_de_proxy_is_independent_and_both_next_job_consumers_start_it() -> None:
+    root = archive.POLICY_PATH.parents[2]
+    unit = (root / "ops/systemd/quanthus-gdrive-de-proxy.service").read_text()
+    assert "-config /etc/quanthus/gdrive-complete-v1/xray-de.json" in unit
+    assert "-config /etc/quanthus/gdrive-complete-v1/xray.json" not in unit
+    assert "Restart=on-failure" in unit and "NoNewPrivileges=true" in unit
+    for name in ("quanthus-gdrive-complete-daily", "quanthus-gdrive-complete-oauth"):
+        consumer = (root / f"ops/systemd/{name}.service").read_text()
+        for directive in ("After=", "Wants="):
+            line = next(line for line in consumer.splitlines() if line.startswith(directive))
+            assert "quanthus-gdrive-de-proxy.service" in line
+            assert "quanthus-gdrive-proxy.service" in line
 
 
 def test_v4_state_is_separate_and_uses_global_target_stage_mail_ledger():

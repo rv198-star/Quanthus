@@ -1,7 +1,7 @@
 [Unit]
 Description=CN01 qualified complete Daily immutable GDrive archive
-After=network-online.target quanthus-gdrive-proxy.service quanthus-gdrive-complete-oauth.service
-Wants=network-online.target quanthus-gdrive-proxy.service quanthus-gdrive-complete-oauth.service
+After=network-online.target quanthus-gdrive-proxy.service quanthus-gdrive-de-proxy.service quanthus-gdrive-complete-oauth.service
+Wants=network-online.target quanthus-gdrive-proxy.service quanthus-gdrive-de-proxy.service quanthus-gdrive-complete-oauth.service
 ConditionPathExists=/opt/quanthus/gdrive-complete-current/ops/bin/run-gdrive-complete-daily
 
 [Service]

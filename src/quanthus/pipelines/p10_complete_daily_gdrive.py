@@ -34,10 +34,11 @@ from quanthus.pipelines.p10_delivery_common import (
     safe_path,
     verify_seal,
 )
+from quanthus.pipelines.p10_gdrive_incremental_archive import delta_reference
 from quanthus.policy import find_project_root
 
 SOURCE = Path("/srv/quanthus/dwd-dws-v2/daily/products/complete-daily")
-STATE = Path("/var/lib/quanthus/gdrive-complete-v3")
+STATE = Path("/var/lib/quanthus/gdrive-complete-v4")
 # The notification key is global per target day/stage, so all archive revisions
 # must share its durable request, lock and actual provider receipt.
 MAIL_STATE = Path("/var/lib/quanthus/gdrive-complete-v1/notifications")
@@ -98,6 +99,7 @@ def freeze(
         raise ArchiveError("source_revision_changed_retry")
     key = pointer["manifest_sha256"][7:]
     run = state / "runs" / key
+    reference, previous_files = delta_reference(source, state, policy, str(day))
     identity = {
         "market_date": str(day),
         "manifest_sha256": pointer["manifest_sha256"],
@@ -105,6 +107,7 @@ def freeze(
         "archive_policy_sha256": file_digest(POLICY_PATH),
         "effective_archive_policy_sha256": digest(encoded(policy)),
         "archive_code_revision": revision,
+        "archive_reference": reference,
     }
     if (run / "archive.json").exists():
         saved = object_at(run / "archive.json")
@@ -116,6 +119,13 @@ def freeze(
         return upload, saved
     paths = sorted(p for p in package.rglob("*") if p.is_file())
     size = sum(p.stat().st_size for p in paths)
+    source_manifest = object_at(package / "manifest.json")
+    inherited = [
+        item for item in source_manifest["files"] if previous_files.get(item["path"]) == item
+    ]
+    inherited_paths = {item["path"] for item in inherited}
+    packed_paths = [p for p in paths if p.relative_to(package).as_posix() not in inherited_paths]
+    packed_bytes = sum(p.stat().st_size for p in packed_paths)
     # Tar overhead is bounded before writing; no second full source copy.
     upper_bound = size + len(paths) * 8192 + 1024 * 1024
     if size > policy["max_package_bytes"] or upper_bound > policy["max_archive_bytes"]:
@@ -127,6 +137,10 @@ def freeze(
     archive_name = f"dwd-complete-{day}-{key[:16]}.tar.zst"
     archive = upload / archive_name
     incoming = run / "archive.incoming"
+    file_list = run / ".tar-files"
+    file_list.write_bytes(
+        b"".join(p.relative_to(package).as_posix().encode() + b"\0" for p in packed_paths)
+    )
     command = [
         "tar",
         "--sort=name",
@@ -141,7 +155,10 @@ def freeze(
         str(incoming),
         "-C",
         str(package),
-        ".",
+        "--no-recursion",
+        "--null",
+        "--files-from",
+        str(file_list),
     ]
 
     def remaining() -> int:
@@ -188,14 +205,20 @@ def freeze(
         "source_code_revision": receipt["code_revision"],
         "source_package_path": str(package),
         "source_bytes": size,
+        "packed_source_bytes": packed_bytes,
+        "inherited_files": inherited,
+        "archive_depth": reference["archive_depth"] + 1 if reference else 0,
+        "archive_kind": "exact_incremental_complete_package_v1",
         "archive_name": archive_name,
         "archive_sha256": file_digest(archive),
         "archive_md5": md5(archive),
         "archive_bytes": archive.stat().st_size,
         "remote": remote,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "restore": "tar --zstd -xf archive.tar.zst -C empty-package-dir; "
-        "verify manifest/READY and physical files before explicit pointer publication",
+        "restore": "python -m quanthus.pipelines.p10_gdrive_incremental_archive "
+        "--bundle <each downloaded dependency, oldest first> --bundle <this bundle> "
+        "--expected-manifest-sha256 <exact target> --output <new empty path>; "
+        "run producer semantic verifier before explicit pointer publication",
         "retention": "immutable cloud archive; no cloud deletion",
     }
     atomic(upload / "archive-manifest.json", report)
@@ -298,6 +321,36 @@ def transfer(
         until = min(job_until, time.monotonic() + policy["route_timeout_seconds"])
         try:
             call = {"config": config, "proxy": route["url"], "policy": policy, "until": until}
+            reference = report.get("archive_reference")
+            if reference:
+                marker = json.loads(
+                    rclone(["cat", reference["remote"] + "/CLOUD_READY.json"], output=True, **call)
+                )
+                if any(
+                    marker.get(k) != reference[k]
+                    for k in (
+                        "manifest_sha256",
+                        "content_digest",
+                        "archive_sha256",
+                        "archive_md5",
+                        "archive_bytes",
+                        "archive_policy_sha256",
+                    )
+                ):
+                    raise ArchiveError("cloud_dependency_identity_differs")
+                files = json.loads(
+                    rclone(
+                        ["lsjson", reference["remote"], "--files-only", "--hash"],
+                        output=True,
+                        **call,
+                    )
+                )
+                physical = [x for x in files if x["Name"] == reference["archive_name"]]
+                if len(physical) != 1 or (
+                    physical[0]["Size"] != reference["archive_bytes"]
+                    or physical[0].get("Hashes", {}).get("MD5") != reference["archive_md5"]
+                ):
+                    raise ArchiveError("cloud_dependency_physical_identity_differs")
             rclone(["copy", str(upload), report["remote"], "--immutable", "--checksum"], **call)
             # Drive compares physical archive size and MD5; SHA256SUMS is also backed up.
             rclone(["check", str(upload), report["remote"], "--one-way"], **call)

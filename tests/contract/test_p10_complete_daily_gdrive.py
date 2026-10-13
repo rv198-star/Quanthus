@@ -34,8 +34,8 @@ def test_no_complete_pointer_does_not_archive_or_notify(tmp_path: Path, monkeypa
 
 def test_source_bound_archive_has_finite_large_transfer_budget_and_separate_namespace() -> None:
     policy = archive.object_at(archive.POLICY_PATH)
-    assert policy["policy_id"] == "p10-complete-daily-gdrive-v3"
-    assert policy["remote_prefix"] == "source-bound-v3"
+    assert policy["policy_id"] == "p10-complete-daily-gdrive-v4"
+    assert policy["remote_prefix"] == "source-bound-v4"
     assert policy["command_timeout_seconds"] == 7200
     assert policy["route_timeout_seconds"] == 7500
     assert policy["job_timeout_seconds"] == 15000
@@ -290,8 +290,11 @@ def test_invalid_transfer_profile_fails_before_network(tmp_path: Path, monkeypat
     monkeypatch.setattr(archive.subprocess, "run", lambda *a, **k: pytest.fail("network called"))
     with pytest.raises(archive.ArchiveError, match="invalid_versioned_transfer_profile"):
         archive.rclone(
-            ["lsd", "gdrive:"], config=tmp_path / "config",
-            proxy="http://127.0.0.1:19082", policy=policy, until=time.monotonic() + 30,
+            ["lsd", "gdrive:"],
+            config=tmp_path / "config",
+            proxy="http://127.0.0.1:19082",
+            policy=policy,
+            until=time.monotonic() + 30,
         )
 
 
@@ -300,9 +303,11 @@ def test_new_archive_failure_uses_existing_global_mail_receipt(tmp_path: Path, m
     state = tmp_path / "private-v3"
     key = "a" * 64
     atomic(source / "date-pointers" / "2026-10-13.json", {"manifest_sha256": "sha256:" + key})
-    monkeypatch.setattr(archive, "freeze", lambda *a, **k: (_ for _ in ()).throw(
-        archive.ArchiveError("synthetic_transfer_failure")
-    ))
+    monkeypatch.setattr(
+        archive,
+        "freeze",
+        lambda *a, **k: (_ for _ in ()).throw(archive.ArchiveError("synthetic_transfer_failure")),
+    )
     roots = []
 
     def mail(**kwargs):
@@ -407,8 +412,8 @@ def test_scoped_oauth_refresh_uses_primary_then_fallback_and_cache(tmp_path: Pat
     assert routes == ["http://127.0.0.1:19082", "http://127.0.0.1:19083"]
 
 
-def test_v3_state_is_separate_and_uses_global_target_stage_mail_ledger():
-    assert str(archive.STATE) == "/var/lib/quanthus/gdrive-complete-v3"
+def test_v4_state_is_separate_and_uses_global_target_stage_mail_ledger():
+    assert str(archive.STATE) == "/var/lib/quanthus/gdrive-complete-v4"
     assert str(archive.MAIL_STATE) == "/var/lib/quanthus/gdrive-complete-v1/notifications"
     assert str(archive.CONFIG) == "/etc/quanthus/gdrive-complete-v1/rclone.conf"
     root = archive.POLICY_PATH.parents[2]

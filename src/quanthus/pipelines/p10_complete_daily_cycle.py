@@ -19,6 +19,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, cast
 
+from quanthus.pipelines.contracts import verify_ods_release
 from quanthus.pipelines.p10_complete_daily import accepted
 from quanthus.pipelines.p10_complete_daily_notifications import failure
 from quanthus.pipelines.p10_complete_daily_schedule import (
@@ -28,7 +29,13 @@ from quanthus.pipelines.p10_complete_daily_schedule import (
     policy,
     target_for,
 )
-from quanthus.pipelines.p10_delivery_common import atomic, object_at, safe_path
+from quanthus.pipelines.p10_delivery_common import (
+    atomic,
+    file_digest,
+    object_at,
+    safe_path,
+    verify_seal,
+)
 from quanthus.pipelines.p10_minute_daily_cycle import calendar_for, find_market_ods
 from quanthus.pipelines.p10_minute_operation_runtime import run_one
 from quanthus.pipelines.p10_native_minute_delivery import (
@@ -50,7 +57,50 @@ DAILY = ROOT / "daily/products/daily-core"
 RELEASES = Path("/root/work/astock/data/shadow/cn01-ods-v1/releases/daily")
 
 
-def sealed_daily_sources(releases: Path, target: date) -> tuple[Path, str]:
+def sealed_daily_sources(
+    releases: Path, target: date, *, daily: Path = DAILY
+) -> tuple[Path, str]:
+    dated = daily / "date-pointers" / f"{target}.json"
+    if dated.exists():
+        pointer = object_at(dated)
+        package = safe_path(daily, pointer["manifest_path"]).parent
+        if (
+            pointer.get("kind") != "cn01_daily_core_dwd_current"
+            or pointer.get("market_date") != str(target)
+            or file_digest(package / "manifest.json") != pointer.get("manifest_sha256")
+        ):
+            raise ValueError("dated daily source binding identity differs")
+        manifest = verify_seal(package, "cn01_daily_core_dwd_increment")
+        if manifest["market_date"] != str(target):
+            raise ValueError("dated daily source binding date differs")
+        selected = manifest["selected_releases"]
+        sources = {}
+        for lane, prefix in (
+            ("market_daily_core", "hermes-market-daily-core-"),
+            ("calendar_daily_events", "hermes-calendar-daily-events-"),
+        ):
+            expected = selected[lane]
+            matches = []
+            for marker in sorted((releases / str(target)).glob("*/release.json")):
+                if marker.is_symlink() or marker.parent.is_symlink():
+                    continue
+                if file_digest(marker) != expected["manifest_sha256"]:
+                    continue
+                checked = verify_ods_release(marker.parent)
+                release = checked.release
+                if (
+                    checked.manifest_sha256 == expected["manifest_sha256"]
+                    and release.release_id == expected["release_id"]
+                    and release.release_id.startswith(prefix)
+                    and release.market_date == target
+                    and release.schedule == "daily"
+                ):
+                    matches.append(marker.parent)
+            if len(matches) != 1:
+                raise ValueError("exact daily-bound ODS source absent or ambiguous")
+            sources[lane] = matches[0]
+        return sources["market_daily_core"], selected["calendar_daily_events"]["manifest_sha256"]
+    # Preserve legacy single-source admission when no dated DWD binding exists.
     market = find_market_ods(releases, target)
     events = _select_lane(releases.parent, target, "calendar_daily_events")
     return market, events.manifest_sha256
@@ -341,7 +391,7 @@ def run(
         ref_file = job / "daily-reference.json"
         if not ref_file.exists():
             try:
-                ods, events_sha = sealed_daily_sources(releases, target)
+                ods, events_sha = sealed_daily_sources(releases, target, daily=daily)
                 freeze_reference(ods, str(target), ref_file, events_sha=events_sha)
                 atomic(job / "calendar.json", rows)
                 atomic(job / "code.json", {"code_revision": revision, "policy_id": POLICY_ID})

@@ -99,7 +99,6 @@ def freeze(
         raise ArchiveError("source_revision_changed_retry")
     key = pointer["manifest_sha256"][7:]
     run = state / "runs" / key
-    reference, previous_files = delta_reference(source, state, policy, str(day))
     identity = {
         "market_date": str(day),
         "manifest_sha256": pointer["manifest_sha256"],
@@ -107,7 +106,6 @@ def freeze(
         "archive_policy_sha256": file_digest(POLICY_PATH),
         "effective_archive_policy_sha256": digest(encoded(policy)),
         "archive_code_revision": revision,
-        "archive_reference": reference,
     }
     if (run / "archive.json").exists():
         saved = object_at(run / "archive.json")
@@ -116,7 +114,11 @@ def freeze(
         upload = run / "upload"
         if file_digest(upload / saved["archive_name"]) != saved["archive_sha256"]:
             raise ArchiveError("frozen_archive_checksum_differs")
+        # A later day's success must not rewrite an older failed package's
+        # dependency. transfer() rechecks this exact frozen cloud reference.
         return upload, saved
+    reference, previous_files = delta_reference(source, state, policy, str(day))
+    identity["archive_reference"] = reference
     paths = sorted(p for p in package.rglob("*") if p.is_file())
     size = sum(p.stat().st_size for p in paths)
     source_manifest = object_at(package / "manifest.json")
@@ -308,6 +310,99 @@ def rclone(
     return result.stdout if output else ""
 
 
+def verify_cloud_dependencies(reference: dict[str, Any], call: dict[str, Any]) -> None:
+    """Check the complete bounded recovery closure before confirming a delta."""
+    seen: set[tuple[str, str]] = set()
+    current: dict[str, Any] | None = reference
+    while current is not None:
+        identity = (current["remote"], current["archive_sha256"])
+        if identity in seen or len(seen) >= 28:
+            raise ArchiveError("cloud_dependency_cycle_or_depth_exceeded")
+        seen.add(identity)
+        remote = current["remote"]
+        files = json.loads(
+            rclone(["lsjson", remote, "--files-only", "--hash"], output=True, **call)
+        )
+        physical = {item["Name"]: item for item in files}
+        names = {
+            "archive-manifest.json",
+            "source-pointer.json",
+            "source-verification.json",
+            "SHA256SUMS",
+            "CLOUD_READY.json",
+            current["archive_name"],
+        }
+        if len(physical) != len(files) or not names <= physical.keys():
+            raise ArchiveError("cloud_dependency_metadata_missing")
+        tar = physical[current["archive_name"]]
+        if (
+            tar["Size"] != current["archive_bytes"]
+            or tar.get("Hashes", {}).get("MD5") != current["archive_md5"]
+        ):
+            raise ArchiveError("cloud_dependency_physical_identity_differs")
+        for name in names - {current["archive_name"]}:
+            if not 0 < physical[name]["Size"] <= 4 * 1024**2:
+                raise ArchiveError("cloud_dependency_metadata_budget_exceeded")
+
+        def read(name: str, dependency_remote: str = remote) -> str:
+            return rclone(["cat", dependency_remote + "/" + name], output=True, **call)
+
+        marker = json.loads(read("CLOUD_READY.json"))
+        if marker.get("status") != "cloud_archive_verified" or any(
+            marker.get(key) != current[key]
+            for key in (
+                "manifest_sha256",
+                "content_digest",
+                "archive_sha256",
+                "archive_md5",
+                "archive_bytes",
+                "archive_policy_sha256",
+            )
+        ):
+            raise ArchiveError("cloud_dependency_identity_differs")
+        sums = {}
+        for line in read("SHA256SUMS").splitlines():
+            sha, name = line.split("  ", 1)
+            if len(sha) != 64 or any(c not in "0123456789abcdef" for c in sha) or name in sums:
+                raise ArchiveError("cloud_dependency_checksums_invalid")
+            sums[name] = "sha256:" + sha
+        if sums.get(current["archive_name"]) != current["archive_sha256"]:
+            raise ArchiveError("cloud_dependency_archive_SHA256_differs")
+        metadata = {}
+        for name in ("archive-manifest.json", "source-pointer.json", "source-verification.json"):
+            raw = read(name)
+            if digest(raw.encode()) != sums.get(name):
+                raise ArchiveError("cloud_dependency_metadata_checksum_differs")
+            metadata[name] = json.loads(raw)
+        report = metadata["archive-manifest.json"]
+        if (
+            report.get("base", {}).get("manifest_sha256") != BASE23_MANIFEST
+            or report.get("base", {}).get("content_digest") != BASE23_CONTENT
+            or report.get("consumable_intervals") != ["1d", "1m", "5m"]
+            or metadata["source-verification.json"].get("base") != report["base"]
+        ):
+            raise ArchiveError("cloud_dependency_product_binding_differs")
+        if any(marker.get(key) != value for key, value in report.items()) or any(
+            value.get("manifest_sha256") != current["manifest_sha256"]
+            or value.get("content_digest") != current["content_digest"]
+            for value in metadata.values()
+        ):
+            raise ArchiveError("cloud_dependency_source_evidence_differs")
+        depth = report.get("archive_depth", 0)
+        if (
+            type(depth) is not int
+            or not 0 <= depth <= 27
+            or depth != current.get("archive_depth", 0)
+        ):
+            raise ArchiveError("cloud_dependency_depth_differs")
+        parent = report.get("archive_reference")
+        if (parent is None and depth != 0) or (
+            parent is not None and parent.get("archive_depth", 0) + 1 != depth
+        ):
+            raise ArchiveError("cloud_dependency_depth_differs")
+        current = parent
+
+
 def transfer(
     upload: Path,
     report: dict[str, Any],
@@ -323,34 +418,7 @@ def transfer(
             call = {"config": config, "proxy": route["url"], "policy": policy, "until": until}
             reference = report.get("archive_reference")
             if reference:
-                marker = json.loads(
-                    rclone(["cat", reference["remote"] + "/CLOUD_READY.json"], output=True, **call)
-                )
-                if any(
-                    marker.get(k) != reference[k]
-                    for k in (
-                        "manifest_sha256",
-                        "content_digest",
-                        "archive_sha256",
-                        "archive_md5",
-                        "archive_bytes",
-                        "archive_policy_sha256",
-                    )
-                ):
-                    raise ArchiveError("cloud_dependency_identity_differs")
-                files = json.loads(
-                    rclone(
-                        ["lsjson", reference["remote"], "--files-only", "--hash"],
-                        output=True,
-                        **call,
-                    )
-                )
-                physical = [x for x in files if x["Name"] == reference["archive_name"]]
-                if len(physical) != 1 or (
-                    physical[0]["Size"] != reference["archive_bytes"]
-                    or physical[0].get("Hashes", {}).get("MD5") != reference["archive_md5"]
-                ):
-                    raise ArchiveError("cloud_dependency_physical_identity_differs")
+                verify_cloud_dependencies(reference, call)
             rclone(["copy", str(upload), report["remote"], "--immutable", "--checksum"], **call)
             # Drive compares physical archive size and MD5; SHA256SUMS is also backed up.
             rclone(["check", str(upload), report["remote"], "--one-way"], **call)

@@ -13,8 +13,11 @@ minute R2 floor / R3 exclusion, actual knowledge times and source seals stay unc
   An unchanged inventory item (path, bytes and SHA256 all equal) is inherited;
   changed/new files plus the new manifest and READY are packed. No retagging.
 - Each delta names the exact prior manifest/content/archive SHA256, MD5, size,
-  policy and remote location. Before copying a delta, the dependency CLOUD_READY
-  and actual remote archive size/MD5 must match. Missing evidence fails delivery.
+  policy and remote location. Before copying a delta, all dependencies' CLOUD_READY,
+  actual archive size/MD5 and required metadata SHA256 must match within the bounded
+  chain and route/job budget. Missing ancestors or sidecars fail delivery.
+- A failed frozen archive keeps its original exact dependency during later retries,
+  even if a newer day succeeds first. Its cloud closure is checked again before upload.
 - Maximum depth is 27 deltas (28 explicit bundles for recovery). At that bound a
   new full complete-Daily snapshot is required; it still excludes Base. This bounds
   recovery work and is explicit in the versioned policy, not a normal daily resend.

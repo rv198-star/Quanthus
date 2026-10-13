@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -15,7 +16,14 @@ import pytest
 from quanthus.pipelines import p10_complete_daily as full
 from quanthus.pipelines import p10_complete_daily_gdrive as archive
 from quanthus.pipelines import p10_gdrive_incremental_archive as delta
-from quanthus.pipelines.p10_delivery_common import atomic, file_digest, object_at, seal
+from quanthus.pipelines.p10_delivery_common import (
+    atomic,
+    digest,
+    encoded,
+    file_digest,
+    object_at,
+    seal,
+)
 from tests.contract.test_p10_complete_daily_gdrive import complete as build_native_complete
 
 
@@ -135,6 +143,36 @@ def test_restore_cli_is_executable():
     assert "--expected-manifest-sha256" in completed.stdout
 
 
+def test_older_failed_delta_reuses_frozen_reference_after_newer_day_succeeds(
+    tmp_path: Path, monkeypatch
+):
+    state = tmp_path / "state"
+    pointer = {"manifest_sha256": "sha256:" + "b" * 64, "content_digest": "content"}
+    run = state / "runs" / ("b" * 64)
+    upload = run / "upload"
+    upload.mkdir(parents=True)
+    physical = upload / "archive.tar.zst"
+    physical.write_bytes(b"synthetic frozen physical archive")
+    policy = object_at(archive.POLICY_PATH)
+    saved = {
+        **pointer,
+        "market_date": "2026-10-14",
+        "archive_policy_sha256": file_digest(archive.POLICY_PATH),
+        "effective_archive_policy_sha256": digest(encoded(policy)),
+        "archive_code_revision": "c" * 40,
+        "archive_reference": {"remote": "gdrive:original-13th-reference"},
+        "archive_name": physical.name,
+        "archive_sha256": file_digest(physical),
+    }
+    atomic(run / "archive.json", saved)
+    atomic(state / "LAST_SUCCESS.json", {"market_date": "2026-10-15"})
+    monkeypatch.setattr(archive, "admitted", lambda *a: (tmp_path, pointer, {}))
+    monkeypatch.setattr(
+        archive, "delta_reference", lambda *a: pytest.fail("frozen reference reselected")
+    )
+    assert archive.freeze(tmp_path, date(2026, 10, 14), state, "c" * 40, policy) == (upload, saved)
+
+
 def test_delta_requires_actual_confirmed_archive_and_bounds_chain(tmp_path: Path):
     root = tmp_path / "source"
     root.mkdir()
@@ -159,6 +197,83 @@ def test_delta_requires_actual_confirmed_archive_and_bounds_chain(tmp_path: Path
     atomic(state / "LAST_SUCCESS.json", done)
     with pytest.raises(ValueError, match="actual cloud confirmation"):
         delta.delta_reference(root, state, policy, "2026-10-13")
+
+
+@pytest.mark.parametrize("fault", [None, "ancestor", "sidecar", "checksum"])
+def test_cloud_confirmation_requires_entire_restorable_dependency_closure(
+    tmp_path: Path, monkeypatch, fault: str | None
+):
+    first, second = tmp_path / "first", tmp_path / "second"
+    source(first, revision="a" * 40)
+    source(second, revision="b" * 40)
+    b1, b2 = tmp_path / "bundle1", tmp_path / "bundle2"
+    parent = bundle(b1, first)
+    parent.update(
+        {
+            "remote": "gdrive:full",
+            "archive_depth": 0,
+            "base": object_at(first / "manifest.json")["base"],
+            "consumable_intervals": ["1d", "1m", "5m"],
+        }
+    )
+    child = bundle(b2, second, reference=parent)
+    child.update(
+        {
+            "remote": "gdrive:delta",
+            "archive_depth": 1,
+            "base": parent["base"],
+            "consumable_intervals": ["1d", "1m", "5m"],
+        }
+    )
+    for directory, report in ((b1, parent), (b2, child)):
+        atomic(directory / "archive-manifest.json", report)
+        atomic(directory / "CLOUD_READY.json", {**report, "status": "cloud_archive_verified"})
+        (directory / "SHA256SUMS").write_text(
+            "".join(
+                f"{file_digest(p)[7:]}  {p.name}\n"
+                for p in sorted(directory.iterdir())
+                if p.name not in {"SHA256SUMS", "CLOUD_READY.json"}
+            )
+        )
+    cloud = {"gdrive:full": b1, "gdrive:delta": b2}
+    if fault == "ancestor":
+        cloud.pop("gdrive:full")
+    elif fault == "sidecar":
+        (b1 / "source-verification.json").unlink()
+    elif fault == "checksum":
+        (b1 / "source-pointer.json").write_text('{"changed":"evidence"}')
+    visited = []
+
+    def fake(args, **kwargs):
+        if args[0] == "lsjson":
+            remote = args[1]
+            visited.append(remote)
+            if remote not in cloud:
+                raise archive.ArchiveError("cloud_dependency_missing")
+            return json.dumps(
+                [
+                    {
+                        "Name": p.name,
+                        "Size": p.stat().st_size,
+                        "Hashes": {
+                            "MD5": hashlib.md5(p.read_bytes(), usedforsecurity=False).hexdigest()
+                        },
+                    }
+                    for p in cloud[remote].iterdir()
+                ]
+            )
+        if args[0] == "cat":
+            remote, name = args[1].rsplit("/", 1)
+            return (cloud[remote] / name).read_text()
+        pytest.fail("unexpected cloud mutation during dependency verification")
+
+    monkeypatch.setattr(archive, "rclone", fake)
+    if fault:
+        with pytest.raises(archive.ArchiveError, match="cloud_dependency"):
+            archive.verify_cloud_dependencies(child, {})
+    else:
+        archive.verify_cloud_dependencies(child, {})
+    assert visited == ["gdrive:delta", "gdrive:full"]
 
 
 @pytest.mark.parametrize("fault", ["marker", "size", "md5"])

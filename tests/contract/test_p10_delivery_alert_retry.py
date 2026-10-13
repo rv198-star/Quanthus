@@ -143,3 +143,41 @@ def test_archive_timeout_target_is_fresh_or_explicitly_unresolved(tmp_path, monk
         now.date(),
         "运行日期（目标交易日未确定）",
     )
+
+
+@pytest.mark.parametrize("stage", ["gdrive", "daily_cycle", "minutes", "mirror"])
+def test_unresolved_execution_date_never_suppresses_real_trade_date(tmp_path, monkeypatch, stage):
+    calls = []
+    monkeypatch.setattr(
+        notices.mail, "_send_resend", lambda **kw: calls.append(kw) or {"status": "sent"}
+    )
+    args = dict(day=date(2026, 10, 14), stage=stage, state_root=tmp_path, reason="synthetic")
+    unknown = {**args, "context": {"market_date_label": "运行日期（目标交易日未确定）"}}
+    known = {**args, "context": {"market_date_label": "交易日"}}
+    notices.failure(**unknown)
+    notices.failure(**known)
+    assert len(calls) == 2 and calls[0]["key"] != calls[1]["key"]
+    assert notices.failure(**unknown)["status"] == "already_sent"
+    assert notices.failure(**known)["status"] == "already_sent"
+
+
+def test_unresolved_date_pending_replays_the_same_namespace(tmp_path, monkeypatch):
+    calls = []
+
+    def send(**kw):
+        calls.append(kw)
+        if len(calls) == 1:
+            raise TimeoutError("synthetic")
+        return {"status": "sent"}
+
+    monkeypatch.setattr(notices.mail, "_send_resend", send)
+    with pytest.raises(TimeoutError):
+        notices.failure(
+            day=date(2026, 10, 14),
+            stage="gdrive",
+            state_root=tmp_path,
+            reason="synthetic",
+            context={"market_date_label": "运行日期（目标交易日未确定）"},
+        )
+    assert notices.retry_pending(tmp_path)["remaining"] == 0
+    assert calls[0] == calls[1]

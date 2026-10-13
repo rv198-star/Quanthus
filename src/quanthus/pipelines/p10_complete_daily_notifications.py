@@ -27,12 +27,19 @@ EVENTS = {
 }
 
 
+def _notification_key(day: date, stage: str, context: dict[str, Any]) -> str:
+    identity = [POLICY_ID, day.isoformat(), stage]
+    if str(context.get("market_date_label", "")).startswith("运行日期"):
+        identity.append("execution_date_unresolved")
+    return digest(encoded(identity))[7:]
+
+
 def failure(
     *, day: date, stage: str, state_root: Path, reason: str, context: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     event = EVENTS[stage]
     state_root.mkdir(parents=True, exist_ok=True)
-    key = digest(encoded([POLICY_ID, day.isoformat(), stage]))[7:]
+    key = _notification_key(day, stage, context or {})
     path = state_root / f"{key}.json"
     details = {"policy_id": POLICY_ID, "required_intervals": ["1d", "1m", "5m"], **(context or {})}
     with (state_root / f"{key}.lock").open("a+") as handle:
@@ -60,6 +67,7 @@ def failure(
             or payload.get("stage") != stage
             or not isinstance(payload.get("reason"), str)
             or not isinstance(payload.get("context"), dict)
+            or _notification_key(day, stage, payload["context"]) != key
         ):
             raise ValueError("pending notification identity differs")
         try:
@@ -115,7 +123,7 @@ def retry_pending(state_root: Path, *, limit: int = 4) -> dict[str, Any]:
             stage = payload["stage"]
             if (
                 stage not in EVENTS
-                or path.stem != digest(encoded([POLICY_ID, str(day), stage]))[7:]
+                or path.stem != _notification_key(day, stage, payload["context"])
                 or payload.get("policy_id") != POLICY_ID
             ):
                 raise ValueError("pending notification identity differs")

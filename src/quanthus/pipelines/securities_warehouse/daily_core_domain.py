@@ -656,6 +656,18 @@ def build_daily_domain_increment(
         WHERE CAST(announce_date AS DATE)>{_sql(covered_after.isoformat())}::DATE
           AND CAST(announce_date AS DATE)<={_sql(market_date.isoformat())}::DATE"""
         effective = "CAST(o.publish_time AS TIMESTAMP) AT TIME ZONE 'Asia/Shanghai'"
+        held_disclosure_count = 0
+        if universe_artifact:
+            identity_clause = """EXISTS (SELECT 1 FROM base_listing l JOIN base_security s ON s.security_id=l.security_id
+                WHERE o.stock_code=l.listing_code
+                AND CAST(o.announce_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+                AND (l.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))
+                AND CAST(o.announce_date AS DATE)>=CAST(s.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+                AND (s.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(s.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE)))"""
+            held_path = work / "quality/disclosure-unavailable.parquet"
+            _copy(connection, f"SELECT o.*, 'LISTING_NOT_EFFECTIVE_OR_IDENTITY_UNAVAILABLE'::VARCHAR reason_code FROM ({ann_source}) o WHERE NOT {identity_clause}", held_path)
+            held_disclosure_count = pq.ParquetFile(held_path).metadata.num_rows
+            ann_source = f"SELECT o.* FROM ({ann_source}) o WHERE {identity_clause}"
         disclosure_output = (
             work
             / f"payload/disclosure_company_event/dwd_disclosure/market_date={market_date}/part-00000.parquet"
@@ -750,6 +762,8 @@ def build_daily_domain_increment(
                 [str(announcements_path), covered_after.isoformat(), market_date.isoformat()],
             ).fetchone()[0],
         }
+        full_disclosure_population = expected["dwd_disclosure"]
+        expected["dwd_disclosure"] -= held_disclosure_count
         expected["dwd_disclosure_subject"] = expected["dwd_disclosure"]
         for table, count in expected.items():
             if row_counts[table] != count:
@@ -764,6 +778,9 @@ def build_daily_domain_increment(
             "tables": audit_tables,
             "source_conservation": expected,
             "ods_only_artifacts": ods_only_artifacts,
+            "disclosure_population": full_disclosure_population,
+            "held_disclosures": held_disclosure_count,
+            "held_disclosure_disposition": "unavailable; affected disclosure use held; original source preserved",
             "result": "accepted",
         }
         audit_path = work / "audit.json"

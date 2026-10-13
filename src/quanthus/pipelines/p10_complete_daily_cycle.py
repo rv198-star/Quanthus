@@ -11,6 +11,7 @@ import fcntl
 import gzip
 import json
 import math
+import os
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -317,7 +318,19 @@ def run(
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         if (complete / "date-pointers" / f"{target}.json").exists():
             evidence = accepted(complete, target)
-            if evidence["code_revision"] != revision:
+            if os.environ.get("HERMES_ODS_PREVENTION_POLICY") == "p10-acquisition-prevention-v1":
+                from quanthus.pipelines.p10_complete_daily import build as revise_complete
+
+                pointer = object_at(complete / "date-pointers" / f"{target}.json")
+                package = safe_path(complete, pointer["manifest_path"]).parent
+                evidence = revise_complete(
+                    daily=package / "members/1d",
+                    m1=package / "members/1m",
+                    m5=package / "members/5m",
+                    output_root=complete,
+                    code_revision=revision,
+                )
+            elif evidence["code_revision"] != revision:
                 raise ValueError("accepted complete Daily code differs; explicit revision required")
             return {
                 "status": "complete_daily_published",

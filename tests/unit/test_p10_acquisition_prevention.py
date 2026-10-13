@@ -367,3 +367,93 @@ def test_orphan_sealed_package_recovery_is_idempotent(
     assert result["manifest_sha256"] == repeated["manifest_sha256"]
     assert len(calls) == 1
     assert (tmp_path / "products/disclosure/CURRENT_DOMAIN.json").exists()
+
+
+def test_financial_json_numeric_tokens_preserved_without_legacy_change() -> None:
+    from quanthus.pipelines.securities_warehouse.financial_reporting import (
+        decode_financial_envelope,
+    )
+
+    raw = (
+        b'{"result":{"data":{"report_list":{"20260630":{"data":['
+        b'{"item_value":123456789012345.1234567890}]}}}}}'
+    )
+    row = {
+        "raw_payload_gzip": gzip.compress(raw, mtime=0),
+        "raw_payload_sha256": digest(raw),
+        "raw_payload_bytes": len(raw),
+    }
+    exact = decode_financial_envelope(row, preserve_numeric_tokens=True)
+    assert exact.report_list["20260630"]["data"][0]["item_value"] == "123456789012345.1234567890"
+    legacy = decode_financial_envelope(row)
+    assert isinstance(legacy.report_list["20260630"]["data"][0]["item_value"], float)
+
+
+def test_prelisting_disclosure_is_held_without_blocking_qualified_correction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import datetime, timezone
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from quanthus.pipelines import p10_domain_continuation as domain
+
+    core = tmp_path / "core"
+    pointer = core / "date-pointers/2026-10-12.json"
+    pointer.parent.mkdir(parents=True)
+    pointer.write_text(
+        json.dumps(
+            {
+                "market_date": "2026-10-12",
+                "manifest_path": "not-read",
+                "manifest_sha256": "synthetic",
+            }
+        )
+    )
+    monkeypatch.setattr(domain, "_previous_disclosures", lambda *args: {})
+    source = tmp_path / "source.parquet"
+    base = {
+        "stock_code": "688001",
+        "title": "synthetic",
+        "publish_time": "2026-10-08 12:00:00",
+        "announce_date": "2026-10-08",
+        "url": "synthetic",
+        "acquired_at": "2026-10-12T18:30:00+08:00",
+    }
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {**base, "ann_id": "prelisting"},
+                {
+                    **base,
+                    "ann_id": "qualified",
+                    "announce_date": "2026-10-12",
+                    "publish_time": "2026-10-12 12:00:00",
+                },
+            ]
+        ),
+        source,
+    )
+    ids = {
+        "dwd_security": [{"security_id": "s1", "company_id": "c1"}],
+        "dwd_listing": [
+            {
+                "security_id": "s1",
+                "listing_code": "688001",
+                "effective_from": datetime(2026, 10, 9, tzinfo=timezone.utc),
+                "effective_to": None,
+            }
+        ],
+    }
+    result = domain._write_disclosures(
+        tmp_path / "stage",
+        source=source,
+        core=core,
+        products=tmp_path / "products",
+        market_date=date(2026, 10, 12),
+        identities=ids,
+        observed=datetime(2026, 10, 13, tzinfo=timezone.utc),
+    )
+    assert result["held_count"] == 1 and result["held_disclosures"][0]["ann_id"] == "prelisting"
+    assert result["row_counts"]["dwd_disclosure"] == 1

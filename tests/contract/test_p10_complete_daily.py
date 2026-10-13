@@ -287,8 +287,10 @@ def test_projection_hashes_immutable_manifest_once_per_member(
     mapping, _ = full.daily_mapping(members[0], DAY)
     manifest = member / "manifest.json"
     expected_revision = (
-        "tencent-mkline-m1" if interval == "1m" else "baostock-native-5m"
-    ) + "@" + file_digest(manifest)[7:19]
+        ("tencent-mkline-m1" if interval == "1m" else "baostock-native-5m")
+        + "@"
+        + file_digest(manifest)[7:19]
+    )
     original = full.file_digest
     calls = []
 
@@ -772,3 +774,81 @@ def test_daily_failure_stale_or_malformed_context_uses_explicit_unresolved_date(
             path.unlink()
         day, label = notifications._daily_failure_target(now, path)
         assert day == now.date() and "运行日期" in label and "未确定" in label
+
+
+def test_complete_mirror_consumer_carries_domain_versions_and_explicit_gaps(
+    members: tuple, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quanthus.pipelines import p10_domain_continuation as domain
+    from quanthus.pipelines.p10_delivery_common import BASE23_CONTENT, BASE23_MANIFEST, seal
+
+    domain_root = tmp_path / "domains"
+    package = domain_root / "disclosure/packages" / DAY / "synthetic"
+    payload = package / "payload/dwd_disclosure/part-00000.parquet"
+    payload.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist([{"disclosure_id": "synthetic", "knowledge_from": ACQUIRED}]), payload
+    )
+    seal(
+        package,
+        {
+            "schema_version": 1,
+            "kind": domain.KIND,
+            "domain": "disclosure",
+            "policy_id": domain.POLICY,
+            "market_date": DAY,
+            "code_revision": REVISION,
+            "base": {"manifest_sha256": BASE23_MANIFEST, "content_digest": BASE23_CONTENT},
+            "consumer_purpose": domain.PURPOSE,
+            "execution_authorized": False,
+            "audit": {"row_counts": {"dwd_disclosure": 1}},
+        },
+    )
+    checked = domain.verify(package)
+    atomic(
+        domain_root / "disclosure/date-pointers" / (DAY + ".json"),
+        {
+            "manifest_path": (package / "manifest.json")
+            .relative_to(domain_root / "disclosure")
+            .as_posix(),
+            "manifest_sha256": checked["manifest_sha256"],
+        },
+    )
+    monkeypatch.setenv("QUANTHUS_DOMAIN_CONTINUATION_ROOT", str(domain_root))
+    monkeypatch.setenv("HERMES_ODS_PREVENTION_POLICY", domain.POLICY)
+    source = tmp_path / "source"
+    full.build(
+        daily=members[0], m1=members[1], m5=members[2], output_root=source, code_revision=REVISION
+    )
+    pointer = json.loads((source / full.POINTER).read_text())
+    manifest = json.loads((source / pointer["manifest_path"]).read_text())
+    assert manifest["domain_manifest_sha256"]["disclosure-" + DAY] == checked["manifest_sha256"]
+    assert manifest["domain_disposition"]["financial"] == "unavailable_no_qualified_weekly_source"
+    monkeypatch.setenv("QUANTHUS_CN01_DWD_REMOTE_ROOT", mirror.REMOTE)
+    monkeypatch.setattr(mirror, "_ssh_command", lambda: ("cn01", "22", "reader", "", "", "ssh"))
+
+    def transfer(*, source: str, destination: Path, ssh: str, extra: tuple = ()) -> None:
+        local = tmp_path / "source" / source.split(mirror.REMOTE + "/", 1)[1]
+        if local.is_dir():
+            shutil.copytree(local, destination, dirs_exist_ok=True)
+        else:
+            shutil.copyfile(local, destination)
+
+    monkeypatch.setattr(mirror, "_run_rsync", transfer)
+    target = tmp_path / "oci"
+    mirror.sync(root=target, target=date.fromisoformat(DAY))
+    consumer = CompleteDailySource(target)
+    cutoff = max(
+        datetime.fromisoformat(consumer.admission()["first_verified_visible_at"])
+        + timedelta(seconds=1),
+        ACQUIRED + timedelta(seconds=1),
+    )
+    rows = list(consumer.iter_domain_rows(table="dwd_disclosure", knowledge_cutoff=cutoff))
+    assert [item["disclosure_id"] for item in rows] == ["synthetic"]
+    assert not list(consumer.iter_domain_rows(table="dwd_financial_fact", knowledge_cutoff=cutoff))
+    with pytest.raises(ValueError, match="visible"):
+        list(
+            consumer.iter_domain_rows(
+                table="dwd_disclosure", knowledge_cutoff=ACQUIRED - timedelta(days=30)
+            )
+        )

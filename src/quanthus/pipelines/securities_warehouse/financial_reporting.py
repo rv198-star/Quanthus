@@ -181,7 +181,9 @@ def _unpack_byte_literal(value: object) -> bytes:
     return decoded
 
 
-def decode_financial_envelope(row: Mapping[str, Any]) -> DecodedFinancialEnvelope:
+def decode_financial_envelope(
+    row: Mapping[str, Any], *, preserve_numeric_tokens: bool = False
+) -> DecodedFinancialEnvelope:
     """Losslessly unpack, decompress, hash-check, and parse one ODS envelope."""
 
     packed = _unpack_byte_literal(row.get("raw_payload_gzip"))
@@ -199,7 +201,7 @@ def decode_financial_envelope(row: Mapping[str, Any]) -> DecodedFinancialEnvelop
     if actual_sha256 != declared_sha256:
         raise FinancialReportingBuildError("raw payload SHA-256 differs from its envelope")
     try:
-        payload = json.loads(raw)
+        payload = json.loads(raw, parse_float=str) if preserve_numeric_tokens else json.loads(raw)
     except json.JSONDecodeError as exc:
         raise FinancialReportingBuildError("raw financial payload is not JSON") from exc
     if not isinstance(payload, Mapping):
@@ -1295,6 +1297,7 @@ def expand_financial_envelope(
     source: FinancialStatementSource,
     company_resolver: FinancialCompanyResolver,
     through_date: date | None = None,
+    preserve_numeric_tokens: bool = False,
 ) -> FinancialEnvelopeRows:
     """Expand one losslessly decoded provider envelope into atomic #61 DWD rows."""
 
@@ -1302,7 +1305,7 @@ def expand_financial_envelope(
     source_name = _text(row.get("source"), "source")
     source_revision = _text(row.get("source_revision"), "source_revision")
     knowledge_from = _utc_timestamp(row.get("acquired_at"), "acquired_at")
-    envelope = decode_financial_envelope(row)
+    envelope = decode_financial_envelope(row, preserve_numeric_tokens=preserve_numeric_tokens)
     reports: list[dict[str, Any]] = []
     concepts: dict[tuple[str, datetime, str], dict[str, Any]] = {}
     facts: list[dict[str, Any]] = []

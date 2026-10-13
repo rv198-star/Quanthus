@@ -18,6 +18,9 @@ from quanthus.pipelines.p10_complete_daily_schedule import POLICY_ID
 from quanthus.pipelines.p10_delivery_common import atomic, digest, encoded, object_at
 
 EVENTS = {
+    "domain_daily": "p10_cn01_daily_domain_failed",
+    "natural_day": "p10_cn01_natural_day_ods_failed",
+    "weekly_source": "p10_cn01_weekly_source_failed",
     "weekly": "p10_cn01_weekly_continuation_failed",
     "acquisition_quality": "p10_cn01_acquisition_quality_failed",
     "gdrive": "p10_cn01_complete_daily_gdrive_failed",
@@ -252,7 +255,11 @@ def main() -> int:
             day=target,
             stage="weekly"
             if args.continuation_service_failure == "weekly"
-            else "acquisition_quality",
+            else (
+                "natural_day"
+                if args.continuation_service_failure == "natural-day"
+                else "domain_daily"
+            ),
             state_root=Path("/var/lib/quanthus/acquisition-continuation-v1/notifications"),
             reason=(
                 "automatic domain continuation service failed or timed out; "

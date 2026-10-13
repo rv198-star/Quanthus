@@ -13,6 +13,7 @@ Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src:/opt/quanthus/p10
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=QUANTHUS_COMPLETE_DAILY_EXPORT_GROUP=quanthus-dwd-ro
 EnvironmentFile=/etc/quanthus/dwd-notification.env
+EnvironmentFile=-/etc/quanthus/cn01-acquisition-prevention.env
 ExecStart=/root/work/Quanthus/.venv-p1/bin/python /opt/quanthus/data-delivery-current/ops/bin/run-complete-daily-cycle
 TimeoutStartSec=110min
 MemoryMax=2300M

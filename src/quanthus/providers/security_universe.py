@@ -108,11 +108,11 @@ def refresh(*, home: Path, day: date) -> tuple[Path, dict[str, Any]]:
             os.rename(root, root.with_name(root.name + ".unsealed-" + clock().replace(":", "")))
         attempt = root.parent / ("attempt-" + day.isoformat() + "-" + clock().replace(":", ""))
         attempt.mkdir()
-        set_socket_timeout(30)
         with contextlib.redirect_stdout(io.StringIO()):
             login = bs.login()
         if str(login.error_code) != "0":
             raise ValueError("UNIVERSE_PROVIDER_LOGIN_FAILED")
+        set_socket_timeout(30)
         responses = []
         try:
             for api, args in [

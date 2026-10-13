@@ -664,7 +664,7 @@ def _payload_json(row: Mapping[str, Any]) -> dict[str, Any]:
         decode_financial_envelope,
     )
 
-    return dict(json.loads(decode_financial_envelope(row).raw_payload))
+    return dict(json.loads(decode_financial_envelope(row).raw_payload, parse_float=str))
 
 
 def derive_financial_quarterly(

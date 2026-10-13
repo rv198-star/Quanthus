@@ -71,7 +71,7 @@ def write_parquet(rows: Sequence[Mapping[str, Any]], path: Path, schema: Any) ->
     except ModuleNotFoundError as exc:  # pragma: no cover - deployment dependency
         raise RuntimeError("pyarrow is required by ODS provider collectors") from exc
 
-    # JSON formatting turns bytes into a Python repr and corrupts compressed payloads.
+    # Store native bytes; the envelope decoder still accepts legacy bytes repr.
     binary_fields = {field.name for field in schema if pa.types.is_binary(field.type)}
     normalized = [
         {

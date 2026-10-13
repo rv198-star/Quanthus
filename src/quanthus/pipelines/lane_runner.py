@@ -5035,6 +5035,8 @@ def run_lane(
     attempt_dir.mkdir(parents=True, exist_ok=False)
     landing = attempt_dir / "landing"
     if prevention_enabled():
+        if shutil.disk_usage(resolved.shadow_root).free < 4 * 1024**3:
+            raise LaneRunError("acquisition scratch lacks 4 GiB free reserve")
         os.environ["HERMES_ODS_RAW_CAPTURE_ROOT"] = str(landing / "original-responses")
     landing.mkdir(parents=True, exist_ok=True)
     result = LaneRunResult(

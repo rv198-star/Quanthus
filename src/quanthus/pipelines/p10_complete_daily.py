@@ -171,11 +171,17 @@ def build(
 
     domain_packages = []
     domain_root = os.environ.get("QUANTHUS_DOMAIN_CONTINUATION_ROOT")
+    prevention = os.environ.get("HERMES_ODS_PREVENTION_POLICY") == "p10-acquisition-prevention-v1"
+    if prevention and not domain_root:
+        raise ValueError("prevention delivery requires explicit domain root")
     if domain_root:
         for domain in ("disclosure", "financial"):
             root = Path(domain_root) / domain
-            pointers = [path for path in sorted((root / "date-pointers").glob("*.json"))
-                if path.stem <= daily_manifest["market_date"]]
+            pointers = [
+                path
+                for path in sorted((root / "date-pointers").glob("*.json"))
+                if path.stem <= daily_manifest["market_date"]
+            ]
             if domain == "financial":
                 pointers = pointers[-1:]
             for path in pointers:
@@ -185,6 +191,22 @@ def build(
                 if checked["manifest_sha256"] != pointer["manifest_sha256"]:
                     raise ValueError("complete domain pointer identity differs")
                 domain_packages.append((domain + "-" + path.stem, package, checked))
+    if prevention and not any(
+        key == "disclosure-" + daily_manifest["market_date"]
+        for key, _path, _value in domain_packages
+    ):
+        raise ValueError("required dated disclosure continuation or held ledger missing")
+    domain_disposition = {
+        "policy_id": "p10-acquisition-prevention-v1" if prevention else None,
+        "disclosure": "verified_versions_or_explicit_held_ledger"
+        if domain_packages
+        else "not_configured_legacy",
+        "financial": "qualified_source_native_only"
+        if any(key.startswith("financial-") for key, _path, _value in domain_packages)
+        else "unavailable_no_qualified_weekly_source",
+        "F10_shareholders": "unavailable_no_consumer_grant",
+        "all_business_domains_complete": False,
+    }
     domain_identities = {key: value["manifest_sha256"] for key, _path, value in domain_packages}
     require_revision(code_revision)
     verified = {interval: verify_minute(path) for interval, path in {"1m": m1, "5m": m5}.items()}
@@ -231,9 +253,17 @@ def build(
             "dwd-complete-"
             + daily_manifest["market_date"].replace("-", "")
             + "-"
-            + digest(encoded([identities, domain_identities, code_revision, binding, file_digest(policy_path())]))[
-                7:23
-            ]
+            + digest(
+                encoded(
+                    [
+                        identities,
+                        domain_identities,
+                        code_revision,
+                        binding,
+                        file_digest(policy_path()),
+                    ]
+                )
+            )[7:23]
         )
         destination = output_root / "packages" / daily_manifest["market_date"] / package_id
         if destination.exists():
@@ -242,7 +272,10 @@ def build(
             return result
         destination.parent.mkdir(parents=True, exist_ok=True)
         bytes_needed = sum(
-            p.stat().st_size for member in (daily, m1, m5, *(path for _key, path, _value in domain_packages)) for p in member.rglob("*") if p.is_file()
+            p.stat().st_size
+            for member in (daily, m1, m5, *(path for _key, path, _value in domain_packages))
+            for p in member.rglob("*")
+            if p.is_file()
         )
         if shutil.disk_usage(output_root).free < 4 * 1024**3 + 3 * bytes_needed:
             raise ValueError("complete Daily insufficient staging space plus 4 GiB reserve")
@@ -283,6 +316,7 @@ def build(
                     "base": daily_manifest["base"],
                     "member_manifest_sha256": identities,
                     "domain_manifest_sha256": domain_identities,
+                    "domain_disposition": domain_disposition,
                     "all_business_domains_complete": False,
                     "prior": binding,
                     "consumable_intervals": ["1d", "1m", "5m"],

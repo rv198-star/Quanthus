@@ -38,6 +38,9 @@ class WarehouseNotificationError(RuntimeError):
 
 
 EVENTS = {
+    "p10_cn01_daily_domain_failed": ("CN01 日频领域接续失败", True),
+    "p10_cn01_natural_day_ods_failed": ("CN01 自然日公告采集失败", True),
+    "p10_cn01_weekly_source_failed": ("CN01 周频来源不完整", True),
     "p10_cn01_weekly_continuation_failed": {
         "node": "CN01",
         "stage": "周频 DWD 接续",

@@ -49,15 +49,11 @@ def latest_financial_attempt(shadow: Path, day: date) -> Path:
             for name in (
                 "financial_statements.parquet",
                 "financial_statements.parquet.receipts.parquet",
-                "financial_quarterly.parquet",
             )
         ):
             datasets = object_at(path.parent / "datasets.json")["datasets"]
             states = {item["name"]: item["status"] for item in datasets}
-            if (
-                states.get("financial_statements") == "ready"
-                and states.get("financial_quarterly") == "ready"
-            ):
+            if states.get("financial_statements") == "ready":
                 return path
     raise ValueError("CURRENT_WEEK_FINANCIAL_SOURCE_MISSING")
 
@@ -214,7 +210,7 @@ def run(*, mode: str, day: date, revision: str, state: Path = STATE) -> dict[str
                 if result["unavailable_domains"]:
                     failure(
                         day=day,
-                        stage="weekly",
+                        stage="weekly_source",
                         state_root=state / "notifications",
                         reason=(
                             "qualified financial DWD published; "
@@ -227,6 +223,27 @@ def run(*, mode: str, day: date, revision: str, state: Path = STATE) -> dict[str
                             "unavailable_domains": result["unavailable_domains"],
                         },
                     )
+            if os.environ.get("QUANTHUS_REVISE_ACCEPTED_COMPLETE") == "1":
+                from quanthus.pipelines.p10_complete_daily import build as revise_complete
+
+                complete = Path(
+                    os.environ.get(
+                        "QUANTHUS_COMPLETE_DAILY_ROOT",
+                        "/srv/quanthus/dwd-dws-v2/daily/products/complete-daily",
+                    )
+                )
+                complete_pointer = complete / "CURRENT_COMPLETE_DAILY.json"
+                if complete_pointer.exists():
+                    pointer = object_at(complete_pointer)
+                    if pointer["market_date"] >= day.isoformat():
+                        package = safe_path(complete, pointer["manifest_path"]).parent
+                        result["complete_revision"] = revise_complete(
+                            daily=package / "members/1d",
+                            m1=package / "members/1m",
+                            m5=package / "members/5m",
+                            output_root=complete,
+                            code_revision=revision,
+                        )
             result["status"] = "qualified_domains_published_with_explicit_limitations"
         except Exception as exc:
             result["status"] = "failed"
@@ -234,7 +251,9 @@ def run(*, mode: str, day: date, revision: str, state: Path = STATE) -> dict[str
             atomic(state / "runs" / mode / (day.isoformat() + ".json"), result)
             failure(
                 day=day,
-                stage="weekly" if mode == "weekly" else "acquisition_quality",
+                stage="weekly"
+                if mode == "weekly"
+                else ("natural_day" if mode == "natural-day" else "domain_daily"),
                 state_root=state / "notifications",
                 reason="automatic continuation failed; inspect preserved stage evidence",
                 context={

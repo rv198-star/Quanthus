@@ -32,9 +32,10 @@ from quanthus.pipelines.p10_delivery_common import (
     seal,
     verify_seal,
 )
-from quanthus.pipelines.securities_warehouse.daily_core_domain import _base_files, _verify_base
+from quanthus.pipelines.securities_warehouse.daily_core_domain import _base_files
 from quanthus.pipelines.securities_warehouse.financial_reporting import (
     FinancialStatementSource,
+    _finalize_concepts,
     decode_financial_envelope,
     expand_financial_envelope,
     financial_company_resolver_from_listed_company_rows,
@@ -66,11 +67,15 @@ def metadata(row: dict[str, Any]) -> str:
 
 
 def _identity_rows(
-    base: Path, config: Path
+    base: Path, config: Path, core: Path | None = None, through: date | None = None
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
     import pyarrow.parquet as pq
 
-    native, _config = _verify_base(base, config)
+    from quanthus.pipelines.securities_warehouse.native_base23_reader import read_native_tables
+
+    native = read_native_tables(
+        base, object_at(config), ("dwd_listing", "dwd_security", "dwd_security_identifier")
+    )
     rows = {}
     for table in ("dwd_listing", "dwd_security", "dwd_security_identifier"):
         rows[table] = [
@@ -78,6 +83,36 @@ def _identity_rows(
             for path in _base_files(base, native, table)
             for row in pq.ParquetFile(path).read().to_pylist()
         ]
+    rows["_overlay_bindings"] = []
+    if core is not None and through is not None:
+        pointers = [
+            p
+            for p in sorted((core / "date-pointers").glob("*.json"))
+            if p.stem <= through.isoformat()
+        ]
+        if pointers:
+            pointer = object_at(pointers[-1])
+            path = safe_path(core, pointer["manifest_path"])
+            if (
+                file_digest(path) != pointer["manifest_sha256"]
+                or (path.parent / "READY").read_text().strip() != pointer["manifest_sha256"]
+            ):
+                raise ValueError("identity overlay core binding differs")
+            manifest = object_at(path)
+            for table in ("dwd_listing", "dwd_security", "dwd_security_identifier"):
+                for member in manifest["files"]:
+                    if member["path"].startswith("reference/" + table + "/"):
+                        physical = safe_path(path.parent, member["path"])
+                        if file_digest(physical) != member["sha256"]:
+                            raise ValueError("identity overlay physical file differs")
+                        rows[table].extend(pq.ParquetFile(physical).read().to_pylist())
+                        rows["_overlay_bindings"].append(
+                            {
+                                "daily_manifest_sha256": pointer["manifest_sha256"],
+                                "path": member["path"],
+                                "sha256": member["sha256"],
+                            }
+                        )
     binding = dict(native.binding) if hasattr(native, "binding") else {}
     if (
         binding.get("manifest_sha256") != BASE23_MANIFEST
@@ -234,11 +269,23 @@ def _write_disclosures(
         market_date,
     )
     source_sha = file_digest(source)
-    rows, subjects = [], []
+    rows, subjects, held = [], [], []
     for item in sorted(candidates, key=lambda row: (row["stock_code"], row["ann_id"])):
-        security, company = _company(
-            identities, str(item["stock_code"]), date.fromisoformat(item["announce_date"])
-        )
+        try:
+            security, company = _company(
+                identities, str(item["stock_code"]), date.fromisoformat(item["announce_date"])
+            )
+        except ValueError as exc:
+            if not str(exc).startswith("DISCLOSURE_COMPANY_IDENTITY_UNAVAILABLE:"):
+                raise
+            held.append(
+                {
+                    "stock_code": item["stock_code"],
+                    "ann_id": item["ann_id"],
+                    "reason_code": "LISTING_NOT_EFFECTIVE_OR_IDENTITY_UNAVAILABLE",
+                }
+            )
+            continue
         effective = (
             datetime.fromisoformat(item["publish_time"])
             .replace(tzinfo=ZoneInfo("Asia/Shanghai"))
@@ -294,6 +341,8 @@ def _write_disclosures(
         "row_counts": {"dwd_disclosure": len(rows), "dwd_disclosure_subject": len(subjects)},
         "corrections": dict(Counter(row["correction_kind"] for row in rows)),
         "body_revision_unknown": True,
+        "held_disclosures": held,
+        "held_count": len(held),
         "daily_manifest_sha256": pointer["manifest_sha256"],
     }
 
@@ -339,7 +388,7 @@ def _write_financial(
             for original in batch.to_pylist():
                 key = (original["security_id"], original["provider_source"])
                 receipt = wanted.get(key)
-                envelope = decode_financial_envelope(original)
+                envelope = decode_financial_envelope(original, preserve_numeric_tokens=True)
                 if (
                     key in seen
                     or receipt is None
@@ -361,6 +410,7 @@ def _write_financial(
                     ),
                     company_resolver=resolver,
                     through_date=market_date,
+                    preserve_numeric_tokens=True,
                 )
                 for table, values in [
                     ("dwd_financial_report", expanded.reports),
@@ -384,7 +434,15 @@ def _write_financial(
         for stock in codes
     ):
         raise ValueError("WEEKLY_THREE_STATEMENT_MATRIX_INCOMPLETE")
-    # Resolve shared concept rows once, and check physical key/FK closure in one local job.
+    # Use the existing source-evidence and concept-revision projection once per Job.
+    concepts = paths["dwd_financial_concept"]
+    concept_stage = stage / "staging/concepts/part-00-000000.parquet"
+    concept_stage.parent.mkdir(parents=True)
+    os.replace(concepts, concept_stage)
+    counts["dwd_financial_concept"] = _finalize_concepts(stage, {}, schemas)
+    os.replace(
+        stage / "payload/financial_reporting/dwd_financial_concept/part-00000.parquet", concepts
+    )
     import duckdb
 
     con = duckdb.connect()
@@ -392,16 +450,6 @@ def _write_financial(
     con.execute("SET memory_limit='1GB'")
     con.execute("SET temp_directory=?", [str(stage / "tmp")])
     try:
-        concepts = paths["dwd_financial_concept"]
-        unique = concepts.with_name("unique.parquet")
-        con.execute(
-            "COPY (SELECT DISTINCT * FROM read_parquet(?)) TO '"
-            + str(unique).replace("'", "''")
-            + "' (FORMAT PARQUET, COMPRESSION ZSTD)",
-            [str(concepts)],
-        )
-        os.replace(unique, concepts)
-        counts["dwd_financial_concept"] = pq.ParquetFile(concepts).metadata.num_rows
         for table, version_key in [
             ("dwd_financial_report", "financial_report_id"),
             ("dwd_financial_fact", "financial_fact_id"),
@@ -498,7 +546,7 @@ def build(
         raise ValueError("unsupported continuation domain")
     if domain == "financial" and receipts is None:
         raise ValueError("financial receipts required")
-    identities, binding = _identity_rows(base, config)
+    identities, binding = _identity_rows(base, config, core, day)
     inputs: dict[str, Any] = {
         "source_sha256": file_digest(source),
         "base": binding,
@@ -507,6 +555,7 @@ def build(
         "domain": domain,
         "market_date": day.isoformat(),
         "policy_id": POLICY,
+        "identity_references": identities.get("_overlay_bindings", []),
         "policy_sha256": file_digest(
             Path(__file__).resolve().parents[3]
             / "config/pipelines/p10-acquisition-prevention.v1.json"
@@ -534,7 +583,21 @@ def build(
             if previous_inputs == inputs:
                 return prior_manifest
             if prior_manifest["market_date"] > day.isoformat():
-                raise ValueError("domain pointer regression")
+                dated_path = root / "date-pointers" / (day.isoformat() + ".json")
+                if dated_path.exists():
+                    dated_value = object_at(dated_path)
+                    existing = verify(safe_path(root, dated_value["manifest_path"]).parent)
+                    old_inputs = {
+                        key: value
+                        for key, value in existing["inputs"].items()
+                        if key not in {"history", "code_revision"}
+                    }
+                    new_inputs = {
+                        key: value for key, value in inputs.items() if key != "code_revision"
+                    }
+                    if old_inputs == new_inputs:
+                        return existing
+                raise ValueError("domain pointer regression or changed retired source")
         dated = root / "date-pointers" / (day.isoformat() + ".json")
         if dated.exists():
             dated_pointer = object_at(dated)

@@ -1,0 +1,19 @@
+[Unit]
+Description=OCI retry queued complete DWD mirror failure mail
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/quanthus/data-delivery-current
+EnvironmentFile=/etc/quanthus/t-close-plus-5h.env
+Environment=PYTHONPATH=/opt/quanthus/data-delivery-current/src
+ExecStart=/opt/quanthus/warehouse-current/.venv/bin/python -m quanthus.pipelines.p10_complete_daily_notifications --retry-state /home/ubuntu/data/quanthus/dwd-complete-daily/notifications
+TimeoutStartSec=5min
+MemoryMax=512M
+CPUQuota=100%
+NoNewPrivileges=true
+UMask=0077
+

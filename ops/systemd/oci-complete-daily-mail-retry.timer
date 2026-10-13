@@ -1,0 +1,11 @@
+[Unit]
+Description=OCI independently retry pending failure mail every five minutes
+
+[Timer]
+OnBootSec=2min
+OnCalendar=*-*-* *:00/5:00
+Persistent=true
+Unit=oci-complete-daily-mail-retry.service
+
+[Install]
+WantedBy=timers.target

@@ -74,6 +74,40 @@ fields, exact `QUANTHUS_CN01_DWD_REMOTE_ROOT=products/complete-daily`, and
    complete physical proof, identical OCI manifest/content, actual consumer bar read,
    and real knowledge/visibility times. Synthetic replay cannot establish that result.
 
+## Durable operational mail recovery (2026-10-13)
+
+Each failure writes its immutable reason/context request to the node-private
+notification `pending/` directory before calling Resend. A transport retry retains
+that request and its original stage/date idempotency key; only a successful provider
+receipt permits removing it. This does not prove inbox delivery. Temporary transport
+failure remains a pending request after all in-call retries are exhausted.
+
+The independent CN01/OCI `complete-daily-mail-retry` timers run every five minutes,
+including after reboot. Each state root permits at most four attempts per run; failed
+items rotate behind new pending items. These services only send queued mail and do
+not acquire sources, rebuild products, reset budgets or consume archive attempts.
+CN01 scans both its complete Job and GDrive notification roots; OCI scans its complete
+mirror notification root. The sender and retry service use the same node-local mail
+environment. Do not print its credentials.
+
+The GDrive service has an independent OnFailure hook, covering errors outside its
+per-package handler and systemd timeouts. It takes a target date only from failure
+metadata written during the current service run. Otherwise the message explicitly
+labels its date as an execution date with an unresolved target.
+
+Deploy both the producer/mirror and separate GDrive notification implementations from
+their exact GitHub checkouts, preserving each release's existing data code. Keep daily
+ODS, market/minute gates, scheduling, Base, sealed packages and accepted code bindings
+unchanged. Drain active mail/archive/mirror processes before switching links. Preserve
+the completed 10/12 Job at its original code identity; start the new 10/13 Job normally
+on its next trading day. Verify same-day completed pointers by their sealed receipts,
+without rerunning their controller using a different code revision.
+
+For rollback, stop the mail-retry timers and wait for their bounded services to finish,
+then restore previous code links and exact unit/drop-in state. Preserve pending requests
+and provider receipts. Removing the retry service leaves pending mail requiring recovery;
+it never permits deleting data or resetting collection/transfer budgets.
+
 ## Rollback
 
 Disable the new complete cycle, checkpoint and OCI timers, then let bounded active

@@ -286,3 +286,84 @@ def test_failure_drill_cannot_suppress_real_alert(
         ]
         == "already_sent"
     )
+
+
+def test_provider_can_import_as_standalone_entrypoint() -> None:
+    import os
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-c", "import quanthus.providers.security_universe"],
+        env={**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[2] / "src")},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("interrupt_at", ["export", "dated", "current"])
+def test_orphan_sealed_package_recovery_is_idempotent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, interrupt_at: str
+) -> None:
+    from quanthus.pipelines import p10_domain_continuation as domain
+    from quanthus.pipelines.p10_delivery_common import BASE23_CONTENT, BASE23_MANIFEST
+
+    source = tmp_path / "source.parquet"
+    source.write_bytes(b"synthetic-source")
+    config = tmp_path / "config.json"
+    config.write_text("{}")
+    monkeypatch.setattr(
+        domain,
+        "_identity_rows",
+        lambda *args: ({}, {"manifest_sha256": BASE23_MANIFEST, "content_digest": BASE23_CONTENT}),
+    )
+    monkeypatch.setattr(domain, "_history_bindings", lambda *args: [])
+    calls = []
+
+    def construct(*args: object, **kwargs: object) -> dict:
+        calls.append(True)
+        return {"row_counts": {"dwd_disclosure": 0, "dwd_disclosure_subject": 0}}
+
+    monkeypatch.setattr(domain, "_write_disclosures", construct)
+    real_atomic, real_export = domain.atomic, domain.prepare_export
+    interrupted = False
+
+    def fail_atomic(path: Path, value: object) -> None:
+        nonlocal interrupted
+        should_fail = (interrupt_at == "dated" and path.parent.name == "date-pointers") or (
+            interrupt_at == "current" and path.name == "CURRENT_DOMAIN.json"
+        )
+        if should_fail and not interrupted:
+            interrupted = True
+            raise OSError("synthetic interruption")
+        real_atomic(path, value)
+
+    def fail_export(*args: object) -> None:
+        nonlocal interrupted
+        if interrupt_at == "export" and not interrupted:
+            interrupted = True
+            raise OSError("synthetic interruption")
+        real_export(*args)
+
+    monkeypatch.setattr(domain, "atomic", fail_atomic)
+    monkeypatch.setattr(domain, "prepare_export", fail_export)
+    args = dict(
+        domain="disclosure",
+        source=source,
+        receipts=None,
+        core=tmp_path / "core",
+        products=tmp_path / "products",
+        base=tmp_path / "base",
+        config=config,
+        day=date(2026, 10, 12),
+        code_revision="a" * 40,
+    )
+    with pytest.raises(OSError, match="interruption"):
+        domain.build(**args)
+    result = domain.build(**args)
+    repeated = domain.build(**args)
+    assert result["manifest_sha256"] == repeated["manifest_sha256"]
+    assert len(calls) == 1
+    assert (tmp_path / "products/disclosure/CURRENT_DOMAIN.json").exists()

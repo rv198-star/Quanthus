@@ -10,7 +10,6 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from quanthus.pipelines.p10_delivery_common import atomic, digest, encoded, file_digest, object_at
 from quanthus.providers.acquisition_evidence import POLICY, capture, clock, verify_capture
 from quanthus.providers.baostock_transport import set_socket_timeout
 
@@ -69,6 +68,8 @@ def validate(
 def verify(root: Path, day: date) -> dict[str, Any]:
     import pyarrow.parquet as pq
 
+    from quanthus.pipelines.p10_delivery_common import digest, encoded, file_digest, object_at
+
     value = object_at(root / "universe.json")
     if value.get("policy_id") != POLICY or value.get("market_date") != day.isoformat():
         raise ValueError("UNIVERSE_IDENTITY_DIFFERS")
@@ -93,6 +94,8 @@ def refresh(*, home: Path, day: date) -> tuple[Path, dict[str, Any]]:
     import baostock as bs
     import pyarrow as pa
     import pyarrow.parquet as pq
+
+    from quanthus.pipelines.p10_delivery_common import atomic, digest, encoded, file_digest
 
     root = home / "source-universe-v1" / day.isoformat()
     root.parent.mkdir(parents=True, exist_ok=True)

@@ -80,14 +80,19 @@ def freeze_reference(
         "source_ods_manifest_sha256": sha,
         "event_ods_manifest_sha256": events_sha,
         "policy_id": POLICY_ID,
-        "population": len(market),
+        "population": len(statuses),
         "securities": {
             code: {
-                "close": str(row["close"]),
-                "volume": str(row["volume"]),
+                "close": str(market[code]["close"]) if code in market else None,
+                "volume": str(market[code]["volume"]) if code in market else None,
                 "tradestatus": statuses[code],
+                **(
+                    {"daily_price_observation_state": "unavailable_suspended"}
+                    if code not in market
+                    else {}
+                ),
             }
-            for code, row in sorted(market.items())
+            for code in sorted(statuses)
         },
     }
     if "source_universe" in artifacts:
@@ -96,6 +101,8 @@ def freeze_reference(
         ref["universe_digest"] = universe["universe_digest"]
         ref["universe_manifest_sha256"] = artifacts["source_universe"]["sha256"]
         ref["universe_policy_id"] = universe["policy_id"]
+        if set(statuses) - set(market):
+            ref["kind"] = "p10_complete_daily_job_reference_v3"
     ref["reference_digest"] = digest(encoded(ref))
     if destination.exists():
         if object_at(destination) != ref:
@@ -111,12 +118,28 @@ def reference(path: Path) -> dict[str, Any]:
     codes = value.get("securities", {})
     legacy = value.get("kind") == "p10_complete_daily_job_reference_v1"
     dynamic = value.get("kind") == "p10_complete_daily_job_reference_v2"
+    suspended_reference = value.get("kind") == "p10_complete_daily_job_reference_v3"
+    dynamic = dynamic or suspended_reference
     if dynamic and (
         value.get("universe_policy_id") != "p10-acquisition-prevention-v1"
         or value.get("universe_digest") != digest(encoded(sorted(codes)))
         or not str(value.get("universe_manifest_sha256", "")).startswith("sha256:")
     ):
         raise ValueError("versioned dynamic universe identity differs")
+    if suspended_reference:
+        from quanthus.providers.acquisition_evidence import decimal_token
+
+        for row in codes.values():
+            if row.get("daily_price_observation_state") == "unavailable_suspended":
+                if (
+                    row.get("tradestatus") != "0"
+                    or row.get("close") is not None
+                    or row.get("volume") is not None
+                ):
+                    raise ValueError("unavailable suspended price must remain null")
+            else:
+                decimal_token(row.get("close"), required=True)
+                decimal_token(row.get("volume"), required=True)
     if (
         not (legacy or dynamic)
         or value.get("policy_id") != POLICY_ID
@@ -191,8 +214,51 @@ def native_m5(raw: bytes, code: str, day: str) -> dict[str, dict[str, Decimal]]:
 
 
 def assess(
-    *, interval: str, code: str, day: str, raw: bytes | None, daily: dict[str, str]
+    *, interval: str, code: str, day: str, raw: bytes | None, daily: dict[str, Any]
 ) -> tuple[dict[str, Any], dict[str, dict[str, Decimal]]]:
+    if daily.get("daily_price_observation_state") == "unavailable_suspended":
+        if (
+            interval not in {"1m", "5m"}
+            or daily["tradestatus"] != "0"
+            or daily["volume"] is not None
+            or daily["close"] is not None
+        ):
+            raise ValueError("unavailable price cannot justify an open security")
+        quality = {
+            "stock_code": code,
+            "market_date": day,
+            "quality_grade": "SUSPENDED",
+            "quality_reason": "sealed_daily_suspension_price_unavailable",
+            "formally_ingested": False,
+            "default_research_admitted": False,
+            "raw_sha256": digest(raw) if raw else None,
+            "missing_actual_minutes": [],
+            "auction_source_observed": False,
+            "allowed_consumer": "none",
+            "daily_share_delta": None,
+            "daily_close_delta": None,
+            "daily_price_observation_state": "unavailable_suspended",
+        }
+        if raw is not None:
+            try:
+                if interval == "1m":
+                    observed, _ = target_date_records(raw, code, date.fromisoformat(day))
+                    positive_volume = any(_decimal(row[5]) > 0 for row in observed)
+                else:
+                    positive_volume = any(
+                        bar["volume_shares"] > 0 for bar in native_m5(raw, code, day).values()
+                    )
+            except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+                quality["minute_source_consistency"] = "unavailable_or_invalid"
+                quality["minute_source_detail"] = str(exc)
+            else:
+                quality["minute_source_consistency"] = (
+                    "conflict" if positive_volume else "no_target_positive_volume"
+                )
+                if positive_volume:
+                    quality["quality_grade"] = "R3"
+                    quality["quality_reason"] = "suspended_with_positive_target_minute_volume"
+        return quality, {}
     if interval == "1m":
         quality, bars = assess_native(
             code=code,

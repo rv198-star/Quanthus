@@ -77,6 +77,9 @@ def test_actual_provider_projection_does_not_retry_a_proven_suspension(
     from quanthus.pipelines import lane_runner as lanes
 
     monkeypatch.setenv("HERMES_ODS_PREVENTION_POLICY", POLICY)
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
+    monkeypatch.setenv("ASTOCK_HOME", str(tmp_path / "unavailable-current-authority"))
+    monkeypatch.setenv("QUANTHUS_COLLECTOR_SHA", "a" * 40)
     monkeypatch.setenv("HERMES_ODS_RAW_CAPTURE_ROOT", str(tmp_path))
     monkeypatch.setattr(lanes, "_baostock_login_with_retry", lambda *_a, **_k: 1)
     monkeypatch.setattr(
@@ -95,6 +98,10 @@ def fixture_attempt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pa
     from quanthus.pipelines.p10_delivery_common import atomic, file_digest
 
     monkeypatch.setenv("HERMES_ODS_PREVENTION_POLICY", POLICY)
+    monkeypatch.setenv("HERMES_ODS_ACQUIRE_MODE", "provider")
+    monkeypatch.delenv("HERMES_ODS_SYMBOL_LIMIT", raising=False)
+    monkeypatch.setenv("ASTOCK_HOME", str(tmp_path / "unavailable-current-authority"))
+    monkeypatch.setenv("QUANTHUS_COLLECTOR_SHA", "a" * 40)
     parent = tmp_path / "shadow/attempts/market-daily-core" / DAY
     source = parent / "failed"
     landing = source / "landing"
@@ -113,9 +120,11 @@ def fixture_attempt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pa
             {"security_id": "000002", "tradestatus": "1"},
         ],
     )
-    atomic(
-        landing / "source_universe.json",
-        {"market_date": DAY, "codes": ["000001", "000002"], "universe_digest": "synthetic"},
+    from quanthus.pipelines.p10_delivery_common import digest, encoded
+
+    universe_digest = digest(encoded(["000001", "000002"]))
+    __import__("shutil").copyfile(
+        landing / "ref_security_master.parquet", landing / "stock_list.parquet"
     )
     receipt = capture(
         root=landing / "original-responses",
@@ -134,10 +143,29 @@ def fixture_attempt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pa
         status="0",
     )
     (landing / "original-responses.tar.gz").write_bytes(b"synthetic immutable archive")
+    for name in ["trading_calendar", "index_daily_delta", "valuation_daily_delta"]:
+        write_parquet(landing / (name + ".parquet"), [{"market_date": DAY}])
+    atomic(landing / "acquisition_log.json", {"requests": []})
+    atomic(
+        landing / "source_universe.json",
+        {
+            "market_date": DAY,
+            "codes": ["000001", "000002"],
+            "universe_digest": universe_digest,
+            "policy_id": POLICY,
+            "population": 2,
+            "historical_pit_authorized": False,
+            "warehouse_observed_at": STAMP,
+            "files": {
+                "security_master.parquet": file_digest(landing / "ref_security_master.parquet"),
+                "stock_list.parquet": file_digest(landing / "stock_list.parquet"),
+            },
+        },
+    )
     atomic(
         landing / "acquisition_quality.json",
         {
-            "universe_digest": "synthetic",
+            "universe_digest": universe_digest,
             "original_responses_sha256": file_digest(landing / "original-responses.tar.gz"),
             "raw_members": [
                 {
@@ -162,6 +190,11 @@ def fixture_attempt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pa
             "ref_security_master.parquet",
             "source_universe.json",
             "acquisition_quality.json",
+            "stock_list.parquet",
+            "trading_calendar.parquet",
+            "index_daily_delta.parquet",
+            "valuation_daily_delta.parquet",
+            "acquisition_log.json",
         ]
     ]
     atomic(
@@ -173,7 +206,7 @@ def fixture_attempt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pa
             "datasets": datasets,
             "schedule_id": "synthetic",
             "schedule_contract_revision": "synthetic",
-            "schedule_config_sha256": "synthetic",
+            "schedule_config_sha256": "sha256:" + "b" * 64,
         },
     )
     monkeypatch.setattr(
@@ -195,11 +228,6 @@ def test_recovery_reuses_exact_originals_and_clocks(
     source, output = fixture_attempt(tmp_path, monkeypatch)
     before = file_digest(source / "landing/lane_status.json")
 
-    def publish(**kwargs: object) -> tuple[Path, str, None]:
-        assert kwargs["release_root"] == tmp_path / "shadow/releases"
-        return tmp_path / "shadow/releases/synthetic", "ready", None
-
-    monkeypatch.setattr(recovery.lanes, "_publish", publish)
     result = recovery.recover(source=source, output=output, revision="a" * 40)
     assert result["supplier_calls"] == 0 and result["recovered_status_count"] == 1
     assert file_digest(source / "landing/lane_status.json") == before
@@ -210,6 +238,36 @@ def test_recovery_reuses_exact_originals_and_clocks(
     assert file_digest(source / "landing/daily_ohlcv_none_delta.parquet") == file_digest(
         output / "landing/daily_ohlcv_none_delta.parquet"
     )
+    release = Path(result["release_dir"])
+    assert (release / "READY").is_file()
+    assert file_digest(release / "artifacts/source_universe.json") == file_digest(
+        source / "landing/source_universe.json"
+    )
+    assert not (tmp_path / "unavailable-current-authority").exists()
+
+
+def test_real_publisher_withholds_ready_when_copied_capture_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quanthus.pipelines import p10_suspended_status_recovery as recovery
+
+    source, output = fixture_attempt(tmp_path, monkeypatch)
+    publish = recovery.lanes.publish_ods_release
+
+    def tampered_publish(**kwargs: object) -> object:
+        check = kwargs["before_ready"]
+
+        def tamper_and_check() -> None:
+            raw = next((output / "landing/original-responses").glob("*.json.gz"))
+            raw.write_bytes(raw.read_bytes() + b"changed")
+            check()
+
+        return publish(**{**kwargs, "before_ready": tamper_and_check})
+
+    monkeypatch.setattr(recovery.lanes, "publish_ods_release", tampered_publish)
+    with pytest.raises(ValueError, match="RECOVERY_COPIED_CAPTURE_CHANGED"):
+        recovery.recover(source=source, output=output, revision="a" * 40)
+    assert not list((tmp_path / "shadow/releases").rglob("READY"))
 
 
 def test_open_security_cannot_be_recovered_as_suspended(

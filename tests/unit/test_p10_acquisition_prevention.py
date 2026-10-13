@@ -59,6 +59,66 @@ def test_authoritative_target_universe_keeps_suspension_and_new_listing() -> Non
         validate(date(2026, 10, 12), daily, [])
 
 
+def test_weekly_collector_uses_last_trading_day_refreshed_universe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from quanthus.pipelines import lane_runner as lanes
+
+    home = tmp_path / "home"
+    home.mkdir()
+    calendar = home / "calendar.parquet"
+    lanes._write_parquet(
+        [
+            {"exchange": "SSE", "trade_date": "2026-10-09", "is_open": "1"},
+            {"exchange": "SSE", "trade_date": "2026-10-10", "is_open": "0"},
+        ],
+        calendar,
+    )
+    refreshed = home / "source-universe-v1/2026-10-09"
+    refreshed.mkdir(parents=True)
+    lanes._write_parquet([{"stock_code": "000001"}], refreshed / "stock_list.parquet")
+    spec = tmp_path / "providers.json"
+    spec.write_text(
+        json.dumps(
+            {
+                "lanes": {
+                    "weekly-corrections": {
+                        "raw_f10": {"argv": ["synthetic-provider", "{stock_list}", "{output}"]}
+                    }
+                }
+            }
+        )
+    )
+    monkeypatch.setenv("HERMES_ODS_PREVENTION_POLICY", POLICY)
+    monkeypatch.setenv("HERMES_ODS_PROVIDER_SPEC", str(spec))
+    calls = []
+
+    def refresh(**kwargs: object) -> tuple[Path, dict]:
+        calls.append(kwargs["day"])
+        return refreshed, {}
+
+    monkeypatch.setattr(lanes, "refresh_universe", refresh)
+    output = tmp_path / "landing/raw_f10.parquet"
+
+    def collect(argv: list[str], **kwargs: object) -> SimpleNamespace:
+        assert argv[1] == str(refreshed / "stock_list.parquet")
+        lanes._write_parquet([{"synthetic": "row"}], output)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(__import__("subprocess"), "run", collect)
+    lanes._run_configured_provider_collector(
+        lane_id="weekly-corrections",
+        dataset="raw_f10",
+        output=output,
+        paths=lanes.resolve_paths(home=home, calendar=calendar, shadow_root=tmp_path / "shadow"),
+        market_date=date(2026, 10, 10),
+        window_start=date(2026, 10, 9),
+    )
+    assert calls == [date(2026, 10, 9)]
+
+
 def test_late_and_metadata_revisions_only_not_old_snapshot_duplicates() -> None:
     template = {
         "stock_code": "000001",

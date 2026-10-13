@@ -95,12 +95,13 @@ def _reference(release: Path, day: str) -> tuple[dict[str, dict[str, Any]], str,
             raise ValueError("source target-date universe identity differs")
     population = len(expected_codes) if expected_codes is not None else 4992
     if (
-        len(daily) != population
-        or len(daily_rows) != population
+        len(daily_rows) != len(daily)
+        or (expected_codes is None and len(daily) != population)
         or len(statuses) != population
         or len(status_rows) != population
-        or set(daily) != set(statuses)
-        or (expected_codes is not None and set(daily) != expected_codes)
+        or not set(daily) <= set(statuses)
+        or (expected_codes is not None and set(statuses) != expected_codes)
+        or any(statuses[code] != "0" for code in set(statuses) - set(daily))
         or any(s not in {"0", "1"} for s in statuses.values())
     ):
         raise ValueError("source daily universe/identity/status mismatch")

@@ -279,6 +279,128 @@ def members(tmp_path: Path) -> tuple[Path, Path, Path]:
     return synthetic_daily(tmp_path / "daily"), paths[0], paths[1]
 
 
+@pytest.mark.parametrize("interval", ["1m", "5m"])
+def test_versioned_suspended_reference_keeps_unavailable_prices_null(
+    tmp_path: Path, interval: str
+) -> None:
+    path = tmp_path / "reference.json"
+    securities = {
+        "000001": {"tradestatus": "1", "close": "10.5", "volume": "20"},
+        "000002": {
+            "tradestatus": "0",
+            "close": None,
+            "volume": None,
+            "daily_price_observation_state": "unavailable_suspended",
+        },
+    }
+    value = {
+        "kind": "p10_complete_daily_job_reference_v3",
+        "market_date": DAY,
+        "policy_id": schedule.POLICY_ID,
+        "population": 2,
+        "securities": securities,
+        "universe_policy_id": "p10-acquisition-prevention-v1",
+        "universe_digest": digest(encoded(sorted(securities))),
+        "universe_manifest_sha256": SHA,
+    }
+    atomic(path, {**value, "reference_digest": digest(encoded(value))})
+    ref = minute.reference(path)
+    status, rows = minute.assess(
+        interval=interval, code="000002", day=DAY, raw=None, daily=ref["securities"]["000002"]
+    )
+    assert status["quality_grade"] == "SUSPENDED" and rows == {}
+    assert status["daily_close_delta"] is None and status["daily_share_delta"] is None
+    assert status["formally_ingested"] is False
+    value["securities"]["000002"]["tradestatus"] = "1"
+    atomic(path, {**value, "reference_digest": digest(encoded(value))})
+    with pytest.raises(ValueError, match="unavailable suspended price"):
+        minute.reference(path)
+
+
+def test_daily_mapping_uses_suspension_identity_without_fabricating_a_bar(tmp_path: Path) -> None:
+    root = synthetic_daily(tmp_path / "daily")
+    bar_path = next(root.glob("payload/*/dwd_security_bar/market_date=*/part-*.parquet"))
+    bar = pq.ParquetFile(bar_path).read()
+    original = bar.to_pylist()
+    suspended = original[1]
+    pq.write_table(pa.Table.from_pylist([original[0], *original[2:]], schema=bar.schema), bar_path)
+    state_path = next(root.glob("payload/*/dwd_tradability_state/market_date=*/part-*.parquet"))
+    state = {
+        key: suspended[key]
+        for key in ("listing_id", "calendar_session_id", "source_record_id", "knowledge_from")
+    }
+    state.update(is_tradable=False, can_buy=False, can_sell=False)
+    pq.write_table(pa.Table.from_pylist([state]), state_path)
+    manifest = json.loads((root / "manifest.json").read_text())
+    codes = [f"{i:06}" for i in range(1, 4993)]
+    manifest["acquisition_universe"] = {
+        "market_date": DAY,
+        "policy_id": "p10-acquisition-prevention-v1",
+        "population": 4992,
+        "codes": codes,
+        "universe_digest": digest(encoded(codes)),
+    }
+    atomic(root / "manifest.json", manifest)
+    mapping, schema = full.daily_mapping(root, DAY)
+    assert len(mapping) == 4992 and schema == bar.schema
+    assert mapping["000002"]["listing_id"] == suspended["listing_id"]
+    assert mapping["000002"]["daily_price_observation_state"] == "unavailable_suspended"
+    assert "close" not in mapping["000002"] and "volume" not in mapping["000002"]
+    state["is_tradable"] = True
+    pq.write_table(pa.Table.from_pylist([state]), state_path)
+    with pytest.raises(ValueError, match="lacks exact suspended"):
+        full.daily_mapping(root, DAY)
+
+
+@pytest.mark.parametrize("interval,raw", [("1m", raw_m1()), ("5m", raw_m5())])
+def test_suspension_cannot_hide_positive_target_minute_volume(interval: str, raw: bytes) -> None:
+    daily = {
+        "tradestatus": "0",
+        "close": None,
+        "volume": None,
+        "daily_price_observation_state": "unavailable_suspended",
+    }
+    quality, bars = minute.assess(interval=interval, code="000001", day=DAY, raw=raw, daily=daily)
+    assert quality["quality_grade"] == "R3" and bars == {}
+    assert quality["quality_reason"] == "suspended_with_positive_target_minute_volume"
+    assert quality["formally_ingested"] is False
+    if interval == "1m":
+        other = raw.replace(b"20261012", b"20261009")
+    else:
+        body = json.loads(raw)
+        body["rows"] = []
+        other = encoded(body)
+    quality, bars = minute.assess(interval=interval, code="000001", day=DAY, raw=other, daily=daily)
+    assert quality["quality_grade"] == "SUSPENDED" and bars == {}
+
+
+def test_sealed_member_reuse_preserves_bytes_and_handles_cross_device_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import errno
+    import os
+
+    source = tmp_path / "source"
+    source.write_bytes(b"immutable source bytes")
+    target = tmp_path / "linked"
+    full.copy_sealed_file(str(source), str(target))
+    assert source.stat().st_ino == target.stat().st_ino
+    assert file_digest(source) == file_digest(target)
+
+    def cross_device(*args: object, **kwargs: object) -> None:
+        raise OSError(errno.EXDEV, "different devices")
+
+    monkeypatch.setattr(os, "link", cross_device)
+    copied = tmp_path / "copied"
+    full.copy_sealed_file(str(source), str(copied))
+    assert copied.stat().st_ino != source.stat().st_ino
+    assert file_digest(copied) == file_digest(source)
+    link = tmp_path / "unsafe"
+    link.symlink_to(source)
+    with pytest.raises(ValueError, match="regular non-symlink"):
+        full.copy_sealed_file(str(link), str(tmp_path / "rejected"))
+
+
 @pytest.mark.parametrize("interval,index", [("1m", 1), ("5m", 2)])
 def test_projection_hashes_immutable_manifest_once_per_member(
     members: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch, interval: str, index: int

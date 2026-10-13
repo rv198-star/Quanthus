@@ -8,6 +8,7 @@ acquisition and the later daily reference knowledge, never the business date.
 from __future__ import annotations
 
 import argparse
+import errno
 import fcntl
 import json
 import os
@@ -41,6 +42,19 @@ from quanthus.pipelines.p10_native_minute_delivery import verify as verify_minut
 from quanthus.pipelines.securities_warehouse.daily_core_domain import verify_daily_domain_increment
 
 
+def copy_sealed_file(source: str, destination: str) -> str:
+    """Share verified immutable member bytes; cross-device copies retain the same seal."""
+    if Path(source).is_symlink() or not Path(source).is_file():
+        raise ValueError("sealed member file must be a regular non-symlink")
+    try:
+        os.link(source, destination, follow_symlinks=False)
+    except OSError as exc:
+        if exc.errno not in {errno.EXDEV, errno.EOPNOTSUPP, errno.ENOSYS, errno.EMLINK}:
+            raise
+        shutil.copy2(source, destination)
+    return destination
+
+
 def daily_mapping(root: Path, day: str) -> tuple[dict[str, dict[str, Any]], Any]:
     import pyarrow.parquet as pq
 
@@ -65,13 +79,39 @@ def daily_mapping(root: Path, day: str) -> tuple[dict[str, dict[str, Any]], Any]
     manifest = object_at(root / "manifest.json")
     universe = manifest.get("acquisition_universe")
     expected = set(universe["codes"]) if universe else None
-    if universe and (
-        universe.get("market_date") != day
-        or universe.get("policy_id") != "p10-acquisition-prevention-v1"
-        or universe.get("universe_digest") != digest(encoded(sorted(expected)))
-        or universe.get("population") != len(expected)
+    if (
+        universe
+        and expected is not None
+        and (
+            universe.get("market_date") != day
+            or universe.get("policy_id") != "p10-acquisition-prevention-v1"
+            or universe.get("universe_digest") != digest(encoded(sorted(expected)))
+            or universe.get("population") != len(expected)
+        )
     ):
         raise ValueError("daily DWD universe identity differs")
+    if expected is not None and set(result) != expected:
+        missing = expected - set(result)
+        for path in sorted(
+            root.glob("payload/*/dwd_tradability_state/market_date=*/part-*.parquet")
+        ):
+            for row in pq.ParquetFile(path).read().to_pylist():
+                match = re.search(
+                    r"#code=([0-9]{6})&date=(\d{4}-\d{2}-\d{2})$", row["source_record_id"]
+                )
+                if match and match[1] in missing:
+                    if (
+                        match[2] != day
+                        or row["is_tradable"] is not False
+                        or row["can_buy"] is not False
+                        or row["can_sell"] is not False
+                        or match[1] in result
+                    ):
+                        raise ValueError("missing daily bar lacks exact suspended DWD identity")
+                    result[match[1]] = {
+                        **row,
+                        "daily_price_observation_state": "unavailable_suspended",
+                    }
     if schema is None or (set(result) != expected if expected is not None else len(result) != 4992):
         raise ValueError("daily DWD listing/session mapping population differs")
     return result, schema
@@ -95,6 +135,8 @@ def projected_rows(member: Path, interval: str, mapping: dict[str, dict[str, Any
         for row in batch.to_pylist():
             code = row["stock_code"]
             daily = mapping[code]
+            if daily.get("daily_price_observation_state") == "unavailable_suspended":
+                raise ValueError("minute price row contradicts sealed no-price suspension")
             quality = statuses[code]
             end = (
                 datetime.fromisoformat(row["source_ts"])
@@ -283,9 +325,11 @@ def build(
         counts: Counter[str] = Counter()
         try:
             for interval, source_member in {"1d": daily, "1m": m1, "5m": m5}.items():
-                shutil.copytree(source_member, stage / "members" / interval)
+                shutil.copytree(
+                    source_member, stage / "members" / interval, copy_function=copy_sealed_file
+                )
             for key, package, _value in domain_packages:
-                shutil.copytree(package, stage / "domains" / key)
+                shutil.copytree(package, stage / "domains" / key, copy_function=copy_sealed_file)
             target = stage / MINUTE_FILE
             target.parent.mkdir(parents=True, exist_ok=True)
             projection_schema = minute_dwd_schema(schema)

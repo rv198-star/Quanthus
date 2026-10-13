@@ -22,7 +22,7 @@ import sys
 import tarfile
 import tempfile
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
@@ -537,7 +537,9 @@ def _run_configured_provider_collector(
     )
     stock_list_path = paths.home / "stock_list.parquet"
     if prevention_enabled() and lane_id == "weekly-corrections":
-        source_days = _last_n_sessions(paths.calendar, market_date, 1)
+        source_days = (
+            _session_dates(paths.calendar, market_date, 1) if paths.calendar.is_file() else []
+        )
         if not source_days:
             raise LaneRunError("WEEKLY_UNIVERSE_TRADING_DATE_MISSING")
         universe_root, _universe = refresh_universe(home=paths.home, day=source_days[0])
@@ -4682,6 +4684,7 @@ def _prepare_prevention(
     mandatory: set[str],
     lane_id: str,
     market_date: date,
+    frozen_universe: dict[str, Any] | None = None,
 ) -> tuple[list[DatasetStatus], set[str]]:
     """Versioned scope isolates unrefreshed domains without calling them fresh READY."""
     from quanthus.providers.acquisition_evidence import verify_capture
@@ -4734,16 +4737,40 @@ def _prepare_prevention(
                 }
             )
         result.append(item)
-    source_day = date.fromisoformat(
-        os.environ.get("HERMES_ODS_UNIVERSE_SOURCE_DATE", market_date.isoformat())
-    )
-    root = Path(os.environ["ASTOCK_HOME"]) / "source-universe-v1" / source_day.isoformat()
-    universe = verify_universe(root, source_day)
     raw_root = landing / "original-responses"
     raw_root.mkdir(exist_ok=True)
-    for name in universe["files"]:
-        if name.endswith(".json.gz"):
-            shutil.copyfile(root / name, raw_root / name)
+    if frozen_universe is None:
+        source_day = date.fromisoformat(
+            os.environ.get("HERMES_ODS_UNIVERSE_SOURCE_DATE", market_date.isoformat())
+        )
+        root = Path(os.environ["ASTOCK_HOME"]) / "source-universe-v1" / source_day.isoformat()
+        universe = verify_universe(root, source_day)
+        for name in universe["files"]:
+            if name.endswith(".json.gz"):
+                shutil.copyfile(root / name, raw_root / name)
+    else:
+        from quanthus.pipelines.p10_delivery_common import digest, encoded
+
+        universe = frozen_universe
+        if (
+            universe["policy_id"] != PREVENTION_POLICY
+            or universe["market_date"] != str(market_date)
+            or universe["population"] != len(set(universe["codes"]))
+            or universe["universe_digest"] != digest(encoded(sorted(universe["codes"])))
+            or universe["historical_pit_authorized"] is not False
+        ):
+            raise LaneRunError("FROZEN_UNIVERSE_IDENTITY_DIFFERS")
+        for name, expected_sha in universe["files"].items():
+            if name.endswith(".json.gz"):
+                path = raw_root / name
+            elif name in {"stock_list.parquet", "security_master.parquet"}:
+                path = landing / (
+                    "ref_security_master.parquet" if name == "security_master.parquet" else name
+                )
+            else:
+                continue
+            if path.is_symlink() or _sha256(path) != expected_sha:
+                raise LaneRunError("FROZEN_UNIVERSE_MEMBER_DIFFERS")
     raw_files = sorted(raw_root.glob("*.json.gz"))
     if not raw_files:
         raise LaneRunError("RAW_CLOSURE_MISSING")
@@ -4766,8 +4793,8 @@ def _prepare_prevention(
             knowledge_cutoff=_now_sh_iso(),
         )
     )
-    result.append(
-        _seal_json_dataset(
+    if frozen_universe is None:
+        universe_dataset = _seal_json_dataset(
             name="source_universe",
             payload=universe,
             landing=landing,
@@ -4775,7 +4802,21 @@ def _prepare_prevention(
             knowledge_cutoff=universe["warehouse_observed_at"],
             watermark=market_date.isoformat(),
         )
-    )
+    else:
+        universe_path = landing / "source_universe.json"
+        if json.loads(universe_path.read_text()) != universe:
+            raise LaneRunError("FROZEN_UNIVERSE_DESCRIPTOR_DIFFERS")
+        universe_dataset = DatasetStatus(
+            name="source_universe",
+            status="ready",
+            path=str(universe_path),
+            row_count=1,
+            sha256=_sha256(universe_path),
+            source_revision=PREVENTION_POLICY,
+            knowledge_cutoff=universe["warehouse_observed_at"],
+            watermark=market_date.isoformat(),
+        )
+    result.append(universe_dataset)
     quality = {
         "policy_id": PREVENTION_POLICY,
         "policy_sha256": _sha256(policy_path),
@@ -4824,6 +4865,8 @@ def _publish(
     stream: str | None = None,
     closed: bool = False,
     failure_injection_stage: str | None = None,
+    frozen_universe: dict[str, Any] | None = None,
+    snapshot_check: Callable[[], None] | None = None,
 ) -> tuple[Path | None, str, str | None]:
     """Publish only when all mandatory datasets are ready. READY is last."""
 
@@ -4841,6 +4884,7 @@ def _publish(
             mandatory=mandatory,
             lane_id=lane_id,
             market_date=market_date,
+            frozen_universe=frozen_universe,
         )
     # lane_status artifact must exist before publish and be checksummed
     lane_status_payload = {
@@ -4928,9 +4972,10 @@ def _publish(
             output=release_dir,
             before_ready=(
                 lambda: (
+                    snapshot_check() if snapshot_check is not None else None,
                     _inject_failure(failure_injection_stage, "transfer")
                     if failure_injection_stage == "transfer"
-                    else None
+                    else None,
                 )
             ),
         )

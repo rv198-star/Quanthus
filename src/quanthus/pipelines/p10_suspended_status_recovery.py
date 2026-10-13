@@ -190,6 +190,29 @@ def recover(*, source: Path, output: Path, revision: str) -> dict[str, Any]:
         "historical_pit_authorized": False,
     }
     atomic(new / "response-reprocessing.json", receipt)
+
+    def frozen_source_check() -> None:
+        for name, sha in identities.items():
+            if file_digest(landing / name) != sha:
+                raise ValueError("RECOVERY_SOURCE_CHANGED")
+            if (
+                name
+                not in {
+                    "daily_status_observation_delta.parquet",
+                    "acquisition_quality.json",
+                    "original-responses.tar.gz",
+                }
+                and file_digest(new / name) != sha
+            ):
+                raise ValueError("RECOVERY_COPIED_SOURCE_CHANGED")
+        if object_at(new / "source_universe.json") != universe:
+            raise ValueError("RECOVERY_FROZEN_UNIVERSE_CHANGED")
+        for name, item in raw_inventory.items():
+            if file_digest(landing / "original-responses" / name) != item["sha256"]:
+                raise ValueError("RECOVERY_SOURCE_CAPTURE_CHANGED")
+            if file_digest(new / "original-responses" / name) != item["sha256"]:
+                raise ValueError("RECOVERY_COPIED_CAPTURE_CHANGED")
+
     datasets.append(
         lanes.DatasetStatus(
             name="response_reprocessing",
@@ -212,6 +235,8 @@ def recover(*, source: Path, output: Path, revision: str) -> dict[str, Any]:
         schedule_id=state["schedule_id"],
         schedule_contract_revision=state["schedule_contract_revision"],
         schedule_config_sha256=state["schedule_config_sha256"],
+        frozen_universe=universe,
+        snapshot_check=frozen_source_check,
     )
     for name, sha in identities.items():
         if file_digest(landing / name) != sha:

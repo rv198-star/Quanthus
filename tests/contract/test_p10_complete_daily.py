@@ -425,7 +425,12 @@ def test_waits_for_sealed_daily_before_any_supplier(
         rows=calendar(),
         revision=REVISION,
         journal=tmp_path / "journal",
+        capture=tmp_path / "capture",
+        product=tmp_path / "product",
+        complete=tmp_path / "complete",
+        daily=tmp_path / "daily",
         releases=tmp_path / "releases",
+        notifications=tmp_path / "notifications",
     )
     assert result["status"] == "waiting_for_sealed_daily_ods"
 

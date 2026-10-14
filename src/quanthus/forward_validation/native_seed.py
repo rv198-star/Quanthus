@@ -301,6 +301,10 @@ def _construct(connection: Any, paths: dict[str, tuple[Path, ...]], counts: dict
         LEFT JOIN factor f ON f.security_id=s.security_id AND f.factor_date=c.session_date;
     """)
     diagnostics = _diagnose(connection, binding)
+    diagnostics["reason_counts"]["open_session_without_seed"] = connection.execute(
+        "SELECT count(*) FROM calendar c WHERE NOT EXISTS "
+        "(SELECT 1 FROM seed s WHERE s.calendar_session_id=c.calendar_session_id)"
+    ).fetchone()[0]
     for table in ("dwd_security_bar", "dwd_tradability_state"):
         diagnostics["reason_counts"][f"{table}_calendar_key_missing"] = connection.execute(f"""
             SELECT count(*) FROM {table} raw
@@ -323,10 +327,29 @@ def _diagnose(connection: Any, binding: P6BaseSeedBinding) -> dict[str, Any]:
         "state_missing_or_not_visible": "state_missing_or_not_visible",
         "identity_missing_or_not_visible": "identity_missing_or_not_visible",
         "calendar_not_visible": "dwd_calendar_knowledge_from IS NULL OR dwd_calendar_knowledge_from > knowledge_cutoff",
-        "factor_not_visible": "adjustment_effective AND (dwd_factor_knowledge_from IS NULL OR dwd_factor_knowledge_from > knowledge_cutoff)",
-        "invalid_ohlcv": "NOT bar_missing_or_not_visible AND (open_price IS NULL OR high_price IS NULL OR low_price IS NULL OR close_price IS NULL OR volume IS NULL OR turnover IS NULL OR NOT isfinite(open_price) OR NOT isfinite(high_price) OR NOT isfinite(low_price) OR NOT isfinite(close_price) OR NOT isfinite(volume) OR NOT isfinite(turnover) OR low_price<=0 OR high_price<greatest(open_price,close_price,low_price) OR low_price>least(open_price,close_price) OR volume<0 OR turnover<0)",
-        "source_lineage_missing": "NOT bar_missing_or_not_visible AND (dwd_bar_source_record_id IS NULL OR dwd_bar_source_revision IS NULL OR dwd_bar_source_artifact_sha256 IS NULL OR NOT regexp_full_match(dwd_bar_source_artifact_sha256, '(sha256:)?[0-9a-f]{64}'))",
-        "tradability_invalid": "NOT state_missing_or_not_visible AND (is_tradable IS NULL OR can_buy IS NULL OR can_sell IS NULL OR (NOT is_tradable AND (can_buy OR can_sell)))",
+        "factor_not_visible": (
+            "adjustment_effective AND (dwd_factor_knowledge_from IS NULL OR "
+            "dwd_factor_knowledge_from > knowledge_cutoff)"
+        ),
+        "invalid_ohlcv": (
+            "NOT bar_missing_or_not_visible AND (open_price IS NULL OR high_price IS "
+            "NULL OR low_price IS NULL OR close_price IS NULL OR volume IS NULL OR "
+            "turnover IS NULL OR NOT isfinite(open_price) OR NOT isfinite(high_price) OR "
+            "NOT isfinite(low_price) OR NOT isfinite(close_price) OR NOT "
+            "isfinite(volume) OR NOT isfinite(turnover) OR low_price<=0 OR "
+            "high_price<greatest(open_price,close_price,low_price) OR "
+            "low_price>least(open_price,close_price) OR volume<0 OR turnover<0)"
+        ),
+        "source_lineage_missing": (
+            "NOT bar_missing_or_not_visible AND (dwd_bar_source_record_id IS NULL OR "
+            "dwd_bar_source_revision IS NULL OR dwd_bar_source_artifact_sha256 IS NULL "
+            "OR NOT regexp_full_match(dwd_bar_source_artifact_sha256, "
+            "'(sha256:)?[0-9a-f]{64}'))"
+        ),
+        "tradability_invalid": (
+            "NOT state_missing_or_not_visible AND (is_tradable IS NULL OR can_buy IS "
+            "NULL OR can_sell IS NULL OR (NOT is_tradable AND (can_buy OR can_sell)))"
+        ),
         "session_date_mismatch": "bar_session_date<>session_date OR state_session_date<>session_date",
     }
     for table in ("listing", "security", "state", "calendar"):
@@ -392,9 +415,9 @@ def build_seed(*, root: Path, binding: P6BaseSeedBinding, output: Path,
         }
         payload["content_digest"] = digest_value(payload)
         payload["stages"] = [
-            {"stage": "verify_source", "elapsed_seconds": round(source_seconds, 6),
+            {"stage": "verify_source", "elapsed_seconds": f"{source_seconds:.6f}",
              "disposition": "built_once", "bytes": sum(p.stat().st_size for pp in paths.values() for p in pp)},
-            {"stage": "candidate_seed_and_validation", "elapsed_seconds": round(perf_counter()-build_started, 6),
+            {"stage": "candidate_seed_and_validation", "elapsed_seconds": f"{perf_counter()-build_started:.6f}",
              "disposition": "one_shared_TMP_seed", "rows": diagnostics["rows"],
              "bytes": (staging / "candidate-daily.parquet").stat().st_size},
         ]

@@ -204,7 +204,10 @@ class ParquetConstruction(unittest.TestCase):
             verify_seed_artifact(file.parent)
 
     def test_late_knowledge_is_missing_not_retimed(self):
-        self.con.execute("UPDATE dwd_security_bar SET knowledge_from=knowledge_from+INTERVAL 1 DAY WHERE calendar_session_id='2026-09-30'")
+        self.con.execute((
+            "UPDATE dwd_security_bar SET knowledge_from=knowledge_from+INTERVAL 1 DAY "
+            "WHERE calendar_session_id='2026-09-30'"
+        ))
         self.reseal()
         result = self.build()
         self.assertFalse(result["diagnostics"]["input_validation_passed"])
@@ -213,8 +216,14 @@ class ParquetConstruction(unittest.TestCase):
 
     def test_asof_selects_visible_old_version_not_latest(self):
         self.con.execute("CREATE TABLE old AS SELECT * FROM dwd_security_bar WHERE calendar_session_id='2026-09-30'")
-        self.con.execute("UPDATE dwd_security_bar SET knowledge_to=knowledge_from+INTERVAL 1 DAY WHERE calendar_session_id='2026-09-30'")
-        self.con.execute("INSERT INTO dwd_security_bar SELECT * REPLACE (knowledge_from+INTERVAL 1 DAY AS knowledge_from, 20::DECIMAL(18,4) AS close) FROM old")
+        self.con.execute((
+            "UPDATE dwd_security_bar SET knowledge_to=knowledge_from+INTERVAL 1 DAY "
+            "WHERE calendar_session_id='2026-09-30'"
+        ))
+        self.con.execute((
+            "INSERT INTO dwd_security_bar SELECT * REPLACE (knowledge_from+INTERVAL 1 "
+            "DAY AS knowledge_from, 20::DECIMAL(18,4) AS close) FROM old"
+        ))
         self.reseal()
         result = self.build()
         self.assertTrue(result["diagnostics"]["input_validation_passed"])
@@ -230,6 +239,14 @@ class ParquetConstruction(unittest.TestCase):
         with self.assertRaisesRegex(P6SeedError, "price_basis"):
             self.build()
         self.assertFalse((self.root.parent/"out").exists())
+
+    def test_missing_whole_open_session_cannot_disappear(self):
+        for table in ("dwd_security_bar", "dwd_tradability_state"):
+            self.con.execute(f"DELETE FROM {table} WHERE calendar_session_id='2026-06-01'")
+        self.reseal()
+        result = self.build()
+        self.assertEqual(result["diagnostics"]["reason_counts"]["open_session_without_seed"], 1)
+        self.assertFalse(result["diagnostics"]["input_validation_passed"])
 
 
 if __name__ == "__main__":

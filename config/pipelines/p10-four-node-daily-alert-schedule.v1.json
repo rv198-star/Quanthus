@@ -64,7 +64,7 @@
     },
     "minute_Tplus1": {
       "market_date_phase": "T_plus_1",
-      "first_subsequent_verified_market_session_only": true,
+      "next_calendar_day_of_verified_market_T": true,
       "start_time": "10:30",
       "source_maturity_canary_count_min": 12,
       "source_maturity_canary_count_max": 24,
@@ -101,6 +101,19 @@
       "minute_run_crashed_or_receipt_missing_by_checkpoint",
       "minute_explicit_quality_nonready_one_daily_warning_not_one_per_security"
     ],
+    "cn01_minute_terminal_email": {
+      "delivery_verdicts": ["PASS", "FAIL"],
+      "send_both_pass_and_fail": true,
+      "exactly_one_final_notice_per_market_date_phase": true,
+      "pass_requires": "validated_sealed_manifest_physical_R0_R1_R2_storage_R3_equals_0_and_completed_phase",
+      "fail_if": "required_phase_or_sealed_product_missing_invalid_or_R3_remains",
+      "research_ready_independent_of_delivery_pass": true,
+      "R2_real_source_storage_is_delivery_pass_not_research_ready": true,
+      "bounded_inflight_defers_final_notice": true,
+      "subject_requires": ["trade_date", "T_or_Tplus1", "PASS_or_FAIL"],
+      "body_requires": ["R0_R1_R2_R3_counts", "sealed_manifest_sha", "research_ready", "reason"],
+      "no_retroactive_emails_on_existing_sent_phases": true
+    },
     "not_failure": [
       "suspended_no_trade",
       "R2_admitted_with_known_defects",

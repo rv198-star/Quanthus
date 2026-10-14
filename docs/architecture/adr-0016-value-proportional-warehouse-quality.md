@@ -100,6 +100,65 @@ T+1 **先做 12–24 只跨市场、有代表性、包含已知异常的 source-
 
 每运行满 10 个交易日复盘 T/T+1 的实际累计耗时、超过准入截止的收尾耗时、来源真实修订率、R2/R3 变化、消费者实际受益和正常日级 SLA；调整预算须单独版本化，不因争取清零而无限延长。
 
+## 2026-10-10 Owner correction — calendar-day T+1 and actual repair
+
+This decision supersedes the 2026-10-09 *next-exchange-session* timing only, not the accepted 60-minute admission budget or quality gates. T must be verified as an open exchange trading day, but its T+1 maturity recovery is scheduled at 10:30 on the **next calendar day**, including Saturdays and holidays. A verified target T is not created for nontrading dates. Deadline warning checks likewise move to the next calendar day, with one message per target date and phase.
+
+T+1 first compares 12–24 date-bound canaries. Genuine target-date revisions trigger one bounded, identity-bound pass over the affected R2/R3 cohort (50-security max atomic shards, each independently timeout-bounded) and versioned source-grade publication. An unchanged vendor response does not authorize a speculative repoll. The research-ready gate remains R0/R1 >=99% overall and >=98% per board; R2 storage is not R0/R1 research acceptance and R3 never enters formal ODS/DWD.
+
+The 2026-10-08 historical V1/V2 and old T+1 ledger are immutable. Owner-authorized one-off recovery retains their SHA-bound source receipts and charged elapsed budget, publishes a distinct `loss-aware-1m-historical-correction-v1` version and reports its actual R distribution. Neither a successful collection exit nor a sealed quality package is by itself Research READY. The warning email must display acquisition execution, published-grade distribution, R3 reasons and consumer readiness separately.
+
+## 2026-10-10 Owner minute email acceptance — terminal PASS / FAIL
+
+For CN01 P10 minute T (21:50) and T+1 (11:50), produce one explicit
+outcome email per verified target trading-date and phase, PASS **or** FAIL.
+Do not use the ambiguous "quality degradation" as the final verdict and
+do not silently suppress genuine PASS. Defer while a genuinely bounded
+operation is still in flight; duplicate 22:10/12:10 checkpoints reuse the
+same logical notification identity, irrespective of the verdict.
+
+Minute **delivery PASS** requires a finished verified phase ledger and
+physically verified date-bound immutable package (SEALED, manifest SHA,
+4,992 security-grade records, actual R0/R1/R2 source bytes and Parquet,
+no R3 source bytes), and no remaining R3 securities. Legitimate R2
+storage with disclosed defects is delivery PASS. Outstanding R3, missing
+ledger, invalid source/package or incomplete terminal operation is FAIL.
+An unchanged T+1 vendor maturity canary does not pass if R3 remains.
+
+Report Research READY as an independent strict R0/R1 consumer gate.
+An R2-restricted delivery PASS can be Research NOT READY. Email subject
+must include trade date, T/T+1, PASS/FAIL; body includes grade counts,
+research qualification, actual source/warehouse evidence and reason.
+Never backdate prior email results, overwrite frozen source versions or
+automatically activate protected P3/P5/P6 consumers.
+
+## 2026-10-10 Owner final READY simplification — R2 is sufficient
+
+The accepted current P10 1m research **READY** minimum is R2, with **R3=0
+for every traded security**, genuine source observations, complete 4,992
+security-status population, and verified immutable manifest/SEALED, SHA,
+ODS source bytes and DWD original bars. Suspend-only securities are not
+part of the traded denominator. No global R0/R1 99% coverage requirement,
+board 98% requirement, or case-by-case R2 approval gate remains.
+
+This supersedes the earlier two-layer Data READY vs strict Research READY
+language in this ADR and the *research usage* paragraphs of the old
+R2-storage V2 scope. **Delivery PASS and Research READY now share one
+qualification verdict**. R2 is valid for ordinary gap-aware
+non-execution research without extra approval. R0/R1/R2 remain distinct
+quality labels, with true missing source timestamps and auction defects.
+R3 still never enters formal ODS/DWD. Strict-240 or protected P3/P5/P6
+consumers keep their own existing factual/source/execution contracts,
+not a new universal R2 signoff.
+
+Policy: `config/pipelines/p10-minute-r2-ready.v1.json` and the
+`p10-1m-r2-minimum-ready-v1` runtime. Prior frozen V1/V2 packages and
+manifests are immutable evidence of the old interpretation; evaluate
+their authentic grades with a versioned successor, never rewrite their
+historical seals, knowledge-time or quality defect records. New
+products embed the new policy ID, direct R2 research admission and READY
+from R3=0. T/T+1 notification PASS/FAIL and READY use the same gate.
+
 ## Consequences and change control
 
 - P10 is the sole source-qualification/warehouse engineering owner; business owners define admission sensitivity and accept products only under their own contracts (ADR 0015).

@@ -2,8 +2,8 @@
 Description=P10 cn01-minute-Tplus1 verified data/quality email checkpoint
 
 [Timer]
-OnCalendar=Mon..Fri *-*-* 11:50:00 Asia/Shanghai
-OnCalendar=Mon..Fri *-*-* 12:10:00 Asia/Shanghai
+OnCalendar=*-*-* 11:50:00 Asia/Shanghai
+OnCalendar=*-*-* 12:10:00 Asia/Shanghai
 AccuracySec=1min
 Persistent=false
 Unit=quanthus-p10-deadline@cn01-minute-Tplus1.service

@@ -101,7 +101,7 @@ EVENTS = {
     "p10_cn01_minute_tplus1_failed": {
         "node": "CN01",
         "stage": "P10 1m T+1",
-        "heading": "CN01 次交易日分钟修订未完成",
+        "heading": "CN01 下一自然日分钟修订未完成",
         "failure": True,
     },
     "p10_cn01_minute_quality_degraded": {
@@ -110,6 +110,20 @@ EVENTS = {
         "heading": "CN01 分钟研究级质量降级提示",
         "failure": True,
         "status_label": "质量降级",
+    },
+    "p10_cn01_minute_delivery_pass": {
+        "node": "CN01",
+        "stage": "P10 1m",
+        "heading": "CN01 分钟数据交付 PASS",
+        "failure": False,
+        "status_label": "PASS · 数据交付通过",
+    },
+    "p10_cn01_minute_delivery_fail": {
+        "node": "CN01",
+        "stage": "P10 1m",
+        "heading": "CN01 分钟数据交付 FAIL",
+        "failure": True,
+        "status_label": "FAIL · 数据交付失败",
     },
 }
 
@@ -269,6 +283,17 @@ def _email_html(
         "unit": "systemd unit",
         "run_path": "运行路径",
         "error_code": "错误分类",
+        "executed_phase": "采集阶段",
+        "collection_status": "采集执行",
+        "publication_status": "分级数据发布",
+        "quality_distribution": "证券质量分布",
+        "quality_reasons": "R3主要原因",
+        "research_qualification": "最终研究资格",
+        "tplus1_state": "补数终态",
+        "delivery_verdict": "交付判定",
+        "delivery_reason": "判定原因",
+        "source_revised_count": "源数据修订证券数",
+        "grade_manifest_sha256": "质量包 manifest SHA-256",
     }
     for key, label in context_labels.items():
         value = context.get(key)
@@ -317,12 +342,22 @@ def _send_resend(
         if "status_label" in EVENTS[event]
         else ("失败" if EVENTS[event]["failure"] else "成功")
     )
+    mail_context=context or {}
+    if event=="p10_cn01_minute_quality_degraded":
+        phase=str(mail_context.get("executed_phase") or mail_context.get("stage") or "1m")
+        qualification=str(mail_context.get("research_qualification") or "未验证")
+        outcome_text=f"{phase} {qualification} 质量降级"
+    subject_stage = EVENTS[event]["stage"]
+    if event in {"p10_cn01_minute_delivery_pass", "p10_cn01_minute_delivery_fail"}:
+        phase = str(mail_context.get("executed_phase") or "")
+        subject_stage = f"1m {phase}"
+        outcome_text = "PASS" if event.endswith("_pass") else "FAIL"
     body = _canonical_bytes(
         {
             "from": sender,
             "to": list(_recipients()),
             "subject": (
-                f"[Quanthus][{EVENTS[event]['node']}][{EVENTS[event]['stage']}] "
+                f"[Quanthus][{EVENTS[event]['node']}][{subject_stage}] "
                 f"{market_date.isoformat()} "
                 f"{outcome_text}"
             ),
@@ -527,6 +562,77 @@ def send_daily_event(
             )
         _atomic_json(state_path, record)
         return record
+
+
+def send_minute_delivery_outcome(
+    *,
+    market_date: date,
+    phase: str,
+    passed: bool,
+    state_root: Path,
+    context: Mapping[str, object],
+    reason: str | None = None,
+) -> dict[str, object]:
+    """Exactly one final PASS or FAIL email per date+phase, not per verdict.
+
+    Minute quality is independently SHA-verified upstream. Do not enter the
+    daily-DWD CURRENT path that send_daily_event uses for ordinary successes.
+    Lock identity excludes the verdict so duplicate 12:10/22:10 checkpoints
+    can never mail a contradictory PASS after an earlier FAIL (or vice versa).
+    """
+    if phase not in {"minute_T", "minute_Tplus1"}:
+        raise WarehouseNotificationError("invalid CN01 minute email phase")
+    if context.get("delivery_verdict") != ("PASS" if passed else "FAIL"):
+        raise WarehouseNotificationError("minute email verdict/context differ")
+    event = (
+        "p10_cn01_minute_delivery_pass" if passed
+        else "p10_cn01_minute_delivery_fail"
+    )
+    key_material = f"quanthus-p10-minute-outcome-v1\x1fCN01\x1f{phase}\x1f{market_date}"
+    key = hashlib.sha256(key_material.encode("ascii")).hexdigest()
+    record_root = state_root / "minute-delivery-v1"
+    record_root.mkdir(parents=True, exist_ok=True)
+    state_path = record_root / f"{key}.json"
+    with (record_root / f"{key}.lock").open("a+", encoding="ascii") as stream:
+        fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+        if state_path.is_file():
+            recorded = _object(state_path)
+            if recorded.get("market_date") != market_date.isoformat():
+                raise WarehouseNotificationError("minute email receipt date mismatch")
+            return {**recorded, "status": "skipped"}
+        try:
+            sent = _send_resend(
+                event=event, market_date=market_date, key=key,
+                pointer=None, result=None,
+                error=reason if not passed else None,
+                context={"node": "CN01", "stage": phase, **context},
+            )
+        except Exception as exc:
+            error_code = (
+                exc.code if isinstance(exc, WarehouseNotificationError)
+                else "minute_notification_failed"
+            )
+            _atomic_json(
+                record_root / "failures" / f"{key}.json",
+                {
+                    "kind": "p10_minute_delivery_notice_failure_v1",
+                    "phase": phase, "market_date": market_date.isoformat(),
+                    "error_code": error_code, "error": _bounded_error(exc),
+                    "failed_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+            raise
+        receipt: dict[str, object] = {
+            "kind": "p10_minute_delivery_notice_v1",
+            "phase": phase, "market_date": market_date.isoformat(),
+            "event": event, "verdict": "PASS" if passed else "FAIL",
+            "status": "sent", "sent_at": datetime.now(timezone.utc).isoformat(),
+            "idempotency_key": key, "delivery_reason": reason,
+            "grade_manifest_sha256": context.get("grade_manifest_sha256"),
+            **sent,
+        }
+        _atomic_json(state_path, receipt)
+        return receipt
 
 
 def send_failure_events(

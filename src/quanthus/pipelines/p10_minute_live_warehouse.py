@@ -24,11 +24,19 @@ from pathlib import Path
 from typing import Any
 
 from quanthus.pipelines.loss_aware_m1_research import _board, _reference
+from quanthus.pipelines.p10_minute_readiness import (
+    POLICY_ID as READY_POLICY_ID,
+)
+from quanthus.pipelines.p10_minute_readiness import (
+    ready_after_verified_storage,
+)
 from quanthus.providers.p10_native_m1_shard_capture import target_date_records
 from quanthus.providers.tencent_m1_normalize import expected_times
 
 KIND = "p10_loss_aware_1m_live_source_grade_v1"
 PRODUCT = "intraday-1m-loss-aware-ongoing-v1"
+HISTORICAL_PRODUCT = "intraday-1m-loss-aware-historical-correction-v1"
+HISTORICAL_READY_PRODUCT = "intraday-1m-loss-aware-historical-correction-v2"
 SOURCE_KIND = "p10_tencent_native_m1_raw_capture_shard"
 SIX = re.compile(r"[0-9]{6}\Z")
 ONE = Decimal("1")
@@ -63,10 +71,15 @@ def _decimal(value: Any) -> Decimal:
 
 
 def native_minutes(
-    original: bytes, code: str, day: str
+    original: bytes, code: str, day: str, *,
+    allow_historical: bool = False,
 ) -> dict[str, dict[str, Decimal]]:
     """Only genuinely observed m1 bars for target day; no timestamps shifted."""
-    if not SIX.fullmatch(code) or date.fromisoformat(day) < date(2026, 10, 9):
+    if (
+        not SIX.fullmatch(code)
+        or date.fromisoformat(day)<date(2026,10,8)
+        or (date.fromisoformat(day)<date(2026,10,9) and not allow_historical)
+    ):
         raise ValueError("dynamic capture is outside successor market scope")
     doc = json.loads(original)
     alias = ("sh" if code.startswith("6") else "sz") + code
@@ -101,6 +114,7 @@ def assess_native(
     *,
     code: str, day: str, raw: bytes | None,
     traded: bool, daily_shares: Any, daily_close: Any,
+    allow_historical: bool = False,
 ) -> tuple[dict[str, Any], dict[str, dict[str, Decimal]]]:
     grid = expected_times(day)
     state = {
@@ -125,7 +139,7 @@ def assess_native(
     if raw is None:
         return state, {}
     try:
-        bars = native_minutes(raw,code,day)
+        bars = native_minutes(raw,code,day,allow_historical=allow_historical)
         if not bars:
             state["quality_reason"]="no_real_target_date_m1_bars"
             return state, {}
@@ -152,19 +166,16 @@ def assess_native(
         if not missing and state["auction_source_observed"]:
             grade,reason="R0","native_240_and_auction_observed_exact_daily"
         else:
-            # Genuine native rows, complete daily shares and close. Without
-            # 5m bucket proof this is NOT R1 and cannot be used by the default
-            # minute research consumer.
+            # Genuine native rows with consistent daily shares and close.
+            # R2 carries honest missing-minute/auction defects into research;
+            # callers requiring full 240 bars still filter the real grade.
             grade,reason="R2","native_incomplete_or_unwitnessed_restricted"
         state.update(
             quality_grade=grade,
             quality_reason=reason,
             formally_ingested=True,
-            default_research_admitted=(grade=="R0"),
-            allowed_consumer=(
-                "gap_aware_non_execution_development" if grade=="R0"
-                else "explicit_r2_review_only"
-            ),
+            default_research_admitted=True,
+            allowed_consumer="gap_aware_non_execution_development",
         )
         return state,bars
     except (ValueError,KeyError,TypeError,json.JSONDecodeError) as exc:
@@ -206,6 +217,68 @@ def _source_index(
     return seen
 
 
+def _historical_source_index(
+    root: Path, day: str, daily_sha: str,
+) -> tuple[dict[str, tuple[Path, dict[str, Any]]], dict[str, dict[str, Any]], str]:
+    """Bind the read-only V1 forensic custody; never republish its R3 raw.
+
+    Historic baseline is independently sealed and may ONLY be consumed as
+    one input to a separately named, versioned correction product.
+    """
+    if day!="2026-10-08":
+        raise ValueError("only the separately authorized Oct 08 history is eligible")
+    status=json.loads((root/"date-status"/f"{day}.json").read_text())
+    if (
+        status.get("market_date")!=day
+        or status.get("source_daily_manifest_sha256",daily_sha)!=daily_sha
+    ):
+        raise ValueError("historical date/daily authority mismatch")
+    ods=root/status["source_ods_path"]
+    dwd=root/status["research_dwd_path"]
+    ods_manifest=(ods/"manifest.json").read_bytes()
+    dwd_manifest=(dwd/"manifest.json").read_bytes()
+    if (
+        _sha(ods_manifest)!=status.get("source_ods_manifest_sha256")
+        or _sha(dwd_manifest)!=status.get("research_dwd_manifest_sha256")
+        or json.loads(dwd_manifest).get("source_daily_manifest_sha256")!=daily_sha
+        or json.loads(ods_manifest).get("daily_source_manifest_sha256")!=daily_sha
+    ):
+        raise ValueError("sealed V1 source/DWD manifest changed")
+    archive={row["stock_code"]:row for row in (
+        json.loads(line) for line in (dwd/"security-quality.jsonl").read_text().splitlines()
+    )}
+    inventory={
+        str(item["path"]).removeprefix("raw/"):item
+        for item in json.loads(ods_manifest)["files"] if str(item["path"]).startswith("raw/")
+    }
+    if len(archive)!=4992 or len(inventory)!=4992:
+        raise ValueError("historical population does not cover exactly 4,992 stocks")
+    result={}
+    for code,row in sorted(archive.items()):
+        path=ods/"raw"/f"{code}.json.gz"
+        declared=inventory.get(f"{code}.json.gz")
+        if declared is None or not path.is_file():
+            raise ValueError("historical forensic raw missing")
+        compressed=path.read_bytes()
+        raw=gzip.decompress(compressed)
+        if (
+            _sha(compressed)!=declared["compressed_sha256"]
+            or _sha(raw)!=declared["raw_source_sha256"]
+            or (
+                row.get("source_raw_sha256") is not None
+                and _sha(raw)!="sha256:"+str(row["source_raw_sha256"]).removeprefix("sha256:")
+            )
+        ):
+            raise ValueError("historical source SHA not bound to quality")
+        _,dated=target_date_records(raw,code,date.fromisoformat(day))
+        result[code]=(path,{
+            "raw_sha256":_sha(raw).removeprefix("sha256:"),
+            "target_date_observation_sha256":dated,
+            "captured_at":row["source_acquired_at_or_after"],
+        })
+    return result,archive,status["research_dwd_manifest_sha256"]
+
+
 def _inventory(root: Path) -> list[dict[str, Any]]:
     return [
         {
@@ -221,19 +294,37 @@ def _inventory(root: Path) -> list[dict[str, Any]]:
 def build(
     *, day: str, daily_release: Path, capture_root: Path, product_root: Path,
     prior_capture_root: Path | None = None,
+    historical_forensic_root: Path | None = None,
 ) -> dict[str, Any]:
     import pyarrow as pa
     import pyarrow.parquet as pq
 
-    if date.fromisoformat(day) < date(2026,10,9):
-        raise ValueError("live minute product cannot rewrite frozen historical V2")
+    historical=day=="2026-10-08"
+    if historical != (historical_forensic_root is not None):
+        raise ValueError("historical corrections require an explicit independent baseline")
+    if historical and (
+        product_root.name not in {
+            "loss-aware-1m-historical-correction-v1",
+            "loss-aware-1m-historical-correction-v2",
+        }
+        or prior_capture_root is not None
+    ):
+        raise ValueError("historical V1/V2 products are immutable; use new correction product")
+    if not historical and date.fromisoformat(day)<date(2026,10,9):
+        raise ValueError("historical correction has no authorization for this date")
     market,daily_sha,statuses=_reference(daily_release,day)
     index=_source_index(
         capture_root=capture_root, day=day, daily_sha=daily_sha,
         securities=set(market),
     )
     changed_source_codes: list[str] = []
-    if prior_capture_root is not None:
+    historic_grades: dict[str, dict[str, Any]] = {}
+    historic_baseline_sha = None
+    if historical:
+        prior_index,historic_grades,historic_baseline_sha = _historical_source_index(
+            historical_forensic_root,day,daily_sha
+        )
+    elif prior_capture_root is not None:
         # T+1 is a *correction*, not a replacement of sealed T originals.
         # Overlay only newly observed genuine target-date revisions. A rolling
         # HTTP SHA difference outside that date is never correction evidence.
@@ -241,6 +332,7 @@ def build(
             capture_root=prior_capture_root, day=day, daily_sha=daily_sha,
             securities=set(market),
         )
+    if prior_capture_root is not None or historical:
         merged = dict(prior_index)
         for code, (path, receipt) in index.items():
             if not receipt:
@@ -263,7 +355,7 @@ def build(
     # An immutable product may record partial source supply; missing securities
     # become explicit R3 rejection metadata, not fabricated minute rows.
     candidate_digest=_sha(_encode([
-        day,daily_sha,
+        day,daily_sha,historic_baseline_sha,READY_POLICY_ID,
         sorted((code, row.get("raw_sha256"))
             for code,(_,row) in index.items())
     ]))[7:23]
@@ -312,7 +404,25 @@ def build(
                         daily_shares=market[code]["volume"],
                         daily_close=market[code]["close"],
                         traded=statuses[code]!="0",
+                        allow_historical=historical,
                     )
+                    if historical and quality["quality_grade"]=="R2":
+                        former=historic_grades[code]
+                        # A frozen independently witnessed R1 stays R1 ONLY
+                        # when its exact original source remains unchanged.
+                        if (
+                            former["quality_grade"]=="R1"
+                            and former.get("native_5m_witness_sha256")
+                            and quality["raw_sha256"]==(
+                                "sha256:"+str(former["source_raw_sha256"]).removeprefix("sha256:")
+                            )
+                        ):
+                            quality.update(
+                                quality_grade="R1",
+                                quality_reason="preserved_sealed_v1_same_source_5m_witness",
+                                default_research_admitted=True,
+                                allowed_consumer="gap_aware_non_execution_development",
+                            )
                     quality["source_acquired_at_or_after"]=acquired
                     quality["reference_ods_manifest_sha256"]=daily_sha
                     output.write(_encode(quality))
@@ -354,23 +464,33 @@ def build(
         finally:
             writer.close()
         traded=sum(grades.values())-grades["SUSPENDED"]
-        coverage=Decimal(grades["R0"]+grades["R1"])/Decimal(traded)
-        cohort=all(
-            Decimal(k["R0"]+k["R1"])/Decimal(
-                sum(k.values())-k["SUSPENDED"]
-            )>=Decimal("0.98")
-            for k in board.values()
-            if sum(k.values())>k["SUSPENDED"]
+        source_grade_coverage=(
+            Decimal(grades["R0"]+grades["R1"])/Decimal(traded)
         )
-        ready=coverage>=Decimal("0.99") and cohort
+        ready=ready_after_verified_storage(
+            grades,admitted_raw=acquired_count
+        )
+        readiness_coverage=Decimal(acquired_count)/Decimal(traded)
         summary={
             "kind":KIND,"market_date":day,
-            "product_scope":PRODUCT,"grades":dict(grades),
+            "product_scope":(
+                HISTORICAL_READY_PRODUCT if historical
+                and product_root.name=="loss-aware-1m-historical-correction-v2"
+                else HISTORICAL_PRODUCT if historical else PRODUCT
+            ),
+            "historical_baseline_manifest_sha256":historic_baseline_sha,
+            "readiness_policy_id":READY_POLICY_ID,
+            "grades":dict(grades),
             "rows_per_grade":dict(rows),"research_ready":bool(ready),
             "admitted_raw":acquired_count,"R3_formal_originals":0,
-            "source_grade_coverage":str(coverage),
+            "source_grade_coverage":str(source_grade_coverage),
+            "readiness_coverage":str(readiness_coverage),
+            "board_grades":{name:dict(group) for name,group in board.items()},
             "source_ods_manifest_sha256":daily_sha,
-            "quality_limits":"R2 storage only; default consumer requires R0/R1",
+            "quality_limits":(
+                "R2 genuine observed rows admitted to gap-aware research; "
+                "per-security missing minutes and auction quality remain visible"
+            ),
             "source_capture_root":str(capture_root),
             "prior_source_capture_root":(
                 str(prior_capture_root) if prior_capture_root is not None else None
@@ -404,7 +524,20 @@ def verify(root: Path) -> dict[str, Any]:
     import pyarrow.parquet as pq
     manifest_path=root/"manifest.json"
     manifest=json.loads(manifest_path.read_text())
-    if manifest.get("kind")!=KIND or manifest.get("product_scope")!=PRODUCT:
+    if (
+        manifest.get("kind")!=KIND
+        or manifest.get("product_scope") not in {
+            PRODUCT,HISTORICAL_PRODUCT,HISTORICAL_READY_PRODUCT
+        }
+        or (
+            manifest.get("product_scope")==HISTORICAL_PRODUCT
+            and root.parent.parent.parent.name!="loss-aware-1m-historical-correction-v1"
+        )
+        or (
+            manifest.get("product_scope")==HISTORICAL_READY_PRODUCT
+            and root.parent.parent.parent.name!="loss-aware-1m-historical-correction-v2"
+        )
+    ):
         raise ValueError("wrong product scope/lineage")
     if (root/"SEALED").read_text().strip()!=_sha(manifest_path.read_bytes()):
         raise ValueError("package seal SHA differs")
@@ -462,15 +595,28 @@ def verify(root: Path) -> dict[str, Any]:
             raise ValueError("R3 or suspended raw entered formal warehouse")
     if dict(grade_rows)!=manifest["rows_per_grade"]:
         raise ValueError("Parquet observed-source grade row count differs")
+    if manifest.get("readiness_policy_id")==READY_POLICY_ID:
+        ready=ready_after_verified_storage(
+            manifest["grades"],admitted_raw=manifest["admitted_raw"]
+        )
+        if manifest.get("research_ready") is not ready:
+            raise ValueError("sealed minute READY differs from R2 minimum-grade contract")
+        if any(
+            status["quality_grade"] in {"R0","R1","R2"}
+            and status["default_research_admitted"] is not True
+            for status in statuses.values()
+        ):
+            raise ValueError("new ready contract cannot exclude genuine R2 research")
     return {
         "market_date":manifest["market_date"],
-        "product_scope":PRODUCT,
+        "product_scope":manifest["product_scope"],
         "manifest_sha256":_sha(manifest_path.read_bytes()),
         "grade_rows":dict(grade_rows),
         "quality_grades":manifest["grades"],
         "research_ready":manifest["research_ready"],
         "admitted_raw":manifest["admitted_raw"],
         "R3_rejected":manifest["grades"].get("R3",0),
+        "readiness_policy_id":manifest.get("readiness_policy_id"),
     }
 
 
@@ -480,6 +626,7 @@ def main() -> int:
     parser.add_argument("--market-ods-release",type=Path)
     parser.add_argument("--capture-root",type=Path)
     parser.add_argument("--prior-capture-root",type=Path)
+    parser.add_argument("--historical-forensic-root",type=Path)
     parser.add_argument("--product-root",type=Path)
     parser.add_argument("--verify-package",type=Path)
     args=parser.parse_args()
@@ -492,6 +639,7 @@ def main() -> int:
         day=args.market_date,daily_release=args.market_ods_release,
         capture_root=args.capture_root,product_root=args.product_root,
         prior_capture_root=args.prior_capture_root,
+        historical_forensic_root=args.historical_forensic_root,
     ),sort_keys=True))
     return 0
 

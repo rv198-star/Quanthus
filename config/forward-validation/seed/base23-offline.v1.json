@@ -1,0 +1,31 @@
+{
+  "schema_version": "quanthus.p6-base-seed-binding.v1",
+  "work_item": "P6-BASE-001",
+  "purpose": "p6_historical_seed_offline_validation",
+  "source": {
+    "kind": "dwd_base23_native_purpose_qualified_candidate_v1",
+    "version": "2.3",
+    "package_id": "dwd-base-202609-v2.3",
+    "business_through": "2026-09-30",
+    "manifest_sha256": "sha256:6991d0c9440d4117c3dfdd3375e2267d0e43174203fc834751c9476cd7598206",
+    "content_digest": "sha256:f5b1c35e9d60874a5daa8ce36f50d8d4edf62317075e3f223d344a1eb7292608",
+    "materialization_sha256": "sha256:c3c1eed800ea9180498c4bef1c98bf89f1f15d0f400e7dbc74a10a700f401da5"
+  },
+  "scope": {
+    "history_start": "2026-01-01",
+    "history_end": "2026-09-30",
+    "venues": ["SSE", "SZSE"],
+    "interval_size": "1d",
+    "price_basis": "UNADJUSTED",
+    "knowledge_policy": "source_observed_at_or_before_each_session_close",
+    "minimum_open_sessions": 120
+  },
+  "authority": {
+    "offline_construction_only": true,
+    "consumer_admission": "NOT_GRANTED",
+    "official_cycle_authorized": false,
+    "execution_authorized": false,
+    "protected_partition_access": false
+  },
+  "source_evidence": "https://github.com/rv198-star/Quanthus/blob/94441f52da65f83df22344f5f956037cb1ad2473/config/releases/base23-oci-consumers.v1.json"
+}

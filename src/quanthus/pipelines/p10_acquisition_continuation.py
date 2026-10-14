@@ -13,6 +13,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from quanthus.pipelines.contracts import verify_ods_release
+from quanthus.pipelines.p10_complete_daily_cycle import JOURNAL, calendar_rows
 from quanthus.pipelines.p10_complete_daily_notifications import failure
 from quanthus.pipelines.p10_delivery_common import (
     atomic,
@@ -22,6 +23,7 @@ from quanthus.pipelines.p10_delivery_common import (
     safe_path,
 )
 from quanthus.pipelines.p10_domain_continuation import build
+from quanthus.pipelines.p10_operating_schedule import _market_dates
 
 STATE = Path("/var/lib/quanthus/acquisition-continuation-v1")
 CST = ZoneInfo("Asia/Shanghai")
@@ -84,36 +86,51 @@ def run(*, mode: str, day: date, revision: str, state: Path = STATE) -> dict[str
             "code_revision": revision,
             "domains": {},
         }
+        active = {
+            "mode": mode,
+            "market_date": day.isoformat(),
+            "started_at": datetime.now(CST).isoformat(),
+            "code_revision": revision,
+            "invocation_id": os.environ.get("INVOCATION_ID"),
+        }
+        atomic(state / "active" / (mode + ".json"), active)
         try:
             if mode == "natural-day":
-                # This job supplies closed-date announcements.
-                import pyarrow.parquet as pq
-
-                calendar = (
-                    pq.ParquetFile(Path(os.environ["HERMES_ODS_CALENDAR"]))
-                    .read(columns=["exchange", "trade_date", "is_open"])
-                    .to_pylist()
-                )
-                flags = [
-                    row
-                    for row in calendar
-                    if row["exchange"] in {"SSE", "SZSE"}
-                    and str(row["trade_date"])[:10] == day.isoformat()
-                ]
-                if len(flags) != 2 or len({int(row["is_open"]) for row in flags}) != 1:
+                # Operating eligibility needs the same authoritative current-date
+                # calendar as the daily/T+1 controllers, not sealed Base rows.
+                calendar = calendar_rows(day, JOURNAL / "calendars")
+                saved = object_at(JOURNAL / "calendars" / f"{day}.json")
+                acquired = datetime.fromisoformat(saved["fetched_at"])
+                if (
+                    saved.get("provider") != "baostock-trading-calendar"
+                    or acquired.tzinfo is None
+                    or acquired > datetime.now(CST)
+                ):
                     raise ValueError("NATURAL_DAY_CALENDAR_AUTHORITY_MISSING")
-                if int(flags[0]["is_open"]) == 1:
-                    return {**result, "status": "handled_by_trading_day_daily_core"}
-                source_days = [
-                    str(row["trade_date"])[:10]
-                    for row in calendar
-                    if row["exchange"] == "SSE"
-                    and int(row["is_open"]) == 1
-                    and str(row["trade_date"])[:10] < day.isoformat()
-                ]
-                if not source_days:
+                flags = _market_dates(calendar)
+                if day not in flags:
+                    raise ValueError("NATURAL_DAY_CALENDAR_AUTHORITY_MISSING")
+                result["calendar_authority"] = {
+                    "provider": saved["provider"],
+                    "fetched_at": saved["fetched_at"],
+                    "rows_sha256": saved["rows_sha256"],
+                    "market_date": saved["market_date"],
+                }
+                if flags[day]:
+                    result["status"] = "handled_by_trading_day_daily_core"
+                    atomic(state / "runs" / mode / (day.isoformat() + ".json"), result)
+                    return result
+                source_day = None
+                for offset in range(1, 16):
+                    previous = day - timedelta(days=offset)
+                    if previous not in flags:
+                        raise ValueError("NATURAL_DAY_INTERMEDIATE_CALENDAR_DATE_MISSING")
+                    if flags[previous]:
+                        source_day = previous
+                        break
+                if source_day is None:
                     raise ValueError("NATURAL_DAY_UNIVERSE_SOURCE_DATE_MISSING")
-                env = {**os.environ, "HERMES_ODS_UNIVERSE_SOURCE_DATE": max(source_days)}
+                env = {**os.environ, "HERMES_ODS_UNIVERSE_SOURCE_DATE": str(source_day)}
                 root = Path(__file__).resolve().parents[3]
                 command = [
                     str(root / "ops/bin/run-hermes-ods-lane"),
@@ -129,6 +146,13 @@ def run(*, mode: str, day: date, revision: str, state: Path = STATE) -> dict[str
                 if mode == "daily":
                     pointer = object_at(core / "CURRENT_DAILY_CORE.json")
                     day = date.fromisoformat(pointer["market_date"])
+                    atomic(
+                        state / "active" / (mode + ".json"),
+                        {
+                            **active,
+                            "market_date": day.isoformat(),
+                        },
+                    )
                     if (
                         file_digest(safe_path(core, pointer["manifest_path"]))
                         != pointer["manifest_sha256"]

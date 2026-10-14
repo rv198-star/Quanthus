@@ -52,6 +52,45 @@ _CATALOG_LANES = {
 SOURCE_MATURITY_DEFERRED = 3
 
 
+def _core_event_dependency_for_retry(
+    state: dict[str, Any], *, is_core: bool, home: Path, market_date: date, deadline: float
+) -> dict[str, Any] | None:
+    event = state["lanes"].get("calendar-daily-events", {})
+    market = state["lanes"].get("market-daily-core", {})
+    if not (
+        is_core
+        and os.environ.get("HERMES_ODS_PREVENTION_POLICY") == "p10-acquisition-prevention-v1"
+        and event.get("status") == "failed"
+        and market.get("status") == "ready"
+        and event.get("attempts") == 1
+        and time.monotonic() < deadline
+        and state.get("error_code") != "process_cleanup_unconfirmed"
+    ):
+        return None
+    last_log = Path(event["logs"][-1]) if event.get("logs") else None
+    universe_root = home / "source-universe-v1" / market_date.isoformat()
+    if not (
+        last_log
+        and last_log.exists()
+        and "ValueError: UNIVERSE_PROVIDER_QUERY_FAILED" in last_log.read_text()
+        and (universe_root / "universe.json").exists()
+        and os.environ.get("HERMES_ODS_UNIVERSE_SOURCE_DATE", market_date.isoformat())
+        == market_date.isoformat()
+    ):
+        return None
+    from quanthus.providers.security_universe import verify as verify_universe
+
+    verify_universe(universe_root, market_date)
+    return {
+        "initial_attempt": {**event, "logs": list(event.get("logs", []))},
+        "source_day": market_date.isoformat(),
+        "universe_manifest_sha256": "sha256:"
+        + hashlib.sha256((universe_root / "universe.json").read_bytes()).hexdigest(),
+        "status": "one_retry_with_current_day_dependency",
+        "budget_reset": False,
+    }
+
+
 def _load_env_file(path: Path) -> None:
     """Load the simple KEY=VALUE env files used by the systemd units."""
 
@@ -201,6 +240,55 @@ class LaneJob:
             if self.log_handle is not None:
                 self.log_handle.close()
                 self.log_handle = None
+
+
+def _recover_core_event(
+    state: dict[str, Any],
+    *,
+    is_core: bool,
+    home: Path,
+    market_date: date,
+    deadline: float,
+    daily_group: list[LaneJob],
+    poll_seconds: float,
+) -> None:
+    try:
+        recovery = _core_event_dependency_for_retry(
+            state, is_core=is_core, home=home, market_date=market_date, deadline=deadline
+        )
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+        recovery = None
+        state["core_event_dependency_recovery"] = {
+            "status": "dependency_reverification_failed",
+            "error_class": type(exc).__name__,
+            "budget_reset": False,
+        }
+        state["error_code"] = "source_dependency_reverification_failed"
+    if recovery:
+        event_job = next(job for job in daily_group if job.lane == "calendar-daily-events")
+        state["core_event_dependency_recovery"] = recovery
+        if time.monotonic() >= deadline:
+            recovery["status"] = "deadline_passed_after_dependency_verification"
+        else:
+            try:
+                state["lanes"].update(
+                    _run_group([event_job], deadline=deadline, poll_seconds=poll_seconds)
+                )
+            except (OSError, ProcessGroupCleanupError) as exc:
+                cleanup_failed = isinstance(exc, ProcessGroupCleanupError)
+                state["error_code"] = (
+                    "process_cleanup_unconfirmed" if cleanup_failed else "lane_start_failed"
+                )
+                recovery["status"] = (
+                    "retry_cleanup_unconfirmed" if cleanup_failed else "retry_start_failed"
+                )
+                recovery["error_class"] = type(exc).__name__
+                state["lanes"][event_job.lane] = {
+                    "status": "cleanup_failed" if cleanup_failed else "failed",
+                    "returncode": PROCESS_CLEANUP_FAILED if cleanup_failed else 127,
+                    "attempts": event_job.attempt,
+                    "logs": event_job.logs,
+                }
 
 
 def _lane_command(
@@ -670,6 +758,19 @@ def main() -> int:
                 "attempts": 0,
                 "logs": [],
             }
+
+    # An event query may fail before the parallel market job seals their shared
+    # target-day universe. Retry only this observed failure, once, after the exact
+    # dependency exists; keep the original deadline, logs and price observations.
+    _recover_core_event(
+        state,
+        is_core=is_core,
+        home=home,
+        market_date=market_date,
+        deadline=deadline,
+        daily_group=daily_group,
+        poll_seconds=poll_seconds,
+    )
 
     required_closed_lanes = (
         ("market-daily-core",) if is_core else ("market-daily-core", "intraday-5m", "intraday-1m")

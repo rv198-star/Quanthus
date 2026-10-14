@@ -37,25 +37,46 @@ def seal(root, counts):
         relative = f"payload/{table}/{partition}/part-000000.parquet"
         file = root / relative
         layout[table] = {
-            "files": [{"table": table, "partition": partition, "path": relative,
-                       "rows": counts[table], "size_bytes": file.stat().st_size,
-                       "sha256": _hash(file)}],
+            "files": [
+                {
+                    "table": table,
+                    "partition": partition,
+                    "path": relative,
+                    "rows": counts[table],
+                    "size_bytes": file.stat().st_size,
+                    "sha256": _hash(file),
+                }
+            ],
             "expected_partition_rows": {partition: counts[table]},
         }
         summaries[table] = {partition: {"rows": counts[table]}}
     # Deliberately unreadable/unavailable protected input: no stat/read is allowed.
-    layout["dwd_security_bar"]["files"].append({
-        "table": "dwd_security_bar", "partition": "interval_size=1d/observation_start_year=2025",
-        "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2025/never-open.parquet",
-        "rows": 1, "size_bytes": 42, "sha256": "sha256:" + "5" * 64,
-    })
+    layout["dwd_security_bar"]["files"].append(
+        {
+            "table": "dwd_security_bar",
+            "partition": "interval_size=1d/observation_start_year=2025",
+            "path": (
+                "payload/dwd_security_bar/interval_size=1d/"
+                "observation_start_year=2025/never-open.parquet"
+            ),
+            "rows": 1,
+            "size_bytes": 42,
+            "sha256": "sha256:" + "5" * 64,
+        }
+    )
     purpose = "p10_governance_baseline_with_disclosed_coverage"
     write(root / "MATERIALIZATION.json", {"kind": KIND, "purpose": purpose, "layout": layout})
-    manifest = {"kind": KIND, "version": "2.3", "business_through": "2026-09-30",
-                "business_timezone": "Asia/Shanghai", "purpose": purpose,
-                "consumer_admission": "NOT_GRANTED", "content_digest": "sha256:" + "a" * 64,
-                "materialization_sha256": _hash(root / "MATERIALIZATION.json"),
-                "summaries": summaries}
+    manifest = {
+        "kind": KIND,
+        "version": "2.3",
+        "business_through": "2026-09-30",
+        "business_timezone": "Asia/Shanghai",
+        "purpose": purpose,
+        "consumer_admission": "NOT_GRANTED",
+        "content_digest": "sha256:" + "a" * 64,
+        "materialization_sha256": _hash(root / "MATERIALIZATION.json"),
+        "summaries": summaries,
+    }
     write(root / "manifest.json", manifest)
     (root / "READY").write_text(_hash(root / "manifest.json") + "\n")
     config = json.loads(BINDING.read_text())
@@ -118,10 +139,15 @@ class SourceContracts(unittest.TestCase):
             verify_seed_source(self.root, self.binding)
 
     def test_unknown_version_protected_scope_and_grant_rejected(self):
-        cases = [("source", "version", "2.2"), ("scope", "history_start", "2025-12-31"),
-                 ("scope", "history_end", "2026-10-01"), ("scope", "price_basis", "none"),
-                 ("scope", "minimum_open_sessions", 1), ("scope", "venues", ["BSE"]),
-                 ("authority", "official_cycle_authorized", True)]
+        cases = [
+            ("source", "version", "2.2"),
+            ("scope", "history_start", "2025-12-31"),
+            ("scope", "history_end", "2026-10-01"),
+            ("scope", "price_basis", "none"),
+            ("scope", "minimum_open_sessions", 1),
+            ("scope", "venues", ["BSE"]),
+            ("authority", "official_cycle_authorized", True),
+        ]
         for group, key, value in cases:
             with self.subTest(key=key):
                 raw = json.loads(BINDING.read_text())
@@ -136,17 +162,25 @@ class SourceContracts(unittest.TestCase):
 
     def test_outputs_cannot_overlap_source_or_replace_existing(self):
         with self.assertRaisesRegex(P6SeedError, "overlaps_source"):
-            build_seed(root=self.root, binding=self.binding, output=self.root / "out", code_revision="b"*40)
+            build_seed(
+                root=self.root,
+                binding=self.binding,
+                output=self.root / "out",
+                code_revision="b" * 40,
+            )
         out = self.root.parent / "existing"
         out.mkdir()
         with self.assertRaisesRegex(P6SeedError, "output_exists"):
-            build_seed(root=self.root, binding=self.binding, output=out, code_revision="b"*40)
+            build_seed(root=self.root, binding=self.binding, output=out, code_revision="b" * 40)
 
 
-@unittest.skipUnless(importlib.util.find_spec("duckdb"), "DuckDB unavailable; Parquet tests not run")
+@unittest.skipUnless(
+    importlib.util.find_spec("duckdb"), "DuckDB unavailable; Parquet tests not run"
+)
 class ParquetConstruction(unittest.TestCase):
     def setUp(self):
         import duckdb
+
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name) / "source"
@@ -162,12 +196,49 @@ class ParquetConstruction(unittest.TestCase):
         """)
         venue = "venue_bec59e31eb6bb28111a10d7e6d2c689f"
         queries = {
-            "dwd_trading_calendar": f"SELECT '{venue}' AS venue_id, CAST(d AS VARCHAR) AS calendar_session_id, d AS trade_date, true AS is_open, close_at-INTERVAL 1 DAY AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to, {lineage} FROM dates",
-            "dwd_security_bar": f"SELECT 'l1' AS listing_id, CAST(d AS VARCHAR) AS calendar_session_id, close_at-INTERVAL 5 HOUR AS observation_start, '1d' AS interval_size, 'UNADJUSTED' AS price_basis, 10.00::DECIMAL(18,4) AS open, 11.00::DECIMAL(18,4) AS high, 9.00::DECIMAL(18,4) AS low, 10.50::DECIMAL(18,4) AS close, 10000::BIGINT AS volume, 105000.0::DECIMAL(24,4) AS turnover, close_at-INTERVAL 1 SECOND AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to, CAST(d AS VARCHAR) AS source_record_id, 'r1' AS source_revision, {lineage} FROM dates",
-            "dwd_tradability_state": f"SELECT 'l1' AS listing_id, CAST(d AS VARCHAR) AS calendar_session_id, close_at-INTERVAL 5 HOUR AS observation_start, true AS is_tradable, true AS can_buy, true AS can_sell, close_at-INTERVAL 1 SECOND AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to, {lineage} FROM dates",
-            "dwd_listing": f"SELECT 'l1' AS listing_id, 's1' AS security_id, '{venue}' AS venue_id, '600001' AS listing_code, TIMESTAMPTZ '2025-12-01 00:00:00+08' AS effective_from, NULL::TIMESTAMPTZ AS effective_to, TIMESTAMPTZ '2025-12-01 00:00:00+08' AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to, {lineage}",
-            "dwd_security": f"SELECT 's1' AS security_id, 'co1' AS company_id, 'A_SHARE' AS instrument_type, TIMESTAMPTZ '2025-12-01 00:00:00+08' AS effective_from, NULL::TIMESTAMPTZ AS effective_to, TIMESTAMPTZ '2025-12-01 00:00:00+08' AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to, {lineage}",
-            "dwd_adjustment_factor": f"SELECT 's1' AS security_id, TIMESTAMPTZ '2026-06-01 00:00:00+08' AS effective_from, NULL::TIMESTAMPTZ AS effective_to, 1.0::DECIMAL(18,8) AS factor_value, TIMESTAMPTZ '2026-05-31 00:00:00+08' AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to, {lineage} WHERE false",
+            "dwd_trading_calendar": (
+                f"SELECT '{venue}' AS venue_id, CAST(d AS VARCHAR) AS calendar_session_id, "
+                "d AS trade_date, true AS is_open, close_at-INTERVAL 1 DAY AS knowledge_from, "
+                f"NULL::TIMESTAMPTZ AS knowledge_to, {lineage} FROM dates"
+            ),
+            "dwd_security_bar": (
+                "SELECT 'l1' AS listing_id, CAST(d AS VARCHAR) AS calendar_session_id, "
+                "close_at-INTERVAL 5 HOUR AS observation_start, '1d' AS interval_size, "
+                "'UNADJUSTED' AS price_basis, 10.00::DECIMAL(18,4) AS open, "
+                "11.00::DECIMAL(18,4) AS high, 9.00::DECIMAL(18,4) AS low, "
+                "10.50::DECIMAL(18,4) AS close, 10000::BIGINT AS volume, "
+                "105000.0::DECIMAL(24,4) AS turnover, "
+                "close_at-INTERVAL 1 SECOND AS knowledge_from, "
+                "NULL::TIMESTAMPTZ AS knowledge_to, CAST(d AS VARCHAR) AS source_record_id, "
+                f"'r1' AS source_revision, {lineage} FROM dates"
+            ),
+            "dwd_tradability_state": (
+                "SELECT 'l1' AS listing_id, CAST(d AS VARCHAR) AS calendar_session_id, "
+                "close_at-INTERVAL 5 HOUR AS observation_start, true AS is_tradable, "
+                "true AS can_buy, true AS can_sell, close_at-INTERVAL 1 SECOND AS knowledge_from, "
+                f"NULL::TIMESTAMPTZ AS knowledge_to, {lineage} FROM dates"
+            ),
+            "dwd_listing": (
+                f"SELECT 'l1' AS listing_id, 's1' AS security_id, '{venue}' AS venue_id, "
+                "'600001' AS listing_code, TIMESTAMPTZ '2025-12-01 00:00:00+08' AS effective_from, "
+                "NULL::TIMESTAMPTZ AS effective_to, "
+                "TIMESTAMPTZ '2025-12-01 00:00:00+08' AS knowledge_from, "
+                f"NULL::TIMESTAMPTZ AS knowledge_to, {lineage}"
+            ),
+            "dwd_security": (
+                "SELECT 's1' AS security_id, 'co1' AS company_id, 'A_SHARE' AS instrument_type, "
+                "TIMESTAMPTZ '2025-12-01 00:00:00+08' AS effective_from, "
+                "NULL::TIMESTAMPTZ AS effective_to, "
+                "TIMESTAMPTZ '2025-12-01 00:00:00+08' AS knowledge_from, "
+                f"NULL::TIMESTAMPTZ AS knowledge_to, {lineage}"
+            ),
+            "dwd_adjustment_factor": (
+                "SELECT 's1' AS security_id, "
+                "TIMESTAMPTZ '2026-06-01 00:00:00+08' AS effective_from, "
+                "NULL::TIMESTAMPTZ AS effective_to, 1.0::DECIMAL(18,8) AS factor_value, "
+                "TIMESTAMPTZ '2026-05-31 00:00:00+08' AS knowledge_from, "
+                f"NULL::TIMESTAMPTZ AS knowledge_to, {lineage} WHERE false"
+            ),
         }
         for table, query in queries.items():
             con.execute(f"CREATE TABLE {table} AS {query}")
@@ -184,8 +255,12 @@ class ParquetConstruction(unittest.TestCase):
         self.binding = seal(self.root, counts)
 
     def build(self, name="out"):
-        return build_seed(root=self.root, binding=self.binding, output=self.root.parent/name,
-                          code_revision="b"*40)
+        return build_seed(
+            root=self.root,
+            binding=self.binding,
+            output=self.root.parent / name,
+            code_revision="b" * 40,
+        )
 
     def test_construct_cold_reproduce_and_verify_real_parquet(self):
         from quanthus.concentration import StaticIndustryMembership
@@ -195,62 +270,88 @@ class ParquetConstruction(unittest.TestCase):
         )
         from quanthus.forward_validation.prospective_source import P6ProspectiveVisibility
         from quanthus.industry_mapping import IndustryMappingSource, StaticIndustryMapping
+
         first, second = self.build(), self.build("cold")
         self.assertEqual(first["content_digest"], second["content_digest"])
         self.assertTrue(first["diagnostics"]["input_validation_passed"])
         self.assertFalse(first["consumer_authorized"])
         self.assertEqual(first["official_observations_added"], 0)
         file = self.root.parent / "out/candidate-daily.parquet"
-        columns = {r[0] for r in self.con.execute(f"DESCRIBE SELECT * FROM read_parquet('{file}')").fetchall()}
+        columns = {
+            r[0]
+            for r in self.con.execute(f"DESCRIBE SELECT * FROM read_parquet('{file}')").fetchall()
+        }
         self.assertTrue(set(_CANDIDATE_SCAN_COLUMNS) <= columns)
-        price, observed, cutoff = self.con.execute(f"SELECT close_price,dwd_bar_knowledge_from,knowledge_cutoff FROM read_parquet('{file}') LIMIT 1").fetchone()
+        price, observed, cutoff = self.con.execute(
+            "SELECT close_price,dwd_bar_knowledge_from,knowledge_cutoff "
+            f"FROM read_parquet('{file}') LIMIT 1"
+        ).fetchone()
         self.assertEqual(str(price), "10.5000")
         self.assertLess(observed, cutoff)
         # Execute the existing P6 consumer over actual synthetic Parquet, not just
         # a column-name comparison. No activation/official date is manufactured.
         industry = StaticIndustryMapping(
-            path=self.root.parent / "synthetic-industry.json", schema_version="1.0.0",
-            mapping_version="synthetic", artifact_digest="sha256:" + "a"*64,
-            source=IndustryMappingSource("synthetic", "fixture", datetime(2026, 1, 1, tzinfo=timezone.utc), "r1"),
-            memberships=(StaticIndustryMembership("s1", "industry1", "synthetic", "r1", "fixture"),),
-        )
-        series = tuple(iter_projected_candidate_series(
-            SimpleNamespace(candidate_path=file),
-            source_policy=SimpleNamespace(
-                historical_visibility=P6ProspectiveVisibility(),
-                semantic_digest=first["content_digest"],
+            path=self.root.parent / "synthetic-industry.json",
+            schema_version="1.0.0",
+            mapping_version="synthetic",
+            artifact_digest="sha256:" + "a" * 64,
+            source=IndustryMappingSource(
+                "synthetic", "fixture", datetime(2026, 1, 1, tzinfo=timezone.utc), "r1"
             ),
-            industry_mapping=industry,
-        ))
+            memberships=(
+                StaticIndustryMembership("s1", "industry1", "synthetic", "r1", "fixture"),
+            ),
+        )
+        series = tuple(
+            iter_projected_candidate_series(
+                SimpleNamespace(candidate_path=file),
+                source_policy=SimpleNamespace(
+                    historical_visibility=P6ProspectiveVisibility(),
+                    semantic_digest=first["content_digest"],
+                ),
+                industry_mapping=industry,
+            )
+        )
         self.assertEqual(len(series), 1)
         self.assertEqual(len(series[0]), first["diagnostics"]["rows"])
         self.assertEqual(series[0][0].close_price, price)
-        self.assertEqual(verify_seed_artifact(file.parent)["content_digest"], first["content_digest"])
+        self.assertEqual(
+            verify_seed_artifact(file.parent)["content_digest"], first["content_digest"]
+        )
         file.write_bytes(b"corruption")
         with self.assertRaisesRegex(P6SeedError, "file_mismatch"):
             verify_seed_artifact(file.parent)
 
     def test_late_knowledge_is_missing_not_retimed(self):
-        self.con.execute((
-            "UPDATE dwd_security_bar SET knowledge_from=knowledge_from+INTERVAL 1 DAY "
-            "WHERE calendar_session_id='2026-09-30'"
-        ))
+        self.con.execute(
+            (
+                "UPDATE dwd_security_bar SET knowledge_from=knowledge_from+INTERVAL 1 DAY "
+                "WHERE calendar_session_id='2026-09-30'"
+            )
+        )
         self.reseal()
         result = self.build()
         self.assertFalse(result["diagnostics"]["input_validation_passed"])
         self.assertEqual(result["diagnostics"]["reason_counts"]["bar_missing_or_not_visible"], 1)
-        self.assertFalse((self.root.parent/"out/OFFLINE_VALIDATED").exists())
+        self.assertFalse((self.root.parent / "out/OFFLINE_VALIDATED").exists())
 
     def test_asof_selects_visible_old_version_not_latest(self):
-        self.con.execute("CREATE TABLE old AS SELECT * FROM dwd_security_bar WHERE calendar_session_id='2026-09-30'")
-        self.con.execute((
-            "UPDATE dwd_security_bar SET knowledge_to=knowledge_from+INTERVAL 1 DAY "
+        self.con.execute(
+            "CREATE TABLE old AS SELECT * FROM dwd_security_bar "
             "WHERE calendar_session_id='2026-09-30'"
-        ))
-        self.con.execute((
-            "INSERT INTO dwd_security_bar SELECT * REPLACE (knowledge_from+INTERVAL 1 "
-            "DAY AS knowledge_from, 20::DECIMAL(18,4) AS close) FROM old"
-        ))
+        )
+        self.con.execute(
+            (
+                "UPDATE dwd_security_bar SET knowledge_to=knowledge_from+INTERVAL 1 DAY "
+                "WHERE calendar_session_id='2026-09-30'"
+            )
+        )
+        self.con.execute(
+            (
+                "INSERT INTO dwd_security_bar SELECT * REPLACE (knowledge_from+INTERVAL 1 "
+                "DAY AS knowledge_from, 20::DECIMAL(18,4) AS close) FROM old"
+            )
+        )
         self.reseal()
         result = self.build()
         self.assertTrue(result["diagnostics"]["input_validation_passed"])
@@ -258,14 +359,16 @@ class ParquetConstruction(unittest.TestCase):
     def test_duplicate_identity_or_bar_blocks_validation(self):
         self.con.execute("INSERT INTO dwd_security_bar SELECT * FROM dwd_security_bar LIMIT 1")
         self.reseal()
-        self.assertEqual(self.build()["diagnostics"]["reason_counts"]["duplicate_listing_session"], 1)
+        self.assertEqual(
+            self.build()["diagnostics"]["reason_counts"]["duplicate_listing_session"], 1
+        )
 
     def test_wrong_price_basis_rejected_before_artifact_publication(self):
         self.con.execute("UPDATE dwd_security_bar SET price_basis='FORWARD_ADJUSTED'")
         self.reseal()
         with self.assertRaisesRegex(P6SeedError, "price_basis"):
             self.build()
-        self.assertFalse((self.root.parent/"out").exists())
+        self.assertFalse((self.root.parent / "out").exists())
 
     def test_missing_whole_open_session_cannot_disappear(self):
         for table in ("dwd_security_bar", "dwd_tradability_state"):

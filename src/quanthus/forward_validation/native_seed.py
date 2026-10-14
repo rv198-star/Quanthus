@@ -47,19 +47,44 @@ _PARTITIONS = {
 _COMMON = {"knowledge_from", "knowledge_to", "source_artifact_sha256"}
 _COLUMNS = {
     "dwd_security_bar": {
-        "listing_id", "calendar_session_id", "observation_start", "interval_size",
-        "price_basis", "open", "high", "low", "close", "volume", "turnover",
-        "source_record_id", "source_revision",
+        "listing_id",
+        "calendar_session_id",
+        "observation_start",
+        "interval_size",
+        "price_basis",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "turnover",
+        "source_record_id",
+        "source_revision",
     },
     "dwd_tradability_state": {
-        "listing_id", "calendar_session_id", "observation_start",
-        "is_tradable", "can_buy", "can_sell",
+        "listing_id",
+        "calendar_session_id",
+        "observation_start",
+        "is_tradable",
+        "can_buy",
+        "can_sell",
     },
     "dwd_trading_calendar": {"venue_id", "calendar_session_id", "trade_date", "is_open"},
     "dwd_listing": {
-        "listing_id", "security_id", "venue_id", "listing_code", "effective_from", "effective_to",
+        "listing_id",
+        "security_id",
+        "venue_id",
+        "listing_code",
+        "effective_from",
+        "effective_to",
     },
-    "dwd_security": {"security_id", "company_id", "instrument_type", "effective_from", "effective_to"},
+    "dwd_security": {
+        "security_id",
+        "company_id",
+        "instrument_type",
+        "effective_from",
+        "effective_to",
+    },
     "dwd_adjustment_factor": {"security_id", "effective_from", "effective_to", "factor_value"},
 }
 
@@ -82,24 +107,37 @@ class P6BaseSeedBinding:
             start = date.fromisoformat(scope["history_start"])
             end = date.fromisoformat(scope["history_end"])
             if (
-                raw["schema_version"] != SCHEMA or raw["purpose"] != PURPOSE
+                raw["schema_version"] != SCHEMA
+                or raw["purpose"] != PURPOSE
                 or raw["work_item"] != "P6-BASE-001"
-                or source["kind"] != KIND or source["version"] != "2.3"
+                or source["kind"] != KIND
+                or source["version"] != "2.3"
                 or source["package_id"] != "dwd-base-202609-v2.3"
                 or source["business_through"] != "2026-09-30"
                 or not date(2026, 1, 1) <= start <= end <= date(2026, 9, 30)
                 or scope["venues"] != ["SSE", "SZSE"]
-                or scope["interval_size"] != "1d" or scope["price_basis"] != "UNADJUSTED"
+                or scope["interval_size"] != "1d"
+                or scope["price_basis"] != "UNADJUSTED"
                 or scope["minimum_open_sessions"] != 120
                 or scope["knowledge_policy"] != "source_observed_at_or_before_each_session_close"
-                or canonical_json_bytes(authority) != canonical_json_bytes({
-                    "offline_construction_only": True, "consumer_admission": "NOT_GRANTED",
-                    "official_cycle_authorized": False, "execution_authorized": False,
-                    "protected_partition_access": False,
-                })
-                or any(not _SHA.fullmatch(source[k]) for k in (
-                    "manifest_sha256", "content_digest", "materialization_sha256",
-                ))
+                or canonical_json_bytes(authority)
+                != canonical_json_bytes(
+                    {
+                        "offline_construction_only": True,
+                        "consumer_admission": "NOT_GRANTED",
+                        "official_cycle_authorized": False,
+                        "execution_authorized": False,
+                        "protected_partition_access": False,
+                    }
+                )
+                or any(
+                    not _SHA.fullmatch(source[k])
+                    for k in (
+                        "manifest_sha256",
+                        "content_digest",
+                        "materialization_sha256",
+                    )
+                )
             ):
                 raise ValueError("scope, source or authority differs")
         except (KeyError, TypeError, ValueError) as exc:
@@ -114,7 +152,8 @@ class P6BaseSeedBinding:
 
 
 def verify_seed_source(
-    root: Path, binding: P6BaseSeedBinding,
+    root: Path,
+    binding: P6BaseSeedBinding,
 ) -> tuple[dict[str, Any], dict[str, tuple[Path, ...]], dict[str, int]]:
     """Hash the explicit 2026 subset once; never walk protected price partitions."""
     if digest_value(binding.raw) != binding.digest:
@@ -126,9 +165,16 @@ def verify_seed_source(
         raise P6SeedError("base_manifest_digest_mismatch")
     manifest = _object(manifest_path)
     if (
-        any(manifest.get(k) != source[k] for k in (
-            "kind", "version", "business_through", "content_digest", "materialization_sha256",
-        ))
+        any(
+            manifest.get(k) != source[k]
+            for k in (
+                "kind",
+                "version",
+                "business_through",
+                "content_digest",
+                "materialization_sha256",
+            )
+        )
         or manifest.get("business_timezone") != "Asia/Shanghai"
         or manifest.get("purpose") != "p10_governance_baseline_with_disclosed_coverage"
         or _member(root, "READY").read_text(encoding="ascii").strip() != source["manifest_sha256"]
@@ -159,8 +205,11 @@ def verify_seed_source(
             path = _member(root, record["path"])
             count = record.get("rows")
             if (
-                record.get("table") != table or record.get("partition") != partition
-                or type(count) is not int or count < 0 or path in selected
+                record.get("table") != table
+                or record.get("partition") != partition
+                or type(count) is not int
+                or count < 0
+                or path in selected
                 or path.stat().st_size != record.get("size_bytes")
                 or _hash(path) != record.get("sha256")
             ):
@@ -207,8 +256,13 @@ def _effective(alias: str) -> str:
     )
 
 
-def _construct(connection: Any, paths: dict[str, tuple[Path, ...]], counts: dict[str, int],
-               binding: P6BaseSeedBinding, output: Path) -> dict[str, Any]:
+def _construct(
+    connection: Any,
+    paths: dict[str, tuple[Path, ...]],
+    counts: dict[str, int],
+    binding: P6BaseSeedBinding,
+    output: Path,
+) -> dict[str, Any]:
     for table, members in paths.items():
         files = "[" + ",".join(_text(p) for p in members) + "]"
         connection.execute(
@@ -291,13 +345,13 @@ def _construct(connection: Any, paths: dict[str, tuple[Path, ...]], counts: dict
           l.listing_id IS NULL OR s.security_id IS NULL AS identity_missing_or_not_visible
         FROM keys k JOIN calendar c USING (calendar_session_id)
         LEFT JOIN dwd_listing l ON l.listing_id=k.listing_id AND l.venue_id=c.venue_id
-          AND {_visible('l')} AND {_effective('l')}
+          AND {_visible("l")} AND {_effective("l")}
         LEFT JOIN dwd_security s ON s.security_id=l.security_id
-          AND {_visible('s')} AND {_effective('s')}
+          AND {_visible("s")} AND {_effective("s")}
         LEFT JOIN dwd_security_bar b ON b.listing_id=k.listing_id
-          AND b.calendar_session_id=k.calendar_session_id AND {_visible('b')}
+          AND b.calendar_session_id=k.calendar_session_id AND {_visible("b")}
         LEFT JOIN dwd_tradability_state t ON t.listing_id=k.listing_id
-          AND t.calendar_session_id=k.calendar_session_id AND {_visible('t')}
+          AND t.calendar_session_id=k.calendar_session_id AND {_visible("t")}
         LEFT JOIN factor f ON f.security_id=s.security_id AND f.factor_date=c.session_date;
     """)
     diagnostics = _diagnose(connection, binding)
@@ -326,7 +380,10 @@ def _diagnose(connection: Any, binding: P6BaseSeedBinding) -> dict[str, Any]:
         "bar_missing_or_not_visible": "bar_missing_or_not_visible",
         "state_missing_or_not_visible": "state_missing_or_not_visible",
         "identity_missing_or_not_visible": "identity_missing_or_not_visible",
-        "calendar_not_visible": "dwd_calendar_knowledge_from IS NULL OR dwd_calendar_knowledge_from > knowledge_cutoff",
+        "calendar_not_visible": (
+            "dwd_calendar_knowledge_from IS NULL "
+            "OR dwd_calendar_knowledge_from > knowledge_cutoff"
+        ),
         "factor_not_visible": (
             "adjustment_effective AND (dwd_factor_knowledge_from IS NULL OR "
             "dwd_factor_knowledge_from > knowledge_cutoff)"
@@ -350,7 +407,9 @@ def _diagnose(connection: Any, binding: P6BaseSeedBinding) -> dict[str, Any]:
             "NOT state_missing_or_not_visible AND (is_tradable IS NULL OR can_buy IS "
             "NULL OR can_sell IS NULL OR (NOT is_tradable AND (can_buy OR can_sell)))"
         ),
-        "session_date_mismatch": "bar_session_date<>session_date OR state_session_date<>session_date",
+        "session_date_mismatch": (
+            "bar_session_date<>session_date OR state_session_date<>session_date"
+        ),
     }
     for table in ("listing", "security", "state", "calendar"):
         field = f"dwd_{table}_source_artifact_sha256"
@@ -370,12 +429,17 @@ def _diagnose(connection: Any, binding: P6BaseSeedBinding) -> dict[str, Any]:
     reasons["insufficient_open_sessions"] = int(len(dates) < 120)
     reasons["history_end_missing"] = int(not dates or dates[-1][0] != binding.history_end)
     reasons["empty_seed"] = int(rows == 0)
-    return {"rows": rows, "open_sessions": len(dates), "reason_counts": reasons,
-            "input_validation_passed": not any(reasons.values())}
+    return {
+        "rows": rows,
+        "open_sessions": len(dates),
+        "reason_counts": reasons,
+        "input_validation_passed": not any(reasons.values()),
+    }
 
 
-def build_seed(*, root: Path, binding: P6BaseSeedBinding, output: Path,
-               code_revision: str) -> dict[str, Any]:
+def build_seed(
+    *, root: Path, binding: P6BaseSeedBinding, output: Path, code_revision: str
+) -> dict[str, Any]:
     """Build a new immutable diagnostic Seed; refuse replacement or implicit reuse."""
     if not _REVISION.fullmatch(code_revision):
         raise P6SeedError("invalid_code_revision")
@@ -401,25 +465,43 @@ def build_seed(*, root: Path, binding: P6BaseSeedBinding, output: Path,
         connection.execute(f"SET temp_directory={_text(staging / 'spill')}")
         connection.execute("SET max_temp_directory_size='6GB'")
         build_started = perf_counter()
-        diagnostics = _construct(connection, paths, counts, binding, staging / "candidate-daily.parquet")
+        diagnostics = _construct(
+            connection, paths, counts, binding, staging / "candidate-daily.parquet"
+        )
         payload = {
-            "schema_version": ARTIFACT_SCHEMA, "purpose": PURPOSE,
-            "binding": binding.raw, "binding_digest": binding.digest,
-            "code_revision": code_revision, "duckdb_version": duckdb.__version__,
+            "schema_version": ARTIFACT_SCHEMA,
+            "purpose": PURPOSE,
+            "binding": binding.raw,
+            "binding_digest": binding.digest,
+            "code_revision": code_revision,
+            "duckdb_version": duckdb.__version__,
             "source_consumer_admission": manifest.get("consumer_admission"),
-            "consumer_authorized": False, "official_observations_added": 0,
-            "execution_authorized": False, "protected_price_partitions_opened": [],
-            "diagnostics": diagnostics, "source_row_counts": counts,
+            "consumer_authorized": False,
+            "official_observations_added": 0,
+            "execution_authorized": False,
+            "protected_price_partitions_opened": [],
+            "diagnostics": diagnostics,
+            "source_row_counts": counts,
             "files": {"candidate-daily.parquet": _hash(staging / "candidate-daily.parquet")},
-            "source_members": {t: [str(p.relative_to(root)) for p in pp] for t, pp in paths.items()},
+            "source_members": {
+                t: [str(p.relative_to(root)) for p in pp] for t, pp in paths.items()
+            },
         }
         payload["content_digest"] = digest_value(payload)
         payload["stages"] = [
-            {"stage": "verify_source", "elapsed_seconds": f"{source_seconds:.6f}",
-             "disposition": "built_once", "bytes": sum(p.stat().st_size for pp in paths.values() for p in pp)},
-            {"stage": "candidate_seed_and_validation", "elapsed_seconds": f"{perf_counter()-build_started:.6f}",
-             "disposition": "one_shared_TMP_seed", "rows": diagnostics["rows"],
-             "bytes": (staging / "candidate-daily.parquet").stat().st_size},
+            {
+                "stage": "verify_source",
+                "elapsed_seconds": f"{source_seconds:.6f}",
+                "disposition": "built_once",
+                "bytes": sum(p.stat().st_size for pp in paths.values() for p in pp),
+            },
+            {
+                "stage": "candidate_seed_and_validation",
+                "elapsed_seconds": f"{perf_counter() - build_started:.6f}",
+                "disposition": "one_shared_TMP_seed",
+                "rows": diagnostics["rows"],
+                "bytes": (staging / "candidate-daily.parquet").stat().st_size,
+            },
         ]
         (staging / "manifest.json").write_bytes(canonical_json_bytes(payload) + b"\n")
         if diagnostics["input_validation_passed"]:
@@ -444,7 +526,8 @@ def verify_seed_artifact(output: Path) -> dict[str, Any]:
     payload = _object(_member(root, "manifest.json"))
     if (
         payload.get("schema_version") != ARTIFACT_SCHEMA
-        or payload.get("purpose") != PURPOSE or payload.get("consumer_authorized") is not False
+        or payload.get("purpose") != PURPOSE
+        or payload.get("consumer_authorized") is not False
         or payload.get("execution_authorized") is not False
         or payload.get("official_observations_added") != 0
         or payload.get("protected_price_partitions_opened") != []
@@ -482,13 +565,28 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "build":
-            result = build_seed(root=args.root, binding=P6BaseSeedBinding.load(args.binding),
-                                output=args.output, code_revision=args.code_revision)
+            result = build_seed(
+                root=args.root,
+                binding=P6BaseSeedBinding.load(args.binding),
+                output=args.output,
+                code_revision=args.code_revision,
+            )
         else:
             result = verify_seed_artifact(args.output)
-        print(json.dumps({k: result[k] for k in (
-            "content_digest", "diagnostics", "consumer_authorized", "official_observations_added",
-        )}, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    k: result[k]
+                    for k in (
+                        "content_digest",
+                        "diagnostics",
+                        "consumer_authorized",
+                        "official_observations_added",
+                    )
+                },
+                sort_keys=True,
+            )
+        )
         return 0 if result["diagnostics"]["input_validation_passed"] else 2
     except (P6SeedError, NativeBase23Error, OSError, ValueError) as exc:
         print(json.dumps({"status": "BLOCKED", "reason": str(exc), "consumer_authorized": False}))

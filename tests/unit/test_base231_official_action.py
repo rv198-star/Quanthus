@@ -190,3 +190,61 @@ def test_sse_current_table_conflicts_do_not_become_success(fault):
         body = body.replace("2026/9/29", "2026/10/8")
     with pytest.raises(RuntimeError):
         parse_distribution(body, code="600001", venue="SSE", expected_ex_date=date(2026, 9, 29))
+
+
+@pytest.mark.parametrize(
+    "wording", ["派发现金红利人民币", "派发现金股利人民币", "派现金红利人民币"]
+)
+def test_szse_explicit_rmb_before_amount_preserves_original_decimal(wording):
+    body = BODY.replace("派2.50元人民币现金", wording + "2.50元")
+    row, _ = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15)
+    )
+    assert row["cash_per_share"] == Decimal("0.250")
+    with pytest.raises(RuntimeError):
+        parse_distribution(
+            body.replace("人民币", "美元"),
+            code="003018",
+            venue="SZSE",
+            expected_ex_date=date(2026, 7, 15),
+        )
+    with pytest.raises(RuntimeError):
+        parse_distribution(
+            body.replace("人民币", ""),
+            code="003018",
+            venue="SZSE",
+            expected_ex_date=date(2026, 7, 15),
+        )
+
+
+def test_explicit_rmb_word_order_does_not_hide_conflicting_implemented_amount():
+    body = BODY.replace("三、股权", "每10股派发现金红利人民币3元（含税）三、股权")
+    with pytest.raises(RuntimeError, match="EXPLICIT_TERM"):
+        parse_distribution(body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15))
+
+
+def test_sse_current_explicit_rmb_prefix_uses_per_share_amount():
+    body = SSE_CURRENT.replace("每股派发现金红利", "每股派发现金红利人民币")
+    row, _ = parse_distribution(
+        body, code="600001", venue="SSE", expected_ex_date=date(2026, 9, 29)
+    )
+    assert row["cash_per_share"] == Decimal("0.02")
+
+
+def test_legacy_sse_explicit_rmb_prefix_does_not_change_per_share_scale():
+    body = """688115上海证券交易所年度权益分派实施公告
+    每股分配比例A股每股现金红利人民币0.067元（含税） 相关日期
+    股权登记日 除权（息）日 现金红利发放日
+    2026/7/14 2026/7/15 2026/7/15 一、股东会
+    """
+    row, _ = parse_distribution(
+        body, code="688115", venue="SSE", expected_ex_date=date(2026, 7, 15)
+    )
+    assert row["cash_per_share"] == Decimal("0.067")
+    with pytest.raises(RuntimeError):
+        parse_distribution(
+            body.replace("人民币", "美元"),
+            code="688115",
+            venue="SSE",
+            expected_ex_date=date(2026, 7, 15),
+        )

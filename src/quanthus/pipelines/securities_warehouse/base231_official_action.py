@@ -97,7 +97,8 @@ def parse_distribution(
             else _per_ten(
                 _one(
                     r"每10股派(?:发现金红利|现金红利|发现金股利|现金股利)?"
-                    r"([0-9]+(?:\.[0-9]+)?)元人民币现金[（(【]含税",
+                    r"(?=人民币|[0-9]+(?:\.[0-9]+)?元人民币现金)"
+                    r"(?:人民币)?([0-9]+(?:\.[0-9]+)?)元(?:人民币现金)?[（(【]含税",
                     section,
                 )
             )
@@ -125,14 +126,16 @@ def parse_distribution(
             if len(ordered_dates) not in {3, 4}:
                 raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
             record_date, ex_date = [date(*map(int, d)) for d in ordered_dates[:2]]
-            cash = Decimal(_one(r"每股现金红利([0-9]+(?:\.[0-9]+)?)元", section))
+            cash = Decimal(_one(r"每股现金红利(?:人民币)?([0-9]+(?:\.[0-9]+)?)元", section))
         else:
             match = re.search(r"二、分配方案(.+?)三、相关日期", text)
             if match is None:
                 raise BoundedError("OFFICIAL_ACTION_IMPLEMENTATION_SECTION_MISSING")
             section = match[1]
             record_date, ex_date = sse_distribution_dates(body)
-            cash = Decimal(_one(r"每股派发现金红利([0-9]+(?:\.[0-9]+)?)元[（(]含税[）)]", section))
+            cash = Decimal(
+                _one(r"每股派发现金红利(?:人民币)?([0-9]+(?:\.[0-9]+)?)元[（(]含税[）)]", section)
+            )
         bonus = (
             Decimal(_one(r"每股派送红股([0-9]+(?:\.[0-9]+)?)股", section))
             if "每股派送红股" in section

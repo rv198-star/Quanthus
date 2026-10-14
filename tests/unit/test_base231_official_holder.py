@@ -467,3 +467,57 @@ def test_split_quantity_first_uses_explicit_header_without_guessing_nature():
     assert rows[0]["category"] is None
     with pytest.raises(RuntimeError):
         parse_top_matrix(body.replace("1001  1.00", "1002  1.00", 1), hints)
+
+
+def test_wrapped_strategic_note_ends_before_its_continuation_rows():
+    body, hints = sample()
+    body = body.replace(
+        "上述股东关联关系的说明：未知",
+        "战略投资者或一般法人\n因配售新股成为前10名\n股东的情况（如有）\n不适用\n上述股东关联关系的说明：未知",
+    )
+    assert len(parse_top_matrix(body, hints)[0]) == 10
+
+
+def test_explicit_unknown_nature_is_retained_as_source_unknown():
+    body, hints = sample()
+    body = body.replace("合成股东1  其他", "合成股东1  未知", 1)
+    rows, _ = parse_top_matrix(body, hints)
+    assert rows[0]["category"] == "未知"
+
+
+def test_share_unit_can_precede_wrapped_shareholder_census_but_nearest_unit_wins():
+    body, hints = sample()
+    body = body.replace("单位：股\n", "单位：股\n" + "股东总数说明\n" * 20)
+    assert len(parse_top_matrix(body, hints)[0]) == 10
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("前10名股东持股", "单位：万元\n前10名股东持股"), hints)
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("单位：股", "单位：份"), hints)
+
+
+def test_nature_last_wrapped_name_cell_does_not_absorb_right_hand_change_value():
+    body, hints = nature_last_sample()
+    body = body.replace("股东名称  报告期内增减", "股东名称         报告期内增减")
+    hints[0]["HOLDER_NAME"] = "合成股东四号名称续名"
+    body = body.replace("合成股东1  -2", "合成股东四号名称 -7\n续名  -2", 1)
+    assert parse_top_matrix(body, hints)[0][0]["name"] == hints[0]["HOLDER_NAME"]
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("四号名称 -7", "错误名称 -7"), hints)
+
+
+def test_nearest_unsupported_source_unit_is_not_skipped_for_an_older_share_unit():
+    body, hints = sample()
+    body = body.replace("单位：股", "单位：股\n单位：份")
+    with pytest.raises(RuntimeError, match="SHARE_UNIT"):
+        parse_top_matrix(body, hints)
+
+
+def test_existing_strategic_heading_ends_even_with_interposed_right_hand_note():
+    body, hints = sample()
+    body = body.replace(
+        "上述股东关联关系的说明：未知",
+        "战略投资者或一般法人因配售新股成为前 10\n"
+        "                         无。\n"
+        "名股东的情况（如有）\n上述股东关联关系的说明：未知",
+    )
+    assert len(parse_top_matrix(body, hints)[0]) == 10

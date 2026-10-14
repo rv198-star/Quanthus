@@ -17,11 +17,10 @@ The Owner explicitly authorized necessary additional acquisition for items 1–8
 No production mutation, credentials, ACL, node transfer or publication is implied.
 
 The prior active ledger is `artifacts/base231-priority-batch-20261014T055731Z-af1d811/current-gaps-v2.json`;
-its pending prose is superseded by current actual output/cold receipts. The current handoff ledger is `current-gaps.json` under
+its pending prose is superseded by current actual output/cold receipts. The current handoff ledger is `current-gaps-final2.json` under
 `artifacts/base231-convergence-20261014T131000Z-b84130c`; its handoff binds the
 final local commit, exact source executions and scoped outputs.
-The predecessor `current-gaps-final.json` remains historical. The
-earlier `current-gaps.json` is a pre-seal draft, not a second live gap list.
+The predecessor ledgers remain historical snapshots, not additional live gap lists.
 Neither source capture nor a domain seal is full acceptance.
 The unchanged full predecessor manifest is
 `91845422851368028e4e8a6b83e0dc9ba2a9e30dfdd8e4d6de892f64adac1d7f`.
@@ -37,13 +36,13 @@ Current verified materializations:
   with explicit source currency. Old unknown-currency F10 literals stay unknown.
   Reusing the same qualified origin TMP for 519 envelopes adds 852 prelisting
   reports and 75,124 facts at actual new knowledge; no listed-period duplication.
-- G03: 35 additional complete official matrices / 350 native rows, after
+- G03: 41 additional complete official matrices / 410 native rows, after
   whole-name-chain, exact-quantity, official-percentage and full-candidate replay.
   Native floating tables without a percentage column keep percentage unknown.
-  Source completeness is 1,046 / 1,147 coordinates; source-priority conflicts,
+  Source completeness is 1,052 / 1,147 coordinates; source-priority conflicts,
   identity and unhandled layouts remain separate, not silently accepted.
 - G06: 1,473 original bodies plus 16 qualified large original bodies, each with
-  typed disclosure and subject observations; 161 implemented distributions and
+  typed disclosure and subject observations; 218 implemented distributions and
   terms. Remaining scanned/unsupported bodies are not no-change proof.
   All 32 previous size-limit failures were actually fetched, 1,438,690,706 bytes;
   16 large PDFs have blank extracted text. Original failures remain evidence.
@@ -56,7 +55,7 @@ Current verified materializations:
   matches the retained provider name for each target. They use explicit effective dates and unchanged
   security/listing parents, not current provider names backfilled into history.
 
-The final holder and name scopes are `G03-official-complete-matrices-v11` and
+The final holder and name scopes are `G03-official-complete-matrices-v17` and
 `G07-official-dated-short-names-v4`; earlier attempts remain historical evidence.
 The source-specific name adapter covers direct start dates, numbered current
 warning fields, an explicit warning-withdrawal/resumption chain and explicit
@@ -154,7 +153,7 @@ pagination returned repeated first pages, so captures never assert complete inde
 coverage; exact matched body identity remains independently checked.
 
 Continuation: reuse all sealed scopes with identical inputs. Group the remaining
-62 official holder layout/field cases by actual layout before extending adapters;
+56 official holder report/layout/field cases by actual layout before extending adapters;
 28 require dated issuer evidence and 11 have no exact ten-row hint census. The
 42 original cross-source disagreements remain unarbitrated. The 30 blank/scan
 PDFs and two unmatched original announcement IDs require exact body evidence,
@@ -176,23 +175,23 @@ heading variants and single-A-share SSE implementation-date tables. Undisclosed
 bonus/transfer components remain null; only an explicit statement inside the
 implemented section establishes zero. Tax conflicts, A/B date ambiguity, proposals,
 source/listing/venue/calendar failure and post-cutoff implementation remain held
-or outside scope. The frozen 360-source cohort yields 213 qualified implemented
-actions/213 stated terms, 54 post-September30 implementations and 93 unresolved
+or outside scope. The frozen 360-source cohort yields 218 qualified implemented
+actions/218 stated terms, 54 post-September30 implementations and 88 unresolved
 layout/term/scope candidates. A candidate is not necessarily a missing action;
 title/body availability alone never establishes whole-weekly completeness.
 
 Holder adaptations preserve wrapped left-column names alongside right-hand
 pledge cells and use physical header order for quantity-first/split rows. Exact
-names, ten ranks, native percentages and quantities remain mandatory. Forty
-complete official matrices / 400 rows now cover 1,051 / 1,147 original source
+names, ten ranks, native percentages and quantities remain mandatory. Forty-one
+complete official matrices / 410 rows now cover 1,052 / 1,147 original source
 coordinates; this is source completeness, not resolution of all source conflicts.
-The remaining 96 comprise 57 report/layout/field, 28 dated-issuer and 11 exact
+The remaining 95 comprise 56 report/layout/field, 28 dated-issuer and 11 exact
 provider-frame cases. Twenty-one of the prior layout targets have no exact report
 in the selected original-report inventory; no global absence is asserted.
 
 The original 42 source disagreements were crosschecked against the new official
-scope: 15 exact coordinates have complete official matrices. Thirty-three original
-raw frames were replayed from unchanged hashed members. Twenty-nine could be
+scope: 16 exact coordinates have complete official matrices. Thirty-five original
+raw frames were replayed from unchanged hashed members. Thirty-one could be
 compared, four retain coordinate/component constraints. Comparisons distinguish
 already-normalized native quantities from their retained 万股/亿股 tokens, and
 never apply scale twice or compare unlike percentage denominators. Membership and
@@ -201,9 +200,11 @@ error. Keep each source matrix separate; no flat union, arbitrary source priorit
 net change or inferred exit. Historical arbitration remains open for all 42.
 
 Final ordinary-code identities use new immutable domain siblings
-`G03-official-complete-matrices-v13` and `G06-dated-distribution-terms-v3` under
-`/var/tmp/base231-convergence-20261014T131000Z-b84130c`. The formatting rebind retains
-all earlier attempts and byte-identical native/source files and clocks. Both final
+`G03-official-complete-matrices-v17` and `G06-dated-distribution-terms-v4` under
+`/var/tmp/base231-convergence-20261014T131000Z-b84130c`. The current grouped continuation retains all earlier attempts. All 40 prior holder
+business matrices are unchanged; the additional explicit-unknown category matrix
+does not invent a known category. The 213 prior distribution business coordinates
+are retained alongside five explicitly RMB-denominated original SSE announcements. Both final
 domains have two independent cold reconstructions plus disposable missing/corrupt
 negatives. Their READY seals remain domain-only; full successor integration,
 capacity qualification and whole-image acceptance remain separate.
@@ -214,3 +215,33 @@ receipts remain historical. No source acquisition, payload cleanup, production
 mutation or new OCR/system-package installation occurred in this continuation.
 The new source-matrix comparison is a bounded diagnostic under the existing P10
 source-scoped delivery design, not a new consumer or historical-precision policy.
+
+
+The second holder group recognizes wrapped strategic-note boundaries and explicit
+source `未知` nature, preserving the existing layouts as the first parser family.
+The separate physical-name-cell fallback still requires the complete ten names,
+original quantities and ranks. The nearest explicit unit wins: `份` or an
+unsupported unit never falls back to an older `股` declaration. No CDR unit
+conversion or footnote-name identity inference is admitted. The whole original
+40-frame business digest set is checked against the current 41-frame output.
+
+The cash-term grammar accepts explicit `人民币` before an amount as well as the
+original suffix order. Unlike Chinese-language inference, the source bytes supply
+the currency token. Original implemented sections, tax status, per-share/per-ten
+scale, market/date identity and conflicting amounts remain checked. Titles and
+proposal sections never supply missing implemented values. All new observations
+retain actual acquisition/governance clocks and do not qualify September PIT.
+
+Docs-impact: the bounded parser families implement existing source qualification
+and fail-closed contracts. No warehouse architecture, consumer gate, priority
+arbitration or policy is changed. Full successor integration and whole-image cold
+acceptance remain separate, capacity-gated stages.
+
+The final cash-reference scope is rebound as `G09-complete-cash-plan-v3` under the
+current convergence job. Its physical native/source bytes and all original
+knowledge clocks remain unchanged. This is required because the cash parser's
+ordinary-code hash changed; an old READY alone cannot establish current-code
+replay. The rebind requires full local reconstruction, two source-hidden cold
+relocations and missing/corrupt negatives before its new domain seal. Other
+retained domains keep their existing code/input identities; their prior receipts
+are reused rather than rebuilding identical prerequisites.

@@ -21,7 +21,7 @@ from .financial_reporting import FinancialCompanyIdentity
 from .ownership_capital import _stable_holder_key, ownership_capital_schemas
 
 CONTRACT_ID = "p10-base231-official-complete-holder-matrix-reconciled-hints-v1"
-_NATURE = "国有法人|境外法人|境内非国有法人|境内自然人|境外自然人|其他"
+_NATURE = "国有法人|境外法人|境内非国有法人|境内自然人|境外自然人|其他|未知"
 _WRAPPED_NATURE = (
     _NATURE + "|境内非国有法|境内非国有|境内非国|有法人|法人|国有法|"
     "境内自然|境外自然|境外法|境内法|自然人|然人|人"
@@ -54,6 +54,20 @@ def _validate_hints(hints: list[dict[str, Any]]) -> None:
 def parse_top_matrix(
     body: str, hints: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    try:
+        return _parse_top_matrix(body, hints, physical_name_cells=False)
+    except BoundedError as error:
+        if str(error) != "OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN":
+            raise
+    # Preserve the already qualified source grammar. A separate explicit-column
+    # family may resolve wrapped non-name cells, but never weakens full names,
+    # complete ranks or original quantity reconciliation.
+    return _parse_top_matrix(body, hints, physical_name_cells=True)
+
+
+def _parse_top_matrix(
+    body: str, hints: list[dict[str, Any]], *, physical_name_cells: bool
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not isinstance(body, str) or not 0 < len(body.encode()) <= 16 * 1024**2:
         raise BoundedError("OFFICIAL_HOLDER_BODY_BOUND")
     _validate_hints(hints)
@@ -66,8 +80,8 @@ def parse_top_matrix(
     if len(starts) != 1:
         raise BoundedError("OFFICIAL_HOLDER_UNIQUE_COMPLETE_TOP_MATRIX_REQUIRED")
     start = starts[0]
-    before = _norm("\n".join(lines[max(0, start - 15) : start + 6]))
-    units = re.findall(r"单位[:：](万股|股|元|万元)", before)
+    before = "\n".join(lines[max(0, start - 32) : start + 6])
+    units = re.findall(r"单位\s*[:：]\s*(\S+)", before)
     if not units or units[-1] != "股":
         raise BoundedError("OFFICIAL_HOLDER_EXPLICIT_SHARE_UNIT_REQUIRED")
     end = next(
@@ -75,6 +89,13 @@ def parse_top_matrix(
             i
             for i in range(start + 1, len(lines))
             if _norm(lines[i]).startswith("战略投资者或一般法人因")
+            or (
+                _norm(lines[i]).startswith("战略投资者或一般法人")
+                and re.search(
+                    r"战略投资者或一般法人因配售新股成为前(?:10|十)名股东",
+                    _norm("".join(lines[i : i + 5])),
+                )
+            )
             or any(
                 t in _norm(lines[i])
                 for t in [
@@ -144,6 +165,31 @@ def parse_top_matrix(
         == sorted(header_columns, key=lambda value: -1 if value is None else value)
         and len(set(header_columns)) == 4
     )
+    nature_column = column("股东性质")
+    name_fence = (
+        header_columns[0]
+        if nature_last
+        else (
+            nature_column
+            if nature_column is not None
+            and quantity_column is not None
+            and nature_column < quantity_column
+            else None
+        )
+    )
+    if not physical_name_cells:
+        name_fence = None
+
+    def name_cell(line: str) -> str:
+        if name_fence is None:
+            return re.split(r"\s{2,}", line.strip())[0]
+        width = 0
+        for i, char in enumerate(line):
+            width += 2 if unicodedata.east_asian_width(char) in {"W", "F"} else 1
+            if width > name_fence:
+                return line[:i].strip()
+        return line.strip()
+
     last_nature_pattern = re.compile(
         r"^(.*?)\s+[+-]?[0-9][0-9,]*(?:\.[0-9]+)?\s+"
         r"([0-9][0-9,]*(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)(%?)\s+"
@@ -218,16 +264,17 @@ def parse_top_matrix(
             offset += len(fragment)
             continue
         stripped = line.strip()
-        left_cell = re.split(r"\s{2,}", stripped)[0]
+        left_cell = name_cell(line)
         indent = len(line) - len(line.lstrip())
         # These are this source layout's column headers/right-hand cells and
         # page furniture. Every left-column name byte must match the full chain.
         if (
             not stripped
             or indent > 8
+            and (name_fence is None or indent >= name_fence)
             or stripped.isdecimal()
             or line_index < first_numeric
-            and stripped in {"例", "况", "称", "质", "数量", "股东名", "股东性"}
+            and _norm(left_cell) in {"例", "况", "称", "质", "数量", "股东名", "股东性", "(全称)"}
             or re.fullmatch(r".+\d{4}年(?:第[一二三四]季度|年度|半年度)报告(?:全文)?", _norm(line))
             or any(
                 k in left_cell
@@ -245,7 +292,7 @@ def parse_top_matrix(
             )
         ):
             continue
-        fragment = _norm(re.split(r"\s{2,}", stripped)[0])
+        fragment = _norm(left_cell)
         parts.append(fragment)
         offset += len(fragment)
     ordered = sorted(hints, key=lambda r: r["HOLDER_RANK"])
@@ -324,9 +371,7 @@ def parse_floating_matrix(
     if len(starts) != 1:
         raise BoundedError("OFFICIAL_FLOATING_UNIQUE_COMPLETE_MATRIX_REQUIRED")
     start = starts[0]
-    units = re.findall(
-        r"单位[:：](万股|股|元|万元)", _norm("\n".join(lines[max(0, start - 200) : start + 6]))
-    )
+    units = re.findall(r"单位\s*[:：]\s*(\S+)", "\n".join(lines[max(0, start - 200) : start + 6]))
     if not units or units[-1] != "股":
         raise BoundedError("OFFICIAL_HOLDER_EXPLICIT_SHARE_UNIT_REQUIRED")
     end = next(

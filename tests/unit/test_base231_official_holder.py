@@ -64,6 +64,58 @@ def test_wrapped_nature_after_numeric_row_preserves_complete_name_chain():
     assert rows[0]["category"] is None
 
 
+def split_numeric_sample():
+    body, hints = sample()
+    hints[0]["HOLDER_NAME"] = "合成公司全称"
+    body = body.replace(
+        "合成股东1  其他  1.00%  1001  0  不适用  0",
+        "合成公司  境内非国有法\n                    1.00%  1001  0  不适用  0\n全称         人",
+    )
+    body = body.replace("合成股东2", "合成公司2025年第三季度报告\n合成股东2", 1)
+    return body, hints
+
+
+def test_explicit_column_order_binds_split_nature_and_numeric_row_without_inventing_category():
+    body, hints = split_numeric_sample()
+    rows, proof = parse_top_matrix(body, hints)
+    assert len(rows) == proof["rows"] == 10
+    assert rows[0]["name"] == "合成公司全称"
+    assert rows[0]["quantity"] == 1001
+    assert rows[0]["raw_percentage"] == "1.00%"
+    assert rows[0]["category"] is None
+
+
+@pytest.mark.parametrize("fault", ["order", "header", "quantity", "name", "extent"])
+def test_split_numeric_rows_do_not_bypass_explicit_header_or_full_frame(fault):
+    body, hints = split_numeric_sample()
+    if fault == "order":
+        body = body.replace("持股比例  持股数量", "持股数量  持股比例")
+    elif fault == "header":
+        body = body.replace("持股比例  持股数量", "未确认列甲  未确认列乙")
+    elif fault == "quantity":
+        body = body.replace("1.00%  1001", "1.00%  1002", 1)
+    elif fault == "name":
+        body = body.replace("全称         人", "多余全称         人")
+    else:
+        body = body.replace("                    1.00%  1001  0  不适用  0", "")
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body, hints)
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_top_matrix_ends_at_explicit_strategic_investor_note_section(wrapped):
+    body, hints = sample()
+    body = body.replace(
+        "上述股东关联关系的说明：未知", "战略投资者或一般法人因配售新股成为前10名股东的情况\n不适用"
+    )
+    if wrapped:
+        body = body.replace("一般法人因配售", "一般法人因\n配售")
+    rows, _ = parse_top_matrix(body, hints)
+    assert len(rows) == 10
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("战略投资者或", "额外未说明股东\n战略投资者或"), hints)
+
+
 def floating_sample():
     _, hints = sample()
     lines = [
@@ -86,6 +138,28 @@ def test_complete_floating_table_does_not_infer_undisclosed_percentage():
     assert rows[0]["percentage"] is None
     assert rows[0]["share_nature"] == "人民币普通股"
     assert proof["percentage_authority"] == "NOT_DISCLOSED_IN_OFFICIAL_FLOATING_TABLE"
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_floating_matrix_ends_at_explicit_cross_holder_relation_note(wrapped):
+    from quanthus.pipelines.securities_warehouse.base231_official_holder import (
+        parse_floating_matrix,
+    )
+
+    body, hints = floating_sample()
+    body = body.replace(
+        "上述股东关联关系的说明",
+        "前10名无限售流通股股东之间，以及前10名无限售流通股股东和前10名股东之间的关联关系\n未知",
+    )
+    if wrapped:
+        body = body.replace("前10名无限售流通股", "前10名无限售流通\n股")
+    rows, _ = parse_floating_matrix(body, hints)
+    assert len(rows) == 10
+    with pytest.raises(RuntimeError):
+        parse_floating_matrix(
+            body.replace("前10名无限售流通", "额外未说明股东\n前10名无限售流通", 1),
+            hints,
+        )
 
 
 @pytest.mark.parametrize("fault", ["name", "quantity", "shares", "extra", "unit", "rank"])

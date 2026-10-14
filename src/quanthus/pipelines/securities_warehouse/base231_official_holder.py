@@ -74,9 +74,17 @@ def parse_top_matrix(
         (
             i
             for i in range(start + 1, len(lines))
-            if any(
+            if _norm(lines[i]).startswith("战略投资者或一般法人因")
+            or any(
                 t in _norm(lines[i])
-                for t in ["上述股东关联关系", "前10名无限售", "前十名无限售", "上述股东涉及委托"]
+                for t in [
+                    "上述股东关联关系",
+                    "前10名无限售",
+                    "前十名无限售",
+                    "上述股东涉及委托",
+                    "战略投资者或一般法人因配售新股成为前10名股东",
+                    "战略投资者或一般法人因配售新股成为前十名股东",
+                ]
             )
         ),
         len(lines),
@@ -100,6 +108,26 @@ def parse_top_matrix(
         return next(iter(positions)) if len(positions) == 1 else None
 
     header_columns = [column(label) for label in ["报告期内增减", "期末持股数", "比例", "股东性质"]]
+    percentage_column = next(
+        (value for label in ["持股比", "比例"] if (value := column(label)) is not None), None
+    )
+    quantity_column = next(
+        (
+            value
+            for label in ["持股数量", "报告期末持股", "期末持股数"]
+            if (value := column(label)) is not None
+        ),
+        None,
+    )
+    split_percentage_first = (
+        percentage_column is not None
+        and quantity_column is not None
+        and percentage_column < quantity_column
+    )
+    split_numeric_pattern = re.compile(
+        r"^(.*?)\s+([0-9]+(?:\.[0-9]+)?)%\s+"
+        r"([0-9][0-9,]*(?:\.[0-9]+)?)\s+"
+    )
     nature_last = bool(
         "(%)" in header
         and all(value is not None for value in header_columns)
@@ -125,7 +153,7 @@ def parse_top_matrix(
     parts: list[str] = []
     anchors: list[dict[str, Any]] = []
     offset = 0
-    for line in block:
+    for line_index, line in enumerate(block):
         match = last_nature_pattern.match(line) if nature_last else anchor_pattern.match(line)
         if match:
             fragment = _norm(match[1].strip())
@@ -154,6 +182,26 @@ def parse_top_matrix(
             parts.append(fragment)
             offset += len(fragment)
             continue
+        # Some tables wrap the nature into another physical line. This family
+        # requires an explicit percentage-before-quantity column order and a
+        # native '%' token. Full official names, all ten rows and exact hint
+        # quantities are still checked below; no category is reconstructed.
+        split = split_numeric_pattern.match(line) if split_percentage_first else None
+        if split:
+            fragment = _norm(split[1].strip())
+            anchors.append(
+                dict(
+                    start=offset,
+                    end=offset + len(fragment),
+                    nature=None,
+                    pct=split[2],
+                    qty=split[3],
+                    raw_pct=split[2] + "%",
+                )
+            )
+            parts.append(fragment)
+            offset += len(fragment)
+            continue
         stripped = line.strip()
         indent = len(line) - len(line.lstrip())
         # These are this source layout's column headers/right-hand cells and
@@ -162,6 +210,9 @@ def parse_top_matrix(
             not stripped
             or indent > 8
             or stripped.isdecimal()
+            or line_index < first_numeric
+            and stripped in {"例", "况", "称", "质", "数量", "股东名", "股东性"}
+            or re.fullmatch(r".+\d{4}年(?:第[一二三四]季度|年度|半年度)报告(?:全文)?", _norm(line))
             or any(
                 k in stripped
                 for k in [
@@ -266,7 +317,8 @@ def parse_floating_matrix(
         (
             i
             for i in range(start + 1, len(lines))
-            if any(
+            if _norm(lines[i]).startswith(("前10名无限售流通", "前十名无限售流通"))
+            or any(
                 t in _norm(lines[i])
                 for t in [
                     "上述股东",
@@ -274,6 +326,8 @@ def parse_floating_matrix(
                     "前十名无限售条",
                     "持股5%以上股东",
                     "前10名股东参与",
+                    "前10名无限售流通股股东之间",
+                    "前十名无限售流通股股东之间",
                 ]
             )
         ),

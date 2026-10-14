@@ -17,9 +17,11 @@ The Owner explicitly authorized necessary additional acquisition for items 1–8
 No production mutation, credentials, ACL, node transfer or publication is implied.
 
 The prior active ledger is `artifacts/base231-priority-batch-20261014T055731Z-af1d811/current-gaps-v2.json`;
-its pending prose is superseded by current actual output/cold receipts. The new
-current ledger must bind the final local commit, exact source executions and scoped
-outputs before handoff. Neither source capture nor a domain seal is full acceptance.
+its pending prose is superseded by current actual output/cold receipts. The active
+handoff ledger is `current-gaps-final.json` under the current controls; its handoff
+binds the final local commit, exact source executions and scoped outputs. The
+earlier `current-gaps.json` is a pre-seal draft, not a second live gap list.
+Neither source capture nor a domain seal is full acceptance.
 The unchanged full predecessor manifest is
 `91845422851368028e4e8a6b83e0dc9ba2a9e30dfdd8e4d6de892f64adac1d7f`.
 
@@ -34,10 +36,10 @@ Current verified materializations:
   with explicit source currency. Old unknown-currency F10 literals stay unknown.
   Reusing the same qualified origin TMP for 519 envelopes adds 852 prelisting
   reports and 75,124 facts at actual new knowledge; no listed-period duplication.
-- G03: 25 additional complete official matrices / 250 native rows, after
+- G03: 35 additional complete official matrices / 350 native rows, after
   whole-name-chain, exact-quantity, official-percentage and full-candidate replay.
   Native floating tables without a percentage column keep percentage unknown.
-  Source completeness is 1,036 / 1,147 coordinates; source-priority conflicts,
+  Source completeness is 1,046 / 1,147 coordinates; source-priority conflicts,
   identity and unhandled layouts remain separate, not silently accepted.
 - G06: 1,473 original bodies plus 16 qualified large original bodies, each with
   typed disclosure and subject observations; 161 implemented distributions and
@@ -48,9 +50,21 @@ Current verified materializations:
   the actual raw row and official legal-continuity notice plus both dated native
   identities. This grants no January code activation or transaction equivalence.
 - G07: reuse the 23 accepted IPO scopes and 546 daily observations. New official
-  dated short-name aliases comprise 26 source-grounded intervals for 25 securities
-  from 33 retained name differences, with one two-event chain. They use explicit effective dates and unchanged
+  dated short-name aliases comprise 34 source-grounded intervals for all 33
+  retained name differences, with one two-event chain. The latest official name
+  matches the retained provider name for each target. They use explicit effective dates and unchanged
   security/listing parents, not current provider names backfilled into history.
+
+The final holder and name scopes are `G03-official-complete-matrices-v11` and
+`G07-official-dated-short-names-v4`; earlier attempts remain historical evidence.
+The source-specific name adapter covers direct start dates, numbered current
+warning fields, an explicit warning-withdrawal/resumption chain and explicit
+delisting-period name arrangements. It never projects a trading state from an
+alias. Reverse historical narrative pairs cannot overwrite numbered current
+fields; conflicting explicit starts stay held. Holder parsing requires explicit
+column order for split numeric rows, exact native percentage tokens and the
+complete ten-name/rank/quantity chain. Wrapped post-table notes are section
+boundaries, never extra holders or a reason to admit incomplete rows.
 
 Each completed scope has two physically independent relocations, fresh processes,
 source-root/network denial and missing/corrupt disposable negatives. The stronger
@@ -126,17 +140,20 @@ credentials, run artifacts or local databases. No production mutation or push.
 
 ## Latest bounded continuation checks
 
-The final stable code was checked with `make check PYTHON=.venv/bin/python`: 6,067
-passed, 21 skipped and 66 warnings. Earlier 6,025 / 6,037 reports and an intentionally
-cancelled superseded check remain historical logs. Changed-source Ruff and strict
-mypy must bind the final commit. The existing 216 whole-repository lint failures
-were not rerun or described as green. Source captures retain actual Oct14 acquisition;
+The predecessor was checked with `make check PYTHON=.venv/bin/python`: 6,067
+passed, 21 skipped and 66 warnings. A completed intermediate continuation check
+reported 6,093 passed / 21 skipped; the final current check is recorded separately
+in `make-check-qualified-name-holder-final.txt` and `checks.json` at handoff.
+The 82 final name/holder focused cases and changed-source Ruff/strict mypy passed.
+Expected failing regressions and intentionally cancelled superseded checks remain
+historical logs. The existing 216 whole-repository lint failures were not rerun or
+described as green. Source captures retain actual Oct14 acquisition;
 September business scope does not imply September knowledge. New official index
 pagination returned repeated first pages, so captures never assert complete index
 coverage; exact matched body identity remains independently checked.
 
 Continuation: reuse all sealed scopes with identical inputs. Group the remaining
-72 official holder layout/field cases by actual layout before extending adapters;
+62 official holder layout/field cases by actual layout before extending adapters;
 28 require dated issuer evidence and 11 have no exact ten-row hint census. The
 42 original cross-source disagreements remain unarbitrated. The 30 blank/scan
 PDFs and two unmatched original announcement IDs require exact body evidence,

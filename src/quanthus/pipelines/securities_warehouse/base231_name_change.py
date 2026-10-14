@@ -47,8 +47,43 @@ def parse_name_change(body: str, *, code: str) -> dict[str, Any]:
         r"(?:证券|股票)代码[:：]" + code + r"(?![0-9])", text[:3000]
     ):
         raise BoundedError("OFFICIAL_NAME_EXACT_HEADER_CODE_REQUIRED")
-    dated = set(re.findall(r"(?:证券|股票)(?:证券)?简称将[于自]" + _DAY + r"起由" + _NAMES, text))
-    pairs = set(re.findall(r"(?:证券|股票)(?:证券)?简称(?:将)?由" + _NAMES, text))
+    delisting_names = set(
+        re.findall(
+            r"一、公司股票在退市整理期间的证券代码、证券简称及涨跌幅限制"
+            r"1、证券代码[:：]" + code + r"2、证券简称[:：]([^。；：:]{1,30})3、涨跌幅限制",
+            text,
+        )
+    )
+    delisting_dates = set(re.findall(r"公司股票进入退市整理期的起始日为" + _DAY, text))
+    header_names = set(
+        re.findall(
+            r"证券代码[:：]" + code + r"证券简称[:：]([^。；：:]{1,30})公告编号[:：]",
+            text[:3000],
+        )
+    )
+    dated = set(
+        re.findall(r"(?:证券|股票)(?:证券)?简称(?:将)?[于自]" + _DAY + r"起由" + _NAMES, text)
+    )
+    if delisting_names:
+        if len(delisting_names) != len(delisting_dates) or len(delisting_names) != 1:
+            raise BoundedError("OFFICIAL_NAME_EXPLICIT_DATE_CONFLICT")
+        if len(header_names) != 1:
+            raise BoundedError("OFFICIAL_NAME_EXPLICIT_PAIR_CONFLICT")
+        dated.add(
+            (*next(iter(delisting_dates)), next(iter(header_names)), next(iter(delisting_names)))
+        )
+    # This source family ties the alias explicitly to this warning withdrawal
+    # and that withdrawal explicitly to resumption. A standalone resume date,
+    # board date or unrelated warning cannot supply an alias effective date.
+    dated.update(
+        re.findall(
+            r"并于" + _DAY + r"开市起复牌。自复牌之日起[,，]深圳证券交易所"
+            r"撤销对公司股票交易的退市风险警示。公司股票交易本次撤销退市风险警示后[,，]"
+            r"公司股票交易继续被实施其他风险警示[,，]公司股票简称将由" + _NAMES,
+            text,
+        )
+    )
+    pairs = set(re.findall(r"(?:证券|股票)(?:证券)?简称(?:[:：]|将)?由" + _NAMES, text))
     before = set(
         re.findall(
             r"(?m)^\s*(?:[一二三四\d]+[、.]\s*)?变更前证券简称[:：]"
@@ -69,12 +104,32 @@ def parse_name_change(body: str, *, code: str) -> dict[str, Any]:
         pairs.add((next(iter(before)), next(iter(after))))
     date_tokens = re.findall(
         r"(?:证券简称变更日期|(?:新证券简称的|证券简称)启用日期|"
-        r"(?:撤销|实施)[^。；：:]{0,30}风险警示(?:的)?起始日)(?:为|[:：])" + _DAY,
+        r"(?:撤销|实施)[^。；：:]{0,30}风险警示(?:的)?起始日(?:期)?)(?:为|[:：])(?:自)?" + _DAY,
         text,
     )
     activation = re.findall(r"(?:证券|股票)简称由" + _NAMES + r"[,，]启用时间为" + _DAY, text)
     date_tokens.extend(tuple(x[2:]) for x in activation)
     labelled_dates = {date(*map(int, tokens)) for tokens in date_tokens}
+    numbered = set(
+        re.findall(
+            r"(?:[（(][二2][)）]|[二2][、.])(?:证券|股票)简称[:：]由"
+            + _NAMES
+            + r"[；;][^。]{0,100}?(?:[（(][四4][)）]|[四4][、.])"
+            r"(?:撤销|实施)[^。；：:]{0,30}风险警示(?:的)?起始日(?:期)?[:：](?:自)?" + _DAY,
+            text,
+        )
+    )
+    if numbered:
+        if len(numbered) != 1:
+            raise BoundedError("OFFICIAL_NAME_EXPLICIT_DATE_CONFLICT")
+        old, new, y, m, d = next(iter(numbered))
+        day = date(int(y), int(m), int(d))
+        # Numbered fields bind this event's pair to this event's start. Other
+        # narrative pairs can describe a previous warning in the same notice.
+        # Conflicting explicit starts or direct implementations remain errors.
+        if labelled_dates != {day} or dated and dated != {(y, m, d, old, new)}:
+            raise BoundedError("OFFICIAL_NAME_EXPLICIT_DATE_CONFLICT")
+        pairs = {(old, new)}
     if dated:
         if len(dated) != 1:
             raise BoundedError("OFFICIAL_NAME_EXPLICIT_DATE_CONFLICT")

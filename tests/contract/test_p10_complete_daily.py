@@ -35,6 +35,61 @@ REVISION = "c" * 40
 ACQUIRED = datetime(2026, 10, 13, 2, 40, tzinfo=timezone.utc)
 
 
+def test_build_reuses_same_job_native_semantics_but_standalone_verify_rechecks(
+    members: tuple, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    daily, m1, m5 = members
+    original = full.verify_minute
+    calls = []
+
+    def counted(path):
+        calls.append(path)
+        return original(path)
+
+    monkeypatch.setattr(full, "verify_minute", counted)
+    result = full.build(
+        daily=daily, m1=m1, m5=m5, output_root=tmp_path / "complete", code_revision=REVISION
+    )
+    assert calls == [m1, m5]
+    full.verify(tmp_path / "complete" / "packages" / DAY / result["package_id"])
+    assert len(calls) == 4
+
+
+def test_same_job_reuse_rejects_changed_member_bytes(
+    members: tuple, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    daily, m1, m5 = members
+    original = full.verify
+
+    def tampered(path, **kwargs):
+        member = path / "members/1m/minute-real-observed.parquet"
+        member.write_bytes(member.read_bytes() + b"changed")
+        return original(path, **kwargs)
+
+    monkeypatch.setattr(full, "verify", tampered)
+    with pytest.raises(ValueError):
+        full.build(
+            daily=daily, m1=m1, m5=m5, output_root=tmp_path / "complete", code_revision=REVISION
+        )
+
+
+def test_same_job_reuse_rejects_changed_verification_identity(
+    members: tuple, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    daily, m1, m5 = members
+    original = full.verify
+
+    def tampered(path, **kwargs):
+        kwargs["_verified_minutes"]["1m"]["manifest_sha256"] = "sha256:" + "0" * 64
+        return original(path, **kwargs)
+
+    monkeypatch.setattr(full, "verify", tampered)
+    with pytest.raises(ValueError, match="same-Job native verification evidence identity changed"):
+        full.build(
+            daily=daily, m1=m1, m5=m5, output_root=tmp_path / "complete", code_revision=REVISION
+        )
+
+
 def calendar() -> list[dict]:
     first = date(2026, 9, 25)
     closed = {date(2026, 9, 28) + timedelta(days=i) for i in range(10)}

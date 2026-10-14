@@ -414,7 +414,10 @@ def build(
                     "sealed_at": datetime.now(timezone.utc).isoformat(),
                 },
             )
-            result = verify(stage)
+            # Both members were semantically verified above in this same Job.
+            # Recheck every physical byte after copying; reuse that semantic
+            # evidence only for the exact unchanged member seals.
+            result = verify(stage, _verified_minutes=verified)
             os.replace(stage, destination)
             publish(output_root, destination, result)
             return result
@@ -429,7 +432,9 @@ def policy_path() -> Path:
     return CONFIG
 
 
-def verify(root: Path) -> dict[str, Any]:
+def verify(
+    root: Path, *, _verified_minutes: dict[str, dict[str, Any]] | None = None
+) -> dict[str, Any]:
     import pyarrow.parquet as pq
 
     manifest = verify_seal(root, KIND)
@@ -459,7 +464,25 @@ def verify(root: Path) -> dict[str, Any]:
     refs = set()
     for interval in ("1m", "5m"):
         member = root / "members" / interval
-        actual = verify_minute(member)
+        if _verified_minutes is None:
+            actual = verify_minute(member)
+        else:
+            from quanthus.pipelines.p10_native_minute_delivery import KIND as MINUTE_KIND
+
+            sealed = verify_seal(member, MINUTE_KIND)
+            actual = _verified_minutes[interval]
+            expected = {
+                "market_date": sealed["market_date"],
+                "interval": sealed["interval"],
+                "manifest_sha256": file_digest(member / "manifest.json"),
+                "content_digest": sealed["content_digest"],
+                "quality_grades": sealed["grades"],
+                "row_counts": sealed["rows_per_grade"],
+                "research_ready": sealed["research_ready"],
+                "reference_digest": sealed["reference_digest"],
+            }
+            if any(actual.get(key) != value for key, value in expected.items()):
+                raise ValueError("same-Job native verification evidence identity changed")
         ref = reference(member / "daily-reference.json")
         member_manifest = object_at(member / "manifest.json")
         if (

@@ -2,7 +2,6 @@
 Description=CN01 source-bound DWD continuation (%i)
 After=network-online.target
 Wants=network-online.target
-OnFailure=cn01-dwd-domain-continuation-failure@%i.service
 
 [Service]
 Type=oneshot
@@ -14,7 +13,9 @@ EnvironmentFile=/etc/quanthus/cn01-acquisition-prevention.env
 EnvironmentFile=/etc/quanthus/dwd-notification.env
 WorkingDirectory=/opt/quanthus/daily-core-current
 ExecStart=/opt/quanthus/daily-core-current/ops/bin/run-p10-acquisition-continuation --mode %i
+ExecStopPost=/usr/bin/env PYTHONPATH=/opt/quanthus/daily-core-current/src /root/work/Quanthus/.venv-p1/bin/python -m quanthus.pipelines.p10_complete_daily_notifications --continuation-service-stop %i
 TimeoutStartSec=3700
+TimeoutStopSec=150
 KillMode=control-group
 Nice=5
 UMask=0027

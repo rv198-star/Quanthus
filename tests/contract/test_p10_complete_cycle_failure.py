@@ -16,6 +16,8 @@ INVOCATION = "b" * 32
 def activity(tmp_path, monkeypatch):
     now = datetime.now(cycle.CST)
     monkeypatch.setenv("INVOCATION_ID", INVOCATION)
+    monkeypatch.setenv("MONITOR_UNIT", "quanthus-complete-daily.service")
+    monkeypatch.setenv("MONITOR_INVOCATION_ID", INVOCATION)
     monkeypatch.setattr(notices, "_service_started_at", lambda unit: now.timestamp() - 2)
     monkeypatch.setattr(notices.subprocess, "check_output", lambda *args, **kw: INVOCATION)
     value = {
@@ -172,3 +174,103 @@ def test_calendar_error_remains_unresolved_minutes(activity, monkeypatch):
     assert calls[0]["stage"] == "minutes"
     assert calls[0]["context"]["market_date_label"].startswith("运行日期")
     assert json.loads((root / "active-run.json").read_text())["market_date"] is None
+
+
+def test_delayed_failure_monitor_never_binds_a_new_invocation(activity):
+    root, now, value = activity
+    atomic(
+        root / "active-run.json",
+        {**value, "invocation_id": "c" * 32, "market_date": "2026-10-14", "stage": "complete"},
+    )
+    day, stage, label = notices._complete_cycle_failure_target(now, root)
+    assert day == now.date() and stage == "minutes" and label.startswith("运行日期")
+
+
+def test_stop_hook_uses_own_invocation_without_new_systemd_monitor_fields(activity, monkeypatch):
+    root, _, value = activity
+    atomic(root / "active-run.json", {**value, "stage": "complete"})
+    monkeypatch.delenv("MONITOR_UNIT", raising=False)
+    monkeypatch.delenv("MONITOR_INVOCATION_ID", raising=False)
+    monkeypatch.setenv("SERVICE_RESULT", "timeout")
+    monkeypatch.setattr(cycle, "JOURNAL", root)
+    monkeypatch.setattr(sys, "argv", ["notice", "--complete-cycle-service-stop"])
+    calls = []
+    monkeypatch.setattr(notices, "failure", lambda **kw: calls.append(kw) or {})
+    assert notices.main() == 0
+    assert calls[0]["day"] == date(2026, 10, 13) and calls[0]["stage"] == "complete"
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--complete-cycle-service-stop"],
+        ["--daily-cycle-service-stop"],
+        ["--continuation-service-stop", "natural-day"],
+    ],
+)
+def test_successful_stop_sends_no_failure(activity, monkeypatch, args):
+    monkeypatch.setenv("SERVICE_RESULT", "success")
+    monkeypatch.setattr(sys, "argv", ["notice", *args])
+    monkeypatch.setattr(notices, "failure", lambda **kw: pytest.fail("no failure mail on success"))
+    assert notices.main() == 0
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--complete-cycle-service-stop"],
+        ["--daily-cycle-service-stop"],
+        ["--continuation-service-stop", "natural-day"],
+    ],
+)
+def test_stop_hook_rejects_missing_service_result(activity, monkeypatch, args):
+    monkeypatch.delenv("SERVICE_RESULT", raising=False)
+    monkeypatch.setattr(sys, "argv", ["notice", *args])
+    with pytest.raises(ValueError, match="SERVICE_RESULT"):
+        notices.main()
+
+
+def test_delayed_daily_failure_does_not_use_new_current_target(activity, monkeypatch):
+    root, now, _ = activity
+    monkeypatch.setenv("MONITOR_UNIT", "quanthus-daily-core@cn01.service")
+    monkeypatch.setattr(notices, "_daily_service_started_at", lambda: now.timestamp() - 2)
+    path = root / "LATEST.json"
+    atomic(
+        path,
+        {
+            "invocation_id": "c" * 32,
+            "started_at": now.isoformat(),
+            "active_market_date": "2026-10-14",
+        },
+    )
+    day, label = notices._daily_failure_target(now, path)
+    assert day == now.date() and label.startswith("运行日期")
+
+
+def test_daily_stop_binds_actual_running_target(activity, monkeypatch):
+    root, now, _ = activity
+    monkeypatch.setattr(notices, "_daily_service_started_at", lambda: now.timestamp() - 2)
+    path = root / "LATEST.json"
+    atomic(
+        path,
+        {
+            "invocation_id": INVOCATION,
+            "started_at": now.isoformat(),
+            "active_market_date": "2026-10-13",
+        },
+    )
+    assert notices._daily_failure_target(now, path, originating_invocation_id=INVOCATION) == (
+        date(2026, 10, 13),
+        "交易日",
+    )
+
+
+def test_delayed_continuation_failure_never_uses_new_target(activity, monkeypatch):
+    root, now, value = activity
+    monkeypatch.setenv("MONITOR_UNIT", "cn01-dwd-domain-continuation@natural-day.service")
+    atomic(
+        root / "active/natural-day.json",
+        {**value, "mode": "natural-day", "invocation_id": "c" * 32},
+    )
+    day, label = notices._continuation_failure_target(now, "natural-day", root)
+    assert day == now.date() and label.startswith("运行日期")

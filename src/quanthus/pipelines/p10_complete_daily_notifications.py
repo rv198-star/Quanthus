@@ -184,19 +184,32 @@ def _daily_service_started_at() -> float | None:
     return _service_started_at("quanthus-daily-core@cn01.service")
 
 
-def _complete_cycle_failure_target(now: datetime, state: Path) -> tuple[date, str, str]:
-    """Resolve only the exact current controller invocation's date and phase."""
+def _service_invocation_id(unit: str) -> str | None:
+    """Only the originating failure identity, never a newer current invocation."""
+    value = os.environ.get("MONITOR_INVOCATION_ID", "")
+    if os.environ.get("MONITOR_UNIT") != unit or not re.fullmatch(r"[0-9a-f]{32}", value):
+        return None
+    return value
+
+
+def _complete_cycle_failure_target(
+    now: datetime, state: Path, *, originating_invocation_id: str | None = None
+) -> tuple[date, str, str]:
+    """Resolve only the exact originating controller invocation's date and phase."""
     fallback = (now.date(), "minutes", "运行日期（目标交易日未确定）")
     unit = "quanthus-complete-daily.service"
     service_start = _service_started_at(unit)
+    invocation = (
+        originating_invocation_id
+        if originating_invocation_id is not None
+        else _service_invocation_id(unit)
+    )
     try:
-        invocation = subprocess.check_output(
-            ["systemctl", "show", unit, "--property=InvocationID", "--value"],
-            text=True,
-            timeout=5,
-            stderr=subprocess.DEVNULL,
-        ).strip()
-        if service_start is None or not re.fullmatch(r"[0-9a-f]{32}", invocation):
+        if (
+            service_start is None
+            or invocation is None
+            or not re.fullmatch(r"[0-9a-f]{32}", invocation)
+        ):
             return fallback
         active = object_at(state / "active-run.json")
         started = datetime.fromisoformat(active["started_at"])
@@ -234,16 +247,24 @@ def _archive_failure_target(now: datetime, state: Path) -> tuple[date, str]:
     return fallback
 
 
-def _daily_failure_target(now: datetime, path: Path) -> tuple[date, str]:
+def _daily_failure_target(
+    now: datetime, path: Path, *, originating_invocation_id: str | None = None
+) -> tuple[date, str]:
     fallback = (now.date(), "运行日期（目标交易日未确定）")
     service_start = _daily_service_started_at()
-    if service_start is None:
+    invocation = (
+        originating_invocation_id
+        if originating_invocation_id is not None
+        else _service_invocation_id("quanthus-daily-core@cn01.service")
+    )
+    if service_start is None or invocation is None or not re.fullmatch(r"[0-9a-f]{32}", invocation):
         return fallback
     try:
         state = object_at(path)
         started = datetime.fromisoformat(state["started_at"])
         if (
-            started.tzinfo is None
+            state.get("invocation_id") != invocation
+            or started.tzinfo is None
             or not service_start - 1 <= started.timestamp() <= now.timestamp()
         ):
             return fallback
@@ -254,17 +275,60 @@ def _daily_failure_target(now: datetime, path: Path) -> tuple[date, str]:
         return fallback
 
 
+def _continuation_failure_target(
+    now: datetime, mode: str, state: Path, *, originating_invocation_id: str | None = None
+) -> tuple[date, str]:
+    """Use this invocation's declared target; stale files remain unresolved."""
+    fallback = (now.date(), "运行日期（目标交易日未确定）")
+    unit = f"cn01-dwd-domain-continuation@{mode}.service"
+    service_start = _service_started_at(unit)
+    invocation = (
+        originating_invocation_id
+        if originating_invocation_id is not None
+        else _service_invocation_id(unit)
+    )
+    if service_start is None or invocation is None or not re.fullmatch(r"[0-9a-f]{32}", invocation):
+        return fallback
+    try:
+        active = object_at(state / "active" / f"{mode}.json")
+        started = datetime.fromisoformat(active["started_at"])
+        if (
+            active.get("mode") != mode
+            or active.get("invocation_id") != invocation
+            or started.tzinfo is None
+            or not service_start - 1 <= started.timestamp() <= now.timestamp()
+        ):
+            return fallback
+        return date.fromisoformat(active["market_date"]), "业务日期"
+    except (OSError, ValueError, TypeError, KeyError):
+        return fallback
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--daily-cycle-failure", action="store_true")
+    mode.add_argument("--daily-cycle-service-stop", action="store_true")
     mode.add_argument("--complete-cycle-service-failure", action="store_true")
+    mode.add_argument("--complete-cycle-service-stop", action="store_true")
     mode.add_argument("--archive-service-failure", action="store_true")
     mode.add_argument("--mirror-service-failure", action="store_true")
     mode.add_argument("--mirror-service-stop", action="store_true")
     mode.add_argument("--continuation-service-failure", choices=("daily", "weekly", "natural-day"))
+    mode.add_argument("--continuation-service-stop", choices=("daily", "weekly", "natural-day"))
     mode.add_argument("--retry-state", action="append", type=Path)
     args = parser.parse_args()
+    if (
+        args.daily_cycle_service_stop
+        or args.complete_cycle_service_stop
+        or args.continuation_service_stop
+    ):
+        result = os.environ.get("SERVICE_RESULT")
+        if not result:
+            raise ValueError("service stop hook requires systemd SERVICE_RESULT")
+        if result == "success":
+            print(json.dumps({"status": "notification_not_required", "service_result": result}))
+            return 0
     if args.retry_state:
         results = [retry_pending(root) for root in args.retry_state]
         print(json.dumps({"results": results}, sort_keys=True))
@@ -280,8 +344,14 @@ def main() -> int:
     from quanthus.pipelines.p10_complete_daily_cycle import DAILY, JOURNAL
     from quanthus.pipelines.p10_complete_daily_schedule import CST
 
-    if args.complete_cycle_service_failure:
-        target, stage, label = _complete_cycle_failure_target(datetime.now(CST), JOURNAL)
+    if args.complete_cycle_service_failure or args.complete_cycle_service_stop:
+        target, stage, label = _complete_cycle_failure_target(
+            datetime.now(CST),
+            JOURNAL,
+            originating_invocation_id=os.environ.get("INVOCATION_ID", "")
+            if args.complete_cycle_service_stop
+            else None,
+        )
         record = failure(
             day=target,
             stage=stage,
@@ -330,29 +400,30 @@ def main() -> int:
         )
         print(json.dumps(record, sort_keys=True))
         return 0
-    if args.continuation_service_failure:
-        from datetime import timedelta
-
-        target = datetime.now(CST).date()
-        if args.continuation_service_failure == "weekly":
-            target -= timedelta(days=(target.weekday() - 5) % 7)
+    if args.continuation_service_failure or args.continuation_service_stop:
+        mode_name = args.continuation_service_failure or args.continuation_service_stop
+        continuation_state = Path("/var/lib/quanthus/acquisition-continuation-v1")
+        target, label = _continuation_failure_target(
+            datetime.now(CST),
+            mode_name,
+            continuation_state,
+            originating_invocation_id=os.environ.get("INVOCATION_ID", "")
+            if args.continuation_service_stop
+            else None,
+        )
         record = failure(
             day=target,
             stage="weekly"
-            if args.continuation_service_failure == "weekly"
-            else (
-                "natural_day"
-                if args.continuation_service_failure == "natural-day"
-                else "domain_daily"
-            ),
-            state_root=Path("/var/lib/quanthus/acquisition-continuation-v1/notifications"),
+            if mode_name == "weekly"
+            else ("natural_day" if mode_name == "natural-day" else "domain_daily"),
+            state_root=continuation_state / "notifications",
             reason=(
                 "automatic domain continuation service failed or timed out; "
                 "inspect retained run evidence"
             ),
             context={
-                "market_date_label": "运行日期（目标交易日未确定）",
-                "mode": args.continuation_service_failure,
+                "market_date_label": label,
+                "mode": mode_name,
             },
         )
         print(json.dumps(record, sort_keys=True))
@@ -374,7 +445,13 @@ def main() -> int:
         )
         print(json.dumps(record, sort_keys=True))
         return 0
-    target, label = _daily_failure_target(datetime.now(CST), DAILY / "operations/LATEST.json")
+    target, label = _daily_failure_target(
+        datetime.now(CST),
+        DAILY / "operations/LATEST.json",
+        originating_invocation_id=os.environ.get("INVOCATION_ID", "")
+        if args.daily_cycle_service_stop
+        else None,
+    )
     record = failure(
         day=target,
         stage="daily_cycle",

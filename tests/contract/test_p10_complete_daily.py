@@ -1066,11 +1066,14 @@ def test_daily_cycle_failure_mail_uses_actual_failed_target(
     import sys
 
     today = datetime.now(schedule.CST).date()
+    monkeypatch.setenv("MONITOR_UNIT", "quanthus-daily-core@cn01.service")
+    monkeypatch.setenv("MONITOR_INVOCATION_ID", "a" * 32)
     atomic(
         tmp_path / "daily/operations/LATEST.json",
         {
             "started_at": datetime.now(schedule.CST).isoformat(),
             "through_date": str(today),
+            "invocation_id": "a" * 32,
             "attempts": [{"market_date": "2026-10-09", "returncode": 2}],
         },
     )

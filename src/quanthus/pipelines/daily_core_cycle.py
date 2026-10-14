@@ -15,6 +15,7 @@ import time
 from contextlib import redirect_stdout
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from quanthus.pipelines.securities_warehouse.daily_core_domain import verify_daily_domain_increment
@@ -25,7 +26,7 @@ CST = ZoneInfo("Asia/Shanghai")
 BASELINE = date(2026, 9, 24)
 
 
-def pending_market_dates(after: date, through: date, rows: list[dict]) -> list[date]:
+def pending_market_dates(after: date, through: date, rows: list[dict[str, Any]]) -> list[date]:
     """Require consecutive explicit calendar evidence, never weekday guessing."""
     flags = {}
     for row in rows:
@@ -47,7 +48,7 @@ def pending_market_dates(after: date, through: date, rows: list[dict]) -> list[d
     return result
 
 
-def _write(path: Path, value: dict) -> None:
+def _write(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
     with tmp.open("x", encoding="utf-8") as f:
@@ -110,14 +111,16 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         started = time.monotonic()
         run = core / "operations" / now.strftime("%Y%m%dT%H%M%S%f%z")
-        state = {
+        state: dict[str, Any] = {
             "schema_version": 1,
             "product_scope": "daily-core-v1",
             "started_at": now.isoformat(),
+            "invocation_id": os.environ.get("INVOCATION_ID"),
             "through_date": through.isoformat(),
             "attempts": [],
             "minute_products": "separate_not_qualified_by_daily_core",
         }
+        _write(core / "operations/LATEST.json", {**state, "status": "initializing"})
         try:
             after = (
                 _verified_pointer(pointer)
@@ -172,6 +175,10 @@ def main(argv: list[str] | None = None) -> int:
                     log = run / f"{target.isoformat()}.log"
                     _write(
                         run / "run.json",
+                        {**state, "status": "running", "active_market_date": target.isoformat()},
+                    )
+                    _write(
+                        core / "operations/LATEST.json",
                         {**state, "status": "running", "active_market_date": target.isoformat()},
                     )
                     with log.open("x") as output:

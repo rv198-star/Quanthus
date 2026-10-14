@@ -154,33 +154,39 @@ immutable products and pending mail; do not reset budgets or alter source bytes.
 
 ## Controller timeout and crash notification
 
-`quanthus-complete-daily.service` has a dedicated OnFailure handler in addition to
-the independent 13:00/13:20 watchdogs. The controller writes `active-run.json`
-with its systemd InvocationID, code revision, actual target date and stage. It
-starts with an unresolved date, then binds the calendar-resolved target; the
-stage changes to complete only after minute admission or when checking an
-already accepted complete product. A stage change preserves the invocation start.
+CN01 systemd 249 does not provide the newer OnFailure MONITOR_INVOCATION_ID.
+Use ExecStopPost inside the originating service for the daily cycle, T+1
+controller and domain continuations. SERVICE_RESULT=success sends no mail;
+failures use that original INVOCATION_ID, target and stage. The stop command pins
+PYTHONPATH explicitly so acquisition EnvironmentFiles cannot select older code.
+TimeoutStopSec=150 bounds notification finalization; durable replay retains a
+failed transport request. No supplier operation, grading or rebuild occurs here.
 
-The failure handler accepts only that current invocation and its bounded start
-time. It reuses the existing date/stage mail key with internal failures and the
-watchdog. Missing, stale or invalid markers produce an explicitly unresolved
-runtime-date minutes alert, never a guessed prior market date. No new supplier
-operation, grading, rebuild or budget reset occurs in the hook. Existing queued
-mail replay handles transport errors.
+The T+1 controller writes active-run.json with its invocation, code revision,
+start, actual target and minutes/complete stage. It starts with an unresolved
+calendar target. After minute admission, or when checking an accepted complete
+product, the stage becomes complete while preserving invocation start. The daily
+cycle records its invocation in initializing/running LATEST state before starting
+children. Domain continuation retains its own invocation marker. Immutable data
+products, old Jobs and budgets remain unchanged.
 
-Fetch the exact repair commit from GitHub, verify focused Linux tests and unit
-definitions, then switch only `data-delivery-current` while the controller and
-mail retry are idle. Install the versioned controller failure unit and its scoped
-OnFailure drop-in; restore prior timer activity after daemon-reload. Keep the
-prior completed Job, processing-resume authorization, quality policy, producer,
-archive and OCI identities. A new target Job pins the new code on its ordinary
-start. Do not restart an accepted old Job merely to demonstrate the new hook.
+A handler must match the originating invocation and start window. OnFailure
+compatibility only accepts MONITOR_UNIT/MONITOR_INVOCATION_ID; it never substitutes
+a newer current service identity. Stale/missing markers remain explicitly
+unresolved. The existing date/stage key deduplicates internal and terminal errors.
+Delayed old hooks cannot mark a new target or stage as failed.
 
-Rollback restores the previous data-delivery code link and removes only this
-failure unit/drop-in after bounded jobs drain. Retain activity, Job, raw,
-notification and publication evidence. Synthetic failure/deduplication tests
-and actual runtime path readback do not pre-accept a future natural failure or
-tomorrow's minute collection and joint delivery.
+Fetch the exact repair through GitHub; run focused Linux checks, unit validation
+and independent review. Drain affected producers and mail retries before switching
+the daily-core and data-delivery links to the reviewed common engineering release.
+Install scoped stop-hook drop-ins, clear superseded OnFailure entries and restore
+previous trigger activity. Keep prior completed products, processing authorization,
+quality policy, archive and OCI identities. New target Jobs pin the new code on
+ordinary startup; do not restart an accepted old Job as a demonstration.
+
+Rollback restores both prior links and exact saved drop-ins after bounded jobs
+drain. Retain activity, Job, raw, notification and publication evidence. Synthetic
+failure/deduplication and actual runtime readback are not future natural acceptance.
 
 ## General rollout rollback
 

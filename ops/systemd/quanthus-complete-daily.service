@@ -2,7 +2,6 @@
 Description=CN01 T+1 trading-day native 1m/5m and complete DWD
 After=network-online.target
 Wants=network-online.target
-OnFailure=quanthus-complete-daily-controller-failure.service
 ConditionPathExists=/opt/quanthus/data-delivery-current/ops/bin/run-complete-daily-cycle
 
 [Service]
@@ -16,7 +15,9 @@ Environment=QUANTHUS_COMPLETE_DAILY_EXPORT_GROUP=quanthus-dwd-ro
 EnvironmentFile=/etc/quanthus/dwd-notification.env
 EnvironmentFile=-/etc/quanthus/cn01-acquisition-prevention.env
 ExecStart=/root/work/Quanthus/.venv-p1/bin/python /opt/quanthus/data-delivery-current/ops/bin/run-complete-daily-cycle
+ExecStopPost=/usr/bin/env PYTHONPATH=/opt/quanthus/data-delivery-current/src:/opt/quanthus/p10-minute-deps/baostock-0.9.4 /root/work/Quanthus/.venv-p1/bin/python -m quanthus.pipelines.p10_complete_daily_notifications --complete-cycle-service-stop
 TimeoutStartSec=110min
+TimeoutStopSec=150
 MemoryMax=2300M
 CPUQuota=150%
 KillMode=control-group

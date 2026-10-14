@@ -296,6 +296,7 @@ def run_interval(
     product: Path,
     revision: str,
     capture_authorized: bool = True,
+    processing_interval: str | None = None,
 ) -> dict[str, Any]:
     product = product / interval
     journal = job / interval
@@ -314,6 +315,8 @@ def run_interval(
         result = verify(previous)
         if result["research_ready"]:
             return result
+        if not capture_authorized and processing_interval != interval:
+            return {**result, "repair_disposition": "processing_interval_not_authorized"}
         if (journal / f"{target}-T_plus_1.json").exists():
             ledger = object_at(journal / f"{target}-T_plus_1.json")
             grading = [
@@ -533,6 +536,15 @@ def run(
         ref_file = job / "daily-reference.json"
         processing_only = False
         if not ref_file.exists():
+            markers = [job / "code.json", job / "calendar.json"]
+            markers += [job / interval / f"{target}-T_plus_1.json" for interval in ("1m", "5m")]
+            markers += [
+                capture / str(target) / interval / "initial-v1" for interval in ("1m", "5m")
+            ]
+            if any(p.exists() for p in markers):
+                raise ValueError(
+                    "existing Job missing immutable reference; preserve original identity"
+                )
             try:
                 ods, events_sha = sealed_daily_sources(releases, target, daily=daily)
                 freeze_reference(ods, str(target), ref_file, events_sha=events_sha)
@@ -574,6 +586,7 @@ def run(
                     product=product,
                     revision=revision,
                     capture_authorized=not processing_only,
+                    processing_interval="5m" if processing_only else None,
                 )
                 for interval in ("1m", "5m")
             }

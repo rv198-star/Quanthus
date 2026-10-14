@@ -18,6 +18,7 @@ from quanthus.pipelines.p10_delivery_common import atomic, digest, encoded
 from tests.contract.test_p10_complete_daily import (
     DAY,
     REVISION,
+    calendar,
     capture,
     raw_m1,
     raw_m5,
@@ -75,6 +76,13 @@ def test_empty_new_source_does_not_replace_real_old_observation() -> None:
     m1 = json.loads(raw_m1())
     m1["outside_target"] = "rolling_vendor_metadata"
     assert not minute.target_source_changed(raw_m1(), encoded(m1), "000001", DAY, "1m")
+
+
+@pytest.mark.parametrize("rows", [[], [["202610111500", "10.5", "10.5", "10.5", "10.5", ".2", {}]]])
+def test_one_minute_empty_or_other_date_revision_does_not_replace_target(rows: list) -> None:
+    value = json.loads(raw_m1())
+    value["data"]["sz000001"]["m1"] = rows
+    assert not minute.target_source_changed(raw_m1(), encoded(value), "000001", DAY, "1m")
 
 
 def test_repair_cannot_hide_tampered_prior_raw_sha(tmp_path: Path) -> None:
@@ -137,6 +145,7 @@ def test_failed_repair_grade_resumes_existing_capture_only(
         product=tmp_path / "products",
         revision=REVISION,
         capture_authorized=capture_authorized,
+        processing_interval="5m" if not capture_authorized else None,
     )
     assert result["research_ready"]
     kwargs = operation.call_args.kwargs
@@ -144,6 +153,39 @@ def test_failed_repair_grade_resumes_existing_capture_only(
     assert "build" in kwargs["command"] and "capture" not in kwargs["command"]
     assert "--prior-capture-root" in kwargs["command"]
     assert (journal / f"{DAY}-T_plus_1.json").read_bytes() == ledger_before
+
+
+def test_five_minute_resume_cannot_regrade_unbound_one_minute_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    job = tmp_path / "job"
+    journal = job / "1m"
+    journal.mkdir(parents=True)
+    atomic(
+        journal / f"{DAY}-T_plus_1.json",
+        {
+            "operations": [{"operation_id": "repair-grade", "exit_code": 1}],
+            "cumulative_processing_seconds": 1960.5,
+        },
+    )
+    monkeypatch.setattr(cycle, "reference", lambda _: {"securities": {}})
+    monkeypatch.setattr(cycle, "_package", lambda *_: tmp_path / "prior")
+    monkeypatch.setattr(cycle, "verify", lambda _: {"research_ready": False})
+    operation = Mock()
+    monkeypatch.setattr(cycle, "_operation", operation)
+    result = cycle.run_interval(
+        interval="1m",
+        target=cycle.date.fromisoformat(DAY),
+        job=job,
+        capture=tmp_path / "capture",
+        product=tmp_path / "products",
+        revision=REVISION,
+        capture_authorized=False,
+        processing_interval="5m",
+    )
+    assert result["repair_disposition"] == "processing_interval_not_authorized"
+    assert not operation.called
 
 
 def test_failed_grading_retry_limit_never_restarts_collection(
@@ -241,6 +283,36 @@ def test_resume_rejects_wrong_identity_or_source_authorization(
     with pytest.raises(ValueError, match="resume identity"):
         cycle.reconcile_job_code(job, captures, cycle.date.fromisoformat(DAY), revision)
     assert not (job / "code-resumes").exists()
+
+
+def test_existing_job_with_missing_reference_never_rewrites_code_or_acquires(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    journal = tmp_path / "operations"
+    job = journal / DAY
+    job.mkdir(parents=True)
+    atomic(job / "code.json", {"code_revision": REVISION, "policy_id": cycle.POLICY_ID})
+    original = (job / "code.json").read_bytes()
+    source = Mock()
+    monkeypatch.setattr(cycle, "sealed_daily_sources", source)
+    operation = Mock()
+    monkeypatch.setattr(cycle, "_operation", operation)
+    with pytest.raises(ValueError, match="missing immutable reference"):
+        cycle.run(
+            now=cycle.datetime(2026, 10, 13, 11, 30, tzinfo=cycle.CST),
+            rows=calendar(),
+            revision="d" * 40,
+            journal=journal,
+            capture=tmp_path / "capture",
+            product=tmp_path / "products",
+            complete=tmp_path / "complete",
+            daily=tmp_path / "daily",
+            releases=tmp_path / "releases",
+            notifications=tmp_path / "notifications",
+        )
+    assert (job / "code.json").read_bytes() == original
+    assert not source.called and not operation.called
 
 
 def test_pinned_entrypoint_propagates_release_path_to_children(

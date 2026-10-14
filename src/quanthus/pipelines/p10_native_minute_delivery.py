@@ -222,7 +222,7 @@ def target_source_changed(before: bytes, after: bytes, code: str, day: str, inte
 
     def records(raw: bytes) -> Any:
         if interval == "1m":
-            return target_date_records(raw, code, date.fromisoformat(day))[1]
+            return target_date_records(raw, code, date.fromisoformat(day))[0]
         if interval != "5m":
             raise ValueError("unsupported native interval")
         return native_m5(raw, code, day)

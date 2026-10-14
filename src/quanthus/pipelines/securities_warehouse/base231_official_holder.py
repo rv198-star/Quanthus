@@ -97,7 +97,6 @@ def parse_top_matrix(
         len(block),
     )
     header = _norm("\n".join(block[:first_numeric]))
-    quantity_first = bool(re.search(r"持股数量.*?比例.*?\(%\)", header))
 
     def column(label: str) -> int | None:
         positions = {
@@ -114,7 +113,7 @@ def parse_top_matrix(
     quantity_column = next(
         (
             value
-            for label in ["持股数量", "报告期末持股", "期末持股数"]
+            for label in ["持股数量", "报告期末持股", "期末持股数", "报告期末持"]
             if (value := column(label)) is not None
         ),
         None,
@@ -124,9 +123,19 @@ def parse_top_matrix(
         and quantity_column is not None
         and percentage_column < quantity_column
     )
+    quantity_first = bool(
+        "(%)" in header
+        and percentage_column is not None
+        and quantity_column is not None
+        and quantity_column < percentage_column
+    )
     split_numeric_pattern = re.compile(
         r"^(.*?)\s+([0-9]+(?:\.[0-9]+)?)%\s+"
         r"([0-9][0-9,]*(?:\.[0-9]+)?)\s+"
+    )
+    split_quantity_pattern = re.compile(
+        r"^(.*?)\s+([0-9][0-9,]*(?:\.[0-9]+)?)\s+"
+        r"([0-9]+(?:\.[0-9]+)?)(%?)\s+"
     )
     nature_last = bool(
         "(%)" in header
@@ -186,7 +195,13 @@ def parse_top_matrix(
         # requires an explicit percentage-before-quantity column order and a
         # native '%' token. Full official names, all ten rows and exact hint
         # quantities are still checked below; no category is reconstructed.
-        split = split_numeric_pattern.match(line) if split_percentage_first else None
+        split = (
+            split_quantity_pattern.match(line)
+            if quantity_first
+            else split_numeric_pattern.match(line)
+            if split_percentage_first
+            else None
+        )
         if split:
             fragment = _norm(split[1].strip())
             anchors.append(
@@ -194,15 +209,16 @@ def parse_top_matrix(
                     start=offset,
                     end=offset + len(fragment),
                     nature=None,
-                    pct=split[2],
-                    qty=split[3],
-                    raw_pct=split[2] + "%",
+                    pct=split[3] if quantity_first else split[2],
+                    qty=split[2] if quantity_first else split[3],
+                    raw_pct=(split[3] + split[4]) if quantity_first else split[2] + "%",
                 )
             )
             parts.append(fragment)
             offset += len(fragment)
             continue
         stripped = line.strip()
+        left_cell = re.split(r"\s{2,}", stripped)[0]
         indent = len(line) - len(line.lstrip())
         # These are this source layout's column headers/right-hand cells and
         # page furniture. Every left-column name byte must match the full chain.
@@ -214,7 +230,7 @@ def parse_top_matrix(
             and stripped in {"例", "况", "称", "质", "数量", "股东名", "股东性"}
             or re.fullmatch(r".+\d{4}年(?:第[一二三四]季度|年度|半年度)报告(?:全文)?", _norm(line))
             or any(
-                k in stripped
+                k in left_cell
                 for k in [
                     "股东名称",
                     "股东性质",

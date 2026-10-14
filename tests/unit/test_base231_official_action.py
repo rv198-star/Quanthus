@@ -95,3 +95,98 @@ def test_materialization_has_actual_new_knowledge_and_date_only_publication():
     assert output["dwd_corporate_action"][0]["knowledge_from"] == now
     assert output["dwd_corporate_action"][0]["announced_at"] is None
     assert len(output["dwd_corporate_action_term"]) == 2
+
+
+def test_cash_only_szse_does_not_require_invented_transfer_or_bonus():
+    body = """证券代码003018 2026年半年度权益分派实施公告
+    一、股东会原预案每10股转增9股，不送红股，不以公积金转增股本
+    二、本次权益分派方案
+    向全体股东每10股派3元人民币现金【含税；扣税后每10股派2.7元】
+    三、股权登记日及除权除息日
+    股权登记日：2026年9月29日；除权日（除息日）：2026年9月30日
+    """
+    row, proof = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 9, 30)
+    )
+    assert row["cash_per_share"] == Decimal("0.3")
+    assert row["transfer_shares"] is None
+    assert row["bonus_shares"] is None
+    assert proof["classes"]["transfer_shares"] == "NULL"
+
+
+@pytest.mark.parametrize("wording", ["派", "派发现金红利", "派现金红利", "派发现金股利"])
+def test_szse_explicit_pretax_cash_wordings(wording):
+    body = BODY.replace("派2.50元人民币现金（含税", wording + "2.50元人民币现金（含税")
+    row, _ = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15)
+    )
+    assert row["cash_per_share"] == Decimal("0.25")
+
+
+def test_szse_cash_tax_disagreement_and_ab_date_ambiguity_remain_held():
+    for extra in [
+        "每10股派3元人民币现金（含税）",
+        "每10股转增3股",
+    ]:
+        body = BODY.replace("三、股权", extra + "三、股权")
+        with pytest.raises(RuntimeError):
+            parse_distribution(
+                body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15)
+            )
+    body = BODY + "B股股权登记日为：2026年7月17日"
+    with pytest.raises(RuntimeError):
+        parse_distribution(body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15))
+
+
+def test_szse_disclosed_non_distribution_is_zero_only_inside_implemented_section():
+    body = BODY.replace("每10股转增2.25股，不送红股", "不送红股，不以资本公积金转增股本")
+    row, _ = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15)
+    )
+    assert row["bonus_shares"] == row["transfer_shares"] == 0
+
+
+def test_szse_current_year_profit_heading_is_an_implementation_scope():
+    body = BODY.replace(
+        "二、本次实施的利润分配及资本公积金转增股本方案",
+        "二、本次实施的2026年中期利润分配方案",
+    )
+    assert parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15)
+    )[0]["cash_per_share"] == Decimal("0.25")
+
+
+SSE_CURRENT = """600001 上海证券交易所2026年半年度权益分派实施公告
+二、分配方案
+以实施前总股本为基数，每股派发现金红利0.02元（含税）。
+三、相关日期
+股份类别 股权登记日 最后交易日 除权（息）日 现金红利发放日
+Ａ股 2026/9/28 － 2026/9/29 2026/9/29
+四、分配实施办法
+"""
+
+
+def test_sse_current_implementation_table_binds_per_share_cash_and_exact_dates():
+    row, _ = parse_distribution(
+        SSE_CURRENT, code="600001", venue="SSE", expected_ex_date=date(2026, 9, 29)
+    )
+    assert row["record_date"] == date(2026, 9, 28)
+    assert row["cash_per_share"] == Decimal("0.02")
+    assert row["transfer_shares"] is row["bonus_shares"] is None
+
+
+@pytest.mark.parametrize("fault", ["two_classes", "pretax", "proposal", "cash_conflict", "date"])
+def test_sse_current_table_conflicts_do_not_become_success(fault):
+    body = SSE_CURRENT
+    if fault == "two_classes":
+        body = body.replace("四、", "Ｂ股 2026/10/8 2026/9/28 2026/10/20 四、")
+    elif fault == "pretax":
+        body = body.replace("含税", "扣税后")
+    elif fault == "proposal":
+        body = body.replace("二、分配方案", "二、拟定方案")
+    elif fault == "cash_conflict":
+        body = body.replace("三、", "每股派发现金红利0.03元（含税）。三、")
+    else:
+        body = body.replace("2026/9/29", "2026/10/8")
+    with pytest.raises(RuntimeError):
+        parse_distribution(body, code="600001", venue="SSE", expected_ex_date=date(2026, 9, 29))

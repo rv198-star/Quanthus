@@ -8,6 +8,7 @@ conflicting value to overwrite silently. Original observations remain intact.
 from __future__ import annotations
 
 import re
+import unicodedata
 from datetime import date, datetime
 from decimal import Decimal, localcontext
 from typing import Any
@@ -36,6 +37,37 @@ def _per_ten(token: str) -> Decimal:
     return Decimal((parts.sign, parts.digits, parts.exponent - 1))
 
 
+def szse_distribution_dates(body: str) -> tuple[date, date]:
+    """Read explicit labels; multiple A/B or revised dates remain ambiguous."""
+    text = re.sub(r"\s+", "", body)
+    dates = []
+    for label in [r"股权登记日", r"(?:除权除息日|除权日[（(]除息日[）)])"]:
+        tokens = set(re.findall(label + r"[为：:]{1,2}(\d{4})年(\d{1,2})月(\d{1,2})日", text))
+        if len(tokens) != 1:
+            raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
+        dates.append(date(*map(int, next(iter(tokens)))))
+    return dates[0], dates[1]
+
+
+def sse_distribution_dates(body: str) -> tuple[date, date]:
+    """Only the explicitly ordered, single A-share current implementation table."""
+    text = re.sub(r"\s+", "", unicodedata.normalize("NFKC", body))
+    match = re.search(r"三、相关日期(.+?)四、", text)
+    if match is None:
+        raise BoundedError("OFFICIAL_ACTION_IMPLEMENTATION_SECTION_MISSING")
+    section = match[1]
+    if (
+        not re.search(r"股份类别股权登记日.*?除权\(息\)日现金红利发放日A股", section)
+        or "B股" in section
+        or "H股" in section
+    ):
+        raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
+    tokens = re.findall(r"(\d{4})/(\d{1,2})/(\d{1,2})", section)
+    if len(tokens) != 3:
+        raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
+    return date(*map(int, tokens[0])), date(*map(int, tokens[1]))
+
+
 def parse_distribution(
     body: str, *, code: str, venue: str, expected_ex_date: date
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -50,41 +82,57 @@ def parse_distribution(
         raise BoundedError("OFFICIAL_ACTION_DOCUMENT_SCOPE_UNQUALIFIED")
     if venue == "SZSE":
         match = re.search(
-            r"二、(?:本次实施的)?(?:权益分派方案|利润分配及资本公积金转增股本方案)"
-            r"(.+?)三、股权登记日与除权除息日",
+            r"二、(?:本次实施的|本次)?(?:权益分派方案|利润分配及资本公积金转增股本方案|"
+            r"(?:2026年(?:中期|半年度|年度))?利润分配方案)"
+            r"(.+?)三、(?:股权登记日[与及]除权除息日|分红派息日期)",
             text,
         )
         if match is None:
             raise BoundedError("OFFICIAL_ACTION_IMPLEMENTATION_SECTION_MISSING")
         section = match.group(1)
-        ex_tokens = set(re.findall(r"除权除息日[为：:]{1,2}(\d{4})年(\d{1,2})月(\d{1,2})日", text))
-        record_tokens = set(
-            re.findall(r"股权登记日[为：:]{1,2}(\d{4})年(\d{1,2})月(\d{1,2})日", text)
-        )
-        if len(ex_tokens) != 1 or len(record_tokens) != 1:
-            raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
-        ex_date = date(*map(int, next(iter(ex_tokens))))
-        record_date = date(*map(int, next(iter(record_tokens))))
+        record_date, ex_date = szse_distribution_dates(body)
         cash = (
             Decimal(0)
             if "不派发现金红利" in section
-            else _per_ten(_one(r"每10股派([0-9]+(?:\.[0-9]+)?)元人民币现金（含税", section))
+            else _per_ten(
+                _one(
+                    r"每10股派(?:发现金红利|现金红利|发现金股利|现金股利)?"
+                    r"([0-9]+(?:\.[0-9]+)?)元人民币现金[（(【]含税",
+                    section,
+                )
+            )
         )
-        transfer = _per_ten(_one(r"每10股转增([0-9]+(?:\.[0-9]+)?)股", section))
+        transfers = re.findall(r"每10股转增([0-9]+(?:\.[0-9]+)?)股", section)
+        no_transfer = bool(re.search(r"不以(?:资本)?公积金转增股本", section))
+        if transfers and no_transfer:
+            raise BoundedError("OFFICIAL_ACTION_EXPLICIT_TERM_MISSING_OR_CONFLICTING")
+        transfer = (
+            _per_ten(_one(r"每10股转增([0-9]+(?:\.[0-9]+)?)股", section))
+            if transfers
+            else Decimal(0)
+            if no_transfer
+            else None
+        )
         bonus = Decimal(0) if "不送红股" in section else None
     elif venue == "SSE":
         if "上海证券交易所" not in text:
             raise BoundedError("OFFICIAL_ACTION_VENUE_NOT_PROVEN")
         match = re.search(r"每股分配比例(.+?)(?:相关日期)", text)
         dates = re.search(r"股权登记日(.{1,180})一、", text)
-        if match is None or dates is None or "除权（息）日" not in dates.group(1):
-            raise BoundedError("OFFICIAL_ACTION_IMPLEMENTATION_SECTION_MISSING")
-        section = match.group(1)
-        ordered_dates = re.findall(r"(\d{4})/(\d{1,2})/(\d{1,2})", dates.group(1))
-        if len(ordered_dates) not in {3, 4}:
-            raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
-        record_date, ex_date = [date(*map(int, d)) for d in ordered_dates[:2]]
-        cash = Decimal(_one(r"每股现金红利([0-9]+(?:\.[0-9]+)?)元", section))
+        if match is not None and dates is not None and "除权（息）日" in dates[1]:
+            section = match.group(1)
+            ordered_dates = re.findall(r"(\d{4})/(\d{1,2})/(\d{1,2})", dates.group(1))
+            if len(ordered_dates) not in {3, 4}:
+                raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
+            record_date, ex_date = [date(*map(int, d)) for d in ordered_dates[:2]]
+            cash = Decimal(_one(r"每股现金红利([0-9]+(?:\.[0-9]+)?)元", section))
+        else:
+            match = re.search(r"二、分配方案(.+?)三、相关日期", text)
+            if match is None:
+                raise BoundedError("OFFICIAL_ACTION_IMPLEMENTATION_SECTION_MISSING")
+            section = match[1]
+            record_date, ex_date = sse_distribution_dates(body)
+            cash = Decimal(_one(r"每股派发现金红利([0-9]+(?:\.[0-9]+)?)元[（(]含税[）)]", section))
         bonus = (
             Decimal(_one(r"每股派送红股([0-9]+(?:\.[0-9]+)?)股", section))
             if "每股派送红股" in section

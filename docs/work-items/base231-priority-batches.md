@@ -10,16 +10,17 @@ Keep the already sealed predecessor and all previous attempts immutable.
 
 The current CN02 continuation starts at `0e1c60b2ad6ec6e25065e62374f76d97875d9963`,
 on `codex/base22-standalone`, in `/root/Quanthus/.worktrees/base22-standalone`.
-Current controls: `artifacts/base231-supplement-20261014T065402Z-0e1c60b`;
+Retained source controls: `artifacts/base231-supplement-20261014T065402Z-0e1c60b`;
 private source root: `/var/tmp/base231-supplement-20261014T065402Z-0e1c60b`;
 scoped native outputs: the sibling ending in `-domains`.
 The Owner explicitly authorized necessary additional acquisition for items 1–8.
 No production mutation, credentials, ACL, node transfer or publication is implied.
 
 The prior active ledger is `artifacts/base231-priority-batch-20261014T055731Z-af1d811/current-gaps-v2.json`;
-its pending prose is superseded by current actual output/cold receipts. The active
-handoff ledger is `current-gaps-final.json` under the current controls; its handoff
-binds the final local commit, exact source executions and scoped outputs. The
+its pending prose is superseded by current actual output/cold receipts. The current handoff ledger is `current-gaps.json` under
+`artifacts/base231-convergence-20261014T131000Z-b84130c`; its handoff binds the
+final local commit, exact source executions and scoped outputs.
+The predecessor `current-gaps-final.json` remains historical. The
 earlier `current-gaps.json` is a pre-seal draft, not a second live gap list.
 Neither source capture nor a domain seal is full acceptance.
 The unchanged full predecessor manifest is
@@ -159,3 +160,57 @@ Continuation: reuse all sealed scopes with identical inputs. Group the remaining
 PDFs and two unmatched original announcement IDs require exact body evidence,
 not an empty no-change assumption. Full-image integration still requires its
 execution/cold-copy budget; no complete new mirror was created by these checks.
+
+## Medium-and-above continuation, 2026-10-14
+
+Owner's latest scope prioritizes medium-and-above remediation. Chinese text is
+not currency evidence. The existing 879 fresh Sina envelopes were rechecked:
+10,347 source report objects explicitly declare `rCurrency=CNY`; this includes
+periods outside the admitted business scope, so the envelope count is not a new
+qualified-report census. The already qualified current/prelisting native outputs
+remain the deliverable. The old 499,000 TDX monetary literals are retained without
+retroactively assigning the new provider's currency or historical clocks.
+
+Distribution adaptation now supports explicit SZSE cash-only terms, bracket and
+heading variants and single-A-share SSE implementation-date tables. Undisclosed
+bonus/transfer components remain null; only an explicit statement inside the
+implemented section establishes zero. Tax conflicts, A/B date ambiguity, proposals,
+source/listing/venue/calendar failure and post-cutoff implementation remain held
+or outside scope. The frozen 360-source cohort yields 213 qualified implemented
+actions/213 stated terms, 54 post-September30 implementations and 93 unresolved
+layout/term/scope candidates. A candidate is not necessarily a missing action;
+title/body availability alone never establishes whole-weekly completeness.
+
+Holder adaptations preserve wrapped left-column names alongside right-hand
+pledge cells and use physical header order for quantity-first/split rows. Exact
+names, ten ranks, native percentages and quantities remain mandatory. Forty
+complete official matrices / 400 rows now cover 1,051 / 1,147 original source
+coordinates; this is source completeness, not resolution of all source conflicts.
+The remaining 96 comprise 57 report/layout/field, 28 dated-issuer and 11 exact
+provider-frame cases. Twenty-one of the prior layout targets have no exact report
+in the selected original-report inventory; no global absence is asserted.
+
+The original 42 source disagreements were crosschecked against the new official
+scope: 15 exact coordinates have complete official matrices. Thirty-three original
+raw frames were replayed from unchanged hashed members. Twenty-nine could be
+compared, four retain coordinate/component constraints. Comparisons distinguish
+already-normalized native quantities from their retained 万股/亿股 tokens, and
+never apply scale twice or compare unlike percentage denominators. Membership and
+quantity differences are genuine observations, not automatic proof of provider
+error. Keep each source matrix separate; no flat union, arbitrary source priority,
+net change or inferred exit. Historical arbitration remains open for all 42.
+
+Final ordinary-code identities use new immutable domain siblings
+`G03-official-complete-matrices-v13` and `G06-dated-distribution-terms-v3` under
+`/var/tmp/base231-convergence-20261014T131000Z-b84130c`. The formatting rebind retains
+all earlier attempts and byte-identical native/source files and clocks. Both final
+domains have two independent cold reconstructions plus disposable missing/corrupt
+negatives. Their READY seals remain domain-only; full successor integration,
+capacity qualification and whole-image acceptance remain separate.
+
+Current controls: `artifacts/base231-convergence-20261014T131000Z-b84130c`.
+Its `current-gaps.json` supersedes the prior handoff ledger when exported; earlier
+receipts remain historical. No source acquisition, payload cleanup, production
+mutation or new OCR/system-package installation occurred in this continuation.
+The new source-matrix comparison is a bounded diagnostic under the existing P10
+source-scoped delivery design, not a new consumer or historical-precision policy.

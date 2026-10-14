@@ -427,3 +427,43 @@ def test_nature_last_wrapped_header_columns_use_physical_order():
     )
     rows, _ = parse_top_matrix(body, hints)
     assert len(rows) == 10
+
+
+def test_wrapped_name_left_cell_is_not_discarded_for_right_hand_pledge():
+    body, hints = split_numeric_sample()
+    body = body.replace(
+        "合成公司  境内非国有法", "合成公司  境内非国有法                  质押  1001"
+    )
+    rows, _ = parse_top_matrix(body, hints)
+    assert rows[0]["name"] == "合成公司全称"
+    assert rows[0]["quantity"] == 1001
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("合成公司  境内", "额外合成公司  境内"), hints)
+
+
+def test_quantity_first_header_is_ordered_by_physical_columns_across_lines():
+    body, hints = quantity_first_sample()
+    body = body.replace(
+        "股东名称  股东性质  持股数量  持股比例（%）  有限售股份  股份状态",
+        "                                    持股比\n"
+        "股东名称      股东性质  持股数量\n"
+        "                                    例(%)",
+    )
+    rows, _ = parse_top_matrix(body, hints)
+    assert len(rows) == 10
+    assert rows[0]["quantity"] == 1001
+    assert rows[0]["raw_percentage"] == "1.00"
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("例(%)", "例"), hints)
+
+
+def test_split_quantity_first_uses_explicit_header_without_guessing_nature():
+    body, hints = quantity_first_sample()
+    body = body.replace(
+        "合成股东1  其他  1001  1.00", "合成股东1\n                    1001  1.00", 1
+    )
+    rows, _ = parse_top_matrix(body, hints)
+    assert rows[0]["quantity"] == 1001
+    assert rows[0]["category"] is None
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("1001  1.00", "1002  1.00", 1), hints)

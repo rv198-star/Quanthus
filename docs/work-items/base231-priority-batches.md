@@ -8,12 +8,56 @@ G10-G13 are deferred according to declared use. A bounded purpose qualification
 does not close the whole historical issue, grant a consumer or accept a Base.
 Keep the already sealed predecessor and all previous attempts immutable.
 
-The local continuation starts at `af1d81128a887be41902280939f96347c5a45ac5`,
-on `codex/base22-standalone`. Private controls are at
-`artifacts/base231-priority-batch-20261014T055731Z-af1d811`; the job-local
-data root is `/var/tmp/base231-priority-batch-20261014T055731Z-af1d811`.
-The latest exported `current-gaps.json` is the active status ledger. Earlier
-sealed manifests are historical evidence, not writable status dashboards.
+The current CN02 continuation starts at `0e1c60b2ad6ec6e25065e62374f76d97875d9963`,
+on `codex/base22-standalone`, in `/root/Quanthus/.worktrees/base22-standalone`.
+Current controls: `artifacts/base231-supplement-20261014T065402Z-0e1c60b`;
+private source root: `/var/tmp/base231-supplement-20261014T065402Z-0e1c60b`;
+scoped native outputs: the sibling ending in `-domains`.
+The Owner explicitly authorized necessary additional acquisition for items 1–8.
+No production mutation, credentials, ACL, node transfer or publication is implied.
+
+The prior active ledger is `artifacts/base231-priority-batch-20261014T055731Z-af1d811/current-gaps-v2.json`;
+its pending prose is superseded by current actual output/cold receipts. The new
+current ledger must bind the final local commit, exact source executions and scoped
+outputs before handoff. Neither source capture nor a domain seal is full acceptance.
+The unchanged full predecessor manifest is
+`91845422851368028e4e8a6b83e0dc9ba2a9e30dfdd8e4d6de892f64adac1d7f`.
+
+Current verified materializations:
+
+- G09: one sixth selected event reference input, retaining the earlier five;
+  the actual SSE rule and cash-only implementation establish the combined share
+  increment without inventing individual bonus/transfer atoms. No cumulative basis.
+- G01: 173 official source-reported financial origins, 341 reports and 5,456 facts.
+  This is financial-source scope, not a legal-form date or trading/PIT extension.
+- G02: 879 new complete statement envelopes, 8,892 reports and 786,144 facts,
+  with explicit source currency. Old unknown-currency F10 literals stay unknown.
+  Reusing the same qualified origin TMP for 519 envelopes adds 852 prelisting
+  reports and 75,124 facts at actual new knowledge; no listed-period duplication.
+- G03: 25 additional complete official matrices / 250 native rows, after
+  whole-name-chain, exact-quantity, official-percentage and full-candidate replay.
+  Native floating tables without a percentage column keep percentage unknown.
+  Source completeness is 1,036 / 1,147 coordinates; source-priority conflicts,
+  identity and unhandled layouts remain separate, not silently accepted.
+- G06: 1,473 original bodies plus 16 qualified large original bodies, each with
+  typed disclosure and subject observations; 161 implemented distributions and
+  terms. Remaining scanned/unsupported bodies are not no-change proof.
+  All 32 previous size-limit failures were actually fetched, 1,438,690,706 bytes;
+  16 large PDFs have blank extracted text. Original failures remain evidence.
+- G05: the exact 302132 / 2025-01-17 report-subject bridge is reconstructed from
+  the actual raw row and official legal-continuity notice plus both dated native
+  identities. This grants no January code activation or transaction equivalence.
+- G07: reuse the 23 accepted IPO scopes and 546 daily observations. New official
+  dated short-name aliases comprise 26 source-grounded intervals for 25 securities
+  from 33 retained name differences, with one two-event chain. They use explicit effective dates and unchanged
+  security/listing parents, not current provider names backfilled into history.
+
+Each completed scope has two physically independent relocations, fresh processes,
+source-root/network denial and missing/corrupt disposable negatives. The stronger
+source denial hides all `/var/tmp` where required; native source reads are probed.
+Do not confuse a passing memory map, source plan or previous test count with these
+actual serialized outputs. Pending acquisitions/unsupported layouts need their own
+qualification; the broad eight issues remain open and consumer admission is unchanged.
 
 ## Stage ownership
 
@@ -37,7 +81,8 @@ separate stage gated by its complete execution and independent-copy budget.
   calculation and an explicit half-even 18-place output quantum. Original source
   amounts, prices and times are unchanged. This single-event method is neither
   cumulative QFQ/HFQ nor automatic consumer effect selection; inherited historical
-  conflicts and the remaining incomplete event retain their restrictions.
+  conflicts and the remaining remaining historical scopes retain their restrictions; the sixth selected cash-only
+  event is qualified by the separately versioned official rule successor.
 - G07 reuses the previously qualified exact 23-listing scope and its 546 daily
   observations. Its native rows are in the physical integration TMP. No broader
   BSE, intraday or dated-name qualification follows.
@@ -78,3 +123,22 @@ mypy and `make check PYTHON=.venv/bin/python` before handoff. Keep actual failur
 and orchestration attempts; distinguish checks passed from baseline lint failures
 and checks not run. Commit only code/config/tests/docs locally, never payloads,
 credentials, run artifacts or local databases. No production mutation or push.
+
+## Latest bounded continuation checks
+
+The final stable code was checked with `make check PYTHON=.venv/bin/python`: 6,067
+passed, 21 skipped and 66 warnings. Earlier 6,025 / 6,037 reports and an intentionally
+cancelled superseded check remain historical logs. Changed-source Ruff and strict
+mypy must bind the final commit. The existing 216 whole-repository lint failures
+were not rerun or described as green. Source captures retain actual Oct14 acquisition;
+September business scope does not imply September knowledge. New official index
+pagination returned repeated first pages, so captures never assert complete index
+coverage; exact matched body identity remains independently checked.
+
+Continuation: reuse all sealed scopes with identical inputs. Group the remaining
+72 official holder layout/field cases by actual layout before extending adapters;
+28 require dated issuer evidence and 11 have no exact ten-row hint census. The
+42 original cross-source disagreements remain unarbitrated. The 30 blank/scan
+PDFs and two unmatched original announcement IDs require exact body evidence,
+not an empty no-change assumption. Full-image integration still requires its
+execution/cold-copy budget; no complete new mirror was created by these checks.

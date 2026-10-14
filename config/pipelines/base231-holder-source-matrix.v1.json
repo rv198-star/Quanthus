@@ -1,0 +1,14 @@
+{
+  "contract_id": "p10-base231-qualified-holder-source-matrix-membership-v1",
+  "business_through": "2026-09-30",
+  "timezone": "Asia/Shanghai",
+  "required_source_qualification": "NEW_GOVERNED_EXACT_RAW_CHILD_SELECTION",
+  "membership": "exact qualified complete source frame",
+  "component_reuse": "every actual business field equals the latest retained component",
+  "component_conflict": "hold the whole affected new source frame",
+  "legacy_absent_members": "retain original observations; do not infer exits",
+  "flat_union_complete_matrix_admission": "NOT_GRANTED",
+  "net_change_admission": "NOT_GRANTED",
+  "historical_PIT_admission": "NOT_GRANTED",
+  "consumer_admission": "NOT_GRANTED"
+}

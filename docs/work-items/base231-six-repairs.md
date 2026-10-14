@@ -72,3 +72,26 @@ particular an official holder event does not automatically deduplicate an F10
 atom, and a legal issuer observation does not extend listing/trading history.
 Re-run full-image key/version and source closure after integration; domain
 cold replay alone does not accept a new Base or grant consumer admission.
+
+The separately versioned `base231-holder-source-matrix.v1.json` keeps exact
+membership of each qualified complete source frame. The predecessor's strict
+flat-matrix evaluator is unchanged. Compatible new components may be appended
+while all previous rows, including holders absent from the new capture, remain
+intact. A true difference in any matched business field holds the entire new
+frame. A separate local membership file identifies the original new matrix;
+it is evidence, not an additional warehouse table. The union of old and new
+observations is not admitted as a complete ranking, percentage denominator,
+exit or net-change view. New membership is known only at its actual governance
+clock; it does not recover historical availability.
+
+`base231_official_adjustment` and the exact scoped
+`base231-official-adjustment-bases.v1.json` add current-knowledge all-issued-share
+coefficient observations for six original official implementation bodies.
+The official final reference-price formula, or explicitly non-differentiated
+total-issued-share implementation base, supplies this separate economic basis.
+Eligible-holder payout observations remain distinct. Preserve the original
+declared publication instant, actual body receipt and new interpretation clock.
+Unknown bonus/transfer components remain null, not inferred zero. Prior values
+and knowledge versions remain unchanged. These observations do not admit a
+price-factor series, historical PIT or a production consumer, and do not close
+unrelated inherited action conflicts.

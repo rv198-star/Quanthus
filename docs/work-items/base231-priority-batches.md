@@ -245,3 +245,116 @@ replay. The rebind requires full local reconstruction, two source-hidden cold
 relocations and missing/corrupt negatives before its new domain seal. Other
 retained domains keep their existing code/input identities; their prior receipts
 are reused rather than rebuilding identical prerequisites.
+
+## Financial integration ownership and preserved history
+
+`base231_financial_integration.py` consumes the already qualified financial
+outputs and one immutable native-report dependency. It does not decode original
+envelopes again or construct a full-history JSON database. Original reports and
+facts retain every typed field; only an open report knowledge interval may close
+at an exact later qualified observation from the same provider. Finite historical
+ends and gaps are retained. A different provider, retrospective clock, duplicate
+version or intersecting finite end fails closed. Source qualification precedes
+this merger; equality of provider names cannot itself grant source authority.
+
+The frozen model keys concepts by identity, taxonomy, effective start and knowledge
+start. Sealed same-clock/effective-scope variants are historical records, not
+redundant new captures. Applying the incoming cumulative-prefix reducer to the
+whole sealed table would omit 540 existing records in this selected predecessor;
+the successor preserves all 2,066 native concept atoms. It reduces only incoming
+observations, reuses a native version only when it covers the entire genuine
+knowledge/effective interval, and adds 735 source-grounded versions. Unknown
+endpoints remain unknown; no historical gap is filled or publication inferred.
+
+Financial origin observations retain their explicit financial-only issuer scope.
+The 445 dated issuer dependencies from the existing qualified integration TMP
+must accompany its 770 prelisting reports; without those parents the stricter
+date check correctly rejects the first dependency assembly. They do not extend
+listing/security/ownership continuity. The first failed assembly is retained.
+
+The physical scope contains 1,615,677 reports, 2,801 concepts and 1,178,444 new
+facts. It is a financial integration TMP, not a complete 33-table image or ADM.
+Its 8,811 exact open old-report interval closures are paired with real successor
+knowledge versions; old facts remain untouched. The selected new fact business
+keys were checked against all 80,310,412 native facts before materialization.
+The absence of collisions does not replace eventual whole-image acceptance.
+
+`base231_financial_integration_audit.py` uses only contained typed dependencies,
+local contracts and ordinary code. It reconstructs the report interval selection
+and concept merge, scans every physical output partition, checks global keys,
+Shanghai dates and financial temporal references, and compares every report/fact
+column in deterministic key order. Fully rehashed value/source/concept changes,
+an extra empty partition and changed qualification/purpose still fail. Archive
+source-root strings are never opened. Two new-process source/network-denied cold
+receipts and disposable damage checks remain explicit evidence; a financial TMP
+receipt cannot establish independent acceptance of the absent whole parent image.
+
+Docs-impact: source-preserving integration implements the existing frozen model
+and purpose-qualified delivery contracts. Consumer activation, protected partition
+and historical PIT rules are unchanged. Current receipts and the single active
+gap ledger are exported from
+`artifacts/base231-financial-consolidation-20261014T150000Z-7293db2`;
+the preceding convergence ledger remains a historical recovery snapshot after
+that handoff completes. The current ledger is `current-gaps.json` in that directory.
+
+The official holder integration TMP adds 410 source-grounded components from the
+41 qualified complete matrices against 423 prior rows at those exact frames.
+Compatibility is checked at the frozen component grain, including share nature
+and percentage basis; it is not cross-provider numerical consensus. The exact
+410-member official matrix view is retained separately. Legacy rows are never
+inferred exits, and the flat union does not qualify ranking, denominators or net
+changes. The 42 original provider disagreements remain unarbitrated.
+
+### Qualified event and identity partition integration
+
+The continuation uses `base231_observation_integration.py` and its offline audit
+alongside the financial integration. Source-body verification permits only exact
+issuer/document/language-matched disclosure successors to end an open native
+knowledge interval at the genuine later observation. Finite ends and gaps remain
+unchanged; other event, identity and reference-factor scopes only append disjoint
+versions or reuse identical atoms. Equal-key different values, retroactive
+versions and unqualified closure fail. Regression tests include fully repacked
+value changes, unknown qualification, expanded output files and empty directories.
+
+The selected real sources now materialize twelve affected-table dependencies:
+1,490 disclosure observations and subjects, 230 actions, 238 terms, 103 security
+identifiers, 618 dated financial/company parents, 23 each of securities, listings
+and company identifiers, six current event-reference factors, twelve inputs and
+11 holder-change observations. Exactly 1,487 old disclosure knowledge intervals
+end at qualified real new observations; every other old atom is retained.
+Previously successful partition checkpoints are reused only after equality of
+all typed columns in the same global version-key order. Partition serialization
+order itself is not a global semantic ordering.
+
+These remain immutable `TMP` inputs without final READY or consumer admission.
+Their contained-dependency cold reconstruction verifies files, partitions, keys,
+clocks and lineage. It explicitly does not replace integrated cross-table foreign
+key closure or complete 33-table successor acceptance. The original 42 holder
+source disputes, unknown older currency, historical PIT and minute constraints
+remain scoped limitations. No new supplier collection or frozen-policy change is
+introduced. Documentation impact: internal implementation of the existing P10
+native-image contracts; the model, consumer gates and publication policy are unchanged.
+
+### Complete successor composition and capacity topology
+
+`base231_convergence_image.py` binds the exact retained predecessor and five
+fixed source roles. It reconstructs the only allowed file selection: full report
+and concept replacement; new facts appended to unchanged native facts; affected
+event partitions replaced by their reproduced dependency; exact priority deltas
+for bars, state and holder components; official compatible components appended.
+It scans the full native image and then independently reconstructs the contained
+financial/event/holder scopes. Its distinct 2.3.1 seal requires a complete receipt,
+writes READY last and never grants consumers or overwrites prior seals. The seal
+alone does not establish two cold runs or Owner final acceptance.
+
+Capacity registration uses one complete candidate on the data filesystem, one
+rotating physical verification copy on the system filesystem and bounded audit
+TMP on the data filesystem. The first copy is retired only after successful full
+cold validation and exact byte restoration proof from the pinned candidate; the
+second is independently created at a new path and checked by another process.
+Intentional disposable negative checks operate only on this verification copy.
+All source identities, original Base2.3 and failed materializations stay retained.
+Completed disposable source-domain copies may have duplicate data retired under
+Owner cleanup authority after exact full-hash restoration proof; their metadata,
+receipts and nonmatching/corrupted bytes remain historical evidence. Such retired
+copy directories are archives, not currently usable complete images.

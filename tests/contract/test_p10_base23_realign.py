@@ -492,3 +492,280 @@ def test_native_capture_action_and_exact_failed_job_resume_preserve_budget(tmp_p
     assert latest["operations"][0] == original["operations"][0]
     assert latest["cumulative_processing_seconds"] == 24.0
     assert latest["code_resumes"][0]["retained_cumulative_seconds"] == 12.0
+
+
+def test_oct08_native_requires_exact_daily_authority_and_preserves_real_gaps(tmp_path, monkeypatch):
+    from decimal import Decimal
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from quanthus.pipelines.securities_warehouse import daily_core_domain
+    from quanthus.providers.p10_native_m1_shard_capture import target_date_records
+
+    _, actual_daily, _, _ = daily(tmp_path / "daily", monkeypatch)
+    dm = json.loads((actual_daily / "manifest.json").read_text())
+    dm["selected_releases"] = {
+        "market_daily_core": {"manifest_sha256": "sha256:" + "a" * 64},
+        "calendar_daily_events": {"manifest_sha256": "sha256:" + "b" * 64},
+    }
+    atomic(actual_daily / "manifest.json", dm)
+    monkeypatch.setattr(daily_core_domain, "verify_daily_domain_increment", lambda _: None)
+    monkeypatch.setattr(
+        complete,
+        "daily_mapping",
+        lambda *_: ({"000001": {"close": Decimal("1"), "volume": Decimal("200")}}, None),
+    )
+    status_path = (
+        actual_daily
+        / "payload/test/dwd_tradability_state/market_date=2026-10-08/part-00000.parquet"
+    )
+    status_path.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [{"source_record_id": "source#code=000001&date=2026-10-08", "is_tradable": True}]
+        ),
+        status_path,
+    )
+    ref = {
+        "kind": "p10_complete_daily_job_reference_v2",
+        "market_date": "2026-10-08",
+        "source_ods_manifest_sha256": "sha256:" + "a" * 64,
+        "event_ods_manifest_sha256": "sha256:" + "b" * 64,
+        "policy_id": "p10-trading-day-complete-daily-v1",
+        "population": 1,
+        "securities": {"000001": {"close": "1", "volume": "200", "tradestatus": "1"}},
+        "universe_policy_id": "p10-acquisition-prevention-v1",
+        "universe_digest": dm["acquisition_universe"]["universe_digest"],
+        "universe_manifest_sha256": "sha256:" + "c" * 64,
+    }
+    ref["reference_digest"] = digest(encoded(ref))
+    ref_file = tmp_path / "reference.json"
+    atomic(ref_file, ref)
+    raw = encoded(
+        {
+            "code": 0,
+            "data": {
+                "sz000001": {
+                    "m1": [
+                        ["202610080930", "1", "1", "1", "1", "1", {}],
+                        ["202610081500", "1", "1", "1", "1", "1", {}],
+                    ]
+                }
+            },
+        }
+    )
+    before, _ = minute.assess(
+        interval="1m", code="000001", day="2026-10-08", raw=raw, daily=ref["securities"]["000001"]
+    )
+    assert before["quality_grade"] == "R3"
+    shard = tmp_path / "capture/shard-000"
+    atomic(
+        shard / "identity.json",
+        {
+            "kind": "p10_tencent_native_m1_raw_capture_shard",
+            "market_date": "2026-10-08",
+            "market_ods_manifest_sha256": ref["source_ods_manifest_sha256"],
+            "selected_symbols": ["000001"],
+            "provider": "tencent-mkline-m1",
+        },
+    )
+    atomic(
+        shard / "receipts/000001.json",
+        {
+            "stock_code": "000001",
+            "market_date": "2026-10-08",
+            "source_market_ods_sha256": ref["source_ods_manifest_sha256"],
+            "status": "raw_saved",
+            "provider": "tencent-mkline-m1",
+            "captured_at": "2026-10-14T03:00:00+00:00",
+            "raw_sha256": hashlib.sha256(raw).hexdigest(),
+            "target_date_observation_sha256": target_date_records(raw, "000001", date(2026, 10, 8))[
+                1
+            ],
+        },
+    )
+    (shard / "raw").mkdir()
+    (shard / "raw/000001.json.gz").write_bytes(gzip.compress(raw))
+    args = {
+        "reference_file": ref_file,
+        "capture_root": tmp_path / "capture",
+        "interval": "1m",
+        "product_root": tmp_path / "products",
+        "code_revision": "d" * 40,
+    }
+    with pytest.raises(ValueError, match="explicit Base23"):
+        minute.build(**args)
+    result = minute.build(**args, historical_daily=actual_daily)
+    package = Path(result["package_path"])
+    assert result["quality_grades"] == {"R2": 1}
+    assert result["row_counts"] == {"R2": 2}
+    manifest = json.loads((package / "manifest.json").read_text())
+    assert manifest["historical_alignment"] == repair.alignment_binding(actual_daily)
+    status = json.loads((package / "quality-status.jsonl").read_text())
+    assert len(status["missing_actual_minutes"]) == 239
+    assert status["source_acquired_at_or_after"] == "2026-10-14T03:00:00+00:00"
+    mismatch = {**ref, "source_ods_manifest_sha256": "sha256:" + "f" * 64}
+    with pytest.raises(ValueError, match="reference differs"):
+        minute._historical_daily_binding(actual_daily, mismatch)
+    for key, value in [
+        ("close", "2"),
+        ("volume", "201"),
+        ("tradestatus", "0"),
+        ("daily_price_observation_state", "unavailable_suspended"),
+    ]:
+        wrong = json.loads(json.dumps(ref))
+        wrong["securities"]["000001"][key] = value
+        wrong.pop("reference_digest")
+        wrong["reference_digest"] = digest(encoded(wrong))
+        with pytest.raises(ValueError, match="values or status differ"):
+            minute._historical_daily_binding(actual_daily, wrong)
+
+
+def test_semantic_resume_requires_two_exact_frozen_source_receipts(tmp_path, monkeypatch):
+    from quanthus.pipelines import p10_historical_tplus1_recovery as runtime
+    from quanthus.pipelines.p10_minute_live_warehouse import expected_times
+    from quanthus.providers.p10_native_m1_shard_capture import target_date_records
+
+    monkeypatch.setattr(repair, "STATE", tmp_path)
+
+    def execute(*, state_path, state, operation_id, **kwargs):
+        result = {"operation_id": operation_id, "outcome": "success", "duration_seconds": 12.0}
+        state["operations"].append(result)
+        state["cumulative_processing_seconds"] += 12.0
+        atomic(state_path, state)
+        return result
+
+    monkeypatch.setattr(runtime, "_run_operation", execute)
+    codes = ["000001", "600000"]
+    ref = {
+        "kind": "p10_complete_daily_job_reference_v2",
+        "market_date": "2026-10-08",
+        "source_ods_manifest_sha256": "sha256:" + "a" * 64,
+        "event_ods_manifest_sha256": "sha256:" + "b" * 64,
+        "policy_id": "p10-trading-day-complete-daily-v1",
+        "population": 2,
+        "securities": {c: {"close": "1", "volume": "24100", "tradestatus": "1"} for c in codes},
+        "universe_policy_id": "p10-acquisition-prevention-v1",
+        "universe_digest": digest(encoded(codes)),
+        "universe_manifest_sha256": "sha256:" + "c" * 64,
+    }
+    ref["reference_digest"] = digest(encoded(ref))
+    atomic(tmp_path / "references/2026-10-08.json", ref)
+    args = {
+        "day": "2026-10-08",
+        "interval": "1m",
+        "reference_digest": ref["reference_digest"],
+        "revision": "b" * 40,
+        "operation_id": "source-preflight",
+        "argv": ["python", "-m", "quanthus.pipelines.p10_native_minute_delivery", "build"],
+        "publication": True,
+    }
+    repair.run_recovery_operation(**args)
+    original = json.loads((tmp_path / "minute-jobs/2026-10-08/1m/ledger.json").read_text())
+    capture = tmp_path / "captures/2026-10-08/1m/canary-reference-v2"
+    atomic(
+        capture / "identity.json",
+        {
+            "kind": "p10_tencent_native_m1_raw_capture_shard",
+            "provider": "tencent-mkline-m1",
+            "market_date": "2026-10-08",
+            "market_ods_manifest_sha256": ref["source_ods_manifest_sha256"],
+            "selected_symbols": codes,
+        },
+    )
+    rows = []
+    for code in codes:
+        symbol = ("sh" if code.startswith("6") else "sz") + code
+        raw = encoded(
+            {
+                "code": 0,
+                "data": {
+                    symbol: {
+                        "m1": [
+                            [stamp, "1", "1", "1", "1", "1", {}]
+                            for stamp in sorted(["202610080930", *expected_times("2026-10-08")])
+                        ]
+                    }
+                },
+            }
+        )
+        acquired = "2026-10-14T18:20:00+00:00"
+        sha = hashlib.sha256(raw).hexdigest()
+        path = capture / "raw" / (code + ".json.gz")
+        path.parent.mkdir(exist_ok=True)
+        path.write_bytes(gzip.compress(raw))
+        atomic(
+            capture / "receipts" / (code + ".json"),
+            {
+                "stock_code": code,
+                "market_date": "2026-10-08",
+                "source_market_ods_sha256": ref["source_ods_manifest_sha256"],
+                "status": "raw_saved",
+                "provider": "tencent-mkline-m1",
+                "captured_at": acquired,
+                "raw_sha256": sha,
+                "target_date_observation_sha256": target_date_records(raw, code, date(2026, 10, 8))[
+                    1
+                ],
+            },
+        )
+        rows.append(
+            {
+                "stock_code": code,
+                "quality_grade": "R3",
+                "quality_reason": "invalid_native_source:ValueError",
+                "native_target_rows": 241,
+                "captured_at": acquired,
+                "raw_sha256": sha,
+            }
+        )
+    proof_path = tmp_path / "canary-shared-reference-bound-20261008.json"
+    proof = {"reference_digest": ref["reference_digest"], "source_results": rows}
+    atomic(proof_path, proof)
+
+    def authorization():
+        return {
+            "kind": "p10_october_realignment_processing_resume_v2",
+            "policy_id": repair.ID,
+            "contract_sha256": file_digest(repair.CONFIG),
+            "market_date": args["day"],
+            "interval": args["interval"],
+            "reference_digest": args["reference_digest"],
+            "from_code_revision": args["revision"],
+            "to_code_revision": "d" * 40,
+            "frozen_operations_digest": digest(encoded(original["operations"])),
+            "preserve_original_code_and_elapsed_budget": True,
+            "source_window_unchanged": True,
+            "reason_code": "native_historical_scope_adaptation",
+            "evidence_sha256": file_digest(proof_path),
+        }
+
+    next_args = {
+        **args,
+        "revision": "d" * 40,
+        "operation_id": "source-reuse",
+        "argv": ["python", "-m", "quanthus.pipelines.p10_native_minute_delivery", "seed-m1"],
+    }
+    atomic(proof_path, {**proof, "source_results": [rows[0], rows[0]]})
+    with pytest.raises(ValueError, match="budget cannot reset"):
+        repair.run_recovery_operation(**next_args, resume_authorization=authorization())
+    atomic(proof_path, {**proof, "reference_digest": "sha256:" + "f" * 64})
+    with pytest.raises(ValueError, match="budget cannot reset"):
+        repair.run_recovery_operation(**next_args, resume_authorization=authorization())
+    atomic(proof_path, proof)
+    receipt_path = capture / "receipts/600000.json"
+    receipt = json.loads(receipt_path.read_text())
+    atomic(receipt_path, {**receipt, "source_market_ods_sha256": "sha256:" + "f" * 64})
+    with pytest.raises(ValueError, match="budget cannot reset"):
+        repair.run_recovery_operation(**next_args, resume_authorization=authorization())
+    atomic(receipt_path, receipt)
+    assert (
+        repair.run_recovery_operation(**next_args, resume_authorization=authorization())["outcome"]
+        == "success"
+    )
+    latest = json.loads((tmp_path / "minute-jobs/2026-10-08/1m/ledger.json").read_text())
+    assert (
+        latest["cumulative_processing_seconds"] == 24.0
+        and latest["code_revision"] == args["revision"]
+    )

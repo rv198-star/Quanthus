@@ -554,7 +554,11 @@ def run_recovery_operation(
     grade_module = "quanthus.pipelines.p10_native_minute_delivery"
     if (
         publication
-        and (argv[2] != grade_module or len(argv) < 4 or argv[3] not in {"build", "verify"})
+        and (
+            argv[2] != grade_module
+            or len(argv) < 4
+            or argv[3] not in {"build", "verify", "seed-m1"}
+        )
     ) or (
         not publication
         and argv[2] not in capture_modules
@@ -601,11 +605,94 @@ def run_recovery_operation(
                     "preserve_original_code_and_elapsed_budget": True,
                     "source_window_unchanged": True,
                 }
+                semantic_resume = False
+                if (
+                    publication
+                    and day == "2026-10-08"
+                    and interval == "1m"
+                    and (resume_authorization or {}).get("kind")
+                    == "p10_october_realignment_processing_resume_v2"
+                ):
+                    from quanthus.pipelines.p10_native_minute_delivery import reference
+
+                    proof_path = STATE / "canary-shared-reference-bound-20261008.json"
+                    proof = object_at(proof_path)
+                    rows = proof.get("source_results", [])
+                    frozen_ref = reference(STATE / "references/2026-10-08.json")
+                    semantic_resume = len(rows) == 2 and all(
+                        r.get("quality_grade") == "R3"
+                        and r.get("quality_reason") == "invalid_native_source:ValueError"
+                        and r.get("native_target_rows") == 241
+                        for r in rows
+                    )
+                    semantic_resume = (
+                        semantic_resume
+                        and {r["stock_code"] for r in rows} == {"000001", "600000"}
+                        and proof.get("reference_digest")
+                        == reference_digest
+                        == frozen_ref["reference_digest"]
+                    )
+                    if semantic_resume:
+                        from quanthus.providers.p10_native_m1_shard_capture import (
+                            target_date_records,
+                        )
+
+                        capture = STATE / "captures/2026-10-08/1m/canary-reference-v2"
+                        identity_proof = object_at(capture / "identity.json")
+                        semantic_resume = (
+                            identity_proof.get("kind") == "p10_tencent_native_m1_raw_capture_shard"
+                            and identity_proof.get("provider") == "tencent-mkline-m1"
+                            and identity_proof.get("market_date") == "2026-10-08"
+                            and identity_proof.get("market_ods_manifest_sha256")
+                            == frozen_ref["source_ods_manifest_sha256"]
+                            and set(identity_proof.get("selected_symbols", []))
+                            == {"000001", "600000"}
+                        )
+                        for row in rows:
+                            code = row["stock_code"]
+                            if code not in {"000001", "600000"}:
+                                semantic_resume = False
+                                break
+                            raw = gzip.decompress(
+                                (capture / "raw" / (code + ".json.gz")).read_bytes()
+                            )
+                            receipt = object_at(capture / "receipts" / (code + ".json"))
+                            acquired = datetime.fromisoformat(receipt["captured_at"])
+                            target_rows, target_digest = target_date_records(
+                                raw, code, date(2026, 10, 8)
+                            )
+                            if (
+                                hashlib.sha256(raw).hexdigest() != row["raw_sha256"]
+                                or receipt["captured_at"] != row["captured_at"]
+                                or receipt.get("raw_sha256") != row["raw_sha256"]
+                                or receipt.get("provider") != "tencent-mkline-m1"
+                                or receipt.get("status") != "raw_saved"
+                                or receipt.get("stock_code") != code
+                                or receipt.get("market_date") != "2026-10-08"
+                                or receipt.get("source_market_ods_sha256")
+                                != frozen_ref["source_ods_manifest_sha256"]
+                                or receipt.get("target_date_observation_sha256") != target_digest
+                                or len(target_rows) != 241
+                                or acquired.tzinfo is None
+                                or not datetime.fromisoformat(c["source_window_start"])
+                                <= acquired
+                                < datetime.fromisoformat(c["source_window_end"])
+                            ):
+                                semantic_resume = False
+                                break
+                    if semantic_resume:
+                        expected_resume.update(
+                            {
+                                "kind": "p10_october_realignment_processing_resume_v2",
+                                "reason_code": "native_historical_scope_adaptation",
+                                "evidence_sha256": file_digest(proof_path),
+                            }
+                        )
                 if (
                     resume_authorization != expected_resume
                     or state.get("inflight_operation")
                     or not state["operations"]
-                    or state["operations"][-1].get("outcome") != "failed"
+                    or (state["operations"][-1].get("outcome") != "failed" and not semantic_resume)
                 ):
                     raise ValueError(
                         "recovery processing code changed without exact failed-job resume; "
@@ -653,13 +740,22 @@ def run_recovery_operation(
         )
 
 
-def seed_reused_m1(*, origin_root: Path, reference_file: Path, output: Path) -> dict[str, int]:
+def seed_reused_m1(
+    *, origin_root: Path, reference_file: Path, output: Path, historical_daily: Path | None = None
+) -> dict[str, int]:
     """Reproject unchanged Tencent responses with explicit original capture proof."""
     from quanthus.pipelines.p10_native_minute_delivery import assess, reference
     from quanthus.providers.p10_native_m1_shard_capture import target_date_records
 
     ref = reference(reference_file)
     check_day(ref["market_date"])
+    historical = ref["market_date"] == "2026-10-08"
+    if historical:
+        from quanthus.pipelines.p10_native_minute_delivery import _historical_daily_binding
+
+        if historical_daily is None:
+            raise ValueError("Oct08 source reuse requires actual Base23 daily authority")
+        _historical_daily_binding(historical_daily, ref)
     if output.exists():
         raise ValueError("reuse seed is immutable; use its existing receipts")
     origins = {}
@@ -686,7 +782,12 @@ def seed_reused_m1(*, origin_root: Path, reference_file: Path, output: Path) -> 
                 raw, code, date.fromisoformat(ref["market_date"])
             )
             quality, _ = assess(
-                interval="1m", code=code, day=ref["market_date"], raw=raw, daily=daily
+                interval="1m",
+                code=code,
+                day=ref["market_date"],
+                raw=raw,
+                daily=daily,
+                allow_historical=historical,
             )
         except (ValueError, KeyError, TypeError):
             continue

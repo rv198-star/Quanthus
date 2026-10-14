@@ -269,6 +269,13 @@ def build(
     source_sha = daily_manifest["selected_releases"]["market_daily_core"]["manifest_sha256"]
     for interval, member in verified.items():
         ref = reference((m1 if interval == "1m" else m5) / "daily-reference.json")
+        member_manifest = object_at((m1 if interval == "1m" else m5) / "manifest.json")
+        if (
+            member_manifest.get("historical_alignment")
+            and member_manifest["historical_alignment"]["daily_manifest_sha256"]
+            != daily_result.manifest_sha256
+        ):
+            raise ValueError("historical native minute binds a different actual daily")
         if (
             member["market_date"] != daily_manifest["market_date"]
             or member["interval"] != interval
@@ -454,6 +461,13 @@ def verify(root: Path) -> dict[str, Any]:
         member = root / "members" / interval
         actual = verify_minute(member)
         ref = reference(member / "daily-reference.json")
+        member_manifest = object_at(member / "manifest.json")
+        if (
+            member_manifest.get("historical_alignment")
+            and member_manifest["historical_alignment"]["daily_manifest_sha256"]
+            != dr.manifest_sha256
+        ):
+            raise ValueError("historical native minute binds a different actual daily")
         if (
             actual["interval"] != interval
             or actual["market_date"] != manifest["market_date"]

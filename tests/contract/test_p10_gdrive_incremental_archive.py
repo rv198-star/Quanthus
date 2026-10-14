@@ -28,8 +28,8 @@ from tests.contract.test_p10_complete_daily_gdrive import complete as build_nati
 
 
 @pytest.fixture
-def native_complete(tmp_path: Path) -> Path:
-    return build_native_complete.__wrapped__(tmp_path)
+def native_complete(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    return build_native_complete.__wrapped__(tmp_path, monkeypatch)
 
 
 def source(root: Path, *, revision: str, changed: bytes = b"new daily") -> dict:

@@ -6,6 +6,7 @@ import argparse
 import gzip
 import json
 import os
+import re
 import shutil
 import tempfile
 from collections import Counter
@@ -241,7 +242,13 @@ def target_source_changed(before: bytes, after: bytes, code: str, day: str, inte
 
 
 def assess(
-    *, interval: str, code: str, day: str, raw: bytes | None, daily: dict[str, Any]
+    *,
+    interval: str,
+    code: str,
+    day: str,
+    raw: bytes | None,
+    daily: dict[str, Any],
+    allow_historical: bool = False,
 ) -> tuple[dict[str, Any], dict[str, dict[str, Decimal]]]:
     if daily.get("daily_price_observation_state") == "unavailable_suspended":
         if (
@@ -294,6 +301,7 @@ def assess(
             traded=daily["tradestatus"] == "1",
             daily_shares=daily["volume"],
             daily_close=daily["close"],
+            allow_historical=allow_historical,
         )
         if any(
             bar[name] <= 0 for bar in bars.values() for name in ("open", "high", "low", "close")
@@ -425,6 +433,69 @@ def minute_schema() -> Any:
     )
 
 
+def _historical_daily_binding(daily: Path, ref: dict[str, Any]) -> dict[str, str]:
+    import pyarrow.parquet as pq
+
+    from quanthus.pipelines.p10_base23_realign import alignment_binding
+    from quanthus.pipelines.p10_complete_daily import daily_mapping
+    from quanthus.pipelines.securities_warehouse.daily_core_domain import (
+        verify_daily_domain_increment,
+    )
+
+    binding = alignment_binding(daily)
+    verify_daily_domain_increment(daily)
+    manifest = object_at(daily / "manifest.json")
+    if (
+        binding["market_date"] != ref["market_date"]
+        or binding["universe_digest"] != ref.get("universe_digest")
+        or manifest["selected_releases"]["market_daily_core"]["manifest_sha256"]
+        != ref["source_ods_manifest_sha256"]
+        or manifest["selected_releases"]["calendar_daily_events"]["manifest_sha256"]
+        != ref["event_ods_manifest_sha256"]
+    ):
+        raise ValueError("historical native minute reference differs from actual Base23 daily")
+    mapping, _ = daily_mapping(daily, ref["market_date"])
+    states = {}
+    for path in daily.glob("payload/*/dwd_tradability_state/market_date=*/part-*.parquet"):
+        for row in (
+            pq.ParquetFile(path).read(columns=["source_record_id", "is_tradable"]).to_pylist()
+        ):
+            match = re.search(
+                r"#code=([0-9]{6})&date=(\d{4}-\d{2}-\d{2})$", row["source_record_id"]
+            )
+            if (
+                match is None
+                or match[2] != ref["market_date"]
+                or match[1] in states
+                or type(row["is_tradable"]) is not bool
+            ):
+                raise ValueError("historical daily status identity differs")
+            states[match[1]] = "1" if row["is_tradable"] else "0"
+    if set(mapping) != set(ref["securities"]) or set(states) != set(mapping):
+        raise ValueError("historical reference status population differs")
+    for code, observed in ref["securities"].items():
+        actual = mapping[code]
+        if observed["tradestatus"] != states[code]:
+            raise ValueError("historical reference values or status differ from actual daily")
+        if actual.get("daily_price_observation_state") == "unavailable_suspended":
+            if (
+                observed.get("close") is not None
+                or observed.get("volume") is not None
+                or observed.get("daily_price_observation_state") != "unavailable_suspended"
+                or states[code] != "0"
+            ):
+                raise ValueError("historical reference unavailable/null state differs")
+        elif (
+            observed.get("daily_price_observation_state") is not None
+            or observed.get("close") is None
+            or observed.get("volume") is None
+            or _decimal(observed["close"]) != actual["close"]
+            or _decimal(observed["volume"]) != actual["volume"]
+        ):
+            raise ValueError("historical reference values or status differ from actual daily")
+    return binding
+
+
 def build(
     *,
     reference_file: Path,
@@ -433,12 +504,18 @@ def build(
     product_root: Path,
     code_revision: str,
     prior_capture_root: Path | None = None,
+    historical_daily: Path | None = None,
 ) -> dict[str, Any]:
     import pyarrow as pa
     import pyarrow.parquet as pq
 
     ref = reference(reference_file)
     require_revision(code_revision)
+    historical_alignment = None
+    if interval == "1m" and ref["market_date"] == "2026-10-08":
+        if historical_daily is None:
+            raise ValueError("Oct08 native minute requires explicit Base23 daily authority")
+        historical_alignment = _historical_daily_binding(historical_daily, ref)
     index = source_index(capture_root, ref, interval)
     if prior_capture_root is not None:
         prior = source_index(prior_capture_root, ref, interval)
@@ -465,6 +542,7 @@ def build(
                 ref["reference_digest"],
                 interval,
                 code_revision,
+                historical_alignment,
                 [(code, receipt) for code, (_, receipt) in sorted(index.items())],
             ]
         )
@@ -482,6 +560,13 @@ def build(
     buffer = []
     try:
         shutil.copyfile(reference_file, stage / "daily-reference.json")
+        if historical_alignment is not None:
+            from quanthus.pipelines.p10_complete_daily import copy_sealed_file
+
+            assert historical_daily is not None
+            shutil.copytree(
+                historical_daily, stage / "historical-daily", copy_function=copy_sealed_file
+            )
         (stage / "ods/raw").mkdir(parents=True)
         with (
             pq.ParquetWriter(
@@ -495,7 +580,12 @@ def build(
                 if raw is not None and digest(raw) != "sha256:" + receipt["raw_sha256"]:
                     raise ValueError("immutable captured original SHA differs")
                 quality, bars = assess(
-                    interval=interval, code=code, day=ref["market_date"], raw=raw, daily=daily
+                    interval=interval,
+                    code=code,
+                    day=ref["market_date"],
+                    raw=raw,
+                    daily=daily,
+                    allow_historical=historical_alignment is not None,
                 )
                 quality["source_acquired_at_or_after"] = receipt.get("captured_at")
                 quality["reference_ods_manifest_sha256"] = ref["source_ods_manifest_sha256"]
@@ -548,6 +638,11 @@ def build(
                 "research_ready": grades["R3"] == 0 and sum(grades.values()) == ref["population"],
                 "execution_authorized": False,
                 "sealed_at": datetime.now(timezone.utc).isoformat(),
+                **(
+                    {"historical_alignment": historical_alignment}
+                    if historical_alignment is not None
+                    else {}
+                ),
             },
         )
         result = verify(stage)
@@ -567,6 +662,14 @@ def verify(root: Path) -> dict[str, Any]:
     require_revision(manifest.get("code_revision"))
     ref = reference(root / "daily-reference.json")
     interval = manifest["interval"]
+    historical_alignment = manifest.get("historical_alignment")
+    if interval == "1m" and ref["market_date"] == "2026-10-08":
+        if historical_alignment is None or historical_alignment != _historical_daily_binding(
+            root / "historical-daily", ref
+        ):
+            raise ValueError("Oct08 native minute historical daily authority differs")
+    elif historical_alignment is not None:
+        raise ValueError("unexpected historical native minute authority")
     if (
         interval not in {"1m", "5m"}
         or manifest.get("policy_id") != POLICY_ID
@@ -598,6 +701,7 @@ def verify(root: Path) -> dict[str, Any]:
                 day=ref["market_date"],
                 raw=raw,
                 daily=ref["securities"][code],
+                allow_historical=historical_alignment is not None,
             )
             if any(
                 status.get(key) != value
@@ -659,6 +763,7 @@ def verify(root: Path) -> dict[str, Any]:
                     day=ref["market_date"],
                     raw=raw,
                     daily=ref["securities"][code],
+                    allow_historical=historical_alignment is not None,
                 )
             stamp = datetime.fromisoformat(row["source_ts"]).strftime("%Y%m%d%H%M")
             original = remaining.pop(stamp, None)
@@ -703,7 +808,7 @@ def verify(root: Path) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["capture", "build", "verify"])
+    parser.add_argument("action", choices=["capture", "build", "verify", "seed-m1"])
     parser.add_argument("--reference", type=Path)
     parser.add_argument("--interval", choices=["1m", "5m"])
     parser.add_argument("--output", type=Path, required=True)
@@ -712,8 +817,18 @@ def main() -> int:
     parser.add_argument("--codes-file", type=Path)
     parser.add_argument("--shard-index", type=int)
     parser.add_argument("--code-revision")
+    parser.add_argument("--historical-daily", type=Path)
     args = parser.parse_args()
-    if args.action == "verify":
+    if args.action == "seed-m1":
+        from quanthus.pipelines.p10_base23_realign import seed_reused_m1
+
+        result = seed_reused_m1(
+            origin_root=args.capture_root,
+            reference_file=args.reference,
+            output=args.output,
+            historical_daily=args.historical_daily,
+        )
+    elif args.action == "verify":
         result = verify(args.output)
     elif args.action == "build":
         result = build(
@@ -723,6 +838,7 @@ def main() -> int:
             product_root=args.output,
             code_revision=args.code_revision,
             prior_capture_root=args.prior_capture_root,
+            historical_daily=args.historical_daily,
         )
     else:
         ref = reference(args.reference)

@@ -87,7 +87,7 @@ def audit_convergence_image(root: Path, budget: Budget) -> dict[str, Any]:
         name = "SCOPE.json" if source == "holder" else "integration-TMP.json"
         if file_sha(root / prefix / name) != plan["sources"][source]["descriptor_sha256"]:
             raise BoundedError("CONVERGENCE_CONTAINED_SCOPE_IDENTITY_CHANGED")
-    native = audit_native_image(root, budget)
+    native = audit_native_image(root, budget, unique_business_key_shortcut=True)
     budget.begin_stage("contained-financial-reconstruction")
     financial = audit_financial_tmp(root / PREFIXES["financial"], budget)
     budget.begin_stage("contained-event-identity-reconstruction")

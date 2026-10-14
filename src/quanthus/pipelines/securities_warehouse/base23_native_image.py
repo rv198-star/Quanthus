@@ -471,8 +471,21 @@ def materialize_native_image(
     return record
 
 
-def audit_native_image(root: Path, budget: Budget) -> dict[str, Any]:
-    """All runtime evidence is local; source roots are inert archival strings."""
+def audit_native_image(
+    root: Path, budget: Budget, *, unique_business_key_shortcut: bool = False
+) -> dict[str, Any]:
+    """All runtime evidence is local; source roots are inert archival strings.
+
+    Legacy callers retain the original algorithm. The successor option proves
+    exact business-key uniqueness before omitting vacuous interval comparisons.
+    """
+    if type(unique_business_key_shortcut) is not bool:
+        raise BoundedError("NATIVE_IMAGE_KEY_ALGORITHM_OPTION_INVALID")
+    scan_type = NativeGlobalScan
+    if unique_business_key_shortcut:
+        from .base231_native_keys import UniqueBusinessKeyScan
+
+        scan_type = UniqueBusinessKeyScan
     root = physical_path(root)
     if not os.statvfs(root).f_flag & os.ST_RDONLY:
         raise BoundedError("NATIVE_IMAGE_KERNEL_READONLY_REQUIRED")
@@ -510,7 +523,7 @@ def audit_native_image(root: Path, budget: Budget) -> dict[str, Any]:
     if (root / "manifest.json").exists():
         declared |= {"manifest.json", "READY"}
     summaries = {}
-    with NativeGlobalScan(budget, read_only_roots=[root]) as scan:
+    with scan_type(budget, read_only_roots=[root]) as scan:
         for table in sorted(ss):
             budget.begin_stage("whole-table-" + table)
             entry = record["layout"][table]

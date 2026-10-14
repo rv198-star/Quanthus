@@ -358,3 +358,33 @@ Completed disposable source-domain copies may have duplicate data retired under
 Owner cleanup authority after exact full-hash restoration proof; their metadata,
 receipts and nonmatching/corrupted bytes remain historical evidence. Such retired
 copy directories are archives, not currently usable complete images.
+
+### Exact unique-business-key shortcut for full successor verification
+
+The complete 33-table construction passed the original native algorithm at local
+commit `0f4df1eac4d89fdbb2f506b1a39429c5cd893cc0`; its manifest and data remain
+immutable. The measured full scan took 5,692.80 seconds, with 2,944,032,768 allocated
+TMP bytes and 3,004,461,056 RSS bytes. Complete source-denied cold acceptance is
+still separate from that construction receipt.
+
+`base231_native_keys.py` proves uniqueness using full business-key equality over
+all physical files, bucketed by the existing deterministic hash. When a complete
+bucket has unique business keys and the version key contains that full key and
+`knowledge_from`, duplicate version keys and overlapping version pairs are
+impossible. Only then are the vacuous legacy version checks omitted. Repeated
+business keys retain the original duplicate and interval checks; collisions never
+substitute hash equality for key equality. Required fields, original time/cutoff
+rules, schema, calendar/venue, lineage, foreign keys and typed summaries remain
+unconditional. Failed indexes remain evidence and only successful owned indexes
+are retired. No memory, disk, source-priority or policy threshold changes.
+
+Legacy producer key modules are unchanged and native-image callers keep the
+original algorithm by default. Only the explicit complete-successor audit opts
+in. Regression tests compare legacy/successor positive and negative results,
+including extra version fields, nulls, open/overlapping intervals, hash collisions,
+Shanghai date boundaries and invalid intervals after unique-key proof. A complete
+33-table synthetic image must return identical semantic receipts under both
+algorithms. The real fixed samples and both complete cold runs must subsequently
+pass; sample timings do not replace full acceptance or certify worst-case capacity.
+Construction and verification code revisions are recorded separately, rather than
+rewriting the immutable construction identity or producer qualifications.

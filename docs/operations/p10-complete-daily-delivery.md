@@ -108,7 +108,51 @@ then restore previous code links and exact unit/drop-in state. Preserve pending 
 and provider receipts. Removing the retry service leaves pending mail requiring recovery;
 it never permits deleting data or resetting collection/transfer budgets.
 
-## Rollback
+## Failed native grading and exact processing-only resume (2026-10-14)
+
+A quarantined original with invalid row identity must not crash comparison with a
+valid target-date revision. Both original/revised raw SHA bindings remain enforced;
+the selected revision still passes the complete native assessment. Invalid or empty
+new observations do not replace valid old bars or justify another supplier pass.
+
+A failed `repair-grade` is not a completed repair. Subsequent scheduled cycles may
+retry **only grading of the existing repair capture**, with distinct
+`repair-grade-retry-001/002` operation identities. The original receipt and charged
+60-minute ledger remain intact; each retry has its own maximum 600 seconds. Source
+capture/canary remains prohibited after 13:00. Successful grading with remaining R3
+still blocks complete publication. Deadline checks retain late seal/publish times.
+
+The pinned `run-complete-daily-cycle` entrypoint propagates its resolved `ROOT/src`
+to the first position in child `PYTHONPATH`, retaining SDK dependency paths. Record
+actual child module paths/digests during rollout; a requested Git SHA alone does
+not prove which module the child executed.
+
+For a failed Job already pinned to an older code SHA, preserve `code.json` and use
+an explicit private JSON authorization selected by
+`QUANTHUS_COMPLETE_DAILY_RESUME_AUTHORIZATION`. Its exact v1 fields are:
+`kind=p10-complete-daily-processing-resume-v1`, `market_date`, `interval=5m`,
+`from_code_revision`, `to_code_revision`, `policy_id`, `reference_digest`,
+`failed_operation_digest`, `original_capture_digest`, `repair_capture_digest`,
+and `processing_only=true`. Capture digests bind sorted relative paths and SHA256
+of all identity files, receipts and raw compressed bytes. The failed operation
+digest binds its complete immutable original receipt. Scope is one exact target
+and input closure; additional/mismatched fields fail closed.
+
+After an idle-job/lock check, Linux focused tests, independent review, and an
+isolated build using these actual frozen inputs, fetch the exact repair SHA from
+GitHub, preserve the previous link/config state, and switch only
+`data-delivery-current`. Load the scoped resume authorization in a private final
+EnvironmentFile for the complete service. No daily-core switch is required. The
+controller writes a separate immutable `code-resumes/<SHA>.json` receipt and may
+grade existing inputs but cannot capture new sources for the reconciled Job.
+Only a physically verified R3=0 pair permits normal complete DWD, OCI and archive
+handoff. Preserve original failures; report later recovery with actual times.
+
+Rollback restores the prior data-delivery link and removes only this rollout's
+resume EnvironmentFile/drop-in. Preserve old/new Job receipts, captured inputs,
+immutable products and pending mail; do not reset budgets or alter source bytes.
+
+## General rollout rollback
 
 Disable the new complete cycle, checkpoint and OCI timers, then let bounded active
 operations drain; do not kill an immutable publication midway. Preserve quarantine,

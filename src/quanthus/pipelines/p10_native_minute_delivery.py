@@ -213,6 +213,33 @@ def native_m5(raw: bytes, code: str, day: str) -> dict[str, dict[str, Decimal]]:
     return bars
 
 
+def target_source_changed(before: bytes, after: bytes, code: str, day: str, interval: str) -> bool:
+    """Compare admissible target records; invalid originals remain quarantined.
+
+    A valid revision can repair an invalid original. Invalid new records cannot
+    replace valid old observations or authorize a speculative repair pass.
+    """
+
+    def records(raw: bytes) -> Any:
+        if interval == "1m":
+            return target_date_records(raw, code, date.fromisoformat(day))[1]
+        if interval != "5m":
+            raise ValueError("unsupported native interval")
+        return native_m5(raw, code, day)
+
+    try:
+        new = records(after)
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+        return False
+    if not new:
+        return False
+    try:
+        old = records(before)
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+        return True
+    return bool(old != new)
+
+
 def assess(
     *, interval: str, code: str, day: str, raw: bytes | None, daily: dict[str, Any]
 ) -> tuple[dict[str, Any], dict[str, dict[str, Decimal]]]:
@@ -413,16 +440,12 @@ def build(
             if code in prior and prior[code][1]:
                 before = gzip.decompress(prior[code][0].read_bytes())
                 after = gzip.decompress(path.read_bytes())
-                if interval == "1m":
-                    day = date.fromisoformat(ref["market_date"])
-                    changed = (
-                        target_date_records(before, code, day)[1]
-                        != target_date_records(after, code, day)[1]
-                    )
-                else:
-                    changed = native_m5(before, code, ref["market_date"]) != native_m5(
-                        after, code, ref["market_date"]
-                    )
+                if (
+                    digest(before) != "sha256:" + prior[code][1]["raw_sha256"]
+                    or digest(after) != "sha256:" + receipt["raw_sha256"]
+                ):
+                    raise ValueError("immutable captured original SHA differs")
+                changed = target_source_changed(before, after, code, ref["market_date"], interval)
                 if not changed:
                     continue
             merged[code] = (path, receipt)

@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """Run the pinned GitHub release's complete Daily Job."""
+
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
+# Child module operations must use the same pinned release as this entrypoint.
+os.environ["PYTHONPATH"] = os.pathsep.join(
+    [str(ROOT / "src"), *filter(None, os.environ.get("PYTHONPATH", "").split(os.pathsep))]
+)
 from quanthus.pipelines.p10_complete_daily_cycle import main  # noqa: E402
 
 if __name__ == "__main__":

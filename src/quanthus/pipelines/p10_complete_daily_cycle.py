@@ -31,6 +31,8 @@ from quanthus.pipelines.p10_complete_daily_schedule import (
 )
 from quanthus.pipelines.p10_delivery_common import (
     atomic,
+    digest,
+    encoded,
     file_digest,
     object_at,
     safe_path,
@@ -39,15 +41,14 @@ from quanthus.pipelines.p10_minute_daily_cycle import calendar_for, find_market_
 from quanthus.pipelines.p10_minute_operation_runtime import run_one
 from quanthus.pipelines.p10_native_minute_delivery import (
     freeze_reference,
-    native_m5,
     reference,
     source_index,
+    target_source_changed,
     verify,
 )
 from quanthus.pipelines.securities_warehouse.daily_core_domain import verify_daily_domain_increment
 from quanthus.pipelines.securities_warehouse.daily_core_ods_catalog import _select_lane
 from quanthus.pipelines.securities_warehouse.daily_domain import DailyDomainBuildError
-from quanthus.providers.p10_native_m1_shard_capture import target_date_records
 
 ROOT = Path("/srv/quanthus/dwd-dws-v2")
 JOURNAL = ROOT / "intraday/operations/complete-daily-v1"
@@ -58,9 +59,7 @@ DAILY = ROOT / "daily/products/daily-core"
 RELEASES = Path("/root/work/astock/data/shadow/cn01-ods-v1/releases/daily")
 
 
-def sealed_daily_sources(
-    releases: Path, target: date, *, daily: Path = DAILY
-) -> tuple[Path, str]:
+def sealed_daily_sources(releases: Path, target: date, *, daily: Path = DAILY) -> tuple[Path, str]:
     dated = daily / "date-pointers" / f"{target}.json"
     if dated.exists():
         pointer = object_at(dated)
@@ -180,8 +179,123 @@ def _package(product: Path, target: date) -> Path | None:
     return package
 
 
+def repair_capture_digest(root: Path) -> str:
+    """Bind a processing-only resume to already captured bytes and receipts."""
+    files = sorted(p for p in root.glob("shard-*/*") if p.name == "identity.json")
+    files += sorted(root.glob("shard-*/receipts/*.json"))
+    files += sorted(root.glob("shard-*/raw/*.json.gz"))
+    if not files or any(p.is_symlink() or not p.is_file() for p in files):
+        raise ValueError("resume requires an immutable existing repair capture")
+    return digest(encoded([(p.relative_to(root).as_posix(), file_digest(p)) for p in files]))
+
+
+def reconcile_job_code(job: Path, capture: Path, target: date, revision: str) -> bool:
+    """Explicitly resume a pinned old Job without replacing its original code record."""
+    original = object_at(job / "code.json")
+    if original == {"code_revision": revision, "policy_id": POLICY_ID}:
+        return False
+    path = os.environ.get("QUANTHUS_COMPLETE_DAILY_RESUME_AUTHORIZATION")
+    if not path:
+        raise ValueError("persisted Job code identity changed; explicit resume required")
+    authorization = object_at(Path(path))
+    ledger = object_at(job / "5m" / f"{target}-T_plus_1.json")
+    failed = next((op for op in ledger["operations"] if op["operation_id"] == "repair-grade"), None)
+    if (
+        failed is None
+        or failed.get("exit_code") == 0
+        or ledger.get("market_date") != str(target)
+        or ledger.get("phase") != "T_plus_1"
+        or ledger.get("policy_id") != POLICY_ID
+        or ledger.get("inflight_operation") is not None
+    ):
+        raise ValueError("processing resume requires the original failed idle repair operation")
+    expected = {
+        "kind": "p10-complete-daily-processing-resume-v1",
+        "market_date": str(target),
+        "from_code_revision": original.get("code_revision"),
+        "to_code_revision": revision,
+        "policy_id": POLICY_ID,
+        "interval": "5m",
+        "failed_operation_digest": digest(encoded(failed)),
+        "reference_digest": reference(job / "daily-reference.json")["reference_digest"],
+        "original_capture_digest": repair_capture_digest(capture / str(target) / "5m/initial-v1"),
+        "repair_capture_digest": repair_capture_digest(capture / str(target) / "5m/repair-v1"),
+        "processing_only": True,
+    }
+    if original.get("policy_id") != POLICY_ID or authorization != expected:
+        raise ValueError("explicit processing resume identity differs")
+    receipt = {**expected, "authorization_sha256": file_digest(Path(path))}
+    record = job / "code-resumes" / f"{revision}.json"
+    if record.exists():
+        existing = object_at(record)
+        if {k: v for k, v in existing.items() if k != "recorded_at"} != receipt:
+            raise ValueError("immutable code resume receipt differs")
+    else:
+        atomic(record, {**receipt, "recorded_at": datetime.now(CST).isoformat()})
+    return True
+
+
+def retry_existing_repair_grade(
+    *,
+    journal: Path,
+    calendar: Path,
+    target: date,
+    ref_file: Path,
+    root: Path,
+    original: Path,
+    product: Path,
+    revision: str,
+    attempts: int,
+) -> dict[str, Any]:
+    """Retry only local grading, twice at most, retaining charged original budget."""
+    if attempts >= 3:
+        return {"research_ready": False, "status": "repair_grade_retry_limit"}
+    # Validate the frozen capture closure before any child processing operation.
+    repair_capture_digest(root)
+    command = [
+        sys.executable,
+        "-m",
+        "quanthus.pipelines.p10_native_minute_delivery",
+        "build",
+        "--reference",
+        str(ref_file),
+        "--interval",
+        product.name,
+        "--capture-root",
+        str(root),
+        "--prior-capture-root",
+        str(original),
+        "--output",
+        str(product),
+        "--code-revision",
+        revision,
+    ]
+    response = _operation(
+        journal=journal,
+        calendar=calendar,
+        target=target,
+        operation=f"repair-grade-retry-{attempts:03}",
+        command=command,
+    )
+    package = _package(product, target)
+    if response.get("receipt", {}).get("exit_code") != 0 or package is None:
+        return {
+            "research_ready": False,
+            "status": "repair_grade_retry_failed",
+            "operation_status": response["status"],
+        }
+    return {**verify(package), "repair_disposition": "reused_capture_grade_retry"}
+
+
 def run_interval(
-    *, interval: str, target: date, job: Path, capture: Path, product: Path, revision: str
+    *,
+    interval: str,
+    target: date,
+    job: Path,
+    capture: Path,
+    product: Path,
+    revision: str,
+    capture_authorized: bool = True,
 ) -> dict[str, Any]:
     product = product / interval
     journal = job / interval
@@ -202,8 +316,28 @@ def run_interval(
             return result
         if (journal / f"{target}-T_plus_1.json").exists():
             ledger = object_at(journal / f"{target}-T_plus_1.json")
-            if any(op["operation_id"] == "repair-grade" for op in ledger["operations"]):
-                return {**result, "repair_disposition": "one_bounded_repair_completed_stop"}
+            grading = [
+                op
+                for op in ledger["operations"]
+                if op["operation_id"] == "repair-grade"
+                or op["operation_id"].startswith("repair-grade-retry-")
+            ]
+            if grading:
+                if any(op["exit_code"] == 0 for op in grading):
+                    return {**result, "repair_disposition": "one_bounded_repair_completed_stop"}
+                return retry_existing_repair_grade(
+                    journal=journal,
+                    calendar=calendar,
+                    target=target,
+                    ref_file=ref_file,
+                    root=capture / str(target) / interval / "repair-v1",
+                    original=original,
+                    product=product,
+                    revision=revision,
+                    attempts=len(grading),
+                )
+        if not capture_authorized:
+            return {**result, "repair_disposition": "processing_only_no_completed_repair"}
         # One bounded canary detects target-date repair; never poll the market again
         # merely because the rolling HTTP envelope changed outside T.
         quality = [
@@ -257,15 +391,11 @@ def run_interval(
                 break
             first = gzip.decompress(before[code][0].read_bytes())
             second = gzip.decompress(path.read_bytes())
-            if interval == "1m":
-                changed = (
-                    target_date_records(first, code, target)[1]
-                    != target_date_records(second, code, target)[1]
-                )
-            else:
-                changed = native_m5(first, code, str(target)) != native_m5(
-                    second, code, str(target)
-                )
+            if digest(first) != "sha256:" + before[code][1]["raw_sha256"] or (
+                digest(second) != "sha256:" + receipt["raw_sha256"]
+            ):
+                raise ValueError("immutable canary original SHA differs")
+            changed = target_source_changed(first, second, code, str(target), interval)
             if changed:
                 break
         if not changed:
@@ -275,6 +405,8 @@ def run_interval(
         atomic(cohort_file, codes)
         attempt = "repair"
     attempts = []
+    if not capture_authorized:
+        return {"research_ready": False, "status": "processing_only_source_absent"}
     for index in range(math.ceil(len(codes) / 50)):
         if _budget(journal, target) >= 3000 or datetime.now(CST) >= datetime.combine(
             datetime.now(CST).date(),
@@ -399,6 +531,7 @@ def run(
                 "disposition": "reuse_unchanged_verified_identity",
             }
         ref_file = job / "daily-reference.json"
+        processing_only = False
         if not ref_file.exists():
             try:
                 ods, events_sha = sealed_daily_sources(releases, target, daily=daily)
@@ -426,10 +559,8 @@ def run(
                         reason="sealed target daily ODS prerequisite absent at minute deadline",
                     )
                 return result
-        elif object_at(job / "code.json") != {"code_revision": revision, "policy_id": POLICY_ID}:
-            raise ValueError(
-                "persisted Job code identity changed; preserve budget and reconcile explicitly"
-            )
+        else:
+            processing_only = reconcile_job_code(job, capture, target, revision)
         if shutil_free(journal) < 4 * 1024**3:
             raise ValueError("capture requires 4 GiB node disk reserve")
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -442,6 +573,7 @@ def run(
                     capture=capture,
                     product=product,
                     revision=revision,
+                    capture_authorized=not processing_only,
                 )
                 for interval in ("1m", "5m")
             }

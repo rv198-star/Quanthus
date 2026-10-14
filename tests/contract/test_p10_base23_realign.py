@@ -1,7 +1,7 @@
 import gzip
 import hashlib
 import json
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -430,3 +430,65 @@ def test_daily_mirror_reentry_keeps_full_predecessor_and_first_receipt(tmp_path,
         == old_pointer
     )
     assert json.loads((target / "CURRENT_DAILY_CORE.json").read_text())["manifest_sha256"] == "tip"
+
+
+def test_native_capture_action_and_exact_failed_job_resume_preserve_budget(tmp_path, monkeypatch):
+    from quanthus.pipelines import p10_historical_tplus1_recovery as runtime
+
+    class FixedTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 14, 18, 0, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(repair, "STATE", tmp_path)
+    monkeypatch.setattr(repair, "datetime", FixedTime)
+
+    def execute(*, state_path, state, operation_id, **kwargs):
+        result = {
+            "operation_id": operation_id,
+            "outcome": "failed" if operation_id == "preflight" else "success",
+            "duration_seconds": 12.0,
+        }
+        state["operations"].append(result)
+        state["cumulative_processing_seconds"] += 12.0
+        atomic(state_path, state)
+        return result
+
+    monkeypatch.setattr(runtime, "_run_operation", execute)
+    args = {
+        "day": "2026-10-08",
+        "interval": "1m",
+        "reference_digest": "sha256:" + "a" * 64,
+        "revision": "b" * 40,
+        "operation_id": "preflight",
+        "argv": ["python", "-m", "quanthus.pipelines.p10_native_minute_delivery", "capture"],
+    }
+    assert repair.run_recovery_operation(**args)["outcome"] == "failed"
+    path = tmp_path / "minute-jobs/2026-10-08/1m/ledger.json"
+    original = json.loads(path.read_text())
+    new_args = {**args, "revision": "c" * 40, "operation_id": "native-capture"}
+    with pytest.raises(ValueError, match="budget cannot reset"):
+        repair.run_recovery_operation(**new_args)
+    authorization = {
+        "kind": "p10_october_realignment_processing_resume_v1",
+        "policy_id": repair.ID,
+        "contract_sha256": file_digest(repair.CONFIG),
+        "market_date": args["day"],
+        "interval": args["interval"],
+        "reference_digest": args["reference_digest"],
+        "from_code_revision": args["revision"],
+        "to_code_revision": new_args["revision"],
+        "frozen_operations_digest": digest(encoded(original["operations"])),
+        "preserve_original_code_and_elapsed_budget": True,
+        "source_window_unchanged": True,
+    }
+    assert (
+        repair.run_recovery_operation(**new_args, resume_authorization=authorization)["outcome"]
+        == "success"
+    )
+    latest = json.loads(path.read_text())
+    assert latest["code_revision"] == args["revision"]
+    assert latest["processing_code_revision"] == new_args["revision"]
+    assert latest["operations"][0] == original["operations"][0]
+    assert latest["cumulative_processing_seconds"] == 24.0
+    assert latest["code_resumes"][0]["retained_cumulative_seconds"] == 12.0

@@ -19,7 +19,13 @@ from tests.contract.test_p10_complete_daily import members as source_members
 
 
 @pytest.fixture
-def complete(tmp_path: Path) -> Path:
+def complete(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    # Synthetic packages must not inherit the host's real cloud archive history.
+    policy = archive.object_at(archive.POLICY_PATH)
+    policy["bootstrap_archive_state"] = str(tmp_path / "empty-bootstrap")
+    policy_path = tmp_path / "archive-policy.json"
+    atomic(policy_path, policy)
+    monkeypatch.setattr(archive, "POLICY_PATH", policy_path)
     daily, m1, m5 = source_members.__wrapped__(tmp_path)
     root = tmp_path / "complete"
     full.build(daily=daily, m1=m1, m5=m5, output_root=root, code_revision=REVISION)

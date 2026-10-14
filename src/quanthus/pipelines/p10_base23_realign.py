@@ -539,6 +539,7 @@ def run_recovery_operation(
     operation_id: str,
     argv: list[str],
     publication: bool = False,
+    resume_authorization: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Independent finite recovery ledger; never invoke/reset old T+1 budgets."""
     from quanthus.pipelines.p10_historical_tplus1_recovery import _run_operation
@@ -554,7 +555,11 @@ def run_recovery_operation(
     if (
         publication
         and (argv[2] != grade_module or len(argv) < 4 or argv[3] not in {"build", "verify"})
-    ) or (not publication and argv[2] not in capture_modules):
+    ) or (
+        not publication
+        and argv[2] not in capture_modules
+        and not (argv[2] == grade_module and len(argv) >= 4 and argv[3] == "capture")
+    ):
         raise ValueError("capture cannot bypass source window as publication")
     if "-c" in argv:
         raise ValueError("inline commands cannot enter the recovery ledger")
@@ -577,10 +582,45 @@ def run_recovery_operation(
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         if path.exists():
             state = object_at(path)
-            if any(state.get(k) != v for k, v in identity.items()):
+            if any(state.get(k) != v for k, v in identity.items() if k != "code_revision"):
                 raise ValueError(
                     "recovery Job reference/code identity changed; budget cannot reset"
                 )
+            effective_revision = state.get("processing_code_revision", state["code_revision"])
+            if effective_revision != revision:
+                expected_resume = {
+                    "kind": "p10_october_realignment_processing_resume_v1",
+                    "policy_id": ID,
+                    "contract_sha256": file_digest(CONFIG),
+                    "market_date": day,
+                    "interval": interval,
+                    "reference_digest": reference_digest,
+                    "from_code_revision": effective_revision,
+                    "to_code_revision": revision,
+                    "frozen_operations_digest": digest(encoded(state["operations"])),
+                    "preserve_original_code_and_elapsed_budget": True,
+                    "source_window_unchanged": True,
+                }
+                if (
+                    resume_authorization != expected_resume
+                    or state.get("inflight_operation")
+                    or not state["operations"]
+                    or state["operations"][-1].get("outcome") != "failed"
+                ):
+                    raise ValueError(
+                        "recovery processing code changed without exact failed-job resume; "
+                        "budget cannot reset"
+                    )
+                state.setdefault("code_resumes", []).append(
+                    {
+                        **expected_resume,
+                        "retained_cumulative_seconds": state["cumulative_processing_seconds"],
+                        "applies_after_operation_count": len(state["operations"]),
+                        "observed_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
+                state["processing_code_revision"] = revision
+                atomic(path, state)
         else:
             state = {
                 **identity,

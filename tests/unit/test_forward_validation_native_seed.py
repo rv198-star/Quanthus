@@ -324,10 +324,8 @@ class ParquetConstruction(unittest.TestCase):
 
     def test_late_knowledge_is_missing_not_retimed(self):
         self.con.execute(
-            (
-                "UPDATE dwd_security_bar SET knowledge_from=knowledge_from+INTERVAL 1 DAY "
-                "WHERE calendar_session_id='2026-09-30'"
-            )
+            "UPDATE dwd_security_bar SET knowledge_from=knowledge_from+INTERVAL 1 DAY "
+            "WHERE calendar_session_id='2026-09-30'"
         )
         self.reseal()
         result = self.build()
@@ -341,16 +339,12 @@ class ParquetConstruction(unittest.TestCase):
             "WHERE calendar_session_id='2026-09-30'"
         )
         self.con.execute(
-            (
-                "UPDATE dwd_security_bar SET knowledge_to=knowledge_from+INTERVAL 1 DAY "
-                "WHERE calendar_session_id='2026-09-30'"
-            )
+            "UPDATE dwd_security_bar SET knowledge_to=knowledge_from+INTERVAL 1 DAY "
+            "WHERE calendar_session_id='2026-09-30'"
         )
         self.con.execute(
-            (
-                "INSERT INTO dwd_security_bar SELECT * REPLACE (knowledge_from+INTERVAL 1 "
-                "DAY AS knowledge_from, 20::DECIMAL(18,4) AS close) FROM old"
-            )
+            "INSERT INTO dwd_security_bar SELECT * REPLACE (knowledge_from+INTERVAL 1 "
+            "DAY AS knowledge_from, 20::DECIMAL(18,4) AS close) FROM old"
         )
         self.reseal()
         result = self.build()

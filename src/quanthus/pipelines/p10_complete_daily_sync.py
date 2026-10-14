@@ -7,6 +7,7 @@ import fcntl
 import json
 import os
 import shutil
+import tempfile
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -25,7 +26,7 @@ CACHE = ".complete-sync-cache-v1"
 
 
 def seed_verified_files(root: Path, package: Path, manifest: dict[str, Any]) -> None:
-    """Reuse exact immutable local files; changed or unverified bytes still transfer."""
+    """Seed independent exact files; rsync metadata must not mutate a prior package."""
     pointer = root / POINTER
     candidates = []
     if pointer.exists():
@@ -38,6 +39,26 @@ def seed_verified_files(root: Path, package: Path, manifest: dict[str, Any]) -> 
     for item in manifest["files"]:
         relative = item["path"]
         target = safe_path(package, relative)
+        # Old resumable jobs may already contain links made by the previous
+        # implementation, including rsync's delayed partial files.
+        partial_target = safe_path(
+            package, (Path(relative).parent / ".rsync-partial" / Path(relative).name).as_posix()
+        )
+        for existing in (target, partial_target):
+            if existing.exists() and existing.stat().st_nlink > 1:
+                if existing.stat().st_size > item["bytes"]:
+                    raise ValueError("shared mirror partial exceeds declared file budget")
+                if shutil.disk_usage(existing.parent).free < existing.stat().st_size + 4 * 1024**3:
+                    raise ValueError("mirror detachment lacks file bytes plus 4 GiB reserve")
+                with tempfile.NamedTemporaryFile(
+                    prefix=".seed-independent-", dir=existing.parent, delete=False
+                ) as handle:
+                    independent = Path(handle.name)
+                try:
+                    shutil.copy2(existing, independent)
+                    os.replace(independent, existing)
+                finally:
+                    independent.unlink(missing_ok=True)
         if target.exists():
             continue
         for candidate in candidates:
@@ -51,9 +72,12 @@ def seed_verified_files(root: Path, package: Path, manifest: dict[str, Any]) -> 
             if source.stat().st_size != item["bytes"] or file_digest(source) != item["sha256"]:
                 continue
             target.parent.mkdir(parents=True, exist_ok=True)
-            from quanthus.pipelines.p10_complete_daily import copy_sealed_file
-
-            copy_sealed_file(str(source), str(target))
+            # rsync -a can update timestamps, ownership and permissions even when
+            # --checksum skips the payload. A hard link would mutate the sealed
+            # candidate package through those metadata updates.
+            if shutil.disk_usage(target.parent).free < source.stat().st_size + 4 * 1024**3:
+                raise ValueError("mirror seed lacks file bytes plus 4 GiB reserve")
+            shutil.copy2(source, target)
             break
 
 
@@ -88,6 +112,10 @@ def _copy_immutable(
     if required < 0 or shutil.disk_usage(stage).free < required + 4 * 1024**3:
         raise ValueError("OCI lacks exact package staging budget plus 4 GiB reserve")
     seed_verified_files(stage.parent, package, manifest)
+    # Seeding and detaching resumable files consumed space. Keep the original
+    # full transfer allowance available before rsync can allocate replacements.
+    if shutil.disk_usage(stage).free < required + 4 * 1024**3:
+        raise ValueError("OCI lacks post-seed transfer bytes plus 4 GiB reserve")
     _run_rsync(
         source=f"{source}/{relative.as_posix()}/",
         destination=package,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import os
 import shutil
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -764,7 +765,10 @@ def test_mirror_reuses_only_exact_sealed_local_files(
     mirror.seed_verified_files(root, incoming, manifest)
     victim = next(item for item in manifest["files"] if item["path"].endswith(".parquet"))
     old_file, new_file = old / victim["path"], incoming / victim["path"]
-    assert new_file.stat().st_ino == old_file.stat().st_ino
+    assert new_file.stat().st_ino != old_file.stat().st_ino
+    original_stat = old_file.stat()
+    os.utime(new_file, ns=(new_file.stat().st_atime_ns, original_stat.st_mtime_ns + 1000000000))
+    assert old_file.stat().st_mtime_ns == original_stat.st_mtime_ns
     assert file_digest(new_file) == victim["sha256"]
     assert not (incoming / "READY").exists()
     changed = root / mirror.CACHE / "changed"
@@ -807,11 +811,111 @@ def test_mirror_private_cache_reuse_requires_actual_incoming_hash(tmp_path: Path
     incoming = root / mirror.CACHE / "packages" / DAY / "new"
     incoming.mkdir(parents=True)
     mirror.seed_verified_files(root, incoming, {"files": [item]})
-    assert (incoming / item["path"]).stat().st_ino == (old / item["path"]).stat().st_ino
+    assert (incoming / item["path"]).stat().st_ino != (old / item["path"]).stat().st_ino
     bad = incoming.parent / "bad"
     bad.mkdir()
     mirror.seed_verified_files(root, bad, {"files": [{**item, "sha256": "sha256:" + "0" * 64}]})
     assert not (bad / item["path"]).exists()
+
+
+@pytest.mark.parametrize("partial", [False, True])
+def test_mirror_existing_shared_target_is_detached_before_rsync_metadata(
+    tmp_path: Path, partial: bool
+):
+    root = tmp_path / "oci"
+    source = root / "original" / "data.parquet"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"exact sealed bytes")
+    before = source.stat()
+    incoming = root / mirror.CACHE / "incoming"
+    target = incoming / (".rsync-partial/data.parquet" if partial else "data.parquet")
+    target.parent.mkdir(parents=True)
+    os.link(source, target)
+    item = {"path": "data.parquet", "bytes": 18, "sha256": file_digest(source)}
+    mirror.seed_verified_files(root, incoming, {"files": [item]})
+    assert target.stat().st_ino != source.stat().st_ino
+    assert file_digest(target) == item["sha256"]
+    os.utime(target, ns=(target.stat().st_atime_ns, before.st_mtime_ns + 1000000000))
+    assert source.stat().st_mtime_ns == before.st_mtime_ns
+    assert source.stat().st_ino == before.st_ino
+
+
+def test_mirror_shared_target_detachment_retains_link_when_reserve_is_insufficient(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    source = tmp_path / "original.parquet"
+    source.write_bytes(b"exact sealed bytes")
+    incoming = tmp_path / "incoming"
+    incoming.mkdir()
+    target = incoming / "data.parquet"
+    os.link(source, target)
+    monkeypatch.setattr(
+        mirror.shutil, "disk_usage", lambda _: shutil._ntuple_diskusage(0, 0, 4 * 1024**3)
+    )
+    item = {"path": "data.parquet", "bytes": 18, "sha256": file_digest(source)}
+    with pytest.raises(ValueError, match="4 GiB reserve"):
+        mirror.seed_verified_files(tmp_path, incoming, {"files": [item]})
+    assert target.stat().st_ino == source.stat().st_ino
+    assert not list(incoming.glob(".seed-independent-*"))
+
+
+def test_mirror_seed_rechecks_reserve_after_partial_detachment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    root = tmp_path / "oci"
+    cached = root / mirror.CACHE / "packages" / DAY / "old"
+    cached.mkdir(parents=True)
+    atomic(cached / "manifest.json", {"files": []})
+    source = cached / "data.parquet"
+    source.write_bytes(b"exact sealed bytes")
+    incoming = root / mirror.CACHE / "incoming"
+    partial = incoming / ".rsync-partial/data.parquet"
+    partial.parent.mkdir(parents=True)
+    os.link(source, partial)
+    reserve = 4 * 1024**3
+    free = iter([reserve + 18, reserve])
+    monkeypatch.setattr(
+        mirror.shutil, "disk_usage", lambda _: shutil._ntuple_diskusage(0, 0, next(free))
+    )
+    item = {"path": "data.parquet", "bytes": 18, "sha256": file_digest(source)}
+    with pytest.raises(ValueError, match="mirror seed.*4 GiB reserve"):
+        mirror.seed_verified_files(root, incoming, {"files": [item]})
+    assert partial.stat().st_ino != source.stat().st_ino
+    assert not (incoming / "data.parquet").exists()
+
+
+def test_mirror_rechecks_full_transfer_reserve_after_seeding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    source_manifest = tmp_path / "source.json"
+    atomic(source_manifest, {"files": [{"path": "data.bin", "bytes": 18}]})
+    pointer = {
+        "kind": "cn01_complete_daily_dwd_current",
+        "market_date": DAY,
+        "package_id": "fixture",
+        "manifest_path": f"packages/{DAY}/fixture/manifest.json",
+        "manifest_sha256": file_digest(source_manifest),
+    }
+    calls = []
+
+    def download(**kwargs):
+        calls.append(kwargs["source"])
+        assert kwargs["source"].endswith("/manifest.json")
+        shutil.copy2(source_manifest, kwargs["destination"])
+
+    monkeypatch.setattr(mirror, "_run_rsync", download)
+    monkeypatch.setattr(mirror, "seed_verified_files", lambda *_: None)
+    reserve = 4 * 1024**3
+    free = iter([reserve + 18, reserve])
+    monkeypatch.setattr(
+        mirror.shutil, "disk_usage", lambda _: shutil._ntuple_diskusage(0, 0, next(free))
+    )
+    with pytest.raises(ValueError, match="post-seed transfer bytes.*4 GiB reserve"):
+        mirror._copy_immutable(
+            pointer=pointer, target=date.fromisoformat(DAY), stage=tmp_path / "stage",
+            source="reader@cn01:products/complete-daily", ssh="ssh"
+        )
+    assert len(calls) == 1
 
 
 def test_complete_delayed_partial_can_seed_only_after_exact_hash(tmp_path: Path) -> None:
@@ -825,7 +929,7 @@ def test_complete_delayed_partial_can_seed_only_after_exact_hash(tmp_path: Path)
     incoming = root / mirror.CACHE / "packages" / DAY / "new"
     incoming.mkdir(parents=True)
     mirror.seed_verified_files(root, incoming, {"files": [item]})
-    assert (incoming / item["path"]).stat().st_ino == partial.stat().st_ino
+    assert (incoming / item["path"]).stat().st_ino != partial.stat().st_ino
     bad = incoming.parent / "bad"
     bad.mkdir()
     mirror.seed_verified_files(root, bad, {"files": [{**item, "sha256": "sha256:" + "0" * 64}]})

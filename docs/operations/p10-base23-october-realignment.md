@@ -48,9 +48,18 @@ associated archive wiring are imported unchanged from production 9c9abe7.
 - If an expected head, protected October 12/13 file, source/reference, or code
   identity changes, stop that publication and retain the scene. Do not reset,
   delete, retag an old Daily, loosen dates, or change the original policy bytes.
-- Original packages and dated descriptors remain readable for rollback. Restore
-  an exact old dated descriptor/catalog under the same lock only after fencing
-  a conflicting writer and checking later dependencies; do not regress CURRENT.
+- Original packages and dated descriptors remain readable as audit evidence.
+  A Base 2.1 dated version must not be restored as a production fallback. Withhold
+  an affected date if it has no qualified Base 2.3 fallback; for an existing Base
+  2.3 fallback, fence the writer and check later dependencies under the same lock
+  before restoring its exact descriptor/catalog. Do not regress CURRENT.
+- If final verification times out after a complete package was sealed, retain the
+  original timeout, log, exact staging manifest and member identities. Independently
+  verify that unchanged sealed staging under another bounded operation before
+  publishing it; do not rebuild or recollect unchanged inputs. Within a new build
+  Job, copying an already deeply verified native member requires physical seal
+  verification before its semantic evidence can be reused. Standalone verification
+  still performs the full native and DWD projection checks.
 - Source expiry, genuine R3 or budget exhaustion blocks the affected minute and
   joint delivery. Independently qualified daily-core can still be delivered.
 - Preserve the 4,173 visibility exceptions, PIT and P3/P5/P6 activation gates.

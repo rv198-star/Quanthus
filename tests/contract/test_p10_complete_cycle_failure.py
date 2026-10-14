@@ -1,6 +1,7 @@
 import json
 import sys
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -274,3 +275,29 @@ def test_delayed_continuation_failure_never_uses_new_target(activity, monkeypatc
     )
     day, label = notices._continuation_failure_target(now, "natural-day", root)
     assert day == now.date() and label.startswith("运行日期")
+
+
+def test_daily_stop_hook_loads_existing_mail_environment_and_pins_code():
+    root = Path(__file__).resolve().parents[2]
+    unit = (
+        root / "ops/systemd/quanthus-daily-core@cn01.service.d/30-complete-delivery-failure.conf"
+    ).read_text()
+    assert "EnvironmentFile=/etc/quanthus/dwd-notification.env" in unit
+    assert "PYTHONPATH=/opt/quanthus/daily-core-current/src" in unit
+    assert "--daily-cycle-service-stop" in unit
+    assert "OnFailure=\n" in unit
+
+
+@pytest.mark.parametrize(
+    "name,flag",
+    [
+        ("quanthus-complete-daily.service", "--complete-cycle-service-stop"),
+        ("cn01-dwd-domain-continuation@.service", "--continuation-service-stop %i"),
+    ],
+)
+def test_controller_and_continuation_stop_hook_have_bounded_mail_configuration(name, flag):
+    root = Path(__file__).resolve().parents[2]
+    unit = (root / "ops/systemd" / name).read_text()
+    assert "EnvironmentFile=/etc/quanthus/dwd-notification.env" in unit
+    assert "TimeoutStopSec=150" in unit
+    assert flag in unit

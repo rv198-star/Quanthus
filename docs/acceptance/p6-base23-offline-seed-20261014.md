@@ -1,6 +1,6 @@
 # P6-BASE-001 Base 2.3 offline Seed engineering — 2026-10-14
 
-Governing design: `../design/lld/08-validation-governance/p6-forward-validation.md`.
+Offline design: `../design/lld/08-validation-governance/p6-native-seed-offline.md`.
 This is engineering evidence, not source qualification or P6 production acceptance.
 
 ## Decision and recovery point
@@ -70,8 +70,8 @@ requested independent reproduction; retained successful runs are not rerun as pr
 
 ## Validation and remaining work
 
-Cloud standard-library tests: 7 source/binding tests passed; 5 real-Parquet synthetic
-integration tests skipped because DuckDB is unavailable. They cover pinned identities,
+Cloud standard-library tests: 7 source/binding tests passed; real-Parquet synthetic
+integration tests initially skipped because DuckDB is unavailable. They cover pinned identities,
 unknown versions, protected scope, unauthorized grants, payload mutation/symlinks,
 unlisted files, source/output separation and no replacement of completed artifacts.
 
@@ -79,8 +79,19 @@ unlisted files, source/output separation and no replacement of completed artifac
 pytest is not installed. Both GitHub git fetch and package installation were rejected
 by the environment network proxy (CONNECT 403), including an approved fetch retry.
 GitHub connector reads/writes remain available; no proxy bypass was attempted.
-No full-suite PASS or skipped Parquet PASS is claimed. Remote CI results belong to the
-exact Draft PR commit and will be recorded in the issue/PR continuation evidence.
+No full-suite PASS or skipped Parquet PASS is claimed. GitHub CI run 38630026123 at
+`e537157` failed/cancelled before any Python job steps; the log endpoint returned
+BlobNotFound. This gives no code-test verdict, and no cause beyond that is inferred.
+
+An isolated OCI QA checkout then consumed the exact GitHub commit, using already
+installed cached Python/DuckDB/PyArrow/pytest dependencies without network installation.
+At `851898e`, all 6 actual-Parquet synthetic tests and the remaining source/probe/activation
+tests passed: 36 passed, 10 subtests passed, with one frozen-design hash contract failure.
+That failure was fixed by restoring the original production design's exact SHA
+`2336837cd5023f2aec475b8185df6a824566a9f1a779d13c477c6b0309cc3f67` and placing
+the new design in an independent document. The earlier test also caught and fixed float
+stage timings incompatible with P6 canonical JSON. Final-SHA test/check receipts are
+recorded in #514/#515; synthetic Parquet results remain distinct from real Base data.
 
 Real-data next step: provide this cloud task an authorized read-only mount/export of the
 declared 2026 subset and reference tables, or authorize the original NexusDock runtime

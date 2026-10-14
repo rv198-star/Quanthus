@@ -53,6 +53,10 @@ emergency fix. Exceeding the budget downgrades that period's research credibilit
 
 ## 6. Work items
 
+The independent `P6-BASE-001` offline interface is described in
+[`p6-native-seed-offline.md`](08-validation-governance/p6-native-seed-offline.md).
+It does not revise the frozen production design or the activation gate below.
+
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
 | P6-000 | Coordinate the bounded P6 prospective-validation program | META-DOC-001, accepted P3/P4 and Expert Strategy MVP | All eight children accepted |

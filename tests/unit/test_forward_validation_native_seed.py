@@ -6,13 +6,15 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 from quanthus.forward_validation.native_seed import (
+    _PARTITIONS,
     KIND,
     P6BaseSeedBinding,
     P6SeedError,
-    _PARTITIONS,
     _hash,
     build_seed,
     verify_seed_artifact,
@@ -186,7 +188,13 @@ class ParquetConstruction(unittest.TestCase):
                           code_revision="b"*40)
 
     def test_construct_cold_reproduce_and_verify_real_parquet(self):
-        from quanthus.event_library.physical_scan import _CANDIDATE_SCAN_COLUMNS
+        from quanthus.concentration import StaticIndustryMembership
+        from quanthus.event_library.physical_scan import (
+            _CANDIDATE_SCAN_COLUMNS,
+            iter_projected_candidate_series,
+        )
+        from quanthus.forward_validation.prospective_source import P6ProspectiveVisibility
+        from quanthus.industry_mapping import IndustryMappingSource, StaticIndustryMapping
         first, second = self.build(), self.build("cold")
         self.assertEqual(first["content_digest"], second["content_digest"])
         self.assertTrue(first["diagnostics"]["input_validation_passed"])
@@ -198,6 +206,25 @@ class ParquetConstruction(unittest.TestCase):
         price, observed, cutoff = self.con.execute(f"SELECT close_price,dwd_bar_knowledge_from,knowledge_cutoff FROM read_parquet('{file}') LIMIT 1").fetchone()
         self.assertEqual(str(price), "10.5000")
         self.assertLess(observed, cutoff)
+        # Execute the existing P6 consumer over actual synthetic Parquet, not just
+        # a column-name comparison. No activation/official date is manufactured.
+        industry = StaticIndustryMapping(
+            path=self.root.parent / "synthetic-industry.json", schema_version="1.0.0",
+            mapping_version="synthetic", artifact_digest="sha256:" + "a"*64,
+            source=IndustryMappingSource("synthetic", "fixture", datetime(2026, 1, 1, tzinfo=timezone.utc), "r1"),
+            memberships=(StaticIndustryMembership("s1", "industry1", "synthetic", "r1", "fixture"),),
+        )
+        series = tuple(iter_projected_candidate_series(
+            SimpleNamespace(candidate_path=file),
+            source_policy=SimpleNamespace(
+                historical_visibility=P6ProspectiveVisibility(),
+                semantic_digest=first["content_digest"],
+            ),
+            industry_mapping=industry,
+        ))
+        self.assertEqual(len(series), 1)
+        self.assertEqual(len(series[0]), first["diagnostics"]["rows"])
+        self.assertEqual(series[0][0].close_price, price)
         self.assertEqual(verify_seed_artifact(file.parent)["content_digest"], first["content_digest"])
         file.write_bytes(b"corruption")
         with self.assertRaisesRegex(P6SeedError, "file_mismatch"):

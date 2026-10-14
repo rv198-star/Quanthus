@@ -381,8 +381,7 @@ def _diagnose(connection: Any, binding: P6BaseSeedBinding) -> dict[str, Any]:
         "state_missing_or_not_visible": "state_missing_or_not_visible",
         "identity_missing_or_not_visible": "identity_missing_or_not_visible",
         "calendar_not_visible": (
-            "dwd_calendar_knowledge_from IS NULL "
-            "OR dwd_calendar_knowledge_from > knowledge_cutoff"
+            "dwd_calendar_knowledge_from IS NULL OR dwd_calendar_knowledge_from > knowledge_cutoff"
         ),
         "factor_not_visible": (
             "adjustment_effective AND (dwd_factor_knowledge_from IS NULL OR "

@@ -70,28 +70,42 @@ requested independent reproduction; retained successful runs are not rerun as pr
 
 ## Validation and remaining work
 
-Cloud standard-library tests: 7 source/binding tests passed; real-Parquet synthetic
-integration tests initially skipped because DuckDB is unavailable. They cover pinned identities,
-unknown versions, protected scope, unauthorized grants, payload mutation/symlinks,
-unlisted files, source/output separation and no replacement of completed artifacts.
-
-`make check` actually ran: doctor and compile passed, pytest failed to start because
-pytest is not installed. Both GitHub git fetch and package installation were rejected
-by the environment network proxy (CONNECT 403), including an approved fetch retry.
+Cloud standard-library tests: 7 source/binding tests passed, 6 Parquet tests skipped
+because DuckDB is unavailable. The cloud `make check` passed doctor and compile but
+could not start pytest; standalone `make planning-check` passed. Git fetch and package
+installation received network-proxy CONNECT 403, including an approved fetch retry.
 GitHub connector reads/writes remain available; no proxy bypass was attempted.
-No full-suite PASS or skipped Parquet PASS is claimed. GitHub CI run 38630026123 at
-`e537157` failed/cancelled before any Python job steps; the log endpoint returned
-BlobNotFound. This gives no code-test verdict, and no cause beyond that is inferred.
 
-An isolated OCI QA checkout then consumed the exact GitHub commit, using already
-installed cached Python/DuckDB/PyArrow/pytest dependencies without network installation.
-At `851898e`, all 6 actual-Parquet synthetic tests and the remaining source/probe/activation
-tests passed: 36 passed, 10 subtests passed, with one frozen-design hash contract failure.
-That failure was fixed by restoring the original production design's exact SHA
-`2336837cd5023f2aec475b8185df6a824566a9f1a779d13c477c6b0309cc3f67` and placing
-the new design in an independent document. The earlier test also caught and fixed float
-stage timings incompatible with P6 canonical JSON. Final-SHA test/check receipts are
-recorded in #514/#515; synthetic Parquet results remain distinct from real Base data.
+An isolated OCI QA checkout at
+`/srv/agentdock/worktrees/quanthus-p6-offline-qa-20261014` consumed exact GitHub commits.
+It used existing cached Python 3.10.12, DuckDB 1.5.6, PyArrow 25.0.1 and pytest 9.1.1,
+without installing dependencies or accessing production data. PyArrow/pytest are outside
+the project's declared `<24`/`<9` ranges: these receipts are not the locked CI matrix.
+
+| Check | Actual result |
+| --- | --- |
+| Seed, reused probe, activation, P6 planning and production-control contracts at `9c4570b284f891ec3910cd435a365826c02ec273` | **37 passed, 10 subtests passed** |
+| Six Parquet integration cases within that run | Actual synthetic Parquet build, cold digest reproduction, retained verification/tamper detection, existing P6 candidate reader, per-session PIT versions, late knowledge, duplicates, raw-price basis, missing calendar session |
+| Ruff lint on new builder, reused Base23 helper and new tests | Passed |
+| Full `make check` at behavior-equivalent `bdcae70cc5b78816839f281006feeaccd0c40343` | **3358 passed, 28 failed, 17 skipped, 364 subtests passed**; no full PASS claim |
+| Baseline dual-lane suite on unchanged main `f5b87dab454a719240d56944cb2243ed8765113f` | Same **27 failed**, 13 passed, 3 subtests passed; frozen runtime rejects the cached versions |
+| Remaining provider failure, rerun with absolute checkout `PYTHONPATH` | **1 passed**; relative `PYTHONPATH=src` lost the package when the child changed directory |
+| GitHub Actions run [38632114137](https://github.com/rv198-star/Quanthus/actions/runs/38632114137) at `9c4570b` | Failed/cancelled, Python job steps `[]`; no code-test verdict |
+
+The dual-lane fixture requires Python 3.10, DuckDB 1.5.5, Polars 1.43.0,
+PyArrow 23.0.1 and installed Quanthus 0.1.0.dev0. No frozen runtime, contract or test
+was relaxed to accommodate this QA environment. The full-suite skips concern unavailable
+external artifacts, PostgreSQL test configuration and Torch. The original Actions log
+request returned BlobNotFound; no specific CI service failure cause is asserted.
+
+QA logs under `artifacts/p6-base23-qa/` include `focused-9c4570b.log`,
+`make-check.log`, `baseline-dual-lane.log` and `provider-import.log`. The final
+format-only change has identical Python AST; final-SHA checks and remote CI receipts
+are recorded in #514/#515. Development also caught and fixed canonical JSON float
+timings and restored the original frozen production design's exact SHA
+`2336837cd5023f2aec475b8185df6a824566a9f1a779d13c477c6b0309cc3f67`.
+The new design is an independent document; synthetic results never establish real
+Base data quality, source admission or a new official observation.
 
 Real-data next step: provide this cloud task an authorized read-only mount/export of the
 declared 2026 subset and reference tables, or authorize the original NexusDock runtime

@@ -108,6 +108,8 @@ class CompleteDailySource:
         knowledge_cutoff: datetime,
         continuous_only: bool = True,
     ) -> Any:
+        import pyarrow as pa
+        import pyarrow.compute as pc
         import pyarrow.parquet as pq
 
         if knowledge_cutoff.tzinfo is None:
@@ -128,6 +130,12 @@ class CompleteDailySource:
             if item is None or file_digest(path) != item["sha256"]:
                 raise ValueError("consumer bar file differs from accepted complete product")
             for batch in pq.ParquetFile(path).iter_batches(batch_size=20000):
+                # Discard other intervals in Arrow before expanding Decimal and
+                # timezone-aware rows into Python objects. All requested fields
+                # and the existing knowledge/quality checks remain unchanged.
+                batch = batch.filter(
+                    pc.is_in(batch.column("interval_size"), value_set=pa.array(required_intervals))
+                )
                 for row in batch.to_pylist():
                     if row["interval_size"] not in required_intervals:
                         continue

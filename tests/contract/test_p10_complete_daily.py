@@ -670,6 +670,21 @@ def test_exact_mirror_and_consumer_read_actual_bars_without_execution(
     cutoff = max(cutoff, ACQUIRED + timedelta(seconds=1))
     rows = list(consumer.iter_bars(required_intervals=("1m", "5m"), knowledge_cutoff=cutoff))
     assert len(rows) == 2 and {row["interval_size"] for row in rows} == {"1m", "5m"}
+    import pyarrow.compute as pc
+
+    original_filter = pc.is_in
+    filters = []
+
+    def tracked_filter(values, *, value_set):
+        filters.append(value_set.to_pylist())
+        return original_filter(values, value_set=value_set)
+
+    monkeypatch.setattr(pc, "is_in", tracked_filter)
+    five_minute_rows = list(
+        consumer.iter_bars(required_intervals=("5m",), knowledge_cutoff=cutoff)
+    )
+    assert five_minute_rows == [row for row in rows if row["interval_size"] == "5m"]
+    assert filters and all(value == ["5m"] for value in filters)
     assert admitted["execution_authorized"] is False
     with pytest.raises(ValueError, match="visible"):
         list(

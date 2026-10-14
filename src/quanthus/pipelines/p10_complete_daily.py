@@ -187,28 +187,42 @@ def minute_dwd_schema(daily_schema: Any) -> Any:
     )
 
 
-def _check_daily(root: Path) -> tuple[dict[str, Any], Any, dict[str, dict[str, Any]], Any]:
+def _check_daily(
+    root: Path, historical_alignment: Any = None
+) -> tuple[dict[str, Any], Any, dict[str, dict[str, Any]], Any]:
     result = verify_daily_domain_increment(root)
     manifest = object_at(root / "manifest.json")
     if (
         manifest.get("kind") != "cn01_daily_core_dwd_increment"
         or manifest.get("base", {}).get("manifest_sha256") != BASE_SHA
         or manifest.get("base", {}).get("content_digest") != BASE_CONTENT
-        or date.fromisoformat(manifest["market_date"])
-        < date.fromisoformat(policy()["baseline_market_date"])
     ):
         raise ValueError("daily member must actually bind accepted Base 2.3, never retag legacy")
+    if historical_alignment is not None:
+        from quanthus.pipelines.p10_base23_realign import verify_alignment
+
+        verify_alignment(historical_alignment, root)
+    elif date.fromisoformat(manifest["market_date"]) < date.fromisoformat(
+        policy()["baseline_market_date"]
+    ):
+        raise ValueError("historical complete date requires its explicit one-off authority")
     mapping, schema = daily_mapping(root, manifest["market_date"])
     return manifest, result, mapping, schema
 
 
 def build(
-    *, daily: Path, m1: Path, m5: Path, output_root: Path, code_revision: str
+    *,
+    daily: Path,
+    m1: Path,
+    m5: Path,
+    output_root: Path,
+    code_revision: str,
+    historical_alignment: Any = None,
 ) -> dict[str, Any]:
     import pyarrow as pa
     import pyarrow.parquet as pq
 
-    daily_manifest, daily_result, mapping, schema = _check_daily(daily)
+    daily_manifest, daily_result, mapping, schema = _check_daily(daily, historical_alignment)
     from quanthus.pipelines.p10_domain_continuation import verify as verify_domain
 
     domain_packages = []
@@ -357,6 +371,11 @@ def build(
                     "code_revision": code_revision,
                     "policy_id": POLICY_ID,
                     "policy_sha256": file_digest(policy_path()),
+                    **(
+                        {"historical_alignment": historical_alignment}
+                        if historical_alignment is not None
+                        else {}
+                    ),
                     "base": daily_manifest["base"],
                     "member_manifest_sha256": identities,
                     "domain_manifest_sha256": domain_identities,
@@ -424,7 +443,9 @@ def verify(root: Path) -> dict[str, Any]:
         or manifest.get("execution_authorized") is not False
     ):
         raise ValueError("complete Daily purpose/quality policy differs")
-    dm, dr, mapping, schema = _check_daily(root / "members/1d")
+    dm, dr, mapping, schema = _check_daily(
+        root / "members/1d", manifest.get("historical_alignment")
+    )
     if dm["market_date"] != manifest["market_date"] or dm["base"] != manifest["base"]:
         raise ValueError("complete Daily actual Base/date differs")
     source_sha = dm["selected_releases"]["market_daily_core"]["manifest_sha256"]
@@ -554,6 +575,7 @@ def main() -> int:
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--code-revision")
     parser.add_argument("--verify", type=Path)
+    parser.add_argument("--historical-alignment", type=Path)
     args = parser.parse_args()
     result = (
         verify(args.verify)
@@ -564,6 +586,9 @@ def main() -> int:
             m5=args.m5,
             output_root=args.output_root,
             code_revision=args.code_revision,
+            historical_alignment=object_at(args.historical_alignment)
+            if args.historical_alignment
+            else None,
         )
     )
     print(json.dumps(result, sort_keys=True))

@@ -1,0 +1,25 @@
+[Unit]
+Description=CN01 qualified complete Daily immutable GDrive archive
+After=network-online.target quanthus-gdrive-proxy.service quanthus-gdrive-de-proxy.service quanthus-gdrive-complete-oauth.service
+Wants=network-online.target quanthus-gdrive-proxy.service quanthus-gdrive-de-proxy.service quanthus-gdrive-complete-oauth.service
+ConditionPathExists=/opt/quanthus/gdrive-complete-current/ops/bin/run-gdrive-complete-daily
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/quanthus/gdrive-complete-current
+Environment=PYTHONPATH=/opt/quanthus/gdrive-complete-current/src
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=/etc/quanthus/dwd-notification.env
+ExecStart=/root/work/Quanthus/.venv-p1/bin/python /opt/quanthus/gdrive-complete-current/ops/bin/run-gdrive-complete-daily
+TimeoutStartSec=255min
+MemoryMax=512M
+CPUQuota=75%
+KillMode=control-group
+NoNewPrivileges=true
+UMask=0077
+Nice=15
+IOSchedulingClass=idle
+StandardOutput=journal
+StandardError=journal

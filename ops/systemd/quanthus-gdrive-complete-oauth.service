@@ -1,0 +1,20 @@
+[Unit]
+Description=CN01 complete DWD Google Drive scoped credential refresh
+After=network-online.target quanthus-gdrive-proxy.service quanthus-gdrive-de-proxy.service
+Wants=network-online.target quanthus-gdrive-proxy.service quanthus-gdrive-de-proxy.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/quanthus/gdrive-complete-current
+Environment=PYTHONPATH=/opt/quanthus/gdrive-complete-current/src
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/root/work/Quanthus/.venv-p1/bin/python -m quanthus.pipelines.p10_gdrive_oauth_bridge
+Restart=on-failure
+RestartSec=5s
+MemoryMax=192M
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Start GDrive archive after complete DWD dated pointer publication
+
+[Path]
+PathChanged=/srv/quanthus/dwd-dws-v2/daily/products/complete-daily/date-pointers
+Unit=quanthus-gdrive-complete-daily.service
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Recover missed complete DWD archive events and bounded retries
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=15min
+Unit=quanthus-gdrive-complete-daily.service
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

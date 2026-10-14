@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "policy_id": "p10-owner-october-base23-realignment-v1",
+  "authority": "Owner 2026-10-15: reprocess October dates except October 12 and 13 against Base 2.3",
+  "business_dates": ["2026-10-08", "2026-10-09", "2026-10-14"],
+  "natural_dates": ["2026-10-10", "2026-10-11"],
+  "protected_dates": ["2026-10-12", "2026-10-13"],
+  "base_manifest_sha256": "sha256:6991d0c9440d4117c3dfdd3375e2267d0e43174203fc834751c9476cd7598206",
+  "base_content_digest": "sha256:f5b1c35e9d60874a5daa8ce36f50d8d4edf62317075e3f223d344a1eb7292608",
+  "parent_policy_id": "p10-trading-day-complete-daily-v1",
+  "minimum_minute_grade": "R2",
+  "maximum_R3": 0,
+  "operation_budget_seconds_per_interval": 3600,
+  "operation_timeout_seconds": 600,
+  "source_window_start": "2026-10-15T00:28:50+08:00",
+  "source_window_end": "2026-10-15T09:30:00+08:00",
+  "knowledge_time": "actual acquisition; reused responses preserve their original capture time",
+  "consumer_purpose": "gap_aware_non_execution_development",
+  "execution_authorized": false,
+  "original_jobs": "immutable; this separate one-off Job has a new Base/source/universe closure, not a reset of T/T+1 ledgers",
+  "preserve_current_monotonicity": true,
+  "publish": "explicit expected-old dated-head CAS under original production locks, preserve sealed originals"
+}

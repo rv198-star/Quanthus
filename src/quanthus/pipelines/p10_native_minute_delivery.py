@@ -378,7 +378,12 @@ def source_index(
     for shard in sorted(root.glob("shard-*")):
         meta = object_at(shard / "identity.json")
         if (
-            meta.get("kind") != expected_kind
+            meta.get("kind")
+            not in (
+                {expected_kind, "p10_tencent_native_m1_response_reprojection_v1"}
+                if interval == "1m"
+                else {expected_kind}
+            )
             or meta.get("market_date") != ref["market_date"]
             or meta.get("market_ods_manifest_sha256") != ref["source_ods_manifest_sha256"]
         ):
@@ -395,6 +400,10 @@ def source_index(
                 or receipt.get("source_market_ods_sha256") != ref["source_ods_manifest_sha256"]
             ):
                 raise ValueError("source receipt differs from exact daily identity")
+            if receipt and meta.get("kind") == "p10_tencent_native_m1_response_reprojection_v1":
+                from quanthus.pipelines.p10_base23_realign import verify_reprojection
+
+                verify_reprojection(meta, receipt, shard / "raw" / f"{code}.json.gz", code, ref)
             result[code] = (shard / "raw" / f"{code}.json.gz", receipt)
     return result
 
@@ -490,6 +499,11 @@ def build(
                 )
                 quality["source_acquired_at_or_after"] = receipt.get("captured_at")
                 quality["reference_ods_manifest_sha256"] = ref["source_ods_manifest_sha256"]
+                if quality["formally_ingested"] and "reuse_origin_receipt" in receipt:
+                    atomic(stage / "ods/source-reuse" / f"{code}.json", receipt)
+                    quality["source_reprojection_receipt_sha256"] = file_digest(
+                        stage / "ods/source-reuse" / f"{code}.json"
+                    )
                 grades[quality["quality_grade"]] += 1
                 out.write(encoded(quality))
                 if quality["formally_ingested"]:
@@ -604,6 +618,21 @@ def verify(root: Path) -> dict[str, Any]:
         if status.get("reference_ods_manifest_sha256") != ref["source_ods_manifest_sha256"]:
             raise ValueError("quality row daily binding differs")
         statuses[code] = status
+        if status.get("source_reprojection_receipt_sha256"):
+            from quanthus.pipelines.p10_base23_realign import verify_reprojection
+
+            proof = root / "ods/source-reuse" / f"{code}.json"
+            if file_digest(proof) != status["source_reprojection_receipt_sha256"]:
+                raise ValueError("reused source receipt hash differs")
+            receipt = object_at(proof)
+            verify_reprojection(
+                {"provider": "tencent-mkline-m1"},
+                receipt,
+                root / "ods/raw" / f"{code}.json.gz",
+                code,
+                ref,
+                quality_status=status,
+            )
         grades[status["quality_grade"]] += 1
     if set(statuses) != set(ref["securities"]) or dict(grades) != manifest["grades"]:
         raise ValueError("minute status census differs")

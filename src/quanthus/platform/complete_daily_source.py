@@ -6,7 +6,7 @@ requests this source and its required intervals; execution remains unauthorized.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,16 +24,28 @@ from quanthus.pipelines.p10_delivery_common import COMPLETE_POINTER as POINTER
 
 
 class CompleteDailySource:
-    def __init__(self, root: Path, *, purpose: str = "gap_aware_non_execution_development"):
+    def __init__(
+        self,
+        root: Path,
+        *,
+        purpose: str = "gap_aware_non_execution_development",
+        market_date: str | None = None,
+    ):
         if purpose != "gap_aware_non_execution_development":
             raise ValueError(
                 "complete Daily does not grant execution or strict historical research"
             )
         self.root = root.resolve()
         self.purpose = purpose
+        self.market_date = date.fromisoformat(market_date).isoformat() if market_date else None
 
     def admission(self, required_intervals: tuple[str, ...] = ("1d", "1m", "5m")) -> dict[str, Any]:
-        pointer = object_at(self.root / POINTER)
+        pointer_path = (
+            self.root / POINTER
+            if self.market_date is None
+            else (self.root / "date-pointers" / (self.market_date + ".json"))
+        )
+        pointer = object_at(pointer_path)
         package = safe_path(self.root, pointer["manifest_path"]).parent
         manifest = object_at(package / "manifest.json")
         visibility = object_at(
@@ -53,6 +65,7 @@ class CompleteDailySource:
             or (package / "READY").read_text().strip() != pointer["manifest_sha256"]
             or pointer["content_digest"] != manifest["content_digest"]
             or pointer["market_date"] != manifest["market_date"]
+            or (self.market_date is not None and pointer["market_date"] != self.market_date)
             or visibility.get("manifest_sha256") != pointer["manifest_sha256"]
             or visibility.get("content_digest") != pointer["content_digest"]
             or visibility.get("exact_source_match") is not True
@@ -68,6 +81,13 @@ class CompleteDailySource:
             raise ValueError(
                 "complete Daily source missing exact OCI visibility or joint quality admission"
             )
+        if (
+            date.fromisoformat(manifest["market_date"]) < date(2026, 10, 12)
+            or manifest.get("historical_alignment") is not None
+        ):
+            from quanthus.pipelines.p10_base23_realign import verify_alignment
+
+            verify_alignment(manifest.get("historical_alignment"), package / "members/1d")
         return {
             "status": "admitted",
             "market_date": pointer["market_date"],
@@ -125,8 +145,17 @@ class CompleteDailySource:
 
         from quanthus.pipelines.p10_domain_continuation import verify as verify_domain
 
-        if table not in {"dwd_disclosure", "dwd_disclosure_subject", "dwd_financial_report",
-            "dwd_financial_concept", "dwd_financial_fact"} or knowledge_cutoff.tzinfo is None:
+        if (
+            table
+            not in {
+                "dwd_disclosure",
+                "dwd_disclosure_subject",
+                "dwd_financial_report",
+                "dwd_financial_concept",
+                "dwd_financial_fact",
+            }
+            or knowledge_cutoff.tzinfo is None
+        ):
             raise ValueError("unsupported domain table or naive cutoff")
         admission = self.admission()
         if knowledge_cutoff < datetime.fromisoformat(admission["first_verified_visible_at"]):

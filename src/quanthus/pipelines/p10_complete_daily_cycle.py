@@ -59,6 +59,35 @@ DAILY = ROOT / "daily/products/daily-core"
 RELEASES = Path("/root/work/astock/data/shadow/cn01-ods-v1/releases/daily")
 
 
+def cycle_activity(
+    journal: Path, *, target: date | None, revision: str, stage: str
+) -> dict[str, Any]:
+    """Bind timeout/crash notification to this invocation, never a previous Job."""
+    if stage not in {"minutes", "complete"}:
+        raise ValueError("unknown complete cycle activity stage")
+    path = journal / "active-run.json"
+    invocation = os.environ.get("INVOCATION_ID")
+    started = datetime.now(CST).isoformat()
+    if path.exists():
+        previous = object_at(path)
+        if (
+            previous.get("invocation_id") == invocation
+            and previous.get("code_revision") == revision
+        ):
+            started = previous["started_at"]
+    value = {
+        "kind": "p10_complete_daily_cycle_activity_v1",
+        "policy_id": POLICY_ID,
+        "invocation_id": invocation,
+        "started_at": started,
+        "market_date": str(target) if target is not None else None,
+        "code_revision": revision,
+        "stage": stage,
+    }
+    atomic(path, value)
+    return value
+
+
 def sealed_daily_sources(releases: Path, target: date, *, daily: Path = DAILY) -> tuple[Path, str]:
     dated = daily / "date-pointers" / f"{target}.json"
     if dated.exists():
@@ -512,6 +541,7 @@ def run(
     with (job / ".job.lock").open("a+") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         if (complete / "date-pointers" / f"{target}.json").exists():
+            cycle_activity(journal, target=target, revision=revision, stage="complete")
             evidence = accepted(complete, target)
             if os.environ.get("HERMES_ODS_PREVENTION_POLICY") == "p10-acquisition-prevention-v1":
                 from quanthus.pipelines.p10_complete_daily import build as revise_complete
@@ -620,6 +650,7 @@ def run(
             )
             return result
         try:
+            cycle_activity(journal, target=target, revision=revision, stage="complete")
             source = daily_package(daily, target)
             # One separately bounded composite build; minute histories are shared sealed ADM.
             command = [
@@ -690,17 +721,31 @@ def main() -> int:
     now = datetime.now(CST)
     target = None
     try:
+        cycle_activity(JOURNAL, target=None, revision=args.code_revision, stage="minutes")
         rows = (
             json.loads(args.calendar_file.read_text())
             if args.calendar_file
             else calendar_rows(now.date(), JOURNAL / "calendars")
         )
         target = target_for(now, rows)
+        cycle_activity(JOURNAL, target=target, revision=args.code_revision, stage="minutes")
         result = run(now=now, rows=rows, revision=args.code_revision)
     except Exception as exc:
+        stage = "minutes"
+        try:
+            active = object_at(JOURNAL / "active-run.json")
+            if (
+                active.get("invocation_id") == os.environ.get("INVOCATION_ID")
+                and active.get("code_revision") == args.code_revision
+                and active.get("market_date") == (str(target) if target else None)
+                and active.get("stage") in {"minutes", "complete"}
+            ):
+                stage = active["stage"]
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
         failure(
             day=target or now.date(),
-            stage="minutes",
+            stage=stage,
             state_root=JOURNAL / "notifications",
             reason=f"complete Daily controller failed: {type(exc).__name__}",
             context={

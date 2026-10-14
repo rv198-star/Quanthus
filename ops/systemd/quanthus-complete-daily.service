@@ -2,6 +2,7 @@
 Description=CN01 T+1 trading-day native 1m/5m and complete DWD
 After=network-online.target
 Wants=network-online.target
+OnFailure=quanthus-complete-daily-controller-failure.service
 ConditionPathExists=/opt/quanthus/data-delivery-current/ops/bin/run-complete-daily-cycle
 
 [Service]

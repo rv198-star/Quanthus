@@ -152,6 +152,36 @@ Rollback restores the prior data-delivery link and removes only this rollout's
 resume EnvironmentFile/drop-in. Preserve old/new Job receipts, captured inputs,
 immutable products and pending mail; do not reset budgets or alter source bytes.
 
+## Controller timeout and crash notification
+
+`quanthus-complete-daily.service` has a dedicated OnFailure handler in addition to
+the independent 13:00/13:20 watchdogs. The controller writes `active-run.json`
+with its systemd InvocationID, code revision, actual target date and stage. It
+starts with an unresolved date, then binds the calendar-resolved target; the
+stage changes to complete only after minute admission or when checking an
+already accepted complete product. A stage change preserves the invocation start.
+
+The failure handler accepts only that current invocation and its bounded start
+time. It reuses the existing date/stage mail key with internal failures and the
+watchdog. Missing, stale or invalid markers produce an explicitly unresolved
+runtime-date minutes alert, never a guessed prior market date. No new supplier
+operation, grading, rebuild or budget reset occurs in the hook. Existing queued
+mail replay handles transport errors.
+
+Fetch the exact repair commit from GitHub, verify focused Linux tests and unit
+definitions, then switch only `data-delivery-current` while the controller and
+mail retry are idle. Install the versioned controller failure unit and its scoped
+OnFailure drop-in; restore prior timer activity after daemon-reload. Keep the
+prior completed Job, processing-resume authorization, quality policy, producer,
+archive and OCI identities. A new target Job pins the new code on its ordinary
+start. Do not restart an accepted old Job merely to demonstrate the new hook.
+
+Rollback restores the previous data-delivery code link and removes only this
+failure unit/drop-in after bounded jobs drain. Retain activity, Job, raw,
+notification and publication evidence. Synthetic failure/deduplication tests
+and actual runtime path readback do not pre-accept a future natural failure or
+tomorrow's minute collection and joint delivery.
+
 ## General rollout rollback
 
 Disable the new complete cycle, checkpoint and OCI timers, then let bounded active

@@ -6,6 +6,7 @@ import argparse
 import fcntl
 import json
 import os
+import re
 import subprocess
 import time
 from contextlib import suppress
@@ -183,6 +184,37 @@ def _daily_service_started_at() -> float | None:
     return _service_started_at("quanthus-daily-core@cn01.service")
 
 
+def _complete_cycle_failure_target(now: datetime, state: Path) -> tuple[date, str, str]:
+    """Resolve only the exact current controller invocation's date and phase."""
+    fallback = (now.date(), "minutes", "运行日期（目标交易日未确定）")
+    unit = "quanthus-complete-daily.service"
+    service_start = _service_started_at(unit)
+    try:
+        invocation = subprocess.check_output(
+            ["systemctl", "show", unit, "--property=InvocationID", "--value"],
+            text=True,
+            timeout=5,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        if service_start is None or not re.fullmatch(r"[0-9a-f]{32}", invocation):
+            return fallback
+        active = object_at(state / "active-run.json")
+        started = datetime.fromisoformat(active["started_at"])
+        if (
+            active.get("kind") != "p10_complete_daily_cycle_activity_v1"
+            or active.get("policy_id") != POLICY_ID
+            or active.get("invocation_id") != invocation
+            or not re.fullmatch(r"[0-9a-f]{40}", str(active.get("code_revision", "")))
+            or active.get("stage") not in {"minutes", "complete"}
+            or started.tzinfo is None
+            or not service_start - 1 <= started.timestamp() <= now.timestamp()
+        ):
+            return fallback
+        return date.fromisoformat(active["market_date"]), active["stage"], "交易日"
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        return fallback
+
+
 def _archive_failure_target(now: datetime, state: Path) -> tuple[date, str]:
     fallback = (now.date(), "运行日期（目标交易日未确定）")
     started = _service_started_at("quanthus-gdrive-complete-daily.service")
@@ -226,6 +258,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--daily-cycle-failure", action="store_true")
+    mode.add_argument("--complete-cycle-service-failure", action="store_true")
     mode.add_argument("--archive-service-failure", action="store_true")
     mode.add_argument("--mirror-service-failure", action="store_true")
     mode.add_argument("--mirror-service-stop", action="store_true")
@@ -246,6 +279,23 @@ def main() -> int:
         )
     from quanthus.pipelines.p10_complete_daily_cycle import DAILY, JOURNAL
     from quanthus.pipelines.p10_complete_daily_schedule import CST
+
+    if args.complete_cycle_service_failure:
+        target, stage, label = _complete_cycle_failure_target(datetime.now(CST), JOURNAL)
+        record = failure(
+            day=target,
+            stage=stage,
+            state_root=JOURNAL / "notifications",
+            reason="T+1 complete Daily controller failed or timed out; "
+            "inspect preserved Job and operation receipts",
+            context={
+                "market_date_label": label,
+                "unit": "quanthus-complete-daily.service",
+                "error_code": "complete_cycle_service_failed",
+            },
+        )
+        print(json.dumps(record, sort_keys=True))
+        return 0
 
     if args.mirror_service_stop:
         result = os.environ.get("SERVICE_RESULT")

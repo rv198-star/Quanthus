@@ -178,3 +178,27 @@ def test_numbered_registered_chinese_name_and_origin_remain_inside_basic_section
         "有限公司成立日期", "（四）成立日期")
     identity, _, _ = qualify_origin(**kw)
     assert identity.company_id == kw["parent"].company_id
+
+
+@pytest.mark.parametrize("outside", [False, True])
+def test_original_financial_target_scope_excludes_other_previously_handled_subjects(
+        tmp_path, monkeypatch, outside):
+    import json
+
+    from quanthus.pipelines.securities_warehouse import base231_prospectus_origin as module
+    from quanthus.pipelines.securities_warehouse.base22 import file_sha
+
+    path = tmp_path / "frozen-targets.json"
+    targets = [dict(code=str(n).zfill(6)) for n in range(350)]
+    path.write_text(json.dumps(dict(targets=targets)))
+    monkeypatch.setattr(module, "TARGETS_SHA256", file_sha(path))
+    plan = dict(original_financial_targets=path.name, members={path.name: {}},
+                profiles=[dict(code="999999" if outside else "000123")])
+    if outside:
+        with pytest.raises(RuntimeError, match="OUTSIDE_FROZEN_REPAIR_SCOPE"):
+            module.verify_target_scope(tmp_path, plan)
+    else:
+        module.verify_target_scope(tmp_path, plan)
+    path.write_text(json.dumps(dict(targets=targets[:-1])))
+    with pytest.raises(RuntimeError, match="REGISTRATION_CHANGED"):
+        module.verify_target_scope(tmp_path, plan)

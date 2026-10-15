@@ -21,6 +21,26 @@ from .listed_company import _stable_id
 CONTRACT_ID = "p10-base231-official-prospectus-current-financial-origin-v1"
 SCOPE = "CURRENT_FINANCIAL_LITERAL_EXPLICIT_PROSPECTUS_ORIGIN_ONLY"
 TZ = ZoneInfo("Asia/Shanghai")
+TARGETS_SHA256 = "sha256:f338ede8fb6bae65a7dbad77b16d673b0e2c63446bee188c6a0a0ca13fdb7f15"
+
+
+def verify_target_scope(root: Path, plan: dict[str, Any]) -> None:
+    """Only the frozen 350 unresolved subjects count toward this repair cohort."""
+    import json
+
+    from .base22 import file_sha
+
+    name = plan.get("original_financial_targets")
+    if not isinstance(name, str) or name not in plan["members"]:
+        raise BoundedError("PROSPECTUS_ORIGINAL_FINANCIAL_TARGET_REGISTRATION_REQUIRED")
+    path = root / name
+    if file_sha(path) != TARGETS_SHA256:
+        raise BoundedError("PROSPECTUS_ORIGINAL_FINANCIAL_TARGET_REGISTRATION_CHANGED")
+    targets = json.loads(path.read_bytes())["targets"]
+    codes = {row["code"] for row in targets}
+    selected = [row["code"] for row in plan["profiles"]]
+    if len(targets) != 350 or len(codes) != 350 or not set(selected) <= codes:
+        raise BoundedError("PROSPECTUS_FINANCIAL_SUBJECT_OUTSIDE_FROZEN_REPAIR_SCOPE")
 
 
 def verify_source(root: Path, spec: dict[str, Any], *, observed_at: datetime) -> dict[str, Any]:

@@ -166,6 +166,7 @@ def replay_origin_scope(root: Path) -> dict[str, Any]:
     from .base231_prospectus_origin import project_financial as project_prospectus
     from .base231_prospectus_origin import qualify_origin as qualify_prospectus
     from .base231_prospectus_origin import verify_source as verify_prospectus_source
+    from .base231_prospectus_origin import verify_target_scope
     from .financial_reporting import financial_company_resolver_from_listed_company_rows
 
     plan = json.loads((root / "INPUTS.json").read_bytes())
@@ -193,6 +194,7 @@ def replay_origin_scope(root: Path) -> dict[str, Any]:
             name = "src/quanthus/pipelines/securities_warehouse/" + module
             if plan["code_inputs"].get(name) != file_sha(Path(name)):
                 raise BoundedError("PROSPECTUS_FINANCIAL_SOURCE_CODE_UNPINNED")
+        verify_target_scope(root, plan)
     parent_path = root / "inputs/qualified-parent-manifest.json"
     parent = json.loads(parent_path.read_bytes())
     if (file_sha(parent_path) != QUALIFIED_PARENT

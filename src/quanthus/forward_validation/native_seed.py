@@ -254,14 +254,14 @@ def _text(value: object) -> str:
 def _visible(alias: str) -> str:
     return (
         f"{alias}.knowledge_from <= c.close_at AND "
-        f"({alias}.knowledge_to IS NULL OR {alias}.knowledge_to > c.close_at)"
+        f"coalesce({alias}.knowledge_to, TIMESTAMPTZ 'infinity') > c.close_at"
     )
 
 
 def _effective(alias: str) -> str:
     return (
         f"{alias}.effective_from <= c.close_at AND "
-        f"({alias}.effective_to IS NULL OR {alias}.effective_to > c.close_at)"
+        f"coalesce({alias}.effective_to, TIMESTAMPTZ 'infinity') > c.close_at"
     )
 
 

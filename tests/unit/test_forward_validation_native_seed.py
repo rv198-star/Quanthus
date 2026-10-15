@@ -15,7 +15,9 @@ from quanthus.forward_validation.native_seed import (
     KIND,
     P6BaseSeedBinding,
     P6SeedError,
+    _effective,
     _hash,
+    _visible,
     build_seed,
     verify_seed_artifact,
     verify_seed_source,
@@ -232,6 +234,28 @@ class SourceContracts(unittest.TestCase):
     importlib.util.find_spec("duckdb"), "DuckDB unavailable; Parquet tests not run"
 )
 class ParquetConstruction(unittest.TestCase):
+    def test_temporal_ranges_keep_inclusive_start_and_exclusive_end(self):
+        import duckdb
+
+        with duckdb.connect(":memory:") as con:
+            for predicate, start, end in (
+                (_visible, "knowledge_from", "knowledge_to"),
+                (_effective, "effective_from", "effective_to"),
+            ):
+                rows = con.execute(f"""
+                    WITH c AS (SELECT TIMESTAMPTZ '2026-09-30 07:00:00+00' AS close_at),
+                    v(id,{start},{end}) AS (VALUES
+                      ('open', TIMESTAMPTZ '2026-09-30 07:00:00+00', NULL),
+                      ('closed', TIMESTAMPTZ '2026-09-30 06:00:00+00',
+                                 TIMESTAMPTZ '2026-09-30 07:00:00+00'),
+                      ('future', TIMESTAMPTZ '2026-09-30 07:00:01+00', NULL),
+                      ('active', TIMESTAMPTZ '2026-09-30 06:00:00+00',
+                                 TIMESTAMPTZ '2026-09-30 07:00:01+00'),
+                      ('unknown', NULL, NULL))
+                    SELECT id FROM v CROSS JOIN c WHERE {predicate("v")} ORDER BY id
+                """).fetchall()
+                self.assertEqual(rows, [("active",), ("open",)])
+
     def setUp(self):
         import duckdb
 

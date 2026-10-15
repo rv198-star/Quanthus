@@ -603,21 +603,32 @@ def vertical_lending_sample():
     def line(cells):
         result = " " * 80
         for at, text in cells:
-            result = result[:at] + text + result[at + len(text):]
+            result = result[:at] + text + result[at + len(text) :]
         return result.rstrip()
 
     header = [
-        "单位：股", "前十名股东持股情况（不含通过转融通出借股份）",
-        line([(51, "包含")]), line([(46, "持有"), (51, "转融")]),
+        "单位：股",
+        "前十名股东持股情况（不含通过转融通出借股份）",
+        line([(51, "包含")]),
+        line([(46, "持有"), (51, "转融")]),
         line([(46, "有限"), (51, "通借")]),
-        line([(3, "股东名称"), (13, "报告期内增"), (22, "期末持股数"),
-              (39, "比例"), (51, "出股"), (66, "股东")]),
-        line([(3, "（全称）"), (15, "减"), (24, "量"), (39, "(%)"),
-              (51, "份的"), (66, "性质")]),
-        line([(46, "售条"), (51, "限售")]), line([(46, "件股"), (51, "股份")]),
+        line(
+            [
+                (3, "股东名称"),
+                (13, "报告期内增"),
+                (22, "期末持股数"),
+                (39, "比例"),
+                (51, "出股"),
+                (66, "股东"),
+            ]
+        ),
+        line([(3, "（全称）"), (15, "减"), (24, "量"), (39, "(%)"), (51, "份的"), (66, "性质")]),
+        line([(46, "售条"), (51, "限售")]),
+        line([(46, "件股"), (51, "股份")]),
     ]
-    data = body.splitlines()[next(i for i, s in enumerate(body.splitlines())
-                                 if s.startswith("合成股东1 ")):]
+    data = body.splitlines()[
+        next(i for i, s in enumerate(body.splitlines()) if s.startswith("合成股东1 ")) :
+    ]
     return "\n".join(header + data), hints
 
 
@@ -625,8 +636,14 @@ def test_vertical_lending_fragments_bind_same_physical_column_with_split_name_ce
     body, hints = vertical_lending_sample()
     hints[1]["HOLDER_NAME"] = "合成股东二全称"
     body = body.replace("合成股东2  0", "合成股东二  0").replace(
-        "1002  1.25  0  0  无  0  其他", "1002  1.25  0  0  无  0\n全称"
-        + " " * 55 + "非国\n" + " " * 60 + "有法\n" + " " * 60 + "人"
+        "1002  1.25  0  0  无  0  其他",
+        "1002  1.25  0  0  无  0\n全称"
+        + " " * 55
+        + "非国\n"
+        + " " * 60
+        + "有法\n"
+        + " " * 60
+        + "人",
     )
     rows, _ = parse_top_matrix(body, hints)
     assert len(rows) == 10 and rows[1]["name"] == hints[1]["HOLDER_NAME"]
@@ -773,5 +790,87 @@ def test_split_floating_family_rejects_unproved_extent_columns_and_share_class(f
         body = body.replace("流通股的数量", "未知股的数量")
     else:
         body = body.replace(f"{str(1001):>12}    {str(1001):>12}", "1001  12%  1001")
+    with pytest.raises(RuntimeError):
+        parse_floating_matrix(body, hints)
+
+
+def column_floating_sample():
+    hints = [
+        dict(HOLDER_RANK=n, HOLDER_NAME=f"合成股东{n}公司", HOLD_NUM=str(1000 + n))
+        for n in range(1, 11)
+    ]
+    lines = [
+        "单位：股",
+        "前10名无限售条件股东持股情况（不含通过转融通出借股份、高管锁定股）",
+        "股东名称          报告期末持有无限售条件股份数量        股份种类",
+        " " * 55 + "股份种类     数量",
+    ]
+    for n in range(1, 11):
+        lines += [
+            f"{'#合成股东' if n == 1 else '合成股东':<20}",
+            f"{str(n):<20} {str(1000 + n):>25}   人民币普通股     {1000 + n}",
+            "公司",
+        ]
+        if n == 5:
+            lines += ["\f", "       合成公司2025年半年度报告全文", "12"]
+    lines += ["前10名无限售流通股股东之间关联关系说明"]
+    return "\n".join(lines), hints
+
+
+def test_explicit_column_floating_preserves_all_names_quantities_and_annotation():
+    from quanthus.pipelines.securities_warehouse.base231_official_holder import (
+        parse_floating_matrix,
+    )
+
+    body, hints = column_floating_sample()
+    rows, proof = parse_floating_matrix(body, hints)
+    assert [r["quantity"] for r in rows] == list(range(1001, 1011))
+    assert [r["name"] for r in rows] == [h["HOLDER_NAME"] for h in hints]
+    assert all(r["percentage"] is None for r in rows)
+    assert proof["layout_contract"] == "explicit-column-wrapped-floating-matrix-v1"
+    assert proof["name_prefix_annotations"] == [{"rank": 1, "marker": "#"}]
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "name",
+        "interior_marker",
+        "extra",
+        "missing",
+        "quantity",
+        "repeat",
+        "class",
+        "unit",
+        "unknown_header",
+        "rank",
+    ],
+)
+def test_column_floating_never_infers_missing_atoms_or_rows(fault):
+    from quanthus.pipelines.securities_warehouse.base231_official_holder import (
+        parse_floating_matrix,
+    )
+
+    body, hints = column_floating_sample()
+    if fault == "name":
+        body = body.replace("#合成股东", "#错误股东", 1)
+    elif fault == "interior_marker":
+        body = body.replace("#合成股东", "合#成股东", 1)
+    elif fault == "extra":
+        body = body.replace("前10名无限售流通股", "额外股东\n前10名无限售流通股", 1)
+    elif fault == "missing":
+        body = body.replace("1001", "", 1)
+    elif fault == "quantity":
+        hints[0]["HOLD_NUM"] = "1002"
+    elif fault == "repeat":
+        body = body.replace("1001", "1002", 1)
+    elif fault == "class":
+        body = body.replace("人民币普通股", "境外普通股", 1)
+    elif fault == "unit":
+        body = body.replace("单位：股", "单位：份", 1)
+    elif fault == "unknown_header":
+        body = body.replace("报告期末持有无限售条件股份数量", "未知条件的数量", 1)
+    else:
+        hints[0]["HOLDER_RANK"] = 2
     with pytest.raises(RuntimeError):
         parse_floating_matrix(body, hints)

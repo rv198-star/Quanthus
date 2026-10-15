@@ -77,9 +77,7 @@ def _parse_top_matrix(
     original_body = body
     if physical_name_cells:
         body = _join_explicit_lending_delta(body)
-    wrapped_nature = _WRAPPED_NATURE + (
-        "|国有|非国|有法" if body != original_body else ""
-    )
+    wrapped_nature = _WRAPPED_NATURE + ("|国有|非国|有法" if body != original_body else "")
     lines = body.splitlines()
     starts = [
         i
@@ -159,9 +157,7 @@ def _parse_top_matrix(
                                 )
                                 # A centered one-character second line need
                                 # not begin at the first line's left edge.
-                                centered = abs(
-                                    left + len(first) - right - len(second)
-                                ) <= 4
+                                centered = abs(left + len(first) - right - len(second)) <= 4
                                 if match.start() == other.start() or (
                                     abs(left - right) <= 4 and centered
                                 ):
@@ -429,8 +425,7 @@ def _vertical_lending_header(lines: list[str]) -> bool:
     columns = []
     for token in ["包含", "转融", "通借", "出股", "份的"]:
         found = [
-            m.start() for line in lines if "持股情况" not in line
-            for m in re.finditer(token, line)
+            m.start() for line in lines if "持股情况" not in line for m in re.finditer(token, line)
         ]
         if len(found) != 1:
             return False
@@ -472,7 +467,11 @@ def _join_explicit_lending_delta(body: str) -> str:
         match = previous.fullmatch(lines[i])
         if match and following.fullmatch(lines[i + 1]):
             lines[i] = (
-                match[1] + "  " + match[3] + "  " + lines[i + 1].strip()
+                match[1]
+                + "  "
+                + match[3]
+                + "  "
+                + lines[i + 1].strip()
                 + ("  " + match[4] if match[4] else "")
             )
             lines[i + 1] = ""
@@ -623,7 +622,154 @@ def parse_floating_matrix(
             "OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN",
         }:
             raise
-    return _parse_split_floating_matrix(body, hints)
+    try:
+        return _parse_split_floating_matrix(body, hints)
+    except BoundedError as error:
+        if str(error) not in {
+            "OFFICIAL_FLOATING_UNIQUE_COMPLETE_MATRIX_REQUIRED",
+            "OFFICIAL_FLOATING_EXPLICIT_PHYSICAL_COLUMNS_REQUIRED",
+            "OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN",
+        }:
+            raise
+    return _parse_column_floating_matrix(body, hints)
+
+
+def _parse_column_floating_matrix(
+    body: str, hints: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Explicit repeated-quantity columns with complete wrapped names.
+
+    A leading # or * is retained as a source annotation only when the entire
+    subsequent name chain and every native quantity reconcile exactly. Interior
+    symbols, unknown text, missing ranks and additional rows are never removed.
+    """
+    _validate_hints(hints)
+    if not 0 < len(body.encode()) <= 16 * 1024**2:
+        raise BoundedError("OFFICIAL_HOLDER_BODY_BOUND")
+    lines = body.split("\n")
+    heading = (
+        r"前(?:10|十)名无限售条件股东持股情况(?:[(]不含通过转融通出借股份(?:、高管锁定股)?[)])?"
+    )
+    starts = [i for i, line in enumerate(lines) if re.fullmatch(heading, _norm(line))]
+    if len(starts) != 1:
+        raise BoundedError("OFFICIAL_FLOATING_UNIQUE_COMPLETE_MATRIX_REQUIRED")
+    start = starts[0]
+    units = re.findall(r"单位\s*[:：]\s*(\S+)", "\n".join(lines[max(0, start - 200) : start + 2]))
+    if not units or units[-1] != "股":
+        raise BoundedError("OFFICIAL_HOLDER_EXPLICIT_SHARE_UNIT_REQUIRED")
+    end = next(
+        (
+            i
+            for i in range(start + 1, len(lines))
+            if _norm(lines[i]).startswith(("前10名无限售流通", "前十名无限售流通", "上述股东"))
+        ),
+        None,
+    )
+    if end is None:
+        raise BoundedError("OFFICIAL_HOLDER_COMPLETE_ROW_EXTENT_UNPROVEN")
+    block = lines[start + 1 : end]
+    anchor = re.compile(
+        r"^(.*?)\s+([0-9][0-9,]*(?:\.[0-9]+)?)\s+人民币普通股\s+([0-9][0-9,]*(?:\.[0-9]+)?)\s*$"
+    )
+    first = next((i for i, line in enumerate(block) if anchor.fullmatch(line)), len(block))
+    header = _norm("".join(block[:first]))
+    if not all(
+        t in header for t in ["股东名称", "报告期末持有无限售条件股份数量", "股份种类", "数量"]
+    ):
+        raise BoundedError("OFFICIAL_FLOATING_EXPLICIT_PHYSICAL_COLUMNS_REQUIRED")
+    headers = [i for i, line in enumerate(block[:first]) if re.search(r"股份种类\s+数量", line)]
+    if len(headers) != 1:
+        raise BoundedError("OFFICIAL_FLOATING_EXPLICIT_PHYSICAL_COLUMNS_REQUIRED")
+    data_start = headers[0] + 1
+    parts = []
+    atoms: list[dict[str, Any]] = []
+    offset = 0
+    for i, line in enumerate(block[data_start:], data_start):
+        match = anchor.fullmatch(line)
+        if match:
+            fragment = _norm(match[1])
+            atoms.append(
+                dict(start=offset, end=offset + len(fragment), qty=match[2], repeated=match[3])
+            )
+        else:
+            fragment = _norm(line)
+            if not fragment:
+                continue
+            if re.fullmatch(r".{1,80}[0-9]{4}年(?:半年度|年度|第[一二三四]季度)报告全文", fragment):
+                continue
+            if (
+                fragment.isdecimal()
+                and len(fragment) <= 4
+                and any("报告全文" in nearby for nearby in block[max(0, i - 2) : i + 3])
+            ):
+                continue
+        parts.append(fragment)
+        offset += len(fragment)
+    chain = "".join(parts)
+    ordered = sorted(hints, key=lambda r: r["HOLDER_RANK"])
+    annotations = []
+    spans = []
+    pos = 0
+    for i, hint in enumerate(ordered):
+        name = _norm(hint["HOLDER_NAME"])
+        begin = pos
+        if chain[pos : pos + 1] in {"#", "*"} and chain[pos + 1 :].startswith(name):
+            annotations.append(dict(rank=i + 1, marker=chain[pos]))
+            pos += 1
+        if not chain[pos:].startswith(name):
+            raise BoundedError("OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN")
+        pos += len(name)
+        spans.append((begin, pos))
+    if pos != len(chain) or len(atoms) != 10:
+        raise BoundedError("OFFICIAL_HOLDER_COMPLETE_ROW_EXTENT_UNPROVEN")
+    rows = []
+    for atom in atoms:
+        indices = [
+            i
+            for i, (a, b) in enumerate(spans)
+            if (
+                a < atom["start"] <= b
+                if atom["start"] == atom["end"]
+                else atom["start"] < b and atom["end"] > a
+            )
+        ]
+        if len(indices) != 1:
+            raise BoundedError("OFFICIAL_HOLDER_NUMERIC_ROW_NAME_BINDING_UNPROVEN")
+        n = indices[0]
+        quantity = Decimal(atom["qty"].replace(",", ""))
+        if (
+            quantity < 0
+            or quantity != Decimal(atom["repeated"].replace(",", ""))
+            or quantity != Decimal(str(ordered[n]["HOLD_NUM"]))
+        ):
+            raise BoundedError("OFFICIAL_HOLDER_EXACT_QUANTITY_OR_PERCENTAGE_CONFLICT")
+        rows.append(
+            dict(
+                rank=n + 1,
+                name=ordered[n]["HOLDER_NAME"],
+                category=None,
+                share_nature="人民币普通股",
+                quantity=quantity,
+                percentage=None,
+                raw_quantity=atom["qty"],
+                raw_percentage=None,
+            )
+        )
+    if [r["rank"] for r in rows] != list(range(1, 11)):
+        raise BoundedError("OFFICIAL_HOLDER_COMPLETE_ROW_EXTENT_UNPROVEN")
+    return rows, dict(
+        contract_id=CONTRACT_ID,
+        layout_contract="explicit-column-wrapped-floating-matrix-v1",
+        rows=10,
+        whole_block_sha256=digest("\n".join(block)),
+        complete_name_chain_sha256=digest(chain),
+        native_atoms_sha256=digest(rows),
+        name_prefix_annotations=annotations,
+        explicit_share_unit="SHARE",
+        rank_authority="EXPLICIT_PROVIDER_RANK_RECONCILED_TO_COMPLETE_OFFICIAL_ORDER",
+        percentage_authority="NOT_DISCLOSED_IN_OFFICIAL_FLOATING_TABLE",
+        source_priority_or_transaction_equivalence_granted=False,
+    )
 
 
 def _parse_split_floating_matrix(

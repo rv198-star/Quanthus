@@ -4,17 +4,75 @@ from __future__ import annotations
 
 import json
 import subprocess
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .base22 import digest, file_sha, load_contract
 from .base22_bounded import BoundedError
+from .base22_outputs import instant
 from .base22_sources import _tree, physical_path
 from .base231_official_holder import CONTRACT_ID, project_top_matrix
 from .base231_official_profile import QUALIFIED_PARENT
 from .financial_reporting import financial_company_resolver_from_listed_company_rows
 from .ownership_capital import ownership_capital_schemas
+
+CURRENT_SOURCE_CONTRACT = "p10-base231-current-official-holder-document-source-v1"
+
+
+def verify_current_document_receipts(
+    *,
+    actual: dict[str, Any],
+    index_receipt: dict[str, Any],
+    PDF_receipt: dict[str, Any],
+    index_sha256: str,
+    index_bytes: int,
+    PDF_sha256: str,
+    PDF_bytes: int,
+    observed_at: datetime,
+) -> None:
+    """Verify actual new source transport without inventing historical acceptance."""
+    if type(actual.get("announcementTime")) is not int:
+        raise BoundedError("OFFICIAL_HOLDER_CURRENT_SOURCE_PUBLICATION_REQUIRED")
+    published = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(
+        milliseconds=actual["announcementTime"]
+    )
+    day = published.astimezone(ZoneInfo("Asia/Shanghai")).date()
+    relative = "finalpage/" + day.isoformat() + "/" + str(actual["announcementId"]) + ".PDF"
+    if (
+        actual.get("adjunctUrl") != relative
+        or (index_receipt.get("request_payload") or {}).get("stock")
+        != actual["secCode"] + "," + actual["orgId"]
+    ):
+        raise BoundedError("OFFICIAL_HOLDER_CURRENT_SOURCE_ISSUER_OR_DOCUMENT_UNPROVEN")
+    for receipt, uri, sha, size in [
+        (
+            index_receipt,
+            "https://www.cninfo.com.cn/new/hisAnnouncement/query",
+            index_sha256,
+            index_bytes,
+        ),
+        (PDF_receipt, "https://static.cninfo.com.cn/" + relative, PDF_sha256, PDF_bytes),
+    ]:
+        if (
+            receipt.get("URI") != uri
+            or type(receipt.get("http_status")) is not int
+            or receipt["http_status"] != 200
+            or receipt.get("error") is not None
+            or receipt.get("response_cap_reached") is not False
+            or receipt.get("actual_transport") != "urllib.request"
+            or receipt.get("body_sha256") != sha
+            or receipt.get("actual_response_body_bytes") != size
+            or not published
+            <= instant(datetime.fromisoformat(receipt["completed_at"]))
+            <= instant(observed_at)
+        ):
+            raise BoundedError("OFFICIAL_HOLDER_CURRENT_ACTUAL_SOURCE_RECEIPT_UNPROVEN")
+    if instant(datetime.fromisoformat(index_receipt["completed_at"])) > instant(
+        datetime.fromisoformat(PDF_receipt["completed_at"])
+    ):
+        raise BoundedError("OFFICIAL_HOLDER_CURRENT_SOURCE_CLOCK_ORDER_UNPROVEN")
 
 
 def replay_official_holder(root: Path) -> dict[str, Any]:
@@ -144,14 +202,28 @@ def replay_official_holder(root: Path) -> dict[str, Any]:
             original_row = original["actual_index_row"]
             document_id = str(original_row["announcementId"])
             original_receipt = json.loads((root / candidate["receipt"]).read_bytes())
+            current_source = candidate.get("source_contract") is not None
+            if current_source:
+                if candidate["source_contract"] != CURRENT_SOURCE_CONTRACT:
+                    raise BoundedError("OFFICIAL_HOLDER_CURRENT_SOURCE_CONTRACT_UNREVIEWED")
+                verify_current_document_receipts(
+                    actual=original_row,
+                    index_receipt=json.loads((root / candidate["index_receipt"]).read_bytes()),
+                    PDF_receipt=original_receipt,
+                    index_sha256=file_sha(root / candidate["index"]),
+                    index_bytes=(root / candidate["index"]).stat().st_size,
+                    PDF_sha256=file_sha(root / candidate["PDF"]),
+                    PDF_bytes=(root / candidate["PDF"]).stat().st_size,
+                    observed_at=now,
+                )
             if (
                 file_sha(root / candidate["index"]) != original["index_sha256"]
                 or original_row not in (raw_index.get("announcements") or [])
                 or original_row["secCode"] != spec["code"]
                 or original_receipt["URI"]
                 != "https://static.cninfo.com.cn/" + original_row["adjunctUrl"]
-                or original_receipt["http_status"] != "200"
-                or original_receipt["curl_exit"] != 0
+                or (not current_source and original_receipt["http_status"] != "200")
+                or (not current_source and original_receipt["curl_exit"] != 0)
                 or file_sha(root / candidate["PDF"]) != original_receipt["body_sha256"]
             ):
                 raise BoundedError("OFFICIAL_HOLDER_COMPLETE_ORIGINAL_DOCUMENT_INDEX_CHANGED")

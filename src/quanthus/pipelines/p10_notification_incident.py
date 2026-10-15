@@ -46,6 +46,8 @@ def acknowledge(root: Path, day: date, stage: str, receipt: dict[str, Any]) -> N
         return
     if receipt.get("delivery_status") != "sent":
         return
+    if str(receipt.get("market_date_label", "")).startswith("运行日期"):
+        return
     prior = EXPORT / f"{day}-{stage}.json"
     if prior.exists() and object_at(prior).get("resolved") is True:
         return

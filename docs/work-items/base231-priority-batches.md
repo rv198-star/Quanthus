@@ -11,6 +11,12 @@ units, unrelated currency mentions, report language and country never supply
 this qualification. The separate report contract is mandatory during contained
 offline replay. It preserves actual new acquisition/knowledge and grants no
 historical PIT, original source priority, cumulative factor or consumer admission.
+The narrow report lexer recognizes fullwidth decimal digits/point and exact
+per-ten denominations such as 10.00. It compares the report's own table and
+cash clauses numerically while preserving the implementation's original Decimal
+digits and precision in output. Actual official `.PDF`/`.pdf` URI spelling is
+retained exactly. A changed implementation amount, unknown currency or wrong
+denominator remains held; successful source retrieval does not supply authority.
 
 The exact cash-first wrapped SSE date-header family is supported for a single
 A-share row only. Two recovered October ex-dates remain outside September30;

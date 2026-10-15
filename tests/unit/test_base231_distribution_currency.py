@@ -76,6 +76,19 @@ def test_full_current_report_currency_source_has_separate_qualification_contract
             qualify_currency_source(e, **args)
 
 
+def test_report_pdf_uri_preserves_the_actual_official_lowercase_suffix():
+    e, args = sample()
+    e["actual_index_row"]["announcementTitle"] = "2026年半年度报告"
+    e["actual_index_row"]["adjunctUrl"] = "finalpage/2026-08-20/456.pdf"
+    e["PDF_receipt"]["URI"] = "https://static.cninfo.com.cn/finalpage/2026-08-20/456.pdf"
+    assert qualify_currency_source(e, **args)["contract_id"] == (
+        "p10-base231-official-report-defined-dividend-currency-v1"
+    )
+    e["PDF_receipt"]["URI"] = e["PDF_receipt"]["URI"].replace("456.pdf", "456.PDF")
+    with pytest.raises(RuntimeError):
+        qualify_currency_source(e, **args)
+
+
 @pytest.mark.parametrize(
     "fault",
     [

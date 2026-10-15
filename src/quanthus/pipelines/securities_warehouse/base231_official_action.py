@@ -103,16 +103,22 @@ def _report_defined_currency_cash(body: str) -> str:
         for units, value in definitions
     ):
         raise BoundedError("OFFICIAL_ACTION_REPORT_CURRENCY_DEFINITION_UNPROVEN")
-    text = re.sub(r"\s+", "", body)
+    text = re.sub(r"\s+", "", body).translate(
+        str.maketrans("０１２３４５６７８９．", "0123456789.")
+    )
     sections = re.findall(
         r"二、本报告期利润分配及资本公积金转增股本情况(.+?)三、公司股权激励", text
     )
     if len(sections) != 1:
         raise BoundedError("OFFICIAL_ACTION_REPORT_DIVIDEND_SECTION_UNPROVEN")
     section = sections[0]
+    if re.search(r"[BH]股|美元|港币|港元|欧元|日元", section):
+        raise BoundedError("OFFICIAL_ACTION_REPORT_DIVIDEND_CURRENCY_OR_CLASS_AMBIGUOUS")
     table = _one(r"每10股派息数[（(]元[）)][（(]含税[）)]([0-9]+(?:\.[0-9]+)?)", section)
     prose = _one(
-        r"每10股派(?:发|送)现金(?:股利|红利)([0-9]+(?:\.[0-9]+)?)元[（(]含税", section
+        r"(?:每10(?:\.0+)?股|按10股向全体股东)派(?:发|送)?现金(?:股利|红利)?(?:人民币)?"
+        r"([0-9]+(?:\.[0-9]+)?)元[（(]含税",
+        section,
     )
     if Decimal(table) != Decimal(prose):
         raise BoundedError("OFFICIAL_ACTION_REPORT_DIVIDEND_TABLE_CONFLICT")
@@ -141,8 +147,8 @@ def _szse_approved_cash(
     if (
         not re.match(r"(?:股东会|董事会|利润分配方案审议等情况)", approved)
         or "审议通过" not in approved
-        or not re.search(r"2026年(?:半年度|中期)", approved)
-        or not (re.search(r"2026年(?:半年度|中期)", section) or cover_period)
+        or not re.search(r"2026年(?:半年度|(?:度)?中期)", approved)
+        or not (re.search(r"2026年(?:半年度|(?:度)?中期)", section) or cover_period)
         or re.search(r"[BH]股", approved + section)
         or not re.search(
             r"本次(?:实施的)?(?:权益分派|权益分配|分配|分派|利润分配)方案(?:内容)?与.{1,160}"
@@ -175,7 +181,7 @@ def _szse_approved_cash(
         r"每10股派发现金人民币([0-9]+(?:\.[0-9]+)?)[（(【]含税", source
     ))
     if scheme_text is not None and re.search(r"2026\s*年半年度报告", scheme_text[:2000]):
-        explicit.append((_report_defined_currency_cash(scheme_text), ""))
+        explicit = [(_report_defined_currency_cash(scheme_text), "")]
     if not explicit or {Decimal(a or b) for a, b in explicit} != {Decimal(implemented)}:
         raise BoundedError("OFFICIAL_ACTION_EXPLICIT_TERM_MISSING_OR_CONFLICTING")
     return _per_ten(implemented), digest(
@@ -285,7 +291,8 @@ def parse_distribution(
         match = re.search(
             r"二、(?:本次实施的|本次)?(?:A股)?(?:权益分派(?:实施)?方案|权益分配方案|"
             r"利润分配及资本公积金转增股本方案|"
-            r"(?:2026年(?:中期|半年度|年度))?利润分配方案)"
+            r"(?:2026年(?:中期|半年度|年度))?利润分配方案|"
+            r"利润分配(?=本次实施的2026年半年度权益分配方案为))"
             r"(.+?)三、(?:A股)?(?:股权登记日[与及]除权除息日|分红派息日期?|权益分派日期)",
             text,
         )

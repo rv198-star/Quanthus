@@ -48,13 +48,10 @@ def qualify_currency_source(
     published = epoch + timedelta(milliseconds=actual["announcementTime"])
     implementation_at = epoch + timedelta(milliseconds=implementation["announcementTime"])
     day = published.astimezone(ZoneInfo("Asia/Shanghai")).date()
-    uri = (
-        "https://static.cninfo.com.cn/finalpage/"
-        + day.isoformat()
-        + "/"
-        + actual["announcementId"]
-        + ".PDF"
-    )
+    adjunct = "finalpage/" + day.isoformat() + "/" + actual["announcementId"] + ".PDF"
+    if report and actual.get("adjunctUrl") == adjunct[:-4] + ".pdf":
+        adjunct = actual["adjunctUrl"]
+    uri = "https://static.cninfo.com.cn/" + adjunct
     if (
         actual.get("adjunctUrl") != uri.removeprefix("https://static.cninfo.com.cn/")
         or not published <= implementation_at <= clock

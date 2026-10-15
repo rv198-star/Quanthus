@@ -146,6 +146,60 @@ def test_report_identity_uses_its_own_company_table_before_financial_sections():
             )
 
 
+def test_report_explicit_rmb_prose_agrees_with_its_own_current_table():
+    body = approved_cash_body().replace("现金股利人民币2.50元", "现金股利2.50元")
+    report = report_currency_body().replace("现金股利2.50元", "现金股利人民币2.50元")
+    row, _ = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+        currency_scheme_body=report,
+    )
+    assert row["cash_per_share"].as_tuple() == Decimal("0.2500000").as_tuple()
+    with pytest.raises(RuntimeError):
+        parse_distribution(
+            body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+            currency_scheme_body=report.replace("人民币", "美元"),
+        )
+
+
+@pytest.mark.parametrize("clause", [
+    "每10股派发现金2.50元（含税）",
+    "每10股派现金红利2.50元（含税）",
+    "每１０股派发现金红利２．５０元（含税）",
+    "按10股向全体股东派发现金红利2.50元（含税）",
+    "每10.00股派发现金红利2.50元（含税）",
+])
+def test_report_explicit_cash_clauses_keep_per_ten_units_and_table_agreement(clause):
+    body = approved_cash_body().replace("现金股利人民币2.50元", "现金股利2.50元")
+    report = report_currency_body().replace("每10股派发现金股利2.50元（含税）", clause)
+    row, _ = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+        currency_scheme_body=report,
+    )
+    assert row["cash_per_share"].as_tuple() == Decimal("0.2500000").as_tuple()
+    for bad in [clause.replace("10股", "20股").replace("１０股", "２０股").replace(
+                    "10.00股", "10.01股"),
+                clause.replace("含税", "税后")]:
+        with pytest.raises(RuntimeError):
+            parse_distribution(
+                body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+                currency_scheme_body=report.replace(clause, bad),
+            )
+
+
+def test_explicit_current_year_midyear_wording_never_admits_other_year():
+    body = approved_cash_body().replace("2026年中期", "2026年度中期")
+    row, _ = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+        currency_scheme_body=report_currency_body(),
+    )
+    assert row["cash_per_share"].as_tuple() == Decimal("0.2500000").as_tuple()
+    with pytest.raises(RuntimeError):
+        parse_distribution(
+            body.replace("2026年度中期", "2025年度中期"), code="003018", venue="SZSE",
+            expected_ex_date=date(2026, 7, 15), currency_scheme_body=report_currency_body(),
+        )
+
+
 def test_current_implemented_section_can_bind_period_to_exact_cover_title():
     body = approved_cash_body().replace("2026权益分派实施公告", "2026年半年度权益分派实施公告")
     body = body.replace("本公司2026年中期方案为：", "本公司方案为：")
@@ -727,4 +781,19 @@ def test_exact_current_approved_consistency_wording_keeps_report_currency_checks
         parse_distribution(
             body.replace("一致", "存在差异"), code="003018", venue="SZSE",
             expected_ex_date=date(2026, 7, 15), currency_scheme_body=report_currency_body(),
+        )
+
+
+def test_exact_implemented_halfyear_section_without_repeated_heading_scheme_word():
+    body = approved_cash_body().replace(
+        "二、本次实施的利润分配及资本公积金转增股本方案", "二、本次实施的利润分配"
+    ).replace("本公司2026年中期方案为", "本次实施的2026年半年度权益分配方案为")
+    row, _ = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15)
+    )
+    assert row["cash_per_share"].as_tuple() == Decimal("0.2500000").as_tuple()
+    with pytest.raises(RuntimeError):
+        parse_distribution(
+            body.replace("本次实施的2026年半年度权益分配方案为", "拟定2026年半年度权益分配方案为"),
+            code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
         )

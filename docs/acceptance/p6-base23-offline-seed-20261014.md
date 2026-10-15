@@ -3,6 +3,10 @@
 Offline design: `../design/lld/08-validation-governance/p6-native-seed-offline.md`.
 This is engineering evidence, not source qualification or P6 production acceptance.
 
+Current recovery point: the 2026-10-15 continuation below resolved read access, built
+the real input and independently reproduced its **PIT NO_PASS** result. The 2026-10-14
+sections retain the earlier evidence; their permission blocker is no longer current.
+
 ## Decision and recovery point
 
 Owner explicitly instructed continued P6 progress, with Base 2.3 sufficient for the
@@ -107,8 +111,149 @@ timings and restored the original frozen production design's exact SHA
 The new design is an independent document; synthetic results never establish real
 Base data quality, source admission or a new official observation.
 
-Real-data next step: provide this cloud task an authorized read-only mount/export of the
+The 2026-10-14 recovery point was to provide an authorized read-only mount/export of the
 declared 2026 subset and reference tables, or authorize the original NexusDock runtime
 to read the exact source and run this GitHub-pinned CLI in an isolated output directory.
 Do not edit the Base, sealed ledgers, old failed Jobs, frozen gates or timers. Production
 deployment and a new 66-session prospective start are subsequent, separately authorized work.
+
+## 2026-10-15 authorized real-input continuation
+
+Owner replied “允许” at 05:00 UTC to the precisely scoped UID995 read-only access
+request. Before execution, authority and scope were recorded in
+[#514 comment 6184821078](https://github.com/rv198-star/Quanthus/issues/514#issuecomment-6184821078).
+Existing administrator capability was available; no sudoers or persistent privilege was added.
+Selected source children had existing named-user/group ACLs masked to no access. Raising
+their masks would widen other principals' effective access, so the authorized alternative
+was an independent OCI-local read-only copy, recorded before copying in
+[#514 comment 6184895116](https://github.com/rv198-star/Quanthus/issues/514#issuecomment-6184895116).
+
+The new input root is the QA checkout's `artifacts/p6-base23-input-20261015`.
+It contains exactly three metadata files and 105 selected Parquet files, 155,128,843 bytes
+in total, with original relative paths and matching sealed hashes. Ordinary UID995 verified
+all 108 file opens, directory traversal, no member write access and no new other-principal
+access. Original source owners, modes, ACLs, size, mtime and inode were identical before
+and after. The original Base still denies UID995. `BASE_CURRENT.json` is unnecessary and
+was neither copied nor granted. Only 2026 daily bar/state/calendar and all three approved
+reference-table subtrees were copied; no 2025 price or minute partition was opened.
+This is an access projection, not a new governed data product or source repair.
+
+The source identities listed above were now verified from actual metadata and file bytes.
+Selected payload is 104,963,709 bytes:
+
+| Native table | Files | Source rows |
+| --- | ---: | ---: |
+| dwd_security_bar, 2026/1d | 49 | 932,003 |
+| dwd_tradability_state, 2026 | 49 | 974,797 |
+| dwd_trading_calendar, 2026 | 4 | 888 |
+| dwd_listing, all | 1 | 5,868 |
+| dwd_security, all | 1 | 5,868 |
+| dwd_adjustment_factor, all | 1 | 139,935 |
+
+Real layout exposed three adapter defects: monthly leaf partitions had been mistaken for
+year partitions; nullable interval predicates produced an expensive nested-loop join;
+and native calendar `close_at` shadowed the computed policy cutoff. The final code checks
+each selected leaf's counts, preserves interval semantics with hashable joins, explicitly
+projects calendar columns and selects the version visible at each session close. Known
+outside-venue records are excluded from orphan diagnostics; genuinely unknown keys still
+block. No source timestamp, cutoff, frozen gate or original data was changed.
+
+Five newly added regression methods passed: monthly leaf inventories; inclusive starts,
+exclusive ends and unknown starts; outside-venue versus unknown calendar keys; nullable
+native close columns; and a visible old calendar version before a late revision. The final
+three ran on OCI at `1299ded6c0654895074e1497f659f056662d4a90` (0.669 seconds).
+Changed-file Ruff lint/format, compile and diff checks passed. Previously completed tests
+and accepted research batches were not repeated. The earlier full-suite limitations above
+remain; this is not a new locked-environment or full-suite PASS claim.
+
+### Real construction, PIT and independent reproduction
+
+Final executable revision: `1299ded6c0654895074e1497f659f056662d4a90`.
+Binding digest: `sha256:558dcef9be03dd6b6115e4a3f1884dad10f5a09a5401a8f5ff804f08264509af`.
+Both runs used separate processes, new staging/output directories and no artifact cache.
+
+| Result | build-d | build-e-cold |
+| --- | ---: | ---: |
+| Candidate rows / distinct open sessions | 932,022 / 181 | 932,022 / 181 |
+| Source verification seconds | 0.439158 | 0.436883 |
+| Shared Seed construction and diagnosis seconds | 13.234545 | 12.748303 |
+| Candidate Parquet bytes | 751,719 | 751,719 |
+| Input validation / CLI exit | NO_PASS / 2 | NO_PASS / 2 |
+| Retained artifact integrity | verified | verified |
+| OFFLINE_VALIDATED marker | absent | absent |
+
+Both content digests are
+`sha256:8d524c59065a3c83b708f783405f16e2b471e3854669746606aff5216935bf6d`;
+both Parquet hashes are
+`sha256:3e12bebeb68299c9902fefd20f15b35a4c8f74142c3b3078ed4abf5bba18d514`.
+The diagnostic maps, input counts, binding and code identities also match. Manifest hashes
+differ because their nonsemantic stage timings differ. Retained verification rebuilt no input.
+This proves independent reproduction of an unqualified diagnostic projection, not PIT acceptance.
+
+Final reason counts: all 932,022 candidate rows have no visible bar/state/calendar at their
+session close; 727,350 have no visible listing/security identity. Corresponding missing-lineage
+counts reflect those absent joins. Calendar-key orphans, duplicate listing/session keys,
+empty open sessions and insufficient history are zero. The 42,775 state rows whose calendar
+venue is outside SSE/SZSE are excluded. Zero invalid-OHLC/factor counts on unavailable joined
+rows do not establish price or factor qualification.
+
+Independent source-clock admission census found every one of 932,003 bars and 974,797 state
+records later than its historical session close: knowledge_from ranges from
+2026-08-03T23:59:00Z to 2026-10-09T05:51:52.382704Z. All listing/security/factor knowledge
+starts are 2026-08-03T23:59:00Z. These warehouse clocks do not prove historical provider
+availability and are not backdated. The NO_PASS applies to the pinned per-session PIT use;
+it is not a claim that Base2.3 is unusable for every later-as-of purpose. Such a different use
+requires an explicit qualified source disposition, not an implicit reinterpretation here.
+
+Intermediate build-a stopped on the monthly-layout mismatch; build-b was stopped before
+publication after its nested-loop plan was diagnosed; build-c is superseded diagnostic
+evidence with the calendar-column defect. None was an accepted research batch. Their logs
+remain alongside the final runs; only build-d/e support the final results above.
+
+### Evidence and remaining input boundary
+
+All paths below are under `/srv/agentdock/worktrees/quanthus-p6-offline-qa-20261014/`.
+Run artifacts and market bytes are not committed to Git.
+
+| Evidence | SHA256 |
+| --- | --- |
+| `artifacts/p6-base23-access-20261015/readonly-input-receipt.json` | `872a3bf38d3ee67a155133fe28ba04acd7e06a428dbc856a25c282c0a2127d77` |
+| `artifacts/p6-base23-access-20261015/uid995-verification.json` | `f3070c169b8748a3c991baac0ef5c90808111c8f016ed54aa1bc89814a7dd14d` |
+| `artifacts/p6-base23-real-20261015/cold-verification-receipt.json` | `d0d589f63d4514f6e1b993259a4d3c8b16768314cb537eb6b017c2f1bdcdc4e0` |
+| `artifacts/p6-base23-real-20261015/source-temporal-census.json` | `7d4125d2598b4cc73de79c53c686db10bcc3a75d525fe6633719078a9e5f4cc6` |
+
+The clock census includes build-c's intermediate timing/digest for provenance; final
+construction results come from the cold-verification receipt. Access receipt records the
+full selected inventory and before/after metadata; the UID995 receipt records actual opens.
+
+Source qualification is registered as
+[P10-DATA-P6-BASE23-001 / #526](https://github.com/rv198-star/Quanthus/issues/526).
+Producer admission remains NOT_GRANTED. Existing #516 remains its Base2.2 HOLD fallback.
+P6 disposition is to defer the affected historical replay/Seed acceptance and activation,
+retain negative evidence, and deliver the completed adapter and offline validation work.
+No acquisition, source recovery, timestamp repair or new quality pipeline is undertaken.
+
+The full historical replay contract still requires seven datasets. Qualified source and
+consumer mapping are needed for daily_ohlcv_none, daily_universe,
+price_limit_execution_daily, security_code_validity and trading_calendar; all are affected
+by the current PIT finding. It also requires corporate_actions_normalized and
+corporate_action_exceptions, with source/authority/report digests, normalization policy,
+matching exception-ledger version/digest and security_fail_closed disposition. Those inputs
+are outside this six-table access scope, and no purpose-qualified Base2.3 handoff has been
+established. Adjustment factors cannot replace them; old Base2.1 correction authority is not
+inherited. This is an unavailable handoff, not evidence that the files globally do not exist.
+Accordingly full replay is **NOT_RUN_INPUT_NOT_QUALIFIED**, not a failed strategy experiment.
+
+Executable revision CI [38687659934](https://github.com/rv198-star/Quanthus/actions/runs/38687659934)
+failed/cancelled before a code-test verdict; final documentation-head CI is recorded in #514/#515.
+Draft #515 stays open and #513 stays separate. No production deployment, activation or ledger
+write occurred; this work added zero official observations and does not assert a freshly read
+production 0/66 count. Frozen production design retains SHA256
+`2336837cd5023f2aec475b8185df6a824566a9f1a779d13c477c6b0309cc3f67`.
+
+Resume from the retained final outputs and #526's exact source handoff. Review its qualified
+purpose and new input inventory before expanding access or building a successor replay bundle;
+do not rebuild these unchanged diagnostics as progress. Production rollout would separately
+require a versioned deployment/activation, the qualified Base-to-Daily bridge, frozen-runtime
+checks and rollback, then future eligible sessions and independent reproduction. Those steps
+were neither performed nor newly authorized by this offline execution.

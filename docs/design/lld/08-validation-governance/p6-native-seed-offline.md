@@ -39,12 +39,27 @@ their timestamps are never moved to that close. Orphan session keys, ambiguous l
 sessions, invalid OHLCV, missing lineage and insufficient history fail offline validation.
 No source repair, correction reparenting or inherited P4 research authority occurs.
 
+Native year selections may contain month leaf partitions; verify every selected leaf's
+inventory and row count without widening the year scope. Calendar projection names the
+policy cutoff explicitly, so a native nullable `close_at` cannot shadow it. Select calendar
+versions visible at that cutoff; a late current version is retained only as a blocking
+diagnostic when no visible version exists. Known outside-venue session keys are excluded
+from this SSE/SZSE consumer, while unknown keys remain errors.
+
 `build` refuses an existing output. `verify` checks the retained artifact without another
 source build; an independent cold construction uses a fresh output and compares content
 digests. `OFFLINE_VALIDATED` means only input engineering validation; producer
 `NOT_GRANTED`, P6 consumer authorization, protected-window gates and activation are separate.
 There is no Worker/production call path to this adapter. A later production change still
 requires purpose-qualified input and the explicit successor deployment/activation decision.
+
+The 2026-10-15 real OCI construction and independent cold construction reproduce a
+932,022-row / 181-session diagnostic projection, but fail the declared historical PIT
+use. Source admission remains NOT_GRANTED; #526 owns the bounded P10 handoff. This interface
+does not supply the seven-table historical replay bundle. In particular, normalized actions
+and their exception/source/authority closure are neither replaced by adjustment factors nor
+inherited from Base2.1. Defer affected replay acceptance until qualified inputs exist;
+the complete negative evidence remains reusable without repeating the same source scan.
 
 Tests: `tests/unit/test_forward_validation_native_seed.py`. Current evidence and runnable
 commands: `docs/acceptance/p6-base23-offline-seed-20261014.md`.

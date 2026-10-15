@@ -274,3 +274,24 @@ by the original response-object entry. A full first page fails with
 The opaque vendor checksum field is retained and syntax-checked, not claimed as
 independently verified; capture SHA256 binds the unchanged bytes. Actual request
 restarts retain cumulative usage and may replay already acquired bytes offline.
+
+## Base 2.4 historical coverage prerequisite
+
+Work item: `P10-DATA-BASE24-020` / #530, within the same draft successor.
+`src/quanthus/pipelines/securities_warehouse/base24_coverage.py` implements
+`p10-base24-historical-denominator-v1`. It consumes explicitly bound source ids,
+SSE/SZSE dated listing intervals and per-venue open/closed calendar cells. Every
+civil date in the declared range must have a source cell; weekends are not
+inferred. Conflicting calendar values fail closed. Missing or conflicting listing
+intervals remain unresolved keys, without guessed precedence or a reduced universe.
+A delisting boundary on an open day remains required/uncertain until specific
+source evidence qualifies its exclusion. Current snapshots do not become past PIT.
+
+The compact prerequisite counts known listing/session units and month/venue totals
+without expanding all security-day observations into a database. It explicitly
+leaves complete-universe admission, source/ODS/DWD bucket census, suspension
+exemptions, minute bucket/session rules and the inherited index scope to their own
+gates. BSE is counted as outside this explicit minute product boundary, not removed
+from other retained domains. Tests: `tests/unit/test_base24_coverage.py` cover retired
+and new listings, unknown dates, venue/calendar conflicts, missing closed dates
+and unbound sources. A structurally complete input is not a full-coverage grant.

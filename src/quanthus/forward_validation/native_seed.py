@@ -204,9 +204,12 @@ def verify_seed_source(
                 continue
             path = _member(root, record["path"])
             count = record.get("rows")
+            leaf = record.get("partition")
             if (
                 record.get("table") != table
-                or record.get("partition") != partition
+                or not isinstance(leaf, str)
+                or not (leaf == partition or leaf.startswith(partition + "/"))
+                or not record["path"].startswith(f"payload/{table}/{leaf}/")
                 or type(count) is not int
                 or count < 0
                 or path in selected
@@ -215,14 +218,20 @@ def verify_seed_source(
             ):
                 raise P6SeedError(f"seed_member_mismatch:{table}")
             selected.append(path)
-            rows[partition] += count
+            rows[leaf] += count
         if not selected:
             raise P6SeedError(f"missing_seed_partition:{table}:{partition}")
-        if (
-            entry.get("expected_partition_rows", {}).get(partition) != rows[partition]
-            or manifest.get("summaries", {}).get(table, {}).get(partition, {}).get("rows")
-            != rows[partition]
-        ):
+        expected = {
+            key: value
+            for key, value in entry.get("expected_partition_rows", {}).items()
+            if key == partition or key.startswith(partition + "/")
+        }
+        summaries = {
+            key: value.get("rows")
+            for key, value in manifest.get("summaries", {}).get(table, {}).items()
+            if key == partition or key.startswith(partition + "/")
+        }
+        if dict(rows) != expected or dict(rows) != summaries:
             raise P6SeedError(f"seed_partition_count_mismatch:{table}")
         # Reject additions/symlinks only under this selected subtree.
         physical = set()
@@ -234,7 +243,7 @@ def verify_seed_source(
         if physical != set(selected):
             raise P6SeedError(f"seed_physical_inventory_mismatch:{table}")
         paths[table] = tuple(sorted(selected))
-        counts[table] = rows[partition]
+        counts[table] = sum(rows.values())
     return manifest, paths, counts
 
 

@@ -103,6 +103,60 @@ class SourceContracts(unittest.TestCase):
         self.assertEqual(sum(counts.values()), 6)
         self.assertFalse(any("2025" in str(p) for pp in paths.values() for p in pp))
 
+    def test_native_month_leaf_partitions(self):
+        layout = json.loads((self.root / "MATERIALIZATION.json").read_text())
+        manifest = json.loads((self.root / "manifest.json").read_text())
+        for table in ("dwd_security_bar", "dwd_tradability_state"):
+            partition = _PARTITIONS[table]
+            entry = layout["layout"][table]
+            original = entry["files"].pop(0)
+            old_file = self.root / original["path"]
+            content = old_file.read_bytes()
+            old_file.unlink()
+            entry["expected_partition_rows"] = {}
+            manifest["summaries"][table] = {}
+            for month in (1, 9):
+                leaf = f"{partition}/observation_start_month={month}"
+                relative = f"payload/{table}/{leaf}/part-000000.parquet"
+                file = self.root / relative
+                file.parent.mkdir(parents=True)
+                file.write_bytes(content)
+                entry["files"].append(dict(original, path=relative, partition=leaf))
+                entry["expected_partition_rows"][leaf] = 1
+                manifest["summaries"][table][leaf] = {"rows": 1}
+
+        def reseal():
+            write(self.root / "MATERIALIZATION.json", layout)
+            manifest["materialization_sha256"] = _hash(self.root / "MATERIALIZATION.json")
+            write(self.root / "manifest.json", manifest)
+            (self.root / "READY").write_text(_hash(self.root / "manifest.json") + "\n")
+            raw = json.loads(BINDING.read_text())
+            raw["source"].update(
+                content_digest=manifest["content_digest"],
+                materialization_sha256=manifest["materialization_sha256"],
+                manifest_sha256=_hash(self.root / "manifest.json"),
+            )
+            return P6BaseSeedBinding.from_dict(raw)
+
+        _, paths, counts = verify_seed_source(self.root, reseal())
+        self.assertEqual(counts["dwd_security_bar"], 2)
+        self.assertEqual(counts["dwd_tradability_state"], 2)
+        self.assertEqual(len(paths["dwd_security_bar"]), 2)
+        self.assertFalse(any("2025" in str(p) for pp in paths.values() for p in pp))
+        entry = layout["layout"]["dwd_security_bar"]
+        leaf = _PARTITIONS["dwd_security_bar"] + "/observation_start_month=9"
+        entry["expected_partition_rows"][leaf] = 2
+        with self.assertRaisesRegex(P6SeedError, "partition_count_mismatch"):
+            verify_seed_source(self.root, reseal())
+        entry["expected_partition_rows"][leaf] = 1
+        manifest["summaries"]["dwd_security_bar"][leaf]["rows"] = 2
+        with self.assertRaisesRegex(P6SeedError, "partition_count_mismatch"):
+            verify_seed_source(self.root, reseal())
+        manifest["summaries"]["dwd_security_bar"][leaf]["rows"] = 1
+        entry["files"][-1]["partition"] = leaf.replace("month=9", "month=1")
+        with self.assertRaisesRegex(P6SeedError, "member_mismatch"):
+            verify_seed_source(self.root, reseal())
+
     def test_source_digest_and_ready_fail_closed(self):
         for name in ("READY", "manifest.json", "MATERIALIZATION.json"):
             with self.subTest(name=name):

@@ -1012,6 +1012,13 @@ def project_top_matrix(
     from .listed_company import _stable_id
 
     original_index = original_index or {}
+    cover_codes = set(re.findall(r"公司代码[:：]([0-9]{6})", _norm(body.split("\f", 1)[0][:4000])))
+    cover_binds_issuer = (
+        cover_codes == {parent.stock_code}
+        and original_index.get("secCode") == parent.stock_code
+        and str(original_index.get("announcementId")) == announcement_id
+        and bool(original_index.get("orgId"))
+    )
     org_bindings = [
         r
         for r in (company_org_bindings or [])
@@ -1034,8 +1041,9 @@ def project_top_matrix(
         )
     )
     if (
-        (reported_codes and reported_codes != {parent.stock_code})
-        or (not reported_codes and not index_binds_issuer)
+        (cover_codes and not cover_binds_issuer)
+        or (not cover_codes and reported_codes and reported_codes != {parent.stock_code})
+        or (not cover_codes and not reported_codes and not index_binds_issuer)
         or not any(title in header for title in quarter_titles.get(business_date.month, []))
     ):
         raise BoundedError("OFFICIAL_HOLDER_REPORT_HEADER_CODE_PERIOD_UNPROVEN")
@@ -1085,6 +1093,11 @@ def project_top_matrix(
     if typed.to_pylist() != rows:
         raise BoundedError("OFFICIAL_HOLDER_NATIVE_NUMERIC_OR_CLOCK_CHANGED")
     result = typed.to_pylist()
+    if cover_binds_issuer and (
+        bool(reported_codes and reported_codes != {parent.stock_code})
+        or (not reported_codes and not index_binds_issuer)
+    ):
+        proof["report_issuer_binding"] = "FIRST_PAGE_COMPANY_CODE_AND_EXACT_OFFICIAL_INDEX"
     return result, dict(
         proof,
         input_pdf_sha256=official_sha256,

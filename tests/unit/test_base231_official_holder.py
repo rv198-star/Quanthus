@@ -981,3 +981,77 @@ def test_top_missing_wrapped_nature_remains_unknown_without_changing_numeric_ato
     assert rows[0]["quantity"] == 1001 and rows[0]["raw_percentage"] == "1.00"
     with pytest.raises(RuntimeError):
         parse_top_matrix(body.replace("无  /  ", "不明状态  /  ", 1), hints)
+
+
+def cover_projection(body, hints, code="000400"):
+    from datetime import date, datetime, timezone
+
+    from quanthus.pipelines.securities_warehouse.base231_official_holder import project_top_matrix
+    from quanthus.pipelines.securities_warehouse.financial_reporting import FinancialCompanyIdentity
+
+    clock = datetime(2026, 10, 15, tzinfo=timezone.utc)
+    return project_top_matrix(
+        body,
+        hints,
+        parent=FinancialCompanyIdentity(
+            "000400", "s", "c", datetime(1990, 1, 1, tzinfo=timezone.utc), None
+        ),
+        business_date=date(2025, 12, 31),
+        announcement_id="123",
+        official_sha256="sha256:" + "a" * 64,
+        hint_sha256="sha256:" + "b" * 64,
+        source_known_at=clock,
+        observed_at=clock,
+        original_index=dict(secCode=code, orgId="official-org", announcementId="123"),
+    )
+
+
+def test_annual_cover_company_code_is_distinct_from_another_company_in_glossary():
+    body, hints = sample()
+    body = (
+        "公司代码：000400 公司简称：合成公司\n2025年年度报告\f释义\n其他公司证券代码：002241\n"
+        + body
+    )
+    rows, proof = cover_projection(body, hints)
+    assert len(rows) == 10
+    assert proof["report_issuer_binding"] == "FIRST_PAGE_COMPANY_CODE_AND_EXACT_OFFICIAL_INDEX"
+
+
+@pytest.mark.parametrize("fault", ["cover_code", "index_code", "extra_cover", "missing_index_org"])
+def test_company_cover_identity_is_not_a_generic_code_alias(fault):
+    body, hints = sample()
+    body = "公司代码：000400\n2025年年度报告\f" + body
+    if fault == "cover_code":
+        body = body.replace("000400", "000401")
+    elif fault == "extra_cover":
+        body = body.replace("\f", "\n公司代码：000401\f")
+    code = "000401" if fault == "index_code" else "000400"
+    if fault == "missing_index_org":
+        from datetime import date, datetime, timezone
+
+        from quanthus.pipelines.securities_warehouse.base231_official_holder import (
+            project_top_matrix,
+        )
+        from quanthus.pipelines.securities_warehouse.financial_reporting import (
+            FinancialCompanyIdentity,
+        )
+
+        clock = datetime(2026, 10, 15, tzinfo=timezone.utc)
+        with pytest.raises(RuntimeError):
+            project_top_matrix(
+                body,
+                hints,
+                parent=FinancialCompanyIdentity(
+                    "000400", "s", "c", datetime(1990, 1, 1, tzinfo=timezone.utc), None
+                ),
+                business_date=date(2025, 12, 31),
+                announcement_id="123",
+                official_sha256="sha256:" + "a" * 64,
+                hint_sha256="sha256:" + "b" * 64,
+                source_known_at=clock,
+                observed_at=clock,
+                original_index=dict(secCode="000400", announcementId="123"),
+            )
+    else:
+        with pytest.raises(RuntimeError):
+            cover_projection(body, hints, code=code)

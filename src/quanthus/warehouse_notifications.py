@@ -366,6 +366,13 @@ def _email_html(
         "deadline": "交付截止时间",
         "target_next_trade_day": "T+1交易日",
         "policy_id": "运行规则版本",
+        "source_complete_status": "上游补数与构建",
+        "source_minute_quality": "上游分钟质量声明",
+        "mirror_stage_status": "OCI交付阶段",
+        "consumer_admission_status": "OCI消费准入",
+        "source_manifest_sha256": "来源完整包manifest",
+        "source_content_digest": "来源完整包content",
+        "service_result": "服务停止原因",
     }
     for key, label in context_labels.items():
         value = context.get(key)

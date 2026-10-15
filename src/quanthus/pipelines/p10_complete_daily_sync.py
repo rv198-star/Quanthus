@@ -214,6 +214,43 @@ def _validate_pointer(pointer: dict[str, Any], target: date) -> Path:
     return path.parent
 
 
+def mirror_mail_context(root: Path, target: date) -> dict[str, Any]:
+    """Describe the failed delivery separately from upstream source declarations.
+
+    This reads only the exact cached manifest; it is not receiver acceptance.
+    """
+    context: dict[str, Any] = {
+        "source_complete_status": "上游补数及构建状态未取得可绑定证据",
+        "mirror_stage_status": "本次OCI同步流程未成功结束",
+        "consumer_admission_status": "消费放行以本端精确验收回执为准；本邮件不构成放行",
+    }
+    try:
+        pending = object_at(root / CACHE / "pending.json")
+        if pending.get("market_date") != str(target):
+            return context
+        pointer = pending["source_pointer"]
+        if not isinstance(pointer, dict):
+            return context
+        relative = _validate_pointer(pointer, target)
+        path = safe_path(root / CACHE, relative.as_posix()) / "manifest.json"
+        manifest = object_at(path)
+        if (
+            file_digest(path) != pointer["manifest_sha256"]
+            or manifest.get("market_date") != str(target)
+            or manifest.get("content_digest") != pointer["content_digest"]
+        ):
+            return context
+        context.update(
+            source_complete_status="上游完整包已发布；此处仅展示来源声明，不代表 OCI 本端验收状态",
+            source_manifest_sha256=pointer["manifest_sha256"],
+            source_content_digest=pointer["content_digest"],
+            source_minute_quality=str(manifest.get("minute_quality_grades", {})),
+        )
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return context
+
+
 def sync(*, root: Path, target: date) -> dict[str, Any]:
     if os.environ.get("QUANTHUS_CN01_DWD_REMOTE_ROOT") != REMOTE:
         raise ValueError("complete mirror requires exact existing read-only jail subroot")
@@ -244,6 +281,7 @@ def sync(*, root: Path, target: date) -> dict[str, Any]:
                     "kind": "oci_resumable_complete_sync_v1",
                     "market_date": str(target),
                     "started_at": datetime.now(timezone.utc).isoformat(),
+                    "source_pointer": pointer,
                 },
             )
             existing = root / "date-pointers" / f"{target}.json"
@@ -325,7 +363,10 @@ def main() -> int:
             stage="mirror",
             state_root=args.notification_state,
             reason=f"complete DWD synchronization failed: {type(exc).__name__}",
-            context={"market_date_label": "交易日" if target else "运行日期（目标交易日未确定）"},
+            context={
+                "market_date_label": "交易日" if target else "运行日期（目标交易日未确定）",
+                **(mirror_mail_context(args.local_root, target) if target else {}),
+            },
         )
         raise
     print(json.dumps(result, sort_keys=True))

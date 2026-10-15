@@ -35,6 +35,7 @@ def project_terms(
     observed_at: datetime,
     vocabulary: dict[str, Any],
     currency_evidence: dict[str, Any] | None = None,
+    payment_revision: dict[str, Any] | None = None,
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
     import pyarrow as pa  # type: ignore[import-untyped]
 
@@ -66,6 +67,21 @@ def project_terms(
         "same-issuer-current-approved-scheme-corroboration-v1"
     ):
         raise BoundedError("DISTRIBUTION_CURRENCY_CORROBORATION_NOT_NEEDED")
+    revision_proof = None
+    if payment_revision is not None:
+        from .base231_distribution_revision import qualify_payment_revision
+
+        if venue != "SZSE":
+            raise BoundedError("DISTRIBUTION_PAYMENT_REVISION_VENUE_UNSUPPORTED")
+        revision_proof = qualify_payment_revision(
+            payment_revision["previous"],
+            dict(selection=selection, receipt=receipt, index=index,
+                 PDF_sha256=receipt["body_sha256"], body=body),
+            payment_revision["notice"], parent=parent, observed_at=observed_at,
+            expected_ex_date=expected_ex_date,
+            currency_scheme_body=currency_evidence["body"] if currency_evidence else None,
+        )
+        record["payment_date"] = revision_proof["payment_date"]
     from .disclosure_event import _effective_start
 
     at = _effective_start(expected_ex_date)
@@ -123,6 +139,9 @@ def project_terms(
             if currency_proof is not None:
                 row["source_revision"] = currency_proof["contract_id"]
                 row["source_artifact_sha256"] = digest(currency_proof)
+            if revision_proof is not None:
+                row["source_revision"] = revision_proof["contract_id"]
+                row["source_artifact_sha256"] = digest([currency_proof, revision_proof])
         if (
             pa.Table.from_pylist(values, schema=disclosure_event_schemas()[table]).to_pylist()
             != values
@@ -145,6 +164,8 @@ def project_terms(
     )
     if currency_proof is not None:
         proof["currency_source_proof"] = currency_proof
+    if revision_proof is not None:
+        proof["payment_revision_proof"] = revision_proof
     return output, proof
 
 
@@ -183,6 +204,14 @@ def replay_terms_domain(root: Path) -> dict[str, Any]:
             str(code)
         ) != file_sha(code):
             raise BoundedError("DISTRIBUTION_CURRENCY_OFFLINE_CONTRACT_REQUIRED")
+    if any(s.get("payment_revision") for s in plan["selection"]):
+        from .base231_distribution_revision import CONTRACT_ID as revision_contract
+
+        code = Path("src/quanthus/pipelines/securities_warehouse/base231_distribution_revision.py")
+        if plan.get("payment_revision_contract") != revision_contract or plan["code_inputs"].get(
+            str(code)
+        ) != file_sha(code):
+            raise BoundedError("DISTRIBUTION_PAYMENT_REVISION_OFFLINE_CONTRACT_REQUIRED")
     if (
         file_sha(root / "inputs/image-manifest.json")
         != "sha256:91845422851368028e4e8a6b83e0dc9ba2a9e30dfdd8e4d6de892f64adac1d7f"
@@ -251,6 +280,14 @@ def replay_terms_domain(root: Path) -> dict[str, Any]:
                     timeout=60,
                 ).stdout.decode(),
             )
+        revision_evidence = None
+        revision_spec = s.get("payment_revision")
+        if revision_spec is not None:
+            from .base231_distribution_revision import load_revision_evidence
+
+            revision_evidence = {
+                k: load_revision_evidence(root, revision_spec[k]) for k in ["previous", "notice"]
+            }
         rows, pf = project_terms(
             body,
             selection=original,
@@ -265,11 +302,16 @@ def replay_terms_domain(root: Path) -> dict[str, Any]:
             observed_at=now,
             vocabulary=vocab,
             currency_evidence=currency_evidence,
+            payment_revision=revision_evidence,
         )
         if cs is not None and digest(pf["currency_source_proof"]) != file_sha(
             root / cs["qualification"]
         ):
             raise BoundedError("DISTRIBUTION_CURRENCY_SOURCE_QUALIFICATION_CHANGED")
+        if revision_spec is not None and digest(pf["payment_revision_proof"]) != file_sha(
+            root / revision_spec["qualification"]
+        ):
+            raise BoundedError("DISTRIBUTION_PAYMENT_REVISION_QUALIFICATION_CHANGED")
         for t, v in rows.items():
             output[t].extend(v)
         proofs.append(pf)

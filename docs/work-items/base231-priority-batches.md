@@ -2,6 +2,23 @@
 
 ## Current recovery checkpoint
 
+The Owner's budget continuation is tracked by #525. Its single live ledger is
+`current-gaps.json` under the private CN02 review job
+`base231-budget-exhaustion-continuation-20261015T153555Z-c887578`; the older
+counts below are historical checkpoints. Continue each item until solved or its
+own time/request/byte ceiling, without resetting counters or idle budget burn.
+New domain acceptance never replaces successor whole-image acceptance.
+
+The opt-in `p10-base231-exact-official-payment-date-revision-v1` contract accepts
+only an exact three-document chain: original implementation, corrected
+implementation and correcting notice for the same official issuer. Only the
+explicit payment sentence, bulletin number, corrected title and signature date
+may differ; all other body characters and parsed numeric terms must agree.
+It selects one corrected event, preserves original sources and knowledge clocks,
+and serializes the proven payment date. It grants neither historical provider
+priority nor cumulative adjustment or consumer admission. Offline replay requires
+all three local originals, their qualification and the pinned revision code.
+
 Owner reordered the entire 13-item candidate set, not just the earlier six.
 Batch one is G09, G07, G06, G02; batch two is G03, G04, G01, G05. G08 and
 G10-G13 are deferred according to declared use. A bounded purpose qualification

@@ -11,9 +11,9 @@ EnvironmentFile=/etc/quanthus/cn01-dwd.env
 EnvironmentFile=/etc/quanthus/cn01-daily-core.env
 EnvironmentFile=/etc/quanthus/cn01-acquisition-prevention.env
 EnvironmentFile=/etc/quanthus/dwd-notification.env
-WorkingDirectory=/opt/quanthus/daily-core-current
-ExecStart=/opt/quanthus/daily-core-current/ops/bin/run-p10-acquisition-continuation --mode %i
-ExecStopPost=/usr/bin/env PYTHONPATH=/opt/quanthus/daily-core-current/src /root/work/Quanthus/.venv-p1/bin/python -m quanthus.pipelines.p10_complete_daily_notifications --continuation-service-stop %i
+WorkingDirectory=/opt/quanthus/data-delivery-current
+ExecStart=/opt/quanthus/data-delivery-current/ops/bin/run-p10-acquisition-continuation --mode %i
+ExecStopPost=/usr/bin/env PYTHONPATH=/opt/quanthus/data-delivery-current/src /root/work/Quanthus/.venv-p1/bin/python -m quanthus.pipelines.p10_complete_daily_notifications --continuation-service-stop %i
 TimeoutStartSec=3700
 TimeoutStopSec=150
 KillMode=control-group

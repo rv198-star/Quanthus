@@ -99,7 +99,7 @@ def fetch_baostock_calendar(start: date, end: date) -> list[dict[str, Any]]:
     """Fetch one shared A-share calendar window from the locked upstream source."""
 
     try:
-        import baostock as bs  # type: ignore[import-not-found]
+        import baostock as bs  # type: ignore[import-untyped]
     except ModuleNotFoundError as exc:  # pragma: no cover - deployment dependency
         raise CalendarRefreshError("baostock is required for calendar refresh") from exc
 
@@ -120,9 +120,7 @@ def fetch_baostock_calendar(start: date, end: date) -> list[dict[str, Any]]:
             end_date=end.isoformat(),
         )
         if str(query.error_code) != "0":
-            raise CalendarRefreshError(
-                f"baostock query_trade_dates failed: {query.error_msg}"
-            )
+            raise CalendarRefreshError(f"baostock query_trade_dates failed: {query.error_msg}")
         rows: list[dict[str, Any]] = []
         while str(query.error_code) == "0" and query.next():
             values = query.get_row_data()
@@ -208,9 +206,7 @@ def _target_state(rows: dict[tuple[str, date], dict[str, Any]], target: date) ->
             )
         states[exchange] = _as_flag(row["is_open"])
     if states["SSE"] != states["SZSE"]:
-        raise CalendarRefreshError(
-            f"fresh calendar disagrees for {target}: {states}"
-        )
+        raise CalendarRefreshError(f"fresh calendar disagrees for {target}: {states}")
     return "both_open" if states["SSE"] == 1 else "both_closed"
 
 
@@ -283,16 +279,47 @@ def refresh_calendar(
     fetched_at = datetime.now(timezone.utc)
     existing = _normalize_existing(_read_calendar(source.resolve()))
     try:
-        fetched_raw = list(fetcher(window_start, window_end))
+        from quanthus.providers import daily_source_failover as failover
+
+        reuse_evidence = None
+        if failover.enabled() and fetcher is fetch_baostock_calendar:
+            fetched_raw, reuse_evidence = failover.calendar_rows(
+                window_start,
+                window_end,
+                fetch=fetch_baostock_calendar,
+                calendar_root=Path(
+                    "/srv/quanthus/dwd-dws-v2/intraday/operations/complete-daily-v1/calendars"
+                ),
+                circuit_root=Path(os.environ.get("ASTOCK_HOME", "/root/work/astock/data"))
+                / "source-failover-v1",
+            )
+            if not reuse_evidence["is_new_refresh"]:
+                fetched_at = datetime.fromisoformat(reuse_evidence["original_fetched_at"])
+                from quanthus.providers.acquisition_evidence import capture, clock
+
+                started = clock()
+                reuse_evidence["original_capture"] = capture(
+                    root=output.parent.parent / "original-responses",
+                    request={
+                        "provider": "baostock",
+                        "api": "saved_authority_receipt_reuse",
+                        "original_fetched_at": reuse_evidence["original_fetched_at"],
+                        "is_new_refresh": False,
+                    },
+                    raw=Path(reuse_evidence["source_path"]).read_bytes(),
+                    started_at=started,
+                    completed_at=clock(),
+                    status="verified_local_reuse",
+                )
+        else:
+            fetched_raw = list(fetcher(window_start, window_end))
     except CalendarRefreshError:
         raise
     except Exception as exc:
         raise CalendarRefreshError(f"calendar upstream request failed: {exc}") from exc
     fetched, fetched_dates = _normalize_fetched(fetched_raw, fetched_at=fetched_at)
     if target_date not in fetched_dates:
-        raise CalendarRefreshError(
-            f"upstream response does not contain target date {target_date}"
-        )
+        raise CalendarRefreshError(f"upstream response does not contain target date {target_date}")
 
     changed = sum(
         1
@@ -315,7 +342,7 @@ def refresh_calendar(
         window_start=window_start,
         window_end=window_end,
         target_state=state,
-        source=SOURCE,
+        source=reuse_evidence["source"] if reuse_evidence else SOURCE,
         source_path=source.resolve(),
         output_path=output.resolve(),
         metadata_path=metadata,
@@ -326,7 +353,10 @@ def refresh_calendar(
         fetched_at=fetched_at,
     )
     try:
-        _atomic_write_json(metadata, result.to_dict())
+        _atomic_write_json(
+            metadata,
+            result.to_dict() | ({"reuse_evidence": reuse_evidence} if reuse_evidence else {}),
+        )
     except Exception as exc:
         raise CalendarRefreshError(f"cannot write calendar metadata: {exc}") from exc
     return result

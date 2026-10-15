@@ -31,6 +31,7 @@ def load(
     index_codes: set[str],
     universe_digest: str,
     converter_sha256: str,
+    include_current: bool = False,
 ) -> dict[str, dict[str, Any]]:
     root = shadow / "attempts/market-daily-core" / str(day)
     selected: dict[str, dict[str, Any]] = {}
@@ -38,7 +39,9 @@ def load(
     attempts = sorted(root.iterdir()) if root.exists() else []
     for attempt in attempts[-12:]:
         old = attempt / "landing"
-        if old == landing or not (old / "provider_readiness.json").exists():
+        if (old == landing and not include_current) or not (
+            old / "provider_readiness.json"
+        ).exists():
             continue
         ready = json.loads((old / "provider_readiness.json").read_text())
         if ready.get("target_date") != str(day) or ready.get("ready") is not True:

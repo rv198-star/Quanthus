@@ -225,3 +225,36 @@ failure throttling. This policy does not modify the frozen complete-data policy 
 data gates, production schedule, Base identity or historical receipts. Implementation:
 `p10_notification_trial`, `p10_notification_incident` and
 `p10_complete_daily_notifications`; contract: `test_p10_notification_trial.py`.
+
+### 2026-10-15 Daily source retry and failover
+
+Owner requested an automatic backup and retry-switch mechanism. The independent opt-in
+`config/pipelines/p10-daily-source-failover.v1.json` admits native Tencent **whole-equity daily
+bars** for gap-aware non-execution warehouse use. It does not rewrite the existing product,
+minute, ST, ownership or Base policies. BaoStock remains first; primary readiness is bounded to
+120 seconds and the primary scan gets at most 900 seconds and half the remaining original Job
+budget. Fallback shares the same original completion deadline, makes at most two sequential
+HTTP attempts, and only requests absent observations. Exact preserved responses are requalified
+and reused with their original acquisition clocks. No cross-source OHLC assembly is permitted.
+
+Explicit provider access denial opens a provider-wide one-hour local cooldown immediately;
+ordinary transport failures use a per-scope circuit. After cooldown only a scheduled probe may
+reassess the provider; that duration is not a prediction of the vendor's ban release. Engineering,
+identity, schema and shared-budget failures are not mislabeled as a supplier outage.
+
+A calendar fallback requires same-observation-day saved BaoStock authority, exact row digest,
+complete target-window coverage, original clocks and a preserved source envelope. It is labeled
+reuse, never refreshed. The universe remains exact target-date, physically verified with original
+listing/status evidence. Missing new-date authority still blocks; previous-date snapshots and
+weekday arithmetic are never substitutes. Tencent index units and quote valuation semantics are
+not admitted by this change: exact target-date BaoStock index observations and the unchanged
+nonempty valuation gate remain required. These are explicit remaining source dependencies.
+
+Tencent's native reported precision is preserved using Decimal and declared source units;
+amount/volume quantization is disclosed rather than silently rounded into equality with BaoStock.
+Missing ST is unknown, never NORMAL: daily warehouse can_buy is false for affected observations,
+and the original S2/ST qualification still blocks. Missing valuation fields retain four measure
+rows with null values and explicit source absence. Existing genuine BaoStock valuations remain
+independent observations. Restricted daily completion mail names those source/use limitations;
+it never accepts S2, a minute product or complete two-end delivery. Joint delivery still requires
+native 1m/5m minimum R2, R3=0 and its existing exact transfer receipts.

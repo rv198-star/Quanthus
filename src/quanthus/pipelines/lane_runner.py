@@ -1748,26 +1748,38 @@ def _build_market_open(
             completion_deadline_at = recovery_deadline_at or _contract_deadline(
                 market_date, completion_deadline
             )
-            index_rows, index_log_rows = _baostock_wait_for_index_day(
-                market_date,
-                deadline_at=readiness_deadline_at,
-                poll_interval_seconds=float(provider_readiness["poll_interval_seconds"]),
-                socket_timeout_seconds=socket_timeout_seconds,
-                progress_path=landing / "provider_readiness.json",
-                **({"captured_responses": captured_responses} if captured_responses else {}),
-            )
-            bars, status_rows, stock_log_rows = _baostock_fetch_day(
-                codes,
-                market_date,
-                missing_set_retry_rounds=int(provider_readiness["missing_set_retry_rounds"]),
-                missing_set_retry_delay_seconds=float(
-                    provider_readiness["missing_set_retry_delay_seconds"]
-                ),
-                socket_timeout_seconds=socket_timeout_seconds,
-                deadline_at=completion_deadline_at,
-                **({"captured_responses": captured_responses} if captured_responses else {}),
-            )
-            log_rows = [*index_log_rows, *stock_log_rows]
+            from quanthus.providers import daily_source_failover as failover
+            if failover.enabled():
+                from quanthus.providers.daily_market_routing import acquire
+                bars, status_rows, index_rows, log_rows = acquire(
+                    paths=paths, market_date=market_date, codes=list(codes), landing=landing,
+                    readiness=provider_readiness, readiness_deadline=readiness_deadline_at,
+                    completion_deadline=completion_deadline_at, captured=captured_responses,
+                    universe=universe, converter_sha256=_sha256(Path(__file__)),
+                )
+                request_summary["provider"] = failover.POLICY
+                rev += "." + failover.POLICY
+            else:
+                index_rows, index_log_rows = _baostock_wait_for_index_day(
+                    market_date,
+                    deadline_at=readiness_deadline_at,
+                    poll_interval_seconds=float(provider_readiness["poll_interval_seconds"]),
+                    socket_timeout_seconds=socket_timeout_seconds,
+                    progress_path=landing / "provider_readiness.json",
+                    **({"captured_responses": captured_responses} if captured_responses else {}),
+                )
+                bars, status_rows, stock_log_rows = _baostock_fetch_day(
+                    codes,
+                    market_date,
+                    missing_set_retry_rounds=int(provider_readiness["missing_set_retry_rounds"]),
+                    missing_set_retry_delay_seconds=float(
+                        provider_readiness["missing_set_retry_delay_seconds"]
+                    ),
+                    socket_timeout_seconds=socket_timeout_seconds,
+                    deadline_at=completion_deadline_at,
+                    **({"captured_responses": captured_responses} if captured_responses else {}),
+                )
+                log_rows = [*index_log_rows, *stock_log_rows]
         else:
             bars, status_rows, log_rows = _local_market_acquire(
                 paths=paths, market_date=market_date, codes=codes
@@ -1822,7 +1834,7 @@ def _build_market_open(
                 "total_share": bar.pop("_valuation_total_share", None),
                 "total_mv": bar.pop("_valuation_total_mv", None),
                 "source": (
-                    "baostock.query_history_k_data_plus.valuation"
+                    bar.pop("_valuation_source", "baostock.query_history_k_data_plus.valuation")
                     if mode == "provider"
                     else "local-sot.valuation_daily"
                 ),
@@ -1879,7 +1891,7 @@ def _build_market_open(
         watermark=watermark,
         source_request=json.dumps(
             {
-                "provider": "baostock" if mode == "provider" else "local-sot",
+                "provider": request_summary["provider"],
                 "market_date": watermark,
                 "fields": ["peTTM", "pbMRQ", "psTTM", "pcfNcfTTM"],
                 "coverage_basis": "one valuation observation per returned daily bar",

@@ -209,3 +209,19 @@ production continues during rollback. Do not repoint old Daily or change sealed 
 Any new complete pointer/visibility stays for audit but is inaccessible to restored
 consumers; a rollback is not a reason to backdate or relabel it. Check independent
 daily timers/current and container health again, and record the rollback receipt.
+
+#### Daily source failover (2026-10-15)
+
+Opt-in environment: `QUANTHUS_DAILY_SOURCE_FAILOVER=p10-daily-source-failover-v1`.
+The policy is separate from the frozen complete-product policy. Source circuits live below
+`$ASTOCK_HOME/source-failover-v1`; each attempt's acquisition log records the exact routing,
+source counts, original response reuse, unknown ST and failures. Do not delete those receipts
+while the attempt/product or an open recovery references them. An access-denied circuit spans
+calendar/daily; ordinary retry budgets and the original Job deadline are retained.
+
+Do not announce full resilience: missing target-date universe/status, required index, calendar
+coverage or all-empty valuations still fail closed. Disable the opt-in and restore exact old
+code/collector pins for rollback; preserve new immutable data and original failed receipts.
+The two code roots on CN01 must both contain ST_UNKNOWN handling before enabling the fallback.
+A production rollout needs exact-SHA independent review, Linux focused checks and isolated
+actual-response decoding. Code readiness is distinct from acceptance of the next scheduled Job.

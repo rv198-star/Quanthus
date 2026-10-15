@@ -140,18 +140,37 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("daily-core requested date is older than current product")
             if after == through:
                 dates = []
-                calendar = []
+                calendar: list[dict[str, Any]] = []
             else:
                 if (through - after).days > 45:
                     raise ValueError("calendar catch-up exceeds bounded 45-day recovery window")
                 checkpoint("calendar")
                 with redirect_stdout(io.StringIO()):
-                    calendar = fetch_baostock_calendar(after + timedelta(days=1), through)
+                    from quanthus.providers import daily_source_failover as failover
+
+                    if failover.enabled():
+                        calendar, calendar_evidence = failover.calendar_rows(
+                            after + timedelta(days=1),
+                            through,
+                            fetch=fetch_baostock_calendar,
+                            calendar_root=Path(
+                                "/srv/quanthus/dwd-dws-v2/intraday/operations/complete-daily-v1/calendars"
+                            ),
+                            circuit_root=Path(
+                                os.environ.get("ASTOCK_HOME", "/root/work/astock/data")
+                            )
+                            / "source-failover-v1",
+                        )
+                        state["calendar_evidence"] = calendar_evidence
+                    else:
+                        calendar = fetch_baostock_calendar(after + timedelta(days=1), through)
                 dates = pending_market_dates(after, through, calendar)
             state["calendar_sha256"] = hashlib.sha256(
                 json.dumps(calendar, sort_keys=True).encode()
             ).hexdigest()
-            state["calendar_source"] = "baostock.query_trade_dates"
+            state["calendar_source"] = state.get("calendar_evidence", {}).get(
+                "source", "baostock.query_trade_dates"
+            )
             state["calendar_rows"] = calendar
             state["pending_dates"] = [x.isoformat() for x in dates]
             state["selected_dates"] = [x.isoformat() for x in dates[: args.max_sessions]]

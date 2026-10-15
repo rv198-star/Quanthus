@@ -37,6 +37,13 @@ from quanthus.pipelines.securities_warehouse.native_base23_reader import (
     verify_native_prior_transition,
 )
 
+# Shared with the focused SQL regression: unknown is never a normal ST observation.
+ST_BUY_SQL = "(o.tradestatus='1' AND coalesce(o.isST IN ('0','1'),false))"
+ST_REASON_SQL = """CASE WHEN o.tradestatus<>'1' THEN 'SOURCE_NOT_TRADABLE'
+    WHEN o.isST IS NULL OR o.isST NOT IN ('0','1') THEN 'ST_UNKNOWN'
+    WHEN o.isST='1' THEN 'ST_TRADABLE' ELSE 'NORMAL' END"""
+
+
 _TABLE_KEYS = {
     "dwd_trading_calendar": ("venue_id", "trade_date", "session_type"),
     "dwd_security_bar": ("listing_id", "observation_start", "interval_size", "price_basis"),
@@ -493,7 +500,9 @@ def build_daily_domain_increment(
     try:
         universe_artifact = selected["market_daily_core"]["artifacts"].get("source_universe")
         if universe_artifact:
-            from quanthus.pipelines.securities_warehouse.base23_identity_overlay import build_overlay
+            from quanthus.pipelines.securities_warehouse.base23_identity_overlay import (
+                build_overlay,
+            )
 
             master, master_artifact = _artifact(selected, "market_daily_core", "security_master")
             overlay = build_overlay(universe=_object(universe_artifact[0]), master=master,
@@ -636,9 +645,10 @@ def build_daily_domain_increment(
             connection,
             f"""SELECT {_lineage(status_path, status_artifact, "o")},
             c.observation_start, c.observation_end, l.listing_id, c.calendar_session_id,
-            o.tradestatus='1' is_tradable, o.tradestatus='1' can_buy, o.tradestatus='1' can_sell,
-            CASE WHEN o.tradestatus<>'1' THEN 'SOURCE_NOT_TRADABLE'
-                 WHEN o.isST='1' THEN 'ST_TRADABLE' ELSE 'NORMAL' END::VARCHAR reason_code,
+            o.tradestatus='1' is_tradable,
+            {ST_BUY_SQL} can_buy,
+            o.tradestatus='1' can_sell,
+            {ST_REASON_SQL}::VARCHAR reason_code,
             NULL::DECIMAL(38,10) upper_price, NULL::DECIMAL(38,10) lower_price,
             {_sql(catalog["catalog_digest"])}::VARCHAR input_revision_digest
             FROM ({status_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
@@ -781,6 +791,16 @@ def build_daily_domain_increment(
             "disclosure_population": full_disclosure_population,
             "held_disclosures": held_disclosure_count,
             "held_disclosure_disposition": "unavailable; affected disclosure use held; original source preserved",
+            "source_limitations": {
+                "st_unknown": connection.execute(
+                    "SELECT count(*) FROM read_parquet(?) WHERE isST IS NULL OR isST NOT IN ('0','1')", [str(status_path)]
+                ).fetchone()[0],
+                "valuation_null_fields": {field: connection.execute(
+                    f"SELECT count(*) FROM read_parquet(?) WHERE {field} IS NULL", [str(valuation_path)]
+                ).fetchone()[0] for field in ("pe_ttm","pb","ps_ttm","pcf_ttm")},
+                "unknown_st_blocks_new_positions": True,
+                "st_product_admission_unchanged": True,
+            },
             "result": "accepted",
         }
         audit_path = work / "audit.json"

@@ -114,7 +114,14 @@ def _szse_approved_cash(
         raise BoundedError("OFFICIAL_ACTION_EXPLICIT_TERM_MISSING_OR_CONFLICTING")
     source = approved
     if scheme_text is not None:
-        source = re.sub(r"\s+", "", scheme_text)
+        # A single indented page number between the literal 现/金 at an
+        # actual form-feed boundary is PDF furniture, never a dividend digit.
+        scheme_layout = re.sub(
+            r"(?<=现)[ \t]*\n(?:[ \t]*\n)*[ \t]{8,}[0-9]{1,4}[ \t]*\n\f"
+            r"[ \t]*(?=金股利)",
+            "\n", scheme_text,
+        )
+        source = re.sub(r"\s+", "", scheme_layout)
         if not re.search(r"2026年(?:半年度|中期)", source):
             raise BoundedError("OFFICIAL_ACTION_EXPLICIT_TERM_MISSING_OR_CONFLICTING")
     explicit = re.findall(
@@ -122,6 +129,11 @@ def _szse_approved_cash(
         r"|([0-9]+(?:\.[0-9]+)?)元人民币)(?:现金)?[（(【]含税",
         source,
     )
+    # 人民币 itself is the explicit currency unit in this narrow per-ten cash
+    # clause. Do not apply to totals, other currencies or unlabelled numbers.
+    explicit.extend((token, "") for token in re.findall(
+        r"每10股派发现金人民币([0-9]+(?:\.[0-9]+)?)[（(【]含税", source
+    ))
     if not explicit or {Decimal(a or b) for a, b in explicit} != {Decimal(implemented)}:
         raise BoundedError("OFFICIAL_ACTION_EXPLICIT_TERM_MISSING_OR_CONFLICTING")
     return _per_ten(implemented), digest(

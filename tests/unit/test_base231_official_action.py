@@ -95,6 +95,42 @@ def test_current_implemented_section_can_bind_period_to_exact_cover_title():
             )
 
 
+@pytest.mark.parametrize("clause", [
+    "每10股派发现金人民币2.50（含税）",
+    "每10股派发现\n\n                          1\n\f金股利2.50元人民币（含税）",
+])
+def test_current_approved_scheme_explicit_currency_atom_and_exact_page_footer(clause):
+    body = approved_cash_body().replace("现金股利人民币2.50元", "现金股利2.50元")
+    scheme = "证券代码003018 2026年半年度利润分配预案：" + clause
+    row, proof = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+        currency_scheme_body=scheme,
+    )
+    assert row["cash_per_share"].as_tuple() == Decimal("0.2500000").as_tuple()
+    assert proof["currency_binding_contract"] == (
+        "same-issuer-current-approved-scheme-corroboration-v1"
+    )
+    for invalid in [
+        scheme.replace("人民币", "美元"),
+        scheme.replace("2.50", "2.60"),
+        scheme.replace("含税", "税后"),
+        scheme.replace("每10股", "合计"),
+        scheme.replace("003018", "003019"),
+    ]:
+        with pytest.raises(RuntimeError):
+            parse_distribution(
+                body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+                currency_scheme_body=invalid,
+            )
+    if "\f" in scheme:
+        for invalid in [scheme.replace("\f", ""), scheme.replace("1\n\f", "11 12\n\f")]:
+            with pytest.raises(RuntimeError):
+                parse_distribution(
+                    body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+                    currency_scheme_body=invalid,
+                )
+
+
 @pytest.mark.parametrize(
     "fault",
     [

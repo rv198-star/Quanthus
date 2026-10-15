@@ -204,6 +204,15 @@ def replay_terms_domain(root: Path) -> dict[str, Any]:
             str(code)
         ) != file_sha(code):
             raise BoundedError("DISTRIBUTION_CURRENCY_OFFLINE_CONTRACT_REQUIRED")
+        from .base231_distribution_currency import REPORT_CONTRACT_ID, REPORT_TITLE
+
+        if any(
+            REPORT_TITLE.fullmatch(s["currency_scheme"]["actual_index_row"].get(
+                "announcementTitle", ""
+            ))
+            for s in plan["selection"] if s.get("currency_scheme")
+        ) and plan.get("report_currency_evidence_contract") != REPORT_CONTRACT_ID:
+            raise BoundedError("DISTRIBUTION_REPORT_CURRENCY_OFFLINE_CONTRACT_REQUIRED")
     if any(s.get("payment_revision") for s in plan["selection"]):
         from .base231_distribution_revision import CONTRACT_ID as revision_contract
 

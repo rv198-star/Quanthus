@@ -2,6 +2,20 @@
 
 ## Current recovery checkpoint
 
+The current report-defined dividend-currency adapter requires an exact full
+2026 half-year official report, original issuer-filtered index/transport, its
+own company-code table, and an explicit report-wide glossary mapping 元 to
+人民币元. Its own current pretax per-ten dividend table and prose must agree
+with each other and the approved, unchanged implementation. Financial-statement
+units, unrelated currency mentions, report language and country never supply
+this qualification. The separate report contract is mandatory during contained
+offline replay. It preserves actual new acquisition/knowledge and grants no
+historical PIT, original source priority, cumulative factor or consumer admission.
+
+The exact cash-first wrapped SSE date-header family is supported for a single
+A-share row only. Two recovered October ex-dates remain outside September30;
+successful parsing does not turn them into missing September actions.
+
 The October 16 continuation classifies the remaining exact official profile
 headers before qualification. The optional explicit-header fallback permits one
 labelled industry field between the transaction/company header and the unique

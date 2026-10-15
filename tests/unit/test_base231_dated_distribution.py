@@ -1,11 +1,37 @@
 from copy import deepcopy
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
 from quanthus.pipelines.securities_warehouse.base231_dated_distribution import project_terms
 from quanthus.pipelines.securities_warehouse.financial_reporting import FinancialCompanyIdentity
+
+
+def test_offline_report_currency_requires_its_separate_plan_contract(tmp_path):
+    from quanthus.pipelines.securities_warehouse.base22 import canonical, digest, file_sha
+    from quanthus.pipelines.securities_warehouse.base231_dated_distribution import (
+        CONTRACT_ID,
+        replay_terms_domain,
+    )
+    from quanthus.pipelines.securities_warehouse.base231_distribution_currency import (
+        CONTRACT_ID as currency_contract,
+    )
+
+    code = "src/quanthus/pipelines/securities_warehouse/base231_distribution_currency.py"
+    plan = dict(
+        contract_id=CONTRACT_ID, through_date="2026-09-30", complete_Base=False,
+        consumer_admission="NOT_GRANTED", members={}, code_inputs={code: file_sha(Path(code))},
+        currency_evidence_contract=currency_contract,
+        selection=[dict(currency_scheme=dict(actual_index_row=dict(
+            announcementTitle="2026年半年度报告"
+        )))],
+    )
+    plan["identity"] = digest(plan)
+    (tmp_path / "INPUTS.json").write_bytes(canonical(plan))
+    with pytest.raises(RuntimeError, match="REPORT_CURRENCY_OFFLINE_CONTRACT_REQUIRED"):
+        replay_terms_domain(tmp_path)
 
 BODY = """证券代码：003018 2026权益分派实施公告
 二、本次实施的利润分配及资本公积金转增股本方案

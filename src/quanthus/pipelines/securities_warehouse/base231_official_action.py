@@ -80,6 +80,41 @@ def szse_distribution_dates(body: str) -> tuple[date, date]:
     return dates[0], dates[1]
 
 
+def _report_defined_currency_cash(body: str) -> str:
+    """Use only an explicit report-wide glossary and its own dividend table.
+
+    A financial-statement unit, unrelated RMB mention or country/language is
+    insufficient. The current report's pretax table and prose must agree; the
+    caller separately compares them with the approved implementation amount.
+    """
+    glossary = re.search(r"(?:^|\n)[ \t]*释义[ \t]*\n(.+?)第二节", body, re.S)
+    if glossary is None or not re.search(r"2026\s*年半年度报告", body[:2000]):
+        raise BoundedError("OFFICIAL_ACTION_REPORT_CURRENCY_DEFINITION_UNPROVEN")
+    definitions = re.findall(
+        r"(?m)^[ \t]*(元(?:、万元)?(?:、亿元)?)[ \t]+指[ \t]+([^\r\n]+)",
+        glossary[1],
+    )
+    if not definitions or any(
+        re.sub(r"\s+", "", value) != "、".join("人民币" + u for u in units.split("、"))
+        for units, value in definitions
+    ):
+        raise BoundedError("OFFICIAL_ACTION_REPORT_CURRENCY_DEFINITION_UNPROVEN")
+    text = re.sub(r"\s+", "", body)
+    sections = re.findall(
+        r"二、本报告期利润分配及资本公积金转增股本情况(.+?)三、公司股权激励", text
+    )
+    if len(sections) != 1:
+        raise BoundedError("OFFICIAL_ACTION_REPORT_DIVIDEND_SECTION_UNPROVEN")
+    section = sections[0]
+    table = _one(r"每10股派息数[（(]元[）)][（(]含税[）)]([0-9]+(?:\.[0-9]+)?)", section)
+    prose = _one(
+        r"每10股派(?:发|送)现金(?:股利|红利)([0-9]+(?:\.[0-9]+)?)元[（(]含税", section
+    )
+    if Decimal(table) != Decimal(prose):
+        raise BoundedError("OFFICIAL_ACTION_REPORT_DIVIDEND_TABLE_CONFLICT")
+    return prose
+
+
 def _szse_approved_cash(
     section: str, text: str, *, scheme_text: str | None = None
 ) -> tuple[Decimal, str]:
@@ -134,6 +169,8 @@ def _szse_approved_cash(
     explicit.extend((token, "") for token in re.findall(
         r"每10股派发现金人民币([0-9]+(?:\.[0-9]+)?)[（(【]含税", source
     ))
+    if scheme_text is not None and re.search(r"2026\s*年半年度报告", scheme_text[:2000]):
+        explicit.append((_report_defined_currency_cash(scheme_text), ""))
     if not explicit or {Decimal(a or b) for a, b in explicit} != {Decimal(implemented)}:
         raise BoundedError("OFFICIAL_ACTION_EXPLICIT_TERM_MISSING_OR_CONFLICTING")
     return _per_ten(implemented), digest(
@@ -153,7 +190,8 @@ def sse_distribution_dates(body: str) -> tuple[date, date]:
     # the sole A-share row still supplies all three ordered dates.
     header = (
         r"(?:股份类别股权登记日.*?除权\(息\)日现金红利发放日"
-        r"|除权\(息\)现金红利发股份类别股权登记日最后交易日日放日)A股"
+        r"|除权\(息\)现金红利发股份类别股权登记日最后交易日日放日"
+        r"|现金红利发放股份类别股权登记日最后交易日除权\(息\)日日)A股"
     )
     if (
         not (
@@ -220,14 +258,24 @@ def parse_distribution(
     currency_summary_sha256 = None
     currency_approved_sha256 = None
     external_currency = False
-    if currency_scheme_body is not None and (
-        venue != "SZSE"
-        or not re.search(
-            r"(?:证券|股票|A股)代码[:：]?" + re.escape(code),
-            re.sub(r"\s+", "", currency_scheme_body[:4000]),
-        )
-    ):
-        raise BoundedError("OFFICIAL_ACTION_CURRENCY_SCHEME_IDENTITY_UNPROVEN")
+    if currency_scheme_body is not None:
+        identity_text = re.sub(r"\s+", "", currency_scheme_body[:4000])
+        issuer_matches = bool(re.search(
+            r"(?:证券|股票|A股)代码[:：]?" + re.escape(code), identity_text
+        ))
+        if re.search(r"2026\s*年半年度报告", currency_scheme_body[:2000]):
+            report_text = re.sub(r"\s+", "", currency_scheme_body[:20000])
+            company = re.search(
+                r"第二节公司简介和主要财务指标一、公司简介(.+?)二、联系人和联系方式",
+                report_text,
+            )
+            codes = set(re.findall(
+                r"(?:证券|股票|A股)代码[:：]?(\d{6})(?!\d)",
+                company[1] if company is not None else "",
+            ))
+            issuer_matches = codes == {code}
+        if venue != "SZSE" or not issuer_matches:
+            raise BoundedError("OFFICIAL_ACTION_CURRENCY_SCHEME_IDENTITY_UNPROVEN")
     if venue == "SZSE":
         match = re.search(
             r"二、(?:本次实施的|本次)?(?:A股)?(?:权益分派(?:实施)?方案|权益分配方案|"

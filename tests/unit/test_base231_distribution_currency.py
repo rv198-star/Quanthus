@@ -64,6 +64,18 @@ def test_currency_source_has_actual_new_clock_and_no_old_acceptance():
     assert (evidence, args) == before
 
 
+def test_full_current_report_currency_source_has_separate_qualification_contract():
+    e, args = sample()
+    e["actual_index_row"]["announcementTitle"] = "2026年半年度报告"
+    proof = qualify_currency_source(e, **args)
+    assert proof["contract_id"] == "p10-base231-official-report-defined-dividend-currency-v1"
+    assert proof["currency_scope"] == "EXPLICIT_REPORT_GLOSSARY_AND_SAME_EVENT_DIVIDEND_ONLY"
+    for title in ["2026年半年度报告摘要", "2026年半年度报告（英文）", "2025年半年度报告"]:
+        e["actual_index_row"]["announcementTitle"] = title
+        with pytest.raises(RuntimeError):
+            qualify_currency_source(e, **args)
+
+
 @pytest.mark.parametrize(
     "fault",
     [

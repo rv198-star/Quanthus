@@ -75,6 +75,69 @@ def test_szse_same_current_approved_scheme_can_supply_currency_only():
     assert proof["derived_price_factor_admission"] == "NOT_GRANTED"
 
 
+def report_currency_body():
+    return (
+        "证券代码003018 2026年半年度报告全文\n第一节 重要提示、目录和释义\n"
+        "释义\n元、万元、亿元 指 人民币元、人民币万元、人民币亿元\n"
+        "第二节 公司简介和主要财务指标\n一、公司简介\n股票代码003018\n"
+        "二、联系人和联系方式\n第四节 公司治理、环境和社会\n"
+        "二、本报告期利润分配及资本公积金转增股本情况\n"
+        "每10股派息数（元）（含税）2.50\n每10股转增数（股）2.25\n"
+        "利润分配或资本公积金转增预案的详细情况说明\n"
+        "向全体股东每10股派发现金股利2.50元（含税）。\n"
+        "三、公司股权激励计划\n"
+    )
+
+
+def test_report_own_explicit_currency_definition_and_dividend_table_agree():
+    body = approved_cash_body().replace("现金股利人民币2.50元", "现金股利2.50元")
+    report = report_currency_body()
+    row, proof = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+        currency_scheme_body=report,
+    )
+    assert row["cash_per_share"].as_tuple() == Decimal("0.2500000").as_tuple()
+    assert proof["currency_binding_contract"] == (
+        "same-issuer-current-approved-scheme-corroboration-v1"
+    )
+    for invalid in [
+        report.replace("指 人民币元、人民币万元、人民币亿元", "指 美元、万美元、亿美元"),
+        report.replace("元、万元、亿元 指", "附注：元、万元、亿元"),
+        report.replace("（含税）2.50", "（含税）3.00"),
+        report.replace("股利2.50", "股利3.00"),
+        report.replace("释义", "财务报表附注"),
+        report.replace("二、本报告期利润分配", "二、上年度利润分配"),
+        report.replace("003018", "000001"),
+        report.replace("2.50元（含税）", "2.50元（税后）"),
+        report.replace("第二节", "元 指 美元\n第二节"),
+    ]:
+        with pytest.raises(RuntimeError):
+            parse_distribution(
+                body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+                currency_scheme_body=invalid,
+            )
+
+
+def test_report_identity_uses_its_own_company_table_before_financial_sections():
+    body = approved_cash_body().replace("现金股利人民币2.50元", "现金股利2.50元")
+    report = report_currency_body().replace("证券代码003018 ", "")
+    row, _ = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+        currency_scheme_body=report,
+    )
+    assert row["cash_per_share"].as_tuple() == Decimal("0.2500000").as_tuple()
+    for invalid in [
+        report.replace("股票代码003018", "股票代码000001"),
+        report.replace("股票代码003018", "股票代码003018 股票代码000001"),
+        report.replace("一、公司简介", "一、子公司简介"),
+    ]:
+        with pytest.raises(RuntimeError):
+            parse_distribution(
+                body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+                currency_scheme_body=invalid,
+            )
+
+
 def test_current_implemented_section_can_bind_period_to_exact_cover_title():
     body = approved_cash_body().replace("2026权益分派实施公告", "2026年半年度权益分派实施公告")
     body = body.replace("本公司2026年中期方案为：", "本公司方案为：")
@@ -421,6 +484,29 @@ def test_sse_wrapped_header_keeps_the_explicit_single_a_share_date_row():
         body.replace("Ａ股", "Ｂ股"),
         body.replace("四、", "Ｂ股 2026/10/9 － 2026/10/12 2026/10/12 四、"),
         body.replace("股权登记日 最后交易日", "最后交易日 股权登记日"),
+    ]:
+        with pytest.raises(RuntimeError, match="DATE_LABEL"):
+            parse_distribution(
+                invalid, code="600001", venue="SSE", expected_ex_date=date(2026, 9, 29)
+            )
+
+
+def test_sse_cash_first_wrapped_header_keeps_single_a_share_dates():
+    body = SSE_CURRENT.replace(
+        "股份类别 股权登记日 最后交易日 除权（息）日 现金红利发放日",
+        "现金红利发放\n股份类别 股权登记日 最后交易日 除权（息）日\n日",
+    )
+    row, _ = parse_distribution(
+        body, code="600001", venue="SSE", expected_ex_date=date(2026, 9, 29)
+    )
+    assert row["record_date"] == date(2026, 9, 28)
+    assert row["cash_per_share"].as_tuple() == Decimal("0.02").as_tuple()
+    for invalid in [
+        body.replace("Ａ股", "Ｂ股"),
+        body.replace("四、", "Ｂ股 2026/9/28 － 2026/9/29 2026/9/29 四、"),
+        body.replace("股权登记日 最后交易日", "最后交易日 股权登记日"),
+        body.replace("四、", "2026/9/30 四、"),
+        body.replace("现金红利发放\n", "现金红利发放日\n"),
     ]:
         with pytest.raises(RuntimeError, match="DATE_LABEL"):
             parse_distribution(

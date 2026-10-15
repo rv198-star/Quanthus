@@ -12,6 +12,8 @@ from .base22_bounded import BoundedError
 from .base22_outputs import instant
 
 CONTRACT_ID = "p10-base231-official-current-scheme-currency-corroboration-v1"
+REPORT_CONTRACT_ID = "p10-base231-official-report-defined-dividend-currency-v1"
+REPORT_TITLE = re.compile(r"(?:.+[:：])?2026年半年度报告(?:[（(]更新后[）)])?")
 
 
 def qualify_currency_source(
@@ -23,6 +25,7 @@ def qualify_currency_source(
     must also prove approved/implemented consistency and equal per-ten values.
     """
     actual = evidence["actual_index_row"]
+    report = REPORT_TITLE.fullmatch(actual.get("announcementTitle", "")) is not None
     index = evidence["index"]
     index_receipt, receipt = evidence["index_receipt"], evidence["PDF_receipt"]
     clock = instant(observed_at)
@@ -35,7 +38,7 @@ def qualify_currency_source(
         or not isinstance(actual.get("announcementId"), str)
         or not re.fullmatch(r"[0-9]+", actual["announcementId"])
         or not re.search(r"2026年?(?:半年度|中期)", actual.get("announcementTitle", ""))
-        or not re.search(r"利润分配|分红", actual.get("announcementTitle", ""))
+        or (not report and not re.search(r"利润分配|分红", actual.get("announcementTitle", "")))
         or re.search(r"实施|取消|终止|调整", actual["announcementTitle"])
         or type(actual.get("announcementTime")) is not int
         or type(implementation.get("announcementTime")) is not int
@@ -84,7 +87,7 @@ def qualify_currency_source(
     if query.get("stock") != actual["secCode"] + "," + actual["orgId"]:
         raise BoundedError("DISTRIBUTION_CURRENCY_SCHEME_QUERY_ISSUER_UNPROVEN")
     return dict(
-        contract_id=CONTRACT_ID,
+        contract_id=REPORT_CONTRACT_ID if report else CONTRACT_ID,
         implementation_index_row_sha256=digest(implementation),
         scheme_index_row_sha256=digest(actual),
         scheme_index_sha256=evidence["index_sha256"],
@@ -101,4 +104,6 @@ def qualify_currency_source(
         old_acceptance_claimed=False,
         historical_PIT_restored=False,
         factor_admission="NOT_GRANTED",
+        **({"currency_scope": "EXPLICIT_REPORT_GLOSSARY_AND_SAME_EVENT_DIVIDEND_ONLY"}
+           if report else {}),
     )

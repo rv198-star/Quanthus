@@ -583,6 +583,7 @@ def run(
             except (ValueError, OSError, KeyError) as exc:
                 result: dict[str, Any] = {
                     "status": "waiting_for_sealed_daily_ods",
+                    "invocation_id": os.environ.get("INVOCATION_ID"),
                     "market_date": str(target),
                     "error_class": type(exc).__name__,
                 }
@@ -629,6 +630,7 @@ def run(
         qualified = all(value.get("research_ready") is True for value in minutes.values())
         result = {
             "market_date": str(target),
+            "invocation_id": os.environ.get("INVOCATION_ID"),
             "policy_id": POLICY_ID,
             "minutes": minutes,
             "status": "minutes_qualified" if qualified else "minutes_not_qualified",
@@ -642,6 +644,7 @@ def run(
                 reason="native 1m/5m did not both reach R2 minimum with R3=0; "
                 "joint publication held",
                 context={
+                    "deadline": checkpoint(target, "minute_deadline", rows).isoformat(),
                     "quality_distribution": {
                         key: value.get("quality_grades", "unbuilt")
                         for key, value in minutes.items()
@@ -649,6 +652,20 @@ def run(
                 },
             )
             return result
+        from quanthus.pipelines import p10_notification_trial as trial
+        from quanthus.pipelines.p10_complete_daily_notifications import success
+
+        if trial.enabled(target):
+            try:
+                result["minute_completion_notification"] = success(
+                    day=target, stage="minutes", state_root=notifications,
+                    evidence=trial.minute_evidence(minutes, target), code_revision=revision,
+                )
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                result["minute_completion_notification"] = {
+                    "status": "completion_notification_not_queued",
+                    "error_class": type(exc).__name__,
+                }
         try:
             cycle_activity(journal, target=target, revision=revision, stage="complete")
             source = daily_package(daily, target)
@@ -693,6 +710,9 @@ def run(
                 raise ValueError("complete DWD projection failed; inspect bounded Job log")
             result["complete"] = json.loads(completed.stdout.splitlines()[-1])
             result["status"] = "complete_daily_published"
+            from quanthus.pipelines.p10_notification_incident import resolve
+
+            resolve(notifications, target, "complete")
         except Exception as exc:
             result["status"] = "complete_daily_failed"
             result["error_class"] = type(exc).__name__
@@ -702,6 +722,7 @@ def run(
                 state_root=notifications,
                 reason="native minutes qualified but complete DWD build "
                 "or daily DWD dependency failed",
+                context={"deadline": checkpoint(target, "complete_deadline", rows).isoformat()},
             )
         atomic(job / "status.json", result)
         return result

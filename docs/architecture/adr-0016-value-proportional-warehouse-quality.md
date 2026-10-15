@@ -161,6 +161,16 @@ from R3=0. T/T+1 notification PASS/FAIL and READY use the same gate.
 
 ## Consequences and change control
 
+### 2026-10-15 Owner instruction — delivery alerts and trial success mail
+
+The Owner approved deadline-based ordinary alerts, immediate actionable-fault alerts,
+and aggregation of downstream waits into an acknowledged upstream incident. During the
+trial, successful T daily-ODS completion and T+1 joint native-minute qualification each
+send one evidence-bound success notice per business date/stage. The operational contract
+is `config/pipelines/p10-notification-trial.v1.json`; see LLD12's notification section.
+This supersedes per-attempt mail behavior only. The complete-data policy bytes, collection
+budgets, deadlines, R2/R3 gates, Base identity and historical notifications remain unchanged.
+
 ### 2026-10-13 Owner instruction — complete T+1 trading-day delivery
 
 The Owner authorized repair of the CN01-to-OCI complete Daily path and confirmed

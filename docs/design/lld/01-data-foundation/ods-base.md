@@ -231,3 +231,35 @@ a paired production switch or turn older increments into Base 2.3 increments.
 Operations are in `docs/operations/ods-base-runbook.md`; regressions are in
 `tests/unit/test_ods_monthly_input.py`. GitHub code distribution, target recovery,
 paired consumer compatibility and authorized switch/rollback remain explicit steps.
+
+## Base 2.4 opt-in native 5m source evidence
+
+Work item: `P10-DATA-BASE24-010` / #529, under the
+[v1.3 execution plan](../../work-items/base24-build.md). Design status: draft;
+delivery gate: blocked for real source/range qualification. This successor does
+not change the accepted July policies, existing float collector or Base 2.3 seals.
+
+`src/quanthus/providers/native_5m_exact.py` implements
+`p10-native-5m-exact-v1`: one explicit `sh`/`sz` security and business date,
+supplier-native frequency `5`, unadjusted basis `3`. Response fields, request
+echo, all returned dates/codes and pagination completion must agree. Numbers are
+finite `Decimal` values; original numeric lexemes retain source scale, zero and
+exponent through independent Parquet serialization. Source timestamps retain
+their millisecond instant in Asia/Shanghai. Empty results do not prove suspension,
+no applicable bars or complete historical coverage. This parser does not assign
+R0/R1/R2 or assert bucket/session completeness or independently qualify units.
+
+Wire capture wraps only an already authenticated process-local SDK socket. It
+retains unchanged response bytes, request hashes, actual receive clocks and
+completion state; outbound login bytes/credentials are never captured. Actual
+sends (including pagination), response bytes and wall time are bounded. Short
+send, EOF, truncation and exhausted limits fail closed even if the SDK swallows
+the exception. The original socket is restored on every exit. The caller owns a
+single supplier process/lock, registered shared request budget, explicit timeout,
+private new output paths physically disjoint from inputs, and external RSS/disk
+stops. This is not a replacement scheduler or a shared-budget exemption.
+
+Regressions: `tests/unit/test_native_5m_exact.py`, alongside the retained
+`tests/unit/test_native_5m_baostock.py`. Tests are synthetic; actual retired-security,
+2020-boundary, unit/basis and complete-range source qualification remain separate
+evidence gates. Protected raw responses are kept outside safe review exports.

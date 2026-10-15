@@ -1,0 +1,306 @@
+"""Opt-in exact BaoStock five-minute observations; no legacy collector changes.
+
+The parser preserves lexical decimals and Shanghai timestamps. Wire capture wraps
+only an already authenticated process-local socket, never login credentials. Empty
+responses are observations, not suspension or full-coverage evidence.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import importlib
+import json
+import re
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
+from typing import Any, BinaryIO
+from zoneinfo import ZoneInfo
+
+FIELDS = ("date", "time", "code", "open", "high", "low", "close", "volume", "amount")
+SHANGHAI = ZoneInfo("Asia/Shanghai")
+TRAILER = b"<![CDATA[]]>\n"
+CONTRACT = "p10-native-5m-exact-v1"
+
+
+class Native5mError(ValueError):
+    """Stable reason code, without protected source values."""
+
+
+def _utc() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+@dataclass(frozen=True)
+class NativeDay:
+    code: str
+    business_date: str
+
+    def __post_init__(self) -> None:
+        if not re.fullmatch(r"(?:sh|sz)\.[0-9]{6}", self.code):
+            raise Native5mError("INVALID_SECURITY_CODE")
+        if date.fromisoformat(self.business_date).isoformat() != self.business_date:
+            raise Native5mError("INVALID_BUSINESS_DATE")
+
+
+@dataclass(frozen=True)
+class ExactBar:
+    code: str
+    timestamp: datetime
+    lexical_values: tuple[str, ...]
+
+    @property
+    def values(self) -> tuple[Decimal, ...]:
+        return tuple(Decimal(value) for value in self.lexical_values)
+
+
+def _check_response(response: Any, request: NativeDay) -> None:
+    if str(response.error_code) != "0":
+        raise Native5mError("PROVIDER_ERROR")
+    if (
+        tuple(response.fields) != FIELDS
+        or response.code != request.code
+        or response.start_date != request.business_date
+        or response.end_date != request.business_date
+        or str(response.frequency) != "5"
+        or str(response.adjustflag) != "3"
+    ):
+        raise Native5mError("RESPONSE_CONTRACT_MISMATCH")
+
+
+def parse_response(
+    response: Any, request: NativeDay, *, max_rows: int = 1024, max_pages: int = 2
+) -> tuple[ExactBar, ...]:
+    """Validate all pages, including the final failed/empty pagination response.
+
+    Page limits bound parsing; the wire wrapper separately bounds *actual* sends,
+    including an attempted continuation that the vendor SDK might swallow.
+    """
+    if max_rows < 1 or max_pages < 1:
+        raise Native5mError("INVALID_PARSE_LIMIT")
+    _check_response(response, request)
+    rows = []
+    seen = set()
+    pages = set()
+    while response.next():
+        _check_response(response, request)
+        page = int(response.cur_page_num)
+        pages.add(page)
+        if page < 1 or len(pages) > max_pages or page > max_pages:
+            raise Native5mError("PAGE_LIMIT")
+        raw = response.get_row_data()
+        if (
+            len(raw) != len(FIELDS)
+            or any(not isinstance(value, str) for value in raw)
+            or raw[0] != request.business_date
+            or raw[2] != request.code
+        ):
+            raise Native5mError("ROW_DATE_CODE_SCHEMA_MISMATCH")
+        if not re.fullmatch(r"[0-9]{17}", raw[1]):
+            raise Native5mError("INVALID_SOURCE_TIMESTAMP")
+        stamp = datetime.strptime(raw[1], "%Y%m%d%H%M%S%f").replace(tzinfo=SHANGHAI)
+        if stamp.date().isoformat() != request.business_date:
+            raise Native5mError("TIMESTAMP_DATE_MISMATCH")
+        if stamp in seen:
+            raise Native5mError("DUPLICATE_BAR_KEY")
+        try:
+            numbers = tuple(Decimal(value) for value in raw[3:])
+        except InvalidOperation as exc:
+            raise Native5mError("INVALID_DECIMAL") from exc
+        if any(not value.is_finite() for value in numbers):
+            raise Native5mError("NONFINITE_DECIMAL")
+        seen.add(stamp)
+        rows.append(ExactBar(request.code, stamp, tuple(raw[3:])))
+        if len(rows) > max_rows:
+            raise Native5mError("ROW_LIMIT")
+    _check_response(response, request)
+    if int(response.cur_page_num) > max_pages:
+        raise Native5mError("PAGE_LIMIT")
+    return tuple(sorted(rows, key=lambda row: row.timestamp))
+
+
+def fetch_day(client: Any, request: NativeDay) -> tuple[ExactBar, ...]:
+    """One exact unadjusted supplier-native query, without fallback or aggregation."""
+    response = client.query_history_k_data_plus(
+        request.code,
+        ",".join(FIELDS),
+        start_date=request.business_date,
+        end_date=request.business_date,
+        frequency="5",
+        adjustflag="3",
+    )
+    return parse_response(response, request)
+
+
+def write_parquet(path: Path, bars: tuple[ExactBar, ...]) -> None:
+    """Independent exact serialization, retaining each original numeric lexeme.
+
+    A shared column scale may add trailing zeroes in the numeric representation;
+    lexical_values retains each source value's original scale. No float is used.
+    """
+    pa = importlib.import_module("pyarrow")
+    pq = importlib.import_module("pyarrow.parquet")
+
+    fields = [
+        pa.field("code", pa.string()),
+        pa.field("timestamp", pa.timestamp("us", "Asia/Shanghai")),
+        pa.field("source_values", pa.list_(pa.string())),
+    ]
+    for index, name in enumerate(FIELDS[3:]):
+        values = [bar.values[index] for bar in bars]
+        scale = max([0, *(-int(value.as_tuple().exponent) for value in values)])
+        precision = max(
+            [
+                1,
+                *(
+                    len(value.as_tuple().digits) + int(value.as_tuple().exponent) + scale
+                    for value in values
+                ),
+                scale,
+            ]
+        )
+        if precision > 76:
+            raise Native5mError("DECIMAL_STORAGE_RANGE")
+        kind = (
+            pa.decimal128(precision, scale) if precision <= 38 else pa.decimal256(precision, scale)
+        )
+        fields.append(pa.field(name, kind))
+    schema = pa.schema(fields, metadata={b"contract": CONTRACT.encode()})
+    rows = [
+        dict(
+            code=bar.code,
+            timestamp=bar.timestamp,
+            source_values=list(bar.lexical_values),
+            **dict(zip(FIELDS[3:], bar.values, strict=True)),
+        )
+        for bar in bars
+    ]
+    table = pa.Table.from_pylist(rows, schema=schema)
+    with path.open("xb") as stream:
+        pq.write_table(table, stream, compression="zstd")
+
+
+class WireCapture:
+    """Bound real socket sends/receives and retain unchanged response bytes.
+
+    Must run in an isolated single-provider process. This is not a scheduler or
+    cross-process supplier quota; the caller also owns the registered shared lock
+    and cumulative job/request budget. The output directory must already be new,
+    private and physically disjoint from every source root.
+    """
+
+    def __init__(
+        self, sock: Any, root: Path, *, max_requests: int, max_bytes: int, seconds: float
+    ) -> None:
+        if min(max_requests, max_bytes, seconds) <= 0 or root.is_symlink():
+            raise Native5mError("INVALID_CAPTURE_LIMIT_OR_ROOT")
+        if not root.is_dir() or any(root.iterdir()):
+            raise Native5mError("CAPTURE_REQUIRES_EMPTY_DIRECTORY")
+        self.sock = sock
+        self.root = root
+        self.max_requests = max_requests
+        self.max_bytes = max_bytes
+        self.deadline = time.monotonic() + seconds
+        self.total_bytes = 0
+        self.records: list[dict[str, Any]] = []
+        self.failure: str | None = None
+        self._stream: BinaryIO | None = None
+        self._tail = b""
+        self._hash = hashlib.sha256()
+
+    def _stop(self, reason: str) -> None:
+        self.failure = reason
+        raise Native5mError(reason)
+
+    def _check(self) -> None:
+        if self.failure:
+            raise Native5mError(self.failure)
+        if time.monotonic() >= self.deadline:
+            self._stop("WIRE_TIME_LIMIT")
+
+    def _finish(self) -> None:
+        if self._stream is None:
+            return
+        self._stream.close()
+        self._stream = None
+        record = self.records[-1]
+        record.update(
+            response_sha256=self._hash.hexdigest(),
+            ended_at=_utc(),
+            complete=self._tail.endswith(TRAILER),
+        )
+        if not record["complete"] and self.failure is None:
+            self.failure = "TRUNCATED_WIRE_RESPONSE"
+
+    def send(self, data: bytes, *args: Any) -> int:
+        self._check()
+        self._finish()
+        self._check()
+        if len(self.records) >= self.max_requests:
+            self._stop("WIRE_REQUEST_LIMIT")
+        name = f"response-{len(self.records) + 1:04}.wire"
+        self._stream = (self.root / name).open("xb")
+        self._hash = hashlib.sha256()
+        self._tail = b""
+        self.records.append(
+            dict(
+                path=name,
+                started_at=_utc(),
+                request_sha256=hashlib.sha256(data).hexdigest(),
+                received_bytes=0,
+                complete=False,
+            )
+        )
+        sent: int = self.sock.send(data, *args)
+        if sent != len(data):
+            self._stop("SHORT_SOCKET_SEND")
+        return sent
+
+    def recv(self, size: int, *args: Any) -> bytes:
+        self._check()
+        remaining = self.max_bytes - self.total_bytes
+        if remaining <= 0:
+            self._stop("WIRE_BYTE_LIMIT")
+        if self._stream is None:
+            self._stop("RECV_WITHOUT_REQUEST")
+        chunk: bytes = self.sock.recv(min(size, remaining), *args)
+        if not chunk:
+            self._stop("WIRE_EOF")
+        assert self._stream is not None
+        self._stream.write(chunk)
+        self._stream.flush()
+        self._hash.update(chunk)
+        self._tail = (self._tail + chunk)[-len(TRAILER) :]
+        self.total_bytes += len(chunk)
+        self.records[-1]["received_bytes"] += len(chunk)
+        self.records[-1]["last_received_at"] = _utc()
+        return chunk
+
+    def close(self) -> None:
+        self._finish()
+        with (self.root / "wire-receipt.json").open("x", encoding="utf-8") as stream:
+            json.dump(
+                dict(contract=CONTRACT, failure=self.failure, records=self.records),
+                stream,
+                ensure_ascii=False,
+                indent=2,
+            )
+        if self.failure:
+            raise Native5mError(self.failure)
+
+
+@contextmanager
+def captured_socket(context: Any, root: Path, **limits: Any) -> Iterator[WireCapture]:
+    """Always restore the SDK socket; vendor swallowed errors still fail closed."""
+    original = context.default_socket
+    capture = WireCapture(original, root, **limits)
+    context.default_socket = capture
+    try:
+        yield capture
+    finally:
+        context.default_socket = original
+        capture.close()

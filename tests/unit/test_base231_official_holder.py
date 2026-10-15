@@ -607,3 +607,90 @@ def test_lending_column_family_fails_closed(fault):
         body = body.replace("  0  0  无", "  0  无")
     with pytest.raises(RuntimeError):
         parse_top_matrix(body, hints)
+
+
+def split_floating_sample():
+    hints = [
+        dict(HOLDER_RANK=n, HOLDER_NAME=f"合成股东{n}续", HOLD_NUM=str(1000 + n))
+        for n in range(1, 11)
+    ]
+    lines = [
+        "(二) 前十名股东、前十名无限售条件股东持股情况表",
+        "单位：股",
+        "前十名无限售条件股东持股情况（不含通过转融通出借股份）",
+        " " * 37 + "持有无限售条件     股份种类及数量",
+        f"{'股东名称':<37}{'流通股的数量':<16}种类      数量",
+    ]
+    for n in range(1, 11):
+        lines.extend(
+            [
+                f"{'合成股东':<52}人民币普",
+                f"{str(n):<37}{str(1000 + n):>12}    {str(1000 + n):>12}",
+                f"{'续':<53}通股",
+            ]
+        )
+    return "\n".join(lines + ["前十名股东中回购专户情况说明 无"]), hints
+
+
+def test_floating_split_share_class_has_all_ten_exact_paired_quantities():
+    from quanthus.pipelines.securities_warehouse.base231_official_holder import (
+        parse_floating_matrix,
+    )
+
+    body, hints = split_floating_sample()
+    rows, proof = parse_floating_matrix(body, hints)
+    assert [r["name"] for r in rows] == [h["HOLDER_NAME"] for h in hints]
+    assert [r["quantity"] for r in rows] == list(range(1001, 1011))
+    assert all(r["percentage"] is None and r["share_nature"] == "人民币普通股" for r in rows)
+    assert proof["layout_contract"] == "physical-split-rmb-share-class-paired-quantities-v1"
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "class",
+        "suffix",
+        "quantity",
+        "name",
+        "extra",
+        "missing",
+        "rank",
+        "unit",
+        "column",
+        "order",
+        "percent",
+        "quantity_header",
+    ],
+)
+def test_split_floating_family_rejects_unproved_extent_columns_and_share_class(fault):
+    from quanthus.pipelines.securities_warehouse.base231_official_holder import (
+        parse_floating_matrix,
+    )
+
+    body, hints = split_floating_sample()
+    if fault == "class":
+        body = body.replace("人民币普", "境外普通", 1)
+    elif fault == "suffix":
+        body = body.replace(f"{'续':<53}通股", f"{'续':<53}未知", 1)
+    elif fault == "quantity":
+        body = body.replace("1001", "1002", 1)
+    elif fault == "name":
+        body = body.replace("合成股东", "错误股东", 1)
+    elif fault == "extra":
+        body = body.replace("前十名股东中回购", "隐藏股东\n前十名股东中回购")
+    elif fault == "missing":
+        body = body.replace(f"{'续':<53}通股", "", 1)
+    elif fault == "rank":
+        hints[7]["HOLDER_RANK"] = 7
+    elif fault == "unit":
+        body = body.replace("单位：股", "单位：股\n单位：万股")
+    elif fault == "column":
+        body = body.replace("持有无限售条件", "未知持股条件")
+    elif fault == "order":
+        body = body.replace("种类      数量", "            种类 数量")
+    elif fault == "quantity_header":
+        body = body.replace("流通股的数量", "未知股的数量")
+    else:
+        body = body.replace(f"{str(1001):>12}    {str(1001):>12}", "1001  12%  1001")
+    with pytest.raises(RuntimeError):
+        parse_floating_matrix(body, hints)

@@ -405,7 +405,7 @@ def _parse_top_matrix(
     )
 
 
-def parse_floating_matrix(
+def _parse_floating_matrix(
     body: str, hints: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Only the explicit single-share-class, repeated-quantity source layout.
@@ -534,6 +534,169 @@ def parse_floating_matrix(
         rank_authority="EXPLICIT_PROVIDER_RANK_RECONCILED_TO_COMPLETE_OFFICIAL_ORDER",
         percentage_authority="NOT_DISCLOSED_IN_OFFICIAL_FLOATING_TABLE",
         source_priority_or_transaction_equivalence_granted=False,
+    )
+
+
+def parse_floating_matrix(
+    body: str, hints: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    try:
+        return _parse_floating_matrix(body, hints)
+    except BoundedError as error:
+        if str(error) not in {
+            "OFFICIAL_FLOATING_UNIQUE_COMPLETE_MATRIX_REQUIRED",
+            "OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN",
+        }:
+            raise
+    return _parse_split_floating_matrix(body, hints)
+
+
+def _parse_split_floating_matrix(
+    body: str, hints: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Narrow physical-column family with a split, repeated share class."""
+    _validate_hints(hints)
+    if not 0 < len(body.encode()) <= 16 * 1024**2:
+        raise BoundedError("OFFICIAL_HOLDER_BODY_BOUND")
+    lines = body.splitlines()
+    starts = [
+        i
+        for i, line in enumerate(lines)
+        if re.fullmatch(
+            r"前(?:10|十)名无限售条件股东持股情况(?:[（(]不含通过转融通出借股份[）)])?", _norm(line)
+        )
+    ]
+    if len(starts) != 1:
+        raise BoundedError("OFFICIAL_FLOATING_UNIQUE_COMPLETE_MATRIX_REQUIRED")
+    start = starts[0]
+    units = re.findall(r"单位\s*[:：]\s*(\S+)", "\n".join(lines[max(0, start - 200) : start + 6]))
+    if not units or units[-1] != "股":
+        raise BoundedError("OFFICIAL_HOLDER_EXPLICIT_SHARE_UNIT_REQUIRED")
+    ends = [
+        i
+        for i in range(start + 1, len(lines))
+        if _norm(lines[i]).startswith(
+            ("上述股东", "前十名股东中回购专户情况说明", "前10名股东中回购专户情况说明")
+        )
+    ]
+    if not ends:
+        raise BoundedError("OFFICIAL_HOLDER_COMPLETE_ROW_EXTENT_UNPROVEN")
+    block = lines[start + 1 : ends[0]]
+    headers = [
+        (i, m.start()) for i, line in enumerate(block) for m in re.finditer(r"种类\s+数量", line)
+    ]
+    qtycols = {m.start() for line in block[:8] for m in re.finditer("持有无限售条件", line)}
+    if (
+        len(headers) != 1
+        or len(qtycols) != 1
+        or "股份种类及数量" not in _norm("\n".join(block[: headers[0][0] + 1]))
+    ):
+        raise BoundedError("OFFICIAL_FLOATING_EXPLICIT_PHYSICAL_COLUMNS_REQUIRED")
+    h, kindcol = headers[0]
+    qtycol = next(iter(qtycols))
+    if not 0 < qtycol < kindcol or not any(
+        abs(match.start() - qtycol) <= 1
+        for line in block[: h + 1]
+        for match in re.finditer("流通股的数量", line)
+    ):
+        raise BoundedError("OFFICIAL_FLOATING_EXPLICIT_PHYSICAL_COLUMNS_REQUIRED")
+    parts = []
+    anchors: list[dict[str, Any]] = []
+    classes = []
+    offset = 0
+    for i, line in enumerate(block[h + 1 :], h + 1):
+        match = re.fullmatch(
+            r"(.*?)\s+([0-9][0-9,]*(?:\.[0-9]+)?)\s+([0-9][0-9,]*(?:\.[0-9]+)?)\s*", line
+        )
+        if match:
+            if match.start(2) < qtycol or match.start(3) < kindcol:
+                raise BoundedError("OFFICIAL_FLOATING_EXPLICIT_PHYSICAL_COLUMNS_REQUIRED")
+            left = match[1]
+            fragment = _norm(left)
+            anchors.append(
+                dict(
+                    line=i,
+                    start=offset,
+                    end=offset + len(fragment),
+                    qty=match[2],
+                    repeated=match[3],
+                )
+            )
+        else:
+            left = line[:qtycol]
+            right = line[qtycol:].strip()
+            if right:
+                if right not in {"人民币普", "通股"} or abs(line.index(right) - kindcol) > 1:
+                    raise BoundedError("OFFICIAL_FLOATING_SPLIT_SHARE_CLASS_UNPROVEN")
+                classes.append((i, right))
+            fragment = _norm(left)
+        parts.append(fragment)
+        offset += len(fragment)
+    if (
+        len(anchors) != 10
+        or len(classes) != 20
+        or any(
+            classes[2 * i] != (a["line"] - 1, "人民币普")
+            or classes[2 * i + 1] != (a["line"] + 1, "通股")
+            for i, a in enumerate(anchors)
+        )
+    ):
+        raise BoundedError("OFFICIAL_FLOATING_SPLIT_SHARE_CLASS_UNPROVEN")
+    ordered = sorted(hints, key=lambda r: r["HOLDER_RANK"])
+    names = [_norm(r["HOLDER_NAME"]) for r in ordered]
+    if "".join(parts) != "".join(names):
+        raise BoundedError("OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN")
+    spans = []
+    offset = 0
+    for name in names:
+        spans.append((offset, offset + len(name)))
+        offset += len(name)
+    rows = []
+    for anchor in anchors:
+        indices = [
+            i
+            for i, (a, b) in enumerate(spans)
+            if (
+                a < anchor["start"] <= b
+                if anchor["start"] == anchor["end"]
+                else anchor["start"] < b and anchor["end"] > a
+            )
+        ]
+        if len(indices) != 1:
+            raise BoundedError("OFFICIAL_HOLDER_NUMERIC_ROW_NAME_BINDING_UNPROVEN")
+        index = indices[0]
+        quantity = Decimal(anchor["qty"].replace(",", ""))
+        if (
+            quantity != Decimal(anchor["repeated"].replace(",", ""))
+            or quantity != Decimal(str(ordered[index]["HOLD_NUM"]))
+            or quantity < 0
+        ):
+            raise BoundedError("OFFICIAL_HOLDER_EXACT_QUANTITY_OR_PERCENTAGE_CONFLICT")
+        rows.append(
+            dict(
+                rank=index + 1,
+                name=ordered[index]["HOLDER_NAME"],
+                category=None,
+                share_nature="人民币普通股",
+                quantity=quantity,
+                percentage=None,
+                raw_quantity=anchor["qty"],
+                raw_percentage=None,
+            )
+        )
+    if [r["rank"] for r in rows] != list(range(1, 11)):
+        raise BoundedError("OFFICIAL_HOLDER_COMPLETE_ROW_EXTENT_UNPROVEN")
+    return rows, dict(
+        contract_id=CONTRACT_ID,
+        rows=10,
+        whole_block_sha256=digest("\n".join(block)),
+        complete_name_chain_sha256=digest("".join(parts)),
+        native_atoms_sha256=digest(rows),
+        explicit_share_unit="SHARE",
+        rank_authority="EXPLICIT_PROVIDER_RANK_RECONCILED_TO_COMPLETE_OFFICIAL_ORDER",
+        percentage_authority="NOT_DISCLOSED_IN_OFFICIAL_FLOATING_TABLE",
+        source_priority_or_transaction_equivalence_granted=False,
+        layout_contract="physical-split-rmb-share-class-paired-quantities-v1",
     )
 
 

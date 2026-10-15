@@ -10,6 +10,16 @@ class BaostockTransportError(RuntimeError):
     """Raised when a live BaoStock socket cannot be bounded."""
 
 
+class BaostockAccessDenied(RuntimeError):
+    """The supplier explicitly refused access; do not reconnect or scan onward."""
+
+
+def require_access(error_code: Any, error_msg: Any) -> None:
+    message = str(error_msg).lower()
+    if str(error_code) == "10001011" or "黑名单" in message or "blacklist" in message:
+        raise BaostockAccessDenied("BAOSTOCK_ACCESS_DENIED: " + str(error_code))
+
+
 def set_socket_timeout(timeout_seconds: float) -> bool:
     """Set a timeout on BaoStock's process-global socket after login.
 

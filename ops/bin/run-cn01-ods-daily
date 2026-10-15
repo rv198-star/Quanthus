@@ -52,6 +52,34 @@ _CATALOG_LANES = {
 SOURCE_MATURITY_DEFERRED = 3
 
 
+def _denied_shared_universe(
+    state: dict[str, Any], *, home: Path, market_date: date
+) -> dict[str, Any] | None:
+    """Do not repeat a refused shared dependency inside the same daily-core Job."""
+    if os.environ.get("HERMES_ODS_PREVENTION_POLICY") != "p10-acquisition-prevention-v1":
+        return None
+    market = state["lanes"].get("market-daily-core", {})
+    if market.get("status") != "failed":
+        return None
+    denied = False
+    for name in market.get("logs", []):
+        with Path(name).open("rb") as handle:
+            handle.seek(max(0, Path(name).stat().st_size - 65536))
+            denied |= b"BAOSTOCK_ACCESS_DENIED" in handle.read(65536)
+    if not denied:
+        return None
+    root = home / "source-universe-v1" / market_date.isoformat()
+    if (root / "universe.json").exists():
+        from quanthus.providers.security_universe import verify
+
+        try:
+            verify(root, market_date)
+            return None  # The independent event source can reuse this exact dependency.
+        except (OSError, ValueError, KeyError, TypeError):
+            return {"error_code": "shared_universe_invalid", "source_request_repeated": False}
+    return {"error_code": "shared_universe_access_denied", "source_request_repeated": False}
+
+
 def _core_event_dependency_for_retry(
     state: dict[str, Any], *, is_core: bool, home: Path, market_date: date, deadline: float
 ) -> dict[str, Any] | None:
@@ -713,14 +741,26 @@ def main() -> int:
         pending_by_lane = {job.lane: job for job in pending}
         # Only the event lane is independent. The market and minute lanes share
         # pve_market_api, so run them in a deliberate order instead of lock racing.
-        for lane_group in (
-            ("market-daily-core", "calendar-daily-events"),
-            ("intraday-5m",),
-            ("intraday-1m",),
-        ):
+        # The prevention universe is a shared target-day dependency. Let market
+        # establish it once; events can then reuse it even if price acquisition fails.
+        groups = (
+            (("market-daily-core",), ("calendar-daily-events",)) if is_core
+            else (("market-daily-core", "calendar-daily-events"),)
+        ) + (("intraday-5m",), ("intraday-1m",))
+        for lane_group in groups:
             jobs = [pending_by_lane[lane] for lane in lane_group if lane in pending_by_lane]
             if jobs:
                 try:
+                    blocked = (
+                        _denied_shared_universe(state, home=home, market_date=market_date)
+                        if is_core and lane_group == ("calendar-daily-events",) else None
+                    )
+                    if blocked:
+                        state["lanes"]["calendar-daily-events"] = {
+                            "status": "blocked_shared_dependency", "attempts": 0,
+                            "returncode": None, "logs": [], **blocked,
+                        }
+                        continue
                     results = _run_group(jobs, deadline=deadline, poll_seconds=poll_seconds)
                     for result in results.values():
                         if (

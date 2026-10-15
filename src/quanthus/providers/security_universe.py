@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from quanthus.providers.acquisition_evidence import POLICY, capture, clock, verify_capture
-from quanthus.providers.baostock_transport import set_socket_timeout
+from quanthus.providers.baostock_transport import require_access, set_socket_timeout
 
 
 def in_scope(code: str) -> bool:
@@ -110,6 +110,7 @@ def refresh(*, home: Path, day: date) -> tuple[Path, dict[str, Any]]:
         attempt.mkdir()
         with contextlib.redirect_stdout(io.StringIO()):
             login = bs.login()
+        require_access(login.error_code, login.error_msg)
         if str(login.error_code) != "0":
             raise ValueError("UNIVERSE_PROVIDER_LOGIN_FAILED")
         set_socket_timeout(30)
@@ -143,6 +144,7 @@ def refresh(*, home: Path, day: date) -> tuple[Path, dict[str, Any]]:
                     status=str(result.error_code),
                 )
                 if str(result.error_code) != "0":
+                    require_access(result.error_code, result.error_msg)
                     raise ValueError("UNIVERSE_PROVIDER_QUERY_FAILED")
                 responses.append([dict(zip(result.fields, row, strict=True)) for row in rows])
         finally:

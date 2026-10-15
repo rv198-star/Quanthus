@@ -366,6 +366,10 @@ def _email_html(
         "deadline": "交付截止时间",
         "target_next_trade_day": "T+1交易日",
         "policy_id": "运行规则版本",
+        "product_scope": "数据产品范围",
+        "failed_phase": "失败步骤",
+        "cycle_status": "任务终态",
+        "candidate_market_date": "候选日期（仍需交易日历核实）",
     }
     for key, label in context_labels.items():
         value = context.get(key)

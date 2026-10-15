@@ -54,7 +54,11 @@ from quanthus.providers.acquisition_evidence import (
 from quanthus.providers.acquisition_evidence import (
     enabled as prevention_enabled,
 )
-from quanthus.providers.baostock_transport import set_socket_timeout
+from quanthus.providers.baostock_transport import (
+    BaostockAccessDenied,
+    require_access,
+    set_socket_timeout,
+)
 from quanthus.providers.minute_recovery import load_minute_recovery_policy
 from quanthus.providers.security_universe import refresh as refresh_universe
 from quanthus.providers.trading_calendar import (
@@ -1004,10 +1008,13 @@ def _baostock_login_with_retry(
     for attempt in range(1, max_attempts + 1):
         try:
             login = bs.login()
+            require_access(login.error_code, login.error_msg)
             if str(login.error_code) == "0":
                 set_socket_timeout(socket_timeout_seconds)
                 return attempt
             last_error = str(login.error_msg)
+        except BaostockAccessDenied:
+            raise
         except Exception as exc:  # noqa: BLE001
             last_error = str(exc)
         if attempt < max_attempts:
@@ -1099,6 +1106,7 @@ def _baostock_query_day_with_retry(
                 completed_at=response_clock(),
                 status=error_code,
             )
+        require_access(error_code, error_msg)
         if error_code == "0" and rows:
             return rows, error_code, error_msg, attempt, retry_errors
         if error_code == "0":
@@ -1130,6 +1138,7 @@ def _baostock_fetch_day(
     missing_set_retry_delay_seconds: float = 30,
     socket_timeout_seconds: float = 30,
     deadline_at: datetime | None = None,
+    captured_responses: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     import baostock as bs
 
@@ -1138,7 +1147,12 @@ def _baostock_fetch_day(
     if missing_set_retry_delay_seconds < 0:
         raise LaneRunError("missing_set_retry_delay_seconds must be non-negative")
     day = market_date.isoformat()
-    login_attempts = _baostock_login_with_retry(bs, socket_timeout_seconds=socket_timeout_seconds)
+    captured_responses = dict(captured_responses or {})
+    login_attempts = (
+        _baostock_login_with_retry(bs, socket_timeout_seconds=socket_timeout_seconds)
+        if any(_to_bs_code(code) not in captured_responses for code in codes) else 0
+    )
+    consecutive_provider_errors = 0
     fields = (
         "date,code,open,high,low,close,volume,amount,turn,pctChg,tradestatus,isST,"
         "peTTM,pbMRQ,psTTM,pcfNcfTTM"
@@ -1179,15 +1193,21 @@ def _baostock_fetch_day(
                 }
                 started = time.monotonic()
                 request_started_at = response_clock()
-                rows, err, msg, attempts, retry_errors = _baostock_query_day_with_retry(
-                    bs,
-                    code=bs_code,
-                    fields=fields,
-                    day=day,
-                    socket_timeout_seconds=socket_timeout_seconds,
-                )
-                acquired_at = _now_sh_iso()
-                raw_receipt = (
+                seed = captured_responses.pop(bs_code, None)
+                retry_errors: list[dict[str, str]]
+                if seed:
+                    rows, err, msg, attempts, retry_errors = seed["rows"], "0", "", 0, []
+                else:
+                    if not login_attempts:
+                        login_attempts = _baostock_login_with_retry(
+                            bs, socket_timeout_seconds=socket_timeout_seconds
+                        )
+                    rows, err, msg, attempts, retry_errors = _baostock_query_day_with_retry(
+                        bs, code=bs_code, fields=fields, day=day,
+                        socket_timeout_seconds=socket_timeout_seconds,
+                    )
+                acquired_at = seed["observed_at"] if seed else _now_sh_iso()
+                raw_receipt = seed["receipt"] if seed else (
                     capture_response(
                         request={**request, "representation": "lossless_sdk_strings"},
                         raw=json.dumps(
@@ -1221,11 +1241,20 @@ def _baostock_fetch_day(
                         "duration_seconds": round(time.monotonic() - started, 3),
                         "attempts": attempts,
                         "initial_login_attempts": login_attempts,
+                        "source_disposition": (
+                            "verified_original_response_reuse" if seed else "new_request"
+                        ),
                         "raw_receipt": raw_receipt,
                         "retry_errors": retry_errors,
                         "scan_round": scan_round,
                     }
                 )
+                if err not in {"0", "empty_response", "target_date_missing"}:
+                    consecutive_provider_errors += 1
+                    if consecutive_provider_errors >= 3:
+                        raise LaneRunError("BAOSTOCK_PROVIDER_FAILURE_CIRCUIT: " + err)
+                else:
+                    consecutive_provider_errors = 0
                 if err != "0" or matching is None:
                     next_missing.append(code)
                     continue
@@ -1292,7 +1321,8 @@ def _baostock_fetch_day(
                 }
             remaining = next_missing
     finally:
-        bs.logout()
+        if login_attempts:
+            bs.logout()
     return (
         [bars_by_code[code] for code in codes if code in bars_by_code],
         [status_by_code[code] for code in codes if code in status_by_code],
@@ -1304,13 +1334,18 @@ def _baostock_fetch_index_day(
     market_date: date,
     *,
     socket_timeout_seconds: float = 30,
+    captured_responses: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Fetch the contract's daily index set directly from Baostock."""
 
     import baostock as bs
 
     day = market_date.isoformat()
-    login_attempts = _baostock_login_with_retry(bs, socket_timeout_seconds=socket_timeout_seconds)
+    captured_responses = captured_responses or {}
+    login_attempts = (
+        _baostock_login_with_retry(bs, socket_timeout_seconds=socket_timeout_seconds)
+        if any(code not in captured_responses for code in INDEX_CODES.values()) else 0
+    )
     fields = "date,code,open,high,low,close,volume,amount,pctChg"
     rows_out: list[dict[str, Any]] = []
     log_rows: list[dict[str, Any]] = []
@@ -1327,14 +1362,16 @@ def _baostock_fetch_index_day(
                 "fields": fields,
             }
             started = time.monotonic()
-            rows, err, msg, attempts, retry_errors = _baostock_query_day_with_retry(
-                bs,
-                code=bs_code,
-                fields=fields,
-                day=day,
-                socket_timeout_seconds=socket_timeout_seconds,
-            )
-            acquired_at = _now_sh_iso()
+            seed = captured_responses.get(bs_code)
+            retry_errors: list[dict[str, str]]
+            if seed:
+                rows, err, msg, attempts, retry_errors = seed["rows"], "0", "", 0, []
+            else:
+                rows, err, msg, attempts, retry_errors = _baostock_query_day_with_retry(
+                    bs, code=bs_code, fields=fields, day=day,
+                    socket_timeout_seconds=socket_timeout_seconds,
+                )
+            acquired_at = seed["observed_at"] if seed else _now_sh_iso()
             log_rows.append(
                 {
                     "index_code": index_code,
@@ -1346,6 +1383,9 @@ def _baostock_fetch_index_day(
                     "duration_seconds": round(time.monotonic() - started, 3),
                     "attempts": attempts,
                     "initial_login_attempts": login_attempts,
+                    "source_disposition": (
+                        "verified_original_response_reuse" if seed else "new_request"
+                    ),
                     "retry_errors": retry_errors,
                 }
             )
@@ -1376,7 +1416,8 @@ def _baostock_fetch_index_day(
                     }
                 )
     finally:
-        bs.logout()
+        if login_attempts:
+            bs.logout()
     return rows_out, log_rows
 
 
@@ -1414,7 +1455,10 @@ def _ods_node_id() -> str:
 
 
 def _market_acquisition_metrics(log_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    request_rows = [row for row in log_rows if row.get("duration_seconds") is not None]
+    request_rows = [
+        row for row in log_rows if row.get("duration_seconds") is not None
+        and row.get("source_disposition") != "verified_original_response_reuse"
+    ]
     durations = [float(row["duration_seconds"]) for row in request_rows]
     stamps = [
         datetime.fromisoformat(str(row["acquired_at"])).astimezone(UTC)
@@ -1432,6 +1476,10 @@ def _market_acquisition_metrics(log_rows: Sequence[Mapping[str, Any]]) -> dict[s
             (int(row.get("readiness_poll") or 0) for row in log_rows), default=0
         ),
         "request_count": len(request_rows),
+        "reused_response_count": sum(
+            row.get("source_disposition") == "verified_original_response_reuse"
+            for row in log_rows
+        ),
         "empty_response_count": sum(
             str(row.get("response_error_code")) == "empty_response" for row in request_rows
         ),
@@ -1459,6 +1507,7 @@ def _baostock_wait_for_index_day(
     poll_interval_seconds: float,
     socket_timeout_seconds: float,
     progress_path: Path,
+    captured_responses: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Poll the complete sentinel index set before starting the stock scan."""
 
@@ -1474,6 +1523,7 @@ def _baostock_wait_for_index_day(
         latest_rows, poll_logs = _baostock_fetch_index_day(
             market_date,
             socket_timeout_seconds=socket_timeout_seconds,
+            **({"captured_responses": captured_responses} if captured_responses else {}),
         )
         for item in poll_logs:
             item["phase"] = "provider_readiness"
@@ -1497,6 +1547,7 @@ def _baostock_wait_for_index_day(
                 "checked_at": checked_at,
                 "deadline_at": deadline_at.isoformat(),
                 "ready": not missing,
+                "evidence_mode": "same_date_original_responses_or_new_queries",
                 "missing_indices": missing,
                 "requests": all_logs,
             },
@@ -1676,6 +1727,16 @@ def _build_market_open(
         ),
         "excluded_from_collection_window_experiment": recovery_deadline_at is not None,
     }
+    captured_responses = {}
+    if mode == "provider" and prevention_enabled():
+        from quanthus.providers.market_raw_reuse import load as load_market_raw
+
+        captured_responses = load_market_raw(
+            shadow=paths.shadow_root, day=market_date, landing=landing,
+            stock_codes={_to_bs_code(code) for code in codes},
+            index_codes=set(INDEX_CODES.values()), universe_digest=universe["universe_digest"],
+            converter_sha256=_sha256(Path(__file__)),
+        )
     try:
         if mode == "provider":
             if provider_readiness is None or completion_deadline is None:
@@ -1693,6 +1754,7 @@ def _build_market_open(
                 poll_interval_seconds=float(provider_readiness["poll_interval_seconds"]),
                 socket_timeout_seconds=socket_timeout_seconds,
                 progress_path=landing / "provider_readiness.json",
+                **({"captured_responses": captured_responses} if captured_responses else {}),
             )
             bars, status_rows, stock_log_rows = _baostock_fetch_day(
                 codes,
@@ -1703,6 +1765,7 @@ def _build_market_open(
                 ),
                 socket_timeout_seconds=socket_timeout_seconds,
                 deadline_at=completion_deadline_at,
+                **({"captured_responses": captured_responses} if captured_responses else {}),
             )
             log_rows = [*index_log_rows, *stock_log_rows]
         else:

@@ -50,6 +50,8 @@ def failure(
     key = _notification_key(day, stage, context or {})
     path = state_root / f"{key}.json"
     details = {"policy_id": POLICY_ID, "required_intervals": ["1d", "1m", "5m"], **(context or {})}
+    if stage == "daily_cycle":
+        details.update(policy_id="daily-core-v1", required_intervals=["1d"])
     with (state_root / f"{key}.lock").open("a+") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         pending = state_root / "pending" / f"{key}.json"
@@ -452,13 +454,28 @@ def main() -> int:
         if args.daily_cycle_service_stop
         else None,
     )
+    context: dict[str, Any] = {
+        "market_date_label": label, "error_code": "daily_cycle_service_failed",
+        "product_scope": "daily-core-v1",
+    }
+    reason = "daily-core ODS/DWD did not complete; inspect its exact stage record"
+    try:
+        cycle_record = object_at(DAILY / "operations/LATEST.json")
+        origin = os.environ.get("INVOCATION_ID")
+        if origin and cycle_record.get("invocation_id") == origin:
+            context["failed_phase"] = cycle_record.get("phase", "daily_cycle")
+            context["cycle_status"] = cycle_record.get("status")
+            context["candidate_market_date"] = cycle_record.get("through_date")
+            context["run_path"] = str(DAILY / "operations/LATEST.json")
+            if cycle_record.get("error"):
+                reason = mail._bounded_error(str(cycle_record["error"]))
+                if "BAOSTOCK_ACCESS_DENIED" in reason or "黑名单" in reason:
+                    context["error_code"] = "baostock_access_denied"
+    except (OSError, ValueError, TypeError):
+        pass
     record = failure(
-        day=target,
-        stage="daily_cycle",
-        state_root=JOURNAL / "notifications",
-        reason="independent daily ODS/DWD service failed; inspect its stage record; "
-        "this alert does not imply both acquisition and build failed",
-        context={"market_date_label": label, "error_code": "daily_cycle_service_failed"},
+        day=target, stage="daily_cycle", state_root=JOURNAL / "notifications",
+        reason=reason, context=context,
     )
     print(json.dumps(record, sort_keys=True))
     return 0

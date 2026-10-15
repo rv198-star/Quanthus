@@ -121,7 +121,14 @@ def main(argv: list[str] | None = None) -> int:
             "minute_products": "separate_not_qualified_by_daily_core",
         }
         _write(core / "operations/LATEST.json", {**state, "status": "initializing"})
+
+        def checkpoint(phase: str) -> None:
+            state["phase"] = phase
+            _write(run / "run.json", {**state, "status": "running"})
+            _write(core / "operations/LATEST.json", {**state, "status": "running"})
+
         try:
+            checkpoint("verify_prior_daily")
             after = (
                 _verified_pointer(pointer)
                 if pointer.exists()
@@ -137,6 +144,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 if (through - after).days > 45:
                     raise ValueError("calendar catch-up exceeds bounded 45-day recovery window")
+                checkpoint("calendar")
                 with redirect_stdout(io.StringIO()):
                     calendar = fetch_baostock_calendar(after + timedelta(days=1), through)
                 dates = pending_market_dates(after, through, calendar)
@@ -153,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
                 state["status"] = "caught_up_to_latest_completed_session"
             else:
                 for target in dates[: args.max_sessions]:
+                    state["phase"] = "ods_and_dwd"
                     remaining = args.max_wall_seconds - (time.monotonic() - started)
                     if remaining < 60:
                         state["status"] = "bounded_budget_exhausted"
@@ -215,6 +224,7 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError, RuntimeError) as exc:
             state["status"] = "blocked_required_core_evidence"
             state["error"] = str(exc)[:1500]
+            state["error_class"] = type(exc).__name__
             result = 2
         state["elapsed_seconds"] = round(time.monotonic() - started, 3)
         _write(run / "run.json", state)

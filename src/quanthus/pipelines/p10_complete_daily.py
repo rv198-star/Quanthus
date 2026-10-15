@@ -304,7 +304,7 @@ def build(
             raise ValueError("no complete Daily pointer regression")
         binding = prior
         if prior and prior["market_date"] == daily_manifest["market_date"]:
-            old = verify(safe_path(output_root, prior["manifest_path"]).parent)
+            old = verified_prior(output_root, prior)
             if (
                 old["member_manifest_sha256"] == identities
                 and old["code_revision"] == code_revision
@@ -548,6 +548,44 @@ def verify(
         "prior": manifest["prior"],
         "domain_manifest_sha256": manifest.get("domain_manifest_sha256", {}),
     }
+
+
+def verified_prior(root: Path, pointer: dict[str, Any]) -> dict[str, Any]:
+    """Reuse an admitted prior for revision identity after full physical hashing.
+
+    Only a missing receipt permits cold verification. A mismatched existing
+    receipt fails closed. New members and standalone verify remain unchanged.
+    """
+    package = safe_path(root, pointer["manifest_path"]).parent
+    path = root / "verification" / (pointer["manifest_sha256"][7:] + ".json")
+    if not path.exists():
+        return verify(package)
+    if object_at(root / "date-pointers" / (pointer["market_date"] + ".json")) != pointer:
+        raise ValueError("prior dated pointer differs from exact current")
+    receipt = accepted(root, date.fromisoformat(pointer["market_date"]))
+    manifest = verify_seal(package, KIND)
+    fields = (
+        "package_id",
+        "market_date",
+        "content_digest",
+        "base",
+        "member_manifest_sha256",
+        "code_revision",
+        "minute_row_counts",
+        "consumable_intervals",
+        "minute_quality_grades",
+        "prior",
+    )
+    if (
+        not set(fields + ("manifest_sha256", "domain_manifest_sha256")).issubset(receipt)
+        or any(receipt[key] != manifest[key] for key in fields)
+        or receipt.get("domain_manifest_sha256", {}) != manifest.get("domain_manifest_sha256", {})
+        or receipt["manifest_sha256"] != file_digest(package / "manifest.json")
+        or pointer.get("package_id") != manifest["package_id"]
+        or pointer.get("base") != manifest["base"]
+    ):
+        raise ValueError("prior actual verification receipt differs from physical closure")
+    return receipt
 
 
 def publish(root: Path, package: Path, verified: dict[str, Any]) -> dict[str, Any]:

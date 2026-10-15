@@ -119,8 +119,16 @@ def failure(
             old = state_root / f"{_notification_key(day, alias, key_context)}.json"
             if old.exists():
                 with suppress(OSError, ValueError, KeyError):
-                    incident.acknowledge(state_root, day, group, object_at(old))
+                    incident.acknowledge(state_root, day, group, {
+                        **object_at(old), "market_date_label": key_context.get("market_date_label"),
+                    })
                 return {**object_at(old), "status": "already_sent"}
+            queued = state_root / "pending" / old.name
+            if queued.exists():
+                original = object_at(queued)
+                key = queued.stem
+                group = original["context"].get("notification_group", original["stage"])
+                break
     path = state_root / f"{key}.json"
     details = {"policy_id": POLICY_ID, "required_intervals": ["1d", "1m", "5m"], **(context or {})}
     if decision and decision["action"] != "legacy":
@@ -148,7 +156,9 @@ def failure(
         payload = object_at(pending)
         frozen_stage = str(payload.get("stage", ""))
         stage_matches = frozen_stage == stage or (
-            group == "daily_ods" and frozen_stage in {
+            group in {"daily_ods", "daily_cycle", "domain_daily", "acquisition_quality"}
+            and stage in {"daily_ods", "daily_cycle", "domain_daily", "acquisition_quality"}
+            and frozen_stage in {
                 "daily_ods", "daily_cycle", "domain_daily", "acquisition_quality",
             }
         )
@@ -158,7 +168,7 @@ def failure(
             or not stage_matches
             or not isinstance(payload.get("reason"), str)
             or not isinstance(payload.get("context"), dict)
-            or _notification_key(day, payload["context"].get("notification_group", stage),
+            or _notification_key(day, payload["context"].get("notification_group", frozen_stage),
                                  payload["context"]) != key
         ):
             raise ValueError("pending notification identity differs")
@@ -193,6 +203,7 @@ def failure(
             "policy_id": POLICY_ID,
             "idempotency_key": key,
             "sent_at": datetime.now(timezone.utc).isoformat(),
+            "market_date_label": payload["context"].get("market_date_label", "交易日"),
             **sent,
         }
         atomic(path, record)
@@ -253,7 +264,7 @@ def reconcile_successes(state_root: Path) -> list[dict[str, Any]]:
     """Recover a missed enqueue for only today's two authoritative operating targets."""
     if state_root != incident.CN01_NOTES:
         return []
-    from quanthus.pipelines.p10_complete_daily_schedule import target_for
+    from quanthus.pipelines.p10_complete_daily_schedule import checkpoint, target_for
 
     now = datetime.now(trial.CST)
     try:
@@ -270,6 +281,7 @@ def reconcile_successes(state_root: Path) -> list[dict[str, Any]]:
         potential = {target_for(now, calendar["rows"], daily=True),
                      target_for(now, calendar["rows"])}
         targets = {day for day in potential if day is not None}
+        minute_target = target_for(now, calendar["rows"])
     except (OSError, ValueError, KeyError, TypeError):
         return [{"status": "completion_reconciliation_calendar_unavailable"}]
     results = []
@@ -277,6 +289,10 @@ def reconcile_successes(state_root: Path) -> list[dict[str, Any]]:
         if not trial.success_enabled(day):
             continue
         for stage in SUCCESS_EVENTS:
+            if stage == "minutes" and (
+                day != minute_target or now < checkpoint(day, "minute_start", calendar["rows"])
+            ):
+                continue
             key = _notification_key(day, stage, {"notification_outcome": "success"})
             if any(path.exists() for path in [state_root / f"{key}.json",
                                               state_root / "pending" / f"{key}.json"]):

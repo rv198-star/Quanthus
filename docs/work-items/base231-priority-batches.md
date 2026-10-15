@@ -474,3 +474,20 @@ page totals do not qualify. This layout contract supplies neither currency nor
 approval: the same-event explicit currency and approved-scheme checks still apply.
 Domain replay and both independent source-denied cold reads remain mandatory;
 this adapter alone does not qualify a complete successor image or a consumer.
+
+### Explicit nature-first physical holder matrices
+
+`explicit-native-holder-nature-first-columns-v1` is a separate opt-in source
+layout. It binds split PDF title/header words to the complete native table,
+orders name, nature, percentage, quantity and the next explicit source column,
+then reconciles every complete name and quantity against exactly ten hint ranks.
+Percentages require native percent signs; categories require their complete
+source text. Quantity digits are joined only inside that physical quantity cell.
+Source annotations remain evidence, not aliases or inferred shareholders.
+The complete following strategic-investor label may close the table across a
+page boundary; unrecognized labels, missing digits/rows/units and unknown geometry
+remain fail-closed. Reports stating units in 份 are not silently changed to 股.
+Offline replay requires both physical-parser module hashes and this exact layout
+contract. Existing source layouts keep their previous explicit contracts.
+These are late governance observations, not repaired historical knowledge times,
+cross-provider precedence, complete successor acceptance or consumer admission.

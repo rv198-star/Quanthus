@@ -26,12 +26,16 @@ def extract_physical_layout(
 ) -> str | None:
     if "physical_layout_contract" not in candidate:
         return None
+    from .base231_holder_nature_first import CONTRACT_ID as NATURE_FIRST_CONTRACT
     from .base231_holder_physical_columns import CONTRACT_ID as PHYSICAL_CONTRACT
 
     module = "src/quanthus/pipelines/securities_warehouse/base231_holder_physical_columns.py"
+    nature_module = "src/quanthus/pipelines/securities_warehouse/base231_holder_nature_first.py"
     if (
-        candidate["physical_layout_contract"] != PHYSICAL_CONTRACT
+        candidate["physical_layout_contract"] not in {PHYSICAL_CONTRACT, NATURE_FIRST_CONTRACT}
         or code_inputs.get(module) != file_sha(Path(module))
+        or candidate["physical_layout_contract"] == NATURE_FIRST_CONTRACT
+        and code_inputs.get(nature_module) != file_sha(Path(nature_module))
     ):
         raise BoundedError("OFFICIAL_HOLDER_PHYSICAL_CONTRACT_OR_CODE_UNPINNED")
     return subprocess.run(
@@ -274,6 +278,7 @@ def replay_official_holder(root: Path) -> dict[str, Any]:
                     company_org_bindings=org_bindings,
                     holding_type=spec["holding_type"],
                     physical_layout_xml=physical_xml,
+                    physical_layout_contract=candidate.get("physical_layout_contract"),
                 )
             except (RuntimeError, ValueError):
                 continue

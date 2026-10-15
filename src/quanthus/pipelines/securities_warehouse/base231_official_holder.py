@@ -1008,6 +1008,7 @@ def project_top_matrix(
     company_org_bindings: list[dict[str, Any]] | None = None,
     holding_type: str = "TOP_SHAREHOLDERS",
     physical_layout_xml: str | None = None,
+    physical_layout_contract: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     import pyarrow as pa  # type: ignore[import-untyped]
 
@@ -1077,14 +1078,22 @@ def project_top_matrix(
         raise BoundedError("OFFICIAL_HOLDER_TABLE_KIND_UNREVIEWED")
     revision = CONTRACT_ID
     if physical_layout_xml is not None:
+        from .base231_holder_nature_first import CONTRACT_ID as NATURE_FIRST_CONTRACT
+        from .base231_holder_nature_first import parse_nature_first_matrix
         from .base231_holder_physical_columns import CONTRACT_ID as PHYSICAL_CONTRACT
         from .base231_holder_physical_columns import parse_physical_top_matrix
 
         if holding_type != "TOP_SHAREHOLDERS":
             raise BoundedError("OFFICIAL_HOLDER_PHYSICAL_TABLE_KIND_UNREVIEWED")
-        atoms, proof = parse_physical_top_matrix(physical_layout_xml, hints)
+        if physical_layout_contract == NATURE_FIRST_CONTRACT:
+            atoms, proof = parse_nature_first_matrix(physical_layout_xml, hints)
+            revision = CONTRACT_ID + "+" + NATURE_FIRST_CONTRACT
+        elif physical_layout_contract in {None, PHYSICAL_CONTRACT}:
+            atoms, proof = parse_physical_top_matrix(physical_layout_xml, hints)
+            revision = CONTRACT_ID + "+" + PHYSICAL_CONTRACT
+        else:
+            raise BoundedError("OFFICIAL_HOLDER_PHYSICAL_TABLE_CONTRACT_UNREVIEWED")
         proof["original_text_body_sha256"] = digest(body)
-        revision = CONTRACT_ID + "+" + PHYSICAL_CONTRACT
     else:
         atoms, proof = (
             parse_top_matrix(body, hints)

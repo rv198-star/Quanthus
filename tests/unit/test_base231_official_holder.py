@@ -874,3 +874,46 @@ def test_column_floating_never_infers_missing_atoms_or_rows(fault):
         hints[0]["HOLDER_RANK"] = 2
     with pytest.raises(RuntimeError):
         parse_floating_matrix(body, hints)
+
+
+@pytest.mark.parametrize("variant", ["joined_header", "wrapped_header"])
+def test_column_floating_explicit_alternative_header_and_annual_page(variant):
+    from quanthus.pipelines.securities_warehouse.base231_official_holder import (
+        parse_floating_matrix,
+    )
+
+    body, hints = column_floating_sample()
+    body = body.replace(
+        "报告期末持有无限售条件股份数量",
+        "持有无限售条件流通股的数量"
+        if variant == "joined_header"
+        else "持有无限售条件\n流通股的数量",
+    )
+    body = (
+        body.replace("股份种类     数量", "种类     数量")
+        .replace("合成公司2025年半年度报告全文", "合成公司2025年年度报告")
+        .replace("\n12\n", "\n12 / 200\n")
+    )
+    body = body.replace("前10名无限售流通股股东之间关联关系说明", "前十名股东中回购专户情况说明")
+    rows, proof = parse_floating_matrix(body, hints)
+    assert len(rows) == 10 and rows[0]["quantity"] == 1001
+    assert proof["name_prefix_annotations"] == [dict(rank=1, marker="#")]
+
+
+def test_floating_quantity_header_may_wrap_only_in_same_physical_column():
+    from quanthus.pipelines.securities_warehouse.base231_official_holder import (
+        parse_floating_matrix,
+    )
+
+    body, hints = column_floating_sample()
+    body = body.replace(
+        "股东名称          报告期末持有无限售条件股份数量        股份种类",
+        " " * 30 + "持有无限售条件       股份种类及数量\n股东名称\n" + " " * 31 + "流通股的数量",
+    )
+    body = body.replace("股份种类     数量", "种类     数量")
+    rows, _ = parse_floating_matrix(body, hints)
+    assert len(rows) == 10
+    with pytest.raises(RuntimeError):
+        parse_floating_matrix(
+            body.replace(" " * 31 + "流通股的数量", " " * 2 + "流通股的数量"), hints
+        )

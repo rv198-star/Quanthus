@@ -620,6 +620,7 @@ def parse_floating_matrix(
         if str(error) not in {
             "OFFICIAL_FLOATING_UNIQUE_COMPLETE_MATRIX_REQUIRED",
             "OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN",
+            "OFFICIAL_FLOATING_SPLIT_SHARE_CLASS_UNPROVEN",
         }:
             raise
     try:
@@ -629,6 +630,7 @@ def parse_floating_matrix(
             "OFFICIAL_FLOATING_UNIQUE_COMPLETE_MATRIX_REQUIRED",
             "OFFICIAL_FLOATING_EXPLICIT_PHYSICAL_COLUMNS_REQUIRED",
             "OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN",
+            "OFFICIAL_FLOATING_SPLIT_SHARE_CLASS_UNPROVEN",
         }:
             raise
     return _parse_column_floating_matrix(body, hints)
@@ -661,7 +663,15 @@ def _parse_column_floating_matrix(
         (
             i
             for i in range(start + 1, len(lines))
-            if _norm(lines[i]).startswith(("前10名无限售流通", "前十名无限售流通", "上述股东"))
+            if _norm(lines[i]).startswith(
+                (
+                    "前10名无限售流通",
+                    "前十名无限售流通",
+                    "上述股东",
+                    "前十名股东中回购专户",
+                    "前10名股东中回购专户",
+                )
+            )
         ),
         None,
     )
@@ -673,11 +683,27 @@ def _parse_column_floating_matrix(
     )
     first = next((i for i, line in enumerate(block) if anchor.fullmatch(line)), len(block))
     header = _norm("".join(block[:first]))
-    if not all(
-        t in header for t in ["股东名称", "报告期末持有无限售条件股份数量", "股份种类", "数量"]
+    split_quantity_columns = [
+        match.start() for line in block[:first] for match in re.finditer("持有无限售条件", line)
+    ]
+    split_quantity_suffixes = [
+        match.start() for line in block[:first] for match in re.finditer("流通股的数量", line)
+    ]
+    split_quantity_header = (
+        len(split_quantity_columns) == len(split_quantity_suffixes) == 1
+        and abs(split_quantity_columns[0] - split_quantity_suffixes[0]) <= 2
+    )
+    if not all(t in header for t in ["股东名称", "股份种类", "数量"]) or not (
+        split_quantity_header
+        or any(
+            label in header
+            for label in ["报告期末持有无限售条件股份数量", "持有无限售条件流通股的数量"]
+        )
     ):
         raise BoundedError("OFFICIAL_FLOATING_EXPLICIT_PHYSICAL_COLUMNS_REQUIRED")
-    headers = [i for i, line in enumerate(block[:first]) if re.search(r"股份种类\s+数量", line)]
+    headers = [
+        i for i, line in enumerate(block[:first]) if re.search(r"(?:股份)?种类\s+数量", line)
+    ]
     if len(headers) != 1:
         raise BoundedError("OFFICIAL_FLOATING_EXPLICIT_PHYSICAL_COLUMNS_REQUIRED")
     data_start = headers[0] + 1
@@ -695,12 +721,12 @@ def _parse_column_floating_matrix(
             fragment = _norm(line)
             if not fragment:
                 continue
-            if re.fullmatch(r".{1,80}[0-9]{4}年(?:半年度|年度|第[一二三四]季度)报告全文", fragment):
+            if re.fullmatch(
+                r".{1,80}[0-9]{4}年(?:半年度|年度|第[一二三四]季度)报告(?:全文)?", fragment
+            ):
                 continue
-            if (
-                fragment.isdecimal()
-                and len(fragment) <= 4
-                and any("报告全文" in nearby for nearby in block[max(0, i - 2) : i + 3])
+            if re.fullmatch(r"[0-9]{1,4}(?:/[0-9]{1,4})?", fragment) and any(
+                "报告" in nearby for nearby in block[max(0, i - 3) : i + 4]
             ):
                 continue
         parts.append(fragment)

@@ -60,16 +60,30 @@ def parse_top_matrix(
         if str(error) not in {
             "OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN",
             "OFFICIAL_HOLDER_EXACT_QUANTITY_OR_PERCENTAGE_CONFLICT",
+            "OFFICIAL_HOLDER_COMPLETE_ROW_EXTENT_UNPROVEN",
         }:
             raise
     # Preserve the already qualified source grammar. A separate explicit-column
     # family may resolve wrapped non-name cells, but never weakens full names,
     # complete ranks or original quantity reconciliation.
-    return _parse_top_matrix(body, hints, physical_name_cells=True)
+    try:
+        return _parse_top_matrix(body, hints, physical_name_cells=True)
+    except BoundedError as error:
+        if str(error) not in {
+            "OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN",
+            "OFFICIAL_HOLDER_EXACT_QUANTITY_OR_PERCENTAGE_CONFLICT",
+            "OFFICIAL_HOLDER_COMPLETE_ROW_EXTENT_UNPROVEN",
+        }:
+            raise
+    return _parse_top_matrix(body, hints, physical_name_cells=True, raw_name_cells=True)
 
 
 def _parse_top_matrix(
-    body: str, hints: list[dict[str, Any]], *, physical_name_cells: bool
+    body: str,
+    hints: list[dict[str, Any]],
+    *,
+    physical_name_cells: bool,
+    raw_name_cells: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not isinstance(body, str) or not 0 < len(body.encode()) <= 16 * 1024**2:
         raise BoundedError("OFFICIAL_HOLDER_BODY_BOUND")
@@ -78,6 +92,8 @@ def _parse_top_matrix(
     if physical_name_cells:
         body = _join_explicit_lending_delta(body)
     wrapped_nature = _WRAPPED_NATURE + ("|国有|非国|有法" if body != original_body else "")
+    if physical_name_cells:
+        wrapped_nature += "|境内自|境外自"
     lines = body.splitlines()
     starts = [
         i
@@ -138,8 +154,9 @@ def _parse_top_matrix(
         # column. Merely finding the words elsewhere does not grant a column.
         if physical_name_cells and not positions:
             pairs = {
-                "报告期内增减": [("报告期", "内增减"), ("报告期内增", "减")],
-                "股东性质": [("股东", "性质")],
+                "报告期内增减": [("报告期", "内增减"), ("报告期内增", "减"), ("报告期内", "增减")],
+                "股东性质": [("股东", "性质"), ("股东性", "质")],
+                "期末持股数": [("期末持股", "数量")],
             }
             wrapped = set()
             for first, second in pairs.get(label, []):
@@ -149,7 +166,7 @@ def _parse_top_matrix(
                             2 if unicodedata.east_asian_width(c) in {"W", "F"} else 1
                             for c in line[: match.start()]
                         )
-                        for following in block[n + 1 : min(n + 3, first_numeric)]:
+                        for following in block[n + 1 : min(n + 5, first_numeric)]:
                             for other in re.finditer(re.escape(second), following):
                                 right = sum(
                                     2 if unicodedata.east_asian_width(c) in {"W", "F"} else 1
@@ -158,7 +175,7 @@ def _parse_top_matrix(
                                 # A centered one-character second line need
                                 # not begin at the first line's left edge.
                                 centered = abs(left + len(first) - right - len(second)) <= 4
-                                if match.start() == other.start() or (
+                                if abs(match.start() - other.start()) <= 2 or (
                                     abs(left - right) <= 4 and centered
                                 ):
                                     wrapped.add(left)
@@ -220,7 +237,7 @@ def _parse_top_matrix(
         name_fence = None
 
     def name_cell(line: str) -> str:
-        if lending_column and raw_name_fence is not None:
+        if (lending_column or raw_name_cells) and nature_last and raw_name_fence is not None:
             if _norm(line[:raw_name_fence]) in {"(全称)", "股东名称"}:
                 return line[:raw_name_fence].strip()
             remainder = _norm(line[raw_name_fence:])
@@ -255,10 +272,14 @@ def _parse_top_matrix(
         r"[0-9][0-9,]*(?:\.[0-9]+)?\s+"
         + (r"[0-9][0-9,]*(?:\.[0-9]+)?\s+" if lending_column else "")
         + r"(?:无|质押|冻结|不适用|标记)\s+"
-        r"[0-9][0-9,]*(?:\.[0-9]+)?"
+        + (
+            r"(?:[0-9][0-9,]*(?:\.[0-9]+)?|/|未知)?"
+            if physical_name_cells
+            else r"[0-9][0-9,]*(?:\.[0-9]+)?"
+        )
         + (
             r"(?:\s+(" + wrapped_nature + r"))?\s*$"
-            if lending_column
+            if lending_column or physical_name_cells
             else r"\s+(" + _NATURE + r")\s*$"
         )
     )

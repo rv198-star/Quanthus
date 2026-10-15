@@ -917,3 +917,67 @@ def test_floating_quantity_header_may_wrap_only_in_same_physical_column():
         parse_floating_matrix(
             body.replace(" " * 31 + "流通股的数量", " " * 2 + "流通股的数量"), hints
         )
+
+
+@pytest.mark.parametrize("state_quantity", ["", "/", "未知"])
+def test_top_matrix_does_not_require_unrelated_pledge_quantity(state_quantity):
+    body, hints = nature_last_sample()
+    body = body.replace("无  0  其他", "无  " + state_quantity + "  其他")
+    rows, _ = parse_top_matrix(body, hints)
+    assert len(rows) == 10 and rows[0]["quantity"] == 1001 and rows[0]["percentage"] == 1
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("1001", "1002", 1), hints)
+
+
+def test_top_split_header_columns_keep_explicit_order_and_unknown_nature():
+    body, hints = nature_last_sample()
+
+    def physical(cells):
+        value = ""
+        for col, text in cells:
+            width = sum(2 if ord(c) > 127 else 1 for c in value)
+            value += " " * max(0, col - width) + text
+        return value
+
+    header = "\n".join(
+        [
+            physical(
+                [(0, "股东名称"), (14, "报告期内"), (30, "期末持股"), (48, "比例"), (65, "股东性")]
+            ),
+            physical([(15, "增减"), (31, "数量"), (48, "(%)")]),
+            physical([(66, "质")]),
+        ]
+    )
+    body = body.replace(
+        "股东名称  报告期内增减  期末持股数量  比例（%）  有限售股份  股份状态  数量  股东性质",
+        header,
+    )
+    rows, _ = parse_top_matrix(body, hints)
+    assert len(rows) == 10 and rows[0]["quantity"] == 1001
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("期末持股", "未知数量"), hints)
+
+
+def test_top_physical_raw_name_column_does_not_clip_wide_characters():
+    body, hints = nature_last_sample()
+    old = next(x for x in body.splitlines() if "报告期内增减" in x)
+    header = "股东名称     报告期内增减      期末持股数量        比例（%）           股东性质"
+    body = body.replace(old, header)
+    for n, h in enumerate(hints, 1):
+        name = f"合成股东全称{n}甲乙丙"
+        body = body.replace(h["HOLDER_NAME"] + "  -2", name + "  -2", 1)
+        h["HOLDER_NAME"] = name
+    rows, _ = parse_top_matrix(body, hints)
+    assert [r["name"] for r in rows] == [h["HOLDER_NAME"] for h in hints]
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("甲乙丙", "甲乙丁", 1), hints)
+
+
+def test_top_missing_wrapped_nature_remains_unknown_without_changing_numeric_atoms():
+    body, hints = nature_last_sample()
+    body = body.replace("无  0  其他", "无  /  ", 1)
+    rows, _ = parse_top_matrix(body, hints)
+    assert len(rows) == 10 and rows[0]["category"] is None
+    assert rows[0]["quantity"] == 1001 and rows[0]["raw_percentage"] == "1.00"
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("无  /  ", "不明状态  /  ", 1), hints)

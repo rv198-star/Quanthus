@@ -12,6 +12,7 @@ from typing import Any, cast
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 from quanthus.providers.acquisition_evidence import capture, clock, decimal_token
 from quanthus.providers.daily_source_failover import (
@@ -242,7 +243,11 @@ def reuse(
             if request["code"] != expected_symbol:
                 raise ValueError("TENCENT_REUSE_EXCHANGE_IDENTITY_DIFFERS")
             stamp = datetime.fromisoformat(envelope["response_completed_at"])
-            if stamp.tzinfo is None or stamp > datetime.now(timezone.utc):
+            if (
+                stamp.tzinfo is None
+                or stamp > datetime.now(timezone.utc)
+                or stamp.astimezone(ZoneInfo("Asia/Shanghai")).date() < day
+            ):
                 raise ValueError("TENCENT_REUSE_OBSERVATION_CLOCK_INVALID")
             raw = base64.b64decode(envelope["raw_base64"], validate=True)
             if len(raw) > 2 * 1024 * 1024:

@@ -471,3 +471,29 @@ def test_nonexact_index_evidence_blocks_tencent_before_collection(tmp_path, monk
     with pytest.raises(router.SourceUnavailable, match="INDEX_EVIDENCE_MISSING"):
         market.acquire(**args)
     assert calls == []
+
+
+def test_hash_valid_pre_target_clock_cannot_supply_future_business_observation(tmp_path):
+    from quanthus.providers.acquisition_evidence import capture
+
+    root = (
+        tmp_path
+        / "shadow/attempts/market-daily-core"
+        / str(DAY)
+        / "first/landing/original-responses"
+    )
+    capture(
+        root=root,
+        request={
+            "provider": "tencent",
+            "code": "sz000001",
+            "basis": "none",
+            "market_date": str(DAY),
+        },
+        raw=payload(),
+        started_at="2026-10-14T10:00:00+00:00",
+        completed_at="2026-10-14T10:00:00+00:00",
+        status="200",
+    )
+    with pytest.raises(ValueError, match="OBSERVATION_CLOCK_INVALID"):
+        tx.reuse(tmp_path / "shadow", tmp_path / "new", DAY, {"000001"})

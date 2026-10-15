@@ -57,7 +57,10 @@ def parse_top_matrix(
     try:
         return _parse_top_matrix(body, hints, physical_name_cells=False)
     except BoundedError as error:
-        if str(error) != "OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN":
+        if str(error) not in {
+            "OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN",
+            "OFFICIAL_HOLDER_EXACT_QUANTITY_OR_PERCENTAGE_CONFLICT",
+        }:
             raise
     # Preserve the already qualified source grammar. A separate explicit-column
     # family may resolve wrapped non-name cells, but never weakens full names,
@@ -125,7 +128,34 @@ def _parse_top_matrix(
             for line in block[:first_numeric]
             if (pos := line.find(label)) >= 0
         }
-        return next(iter(positions)) if len(positions) == 1 else None
+        if len(positions) == 1:
+            return next(iter(positions))
+        # The fallback family binds split header words to the same physical
+        # column. Merely finding the words elsewhere does not grant a column.
+        if physical_name_cells and not positions:
+            pairs = {
+                "报告期内增减": [("报告期", "内增减"), ("报告期内增", "减")],
+                "股东性质": [("股东", "性质")],
+            }
+            wrapped = set()
+            for first, second in pairs.get(label, []):
+                for n, line in enumerate(block[:first_numeric]):
+                    for match in re.finditer(re.escape(first), line):
+                        left = sum(
+                            2 if unicodedata.east_asian_width(c) in {"W", "F"} else 1
+                            for c in line[: match.start()]
+                        )
+                        for following in block[n + 1 : min(n + 3, first_numeric)]:
+                            for other in re.finditer(re.escape(second), following):
+                                right = sum(
+                                    2 if unicodedata.east_asian_width(c) in {"W", "F"} else 1
+                                    for c in following[: other.start()]
+                                )
+                                if match.start() == other.start() and abs(left - right) <= 4:
+                                    wrapped.add(left)
+            if len(wrapped) == 1:
+                return next(iter(wrapped))
+        return None
 
     header_columns = [column(label) for label in ["报告期内增减", "期末持股数", "比例", "股东性质"]]
     percentage_column = next(
@@ -181,6 +211,13 @@ def _parse_top_matrix(
         name_fence = None
 
     def name_cell(line: str) -> str:
+        if lending_column and raw_name_fence is not None:
+            if _norm(line[:raw_name_fence]) in {"(全称)", "股东名称"}:
+                return line[:raw_name_fence].strip()
+            remainder = _norm(line[raw_name_fence:])
+            if remainder and remainder not in _WRAPPED_NATURE.split("|"):
+                return line.strip()
+            return line[:raw_name_fence].strip()
         if name_fence is None:
             return re.split(r"\s{2,}", line.strip())[0]
         width = 0
@@ -190,11 +227,28 @@ def _parse_top_matrix(
                 return line[:i].strip()
         return line.strip()
 
+    lending_column = bool(
+        physical_name_cells
+        and nature_last
+        and all(token in header for token in ("包含转", "融通借", "出股份"))
+    )
+    raw_fences = {
+        match.start() for line in block[:first_numeric] for match in re.finditer("报告期", line)
+    }
+    raw_name_fence = next(iter(raw_fences)) if len(raw_fences) == 1 else None
+    lending_column = lending_column and raw_name_fence is not None
     last_nature_pattern = re.compile(
         r"^(.*?)\s+[+-]?[0-9][0-9,]*(?:\.[0-9]+)?\s+"
         r"([0-9][0-9,]*(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)(%?)\s+"
-        r"[0-9][0-9,]*(?:\.[0-9]+)?\s+(?:无|质押|冻结|不适用|标记)\s+"
-        r"[0-9][0-9,]*(?:\.[0-9]+)?\s+(" + _NATURE + r")\s*$"
+        r"[0-9][0-9,]*(?:\.[0-9]+)?\s+"
+        + (r"[0-9][0-9,]*(?:\.[0-9]+)?\s+" if lending_column else "")
+        + r"(?:无|质押|冻结|不适用|标记)\s+"
+        r"[0-9][0-9,]*(?:\.[0-9]+)?"
+        + (
+            r"(?:\s+(" + _WRAPPED_NATURE + r"))?\s*$"
+            if lending_column
+            else r"\s+(" + _NATURE + r")\s*$"
+        )
     )
     anchor_pattern = (
         re.compile(
@@ -217,7 +271,7 @@ def _parse_top_matrix(
                     start=offset,
                     end=offset + len(fragment),
                     nature=(
-                        match[5]
+                        (match[5] if match[5] in _NATURE.split("|") else None)
                         if nature_last
                         else match[2]
                         if match[2] in _NATURE.split("|")

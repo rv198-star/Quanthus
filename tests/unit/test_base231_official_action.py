@@ -248,3 +248,51 @@ def test_legacy_sse_explicit_rmb_prefix_does_not_change_per_share_scale():
             venue="SSE",
             expected_ex_date=date(2026, 7, 15),
         )
+
+
+def test_physical_pdf_page_footer_can_split_explicit_currency_word():
+    from quanthus.pipelines.securities_warehouse.base22 import digest
+
+    body = BODY.replace("元人民币现金", "元人民币\n\n\n            1\n\f现金")
+    row, proof = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15)
+    )
+    assert row["cash_per_share"] == Decimal("0.25")
+    assert proof["source_body_sha256"] == digest(body)
+    assert proof["layout_normalization_contract"] == "pdf-explicit-rmb-cash-page-footer-v1"
+
+
+@pytest.mark.parametrize(
+    "separator", ["\n1\n\f", "\n            1\n", "1", "\n            12345\n\f"]
+)
+def test_unproven_numeric_fragments_are_not_silently_removed(separator):
+    body = BODY.replace("元人民币现金", "元人民币" + separator + "现金")
+    with pytest.raises(RuntimeError):
+        parse_distribution(body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15))
+
+
+@pytest.mark.parametrize("heading", [
+    "二、本次实施的权益分配方案", "二、本次权益分派实施方案", "二、A股权益分派方案"
+])
+@pytest.mark.parametrize(
+    "date_heading", ["三、分红派息日", "三、权益分派日期", "三、A股分红派息日期"]
+)
+def test_exact_implemented_section_heading_variants(heading, date_heading):
+    body = BODY.replace("二、本次实施的利润分配及资本公积金转增股本方案", heading)
+    body = body.replace("三、股权登记日与除权除息日", date_heading)
+    row, _ = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15)
+    )
+    assert row["cash_per_share"] == Decimal("0.25")
+    with pytest.raises(RuntimeError):
+        parse_distribution(body.replace("人民币", "美元"), code="003018", venue="SZSE",
+                           expected_ex_date=date(2026, 7, 15))
+
+
+def test_page_footer_rule_never_removes_a_fragment_inside_numeric_amount():
+    body = BODY.replace("2.50元", "2.\n            5\n\f50元")
+    row, proof = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15)
+    )
+    assert row["cash_per_share"] == Decimal("0.2550")
+    assert "layout_normalization_contract" not in proof

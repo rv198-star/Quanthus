@@ -71,7 +71,16 @@ def sse_distribution_dates(body: str) -> tuple[date, date]:
 def parse_distribution(
     body: str, *, code: str, venue: str, expected_ex_date: date
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    text = re.sub(r"\s+", "", body)
+    # A numeric footer may split a word across PDF pages. Only remove a
+    # standalone, indented page number inside the explicit RMB cash phrase.
+    # Ordinary numbers, table values and unmarked line breaks remain untouched.
+    layout_body = re.sub(
+        r"(?<=元人民币)[ \t]*\n(?:[ \t]*\n)*[ \t]{8,}[0-9]{1,4}[ \t]*\n\f"
+        r"[ \t]*(?=现金[（(【]含税)",
+        "\n",
+        body,
+    )
+    text = re.sub(r"\s+", "", layout_body)
     if (
         not re.fullmatch(r"\d{6}", code)
         or code not in text
@@ -82,9 +91,10 @@ def parse_distribution(
         raise BoundedError("OFFICIAL_ACTION_DOCUMENT_SCOPE_UNQUALIFIED")
     if venue == "SZSE":
         match = re.search(
-            r"二、(?:本次实施的|本次)?(?:权益分派方案|利润分配及资本公积金转增股本方案|"
+            r"二、(?:本次实施的|本次)?(?:A股)?(?:权益分派(?:实施)?方案|权益分配方案|"
+            r"利润分配及资本公积金转增股本方案|"
             r"(?:2026年(?:中期|半年度|年度))?利润分配方案)"
-            r"(.+?)三、(?:股权登记日[与及]除权除息日|分红派息日期)",
+            r"(.+?)三、(?:A股)?(?:股权登记日[与及]除权除息日|分红派息日期?|权益分派日期)",
             text,
         )
         if match is None:
@@ -186,6 +196,9 @@ def parse_distribution(
         },
         publication_instant=None,
     )
+    if layout_body != body:
+        proof["layout_normalization_contract"] = "pdf-explicit-rmb-cash-page-footer-v1"
+        proof["layout_body_sha256"] = digest(layout_body)
     return record, proof
 
 

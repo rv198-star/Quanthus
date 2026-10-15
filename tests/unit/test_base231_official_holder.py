@@ -521,3 +521,89 @@ def test_existing_strategic_heading_ends_even_with_interposed_right_hand_note():
         "名股东的情况（如有）\n上述股东关联关系的说明：未知",
     )
     assert len(parse_top_matrix(body, hints)[0]) == 10
+
+
+def lending_column_sample():
+    hints = [
+        dict(HOLDER_RANK=n, HOLDER_NAME=f"合成股东{n}", HOLD_NUM=str(1000 + n))
+        for n in range(1, 11)
+    ]
+    header = [
+        "单位：股",
+        "前十名股东持股情况（不含通过转融通出借股份）",
+        "                                                 持有   包含转   质押、标记或冻结",
+        "                                                 有限   融通借      情况",
+        "  股东名称      报告期                       比例         售条   出股份"
+        "                        股东",
+        "                        期末持股数量",
+        "  （全称）      内增减                       (%)        件股   的限售"
+        "                        性质",
+        "                                                            股份",
+        "                                                 份数   股份数         数量",
+        "                                                            状态",
+        "                                                  量    量",
+    ]
+    data = [f"{h['HOLDER_NAME']}  0  {h['HOLD_NUM']}  1.25  0  0  无  0  其他" for h in hints]
+    return "\n".join(header + data + ["前十名无限售条件股东持股情况"]), hints
+
+
+def test_wrapped_explicit_lending_header_preserves_complete_native_matrix():
+    body, hints = lending_column_sample()
+    rows, proof = parse_top_matrix(body, hints)
+    assert len(rows) == proof["rows"] == 10
+    assert rows[0]["quantity"] == 1001
+    assert rows[0]["raw_percentage"] == "1.25"
+
+
+def test_lending_column_wrapped_nature_stays_unknown_not_inferred():
+    body, hints = lending_column_sample()
+    body = body.replace(
+        "无  0  其他",
+        "无  0\n                              境内非国有法\n                              人",
+        1,
+    )
+    rows, _ = parse_top_matrix(body, hints)
+    assert rows[0]["category"] is None
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "header",
+        "order",
+        "unit",
+        "quantity",
+        "name",
+        "extra",
+        "missing",
+        "rank",
+        "unknown_right_cell",
+        "missing_column",
+    ],
+)
+def test_lending_column_family_fails_closed(fault):
+    body, hints = lending_column_sample()
+    if fault == "header":
+        body = body.replace("包含转", "未知列")
+    elif fault == "order":
+        body = body.replace("期末持股数量", "期末其他数量")
+    elif fault == "unit":
+        body = body.replace("单位：股", "单位：万股")
+    elif fault == "quantity":
+        body = body.replace("  1001  ", "  1002  ", 1)
+    elif fault == "name":
+        body = body.replace("合成股东1  ", "未知股东1  ", 1)
+    elif fault == "extra":
+        body = body.replace(
+            "前十名无限售", "额外股东  0  999  1.25  0  0  无  0  其他\n前十名无限售"
+        )
+    elif fault == "missing":
+        body = body.replace("合成股东1  0  1001  1.25  0  0  无  0  其他", "")
+    elif fault == "rank":
+        hints[7]["HOLDER_RANK"] = 7
+    elif fault == "unknown_right_cell":
+        body = body.replace("合成股东1  ", "              隐藏名称\n合成股东1  ", 1)
+    else:
+        body = body.replace("  0  0  无", "  0  无")
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body, hints)

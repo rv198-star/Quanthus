@@ -484,3 +484,43 @@ def test_distinct_producers_never_reuse_resend_key_across_outboxes(tmp_path, fro
         )
     assert len(sender) == 3 and len({request["key"] for request in sender}) == 3
     assert sender[0]["event"] != sender[1]["event"] != sender[2]["event"]
+
+
+def test_optional_mail_context_does_not_break_existing_notifications(monkeypatch):
+    from datetime import date
+
+    from quanthus import warehouse_notifications as mail
+
+    calls = []
+    monkeypatch.setenv("QUANTHUS_RESEND_API_KEY", "synthetic-not-a-real-key")
+    monkeypatch.setenv("QUANTHUS_RESEND_RETRIES", "0")
+
+    class Response:
+        status = 200
+
+        def getcode(self):
+            return self.status
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b'{"id":"offline-synthetic"}'
+
+    def send(request, **kwargs):
+        calls.append(request)
+        return Response()
+
+    monkeypatch.setattr(mail.request, "urlopen", send)
+    result = mail._send_resend(
+        event="p10_cn01_daily_ods_completed",
+        market_date=date(2026, 10, 15),
+        pointer=None,
+        result=None,
+        key="offline-optional-context",
+        context=None,
+    )
+    assert result["message_id"] == "offline-synthetic" and len(calls) == 1

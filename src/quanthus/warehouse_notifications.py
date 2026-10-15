@@ -445,7 +445,7 @@ def _send_resend(
         qualification = str(mail_context.get("research_qualification") or "未验证")
         outcome_text = f"{phase} {qualification} 质量降级"
     subject_stage = EVENTS[event]["stage"]
-    if context.get("delivery_scope") == "restricted_daily":
+    if mail_context.get("delivery_scope") == "restricted_daily":
         subject_stage = str(subject_stage) + "（受限日频）"
     if event in {"p10_cn01_minute_delivery_pass", "p10_cn01_minute_delivery_fail"}:
         phase = str(mail_context.get("executed_phase") or "")

@@ -2,6 +2,16 @@
 
 ## Current recovery checkpoint
 
+The October 16 continuation classifies the remaining exact official profile
+headers before qualification. The optional explicit-header fallback permits one
+labelled industry field between the transaction/company header and the unique
+security code, and ASCII/fullwidth parentheses only. It never searches subsidiary
+paragraphs for a company name. The prior 173 qualification proofs remain identical;
+13 additional source headers pass the bounded source-origin test, with native
+financial materialization and independent acceptance still separate. This is
+financial-only current knowledge, not historical ownership, legal continuity,
+listing extension, PIT admission or a complete successor image.
+
 The Owner's budget continuation is tracked by #525. Its single live ledger is
 `current-gaps.json` under the private CN02 review job
 `base231-budget-exhaustion-continuation-20261015T153555Z-c887578`; the older

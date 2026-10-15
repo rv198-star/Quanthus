@@ -95,3 +95,38 @@ def test_current_origin_financial_view_excludes_periods_before_reported_origin()
             observed_at=kw["observed_at"],
             contract=load_contract(Path("config/pipelines/base231-domains.v1.json")),
         )
+
+
+@pytest.mark.parametrize("industry", ["", "所属行业:       制造业\n"])
+@pytest.mark.parametrize("parentheses", [False, True])
+def test_explicit_profile_header_industry_and_parenthesis_typography(industry, parentheses):
+    kw = source()
+    name = "合成(上海)股份有限公司" if parentheses else kw["expected_name"]
+    native = name.replace("(", "（").replace(")", "）")
+    kw.update(expected_name=name, body=kw["body"].replace(
+        "合成股份有限公司          交易信息\n", native + "          交易信息\n" + industry))
+    _, _, proof = qualify_origin(**kw)
+    if industry or parentheses:
+        assert proof["header_layout_contract"] == "explicit-profile-header-typography-v1"
+        assert proof["header_name_typography_only"] is parentheses
+    assert proof["historical_PIT_qualified"] is False
+
+
+@pytest.mark.parametrize("fault", ["subsidiary", "different", "duplicate", "unlabelled",
+                                    "two_industry"])
+def test_profile_header_fallback_cannot_borrow_an_unrelated_name(fault):
+    kw = source()
+    name = kw["expected_name"]
+    if fault == "subsidiary":
+        prefix = name + "          交易信息\n子公司：另一股份有限公司\n"
+    elif fault == "different":
+        prefix = "另一股份有限公司          交易信息\n所属行业: 制造业\n"
+    elif fault == "duplicate":
+        prefix = name + "          交易信息\n" + name + "          交易信息\n所属行业: 制造业\n"
+    elif fault == "unlabelled":
+        prefix = name + "          交易信息\n制造业\n"
+    else:
+        prefix = name + "          交易信息\n所属行业: 制造业\n所属行业: 金融业\n"
+    kw["body"] = kw["body"].replace(name + "          交易信息\n", prefix)
+    with pytest.raises(RuntimeError, match="EXACT_ORIGINAL_NAME"):
+        qualify_origin(**kw)

@@ -51,8 +51,33 @@ def qualify_origin(
         raise BoundedError("OFFICIAL_PROFILE_UNIQUE_CODE_HEADER_REQUIRED")
     preceding = [line.strip() for line in body[:code_lines[0].start()].splitlines()
                  if line.strip()]
+    header_proof: dict[str, Any] = {}
     if not preceding or preceding[-1].split()[0] != expected_name:
-        raise BoundedError("OFFICIAL_PROFILE_EXACT_ORIGINAL_NAME_REQUIRED")
+        # A native profile may put its explicitly labelled industry between the
+        # company/transaction header and code. Only this one intervening field
+        # and ASCII/fullwidth parenthesis typography are accepted; a company
+        # mentioned in a business/subsidiary paragraph is never an identity.
+        candidate = preceding[-2:] if preceding else []
+        if candidate and re.fullmatch(r"所属行业[：:]\s*\S.*", candidate[-1]):
+            candidate.pop()
+        native_name = ""
+        if candidate:
+            header = re.fullmatch(r"(\S+)\s+交易信息", candidate[-1])
+            if header:
+                native_name = header.group(1)
+        typography = str.maketrans({"（": "(", "）": ")"})
+        header_lines = [line for line in preceding if re.fullmatch(r"\S+\s+交易信息", line)]
+        same_name = native_name.translate(typography) == expected_name.translate(typography)
+        if (not native_name or not same_name
+                or len(header_lines) != 1 or len(preceding) > 8
+                or preceding[-1] != header_lines[0]
+                and (len(preceding) < 2 or preceding[-2] != header_lines[0])):
+            raise BoundedError("OFFICIAL_PROFILE_EXACT_ORIGINAL_NAME_REQUIRED")
+        header_proof = dict(
+            header_layout_contract="explicit-profile-header-typography-v1",
+            header_name_typography_only=native_name != expected_name,
+            native_header_sha256=digest(preceding[-2:]),
+        )
     fields: dict[str, date] = {}
     for label in ("成立日期", "上市日期"):
         found = re.findall(r"(?m)^\s*" + label + r"\s+([0-9]{4})/([0-9]{1,2})/([0-9]{1,2})\b", body)
@@ -87,6 +112,7 @@ def qualify_origin(
         historical_PIT_qualified=False, security_or_listing_extended=False,
         consumer_admission="NOT_GRANTED",
     )
+    proof.update(header_proof)
     return identity, company, proof
 
 

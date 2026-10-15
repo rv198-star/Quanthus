@@ -300,12 +300,24 @@ def _construct(
     venues = ",".join(_text(v) for v in _VENUES)
     start, end = _text(binding.history_start), _text(binding.history_end)
     connection.execute(f"""
-        CREATE TEMP TABLE calendar AS
-        SELECT *, CAST(trade_date AS DATE) AS session_date,
+        CREATE TEMP TABLE calendar_versions AS
+        SELECT venue_id, calendar_session_id, knowledge_from, knowledge_to,
+          source_artifact_sha256, is_open, CAST(trade_date AS DATE) AS session_date,
           timezone('Asia/Shanghai', CAST(trade_date AS DATE) + TIME '15:00:00') AS close_at
         FROM dwd_trading_calendar
         WHERE CAST(trade_date AS DATE) BETWEEN CAST({start} AS DATE) AND CAST({end} AS DATE)
-          AND venue_id IN ({venues}) AND is_open AND knowledge_to IS NULL;
+          AND venue_id IN ({venues});
+        CREATE TEMP TABLE calendar AS
+        WITH visible AS (
+          SELECT * FROM calendar_versions WHERE knowledge_from <= close_at
+            AND coalesce(knowledge_to, TIMESTAMPTZ 'infinity') > close_at
+        )
+        SELECT * FROM visible WHERE is_open
+        UNION ALL
+        SELECT current.* FROM calendar_versions current
+        WHERE current.is_open AND current.knowledge_to IS NULL
+          AND NOT EXISTS (SELECT 1 FROM visible
+                          WHERE visible.calendar_session_id=current.calendar_session_id);
         CREATE TEMP TABLE factor AS
         SELECT security_id, CAST(timezone('Asia/Shanghai', effective_from) AS DATE) AS factor_date,
           min(effective_from) AS effective_from, max(knowledge_from) AS knowledge_from,
@@ -375,6 +387,13 @@ def _construct(
               BETWEEN CAST({start} AS DATE) AND CAST({end} AS DATE)
               AND NOT EXISTS (SELECT 1 FROM calendar c
                               WHERE c.calendar_session_id=raw.calendar_session_id)
+              AND (
+                NOT EXISTS (SELECT 1 FROM dwd_trading_calendar known
+                            WHERE known.calendar_session_id=raw.calendar_session_id)
+                OR EXISTS (SELECT 1 FROM dwd_trading_calendar permitted
+                           WHERE permitted.calendar_session_id=raw.calendar_session_id
+                             AND permitted.venue_id IN ({venues}))
+              )
         """).fetchone()[0]
     diagnostics["input_validation_passed"] = not any(diagnostics["reason_counts"].values())
     connection.execute(

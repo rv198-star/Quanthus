@@ -411,6 +411,56 @@ class ParquetConstruction(unittest.TestCase):
         self.assertEqual(result["diagnostics"]["reason_counts"]["bar_missing_or_not_visible"], 1)
         self.assertFalse((self.root.parent / "out/OFFLINE_VALIDATED").exists())
 
+    def test_outside_venue_is_excluded_but_unknown_calendar_key_blocks(self):
+        self.con.execute("""
+            INSERT INTO dwd_trading_calendar
+            SELECT * REPLACE ('outside-venue' AS venue_id, 'outside-session' AS calendar_session_id)
+            FROM dwd_trading_calendar WHERE calendar_session_id='2026-09-30';
+            INSERT INTO dwd_tradability_state
+            SELECT * REPLACE ('outside-listing' AS listing_id,
+                             'outside-session' AS calendar_session_id)
+            FROM dwd_tradability_state WHERE calendar_session_id='2026-09-30';
+        """)
+        self.reseal()
+        result = self.build()
+        reason = "dwd_tradability_state_calendar_key_missing"
+        self.assertTrue(result["diagnostics"]["input_validation_passed"])
+        self.assertEqual(result["diagnostics"]["reason_counts"][reason], 0)
+        self.con.execute("""
+            UPDATE dwd_tradability_state SET calendar_session_id='unknown-session'
+            WHERE listing_id='outside-listing'
+        """)
+        self.reseal()
+        result = self.build("unknown-key")
+        self.assertFalse(result["diagnostics"]["input_validation_passed"])
+        self.assertEqual(result["diagnostics"]["reason_counts"][reason], 1)
+
+    def test_native_calendar_close_column_cannot_shadow_policy_cutoff(self):
+        self.con.execute("ALTER TABLE dwd_trading_calendar ADD COLUMN close_at TIMESTAMPTZ")
+        self.reseal()
+        result = self.build()
+        self.assertTrue(result["diagnostics"]["input_validation_passed"])
+        file = self.root.parent / "out/candidate-daily.parquet"
+        missing = self.con.execute(
+            f"SELECT count(*) FROM read_parquet('{file}') WHERE knowledge_cutoff IS NULL"
+        ).fetchone()[0]
+        self.assertEqual(missing, 0)
+
+    def test_calendar_uses_visible_old_version_before_late_revision(self):
+        self.con.execute("""
+            UPDATE dwd_trading_calendar
+            SET knowledge_to=TIMESTAMPTZ '2026-10-01 00:00:00+08'
+            WHERE calendar_session_id='2026-09-30';
+            INSERT INTO dwd_trading_calendar SELECT * REPLACE (
+              TIMESTAMPTZ '2026-10-01 00:00:00+08' AS knowledge_from,
+              NULL::TIMESTAMPTZ AS knowledge_to)
+            FROM dwd_trading_calendar WHERE calendar_session_id='2026-09-30';
+        """)
+        self.reseal()
+        result = self.build()
+        self.assertTrue(result["diagnostics"]["input_validation_passed"])
+        self.assertEqual(result["diagnostics"]["reason_counts"]["calendar_not_visible"], 0)
+
     def test_asof_selects_visible_old_version_not_latest(self):
         self.con.execute(
             "CREATE TABLE old AS SELECT * FROM dwd_security_bar "

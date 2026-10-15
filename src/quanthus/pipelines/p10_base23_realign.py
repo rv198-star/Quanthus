@@ -237,6 +237,7 @@ def publish_complete_revision(
     package: Path,
     protected: dict[str, str],
     protected_closure: dict[str, list[int]] | None = None,
+    expected_old: str | None = None,
 ) -> dict[str, Any]:
     from quanthus.pipelines.p10_complete_daily import verify
 
@@ -245,6 +246,8 @@ def publish_complete_revision(
     if not package.resolve().is_relative_to(root.resolve()):
         raise ValueError("complete revision outside actual product root")
     day = result["market_date"]
+    if expected_old is not None and day != "2026-10-12":
+        raise ValueError("complete replacement authority is limited to October12")
     path = root / "date-pointers" / (day + ".json")
     current = root / "CURRENT_COMPLETE_DAILY.json"
     descriptor = {
@@ -260,8 +263,21 @@ def publish_complete_revision(
     with (root / ".publish.lock").open("a+") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
         check_protected(protected, protected_closure)
+        if expected_old is not None and not path.exists():
+            raise ValueError("complete historical revision CAS requires existing dated head")
         if path.exists() and object_at(path)["manifest_sha256"] != result["manifest_sha256"]:
-            raise ValueError("complete historical date already has another recovery version")
+            old = object_at(path)
+            if (
+                day != "2026-10-12"
+                or expected_old != old["manifest_sha256"]
+                or result["prior"] != old
+            ):
+                raise ValueError("complete historical revision CAS/prior differs")
+            archive = root / "dated-revisions" / day / (old["manifest_sha256"][7:] + ".json")
+            if archive.exists() and object_at(archive) != old:
+                raise ValueError("complete immutable predecessor differs")
+            if not archive.exists():
+                atomic(archive, old)
         from quanthus.pipelines.p10_delivery_common import prepare_export
 
         prepare_export(root, package)
@@ -299,6 +315,8 @@ def mirror_daily_revision(
     from quanthus.warehouse_sync import _run_rsync, _ssh_command, _validate_pointer
 
     check_day(day)
+    if root.exists() and root.stat().st_uid != os.geteuid():
+        raise ValueError("daily recovery mirror must run as the existing product owner")
     if os.environ.get("QUANTHUS_CN01_DWD_REMOTE_ROOT") != "products/daily-core":
         raise ValueError("recovery mirror requires exact daily-core SSH jail")
     host, _, user, _, _, ssh = _ssh_command()
@@ -419,6 +437,7 @@ def mirror_complete_revision(
     expected_new: str,
     protected: dict[str, str],
     protected_closure: dict[str, list[int]] | None = None,
+    expected_old: str | None = None,
 ) -> dict[str, Any]:
     """Mirror a qualified historical complete package without regressing CURRENT."""
     from quanthus.pipelines.p10_complete_daily_sync import (
@@ -429,6 +448,8 @@ def mirror_complete_revision(
     from quanthus.warehouse_sync import _run_rsync, _ssh_command
 
     check_day(day)
+    if expected_old is not None and day != "2026-10-12":
+        raise ValueError("complete replacement authority is limited to October12")
     if os.environ.get("QUANTHUS_CN01_DWD_REMOTE_ROOT") != REMOTE:
         raise ValueError("complete historical mirror requires exact existing SSH jail")
     host, _, user, _, _, ssh = _ssh_command()
@@ -448,7 +469,13 @@ def mirror_complete_revision(
             if pointer["manifest_sha256"] != expected_new:
                 raise ValueError("complete historical source identity changed")
             dated = root / "date-pointers" / (day + ".json")
-            if dated.exists() and object_at(dated)["manifest_sha256"] != expected_new:
+            if expected_old is not None and not dated.exists():
+                raise ValueError("complete historical receiver CAS requires existing dated head")
+            if (
+                dated.exists()
+                and object_at(dated)["manifest_sha256"] != expected_new
+                and (day != "2026-10-12" or object_at(dated)["manifest_sha256"] != expected_old)
+            ):
                 raise ValueError("complete historical receiver dated identity differs")
             package, actual = _copy_immutable(
                 pointer=pointer, target=date.fromisoformat(day), stage=stage, source=source, ssh=ssh
@@ -465,6 +492,7 @@ def mirror_complete_revision(
                 package=destination,
                 protected=protected,
                 protected_closure=protected_closure,
+                expected_old=expected_old,
             )
             path = root / "visibility" / (day + "-" + expected_new[7:23] + ".json")
             if path.exists():

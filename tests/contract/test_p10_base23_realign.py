@@ -808,3 +808,101 @@ def test_semantic_resume_requires_two_exact_frozen_source_receipts(tmp_path, mon
         latest["cumulative_processing_seconds"] == 24.0
         and latest["code_revision"] == args["revision"]
     )
+
+
+@pytest.mark.parametrize("expected_ok,prior_ok", [(False, True), (True, False), (True, True)])
+def test_oct12_complete_replacement_requires_exact_cas_and_old_prior(
+    tmp_path, monkeypatch, expected_ok, prior_ok
+):
+    from quanthus.pipelines import p10_delivery_common as common
+
+    root, package, old, protected = daily(tmp_path, monkeypatch, day="2026-10-12")
+    actual = {
+        "market_date": "2026-10-12",
+        "package_id": "new",
+        "manifest_sha256": file_digest(package / "manifest.json"),
+        "content_digest": "sha256:" + "e" * 64,
+        "base": repair.contract()["base_manifest_sha256"],
+        "prior": old if prior_ok else None,
+    }
+    monkeypatch.setattr(complete, "verify", lambda _: actual)
+    monkeypatch.setattr(common, "prepare_export", lambda *_: None)
+    current = root / "CURRENT_COMPLETE_DAILY.json"
+    atomic(current, {"market_date": "2026-10-14"})
+    before = current.read_bytes()
+    kwargs = dict(
+        root=root,
+        package=package,
+        protected=protected,
+        expected_old=old["manifest_sha256"] if expected_ok else None,
+    )
+    if expected_ok and prior_ok:
+        repair.publish_complete_revision(**kwargs)
+        assert (
+            json.loads((root / "dated-revisions/2026-10-12" / ("a" * 64 + ".json")).read_text())
+            == old
+        )
+    else:
+        with pytest.raises(ValueError, match="CAS/prior"):
+            repair.publish_complete_revision(**kwargs)
+        assert json.loads((root / "date-pointers/2026-10-12.json").read_text()) == old
+    assert current.read_bytes() == before
+
+
+def test_oct12_complete_expected_old_requires_existing_head(tmp_path, monkeypatch):
+    root, package, _, protected = daily(tmp_path, monkeypatch, day="2026-10-12")
+    (root / "date-pointers/2026-10-12.json").unlink()
+    monkeypatch.setattr(
+        complete,
+        "verify",
+        lambda _: {
+            "market_date": "2026-10-12",
+            "package_id": "new",
+            "manifest_sha256": file_digest(package / "manifest.json"),
+            "content_digest": "new",
+            "base": {},
+            "prior": None,
+        },
+    )
+    with pytest.raises(ValueError, match="requires existing dated head"):
+        repair.publish_complete_revision(
+            root=root, package=package, protected=protected, expected_old="sha256:" + "a" * 64
+        )
+
+
+def test_oct12_complete_receiver_requires_existing_expected_head(tmp_path, monkeypatch):
+    from quanthus import warehouse_sync
+    from quanthus.pipelines import p10_complete_daily_sync as mirror
+
+    root = tmp_path / "receiver"
+    protected_file = tmp_path / "protected13.json"
+    protected_file.write_text("original13")
+    protected = {str(protected_file): hashlib.sha256(protected_file.read_bytes()).hexdigest()}
+    day = "2026-10-12"
+    pointer = {"manifest_sha256": "sha256:" + "b" * 64}
+    monkeypatch.setenv("QUANTHUS_CN01_DWD_REMOTE_ROOT", mirror.REMOTE)
+    monkeypatch.setattr(
+        warehouse_sync, "_ssh_command", lambda: ("cn01", None, "reader", None, None, "ssh")
+    )
+    monkeypatch.setattr(
+        warehouse_sync, "_run_rsync", lambda **kw: atomic(kw["destination"], pointer)
+    )
+    monkeypatch.setattr(mirror, "_copy_immutable", lambda **_: pytest.fail("payload before CAS"))
+    with pytest.raises(ValueError, match="requires existing dated head"):
+        repair.mirror_complete_revision(
+            root=root,
+            day=day,
+            expected_new=pointer["manifest_sha256"],
+            expected_old="sha256:" + "a" * 64,
+            protected=protected,
+        )
+
+
+def test_daily_repair_rejects_different_writer_identity(tmp_path, monkeypatch):
+    root = tmp_path / "product"
+    root.mkdir()
+    monkeypatch.setattr(repair.os, "geteuid", lambda: root.stat().st_uid + 1)
+    with pytest.raises(ValueError, match="existing product owner"):
+        repair.mirror_daily_revision(
+            root=root, day="2026-10-12", expected_old="old", expected_new="new", protected={}
+        )

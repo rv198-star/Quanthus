@@ -180,13 +180,28 @@ def _recover_prior(
     if current and current["market_date"] > str(target):
         raise ValueError("predecessor chain would regress OCI current")
     seen.add(pointer["manifest_sha256"])
-    package, actual = _copy_immutable(
-        pointer=pointer, target=target, stage=stage, source=source, ssh=ssh
+    # Resolve the exact small manifest first. Publish oldest prerequisites one
+    # at a time, so a bounded service retry resumes from durable acceptance
+    # instead of repeatedly verifying all descendants before any publication.
+    relative = _validate_pointer(pointer, target)
+    manifest_path = safe_path(stage, (relative / "manifest.json").as_posix())
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    _run_rsync(
+        source=f"{source}/{relative.as_posix()}/manifest.json",
+        destination=manifest_path,
+        ssh=ssh,
     )
-    prior = actual["prior"]
+    if file_digest(manifest_path) != pointer["manifest_sha256"]:
+        raise ValueError("remote predecessor manifest identity differs")
+    prior = object_at(manifest_path)["prior"]
     if prior and prior["market_date"] > str(target):
         raise ValueError("predecessor date is later than its child")
     _recover_prior(root=root, pointer=prior, stage=stage, source=source, ssh=ssh, seen=seen)
+    package, actual = _copy_immutable(
+        pointer=pointer, target=target, stage=stage, source=source, ssh=ssh
+    )
+    if actual["prior"] != prior:
+        raise ValueError("verified predecessor closure differs")
     destination = root / _validate_pointer(pointer, target)
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():

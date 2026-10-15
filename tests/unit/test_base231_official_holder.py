@@ -983,6 +983,18 @@ def test_top_missing_wrapped_nature_remains_unknown_without_changing_numeric_ato
         parse_top_matrix(body.replace("无  /  ", "不明状态  /  ", 1), hints)
 
 
+def test_top_numeric_row_may_end_at_explicit_no_pledge_state():
+    body, hints = nature_last_sample()
+    body = body.replace("无  0  其他", "无", 1)
+    rows, _ = parse_top_matrix(body, hints)
+    assert len(rows) == 10 and rows[0]["category"] is None
+    assert rows[0]["quantity"] == 1001 and rows[0]["raw_percentage"] == "1.00"
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("1001", "1002", 1), hints)
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body.replace("无\n", "不明状态\n", 1), hints)
+
+
 def cover_projection(body, hints, code="000400"):
     from datetime import date, datetime, timezone
 

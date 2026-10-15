@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import zlib
 from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
@@ -18,8 +19,10 @@ from quanthus.providers.native_5m_exact import (
     NativeDay,
     WireCapture,
     captured_socket,
+    fetch_captured_day,
     fetch_day,
     parse_response,
+    parse_wire_response,
     write_parquet,
 )
 
@@ -240,3 +243,90 @@ def test_multiple_lexical_scales_survive_and_excess_precision_rejected(tmp_path)
     with pytest.raises(Native5mError, match="STORAGE_RANGE"):
         write_parquet(tmp_path / "wide.parquet", (wide,))
     assert not (tmp_path / "wide.parquet").exists()
+
+
+def wire_message(*, newline=False, adjustflag="3", page_size=2000, version="00.9.10"):
+    body = "\x01".join(
+        [
+            "0",
+            "success",
+            "query_history_k_data_plus",
+            "anonymous",
+            "1",
+            str(page_size),
+            json.dumps({"record": [row()]}),
+            "sz.000001",
+            ",".join(FIELDS),
+            "2020-01-02",
+            "2020-01-02",
+            "5",
+            adjustflag,
+        ]
+    ) + ("\n" if newline else "")
+    compressed = zlib.compress(body.encode())
+    header = f"{version}\x0196\x01{len(compressed):010d}".encode()
+    return header + compressed + b"\x01123456789\n" + TRAILER
+
+
+@pytest.mark.parametrize("newline", [True, False])
+def test_original_wire_proves_contract_with_or_without_body_newline(newline):
+    parsed = parse_wire_response(
+        wire_message(newline=newline), NativeDay("sz.000001", "2020-01-02")
+    )
+    assert parsed[0].lexical_values == tuple(row()[3:])
+
+
+def test_real_sdk_unconditionally_slices_basis_but_raw_proof_remains(monkeypatch):
+    import baostock.common.context as context
+    import baostock.security.history as history
+
+    raw = wire_message()
+    plain = raw[:21].decode() + zlib.decompress(raw[21:]).decode()
+    monkeypatch.setattr(history.sock, "send_msg", lambda _: plain)
+    monkeypatch.setattr(context, "user_id", "anonymous", raising=False)
+    result = history.query_history_k_data_plus(
+        "sz.000001",
+        ",".join(FIELDS),
+        start_date="2020-01-02",
+        end_date="2020-01-02",
+        frequency="5",
+        adjustflag="3",
+    )
+    assert result.adjustflag == ""
+    with pytest.raises(Native5mError, match="RESPONSE_CONTRACT"):
+        parse_response(result, NativeDay("sz.000001", "2020-01-02"))
+    assert len(parse_wire_response(raw, NativeDay("sz.000001", "2020-01-02"))) == 1
+
+
+@pytest.mark.parametrize(
+    "raw,reason",
+    [
+        (wire_message(adjustflag="2"), "RESPONSE_CONTRACT"),
+        (wire_message(page_size=1), "TERMINAL_PAGE_UNPROVEN"),
+        (wire_message(version="00.9.99"), "HEADER_INVALID"),
+        (wire_message()[:-1], "TRUNCATED"),
+        (wire_message()[:30] + b"broken" + TRAILER, "LENGTH_MISMATCH"),
+    ],
+)
+def test_wire_basis_page_version_and_damage_cannot_be_waived(raw, reason):
+    with pytest.raises(Native5mError, match=reason):
+        parse_wire_response(raw, NativeDay("sz.000001", "2020-01-02"))
+
+
+def test_captured_query_consumes_fresh_original_frame(tmp_path):
+    raw = wire_message()
+    sock = Socket([raw])
+    context = SimpleNamespace(default_socket=sock)
+
+    def query(*args, **kwargs):
+        context.default_socket.send(b"query exact original request")
+        context.default_socket.recv(10000)
+        return SimpleNamespace(adjustflag="")
+
+    with captured_socket(context, tmp_path, max_requests=1, max_bytes=10000, seconds=10) as wire:
+        bars = fetch_captured_day(
+            SimpleNamespace(query_history_k_data_plus=query),
+            NativeDay("sz.000001", "2020-01-02"),
+            wire,
+        )
+    assert len(bars) == 1 and bars[0].lexical_values == tuple(row()[3:])

@@ -12,12 +12,14 @@ import importlib
 import json
 import re
 import time
+import zlib
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, BinaryIO
 from zoneinfo import ZoneInfo
 
@@ -25,6 +27,7 @@ FIELDS = ("date", "time", "code", "open", "high", "low", "close", "volume", "amo
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 TRAILER = b"<![CDATA[]]>\n"
 CONTRACT = "p10-native-5m-exact-v1"
+WIRE_SERVER_VERSION = "00.9.10"
 
 
 class Native5mError(ValueError):
@@ -134,6 +137,101 @@ def fetch_day(client: Any, request: NativeDay) -> tuple[ExactBar, ...]:
         adjustflag="3",
     )
     return parse_response(response, request)
+
+
+def parse_wire_response(raw: bytes, request: NativeDay) -> tuple[ExactBar, ...]:
+    """Validate the original envelope, without the SDK's unconditional ``[:-1]``.
+
+    Some live compressed bodies have no final newline. BaoStock 0.9.4 drops the
+    final adjustflag character in that case. An empty SDK echo is never accepted:
+    the independent original envelope must prove the full request contract.
+    This exact-day path requires a terminal short first page, never a page cap.
+    """
+    constants = importlib.import_module("baostock.common.contants")
+    header_size = constants.MESSAGE_HEADER_LENGTH
+    if not raw.endswith(TRAILER):
+        raise Native5mError("WIRE_ENVELOPE_TRUNCATED")
+    try:
+        header = raw[:header_size].decode("utf-8").split(constants.MESSAGE_SPLIT)
+        if (
+            len(header) != 3
+            or int(header[2]) < 1
+            or header[0] != WIRE_SERVER_VERSION
+            or header[1] != constants.MESSAGE_TYPE_GETKDATAPLUS_RESPONSE
+        ):
+            raise Native5mError("WIRE_HEADER_INVALID")
+        length = int(header[2])
+        # The native frame carries an opaque vendor checksum after the compressed
+        # body. Preserve it; its algorithm is not independently qualified here.
+        tail = raw[header_size + length : -len(TRAILER)]
+        if not re.fullmatch(rb"\x01[0-9]{1,10}\n", tail):
+            raise Native5mError("WIRE_LENGTH_MISMATCH")
+        body = raw[header_size : header_size + length]
+        if header[1] in constants.COMPRESSED_MESSAGE_TYPE_TUPLE:
+            decoder = zlib.decompressobj()
+            body = decoder.decompress(body, 4 * 1024 * 1024 + 1)
+            if len(body) > 4 * 1024 * 1024 or not decoder.eof or decoder.unused_data:
+                raise Native5mError("WIRE_DECOMPRESSION_LIMIT_OR_TRAILING_DATA")
+        elif len(body) > 4 * 1024 * 1024:
+            raise Native5mError("WIRE_PLAIN_LIMIT")
+        # Strip only a real terminator, never an arbitrary final character.
+        text = body.decode("utf-8").removesuffix("\n")
+        parts = text.split(constants.MESSAGE_SPLIT)
+        if len(parts) != 13 or parts[2] != "query_history_k_data_plus":
+            raise Native5mError("WIRE_BODY_CONTRACT_INVALID")
+        if parts[0] != "0":
+            raise Native5mError("PROVIDER_ERROR")
+        record = json.loads(parts[6])["record"]
+        if not isinstance(record, list) or int(parts[4]) != 1:
+            raise Native5mError("WIRE_PAGE_INVALID")
+        if not len(record) < int(parts[5]):
+            raise Native5mError("WIRE_TERMINAL_PAGE_UNPROVEN")
+        response = SimpleNamespace(
+            error_code=parts[0],
+            cur_page_num=parts[4],
+            code=parts[7],
+            fields=parts[8].split(","),
+            start_date=parts[9],
+            end_date=parts[10],
+            frequency=parts[11],
+            adjustflag=parts[12],
+        )
+    except (ValueError, IndexError, KeyError, UnicodeDecodeError, zlib.error) as exc:
+        if isinstance(exc, Native5mError):
+            raise
+        raise Native5mError("WIRE_ENVELOPE_INVALID") from exc
+    rows = iter(record)
+
+    def advance() -> bool:
+        response.current = next(rows, None)
+        return response.current is not None
+
+    response.next = advance
+    response.get_row_data = lambda: response.current
+    return parse_response(response, request)
+
+
+def fetch_captured_day(
+    client: Any, request: NativeDay, capture: WireCapture
+) -> tuple[ExactBar, ...]:
+    """Use a fresh actual captured response, never repair an SDK echo in place."""
+    before = len(capture.records)
+    client.query_history_k_data_plus(
+        request.code,
+        ",".join(FIELDS),
+        start_date=request.business_date,
+        end_date=request.business_date,
+        frequency="5",
+        adjustflag="3",
+    )
+    capture._finish()
+    capture._check()
+    if len(capture.records) != before + 1:
+        raise Native5mError("ONE_EXACT_RESPONSE_REQUIRED")
+    raw = (capture.root / capture.records[-1]["path"]).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != capture.records[-1]["response_sha256"]:
+        raise Native5mError("CAPTURED_RESPONSE_CHANGED")
+    return parse_wire_response(raw, request)
 
 
 def write_parquet(path: Path, bars: tuple[ExactBar, ...]) -> None:

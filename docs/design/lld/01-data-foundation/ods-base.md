@@ -263,3 +263,14 @@ Regressions: `tests/unit/test_native_5m_exact.py`, alongside the retained
 `tests/unit/test_native_5m_baostock.py`. Tests are synthetic; actual retired-security,
 2020-boundary, unit/basis and complete-range source qualification remain separate
 evidence gates. Protected raw responses are kept outside safe review exports.
+
+The captured-frame entry validates native server envelope version `00.9.10` and
+response type96, byte framing, bounded decompression, JSON records, exact request
+echo and a short terminal first page before parsing. Original responses with or
+without a genuine final body newline are supported. This fixes the installed
+SDK0.9.4's unconditional last-character slice; an empty SDK basis is still rejected
+by the original response-object entry. A full first page fails with
+`WIRE_TERMINAL_PAGE_UNPROVEN` rather than silently stopping at a provider cap.
+The opaque vendor checksum field is retained and syntax-checked, not claimed as
+independently verified; capture SHA256 binds the unchanged bytes. Actual request
+restarts retain cumulative usage and may replay already acquired bytes offline.

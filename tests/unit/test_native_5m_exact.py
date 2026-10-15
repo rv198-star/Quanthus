@@ -245,7 +245,7 @@ def test_multiple_lexical_scales_survive_and_excess_precision_rejected(tmp_path)
     assert not (tmp_path / "wide.parquet").exists()
 
 
-def wire_message(*, newline=False, adjustflag="3", page_size=2000, version="00.9.10"):
+def wire_message(*, newline=False, adjustflag="3", page_size=2000, version="00.9.10", rows=None):
     body = "\x01".join(
         [
             "0",
@@ -254,7 +254,7 @@ def wire_message(*, newline=False, adjustflag="3", page_size=2000, version="00.9
             "anonymous",
             "1",
             str(page_size),
-            json.dumps({"record": [row()]}),
+            json.dumps({"record": [row()] if rows is None else rows}),
             "sz.000001",
             ",".join(FIELDS),
             "2020-01-02",
@@ -274,6 +274,12 @@ def test_original_wire_proves_contract_with_or_without_body_newline(newline):
         wire_message(newline=newline), NativeDay("sz.000001", "2020-01-02")
     )
     assert parsed[0].lexical_values == tuple(row()[3:])
+
+
+@pytest.mark.parametrize("records", [[None, row()], [row(), None], [None]])
+def test_null_wire_record_cannot_impersonate_end_of_response(records):
+    with pytest.raises(Native5mError, match="WIRE_RECORD_SCHEMA"):
+        parse_wire_response(wire_message(rows=records), NativeDay("sz.000001", "2020-01-02"))
 
 
 def test_real_sdk_unconditionally_slices_basis_but_raw_proof_remains(monkeypatch):

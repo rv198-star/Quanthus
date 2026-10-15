@@ -184,6 +184,10 @@ def parse_wire_response(raw: bytes, request: NativeDay) -> tuple[ExactBar, ...]:
         record = json.loads(parts[6])["record"]
         if not isinstance(record, list) or int(parts[4]) != 1:
             raise Native5mError("WIRE_PAGE_INVALID")
+        if any(not isinstance(row, list) for row in record):
+            # A JSON null must not become the iterator's end sentinel and hide
+            # valid records following it, or turn malformed data into empty data.
+            raise Native5mError("WIRE_RECORD_SCHEMA_INVALID")
         if not len(record) < int(parts[5]):
             raise Native5mError("WIRE_TERMINAL_PAGE_UNPROVEN")
         response = SimpleNamespace(

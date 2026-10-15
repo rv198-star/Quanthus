@@ -115,7 +115,7 @@ def failure(
         group = key_context.get("notification_group", stage)
     key = _notification_key(day, group, key_context)
     if not success_notice and group == "daily_ods":
-        for alias in ("daily_ods", "daily_cycle", "domain_daily", "acquisition_quality"):
+        for alias in ("daily_ods", "daily_cycle"):
             old = state_root / f"{_notification_key(day, alias, key_context)}.json"
             if old.exists():
                 with suppress(OSError, ValueError, KeyError):
@@ -156,10 +156,10 @@ def failure(
         payload = object_at(pending)
         frozen_stage = str(payload.get("stage", ""))
         stage_matches = frozen_stage == stage or (
-            group in {"daily_ods", "daily_cycle", "domain_daily", "acquisition_quality"}
-            and stage in {"daily_ods", "daily_cycle", "domain_daily", "acquisition_quality"}
+            group in {"daily_ods", "daily_cycle"}
+            and stage in {"daily_ods", "daily_cycle"}
             and frozen_stage in {
-                "daily_ods", "daily_cycle", "domain_daily", "acquisition_quality",
+                "daily_ods", "daily_cycle",
             }
         )
         if (

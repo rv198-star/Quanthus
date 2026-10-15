@@ -12,6 +12,14 @@ financial materialization and independent acceptance still separate. This is
 financial-only current knowledge, not historical ownership, legal continuity,
 listing extension, PIT admission or a complete successor image.
 
+The separate `official-prospectus-current-financial-origin-v1` adapter binds a
+full original prospectus, its actual issuer-filtered official index/transport,
+the exact retained company name, and an explicit origin field in the issuer's
+own basic-information section. It never substitutes a query mapping for dated
+ownership evidence. The offline origin replay requires this source adapter and
+transport verifier to be pinned and reconstructs all native financial outputs
+from contained evidence. Existing profile sources keep their original contract.
+
 The Owner's budget continuation is tracked by #525. Its single live ledger is
 `current-gaps.json` under the private CN02 review job
 `base231-budget-exhaustion-continuation-20261015T153555Z-c887578`; the older

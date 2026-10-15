@@ -162,10 +162,15 @@ def replay_origin_scope(root: Path) -> dict[str, Any]:
     from .base22_f10_ownership import _cells
     from .base22_sources import _tree, physical_path
     from .base231_financial_summary import load_contract as load_summary
+    from .base231_prospectus_origin import CONTRACT_ID as PROSPECTUS_CONTRACT
+    from .base231_prospectus_origin import project_financial as project_prospectus
+    from .base231_prospectus_origin import qualify_origin as qualify_prospectus
+    from .base231_prospectus_origin import verify_source as verify_prospectus_source
     from .financial_reporting import financial_company_resolver_from_listed_company_rows
 
     plan = json.loads((root / "INPUTS.json").read_bytes())
-    if (plan.get("contract_id") != CONTRACT_ID or plan.get("through_date") != "2026-09-30"
+    if (plan.get("contract_id") not in {CONTRACT_ID, PROSPECTUS_CONTRACT}
+            or plan.get("through_date") != "2026-09-30"
             or plan.get("legal_form_date_qualified") is not False
             or plan.get("provider_PIT") is not False
             or plan.get("consumer_admission") != "NOT_GRANTED"
@@ -182,6 +187,12 @@ def replay_origin_scope(root: Path) -> dict[str, Any]:
     for path, sha in plan["code_inputs"].items():
         if file_sha(Path(path)) != sha:
             raise BoundedError("OFFICIAL_ORIGIN_OFFLINE_ORDINARY_CODE_CHANGED")
+    is_prospectus = plan["contract_id"] == PROSPECTUS_CONTRACT
+    if is_prospectus:
+        for module in ("base231_prospectus_origin.py", "base231_official_holder_replay.py"):
+            name = "src/quanthus/pipelines/securities_warehouse/" + module
+            if plan["code_inputs"].get(name) != file_sha(Path(name)):
+                raise BoundedError("PROSPECTUS_FINANCIAL_SOURCE_CODE_UNPINNED")
     parent_path = root / "inputs/qualified-parent-manifest.json"
     parent = json.loads(parent_path.read_bytes())
     if (file_sha(parent_path) != QUALIFIED_PARENT
@@ -219,6 +230,10 @@ def replay_origin_scope(root: Path) -> dict[str, Any]:
     identities, qualifications = {}, {}
     output: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for spec in plan["profiles"]:
+        references = ("PDF", "receipt", "index", "index_receipt") if is_prospectus else (
+            "PDF", "receipt")
+        if any(spec.get(key) not in plan["members"] for key in references):
+            raise BoundedError("OFFICIAL_ORIGIN_PROFILE_REFERENCE_OUTSIDE_MEMBERS")
         code = spec["code"]
         if digest(originals[code]) != spec["original_profile_raw_row_sha256"]:
             raise BoundedError("OFFICIAL_ORIGIN_ORIGINAL_NAME_SOURCE_CHANGED")
@@ -232,17 +247,22 @@ def replay_origin_scope(root: Path) -> dict[str, Any]:
             raise BoundedError("OFFICIAL_ORIGIN_ORIGINAL_PARENT_MISSING")
         receipt = json.loads((root / spec["receipt"]).read_bytes())
         uri = "https://static.cninfo.com.cn/finalpage/enpage/" + code + "_1.pdf"
-        if (receipt.get("URI") != uri or receipt.get("http_status") != "200"
-                or receipt.get("curl_exit") != 0
-                or receipt.get("body_sha256") != file_sha(root / spec["PDF"])):
+        if is_prospectus:
+            actual = verify_prospectus_source(root, spec, observed_at=clock)
+        elif (receipt.get("URI") != uri or receipt.get("http_status") != "200"
+              or receipt.get("curl_exit") != 0
+              or receipt.get("body_sha256") != file_sha(root / spec["PDF"])):
             raise BoundedError("OFFICIAL_ORIGIN_REAL_RECEIPT_CHANGED")
         body = subprocess.run(["pdftotext", "-layout", str(root / spec["PDF"]), "-"],
                               capture_output=True, check=True, timeout=30).stdout.decode()
-        identity, company, qualification = qualify_origin(
-            body, code=code, expected_name=next(iter(fields)), issuer=issuers.get(code, {}),
-            parent=parent, pdf_sha256=file_sha(root / spec["PDF"]), document_uri=uri,
-            received_at=datetime.fromisoformat(receipt["completed_at"]), observed_at=clock,
-        )
+        arguments: dict[str, Any] = dict(
+            code=code, expected_name=next(iter(fields)), issuer=issuers.get(code, {}),
+            parent=parent, pdf_sha256=file_sha(root / spec["PDF"]),
+            received_at=datetime.fromisoformat(receipt["completed_at"]), observed_at=clock)
+        if is_prospectus:
+            identity, company, qualification = qualify_prospectus(body, actual=actual, **arguments)
+        else:
+            identity, company, qualification = qualify_origin(body, document_uri=uri, **arguments)
         if digest(qualification) != spec["qualification_sha256"]:
             raise BoundedError("OFFICIAL_ORIGIN_QUALIFICATION_CHANGED")
         identities[code], qualifications[code] = identity, qualification
@@ -259,7 +279,8 @@ def replay_origin_scope(root: Path) -> dict[str, Any]:
                     ("stock_code", "category", "source", "source_revision", "content_sha256",
                      "acquired_at", "provider_updated_date", "market_date"))):
             raise BoundedError("OFFICIAL_ORIGIN_RAW_NOT_IN_EXACT_QUALIFIED_PARENT_SELECTION")
-        rows, _ = project_origin_financial(
+        project = project_prospectus if is_prospectus else project_origin_financial
+        rows, _ = project(
             raw, identity=identities[spec["code"]], qualification=qualifications[spec["code"]],
             source_sha256=spec["member_sha256"], source_revision=spec["source_revision"],
             observed_at=clock, contract=contract,

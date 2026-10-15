@@ -441,9 +441,12 @@ def test_missed_success_enqueue_is_recovered_without_supplier_calls(
             "catalog": {"status": "ready", "root": str(tmp_path / "verified-catalog")},
         },
     )
-    atomic(root.parent / str(DAY) / "status.json", {
-        "minutes": minute_receipts(tmp_path / "current-T-minutes"),
-    })
+    atomic(
+        root.parent / str(DAY) / "status.json",
+        {
+            "minutes": minute_receipts(tmp_path / "current-T-minutes"),
+        },
+    )
     checked = []
     monkeypatch.setattr(
         trial,
@@ -463,3 +466,21 @@ def test_missed_success_enqueue_is_recovered_without_supplier_calls(
     assert sender[0]["event"] == "p10_cn01_daily_ods_completed"
     notices.retry_pending(root)
     assert len(sender) == len(checked) == 1
+
+
+def test_distinct_producers_never_reuse_resend_key_across_outboxes(tmp_path, frozen, sender):
+    core = tmp_path / "complete-daily-v1/notifications"
+    continuation = tmp_path / "acquisition-continuation-v1/notifications"
+    for stage, root in [
+        ("daily_cycle", core),
+        ("acquisition_quality", continuation),
+        ("domain_daily", continuation),
+    ]:
+        notices.failure(
+            day=DAY,
+            stage=stage,
+            state_root=root,
+            reason="PermissionError: independent producer fault",
+        )
+    assert len(sender) == 3 and len({request["key"] for request in sender}) == 3
+    assert sender[0]["event"] != sender[1]["event"] != sender[2]["event"]

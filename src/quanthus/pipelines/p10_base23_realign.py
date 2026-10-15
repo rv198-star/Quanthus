@@ -184,6 +184,9 @@ def publish_daily_revision(
             prior = object_at(root / "date-pointers/2026-10-13.json")
             if (m.get("prior") or {}).get("manifest_sha256") != prior["manifest_sha256"]:
                 raise ValueError("14 revision must retain protected13 predecessor")
+        from quanthus.pipelines.p10_delivery_common import prepare_export
+
+        prepare_export(root, package)
         archive = root / "dated-revisions" / day / (expected_old[7:] + ".json")
         if archive.exists() and object_at(archive) != old:
             raise ValueError("immutable old dated descriptor differs")

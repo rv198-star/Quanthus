@@ -906,3 +906,25 @@ def test_daily_repair_rejects_different_writer_identity(tmp_path, monkeypatch):
         repair.mirror_daily_revision(
             root=root, day="2026-10-12", expected_old="old", expected_new="new", protected={}
         )
+
+
+def test_daily_source_export_precedes_visible_pointer(tmp_path, monkeypatch):
+    from quanthus.pipelines import p10_delivery_common as common
+
+    root, package, old, protected = daily(tmp_path, monkeypatch, day="2026-10-12")
+    observed = []
+
+    def prepare(export_root, export_package):
+        assert export_root == root and export_package == package
+        assert json.loads((root / "date-pointers/2026-10-12.json").read_text()) == old
+        observed.append(True)
+
+    monkeypatch.setattr(common, "prepare_export", prepare)
+    repair.publish_daily_revision(
+        root=root,
+        package=package,
+        expected_old=old["manifest_sha256"],
+        protected=protected,
+        receipt_root=tmp_path / "receipts",
+    )
+    assert observed == [True]

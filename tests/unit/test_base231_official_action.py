@@ -89,9 +89,17 @@ def report_currency_body():
     )
 
 
-def test_report_own_explicit_currency_definition_and_dividend_table_agree():
+@pytest.mark.parametrize("definition", [
+    "元、万元、亿元 指 人民币元、人民币万元、人民币亿元",
+    "元，万元，亿元 指 人民币元，人民币万元，人民币亿元",
+    "元、万元、亿元 指 人民币元、万元、亿元",
+    "元、万元、亿元 指 元人民币、万元人民币、亿元人民币",
+])
+def test_report_own_explicit_currency_definition_and_dividend_table_agree(definition):
     body = approved_cash_body().replace("现金股利人民币2.50元", "现金股利2.50元")
-    report = report_currency_body()
+    report = report_currency_body().replace(
+        "元、万元、亿元 指 人民币元、人民币万元、人民币亿元", definition
+    )
     row, proof = parse_distribution(
         body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
         currency_scheme_body=report,
@@ -101,8 +109,8 @@ def test_report_own_explicit_currency_definition_and_dividend_table_agree():
         "same-issuer-current-approved-scheme-corroboration-v1"
     )
     for invalid in [
-        report.replace("指 人民币元、人民币万元、人民币亿元", "指 美元、万美元、亿美元"),
-        report.replace("元、万元、亿元 指", "附注：元、万元、亿元"),
+        report.replace(definition, "元、万元、亿元 指 美元、万美元、亿美元"),
+        report.replace(definition, "附注：元、万元、亿元 人民币元、人民币万元、人民币亿元"),
         report.replace("（含税）2.50", "（含税）3.00"),
         report.replace("股利2.50", "股利3.00"),
         report.replace("释义", "财务报表附注"),
@@ -694,3 +702,29 @@ def test_page_footer_rule_never_removes_a_fragment_inside_numeric_amount():
     )
     assert row["cash_per_share"] == Decimal("0.2550")
     assert "layout_normalization_contract" not in proof
+
+
+@pytest.mark.parametrize("heading,consistent", [
+    ("利润分配方案审议等情况",
+     "本次实施的分配方案与公司董事会审议通过的利润分配方案及其调整原则是一致的"),
+    ("股东会审议通过权益分派情况",
+     "本次权益分派方案内容与股东会审议通过的2026年半年度利润分配方案及其调整原则一致"),
+    ("股东会审议通过权益分派情况",
+     "本次实施的权益分派方案与股东会审议通过的方案及调整原则一致"),
+])
+def test_exact_current_approved_consistency_wording_keeps_report_currency_checks(
+    heading, consistent
+):
+    body = approved_cash_body().replace("现金股利人民币2.50元", "现金股利2.50元").replace(
+        "股东会审议通过权益分派情况", heading
+    ).replace("本次实施的权益分派方案与公司股东会审议通过的分配方案一致", consistent)
+    row, _ = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+        currency_scheme_body=report_currency_body(),
+    )
+    assert row["cash_per_share"].as_tuple() == Decimal("0.2500000").as_tuple()
+    with pytest.raises(RuntimeError):
+        parse_distribution(
+            body.replace("一致", "存在差异"), code="003018", venue="SZSE",
+            expected_ex_date=date(2026, 7, 15), currency_scheme_body=report_currency_body(),
+        )

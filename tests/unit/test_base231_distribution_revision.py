@@ -130,6 +130,40 @@ def test_reference_parenthesis_may_precede_quoted_title_in_pdf_column_order():
         qualify_payment_revision(*docs, **args)
 
 
+def test_full_method_correction_preserves_all_other_characters_and_one_event():
+    docs, args = sample()
+    old, new = docs[:2]
+    old_clause = old["body"].split("五、权益分派方法\n")[1].split("\n董事会")[0]
+    new_clause = new["body"].split("五、权益分派方法\n")[1].split("\n董事会")[0]
+    tail = "以下A股股东的现金红利由本公司自行派发：合成股东。"
+    for d, clause in [(old, old_clause), (new, new_clause)]:
+        d["body"] = d["body"].replace(clause, clause + tail + "六、相关参数调整")
+    docs[2]["selection"]["actual_index_row"]["announcementTitle"] = (
+        "2026年中期权益分派实施的更正公告"
+    )
+    docs[2]["body"] = (
+        "股票代码：003018 公告编号：2026-067\n2026年中期权益分派实施的更正公告\n"
+        "公司于2026年9月10日在巨潮资讯网（www.cninfo.com.cn）披露了"
+        "《2026年中期权益分派实施公告》（公告编号：2026-066号），现更正如下："
+        "更正前内容：五、权益分派方法" + old_clause + tail
+        + "更正后内容：五、权益分派方法" + new_clause + tail
+        + "除上述更正内容之外，原公告中的其它内容不变。"
+    )
+    for d in docs:
+        d["body"] = "一心为民   全心服务\n" + d["body"] + "\n第 1 页 共 1 页\n"
+    before = deepcopy(docs)
+    proof = qualify_payment_revision(*docs, **args)
+    assert proof["event_count"] == 1
+    assert proof["payment_date"] == date(2026, 9, 15)
+    assert proof["notice_layout_contract"] == "explicit-full-payment-method-correction-v1"
+    assert docs == before
+    for which in [1, 2]:
+        invalid = deepcopy(docs)
+        invalid[which]["body"] = invalid[which]["body"].replace("合成股东", "其他股东", 1)
+        with pytest.raises(RuntimeError):
+            qualify_payment_revision(*invalid, **args)
+
+
 @pytest.mark.parametrize("fault", [
     "code", "org", "missing_index", "future_capture", "notice_number", "notice_title",
     "notice_before", "notice_after", "other_change", "amount_change", "no_unchanged",

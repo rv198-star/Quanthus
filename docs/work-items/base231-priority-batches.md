@@ -16,6 +16,14 @@ The exact cash-first wrapped SSE date-header family is supported for a single
 A-share row only. Two recovered October ex-dates remain outside September30;
 successful parsing does not turn them into missing September actions.
 
+The explicit full-payment-method correction layout compares both complete
+quoted method blocks against their original and corrected implementations.
+Only a complete numbered-page census and the literal standalone repeated header
+may be removed as page furniture. Every remaining body character, holder detail
+and distribution term must agree except the already declared payment clause,
+bulletin number, corrected title and signature date. A corrected pair yields
+one current event with both originals retained, never two dividends.
+
 The October 16 continuation classifies the remaining exact official profile
 headers before qualification. The optional explicit-header fallback permits one
 labelled industry field between the transaction/company header and the unique

@@ -27,6 +27,21 @@ _PAYMENT = re.compile(
 )
 _NUMBER = re.compile(r"公告编号[：:](\d{4}-\d{3})")
 _TITLE = "2026年中期权益分派实施公告"
+_METHOD_NOTICE_TITLE = "2026年中期权益分派实施的更正公告"
+
+
+def _full_method_layout(body: str) -> str:
+    """Remove only explicit complete page furniture in this named source form."""
+    footer = re.compile(r"(?m)^[ \t]*第[ \t]*(\d+)[ \t]*页[ \t]*共[ \t]*(\d+)[ \t]*页[ \t]*$")
+    pages = [(int(a), int(b)) for a, b in footer.findall(body)]
+    header = re.compile(r"(?m)^[ \t\f]*一心为民[ \t]+全心服务[ \t]*$")
+    if (
+        not pages or len({b for _, b in pages}) != 1
+        or [a for a, _ in pages] != list(range(1, pages[0][1] + 1))
+        or len(header.findall(body)) != len(pages)
+    ):
+        raise BoundedError("PAYMENT_REVISION_EXACT_PAGE_FURNITURE_REQUIRED")
+    return re.sub(r"\s+", "", header.sub("", footer.sub("", body)))
 
 
 def _single(pattern: re.Pattern[str], body: str) -> re.Match[str]:
@@ -48,13 +63,15 @@ def qualify_payment_revision(
 ) -> dict[str, Any]:
     documents = [previous, corrected, notice]
     actuals = [d["selection"]["actual_index_row"] for d in documents]
+    full_method = actuals[2]["announcementTitle"] == _METHOD_NOTICE_TITLE
     orgs = {a.get("orgId") for a in actuals}
     if (
         len({a["announcementId"] for a in actuals}) != 3
         or len(orgs) != 1 or None in orgs or "" in orgs
         or any(a["secCode"] != parent.stock_code for a in actuals)
         or [a["announcementTitle"] for a in actuals] != [
-            _TITLE, _TITLE + "（更正后）", "关于" + _TITLE + "的更正公告",
+            _TITLE, _TITLE + "（更正后）",
+            _METHOD_NOTICE_TITLE if full_method else "关于" + _TITLE + "的更正公告",
         ]
         or not actuals[0]["announcementTime"] < actuals[1]["announcementTime"]
         == actuals[2]["announcementTime"]
@@ -63,7 +80,8 @@ def qualify_payment_revision(
     source_proofs = []
     for d in documents:
         body = re.sub(r"\s+", "", d["body"])
-        if set(re.findall(r"证券代码[：:]?(\d{6})", body[:4000])) != {parent.stock_code}:
+        label = r"(?:证券|股票)代码" if full_method else r"证券代码"
+        if set(re.findall(label + r"[：:]?(\d{6})", body[:4000])) != {parent.stock_code}:
             raise BoundedError("PAYMENT_REVISION_BODY_ISSUER_REQUIRED")
         _, proof = project_body(
             d["selection"], d["receipt"], index=d["index"],
@@ -71,7 +89,10 @@ def qualify_payment_revision(
             observed_at=observed_at,
         )
         source_proofs.append(proof)
-    old, new, correction = [re.sub(r"\s+", "", d["body"]) for d in documents]
+    old, new, correction = [
+        _full_method_layout(d["body"]) if full_method else re.sub(r"\s+", "", d["body"])
+        for d in documents
+    ]
     old_number, new_number = [_single(_NUMBER, b)[1] for b in [old, new]]
     if old_number == new_number or _TITLE + "（更正后）" not in new:
         raise BoundedError("PAYMENT_REVISION_EXPLICIT_CORRECTED_VERSION_REQUIRED")
@@ -85,7 +106,20 @@ def qualify_payment_revision(
         correction,
     )
     prefix = correction.split("更正前", 1)[0]
-    if (
+    if full_method:
+        correction_match = re.search(
+            r"更正前内容[：:](.+?)更正后内容[：:](.+?)"
+            r"除上述更正内容之外，原公告中的其它内容不变。", correction,
+        )
+        blocks = [re.search(r"五、权益分派方法.+?(?=六、)", b) for b in [old, new]]
+        if (
+            correction_match is None or any(b is None for b in blocks)
+            or correction_match.groups() != tuple(b[0] for b in blocks if b is not None)
+            or prefix.count("巨潮资讯网（www.cninfo.com.cn）披露了《" + _TITLE + "》") != 1
+            or re.findall(r"（公告编号[：:](\d{4}-\d{3})号?）", prefix) != [old_number]
+        ):
+            raise BoundedError("PAYMENT_REVISION_NOTICE_EXACT_CHANGE_UNPROVEN")
+    elif (
         correction_match is None or correction_match.groups() != (before[0], after[0])
         or prefix.count("在巨潮资讯网刊登了《" + _TITLE + "》") != 1
         or re.findall(r"（公告编号[：:](\d{4}-\d{3})）", prefix) != [old_number]
@@ -120,6 +154,8 @@ def qualify_payment_revision(
         unchanged_body_sha256=digest(unchanged(new, after)), observed_at=observed_at,
         old_values_overwritten=False, historical_PIT_restored=False,
         cumulative_adjustment_qualified=False, consumer_admission="NOT_GRANTED",
+        **({"notice_layout_contract": "explicit-full-payment-method-correction-v1"}
+           if full_method else {}),
     )
 
 

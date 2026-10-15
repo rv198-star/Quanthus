@@ -91,11 +91,15 @@ def _report_defined_currency_cash(body: str) -> str:
     if glossary is None or not re.search(r"2026\s*年半年度报告", body[:2000]):
         raise BoundedError("OFFICIAL_ACTION_REPORT_CURRENCY_DEFINITION_UNPROVEN")
     definitions = re.findall(
-        r"(?m)^[ \t]*(元(?:、万元)?(?:、亿元)?)[ \t]+指[ \t]+([^\r\n]+)",
+        r"(?m)^[ \t]*(元(?:[、，]万元)?(?:[、，]亿元)?)[ \t]+指[ \t]+([^\r\n]+)",
         glossary[1],
     )
     if not definitions or any(
-        re.sub(r"\s+", "", value) != "、".join("人民币" + u for u in units.split("、"))
+        re.sub(r"\s+", "", value).replace("，", "、") not in {
+            "、".join("人民币" + u for u in units.replace("，", "、").split("、")),
+            "、".join(u + "人民币" for u in units.replace("，", "、").split("、")),
+            "人民币" + units.replace("，", "、"),
+        }
         for units, value in definitions
     ):
         raise BoundedError("OFFICIAL_ACTION_REPORT_CURRENCY_DEFINITION_UNPROVEN")
@@ -135,14 +139,15 @@ def _szse_approved_cash(
         and not re.search(r"(?:20\d{2}年(?:半年度|中期|年度)|拟稿|草稿)", section)
     )
     if (
-        not re.match(r"(?:股东会|董事会)", approved)
+        not re.match(r"(?:股东会|董事会|利润分配方案审议等情况)", approved)
         or "审议通过" not in approved
         or not re.search(r"2026年(?:半年度|中期)", approved)
         or not (re.search(r"2026年(?:半年度|中期)", section) or cover_period)
         or re.search(r"[BH]股", approved + section)
         or not re.search(
             r"本次(?:实施的)?(?:权益分派|权益分配|分配|分派|利润分配)方案(?:内容)?与.{1,160}"
-            r"审议通过的(?:权益分派|利润分配|分配|分派)(?:方|预)案(?:及其调整原则)?(?:是)?一致",
+            r"审议通过的(?:(?:2026年(?:半年度|中期))?(?:权益分派|利润分配|分配|分派))?"
+            r"(?:方|预)案(?:及(?:其)?调整原则)?(?:是)?一致",
             approved,
         )
     ):

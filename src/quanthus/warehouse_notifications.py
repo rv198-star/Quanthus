@@ -377,6 +377,8 @@ def _email_html(
         "notification_policy_id": "通知规则版本",
         "completed_at": "本次完成确认时间",
         "daily_ods_status": "日频ODS采集",
+        "source_limitations": "来源及用途缺口",
+        "delivery_scope": "本次交付范围",
         "minute_status": "分钟采集资格",
         "complete_dwd_status": "完整DWD",
         "oci_status": "OCI交付",
@@ -443,6 +445,8 @@ def _send_resend(
         qualification = str(mail_context.get("research_qualification") or "未验证")
         outcome_text = f"{phase} {qualification} 质量降级"
     subject_stage = EVENTS[event]["stage"]
+    if context.get("delivery_scope") == "restricted_daily":
+        subject_stage = str(subject_stage) + "（受限日频）"
     if event in {"p10_cn01_minute_delivery_pass", "p10_cn01_minute_delivery_fail"}:
         phase = str(mail_context.get("executed_phase") or "")
         subject_stage = f"1m {phase}"

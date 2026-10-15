@@ -231,7 +231,7 @@ def test_daily_completion_checks_catalog_and_both_physical_sources(tmp_path, mon
             seen.append(root)
             or SimpleNamespace(
                 manifest_sha256="sha256:" + "a" * 64,
-                release=SimpleNamespace(market_date=DAY, status="ready"),
+                release=SimpleNamespace(market_date=DAY, status="ready", artifacts=[]),
             )
         ),
     )

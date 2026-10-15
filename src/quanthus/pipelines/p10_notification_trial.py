@@ -147,6 +147,7 @@ def daily_evidence(catalog_root: Path, release_root: Path, day: date) -> dict[st
         raise ValueError("daily success requires actual target daily-core catalog")
     catalog = object_at(catalog_root / "catalog.json")
     identities = {}
+    source_limitations = []
     for lane in catalog["lanes"]:
         from quanthus.pipelines.p10_delivery_common import safe_path
 
@@ -157,6 +158,19 @@ def daily_evidence(catalog_root: Path, release_root: Path, day: date) -> dict[st
         ):
             raise ValueError("daily success source bytes differ from selected catalog")
         identities[lane["lane"]] = lane["release_manifest_sha256"]
+        if lane["lane"] == "market_daily_core":
+            bundle = safe_path(release_root, lane["release_path"])
+            for artifact in actual.release.artifacts:
+                if artifact.name == "acquisition_log":
+                    acquisition = object_at(safe_path(bundle, str(artifact.relative_path)))
+                    for request in acquisition.get("requests", []):
+                        if request.get("provider") == "daily-source-router":
+                            decision = request["decision"]
+                            if decision.get("st_unknown") or any(
+                                source.startswith("tencent") and count
+                                for source, count in decision.get("source_counts", {}).items()
+                            ):
+                                source_limitations.append(decision)
     if set(identities) != {"market_daily_core", "calendar_daily_events"}:
         raise ValueError("daily completion source closure differs")
     return {
@@ -164,7 +178,9 @@ def daily_evidence(catalog_root: Path, release_root: Path, day: date) -> dict[st
         "verification": "daily_core_catalog_and_source_bytes",
         "catalog_digest": checked.catalog_digest,
         "ods_release_manifests": identities,
-        "daily_ods_status": "已完整采集并封存",
+        "daily_ods_status": "受限日频采集完成并封存" if source_limitations else "已完整采集并封存",
+        "source_limitations": source_limitations,
+        "delivery_scope": "restricted_daily" if source_limitations else "daily_core",
         "required_intervals": ["1d"],
         "complete_dwd_status": "未由本通知验收",
         "oci_status": "未由本通知验收",

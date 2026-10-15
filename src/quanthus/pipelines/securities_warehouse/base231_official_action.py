@@ -84,6 +84,41 @@ def szse_distribution_dates(body: str) -> tuple[date, date]:
     return dates[0], dates[1]
 
 
+def _szse_approved_cash(section: str, text: str) -> tuple[Decimal, str]:
+    """Bind an explicit RMB amount to an approved, unchanged current scheme.
+
+    Approval alone is insufficient. The implementation must identify the same
+    midyear period, explicitly confirm consistency and repeat the exact pretax
+    per-ten amount. Precision still comes from the implemented section.
+    """
+    implemented = _one(
+        r"每10股派发现金(?:股利|红利)([0-9]+(?:\.[0-9]+)?)元[（(【]含税", section
+    )
+    parts = text.split("一、", 1)
+    approved = parts[1].split("二、", 1)[0] if len(parts) == 2 else ""
+    if (
+        not re.match(r"(?:股东会|董事会)", approved)
+        or "审议通过" not in approved
+        or not re.search(r"2026年(?:半年度|中期)", approved)
+        or not re.search(r"2026年(?:半年度|中期)", section)
+        or re.search(r"[BH]股", approved + section)
+        or not re.search(
+            r"本次(?:实施的)?(?:权益分派|分配|利润分配)方案(?:内容)?与.{1,160}"
+            r"审议通过的(?:分配|分派)方案(?:及其调整原则)?(?:是)?一致",
+            approved,
+        )
+    ):
+        raise BoundedError("OFFICIAL_ACTION_EXPLICIT_TERM_MISSING_OR_CONFLICTING")
+    explicit = re.findall(
+        r"每10股派(?:发现金股利|发现金红利)?(?:人民币([0-9]+(?:\.[0-9]+)?)元"
+        r"|([0-9]+(?:\.[0-9]+)?)元人民币)(?:现金)?[（(【]含税",
+        approved,
+    )
+    if not explicit or {Decimal(a or b) for a, b in explicit} != {Decimal(implemented)}:
+        raise BoundedError("OFFICIAL_ACTION_EXPLICIT_TERM_MISSING_OR_CONFLICTING")
+    return _per_ten(implemented), digest(approved)
+
+
 def sse_distribution_dates(body: str) -> tuple[date, date]:
     """Only the explicitly ordered, single A-share current implementation table."""
     text = re.sub(r"\s+", "", unicodedata.normalize("NFKC", body))
@@ -158,6 +193,7 @@ def parse_distribution(
         raise BoundedError("OFFICIAL_ACTION_DOCUMENT_SCOPE_UNQUALIFIED")
     cash: Decimal | None
     currency_summary_sha256 = None
+    currency_approved_sha256 = None
     if venue == "SZSE":
         match = re.search(
             r"二、(?:本次实施的|本次)?(?:A股)?(?:权益分派(?:实施)?方案|权益分配方案|"
@@ -191,7 +227,10 @@ def parse_distribution(
             else None
         )
         if cash is None:
-            cash, currency_summary_sha256 = _szse_summary_cash(section, text)
+            try:
+                cash, currency_summary_sha256 = _szse_summary_cash(section, text)
+            except BoundedError:
+                cash, currency_approved_sha256 = _szse_approved_cash(section, text)
         transfers = re.findall(r"每10股转增([0-9]+(?:\.[0-9]+)?)股", section)
         no_transfer = bool(re.search(r"不以(?:资本)?公积金转增股本", section))
         if transfers and no_transfer:
@@ -287,6 +326,9 @@ def parse_distribution(
     if currency_summary_sha256 is not None:
         proof["currency_binding_contract"] = "same-current-implementation-summary-v1"
         proof["current_currency_summary_sha256"] = currency_summary_sha256
+    if currency_approved_sha256 is not None:
+        proof["currency_binding_contract"] = "same-current-approved-and-consistent-scheme-v1"
+        proof["current_approved_scheme_sha256"] = currency_approved_sha256
     return record, proof
 
 

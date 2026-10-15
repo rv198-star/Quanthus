@@ -555,6 +555,87 @@ def test_wrapped_explicit_lending_header_preserves_complete_native_matrix():
     assert rows[0]["raw_percentage"] == "1.25"
 
 
+def split_delta_lending_sample():
+    body, hints = lending_column_sample()
+    body = body.replace("报告期                       ", "报告期内增                   ")
+    body = body.replace("      内增减", "        减")
+    body = body.replace(
+        "合成股东1  0  1001  1.25  0  0  无  0  其他",
+        "合成股东1           0                      国有\n"
+        "                        1001  1.25  0  0  无  0\n"
+        "                                                        法人",
+    )
+    return body, hints
+
+
+def test_lending_explicit_delta_and_quantity_on_adjacent_physical_lines():
+    body, hints = split_delta_lending_sample()
+    rows, proof = parse_top_matrix(body, hints)
+    assert len(rows) == 10 and rows[0]["quantity"] == 1001
+    assert rows[0]["raw_percentage"] == "1.25" and rows[0]["category"] is None
+    assert proof["layout_normalization_contract"] == "adjacent-explicit-lending-delta-row-v1"
+
+
+@pytest.mark.parametrize(
+    "fault", ["no_delta", "unknown_right", "wrong_quantity", "name", "wrong_header", "far_header"]
+)
+def test_split_lending_delta_cannot_be_inferred_or_join_unrelated_columns(fault):
+    body, hints = split_delta_lending_sample()
+    if fault == "no_delta":
+        body = body.replace("合成股东1           0", "合成股东1            ")
+    elif fault == "unknown_right":
+        body = body.replace("0                      国有", "0                      未审核")
+    elif fault == "wrong_quantity":
+        body = body.replace("1001  1.25", "1002  1.25")
+    elif fault == "name":
+        body = body.replace("合成股东1           ", "额外名称合成股东1           ")
+    elif fault == "wrong_header":
+        body = body.replace("报告期内增", "未知字段")
+    else:
+        body = body.replace("        减", "                      减")
+    with pytest.raises(RuntimeError):
+        parse_top_matrix(body, hints)
+
+
+def vertical_lending_sample():
+    body, hints = split_delta_lending_sample()
+
+    def line(cells):
+        result = " " * 80
+        for at, text in cells:
+            result = result[:at] + text + result[at + len(text):]
+        return result.rstrip()
+
+    header = [
+        "单位：股", "前十名股东持股情况（不含通过转融通出借股份）",
+        line([(51, "包含")]), line([(46, "持有"), (51, "转融")]),
+        line([(46, "有限"), (51, "通借")]),
+        line([(3, "股东名称"), (13, "报告期内增"), (22, "期末持股数"),
+              (39, "比例"), (51, "出股"), (66, "股东")]),
+        line([(3, "（全称）"), (15, "减"), (24, "量"), (39, "(%)"),
+              (51, "份的"), (66, "性质")]),
+        line([(46, "售条"), (51, "限售")]), line([(46, "件股"), (51, "股份")]),
+    ]
+    data = body.splitlines()[next(i for i, s in enumerate(body.splitlines())
+                                 if s.startswith("合成股东1 ")):]
+    return "\n".join(header + data), hints
+
+
+def test_vertical_lending_fragments_bind_same_physical_column_with_split_name_cells():
+    body, hints = vertical_lending_sample()
+    hints[1]["HOLDER_NAME"] = "合成股东二全称"
+    body = body.replace("合成股东2  0", "合成股东二  0").replace(
+        "1002  1.25  0  0  无  0  其他", "1002  1.25  0  0  无  0\n全称"
+        + " " * 55 + "非国\n" + " " * 60 + "有法\n" + " " * 60 + "人"
+    )
+    rows, _ = parse_top_matrix(body, hints)
+    assert len(rows) == 10 and rows[1]["name"] == hints[1]["HOLDER_NAME"]
+    assert rows[1]["category"] is None
+    for invalid in [body.replace("通借", "通贷"), body.replace("非国", "未审核")]:
+        with pytest.raises(RuntimeError):
+            parse_top_matrix(invalid, hints)
+
+
 def test_lending_column_wrapped_nature_stays_unknown_not_inferred():
     body, hints = lending_column_sample()
     body = body.replace(

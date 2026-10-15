@@ -74,6 +74,12 @@ def _parse_top_matrix(
     if not isinstance(body, str) or not 0 < len(body.encode()) <= 16 * 1024**2:
         raise BoundedError("OFFICIAL_HOLDER_BODY_BOUND")
     _validate_hints(hints)
+    original_body = body
+    if physical_name_cells:
+        body = _join_explicit_lending_delta(body)
+    wrapped_nature = _WRAPPED_NATURE + (
+        "|国有|非国|有法" if body != original_body else ""
+    )
     lines = body.splitlines()
     starts = [
         i
@@ -117,7 +123,7 @@ def _parse_top_matrix(
     # Some official matrices put quantity before a bare percentage atom. Only
     # their explicit ordered header grants that unit; provider ratios do not.
     first_numeric = next(
-        (i for i, line in enumerate(block) if re.search(_WRAPPED_NATURE, line)),
+        (i for i, line in enumerate(block) if re.search(wrapped_nature, line)),
         len(block),
     )
     header = _norm("\n".join(block[:first_numeric]))
@@ -151,7 +157,14 @@ def _parse_top_matrix(
                                     2 if unicodedata.east_asian_width(c) in {"W", "F"} else 1
                                     for c in following[: other.start()]
                                 )
-                                if match.start() == other.start() and abs(left - right) <= 4:
+                                # A centered one-character second line need
+                                # not begin at the first line's left edge.
+                                centered = abs(
+                                    left + len(first) - right - len(second)
+                                ) <= 4
+                                if match.start() == other.start() or (
+                                    abs(left - right) <= 4 and centered
+                                ):
                                     wrapped.add(left)
             if len(wrapped) == 1:
                 return next(iter(wrapped))
@@ -215,7 +228,7 @@ def _parse_top_matrix(
             if _norm(line[:raw_name_fence]) in {"(全称)", "股东名称"}:
                 return line[:raw_name_fence].strip()
             remainder = _norm(line[raw_name_fence:])
-            if remainder and remainder not in _WRAPPED_NATURE.split("|"):
+            if remainder and remainder not in wrapped_nature.split("|"):
                 return line.strip()
             return line[:raw_name_fence].strip()
         if name_fence is None:
@@ -230,7 +243,10 @@ def _parse_top_matrix(
     lending_column = bool(
         physical_name_cells
         and nature_last
-        and all(token in header for token in ("包含转", "融通借", "出股份"))
+        and (
+            all(token in header for token in ("包含转", "融通借", "出股份"))
+            or _vertical_lending_header(block[:first_numeric])
+        )
     )
     raw_fences = {
         match.start() for line in block[:first_numeric] for match in re.finditer("报告期", line)
@@ -245,14 +261,14 @@ def _parse_top_matrix(
         + r"(?:无|质押|冻结|不适用|标记)\s+"
         r"[0-9][0-9,]*(?:\.[0-9]+)?"
         + (
-            r"(?:\s+(" + _WRAPPED_NATURE + r"))?\s*$"
+            r"(?:\s+(" + wrapped_nature + r"))?\s*$"
             if lending_column
             else r"\s+(" + _NATURE + r")\s*$"
         )
     )
     anchor_pattern = (
         re.compile(
-            r"^(.*?)\s+(" + _WRAPPED_NATURE + r")\s+"
+            r"^(.*?)\s+(" + wrapped_nature + r")\s+"
             r"([0-9][0-9,]*(?:\.[0-9]+)?)\s+"
             r"([0-9]+(?:\.[0-9]+)?)(%?)\s+"
         )
@@ -392,7 +408,7 @@ def _parse_top_matrix(
         )
     if ranks != list(range(1, 11)):
         raise BoundedError("OFFICIAL_HOLDER_COMPLETE_ROW_EXTENT_UNPROVEN")
-    return rows, dict(
+    proof = dict(
         contract_id=CONTRACT_ID,
         rows=10,
         whole_block_sha256=digest("\n".join(block)),
@@ -403,6 +419,65 @@ def _parse_top_matrix(
         percentage_authority="ORIGINAL_OFFICIAL_PERCENT_TOKEN_NOT_PROVIDER_EXTRA_DIGITS",
         source_priority_or_transaction_equivalence_granted=False,
     )
+    if body != original_body:
+        proof["layout_normalization_contract"] = "adjacent-explicit-lending-delta-row-v1"
+        proof["original_layout_body_sha256"] = digest(original_body)
+    return rows, proof
+
+
+def _vertical_lending_header(lines: list[str]) -> bool:
+    columns = []
+    for token in ["包含", "转融", "通借", "出股", "份的"]:
+        found = [
+            m.start() for line in lines if "持股情况" not in line
+            for m in re.finditer(token, line)
+        ]
+        if len(found) != 1:
+            return False
+        columns.append(found[0])
+    return len(set(columns)) == 1
+
+
+def _join_explicit_lending_delta(body: str) -> str:
+    """Join an explicit delta cell with its immediately following numeric row.
+
+    No value or category is inferred. This family requires all lending-column
+    labels, an actual signed delta, a complete quantity/percent/state row and
+    the known nature fragments. Complete names, ranks and quantities still
+    pass the ordinary full-matrix reconciliation afterwards.
+    """
+    lines = body.splitlines()
+    starts = [i for i, s in enumerate(lines) if "前十名股东持股情况" in _norm(s)]
+    if len(starts) != 1:
+        return body
+    start = starts[0]
+    header = _norm("".join(lines[start : start + 14]))
+    if "报告期内增" not in header or not (
+        all(t in header for t in ["包含转", "融通借", "出股份"])
+        or _vertical_lending_header(lines[start : start + 14])
+    ):
+        return body
+    previous = re.compile(
+        r"^(\S.*?)(\s{2,})([+-]?[0-9][0-9,]*(?:\.[0-9]+)?)(?:\s{2,}(国有|其他))?\s*$"
+    )
+    following = re.compile(
+        r"^\s+[0-9][0-9,]*(?:\.[0-9]+)?\s+[0-9]+(?:\.[0-9]+)?\s+"
+        r"[0-9][0-9,]*(?:\.[0-9]+)?\s+[0-9][0-9,]*(?:\.[0-9]+)?\s+"
+        r"(?:无|质押|冻结|不适用|标记)\s+[0-9][0-9,]*(?:\.[0-9]+)?\s*$"
+    )
+    changed = False
+    for i in range(start + 1, len(lines) - 1):
+        if "前十名无限售" in _norm(lines[i]) or "上述股东关联关系" in _norm(lines[i]):
+            break
+        match = previous.fullmatch(lines[i])
+        if match and following.fullmatch(lines[i + 1]):
+            lines[i] = (
+                match[1] + "  " + match[3] + "  " + lines[i + 1].strip()
+                + ("  " + match[4] if match[4] else "")
+            )
+            lines[i + 1] = ""
+            changed = True
+    return "\n".join(lines) if changed else body
 
 
 def _parse_floating_matrix(

@@ -49,6 +49,66 @@ def test_distribution_uses_implemented_section_and_preserves_distinct_adjustment
     assert proof["derived_price_factor_admission"] == "NOT_GRANTED"
 
 
+def approved_cash_body():
+    return BODY.replace(
+        "一、原预案每10股转增9股",
+        "一、股东会审议通过权益分派情况：公司2026年中期利润分配方案经股东会审议通过，"
+        "向全体股东每10股派发现金股利人民币2.50元（含税）。"
+        "本次实施的权益分派方案与公司股东会审议通过的分配方案一致。",
+    ).replace("派2.50元人民币现金", "派发现金股利2.500000元").replace(
+        "向全体股东每10股派发现金股利2.500000元",
+        "本公司2026年中期方案为：向全体股东每10股派发现金股利2.500000元",
+    )
+
+
+def test_szse_same_current_approved_scheme_can_supply_currency_only():
+    row, proof = parse_distribution(
+        approved_cash_body(), code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15)
+    )
+    assert row["cash_per_share"].as_tuple() == Decimal("0.2500000").as_tuple()
+    assert row["transfer_shares"] == Decimal("0.225")
+    assert proof["currency_binding_contract"] == "same-current-approved-and-consistent-scheme-v1"
+    assert proof["derived_price_factor_admission"] == "NOT_GRANTED"
+
+
+@pytest.mark.parametrize(
+    "fault", ["not_approved", "wrong_year", "wrong_period", "no_consistency", "changed",
+              "wrong_value", "currency", "tax", "total_only", "foreign_class", "other_section"]
+)
+def test_approved_currency_requires_same_event_explicit_value_and_implementation(fault):
+    body = approved_cash_body()
+    if fault == "not_approved":
+        body = body.replace("审议通过", "待审议")
+    elif fault == "wrong_year":
+        body = body.replace("2026年中期", "2025年中期", 1)
+    elif fault == "wrong_period":
+        body = body.replace("2026年中期", "2026年年度", 1)
+    elif fault == "no_consistency":
+        body = body.replace("本次实施的权益分派方案与公司股东会审议通过的分配方案一致。", "")
+    elif fault == "changed":
+        body = body.replace("方案一致", "方案不一致")
+    elif fault == "wrong_value":
+        body = body.replace("人民币2.50", "人民币2.60")
+    elif fault == "currency":
+        body = body.replace("人民币", "美元")
+    elif fault == "tax":
+        body = body.replace("人民币2.50元（含税）", "人民币2.50元（扣税后）")
+    elif fault == "total_only":
+        body = body.replace("每10股派发现金股利人民币2.50元", "合计派发现金股利人民币2.50元")
+    elif fault == "foreign_class":
+        body = body.replace(
+            "向全体股东每10股派发现金股利人民币", "向B股股东每10股派发现金股利人民币"
+        )
+    else:
+        body = body.replace(
+            "一、股东会",
+            "一、公司历史方案：2025年年度每10股派发现金股利人民币2.50元（含税）。二点、股东会",
+        )
+        body = body.replace("公司2026年中期利润分配方案", "公司利润分配方案")
+    with pytest.raises(RuntimeError, match="EXPLICIT_TERM"):
+        parse_distribution(body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15))
+
+
 @pytest.mark.parametrize("prefix", ["派1.0元人民币", "派发现金股利人民币1.00元"])
 def test_szse_currency_can_bind_to_matching_current_implementation_summary(prefix):
     body = BODY.replace(

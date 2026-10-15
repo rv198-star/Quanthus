@@ -92,11 +92,18 @@ def _szse_approved_cash(
     implemented = _one(r"每10股派发现金(?:股利|红利)([0-9]+(?:\.[0-9]+)?)元[（(【]含税", section)
     parts = text.split("一、", 1)
     approved = parts[1].split("二、", 1)[0] if len(parts) == 2 else ""
+    # Some current implementation sections omit the period already printed on
+    # the cover and approved scheme. Admit only an exact current cover title,
+    # with no other period or draft marker; never reinterpret a historical plan.
+    cover_period = bool(
+        re.search(r"2026年(?:半年度|中期)权益分派实施公告(?!拟稿|草稿)", parts[0])
+        and not re.search(r"(?:20\d{2}年(?:半年度|中期|年度)|拟稿|草稿)", section)
+    )
     if (
         not re.match(r"(?:股东会|董事会)", approved)
         or "审议通过" not in approved
         or not re.search(r"2026年(?:半年度|中期)", approved)
-        or not re.search(r"2026年(?:半年度|中期)", section)
+        or not (re.search(r"2026年(?:半年度|中期)", section) or cover_period)
         or re.search(r"[BH]股", approved + section)
         or not re.search(
             r"本次(?:实施的)?(?:权益分派|权益分配|分配|分派|利润分配)方案(?:内容)?与.{1,160}"

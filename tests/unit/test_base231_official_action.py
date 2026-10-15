@@ -75,6 +75,26 @@ def test_szse_same_current_approved_scheme_can_supply_currency_only():
     assert proof["derived_price_factor_admission"] == "NOT_GRANTED"
 
 
+def test_current_implemented_section_can_bind_period_to_exact_cover_title():
+    body = approved_cash_body().replace("2026权益分派实施公告", "2026年半年度权益分派实施公告")
+    body = body.replace("本公司2026年中期方案为：", "本公司方案为：")
+    row, proof = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15)
+    )
+    assert row["cash_per_share"].as_tuple() == Decimal("0.2500000").as_tuple()
+    assert proof["current_approved_scheme_sha256"]
+    for invalid in [
+        body.replace("2026年半年度权益分派实施公告", "2025年半年度权益分派实施公告"),
+        body.replace("2026年半年度权益分派实施公告", "2026年年度权益分派实施公告"),
+        body.replace("本公司方案为：", "本公司2025年年度方案为："),
+        body.replace("2026年半年度权益分派实施公告", "2026年半年度权益分派实施公告拟稿"),
+    ]:
+        with pytest.raises(RuntimeError, match="EXPLICIT_TERM"):
+            parse_distribution(
+                invalid, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15)
+            )
+
+
 @pytest.mark.parametrize(
     "fault",
     [

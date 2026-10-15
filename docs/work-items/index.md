@@ -15,7 +15,16 @@ recover/repair data. The reviewed live routing inventory is `config/data-ownersh
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03 | open epic |
-| P10-DATA-BASE24-000 | ODS/DWD Base 2.4 source reconstruction and October Daily continuation | P10-DATA-000 | [Takeover and stage plan](base24-build.md); preparation only, full source/capacity/reader acceptance pending |
+| P10-DATA-BASE24-000 | ODS/DWD Base 2.4 and CN02 T-day Daily, REQ v1.3 | P10-DATA-000 | [#527](https://github.com/rv198-star/Quanthus/issues/527); [execution plan](base24-build.md); source/capacity/image/reader acceptance pending |
+| P10-DATA-BASE24-010 | 证明2020起原生5m与退市证券来源可行性并保全原始字节 | P10-DATA-BASE24-000 | [#529](https://github.com/rv198-star/Quanthus/issues/529); bounded preparation ready; not accepted |
+| P10-DATA-BASE24-020 | 闭合历史listing×session分母和逐桶/日/月/年覆盖账本 | P10-DATA-BASE24-000 | [#530](https://github.com/rv198-star/Quanthus/issues/530); bounded preparation ready; not accepted |
+| P10-DATA-BASE24-030 | 复用既有8/9月5m并修复9月底来源→DWD断点 | P10-DATA-BASE24-010, P10-DATA-BASE24-020, P10-DATA-BASE24-060 | [#531](https://github.com/rv198-star/Quanthus/issues/531); dependent execution blocked; safe design may proceed; not accepted |
+| P10-DATA-BASE24-040 | 构建新ODS闭包及完整33表DWD Base2.4实体配对 | P10-DATA-BASE24-030, P10-DATA-BASE24-020, P10-DATA-BASE24-060 | [#532](https://github.com/rv198-star/Quanthus/issues/532); dependent execution blocked; safe design may proceed; not accepted |
+| P10-DATA-BASE24-050 | 适配CN02 1d+5m读取器并生成真实隔离October Daily | P10-DATA-BASE24-040 | [#533](https://github.com/rv198-star/Quanthus/issues/533); dependent execution blocked; safe design may proceed; not accepted |
+| P10-DATA-BASE24-060 | 冻结每盘峰值容量、保留/回收与分片恢复方案 | P10-DATA-BASE24-000 | [#528](https://github.com/rv198-star/Quanthus/issues/528); bounded preparation ready; not accepted |
+| P10-DATA-BASE24-070 | 完成成对镜像恢复、全表冷验收与损坏失败关闭 | P10-DATA-BASE24-040, P10-DATA-BASE24-050, P10-DATA-BASE24-060 | [#534](https://github.com/rv198-star/Quanthus/issues/534); dependent execution blocked; safe design may proceed; not accepted |
+| P10-DATA-BASE24-080 | 准备CN01→CN02单writer交接、OCI/GDrive与成对回滚 | P10-DATA-BASE24-070, P10-DATA-BASE24-050 | [#535](https://github.com/rv198-star/Quanthus/issues/535); dependent execution blocked; safe design may proceed; not accepted |
+| P10-DATA-BASE24-090 | 取得CN02自然T日盘后、异常恢复及逐端真实运行证据 | P10-DATA-BASE24-080 | [#536](https://github.com/rv198-star/Quanthus/issues/536); dependent execution blocked; safe design may proceed; not accepted |
 | P10-DATA-BASE22-000 | Base 2.2 独立基准镜像：领域闭合、隔离构建与最终验收 | P10-DATA-000; [four-principle programme](base22-build.md) | open finite programme; #480; complete candidate/acceptance pending |
 | P10-DATA-BASE22-010 | 闭合剩余公司行动60键并物化完整领域修复 | P10-DATA-BASE22-000 | #481; 60 original keys remain |
 | P10-DATA-BASE22-020 | 闭合股东208冲突及weekly非空领域并完成原生合并 | P10-DATA-BASE22-000 | #482; 208 conflicts and source-domain closure remain |

@@ -5,9 +5,9 @@
 | Parent | [Permanent P10](../design/lld/12-permanent-data-line.md); [work-item index](index.md) |
 | Design status | draft |
 | Delivery gate | blocked |
-| Requirement input | Owner-supplied REQ-P10-BASE24-001 v1.0, 2026-10-16 |
+| Requirement input | [Owner-supplied REQ-P10-BASE24-001 v1.3](base24-requirements.v1.3.md), 2026-10-16 |
 | Predecessor | [2.3.1 priority batches](base231-priority-batches.md) |
-| Authority | Owner directed current work to converge and prepare 2.4; no separate 2.3.1 release is planned |
+| Authority | Current build line targets 2.4 directly; CN02 is the future Daily writer; T-day after-close is the main target, T+1 is recovery/revision only |
 
 This node is an implementation/takeover plan for received requirements, not a deployed
 policy or new acceptance. The Owner's product direction is recorded below; frozen old
@@ -15,11 +15,16 @@ contracts stay effective until an explicit opt-in successor, tests and governing
 updates agree. No production switch, credentials, service/timer action, cloud upload,
 old data deletion, research activation or paid acquisition follows from this plan.
 
+The v1.3 input supersedes v1.0's fixed T+1 main-flow design. Unpublished target
+version/configuration/output declarations may move directly to2.4. Sealed2.3.1
+images/manifests/receipts retain their original identities. Continue the existing
+isolated branch/worktree; a version change alone does not require another copy.
+
 ## Current recovery checkpoint
 
 Continue CN02 `/root/Quanthus/.worktrees/base22-standalone`, branch
 `codex/base22-standalone`. The inherited, clean engineering checkpoint is
-`3885c39691694bf83fa54442524ae8c8e23787e9`. This takeover changes documentation
+`13eb02d54312e4dcb1131e56db4bc9b1960cdf30`. This v1.3 issue-planning update changes documentation
 only; accepted capsules retain their actual producer/module hashes. Do not rebind
 them to a new HEAD or rename a predecessor image to 2.4.
 
@@ -145,13 +150,35 @@ failure does block the claimed 2020-start default joint product.
    complete day through real production code in isolation, then the actual frozen
    October range. New products bind exact Base identities, not relabelled old Daily.
    Cover September30/first-session boundary plus holiday/weekend/weekly events.
-   Record success/failure per domain and target; no changing scheduler clocks.
+   Record success/failure per domain and target. Design CN02's T-day after-close
+   collection/build path; actual qualified1d+5m should build/deliver immediately,
+   without a fixed wait until T+1. T+1 handles unresolved required observations
+   and real late revisions only. Official supplier availability times and a20:30
+   candidate first attempt are received evidence/proposals, not a frozen success
+   deadline or proof of CN02 actual completion. Keep production timers unchanged.
 6. **F/G: whole acceptance and reviewable switch package.** Changed scope requires
    full physical/semantic validation, two independent relocations/cold processes
    and disposable damage negatives where required. Receipts separate physical,
    coverage, source, DWD admission, purpose, reader, Daily and delivery. Freeze
-   actual CN01/OCI writer/reader SHA/config, drain order, paired rollback paths,
+   actual CN02/CN01/OCI writer/reader SHA/config, drain order, paired rollback paths,
    cloud target identities and approved timing. Production execution is separate.
+
+The new versioned timing table must cover first after-close attempt, retries,
+day-end cutoff, exceptional recovery and delivery deadlines with measured source,
+rating/build/transfer latency. Old10:30/13:00/13:20/14:00 T+1 times are historical,
+not new T-day acceptance gates. Counters/limits cannot reset during migration.
+CN02 must produce its own natural after-close receipts; historical recovery and
+CN01 success are not substitutes. Record actual recovery only if it occurred.
+Trial scope must first resolve single-writer/shared-source budget conflicts without
+silently stopping production or collecting the same task twice.
+
+Before any approved production handoff, drain and stop CN01's old active collection,
+build/archive entrypoints, then enable CN02's corresponding single writer; preserve
+paired rollback. Verify CN02 private/outbound delivery capability, OCI actual read,
+one GDrive archive entry and stage-specific notices. Do not assume inbound public
+SSH exists on CN02 or damage its unrelated marketplace service. Coordinate supplier
+sessions/concurrency/request ceilings across historical, Daily and financial Jobs.
+This data-writer direction does not move OCI business/platform services.
 
 ## Capacity and lifecycle
 
@@ -195,10 +222,10 @@ simultaneous copies when rotating, or delete either before its restoration proof
 | 12 | D/E/F: precise ODS/supplement/code/model/basis identity plus real-reader results | New DWD/read path not run |
 | 13 | A-G: stage ownership, checkpoint identity, cumulative budgets and TMP lifecycle | Old counters preserved; new execution budgets pending |
 | 14 | E: actual isolated OctoberDaily including holiday/weekly/revision sources | Not run |
-| 15 | E/G: explicit1d5m T+1 contract; existing notification/timer deployment reconciliation | Design preparation only; no timer/service changes |
+| 15 | E/G: CN02 T-day1d5m, T+1 recovery only; versioned timing/single writer/shared-source budgets and actual receipts | Received v1.3 intent; implementation/trial/deployment not accepted |
 | 16 | A-F: per-device write/peak/copy budget and resource-conflict receipt | Snapshot captured; full-job capacity not qualified |
 | 17 | A-G: independent phase-specific source/image/reader/switch conclusions | A preparation captured; B-G not accepted |
-| 18 | E/F: listed negative cases and scoped/full engineering checks | Existing unchanged regressions retained; new profile regressions pending |
+| 18 | E/F: listed negatives, T-day immediate delivery, controlled next-day recovery, single-writer/cross-Job budgets and engineering checks | Existing unchanged regressions retained; new profile regressions pending |
 | 19 | A-G: sole live ledger, identity snapshots and separate completion counters | Existing authority retained; BASE24 entries appended |
 | 20 | F/G: paired manifests, recovery, coverage, reader/Daily and rollback handoff | Final deliverables not yet created |
 
@@ -211,3 +238,44 @@ Target GDrive layout remains `quanthus-ods/base/2.4` and
 publication is separately ready/authorized. Final conclusions must distinguish
 data-range acceptance, actual-reader/Daily acceptance and eligibility to request a
 production switch. All three are currently unaccepted/not eligible for this version.
+
+## Dot execution routing
+
+The finite programme is split into source feasibility(010), historical denominator
+and coverage(020), retainedAugust/September5m(030), source-grounded ODS/DWD pair(040),
+CN02 reader/isolatedOctoberDaily and new timing contract(050), capacity/lifecycle(060),
+whole cold recovery(070), paired single-writer switch/rollback preparation(080), and
+natural after-close operational evidence(090). Actual issue URLs are recorded in the work-item
+index; the parent issue embeds the exact receivedv1.3 requirements so
+Dot can read them without assuming unpublished local commits exist on GitHub.
+
+Start060's capacity planning and010/020's bounded preparation. Full writes cannot
+start until their source/resource gates pass. Each issue owns outputs, input identities,
+prerequisites, acceptance negatives, actual/remaining budgets and the precise next
+action. A blocked expensive stage does not stop independent safe engineering.
+The former unissued070publication-planning placeholder is split into070cold acceptance,
+080switch preparation and090natural-run evidence; old takeover snapshots stay immutable.
+
+Dot uses the existing sole live gap ledger and one workspace writer, restores exact
+checkpoints/counters and reuses unchanged qualified outputs. No new generic scheduler
+or per-small-change full rebuild. Report scope completion separately from admitted
+data coverage, with remaining work share and evidence-based conditional ETA. Budget
+exhaustion/deferment is not repaired data. Treat this issue creation as planning:
+Dot is not started automatically and no deployment/schedule change is performed.
+
+## Live GitHub execution map
+
+Parent: [#527](https://github.com/rv198-star/Quanthus/issues/527), under permanent P10
+#478; successor routing is also recorded on #525 without rewriting its evidence.
+
+| Stable suffix | Issue | Scope |
+| --- | --- | --- |
+| 060 | [#528](https://github.com/rv198-star/Quanthus/issues/528) | 冻结每盘峰值容量、保留/回收与分片恢复方案 |
+| 010 | [#529](https://github.com/rv198-star/Quanthus/issues/529) | 证明2020起原生5m与退市证券来源可行性并保全原始字节 |
+| 020 | [#530](https://github.com/rv198-star/Quanthus/issues/530) | 闭合历史listing×session分母和逐桶/日/月/年覆盖账本 |
+| 030 | [#531](https://github.com/rv198-star/Quanthus/issues/531) | 复用既有8/9月5m并修复9月底来源→DWD断点 |
+| 040 | [#532](https://github.com/rv198-star/Quanthus/issues/532) | 构建新ODS闭包及完整33表DWD Base2.4实体配对 |
+| 050 | [#533](https://github.com/rv198-star/Quanthus/issues/533) | 适配CN02 1d+5m读取器并生成真实隔离October Daily |
+| 070 | [#534](https://github.com/rv198-star/Quanthus/issues/534) | 完成成对镜像恢复、全表冷验收与损坏失败关闭 |
+| 080 | [#535](https://github.com/rv198-star/Quanthus/issues/535) | 准备CN01→CN02单writer交接、OCI/GDrive与成对回滚 |
+| 090 | [#536](https://github.com/rv198-star/Quanthus/issues/536) | 取得CN02自然T日盘后、异常恢复及逐端真实运行证据 |

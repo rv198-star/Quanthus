@@ -19,6 +19,17 @@ and serializes the proven payment date. It grants neither historical provider
 priority nor cumulative adjustment or consumer admission. Offline replay requires
 all three local originals, their qualification and the pinned revision code.
 
+The opt-in `explicit-native-holder-physical-columns-v1` reads the original
+PDF with `pdftotext -bbox-layout` when an explicit nature-last top-holder table
+wraps numeric cells. Source header geometry defines the name, change, quantity
+and percentage columns. Complete native name cells establish row extents; all
+ten original quantities and percentage tokens must reconcile to the exact hint
+census. Only actual characters in one physical quantity cell may be joined.
+Missing digits, inferred ranks and foreign table kinds are rejected. A scoped
+output pins the physical parser and records its separate parser version; cold
+replay extracts coordinates again from its local original PDF. This neither
+arbitrates conflicting sources nor qualifies historical knowledge time.
+
 Owner reordered the entire 13-item candidate set, not just the earlier six.
 Batch one is G09, G07, G06, G02; batch two is G03, G04, G01, G05. G08 and
 G10-G13 are deferred according to declared use. A bounded purpose qualification

@@ -21,6 +21,25 @@ from .ownership_capital import ownership_capital_schemas
 CURRENT_SOURCE_CONTRACT = "p10-base231-current-official-holder-document-source-v1"
 
 
+def extract_physical_layout(
+    pdf: Path, candidate: dict[str, Any], code_inputs: dict[str, Any]
+) -> str | None:
+    if "physical_layout_contract" not in candidate:
+        return None
+    from .base231_holder_physical_columns import CONTRACT_ID as PHYSICAL_CONTRACT
+
+    module = "src/quanthus/pipelines/securities_warehouse/base231_holder_physical_columns.py"
+    if (
+        candidate["physical_layout_contract"] != PHYSICAL_CONTRACT
+        or code_inputs.get(module) != file_sha(Path(module))
+    ):
+        raise BoundedError("OFFICIAL_HOLDER_PHYSICAL_CONTRACT_OR_CODE_UNPINNED")
+    return subprocess.run(
+        ["pdftotext", "-bbox-layout", str(pdf), "-"],
+        check=True, capture_output=True, timeout=60,
+    ).stdout.decode()
+
+
 def verify_current_document_receipts(
     *,
     actual: dict[str, Any],
@@ -233,6 +252,9 @@ def replay_official_holder(root: Path) -> dict[str, Any]:
                 capture_output=True,
                 timeout=60,
             ).stdout.decode()
+            physical_xml = extract_physical_layout(
+                root / candidate["PDF"], candidate, plan["code_inputs"]
+            )
             captured = max(
                 datetime.fromisoformat(receipt["completed_at"]),
                 datetime.fromisoformat(original_receipt["completed_at"]),
@@ -251,6 +273,7 @@ def replay_official_holder(root: Path) -> dict[str, Any]:
                     original_index=original_row,
                     company_org_bindings=org_bindings,
                     holding_type=spec["holding_type"],
+                    physical_layout_xml=physical_xml,
                 )
             except (RuntimeError, ValueError):
                 continue

@@ -1007,6 +1007,7 @@ def project_top_matrix(
     original_index: dict[str, Any] | None = None,
     company_org_bindings: list[dict[str, Any]] | None = None,
     holding_type: str = "TOP_SHAREHOLDERS",
+    physical_layout_xml: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     import pyarrow as pa  # type: ignore[import-untyped]
 
@@ -1074,14 +1075,25 @@ def project_top_matrix(
         raise BoundedError("OFFICIAL_HOLDER_REPORT_HEADER_CODE_PERIOD_UNPROVEN")
     if holding_type not in {"TOP_SHAREHOLDERS", "TOP_FLOATING_SHAREHOLDERS"}:
         raise BoundedError("OFFICIAL_HOLDER_TABLE_KIND_UNREVIEWED")
-    atoms, proof = (
-        parse_top_matrix(body, hints)
-        if holding_type == "TOP_SHAREHOLDERS"
-        else parse_floating_matrix(body, hints)
-    )
+    revision = CONTRACT_ID
+    if physical_layout_xml is not None:
+        from .base231_holder_physical_columns import CONTRACT_ID as PHYSICAL_CONTRACT
+        from .base231_holder_physical_columns import parse_physical_top_matrix
+
+        if holding_type != "TOP_SHAREHOLDERS":
+            raise BoundedError("OFFICIAL_HOLDER_PHYSICAL_TABLE_KIND_UNREVIEWED")
+        atoms, proof = parse_physical_top_matrix(physical_layout_xml, hints)
+        proof["original_text_body_sha256"] = digest(body)
+        revision = CONTRACT_ID + "+" + PHYSICAL_CONTRACT
+    else:
+        atoms, proof = (
+            parse_top_matrix(body, hints)
+            if holding_type == "TOP_SHAREHOLDERS"
+            else parse_floating_matrix(body, hints)
+        )
     common = dict(
         record_source="cninfo.official_regular_report." + holding_type.lower(),
-        source_revision=CONTRACT_ID,
+        source_revision=revision,
         source_artifact_sha256=official_sha256,
         knowledge_from=clock,
         knowledge_to=None,
@@ -1094,7 +1106,7 @@ def project_top_matrix(
         table_kind=holding_type,
         holding_quantity_unit="SHARE",
         holding_percentage_unit="PERCENT" if holding_type == "TOP_SHAREHOLDERS" else None,
-        parser_version=CONTRACT_ID,
+        parser_version=revision,
     )
     rows = [
         dict(

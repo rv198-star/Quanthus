@@ -203,21 +203,31 @@ def reuse(
 ) -> dict[str, tuple[dict[str, Any], dict[str, Any]]]:
     """Requalify exact preserved responses, keeping their original response clocks."""
     import base64
+    import gzip
     import shutil
 
-    from quanthus.pipelines.p10_delivery_common import digest
-    from quanthus.providers.acquisition_evidence import verify_capture
+    from quanthus.pipelines.p10_delivery_common import atomic, digest
+    from quanthus.providers.acquisition_evidence import POLICY, verify_capture
 
     attempts = shadow / "attempts/market-daily-core" / str(day)
     selected: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
     roots = sorted(attempts.iterdir())[-12:] if attempts.exists() else []
     read_bytes = 0
+    rejections = []
     for attempt in roots:
         for source in sorted((attempt / "landing/original-responses").glob("*.json.gz")):
             read_bytes += source.stat().st_size
             if read_bytes > 512 * 1024**2 or source.stat().st_size > 16 * 1024**2:
                 raise ValueError("TENCENT_REUSE_IO_BUDGET_EXCEEDED")
+            if source.is_symlink():
+                raise ValueError("TENCENT_REUSE_CAPTURE_SYMLINK")
+            with gzip.open(source, "rb") as handle:
+                payload = handle.read(16 * 1024**2 + 1)
+            if len(payload) > 16 * 1024**2 or digest(payload)[7:] + ".json.gz" != source.name:
+                raise ValueError("TENCENT_REUSE_ENVELOPE_IDENTITY_DIFFERS")
             envelope = verify_capture(source)
+            if envelope.get("policy_id") != POLICY:
+                raise ValueError("TENCENT_REUSE_CAPTURE_POLICY_DIFFERS")
             request = envelope["request"]
             code = str(request.get("code", ""))[2:]
             if (
@@ -228,19 +238,15 @@ def reuse(
                 or envelope.get("status") != "200"
             ):
                 continue
+            expected_symbol = ("sh" if code.startswith(("60", "68")) else "sz") + code
+            if request["code"] != expected_symbol:
+                raise ValueError("TENCENT_REUSE_EXCHANGE_IDENTITY_DIFFERS")
             stamp = datetime.fromisoformat(envelope["response_completed_at"])
             if stamp.tzinfo is None or stamp > datetime.now(timezone.utc):
                 raise ValueError("TENCENT_REUSE_OBSERVATION_CLOCK_INVALID")
             raw = base64.b64decode(envelope["raw_base64"], validate=True)
             if len(raw) > 2 * 1024 * 1024:
                 raise ValueError("TENCENT_REUSE_RESPONSE_BYTE_BUDGET_EXCEEDED")
-            bar = decode(raw, request["code"], day, acquired_at=stamp.isoformat())
-            limits = bar.pop("_source_limitations")
-            prior = selected.get(code)
-            if prior and datetime.fromisoformat(prior[0]["acquired_at"]) > stamp:
-                continue
-            if prior and prior[0]["acquired_at"] == stamp.isoformat() and prior[0] != bar:
-                raise ValueError("TENCENT_REUSE_SAME_CLOCK_CONFLICT")
             dest = landing / "original-responses" / source.name
             dest.parent.mkdir(parents=True, exist_ok=True)
             if dest.exists():
@@ -248,6 +254,25 @@ def reuse(
                     raise ValueError("TENCENT_REUSE_CAPTURE_IDENTITY_DIFFERS")
             else:
                 shutil.copyfile(source, dest)
+            try:
+                bar = decode(raw, request["code"], day, acquired_at=stamp.isoformat())
+            except (ValueError, KeyError, TypeError, IndexError) as exc:
+                rejections.append(
+                    {
+                        "code": code,
+                        "capture_file": dest.name,
+                        "capture_sha256": digest(dest.read_bytes()),
+                        "reason": "candidate_not_qualified",
+                        "error_class": type(exc).__name__,
+                    }
+                )
+                continue
+            limits = bar.pop("_source_limitations")
+            prior = selected.get(code)
+            if prior and datetime.fromisoformat(prior[0]["acquired_at"]) > stamp:
+                continue
+            if prior and prior[0]["acquired_at"] == stamp.isoformat() and prior[0] != bar:
+                raise ValueError("TENCENT_REUSE_SAME_CLOCK_CONFLICT")
             selected[code] = (
                 bar,
                 {
@@ -267,4 +292,13 @@ def reuse(
                     },
                 },
             )
+    if rejections:
+        atomic(
+            landing / "tencent-reuse-rejections.json",
+            {
+                "market_date": str(day),
+                "rejections": rejections,
+                "disposition": "preserve rejected candidates; retry missing codes only",
+            },
+        )
     return selected

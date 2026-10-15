@@ -355,3 +355,119 @@ def test_missing_required_index_stops_before_any_new_tencent_collection(tmp_path
     with pytest.raises(router.SourceUnavailable, match="INDEX_EVIDENCE_MISSING"):
         market.acquire(**args)
     assert calls == []
+
+
+def test_old_bad_200_candidate_does_not_block_new_good_response(tmp_path):
+    from quanthus.providers.acquisition_evidence import capture
+
+    root = (
+        tmp_path
+        / "shadow/attempts/market-daily-core"
+        / str(DAY)
+        / "first/landing/original-responses"
+    )
+    request = {"provider": "tencent", "code": "sz000001", "basis": "none", "market_date": str(DAY)}
+    capture(
+        root=root,
+        request=request,
+        raw=payload(day="2026-10-14"),
+        started_at=STAMP,
+        completed_at=STAMP,
+        status="200",
+    )
+    capture(
+        root=root,
+        request=request,
+        raw=payload(),
+        started_at="2026-10-15T15:01:00+00:00",
+        completed_at="2026-10-15T15:01:00+00:00",
+        status="200",
+    )
+    result = tx.reuse(tmp_path / "shadow", tmp_path / "new", DAY, {"000001"})
+    assert result["000001"][0]["acquired_at"] == "2026-10-15T15:01:00+00:00"
+    proof = json.loads((tmp_path / "new/tencent-reuse-rejections.json").read_text())
+    assert len(proof["rejections"]) == 1
+    assert len(list((tmp_path / "new/original-responses").glob("*.gz"))) == 2
+
+
+def test_only_bad_200_candidate_allows_fresh_request_for_missing_code(tmp_path, monkeypatch):
+    from quanthus.providers.acquisition_evidence import capture
+
+    original = tx.reuse
+    market, args, calls, deadlines = routing_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(tx, "reuse", original)
+    root = (
+        tmp_path
+        / "shadow/attempts/market-daily-core"
+        / str(DAY)
+        / "first/landing/original-responses"
+    )
+    capture(
+        root=root,
+        request={
+            "provider": "tencent",
+            "code": "sh600000",
+            "basis": "none",
+            "market_date": str(DAY),
+        },
+        raw=payload(symbol="sh600000", day="2026-10-14"),
+        started_at=STAMP,
+        completed_at=STAMP,
+        status="200",
+    )
+    bars, states, indices, logs = market.acquire(**args)
+    assert calls == ["600000"] and len(bars) == 2
+
+
+@pytest.mark.parametrize("fault", ["clock", "policy", "exchange"])
+def test_tencent_envelope_metadata_tampering_is_hard_failure(tmp_path, fault):
+    import gzip
+
+    from quanthus.providers.acquisition_evidence import capture
+
+    root = (
+        tmp_path
+        / "shadow/attempts/market-daily-core"
+        / str(DAY)
+        / "first/landing/original-responses"
+    )
+    capture(
+        root=root,
+        request={
+            "provider": "tencent",
+            "code": "sz000001",
+            "basis": "none",
+            "market_date": str(DAY),
+        },
+        raw=payload(),
+        started_at=STAMP,
+        completed_at=STAMP,
+        status="200",
+    )
+    p = next(root.glob("*.gz"))
+    v = json.loads(gzip.decompress(p.read_bytes()))
+    if fault == "clock":
+        v["response_completed_at"] = "2026-10-15T14:00:00+00:00"
+    if fault == "policy":
+        v["policy_id"] = "forged"
+    if fault == "exchange":
+        v["request"]["code"] = "sh000001"
+    p.write_bytes(gzip.compress(encoded(v)))
+    with pytest.raises(ValueError, match="ENVELOPE_IDENTITY_DIFFERS"):
+        tx.reuse(tmp_path / "shadow", tmp_path / "new", DAY, {"000001"})
+
+
+@pytest.mark.parametrize("fault", ["duplicate", "wrong_date"])
+def test_nonexact_index_evidence_blocks_tencent_before_collection(tmp_path, monkeypatch, fault):
+    from quanthus.pipelines import lane_runner as lane
+
+    market, args, calls, deadlines = routing_fixture(tmp_path, monkeypatch)
+    rows = [{"index_code": c, "date": str(DAY)} for c in lane.INDEX_CODES]
+    if fault == "duplicate":
+        rows.append(rows[0])
+    else:
+        rows[0]["date"] = "2026-10-14"
+    monkeypatch.setattr(lane, "_baostock_wait_for_index_day", lambda *a, **kw: (rows, []))
+    with pytest.raises(router.SourceUnavailable, match="INDEX_EVIDENCE_MISSING"):
+        market.acquire(**args)
+    assert calls == []

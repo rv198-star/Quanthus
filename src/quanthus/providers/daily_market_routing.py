@@ -106,7 +106,11 @@ def acquire(
                 market_date, captured_responses=captured
             )
             primary_log.extend(logs)
-    if {row["index_code"] for row in index_rows} != set(lane.INDEX_CODES):
+    if (
+        len(index_rows) != len(lane.INDEX_CODES)
+        or {row["index_code"] for row in index_rows} != set(lane.INDEX_CODES)
+        or any(row.get("date") != str(market_date) for row in index_rows)
+    ):
         raise routing.SourceUnavailable("REQUIRED_TARGET_INDEX_EVIDENCE_MISSING")
     # A fresh unrelated listing denominator is never invented from yesterday.
     root = paths.home / "source-universe-v1" / str(market_date)

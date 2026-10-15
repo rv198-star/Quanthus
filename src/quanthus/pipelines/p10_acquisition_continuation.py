@@ -14,7 +14,11 @@ from zoneinfo import ZoneInfo
 
 from quanthus.pipelines.contracts import verify_ods_release
 from quanthus.pipelines.p10_complete_daily_cycle import JOURNAL, calendar_rows
-from quanthus.pipelines.p10_complete_daily_notifications import failure
+from quanthus.pipelines.p10_complete_daily_notifications import (
+    SOURCE_GAP_REASON,
+    failure,
+    source_gap_context,
+)
 from quanthus.pipelines.p10_delivery_common import (
     atomic,
     file_digest,
@@ -210,13 +214,9 @@ def run(*, mode: str, day: date, revision: str, state: Path = STATE) -> dict[str
                         day=day,
                         stage="acquisition_quality",
                         state_root=state / "notifications",
-                        reason=(
-                            "SOURCE_NOT_REFRESHED: affected domains remain excluded; "
-                            "qualified daily core continues"
-                        ),
+                        reason=SOURCE_GAP_REASON,
                         context={
-                            "blocked_domains": result["excluded_domains"],
-                            "daily_core_blocked": False,
+                            **source_gap_context(unknown),
                             "market_date_label": "自然日公告日期"
                             if mode == "natural-day"
                             else "交易日",

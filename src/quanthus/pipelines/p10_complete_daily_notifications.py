@@ -19,6 +19,7 @@ from quanthus.pipelines import p10_notification_incident as incident
 from quanthus.pipelines import p10_notification_trial as trial
 from quanthus.pipelines.p10_complete_daily_schedule import POLICY_ID
 from quanthus.pipelines.p10_delivery_common import atomic, digest, encoded, object_at
+from quanthus.policy import find_project_root
 
 EVENTS = {
     "domain_daily": "p10_cn01_daily_domain_failed",
@@ -38,6 +39,96 @@ SUCCESS_EVENTS = {
     "minutes": "p10_cn01_tplus1_minutes_completed",
 }
 
+SOURCE_GAP_NOTICE = "p10-source-gap-notice-v1"
+SOURCE_GAP_REASON = (
+    "SOURCE_NOT_REFRESHED: affected domains remain excluded; qualified daily core continues"
+)
+SOURCE_GAP_NAMES = {
+    "adjustment_evidence_delta": "复权证据",
+    "suspensions_delta": "停复牌专门来源",
+    "corporate_actions_delta": "公司行动",
+    "dividends_delta": "分红",
+    "factor_evidence_delta": "因子证据",
+    "financial_disclosures_delta": "财务披露增量",
+}
+
+
+def source_gap_context(entries: list[dict[str, Any]]) -> dict[str, Any]:
+    """Only already-excluded, nonblocking domains qualify for a limited notice."""
+    policy = object_at(find_project_root() / "config/pipelines/p10-acquisition-prevention.v1.json")
+    if not entries or policy.get("policy_id") != "p10-acquisition-prevention-v1":
+        raise ValueError("source gap notice requires the existing acquisition policy")
+    allowed = set(policy["daily_core_excluded_domains"])
+    for entry in entries:
+        name = entry.get("dataset")
+        if (
+            name not in allowed or name not in SOURCE_GAP_NAMES
+            or entry.get("daily_core_blocked") is not False
+            or entry.get("current_refresh_proven") is not False
+            or entry.get("state") != "unknown"
+            or entry.get("reason_code") not in {
+                "SOURCE_NOT_REFRESHED", "NONEMPTY_DATASET_UNHANDLED",
+            }
+            or entry.get("blocked_uses") != [name]
+        ):
+            raise ValueError("source gap cannot be described as nonblocking")
+    domains = sorted({entry["dataset"] for entry in entries})
+    return {
+        "notification_outcome": "limited",
+        "source_gap_policy_id": SOURCE_GAP_NOTICE,
+        "source_gap_entries": entries,
+        "source_gap_summary": "、".join(SOURCE_GAP_NAMES[name] for name in domains),
+        "blocked_domains": domains,
+        "daily_core_blocked": False,
+        "required_intervals": ["1d"],
+        "policy_id": "daily-core-v1",
+        "daily_ods_status": "本检查仅报告排除域；日频合格状态以独立封存回执为准",
+    }
+
+
+def _event_for(stage: str, context: dict[str, Any]) -> str:
+    outcome = context.get("notification_outcome")
+    if outcome == "success":
+        return SUCCESS_EVENTS[stage]
+    if outcome == "limited":
+        if stage != "acquisition_quality":
+            raise ValueError("limited source notice cannot replace another failure stage")
+        checked = source_gap_context(context.get("source_gap_entries", []))
+        if any(context.get(key) != value for key, value in checked.items()):
+            raise ValueError("limited source notice identity differs")
+        return "p10_cn01_acquisition_quality_limited"
+    return EVENTS[stage]
+
+
+def _failure_context(stage: str, reason: str, context: dict[str, Any]) -> dict[str, Any]:
+    if context.get("notification_outcome") != "limited":
+        return context
+    try:
+        allowed = set(source_gap_context(context.get("source_gap_entries", []))) | {
+            "market_date_label", "notification_policy_id", "notification_group", "error_code",
+        }
+        valid = (
+            stage == "acquisition_quality"
+            and reason in {"SOURCE_NOT_REFRESHED", SOURCE_GAP_REASON}
+            and context.get("error_code") in {None, "SOURCE_NOT_REFRESHED"}
+            and not (set(context) - allowed)
+            and _event_for(stage, context) == "p10_cn01_acquisition_quality_limited"
+        )
+    except (ValueError, KeyError, TypeError):
+        valid = False
+    if valid:
+        return context
+    # A genuine fault must retain its own failure event/key, even when a caller
+    # accidentally carried the known-debt context into the fault path.
+    clean = dict(context)
+    for key in (
+        "source_gap_entries", "source_gap_policy_id", "source_gap_summary",
+        "daily_core_blocked", "daily_ods_status", "policy_id", "required_intervals",
+    ):
+        clean.pop(key, None)
+    clean["notification_outcome"] = "failure"
+    return clean
+
 
 def _notification_key(day: date, stage: str, context: dict[str, Any]) -> str:
     identity = [POLICY_ID, day.isoformat(), stage]
@@ -47,6 +138,8 @@ def _notification_key(day: date, stage: str, context: dict[str, Any]) -> str:
         identity.append(str(context["isolated_failure_drill"]))
     if context.get("notification_outcome") == "success":
         identity.append("success")
+    elif context.get("notification_outcome") == "limited":
+        identity.append(SOURCE_GAP_NOTICE)
     return digest(encoded(identity))[7:]
 
 
@@ -86,8 +179,10 @@ def success(
 def failure(
     *, day: date, stage: str, state_root: Path, reason: str, context: dict[str, Any] | None = None
 ) -> dict[str, Any]:
+    context = _failure_context(stage, reason, context or {})
     success_notice = (context or {}).get("notification_outcome") == "success"
-    event = SUCCESS_EVENTS[stage] if success_notice else EVENTS[stage]
+    limited_notice = (context or {}).get("notification_outcome") == "limited"
+    event = _event_for(stage, context or {})
     decision: dict[str, Any] = {}
     if not success_notice:
         decision = trial.failure_decision(
@@ -130,10 +225,23 @@ def failure(
                 group = original["context"].get("notification_group", original["stage"])
                 break
     path = state_root / f"{key}.json"
+    if limited_notice and not path.exists():
+        legacy_context = {k: v for k, v in key_context.items() if k != "notification_outcome"}
+        legacy_path = state_root / f"{_notification_key(day, group, legacy_context)}.json"
+        if legacy_path.exists():
+            legacy_record = object_at(legacy_path)
+            if (
+                legacy_record.get("market_date") == str(day)
+                and legacy_record.get("stage") == stage
+                and legacy_record.get("delivery_status") == "sent"
+            ):
+                # A format change must not replay already-notified historical
+                # source debt or resolve any prior genuine failure incident.
+                return {**legacy_record, "status": "already_sent"}
     details = {"policy_id": POLICY_ID, "required_intervals": ["1d", "1m", "5m"], **(context or {})}
     if decision and decision["action"] != "legacy":
         details.update(notification_policy_id=trial.POLICY_ID, notification_group=group)
-    if stage == "daily_cycle" or group == "daily_ods":
+    if stage in {"daily_cycle", "acquisition_quality"} or group == "daily_ods":
         details.update(policy_id="daily-core-v1", required_intervals=["1d"])
     with (state_root / f"{key}.lock").open("a+") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -172,7 +280,7 @@ def failure(
                                  payload["context"]) != key
         ):
             raise ValueError("pending notification identity differs")
-        event = SUCCESS_EVENTS[frozen_stage] if success_notice else EVENTS[frozen_stage]
+        event = _event_for(frozen_stage, payload["context"])
         try:
             sent = mail._send_resend(
                 event=event,
@@ -208,7 +316,7 @@ def failure(
         }
         atomic(path, record)
         pending.unlink(missing_ok=True)
-        if not success_notice:
+        if not success_notice and not limited_notice:
             with suppress(OSError, ValueError, KeyError):
                 incident.acknowledge(state_root, day, group, record)
         return record
@@ -245,6 +353,13 @@ def retry_pending(state_root: Path, *, limit: int = 4) -> dict[str, Any]:
                 reason=payload["reason"],
                 context=payload["context"],
             )
+            if (
+                payload["context"].get("notification_outcome") == "limited"
+                and record.get("delivery_status") == "sent"
+                and record.get("idempotency_key") != path.stem
+            ):
+                atomic(state_root / "reclassified-source-notices" / path.name, payload)
+                path.unlink(missing_ok=True)
             outcomes.append({"key": path.stem, "status": record.get("status", "sent")})
         except Exception as exc:
             with suppress(FileNotFoundError):

@@ -76,6 +76,14 @@ EVENTS = {
         "heading": "CN01采集端来源缺口",
         "failure": True,
     },
+    "p10_cn01_acquisition_quality_limited": {
+        "node": "CN01",
+        "stage": "采集端来源检查",
+        "heading": "来源域存在缺口；不阻断已独立合格的日频",
+        "failure": False,
+        "status_label": "来源受限（不阻断日频）",
+        "detail_label": "缺口说明",
+    },
     "p10_cn01_complete_daily_gdrive_failed": {
         "node": "CN01",
         "stage": "完整 DWD GDrive归档",
@@ -354,7 +362,7 @@ def _email_html(
             ]
         )
     if error:
-        details.append(("错误", error))
+        details.append((str(EVENTS[event].get("detail_label", "错误")), error))
     context_labels = {
         "unit": "systemd unit",
         "run_path": "运行路径",
@@ -391,10 +399,15 @@ def _email_html(
         "failed_phase": "失败步骤",
         "cycle_status": "任务终态",
         "candidate_market_date": "候选日期（仍需交易日历核实）",
+        "source_gap_summary": "未刷新来源域",
+        "source_gap_policy_id": "来源缺口通知版本",
+        "daily_core_blocked": "是否阻断日频",
     }
     for key, label in context_labels.items():
         value = context.get(key)
         if value is not None and str(value).strip():
+            if key == "daily_core_blocked" and isinstance(value, bool):
+                value = "是" if value else "否"
             details.append((label, str(value)))
     rows = "".join(
         f'<tr><th align="left">{html.escape(label)}</th><td>{html.escape(str(value))}</td></tr>'

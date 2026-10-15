@@ -7,6 +7,17 @@ Policy: `config/pipelines/p10-complete-daily.v1.json`.
 
 ## Runtime order
 
+Source-gap notification `p10-source-gap-notice-v1` describes the existing six
+excluded, unrefreshed source domains as limited, with their names and the actual
+daily-core impact. This notice covers 1d acquisition checking only, does not
+assert minute or complete delivery, and does not grant the excluded uses.
+Only sealed evidence with `current_refresh_proven=false`, `state=unknown`,
+an existing excluded domain and `daily_core_blocked=false` can use it. Required
+input failures keep their failure classification. Limited notices have a separate
+deduplication identity and do not acknowledge or suppress a genuine failure.
+Existing queued notices retain their original semantics; no historical mail is
+replayed by deployment. Source admission and production data policies are unchanged.
+
 Notification behavior from 2026-10-15 follows the independent
 `config/pipelines/p10-notification-trial.v1.json` and LLD12's delivery notification
 trial. Ordinary attempt failures are retained locally until their existing checkpoint;

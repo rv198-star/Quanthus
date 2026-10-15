@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any
 
 from quanthus import warehouse_notifications as mail
+from quanthus.pipelines import p10_notification_incident as incident
+from quanthus.pipelines import p10_notification_trial as trial
 from quanthus.pipelines.p10_complete_daily_schedule import POLICY_ID
 from quanthus.pipelines.p10_delivery_common import atomic, digest, encoded, object_at
 
@@ -31,6 +33,10 @@ EVENTS = {
     "complete": "p10_cn01_complete_daily_failed",
     "mirror": "p10_oci_complete_daily_failed",
 }
+SUCCESS_EVENTS = {
+    "daily_ods": "p10_cn01_daily_ods_completed",
+    "minutes": "p10_cn01_tplus1_minutes_completed",
+}
 
 
 def _notification_key(day: date, stage: str, context: dict[str, Any]) -> str:
@@ -39,18 +45,87 @@ def _notification_key(day: date, stage: str, context: dict[str, Any]) -> str:
         identity.append("execution_date_unresolved")
     if context.get("isolated_failure_drill"):
         identity.append(str(context["isolated_failure_drill"]))
+    if context.get("notification_outcome") == "success":
+        identity.append("success")
     return digest(encoded(identity))[7:]
+
+
+def success(
+    *, day: date, stage: str, state_root: Path, evidence: dict[str, Any],
+    code_revision: str,
+) -> dict[str, Any]:
+    """Queue verified stage completion; the independent sender owns transport retries."""
+    if stage not in SUCCESS_EVENTS or not trial.enabled(day):
+        return {"status": "success_notification_not_enabled"}
+    if evidence.get("market_date") != str(day) or not evidence.get("verification"):
+        raise ValueError("success notification requires exact verified business-date evidence")
+    incident.resolve(state_root, day, stage)
+    if not trial.success_enabled(day):
+        return {"status": "success_notification_not_enabled"}
+    details = {
+        **evidence, "notification_outcome": "success", "notification_policy_id": trial.POLICY_ID,
+        "completed_at": datetime.now(trial.CST).isoformat(), "code_revision": code_revision,
+        "policy_id": "daily-core-v1" if stage == "daily_ods" else POLICY_ID,
+    }
+    key = _notification_key(day, stage, details)
+    state_root.mkdir(parents=True, exist_ok=True)
+    with (state_root / f"{key}.lock").open("a+") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        if (state_root / f"{key}.json").exists():
+            return {"status": "already_sent", "key": key}
+        pending = state_root / "pending" / f"{key}.json"
+        if not pending.exists():
+            atomic(pending, {
+                "policy_id": POLICY_ID, "market_date": str(day), "stage": stage,
+                "reason": "verified_stage_completion", "context": details,
+                "queued_at": datetime.now(timezone.utc).isoformat(),
+            })
+    return {"status": "success_notification_queued", "key": key}
 
 
 def failure(
     *, day: date, stage: str, state_root: Path, reason: str, context: dict[str, Any] | None = None
 ) -> dict[str, Any]:
-    event = EVENTS[stage]
+    success_notice = (context or {}).get("notification_outcome") == "success"
+    event = SUCCESS_EVENTS[stage] if success_notice else EVENTS[stage]
+    decision: dict[str, Any] = {}
+    if not success_notice:
+        decision = trial.failure_decision(
+            day=day, stage=stage, reason=reason, context=context or {}, state_root=state_root,
+        )
+        if decision["action"] == "defer":
+            trial.note_deferred(state_root, day, stage, decision)
+            return {"status": "deferred_until_deadline", **decision}
+        if decision["action"] not in {"legacy", "immediate_fault", "immediate_evidence_fault"}:
+            upstream = (context or {}).get("upstream_incident")
+            if upstream is None and state_root == incident.CN01_NOTES:
+                upstream = incident.upstream(incident.EXPORT, day, stage)
+            if isinstance(upstream, dict) and incident.valid(upstream, day, stage):
+                trial.note_deferred(state_root, day, stage, {
+                    "action": "merged_into_acknowledged_upstream_alert",
+                    "upstream_stage": upstream["stage"], "root_alert": upstream["idempotency_key"],
+                })
+                return {"status": "blocked_upstream_already_notified",
+                        "upstream_stage": upstream["stage"]}
     state_root.mkdir(parents=True, exist_ok=True)
-    key = _notification_key(day, stage, context or {})
+    key_context = context or {}
+    group = decision.get("group", stage)
+    legacy_key = _notification_key(day, stage, key_context)
+    if (state_root / "pending" / f"{legacy_key}.json").exists():
+        group = key_context.get("notification_group", stage)
+    key = _notification_key(day, group, key_context)
+    if not success_notice and group == "daily_ods":
+        for alias in ("daily_ods", "daily_cycle", "domain_daily", "acquisition_quality"):
+            old = state_root / f"{_notification_key(day, alias, key_context)}.json"
+            if old.exists():
+                with suppress(OSError, ValueError, KeyError):
+                    incident.acknowledge(state_root, day, group, object_at(old))
+                return {**object_at(old), "status": "already_sent"}
     path = state_root / f"{key}.json"
     details = {"policy_id": POLICY_ID, "required_intervals": ["1d", "1m", "5m"], **(context or {})}
-    if stage == "daily_cycle":
+    if decision and decision["action"] != "legacy":
+        details.update(notification_policy_id=trial.POLICY_ID, notification_group=group)
+    if stage == "daily_cycle" or group == "daily_ods":
         details.update(policy_id="daily-core-v1", required_intervals=["1d"])
     with (state_root / f"{key}.lock").open("a+") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -71,15 +146,23 @@ def failure(
                 },
             )
         payload = object_at(pending)
+        frozen_stage = str(payload.get("stage", ""))
+        stage_matches = frozen_stage == stage or (
+            group == "daily_ods" and frozen_stage in {
+                "daily_ods", "daily_cycle", "domain_daily", "acquisition_quality",
+            }
+        )
         if (
             payload.get("policy_id") != POLICY_ID
             or payload.get("market_date") != day.isoformat()
-            or payload.get("stage") != stage
+            or not stage_matches
             or not isinstance(payload.get("reason"), str)
             or not isinstance(payload.get("context"), dict)
-            or _notification_key(day, stage, payload["context"]) != key
+            or _notification_key(day, payload["context"].get("notification_group", stage),
+                                 payload["context"]) != key
         ):
             raise ValueError("pending notification identity differs")
+        event = SUCCESS_EVENTS[frozen_stage] if success_notice else EVENTS[frozen_stage]
         try:
             sent = mail._send_resend(
                 event=event,
@@ -87,7 +170,7 @@ def failure(
                 pointer=None,
                 result=None,
                 key=key,
-                error=payload["reason"],
+                error=None if success_notice else payload["reason"],
                 context=payload["context"],
             )
         except Exception as exc:
@@ -105,7 +188,7 @@ def failure(
             raise
         record = {
             "market_date": day.isoformat(),
-            "stage": stage,
+            "stage": frozen_stage,
             "delivery_status": "sent",
             "policy_id": POLICY_ID,
             "idempotency_key": key,
@@ -114,6 +197,9 @@ def failure(
         }
         atomic(path, record)
         pending.unlink(missing_ok=True)
+        if not success_notice:
+            with suppress(OSError, ValueError, KeyError):
+                incident.acknowledge(state_root, day, group, record)
         return record
 
 
@@ -121,6 +207,7 @@ def retry_pending(state_root: Path, *, limit: int = 4) -> dict[str, Any]:
     """Replay bounded immutable mail requests without re-running any data stage."""
     if not 1 <= limit <= 4:
         raise ValueError("notification replay limit must be between one and four")
+    reconciliation = reconcile_successes(state_root)
     outcomes = []
     # Bytes are immutable; mtime is only the mail queue's round-robin priority.
     pending = sorted(
@@ -132,8 +219,11 @@ def retry_pending(state_root: Path, *, limit: int = 4) -> dict[str, Any]:
             day = date.fromisoformat(payload["market_date"])
             stage = payload["stage"]
             if (
-                stage not in EVENTS
-                or path.stem != _notification_key(day, stage, payload["context"])
+                stage not in (SUCCESS_EVENTS if payload.get("context", {}).get(
+                    "notification_outcome") == "success" else EVENTS)
+                or path.stem != _notification_key(
+                    day, payload["context"].get("notification_group", stage), payload["context"]
+                )
                 or payload.get("policy_id") != POLICY_ID
             ):
                 raise ValueError("pending notification identity differs")
@@ -155,7 +245,73 @@ def retry_pending(state_root: Path, *, limit: int = 4) -> dict[str, Any]:
         "status": "notification_retry_completed",
         "outcomes": outcomes,
         "remaining": len(list((state_root / "pending").glob("*.json"))),
+        "completion_reconciliation": reconciliation,
     }
+
+
+def reconcile_successes(state_root: Path) -> list[dict[str, Any]]:
+    """Recover a missed enqueue for only today's two authoritative operating targets."""
+    if state_root != incident.CN01_NOTES:
+        return []
+    from quanthus.pipelines.p10_complete_daily_schedule import target_for
+
+    now = datetime.now(trial.CST)
+    try:
+        calendar = object_at(state_root.parent / "calendars" / f"{now.date()}.json")
+        fetched = datetime.fromisoformat(calendar["fetched_at"])
+        if (
+            calendar.get("market_date") != str(now.date())
+            or calendar.get("provider") != "baostock-trading-calendar"
+            or calendar.get("rows_sha256") != digest(encoded(calendar["rows"]))
+            or fetched.tzinfo is None or fetched > now
+            or fetched.astimezone(trial.CST).date() != now.date()
+        ):
+            raise ValueError("completion reconciliation calendar identity differs")
+        potential = {target_for(now, calendar["rows"], daily=True),
+                     target_for(now, calendar["rows"])}
+        targets = {day for day in potential if day is not None}
+    except (OSError, ValueError, KeyError, TypeError):
+        return [{"status": "completion_reconciliation_calendar_unavailable"}]
+    results = []
+    for day in sorted(targets):
+        if not trial.success_enabled(day):
+            continue
+        for stage in SUCCESS_EVENTS:
+            key = _notification_key(day, stage, {"notification_outcome": "success"})
+            if any(path.exists() for path in [state_root / f"{key}.json",
+                                              state_root / "pending" / f"{key}.json"]):
+                continue
+            try:
+                if stage == "daily_ods":
+                    shadow = Path(os.environ.get("HERMES_ODS_SHADOW_ROOT",
+                                                 "/root/work/astock/data/shadow/cn01-ods-v1"))
+                    records = sorted((shadow / "orchestrator/daily-core" / str(day)).glob(
+                        "*/run.json"))[-3:]
+                    ready = [object_at(path) for path in records]
+                    ready = [item for item in ready
+                             if item.get("catalog", {}).get("status") == "ready"]
+                    if not ready:
+                        continue
+                    proof = trial.daily_evidence(Path(ready[-1]["catalog"]["root"]),
+                                                 shadow / "releases", day)
+                else:
+                    status = object_at(state_root.parent / str(day) / "status.json")
+                    minutes = status.get("minutes", {})
+                    if set(minutes) != {"1m", "5m"} or not all(
+                        value.get("research_ready") is True for value in minutes.values()
+                    ):
+                        continue
+                    proof = trial.minute_evidence(minutes, day)
+                revision = subprocess.check_output(
+                    ["git", "-C", str(Path(__file__).resolve().parents[3]), "rev-parse", "HEAD"],
+                    text=True,
+                ).strip()
+                results.append(success(day=day, stage=stage, state_root=state_root,
+                                       evidence=proof, code_revision=revision))
+            except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
+                results.append({"status": "completion_not_yet_qualified", "stage": stage,
+                                "error_class": type(exc).__name__})
+    return results
 
 
 def _service_started_at(unit: str) -> float | None:
@@ -354,6 +510,19 @@ def main() -> int:
             if args.complete_cycle_service_stop
             else None,
         )
+        error_code = "controller_runtime_failed"
+        try:
+            status = object_at(JOURNAL / str(target) / "status.json")
+            if (
+                status.get("invocation_id")
+                and status["invocation_id"] == os.environ.get("INVOCATION_ID")
+                and status.get("status") in {
+                    "minutes_not_qualified", "waiting_for_sealed_daily_ods",
+                }
+            ):
+                error_code = "retryable_stage_incomplete"
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
         record = failure(
             day=target,
             stage=stage,
@@ -363,7 +532,7 @@ def main() -> int:
             context={
                 "market_date_label": label,
                 "unit": "quanthus-complete-daily.service",
-                "error_code": "complete_cycle_service_failed",
+                "error_code": error_code,
             },
         )
         print(json.dumps(record, sort_keys=True))

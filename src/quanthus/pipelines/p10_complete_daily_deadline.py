@@ -124,12 +124,21 @@ def main() -> int:
         )
         raise
     if result["status"] == "failed":
+        context: dict[str, Any] = {"deadline": result["deadline"]}
+        if args.stage == "mirror":
+            from quanthus.pipelines import p10_notification_incident as incident
+            from quanthus.pipelines.p10_complete_daily_sync import CACHE
+
+            context["upstream_incident"] = incident.recent_remote(
+                OCI_ROOT / CACHE / "upstream-notifications",
+                date.fromisoformat(result["market_date"]),
+            )
         result["notification"] = failure(
             day=date.fromisoformat(result["market_date"]),
             stage=args.stage,
             state_root=notification_state,
             reason=result["reason"],
-            context={"deadline": result["deadline"]},
+            context=context,
         )
     print(json.dumps(result, sort_keys=True))
     return 0 if result["status"] != "failed" else 2

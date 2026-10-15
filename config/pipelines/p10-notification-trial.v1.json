@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "policy_id": "p10-delivery-notification-trial-v1",
+  "effective_from_market_date": "2026-10-15",
+  "timezone": "Asia/Shanghai",
+  "failure_mode": "deadline_or_actionable_fault",
+  "success_stages": ["daily_ods", "minutes"],
+  "success_notifications_enabled": true,
+  "success_identity": "one_per_business_date_and_stage",
+  "historical_success_replay": false,
+  "end_condition": "owner_disables_success_notifications",
+  "data_admission_changes": false
+}

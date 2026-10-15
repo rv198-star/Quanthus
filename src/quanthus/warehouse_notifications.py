@@ -38,6 +38,14 @@ class WarehouseNotificationError(RuntimeError):
 
 
 EVENTS = {
+    "p10_cn01_daily_ods_completed": {
+        "node": "CN01", "stage": "T日日频ODS采集", "heading": "T日日频ODS采集完成",
+        "failure": False,
+    },
+    "p10_cn01_tplus1_minutes_completed": {
+        "node": "CN01", "stage": "T+1分钟补采", "heading": "T+1所需1m/5m补采合格",
+        "failure": False,
+    },
     "p10_cn01_daily_domain_failed": {
         "node": "CN01",
         "stage": "日频领域接续",
@@ -366,6 +374,17 @@ def _email_html(
         "deadline": "交付截止时间",
         "target_next_trade_day": "T+1交易日",
         "policy_id": "运行规则版本",
+        "notification_policy_id": "通知规则版本",
+        "completed_at": "本次完成确认时间",
+        "daily_ods_status": "日频ODS采集",
+        "minute_status": "分钟采集资格",
+        "complete_dwd_status": "完整DWD",
+        "oci_status": "OCI交付",
+        "gdrive_status": "GDrive归档",
+        "catalog_digest": "日频ODS目录身份",
+        "ods_release_manifests": "日频ODS来源身份",
+        "minute_evidence": "两档分钟身份",
+        "code_revision": "本次流程代码版本",
         "product_scope": "数据产品范围",
         "failed_phase": "失败步骤",
         "cycle_status": "任务终态",

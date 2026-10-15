@@ -81,7 +81,9 @@ def failure_decision(
     if now.tzinfo is None:
         raise ValueError("notification clock must have timezone")
     daily = {"daily_cycle", "daily_ods", "domain_daily", "acquisition_quality"}
-    group = "daily_ods" if stage in daily else stage
+    # Only the two hooks for the same daily-core product share a queue identity.
+    # Domain continuation and source-quality reports have independent producers/outboxes.
+    group = "daily_ods" if stage in {"daily_cycle", "daily_ods"} else stage
     marker = (reason + " " + str(context.get("error_code", ""))).lower()
     actionable = any(
         token in marker

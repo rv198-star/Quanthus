@@ -41,6 +41,35 @@ def _per_ten(token: str) -> Decimal:
     return Decimal((parts.sign, parts.digits, parts.exponent - 1))
 
 
+def _complete_page_cash_unit_boundary(body: str) -> str:
+    """Remove only a verified physical footer between a complete amount and 元.
+
+    Every physical page must end in its own sequential n/N footer. No digit
+    fragment, inline fraction, missing page or inferred number is rewritten.
+    """
+    pages = body.split("\f")
+    if not pages[-1].strip():
+        pages.pop()
+    if len(pages) < 2:
+        return body
+    for index, page in enumerate(pages, 1):
+        footers = list(re.finditer(
+            r"(?m)^[ \t]{8,}([1-9][0-9]*)/([1-9][0-9]*)[ \t]*$", page
+        ))
+        if (
+            len(footers) != 1
+            or tuple(map(int, footers[0].groups())) != (index, len(pages))
+            or page[footers[0].end():].strip()
+        ):
+            return body
+    return re.sub(
+        r"(每\s*10\s*股\s*派\s*发\s*现\s*金\s*(?:股\s*利|红\s*利)\s*"
+        r"[0-9]+(?:\.[0-9]+)?)[ \t]*\n(?:[ \t]*\n)*"
+        r"[ \t]{8,}[1-9][0-9]*/[1-9][0-9]*[ \t]*\n\f(?=元[（(【]含税)",
+        r"\1\n", body,
+    )
+
+
 def _szse_summary_cash(section: str, text: str) -> tuple[Decimal, str]:
     """Bind currency only through the same document's current event summary.
 
@@ -256,6 +285,9 @@ def parse_distribution(
         "\n",
         body,
     )
+    complete_page_body = _complete_page_cash_unit_boundary(layout_body)
+    complete_page_normalized = complete_page_body != layout_body
+    layout_body = complete_page_body
     text = re.sub(r"\s+", "", layout_body)
     if (
         not re.fullmatch(r"\d{6}", code)
@@ -423,7 +455,10 @@ def parse_distribution(
         publication_instant=None,
     )
     if layout_body != body:
-        proof["layout_normalization_contract"] = "pdf-explicit-rmb-cash-page-footer-v1"
+        proof["layout_normalization_contract"] = (
+            "pdf-complete-page-census-cash-unit-boundary-v1"
+            if complete_page_normalized else "pdf-explicit-rmb-cash-page-footer-v1"
+        )
         proof["layout_body_sha256"] = digest(layout_body)
     if currency_summary_sha256 is not None:
         proof["currency_binding_contract"] = "same-current-implementation-summary-v1"

@@ -89,6 +89,33 @@ def report_currency_body():
     )
 
 
+def test_complete_physical_page_census_can_split_cash_amount_from_unit():
+    body = approved_cash_body().replace("现金股利人民币2.50元", "现金股利2.50元")
+    body = body.replace(
+        "现金股利2.500000元", "现金股利2.500000\n\n            1/3\n\f元"
+    ) + "\n            2/3\n\f其他说明\n            3/3\n\f"
+    row, proof = parse_distribution(
+        body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+        currency_scheme_body=report_currency_body(),
+    )
+    assert row["cash_per_share"].as_tuple() == Decimal("0.2500000").as_tuple()
+    assert proof["layout_normalization_contract"] == (
+        "pdf-complete-page-census-cash-unit-boundary-v1"
+    )
+    for bad in [
+        body.replace("2/3", "1/3"),
+        body.replace("3/3", "3/4"),
+        body.replace("            1/3\n\f", "            1/3\n"),
+        body.replace("            3/3\n\f", ""),
+        body.replace("2.500000\n", "2.50\n").replace("\f元", "\f0000元"),
+    ]:
+        with pytest.raises(RuntimeError, match="EXPLICIT_TERM"):
+            parse_distribution(
+                bad, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15),
+                currency_scheme_body=report_currency_body(),
+            )
+
+
 @pytest.mark.parametrize("definition", [
     "元、万元、亿元 指 人民币元、人民币万元、人民币亿元",
     "元，万元，亿元 指 人民币元，人民币万元，人民币亿元",

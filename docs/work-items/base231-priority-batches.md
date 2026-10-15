@@ -462,3 +462,15 @@ algorithms. The real fixed samples and both complete cold runs must subsequently
 pass; sample timings do not replace full acceptance or certify worst-case capacity.
 Construction and verification code revisions are recorded separately, rather than
 rewriting the immutable construction identity or producer qualifications.
+
+### Complete physical page counters at a dividend unit boundary
+
+The official implementation parser accepts a page footer between a complete
+pretax per-ten cash literal and its explicit 元 unit only when every physical
+page ends with exactly one sequential n/N counter and all N pages are present.
+The original body and literal precision remain bound to evidence. Inline
+fractions, partial numeric fragments, missing or duplicated pages and differing
+page totals do not qualify. This layout contract supplies neither currency nor
+approval: the same-event explicit currency and approved-scheme checks still apply.
+Domain replay and both independent source-denied cold reads remain mandatory;
+this adapter alone does not qualify a complete successor image or a consumer.

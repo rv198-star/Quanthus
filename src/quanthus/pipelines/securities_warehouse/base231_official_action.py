@@ -21,6 +21,10 @@ from .disclosure_event import materialize_corporate_action_rows
 
 CONTRACT_ID = "p10-base231-official-implemented-distribution-basis-v1"
 
+# Whitespace removal joins adjacent PDF table dates. A single-digit day must
+# stop before the next YYYY/ token rather than consume its leading digit.
+_SLASH_DATE = re.compile(r"(\d{4})/(\d{1,2})/(\d{1,2})(?=\d{4}/|[^0-9]|$)")
+
 
 def _one(pattern: str, text: str) -> str:
     found = set(re.findall(pattern, text))
@@ -37,15 +41,46 @@ def _per_ten(token: str) -> Decimal:
     return Decimal((parts.sign, parts.digits, parts.exponent - 1))
 
 
+def _szse_summary_cash(section: str, text: str) -> tuple[Decimal, str]:
+    """Bind currency only through the same document's current event summary.
+
+    The implementation supplies the value and precision. A matching, explicit
+    pretax RMB per-ten statement in 特别提示 supplies currency, never a proposal,
+    total amount, tax deduction, adjustment formula or unrelated RMB mention.
+    """
+    implemented = _one(
+        r"每10股派发现金(?:股利|红利)([0-9]+(?:\.[0-9]+)?)元[（(【]含税", section
+    )
+    prefix = text.split("一、", 1)[0]
+    if "特别提示" not in prefix:
+        raise BoundedError("OFFICIAL_ACTION_EXPLICIT_TERM_MISSING_OR_CONFLICTING")
+    summary = prefix.split("特别提示", 1)[1]
+    if "本次权益分派" not in summary or re.search(r"拟|预案|上次|上年度", summary):
+        raise BoundedError("OFFICIAL_ACTION_EXPLICIT_TERM_MISSING_OR_CONFLICTING")
+    explicit = re.findall(
+        r"每10股派(?:发现金股利|发现金红利)?(?:人民币([0-9]+(?:\.[0-9]+)?)元"
+        r"|([0-9]+(?:\.[0-9]+)?)元人民币)[（(【]含税",
+        summary,
+    )
+    if not explicit or {Decimal(a or b) for a, b in explicit} != {Decimal(implemented)}:
+        raise BoundedError("OFFICIAL_ACTION_EXPLICIT_TERM_MISSING_OR_CONFLICTING")
+    return _per_ten(implemented), digest(summary)
+
+
 def szse_distribution_dates(body: str) -> tuple[date, date]:
     """Read explicit labels; multiple A/B or revised dates remain ambiguous."""
     text = re.sub(r"\s+", "", body)
     dates = []
     for label in [r"股权登记日", r"(?:除权除息日|除权日[（(]除息日[）)])"]:
-        tokens = set(re.findall(label + r"[为：:]{1,2}(\d{4})年(\d{1,2})月(\d{1,2})日", text))
+        tokens = {
+            date(*map(int, parts))
+            for parts in re.findall(
+                label + r"[为：:]{1,2}(\d{4})年(\d{1,2})月(\d{1,2})日", text
+            )
+        }
         if len(tokens) != 1:
             raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
-        dates.append(date(*map(int, next(iter(tokens)))))
+        dates.append(next(iter(tokens)))
     return dates[0], dates[1]
 
 
@@ -56,16 +91,48 @@ def sse_distribution_dates(body: str) -> tuple[date, date]:
     if match is None:
         raise BoundedError("OFFICIAL_ACTION_IMPLEMENTATION_SECTION_MISSING")
     section = match[1]
+    # A two-line PDF header may place the right-hand labels before the left
+    # labels in the text stream. Admit only this exact wrapped header family;
+    # the sole A-share row still supplies all three ordered dates.
+    header = (
+        r"(?:股份类别股权登记日.*?除权\(息\)日现金红利发放日"
+        r"|除权\(息\)现金红利发股份类别股权登记日最后交易日日放日)A股"
+    )
     if (
-        not re.search(r"股份类别股权登记日.*?除权\(息\)日现金红利发放日A股", section)
+        not (
+            re.search(header, section)
+            or re.match(r"股权登记日除权\(息\)日现金红利发放日(?=\d{4}/)", section)
+        )
         or "B股" in section
         or "H股" in section
     ):
         raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
-    tokens = re.findall(r"(\d{4})/(\d{1,2})/(\d{1,2})", section)
+    tokens = _SLASH_DATE.findall(section)
     if len(tokens) != 3:
         raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
     return date(*map(int, tokens[0])), date(*map(int, tokens[1]))
+
+
+def _sse_transfer_terms(section: str) -> tuple[Decimal, date, date]:
+    """Explicit transfer-only implementation and its three-column date table."""
+    normalized = unicodedata.normalize("NFKC", section)
+    parts = normalized.split("相关日期")
+    if len(parts) != 2:
+        raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
+    terms, related = parts
+    if re.search(r"现金|送红股", terms):
+        raise BoundedError("OFFICIAL_ACTION_EXPLICIT_TERM_MISSING_OR_CONFLICTING")
+    ratio = Decimal(
+        _one(r"以资本公积金向全体股东每股转增([0-9]+(?:\.[0-9]+)?)股", terms)
+    )
+    dates = list(_SLASH_DATE.finditer(related))
+    headers = {
+        "股权登记日除权(息)日新增无限售条件流通股份上市日",
+        "新增无限售条件流通股份股权登记日除权(息)日上市日",
+    }
+    if len(dates) != 3 or related[: dates[0].start()] not in headers:
+        raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
+    return ratio, date(*map(int, dates[0].groups())), date(*map(int, dates[1].groups()))
 
 
 def parse_distribution(
@@ -89,6 +156,8 @@ def parse_distribution(
         or expected_ex_date > date(2026, 9, 30)
     ):
         raise BoundedError("OFFICIAL_ACTION_DOCUMENT_SCOPE_UNQUALIFIED")
+    cash: Decimal | None
+    currency_summary_sha256 = None
     if venue == "SZSE":
         match = re.search(
             r"二、(?:本次实施的|本次)?(?:A股)?(?:权益分派(?:实施)?方案|权益分配方案|"
@@ -101,18 +170,28 @@ def parse_distribution(
             raise BoundedError("OFFICIAL_ACTION_IMPLEMENTATION_SECTION_MISSING")
         section = match.group(1)
         record_date, ex_date = szse_distribution_dates(body)
+        explicit_cash = re.findall(
+            r"每10股派(?:发现金红利|现金红利|发现金股利|现金股利|发)?"
+            r"(?=人民币|[0-9]+(?:\.[0-9]+)?元人民币现金)"
+            r"(?:人民币)?([0-9]+(?:\.[0-9]+)?)元(?:人民币现金|现金)?[（(【]含税",
+            section,
+        )
         cash = (
             Decimal(0)
             if "不派发现金红利" in section
             else _per_ten(
                 _one(
-                    r"每10股派(?:发现金红利|现金红利|发现金股利|现金股利)?"
+                    r"每10股派(?:发现金红利|现金红利|发现金股利|现金股利|发)?"
                     r"(?=人民币|[0-9]+(?:\.[0-9]+)?元人民币现金)"
-                    r"(?:人民币)?([0-9]+(?:\.[0-9]+)?)元(?:人民币现金)?[（(【]含税",
+                    r"(?:人民币)?([0-9]+(?:\.[0-9]+)?)元(?:人民币现金|现金)?[（(【]含税",
                     section,
                 )
             )
+            if explicit_cash
+            else None
         )
+        if cash is None:
+            cash, currency_summary_sha256 = _szse_summary_cash(section, text)
         transfers = re.findall(r"每10股转增([0-9]+(?:\.[0-9]+)?)股", section)
         no_transfer = bool(re.search(r"不以(?:资本)?公积金转增股本", section))
         if transfers and no_transfer:
@@ -130,9 +209,14 @@ def parse_distribution(
             raise BoundedError("OFFICIAL_ACTION_VENUE_NOT_PROVEN")
         match = re.search(r"每股分配比例(.+?)(?:相关日期)", text)
         dates = re.search(r"股权登记日(.{1,180})一、", text)
-        if match is not None and dates is not None and "除权（息）日" in dates[1]:
+        transfer_match = re.search(r"二、转增股本方案(.+?)三、转增股本实施办法", text)
+        if transfer_match is not None:
+            section = transfer_match[1]
+            transfer, record_date, ex_date = _sse_transfer_terms(section)
+            cash = None
+        elif match is not None and dates is not None and "除权（息）日" in dates[1]:
             section = match.group(1)
-            ordered_dates = re.findall(r"(\d{4})/(\d{1,2})/(\d{1,2})", dates.group(1))
+            ordered_dates = _SLASH_DATE.findall(dates.group(1))
             if len(ordered_dates) not in {3, 4}:
                 raise BoundedError("OFFICIAL_ACTION_DATE_LABEL_NOT_UNIQUE")
             record_date, ex_date = [date(*map(int, d)) for d in ordered_dates[:2]]
@@ -151,7 +235,8 @@ def parse_distribution(
             if "每股派送红股" in section
             else None
         )
-        transfer = None
+        if transfer_match is None:
+            transfer = None
     else:
         raise BoundedError("OFFICIAL_ACTION_VENUE_UNSUPPORTED")
     if ex_date != expected_ex_date or record_date >= ex_date:
@@ -199,6 +284,9 @@ def parse_distribution(
     if layout_body != body:
         proof["layout_normalization_contract"] = "pdf-explicit-rmb-cash-page-footer-v1"
         proof["layout_body_sha256"] = digest(layout_body)
+    if currency_summary_sha256 is not None:
+        proof["currency_binding_contract"] = "same-current-implementation-summary-v1"
+        proof["current_currency_summary_sha256"] = currency_summary_sha256
     return record, proof
 
 

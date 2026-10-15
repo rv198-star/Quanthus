@@ -15,6 +15,7 @@ recover/repair data. The reviewed live routing inventory is `config/data-ownersh
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03 | open epic |
+| P10-DATA-BASE24-000 | ODS/DWD Base 2.4 source reconstruction and October Daily continuation | P10-DATA-000 | [Takeover and stage plan](base24-build.md); preparation only, full source/capacity/reader acceptance pending |
 | P10-DATA-BASE22-000 | Base 2.2 独立基准镜像：领域闭合、隔离构建与最终验收 | P10-DATA-000; [four-principle programme](base22-build.md) | open finite programme; #480; complete candidate/acceptance pending |
 | P10-DATA-BASE22-010 | 闭合剩余公司行动60键并物化完整领域修复 | P10-DATA-BASE22-000 | #481; 60 original keys remain |
 | P10-DATA-BASE22-020 | 闭合股东208冲突及weekly非空领域并完成原生合并 | P10-DATA-BASE22-000 | #482; 208 conflicts and source-domain closure remain |

@@ -2,6 +2,18 @@
 
 ## Current recovery checkpoint
 
+Owner redirected the next delivery to Base2.4 on2026-10-16. Current scoped
+outputs, original producer/input identities and failed evidence are retained;
+no separate2.3.1 release or transitional whole-image rebuild is planned. Start
+with [the2.4 takeover and stage plan](base24-build.md). The existing private
+continuation `current-gaps.json` remains the sole live ledger, with BASE24
+entries appended. G01/G06 reached actual200-request ceilings; other unfinished
+scopes were redirected, not exhausted. The engineering checkpoint
+`3885c39691694bf83fa54442524ae8c8e23787e9` passed make check with6526passed,
+21skipped. Qualified outputs do not establish new complete-image acceptance.
+The former continuation instructions below are retained as historical recovery
+and contract descriptions; they do not require spending unused budgets before2.4.
+
 The current report-defined dividend-currency adapter requires an exact full
 2026 half-year official report, original issuer-filtered index/transport, its
 own company-code table, and an explicit report-wide glossary mapping 元 to

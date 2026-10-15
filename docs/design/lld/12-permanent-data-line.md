@@ -127,6 +127,7 @@ independent cold construction remain governed.
 | ID | Title | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03; P1 historical foundation retained | Ownership/routing contracts and verified live issue migration; bounded repairs/handoffs need separate evidence and standing epic remains open |
+| P10-DATA-BASE24-000 | Prepare source-grounded ODS/DWD Base 2.4 and isolated October Daily continuation | P10-DATA-000; Owner successor preparation direction, 2026-10-16 | [Draft takeover/stage plan](../../work-items/base24-build.md); default1d/native5m intent and inherited-source reuse require new versioned contracts, capacity/source/image/reader acceptance; no production activation |
 | P10-DATA-BASE22-000 | Base 2.2 独立基准镜像：领域闭合、隔离构建与最终验收 | P10-DATA-000; Owner four-principle continuation 2026-10-08 | #480; [programme](../../work-items/base22-build.md); complete source/repair/33-table/capacity and whole-image acceptance gates |
 | P10-DATA-BASE22-010 | 闭合剩余公司行动60键并物化完整领域修复 | P10-DATA-BASE22-000 | #481; exact original body/clock closure, allowed new versions and complete domain replay |
 | P10-DATA-BASE22-020 | 闭合股东208冲突及weekly非空领域并完成原生合并 | P10-DATA-BASE22-000 | #482; exact conflict/source dispositions, native versions and complete nonempty-domain replay |

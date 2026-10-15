@@ -7,9 +7,19 @@ Policy: `config/pipelines/p10-complete-daily.v1.json`.
 
 ## Runtime order
 
+Notification behavior from 2026-10-15 follows the independent
+`config/pipelines/p10-notification-trial.v1.json` and LLD12's delivery notification
+trial. Ordinary attempt failures are retained locally until their existing checkpoint;
+actionable faults alert once immediately. Trial success mail covers daily ODS and the
+joint native-minute qualification separately. Complete DWD and both destinations retain
+their independent acceptance. The data-policy `failure_mail` text is frozen historical
+metadata; changing that file would invalidate existing sealed policy identities.
+End success messages with `success_notifications_enabled=false` through the normal
+versioned rollout; do not disable the independent failure watchdogs or mail retry timers.
+
 | Product/stage | Target and start | Checkpoint | Failure action |
 | --- | --- | --- | --- |
-| Daily ODS and independent DWD | T, existing daily-core cycle | Daily ODS 23:45 | Service failure hook plus sealed-ODS watchdog |
+| Daily ODS and independent DWD | T, existing daily-core cycle | Daily ODS 23:45 | Ordinary attempts wait; actionable faults alert immediately; sealed-ODS deadline watchdog |
 | Native 1m and 5m ODS/DWD | T, next authoritative trading day 10:30, sealed daily ODS first | 13:00 | Mail; R3 stays quarantined; joint publication held |
 | Complete DWD | Immediately after both required minutes qualify and daily DWD exists | 13:20 | Mail; previous complete pointer retained |
 | OCI exact complete mirror | Poll every two minutes, advance as soon as source publishes | 14:00 independent watchdog | Mail; previous admitted input retained |

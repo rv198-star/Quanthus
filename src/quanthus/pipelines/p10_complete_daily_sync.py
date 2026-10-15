@@ -25,6 +25,34 @@ LOCAL = Path("/home/ubuntu/data/quanthus/dwd-complete-daily")
 CACHE = ".complete-sync-cache-v1"
 
 
+def upstream_alert(root: Path, target: date, *, source: str, ssh: str) -> dict[str, Any] | None:
+    """Copy only tiny acknowledged incident metadata through the existing read-only jail."""
+    from quanthus.pipelines import p10_notification_incident as incident
+
+    cache = root / CACHE / "upstream-notifications"
+    cache.mkdir(parents=True, exist_ok=True)
+    (cache / "fresh-receipt.json").unlink(missing_ok=True)
+    for stage in incident.STAGES:
+        path = cache / f"{target}-{stage}.json"
+        path.unlink(missing_ok=True)
+        try:
+            _run_rsync(source=f"{source}/notification-incidents/{path.name}",
+                       destination=path, ssh=ssh)
+            if path.stat().st_size > 16384:
+                continue
+            value = object_at(path)
+            if incident.valid(value, target, "mirror"):
+                atomic(cache / "fresh-receipt.json", {
+                    "market_date": str(target),
+                    "fetched_at": datetime.now(timezone.utc).isoformat(),
+                    "incident": value,
+                })
+                return value
+        except (WarehouseSyncError, OSError, ValueError, TypeError):
+            continue
+    return None
+
+
 def seed_verified_files(root: Path, package: Path, manifest: dict[str, Any]) -> None:
     """Seed independent exact files; rsync metadata must not mutate a prior package."""
     pointer = root / POINTER
@@ -286,7 +314,10 @@ def sync(*, root: Path, target: date) -> dict[str, Any]:
                 )
             except WarehouseSyncError as exc:
                 if "No such file or directory" in str(exc):
-                    return {"status": "waiting_for_cn01_complete_daily", "market_date": str(target)}
+                    return {
+                        "status": "waiting_for_cn01_complete_daily", "market_date": str(target),
+                        "upstream_incident": upstream_alert(root, target, source=source, ssh=ssh),
+                    }
                 raise
             pointer = object_at(incoming)
             relative = _validate_pointer(pointer, target)
@@ -370,7 +401,8 @@ def main() -> int:
                     stage="mirror",
                     state_root=args.notification_state,
                     reason="exact qualified CN01 complete DWD absent at T+1 14:00 deadline",
-                    context={"deadline": checkpoint(target, "mirror_deadline", rows).isoformat()},
+                    context={"deadline": checkpoint(target, "mirror_deadline", rows).isoformat(),
+                             "upstream_incident": result.get("upstream_incident")},
                 )
     except Exception as exc:
         failure(

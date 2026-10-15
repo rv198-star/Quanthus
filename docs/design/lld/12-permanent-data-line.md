@@ -201,3 +201,27 @@ and uses `CURRENT_DAILY_CORE.json` plus immutable dated descriptors. It does not
 change the old four-lane CURRENT, assert 1m/5m acceptance, or activate P6/training.
 Dedicated CN01/Hermes daily-core services and OCI core-only mirroring are allowed
 after their baseline, physical-source, contract and runtime verification.
+
+### Delivery notification trial (Owner 2026-10-15)
+
+P10-DATA-NOTIFY-001 governs the notification-only successor in
+`config/pipelines/p10-notification-trial.v1.json`. Ordinary T-day attempts wait for
+the existing 23:45 daily-ODS deadline; explicit access refusal, storage/identity or
+controller evidence faults alert immediately. T+1 retains the authoritative trading-day
+13:00/13:20/14:00 checkpoints. A downstream wait may reuse a transport-confirmed,
+unresolved upstream incident from the same business date; independent new faults
+and absent/stale/unverified incident evidence still alert.
+
+During the trial, verified T-day daily ODS and jointly qualified native 1m/5m each
+queue one success per business date/stage. Minimum R2 and R3=0 are unchanged.
+Success binds physical daily source/catalog evidence or the already verified minute
+receipts and exact seals. It separately labels complete DWD, OCI and GDrive as
+unconfirmed until their own evidence exists. No success is backfilled before 2026-10-15.
+The existing bounded mail retry service sends immutable queued requests; missed
+enqueue recovery inspects only the two current authoritative operating targets.
+
+Set `success_notifications_enabled=false` to end success messages without reverting
+failure throttling. This policy does not modify the frozen complete-data policy bytes,
+data gates, production schedule, Base identity or historical receipts. Implementation:
+`p10_notification_trial`, `p10_notification_incident` and
+`p10_complete_daily_notifications`; contract: `test_p10_notification_trial.py`.

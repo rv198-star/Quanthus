@@ -820,6 +820,24 @@ def main() -> int:
             "log": catalog_log,
         }
         if catalog_rc == 0:
+            if is_core:
+                from quanthus.pipelines import p10_notification_trial as trial
+                from quanthus.pipelines.p10_complete_daily_notifications import success
+
+                if trial.enabled(market_date):
+                    try:
+                        state["daily_ods_notification"] = success(
+                            day=market_date, stage="daily_ods",
+                            state_root=Path("/srv/quanthus/dwd-dws-v2/intraday/operations/"
+                                            "complete-daily-v1/notifications"),
+                            evidence=trial.daily_evidence(catalog_root, release_root, market_date),
+                            code_revision=os.environ.get("QUANTHUS_COLLECTOR_SHA", "unknown"),
+                        )
+                    except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
+                        state["daily_ods_notification"] = {
+                            "status": "completion_notification_not_queued",
+                            "error_class": type(exc).__name__,
+                        }
             if args.ods_only:
                 state["dwd"] = {"status": "not_requested"}
             dwd_base = Path(

@@ -34,6 +34,7 @@ def project_terms(
     venues: list[dict[str, Any]],
     observed_at: datetime,
     vocabulary: dict[str, Any],
+    currency_evidence: dict[str, Any] | None = None,
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
     import pyarrow as pa  # type: ignore[import-untyped]
 
@@ -47,9 +48,24 @@ def project_terms(
         parent=parent,
         observed_at=observed_at,
     )
+    currency_proof = None
+    if currency_evidence is not None:
+        from .base231_distribution_currency import qualify_currency_source
+
+        currency_proof = qualify_currency_source(
+            currency_evidence, implementation=announcement, observed_at=observed_at
+        )
     record, term_proof = parse_distribution(
-        body, code=parent.stock_code, venue=venue, expected_ex_date=expected_ex_date
+        body,
+        code=parent.stock_code,
+        venue=venue,
+        expected_ex_date=expected_ex_date,
+        currency_scheme_body=currency_evidence["body"] if currency_evidence is not None else None,
     )
+    if currency_proof is not None and term_proof.get("currency_binding_contract") != (
+        "same-issuer-current-approved-scheme-corroboration-v1"
+    ):
+        raise BoundedError("DISTRIBUTION_CURRENCY_CORROBORATION_NOT_NEEDED")
     from .disclosure_event import _effective_start
 
     at = _effective_start(expected_ex_date)
@@ -104,12 +120,15 @@ def project_terms(
         for row in values:
             row["announced_at"] = published
             row["source_revision"] = CONTRACT_ID
+            if currency_proof is not None:
+                row["source_revision"] = currency_proof["contract_id"]
+                row["source_artifact_sha256"] = digest(currency_proof)
         if (
             pa.Table.from_pylist(values, schema=disclosure_event_schemas()[table]).to_pylist()
             != values
         ):
             raise BoundedError("DISTRIBUTION_NATIVE_VALUE_OR_INSTANT_CHANGED")
-    return output, dict(
+    proof = dict(
         contract_id=CONTRACT_ID,
         input_source_proof_sha256=digest(source_proof),
         audited_term_proof=term_proof,
@@ -124,6 +143,9 @@ def project_terms(
         historical_PIT_qualified=False,
         consumer_admission="NOT_GRANTED",
     )
+    if currency_proof is not None:
+        proof["currency_source_proof"] = currency_proof
+    return output, proof
 
 
 def replay_terms_domain(root: Path) -> dict[str, Any]:
@@ -152,6 +174,15 @@ def replay_terms_domain(root: Path) -> dict[str, Any]:
     for name, sha in plan["code_inputs"].items():
         if file_sha(Path(name)) != sha:
             raise BoundedError("DISTRIBUTION_OFFLINE_CODE_CHANGED")
+    has_currency = any(s.get("currency_scheme") for s in plan["selection"])
+    if has_currency:
+        from .base231_distribution_currency import CONTRACT_ID as currency_contract
+
+        code = Path("src/quanthus/pipelines/securities_warehouse/base231_distribution_currency.py")
+        if plan.get("currency_evidence_contract") != currency_contract or plan["code_inputs"].get(
+            str(code)
+        ) != file_sha(code):
+            raise BoundedError("DISTRIBUTION_CURRENCY_OFFLINE_CONTRACT_REQUIRED")
     if (
         file_sha(root / "inputs/image-manifest.json")
         != "sha256:91845422851368028e4e8a6b83e0dc9ba2a9e30dfdd8e4d6de892f64adac1d7f"
@@ -201,6 +232,25 @@ def replay_terms_domain(root: Path) -> dict[str, Any]:
             capture_output=True,
             timeout=60,
         ).stdout.decode()
+        currency_evidence = None
+        cs = s.get("currency_scheme")
+        if cs is not None:
+            currency_evidence = dict(
+                actual_index_row=cs["actual_index_row"],
+                index=json.loads((root / cs["index"]).read_bytes()),
+                index_receipt=json.loads((root / cs["index_receipt"]).read_bytes()),
+                PDF_receipt=json.loads((root / cs["PDF_receipt"]).read_bytes()),
+                PDF_sha256=file_sha(root / cs["PDF"]),
+                PDF_bytes=(root / cs["PDF"]).stat().st_size,
+                index_sha256=file_sha(root / cs["index"]),
+                index_bytes=(root / cs["index"]).stat().st_size,
+                body=subprocess.run(
+                    ["pdftotext", "-layout", str(root / cs["PDF"]), "-"],
+                    check=True,
+                    capture_output=True,
+                    timeout=60,
+                ).stdout.decode(),
+            )
         rows, pf = project_terms(
             body,
             selection=original,
@@ -214,7 +264,12 @@ def replay_terms_domain(root: Path) -> dict[str, Any]:
             venues=parents["dwd_trading_venue"],
             observed_at=now,
             vocabulary=vocab,
+            currency_evidence=currency_evidence,
         )
+        if cs is not None and digest(pf["currency_source_proof"]) != file_sha(
+            root / cs["qualification"]
+        ):
+            raise BoundedError("DISTRIBUTION_CURRENCY_SOURCE_QUALIFICATION_CHANGED")
         for t, v in rows.items():
             output[t].extend(v)
         proofs.append(pf)

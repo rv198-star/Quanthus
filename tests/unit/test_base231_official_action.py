@@ -50,14 +50,18 @@ def test_distribution_uses_implemented_section_and_preserves_distinct_adjustment
 
 
 def approved_cash_body():
-    return BODY.replace(
-        "一、原预案每10股转增9股",
-        "一、股东会审议通过权益分派情况：公司2026年中期利润分配方案经股东会审议通过，"
-        "向全体股东每10股派发现金股利人民币2.50元（含税）。"
-        "本次实施的权益分派方案与公司股东会审议通过的分配方案一致。",
-    ).replace("派2.50元人民币现金", "派发现金股利2.500000元").replace(
-        "向全体股东每10股派发现金股利2.500000元",
-        "本公司2026年中期方案为：向全体股东每10股派发现金股利2.500000元",
+    return (
+        BODY.replace(
+            "一、原预案每10股转增9股",
+            "一、股东会审议通过权益分派情况：公司2026年中期利润分配方案经股东会审议通过，"
+            "向全体股东每10股派发现金股利人民币2.50元（含税）。"
+            "本次实施的权益分派方案与公司股东会审议通过的分配方案一致。",
+        )
+        .replace("派2.50元人民币现金", "派发现金股利2.500000元")
+        .replace(
+            "向全体股东每10股派发现金股利2.500000元",
+            "本公司2026年中期方案为：向全体股东每10股派发现金股利2.500000元",
+        )
     )
 
 
@@ -72,8 +76,20 @@ def test_szse_same_current_approved_scheme_can_supply_currency_only():
 
 
 @pytest.mark.parametrize(
-    "fault", ["not_approved", "wrong_year", "wrong_period", "no_consistency", "changed",
-              "wrong_value", "currency", "tax", "total_only", "foreign_class", "other_section"]
+    "fault",
+    [
+        "not_approved",
+        "wrong_year",
+        "wrong_period",
+        "no_consistency",
+        "changed",
+        "wrong_value",
+        "currency",
+        "tax",
+        "total_only",
+        "foreign_class",
+        "other_section",
+    ],
 )
 def test_approved_currency_requires_same_event_explicit_value_and_implementation(fault):
     body = approved_cash_body()
@@ -107,6 +123,39 @@ def test_approved_currency_requires_same_event_explicit_value_and_implementation
         body = body.replace("公司2026年中期利润分配方案", "公司利润分配方案")
     with pytest.raises(RuntimeError, match="EXPLICIT_TERM"):
         parse_distribution(body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15))
+
+
+def test_corresponding_official_scheme_supplies_currency_without_editing_implementation():
+    body = approved_cash_body().replace("现金股利人民币2.50元", "现金股利2.50元")
+    scheme = "证券代码003018 2026年半年度利润分配方案：每10股派发现金股利人民币2.50元（含税）"
+    row, proof = parse_distribution(
+        body,
+        code="003018",
+        venue="SZSE",
+        expected_ex_date=date(2026, 7, 15),
+        currency_scheme_body=scheme,
+    )
+    assert row["cash_per_share"].as_tuple() == Decimal("0.2500000").as_tuple()
+    assert proof["currency_binding_contract"] == (
+        "same-issuer-current-approved-scheme-corroboration-v1"
+    )
+    with pytest.raises(RuntimeError):
+        parse_distribution(body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15))
+    for invalid in [
+        scheme.replace("003018", "003019"),
+        scheme.replace("2026年", "2025年"),
+        scheme.replace("人民币", "美元"),
+        scheme.replace("2.50元", "2.51元"),
+        scheme.replace("含税", "扣税后"),
+    ]:
+        with pytest.raises(RuntimeError):
+            parse_distribution(
+                body,
+                code="003018",
+                venue="SZSE",
+                expected_ex_date=date(2026, 7, 15),
+                currency_scheme_body=invalid,
+            )
 
 
 @pytest.mark.parametrize("prefix", ["派1.0元人民币", "派发现金股利人民币1.00元"])
@@ -474,9 +523,9 @@ def test_unproven_numeric_fragments_are_not_silently_removed(separator):
         parse_distribution(body, code="003018", venue="SZSE", expected_ex_date=date(2026, 7, 15))
 
 
-@pytest.mark.parametrize("heading", [
-    "二、本次实施的权益分配方案", "二、本次权益分派实施方案", "二、A股权益分派方案"
-])
+@pytest.mark.parametrize(
+    "heading", ["二、本次实施的权益分配方案", "二、本次权益分派实施方案", "二、A股权益分派方案"]
+)
 @pytest.mark.parametrize(
     "date_heading", ["三、分红派息日", "三、权益分派日期", "三、A股分红派息日期"]
 )
@@ -488,8 +537,12 @@ def test_exact_implemented_section_heading_variants(heading, date_heading):
     )
     assert row["cash_per_share"] == Decimal("0.25")
     with pytest.raises(RuntimeError):
-        parse_distribution(body.replace("人民币", "美元"), code="003018", venue="SZSE",
-                           expected_ex_date=date(2026, 7, 15))
+        parse_distribution(
+            body.replace("人民币", "美元"),
+            code="003018",
+            venue="SZSE",
+            expected_ex_date=date(2026, 7, 15),
+        )
 
 
 def test_page_footer_rule_never_removes_a_fragment_inside_numeric_amount():

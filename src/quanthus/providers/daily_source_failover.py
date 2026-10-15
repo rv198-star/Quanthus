@@ -212,4 +212,12 @@ def calendar_rows(
         rows = invoke("baostock", "calendar", circuit_root, lambda: fetch(start, end))
         return rows, {"source": "baostock.query_trade_dates", "is_new_refresh": True}
     except SourceUnavailable:
-        return saved_calendar(calendar_root, start, end)
+        try:
+            return saved_calendar(calendar_root, start, end)
+        except (FileNotFoundError, SourceUnavailable):
+            # A sealed observation of the now-closed target day remains evidence
+            # for that day. It never establishes today's or a future session.
+            today = datetime.now(ZoneInfo("Asia/Shanghai")).date()
+            if end >= today:
+                raise SourceUnavailable("SAVED_CALENDAR_TARGET_AUTHORITY_MISSING") from None
+            return saved_calendar(calendar_root, start, end, observed_day=end)

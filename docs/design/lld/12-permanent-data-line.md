@@ -242,7 +242,8 @@ ordinary transport failures use a per-scope circuit. After cooldown only a sched
 reassess the provider; that duration is not a prediction of the vendor's ban release. Engineering,
 identity, schema and shared-budget failures are not mislabeled as a supplier outage.
 
-A calendar fallback requires same-observation-day saved BaoStock authority, exact row digest,
+A calendar fallback requires same-observation-day or already closed target-day saved BaoStock
+authority, exact row digest,
 complete target-window coverage, original clocks and a preserved source envelope. It is labeled
 reuse, never refreshed. The universe remains exact target-date, physically verified with original
 listing/status evidence. Missing new-date authority still blocks; previous-date snapshots and

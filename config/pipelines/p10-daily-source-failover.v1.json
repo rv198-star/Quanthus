@@ -11,7 +11,7 @@
   "http_timeout_seconds": 15,
   "circuit_seconds": 3600,
   "primary_readiness_seconds": 120,
-  "reuse_calendar": "same_observation_day_verified_authority_exact_coverage",
+  "reuse_calendar": "same_observation_or_closed_target_day_verified_authority_exact_coverage",
   "reuse_universe": "same_target_date_verified_original_closure_only",
   "fallback_unit": "whole_security_daily_bar",
   "missing_st": "unknown_and_block_new_positions",

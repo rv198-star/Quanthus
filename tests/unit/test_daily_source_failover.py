@@ -497,3 +497,37 @@ def test_hash_valid_pre_target_clock_cannot_supply_future_business_observation(t
     )
     with pytest.raises(ValueError, match="OBSERVATION_CLOCK_INVALID"):
         tx.reuse(tmp_path / "shadow", tmp_path / "new", DAY, {"000001"})
+
+
+def test_closed_target_day_calendar_reuse_never_creates_new_day_authority(tmp_path, monkeypatch):
+    saved(tmp_path / "calendars")
+
+    # Simulate tomorrow's observer without altering the original target-day receipt.
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            stamp = datetime(2026, 10, 16, 2, 0, tzinfo=timezone.utc)
+            return stamp.astimezone(tz) if tz else stamp.replace(tzinfo=None)
+
+    monkeypatch.setattr(router, "datetime", Clock)
+
+    def denied(*a):
+        raise RuntimeError("BAOSTOCK_ACCESS_DENIED:10001011")
+
+    rows, proof = router.calendar_rows(
+        DAY,
+        DAY,
+        fetch=denied,
+        calendar_root=tmp_path / "calendars",
+        circuit_root=tmp_path / "circuit",
+    )
+    assert rows[0]["trade_date"] == str(DAY) and proof["original_fetched_at"] == STAMP
+    assert proof["is_new_refresh"] is False
+    with pytest.raises((router.SourceUnavailable, FileNotFoundError)):
+        router.calendar_rows(
+            DAY,
+            date(2026, 10, 16),
+            fetch=denied,
+            calendar_root=tmp_path / "calendars",
+            circuit_root=tmp_path / "circuit",
+        )

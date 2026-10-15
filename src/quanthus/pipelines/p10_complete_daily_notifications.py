@@ -208,261 +208,502 @@ def _complete_cycle_failure_target(
         if (
             service_start is None
             or invocation is None
-            or not re.fullmatch(r"[0-9a-f]{32}", invocation)
-        ):
-            return fallback
-        active = object_at(state / "active-run.json")
-        started = datetime.fromisoformat(active["started_at"])
-        if (
-            active.get("kind") != "p10_complete_daily_cycle_activity_v1"
-            or active.get("policy_id") != POLICY_ID
-            or active.get("invocation_id") != invocation
-            or not re.fullmatch(r"[0-9a-f]{40}", str(active.get("code_revision", "")))
-            or active.get("stage") not in {"minutes", "complete"}
-            or started.tzinfo is None
-            or not service_start - 1 <= started.timestamp() <= now.timestamp()
-        ):
-            return fallback
-        return date.fromisoformat(active["market_date"]), active["stage"], "交易日"
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
-        return fallback
-
-
-def _archive_failure_target(now: datetime, state: Path) -> tuple[date, str]:
-    fallback = (now.date(), "运行日期（目标交易日未确定）")
-    started = _service_started_at("quanthus-gdrive-complete-daily.service")
-    if started is None:
-        return fallback
-    paths = sorted(
-        (state / "failures").glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True
-    )
-    for path in paths[:28]:
-        if not started - 1 <= path.stat().st_mtime <= now.timestamp():
-            continue
-        try:
-            payload = object_at(path)
-            return date.fromisoformat(payload["market_date"]), "交易日"
-        except (OSError, ValueError, KeyError, TypeError):
-            continue
-    return fallback
-
-
-def _daily_failure_target(
-    now: datetime, path: Path, *, originating_invocation_id: str | None = None
-) -> tuple[date, str]:
-    fallback = (now.date(), "运行日期（目标交易日未确定）")
-    service_start = _daily_service_started_at()
-    invocation = (
-        originating_invocation_id
-        if originating_invocation_id is not None
-        else _service_invocation_id("quanthus-daily-core@cn01.service")
-    )
-    if service_start is None or invocation is None or not re.fullmatch(r"[0-9a-f]{32}", invocation):
-        return fallback
-    try:
-        state = object_at(path)
-        started = datetime.fromisoformat(state["started_at"])
-        if (
-            state.get("invocation_id") != invocation
-            or started.tzinfo is None
-            or not service_start - 1 <= started.timestamp() <= now.timestamp()
-        ):
-            return fallback
-        failures = [item for item in state.get("attempts", []) if item.get("returncode")]
-        candidate = failures[-1]["market_date"] if failures else state.get("active_market_date")
-        return (date.fromisoformat(candidate), "交易日") if candidate else fallback
-    except (OSError, ValueError, TypeError, KeyError):
-        return fallback
-
-
-def _continuation_failure_target(
-    now: datetime, mode: str, state: Path, *, originating_invocation_id: str | None = None
-) -> tuple[date, str]:
-    """Use this invocation's declared target; stale files remain unresolved."""
-    fallback = (now.date(), "运行日期（目标交易日未确定）")
-    unit = f"cn01-dwd-domain-continuation@{mode}.service"
-    service_start = _service_started_at(unit)
-    invocation = (
-        originating_invocation_id
-        if originating_invocation_id is not None
-        else _service_invocation_id(unit)
-    )
-    if service_start is None or invocation is None or not re.fullmatch(r"[0-9a-f]{32}", invocation):
-        return fallback
-    try:
-        active = object_at(state / "active" / f"{mode}.json")
-        started = datetime.fromisoformat(active["started_at"])
-        if (
-            active.get("mode") != mode
-            or active.get("invocation_id") != invocation
-            or started.tzinfo is None
-            or not service_start - 1 <= started.timestamp() <= now.timestamp()
-        ):
-            return fallback
-        return date.fromisoformat(active["market_date"]), "业务日期"
-    except (OSError, ValueError, TypeError, KeyError):
-        return fallback
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--daily-cycle-failure", action="store_true")
-    mode.add_argument("--daily-cycle-service-stop", action="store_true")
-    mode.add_argument("--complete-cycle-service-failure", action="store_true")
-    mode.add_argument("--complete-cycle-service-stop", action="store_true")
-    mode.add_argument("--archive-service-failure", action="store_true")
-    mode.add_argument("--mirror-service-failure", action="store_true")
-    mode.add_argument("--mirror-service-stop", action="store_true")
-    mode.add_argument("--continuation-service-failure", choices=("daily", "weekly", "natural-day"))
-    mode.add_argument("--continuation-service-stop", choices=("daily", "weekly", "natural-day"))
-    mode.add_argument("--retry-state", action="append", type=Path)
-    args = parser.parse_args()
-    if (
-        args.daily_cycle_service_stop
-        or args.complete_cycle_service_stop
-        or args.continuation_service_stop
-    ):
-        result = os.environ.get("SERVICE_RESULT")
-        if not result:
-            raise ValueError("service stop hook requires systemd SERVICE_RESULT")
-        if result == "success":
-            print(json.dumps({"status": "notification_not_required", "service_result": result}))
-            return 0
-    if args.retry_state:
-        results = [retry_pending(root) for root in args.retry_state]
-        print(json.dumps({"results": results}, sort_keys=True))
-        return (
-            2
-            if any(
-                item["status"] == "retry_failed"
-                for result in results
-                for item in result["outcomes"]
-            )
-            else 0
-        )
-    from quanthus.pipelines.p10_complete_daily_cycle import DAILY, JOURNAL
-    from quanthus.pipelines.p10_complete_daily_schedule import CST
-
-    if args.complete_cycle_service_failure or args.complete_cycle_service_stop:
-        target, stage, label = _complete_cycle_failure_target(
-            datetime.now(CST),
-            JOURNAL,
-            originating_invocation_id=os.environ.get("INVOCATION_ID", "")
-            if args.complete_cycle_service_stop
-            else None,
-        )
-        record = failure(
-            day=target,
-            stage=stage,
-            state_root=JOURNAL / "notifications",
-            reason="T+1 complete Daily controller failed or timed out; "
-            "inspect preserved Job and operation receipts",
-            context={
-                "market_date_label": label,
-                "unit": "quanthus-complete-daily.service",
-                "error_code": "complete_cycle_service_failed",
-            },
-        )
-        print(json.dumps(record, sort_keys=True))
-        return 0
-
-    if args.mirror_service_stop:
-        result = os.environ.get("SERVICE_RESULT")
-        if result is None:
-            raise ValueError("mirror stop hook requires systemd SERVICE_RESULT")
-        if result == "success":
-            print(json.dumps({"status": "notification_not_required", "service_result": result}))
-            return 0
-    if args.mirror_service_failure or args.mirror_service_stop:
-        from quanthus.pipelines.p10_complete_daily_sync import CACHE, LOCAL
-
-        now = datetime.now(CST)
-        target, label = now.date(), "运行日期（目标交易日未确定）"
-        try:
-            pending = object_at(LOCAL / CACHE / "pending.json")
-            started = datetime.fromisoformat(pending["started_at"])
-            service_start = _service_started_at("oci-complete-daily-sync.service")
-            if (
-                service_start is not None
-                and started.tzinfo is not None
-                and service_start - 1 <= started.timestamp() <= now.timestamp()
-            ):
-                target, label = date.fromisoformat(pending["market_date"]), "交易日"
-        except (OSError, ValueError, KeyError, TypeError):
-            pass
-        record = failure(
-            day=target,
-            stage="mirror",
-            state_root=LOCAL / "notifications",
-            reason="complete DWD mirror service failed or timed out; private partials retained",
-            context={"market_date_label": label, "unit": "oci-complete-daily-sync.service"},
-        )
-        print(json.dumps(record, sort_keys=True))
-        return 0
-    if args.continuation_service_failure or args.continuation_service_stop:
-        mode_name = args.continuation_service_failure or args.continuation_service_stop
-        continuation_state = Path("/var/lib/quanthus/acquisition-continuation-v1")
-        target, label = _continuation_failure_target(
-            datetime.now(CST),
-            mode_name,
-            continuation_state,
-            originating_invocation_id=os.environ.get("INVOCATION_ID", "")
-            if args.continuation_service_stop
-            else None,
-        )
-        record = failure(
-            day=target,
-            stage="weekly"
-            if mode_name == "weekly"
-            else ("natural_day" if mode_name == "natural-day" else "domain_daily"),
-            state_root=continuation_state / "notifications",
-            reason=(
-                "automatic domain continuation service failed or timed out; "
-                "inspect retained run evidence"
+            or not re.fullmatch(r"[0…10884 tokens truncated…tage),
+        (str(context.get("market_date_label", "交易日")), market_date.isoformat()),
+        (
+            "状态",
+            str(
+                EVENTS[event].get(
+                    "status_label",
+                    "失败" if EVENTS[event]["failure"] else "成功",
+                )
             ),
-            context={
-                "market_date_label": label,
-                "mode": mode_name,
-            },
+        ),
+    ]
+    if result is not None:
+        details.extend(
+            [
+                ("包 ID", str(result.package_id)),
+                ("manifest SHA-256", str(result.manifest_sha256)),
+                ("content digest", str(result.content_digest)),
+                ("载荷大小", f"{result.payload_bytes} bytes"),
+                ("行数", json.dumps(dict(result.row_counts), ensure_ascii=False, sort_keys=True)),
+                ("CURRENT", str(pointer.get("manifest_path", "-")) if pointer else "-"),
+            ]
         )
-        print(json.dumps(record, sort_keys=True))
-        return 0
-    if args.archive_service_failure:
-        from quanthus.pipelines.p10_complete_daily_gdrive import MAIL_STATE, STATE
+    if error:
+        details.append(("错误", error))
+    context_labels = {
+        "unit": "systemd unit",
+        "run_path": "运行路径",
+        "error_code": "错误分类",
+        "executed_phase": "采集阶段",
+        "collection_status": "采集执行",
+        "publication_status": "分级数据发布",
+        "quality_distribution": "证券质量分布",
+        "quality_reasons": "R3主要原因",
+        "research_qualification": "最终研究资格",
+        "tplus1_state": "补数终态",
+        "delivery_verdict": "交付判定",
+        "delivery_reason": "判定原因",
+        "source_revised_count": "源数据修订证券数",
+        "grade_manifest_sha256": "质量包 manifest SHA-256",
+        "required_intervals": "所需数据频率",
+        "deadline": "交付截止时间",
+        "target_next_trade_day": "T+1交易日",
+        "policy_id": "运行规则版本",
+        "source_complete_status": "上游补数与构建",
+        "source_minute_quality": "上游分钟质量声明",
+        "mirror_stage_status": "OCI交付阶段",
+        "consumer_admission_status": "OCI消费准入",
+        "source_manifest_sha256": "来源完整包manifest",
+        "source_content_digest": "来源完整包content",
+        "service_result": "服务停止原因",
+    }
+    for key, label in context_labels.items():
+        value = context.get(key)
+        if value is not None and str(value).strip():
+            details.append((label, str(value)))
+    rows = "".join(
+        f'<tr><th align="left">{html.escape(label)}</th><td>{html.escape(str(value))}</td></tr>'
+        for label, value in details
+    )
+    return (
+        "<!doctype html><html><body>"
+        f"<h2>{html.escape(str(EVENTS[event]['heading']))}</h2>"
+        f'<table border="1" cellpadding="6" cellspacing="0">{rows}</table>'
+        "</body></html>"
+    )
 
-        state = STATE
-        target, label = _archive_failure_target(datetime.now(CST), state)
-        record = failure(
-            day=target,
-            stage="gdrive",
-            state_root=MAIL_STATE,
-            reason="complete DWD GDrive service failed or timed out; "
-            "inspect its bounded archive log",
+
+def _send_resend(
+    *,
+    event: str,
+    market_date: date,
+    pointer: Mapping[str, object] | None,
+    result: DailyDomainResult | None,
+    key: str,
+    error: str | None = None,
+    context: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    api_key = os.environ.get("QUANTHUS_RESEND_API_KEY", "").strip()
+    if not api_key:
+        raise WarehouseNotificationError("QUANTHUS_RESEND_API_KEY is not set")
+    api_url = os.environ.get("QUANTHUS_RESEND_API_URL", "https://api.resend.com/emails")
+    sender = os.environ.get("QUANTHUS_RESEND_FROM", "report@mindthus.com").strip()
+    if not sender:
+        raise WarehouseNotificationError("QUANTHUS_RESEND_FROM is empty")
+    retries_raw = os.environ.get("QUANTHUS_RESEND_RETRIES", "2")
+    try:
+        retries = min(max(int(retries_raw), 0), 5)
+    except ValueError as exc:
+        raise WarehouseNotificationError("QUANTHUS_RESEND_RETRIES must be an integer") from exc
+    try:
+        timeout = float(os.environ.get("QUANTHUS_RESEND_TIMEOUT_SECONDS", "15"))
+    except ValueError as exc:
+        raise WarehouseNotificationError("QUANTHUS_RESEND_TIMEOUT_SECONDS must be numeric") from exc
+    outcome_text = (
+        str(EVENTS[event]["status_label"])
+        if "status_label" in EVENTS[event]
+        else ("失败" if EVENTS[event]["failure"] else "成功")
+    )
+    mail_context = context or {}
+    if event == "p10_cn01_minute_quality_degraded":
+        phase = str(mail_context.get("executed_phase") or mail_context.get("stage") or "1m")
+        qualification = str(mail_context.get("research_qualification") or "未验证")
+        outcome_text = f"{phase} {qualification} 质量降级"
+    subject_stage = EVENTS[event]["stage"]
+    if event in {"p10_cn01_minute_delivery_pass", "p10_cn01_minute_delivery_fail"}:
+        phase = str(mail_context.get("executed_phase") or "")
+        subject_stage = f"1m {phase}"
+        outcome_text = "PASS" if event.endswith("_pass") else "FAIL"
+    body = _canonical_bytes(
+        {
+            "from": sender,
+            "to": list(_recipients()),
+            "subject": (
+                f"[Quanthus][{EVENTS[event]['node']}][{subject_stage}] "
+                f"{market_date.isoformat()} "
+                f"{outcome_text}"
+            ),
+            "html": _email_html(
+                event=event,
+                market_date=market_date,
+                pointer=pointer,
+                result=result,
+                error=error,
+                context=context or {},
+            ),
+        }
+    )
+    attempts = 0
+    for attempts in range(1, retries + 2):
+        try:
+            http_request = request.Request(
+                api_url,
+                data=body,
+                headers={
+                    "Accept": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "Idempotency-Key": key,
+                    "User-Agent": "Quanthus-Warehouse-Notifier/1.0",
+                },
+                method="POST",
+            )
+            try:
+                with request.urlopen(http_request, timeout=timeout) as response:
+                    status = response.getcode()
+                    response_bytes = response.read()
+            except urllib_error.HTTPError as exc:
+                response_bytes = exc.read(1024)
+                detail = response_bytes.decode("utf-8", errors="replace").strip()
+                if detail:
+                    detail = f": {_bounded_error(detail)}"
+                raise WarehouseNotificationError(
+                    f"Resend returned HTTP status {exc.code}{detail}",
+                    code="resend_http_error",
+                ) from exc
+            if not isinstance(status, int) or not 200 <= status < 300:
+                raise WarehouseNotificationError(
+                    f"Resend returned HTTP status {status}", code="resend_http_error"
+                )
+            response_value: object = {}
+            if response_bytes:
+                try:
+                    response_value = json.loads(response_bytes.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    response_value = {}
+            message_id = response_value.get("id") if isinstance(response_value, Mapping) else None
+            return {
+                "provider": "resend",
+                "status": "sent",
+                "attempts": attempts,
+                "message_id": message_id if isinstance(message_id, str) else None,
+            }
+        except Exception as exc:
+            if attempts > retries:
+                message = _bounded_error(exc)
+                if isinstance(exc, WarehouseNotificationError):
+                    raise WarehouseNotificationError(
+                        message, code=exc.code, attempts=attempts
+                    ) from exc
+                raise WarehouseNotificationError(
+                    f"Resend request failed: {message}",
+                    code="resend_request_failed",
+                    attempts=attempts,
+                ) from exc
+            time.sleep(min(float(2 ** (attempts - 1)), 5.0))
+    raise AssertionError("unreachable notification state")
+
+
+def _failure_context(
+    *, failure_receipt: Path | None, error: str | None, context: Mapping[str, object] | None
+) -> tuple[str, dict[str, object]]:
+    values = dict(context or {})
+    if failure_receipt is not None:
+        receipt = _object(failure_receipt)
+        for key in ("error", "error_code", "stage", "node", "unit", "run_path", "market_date"):
+            if key in receipt and key not in values:
+                values[key] = receipt[key]
+    raw_error = error if error is not None else values.get("error")
+    bounded = _bounded_error(raw_error)
+    values["error"] = bounded
+    return bounded, values
+
+
+def send_daily_event(
+    *,
+    event: str,
+    daily_root: Path,
+    market_date: date | None,
+    state_root: Path,
+    error: str | None = None,
+    context: Mapping[str, object] | None = None,
+    failure_receipt: Path | None = None,
+) -> dict[str, object]:
+    if event not in EVENTS:
+        raise WarehouseNotificationError(f"unsupported warehouse event: {event}")
+    failure = bool(EVENTS[event]["failure"])
+    event_context: dict[str, object] = dict(context or {})
+    if failure:
+        failure_error, event_context = _failure_context(
+            failure_receipt=failure_receipt, error=error, context=event_context
+        )
+        if market_date is None:
+            raw_date = event_context.get("market_date")
+            if isinstance(raw_date, str):
+                try:
+                    market_date = date.fromisoformat(raw_date)
+                except ValueError as exc:
+                    raise WarehouseNotificationError(
+                        "failure receipt market_date is invalid"
+                    ) from exc
+        if market_date is None:
+            market_date = datetime.now(ZoneInfo("Asia/Shanghai")).date()
+        pointer = None
+        result = None
+        key_material = (
+            f"quanthus-warehouse-v1\x1f{event}\x1f{market_date}\x1f"
+            f"{event_context.get('stage', '')}\x1f{event_context.get('run_path', '')}\x1f"
+            f"{_failure_digest(failure_error)}"
+        )
+    else:
+        if market_date is None:
+            market_date = _market_date_from_current(daily_root=daily_root)
+        pointer, result = _package_from_current(daily_root=daily_root, market_date=market_date)
+        failure_error = None
+        key_material = (
+            f"quanthus-warehouse-v1\x1f{event}\x1f{market_date}\x1f{result.manifest_sha256}"
+        )
+    key = hashlib.sha256(key_material.encode("ascii")).hexdigest()
+    state_root.mkdir(parents=True, exist_ok=True)
+    lock_path = state_root / f"{key}.lock"
+    state_path = state_root / f"{key}.json"
+    with lock_path.open("a+", encoding="ascii") as lock_stream:
+        fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX)
+        if state_path.exists():
+            value = _object(state_path)
+            value["status"] = "skipped"
+            value["idempotency_key"] = key
+            return value
+        try:
+            sent = _send_resend(
+                event=event,
+                market_date=market_date,
+                pointer=pointer,
+                result=result,
+                key=key,
+                error=failure_error,
+                context=event_context,
+            )
+        except Exception as exc:
+            notification_error = (
+                exc
+                if isinstance(exc, WarehouseNotificationError)
+                else WarehouseNotificationError(
+                    f"notification delivery failed: {_bounded_error(exc)}"
+                )
+            )
+            failure_record: dict[str, object] = {
+                "schema_version": 1,
+                "kind": "quanthus_warehouse_notification_failure",
+                "event": event,
+                "market_date": market_date.isoformat(),
+                "idempotency_key": key,
+                "delivery_status": "failed",
+                "error_code": notification_error.code,
+                "error": _bounded_error(notification_error),
+                "attempts": notification_error.attempts,
+                "failed_at": datetime.now(timezone.utc).isoformat(),
+            }
+            _atomic_json(state_root / "failures" / f"{key}.json", failure_record)
+            raise notification_error from exc
+        record: dict[str, object] = {
+            "schema_version": 1,
+            "kind": "quanthus_warehouse_notification",
+            "event": event,
+            "market_date": market_date.isoformat(),
+            "idempotency_key": key,
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            **sent,
+        }
+        if result is not None:
+            record.update(
+                {
+                    "package_id": result.package_id,
+                    "manifest_sha256": result.manifest_sha256,
+                    "content_digest": result.content_digest,
+                }
+            )
+        if event_context:
+            record["context"] = event_context
+        if failure_error is not None:
+            record.update(
+                {
+                    "delivery_status": "sent",
+                    "error": failure_error,
+                }
+            )
+        _atomic_json(state_path, record)
+        return record
+
+
+def send_minute_delivery_outcome(
+    *,
+    market_date: date,
+    phase: str,
+    passed: bool,
+    state_root: Path,
+    context: Mapping[str, object],
+    reason: str | None = None,
+) -> dict[str, object]:
+    """Exactly one final PASS or FAIL email per date+phase, not per verdict.
+
+    Minute quality is independently SHA-verified upstream. Do not enter the
+    daily-DWD CURRENT path that send_daily_event uses for ordinary successes.
+    Lock identity excludes the verdict so duplicate 12:10/22:10 checkpoints
+    can never mail a contradictory PASS after an earlier FAIL (or vice versa).
+    """
+    if phase not in {"minute_T", "minute_Tplus1"}:
+        raise WarehouseNotificationError("invalid CN01 minute email phase")
+    if context.get("delivery_verdict") != ("PASS" if passed else "FAIL"):
+        raise WarehouseNotificationError("minute email verdict/context differ")
+    event = "p10_cn01_minute_delivery_pass" if passed else "p10_cn01_minute_delivery_fail"
+    key_material = f"quanthus-p10-minute-outcome-v1\x1fCN01\x1f{phase}\x1f{market_date}"
+    key = hashlib.sha256(key_material.encode("ascii")).hexdigest()
+    record_root = state_root / "minute-delivery-v1"
+    record_root.mkdir(parents=True, exist_ok=True)
+    state_path = record_root / f"{key}.json"
+    with (record_root / f"{key}.lock").open("a+", encoding="ascii") as stream:
+        fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+        if state_path.is_file():
+            recorded = _object(state_path)
+            if recorded.get("market_date") != market_date.isoformat():
+                raise WarehouseNotificationError("minute email receipt date mismatch")
+            return {**recorded, "status": "skipped"}
+        try:
+            sent = _send_resend(
+                event=event,
+                market_date=market_date,
+                key=key,
+                pointer=None,
+                result=None,
+                error=reason if not passed else None,
+                context={"node": "CN01", "stage": phase, **context},
+            )
+        except Exception as exc:
+            error_code = (
+                exc.code
+                if isinstance(exc, WarehouseNotificationError)
+                else "minute_notification_failed"
+            )
+            _atomic_json(
+                record_root / "failures" / f"{key}.json",
+                {
+                    "kind": "p10_minute_delivery_notice_failure_v1",
+                    "phase": phase,
+                    "market_date": market_date.isoformat(),
+                    "error_code": error_code,
+                    "error": _bounded_error(exc),
+                    "failed_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+            raise
+        receipt: dict[str, object] = {
+            "kind": "p10_minute_delivery_notice_v1",
+            "phase": phase,
+            "market_date": market_date.isoformat(),
+            "event": event,
+            "verdict": "PASS" if passed else "FAIL",
+            "status": "sent",
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "idempotency_key": key,
+            "delivery_reason": reason,
+            "grade_manifest_sha256": context.get("grade_manifest_sha256"),
+            **sent,
+        }
+        _atomic_json(state_path, receipt)
+        return receipt
+
+
+def send_failure_events(
+    *, failure_receipt: Path, daily_root: Path, state_root: Path
+) -> dict[str, object]:
+    """Send the OCI synchronization failure alert."""
+
+    try:
+        receipt = _object(failure_receipt)
+    except WarehouseNotificationError as exc:
+        # A full sync failure can include a disk error before its receipt is written.  Keep a
+        # generic OCI alert possible in that case; the journal still contains the detailed cause.
+        record = send_daily_event(
+            event="oci_dwd_sync_failed",
+            daily_root=daily_root,
+            market_date=None,
+            state_root=state_root,
+            error=f"failure receipt unavailable: {exc}",
             context={
-                "market_date_label": label,
-                "unit": "quanthus-gdrive-complete-daily.service",
-                "error_code": "gdrive_service_failed",
+                "stage": "oci_dwd_sync",
+                "node": os.environ.get("QUANTHUS_NODE", "OCI"),
+                "unit": os.environ.get("QUANTHUS_SYSTEMD_UNIT", "oci-dwd-daily-sync.service"),
             },
         )
-        print(json.dumps(record, sort_keys=True))
-        return 0
-    target, label = _daily_failure_target(
-        datetime.now(CST),
-        DAILY / "operations/LATEST.json",
-        originating_invocation_id=os.environ.get("INVOCATION_ID", "")
-        if args.daily_cycle_service_stop
-        else None,
+        return {"status": "sent", "events": [record]}
+    failed_at = receipt.get("failed_at")
+    if isinstance(failed_at, str):
+        try:
+            failure_time = datetime.fromisoformat(failed_at)
+            if failure_time.tzinfo is None:
+                raise ValueError("missing timezone")
+        except ValueError as exc:
+            raise WarehouseNotificationError("failure receipt failed_at is invalid") from exc
+        max_age = int(os.environ.get("QUANTHUS_FAILURE_RECEIPT_MAX_AGE_SECONDS", "600"))
+        age = (datetime.now(timezone.utc) - failure_time.astimezone(timezone.utc)).total_seconds()
+        if age > max_age:
+            return {"status": "skipped_stale", "events": [], "receipt_age_seconds": int(age)}
+    record = send_daily_event(
+        event="oci_dwd_sync_failed",
+        daily_root=daily_root,
+        market_date=None,
+        state_root=state_root,
+        failure_receipt=failure_receipt,
     )
-    record = failure(
-        day=target,
-        stage="daily_cycle",
-        state_root=JOURNAL / "notifications",
-        reason="independent daily ODS/DWD service failed; inspect its stage record; "
-        "this alert does not imply both acquisition and build failed",
-        context={"market_date_label": label, "error_code": "daily_cycle_service_failed"},
+    return {"status": "sent", "events": [record]}
+
+
+def _parse_market_date(value: str | None) -> date:
+    if value:
+        try:
+            return date.fromisoformat(value)
+        except ValueError as exc:
+            raise WarehouseNotificationError("market date must use YYYY-MM-DD") from exc
+    return datetime.now(ZoneInfo("Asia/Shanghai")).date()
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--event", choices=sorted(EVENTS), required=True)
+    parser.add_argument("--daily-root", type=Path, required=True)
+    parser.add_argument("--market-date")
+    parser.add_argument("--error")
+    parser.add_argument("--stage")
+    parser.add_argument("--node")
+    parser.add_argument("--unit")
+    parser.add_argument("--run-path")
+    parser.add_argument("--failure-receipt", type=Path)
+    parser.add_argument(
+        "--state-root",
+        type=Path,
+        default=Path(
+            os.environ.get("QUANTHUS_NOTIFICATION_STATE_ROOT", "/var/lib/quanthus/notifications")
+        ),
     )
-    print(json.dumps(record, sort_keys=True))
+    args = parser.parse_args(argv)
+    context = {
+        key: value
+        for key, value in {
+            "stage": args.stage,
+            "node": args.node,
+            "unit": args.unit,
+            "run_path": args.run_path,
+        }.items()
+        if value
+    }
+    try:
+        result = send_daily_event(
+            event=args.event,
+            daily_root=args.daily_root,
+            market_date=_parse_market_date(args.market_date) if args.market_date else None,
+            state_root=args.state_root,
+            error=args.error,
+            context=context,
+            failure_receipt=args.failure_receipt,
+        )
+    except WarehouseNotificationError as exc:
+        print(f"warehouse notification failed: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0
 
 

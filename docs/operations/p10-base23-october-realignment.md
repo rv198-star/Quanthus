@@ -3,6 +3,30 @@
 Owner authority: 2026-10-15, reprocess October except October 12 and 13.
 This is a bounded one-off recovery, not a change to ordinary T/T+1 policy.
 
+## Owner successor: October 10 through 12
+
+Owner subsequently authorized unifying October 10 through 12 on 2026-10-15.
+`config/pipelines/p10-base23-oct12-unification.v1.json` separately authorizes
+October 12's new target-date universe, ODS and immutable Daily/minute revisions.
+October 10/11 reuse the newly collected natural-day disclosures and retained
+financial responses. October 13 stays protected. The earlier v1 authority and
+its already sealed October 8/9 bindings are not rewritten. This changed-input
+Job uses its own cumulative ledger and actual knowledge clocks.
+
+All automatic complete writers, including domain continuation, resolve
+`/opt/quanthus/data-delivery-current`; daily ODS acquisition retains its own
+release. Switch the continuation unit only while both writers are idle, read
+back effective command paths and preserve the existing environment/timers.
+An unchanged semantic input closure reuses its accepted version. A producer
+revision is not to be falsified to make two different actual releases appear
+identical. Retain same-day earlier revisions and original first receipts.
+
+OCI failure email separately states source publication/quality declarations,
+failed receiver delivery and ungranted receiver admission. Exact cached source
+metadata does not replace actual receiver verification or cloud confirmation.
+Keep the original transfer budget and partials; never declare a successful
+minute grade to be successful delivery.
+
 ## Scope and ordering
 
 1. Collect a fresh target-date universe and market/event ODS for October 8, 9,

@@ -28,6 +28,8 @@ CONFIG = (
 )
 ID = "p10-owner-october-base23-realignment-v1"
 STATE = Path("/var/lib/quanthus/base23-october-realignment-20261015")
+OCT12_CONFIG = CONFIG.with_name("p10-base23-oct12-unification.v1.json")
+OCT12_STATE = Path("/var/lib/quanthus/base23-oct12-unification-20261015")
 
 
 def contract() -> dict[str, Any]:
@@ -48,6 +50,23 @@ def contract() -> dict[str, Any]:
 
 
 def check_day(day: str) -> dict[str, Any]:
+    if day == "2026-10-12":
+        c = object_at(OCT12_CONFIG)
+        if (
+            c.get("schema_version") != 1
+            or c.get("policy_id") != "p10-owner-oct12-unification-v1"
+            or c.get("business_dates") != ["2026-10-12"]
+            or c.get("protected_dates") != ["2026-10-13"]
+            or c.get("minimum_minute_grade") != "R2"
+            or c.get("maximum_R3") != 0
+            or c.get("execution_authorized") is not False
+            or c.get("operation_budget_seconds_per_interval") != 3600
+            or c.get("operation_timeout_seconds") != 600
+            or c.get("base_manifest_sha256") != contract()["base_manifest_sha256"]
+            or c.get("base_content_digest") != contract()["base_content_digest"]
+        ):
+            raise ValueError("October12 successor recovery contract differs")
+        return c
     c = contract()
     if day not in c["business_dates"]:
         raise ValueError("date is not authorized by this one-off recovery")
@@ -77,8 +96,10 @@ def alignment_binding(daily: Path) -> dict[str, str]:
     ):
         raise ValueError("October recovery requires evidenced target-date universe")
     return {
-        "policy_id": ID,
-        "contract_sha256": file_digest(CONFIG),
+        "policy_id": c["policy_id"],
+        "contract_sha256": file_digest(
+            OCT12_CONFIG if m["market_date"] == "2026-10-12" else CONFIG
+        ),
         "market_date": m["market_date"],
         "daily_manifest_sha256": file_digest(daily / "manifest.json"),
         "universe_digest": universe["universe_digest"],
@@ -486,8 +507,8 @@ def publish_domain_revision(
     from quanthus.pipelines.p10_domain_continuation import verify
 
     actual = verify(package)
-    c = contract()
     day = actual["market_date"]
+    c = check_day(day) if day == "2026-10-12" else contract()
     if day not in c["business_dates"] + c["natural_dates"] or not package.resolve().is_relative_to(
         root.resolve()
     ):
@@ -569,12 +590,14 @@ def run_recovery_operation(
         raise ValueError("inline commands cannot enter the recovery ledger")
     if interval not in {"1m", "5m"} or not reference_digest.startswith("sha256:"):
         raise ValueError("recovery interval/reference differs")
-    root = STATE / "minute-jobs" / day / interval
+    state_root = OCT12_STATE if day == "2026-10-12" else STATE
+    config_path = OCT12_CONFIG if day == "2026-10-12" else CONFIG
+    root = state_root / "minute-jobs" / day / interval
     root.mkdir(parents=True, exist_ok=True)
     path = root / "ledger.json"
     identity = {
-        "policy_id": ID,
-        "contract_sha256": file_digest(CONFIG),
+        "policy_id": c["policy_id"],
+        "contract_sha256": file_digest(config_path),
         "market_date": day,
         "interval": interval,
         "reference_digest": reference_digest,
@@ -594,8 +617,8 @@ def run_recovery_operation(
             if effective_revision != revision:
                 expected_resume = {
                     "kind": "p10_october_realignment_processing_resume_v1",
-                    "policy_id": ID,
-                    "contract_sha256": file_digest(CONFIG),
+                    "policy_id": c["policy_id"],
+                    "contract_sha256": file_digest(config_path),
                     "market_date": day,
                     "interval": interval,
                     "reference_digest": reference_digest,
@@ -812,7 +835,9 @@ def seed_reused_m1(
         for code, identity, source, old_receipt, target_digest in chunk:
             raw_dest = shard / "raw" / (code + ".json.gz")
             raw_dest.parent.mkdir(exist_ok=True)
-            os.link(source, raw_dest)
+            # Independent inode: later export/rsync metadata cannot touch the
+            # protected original response through a shared hard link.
+            shutil.copy2(source, raw_dest)
             atomic(
                 shard / "receipts" / (code + ".json"),
                 {

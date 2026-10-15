@@ -62,10 +62,46 @@ def daily(tmp_path, monkeypatch, day="2026-10-08"):
     return root, package, old, protected
 
 
-@pytest.mark.parametrize("day", ["2026-10-12", "2026-10-13", "2026-10-15", "2026-09-30"])
+@pytest.mark.parametrize("day", ["2026-10-13", "2026-10-15", "2026-09-30"])
 def test_protected_and_future_dates_never_enter_recovery(day):
     with pytest.raises(ValueError, match="not authorized"):
         repair.check_day(day)
+
+
+def test_oct12_has_separate_successor_authority_without_rewriting_old_binding():
+    original = repair.contract()
+    assert original["protected_dates"] == ["2026-10-12", "2026-10-13"]
+    current = repair.check_day("2026-10-12")
+    assert current["policy_id"] == "p10-owner-oct12-unification-v1"
+    assert current["protected_dates"] == ["2026-10-13"]
+    assert current["minimum_minute_grade"] == "R2"
+    assert current["maximum_R3"] == 0
+    assert "2026-10-12" not in original["business_dates"]
+
+
+def test_oct12_successor_keeps_independent_original_budget(tmp_path, monkeypatch):
+    from quanthus.pipelines import p10_historical_tplus1_recovery as recovery
+
+    monkeypatch.setattr(repair, "OCT12_STATE", tmp_path / "successor")
+    monkeypatch.setattr(repair, "STATE", tmp_path / "original")
+
+    def operation(**kwargs):
+        atomic(kwargs["state_path"], kwargs["state"])
+        return {"outcome": "success"}
+
+    monkeypatch.setattr(recovery, "_run_operation", operation)
+    repair.run_recovery_operation(
+        day="2026-10-12",
+        interval="1m",
+        reference_digest="sha256:" + "f" * 64,
+        revision="a" * 40,
+        operation_id="isolated-grade",
+        argv=["python", "-m", "quanthus.pipelines.p10_native_minute_delivery", "build"],
+        publication=True,
+    )
+    ledger = json.loads((tmp_path / "successor/minute-jobs/2026-10-12/1m/ledger.json").read_text())
+    assert ledger["policy_id"] == "p10-owner-oct12-unification-v1"
+    assert not (tmp_path / "original").exists()
 
 
 def test_historical_complete_needs_exact_extension(tmp_path, monkeypatch):
@@ -206,6 +242,9 @@ def test_response_reprojection_preserves_original_clock_and_closure(tmp_path, mo
         origin_root=tmp_path / "original", reference_file=reference_file, output=tmp_path / "reuse"
     )
     assert result == {"reused": 1, "remaining": 0, "new_supplier_requests": 0}
+    reused = tmp_path / "reuse/shard-000/raw" / (code + ".json.gz")
+    assert reused.read_bytes() == (shard / "raw" / (code + ".json.gz")).read_bytes()
+    assert reused.stat().st_ino != (shard / "raw" / (code + ".json.gz")).stat().st_ino
     index = minute.source_index(tmp_path / "reuse", ref, "1m")
     assert index[code][1]["captured_at"] == origin["captured_at"]
     assert index[code][1]["reuse_origin_receipt"] == origin

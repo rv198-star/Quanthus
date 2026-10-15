@@ -75,7 +75,14 @@ def parse_top_matrix(
             "OFFICIAL_HOLDER_COMPLETE_ROW_EXTENT_UNPROVEN",
         }:
             raise
-    return _parse_top_matrix(body, hints, physical_name_cells=True, raw_name_cells=True)
+    try:
+        return _parse_top_matrix(body, hints, physical_name_cells=True, raw_name_cells=True)
+    except BoundedError as error:
+        if str(error) != "OFFICIAL_HOLDER_COMPLETE_NAME_CHAIN_UNPROVEN":
+            raise
+    return _parse_top_matrix(
+        body, hints, physical_name_cells=True, raw_name_cells=True, split_delta_cells=True
+    )
 
 
 def _parse_top_matrix(
@@ -84,6 +91,7 @@ def _parse_top_matrix(
     *,
     physical_name_cells: bool,
     raw_name_cells: bool = False,
+    split_delta_cells: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not isinstance(body, str) or not 0 < len(body.encode()) <= 16 * 1024**2:
         raise BoundedError("OFFICIAL_HOLDER_BODY_BOUND")
@@ -237,6 +245,17 @@ def _parse_top_matrix(
         name_fence = None
 
     def name_cell(line: str) -> str:
+        if split_delta_cells and nature_last:
+            # Only the explicitly labelled, unmodelled change column may wrap.
+            # Never reconstruct a holding quantity from these fragments: all ten
+            # complete native quantity/percentage anchors remain mandatory.
+            fragment = re.fullmatch(
+                r"(.*?\S)[ \t]{2,}(?:[+-]?[0-9][0-9,]*|[+-])"
+                r"(?:[ \t]{2,}(?:" + wrapped_nature + r"))?\s*",
+                line,
+            )
+            if fragment:
+                return fragment[1].strip()
         if (lending_column or raw_name_cells) and nature_last and raw_name_fence is not None:
             if _norm(line[:raw_name_fence]) in {"(全称)", "股东名称"}:
                 return line[:raw_name_fence].strip()
@@ -358,6 +377,9 @@ def _parse_top_matrix(
         # page furniture. Every left-column name byte must match the full chain.
         if (
             not stripped
+            or split_delta_cells
+            and nature_last
+            and re.fullmatch(r"(?:[+-]?[0-9][0-9,]*|[+-])", stripped) is not None
             or indent > 8
             and (name_fence is None or indent >= name_fence)
             or stripped.isdecimal()
@@ -440,6 +462,8 @@ def _parse_top_matrix(
     if body != original_body:
         proof["layout_normalization_contract"] = "adjacent-explicit-lending-delta-row-v1"
         proof["original_layout_body_sha256"] = digest(original_body)
+    if split_delta_cells:
+        proof["layout_contract"] = "explicit-unmodeled-delta-fragments-v1"
     return rows, proof
 
 

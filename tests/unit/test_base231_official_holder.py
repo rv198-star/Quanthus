@@ -995,6 +995,29 @@ def test_top_numeric_row_may_end_at_explicit_no_pledge_state():
         parse_top_matrix(body.replace("无\n", "不明状态\n", 1), hints)
 
 
+
+def test_top_complete_native_rows_ignore_only_separate_wrapped_delta_atoms():
+    body, hints = nature_last_sample()
+    body = body.replace("股东名称  报告期内增减", "股东名称               报告期内增减")
+    hints[0]["HOLDER_NAME"] = "合成公司全称"
+    body = body.replace(
+        "合成股东1  -2", "合成公司                 -\n全称  -2", 1
+    ).replace("合成股东2  -2", "            1,234,5\n合成股东2  -2", 1)
+    body = body.replace("无  0  其他", "无", 1)
+    rows, proof = parse_top_matrix(body, hints)
+    assert len(rows) == 10 and rows[0]["name"] == "合成公司全称"
+    assert rows[0]["quantity"] == 1001 and rows[1]["quantity"] == 1002
+    assert proof["layout_contract"] == "explicit-unmodeled-delta-fragments-v1"
+    for invalid in [
+        body.replace("全称  -2", "额外全称  -2", 1),
+        body.replace("1,234,5", "1,234,5未审核", 1),
+        body.replace("1001", "1002", 1),
+        body.replace("报告期内增减", "未经审核列"),
+        body.replace("合成股东2  -2  1002", "合成股东2  -2  10", 1),
+    ]:
+        with pytest.raises(RuntimeError):
+            parse_top_matrix(invalid, hints)
+
 def cover_projection(body, hints, code="000400"):
     from datetime import date, datetime, timezone
 

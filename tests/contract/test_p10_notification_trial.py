@@ -441,6 +441,9 @@ def test_missed_success_enqueue_is_recovered_without_supplier_calls(
             "catalog": {"status": "ready", "root": str(tmp_path / "verified-catalog")},
         },
     )
+    atomic(root.parent / str(DAY) / "status.json", {
+        "minutes": minute_receipts(tmp_path / "current-T-minutes"),
+    })
     checked = []
     monkeypatch.setattr(
         trial,

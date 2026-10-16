@@ -206,3 +206,65 @@ def test_bounded_pilot_reuses_same_full_plan_checkpoint(tmp_path):
     assert final["status"] == "COMPLETE"
     assert final["reused"] == 1
     assert final["actual_requests"] == 2
+
+
+def test_bounded_repeated_failure_is_held_and_other_windows_continue(tmp_path):
+    calls = []
+
+    def fetch(staging, request):
+        calls.append(request.code)
+        if request.code.endswith("000001"):
+            raise RuntimeError("bounded failure")
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(b"ok")
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 2}
+
+    output = tmp_path / "out"
+    result = run_acquisition(
+        _plan(),
+        output,
+        fetch,
+        source_roots=(),
+        max_failures=1,
+        max_attempts_per_partition=1,
+    )
+    assert result["status"] == "COMPLETE_WITH_HELD"
+    assert result["completed"] == 1
+    assert result["held"] == 1
+    assert (output / "READY").is_file()
+    held = next((output / "held").glob("*/HOLD.json"))
+    assert json.loads(held.read_text())["attempts"] == 1
+    resumed = run_acquisition(
+        _plan(),
+        output,
+        lambda *_: pytest.fail("terminal windows must be reused or held"),
+        source_roots=(),
+        max_attempts_per_partition=1,
+    )
+    assert resumed["status"] == "COMPLETE_WITH_HELD"
+    assert resumed["held"] == 1
+
+
+def test_changed_held_failure_receipt_blocks_resume(tmp_path):
+    output = tmp_path / "out"
+
+    def fetch(*_):
+        raise RuntimeError("bounded failure")
+
+    run_acquisition(
+        _plan(1),
+        output,
+        fetch,
+        source_roots=(),
+        max_attempts_per_partition=1,
+    )
+    failure = next((output / "failures").glob("*/FAILURE.json"))
+    failure.write_text(failure.read_text() + "changed")
+    with pytest.raises(Native5mAcquireError, match="HELD_PARTITION_CHANGED"):
+        run_acquisition(
+            _plan(1),
+            output,
+            fetch,
+            source_roots=(),
+            max_attempts_per_partition=1,
+        )

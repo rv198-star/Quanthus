@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+from collections import Counter
 from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from decimal import InvalidOperation
@@ -218,6 +219,109 @@ def _verify_sealed(root: Path, window: dict[str, Any], plan_sha: str) -> dict[st
     return receipt
 
 
+def _failure_receipts(failures: Path, identity: str) -> list[Path]:
+    receipts: list[Path] = []
+    if not failures.exists():
+        return receipts
+    for root in sorted(failures.glob(f"{identity}-*")):
+        path = root / "FAILURE.json"
+        if root.is_symlink() or path.is_symlink() or not path.is_file():
+            raise Native5mAcquireError("FAILURE_HISTORY_INVALID")
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError) as exc:
+            raise Native5mAcquireError("FAILURE_HISTORY_INVALID") from exc
+        if value.get("contract") != CONTRACT or value.get("partition_id") != identity:
+            raise Native5mAcquireError("FAILURE_HISTORY_INVALID")
+        receipts.append(path)
+    return receipts
+
+
+def _seal_hold(
+    root: Path,
+    *,
+    failures: Path,
+    window: dict[str, Any],
+    plan_sha: str,
+    attempts: list[Path],
+) -> None:
+    if root.exists() or not attempts:
+        raise Native5mAcquireError("HELD_PARTITION_INVALID")
+    reasons: Counter[str] = Counter()
+    members = []
+    for path in attempts:
+        value = json.loads(path.read_text(encoding="utf-8"))
+        reasons[str(value["reason_code"])] += 1
+        members.append(
+            {
+                "path": path.relative_to(failures.parent).as_posix(),
+                "sha256": _sha(path),
+            }
+        )
+    root.mkdir()
+    hold = {
+        "contract": CONTRACT,
+        "disposition": "HELD_AFTER_BOUNDED_FAILURES",
+        "partition_id": window["partition_id"],
+        "plan_sha256": plan_sha,
+        "code": window["code"],
+        "start_date": window["start_date"],
+        "end_date": window["end_date"],
+        "required_dates": window["required_dates"],
+        "attempts": len(attempts),
+        "reason_counts": dict(sorted(reasons.items())),
+        "failure_receipts": members,
+        "held_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _write(root / "HOLD.json", hold)
+    (root / "READY").write_text(_sha(root / "HOLD.json") + "\n", encoding="ascii")
+
+
+def _verify_held(
+    root: Path, failures: Path, window: dict[str, Any], plan_sha: str
+) -> dict[str, Any]:
+    try:
+        loaded = json.loads((root / "HOLD.json").read_text(encoding="utf-8"))
+        ready = (root / "READY").read_text(encoding="ascii").strip()
+        actual = {path.name for path in root.iterdir() if path.is_file()}
+    except (OSError, ValueError, TypeError) as exc:
+        raise Native5mAcquireError("HELD_PARTITION_CHANGED") from exc
+    if not isinstance(loaded, dict):
+        raise Native5mAcquireError("HELD_PARTITION_CHANGED")
+    hold: dict[str, Any] = loaded
+    if (
+        root.is_symlink()
+        or actual != {"HOLD.json", "READY"}
+        or hold.get("contract") != CONTRACT
+        or hold.get("disposition") != "HELD_AFTER_BOUNDED_FAILURES"
+        or hold.get("partition_id") != window["partition_id"]
+        or hold.get("plan_sha256") != plan_sha
+        or hold.get("required_dates") != window["required_dates"]
+        or type(hold.get("attempts")) is not int
+        or hold["attempts"] < 1
+        or ready != _sha(root / "HOLD.json")
+    ):
+        raise Native5mAcquireError("HELD_PARTITION_CHANGED")
+    members = hold.get("failure_receipts")
+    if not isinstance(members, list) or len(members) != hold["attempts"]:
+        raise Native5mAcquireError("HELD_PARTITION_CHANGED")
+    for member in members:
+        try:
+            path = failures.parent / member["path"]
+            resolved = path.resolve(strict=True)
+            if (
+                failures.resolve(strict=True) not in resolved.parents
+                or path.is_symlink()
+                or _sha(path) != member["sha256"]
+            ):
+                raise Native5mAcquireError("HELD_PARTITION_CHANGED")
+        except (OSError, KeyError, TypeError) as exc:
+            if isinstance(exc, Native5mAcquireError):
+                raise
+            raise Native5mAcquireError("HELD_PARTITION_CHANGED") from exc
+    return hold
+
+
 Fetch = Callable[[Path, NativeWindow], tuple[tuple[ExactBar, ...], dict[str, Any]]]
 
 
@@ -229,6 +333,7 @@ def run_acquisition(
     source_roots: Sequence[Path],
     max_new_partitions: int | None = None,
     max_failures: int | None = None,
+    max_attempts_per_partition: int | None = None,
 ) -> dict[str, Any]:
     """Execute/reuse independent partitions; failed staging never gains READY."""
     _validate_output(output, source_roots)
@@ -236,13 +341,16 @@ def run_acquisition(
         raise Native5mAcquireError("NEW_PARTITION_LIMIT_INVALID")
     if max_failures is not None and max_failures < 1:
         raise Native5mAcquireError("FAILURE_LIMIT_INVALID")
+    if max_attempts_per_partition is not None and max_attempts_per_partition < 1:
+        raise Native5mAcquireError("ATTEMPT_LIMIT_INVALID")
     plan, windows = _plan(plan_bytes)
     plan_sha = hashlib.sha256(plan_bytes).hexdigest()
     output.mkdir(parents=True, exist_ok=True)
     partitions = output / "partitions"
     failures = output / "failures"
+    held_root = output / "held"
     staging_root = output / "staging"
-    for path in (partitions, failures, staging_root):
+    for path in (partitions, failures, held_root, staging_root):
         path.mkdir(exist_ok=True)
     state: dict[str, Any] = {
         "contract": CONTRACT,
@@ -252,6 +360,7 @@ def run_acquisition(
         "completed": 0,
         "reused": 0,
         "failed": 0,
+        "held": 0,
         "actual_requests": 0,
         "actual_bytes": 0,
         "source_roots_modified": False,
@@ -259,12 +368,28 @@ def run_acquisition(
     for window in windows:
         identity = window["partition_id"]
         sealed = partitions / identity
+        held = held_root / identity
+        if held.exists():
+            _verify_held(held, failures, window, plan_sha)
+            state["held"] += 1
+            continue
         if sealed.exists():
             receipt = _verify_sealed(sealed, window, plan_sha)
             state["completed"] += 1
             state["reused"] += 1
             state["actual_requests"] += int(receipt["metrics"].get("actual_requests", 0))
             state["actual_bytes"] += int(receipt["metrics"].get("actual_bytes", 0))
+            continue
+        attempts = _failure_receipts(failures, identity)
+        if max_attempts_per_partition is not None and len(attempts) >= max_attempts_per_partition:
+            _seal_hold(
+                held,
+                failures=failures,
+                window=window,
+                plan_sha=plan_sha,
+                attempts=attempts,
+            )
+            state["held"] += 1
             continue
         if (
             max_new_partitions is not None
@@ -318,22 +443,46 @@ def run_acquisition(
             failure = {
                 "contract": CONTRACT,
                 "partition_id": identity,
+                "plan_sha256": plan_sha,
                 "reason_code": str(exc) if str(exc).isascii() else type(exc).__name__,
                 "failed_at": datetime.now(timezone.utc).isoformat(),
             }
             _write(staging / "FAILURE.json", failure)
             suffix = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-            os.rename(staging, failures / f"{identity}-{suffix}")
-            if max_failures is not None and state["failed"] >= max_failures:
+            failed_root = failures / f"{identity}-{suffix}"
+            os.rename(staging, failed_root)
+            attempts = [*attempts, failed_root / "FAILURE.json"]
+            became_held = False
+            if (
+                max_attempts_per_partition is not None
+                and len(attempts) >= max_attempts_per_partition
+            ):
+                _seal_hold(
+                    held,
+                    failures=failures,
+                    window=window,
+                    plan_sha=plan_sha,
+                    attempts=attempts,
+                )
+                state["held"] += 1
+                became_held = True
+            if not became_held and max_failures is not None and state["failed"] >= max_failures:
                 state["stop_reason"] = "FAILURE_LIMIT"
                 break
     state["finished_at"] = datetime.now(timezone.utc).isoformat()
-    state["status"] = "COMPLETE" if state["completed"] == state["total"] else "PARTIAL"
+    terminal = state["completed"] + state["held"] == state["total"]
+    state["status"] = (
+        "COMPLETE"
+        if terminal and not state["held"]
+        else "COMPLETE_WITH_HELD"
+        if terminal
+        else "PARTIAL"
+    )
     checkpoint = output / "CHECKPOINT.json"
     temporary = output / ".CHECKPOINT.json.tmp"
     temporary.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.replace(temporary, checkpoint)
-    if state["status"] == "COMPLETE":
+    if terminal:
         (output / "READY").write_text(_sha(checkpoint) + "\n", encoding="ascii")
     else:
         (output / "READY").unlink(missing_ok=True)

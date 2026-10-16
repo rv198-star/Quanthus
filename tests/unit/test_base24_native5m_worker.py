@@ -10,6 +10,7 @@ from quanthus.pipelines.securities_warehouse.base24_native5m_worker import (
     _control_calls,
     _data_sends,
     _frozen_inputs,
+    main,
 )
 
 
@@ -93,3 +94,43 @@ def test_worker_rejects_unreadable_durable_send_ledger(tmp_path):
     (path / "wire-receipt.json").write_text("{}")
     with pytest.raises(Native5mWorkerError, match="WIRE_RECEIPT_UNREADABLE"):
         _data_sends(tmp_path / "output")
+
+
+def test_main_retries_partial_worker_until_complete(monkeypatch):
+    results = iter((2, 2, 0))
+    calls = []
+
+    def run(_args):
+        calls.append("run")
+        return next(results)
+
+    monkeypatch.setattr(
+        "quanthus.pipelines.securities_warehouse.base24_native5m_worker.run_worker", run
+    )
+    assert main(["--max-runs", "3", "--retry-wait-seconds", "0"] + _required_args()) == 0
+    assert calls == ["run", "run", "run"]
+
+
+def _required_args():
+    return [
+        "--plan",
+        "plan",
+        "--selection",
+        "selection",
+        "--output",
+        "output",
+        "--evidence",
+        "evidence",
+        "--worktree",
+        "worktree",
+        "--expected-plan-sha256",
+        "0" * 64,
+        "--expected-selection-sha256",
+        "0" * 64,
+        "--expected-code-sha",
+        "0" * 40,
+        "--free-floor-bytes",
+        "1",
+        "--max-allocated-bytes",
+        "1",
+    ]

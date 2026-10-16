@@ -344,11 +344,23 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-rss-bytes", type=int, default=4 * 1024**3)
     parser.add_argument("--request-spacing-seconds", type=float, default=1.0)
     parser.add_argument("--socket-timeout-seconds", type=float, default=30.0)
+    parser.add_argument("--max-runs", type=int, default=1)
+    parser.add_argument("--retry-wait-seconds", type=float, default=60.0)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    return run_worker(_parser().parse_args(argv))
+    args = _parser().parse_args(argv)
+    if args.max_runs < 1 or args.retry_wait_seconds < 0:
+        raise Native5mWorkerError("WORKER_RETRY_CONTRACT_INVALID")
+    result = 2
+    for run_number in range(args.max_runs):
+        result = run_worker(args)
+        if result == 0:
+            return 0
+        if run_number + 1 < args.max_runs:
+            time.sleep(args.retry_wait_seconds)
+    return result
 
 
 if __name__ == "__main__":

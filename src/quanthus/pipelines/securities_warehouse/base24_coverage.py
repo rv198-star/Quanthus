@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
 from collections import Counter
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, timedelta
 from typing import Any
 
@@ -18,6 +18,74 @@ CONTRACT = "p10-base24-historical-denominator-v1"
 
 class CoverageError(ValueError):
     """Fail-closed source/identity/calendar reason without market values."""
+
+
+def bounded_missing_windows(
+    rows: Sequence[tuple[str, str, date, bool]],
+    *,
+    max_calendar_days: int = 730,
+    max_session_days: int = 416,
+    max_observed_gap: int = 3,
+) -> list[dict[str, Any]]:
+    """Compress ordered required sessions while retaining exact missing dates.
+
+    Each input row is venue, stock code, required session date and whether the
+    selected source is already good. Windows only start/end on missing sessions.
+    A few already-good sessions may be queried to join nearby gaps, but remain
+    explicit and are never counted as repair output.
+    """
+    if min(max_calendar_days, max_session_days) < 1 or max_observed_gap < 0:
+        raise CoverageError("WINDOW_LIMIT_INVALID")
+    grouped: dict[tuple[str, str], list[tuple[date, bool]]] = {}
+    for venue, code, day, good in rows:
+        if venue not in VENUES or not isinstance(good, bool):
+            raise CoverageError("WINDOW_ROW_INVALID")
+        _day(day)
+        grouped.setdefault((venue, code), []).append((day, good))
+    output = []
+    for (venue, code), sessions in sorted(grouped.items()):
+        sessions.sort()
+        if len({day for day, _ in sessions}) != len(sessions):
+            raise CoverageError("WINDOW_SESSION_DUPLICATE")
+        start = 0
+        while start < len(sessions):
+            while start < len(sessions) and sessions[start][1]:
+                start += 1
+            if start == len(sessions):
+                break
+            end = start
+            last_missing = start
+            while end + 1 < len(sessions):
+                candidate = end + 1
+                span_sessions = candidate - start + 1
+                span_days = (sessions[candidate][0] - sessions[start][0]).days
+                if span_sessions > max_session_days or span_days > max_calendar_days:
+                    break
+                if not sessions[candidate][1]:
+                    last_missing = candidate
+                    end = candidate
+                    continue
+                if candidate - last_missing - 1 >= max_observed_gap:
+                    break
+                end = candidate
+            end = last_missing
+            selected = sessions[start : end + 1]
+            required = [day.isoformat() for day, good in selected if not good]
+            expected = [day.isoformat() for day, _ in selected]
+            output.append(
+                {
+                    "venue": venue,
+                    "stock_code": code,
+                    "start_date": expected[0],
+                    "end_date": expected[-1],
+                    "required_dates": required,
+                    "expected_session_dates": expected,
+                    "required_security_days": len(required),
+                    "expected_source_days": len(expected),
+                }
+            )
+            start = end + 1
+    return output
 
 
 def _day(value: Any) -> date:

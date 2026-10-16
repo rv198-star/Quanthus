@@ -6,6 +6,7 @@ import pytest
 
 from quanthus.pipelines.securities_warehouse.base24_coverage import (
     CoverageError,
+    bounded_missing_windows,
     source_denominator,
 )
 
@@ -102,3 +103,39 @@ def test_new_listing_cannot_gain_earlier_sessions_or_cross_venue():
         [listing("001248", start="2020-01-03"), listing("600000", start="2020-01-04", venue="SSE")]
     )
     assert result["known_interval_session_units"] == 1
+
+
+def test_missing_windows_merge_contiguous_years_and_bounded_nearby_gaps():
+    rows = [
+        ("SSE", "600000", date(2020, 1, day), good)
+        for day, good in [(2, False), (3, False), (6, True), (7, True), (8, True), (9, False)]
+    ]
+    windows = bounded_missing_windows(rows, max_session_days=6, max_observed_gap=3)
+    assert windows == [
+        {
+            "venue": "SSE",
+            "stock_code": "600000",
+            "start_date": "2020-01-02",
+            "end_date": "2020-01-09",
+            "required_dates": ["2020-01-02", "2020-01-03", "2020-01-09"],
+            "expected_session_dates": [
+                "2020-01-02",
+                "2020-01-03",
+                "2020-01-06",
+                "2020-01-07",
+                "2020-01-08",
+                "2020-01-09",
+            ],
+            "required_security_days": 3,
+            "expected_source_days": 6,
+        }
+    ]
+
+
+def test_missing_windows_split_on_four_good_sessions_or_limits():
+    rows = [("SZSE", "000001", date(2020, 1, day), 3 <= day <= 6) for day in range(2, 9)]
+    windows = bounded_missing_windows(rows, max_session_days=4, max_observed_gap=3)
+    assert [window["required_dates"] for window in windows] == [
+        ["2020-01-02"],
+        ["2020-01-07", "2020-01-08"],
+    ]

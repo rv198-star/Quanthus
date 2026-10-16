@@ -28,6 +28,7 @@ SHANGHAI = ZoneInfo("Asia/Shanghai")
 TRAILER = b"<![CDATA[]]>\n"
 CONTRACT = "p10-native-5m-exact-v1"
 WIRE_SERVER_VERSION = "00.9.10"
+MAX_WINDOW_PAGE_SIZE = 20000
 
 
 class Native5mError(ValueError):
@@ -52,7 +53,7 @@ class NativeDay:
 
 @dataclass(frozen=True)
 class NativeWindow:
-    """One security, at most 366 inclusive civil dates, never the whole universe."""
+    """One security, at most 731 inclusive civil dates, never the whole universe."""
 
     code: str
     start_date: str
@@ -62,7 +63,7 @@ class NativeWindow:
         NativeDay(self.code, self.start_date)
         NativeDay(self.code, self.end_date)
         days = (date.fromisoformat(self.end_date) - date.fromisoformat(self.start_date)).days
-        if not 0 <= days <= 365:
+        if not 0 <= days <= 730:
             raise Native5mError("INVALID_WINDOW_RANGE")
 
 
@@ -307,7 +308,7 @@ def fetch_captured_window(
     object is ignored. Only a newly captured original frame can establish a page.
     All limits, including terminal-page allowance, share the caller's wire budget.
     """
-    if not (1 <= page_size <= 2000 and max_pages >= 1 and max_rows >= 1):
+    if not (1 <= page_size <= MAX_WINDOW_PAGE_SIZE and max_pages >= 1 and max_rows >= 1):
         raise Native5mError("INVALID_PARSE_LIMIT")
     bars: list[ExactBar] = []
     previous: datetime | None = None

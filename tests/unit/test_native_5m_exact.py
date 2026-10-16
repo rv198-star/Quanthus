@@ -468,9 +468,27 @@ def test_window_stops_before_extra_request_on_exhausted_budget(
     assert len(calls) == expected_calls
 
 
-@pytest.mark.parametrize("start,end", [("2020-01-03", "2020-01-02"), ("2020-01-01", "2021-01-01")])
+@pytest.mark.parametrize("start,end", [("2020-01-03", "2020-01-02"), ("2020-01-01", "2022-01-02")])
 def test_window_invalid_or_unbounded_date_range_rejected(start, end):
     from quanthus.providers.native_5m_exact import NativeWindow
 
     with pytest.raises(Native5mError, match="WINDOW"):
         NativeWindow("sz.000001", start, end)
+
+
+def test_window_allows_bounded_two_year_partition():
+    from quanthus.providers.native_5m_exact import NativeWindow
+
+    assert NativeWindow("sz.000001", "2020-01-01", "2021-12-31").end_date == "2021-12-31"
+
+
+def test_window_page_size_has_explicit_twenty_thousand_ceiling():
+    from quanthus.providers.native_5m_exact import NativeWindow, fetch_captured_window
+
+    with pytest.raises(Native5mError, match="INVALID_PARSE_LIMIT"):
+        fetch_captured_window(
+            None,
+            NativeWindow("sz.000001", "2020-01-02", "2020-01-02"),
+            None,
+            page_size=20001,
+        )

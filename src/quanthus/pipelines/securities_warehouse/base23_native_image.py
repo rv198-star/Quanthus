@@ -12,9 +12,11 @@ import importlib
 import json
 import math
 import os
+import re
 import time
 from collections import Counter
 from collections.abc import Callable, Iterator, Mapping
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -31,6 +33,34 @@ from .base23_native_keys import NativeGlobalScan
 KIND = "dwd_base23_native_purpose_qualified_candidate_v1"
 
 
+@dataclass(frozen=True)
+class NativeImageProfile:
+    """Versioned envelope around the shared physical 33-table engine."""
+
+    kind: str
+    purpose: str
+    version: str
+    business_through: str
+    contract_filename: str
+    hard_checks: tuple[str, ...]
+    validate_contract: Callable[[Mapping[str, Any]], None]
+    assess_delivery: Callable[..., dict[str, Any]]
+    validate_table: Callable[[str, list[Path]], None] | None = None
+    manifest_fields: tuple[tuple[str, Any], ...] = ()
+
+
+BASE23_PROFILE = NativeImageProfile(
+    kind=KIND,
+    purpose=PURPOSE,
+    version="2.3",
+    business_through="2026-09-30",
+    contract_filename="base23-delivery.v1.json",
+    hard_checks=HARD_CHECKS,
+    validate_contract=validate_contract,
+    assess_delivery=assess_delivery,
+)
+
+
 def _write(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("x", encoding="utf-8") as stream:
@@ -43,6 +73,8 @@ def _declared_hashes(value: Any) -> dict[str, str]:
     found: dict[str, str] = {}
 
     def add(path: str, sha: str) -> None:
+        if re.fullmatch(r"[0-9a-f]{64}", sha):
+            sha = "sha256:" + sha
         if path in found and found[path] != sha:
             raise BoundedError("SOURCE_DESCRIPTOR_CONFLICTING_MEMBER")
         found[path] = sha
@@ -74,12 +106,16 @@ def _declared_hashes(value: Any) -> dict[str, str]:
 
 
 def validate_selection(
-    plan: Mapping[str, Any], rules: Mapping[str, Any], descriptors: Mapping[str, Any]
+    plan: Mapping[str, Any],
+    rules: Mapping[str, Any],
+    descriptors: Mapping[str, Any],
+    *,
+    profile: NativeImageProfile = BASE23_PROFILE,
 ) -> None:
     """Shared offline structural admission before source opening or output writes."""
     if (
-        plan.get("purpose") != PURPOSE
-        or plan.get("through_date") != "2026-09-30"
+        plan.get("purpose") != profile.purpose
+        or plan.get("through_date") != profile.business_through
         or plan.get("timezone") != "Asia/Shanghai"
         or set(plan.get("tables", {})) != set(rules["tables"])
         or set(plan.get("sources", {})) != set(descriptors)
@@ -265,6 +301,7 @@ def materialize_native_image(
     wall_seconds: int,
     config_root: Path,
     owned_reuse: dict[str, Any] | None = None,
+    profile: NativeImageProfile = BASE23_PROFILE,
 ) -> dict[str, Any]:
     """Copy pinned independent entities; leave a materialization, never write READY.
 
@@ -272,7 +309,7 @@ def materialize_native_image(
     Each exclusive copy is bounded by its frozen byte size; no generic cleanup or
     cache is introduced. Partials and the selection survive a failure.
     """
-    validate_contract(contract)
+    profile.validate_contract(contract)
     # Freeze caller-owned mappings before any writes.
     plan = json.loads(json.dumps(plan))
     roots = {k: physical_path(Path(v["root"])) for k, v in plan["sources"].items()}
@@ -287,7 +324,7 @@ def materialize_native_image(
             raise BoundedError("NATIVE_IMAGE_SOURCE_DESCRIPTOR_CHANGED")
         descriptor_bytes[sid] = p.read_bytes()
         descriptors[sid] = json.loads(descriptor_bytes[sid])
-    validate_selection(plan, rules, descriptors)
+    validate_selection(plan, rules, descriptors, profile=profile)
     expected_schemas = image_schemas(model, extension)
     configuration = {
         "dwd-domain-model.v1.json": (model, MODEL_SHA),
@@ -301,7 +338,9 @@ def materialize_native_image(
             raise BoundedError("NATIVE_IMAGE_FROZEN_CONFIGURATION_CHANGED")
         configuration_bytes[name] = p.read_bytes()
     transfer = (
-        OwnedTransfer(plan=plan, output=output, kind=KIND, **owned_reuse) if owned_reuse else None
+        OwnedTransfer(plan=plan, output=output, kind=profile.kind, **owned_reuse)
+        if owned_reuse
+        else None
     )
     # Project all physical coordinates before copying an expensive full image.
     # Parquet range statistics accelerate this preflight; cold decoded batches
@@ -338,6 +377,8 @@ def materialize_native_image(
                     raise BoundedError("NATIVE_IMAGE_INPUT_SCHEMA_OR_ROWS_CHANGED")
                 parts.setdefault(item["partition"], []).append(path)
                 counts[item["partition"]] += item["rows"]
+            if profile.validate_table is not None:
+                profile.validate_table(table, [p for files in parts.values() for p in files])
             for part, paths in parts.items():
                 check_partition_coordinates(
                     scan,
@@ -375,7 +416,7 @@ def materialize_native_image(
     )
     output.mkdir(parents=True, exist_ok=False)
     _write(output / "evidence/input-plan.json", plan)
-    _write(output / "contract/base23-delivery.v1.json", contract)
+    _write(output / "contract" / profile.contract_filename, contract)
     for name, data in configuration_bytes.items():
         with (output / "contract" / name).open("xb") as stream:
             stream.write(data)
@@ -448,8 +489,8 @@ def materialize_native_image(
             flush=True,
         )
     record = {
-        "kind": KIND,
-        "purpose": PURPOSE,
+        "kind": profile.kind,
+        "purpose": profile.purpose,
         "plan_digest": digest(plan),
         "layout": layout,
         "source_descriptors": {sid: v["descriptor_sha256"] for sid, v in plan["sources"].items()},
@@ -472,7 +513,11 @@ def materialize_native_image(
 
 
 def audit_native_image(
-    root: Path, budget: Budget, *, unique_business_key_shortcut: bool = False
+    root: Path,
+    budget: Budget,
+    *,
+    unique_business_key_shortcut: bool = False,
+    profile: NativeImageProfile = BASE23_PROFILE,
 ) -> dict[str, Any]:
     """All runtime evidence is local; source roots are inert archival strings.
 
@@ -491,15 +536,15 @@ def audit_native_image(
         raise BoundedError("NATIVE_IMAGE_KERNEL_READONLY_REQUIRED")
     record = json.loads((root / "MATERIALIZATION.json").read_bytes())
     plan = json.loads((root / "evidence/input-plan.json").read_bytes())
-    contract = json.loads((root / "contract/base23-delivery.v1.json").read_bytes())
+    contract = json.loads((root / "contract" / profile.contract_filename).read_bytes())
     rules = json.loads((root / "contract/base22-independent-image.v1.json").read_bytes())
     model = json.loads((root / "contract/dwd-domain-model.v1.json").read_bytes())
     extension = json.loads((root / "contract/dwd-domain-model.v1.1-extension.json").read_bytes())
     limitations = json.loads((root / "evidence/limitations.json").read_bytes())
-    validate_contract(contract)
+    profile.validate_contract(contract)
     if (
-        record.get("kind") != KIND
-        or record.get("purpose") != PURPOSE
+        record.get("kind") != profile.kind
+        or record.get("purpose") != profile.purpose
         or record["plan_digest"] != digest(plan)
         or file_sha(root / "contract/dwd-domain-model.v1.json") != MODEL_SHA
         or file_sha(root / "contract/dwd-domain-model.v1.1-extension.json") != EXTENSION_SHA
@@ -512,7 +557,7 @@ def audit_native_image(
         if file_sha(p) != plan["sources"][sid]["descriptor_sha256"]:
             raise BoundedError("NATIVE_IMAGE_LOCAL_SOURCE_EVIDENCE_CHANGED")
         descriptors[sid] = json.loads(p.read_bytes())
-    validate_selection(plan, rules, descriptors)
+    validate_selection(plan, rules, descriptors, profile=profile)
     for relative, sha in record["evidence"].items():
         if file_sha(_physical(root, relative, independent=True)) != sha:
             raise BoundedError("NATIVE_IMAGE_LOCAL_EVIDENCE_CHANGED")
@@ -556,6 +601,8 @@ def audit_native_image(
             ):
                 raise BoundedError("NATIVE_IMAGE_PHYSICAL_PARTITION_SET_CHANGED")
             paths = [p for part in parts.values() for p in part]
+            if profile.validate_table is not None:
+                profile.validate_table(table, paths)
             scan.add(table, paths)
             if table == "dwd_shareholding_observation":
                 check_component_global_keys(scan, table)
@@ -600,10 +647,10 @@ def audit_native_image(
     if _tree(root) != declared:
         raise BoundedError("NATIVE_IMAGE_UNDECLARED_PHYSICAL_FILE")
     _check_directories(root, declared)
-    checks = dict.fromkeys(HARD_CHECKS, "PASS")
+    checks = dict.fromkeys(profile.hard_checks, "PASS")
     checks["two_independent_source_denied_cold_runs"] = "NOT_RUN"
     checks["missing_and_corrupt_fail_closed"] = "NOT_RUN"
-    assessment = assess_delivery(
+    assessment = profile.assess_delivery(
         contract=contract,
         tables=set(ss),
         limitations=limitations,
@@ -611,7 +658,7 @@ def audit_native_image(
         checks=checks,
     )
     result = {
-        "kind": KIND,
+        "kind": profile.kind,
         "materialization_sha256": file_sha(root / "MATERIALIZATION.json"),
         "input_plan_digest": record["plan_digest"],
         "local_evidence_digests": record["evidence"],
@@ -624,7 +671,7 @@ def audit_native_image(
     if (root / "manifest.json").exists():
         manifest = json.loads((root / "manifest.json").read_bytes())
         if (
-            manifest.get("kind") != KIND
+            manifest.get("kind") != profile.kind
             or manifest.get("materialization_sha256") != file_sha(root / "MATERIALIZATION.json")
             or manifest.get("scan_identity") != result["identity"]
             or manifest.get("content_digest")
@@ -636,7 +683,11 @@ def audit_native_image(
 
 
 def seal_native_image(
-    root: Path, receipt: Mapping[str, Any], *, code_revision: str
+    root: Path,
+    receipt: Mapping[str, Any],
+    *,
+    code_revision: str,
+    profile: NativeImageProfile = BASE23_PROFILE,
 ) -> dict[str, Any]:
     """Seal only a successful full structural scan; independent acceptance follows.
 
@@ -647,16 +698,16 @@ def seal_native_image(
         raise BoundedError("NATIVE_IMAGE_SEALED_OUTPUT_ALREADY_EXISTS")
     if (
         not receipt.get("assessment", {}).get("build_eligible")
-        or receipt.get("kind") != KIND
+        or receipt.get("kind") != profile.kind
         or receipt.get("materialization_sha256") != file_sha(root / "MATERIALIZATION.json")
         or receipt.get("identity") != digest({k: v for k, v in receipt.items() if k != "identity"})
     ):
         raise BoundedError("NATIVE_IMAGE_FULL_STRUCTURAL_SCAN_REQUIRED")
     manifest = {
-        "kind": KIND,
-        "purpose": PURPOSE,
-        "version": "2.3",
-        "business_through": "2026-09-30",
+        "kind": profile.kind,
+        "purpose": profile.purpose,
+        "version": profile.version,
+        "business_through": profile.business_through,
         "business_timezone": "Asia/Shanghai",
         "materialization_sha256": file_sha(root / "MATERIALIZATION.json"),
         "scan_identity": receipt["identity"],
@@ -667,6 +718,7 @@ def seal_native_image(
         "independent_acceptance": "NOT_RUN_SEPARATE_RECEIPTS_REQUIRED",
         "consumer_admission": "NOT_GRANTED",
     }
+    manifest.update(dict(profile.manifest_fields))
     manifest["content_digest"] = digest(manifest)
     _write(root / "manifest.json", manifest)
     with (root / "READY").open("x", encoding="utf-8") as stream:

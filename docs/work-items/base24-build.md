@@ -45,6 +45,53 @@ pass is claimed. A prior interrupted check and two corrected cold-controller
 attempts remain evidence, not successful complete runs. Final native domain
 receipts explicitly retain their successful replay/negative checks.
 
+### 2026-10-16 bounded execution checkpoint
+
+This checkpoint supersedes the earlier implementation-state statements below; the
+product boundaries and acceptance gates remain unchanged. Continue from local
+commit `ca6930d8fddfe817fb78bf5d9cc545cc526891f1`. The worktree was clean after that
+commit. `make check PYTHON=.venv/bin/python` passed with 6,645 tests, 21 skips and
+66 warnings. The Base 2.4 focused suite passed 73 tests. These remain engineering
+checks, not real source or candidate acceptance.
+
+The default frequency contract is now versioned as
+`config/pipelines/base24-default-frequency.v1.json`: `1d` plus supplier-native
+`5m`; independent `1m` is `NOT_INCLUDED` and its retained sources are not deleted.
+The source feasibility census froze 21,606 missing windows over 5,051,993 required
+security-days after preserving 2,752,760 existing good security-days. The selected
+single-concurrency acquisition is resumable and fail-closed. Repeatedly invalid
+windows receive a hash-bound `HELD_AFTER_BOUNDED_FAILURES` receipt after three
+attempts, remain in the denominator, and never become acquired data. At the
+2026-10-16T08:20Z snapshot, 334 partitions were sealed and 6 were held; the
+supervisor and acquisition runner were live. Counts are execution snapshots, not
+coverage conclusions.
+
+The downstream chain is registered and live:
+
+1. acquisition root `base24-native5m-acquire-a60465f`;
+2. exact coverage ledger `base24-native5m-ledger-733a7cd`;
+3. source-grounded ODS projection `base24-native5m-projection-5338759`;
+4. whole-domain `dwd_security_bar` replacement `base24-native5m-dwd-bar-80366bb`;
+5. complete 33-table image `base24-complete-dwd-ca6930d`.
+
+The ledger distinguishes acquired R2, justified no-data and unresolved R3. The
+projection watcher refuses to run while R3 remains. The DWD adapter preserves
+actual acquisition time, listing/venue/calendar closure and exact source lineage,
+keeps `1d`, replaces supplemented `5m` security-days as a whole, and emits zero
+`1m` rows. The complete assembler binds all 32 unchanged tables to the exact
+Base 2.3.1 predecessor and replaces only `dwd_security_bar`; it uses the shared
+full-table/global-key/reference/lineage engine under a distinct Base 2.4 contract.
+Its watcher freezes a same-snapshot capacity receipt, performs a source-denied
+read-only full scan, and writes `READY` last. Two relocated cold scans and damage
+negatives remain a later acceptance stage and are not implied by the first seal.
+
+No Base 2.4 ODS or DWD candidate exists at this checkpoint. No production pointer,
+consumer admission, service, CURRENT, cloud archive or source file was changed.
+The data device had 66,120,671,232 free bytes at the snapshot after retiring only
+registered, recoverable Base 2.3.1 intermediate copies. The acquisition, coverage,
+projection, DWD and final-image outputs remain capacity-gated with an 8 GiB free
+floor.
+
 ## Product and immutable input boundary
 
 - Base business upper bound: 2026-09-30 inclusive, Asia/Shanghai. October events

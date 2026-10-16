@@ -67,6 +67,21 @@ def _bars(code):
     return tuple(rows)
 
 
+def _selection(plan, indices, *, shard_id="node-a"):
+    value = json.loads(plan)
+    return json.dumps(
+        {
+            "contract": "p10-base24-native5m-selection-v1",
+            "parent_plan_sha256": hashlib.sha256(plan).hexdigest(),
+            "shard_id": shard_id,
+            "partition_ids": [value["windows"][index]["partition_id"] for index in indices],
+            "maximum_data_sends": len(indices) + 2,
+            "maximum_control_calls": 10,
+        },
+        sort_keys=True,
+    ).encode()
+
+
 def test_complete_partitions_seal_and_resume_without_fetch(tmp_path):
     calls = []
 
@@ -90,6 +105,86 @@ def test_complete_partitions_seal_and_resume_without_fetch(tmp_path):
     assert second["completed"] == 2
     assert second["reused"] == 2
     assert len(list((tmp_path / "out/partitions").glob("*/READY"))) == 2
+
+
+def test_selection_executes_only_frozen_partition_ids_and_resumes(tmp_path):
+    calls = []
+
+    def fetch(staging, request):
+        calls.append(request.code)
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(request.code.encode())
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 9}
+
+    plan = _plan(4)
+    selection = _selection(plan, [1, 3])
+    output = tmp_path / "out"
+    first = run_acquisition(
+        plan,
+        output,
+        fetch,
+        source_roots=(),
+        selection_bytes=selection,
+    )
+    assert calls == ["sz.000002", "sz.000004"]
+    assert first["plan_total"] == 4
+    assert first["total"] == 2
+    assert first["selection_sha256"] == hashlib.sha256(selection).hexdigest()
+    assert first["maximum_data_sends"] == 4
+    assert first["maximum_control_calls"] == 10
+    assert (output / "SELECTION.json").read_bytes() == selection
+    assert len(list((output / "partitions").glob("*/READY"))) == 2
+
+    second = run_acquisition(
+        plan,
+        output,
+        lambda *_: pytest.fail("selected completed partitions must be reused"),
+        source_roots=(),
+        selection_bytes=selection,
+    )
+    assert second["reused"] == 2
+
+
+@pytest.mark.parametrize("defect", ["parent", "unknown", "order", "changed-selection"])
+def test_invalid_or_changed_selection_fails_before_fetch_or_output_mutation(tmp_path, defect):
+    plan = _plan(3)
+    raw = json.loads(_selection(plan, [0, 2]))
+    output = tmp_path / "out"
+    marker = output / "keep"
+    if defect == "parent":
+        raw["parent_plan_sha256"] = "0" * 64
+    elif defect == "unknown":
+        raw["partition_ids"][1] = "f" * 64
+    elif defect == "order":
+        raw["partition_ids"].reverse()
+    else:
+        original = _selection(plan, [0], shard_id="node-a")
+        run_acquisition(
+            plan,
+            output,
+            lambda staging, request: (
+                _bars(request.code),
+                {"actual_requests": 0, "actual_bytes": 0},
+            ),
+            source_roots=(),
+            selection_bytes=original,
+        )
+        marker.write_text("unchanged")
+        raw = json.loads(_selection(plan, [2], shard_id="node-b"))
+    changed = json.dumps(raw, sort_keys=True).encode()
+    before = marker.read_bytes() if marker.exists() else None
+    with pytest.raises(Native5mAcquireError, match="SELECTION"):
+        run_acquisition(
+            plan,
+            output,
+            lambda *_: pytest.fail("invalid selection must fail before fetch"),
+            source_roots=(),
+            selection_bytes=changed,
+        )
+    if before is None:
+        assert not output.exists()
+    else:
+        assert marker.read_bytes() == before
 
 
 def test_failure_retained_without_ready_and_other_partition_continues(tmp_path):

@@ -17,6 +17,7 @@ from quanthus.providers.native_5m_exact import ExactBar, NativeWindow, write_par
 
 CONTRACT = "p10-base24-native5m-acquisition-v1"
 PLAN_CONTRACT = "p10-base24-native5m-missing-window-plan-v1"
+SELECTION_CONTRACT = "p10-base24-native5m-selection-v1"
 BUCKETS = tuple(
     [f"09:{minute:02d}:00" for minute in range(35, 60, 5)]
     + [f"10:{minute:02d}:00" for minute in range(0, 60, 5)]
@@ -114,6 +115,82 @@ def _plan(raw: bytes) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     if total != value.get("missing_security_days"):
         raise Native5mAcquireError("PLAN_SECURITY_DAY_CENSUS_INVALID")
     return value, windows
+
+
+def _selection(
+    raw: bytes | None,
+    *,
+    plan_sha: str,
+    windows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], str | None]:
+    if raw is None:
+        return windows, None
+    try:
+        value = json.loads(raw)
+        partition_ids = value["partition_ids"]
+    except (ValueError, KeyError, TypeError) as exc:
+        raise Native5mAcquireError("SELECTION_UNREADABLE") from exc
+    if (
+        not isinstance(value, dict)
+        or set(value)
+        != {
+            "contract",
+            "parent_plan_sha256",
+            "shard_id",
+            "partition_ids",
+            "maximum_data_sends",
+            "maximum_control_calls",
+        }
+        or value.get("contract") != SELECTION_CONTRACT
+        or value.get("parent_plan_sha256") != plan_sha
+        or not isinstance(value.get("shard_id"), str)
+        or not value["shard_id"]
+        or len(value["shard_id"]) > 64
+        or any(
+            character not in "abcdefghijklmnopqrstuvwxyz0123456789._-"
+            for character in value["shard_id"]
+        )
+        or not isinstance(partition_ids, list)
+        or not partition_ids
+        or any(not isinstance(identity, str) for identity in partition_ids)
+        or len(partition_ids) != len(set(partition_ids))
+        or type(value.get("maximum_data_sends")) is not int
+        or value["maximum_data_sends"] < len(partition_ids)
+        or type(value.get("maximum_control_calls")) is not int
+        or value["maximum_control_calls"] < 2
+    ):
+        raise Native5mAcquireError("SELECTION_CONTRACT_INVALID")
+    window_by_id = {window["partition_id"]: window for window in windows}
+    try:
+        selected = [window_by_id[identity] for identity in partition_ids]
+    except KeyError as exc:
+        raise Native5mAcquireError("SELECTION_UNKNOWN_PARTITION") from exc
+    plan_order = {window["partition_id"]: index for index, window in enumerate(windows)}
+    if partition_ids != sorted(partition_ids, key=plan_order.__getitem__):
+        raise Native5mAcquireError("SELECTION_ORDER_INVALID")
+    return selected, hashlib.sha256(raw).hexdigest()
+
+
+def _bind_selection(output: Path, selection_bytes: bytes | None) -> None:
+    path = output / "SELECTION.json"
+    if output.exists():
+        if selection_bytes is None:
+            if path.exists():
+                raise Native5mAcquireError("SELECTION_CHANGED")
+            return
+        if path.exists():
+            try:
+                if path.is_symlink() or path.read_bytes() != selection_bytes:
+                    raise Native5mAcquireError("SELECTION_CHANGED")
+            except OSError as exc:
+                raise Native5mAcquireError("SELECTION_CHANGED") from exc
+            return
+        if any(output.iterdir()):
+            raise Native5mAcquireError("SELECTION_MISSING_FOR_EXISTING_OUTPUT")
+    if selection_bytes is not None:
+        output.mkdir(parents=True, exist_ok=True)
+        with path.open("xb") as stream:
+            stream.write(selection_bytes)
 
 
 def _validate_bars(bars: tuple[ExactBar, ...], window: dict[str, Any]) -> dict[str, Any]:
@@ -334,6 +411,7 @@ def run_acquisition(
     max_new_partitions: int | None = None,
     max_failures: int | None = None,
     max_attempts_per_partition: int | None = None,
+    selection_bytes: bytes | None = None,
 ) -> dict[str, Any]:
     """Execute/reuse independent partitions; failed staging never gains READY."""
     _validate_output(output, source_roots)
@@ -343,8 +421,14 @@ def run_acquisition(
         raise Native5mAcquireError("FAILURE_LIMIT_INVALID")
     if max_attempts_per_partition is not None and max_attempts_per_partition < 1:
         raise Native5mAcquireError("ATTEMPT_LIMIT_INVALID")
-    plan, windows = _plan(plan_bytes)
+    plan, all_windows = _plan(plan_bytes)
     plan_sha = hashlib.sha256(plan_bytes).hexdigest()
+    windows, selection_sha = _selection(
+        selection_bytes,
+        plan_sha=plan_sha,
+        windows=all_windows,
+    )
+    _bind_selection(output, selection_bytes)
     output.mkdir(parents=True, exist_ok=True)
     partitions = output / "partitions"
     failures = output / "failures"
@@ -355,6 +439,7 @@ def run_acquisition(
     state: dict[str, Any] = {
         "contract": CONTRACT,
         "plan_sha256": plan_sha,
+        "plan_total": len(all_windows),
         "started_at": datetime.now(timezone.utc).isoformat(),
         "total": len(windows),
         "completed": 0,
@@ -366,6 +451,14 @@ def run_acquisition(
         "failure_circuit": "consecutive",
         "source_roots_modified": False,
     }
+    if selection_sha is not None:
+        assert selection_bytes is not None
+        state["selection_sha256"] = selection_sha
+        state["shard_id"] = json.loads(selection_bytes)["shard_id"]
+        state["maximum_data_sends"] = json.loads(selection_bytes)["maximum_data_sends"]
+        state["maximum_control_calls"] = json.loads(selection_bytes)[
+            "maximum_control_calls"
+        ]
     consecutive_failures = 0
     for window in windows:
         identity = window["partition_id"]

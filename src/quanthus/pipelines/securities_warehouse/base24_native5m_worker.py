@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from quanthus.pipelines.securities_warehouse.base24_native5m_acquire import (
+    _bind_selection,
     _plan,
     _selection,
     run_acquisition,
@@ -156,6 +157,7 @@ def run_worker(args: argparse.Namespace) -> int:
         raise Native5mWorkerError("DATA_SEND_BUDGET_EXHAUSTED_BEFORE_LOGIN")
     if prior_control_calls + 2 > maximum_control_calls:
         raise Native5mWorkerError("CONTROL_CALL_BUDGET_EXHAUSTED_BEFORE_LOGIN")
+    _bind_selection(args.output, selection_bytes)
 
     import baostock as bs  # type: ignore[import-untyped]
     import baostock.common.context as context  # type: ignore[import-untyped]

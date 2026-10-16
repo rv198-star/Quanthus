@@ -96,6 +96,61 @@ def test_worker_rejects_unreadable_durable_send_ledger(tmp_path):
         _data_sends(tmp_path / "output")
 
 
+def test_worker_binds_selection_before_opening_supplier_session(tmp_path, monkeypatch):
+    plan = _plan()
+    selection = _selection(plan)
+    plan_path = tmp_path / "plan.json"
+    selection_path = tmp_path / "selection.json"
+    plan_path.write_bytes(plan)
+    selection_path.write_bytes(selection)
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    output = tmp_path / "output"
+    evidence = tmp_path / "evidence"
+    monkeypatch.setattr(
+        "quanthus.pipelines.securities_warehouse.base24_native5m_worker._git_head",
+        lambda _: "a" * 40,
+    )
+    monkeypatch.setattr(
+        "quanthus.pipelines.securities_warehouse.base24_native5m_worker._git_tracked_clean",
+        lambda _: True,
+    )
+    monkeypatch.setitem(__import__("sys").modules, "baostock", None)
+    args = __import__(
+        "quanthus.pipelines.securities_warehouse.base24_native5m_worker",
+        fromlist=["_parser"],
+    )._parser().parse_args(
+        [
+            "--plan",
+            str(plan_path),
+            "--selection",
+            str(selection_path),
+            "--output",
+            str(output),
+            "--evidence",
+            str(evidence),
+            "--worktree",
+            str(worktree),
+            "--expected-plan-sha256",
+            hashlib.sha256(plan).hexdigest(),
+            "--expected-selection-sha256",
+            hashlib.sha256(selection).hexdigest(),
+            "--expected-code-sha",
+            "a" * 40,
+            "--free-floor-bytes",
+            "1",
+            "--max-allocated-bytes",
+            "1000000",
+        ]
+    )
+    with pytest.raises(ModuleNotFoundError):
+        __import__(
+            "quanthus.pipelines.securities_warehouse.base24_native5m_worker",
+            fromlist=["run_worker"],
+        ).run_worker(args)
+    assert (output / "SELECTION.json").read_bytes() == selection
+
+
 def test_main_retries_partial_worker_until_complete(monkeypatch):
     results = iter((2, 2, 0))
     calls = []

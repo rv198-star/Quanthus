@@ -248,6 +248,50 @@ class MarketObservationQueryTests(unittest.TestCase):
         self.assertEqual(start_utc.minute, 30)
         self.assertEqual(end_utc.minute, 31)
 
+    def test_base24_native_5m_preserves_actual_acquisition_as_knowledge_time(self) -> None:
+        acquired = "2026-10-16T06:39:37.000000+00:00"
+        self._write_source("daily_ohlcv_unadjusted", [self._bar_row("2026-01-02")])
+        self._write_source(
+            "base24_native5m_exact",
+            [
+                self._minute_row(
+                    "2026-01-02 09:35:00",
+                    bar_size="5m",
+                    acquired_at=acquired,
+                )
+            ],
+        )
+        connection = self._connection()
+        try:
+            rows = (
+                connection.execute(
+                    _bar_query(self.registry, self.listing, [self.calendar], self.cutoff)
+                )
+                .to_arrow_table()
+                .to_pylist()
+            )
+        finally:
+            connection.close()
+        row = next(row for row in rows if row["interval_size"] == "5m")
+        self.assertEqual(row["knowledge_from"], datetime.fromisoformat(acquired))
+        self.assertNotEqual(row["knowledge_from"], datetime.fromisoformat(self.cutoff))
+        self.assertEqual(row["observation_start"].astimezone(timezone.utc).minute, 30)
+
+    def test_base24_native_5m_without_acquisition_time_fails_closed(self) -> None:
+        self._write_source("daily_ohlcv_unadjusted", [self._bar_row("2026-01-02")])
+        self._write_source(
+            "base24_native5m_exact",
+            [self._minute_row("2026-01-02 09:35:00", bar_size="5m")],
+        )
+        connection = self._connection()
+        try:
+            with self.assertRaisesRegex(duckdb.Error, "BASE24_NATIVE5M_ACQUIRED_AT_MISSING"):
+                connection.execute(
+                    _bar_query(self.registry, self.listing, [self.calendar], self.cutoff)
+                ).fetchall()
+        finally:
+            connection.close()
+
     def test_historical_code_alias_overlay_prefers_direct_code_and_fills_absence(
         self,
     ) -> None:

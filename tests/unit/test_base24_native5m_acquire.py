@@ -107,6 +107,51 @@ def test_failure_retained_without_ready_and_other_partition_continues(tmp_path):
     assert len(list((tmp_path / "out/partitions").glob("*/READY"))) == 1
 
 
+def test_failure_circuit_counts_only_consecutive_supplier_failures(tmp_path):
+    calls = []
+
+    def fetch(staging, request):
+        calls.append(request.code)
+        if request.code.endswith(("000001", "000003")):
+            raise RuntimeError("bounded failure")
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(b"ok")
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 2}
+
+    result = run_acquisition(
+        _plan(3),
+        tmp_path / "out",
+        fetch,
+        source_roots=(),
+        max_failures=2,
+    )
+    assert calls == ["sz.000001", "sz.000002", "sz.000003"]
+    assert result["failed"] == 2
+    assert result["completed"] == 1
+    assert result["failure_circuit"] == "consecutive"
+    assert result.get("stop_reason") is None
+
+
+def test_consecutive_supplier_failures_open_circuit(tmp_path):
+    calls = []
+
+    def fetch(*args):
+        calls.append(args[1].code)
+        raise RuntimeError("bounded failure")
+
+    result = run_acquisition(
+        _plan(3),
+        tmp_path / "out",
+        fetch,
+        source_roots=(),
+        max_failures=2,
+    )
+    assert calls == ["sz.000001", "sz.000002"]
+    assert result["failed"] == 2
+    assert result["stop_reason"] == "FAILURE_LIMIT"
+    assert result["consecutive_failures_at_stop"] == 2
+
+
 @pytest.mark.parametrize("defect,reason", [("partial", "BUCKET"), ("plan", "PARTITION")])
 def test_partial_day_or_changed_plan_fails_closed(tmp_path, defect, reason):
     plan = json.loads(_plan(1))

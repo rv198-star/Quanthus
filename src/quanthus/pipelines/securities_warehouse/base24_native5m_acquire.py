@@ -363,8 +363,10 @@ def run_acquisition(
         "held": 0,
         "actual_requests": 0,
         "actual_bytes": 0,
+        "failure_circuit": "consecutive",
         "source_roots_modified": False,
     }
+    consecutive_failures = 0
     for window in windows:
         identity = window["partition_id"]
         sealed = partitions / identity
@@ -435,11 +437,13 @@ def run_acquisition(
                 encoding="ascii",
             )
             os.rename(staging, sealed)
+            consecutive_failures = 0
             state["completed"] += 1
             state["actual_requests"] += int(metrics.get("actual_requests", 0))
             state["actual_bytes"] += int(metrics.get("actual_bytes", 0))
         except BaseException as exc:
             state["failed"] += 1
+            consecutive_failures += 1
             failure = {
                 "contract": CONTRACT,
                 "partition_id": identity,
@@ -466,8 +470,14 @@ def run_acquisition(
                 )
                 state["held"] += 1
                 became_held = True
-            if not became_held and max_failures is not None and state["failed"] >= max_failures:
+                consecutive_failures = 0
+            if (
+                not became_held
+                and max_failures is not None
+                and consecutive_failures >= max_failures
+            ):
                 state["stop_reason"] = "FAILURE_LIMIT"
+                state["consecutive_failures_at_stop"] = consecutive_failures
                 break
     state["finished_at"] = datetime.now(timezone.utc).isoformat()
     terminal = state["completed"] + state["held"] == state["total"]

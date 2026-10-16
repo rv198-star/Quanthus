@@ -8,6 +8,7 @@ import os
 import shutil
 from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
+from decimal import InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -149,23 +150,72 @@ def _verify_sealed(root: Path, window: dict[str, Any], plan_sha: str) -> dict[st
         raise Native5mAcquireError("SEALED_PARTITION_CHANGED")
     receipt: dict[str, Any] = loaded
     files = receipt.get("files", {})
-    if (
-        receipt.get("contract") != CONTRACT
-        or receipt.get("partition_id") != window["partition_id"]
-        or receipt.get("plan_sha256") != plan_sha
-        or ready != hashlib.sha256((root / "RECEIPT.json").read_bytes()).hexdigest()
-        or any(_sha(root / path) != digest for path, digest in files.items())
-    ):
-        raise Native5mAcquireError("SEALED_PARTITION_CHANGED")
+    try:
+        actual_files = {
+            path.relative_to(root).as_posix()
+            for path in root.rglob("*")
+            if path.is_file() and path.name not in {"RECEIPT.json", "READY"}
+        }
+        if (
+            not isinstance(files, dict)
+            or set(files) != actual_files
+            or receipt.get("contract") != CONTRACT
+            or receipt.get("partition_id") != window["partition_id"]
+            or receipt.get("plan_sha256") != plan_sha
+            or ready != hashlib.sha256((root / "RECEIPT.json").read_bytes()).hexdigest()
+            or any(_sha(root / path) != digest for path, digest in files.items())
+        ):
+            raise Native5mAcquireError("SEALED_PARTITION_CHANGED")
+        table = pq.read_table(root / "exact.parquet")
+        expected_columns = (
+            "code",
+            "timestamp",
+            "source_values",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "amount",
+        )
+        if (
+            tuple(table.column_names) != expected_columns
+            or (table.schema.metadata or {}).get(b"contract") != b"p10-native-5m-exact-v1"
+        ):
+            raise Native5mAcquireError("SEALED_PARTITION_CHANGED")
+        bars = []
+        previous = None
+        for row in table.to_pylist():
+            lexical = row["source_values"]
+            if (
+                row["code"] != window["code"]
+                or not isinstance(lexical, list)
+                or len(lexical) != 6
+                or any(not isinstance(value, str) for value in lexical)
+                or previous is not None
+                and row["timestamp"] <= previous
+            ):
+                raise Native5mAcquireError("SEALED_PARTITION_CHANGED")
+            bar = ExactBar(row["code"], row["timestamp"], tuple(lexical))
+            values = bar.values
+            if any(not value.is_finite() for value in values) or any(
+                row[name] != values[index] for index, name in enumerate(expected_columns[3:])
+            ):
+                raise Native5mAcquireError("SEALED_PARTITION_CHANGED")
+            bars.append(bar)
+            previous = row["timestamp"]
+        census = _validate_bars(tuple(bars), window)
+        if (
+            receipt.get("rows") != len(bars)
+            or receipt.get("source_census") != census
+            or len(bars) > window["maximum_rows"]
+        ):
+            raise Native5mAcquireError("SEALED_PARTITION_CHANGED")
+    except (OSError, KeyError, TypeError, ValueError, InvalidOperation) as exc:
+        if isinstance(exc, Native5mAcquireError):
+            raise
+        raise Native5mAcquireError("SEALED_PARTITION_CHANGED") from exc
     return receipt
-    table = pq.read_table(root / "exact.parquet", columns=["code", "timestamp", "source_values"])
-    rows = table.to_pylist()
-    if (
-        len(rows) > window["maximum_rows"]
-        or len(rows) % 48
-        or any(row["code"] != window["code"] for row in rows)
-    ):
-        raise Native5mAcquireError("SEALED_PARTITION_CHANGED")
 
 
 Fetch = Callable[[Path, NativeWindow], tuple[tuple[ExactBar, ...], dict[str, Any]]]

@@ -1,9 +1,12 @@
 """Checkpointed Base 2.4 acquisition seals only complete exact partitions."""
 
+import hashlib
 import json
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from quanthus.pipelines.securities_warehouse.base24_native5m_acquire import (
@@ -155,6 +158,34 @@ def test_corrupt_sealed_partition_blocks_resume(tmp_path):
         stream.write(b"corrupt")
     with pytest.raises(Native5mAcquireError, match="SEALED_PARTITION_CHANGED"):
         run_acquisition(plan, tmp_path / "out", fetch, source_roots=())
+
+
+def test_consistently_resealed_semantic_change_blocks_resume(tmp_path):
+    def fetch(staging, request):
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(b"ok")
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 2}
+
+    plan = _plan(1)
+    output = tmp_path / "out"
+    run_acquisition(plan, output, fetch, source_roots=())
+    partition = next((output / "partitions").iterdir())
+    parquet = partition / "exact.parquet"
+    table = pq.read_table(parquet)
+    changed = table.set_column(
+        table.schema.get_field_index("code"),
+        "code",
+        pa.array(["sz.999999"] * table.num_rows),
+    )
+    pq.write_table(changed, parquet, compression="zstd")
+    receipt_path = partition / "RECEIPT.json"
+    receipt = json.loads(receipt_path.read_text())
+    receipt["files"]["exact.parquet"] = hashlib.sha256(parquet.read_bytes()).hexdigest()
+    receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
+    (partition / "READY").write_text(hashlib.sha256(receipt_path.read_bytes()).hexdigest() + "\n")
+
+    with pytest.raises(Native5mAcquireError, match="SEALED_PARTITION_CHANGED"):
+        run_acquisition(plan, output, fetch, source_roots=())
 
 
 def test_bounded_pilot_reuses_same_full_plan_checkpoint(tmp_path):

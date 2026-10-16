@@ -92,6 +92,17 @@ registered, recoverable Base 2.3.1 intermediate copies. The acquisition, coverag
 projection, DWD and final-image outputs remain capacity-gated with an 8 GiB free
 floor.
 
+The ODS pair is now an explicit successor rather than a renamed predecessor.
+`config/pipelines/base24-ods.v1.json` and
+`securities_warehouse/base24_ods_image.py` define ODS Base 2.4 as the exact ODS
+2.3 non-1m selection plus the terminal supplier-native 5m acquisition closure:
+original wire bytes, exact Decimal projection, receipts, bounded failures/holds,
+the frozen denominator and a PASS/R3=0 coverage ledger. ODS 2.3 remains an input;
+it is not the ODS corresponding to Base 2.4. The new offline auditor never opens
+archival source paths, rejects missing/corrupt/extra bytes and writes READY last.
+This is implemented engineering state; the real acquisition has not yet reached
+its terminal gate, so no real ODS Base 2.4 candidate or admission is claimed.
+
 ## Product and immutable input boundary
 
 - Base business upper bound: 2026-09-30 inclusive, Asia/Shanghai. October events

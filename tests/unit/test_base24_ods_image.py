@@ -1,0 +1,291 @@
+"""Synthetic ODS Base 2.4 source closure and cold-copy acceptance."""
+
+import hashlib
+import json
+import shutil
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import pytest
+
+from quanthus.pipelines.securities_warehouse.base22 import canonical, digest, file_sha
+from quanthus.pipelines.securities_warehouse.base24_native5m_acquire import (
+    BUCKETS,
+    run_acquisition,
+)
+from quanthus.pipelines.securities_warehouse.base24_ods_image import (
+    Base24OdsError,
+    audit_ods24,
+    freeze_ods24_plan,
+    materialize_ods24,
+    seal_ods24,
+)
+from quanthus.pipelines.securities_warehouse.base24_scope import select_default_members
+from quanthus.providers.native_5m_exact import ExactBar
+
+POLICY = Path("config/pipelines/base24-default-frequency.v1.json").read_bytes()
+ODS24_CONTRACT = Path("config/pipelines/base24-ods.v1.json")
+SHANGHAI = ZoneInfo("Asia/Shanghai")
+
+
+class Budget:
+    def check(self, **kwargs):
+        pass
+
+    def begin_stage(self, name):
+        pass
+
+
+def _write_json(path: Path, value: object) -> None:
+    path.write_bytes(canonical(value) + b"\n")
+
+
+def _make_predecessor(tmp_path: Path) -> tuple[Path, Path]:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    root = tmp_path / "ods23"
+    root.mkdir()
+    five = root / "payload/five.parquet"
+    one = root / "payload/one.parquet"
+    five.parent.mkdir()
+    five.write_bytes(b"retained-five")
+    one.write_bytes(b"optional-one")
+
+    def record(path: str, dataset: str) -> dict[str, object]:
+        member = root / path
+        return {
+            "path": path,
+            "sha256": file_sha(member),
+            "size_bytes": member.stat().st_size,
+            "dataset_id": dataset,
+            "role": "historical_seed",
+            "source_id": "placeholder",
+            "format": "raw",
+        }
+
+    seed_files = [
+        record("payload/five.parquet", "minute_5m_formal_archive"),
+        record("payload/one.parquet", "minute_1m_research_archive"),
+    ]
+    for row in seed_files:
+        row.pop("source_id")
+    seed = {"content": {"files": seed_files}}
+    seed_bytes = canonical(seed)
+    seed_sha = hashlib.sha256(seed_bytes).hexdigest()
+    monthly_files = []
+    for row in seed_files:
+        monthly_files.append({**row, "source_id": seed_sha})
+    content = {
+        "through_date": "2026-09-30",
+        "files": monthly_files,
+        "source_inventory": [
+            {"role": "historical_seed", "manifest_sha256": "sha256:" + seed_sha}
+        ],
+    }
+    manifest = {
+        "schema_version": 1,
+        "kind": "quanthus_ods_base_bundle",
+        "bundle_id": "synthetic-ods23",
+        "content": content,
+        "content_digest": digest(content),
+    }
+    _write_json(root / "manifest.json", manifest)
+    (root / "READY").write_text(file_sha(root / "manifest.json") + "\n")
+    selected = select_default_members((root / "manifest.json").read_bytes(), seed_bytes, POLICY)
+    wrapper = {
+        "contract": "p10-base24-ods23-default-member-selection-v1",
+        "identity": digest(selected),
+        "selection": selected,
+        "source_manifest_sha256": file_sha(root / "manifest.json"),
+        "source_modified": False,
+    }
+    selection_path = tmp_path / "selection/selection.json"
+    selection_path.parent.mkdir()
+    _write_json(selection_path, wrapper)
+    return root, selection_path
+
+
+def _make_acquisition(tmp_path: Path) -> tuple[Path, Path]:
+    plan_path = tmp_path / "denominator/missing-window-plan.json"
+    plan_path.parent.mkdir()
+    identity = hashlib.sha256(b"SSE\t600000\t2026-09-30\t2026-09-30").hexdigest()
+    plan = {
+        "contract": "p10-base24-native5m-missing-window-plan-v1",
+        "frequency": "5",
+        "adjustflag": "3",
+        "business_through": "2026-09-30",
+        "missing_security_days": 1,
+        "windows": [
+            {
+                "partition_id": identity,
+                "venue": "SSE",
+                "code": "sh.600000",
+                "start_date": "2026-09-30",
+                "end_date": "2026-09-30",
+                "required_security_days": 1,
+                "expected_source_days": 1,
+                "required_dates": ["2026-09-30"],
+                "expected_session_dates": ["2026-09-30"],
+                "maximum_rows": 48,
+            }
+        ],
+    }
+    _write_json(plan_path, plan)
+    root = tmp_path / "acquisition"
+
+    def fetch(staging, request):
+        wire = staging / "wire"
+        wire.mkdir()
+        (wire / "response-0001.wire").write_bytes(b"original-supplier-wire")
+        (wire / "wire-receipt.json").write_text('{"records":[]}\n')
+        bars = tuple(
+            ExactBar(
+                request.code,
+                datetime.fromisoformat(f"2026-09-30T{bucket}+08:00"),
+                ("1.00000000001", "2", "0", "1.5", "0", "0"),
+            )
+            for bucket in BUCKETS
+        )
+        return bars, {
+            "actual_requests": 1,
+            "actual_bytes": 22,
+            "elapsed_seconds": 0.1,
+            "actually_observed_at": "2026-10-16T08:00:00+00:00",
+            "provider_original_acquisition": None,
+            "frequency": "5",
+            "adjustflag": "3",
+        }
+
+    result = run_acquisition(
+        plan_path.read_bytes(), root, fetch, source_roots=(tmp_path / "unrelated-source",)
+    )
+    assert result["status"] == "COMPLETE"
+    return root, plan_path
+
+
+def _make_ledger(tmp_path: Path, acquisition: Path) -> Path:
+    root = tmp_path / "ledger"
+    root.mkdir()
+    result = {"status": "PASS", "R3_security_days": 0, "source_prices_exported": False}
+    _write_json(root / "result.safe.json", result)
+    manifest = {
+        "contract": "p10-base24-native5m-coverage-ledger-package-v1",
+        "status": "PASS",
+        "inputs": {
+            "acquisition_READY_SHA256": file_sha(acquisition / "READY").removeprefix("sha256:")
+        },
+        "files": [
+            {
+                "path": "result.safe.json",
+                "size_bytes": (root / "result.safe.json").stat().st_size,
+                "sha256": file_sha(root / "result.safe.json").removeprefix("sha256:"),
+            }
+        ],
+    }
+    _write_json(root / "manifest.json", manifest)
+    (root / "READY").write_text(file_sha(root / "manifest.json").removeprefix("sha256:") + "\n")
+    return root
+
+
+@pytest.fixture
+def source_closure(tmp_path):
+    predecessor, selection = _make_predecessor(tmp_path)
+    acquisition, window_plan = _make_acquisition(tmp_path)
+    ledger = _make_ledger(tmp_path, acquisition)
+    return predecessor, selection, acquisition, window_plan, ledger
+
+
+def _freeze(source_closure):
+    predecessor, selection, acquisition, window_plan, ledger = source_closure
+    return freeze_ods24_plan(
+        predecessor_root=predecessor,
+        selection_path=selection,
+        acquisition_root=acquisition,
+        window_plan_path=window_plan,
+        ledger_root=ledger,
+        contract_path=ODS24_CONTRACT,
+    )
+
+
+def test_ods24_keeps_wire_and_excludes_optional_1m(source_closure, tmp_path):
+    plan = _freeze(source_closure)
+    paths = {row["path"] for row in plan["files"]}
+    assert "payload/five.parquet" in paths
+    assert "payload/one.parquet" not in paths
+    assert any(path.endswith("wire/response-0001.wire") for path in paths)
+    assert plan["default_frequencies"] == ["1d", "5m"]
+    assert plan["optional_1m"] == "NOT_INCLUDED"
+
+    output = tmp_path / "output/ods24"
+    output.parent.mkdir()
+    receipt = materialize_ods24(plan, output, Budget())
+    manifest = seal_ods24(output, receipt, code_revision="a" * 40, budget=Budget())
+    assert manifest["kind"] == "quanthus_ods_base24_bundle"
+    assert (output / "READY").read_text().strip() == file_sha(output / "manifest.json")
+    assert audit_ods24(output, Budget())["status"] == "PASS"
+
+
+def test_cold_audit_does_not_reopen_source_roots(source_closure, tmp_path):
+    plan = _freeze(source_closure)
+    output = tmp_path / "output/ods24"
+    output.parent.mkdir()
+    receipt = materialize_ods24(plan, output, Budget())
+    seal_ods24(output, receipt, code_revision="b" * 40, budget=Budget())
+    for source in source_closure:
+        if source.is_dir():
+            shutil.move(source, source.with_name(source.name + ".removed"))
+        elif source.exists():
+            source.rename(source.with_name(source.name + ".removed"))
+    assert audit_ods24(output, Budget())["source_roots_dereferenced"] is False
+
+
+@pytest.mark.parametrize("damage", ["missing", "corrupt"])
+def test_cold_audit_fails_closed_on_member_damage(source_closure, tmp_path, damage):
+    plan = _freeze(source_closure)
+    output = tmp_path / "output/ods24"
+    output.parent.mkdir()
+    receipt = materialize_ods24(plan, output, Budget())
+    seal_ods24(output, receipt, code_revision="c" * 40, budget=Budget())
+    member = output / "payload/five.parquet"
+    if damage == "missing":
+        member.unlink()
+        reason = "PHYSICAL_FILE_SET"
+    else:
+        member.write_bytes(b"changed")
+        reason = "PHYSICAL_BYTES"
+    with pytest.raises(Base24OdsError, match=reason):
+        audit_ods24(output, Budget())
+
+
+def test_changed_selection_and_symlink_output_fail_before_ready(source_closure, tmp_path):
+    predecessor, selection, acquisition, window_plan, ledger = source_closure
+    changed = json.loads(selection.read_bytes())
+    changed["selection"]["included"][0]["size_bytes"] += 1
+    _write_json(selection, changed)
+    with pytest.raises(Base24OdsError, match="SELECTION_MEMBER_SET"):
+        freeze_ods24_plan(
+            predecessor_root=predecessor,
+            selection_path=selection,
+            acquisition_root=acquisition,
+                window_plan_path=window_plan,
+                ledger_root=ledger,
+                contract_path=ODS24_CONTRACT,
+        )
+
+    # Restore a valid closure, then prove output indirection is rejected before a write.
+    predecessor, selection = _make_predecessor(tmp_path / "fresh")
+    plan = freeze_ods24_plan(
+        predecessor_root=predecessor,
+        selection_path=selection,
+        acquisition_root=acquisition,
+        window_plan_path=window_plan,
+        ledger_root=ledger,
+        contract_path=ODS24_CONTRACT,
+    )
+    real = tmp_path / "real-output"
+    real.mkdir()
+    link = tmp_path / "linked-output"
+    link.symlink_to(real, target_is_directory=True)
+    with pytest.raises(Exception, match="SYMLINK"):
+        materialize_ods24(plan, link, Budget())
+    assert not (real / "READY").exists()

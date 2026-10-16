@@ -1,0 +1,33 @@
+{
+  "contract_id": "p10-base24-ods-1d-native5m-v1",
+  "schema_version": 1,
+  "kind": "quanthus_ods_base24_bundle",
+  "purpose": "BASE24_SOURCE_GROUNDED_1D_NATIVE5M_RECONSTRUCTION",
+  "business_through": "2026-09-30",
+  "business_timezone": "Asia/Shanghai",
+  "default_frequencies": ["1d", "5m"],
+  "optional_1m": "NOT_INCLUDED",
+  "predecessor_kind": "quanthus_ods_base_bundle",
+  "predecessor_version": "2.3",
+  "predecessor_is_final_base24_ods": false,
+  "native5m_acquisition_contract": "p10-base24-native5m-acquisition-v1",
+  "coverage_ledger_contract": "p10-base24-native5m-coverage-ledger-package-v1",
+  "required_native5m_evidence": [
+    "original_wire_bytes",
+    "wire_receipts",
+    "exact_decimal_projection",
+    "partition_receipts",
+    "bounded_failure_and_hold_receipts",
+    "frozen_missing_window_denominator",
+    "R3_zero_coverage_ledger"
+  ],
+  "physical_rules": {
+    "independent_regular_files": true,
+    "symlinks": "FORBIDDEN",
+    "cross_root_hardlinks": "FORBIDDEN",
+    "source_runtime_dependency": "FORBIDDEN",
+    "READY": "LAST_WRITE_AFTER_OFFLINE_AUDIT"
+  },
+  "consumer_admission": "NOT_GRANTED",
+  "production_execution_authorized": false
+}

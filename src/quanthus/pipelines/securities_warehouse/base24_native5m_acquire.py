@@ -138,13 +138,16 @@ def _validate_bars(bars: tuple[ExactBar, ...], window: dict[str, Any]) -> dict[s
     }
 
 
-def _verify_sealed(root: Path, window: dict[str, Any], plan_sha: str) -> None:
+def _verify_sealed(root: Path, window: dict[str, Any], plan_sha: str) -> dict[str, Any]:
     pq = __import__("pyarrow.parquet", fromlist=["read_table"])
     try:
-        receipt = json.loads((root / "RECEIPT.json").read_text(encoding="utf-8"))
+        loaded = json.loads((root / "RECEIPT.json").read_text(encoding="utf-8"))
         ready = (root / "READY").read_text(encoding="ascii").strip()
     except (OSError, ValueError, TypeError) as exc:
         raise Native5mAcquireError("SEALED_PARTITION_CHANGED") from exc
+    if not isinstance(loaded, dict):
+        raise Native5mAcquireError("SEALED_PARTITION_CHANGED")
+    receipt: dict[str, Any] = loaded
     files = receipt.get("files", {})
     if (
         receipt.get("contract") != CONTRACT
@@ -154,6 +157,7 @@ def _verify_sealed(root: Path, window: dict[str, Any], plan_sha: str) -> None:
         or any(_sha(root / path) != digest for path, digest in files.items())
     ):
         raise Native5mAcquireError("SEALED_PARTITION_CHANGED")
+    return receipt
     table = pq.read_table(root / "exact.parquet", columns=["code", "timestamp", "source_values"])
     rows = table.to_pylist()
     if (
@@ -168,10 +172,20 @@ Fetch = Callable[[Path, NativeWindow], tuple[tuple[ExactBar, ...], dict[str, Any
 
 
 def run_acquisition(
-    plan_bytes: bytes, output: Path, fetch: Fetch, *, source_roots: Sequence[Path]
+    plan_bytes: bytes,
+    output: Path,
+    fetch: Fetch,
+    *,
+    source_roots: Sequence[Path],
+    max_new_partitions: int | None = None,
+    max_failures: int | None = None,
 ) -> dict[str, Any]:
     """Execute/reuse independent partitions; failed staging never gains READY."""
     _validate_output(output, source_roots)
+    if max_new_partitions is not None and max_new_partitions < 1:
+        raise Native5mAcquireError("NEW_PARTITION_LIMIT_INVALID")
+    if max_failures is not None and max_failures < 1:
+        raise Native5mAcquireError("FAILURE_LIMIT_INVALID")
     plan, windows = _plan(plan_bytes)
     plan_sha = hashlib.sha256(plan_bytes).hexdigest()
     output.mkdir(parents=True, exist_ok=True)
@@ -196,10 +210,18 @@ def run_acquisition(
         identity = window["partition_id"]
         sealed = partitions / identity
         if sealed.exists():
-            _verify_sealed(sealed, window, plan_sha)
+            receipt = _verify_sealed(sealed, window, plan_sha)
             state["completed"] += 1
             state["reused"] += 1
+            state["actual_requests"] += int(receipt["metrics"].get("actual_requests", 0))
+            state["actual_bytes"] += int(receipt["metrics"].get("actual_bytes", 0))
             continue
+        if (
+            max_new_partitions is not None
+            and state["completed"] - state["reused"] >= max_new_partitions
+        ):
+            state["stop_reason"] = "NEW_PARTITION_LIMIT"
+            break
         staging = staging_root / identity
         if staging.exists():
             suffix = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -252,6 +274,9 @@ def run_acquisition(
             _write(staging / "FAILURE.json", failure)
             suffix = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
             os.rename(staging, failures / f"{identity}-{suffix}")
+            if max_failures is not None and state["failed"] >= max_failures:
+                state["stop_reason"] = "FAILURE_LIMIT"
+                break
     state["finished_at"] = datetime.now(timezone.utc).isoformat()
     state["status"] = "COMPLETE" if state["completed"] == state["total"] else "PARTIAL"
     checkpoint = output / "CHECKPOINT.json"

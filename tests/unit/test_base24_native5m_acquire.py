@@ -155,3 +155,23 @@ def test_corrupt_sealed_partition_blocks_resume(tmp_path):
         stream.write(b"corrupt")
     with pytest.raises(Native5mAcquireError, match="SEALED_PARTITION_CHANGED"):
         run_acquisition(plan, tmp_path / "out", fetch, source_roots=())
+
+
+def test_bounded_pilot_reuses_same_full_plan_checkpoint(tmp_path):
+    calls = []
+
+    def fetch(staging, request):
+        calls.append(request.code)
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(b"ok")
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 2}
+
+    plan = _plan(2)
+    pilot = run_acquisition(plan, tmp_path / "out", fetch, source_roots=(), max_new_partitions=1)
+    assert pilot["status"] == "PARTIAL"
+    assert pilot["stop_reason"] == "NEW_PARTITION_LIMIT"
+    assert pilot["completed"] == pilot["actual_requests"] == 1
+    final = run_acquisition(plan, tmp_path / "out", fetch, source_roots=())
+    assert final["status"] == "COMPLETE"
+    assert final["reused"] == 1
+    assert final["actual_requests"] == 2

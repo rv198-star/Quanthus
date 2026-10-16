@@ -336,3 +336,141 @@ def test_captured_query_consumes_fresh_original_frame(tmp_path):
             wire,
         )
     assert len(bars) == 1 and bars[0].lexical_values == tuple(row()[3:])
+
+
+# Bounded-window regressions are separate from the retained exact-day contract.
+def window_wire(rows, *, page=1, page_size=2, start="2020-01-02", end="2020-01-03", **changes):
+    parts = [
+        "0",
+        "success",
+        "query_history_k_data_plus",
+        "anonymous",
+        str(page),
+        str(page_size),
+        json.dumps({"record": rows}),
+        "sz.000001",
+        ",".join(FIELDS),
+        start,
+        end,
+        "5",
+        "3",
+    ]
+    for index, value in changes.items():
+        parts[int(index)] = value
+    compressed = zlib.compress("\x01".join(parts).encode())
+    return (
+        f"00.9.10\x0196\x01{len(compressed):010d}".encode()
+        + compressed
+        + b"\x01123456789\n"
+        + TRAILER
+    )
+
+
+def later_row(day="2020-01-03"):
+    result = row()
+    result[0] = day
+    result[1] = day.replace("-", "") + "093500123"
+    return result
+
+
+def window_client(context, responses):
+    calls = []
+
+    def query(*args):
+        calls.append(args)
+        context.default_socket.send(b"synthetic request")
+        context.default_socket.recv(100000)
+        return SimpleNamespace(adjustflag="")  # Never trust the SDK's damaged echo.
+
+    return query, calls
+
+
+def test_window_full_page_requires_terminal_continuation_and_preserves_exact_values(tmp_path):
+    from quanthus.providers.native_5m_exact import NativeWindow, fetch_captured_window
+
+    raw = [window_wire([row(), later_row()]), window_wire([], page=2)]
+    context = SimpleNamespace(default_socket=Socket(raw))
+    query, calls = window_client(context, raw)
+    with captured_socket(context, tmp_path, max_requests=2, max_bytes=10000, seconds=10) as capture:
+        bars = fetch_captured_window(
+            query,
+            NativeWindow("sz.000001", "2020-01-02", "2020-01-03"),
+            capture,
+            page_size=2,
+            max_pages=2,
+            max_rows=2,
+        )
+    assert len(bars) == 2
+    assert bars[0].lexical_values == tuple(row()[3:])
+    assert [c[:2] for c in calls] == [(1, 2), (2, 2)]
+    assert all(c[4:6] == ("2020-01-02", "2020-01-03") for c in calls)
+    assert all(c[6:] == ("5", "3") for c in calls)
+
+
+@pytest.mark.parametrize(
+    "second,reason",
+    [
+        (window_wire([later_row()], page=1), "WIRE_PAGE"),
+        (window_wire([row()], page=2), "DUPLICATE_OR_UNSORTED"),
+        (window_wire([None], page=2), "WIRE_RECORD_SCHEMA"),
+        (window_wire([later_row("2020-01-06")], page=2), "ROW_DATE_CODE_SCHEMA"),
+        (window_wire([], page=2, page_size=3), "WIRE_PAGE"),
+        (window_wire([], page=2, **{"12": "2"}), "RESPONSE_CONTRACT"),
+        (window_wire([], page=2, **{"0": "error"}), "PROVIDER_ERROR"),
+    ],
+)
+def test_window_bad_continuation_never_returns_partial_success(tmp_path, second, reason):
+    from quanthus.providers.native_5m_exact import NativeWindow, fetch_captured_window
+
+    first = window_wire([row(), later_row()])
+    context = SimpleNamespace(default_socket=Socket([first, second]))
+    query, _ = window_client(context, [])
+    with (
+        captured_socket(context, tmp_path, max_requests=2, max_bytes=10000, seconds=10) as capture,
+        pytest.raises(Native5mError, match=reason),
+    ):
+        fetch_captured_window(
+            query,
+            NativeWindow("sz.000001", "2020-01-02", "2020-01-03"),
+            capture,
+            page_size=2,
+            max_pages=2,
+            max_rows=10,
+        )
+
+
+@pytest.mark.parametrize(
+    "limits,reason,expected_calls",
+    [
+        ({"max_pages": 1}, "WINDOW_PAGE_LIMIT", 1),
+        ({"max_rows": 1}, "ROW_LIMIT", 1),
+        ({"max_pages": 0}, "INVALID_PARSE_LIMIT", 0),
+    ],
+)
+def test_window_stops_before_extra_request_on_exhausted_budget(
+    tmp_path, limits, reason, expected_calls
+):
+    from quanthus.providers.native_5m_exact import NativeWindow, fetch_captured_window
+
+    context = SimpleNamespace(default_socket=Socket([window_wire([row(), later_row()])]))
+    query, calls = window_client(context, [])
+    with (
+        captured_socket(context, tmp_path, max_requests=2, max_bytes=10000, seconds=10) as capture,
+        pytest.raises(Native5mError, match=reason),
+    ):
+        fetch_captured_window(
+            query,
+            NativeWindow("sz.000001", "2020-01-02", "2020-01-03"),
+            capture,
+            page_size=2,
+            **limits,
+        )
+    assert len(calls) == expected_calls
+
+
+@pytest.mark.parametrize("start,end", [("2020-01-03", "2020-01-02"), ("2020-01-01", "2021-01-01")])
+def test_window_invalid_or_unbounded_date_range_rejected(start, end):
+    from quanthus.providers.native_5m_exact import NativeWindow
+
+    with pytest.raises(Native5mError, match="WINDOW"):
+        NativeWindow("sz.000001", start, end)

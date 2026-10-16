@@ -295,3 +295,40 @@ gates. BSE is counted as outside this explicit minute product boundary, not remo
 from other retained domains. Tests: `tests/unit/test_base24_coverage.py` cover retired
 and new listings, unknown dates, venue/calendar conflicts, missing closed dates
 and unbound sources. A structurally complete input is not a full-coverage grant.
+
+
+## Base 2.4 default frequency projection and bounded window transport
+
+Work items: `P10-DATA-BASE24-010` / #529 and `P10-DATA-BASE24-030` / #531.
+Design status: approved engineering scope under the Owner's explicit 1m separation;
+delivery gate: blocked for complete source, image and reader qualification.
+
+`config/pipelines/base24-default-frequency.v1.json` and
+`securities_warehouse/base24_scope.py` freeze a new opt-in `1d` + supplier-native
+`5m` source projection. Original seed dataset identities select optional 1m
+archives, hotfixes, bars and coverage metadata for `NOT_INCLUDED`; known incremental
+1m bars/meta/coverage have the same disposition. Shared trading calendars,
+after-hours fixed-price observations, acquisition evidence and original manifests
+remain selected. Unknown 1m-lane artifacts fail classification. Selection binds
+original manifest bytes and exact member hashes/sizes, and never modifies or deletes
+the sealed source. Excluded logical bytes describe prospective new-image savings,
+not current free space. The legacy Daily builder and July policies continue to
+require their original inputs; they are not silently granted a different reader.
+
+`native_5m_exact.NativeWindow` extends the existing exact parser to a bounded
+single-security window of at most 366 inclusive civil dates. An explicitly bound
+installed SDK page transport sends requests; only each fresh original wire frame
+proves fields, date range, frequency, basis, exact page number and page size. A full
+page requires continuation, including an empty terminal page when needed. All
+records must be within scope and strictly ordered by timestamp across and within
+pages; duplicates, null rows, changed echo, missing terminal evidence or exhausted
+row/page/wire limits reject the entire partition. A default partition is bounded
+by 20,000 rows and 16 pages; it never expands all securities into memory. The
+existing exact-day and legacy SDK contracts remain unchanged. Serialization uses
+the same Decimal/lexeme preserving independent Parquet path, after all pages pass.
+A successful finite-window experiment is not a complete-range coverage grant.
+
+Tests: `tests/unit/test_base24_scope.py` and
+`tests/unit/test_native_5m_exact.py`. New image assembly, opt-in consumer reader,
+shared job source qualification, full-universe/bucket census, actual peak budget,
+and cold verification remain separate tracked implementation/acceptance work.

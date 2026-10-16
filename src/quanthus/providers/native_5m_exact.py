@@ -51,6 +51,22 @@ class NativeDay:
 
 
 @dataclass(frozen=True)
+class NativeWindow:
+    """One security, at most 366 inclusive civil dates, never the whole universe."""
+
+    code: str
+    start_date: str
+    end_date: str
+
+    def __post_init__(self) -> None:
+        NativeDay(self.code, self.start_date)
+        NativeDay(self.code, self.end_date)
+        days = (date.fromisoformat(self.end_date) - date.fromisoformat(self.start_date)).days
+        if not 0 <= days <= 365:
+            raise Native5mError("INVALID_WINDOW_RANGE")
+
+
+@dataclass(frozen=True)
 class ExactBar:
     code: str
     timestamp: datetime
@@ -147,6 +163,44 @@ def parse_wire_response(raw: bytes, request: NativeDay) -> tuple[ExactBar, ...]:
     the independent original envelope must prove the full request contract.
     This exact-day path requires a terminal short first page, never a page cap.
     """
+    parts = _wire_parts(raw)
+    try:
+        record = json.loads(parts[6])["record"]
+        if not isinstance(record, list) or int(parts[4]) != 1:
+            raise Native5mError("WIRE_PAGE_INVALID")
+        if any(not isinstance(row, list) for row in record):
+            # A JSON null must not become the iterator's end sentinel and hide
+            # valid records following it, or turn malformed data into empty data.
+            raise Native5mError("WIRE_RECORD_SCHEMA_INVALID")
+        if not len(record) < int(parts[5]):
+            raise Native5mError("WIRE_TERMINAL_PAGE_UNPROVEN")
+        response = SimpleNamespace(
+            error_code=parts[0],
+            cur_page_num=parts[4],
+            code=parts[7],
+            fields=parts[8].split(","),
+            start_date=parts[9],
+            end_date=parts[10],
+            frequency=parts[11],
+            adjustflag=parts[12],
+        )
+    except (ValueError, IndexError, KeyError, UnicodeDecodeError, zlib.error) as exc:
+        if isinstance(exc, Native5mError):
+            raise
+        raise Native5mError("WIRE_ENVELOPE_INVALID") from exc
+    rows = iter(record)
+
+    def advance() -> bool:
+        response.current = next(rows, None)
+        return response.current is not None
+
+    response.next = advance
+    response.get_row_data = lambda: response.current
+    return parse_response(response, request)
+
+
+def _wire_parts(raw: bytes) -> list[str]:
+    """Decode one bounded original frame without trusting the SDK object."""
     constants = importlib.import_module("baostock.common.contants")
     header_size = constants.MESSAGE_HEADER_LENGTH
     if not raw.endswith(TRAILER):
@@ -181,38 +235,112 @@ def parse_wire_response(raw: bytes, request: NativeDay) -> tuple[ExactBar, ...]:
             raise Native5mError("WIRE_BODY_CONTRACT_INVALID")
         if parts[0] != "0":
             raise Native5mError("PROVIDER_ERROR")
-        record = json.loads(parts[6])["record"]
-        if not isinstance(record, list) or int(parts[4]) != 1:
-            raise Native5mError("WIRE_PAGE_INVALID")
-        if any(not isinstance(row, list) for row in record):
-            # A JSON null must not become the iterator's end sentinel and hide
-            # valid records following it, or turn malformed data into empty data.
-            raise Native5mError("WIRE_RECORD_SCHEMA_INVALID")
-        if not len(record) < int(parts[5]):
-            raise Native5mError("WIRE_TERMINAL_PAGE_UNPROVEN")
-        response = SimpleNamespace(
-            error_code=parts[0],
-            cur_page_num=parts[4],
-            code=parts[7],
-            fields=parts[8].split(","),
-            start_date=parts[9],
-            end_date=parts[10],
-            frequency=parts[11],
-            adjustflag=parts[12],
-        )
+        return parts
     except (ValueError, IndexError, KeyError, UnicodeDecodeError, zlib.error) as exc:
         if isinstance(exc, Native5mError):
             raise
         raise Native5mError("WIRE_ENVELOPE_INVALID") from exc
-    rows = iter(record)
 
-    def advance() -> bool:
-        response.current = next(rows, None)
-        return response.current is not None
 
-    response.next = advance
-    response.get_row_data = lambda: response.current
-    return parse_response(response, request)
+def _window_page(
+    raw: bytes, request: NativeWindow, page: int, page_size: int
+) -> tuple[tuple[ExactBar, ...], bool]:
+    parts = _wire_parts(raw)
+    if (parts[7], tuple(parts[8].split(",")), *parts[9:]) != (
+        request.code,
+        FIELDS,
+        request.start_date,
+        request.end_date,
+        "5",
+        "3",
+    ):
+        raise Native5mError("RESPONSE_CONTRACT_MISMATCH")
+    try:
+        record = json.loads(parts[6])["record"]
+        if (int(parts[4]), int(parts[5])) != (page, page_size):
+            raise Native5mError("WIRE_PAGE_INVALID")
+        if not isinstance(record, list) or any(not isinstance(row, list) for row in record):
+            raise Native5mError("WIRE_RECORD_SCHEMA_INVALID")
+        if len(record) > page_size:
+            raise Native5mError("WIRE_PAGE_SIZE_EXCEEDED")
+    except (ValueError, TypeError, KeyError) as exc:
+        if isinstance(exc, Native5mError):
+            raise
+        raise Native5mError("WIRE_PAGE_INVALID") from exc
+    bars: list[ExactBar] = []
+    for row in record:
+        if (
+            len(row) != len(FIELDS)
+            or any(not isinstance(v, str) for v in row)
+            or not request.start_date <= row[0] <= request.end_date
+        ):
+            raise Native5mError("ROW_DATE_CODE_SCHEMA_MISMATCH")
+        day = NativeDay(request.code, row[0])
+        response = SimpleNamespace(
+            error_code="0",
+            code=request.code,
+            fields=FIELDS,
+            start_date=row[0],
+            end_date=row[0],
+            frequency="5",
+            adjustflag="3",
+            cur_page_num="1",
+        )
+        response.next = iter((True, False)).__next__
+        response.get_row_data = lambda current=row: current
+        bars.extend(parse_response(response, day, max_rows=1))
+    return tuple(bars), len(record) < page_size
+
+
+def fetch_captured_window(
+    query_page: Any,
+    request: NativeWindow,
+    capture: WireCapture,
+    *,
+    page_size: int = 2000,
+    max_pages: int = 16,
+    max_rows: int = 20000,
+) -> tuple[ExactBar, ...]:
+    """One bounded partition, all pages proved before any output is committed.
+
+    query_page is the installed SDK's version-bound page transport. Its response
+    object is ignored. Only a newly captured original frame can establish a page.
+    All limits, including terminal-page allowance, share the caller's wire budget.
+    """
+    if not (1 <= page_size <= 2000 and max_pages >= 1 and max_rows >= 1):
+        raise Native5mError("INVALID_PARSE_LIMIT")
+    bars: list[ExactBar] = []
+    previous: datetime | None = None
+    for page in range(1, max_pages + 1):
+        before = len(capture.records)
+        query_page(
+            page,
+            page_size,
+            request.code,
+            ",".join(FIELDS),
+            request.start_date,
+            request.end_date,
+            "5",
+            "3",
+        )
+        capture._finish()
+        capture._check()
+        if len(capture.records) != before + 1:
+            raise Native5mError("ONE_EXACT_RESPONSE_REQUIRED")
+        raw = (capture.root / capture.records[-1]["path"]).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != capture.records[-1]["response_sha256"]:
+            raise Native5mError("CAPTURED_RESPONSE_CHANGED")
+        rows, terminal = _window_page(raw, request, page, page_size)
+        for bar in rows:
+            if previous is not None and bar.timestamp <= previous:
+                raise Native5mError("DUPLICATE_OR_UNSORTED_BAR_KEY")
+            previous = bar.timestamp
+            bars.append(bar)
+            if len(bars) > max_rows:
+                raise Native5mError("ROW_LIMIT")
+        if terminal:
+            return tuple(bars)
+    raise Native5mError("WINDOW_PAGE_LIMIT_TERMINAL_UNPROVEN")
 
 
 def fetch_captured_day(

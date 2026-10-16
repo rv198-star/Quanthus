@@ -147,6 +147,54 @@ def test_merge_revalidates_and_materializes_full_canonical_root(tmp_path):
     assert not (output / "staging").exists()
 
 
+def test_merge_accepts_verified_partial_selection_after_bounded_cutover(tmp_path):
+    plan = _plan()
+    initial = freeze_shard_selections(
+        plan,
+        terminal_partition_ids=(),
+        shard_ids=("initial",),
+        maximum_data_sends=5,
+        maximum_control_calls=4,
+    )["initial"]
+    initial_root = tmp_path / "initial"
+    first = run_acquisition(
+        plan,
+        initial_root,
+        _fetch,
+        source_roots=(),
+        selection_bytes=initial,
+        max_new_partitions=1,
+    )
+    assert first["status"] == "PARTIAL"
+    completed = [path.name for path in (initial_root / "partitions").iterdir()]
+
+    continuation = freeze_shard_selections(
+        plan,
+        terminal_partition_ids=completed,
+        shard_ids=("continuation",),
+        maximum_data_sends=4,
+        maximum_control_calls=4,
+    )["continuation"]
+    continuation_root = tmp_path / "continuation"
+    second = run_acquisition(
+        plan,
+        continuation_root,
+        _fetch,
+        source_roots=(),
+        selection_bytes=continuation,
+    )
+    assert second["status"] == "COMPLETE"
+
+    output = tmp_path / "canonical"
+    merged = merge_shard_outputs(
+        plan,
+        sources=(("initial", initial_root), ("continuation", continuation_root)),
+        output=output,
+    )
+    assert merged["status"] == "COMPLETE"
+    assert merged["completed"] == 4
+
+
 @pytest.mark.parametrize("defect", ["missing", "duplicate"])
 def test_merge_rejects_missing_or_duplicate_terminal_partition_before_output(tmp_path, defect):
     plan, _, roots = _build_shards(tmp_path)

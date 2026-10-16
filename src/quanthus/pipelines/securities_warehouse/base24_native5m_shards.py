@@ -161,7 +161,8 @@ def merge_shard_outputs(
                 plan_sha=plan_sha,
                 windows=windows,
             )
-            if physical != {window["partition_id"] for window in selected}:
+            selected_ids = {window["partition_id"] for window in selected}
+            if not physical <= selected_ids:
                 raise Native5mAcquireError("SHARD_MERGE_SELECTION_INVALID")
     resolved: list[tuple[dict[str, Any], str, Path, Path]] = []
     for window in windows:

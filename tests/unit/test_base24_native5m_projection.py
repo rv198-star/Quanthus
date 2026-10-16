@@ -1,13 +1,18 @@
 """Base 2.4 projection keeps exact source values and excludes incidental dates."""
 
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 
 import duckdb
 import pyarrow as pa
 
 from quanthus.pipelines.securities_warehouse.base24_native5m_projection import (
+    Native5mProjectionError,
+    audit_projection,
     projection_query,
+    seal_projection,
 )
 from quanthus.providers.native_5m_exact import SHANGHAI
 
@@ -94,3 +99,102 @@ def test_projection_rejects_missing_or_naive_acquisition_clock():
             raise AssertionError("missing acquisition clock must fail")
     finally:
         connection.close()
+
+
+def _package(root: Path) -> None:
+    rows = (
+        [(9, minute) for minute in range(35, 60, 5)]
+        + [(10, minute) for minute in range(0, 60, 5)]
+        + [(11, minute) for minute in range(0, 31, 5)]
+        + [(13, minute) for minute in range(5, 60, 5)]
+        + [(14, minute) for minute in range(0, 60, 5)]
+        + [(15, 0)]
+    )
+    table = pa.Table.from_pylist(
+        [
+            {
+                "stock_code": "000001",
+                "ts": datetime(2020, 1, 2, hour, minute),
+                "market_date": datetime(2020, 1, 2).date(),
+                "bar_size": "5m",
+                "source_values": ["1", "1", "1", "1", "0", "0"],
+                "open": Decimal("1.0000000000"),
+                "high": Decimal("1.0000000000"),
+                "low": Decimal("1.0000000000"),
+                "close": Decimal("1.0000000000"),
+                "volume": Decimal("0E-10"),
+                "amount": Decimal("0E-10"),
+                "acquired_at": datetime(2026, 10, 16, tzinfo=timezone.utc),
+                "input_partition_id": "a" * 64,
+                "input_artifact_sha256": "sha256:" + "b" * 64,
+                "observation_year": 2020,
+                "observation_month": 1,
+            }
+            for hour, minute in rows
+        ]
+    )
+    connection = duckdb.connect()
+    connection.register("projected", table)
+    try:
+        connection.execute(
+            f"""COPY (
+              SELECT stock_code,ts::TIMESTAMP ts,market_date,bar_size,source_values,
+                     open::DECIMAL(38,10) open,high::DECIMAL(38,10) high,
+                     low::DECIMAL(38,10) low,"close"::DECIMAL(38,10) "close",
+                     volume::DECIMAL(38,10) volume,amount::DECIMAL(38,10) amount,
+                     acquired_at::TIMESTAMPTZ acquired_at,input_partition_id,
+                     input_artifact_sha256,observation_year,observation_month
+              FROM projected
+            ) TO '{root / "payload"}' """
+            "(FORMAT PARQUET,PARTITION_BY(observation_year,observation_month),COMPRESSION ZSTD)"
+        )
+    finally:
+        connection.close()
+    (root / "REGISTRATION.json").write_text(json.dumps({"contract": "test"}) + "\n")
+
+
+def test_sealed_projection_cold_audits_and_rejects_extra_physical_member(tmp_path):
+    _package(tmp_path)
+    manifest = seal_projection(
+        tmp_path,
+        input_identity={"plan_SHA256": "a" * 64, "ledger_manifest_SHA256": "b" * 64},
+        code_revision="test",
+    )
+    assert manifest["summary"]["rows"] == 48
+    assert manifest["summary"]["security_days"] == 1
+    assert audit_projection(tmp_path) == manifest
+    (tmp_path / "payload/extra.txt").write_text("unexpected")
+    try:
+        audit_projection(tmp_path)
+    except Native5mProjectionError as exc:
+        assert str(exc) == "PROJECTION_PHYSICAL_FILE_SET_INVALID"
+    else:
+        raise AssertionError("extra physical member must fail closed")
+
+
+def test_projection_rejects_incomplete_bucket_day_before_ready(tmp_path):
+    _package(tmp_path)
+    parquet = next((tmp_path / "payload").rglob("*.parquet"))
+    table = __import__("pyarrow.parquet", fromlist=["read_table"]).read_table(parquet)
+    __import__("pyarrow.parquet", fromlist=["write_table"]).write_table(table.slice(0, 47), parquet)
+    try:
+        seal_projection(tmp_path, input_identity={}, code_revision="test")
+    except Native5mProjectionError as exc:
+        assert str(exc) == "PROJECTION_KEY_OR_BUCKET_CENSUS_INVALID"
+    else:
+        raise AssertionError("incomplete day must fail closed")
+    assert not (tmp_path / "READY").exists()
+
+
+def test_projection_rejects_row_in_wrong_physical_month(tmp_path):
+    _package(tmp_path)
+    parquet = next((tmp_path / "payload").rglob("*.parquet"))
+    wrong = tmp_path / "payload/observation_year=2020/observation_month=2/data.parquet"
+    wrong.parent.mkdir()
+    parquet.rename(wrong)
+    try:
+        seal_projection(tmp_path, input_identity={}, code_revision="test")
+    except Native5mProjectionError as exc:
+        assert str(exc) == "PROJECTION_ROW_CONTRACT_INVALID"
+    else:
+        raise AssertionError("physical partition mismatch must fail closed")

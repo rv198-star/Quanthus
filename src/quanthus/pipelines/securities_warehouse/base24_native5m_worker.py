@@ -106,6 +106,13 @@ def _git_head(worktree: Path) -> str:
     return process.stdout.strip()
 
 
+def _git_tracked_clean(worktree: Path) -> bool:
+    for arguments in (("diff", "--quiet", "HEAD", "--"), ("diff", "--cached", "--quiet")):
+        if subprocess.run(("git", *arguments), cwd=worktree, check=False).returncode != 0:
+            return False
+    return True
+
+
 def _frozen_inputs(
     plan_bytes: bytes,
     selection_bytes: bytes,
@@ -128,6 +135,7 @@ def run_worker(args: argparse.Namespace) -> int:
         plan_sha != args.expected_plan_sha256
         or selection_sha != args.expected_selection_sha256
         or _git_head(args.worktree) != args.expected_code_sha
+        or not _git_tracked_clean(args.worktree)
     ):
         raise Native5mWorkerError("WORKER_SEMANTIC_CLOSURE_MISMATCH")
     if args.evidence.is_symlink() or args.output.is_symlink():

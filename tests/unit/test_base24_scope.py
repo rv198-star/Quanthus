@@ -92,3 +92,26 @@ def test_unknown_ownership_and_identity_drift_fail_closed(defect, reason):
         monthly["content"]["files"][0]["path"] = "../outside"
     with pytest.raises(Base24ScopeError, match=reason):
         select_default_members(json.dumps(monthly).encode(), seed, POLICY)
+
+
+def test_local_governance_metadata_keeps_unknown_supplier_identity():
+    monthly, seed = documents()
+    monthly["content"]["files"].append(
+        dict(
+            path="payload/source-plan/MATERIALIZATION.json",
+            role="local_governance_evidence",
+            sha256="sha256:" + "2" * 64,
+            size_bytes=4,
+        )
+    )
+    plan = select_default_members(json.dumps(monthly).encode(), seed, POLICY)
+    actual = next(m for m in plan["included"] if m["role"] == "local_governance_evidence")
+    assert "source_id" not in actual
+    assert actual["size_bytes"] == 4
+
+
+def test_missing_supplier_identity_cannot_be_treated_as_governance_metadata():
+    monthly, seed = documents()
+    del monthly["content"]["files"][-1]["source_id"]
+    with pytest.raises(Base24ScopeError, match="SOURCE_IDENTITY_MISSING"):
+        select_default_members(json.dumps(monthly).encode(), seed, POLICY)

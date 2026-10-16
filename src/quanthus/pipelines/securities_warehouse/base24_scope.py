@@ -88,7 +88,13 @@ def select_default_members(
                 reason = "OPTIONAL_1M_ARTIFACT_NOT_INCLUDED"
             elif name not in shared_names:
                 raise Base24ScopeError("UNCLASSIFIED_1M_LANE_ARTIFACT")
-        record = {k: member[k] for k in ("path", "sha256", "size_bytes", "source_id", "role")}
+        if "source_id" not in member and member["role"] != "local_governance_evidence":
+            raise Base24ScopeError("SOURCE_IDENTITY_MISSING")
+        record = {
+            k: member[k]
+            for k in ("path", "sha256", "size_bytes", "source_id", "role")
+            if k in member
+        }
         if reason:
             excluded.append(dict(record, disposition="NOT_INCLUDED", reason=reason))
         else:

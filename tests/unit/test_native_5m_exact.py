@@ -245,7 +245,20 @@ def test_multiple_lexical_scales_survive_and_excess_precision_rejected(tmp_path)
     assert not (tmp_path / "wide.parquet").exists()
 
 
-def wire_message(*, newline=False, adjustflag="3", page_size=2000, version="00.9.10", rows=None):
+def wire_message(
+    *,
+    newline=False,
+    adjustflag="3",
+    page_size=2000,
+    version="00.9.10",
+    rows=None,
+    record_field=None,
+):
+    encoded_record = (
+        json.dumps({"record": [row()] if rows is None else rows})
+        if record_field is None
+        else record_field
+    )
     body = "\x01".join(
         [
             "0",
@@ -254,7 +267,7 @@ def wire_message(*, newline=False, adjustflag="3", page_size=2000, version="00.9
             "anonymous",
             "1",
             str(page_size),
-            json.dumps({"record": [row()] if rows is None else rows}),
+            encoded_record,
             "sz.000001",
             ",".join(FIELDS),
             "2020-01-02",
@@ -274,6 +287,20 @@ def test_original_wire_proves_contract_with_or_without_body_newline(newline):
         wire_message(newline=newline), NativeDay("sz.000001", "2020-01-02")
     )
     assert parsed[0].lexical_values == tuple(row()[3:])
+
+
+def test_successful_empty_wire_record_is_an_exact_empty_observation():
+    assert parse_wire_response(
+        wire_message(record_field=""), NativeDay("sz.000001", "2020-01-02")
+    ) == ()
+
+
+def test_nonempty_malformed_wire_record_remains_fail_closed():
+    with pytest.raises(Native5mError, match="WIRE_ENVELOPE_INVALID"):
+        parse_wire_response(
+            wire_message(record_field="not-json"),
+            NativeDay("sz.000001", "2020-01-02"),
+        )
 
 
 @pytest.mark.parametrize("records", [[None, row()], [row(), None], [None]])

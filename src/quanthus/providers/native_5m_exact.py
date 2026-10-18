@@ -166,7 +166,11 @@ def parse_wire_response(raw: bytes, request: NativeDay) -> tuple[ExactBar, ...]:
     """
     parts = _wire_parts(raw)
     try:
-        record = json.loads(parts[6])["record"]
+        # BaoStock encodes a successful exact-day response with no rows as an
+        # empty record field on the wire.  This is distinct from a malformed
+        # non-empty JSON body: the surrounding response contract still proves
+        # the requested code, date, frequency, basis and terminal first page.
+        record = [] if parts[6] == "" else json.loads(parts[6])["record"]
         if not isinstance(record, list) or int(parts[4]) != 1:
             raise Native5mError("WIRE_PAGE_INVALID")
         if any(not isinstance(row, list) for row in record):

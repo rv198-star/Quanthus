@@ -249,6 +249,14 @@ def _audit_partition(
         or receipt.get("complete_dates") != dates
         or receipt.get("partial_date_bucket_counts") != partial
         or receipt.get("absent_dates") != absent
+        or receipt.get("partial_required_date_bucket_counts")
+        != {
+            day: count
+            for day, count in partial.items()
+            if day in set(window["required_dates"])
+        }
+        or receipt.get("absent_required_dates")
+        != sorted(set(absent) & set(window["required_dates"]))
     ):
         raise Native5mSalvageError("SALVAGE_PARTITION_INVALID")
     return receipt
@@ -285,7 +293,7 @@ def audit_salvage(
     ):
         raise Native5mSalvageError("SALVAGE_PACKAGE_INVALID")
     expected = set()
-    rows = days = 0
+    rows = source_days = recovered_days = partial_days = absent_days = 0
     for member in members:
         identity = member.get("partition_id")
         if identity not in by_id or identity in expected:
@@ -297,7 +305,10 @@ def audit_salvage(
         if member.get("receipt_sha256") != _sha(root / "partitions" / identity / "RECEIPT.json"):
             raise Native5mSalvageError("SALVAGE_PACKAGE_INVALID")
         rows += receipt["rows"]
-        days += len(receipt["complete_dates"])
+        source_days += len(receipt["complete_dates"])
+        recovered_days += len(receipt["recovered_required_dates"])
+        partial_days += len(receipt["partial_required_date_bucket_counts"])
+        absent_days += len(receipt["absent_required_dates"])
     physical = {path.name for path in (root / "partitions").iterdir() if path.is_dir()}
     root_files = {
         path.relative_to(root).as_posix()
@@ -318,7 +329,10 @@ def audit_salvage(
         physical != expected
         or root_files != allowed
         or manifest.get("rows") != rows
-        or manifest.get("complete_days") != days
+        or manifest.get("complete_source_days") != source_days
+        or manifest.get("recovered_required_days") != recovered_days
+        or manifest.get("partial_required_days_retained_unresolved") != partial_days
+        or manifest.get("absent_required_days_retained_unresolved") != absent_days
     ):
         raise Native5mSalvageError("SALVAGE_PACKAGE_INVALID")
     return manifest
@@ -369,7 +383,7 @@ def build_salvage(
     staging.mkdir()
     (staging / "partitions").mkdir()
     members = []
-    total_rows = total_days = total_partial = total_absent = 0
+    total_rows = total_source_days = total_recovered = total_partial = total_absent = 0
     try:
         for identity in selected:
             window = by_id[identity]
@@ -381,6 +395,10 @@ def build_salvage(
             complete, dates, partial, absent = _complete_days(bars, window)
             required = set(window["required_dates"])
             recovered_required = sorted(required & set(dates))
+            partial_required = {
+                day: count for day, count in partial.items() if day in required
+            }
+            absent_required = sorted(required & set(absent))
             if not recovered_required:
                 raise Native5mSalvageError("NO_REQUIRED_COMPLETE_DAY")
             partition = staging / "partitions" / identity
@@ -408,6 +426,8 @@ def build_salvage(
                 "recovered_required_dates": recovered_required,
                 "partial_date_bucket_counts": partial,
                 "absent_dates": absent,
+                "partial_required_date_bucket_counts": partial_required,
+                "absent_required_dates": absent_required,
                 "files": files,
             }
             _write(partition / "RECEIPT.json", receipt)
@@ -417,9 +437,10 @@ def build_salvage(
                 {"partition_id": identity, "receipt_sha256": _sha(partition / "RECEIPT.json")}
             )
             total_rows += len(complete)
-            total_days += len(dates)
-            total_partial += len(partial)
-            total_absent += len(absent)
+            total_source_days += len(dates)
+            total_recovered += len(recovered_required)
+            total_partial += len(partial_required)
+            total_absent += len(absent_required)
         manifest = {
             "contract": PACKAGE_CONTRACT,
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -431,9 +452,10 @@ def build_salvage(
             "selection_partition_ids": selected,
             "partitions": members,
             "rows": total_rows,
-            "complete_days": total_days,
-            "partial_days_retained_unresolved": total_partial,
-            "absent_days_retained_unresolved": total_absent,
+            "complete_source_days": total_source_days,
+            "recovered_required_days": total_recovered,
+            "partial_required_days_retained_unresolved": total_partial,
+            "absent_required_days_retained_unresolved": total_absent,
             "source_prices_exported_to_evidence": False,
         }
         _write(staging / "manifest.json", manifest)

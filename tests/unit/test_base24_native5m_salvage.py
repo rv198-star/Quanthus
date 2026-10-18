@@ -156,13 +156,16 @@ def test_complete_day_is_recovered_and_partial_day_stays_unresolved(tmp_path):
     plan, identity, acquisition, _ = _source(tmp_path)
     output = tmp_path / "salvage"
     result = _build(plan, acquisition, output, identity)
-    assert result["complete_days"] == 1
-    assert result["partial_days_retained_unresolved"] == 1
-    assert result["absent_days_retained_unresolved"] == 0
+    assert result["complete_source_days"] == 1
+    assert result["recovered_required_days"] == 1
+    assert result["partial_required_days_retained_unresolved"] == 1
+    assert result["absent_required_days_retained_unresolved"] == 0
     partition = output / "partitions" / identity
     receipt = json.loads((partition / "RECEIPT.json").read_text())
     assert receipt["recovered_required_dates"] == ["2020-01-02"]
     assert receipt["partial_date_bucket_counts"] == {"2020-01-03": 47}
+    assert receipt["partial_required_date_bucket_counts"] == {"2020-01-03": 47}
+    assert receipt["absent_required_dates"] == []
     assert receipt["rows"] == pq.read_table(partition / "exact.parquet").num_rows == 48
     assert (partition / "source.wire").read_bytes() == b"immutable original response"
     assert audit_salvage(output, plan, parser=_parser) == result

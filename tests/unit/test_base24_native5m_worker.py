@@ -9,9 +9,11 @@ from quanthus.pipelines.securities_warehouse.base24_native5m_worker import (
     Native5mWorkerError,
     _control_calls,
     _data_sends,
+    _fetch_captured_request,
     _frozen_inputs,
     main,
 )
+from quanthus.providers.native_5m_exact import NativeWindow
 
 
 def _plan():
@@ -94,6 +96,52 @@ def test_worker_rejects_unreadable_durable_send_ledger(tmp_path):
     (path / "wire-receipt.json").write_text("{}")
     with pytest.raises(Native5mWorkerError, match="WIRE_RECEIPT_UNREADABLE"):
         _data_sends(tmp_path / "output")
+
+
+@pytest.mark.parametrize("one_day", [True, False])
+def test_worker_routes_single_day_to_exact_day_contract(monkeypatch, one_day):
+    calls = []
+    monkeypatch.setattr(
+        "quanthus.pipelines.securities_warehouse.base24_native5m_worker.time.sleep",
+        lambda value: calls.append(("sleep", value)),
+    )
+    monkeypatch.setattr(
+        "quanthus.pipelines.securities_warehouse.base24_native5m_worker.fetch_captured_day",
+        lambda client, request, capture: calls.append(
+            ("day", client, request.business_date, capture)
+        )
+        or (),
+    )
+    monkeypatch.setattr(
+        "quanthus.pipelines.securities_warehouse.base24_native5m_worker.fetch_captured_window",
+        lambda query, request, capture, **limits: calls.append(
+            ("window", query, request.end_date, capture, limits)
+        )
+        or (),
+    )
+    end = "2020-01-02" if one_day else "2020-01-03"
+    client, query, capture = object(), object(), object()
+    assert (
+        _fetch_captured_request(
+            client=client,
+            query_page=query,
+            request=NativeWindow("sz.000001", "2020-01-02", end),
+            capture=capture,
+            request_spacing_seconds=1.0,
+        )
+        == ()
+    )
+    assert calls[0] == ("sleep", 1.0)
+    if one_day:
+        assert calls[1] == ("day", client, "2020-01-02", capture)
+    else:
+        assert calls[1] == (
+            "window",
+            query,
+            "2020-01-03",
+            capture,
+            {"page_size": 20000, "max_pages": 1, "max_rows": 20000},
+        )
 
 
 def test_worker_binds_selection_before_opening_supplier_session(tmp_path, monkeypatch):

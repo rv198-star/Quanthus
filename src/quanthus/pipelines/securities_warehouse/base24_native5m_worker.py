@@ -25,8 +25,10 @@ from quanthus.pipelines.securities_warehouse.base24_native5m_acquire import (
 )
 from quanthus.providers.native_5m_exact import (
     ExactBar,
+    NativeDay,
     NativeWindow,
     captured_socket,
+    fetch_captured_day,
     fetch_captured_window,
 )
 
@@ -126,6 +128,32 @@ def _frozen_inputs(
     except (ValueError, TypeError) as exc:
         raise Native5mWorkerError("SELECTION_UNREADABLE") from exc
     return selection, plan_sha, hashlib.sha256(selection_bytes).hexdigest()
+
+
+def _fetch_captured_request(
+    *,
+    client: Any,
+    query_page: Any,
+    request: NativeWindow,
+    capture: Any,
+    request_spacing_seconds: float,
+) -> tuple[ExactBar, ...]:
+    """Route one-day remediation through the qualified exact-day contract."""
+    time.sleep(request_spacing_seconds)
+    if request.start_date == request.end_date:
+        return fetch_captured_day(
+            client,
+            NativeDay(request.code, request.start_date),
+            capture,
+        )
+    return fetch_captured_window(
+        query_page,
+        request,
+        capture,
+        page_size=20000,
+        max_pages=1,
+        max_rows=20000,
+    )
 
 
 def run_worker(args: argparse.Namespace) -> int:
@@ -261,16 +289,14 @@ def run_worker(args: argparse.Namespace) -> int:
                 ) as capture:
 
                     def query(*query_args: object) -> Any:
-                        time.sleep(args.request_spacing_seconds)
                         return history.__query_history_k_data_plus_page(*query_args)
 
-                    bars = fetch_captured_window(
-                        query,
-                        request,
-                        capture,
-                        page_size=20000,
-                        max_pages=1,
-                        max_rows=20000,
+                    bars = _fetch_captured_request(
+                        client=bs,
+                        query_page=query,
+                        request=request,
+                        capture=capture,
+                        request_spacing_seconds=args.request_spacing_seconds,
                     )
             finally:
                 if capture is not None:

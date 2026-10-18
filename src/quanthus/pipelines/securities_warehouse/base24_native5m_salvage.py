@@ -331,8 +331,8 @@ def audit_salvage(
         or manifest.get("rows") != rows
         or manifest.get("complete_source_days") != source_days
         or manifest.get("recovered_required_days") != recovered_days
-        or manifest.get("partial_required_days_retained_unresolved") != partial_days
-        or manifest.get("absent_required_days_retained_unresolved") != absent_days
+        or manifest.get("partial_required_days_not_recovered") != partial_days
+        or manifest.get("absent_required_days_not_recovered") != absent_days
     ):
         raise Native5mSalvageError("SALVAGE_PACKAGE_INVALID")
     return manifest
@@ -454,8 +454,8 @@ def build_salvage(
             "rows": total_rows,
             "complete_source_days": total_source_days,
             "recovered_required_days": total_recovered,
-            "partial_required_days_retained_unresolved": total_partial,
-            "absent_required_days_retained_unresolved": total_absent,
+            "partial_required_days_not_recovered": total_partial,
+            "absent_required_days_not_recovered": total_absent,
             "source_prices_exported_to_evidence": False,
         }
         _write(staging / "manifest.json", manifest)

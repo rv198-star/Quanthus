@@ -158,8 +158,8 @@ def test_complete_day_is_recovered_and_partial_day_stays_unresolved(tmp_path):
     result = _build(plan, acquisition, output, identity)
     assert result["complete_source_days"] == 1
     assert result["recovered_required_days"] == 1
-    assert result["partial_required_days_retained_unresolved"] == 1
-    assert result["absent_required_days_retained_unresolved"] == 0
+    assert result["partial_required_days_not_recovered"] == 1
+    assert result["absent_required_days_not_recovered"] == 0
     partition = output / "partitions" / identity
     receipt = json.loads((partition / "RECEIPT.json").read_text())
     assert receipt["recovered_required_dates"] == ["2020-01-02"]

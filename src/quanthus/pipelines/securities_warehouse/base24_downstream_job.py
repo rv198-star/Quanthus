@@ -351,6 +351,7 @@ def audit_month_resolution(
     venue_relation: str = "dwd_trading_venue",
     calendar_relation: str = "dwd_trading_calendar",
     required_relation: str = "required_native5m",
+    knowledge_cutoff: str = "2026-10-19T23:59:59+08:00",
 ) -> dict[str, Any]:
     """Recompute exact-bucket, source, listing, venue and calendar resolution."""
     month = _month(business_month)
@@ -415,9 +416,11 @@ def audit_month_resolution(
         JOIN {listing} l ON l.listing_id=s.listing_id
         JOIN {venue} v ON v.venue_id=l.venue_id
         JOIN {calendar} c ON c.calendar_session_id=s.calendar_session_id
+             AND c.knowledge_from<=cast(? AS TIMESTAMPTZ)
+             AND (c.knowledge_to IS NULL OR cast(? AS TIMESTAMPTZ)<c.knowledge_to)
         JOIN {required} r ON r.stock_code=p.stock_code AND r.trade_date=p.market_date
         """,
-        [month],
+        [month, knowledge_cutoff, knowledge_cutoff],
     ).fetchone()
     if projected_summary is None or bad_days is None or resolved_summary is None:
         raise Base24DownstreamError("BASE24_MONTHLY_RESOLUTION_INVALID")

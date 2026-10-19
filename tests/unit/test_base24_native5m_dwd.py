@@ -52,7 +52,8 @@ def _register(
     connection.execute(
         f"""
         CREATE TABLE dwd_trading_calendar AS SELECT 'session-1' calendar_session_id,
-          'SSE' venue_id,DATE '2020-01-02' trade_date,'{session_type}' session_type,true is_open
+          'SSE' venue_id,DATE '2020-01-02' trade_date,'{session_type}' session_type,true is_open,
+          TIMESTAMPTZ '2019-01-01' knowledge_from,NULL::TIMESTAMPTZ knowledge_to
         """
     )
 
@@ -113,6 +114,28 @@ def test_native5m_dwd_accepts_governed_daily_session_alias():
     finally:
         connection.close()
     assert row is not None
+
+
+def test_native5m_dwd_selects_one_active_calendar_knowledge_version():
+    connection = duckdb.connect()
+    _register(connection, session_type="day")
+    connection.execute(
+        "UPDATE dwd_trading_calendar SET knowledge_from="
+        "TIMESTAMPTZ '2026-10-09T12:00:00+08:00',knowledge_to="
+        "TIMESTAMPTZ '2026-10-09T13:00:00+08:00'"
+    )
+    connection.execute(
+        "INSERT INTO dwd_trading_calendar SELECT 'session-1','SSE',"
+        "DATE '2020-01-02','day',true,TIMESTAMPTZ '2026-10-09T13:00:00+08:00',"
+        "NULL::TIMESTAMPTZ"
+    )
+    try:
+        rows = connection.execute(
+            dwd_native5m_query(knowledge_cutoff="2026-10-19T23:59:59+08:00")
+        ).fetchall()
+    finally:
+        connection.close()
+    assert len(rows) == 1
 
 
 def test_native5m_dwd_rejects_relation_injection():

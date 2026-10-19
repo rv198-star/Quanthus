@@ -222,6 +222,7 @@ def _resolution(
     *,
     venue: str = "SSE",
     session_type: str = "REGULAR_DAY",
+    duplicate_closed_calendar_version: bool = False,
 ) -> dict[str, int]:
     connection = duckdb.connect()
     connection.register("projected_native5m", projected)
@@ -237,9 +238,17 @@ def _resolution(
     connection.execute(
         f"""
         CREATE TABLE dwd_trading_calendar AS SELECT 'session-1' calendar_session_id,
-          'SSE' venue_id,DATE '2020-01-02' trade_date,'{session_type}' session_type,true is_open
+          'SSE' venue_id,DATE '2020-01-02' trade_date,'{session_type}' session_type,true is_open,
+          TIMESTAMPTZ '2026-10-09T13:00:00+08:00' knowledge_from,NULL::TIMESTAMPTZ knowledge_to
         """
     )
+    if duplicate_closed_calendar_version:
+        connection.execute(
+            "INSERT INTO dwd_trading_calendar SELECT 'session-1','SSE',"
+            f"DATE '2020-01-02','{session_type}',true,"
+            "TIMESTAMPTZ '2026-10-09T12:00:00+08:00',"
+            "TIMESTAMPTZ '2026-10-09T13:00:00+08:00'"
+        )
     connection.execute(
         """
         CREATE TABLE required_native5m AS SELECT '600000' stock_code,
@@ -393,3 +402,17 @@ def test_month_resolution_accepts_governed_daily_session_alias():
     )
     resolution = _resolution(projected, supplement, session_type="day")
     assert resolution["resolved_rows"] == 48
+
+
+def test_month_resolution_uses_one_active_calendar_knowledge_version():
+    projected = pa.Table.from_pylist(_projection_rows())
+    supplement = pa.Table.from_pylist(
+        _supplement_rows(), schema=_schemas()["dwd_security_bar"]
+    )
+    resolution = _resolution(
+        projected,
+        supplement,
+        session_type="day",
+        duplicate_closed_calendar_version=True,
+    )
+    assert resolution["venue_calendar_rows"] == 48

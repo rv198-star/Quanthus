@@ -80,6 +80,26 @@ def test_native5m_dwd_wrong_venue_or_date_does_not_resolve():
             connection.close()
 
 
+def test_native5m_dwd_explicit_build_knowledge_cutoff_admits_late_listing_fact():
+    connection = duckdb.connect()
+    _register(connection)
+    connection.execute(
+        "UPDATE dwd_listing SET knowledge_from="
+        "TIMESTAMPTZ '2026-10-14T06:10:33+08:00'"
+    )
+    try:
+        assert connection.execute(
+            dwd_native5m_query(knowledge_cutoff="2026-09-30T23:59:59+08:00")
+        ).fetchall() == []
+        row = connection.execute(
+            dwd_native5m_query(knowledge_cutoff="2026-10-19T23:59:59+08:00")
+        ).to_arrow_table().to_pylist()[0]
+    finally:
+        connection.close()
+    assert row["listing_id"] == "listing-1"
+    assert row["knowledge_from"] == datetime(2026, 10, 16, tzinfo=timezone.utc)
+
+
 def test_native5m_dwd_rejects_relation_injection():
     try:
         dwd_native5m_query(projected_relation="x;drop table y")

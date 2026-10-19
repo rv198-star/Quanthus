@@ -227,6 +227,43 @@ def test_fetch_accepts_sub_tick_json_serialization_noise(tmp_path) -> None:
     assert metrics["daily_reconciliation"]["daily_price_abs_tolerance"] == "1E-8"
 
 
+def test_fetch_accepts_daily_extrema_outside_continuous_five_minute_grid(tmp_path) -> None:
+    def get(url, **_kwargs):
+        return SimpleNamespace(
+            status_code=200,
+            content=(
+                _raw() if url == ENDPOINT else _daily_raw(high="10.3100", low="9.9900")
+            ),
+            headers={},
+        )
+
+    bars, metrics = fetch_captured_day(tmp_path, _request(), api_key="runtime", get=get)
+    assert len(bars) == 48
+    reconciliation = metrics["daily_reconciliation"]
+    assert reconciliation["daily_high_matches_minute_high"] is False
+    assert reconciliation["daily_low_matches_minute_low"] is False
+    assert reconciliation["daily_close_matches_minute_close"] is True
+
+
+@pytest.mark.parametrize(
+    ("daily", "reason"),
+    [
+        ({"high": "10.2900"}, "DAILY_PRICE_BASIS_MISMATCH"),
+        ({"low": "10.0100"}, "DAILY_PRICE_BASIS_MISMATCH"),
+    ],
+)
+def test_fetch_rejects_minute_extrema_outside_daily_range(tmp_path, daily, reason) -> None:
+    def get(url, **_kwargs):
+        return SimpleNamespace(
+            status_code=200,
+            content=_raw() if url == ENDPOINT else _daily_raw(**daily),
+            headers={},
+        )
+
+    with pytest.raises(TushareNative5mError, match=reason):
+        fetch_captured_day(tmp_path, _request(), api_key="runtime", get=get)
+
+
 def test_fetch_accepts_start_grid_with_disclosed_auction_open_difference(tmp_path) -> None:
     def get(url, **_kwargs):
         return SimpleNamespace(

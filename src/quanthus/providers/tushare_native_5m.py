@@ -218,15 +218,13 @@ def _daily_reconciliation(
     values = [bar.values for bar in bars]
     if not values:
         raise TushareNative5mError("DAILY_PRICE_BASIS_MISMATCH")
-    minute_prices = (
-        max(value[1] for value in values),
-        min(value[2] for value in values),
-        values[-1][3],
-    )
-    daily_prices = (daily_high, daily_low, daily_close)
-    if any(
-        abs(minute - expected) > DAILY_PRICE_ABS_TOLERANCE
-        for minute, expected in zip(minute_prices, daily_prices, strict=True)
+    minute_high = max(value[1] for value in values)
+    minute_low = min(value[2] for value in values)
+    minute_close = values[-1][3]
+    if (
+        minute_high > daily_high + DAILY_PRICE_ABS_TOLERANCE
+        or minute_low < daily_low - DAILY_PRICE_ABS_TOLERANCE
+        or abs(minute_close - daily_close) > DAILY_PRICE_ABS_TOLERANCE
     ):
         raise TushareNative5mError("DAILY_PRICE_BASIS_MISMATCH")
     minute_volume = sum((value[4] for value in values), Decimal(0))
@@ -244,8 +242,14 @@ def _daily_reconciliation(
         raise TushareNative5mError("DAILY_VOLUME_OR_AMOUNT_MISMATCH")
     return {
         "label_mode": label_mode,
-        "daily_ohlc_gate": "high_low_close_abs_tolerance; open_difference_disclosed",
+        "daily_ohlc_gate": (
+            "high_low_within_daily_range; close_abs_tolerance; "
+            "open_difference_disclosed"
+        ),
         "daily_price_abs_tolerance": str(DAILY_PRICE_ABS_TOLERANCE),
+        "daily_high_matches_minute_high": minute_high == daily_high,
+        "daily_low_matches_minute_low": minute_low == daily_low,
+        "daily_close_matches_minute_close": minute_close == daily_close,
         "daily_volume_fraction": str(volume_fraction),
         "daily_amount_fraction": str(amount_fraction),
         "daily_fraction_bounds": [str(MIN_DAILY_FRACTION), str(MAX_DAILY_FRACTION)],

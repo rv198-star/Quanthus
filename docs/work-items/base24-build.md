@@ -37,6 +37,44 @@ preserves the exact received REQ, its digest, pre-transfer controls, source-sele
 identity census, capacity receipt and takeover record. No Base build was in flight;
 the node's unrelated scheduler and existing services were left running.
 
+### 2026-10-19 Route A source-convergence checkpoint
+
+This checkpoint supersedes the earlier source-count and alternate-source statements below. Continue
+from local commit `78cc2872bb3242aeb90a43c5b93b26bdfcbff9dc`; it is not pushed. The direct historical native-5m
+adapter keeps the API credential caller-owned and ephemeral, retains exact source bytes and lexical
+Decimal values, and qualifies only complete 48-bucket exact-day observations against a separately
+captured daily observation. Its focused provider suite passed 18 tests; repository-wide checks must
+be rerun after the final source decision.
+
+The immutable Route A successor is
+`/srv/quanthus-base22-data/jobs/base24-native5m-ledger-v8-tushare-78cc287`. An independent physical,
+hash, DuckDB/Parquet and bidirectional row comparison passed: 7,804,753 unique required security-days,
+7,783,878 R2 observations, 20,871 justified no-data units and 4 R3 units. The alternate source
+qualified 217 of the former 221 exact gaps. All 7,804,747 rows outside the six final v8 changes were
+semantically unchanged under bidirectional `EXCEPT ALL`. No source price or credential entered the
+safe evidence.
+
+The four remaining units are `600265` on 2023-02-10, `000555` and `002740` on 2023-12-21, and
+`002866` on 2022-02-21. Both one-minute and five-minute captures have complete grids. The first and
+third units retain daily-turnover reconciliation gaps below the frozen R2 threshold; the second and
+fourth retain price conflicts. A bounded independent comparison restored the exact Base 2.3 DWD
+daily members from one hash-verified GDrive archive part. It confirmed that the stored DWD daily
+observations and the newly captured provider daily observations agree on the governing price/volume
+facts, so none of the four minute conflicts may be guessed away. A second public historical-minute
+probe returned no rows for the two price-conflict dates. The current `R3=0` contract and downstream
+hard gate remain unchanged.
+
+Qualified work continued independently. The 217 admitted source partitions were materialized and
+cold-audited as a 10,416-row physical projection at
+`/srv/quanthus-base22-data/jobs/base24-qualified217-projection-78cc287` (manifest SHA-256
+`1971aa0f61714e21d40f6d393c2279e4548824e28e986eeb7f31cbddabe46841`). They were then resolved
+against the retained Base 2.3.1 listing and trading-calendar identities into a schema-exact,
+reference-closed 10,416-row DWD supplement at
+`/srv/quanthus-base22-data/jobs/base24-qualified217-dwd-supplement-78cc287` (manifest SHA-256
+`6284d364f15d195bee9cc018f38ffce7c3750a15ad8b9ea42f1e545baa056410`). Both packages say
+`QUALIFIED_SUBSET_NOT_FINAL_BASE24`, keep consumer admission denied and retain the four R3 units;
+they are reusable inputs, not a Base 2.4 candidate or acceptance.
+
 The inherited `make check PYTHON=.venv/bin/python` passed at the engineering SHA:
 6,526 passed, 21 skipped, 66 warnings. Scoped holder/action lint and type checks
 passed. These are code checks, not real 2.4 source or image qualification. Earlier

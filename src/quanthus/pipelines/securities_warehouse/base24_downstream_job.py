@@ -392,7 +392,7 @@ def audit_month_resolution(
                  s.listing_id,s.observation_start,s.interval_size,
                  s.price_basis,s.knowledge_from
                )),
-               count_if(
+               coalesce(count_if(
                  s.record_source<>'base24_native5m_exact'
                  OR s.interval_size<>'5m' OR s.price_basis<>'UNADJUSTED'
                  OR s.source_artifact_sha256<>p.input_artifact_sha256
@@ -402,12 +402,12 @@ def audit_month_resolution(
                  OR v.mic_code<>
                     CASE r.venue WHEN 'SSE' THEN 'XSHG' WHEN 'SZSE' THEN 'XSHE' END
                  OR c.trade_date<>p.market_date
-                 OR c.session_type<>'REGULAR_DAY' OR NOT c.is_open
+                 OR c.session_type NOT IN ('REGULAR_DAY','day') OR NOT c.is_open
                  OR strftime(c.trade_date,'%Y-%m')<>?
                  OR s.source_record_id<>
                     'partition='||p.input_partition_id||'&stock_code='||p.stock_code||'&ts='||
                     strftime(p.ts,'%Y-%m-%dT%H:%M:%S')
-               )
+               ),0)
         FROM {projected} p
         JOIN {supplement} s ON s.source_record_id=
              'partition='||p.input_partition_id||'&stock_code='||p.stock_code||'&ts='||

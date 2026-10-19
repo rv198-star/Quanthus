@@ -47,7 +47,7 @@ WITH source AS (
   FROM source s
   JOIN {listing} l ON l.listing_code=s.stock_code
   JOIN {calendar} c ON c.venue_id=l.venue_id AND c.trade_date=s.market_date
-       AND c.session_type='REGULAR_DAY' AND c.is_open
+       AND c.session_type IN ('REGULAR_DAY','day') AND c.is_open
   WHERE l.effective_from<=s.minute_end
     AND (l.effective_to IS NULL OR s.minute_end<l.effective_to)
     AND l.knowledge_from<=TIMESTAMPTZ {cutoff}

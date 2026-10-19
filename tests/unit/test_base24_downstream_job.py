@@ -216,7 +216,13 @@ def _final_month(root: Path) -> tuple[str, pa.Table]:
     return relative, table
 
 
-def _resolution(projected: pa.Table, supplement: pa.Table, *, venue: str = "SSE") -> dict[str, int]:
+def _resolution(
+    projected: pa.Table,
+    supplement: pa.Table,
+    *,
+    venue: str = "SSE",
+    session_type: str = "REGULAR_DAY",
+) -> dict[str, int]:
     connection = duckdb.connect()
     connection.register("projected_native5m", projected)
     connection.register("native5m_supplement", supplement)
@@ -229,9 +235,9 @@ def _resolution(projected: pa.Table, supplement: pa.Table, *, venue: str = "SSE"
         [venue, "XSHG" if venue == "SSE" else "XSHE"],
     )
     connection.execute(
-        """
+        f"""
         CREATE TABLE dwd_trading_calendar AS SELECT 'session-1' calendar_session_id,
-          'SSE' venue_id,DATE '2020-01-02' trade_date,'REGULAR_DAY' session_type,true is_open
+          'SSE' venue_id,DATE '2020-01-02' trade_date,'{session_type}' session_type,true is_open
         """
     )
     connection.execute(
@@ -378,3 +384,12 @@ def test_wrong_venue_records_bounded_failure_and_never_writes_ready(tmp_path):
         "status",
         "transfer_marker_written",
     }
+
+
+def test_month_resolution_accepts_governed_daily_session_alias():
+    projected = pa.Table.from_pylist(_projection_rows())
+    supplement = pa.Table.from_pylist(
+        _supplement_rows(), schema=_schemas()["dwd_security_bar"]
+    )
+    resolution = _resolution(projected, supplement, session_type="day")
+    assert resolution["resolved_rows"] == 48

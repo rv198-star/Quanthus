@@ -13,7 +13,12 @@ from quanthus.pipelines.securities_warehouse.base24_native5m_dwd import (
 )
 
 
-def _register(connection: duckdb.DuckDBPyConnection, *, venue: str = "SSE") -> None:
+def _register(
+    connection: duckdb.DuckDBPyConnection,
+    *,
+    venue: str = "SSE",
+    session_type: str = "REGULAR_DAY",
+) -> None:
     connection.register(
         "projected_native5m",
         pa.Table.from_pylist(
@@ -45,9 +50,9 @@ def _register(connection: duckdb.DuckDBPyConnection, *, venue: str = "SSE") -> N
         """
     )
     connection.execute(
-        """
+        f"""
         CREATE TABLE dwd_trading_calendar AS SELECT 'session-1' calendar_session_id,
-          'SSE' venue_id,DATE '2020-01-02' trade_date,'REGULAR_DAY' session_type,true is_open
+          'SSE' venue_id,DATE '2020-01-02' trade_date,'{session_type}' session_type,true is_open
         """
     )
 
@@ -98,6 +103,16 @@ def test_native5m_dwd_explicit_build_knowledge_cutoff_admits_late_listing_fact()
         connection.close()
     assert row["listing_id"] == "listing-1"
     assert row["knowledge_from"] == datetime(2026, 10, 16, tzinfo=timezone.utc)
+
+
+def test_native5m_dwd_accepts_governed_daily_session_alias():
+    connection = duckdb.connect()
+    _register(connection, session_type="day")
+    try:
+        row = connection.execute(dwd_native5m_query()).fetchone()
+    finally:
+        connection.close()
+    assert row is not None
 
 
 def test_native5m_dwd_rejects_relation_injection():

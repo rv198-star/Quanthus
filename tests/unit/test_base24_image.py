@@ -153,7 +153,9 @@ def test_composition_plan_binds_predecessor_32_tables_and_whole_bar_package(tmp_
         ],
     }
     (bar / "manifest.json").write_text(json.dumps(bar_manifest))
-    (bar / "READY").write_text(file_sha(bar / "manifest.json") + "\n")
+    (bar / "READY").write_text(
+        file_sha(bar / "manifest.json").removeprefix("sha256:") + "\n"
+    )
     plan = build_composition_plan(predecessor, bar, {"tables": {name: {} for name in table_names}})
     assert len(plan["tables"]) == 33
     assert plan["tables"][BAR_TABLE]["source_ids"] == ["native5m_bar"]

@@ -40,7 +40,7 @@ def _ready_manifest(root: Path) -> dict[str, Any]:
     root = physical_path(root)
     manifest = _member(root, "manifest.json")
     ready = _member(root, "READY")
-    if ready.read_text(encoding="ascii").strip() != file_sha(manifest):
+    if _sha_id(ready.read_text(encoding="ascii").strip()) != file_sha(manifest):
         raise BoundedError("BASE24_SOURCE_READY_IDENTITY_CHANGED")
     return json.loads(manifest.read_bytes())
 

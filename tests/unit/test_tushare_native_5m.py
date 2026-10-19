@@ -12,14 +12,21 @@ from quanthus.pipelines.securities_warehouse.base24_native5m_acquire import run_
 from quanthus.providers.native_5m_exact import NativeWindow
 from quanthus.providers.tushare_native_5m import (
     BUCKETS,
+    DAILY_ENDPOINT,
     ENDPOINT,
+    START_BUCKETS,
     TushareNative5mError,
     fetch_captured_day,
     parse_response,
 )
 
 
-def _raw(*, code: str = "000001.SZ", day: str = "2026-09-30") -> bytes:
+def _raw(
+    *,
+    code: str = "000001.SZ",
+    day: str = "2026-09-30",
+    buckets: tuple[str, ...] = BUCKETS,
+) -> bytes:
     fields = [
         "ts_code",
         "trade_time",
@@ -43,7 +50,7 @@ def _raw(*, code: str = "000001.SZ", day: str = "2026-09-30") -> bytes:
             "123.00",
             "1254.600",
         ]
-        for label in BUCKETS
+        for label in buckets
     ]
     return json.dumps(
         {
@@ -53,6 +60,19 @@ def _raw(*, code: str = "000001.SZ", day: str = "2026-09-30") -> bytes:
             "meta": {"coverage": "complete", "partial": False},
             "data": {"fields": fields, "items": items},
         },
+        separators=(",", ":"),
+    ).encode()
+
+
+def _daily_raw(
+    *, code: str = "000001.SZ", day: str = "2026-09-30", close: str = "10.2000"
+) -> bytes:
+    fields = ["ts_code", "trade_date", "open", "high", "low", "close", "vol", "amount"]
+    items = [
+        [code, day.replace("-", ""), "10.1000", "10.3000", "10.0000", close, "59.04", "60.2208"]
+    ]
+    return json.dumps(
+        {"code": 0, "api_name": "daily", "count": 1, "data": {"fields": fields, "items": items}},
         separators=(",", ":"),
     ).encode()
 
@@ -75,6 +95,13 @@ def test_parse_response_preserves_exact_grid_and_lexical_decimals() -> None:
         "1254.600",
     )
     assert rows[0].values[-1] == Decimal("1254.600")
+
+
+def test_parse_response_normalizes_complete_interval_start_grid() -> None:
+    rows = parse_response(_raw(buckets=START_BUCKETS), _request())
+    assert len(rows) == 48
+    assert rows[0].timestamp.isoformat() == "2026-09-30T09:35:00+08:00"
+    assert rows[-1].timestamp.isoformat() == "2026-09-30T15:00:00+08:00"
 
 
 @pytest.mark.parametrize(
@@ -107,13 +134,13 @@ def test_parse_response_rejects_non_exact_day() -> None:
 
 
 def test_fetch_captures_raw_without_persisting_credential(tmp_path) -> None:
-    observed = {}
+    observed = []
 
     def get(url, **kwargs):
-        observed.update(url=url, **kwargs)
+        observed.append({"url": url, **kwargs})
         return SimpleNamespace(
             status_code=200,
-            content=_raw(),
+            content=_raw() if url == ENDPOINT else _daily_raw(),
             headers={"x-request-id": "request-1"},
         )
 
@@ -124,16 +151,22 @@ def test_fetch_captures_raw_without_persisting_credential(tmp_path) -> None:
         get=get,
     )
     assert len(bars) == 48
-    assert observed["url"] == ENDPOINT
-    assert observed["params"]["freq"] == "5min"
-    assert observed["headers"] == {"X-API-Key": "secret-only-in-memory"}
+    assert [request["url"] for request in observed] == [ENDPOINT, DAILY_ENDPOINT]
+    assert observed[0]["params"]["freq"] == "5min"
+    assert observed[1]["params"]["start_date"] == "20260930"
+    assert all(request["headers"] == {"X-API-Key": "secret-only-in-memory"} for request in observed)
     assert metrics["native_frequency"] == "5m"
     assert metrics["source_endpoint"] == ENDPOINT
+    assert metrics["daily_source_endpoint"] == DAILY_ENDPOINT
+    assert metrics["actual_requests"] == 2
+    assert metrics["daily_reconciliation"]["label_mode"] == "interval_end"
     assert metrics["derived_from"] is None
     assert metrics["credential_persisted"] is False
     assert "secret-only-in-memory" not in json.dumps(metrics)
     with gzip.open(tmp_path / "source-response.json.gz", "rb") as stream:
         assert stream.read() == _raw()
+    with gzip.open(tmp_path / "source-daily-response.json.gz", "rb") as stream:
+        assert stream.read() == _daily_raw()
 
 
 def test_fetch_rejects_http_without_writing_payload(tmp_path) -> None:
@@ -159,9 +192,27 @@ def test_fetch_retains_raw_response_when_payload_fails_validation(tmp_path) -> N
         assert stream.read() == raw
 
 
+def test_fetch_fails_closed_on_daily_price_basis_mismatch(tmp_path) -> None:
+    def get(url, **_kwargs):
+        return SimpleNamespace(
+            status_code=200,
+            content=_raw() if url == ENDPOINT else _daily_raw(close="10.1900"),
+            headers={},
+        )
+
+    with pytest.raises(TushareNative5mError, match="DAILY_PRICE_BASIS_MISMATCH"):
+        fetch_captured_day(tmp_path, _request(), api_key="runtime", get=get)
+    assert (tmp_path / "source-response.json.gz").is_file()
+    assert (tmp_path / "source-daily-response.json.gz").is_file()
+
+
 def test_fetcher_seals_through_generic_native5m_acquisition(tmp_path) -> None:
-    def get(*_args, **_kwargs):
-        return SimpleNamespace(status_code=200, content=_raw(), headers={})
+    def get(url, **_kwargs):
+        return SimpleNamespace(
+            status_code=200,
+            content=_raw() if url == ENDPOINT else _daily_raw(),
+            headers={},
+        )
 
     identity = hashlib.sha256(b"SZSE\t000001\t2026-09-30\t2026-09-30").hexdigest()
     plan = {
@@ -202,4 +253,5 @@ def test_fetcher_seals_through_generic_native5m_acquisition(tmp_path) -> None:
     assert receipt["rows"] == 48
     assert receipt["metrics"]["provider"] == "tushare-stk_mins-native-5m"
     assert "source-response.json.gz" in receipt["files"]
+    assert "source-daily-response.json.gz" in receipt["files"]
     assert "runtime-only" not in json.dumps(receipt)

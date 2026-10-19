@@ -12,6 +12,7 @@ from quanthus.pipelines.securities_warehouse.base24_native5m_acquire import run_
 from quanthus.providers.native_5m_exact import NativeWindow
 from quanthus.providers.tushare_native_5m import (
     BUCKETS,
+    ENDPOINT,
     TushareNative5mError,
     fetch_captured_day,
     parse_response,
@@ -123,9 +124,11 @@ def test_fetch_captures_raw_without_persisting_credential(tmp_path) -> None:
         get=get,
     )
     assert len(bars) == 48
+    assert observed["url"] == ENDPOINT
     assert observed["params"]["freq"] == "5min"
     assert observed["headers"] == {"X-API-Key": "secret-only-in-memory"}
     assert metrics["native_frequency"] == "5m"
+    assert metrics["source_endpoint"] == ENDPOINT
     assert metrics["derived_from"] is None
     assert metrics["credential_persisted"] is False
     assert "secret-only-in-memory" not in json.dumps(metrics)

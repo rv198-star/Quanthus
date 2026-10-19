@@ -19,7 +19,7 @@ from typing import Any
 
 from quanthus.providers.native_5m_exact import SHANGHAI, ExactBar, NativeWindow
 
-ENDPOINT = "https://tl.kaixin8.top/tushare/pro/stk_mins"
+ENDPOINT = "https://pcd.mobcvb.cn/tushare/pro/stk_mins"
 PROVIDER = "tushare-stk_mins-native-5m"
 EXPECTED_FIELDS = {
     "ts_code",
@@ -178,6 +178,7 @@ def fetch_captured_day(
         zipped.write(raw)
     return bars, {
         "provider": PROVIDER,
+        "source_endpoint": endpoint,
         "native_frequency": "5m",
         "derived_from": None,
         "price_basis": "provider_unadjusted",

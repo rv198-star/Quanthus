@@ -16,6 +16,10 @@ import pyarrow.parquet as pq  # type: ignore[import-untyped]
 from .base22 import canonical, digest, file_sha
 from .base22_sources import physical_path
 from .base24_native5m_acquire import BUCKETS
+from .base24_native5m_bounded import (
+    Base24BoundedLimitationError,
+    validate_bounded_ledger_package,
+)
 from .base24_native5m_projection import audit_projection
 from .market_observation import _schemas
 
@@ -101,7 +105,7 @@ def validate_successor_ledger(root: Path, expected_manifest_sha256: str) -> dict
     ):
         raise Base24DownstreamError("BASE24_SUCCESSOR_LEDGER_IDENTITY_CHANGED")
     manifest = _object(manifest_path, "BASE24_SUCCESSOR_LEDGER_INVALID")
-    if manifest.get("contract") != LEDGER_CONTRACT or manifest.get("status") != "PASS":
+    if manifest.get("contract") != LEDGER_CONTRACT:
         raise Base24DownstreamError("BASE24_SUCCESSOR_LEDGER_NOT_PASS")
     declared: set[str] = set()
     files = manifest.get("files")
@@ -125,8 +129,10 @@ def validate_successor_ledger(root: Path, expected_manifest_sha256: str) -> dict
     if _tree(root) != {"manifest.json", "READY", *declared}:
         raise Base24DownstreamError("BASE24_SUCCESSOR_LEDGER_FILE_SET_CHANGED")
     result = _object(root / "result.safe.json", "BASE24_SUCCESSOR_LEDGER_INVALID")
-    if result.get("status") != "PASS" or result.get("R3_security_days") != 0:
-        raise Base24DownstreamError("BASE24_SUCCESSOR_LEDGER_NOT_PASS")
+    try:
+        bounded = validate_bounded_ledger_package(root=root, manifest=manifest, result=result)
+    except Base24BoundedLimitationError as exc:
+        raise Base24DownstreamError("BASE24_SUCCESSOR_LEDGER_NOT_PASS") from exc
     ledger_path = root / "coverage-ledger.parquet"
     if ledger_path.relative_to(root).as_posix() not in declared:
         raise Base24DownstreamError("BASE24_SUCCESSOR_LEDGER_INVALID")
@@ -136,8 +142,7 @@ def validate_successor_ledger(root: Path, expected_manifest_sha256: str) -> dict
         ledger_summary = connection.execute(
             """
             SELECT count_if(
-                     rating='R3'
-                     OR source_family='new_native_5m' AND rating IS DISTINCT FROM 'R2'
+                     source_family='new_native_5m' AND rating IS DISTINCT FROM 'R2'
                      OR source_family='new_native_5m' AND disposition IS DISTINCT FROM 'OBSERVED'
                    ),
                    count(*),count_if(source_family='new_native_5m'),
@@ -179,6 +184,9 @@ def validate_successor_ledger(root: Path, expected_manifest_sha256: str) -> dict
         "required_security_days": int(total),
         "projected_security_days": int(projected),
         "projected_rows": int(projected) * 48,
+        "status": bounded["status"],
+        "bounded_unavailable_keys": bounded["bounded_unavailable_keys"],
+        "limitation_policy_sha256": bounded["policy_sha256"],
         "months": months,
     }
 

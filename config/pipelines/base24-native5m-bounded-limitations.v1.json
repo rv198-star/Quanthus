@@ -1,0 +1,71 @@
+{
+  "contract_id": "p10-base24-native5m-bounded-limitations-v1",
+  "schema_version": 1,
+  "authority": "Owner direction 2026-10-19: close Base 2.4 as a 1d+5m product; 1m is diagnostic only",
+  "business_timezone": "Asia/Shanghai",
+  "required_intervals": ["1d", "5m"],
+  "one_minute_disposition": "NOT_INCLUDED_DIAGNOSTIC_ONLY",
+  "global_quality_thresholds_changed": false,
+  "product_status": "PASS_WITH_BOUNDED_5M_LIMITATIONS",
+  "predecessor": {
+    "ledger_manifest_sha256": "sha256:87967073837fb17792787f53dbeac2f23e2af5c7bd75409ead6cf0f171321577",
+    "remaining_r3_sha256": "sha256:81041e953e848e1429d704a3ce971746c8349f2f4c223d98a438cf5d7c828417",
+    "required_security_days": 7804753,
+    "observed_R2_security_days": 7783878,
+    "justified_no_data_security_days": 20871,
+    "R3_security_days": 4
+  },
+  "evidence": {
+    "daily_arbitration_sha256": "sha256:40003d29e864cac34fb3f3a86e75b29ced5a505d02e12a7d0ad8ff45657cce5a",
+    "dual_grid_aggregation_sha256": "sha256:960915b29736de30b2c84a28385d95e8f842815949b758380f5b3de9733ac939"
+  },
+  "semantic_qualifications": [
+    {
+      "venue": "SSE",
+      "stock_code": "600265",
+      "trade_date": "2023-02-10",
+      "predecessor_reason": "DAILY_VOLUME_OR_AMOUNT_MISMATCH",
+      "disposition": "R2_CONTINUOUS_SESSION_ONLY",
+      "ledger_reason": "native_48_bucket_grid_continuous_session_only",
+      "warning": "CALL_AUCTION_TURNOVER_EXCLUDED_WHOLE_DAY_TURNOVER_FEATURES_FORBIDDEN"
+    },
+    {
+      "venue": "SZSE",
+      "stock_code": "002740",
+      "trade_date": "2023-12-21",
+      "predecessor_reason": "DAILY_VOLUME_OR_AMOUNT_MISMATCH",
+      "disposition": "R2_CONTINUOUS_SESSION_ONLY",
+      "ledger_reason": "native_48_bucket_grid_continuous_session_only",
+      "warning": "CALL_AUCTION_TURNOVER_EXCLUDED_WHOLE_DAY_TURNOVER_FEATURES_FORBIDDEN"
+    }
+  ],
+  "unavailable_security_days": [
+    {
+      "venue": "SZSE",
+      "stock_code": "000555",
+      "trade_date": "2023-12-21",
+      "predecessor_reason": "DAILY_PRICE_BASIS_MISMATCH",
+      "ledger_reason": "known_source_conflict_fail_closed",
+      "disposition": "UNAVAILABLE_5M",
+      "daily_frequency_available": true,
+      "five_minute_fail_closed": true
+    },
+    {
+      "venue": "SZSE",
+      "stock_code": "002866",
+      "trade_date": "2022-02-21",
+      "predecessor_reason": "DAILY_PRICE_BASIS_MISMATCH",
+      "ledger_reason": "known_source_conflict_fail_closed",
+      "disposition": "UNAVAILABLE_5M",
+      "daily_frequency_available": true,
+      "five_minute_fail_closed": true
+    }
+  ],
+  "consumer_rules": {
+    "denominator_retains_unavailable_units": true,
+    "unavailable_rows_may_be_imputed": false,
+    "unrelated_qualified_security_days_blocked": false,
+    "continuous_session_rows_may_support_whole_day_turnover_features": false,
+    "trading_execution_authorized": false
+  }
+}

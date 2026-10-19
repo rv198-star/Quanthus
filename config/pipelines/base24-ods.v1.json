@@ -19,7 +19,8 @@
     "partition_receipts",
     "bounded_failure_and_hold_receipts",
     "frozen_missing_window_denominator",
-    "R3_zero_coverage_ledger"
+    "exact_coverage_ledger",
+    "bounded_5m_limitation_policy_when_applicable"
   ],
   "physical_rules": {
     "independent_regular_files": true,

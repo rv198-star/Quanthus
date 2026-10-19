@@ -19,6 +19,10 @@ from typing import Any
 from .base22 import canonical, digest, file_sha
 from .base22_sources import _fingerprint, _member, _tree, disjoint_output, physical_path
 from .base24_native5m_acquire import _plan, _verify_held, _verify_sealed
+from .base24_native5m_bounded import (
+    Base24BoundedLimitationError,
+    validate_bounded_ledger_package,
+)
 
 KIND = "quanthus_ods_base24_bundle"
 CONTRACT = "p10-base24-ods-1d-native5m-v1"
@@ -172,7 +176,6 @@ def _validate_ledger(ledger: Path, acquisition: Path) -> dict[str, Any]:
     manifest = _load_object(manifest_path, "BASE24_ODS_LEDGER_INVALID")
     if (
         manifest.get("contract") != LEDGER_CONTRACT
-        or manifest.get("status") != "PASS"
         or _member(ledger, "READY").read_text(encoding="ascii").strip()
         != file_sha(manifest_path).removeprefix("sha256:")
         or manifest.get("inputs", {}).get("acquisition_READY_SHA256")
@@ -187,7 +190,11 @@ def _validate_ledger(ledger: Path, acquisition: Path) -> dict[str, Any]:
         if member.stat().st_size != row["size_bytes"] or file_sha(member) != _sha(row["sha256"]):
             raise Base24OdsError("BASE24_ODS_LEDGER_MEMBER_INVALID")
     result = _load_object(_member(ledger, "result.safe.json"), "BASE24_ODS_LEDGER_INVALID")
-    if result.get("status") != "PASS" or result.get("R3_security_days") != 0:
+    try:
+        validate_bounded_ledger_package(root=ledger, manifest=manifest, result=result)
+    except Base24BoundedLimitationError as exc:
+        raise Base24OdsError("BASE24_ODS_LEDGER_INVALID") from exc
+    if manifest.get("status") not in {"PASS", "PASS_WITH_BOUNDED_5M_LIMITATIONS"}:
         raise Base24OdsError("BASE24_ODS_LEDGER_INVALID")
     return manifest
 
@@ -475,11 +482,14 @@ def audit_ods24(
     if (
         file_sha(ledger_manifest_path) != plan["native5m"]["ledger_manifest_sha256"]
         or ledger_manifest.get("contract") != LEDGER_CONTRACT
-        or ledger_manifest.get("status") != "PASS"
-        or ledger_result.get("status") != "PASS"
-        or ledger_result.get("R3_security_days") != 0
     ):
         raise Base24OdsError("BASE24_ODS_LEDGER_INVALID")
+    try:
+        validate_bounded_ledger_package(
+            root=root / coverage_prefix, manifest=ledger_manifest, result=ledger_result
+        )
+    except Base24BoundedLimitationError as exc:
+        raise Base24OdsError("BASE24_ODS_LEDGER_INVALID") from exc
     receipt = {
         "contract": CONTRACT,
         "status": "PASS",

@@ -75,6 +75,13 @@ reference-closed 10,416-row DWD supplement at
 `QUALIFIED_SUBSET_NOT_FINAL_BASE24`, keep consumer admission denied and retain the four R3 units;
 they are reusable inputs, not a Base 2.4 candidate or acceptance.
 
+The cold-volume capacity precondition is now satisfied. Four completed CN02 v6/v7 shard roots were
+proved file-for-file recoverable from the sealed canonical acquisition, while their three root-level
+control files per shard were copied into the review evidence. Retiring only those duplicate job roots
+reclaimed 6,801,133,568 bytes and left 47,078,580,224 bytes free on the data filesystem, above the
+45,097,156,608-byte registered minimum. The canonical acquisition seal was unchanged. This permits
+the future full cold run; it does not mean the run or acceptance has occurred.
+
 The inherited `make check PYTHON=.venv/bin/python` passed at the engineering SHA:
 6,526 passed, 21 skipped, 66 warnings. Scoped holder/action lint and type checks
 passed. These are code checks, not real 2.4 source or image qualification. Earlier

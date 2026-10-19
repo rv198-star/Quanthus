@@ -756,38 +756,18 @@ def seal_global_transfer(
     }
     if actual_files != expected_files:
         raise Base24DownstreamError("BASE24_GLOBAL_FILE_SET_INVALID")
-    paths = [str(output_root / relative) for relative in sorted(expected_files)]
-    connection = duckdb.connect()
-    try:
-        global_summary = connection.execute(
-            """
-            SELECT count(*),count(DISTINCT (
-              listing_id,observation_start,interval_size,price_basis,knowledge_from
-            )),count_if(record_source='base24_native5m_exact'),count_if(interval_size='1m')
-            FROM read_parquet(?,union_by_name=true,hive_partitioning=false)
-            """,
-            [paths],
-        ).fetchone()
-        intervals = {
-            row[0]
-            for row in connection.execute(
-                "SELECT DISTINCT interval_size FROM "
-                "read_parquet(?,union_by_name=true,hive_partitioning=false)",
-                [paths],
-            ).fetchall()
-        }
-    finally:
-        connection.close()
-    if global_summary is None:
-        raise Base24DownstreamError("BASE24_GLOBAL_CENSUS_INVALID")
-    rows, keys, native_rows, one_minute = global_summary
+    rows = sum(int(receipt["dwd"]["rows"]) for receipt in receipts)
+    keys = sum(int(receipt["dwd"]["version_keys"]) for receipt in receipts)
+    native_rows = sum(int(receipt["projected_rows"]) for receipt in receipts)
+    intervals = {
+        interval for receipt in receipts for interval in receipt["dwd"]["intervals"]
+    }
     expected_rows = sum(int(receipt["dwd"]["rows"]) for receipt in receipts)
     expected_native = sum(int(receipt["projected_rows"]) for receipt in receipts)
     if (
         rows != keys
         or rows != expected_rows
         or native_rows != expected_native
-        or one_minute
         or intervals != {"1d", "5m"}
     ):
         raise Base24DownstreamError("BASE24_GLOBAL_CENSUS_INVALID")
@@ -803,6 +783,7 @@ def seal_global_transfer(
         "version_keys": int(keys),
         "native5m_rows": int(native_rows),
         "intervals": sorted(intervals),
+        "uniqueness_basis": "MONTH_LOCAL_UNIQUENESS_PLUS_DISJOINT_BUSINESS_MONTH",
         "files": [row for receipt in receipts for row in receipt["dwd"]["files"]],
         "projection_tmp_retirements": [
             file_sha(root / "tmp-retirement-after.json")
@@ -831,6 +812,9 @@ def seal_global_transfer(
         "global_transfer_identity": global_receipt["identity"],
         "rows": int(rows),
         "new_native5m_rows": int(native_rows),
+        "global_uniqueness_basis": (
+            "MONTH_LOCAL_UNIQUENESS_PLUS_DISJOINT_BUSINESS_MONTH"
+        ),
         "files": files,
         "consumer_admission": "NOT_GRANTED",
     }
@@ -842,7 +826,7 @@ def seal_global_transfer(
 
 
 def audit_global_transfer(output_root: Path) -> dict[str, Any]:
-    """Cold-recompute the sealed file set, hashes and global DWD uniqueness census."""
+    """Cold-recompute hashes and bounded global uniqueness from disjoint months."""
     output_root = physical_path(output_root)
     manifest_path = output_root / "manifest.json"
     ready_path = output_root / "READY"
@@ -908,40 +892,60 @@ def audit_global_transfer(output_root: Path) -> dict[str, Any]:
             or file_sha(member) != _sha(row.get("sha256"))
         ):
             raise Base24DownstreamError("BASE24_GLOBAL_TRANSFER_MEMBER_CHANGED")
-    paths = [str(_member(output_root, relative)) for relative in sorted(receipt_paths)]
-    if not paths:
+    if not receipt_paths:
         raise Base24DownstreamError("BASE24_GLOBAL_TRANSFER_RECEIPT_INVALID")
-    connection = duckdb.connect()
-    try:
-        global_summary = connection.execute(
-            """
-            SELECT count(*),count(DISTINCT (
-              listing_id,observation_start,interval_size,price_basis,knowledge_from
-            )),count_if(record_source='base24_native5m_exact'),count_if(interval_size='1m')
-            FROM read_parquet(?,union_by_name=true,hive_partitioning=false)
-            """,
-            [paths],
-        ).fetchone()
-        intervals = sorted(
-            row[0]
-            for row in connection.execute(
-                "SELECT DISTINCT interval_size FROM "
-                "read_parquet(?,union_by_name=true,hive_partitioning=false)",
-                [paths],
-            ).fetchall()
-        )
-    finally:
-        connection.close()
-    if global_summary is None:
-        raise Base24DownstreamError("BASE24_GLOBAL_CENSUS_INVALID")
-    rows, keys, native_rows, one_minute = global_summary
+    months = receipt.get("months")
+    identities = receipt.get("month_receipt_identities")
     if (
-        rows != keys
-        or one_minute
+        not isinstance(months, list)
+        or months != sorted(set(months))
+        or not isinstance(identities, list)
+        or len(identities) != len(months)
+        or receipt.get("uniqueness_basis")
+        != "MONTH_LOCAL_UNIQUENESS_PLUS_DISJOINT_BUSINESS_MONTH"
+    ):
+        raise Base24DownstreamError("BASE24_GLOBAL_CENSUS_INVALID")
+    observed_paths: set[str] = set()
+    rows = 0
+    keys = 0
+    native_rows = 0
+    intervals_seen: set[str] = set()
+    for month, identity in zip(months, identities, strict=True):
+        month_receipt = _object(
+            output_root / f"evidence/months/{_month(month)}.json",
+            "BASE24_GLOBAL_TRANSFER_RECEIPT_INVALID",
+        )
+        frozen_month = {
+            key: value for key, value in month_receipt.items() if key != "identity"
+        }
+        if digest(frozen_month) != identity or month_receipt.get("identity") != identity:
+            raise Base24DownstreamError("BASE24_GLOBAL_TRANSFER_RECEIPT_INVALID")
+        month_files = [row["path"] for row in month_receipt["dwd"]["files"]]
+        if observed_paths.intersection(month_files):
+            raise Base24DownstreamError("BASE24_GLOBAL_FILE_COLLISION")
+        observed_paths.update(month_files)
+        observed = audit_month_dwd(
+            output_root,
+            month_files,
+            month,
+            int(month_receipt["projected_rows"]),
+        )
+        if observed != month_receipt["dwd"]:
+            raise Base24DownstreamError("BASE24_MONTHLY_FINAL_BYTES_CHANGED")
+        rows += int(observed["rows"])
+        keys += int(observed["version_keys"])
+        native_rows += int(observed["native5m_rows"])
+        intervals_seen.update(observed["intervals"])
+    intervals = sorted(intervals_seen)
+    if (
+        observed_paths != receipt_paths
+        or rows != keys
         or int(rows) != receipt.get("rows")
         or int(keys) != receipt.get("version_keys")
         or int(native_rows) != receipt.get("native5m_rows")
         or intervals != receipt.get("intervals")
+        or manifest.get("global_uniqueness_basis")
+        != "MONTH_LOCAL_UNIQUENESS_PLUS_DISJOINT_BUSINESS_MONTH"
         or int(rows) != manifest.get("rows")
         or int(native_rows) != manifest.get("new_native5m_rows")
     ):
@@ -954,5 +958,6 @@ def audit_global_transfer(output_root: Path) -> dict[str, Any]:
         "version_keys": int(keys),
         "native5m_rows": int(native_rows),
         "intervals": intervals,
+        "uniqueness_basis": receipt["uniqueness_basis"],
         "source_roots_dereferenced": False,
     }

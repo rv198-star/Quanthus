@@ -357,6 +357,9 @@ def test_month_transfer_requires_exact_resolution_before_tmp_release_and_global_
     assert audit["status"] == "PASS"
     assert audit["rows"] == 49
     assert audit["version_keys"] == 49
+    assert audit["uniqueness_basis"] == (
+        "MONTH_LOCAL_UNIQUENESS_PLUS_DISJOINT_BUSINESS_MONTH"
+    )
 
 
 def test_wrong_venue_records_bounded_failure_and_never_writes_ready(tmp_path):

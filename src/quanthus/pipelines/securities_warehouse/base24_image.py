@@ -42,22 +42,32 @@ def _ready_manifest(root: Path) -> dict[str, Any]:
     ready = _member(root, "READY")
     if _sha_id(ready.read_text(encoding="ascii").strip()) != file_sha(manifest):
         raise BoundedError("BASE24_SOURCE_READY_IDENTITY_CHANGED")
-    return json.loads(manifest.read_bytes())
+    value = json.loads(manifest.read_bytes())
+    if not isinstance(value, dict):
+        raise BoundedError("BASE24_SOURCE_MANIFEST_INVALID")
+    return value
 
 
 def _bar_lineage(root: Path, files: list[dict[str, Any]]) -> list[list[str]]:
-    pq = importlib.import_module("pyarrow.parquet")
-    observed: set[tuple[str, str, str]] = set()
-    for item in files:
-        path = _member(root, item["path"])
-        for batch in pq.ParquetFile(path).iter_batches(
-            columns=["record_source", "source_revision", "source_artifact_sha256"],
-            batch_size=65536,
-        ):
-            for row in zip(*(column.to_pylist() for column in batch.columns), strict=True):
-                if any(not isinstance(value, str) or not value for value in row):
-                    raise BoundedError("BASE24_BAR_LINEAGE_VALUE_INVALID")
-                observed.add(row)
+    duckdb = importlib.import_module("duckdb")
+    paths = [str(_member(root, item["path"])) for item in files]
+    connection = duckdb.connect()
+    try:
+        connection.execute("SET threads=2")
+        connection.execute("SET memory_limit='2GB'")
+        observed = set(
+            connection.execute(
+                "SELECT DISTINCT record_source,source_revision,source_artifact_sha256 "
+                "FROM read_parquet(?,union_by_name=true,hive_partitioning=false)",
+                [paths],
+            ).fetchall()
+        )
+    finally:
+        connection.close()
+    if any(
+        any(not isinstance(value, str) or not value for value in row) for row in observed
+    ):
+        raise BoundedError("BASE24_BAR_LINEAGE_VALUE_INVALID")
     if not observed:
         raise BoundedError("BASE24_BAR_LINEAGE_EMPTY")
     return [list(row) for row in sorted(observed)]

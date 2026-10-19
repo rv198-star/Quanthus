@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .base22 import file_sha
+from .base22 import digest, file_sha
 from .base22_bounded import BoundedError, Budget
 from .base22_sources import _member, physical_path
 from .base23_delivery import HARD_CHECKS
@@ -63,6 +63,45 @@ def _bar_lineage(root: Path, files: list[dict[str, Any]]) -> list[list[str]]:
     return [list(row) for row in sorted(observed)]
 
 
+def _bar_files(root: Path, manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
+    declared = [
+        item
+        for item in manifest.get("files", [])
+        if isinstance(item, dict)
+        and isinstance(item.get("path"), str)
+        and item["path"].endswith(".parquet")
+    ]
+    if declared and all(isinstance(item.get("rows"), int) for item in declared):
+        return declared
+    receipt = json.loads(_member(root, "evidence/global-transfer-receipt.json").read_bytes())
+    frozen = {key: value for key, value in receipt.items() if key != "identity"}
+    receipt_files = receipt.get("files")
+    if (
+        receipt.get("contract") != "p10-base24-native5m-global-transfer-receipt-v1"
+        or receipt.get("identity") != digest(frozen)
+        or receipt.get("identity") != manifest.get("global_transfer_identity")
+        or not isinstance(receipt_files, list)
+    ):
+        raise BoundedError("BASE24_BAR_PACKAGE_FILE_SET_CHANGED")
+    by_path = {item["path"]: item for item in declared}
+    selected: list[dict[str, Any]] = []
+    for item in receipt_files:
+        if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+            raise BoundedError("BASE24_BAR_PACKAGE_FILE_SET_CHANGED")
+        source = by_path.get(item["path"])
+        if (
+            source is None
+            or source.get("size_bytes") != item.get("size_bytes")
+            or _sha_id(str(source.get("sha256"))) != _sha_id(str(item.get("sha256")))
+            or not isinstance(item.get("rows"), int)
+        ):
+            raise BoundedError("BASE24_BAR_PACKAGE_FILE_SET_CHANGED")
+        selected.append(item)
+    if {item["path"] for item in selected} != set(by_path):
+        raise BoundedError("BASE24_BAR_PACKAGE_FILE_SET_CHANGED")
+    return selected
+
+
 def build_composition_plan(
     predecessor_root: Path, bar_root: Path, rules: Mapping[str, Any]
 ) -> dict[str, Any]:
@@ -86,9 +125,7 @@ def build_composition_plan(
         or bar_manifest.get("consumer_admission") != "NOT_GRANTED"
     ):
         raise BoundedError("BASE24_SOURCE_SCOPE_CHANGED")
-    bar_files = [
-        item for item in bar_manifest.get("files", []) if item["path"].endswith(".parquet")
-    ]
+    bar_files = _bar_files(bar_root, bar_manifest)
     if not bar_files or any(
         not item["path"].startswith("payload/dwd_security_bar/")
         or not isinstance(item.get("rows"), int)

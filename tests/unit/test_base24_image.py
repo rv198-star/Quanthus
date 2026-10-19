@@ -8,7 +8,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from quanthus.pipelines.securities_warehouse.base22 import file_sha
+from quanthus.pipelines.securities_warehouse.base22 import canonical, digest, file_sha
 from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError
 from quanthus.pipelines.securities_warehouse.base24_delivery import (
     INTERVALS,
@@ -103,10 +103,14 @@ def test_interval_validator_does_not_apply_unreviewed_rule_to_other_tables(tmp_p
     validate_default_intervals("dwd_tradability_state", [path])
 
 
-def test_composition_plan_binds_predecessor_32_tables_and_whole_bar_package(tmp_path):
+@pytest.mark.parametrize("rows_in_manifest", [True, False])
+def test_composition_plan_binds_predecessor_32_tables_and_whole_bar_package(
+    tmp_path, rows_in_manifest
+):
     predecessor, bar = tmp_path / "predecessor", tmp_path / "bar"
     (predecessor / "evidence").mkdir(parents=True)
     (bar / "payload/dwd_security_bar/interval_size=5m/year=2026").mkdir(parents=True)
+    (bar / "evidence").mkdir()
     table_names = [BAR_TABLE, *(f"table_{index:02d}" for index in range(1, 33))]
     lineage = [["source", "revision", "sha256:" + "a" * 64]]
     layout, plan_tables = {}, {}
@@ -138,20 +142,30 @@ def test_composition_plan_binds_predecessor_32_tables_and_whole_bar_package(tmp_
         ),
         bar_path,
     )
+    bar_member = {
+        "path": bar_path.relative_to(bar).as_posix(),
+        "sha256": file_sha(bar_path).removeprefix("sha256:"),
+        "size_bytes": bar_path.stat().st_size,
+    }
+    if rows_in_manifest:
+        bar_member["rows"] = 2
     bar_manifest = {
         "business_through": "2026-09-30",
         "default_intervals": ["1d", "5m"],
         "one_minute_disposition": ONE_MINUTE_DISPOSITION,
         "consumer_admission": "NOT_GRANTED",
-        "files": [
-            {
-                "path": bar_path.relative_to(bar).as_posix(),
-                "sha256": file_sha(bar_path).removeprefix("sha256:"),
-                "size_bytes": bar_path.stat().st_size,
-                "rows": 2,
-            }
-        ],
+        "files": [bar_member],
     }
+    if not rows_in_manifest:
+        receipt = {
+            "contract": "p10-base24-native5m-global-transfer-receipt-v1",
+            "files": [{**bar_member, "rows": 2}],
+        }
+        receipt["identity"] = digest(receipt)
+        (bar / "evidence/global-transfer-receipt.json").write_bytes(
+            canonical(receipt) + b"\n"
+        )
+        bar_manifest["global_transfer_identity"] = receipt["identity"]
     (bar / "manifest.json").write_text(json.dumps(bar_manifest))
     (bar / "READY").write_text(
         file_sha(bar / "manifest.json").removeprefix("sha256:") + "\n"

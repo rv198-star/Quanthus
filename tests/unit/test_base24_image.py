@@ -11,9 +11,12 @@ import pytest
 from quanthus.pipelines.securities_warehouse.base22 import canonical, digest, file_sha
 from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError
 from quanthus.pipelines.securities_warehouse.base24_delivery import (
+    BASE24_LIMITATION_IDS,
+    HARD_CHECKS,
     INTERVALS,
     ONE_MINUTE_DISPOSITION,
     PURPOSE,
+    assess_delivery,
     validate_contract,
 )
 from quanthus.pipelines.securities_warehouse.base24_image import (
@@ -28,6 +31,45 @@ from quanthus.pipelines.securities_warehouse.base24_image import (
 CONFIG = Path("config/pipelines/base24-delivery.v1.json")
 
 
+def base24_limitations():
+    evidence = "evidence/base24/bounded-limitations.v1.json"
+    return [
+        {
+            "id": "base24-bounded-continuous-session-turnover",
+            "tables": [BAR_TABLE],
+            "scope_kind": "security_days",
+            "scope": ["SSE/600265/2023-02-10"],
+            "disposition": "QUALIFIED_5M_CONTINUOUS_SESSION_ONLY",
+            "blocked_uses": ["whole_day_turnover_from_5m"],
+            "risk": "bounded",
+            "repair_cost": "authority",
+            "evidence_paths": [evidence],
+        },
+        {
+            "id": "base24-exact-5m-unavailable",
+            "tables": [BAR_TABLE],
+            "scope_kind": "security_days",
+            "scope": ["SZSE/000555/2023-12-21"],
+            "disposition": "PRESERVE_UNAVAILABLE",
+            "blocked_uses": ["5m_bar_on_exact_security_day"],
+            "risk": "bounded",
+            "repair_cost": "authority",
+            "evidence_paths": [evidence],
+        },
+        {
+            "id": "base24-optional-1m-not-included",
+            "tables": [BAR_TABLE],
+            "scope_kind": "interval",
+            "scope": ["1m"],
+            "disposition": "NOT_INCLUDED_DIAGNOSTIC_ONLY",
+            "blocked_uses": ["1m_consumption"],
+            "risk": "out of scope",
+            "repair_cost": "none",
+            "evidence_paths": [evidence],
+        },
+    ]
+
+
 def test_base24_contract_is_explicit_successor_and_does_not_delete_retained_1m():
     contract = json.loads(CONFIG.read_bytes())
     validate_contract(contract)
@@ -37,6 +79,40 @@ def test_base24_contract_is_explicit_successor_and_does_not_delete_retained_1m()
     assert PROFILE.kind == KIND
     assert PROFILE.purpose == PURPOSE
     assert dict(PROFILE.manifest_fields)["default_intervals"] == ["1d", "5m"]
+
+
+def test_base24_delivery_accepts_only_evidence_bound_frequency_limitations():
+    evidence_path = "evidence/base24/bounded-limitations.v1.json"
+    result = assess_delivery(
+        contract=json.loads(CONFIG.read_bytes()),
+        tables={BAR_TABLE},
+        limitations=base24_limitations(),
+        evidence={evidence_path: "sha256:" + "a" * 64},
+        checks=dict.fromkeys(HARD_CHECKS, "PASS"),
+    )
+    assert result["build_eligible"] is True
+    assert result["known_limitation_count"] == 3
+    assert {item["id"] for item in result["limitations"]} == BASE24_LIMITATION_IDS
+
+
+@pytest.mark.parametrize("field,value", [
+    ("scope_kind", "table_window"),
+    ("disposition", "PRESERVE_UNAVAILABLE"),
+    ("blocked_uses", ["cross_provider_exact_price"]),
+])
+def test_base24_frequency_limitation_contract_drift_fails(field, value):
+    limitations = base24_limitations()
+    limitations[0][field] = value
+    with pytest.raises(BoundedError, match="BASE24_LIMITATION_UNBOUND_OR_UNSCOPED"):
+        assess_delivery(
+            contract=json.loads(CONFIG.read_bytes()),
+            tables={BAR_TABLE},
+            limitations=limitations,
+            evidence={
+                "evidence/base24/bounded-limitations.v1.json": "sha256:" + "a" * 64
+            },
+            checks=dict.fromkeys(HARD_CHECKS, "PASS"),
+        )
 
 
 @pytest.mark.parametrize("field", ["required_intervals", "derive_5m_from_1m", "purpose"])

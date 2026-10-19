@@ -24,6 +24,11 @@ from .base24_native5m_projection import audit_projection
 from .market_observation import _schemas
 
 LEDGER_CONTRACT = "p10-base24-native5m-coverage-ledger-package-v1"
+PROJECTED_SOURCE_FAMILIES = (
+    "new_native_5m",
+    "tushare_partition_gated_native_5m",
+    "tushare_bounded_continuous_session_native_5m",
+)
 MONTH_CONTRACT = "p10-base24-native5m-monthly-transfer-v1"
 MONTH_RECEIPT_CONTRACT = "p10-base24-native5m-monthly-transfer-receipt-v1"
 RESOLUTION_CONTRACT = "p10-base24-native5m-monthly-resolution-v1"
@@ -142,14 +147,14 @@ def validate_successor_ledger(root: Path, expected_manifest_sha256: str) -> dict
         ledger_summary = connection.execute(
             """
             SELECT count_if(
-                     source_family='new_native_5m' AND rating IS DISTINCT FROM 'R2'
-                     OR source_family='new_native_5m' AND disposition IS DISTINCT FROM 'OBSERVED'
+                     source_family IN ? AND rating IS DISTINCT FROM 'R2'
+                     OR source_family IN ? AND disposition IS DISTINCT FROM 'OBSERVED'
                    ),
-                   count(*),count_if(source_family='new_native_5m'),
+                   count(*),count_if(source_family IN ?),
                    count(DISTINCT (venue,stock_code,trade_date))
             FROM read_parquet(?)
             """,
-            [str(ledger_path)],
+            [list(PROJECTED_SOURCE_FAMILIES)] * 3 + [str(ledger_path)],
         ).fetchone()
         if ledger_summary is None:
             raise Base24DownstreamError("BASE24_SUCCESSOR_LEDGER_CENSUS_INVALID")
@@ -157,11 +162,11 @@ def validate_successor_ledger(root: Path, expected_manifest_sha256: str) -> dict
         grouped = connection.execute(
             """
             SELECT strftime(trade_date,'%Y-%m') business_month,
-                   count_if(source_family='new_native_5m') projected_security_days,
+                   count_if(source_family IN ?) projected_security_days,
                    count(*) denominator_security_days
             FROM read_parquet(?) GROUP BY ALL ORDER BY ALL
             """,
-            [str(ledger_path)],
+            [list(PROJECTED_SOURCE_FAMILIES), str(ledger_path)],
         ).fetchall()
     finally:
         connection.close()

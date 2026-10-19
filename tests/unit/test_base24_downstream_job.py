@@ -38,7 +38,12 @@ def _write(path: Path, value: object) -> None:
     path.write_bytes(canonical(value) + b"\n")
 
 
-def _ledger(root: Path, *, disposition: str = "OBSERVED") -> Path:
+def _ledger(
+    root: Path,
+    *,
+    disposition: str = "OBSERVED",
+    source_family: str = "new_native_5m",
+) -> Path:
     root.mkdir()
     table = pa.Table.from_pylist(
         [
@@ -50,7 +55,7 @@ def _ledger(root: Path, *, disposition: str = "OBSERVED") -> Path:
                 "rating": "R2",
                 "reason": "native_48_bucket_grid",
                 "evidence_warning": None,
-                "source_family": "new_native_5m",
+                "source_family": source_family,
                 "evidence_digest": HASH_A,
                 "first_acquired_at": "2026-10-16T00:00:00+00:00",
                 "last_acquired_at": "2026-10-16T00:00:00+00:00",
@@ -282,6 +287,17 @@ def test_successor_ledger_is_exact_pass_gate_and_month_source_selection(tmp_path
     bad = _ledger(tmp_path / "bad-ledger", disposition="UNRESOLVED")
     with pytest.raises(Base24DownstreamError, match="BASE24_SUCCESSOR_LEDGER_CENSUS_INVALID"):
         validate_successor_ledger(bad, file_sha(bad / "manifest.json"))
+
+
+@pytest.mark.parametrize(
+    "source_family",
+    ["tushare_partition_gated_native_5m", "tushare_bounded_continuous_session_native_5m"],
+)
+def test_successor_ledger_projects_each_qualified_native5m_family(tmp_path, source_family):
+    root = _ledger(tmp_path / source_family, source_family=source_family)
+    validated = validate_successor_ledger(root, file_sha(root / "manifest.json"))
+    assert validated["projected_security_days"] == 1
+    assert validated["projected_rows"] == 48
 
 
 def test_month_transfer_requires_exact_resolution_before_tmp_release_and_global_ready(tmp_path):

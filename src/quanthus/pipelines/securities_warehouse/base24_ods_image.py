@@ -14,7 +14,7 @@ import json
 import os
 import re
 from collections.abc import Callable, Iterator, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TypeVar
@@ -40,6 +40,7 @@ SUPPLEMENTAL_CLOSURE_CONTRACT = (
 )
 VERIFY_WORKERS = min(8, max(1, os.cpu_count() or 1))
 VERIFY_BATCH = 256
+ACQUISITION_WORKERS = min(2, max(1, os.cpu_count() or 1))
 _T = TypeVar("_T")
 _R = TypeVar("_R")
 
@@ -55,6 +56,28 @@ def _parallel_ordered(
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="base24-ods") as pool:
         for start in range(0, len(values), VERIFY_BATCH):
             yield from pool.map(function, values[start : start + VERIFY_BATCH])
+
+
+def _verify_acquisition_window(
+    value: tuple[str, dict[str, Any], str]
+) -> str:
+    """Validate one acquisition window in an isolated worker process."""
+    acquisition_text, window, plan_sha = value
+    acquisition = Path(acquisition_text)
+    partition = acquisition / "partitions" / window["partition_id"]
+    hold = acquisition / "held" / window["partition_id"]
+    try:
+        if partition.is_dir() and not hold.exists():
+            _verify_sealed(partition, window, plan_sha)
+            return "completed"
+        if hold.is_dir() and not partition.exists():
+            _verify_held(hold, acquisition / "failures", window, plan_sha)
+            return "held"
+    except Exception as exc:
+        raise Base24OdsError(
+            "BASE24_ODS_ACQUISITION_PARTITION_CLOSURE_INVALID"
+        ) from exc
+    raise Base24OdsError("BASE24_ODS_ACQUISITION_PARTITION_CLOSURE_INVALID")
 
 
 def _sha(value: str) -> str:
@@ -171,18 +194,22 @@ def _validate_acquisition(acquisition: Path, plan_path: Path) -> dict[str, Any]:
         != file_sha(checkpoint_path).removeprefix("sha256:")
     ):
         raise Base24OdsError("BASE24_ODS_ACQUISITION_CHECKPOINT_INVALID")
-    def verify(window: dict[str, Any]) -> str:
-        partition = acquisition / "partitions" / window["partition_id"]
-        hold = acquisition / "held" / window["partition_id"]
-        if partition.is_dir() and not hold.exists():
-            _verify_sealed(partition, window, plan_sha)
-            return "completed"
-        elif hold.is_dir() and not partition.exists():
-            _verify_held(hold, acquisition / "failures", window, plan_sha)
-            return "held"
-        else:
-            raise Base24OdsError("BASE24_ODS_ACQUISITION_PARTITION_CLOSURE_INVALID")
-    dispositions = list(_parallel_ordered(windows, verify))
+    work = [(str(acquisition), window, plan_sha) for window in windows]
+    if len(work) < VERIFY_BATCH or ACQUISITION_WORKERS == 1:
+        dispositions = [_verify_acquisition_window(value) for value in work]
+    else:
+        dispositions = []
+        with ProcessPoolExecutor(
+            max_workers=ACQUISITION_WORKERS
+        ) as pool:
+            for start in range(0, len(work), VERIFY_BATCH):
+                dispositions.extend(
+                    pool.map(
+                        _verify_acquisition_window,
+                        work[start : start + VERIFY_BATCH],
+                        chunksize=1,
+                    )
+                )
     completed = dispositions.count("completed")
     held = dispositions.count("held")
     if completed != checkpoint.get("completed") or held != checkpoint.get("held"):

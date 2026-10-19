@@ -60,7 +60,7 @@ def _parallel_ordered(
 
 def _verify_acquisition_window(
     value: tuple[str, dict[str, Any], str]
-) -> str:
+) -> tuple[str, dict[str, dict[str, Any]]]:
     """Validate one acquisition window in an isolated worker process."""
     acquisition_text, window, plan_sha = value
     acquisition = Path(acquisition_text)
@@ -68,11 +68,31 @@ def _verify_acquisition_window(
     hold = acquisition / "held" / window["partition_id"]
     try:
         if partition.is_dir() and not hold.exists():
-            _verify_sealed(partition, window, plan_sha)
-            return "completed"
+            before = {
+                relative: _fingerprint(_member(partition, relative))
+                for relative in sorted(_tree(partition))
+            }
+            receipt = _verify_sealed(partition, window, plan_sha)
+            after = {
+                relative: _fingerprint(_member(partition, relative))
+                for relative in sorted(_tree(partition))
+            }
+            if after != before:
+                raise Base24OdsError("BASE24_ODS_SOURCE_CHANGED_DURING_VALIDATION")
+            # These hashes were checked by _verify_sealed, including its exact
+            # Decimal/lexical and session validation. Reuse only within this
+            # freeze call, while the complete physical fingerprint is unchanged.
+            verified = {
+                str(partition / relative): {
+                    "sha256": _sha(expected),
+                    "source_fingerprint": list(before[relative]),
+                }
+                for relative, expected in receipt["files"].items()
+            }
+            return "completed", verified
         if hold.is_dir() and not partition.exists():
             _verify_held(hold, acquisition / "failures", window, plan_sha)
-            return "held"
+            return "held", {}
     except Exception as exc:
         raise Base24OdsError(
             "BASE24_ODS_ACQUISITION_PARTITION_CLOSURE_INVALID"
@@ -94,17 +114,29 @@ def _load_object(path: Path, reason: str) -> dict[str, Any]:
     return value
 
 
-def _source_member(source: Path, relative: str, role: str, target: str) -> dict[str, Any]:
+def _source_member(
+    source: Path, relative: str, role: str, target: str,
+    *, verified: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     path = _member(source, relative)
+    before = _fingerprint(path)
+    if verified is not None:
+        if verified.get("source_fingerprint") != list(before):
+            raise Base24OdsError("BASE24_ODS_SOURCE_CHANGED_AFTER_VALIDATION")
+        sha256 = verified["sha256"]
+    else:
+        sha256 = file_sha(path)
+    if _fingerprint(path) != before:
+        raise Base24OdsError("BASE24_ODS_SOURCE_CHANGED_DURING_VALIDATION")
     return {
         "path": target,
         "source_path": str(path),
         "source_relative": relative,
         "source_root_archival": str(source),
         "role": role,
-        "size_bytes": path.stat().st_size,
-        "sha256": file_sha(path),
-        "source_fingerprint": list(_fingerprint(path)),
+        "size_bytes": before[2],
+        "sha256": sha256,
+        "source_fingerprint": list(before),
     }
 
 
@@ -179,9 +211,12 @@ def _validate_selection(
     return wrapper, chosen
 
 
-def _validate_acquisition(acquisition: Path, plan_path: Path) -> dict[str, Any]:
+def _validate_acquisition(
+    acquisition: Path, plan_path: Path,
+    *, verified: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     plan_bytes = plan_path.read_bytes()
-    plan_sha = file_sha(plan_path).removeprefix("sha256:")
+    plan_sha = hashlib.sha256(plan_bytes).hexdigest()
     _, windows = _plan(plan_bytes)
     checkpoint_path = _member(acquisition, "CHECKPOINT.json")
     checkpoint = _load_object(checkpoint_path, "BASE24_ODS_ACQUISITION_CHECKPOINT_INVALID")
@@ -195,21 +230,30 @@ def _validate_acquisition(acquisition: Path, plan_path: Path) -> dict[str, Any]:
     ):
         raise Base24OdsError("BASE24_ODS_ACQUISITION_CHECKPOINT_INVALID")
     work = [(str(acquisition), window, plan_sha) for window in windows]
+    dispositions = []
+
+    def collect(result: tuple[str, dict[str, dict[str, Any]]]) -> None:
+        disposition, members = result
+        dispositions.append(disposition)
+        if verified is not None:
+            if any(key in verified for key in members):
+                raise Base24OdsError("BASE24_ODS_ACQUISITION_PARTITION_CLOSURE_INVALID")
+            verified.update(members)
+
     if len(work) < VERIFY_BATCH or ACQUISITION_WORKERS == 1:
-        dispositions = [_verify_acquisition_window(value) for value in work]
+        for value in work:
+            collect(_verify_acquisition_window(value))
     else:
-        dispositions = []
         with ProcessPoolExecutor(
             max_workers=ACQUISITION_WORKERS
         ) as pool:
             for start in range(0, len(work), VERIFY_BATCH):
-                dispositions.extend(
-                    pool.map(
-                        _verify_acquisition_window,
-                        work[start : start + VERIFY_BATCH],
-                        chunksize=1,
-                    )
-                )
+                for result in pool.map(
+                    _verify_acquisition_window,
+                    work[start : start + VERIFY_BATCH],
+                    chunksize=1,
+                ):
+                    collect(result)
     completed = dispositions.count("completed")
     held = dispositions.count("held")
     if completed != checkpoint.get("completed") or held != checkpoint.get("held"):
@@ -318,9 +362,12 @@ def _validate_supplemental_closure(
         target = f"payload/base24-native5m/supplemental/{root_id}/{relative}"
         if target in observed_targets:
             raise Base24OdsError("BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
+        before = _fingerprint(source)
+        source_sha = file_sha(source)
         if (
             row.get("size_bytes") != source.stat().st_size
-            or _sha(str(row.get("sha256"))) != file_sha(source)
+            or _sha(str(row.get("sha256"))) != source_sha
+            or _fingerprint(source) != before
         ):
             raise Base24OdsError("BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
         observed_sources.add(str(source))
@@ -333,8 +380,8 @@ def _validate_supplemental_closure(
                 "source_root_archival": str(root),
                 "role": "native5m_supplemental_source",
                 "size_bytes": source.stat().st_size,
-                "sha256": file_sha(source),
-                "source_fingerprint": list(_fingerprint(source)),
+                "sha256": source_sha,
+                "source_fingerprint": list(before),
             }
         )
     if not set(required).issubset(observed_sources):
@@ -361,7 +408,10 @@ def freeze_ods24_plan(
     contract_path = physical_path(contract_path)
     _validate_contract(contract_path)
     selection, included = _validate_selection(predecessor, selection_path)
-    checkpoint = _validate_acquisition(acquisition, window_plan_path)
+    verified_acquisition: dict[str, dict[str, Any]] = {}
+    checkpoint = _validate_acquisition(
+        acquisition, window_plan_path, verified=verified_acquisition
+    )
     ledger_manifest = _validate_ledger(ledger, acquisition)
     supplemental: dict[str, Any] | None = None
     supplemental_members: list[dict[str, Any]] = []
@@ -401,6 +451,7 @@ def freeze_ods24_plan(
             relative,
             "native5m_raw_acquisition",
             "payload/base24-native5m/acquisition/" + relative,
+            verified=verified_acquisition.get(str(acquisition / relative)),
         ),
     ):
         add(item)

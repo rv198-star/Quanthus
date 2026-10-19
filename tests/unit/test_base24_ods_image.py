@@ -10,6 +10,15 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from quanthus.pipelines.securities_warehouse import (
+    base24_native5m_acquire as acquisition_module,
+)
+from quanthus.pipelines.securities_warehouse import (
+    base24_ods_image as ods_module,
+)
+from quanthus.pipelines.securities_warehouse import (
+    base24_ods_transport as transport_module,
+)
 from quanthus.pipelines.securities_warehouse.base22 import canonical, digest, file_sha
 from quanthus.pipelines.securities_warehouse.base24_native5m_acquire import (
     BUCKETS,
@@ -218,6 +227,149 @@ def transport_image(source_closure, tmp_path):
     receipt = materialize_ods24(plan, root, Budget())
     seal_ods24(root, receipt, code_revision="b" * 40, budget=Budget())
     return root
+
+
+def test_freeze_does_not_hash_verified_acquisition_payload_twice(source_closure, monkeypatch):
+    acquisition = source_closure[2]
+    calls = {}
+
+    def track(function):
+        def hashed(path):
+            key = str(path)
+            calls[key] = calls.get(key, 0) + 1
+            return function(path)
+
+        return hashed
+
+    monkeypatch.setattr(acquisition_module, "_sha", track(acquisition_module._sha))
+    monkeypatch.setattr(ods_module, "file_sha", track(ods_module.file_sha))
+    _freeze(source_closure)
+    payloads = [*acquisition.rglob("exact.parquet"), *acquisition.rglob("*.wire")]
+    assert payloads
+    assert {str(path): calls[str(path)] for path in payloads} == {
+        str(path): 1 for path in payloads
+    }
+
+
+def test_acquisition_mutation_during_validation_is_not_cached(source_closure, monkeypatch):
+    original = ods_module._verify_sealed
+
+    def changed(root, window, plan_sha):
+        result = original(root, window, plan_sha)
+        path = root / "wire/response-0001.wire"
+        raw = path.read_bytes()
+        path.write_bytes(bytes([raw[0] ^ 1]) + raw[1:])
+        return result
+
+    monkeypatch.setattr(ods_module, "_verify_sealed", changed)
+    with pytest.raises(Base24OdsError, match="PARTITION_CLOSURE_INVALID"):
+        _freeze(source_closure)
+
+
+def test_verified_acquisition_hash_rejects_later_change(source_closure):
+    acquisition, window_plan = source_closure[2:4]
+    verified = {}
+    ods_module._validate_acquisition(acquisition, window_plan, verified=verified)
+    path = next(acquisition.rglob("*.wire"))
+    original, stamp = path.read_bytes(), path.stat()
+    path.write_bytes(bytes([original[0] ^ 1]) + original[1:])
+    os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    with pytest.raises(Base24OdsError, match="SOURCE_CHANGED"):
+        ods_module._source_member(
+            acquisition, path.relative_to(acquisition).as_posix(), "raw", "payload/raw",
+            verified=verified[str(path)],
+        )
+
+
+def test_process_workers_preserve_verified_inventory_and_plan(source_closure, monkeypatch):
+    serial = _freeze(source_closure)
+    monkeypatch.setattr(ods_module, "VERIFY_BATCH", 1)
+    monkeypatch.setattr(ods_module, "ACQUISITION_WORKERS", 2)
+    assert _freeze(source_closure) == serial
+
+
+def test_materialization_and_seal_have_one_full_readback(source_closure, tmp_path, monkeypatch):
+    plan = _freeze(source_closure)
+    original = ods_module.audit_ods24
+    audits = []
+
+    def audited(*args, **kwargs):
+        audits.append(args[0])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(ods_module, "audit_ods24", audited)
+    output = tmp_path / "one-readback"
+    receipt = materialize_ods24(plan, output, Budget())
+    assert audits == []
+    seal_ods24(output, receipt, code_revision="c" * 40, budget=Budget())
+    assert audits == [output]
+
+
+def test_retirement_reuses_verified_plan_without_source_byte_reads(
+    transport_image, source_closure, monkeypatch
+):
+    plan = json.loads((transport_image / "evidence/MATERIALIZATION.json").read_bytes())
+    root = source_closure[2]
+    expected_paths = {
+        path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()
+    }
+    original = Path.open
+
+    def guarded(path, *args, **kwargs):
+        if path == root or root in path.parents:
+            pytest.fail("Retirement must not read already verified source bytes")
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guarded)
+    inventory = transport_module.prepare_source_retirement_inventory(root, plan=plan)
+    assert set(inventory) == expected_paths
+    assert all(row["sha256"].startswith("sha256:") for row in inventory.values())
+
+
+def test_retirement_distinguishes_explicit_discard_from_verified_recovery(
+    transport_image, source_closure, monkeypatch
+):
+    plan = json.loads((transport_image / "evidence/MATERIALIZATION.json").read_bytes())
+    root = source_closure[0]
+    discard = {}
+    for relative in ("payload/one.parquet", "manifest.json", "READY"):
+        path = root / relative
+        discard[relative] = {"size_bytes": path.stat().st_size, "sha256": file_sha(path)}
+    original = Path.open
+
+    def guarded(path, *args, **kwargs):
+        if root in path.parents:
+            pytest.fail("Retirement must not hash the source again")
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guarded)
+    result = transport_module.prepare_source_retirement_inventory(root, plan=plan, discard=discard)
+    assert result["payload/one.parquet"]["verification"] == "EXPLICIT_DISCARD_DECLARED_HASH_ONLY"
+    assert result["payload/five.parquet"]["verification"] == (
+        "COPY_AND_SEAL_VERIFIED_UNCHANGED_FINGERPRINT"
+    )
+
+
+@pytest.mark.parametrize("damage", ["bytes", "extra", "missing", "symlink", "plan"])
+def test_retirement_rejects_changed_source_or_plan(transport_image, source_closure, damage):
+    plan = json.loads((transport_image / "evidence/MATERIALIZATION.json").read_bytes())
+    root = source_closure[2]
+    member = next(root.rglob("*.wire"))
+    if damage == "bytes":
+        original, stamp = member.read_bytes(), member.stat()
+        member.write_bytes(bytes([original[0] ^ 1]) + original[1:])
+        os.utime(member, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    elif damage == "extra":
+        (root / "extra").write_bytes(b"unexpected")
+    elif damage == "missing":
+        member.unlink()
+    elif damage == "symlink":
+        member.unlink()
+        member.symlink_to(transport_image / "payload/five.parquet")
+    else:
+        plan["files"][0]["sha256"] = "sha256:" + "0" * 64
+    with pytest.raises(RuntimeError):
+        transport_module.prepare_source_retirement_inventory(root, plan=plan)
 
 
 def test_transport_reuses_pinned_hashes_but_cold_audit_still_reads_bytes(transport_image):

@@ -77,6 +77,56 @@ def physical_metadata(root: Path) -> dict[str, tuple[int, int, int, int, int]]:
     return result
 
 
+def prepare_source_retirement_inventory(
+    root: Path, *, plan: dict[str, Any], discard: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Reuse one job's sealed/copy-verified source inventory for retirement.
+
+    The caller must pin this plan to the successfully sealed image and preserve
+    its retirement authority. Every retained source must still have the exact
+    physical fingerprint recorded before copying. Explicitly discarded members
+    (e.g. optional 1m) carry declared hashes, not a claim of byte recovery.
+    No source payload bytes are opened here. This is not a cold image audit.
+    """
+    root = physical_path(root)
+    frozen = {key: value for key, value in plan.items() if key not in {"identity", "built_at"}}
+    if digest(frozen) != plan.get("identity"):
+        raise Base24OdsError("BASE24_ODS_RETIREMENT_PLAN_CHANGED")
+    expected = {
+        row["source_relative"]: row for row in plan["files"]
+        if row["source_root_archival"] == str(root)
+    }
+    discard = {} if discard is None else discard
+    if (
+        not expected or expected.keys() & discard.keys()
+        or _tree(root) != expected.keys() | discard.keys()
+    ):
+        raise Base24OdsError("BASE24_ODS_RETIREMENT_FILE_SET_CHANGED")
+    result = {}
+    for relative in sorted(expected.keys() | discard.keys()):
+        path = _member(root, relative)
+        stamp = _fingerprint(path)
+        row = expected.get(relative, discard.get(relative))
+        if row is None or stamp[2] != row["size_bytes"]:
+            raise Base24OdsError("BASE24_ODS_RETIREMENT_SOURCE_CHANGED")
+        if relative in expected and (
+            str(path) != row["source_path"] or list(stamp) != row["source_fingerprint"]
+        ):
+            raise Base24OdsError("BASE24_ODS_RETIREMENT_SOURCE_CHANGED")
+        if re.fullmatch(r"sha256:[0-9a-f]{64}", str(row.get("sha256"))) is None:
+            raise Base24OdsError("BASE24_ODS_RETIREMENT_SOURCE_CHANGED")
+        dev, ino, size, mtime, ctime = stamp
+        result[relative] = {
+            "size_bytes": size, "sha256": row["sha256"],
+            "device": dev, "inode": ino, "mtime_ns": mtime, "ctime_ns": ctime,
+            "verification": (
+                "COPY_AND_SEAL_VERIFIED_UNCHANGED_FINGERPRINT" if relative in expected
+                else "EXPLICIT_DISCARD_DECLARED_HASH_ONLY"
+            ),
+        }
+    return result
+
+
 def verify_restored_fault_copy(
     root: Path,
     *,

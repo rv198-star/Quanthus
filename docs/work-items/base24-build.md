@@ -67,6 +67,39 @@ namespace and device/inode/size/mtime/ctime of every untouched member replace an
 otherwise duplicate full read. This optimization never constitutes image acceptance
 by itself. The running builder and frozen cold-worker code remain unchanged.
 
+### 2026-10-20 ODS repeated-read correction
+
+The Owner's five specific duplicate-read findings are tracked together under
+`/srv/agentdock/AgentDock/base22-review-afe2526/base24-ods-read-dedup-20261019T214414Z-06a6fb2`.
+The engineering successor reuses acquisition payload hashes returned by the full
+Decimal/lexical/session verifier only within the same plan-freeze call. The exact
+device/inode/size/mtime/ctime is captured before and after that verification and
+checked again when assembling the plan. There is no cross-job qualification cache.
+Supplemental members are likewise hashed once while freezing their source record.
+
+| Stage | Full-byte work retained | Duplicate work removed |
+| --- | --- | --- |
+| Freeze inputs | Complete acquisition semantic/hash verification and selected historical hashes | Rehashing an already verified acquisition or supplemental member to assemble the same plan |
+| Materialize and seal | Hash while making independent files; one complete output readback before READY | Identical immediate audits after materialization or after writing READY |
+| Cold acceptance | Two hashing copies; two complete source/network-denied cold reads; final complete original-image hash check | Pre-copy hash pass and original-image rehash between relocations |
+| Damage negatives | Missing/corrupt checks on the second independent copy; restored-canary hash and unchanged other-file fingerprints | A third complete copy and a complete unchanged-copy hash after restoration |
+| Retire superseded inputs | Pinned sealed plan, unchanged source namespace/fingerprints, exact selected-member mapping, final metadata check before deletion | Rehashing copied/seal-verified sources during mapping and again during retirement |
+
+Explicitly excluded optional 1m files are retired under the Owner's scope/cleanup
+authority; their declared hashes must never be described as verified recovery.
+Predecessor manifest/READY bytes are preserved before retirement. Unknown extra
+files, source changes or mismatched plan/seal identities stop retirement.
+
+The in-flight builder remains pinned to `e8f5f07360132e18ec735edc043aa6db084fcc74`.
+Its two semantic workers had already completed thousands of windows when the last
+two findings were confirmed. Do not discard that work to save the remaining one
+plan-assembly hash pass: that pass may still occur in this existing invocation.
+The new acquisition optimization applies to the successor code, not retroactively
+to the already imported running module. The replacement waiting controller applies
+the source-retirement optimization to this job before any ODS input retirement.
+Report actual build and cold-controller revisions separately. Neither this code
+change nor synthetic regression success establishes ODS image acceptance.
+
 The Owner explicitly requested the following queue after ODS completion. These are
 authorized work items, not statements of completion or a production switch:
 

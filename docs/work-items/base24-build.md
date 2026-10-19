@@ -37,6 +37,56 @@ preserves the exact received REQ, its digest, pre-transfer controls, source-sele
 identity census, capacity receipt and takeover record. No Base build was in flight;
 the node's unrelated scheduler and existing services were left running.
 
+### 2026-10-20 CN02 execution and post-build queue
+
+This checkpoint supersedes the older running-state prose below, without changing its
+historical evidence. The bounded DWD image has two independent cold receipts and
+missing/corrupt-file negatives. Its manifest is
+`04345d9cfb7d99dae9e65b11bd28591095156e48378b5b44245fc3d36a944b3a`.
+The ODS build remains in progress, using the frozen builder revision
+`e8f5f07360132e18ec735edc043aa6db084fcc74`; do not restart it to apply an unrelated
+controller change. Its source semantic validation, physical construction, cold
+acceptance and final pairing are distinct stages. DWD acceptance does not establish
+ODS, Daily or production-consumer acceptance.
+
+Execution evidence and the detailed resource/retention plan are under
+`/srv/agentdock/AgentDock/base22-review-afe2526/base24-ods-schedule-20261019T211600Z-e8f5f07`.
+Use the data filesystem for the ODS image and one rotating independent cold copy.
+Use system-disk scratch for one upload archive/chunk at a time (3 GiB maximum) and
+bounded engineering checks (2 GiB maximum), preserving an 8 GiB free floor on each
+device. Source semantic workers remain at the registered concurrency of two;
+copy/hash work uses eight bounded I/O workers. The source phase is CPU-bound in
+the recorded sample; do not describe these virtual devices as proven independent
+physical disks or increase workers merely to fill disk queues.
+
+Transport may reuse the exact sealed manifest's member hashes as expectations,
+then verify every byte during copying. It must retain two complete cold reads in
+new source-denied/network-denied processes and a final source-byte verification.
+After read-only damage negatives, the restored canary hash plus the unchanged
+namespace and device/inode/size/mtime/ctime of every untouched member replace an
+otherwise duplicate full read. This optimization never constitutes image acceptance
+by itself. The running builder and frozen cold-worker code remain unchanged.
+
+The Owner explicitly requested the following queue after ODS completion. These are
+authorized work items, not statements of completion or a production switch:
+
+| Order | Work | Completion evidence and dependency |
+| --- | --- | --- |
+| 1 | Upload ODS Base 2.4 to the existing `quanthus-ods/base/2.4` hierarchy; finish DWD at `quanthus-dwd/base/2.4` | Exact parent IDs, independent source acceptance, frozen archive members, bounded restore scan, remote size/MD5/SHA256, cloud readiness written last; never create another same-name root |
+| 2 | Retire CN02 non-2.4 data backups and obsolete TMP | Inventory exact paths/bytes/active dependencies first; verified cloud recovery and no remaining dependency precede deletion; retain system and Xianyu service/code/state/credentials, 2.4 physical data and necessary provenance, active jobs, audit/rollback metadata and repository state |
+| 3 | Adapt CN01's existing ODS/DWD Daily and Weekly mechanisms for CN02 Base 2.4 | Inspect deployed version/configuration; bind exact ODS/DWD identities; daily plus native 5m without a 1m prerequisite; weekly changed/no-change/failed domains explicit; preserve clocks and late revisions; isolated representative runs, retry/idempotency and actual T-day evidence precede the single-writer handoff |
+| 4 | Migrate OCI's existing DWS/ADM data to CN02 and qualify Base 2.4 compatibility | Freeze inventory/manifests and dependency graph; opaque byte transfer preserves old lineage; directly reuse only semantically identical admitted dependencies, rebuild affected partitions through the owning business code; verify CN02 readers before changing endpoints; retain OCI originals until independently verified |
+
+Preparation for steps 3 and 4 may overlap ODS/backup waits. Reuse the existing
+CN01 flow rather than create a second generic scheduler. Weekly patches and late
+Daily corrections must be immutable successors, not edits to the sealed Base.
+Migration authority does not make protected research results readable or open
+training; P10 shared consistency and business-line feature/model ownership remain
+separate. The new instruction covers DWS/ADM data migration, not an automatic
+migration of OCI platform/business services. Do not label an old derived artifact
+as Base 2.4-compatible merely by changing its path or manifest text. Cleanup is a
+dependency-aware allowlist, never deletion of every path outside a Base directory.
+
 ### 2026-10-19 Route A source-convergence checkpoint
 
 This checkpoint supersedes the earlier source-count and alternate-source statements below. Continue

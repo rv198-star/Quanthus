@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -20,6 +21,11 @@ from quanthus.pipelines.securities_warehouse.base24_ods_image import (
     freeze_ods24_plan,
     materialize_ods24,
     seal_ods24,
+)
+from quanthus.pipelines.securities_warehouse.base24_ods_transport import (
+    physical_metadata,
+    prepare_sealed_copy_inventory,
+    verify_restored_fault_copy,
 )
 from quanthus.pipelines.securities_warehouse.base24_scope import select_default_members
 from quanthus.providers.native_5m_exact import ExactBar
@@ -78,9 +84,7 @@ def _make_predecessor(tmp_path: Path) -> tuple[Path, Path]:
     content = {
         "through_date": "2026-09-30",
         "files": monthly_files,
-        "source_inventory": [
-            {"role": "historical_seed", "manifest_sha256": "sha256:" + seed_sha}
-        ],
+        "source_inventory": [{"role": "historical_seed", "manifest_sha256": "sha256:" + seed_sha}],
     }
     manifest = {
         "schema_version": 1,
@@ -207,6 +211,86 @@ def _freeze(source_closure):
     )
 
 
+@pytest.fixture
+def transport_image(source_closure, tmp_path):
+    root = tmp_path / "transport-image"
+    plan = _freeze(source_closure)
+    receipt = materialize_ods24(plan, root, Budget())
+    seal_ods24(root, receipt, code_revision="b" * 40, budget=Budget())
+    return root
+
+
+def test_transport_reuses_pinned_hashes_but_cold_audit_still_reads_bytes(transport_image):
+    root = transport_image
+    expected = prepare_sealed_copy_inventory(
+        root, expected_manifest_sha256=file_sha(root / "manifest.json")
+    )
+    member = root / "payload/five.parquet"
+    expected_hash = expected["payload/five.parquet"]["sha256"]
+    assert file_sha(member) == expected_hash
+    original = member.read_bytes()
+    member.write_bytes(bytes([original[0] ^ 1]) + original[1:])
+    # A metadata inventory is never a completed audit. Byte validation remains
+    # owned by the hashing copy and by each independent cold verifier.
+    reused = prepare_sealed_copy_inventory(
+        root, expected_manifest_sha256=file_sha(root / "manifest.json")
+    )
+    assert reused["payload/five.parquet"]["sha256"] == expected_hash != file_sha(member)
+    with pytest.raises(Base24OdsError, match="PHYSICAL_BYTES"):
+        audit_ods24(root, Budget())
+
+
+@pytest.mark.parametrize("damage", ["seal", "missing", "extra", "symlink"])
+def test_transport_rejects_identity_or_namespace_change(transport_image, damage):
+    root = transport_image
+    pinned = file_sha(root / "manifest.json")
+    if damage == "seal":
+        (root / "manifest.json").write_bytes((root / "manifest.json").read_bytes() + b" ")
+    elif damage == "missing":
+        (root / "payload/five.parquet").unlink()
+    elif damage == "extra":
+        (root / "extra").write_bytes(b"extra")
+    else:
+        (root / "extra").symlink_to(root / "payload/five.parquet")
+    with pytest.raises(RuntimeError):
+        prepare_sealed_copy_inventory(root, expected_manifest_sha256=pinned)
+
+
+def test_fault_copy_canary_restore_and_untouched_file_guard(transport_image):
+    root = transport_image
+    audit_ods24(root, Budget())
+    before = physical_metadata(root)
+    canary = "payload/five.parquet"
+    path = root / canary
+    original, expected_hash = path.read_bytes(), file_sha(path)
+    path.unlink()
+    path.write_bytes(original)
+    verify_restored_fault_copy(root, before=before, canary=canary, expected_sha256=expected_hash)
+    other = root / "payload/source-plan/base24-ods-contract.json"
+    stamp = other.stat()
+    raw = other.read_bytes()
+    other.write_bytes(bytes([raw[0] ^ 1]) + raw[1:])
+    # Same size and restored mtime cannot hide a mutation from the ctime guard.
+    os.utime(other, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    with pytest.raises(Base24OdsError, match="UNTOUCHED_MEMBER_CHANGED"):
+        verify_restored_fault_copy(
+            root, before=before, canary=canary, expected_sha256=expected_hash
+        )
+
+
+def test_fault_copy_rejects_incorrect_canary_restore(transport_image):
+    root = transport_image
+    before = physical_metadata(root)
+    canary = "payload/five.parquet"
+    path = root / canary
+    original, expected_hash = path.read_bytes(), file_sha(path)
+    path.write_bytes(bytes([original[0] ^ 1]) + original[1:])
+    with pytest.raises(Base24OdsError, match="FAULT_RESTORATION_FAILED"):
+        verify_restored_fault_copy(
+            root, before=before, canary=canary, expected_sha256=expected_hash
+        )
+
+
 def _supplemental_closure(tmp_path: Path, acquisition: Path, ledger: Path) -> Path:
     root = tmp_path / "supplemental"
     root.mkdir()
@@ -258,9 +342,7 @@ def test_ods24_keeps_wire_and_excludes_optional_1m(source_closure, tmp_path):
     assert audit_ods24(output, Budget())["status"] == "PASS"
 
 
-def test_ods24_materializes_qualified_supplemental_source_closure(
-    source_closure, tmp_path
-):
+def test_ods24_materializes_qualified_supplemental_source_closure(source_closure, tmp_path):
     predecessor, selection, acquisition, window_plan, ledger = source_closure
     closure = _supplemental_closure(tmp_path, acquisition, ledger)
     plan = freeze_ods24_plan(
@@ -272,9 +354,7 @@ def test_ods24_materializes_qualified_supplemental_source_closure(
         contract_path=ODS24_CONTRACT,
         supplemental_closure_path=closure,
     )
-    supplemental = [
-        row for row in plan["files"] if row["role"] == "native5m_supplemental_source"
-    ]
+    supplemental = [row for row in plan["files"] if row["role"] == "native5m_supplemental_source"]
     assert len(supplemental) == 2
     assert plan["native5m"]["supplemental_required_exact_sources"] == 1
 
@@ -362,9 +442,9 @@ def test_changed_selection_and_symlink_output_fail_before_ready(source_closure, 
             predecessor_root=predecessor,
             selection_path=selection,
             acquisition_root=acquisition,
-                window_plan_path=window_plan,
-                ledger_root=ledger,
-                contract_path=ODS24_CONTRACT,
+            window_plan_path=window_plan,
+            ledger_root=ledger,
+            contract_path=ODS24_CONTRACT,
         )
 
     # Restore a valid closure, then prove output indirection is rejected before a write.

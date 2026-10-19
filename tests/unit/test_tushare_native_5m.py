@@ -69,10 +69,12 @@ def _daily_raw(
     code: str = "000001.SZ",
     day: str = "2026-09-30",
     open_: str = "10.1000",
+    high: str = "10.3000",
+    low: str = "10.0000",
     close: str = "10.2000",
 ) -> bytes:
     fields = ["ts_code", "trade_date", "open", "high", "low", "close", "vol", "amount"]
-    items = [[code, day.replace("-", ""), open_, "10.3000", "10.0000", close, "59.04", "60.2208"]]
+    items = [[code, day.replace("-", ""), open_, high, low, close, "59.04", "60.2208"]]
     return json.dumps(
         {"code": 0, "api_name": "daily", "count": 1, "data": {"fields": fields, "items": items}},
         separators=(",", ":"),
@@ -206,6 +208,23 @@ def test_fetch_fails_closed_on_daily_price_basis_mismatch(tmp_path) -> None:
         fetch_captured_day(tmp_path, _request(), api_key="runtime", get=get)
     assert (tmp_path / "source-response.json.gz").is_file()
     assert (tmp_path / "source-daily-response.json.gz").is_file()
+
+
+def test_fetch_accepts_sub_tick_json_serialization_noise(tmp_path) -> None:
+    def get(url, **_kwargs):
+        return SimpleNamespace(
+            status_code=200,
+            content=(
+                _raw()
+                if url == ENDPOINT
+                else _daily_raw(high="10.3000000000000002", low="9.9999999999999995")
+            ),
+            headers={},
+        )
+
+    bars, metrics = fetch_captured_day(tmp_path, _request(), api_key="runtime", get=get)
+    assert len(bars) == 48
+    assert metrics["daily_reconciliation"]["daily_price_abs_tolerance"] == "1E-8"
 
 
 def test_fetch_accepts_start_grid_with_disclosed_auction_open_difference(tmp_path) -> None:

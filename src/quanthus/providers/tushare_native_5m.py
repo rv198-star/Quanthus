@@ -24,6 +24,7 @@ DAILY_ENDPOINT = "https://pcd.mobcvb.cn/tushare/pro/daily"
 PROVIDER = "tushare-stk_mins-native-5m"
 MIN_DAILY_FRACTION = Decimal("0.95")
 MAX_DAILY_FRACTION = Decimal("1.000001")
+DAILY_PRICE_ABS_TOLERANCE = Decimal("0.00000001")
 EXPECTED_FIELDS = {
     "ts_code",
     "trade_time",
@@ -215,11 +216,17 @@ def _daily_reconciliation(
         raise TushareNative5mError("DAILY_NUMERIC_INVALID")
     daily_open, daily_high, daily_low, daily_close, daily_volume_lots, daily_amount_k = daily
     values = [bar.values for bar in bars]
-    if (
-        not values
-        or max(value[1] for value in values) != daily_high
-        or min(value[2] for value in values) != daily_low
-        or values[-1][3] != daily_close
+    if not values:
+        raise TushareNative5mError("DAILY_PRICE_BASIS_MISMATCH")
+    minute_prices = (
+        max(value[1] for value in values),
+        min(value[2] for value in values),
+        values[-1][3],
+    )
+    daily_prices = (daily_high, daily_low, daily_close)
+    if any(
+        abs(minute - expected) > DAILY_PRICE_ABS_TOLERANCE
+        for minute, expected in zip(minute_prices, daily_prices, strict=True)
     ):
         raise TushareNative5mError("DAILY_PRICE_BASIS_MISMATCH")
     minute_volume = sum((value[4] for value in values), Decimal(0))
@@ -237,7 +244,8 @@ def _daily_reconciliation(
         raise TushareNative5mError("DAILY_VOLUME_OR_AMOUNT_MISMATCH")
     return {
         "label_mode": label_mode,
-        "daily_ohlc_gate": "high_low_close_exact; open_difference_disclosed",
+        "daily_ohlc_gate": "high_low_close_abs_tolerance; open_difference_disclosed",
+        "daily_price_abs_tolerance": str(DAILY_PRICE_ABS_TOLERANCE),
         "daily_volume_fraction": str(volume_fraction),
         "daily_amount_fraction": str(amount_fraction),
         "daily_fraction_bounds": [str(MIN_DAILY_FRACTION), str(MAX_DAILY_FRACTION)],

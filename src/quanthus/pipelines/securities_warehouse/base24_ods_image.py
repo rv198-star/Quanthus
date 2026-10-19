@@ -9,6 +9,7 @@ dereferenced by the offline auditor.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import re
@@ -32,6 +33,9 @@ SELECTION_CONTRACT = "p10-base24-ods23-default-member-selection-v1"
 SCOPE_CONTRACT = "p10-base24-default-1d-native5m-v1"
 LEDGER_CONTRACT = "p10-base24-native5m-coverage-ledger-package-v1"
 ACQUISITION_CONTRACT = "p10-base24-native5m-acquisition-v1"
+SUPPLEMENTAL_CLOSURE_CONTRACT = (
+    "p10-base24-native5m-supplemental-source-closure-v1"
+)
 
 
 class Base24OdsError(RuntimeError):
@@ -222,6 +226,78 @@ def _validate_contract(path: Path) -> dict[str, Any]:
     return contract
 
 
+def _validate_supplemental_closure(
+    path: Path,
+    *,
+    acquisition: Path,
+    ledger_manifest_sha256: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    closure = _load_object(path, "BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
+    frozen = {key: value for key, value in closure.items() if key != "identity"}
+    members = closure.get("members")
+    required = closure.get("required_exact_source_paths")
+    if (
+        closure.get("contract") != SUPPLEMENTAL_CLOSURE_CONTRACT
+        or closure.get("identity") != digest(frozen)
+        or closure.get("primary_acquisition_root_archival") != str(acquisition)
+        or _sha(str(closure.get("ledger_manifest_sha256")))
+        != _sha(ledger_manifest_sha256)
+        or not isinstance(members, list)
+        or not members
+        or not isinstance(required, list)
+        or not required
+        or len(required) != len(set(required))
+    ):
+        raise Base24OdsError("BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
+    validated: list[dict[str, Any]] = []
+    observed_sources: set[str] = set()
+    observed_targets: set[str] = set()
+    for row in members:
+        if not isinstance(row, dict):
+            raise Base24OdsError("BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
+        root_value = row.get("source_root_archival")
+        relative = row.get("source_relative")
+        source_value = row.get("source_path")
+        if (
+            not isinstance(root_value, str)
+            or not isinstance(relative, str)
+            or not isinstance(source_value, str)
+        ):
+            raise Base24OdsError("BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
+        root = physical_path(Path(root_value))
+        if root == acquisition or root in acquisition.parents or acquisition in root.parents:
+            raise Base24OdsError("BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
+        source = _member(root, relative)
+        if source != physical_path(Path(source_value)) or str(source) in observed_sources:
+            raise Base24OdsError("BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
+        root_id = hashlib.sha256(str(root).encode("utf-8")).hexdigest()[:16]
+        target = f"payload/base24-native5m/supplemental/{root_id}/{relative}"
+        if target in observed_targets:
+            raise Base24OdsError("BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
+        if (
+            row.get("size_bytes") != source.stat().st_size
+            or _sha(str(row.get("sha256"))) != file_sha(source)
+        ):
+            raise Base24OdsError("BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
+        observed_sources.add(str(source))
+        observed_targets.add(target)
+        validated.append(
+            {
+                "path": target,
+                "source_path": str(source),
+                "source_relative": relative,
+                "source_root_archival": str(root),
+                "role": "native5m_supplemental_source",
+                "size_bytes": source.stat().st_size,
+                "sha256": file_sha(source),
+                "source_fingerprint": list(_fingerprint(source)),
+            }
+        )
+    if not set(required).issubset(observed_sources):
+        raise Base24OdsError("BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
+    return closure, validated
+
+
 def freeze_ods24_plan(
     *,
     predecessor_root: Path,
@@ -230,6 +306,7 @@ def freeze_ods24_plan(
     window_plan_path: Path,
     ledger_root: Path,
     contract_path: Path,
+    supplemental_closure_path: Path | None = None,
 ) -> dict[str, Any]:
     """Validate and freeze the complete real source closure before any write."""
     predecessor = physical_path(predecessor_root)
@@ -242,6 +319,15 @@ def freeze_ods24_plan(
     selection, included = _validate_selection(predecessor, selection_path)
     checkpoint = _validate_acquisition(acquisition, window_plan_path)
     ledger_manifest = _validate_ledger(ledger, acquisition)
+    supplemental: dict[str, Any] | None = None
+    supplemental_members: list[dict[str, Any]] = []
+    if supplemental_closure_path is not None:
+        supplemental_closure_path = physical_path(supplemental_closure_path)
+        supplemental, supplemental_members = _validate_supplemental_closure(
+            supplemental_closure_path,
+            acquisition=acquisition,
+            ledger_manifest_sha256=file_sha(ledger / "manifest.json"),
+        )
     files: list[dict[str, Any]] = []
     targets: set[str] = set()
 
@@ -272,6 +358,17 @@ def freeze_ods24_plan(
                 relative,
                 "native5m_coverage_evidence",
                 "payload/base24-native5m/coverage/" + relative,
+            )
+        )
+    for item in supplemental_members:
+        add(item)
+    if supplemental_closure_path is not None:
+        add(
+            _source_member(
+                supplemental_closure_path.parent,
+                supplemental_closure_path.name,
+                "native5m_supplemental_closure",
+                "payload/source-plan/native5m-supplemental-closure.json",
             )
         )
     add(
@@ -322,6 +419,15 @@ def freeze_ods24_plan(
             "ledger_root_archival": str(ledger),
             "ledger_manifest_sha256": file_sha(ledger / "manifest.json"),
             "ledger_status": ledger_manifest["status"],
+            "supplemental_closure_identity": (
+                supplemental["identity"] if supplemental is not None else None
+            ),
+            "supplemental_members": len(supplemental_members),
+            "supplemental_required_exact_sources": (
+                len(supplemental["required_exact_source_paths"])
+                if supplemental is not None
+                else 0
+            ),
         },
         "files": files,
         "source_mutation": False,
@@ -440,6 +546,26 @@ def audit_ods24(
             exact_files += 1
     if exact_files != plan["native5m"]["completed_partitions"]:
         raise Base24OdsError("BASE24_ODS_NATIVE5M_PARTITION_CLOSURE_CHANGED")
+    supplemental_members = roles.get("native5m_supplemental_source", 0)
+    if supplemental_members != plan["native5m"].get("supplemental_members", 0):
+        raise Base24OdsError("BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
+    supplemental_identity = plan["native5m"].get("supplemental_closure_identity")
+    if supplemental_identity is not None:
+        embedded_closure = _load_object(
+            _member(root, "payload/source-plan/native5m-supplemental-closure.json"),
+            "BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID",
+        )
+        embedded_frozen = {
+            key: value for key, value in embedded_closure.items() if key != "identity"
+        }
+        if (
+            embedded_closure.get("contract") != SUPPLEMENTAL_CLOSURE_CONTRACT
+            or embedded_closure.get("identity") != supplemental_identity
+            or digest(embedded_frozen) != supplemental_identity
+            or len(embedded_closure.get("required_exact_source_paths", []))
+            != plan["native5m"].get("supplemental_required_exact_sources")
+        ):
+            raise Base24OdsError("BASE24_ODS_SUPPLEMENTAL_SOURCE_CLOSURE_INVALID")
     selection = _load_object(
         _member(root, "payload/source-plan/ods23-default-selection.json"),
         "BASE24_ODS_SELECTION_INVALID",
@@ -499,6 +625,7 @@ def audit_ods24(
         "roles": dict(sorted(roles.items())),
         "completed_native5m_partitions": exact_files,
         "held_native5m_partitions": plan["native5m"]["held_partitions"],
+        "supplemental_native5m_members": supplemental_members,
         "source_roots_dereferenced": False,
         "consumer_admission": "NOT_GRANTED",
     }

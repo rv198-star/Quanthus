@@ -207,6 +207,39 @@ def _freeze(source_closure):
     )
 
 
+def _supplemental_closure(tmp_path: Path, acquisition: Path, ledger: Path) -> Path:
+    root = tmp_path / "supplemental"
+    root.mkdir()
+    exact = root / "partition/exact.parquet"
+    exact.parent.mkdir()
+    exact.write_bytes(b"qualified-external-five-minute-source")
+    metadata = root / "manifest.json"
+    _write_json(metadata, {"contract": "synthetic-supplemental-source-v1"})
+    members = []
+    for member in (exact, metadata):
+        members.append(
+            {
+                "source_path": str(member),
+                "source_root_archival": str(root),
+                "source_relative": member.relative_to(root).as_posix(),
+                "size_bytes": member.stat().st_size,
+                "sha256": file_sha(member),
+            }
+        )
+    closure = {
+        "contract": "p10-base24-native5m-supplemental-source-closure-v1",
+        "primary_acquisition_root_archival": str(acquisition.resolve()),
+        "ledger_manifest_sha256": file_sha(ledger / "manifest.json"),
+        "required_exact_source_paths": [str(exact)],
+        "members": members,
+    }
+    closure["identity"] = digest(closure)
+    path = tmp_path / "source-plan/supplemental-closure.json"
+    path.parent.mkdir()
+    _write_json(path, closure)
+    return path
+
+
 def test_ods24_keeps_wire_and_excludes_optional_1m(source_closure, tmp_path):
     plan = _freeze(source_closure)
     paths = {row["path"] for row in plan["files"]}
@@ -223,6 +256,57 @@ def test_ods24_keeps_wire_and_excludes_optional_1m(source_closure, tmp_path):
     assert manifest["kind"] == "quanthus_ods_base24_bundle"
     assert (output / "READY").read_text().strip() == file_sha(output / "manifest.json")
     assert audit_ods24(output, Budget())["status"] == "PASS"
+
+
+def test_ods24_materializes_qualified_supplemental_source_closure(
+    source_closure, tmp_path
+):
+    predecessor, selection, acquisition, window_plan, ledger = source_closure
+    closure = _supplemental_closure(tmp_path, acquisition, ledger)
+    plan = freeze_ods24_plan(
+        predecessor_root=predecessor,
+        selection_path=selection,
+        acquisition_root=acquisition,
+        window_plan_path=window_plan,
+        ledger_root=ledger,
+        contract_path=ODS24_CONTRACT,
+        supplemental_closure_path=closure,
+    )
+    supplemental = [
+        row for row in plan["files"] if row["role"] == "native5m_supplemental_source"
+    ]
+    assert len(supplemental) == 2
+    assert plan["native5m"]["supplemental_required_exact_sources"] == 1
+
+    output = tmp_path / "output-supplemental/ods24"
+    output.parent.mkdir()
+    receipt = materialize_ods24(plan, output, Budget())
+    seal_ods24(output, receipt, code_revision="d" * 40, budget=Budget())
+    shutil.rmtree(tmp_path / "supplemental")
+    closure.unlink()
+    cold = audit_ods24(output, Budget())
+    assert cold["supplemental_native5m_members"] == 2
+    assert cold["source_roots_dereferenced"] is False
+
+
+def test_ods24_rejects_incomplete_supplemental_source_closure(source_closure, tmp_path):
+    predecessor, selection, acquisition, window_plan, ledger = source_closure
+    closure_path = _supplemental_closure(tmp_path, acquisition, ledger)
+    closure = json.loads(closure_path.read_bytes())
+    closure["members"] = closure["members"][1:]
+    closure.pop("identity")
+    closure["identity"] = digest(closure)
+    _write_json(closure_path, closure)
+    with pytest.raises(Base24OdsError, match="SUPPLEMENTAL_SOURCE_CLOSURE_INVALID"):
+        freeze_ods24_plan(
+            predecessor_root=predecessor,
+            selection_path=selection,
+            acquisition_root=acquisition,
+            window_plan_path=window_plan,
+            ledger_root=ledger,
+            contract_path=ODS24_CONTRACT,
+            supplemental_closure_path=closure_path,
+        )
 
 
 def test_cold_audit_does_not_reopen_source_roots(source_closure, tmp_path):

@@ -65,12 +65,14 @@ def _raw(
 
 
 def _daily_raw(
-    *, code: str = "000001.SZ", day: str = "2026-09-30", close: str = "10.2000"
+    *,
+    code: str = "000001.SZ",
+    day: str = "2026-09-30",
+    open_: str = "10.1000",
+    close: str = "10.2000",
 ) -> bytes:
     fields = ["ts_code", "trade_date", "open", "high", "low", "close", "vol", "amount"]
-    items = [
-        [code, day.replace("-", ""), "10.1000", "10.3000", "10.0000", close, "59.04", "60.2208"]
-    ]
+    items = [[code, day.replace("-", ""), open_, "10.3000", "10.0000", close, "59.04", "60.2208"]]
     return json.dumps(
         {"code": 0, "api_name": "daily", "count": 1, "data": {"fields": fields, "items": items}},
         separators=(",", ":"),
@@ -204,6 +206,22 @@ def test_fetch_fails_closed_on_daily_price_basis_mismatch(tmp_path) -> None:
         fetch_captured_day(tmp_path, _request(), api_key="runtime", get=get)
     assert (tmp_path / "source-response.json.gz").is_file()
     assert (tmp_path / "source-daily-response.json.gz").is_file()
+
+
+def test_fetch_accepts_start_grid_with_disclosed_auction_open_difference(tmp_path) -> None:
+    def get(url, **_kwargs):
+        return SimpleNamespace(
+            status_code=200,
+            content=(
+                _raw(buckets=START_BUCKETS) if url == ENDPOINT else _daily_raw(open_="10.0900")
+            ),
+            headers={},
+        )
+
+    bars, metrics = fetch_captured_day(tmp_path, _request(), api_key="runtime", get=get)
+    assert len(bars) == 48
+    assert metrics["daily_reconciliation"]["label_mode"] == "interval_start_shifted_plus_5m"
+    assert metrics["daily_reconciliation"]["daily_open_matches_first_bar"] is False
 
 
 def test_fetcher_seals_through_generic_native5m_acquisition(tmp_path) -> None:

@@ -220,8 +220,6 @@ def _daily_reconciliation(
         or max(value[1] for value in values) != daily_high
         or min(value[2] for value in values) != daily_low
         or values[-1][3] != daily_close
-        or label_mode == "interval_start_shifted_plus_5m"
-        and values[0][0] != daily_open
     ):
         raise TushareNative5mError("DAILY_PRICE_BASIS_MISMATCH")
     minute_volume = sum((value[4] for value in values), Decimal(0))
@@ -239,7 +237,7 @@ def _daily_reconciliation(
         raise TushareNative5mError("DAILY_VOLUME_OR_AMOUNT_MISMATCH")
     return {
         "label_mode": label_mode,
-        "daily_ohlc_gate": "high_low_close_exact; open_exact_for_interval_start",
+        "daily_ohlc_gate": "high_low_close_exact; open_difference_disclosed",
         "daily_volume_fraction": str(volume_fraction),
         "daily_amount_fraction": str(amount_fraction),
         "daily_fraction_bounds": [str(MIN_DAILY_FRACTION), str(MAX_DAILY_FRACTION)],

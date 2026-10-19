@@ -348,6 +348,7 @@ def audit_month_resolution(
     projected_relation: str = "projected_native5m",
     supplement_relation: str = "native5m_supplement",
     listing_relation: str = "dwd_listing",
+    venue_relation: str = "dwd_trading_venue",
     calendar_relation: str = "dwd_trading_calendar",
     required_relation: str = "required_native5m",
 ) -> dict[str, Any]:
@@ -358,6 +359,7 @@ def audit_month_resolution(
     projected = _relation(projected_relation)
     supplement = _relation(supplement_relation)
     listing = _relation(listing_relation)
+    venue = _relation(venue_relation)
     calendar = _relation(calendar_relation)
     required = _relation(required_relation)
     buckets = ",".join("'" + value + "'" for value in BUCKETS)
@@ -396,7 +398,9 @@ def audit_month_resolution(
                  OR s.source_artifact_sha256<>p.input_artifact_sha256
                  OR s.knowledge_from<>p.acquired_at
                  OR l.listing_code<>p.stock_code
-                 OR l.venue_id<>c.venue_id OR l.venue_id<>r.venue
+                 OR l.venue_id<>c.venue_id
+                 OR v.mic_code<>
+                    CASE r.venue WHEN 'SSE' THEN 'XSHG' WHEN 'SZSE' THEN 'XSHE' END
                  OR c.trade_date<>p.market_date
                  OR c.session_type<>'REGULAR_DAY' OR NOT c.is_open
                  OR strftime(c.trade_date,'%Y-%m')<>?
@@ -409,6 +413,7 @@ def audit_month_resolution(
              'partition='||p.input_partition_id||'&stock_code='||p.stock_code||'&ts='||
              strftime(p.ts,'%Y-%m-%dT%H:%M:%S')
         JOIN {listing} l ON l.listing_id=s.listing_id
+        JOIN {venue} v ON v.venue_id=l.venue_id
         JOIN {calendar} c ON c.calendar_session_id=s.calendar_session_id
         JOIN {required} r ON r.stock_code=p.stock_code AND r.trade_date=p.market_date
         """,

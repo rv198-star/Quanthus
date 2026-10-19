@@ -225,6 +225,10 @@ def _resolution(projected: pa.Table, supplement: pa.Table, *, venue: str = "SSE"
         f"'600000' listing_code,'{venue}' venue_id"
     )
     connection.execute(
+        "CREATE TABLE dwd_trading_venue AS SELECT ? venue_id,? mic_code",
+        [venue, "XSHG" if venue == "SSE" else "XSHE"],
+    )
+    connection.execute(
         """
         CREATE TABLE dwd_trading_calendar AS SELECT 'session-1' calendar_session_id,
           'SSE' venue_id,DATE '2020-01-02' trade_date,'REGULAR_DAY' session_type,true is_open

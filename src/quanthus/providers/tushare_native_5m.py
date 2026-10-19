@@ -172,10 +172,10 @@ def fetch_captured_day(
     if status != 200:
         raise TushareNative5mError(f"SOURCE_HTTP_{status}")
     raw = bytes(response.content)
-    bars = parse_response(raw, request)
     raw_path = staging / "source-response.json.gz"
     with raw_path.open("xb") as sink, gzip.GzipFile(fileobj=sink, mode="wb", mtime=0) as zipped:
         zipped.write(raw)
+    bars = parse_response(raw, request)
     return bars, {
         "provider": PROVIDER,
         "source_endpoint": endpoint,

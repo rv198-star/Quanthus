@@ -145,6 +145,20 @@ def test_fetch_rejects_http_without_writing_payload(tmp_path) -> None:
     assert list(tmp_path.iterdir()) == []
 
 
+def test_fetch_retains_raw_response_when_payload_fails_validation(tmp_path) -> None:
+    body = json.loads(_raw())
+    body["data"]["items"].pop()
+    raw = json.dumps(body, separators=(",", ":")).encode()
+
+    def get(*_args, **_kwargs):
+        return SimpleNamespace(status_code=200, content=raw, headers={})
+
+    with pytest.raises(TushareNative5mError, match="SOURCE_SCHEMA_OR_COUNT_INVALID"):
+        fetch_captured_day(tmp_path, _request(), api_key="runtime", get=get)
+    with gzip.open(tmp_path / "source-response.json.gz", "rb") as stream:
+        assert stream.read() == raw
+
+
 def test_fetcher_seals_through_generic_native5m_acquisition(tmp_path) -> None:
     def get(*_args, **_kwargs):
         return SimpleNamespace(status_code=200, content=_raw(), headers={})

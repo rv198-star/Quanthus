@@ -13,9 +13,11 @@ import hashlib
 import json
 import os
 import re
+from collections.abc import Callable, Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from .base22 import canonical, digest, file_sha
 from .base22_sources import _fingerprint, _member, _tree, disjoint_output, physical_path
@@ -36,10 +38,23 @@ ACQUISITION_CONTRACT = "p10-base24-native5m-acquisition-v1"
 SUPPLEMENTAL_CLOSURE_CONTRACT = (
     "p10-base24-native5m-supplemental-source-closure-v1"
 )
+VERIFY_WORKERS = min(8, max(1, os.cpu_count() or 1))
+VERIFY_BATCH = 256
+_T = TypeVar("_T")
+_R = TypeVar("_R")
 
 
 class Base24OdsError(RuntimeError):
     """Stable reason codes; source row values must never be included."""
+
+
+def _parallel_ordered(
+    values: Sequence[_T], function: Callable[[_T], _R], *, workers: int = VERIFY_WORKERS
+) -> Iterator[_R]:
+    """Evaluate bounded batches concurrently while yielding deterministic order."""
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="base24-ods") as pool:
+        for start in range(0, len(values), VERIFY_BATCH):
+            yield from pool.map(function, values[start : start + VERIFY_BATCH])
 
 
 def _sha(value: str) -> str:
@@ -156,18 +171,20 @@ def _validate_acquisition(acquisition: Path, plan_path: Path) -> dict[str, Any]:
         != file_sha(checkpoint_path).removeprefix("sha256:")
     ):
         raise Base24OdsError("BASE24_ODS_ACQUISITION_CHECKPOINT_INVALID")
-    completed = held = 0
-    for window in windows:
+    def verify(window: dict[str, Any]) -> str:
         partition = acquisition / "partitions" / window["partition_id"]
         hold = acquisition / "held" / window["partition_id"]
         if partition.is_dir() and not hold.exists():
             _verify_sealed(partition, window, plan_sha)
-            completed += 1
+            return "completed"
         elif hold.is_dir() and not partition.exists():
             _verify_held(hold, acquisition / "failures", window, plan_sha)
-            held += 1
+            return "held"
         else:
             raise Base24OdsError("BASE24_ODS_ACQUISITION_PARTITION_CLOSURE_INVALID")
+    dispositions = list(_parallel_ordered(windows, verify))
+    completed = dispositions.count("completed")
+    held = dispositions.count("held")
     if completed != checkpoint.get("completed") or held != checkpoint.get("held"):
         raise Base24OdsError("BASE24_ODS_ACQUISITION_PARTITION_CLOSURE_INVALID")
     if (acquisition / "staging").exists():
@@ -337,29 +354,40 @@ def freeze_ods24_plan(
         targets.add(item["path"])
         files.append(item)
 
-    for relative, row in sorted(included.items()):
+    predecessor_rows = sorted(included.items())
+
+    def predecessor_member(value: tuple[str, dict[str, Any]]) -> dict[str, Any]:
+        relative, row = value
         item = _source_member(predecessor, relative, "retained_ods23_member", relative)
         if item["size_bytes"] != row["size_bytes"] or item["sha256"] != _sha(row["sha256"]):
             raise Base24OdsError("BASE24_ODS_PREDECESSOR_MEMBER_CHANGED")
+        return item
+
+    for item in _parallel_ordered(predecessor_rows, predecessor_member):
         add(item)
-    for relative in sorted(_tree(acquisition)):
-        add(
-            _source_member(
-                acquisition,
-                relative,
-                "native5m_raw_acquisition",
-                "payload/base24-native5m/acquisition/" + relative,
-            )
-        )
-    for relative in sorted(_tree(ledger)):
-        add(
-            _source_member(
-                ledger,
-                relative,
-                "native5m_coverage_evidence",
-                "payload/base24-native5m/coverage/" + relative,
-            )
-        )
+
+    acquisition_paths = sorted(_tree(acquisition))
+    for item in _parallel_ordered(
+        acquisition_paths,
+        lambda relative: _source_member(
+            acquisition,
+            relative,
+            "native5m_raw_acquisition",
+            "payload/base24-native5m/acquisition/" + relative,
+        ),
+    ):
+        add(item)
+    ledger_paths = sorted(_tree(ledger))
+    for item in _parallel_ordered(
+        ledger_paths,
+        lambda relative: _source_member(
+            ledger,
+            relative,
+            "native5m_coverage_evidence",
+            "payload/base24-native5m/coverage/" + relative,
+        ),
+    ):
+        add(item)
     for item in supplemental_members:
         add(item)
     if supplemental_closure_path is not None:
@@ -445,6 +473,34 @@ def _check_budget(budget: Any, reserve: int = 0) -> None:
         budget.check()
 
 
+def _receipt_from_plan(plan: dict[str, Any]) -> dict[str, Any]:
+    roles: dict[str, int] = {}
+    exact_files = 0
+    for item in plan["files"]:
+        role = item["role"]
+        roles[role] = roles.get(role, 0) + 1
+        if re.fullmatch(
+            r"payload/base24-native5m/acquisition/partitions/[0-9a-f]{64}/exact\.parquet",
+            item["path"],
+        ):
+            exact_files += 1
+    receipt = {
+        "contract": CONTRACT,
+        "status": "PASS",
+        "plan_identity": plan["identity"],
+        "files": len(plan["files"]),
+        "logical_bytes": sum(row["size_bytes"] for row in plan["files"]),
+        "roles": dict(sorted(roles.items())),
+        "completed_native5m_partitions": exact_files,
+        "held_native5m_partitions": plan["native5m"]["held_partitions"],
+        "supplemental_native5m_members": roles.get("native5m_supplemental_source", 0),
+        "source_roots_dereferenced": False,
+        "consumer_admission": "NOT_GRANTED",
+    }
+    receipt["identity"] = digest(receipt)
+    return receipt
+
+
 def materialize_ods24(plan: dict[str, Any], output: Path, budget: Any) -> dict[str, Any]:
     """Make independent files; no hard links, symlinks, or source-root dependency."""
     sources = sorted({Path(item["source_root_archival"]) for item in plan["files"]})
@@ -457,30 +513,40 @@ def materialize_ods24(plan: dict[str, Any], output: Path, budget: Any) -> dict[s
         raise Base24OdsError("BASE24_ODS_PLAN_CHANGED")
     required = sum(row["size_bytes"] for row in plan["files"]) + len(canonical(plan)) + 4096
     _check_budget(budget, reserve=required)
-    for item in plan["files"]:
+    def check_source(item: dict[str, Any]) -> None:
         source = physical_path(Path(item["source_path"]))
         if list(_fingerprint(source)) != item["source_fingerprint"]:
             raise Base24OdsError("BASE24_ODS_SOURCE_CHANGED_BEFORE_WRITE")
+    list(_parallel_ordered(plan["files"], check_source))
     staging.mkdir()
     try:
         budget.begin_stage("base24-ods-independent-materialization")
-        for item in plan["files"]:
+
+        def copy_member(item: dict[str, Any]) -> None:
             source = physical_path(Path(item["source_path"]))
             target = _member(staging, item["path"])
             target.parent.mkdir(parents=True, exist_ok=True)
+            copied = hashlib.sha256()
             with source.open("rb") as src, target.open("xb") as dst:
                 for chunk in iter(lambda: src.read(1024 * 1024), b""):
-                    _check_budget(budget, reserve=len(chunk))
+                    copied.update(chunk)
                     dst.write(chunk)
                 dst.flush()
                 os.fsync(dst.fileno())
             if (
                 target.stat().st_nlink != 1
                 or target.stat().st_size != item["size_bytes"]
-                or file_sha(target) != item["sha256"]
+                or "sha256:" + copied.hexdigest() != item["sha256"]
                 or list(_fingerprint(source)) != item["source_fingerprint"]
             ):
                 raise Base24OdsError("BASE24_ODS_COPIED_BYTES_CHANGED")
+
+        with ThreadPoolExecutor(
+            max_workers=VERIFY_WORKERS, thread_name_prefix="base24-ods-copy"
+        ) as pool:
+            for start in range(0, len(plan["files"]), VERIFY_BATCH):
+                _check_budget(budget)
+                list(pool.map(copy_member, plan["files"][start : start + VERIFY_BATCH]))
         materialization = {
             **copy.deepcopy(plan),
             "built_at": datetime.now(timezone.utc).isoformat(),
@@ -490,7 +556,10 @@ def materialize_ods24(plan: dict[str, Any], output: Path, budget: Any) -> dict[s
     except BaseException:
         # Retain failed staging for diagnosis; never mark it READY.
         raise
-    return audit_ods24(output, budget, expected_plan_identity=plan["identity"])
+    # The copy pass validates every source fingerprint and hashes the bytes
+    # written to each independent file.  seal_ods24 performs the one complete
+    # offline readback before it writes the final READY marker.
+    return _receipt_from_plan(plan)
 
 
 def _plan_path(root: Path) -> Path:
@@ -529,21 +598,29 @@ def audit_ods24(
     budget.begin_stage("base24-ods-offline-audit")
     roles: dict[str, int] = {}
     exact_files = 0
-    for item in files:
+
+    def verify_member(item: dict[str, Any]) -> tuple[str, bool]:
         path = _member(root, item["path"])
-        _check_budget(budget)
         if (
             path.stat().st_nlink != 1
             or path.stat().st_size != item["size_bytes"]
             or file_sha(path) != item["sha256"]
         ):
             raise Base24OdsError("BASE24_ODS_PHYSICAL_BYTES_CHANGED")
-        roles[item["role"]] = roles.get(item["role"], 0) + 1
-        if re.fullmatch(
+        exact = bool(re.fullmatch(
             r"payload/base24-native5m/acquisition/partitions/[0-9a-f]{64}/exact\.parquet",
             item["path"],
-        ):
-            exact_files += 1
+        ))
+        return item["role"], exact
+
+    with ThreadPoolExecutor(
+        max_workers=VERIFY_WORKERS, thread_name_prefix="base24-ods-audit"
+    ) as pool:
+        for start in range(0, len(files), VERIFY_BATCH):
+            _check_budget(budget)
+            for role, exact in pool.map(verify_member, files[start : start + VERIFY_BATCH]):
+                roles[role] = roles.get(role, 0) + 1
+                exact_files += int(exact)
     if exact_files != plan["native5m"]["completed_partitions"]:
         raise Base24OdsError("BASE24_ODS_NATIVE5M_PARTITION_CLOSURE_CHANGED")
     supplemental_members = roles.get("native5m_supplemental_source", 0)
@@ -616,20 +693,9 @@ def audit_ods24(
         )
     except Base24BoundedLimitationError as exc:
         raise Base24OdsError("BASE24_ODS_LEDGER_INVALID") from exc
-    receipt = {
-        "contract": CONTRACT,
-        "status": "PASS",
-        "plan_identity": plan["identity"],
-        "files": len(files),
-        "logical_bytes": sum(row["size_bytes"] for row in files),
-        "roles": dict(sorted(roles.items())),
-        "completed_native5m_partitions": exact_files,
-        "held_native5m_partitions": plan["native5m"]["held_partitions"],
-        "supplemental_native5m_members": supplemental_members,
-        "source_roots_dereferenced": False,
-        "consumer_admission": "NOT_GRANTED",
-    }
-    receipt["identity"] = digest(receipt)
+    receipt = _receipt_from_plan(plan)
+    if receipt["roles"] != dict(sorted(roles.items())):
+        raise Base24OdsError("BASE24_ODS_MEMBER_ROLE_SET_CHANGED")
     if sealed:
         manifest = _load_object(root / "manifest.json", "BASE24_ODS_SEAL_INVALID")
         declared = {
@@ -728,5 +794,10 @@ def seal_ods24(
         stream.write(file_sha(root / "manifest.json") + "\n")
         stream.flush()
         os.fsync(stream.fileno())
-    audit_ods24(root, budget, expected_plan_identity=plan["identity"])
+    if (
+        _tree(root) != expected | {"READY"}
+        or (root / "READY").read_text(encoding="ascii").strip()
+        != file_sha(root / "manifest.json")
+    ):
+        raise Base24OdsError("BASE24_ODS_FINAL_PHYSICAL_SET_CHANGED")
     return manifest

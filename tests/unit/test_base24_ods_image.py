@@ -341,6 +341,17 @@ def test_cold_audit_fails_closed_on_member_damage(source_closure, tmp_path, dama
         audit_ods24(output, Budget())
 
 
+def test_seal_performs_full_readback_before_ready(source_closure, tmp_path):
+    plan = _freeze(source_closure)
+    output = tmp_path / "output-before-seal/ods24"
+    output.parent.mkdir()
+    receipt = materialize_ods24(plan, output, Budget())
+    (output / "payload/five.parquet").write_bytes(b"changed-after-copy")
+    with pytest.raises(Base24OdsError, match="PHYSICAL_BYTES"):
+        seal_ods24(output, receipt, code_revision="e" * 40, budget=Budget())
+    assert not (output / "READY").exists()
+
+
 def test_changed_selection_and_symlink_output_fail_before_ready(source_closure, tmp_path):
     predecessor, selection, acquisition, window_plan, ledger = source_closure
     changed = json.loads(selection.read_bytes())

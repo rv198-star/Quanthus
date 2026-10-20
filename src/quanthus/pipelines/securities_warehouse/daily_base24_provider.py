@@ -294,7 +294,7 @@ def main() -> int:
             if args.action == "reference":
                 value = freeze_reference(
                     args.market,
-                    args.day,
+                    args.day.isoformat(),
                     args.output,
                     events_sha=file_digest(args.events / "release.json"),
                 )

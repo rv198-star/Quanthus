@@ -156,6 +156,59 @@ def test_native_shared_reference_exact_bounded_shards(monkeypatch, tmp_path):
     assert all("1m" not in args for _, args in calls)
 
 
+@pytest.mark.parametrize("action", ["reference", "capture"])
+def test_provider_native_boundary_preserves_each_pinned_date_type(monkeypatch, tmp_path, action):
+    """The pinned reference uses ISO strings; its capture API uses date objects."""
+    common = types.ModuleType("quanthus.pipelines.p10_delivery_common")
+    common.file_digest = lambda path: "sha256:" + "a" * 64
+    delivery = types.ModuleType("quanthus.pipelines.p10_native_minute_delivery")
+
+    def freeze(release, day, output, *, events_sha):
+        assert type(day) is str and day == "2026-10-20"
+        return {"reference_digest": "sha256:" + "b" * 64, "market_date": day, "population": 1}
+
+    delivery.freeze_reference = freeze
+    delivery.reference = lambda path: {
+        "securities": {"600000": {}},
+        "source_ods_manifest_sha256": "sha256:" + "a" * 64,
+    }
+    delivery.build = lambda **kwargs: pytest.fail("unexpected native build")
+    capture = types.ModuleType("quanthus.providers.p10_native_m5_shard_capture")
+
+    def shard(**kwargs):
+        assert type(kwargs["market_date"]) is date
+        assert kwargs["market_date"] == date(2026, 10, 20)
+        return {"errors": 0}
+
+    capture.capture_shard = shard
+    for module in [common, delivery, capture]:
+        monkeypatch.setitem(sys.modules, module.__name__, module)
+    monkeypatch.setattr(worker, "runtime", lambda path: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "worker",
+            action,
+            "--runtime",
+            str(tmp_path),
+            "--day",
+            "2026-10-20",
+            "--market",
+            str(tmp_path / "market"),
+            "--events",
+            str(tmp_path / "events"),
+            "--reference",
+            str(tmp_path / "reference"),
+            "--output",
+            str(tmp_path / "output"),
+            "--shard-index",
+            "0",
+        ],
+    )
+    assert worker.main() == 0
+
+
 def test_native_source_error_does_not_build_product(monkeypatch, tmp_path):
     monkeypatch.setattr(cycle, "resources", lambda *a, **kw: {})
     for name in ["market", "events"]:

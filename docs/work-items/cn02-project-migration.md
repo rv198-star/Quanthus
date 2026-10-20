@@ -72,6 +72,32 @@ research, training or strategy/economic evaluation to demonstrate infrastructure
 health. Existing protected artifacts may be transferred as opaque, access-controlled
 bytes under an exact inventory; they must not be rendered into review reports.
 
+### Daily activation successor authority
+
+The Owner explicitly approved real CN02 Daily activation on 2026-10-20 and
+requested backfill from October 8 through the current date. This fulfills the
+separate confirmation requirement for this Daily acquisition/build single-writer
+handover. It does not authorize an OCI application rebuild, P3/P5/P6 activation or
+whole-node shutdown. Preserve the drained CN01 definitions, enabled states and
+exact rollback commands before changing replaced Daily triggers. The source-only
+trial and installation/old-writer fencing are separate facts in the live ledger.
+
+`ops/bin/run-cn02-base24-cycle` runs the actual collector/controller with
+`QUANTHUS_DAILY_CYCLE_CONFIG` and `QUANTHUS_DAILY_PYTHON` set in a private node-local
+environment file. Its `cn02_base24_daily_cycle_v1` JSON pins the physical root,
+Base manifest/policy digests, published collector revision and local pipeline
+revision; no credential belongs in the JSON or repository. `--day YYYY-MM-DD`
+selects a backfill date. Explicit `--market`, `--events`, and optional `--native`
+reuse exact sealed sources; `--native-only` prepares only a source product and
+cannot claim a complete Daily. No option requests 1m or waits for Weekly.
+`--recovery` records late operation explicitly. Core-only quality holds and local
+machine-readable alerts remain visible; they never count as complete 1d/5m dates.
+The examples `cn02-base24-cycle.{service,timer}.example` and
+`cn02-base24-recovery.{service,timer}.example` target calendar-aware 17:30 collection
+and one 21:15 bounded recovery opportunity. Installed and enabled state must be
+verified on the node, not inferred from these files. A full product still requires
+real source qualification and independent cold evidence, including on new paths.
+
 ## One deployment inventory and one live status
 
 Use the existing `current-gaps.json` under

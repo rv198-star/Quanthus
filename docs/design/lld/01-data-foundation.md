@@ -45,6 +45,42 @@ qualification, independent new-process cold acceptance, notifications and single
 cutover remain separate obligations; timer examples do not install or enable them.
 See [the migration work item](../../work-items/cn02-project-migration.md) for operation.
 
+The source-producing successor is `daily_base24_cycle.py`, invoked by
+`ops/bin/run-cn02-base24-cycle`. Its source-only worker imports the separately
+pinned published collector revision `f839af0033ab4aa8cbe6d9fb933f29db88792e91`;
+it never invokes that revision's legacy complete-Daily/DWD cycle or loads old-node
+service environments. The legacy lane schedule is used only as the collector's
+validated request protocol, not as CN02 deployment ownership, a 1m dependency or
+a T+1 schedule. A new private `cn02_base24_daily_cycle_v1` configuration pins the
+Base, release policy, collector and pipeline revisions, isolated output root and
+at most two native-5m capture workers. One target-date supplier universe is shared
+by market/events acquisition; one immutable daily reference binds all 5m shards.
+Only two source lanes and supplier-native 5m are invoked. Raw SDK strings and real
+observation clocks are retained. Unknown provider availability remains unknown.
+
+The cycle verifies the actual authoritative calendar, including every requested
+date, before deciding whether to collect market prices. Closed dates still acquire
+announcement evidence against an explicit previous open-date universe; they never
+create a price session or an empty substitute market table. On open dates the
+cycle constructs and publishes a qualified daily core once before optional 5m
+completion. An unqualified 5m scope retains its original R3 status, a local alert
+and a core-only receipt; it cannot enter the composite pointer or receive a final
+cycle READY. This preserves useful qualified daily data without weakening strict
+native quality checks. Core and full-product pointers use new Base2.4-specific
+names and never masquerade as legacy CURRENT or grant research/execution admission.
+
+The dated index serializes updates across backfill and current-day jobs. Replaying
+an older date cannot regress the latest pointer; each pointer discloses known
+per-date states rather than implying gap-free coverage. Exact completed retries
+reverify and reuse. The configured Shanghai intake/delivery windows remain binding;
+late work requires explicit recovery mode, keeps actual completion time and is not
+described as on-time delivery. Ordinary operation permits at most two attempts per
+date before requiring an explicit disposition. Write budgets and per-device free
+space/inode checks precede each bounded batch; child processes have finite time/RSS
+limits and retain failures. Formal cold acceptance and node cutover remain explicit
+evidence obligations. The Owner separately authorized actual CN02 Daily activation
+and the October 8 onward backfill on 2026-10-20; this does not activate P3/P5/P6.
+
 Physical data contracts and P1 historical acceptance remain here. From 2026-10-03 acquisition,
 shared quality/governance, maintenance and source recovery/repair belong to P10 under
 [`12-permanent-data-line.md`](12-permanent-data-line.md). Other lines only register data defects

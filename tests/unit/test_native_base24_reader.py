@@ -120,6 +120,99 @@ def test_legacy_reader_rejects_24_even_with_exact_pins(native):
         legacy.read_native_parent_references(root, config)
 
 
+def daily_config(config):
+    return {
+        **config,
+        "schema_version": "quanthus.base24-daily-governance.v1",
+        "purpose": "isolated_daily_governance",
+        "consumer_admission": "NOT_GRANTED",
+        "execution_authorized": False,
+        "daily_core_parent_reference": {
+            "status": "accepted",
+            "product_scope": "daily-core-v1",
+            "governance_use": "governance_baseline",
+            "tables": list(legacy.PARENT_TABLES),
+            "trading_or_research_admission": False,
+            "acceptance_receipts": ["sha256:" + "a" * 64, "sha256:" + "b" * 64],
+        },
+    }
+
+
+def test_existing_daily_engine_accepts_explicit_24_governance_parent(native):
+    from quanthus.pipelines.securities_warehouse.daily_core_domain import _verify_base
+
+    root, _, _, config = native
+    config = daily_config(config)
+    config_path = root.parent / "daily.json"
+    config_path.write_text(json.dumps(config))
+    before = (root / "manifest.json").read_bytes()
+    result, actual = _verify_base(root, config_path)
+    assert result.binding["kind"] == successor.KIND
+    assert result.binding["source_consumer_admission"] == "NOT_GRANTED"
+    assert actual == config
+    assert (root / "manifest.json").read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("schema_version", "legacy"),
+        ("purpose", "trading"),
+        ("consumer_admission", "GRANTED"),
+        ("execution_authorized", True),
+    ],
+)
+def test_24_daily_parent_cannot_grant_execution(native, field, value):
+    from quanthus.pipelines.securities_warehouse.daily_core_domain import (
+        DailyDomainBuildError,
+        _verify_base,
+    )
+
+    root, _, _, config = native
+    config = daily_config(config)
+    config[field] = value
+    config_path = root.parent / "daily.json"
+    config_path.write_text(json.dumps(config))
+    with pytest.raises(DailyDomainBuildError, match="governance"):
+        _verify_base(root, config_path)
+
+
+def test_24_daily_still_requires_independent_parent_acceptance(native):
+    from quanthus.pipelines.securities_warehouse.daily_core_domain import (
+        DailyDomainBuildError,
+        _verify_base,
+    )
+
+    root, _, _, config = native
+    config = daily_config(config)
+    config["daily_core_parent_reference"]["status"] = "pending"
+    config_path = root.parent / "daily.json"
+    config_path.write_text(json.dumps(config))
+    with pytest.raises(DailyDomainBuildError, match="acceptance is pending"):
+        _verify_base(root, config_path)
+
+
+@pytest.mark.parametrize("changed", [None, "base", "catalog", "code", "config", "prior"])
+def test_24_daily_reuse_requires_complete_job_identity(tmp_path, monkeypatch, changed):
+    from quanthus.pipelines.securities_warehouse import daily_core_domain as core
+
+    output = tmp_path / "sealed"
+    output.mkdir()
+    identity = dict.fromkeys(["base", "catalog", "code", "config", "prior"], "frozen")
+    (output / "manifest.json").write_text(json.dumps({"job_identity": identity}))
+    before = (output / "manifest.json").read_bytes()
+    requested = dict(identity)
+    sentinel = object()
+    monkeypatch.setattr(core, "verify_daily_domain_increment", lambda _: sentinel)
+    if changed:
+        requested[changed] = "changed"
+        with pytest.raises(core.DailyDomainBuildError, match="job identity"):
+            core._reuse_base24_output(output, requested)
+    else:
+        assert core._reuse_base24_output(output, requested) is sentinel
+    assert (output / "manifest.json").read_bytes() == before
+
+
 @pytest.mark.parametrize(
     "field,value",
     [

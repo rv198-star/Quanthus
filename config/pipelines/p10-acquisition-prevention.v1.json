@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "policy_id": "p10-acquisition-prevention-v1",
+  "authority": "Owner 2026-10-13 daily acquisition repair and deployment instruction",
+  "consumer": "gap_aware_non_execution_development",
+  "execution_authorized": false,
+  "universe": {"provider": "baostock.query_all_stock+query_stock_basic", "target_date_bound": true, "scope": "SSE_SZSE_A_SHARE_00_30_60_68", "require_raw_and_listing_dates": true},
+  "snapshot_projection_is_current_acquisition": false,
+  "daily_core_excluded_domains": ["adjustment_evidence_delta", "suspensions_delta", "corporate_actions_delta", "dividends_delta", "factor_evidence_delta", "financial_disclosures_delta"],
+  "excluded_domain_disposition": "unknown_source_not_refreshed; block affected uses; retain local projection as evidence only",
+  "late_disclosures": "immutable additive knowledge versions; stable document identity plus metadata hash; body revision unknown unless original body captured",
+  "weekly": "publish qualified financial members independently; missing F10/shareholder evidence remains unavailable",
+  "raw_retention": "retain while any published product, checkpoint or open recovery ledger references the response; no automatic deletion",
+  "protected_gates": "PIT/4173/P3/P5/P6 and minimum R2 with R3=0 unchanged"
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": "quanthus.base24-reference-reader.v1",
+  "purpose": "isolated_governance_reference_validation",
+  "through_date": "2026-09-30",
+  "business_timezone": "Asia/Shanghai",
+  "layers": {
+    "dwd": {
+      "format": "native_base24",
+      "package_id": "base24-complete-dwd-bounded-c902994",
+      "manifest_sha256": "sha256:04345d9cfb7d99dae9e65b11bd28591095156e48378b5b44245fc3d36a944b3a",
+      "content_digest": "sha256:b60b36ed63c160a271af047fb0c1ec98a09977c931b3f5f1f25aa0651f2ffd64",
+      "materialization_sha256": "sha256:353eb6ef8a5d9caa2d734bd9e4506616a7017708d85cfe9d9e712c8603bcfa41"
+    }
+  },
+  "parent_tables": [
+    "dwd_listing",
+    "dwd_security",
+    "dwd_trading_calendar",
+    "dwd_market_index",
+    "dwd_trading_venue"
+  ],
+  "daily_core_parent_reference": {
+    "status": "pending",
+    "product_scope": "daily-core-1d5m-v2.4",
+    "governance_use": "governance_baseline",
+    "trading_or_research_admission": false
+  },
+  "consumer_admission": "NOT_GRANTED",
+  "execution_authorized": false,
+  "note": "Pinned metadata and selected-file integrity only. This binding does not accept Daily, T-day timing, historical PIT or production execution."
+}

@@ -369,3 +369,22 @@ def test_source_overlap_is_rejected_before_any_lock_or_run(monkeypatch, tmp_path
         cycle.main()
     assert list(tmp_path.iterdir()) == [marker]
     assert marker.read_bytes() == b"original-source"
+
+
+def test_market_budget_matches_measured_full_universe_and_remains_bounded(monkeypatch, tmp_path):
+    calls = []
+
+    def provider(config, run, label, action, *args, **kwargs):
+        calls.append((action, args, kwargs))
+        if action == "calendar":
+            return {"dates": {"2026-10-20": True}}
+        return {"status": "ready", "release_dir": str(tmp_path / action)}
+
+    monkeypatch.setattr(cycle, "provider", provider)
+    monkeypatch.setattr(cycle, "assemble", lambda *args: {"completed": True})
+    assert cycle.collect({"root": str(tmp_path)}, tmp_path, date(2026, 10, 20)) == {
+        "completed": True
+    }
+    market = next(call for call in calls if call[0] == "market")
+    assert market[1][-2:] == ("--budget", "7200")
+    assert market[2]["timeout"] == 7300

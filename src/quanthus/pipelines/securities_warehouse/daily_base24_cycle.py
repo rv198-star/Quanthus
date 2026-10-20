@@ -561,8 +561,8 @@ def collect(config: dict[str, Any], run: Path, day: date) -> dict[str, Any]:
         "--output",
         str(run / "market-source.json"),
         "--budget",
-        "3600",
-        timeout=3700,
+        "7200",
+        timeout=7300,
     )
     if market["status"] != "ready":
         raise ValueError("DAILY_CYCLE_MARKET_NOT_READY")

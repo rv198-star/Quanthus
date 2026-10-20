@@ -392,3 +392,29 @@ item links this broader successor. Installed topology, executable policies,
 accepted artifacts and deployment status are not changed by this preparation.
 Run focused documentation/ownership contracts and `make check` before handoff.
 Unit and synthetic checks are engineering evidence, not migration acceptance.
+
+### Daily interrupted-source recovery
+
+The first real CN02 market acquisition on 2026-10-20 reached its explicit one-hour
+budget before completing the population. SDK responses are captured at both the
+inner request and outer interpretation boundary; file count is not a completed
+security count. Use distinct successful security identities from the acquisition
+log and verify their original response envelopes.
+
+The additive `daily_base24_market_resume` adapter accepts a frozen, SHA256-bound
+selection of the stopped attempt's acquisition log, universe and original SDK
+captures. Validate scope, physical members, hashes, receipt closure, original
+clocks and exact numeric strings before querying the missing security set. Copy
+retained evidence into the new attempt as independent files; retain the failed
+attempt. The published collector still validates full merged market/status/valuation
+coverage and seals a new release. Record both its collector revision and the new
+adapter revision. Resume is not acceptance of the partial release. The pinned
+collector's second-resolution acquisition time is retained at that precision;
+response-envelope microseconds must not be invented as original knowledge time.
+
+The measured full-universe source budget is two hours, with a bounded termination
+grace. This does not promise the 21:00 target when acquisition starts after 19:00.
+Record actual late completion and use the explicit recovery path. Keep source
+collection, once-only core projection, native-5m qualification and cold acceptance
+as separate dependent stages; a source-quality hold does not erase qualified core
+output or authorize trading/research consumers.

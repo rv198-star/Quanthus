@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import importlib.util
 import io
 import json
 import os
@@ -131,8 +132,44 @@ def calendar(start: date, end: date, output: Path, home: Path | None = None) -> 
             bs.logout()
 
 
-def lane(action: str, day: date, home: Path, runtime_root: Path, budget: int) -> dict[str, Any]:
-    from quanthus.pipelines.lane_runner import resolve_paths, run_lane
+def lane(
+    action: str,
+    day: date,
+    home: Path,
+    runtime_root: Path,
+    budget: int,
+    seed_inventory: Path | None = None,
+    seed_sha256: str | None = None,
+) -> dict[str, Any]:
+    from quanthus.pipelines import lane_runner
+
+    seed = None
+    producer = COLLECTOR
+    original = lane_runner._baostock_fetch_day
+    if seed_inventory is not None:
+        if action != "market" or seed_sha256 is None:
+            raise ValueError("DAILY_MARKET_ONLY_FROZEN_SEED_REQUIRED")
+        # This file runs against the separate published collector namespace. Load
+        # the additive adapter only from the same versioned pipeline checkout.
+        spec = importlib.util.spec_from_file_location(
+            "daily_base24_market_resume", Path(__file__).with_name("daily_base24_market_resume.py")
+        )
+        assert spec is not None and spec.loader is not None
+        resume = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(resume)
+        seed = resume.load_seed(seed_inventory, seed_sha256, day)
+        if seed["collector_revision"] != COLLECTOR:
+            raise ValueError("DAILY_SEED_COLLECTOR_REVISION_DIFFERS")
+        producer = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=Path(__file__).parents[4], text=True
+        ).strip()
+        if subprocess.check_output(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            cwd=Path(__file__).parents[4],
+            text=True,
+        ):
+            raise ValueError("DAILY_RESUME_ADAPTER_CLEAN_REVISION_REQUIRED")
+        lane_runner._baostock_fetch_day = resume.adapter(original, seed, producer)
 
     home.mkdir(parents=True, exist_ok=True)
     os.environ.update(
@@ -141,19 +178,24 @@ def lane(action: str, day: date, home: Path, runtime_root: Path, budget: int) ->
         HERMES_ODS_NODE_ID="cn02",
         HERMES_ODS_ACQUIRE_MODE="provider",
         HERMES_ODS_PREVENTION_POLICY="p10-acquisition-prevention-v1",
-        QUANTHUS_COLLECTOR_SHA=COLLECTOR,
+        QUANTHUS_COLLECTOR_SHA=producer,
     )
-    result = run_lane(
-        lane_id={"market": "market-daily-core", "events": "calendar-daily-events"}[action],
-        market_date=day,
-        schedule_config=runtime_root / "config/schedules/hermes-ods-schedule.v1.json",
-        paths=resolve_paths(
-            home=home, shadow_root=home / "shadow", calendar=home / "calendar-baseline.parquet"
-        ),
-        recovery_deadline_at=(
-            datetime.now(timezone.utc) + timedelta(seconds=budget) if action == "market" else None
-        ),
-    )
+    try:
+        result = lane_runner.run_lane(
+            lane_id={"market": "market-daily-core", "events": "calendar-daily-events"}[action],
+            market_date=day,
+            schedule_config=runtime_root / "config/schedules/hermes-ods-schedule.v1.json",
+            paths=lane_runner.resolve_paths(
+                home=home, shadow_root=home / "shadow", calendar=home / "calendar-baseline.parquet"
+            ),
+            recovery_deadline_at=(
+                datetime.now(timezone.utc) + timedelta(seconds=budget)
+                if action == "market"
+                else None
+            ),
+        )
+    finally:
+        lane_runner._baostock_fetch_day = original
     safe = {
         k: result.to_dict()[k]
         for k in [
@@ -168,6 +210,10 @@ def lane(action: str, day: date, home: Path, runtime_root: Path, budget: int) ->
         ]
     }
     safe["actual_provider_acquisition"] = True
+    safe["collector_revision"] = COLLECTOR
+    safe["adapter_revision"] = producer
+    if seed is not None:
+        safe["seed_inventory_sha256"] = seed_sha256
     if result.status not in {"ready", "closed_session"}:
         safe["qualified"] = False
     return safe
@@ -191,10 +237,16 @@ def main() -> int:
     parser.add_argument("--capture-root", type=Path)
     parser.add_argument("--shard-index", type=int)
     parser.add_argument("--budget", type=int, default=3600)
+    parser.add_argument("--market-seed-inventory", type=Path)
+    parser.add_argument("--market-seed-sha256")
     args = parser.parse_args()
     runtime(args.runtime)
     if not 30 <= args.budget <= 7200:
         raise ValueError("DAILY_PROVIDER_BOUNDED_BUDGET_REQUIRED")
+    if (args.market_seed_inventory is not None or args.market_seed_sha256 is not None) and (
+        args.action != "market" or not args.market_seed_inventory or not args.market_seed_sha256
+    ):
+        raise ValueError("DAILY_MARKET_ONLY_FROZEN_SEED_REQUIRED")
     # SDK chatter is retained in the private service log, never mixed into JSON.
     with contextlib.redirect_stdout(io.StringIO()):
         if args.action == "calendar":
@@ -217,7 +269,15 @@ def main() -> int:
                 if args.action != "events" or args.universe_day > args.day:
                     raise ValueError("DAILY_EVENT_UNIVERSE_DATE_INVALID")
                 os.environ["HERMES_ODS_UNIVERSE_SOURCE_DATE"] = str(args.universe_day)
-            result = lane(args.action, args.day, args.home, args.runtime, args.budget)
+            result = lane(
+                args.action,
+                args.day,
+                args.home,
+                args.runtime,
+                args.budget,
+                args.market_seed_inventory,
+                args.market_seed_sha256,
+            )
             args.output.write_text(json.dumps(result, sort_keys=True) + "\n")
         else:
             from quanthus.pipelines.p10_delivery_common import file_digest

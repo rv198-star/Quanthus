@@ -47,6 +47,13 @@ def _financial_control(path: Path, source_sha: str, envelopes: int, through: dat
     return str(row["source_revision"])
 
 
+def _provider_revision(config: dict[str, Any]) -> str:
+    value = config.get("financial_statement_source", {}).get("provider_revision")
+    if not isinstance(value, str) or not value:
+        raise BoundedError("WEEKLY_PROVIDER_REVISION_CONTRACT_MISSING")
+    return value
+
+
 def _closure(root: Path) -> set[str]:
     materialization = json.loads(_member(root, "references/MATERIALIZATION.json").read_bytes())
     return (
@@ -113,7 +120,10 @@ def seal_financial_weekly(
         raise BoundedError("WEEKLY_CODE_IDENTITY_INVALID")
     if file_sha(physical_path(source_control)) != source_control_sha256:
         raise BoundedError("WEEKLY_FINANCIAL_DATASET_CONTROL_HASH_DIFFERS")
-    revision = _financial_control(source_control, source_sha256, expected_envelopes, through)
+    dataset_revision = _financial_control(
+        source_control, source_sha256, expected_envelopes, through
+    )
+    provider_revision = _provider_revision(config)
     parent, resolver = weekly_parent(base, config)
     output = budget.destination(output)
     if output.exists():
@@ -153,7 +163,7 @@ def seal_financial_weekly(
         through=through,
         output=output / "tables",
         budget=budget,
-        expected_source_revision=revision,
+        expected_source_revision=provider_revision,
     )
     files = {
         n: {"sha256": file_sha(output / n), "bytes": (output / n).stat().st_size}
@@ -169,6 +179,8 @@ def seal_financial_weekly(
         "business_through": through.isoformat(),
         "governance_observed_at": observed_at.isoformat(),
         "source_envelopes": expected_envelopes,
+        "original_dataset_revision": dataset_revision,
+        "original_provider_revision": provider_revision,
         "source_root_archival": str(source.parent),
         "consumer_admission": "NOT_GRANTED",
         "execution_authorized": False,
@@ -224,12 +236,17 @@ def verify_financial_weekly(root: Path, *, manifest_sha256: str, budget: Budget)
         raise BoundedError("WEEKLY_REFERENCE_BINDING_DIFFERS")
     observed = datetime.fromisoformat(manifest["governance_observed_at"])
     through = date.fromisoformat(manifest["business_through"])
-    revision = _financial_control(
+    dataset_revision = _financial_control(
         root / "sources/datasets.json",
         files["sources/" + SOURCE_NAMES[0]]["sha256"],
         manifest["source_envelopes"],
         through,
     )
+    provider_revision = _provider_revision(config)
+    if dataset_revision != manifest.get(
+        "original_dataset_revision"
+    ) or provider_revision != manifest.get("original_provider_revision"):
+        raise BoundedError("WEEKLY_DISTINCT_REVISION_BINDINGS_DIFFER")
     reproduced = materialize_statements(
         source=root / "sources" / SOURCE_NAMES[0],
         receipts=root / "sources" / SOURCE_NAMES[1],
@@ -241,7 +258,7 @@ def verify_financial_weekly(root: Path, *, manifest_sha256: str, budget: Budget)
         through=through,
         output=budget.root / "reproduced-tables",
         budget=budget,
-        expected_source_revision=revision,
+        expected_source_revision=provider_revision,
     )
     if reproduced != manifest["projection"]:
         raise BoundedError("WEEKLY_REPRODUCED_PROJECTION_DIFFERS")

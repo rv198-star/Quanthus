@@ -19,7 +19,7 @@ from tests.unit.test_base24_weekly_materialize import fixture
 from tests.unit.test_native_base24_reader import package, reseal
 
 
-def product(tmp_path):
+def product(tmp_path, provider_revision="v1"):
     inputs = fixture(tmp_path)
     root, manifest, mat, cfg = package(tmp_path)
     start = datetime(1990, 1, 1, tzinfo=timezone.utc)
@@ -52,6 +52,7 @@ def product(tmp_path):
     reseal(root, manifest, mat, cfg)
     contract = weekly_config()
     contract["layers"] = cfg["layers"]
+    contract["financial_statement_source"]["provider_revision"] = provider_revision
     control = tmp_path / "datasets.json"
     control.write_text(
         json.dumps(
@@ -63,7 +64,7 @@ def product(tmp_path):
                         row_count=3,
                         sha256=inputs["source_sha256"],
                         watermark=THROUGH.isoformat(),
-                        source_revision="v1",
+                        source_revision="synthetic-dataset-release-20261017-v2",
                     )
                 ]
             }
@@ -94,6 +95,9 @@ def product(tmp_path):
 
 def test_self_contained_two_moves_and_source_independent_reproduction(tmp_path):
     root, result, limits, originals = product(tmp_path)
+    manifest = json.loads((root / "manifest.json").read_text())
+    assert manifest["original_dataset_revision"] == "synthetic-dataset-release-20261017-v2"
+    assert manifest["original_provider_revision"] == "v1"
     first, second = tmp_path / "move1", tmp_path / "move2"
     shutil.copytree(root, first)
     shutil.copytree(first, second)
@@ -123,6 +127,7 @@ def test_self_contained_two_moves_and_source_independent_reproduction(tmp_path):
         "role-repacked",
         "control-repacked",
         "revision-repacked",
+        "provider-repacked",
     ],
 )
 def test_corruption_and_fully_repacked_semantic_tampering_fail_closed(tmp_path, mutation):
@@ -154,6 +159,22 @@ def test_corruption_and_fully_repacked_semantic_tampering_fail_closed(tmp_path, 
             body["purpose"] = "production_execution"
             cfg.write_bytes(canonical(body) + b"\n")
             manifest["files"][cfg.name] = dict(sha256=file_sha(cfg), bytes=cfg.stat().st_size)
+        elif mutation == "provider-repacked":
+            source = root / "sources/financial_statements.parquet"
+            typed = pq.read_table(source)
+            values = typed.to_pylist()
+            values[0]["source_revision"] = "wrong-provider-revision"
+            pq.write_table(pa.Table.from_pylist(values, schema=typed.schema), source)
+            manifest["files"]["sources/financial_statements.parquet"] = dict(
+                sha256=file_sha(source), bytes=source.stat().st_size
+            )
+            control = root / "sources/datasets.json"
+            body = json.loads(control.read_text())
+            body["datasets"][0]["sha256"] = file_sha(source)
+            control.write_bytes(canonical(body) + b"\n")
+            manifest["files"]["sources/datasets.json"] = dict(
+                sha256=file_sha(control), bytes=control.stat().st_size
+            )
         else:
             control = root / "sources/datasets.json"
             body = json.loads(control.read_text())
@@ -169,6 +190,19 @@ def test_corruption_and_fully_repacked_semantic_tampering_fail_closed(tmp_path, 
         (root / "READY").write_text(result["manifest_sha256"] + "\n")
     with (
         Budget(tmp_path / "verify", [root], limits) as b,
-        pytest.raises((RuntimeError, ValueError, FileNotFoundError)),
+        pytest.raises(
+            (RuntimeError, ValueError, FileNotFoundError),
+            match="SOURCE_REVISION_DIFFERS" if mutation == "provider-repacked" else None,
+        ),
     ):
         verify_financial_weekly(root, manifest_sha256=result["manifest_sha256"], budget=b)
+
+
+def test_build_rejects_provider_revision_mismatch_and_preserves_originals(tmp_path):
+    with pytest.raises(RuntimeError, match="SOURCE_REVISION_DIFFERS"):
+        product(tmp_path, provider_revision="wrong-provider-revision")
+    assert not (tmp_path / "build/product/READY").exists()
+    assert (
+        pq.read_table(tmp_path / "source.parquet").column("source_revision").to_pylist()
+        == ["v1"] * 3
+    )

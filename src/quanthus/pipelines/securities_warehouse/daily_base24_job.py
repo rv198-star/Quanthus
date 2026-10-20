@@ -123,13 +123,12 @@ def _wall_stop(seconds: float) -> Iterator[None]:
         signal.signal(signal.SIGALRM, previous)
 
 
-def _prepare(
-    plan_path: Path, window_path: Path, output: Path
-) -> tuple[dict[str, Any], dict[str, Path], Path, Path]:
-    plan_path, window_path = physical_path(plan_path), physical_path(window_path)
-    plan, _, _ = _read_json(plan_path)
-    if _object(window_path) != WINDOW:
-        raise ValueError("DAILY_JOB_WINDOW_CONTRACT_DIFFERS")
+def validate_plan_inputs(plan: dict[str, Any]) -> dict[str, Path]:
+    """Inspect frozen controls only; domain/payload qualification belongs to the DAG.
+
+    Shared by the intake publisher and the consumer so neither can silently
+    select another release or accept a different business date.
+    """
     if (
         plan.get("kind") != KIND
         or not re.fullmatch(r"[0-9a-f]{40}", str(plan.get("code_revision", "")))
@@ -138,7 +137,8 @@ def _prepare(
         or plan.get("execution_authorized") is not False
     ):
         raise ValueError("DAILY_JOB_PLAN_CONTRACT_INVALID")
-    date.fromisoformat(plan["market_date"])
+    if date.fromisoformat(plan["market_date"]).isoformat() != plan["market_date"]:
+        raise ValueError("DAILY_JOB_SOURCE_DATE_INVALID")
     paths = {}
     for key in ("source_root", "native5m", "base", "release_config", "prior_pointer"):
         raw = plan[key]
@@ -168,6 +168,17 @@ def _prepare(
     for key in (*sorted(LANES), "native5m"):
         if _object(controls[key]).get("market_date") != plan["market_date"]:
             raise ValueError("DAILY_JOB_SOURCE_DATE_DIFFERS")
+    return paths
+
+
+def _prepare(
+    plan_path: Path, window_path: Path, output: Path
+) -> tuple[dict[str, Any], dict[str, Path], Path, Path]:
+    plan_path, window_path = physical_path(plan_path), physical_path(window_path)
+    plan, _, _ = _read_json(plan_path)
+    if _object(window_path) != WINDOW:
+        raise ValueError("DAILY_JOB_WINDOW_CONTRACT_DIFFERS")
+    paths = validate_plan_inputs(plan)
     roots = [*paths.values(), plan_path, window_path]
     # All preflight checks precede creation of the output or sibling lock.
     output = disjoint_output(output, roots)

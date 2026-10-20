@@ -160,6 +160,25 @@ creates catalog -> one immutable core -> physical 1d/5m composite -> full produc
 replay -> job receipt/READY, with per-stage duration and bytes. It does not acquire
 1m, wait for Weekly, advance CURRENT or send messages.
 
+The input-plan publisher is
+`src/quanthus/pipelines/securities_warehouse/daily_base24_intake.py` (run with
+`PYTHONPATH=src .venv/bin/python -m quanthus.pipelines.securities_warehouse.daily_base24_intake`).
+Supply the exact `--market-date`, full `--code-revision`, `--source-root`, relative
+`--market-release` / `--events-release`, and absolute `--native5m`, `--base`,
+`--release-config`, `--prior-pointer`, and `--plan-root`, with explicit
+`--mode t-day` or `replay`. It checks source manifest/READY identities and scopes,
+uses the same frozen control/date validator as the runner, and writes the dated
+plan exclusively. Its checksum seal becomes visible atomically only after the
+controls still match. The publisher reads control metadata, not market payloads;
+its seal is not source qualification or a natural-day acquisition receipt. Payload
+schema/keys/coverage/provenance remain checked by the existing Daily DAG once.
+Exact unchanged retries preserve both files. An interrupted plan can gain its
+missing seal only if the plan bytes and frozen inputs still match; a different
+identity for that date must use a separate isolated plan root. Invalid paths,
+overlap, symlinks, source dates/seals or an expired intake window reject without
+creating a plan or lock. No source discovery, provider calls, notification or
+service activation is performed. Collector integration remains a separate step.
+
 For a preflighted unique isolated output, run:
 
 ```bash

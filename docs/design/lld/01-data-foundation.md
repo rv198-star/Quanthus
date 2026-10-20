@@ -32,6 +32,14 @@ and exact selected releases must match before projection and after verification.
 The versioned Shanghai window is enforced through final job receipt creation;
 an expired or failed job retains evidence without a job READY. Explicit historical
 replay cannot establish natural T-day acquisition or consumer/production admission.
+`daily_base24_intake.py` freezes exact already sealed market/event releases,
+native-5m and Base identities plus configuration/prior controls into an immutable
+dated plan. Publisher and runner share the offline control/date checks. The plan
+seal is atomically visible last; same-identity recovery may complete an interrupted
+publication but cannot overwrite a different plan. Intake does not scan or qualify
+payloads, infer acquisition times or claim producer/consumer admission: each payload
+still passes its existing domain verifier in the downstream DAG. The 20:45 intake
+deadline reserves the final 15 minutes for build and replay.
 This runner consumes already sealed inputs. Acquisition scheduling, fresh source
 qualification, independent new-process cold acceptance, notifications and single-writer
 cutover remain separate obligations; timer examples do not install or enable them.

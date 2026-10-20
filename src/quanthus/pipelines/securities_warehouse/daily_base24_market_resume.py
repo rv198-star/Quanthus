@@ -41,8 +41,8 @@ def stamp(value: str) -> datetime:
 
 def load_seed(inventory: Path, digest: str, day: date) -> dict[str, Any]:
     """Verify frozen members before any output is created; never trust old READY."""
-    from quanthus.providers.acquisition_evidence import (
-        verify_capture,  # type: ignore[import-untyped]
+    from quanthus.providers.acquisition_evidence import (  # type: ignore[import-untyped]
+        verify_capture,
     )
 
     inventory = physical(inventory)

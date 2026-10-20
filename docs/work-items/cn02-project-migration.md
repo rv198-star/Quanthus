@@ -127,6 +127,57 @@ they do not hold unrelated qualified Daily output unless its existing consumer
 contract requires them. Data availability on T does not change the active
 `close-to-next-open-v1` execution rule: earliest execution remains T+1 open.
 
+### Frozen-input pipeline and proposed daily window
+
+The Owner's 2026-10-20 window is a 17:00–18:00 start with delivery before 21:00
+Shanghai. `config/pipelines/base24-daily-window.v1.json` selects 17:30 and enforces
+the 21:00 upper bound, including final product replay. The implementation is
+`daily_base24_job.py`; its executable entry is `ops/bin/run-cn02-base24-daily`.
+This is an isolated frozen-input pipeline, not yet a CN02 collector or natural
+T-day acceptance. It does not load the CN01 four-lane wrapper or legacy env files.
+The `.example` systemd service/timer under `ops/systemd/cn02-base24-daily.*`
+remain uninstalled. Their activation requires the source-intake plan producer,
+notifications, reviewed Git deployment and single-writer handover to be ready.
+The 17:30 collector start target and a sealed-input build are distinct: starting
+a collector does not imply its sealed inputs already exist. Scheduled mode polls
+only today's plan/seal, until the contract's 20:45 intake deadline, reserving the
+last 15 minutes for build and replay. The intake producer publishes
+`YYYY-MM-DD.json` plus `YYYY-MM-DD.json.READY` containing its full `sha256:` hash.
+No plan, a bad seal or a late plan raises a scoped delivery failure; it never
+selects yesterday's plan. Source acquisition and the intake producer must be
+connected and measured before activation; an empty-plan wait is not T-day proof.
+
+A frozen plan has `kind=cn02_base24_daily_frozen_job_v1`, an ISO `market_date`, a
+full `code_revision`, absolute `source_root`, `native5m`, `base`, `release_config`
+and `prior_pointer` paths. `lanes` contains exactly `market_daily_core` and
+`calendar_daily_events`, each with its relative `release_path` and full `sha256:`
+manifest hash. `control_sha256` pins the native and Base manifests, release config
+and prior descriptor. `consumer_admission=NOT_GRANTED` and
+`execution_authorized=false` remain mandatory. Existing catalog/core/native
+verifiers qualify actual payloads; pinned declarations alone are insufficient.
+Input/output/sibling-lock overlap and symlinks fail before writing. The pipeline
+creates catalog -> one immutable core -> physical 1d/5m composite -> full product
+replay -> job receipt/READY, with per-stage duration and bytes. It does not acquire
+1m, wait for Weekly, advance CURRENT or send messages.
+
+For a preflighted unique isolated output, run:
+
+```bash
+ops/bin/run-cn02-base24-daily --plan /absolute/frozen-day.json \
+  --output /absolute/existing-parent/new-job --mode replay --max-seconds 900
+```
+
+Use `--mode t-day` only for the actual Shanghai business day inside the window.
+It records on-day build completion, never an unproven CN02 acquisition claim.
+Final READY is absent on timeout/rejection; preserve partial products and failure
+evidence, then use a new Job/revision for bounded recovery. A complete exact-identity
+rerun verifies and reuses its product without rebuilding catalog/core. It never
+overwrites an incomplete prior attempt. A separate full natural-day test must
+record source availability/acquisition and delivery/alert times. Full cold moves
+and source/network denial remain explicit acceptance modes, not replaced by the
+in-process product replay. Rollback before activation is to leave these examples
+uninstalled; the old writer and all existing source/services remain unchanged.
+
 ## Select OCI assets before transfer
 
 For each installed Quanthus unit, image, volume and artifact root, record its

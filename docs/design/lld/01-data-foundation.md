@@ -22,6 +22,21 @@ date. No downstream module may read vendor frames directly.
 
 ## 2. Scope
 
+The CN02 successor's isolated frozen-input Daily orchestration is owned by
+`src/quanthus/pipelines/securities_warehouse/daily_base24_job.py` and
+`config/pipelines/base24-daily-window.v1.json` under `P10-DATA-BASE24-050` and
+`META-OPS-CN02-001`. The DAG creates one daily-core ODS catalog and one immutable
+core, then builds and fully replays the native-5m composite. Only daily and native
+5m enter this product; Weekly and 1m are not prerequisites. Pinned source controls
+and exact selected releases must match before projection and after verification.
+The versioned Shanghai window is enforced through final job receipt creation;
+an expired or failed job retains evidence without a job READY. Explicit historical
+replay cannot establish natural T-day acquisition or consumer/production admission.
+This runner consumes already sealed inputs. Acquisition scheduling, fresh source
+qualification, independent new-process cold acceptance, notifications and single-writer
+cutover remain separate obligations; timer examples do not install or enable them.
+See [the migration work item](../../work-items/cn02-project-migration.md) for operation.
+
 Physical data contracts and P1 historical acceptance remain here. From 2026-10-03 acquisition,
 shared quality/governance, maintenance and source recovery/repair belong to P10 under
 [`12-permanent-data-line.md`](12-permanent-data-line.md). Other lines only register data defects

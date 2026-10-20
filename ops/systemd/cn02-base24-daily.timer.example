@@ -1,0 +1,11 @@
+[Unit]
+Description=CN02 isolated frozen-input Daily build window; activation requires cutover review
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 17:30:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=false
+Unit=cn02-base24-daily.service
+
+[Install]
+WantedBy=timers.target

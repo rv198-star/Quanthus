@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Isolated frozen-input pipeline. No collection, CURRENT, or legacy env loading.
+set -euo pipefail
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+PYTHON=${QUANTHUS_DAILY_PYTHON:-${ROOT}/.venv/bin/python}
+if [[ "${1:-}" == "--scheduled" ]]; then
+    [[ "$#" -eq 1 ]] || exit 2
+    : "${QUANTHUS_DAILY_PLAN_ROOT:?set the frozen input-plan directory}"
+    : "${QUANTHUS_DAILY_JOB_ROOT:?set the isolated job directory}"
+    set -- --watch-plan-root "${QUANTHUS_DAILY_PLAN_ROOT}" \
+        --job-root "${QUANTHUS_DAILY_JOB_ROOT}"
+fi
+cd -- "${ROOT}"
+export PYTHONPATH="${ROOT}/src"
+export HERMES_ODS_PREVENTION_POLICY=p10-acquisition-prevention-v1
+exec "${PYTHON}" -m quanthus.pipelines.securities_warehouse.daily_base24_job \
+    --window "${ROOT}/config/pipelines/base24-daily-window.v1.json" "$@"

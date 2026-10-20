@@ -1,0 +1,13 @@
+{
+  "schema_version": "quanthus.base24-daily-window.v1",
+  "timezone": "Asia/Shanghai",
+  "start_time": "17:30:00",
+  "sealed_input_deadline": "20:45:00",
+  "delivery_deadline": "21:00:00",
+  "default_intervals": ["1d", "5m"],
+  "one_minute": "NOT_IN_PRODUCT",
+  "weekly_on_daily_critical_path": false,
+  "late_disposition": "ALERT_AFFECTED_SCOPE_AND_BOUNDED_RECOVERY",
+  "earliest_execution": "T+1_OPEN_UNCHANGED",
+  "production_activation": "SEPARATE_CONFIRMATION_REQUIRED"
+}

@@ -74,6 +74,9 @@ Offline verification checks the exact physical file set, hashes, schemas, row an
 key census, calendar/date/venue relationships, source closure and recomputed
 assessment. It reconstructs all seven projections from the local native records,
 so a fully repacked manifest cannot hide altered values or invented authority.
+Market reconstruction shares one monthly join across three outputs; each native
+family shares one bounded version table across its two clock checks. No year-wide
+wide-row difference or twelve-way retained join is required.
 No network, original Base, Daily, correction, old path or source cache is needed.
 
 ## Acceptance and next boundary

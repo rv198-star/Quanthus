@@ -16,6 +16,7 @@ from typing import Any
 from quanthus.backtest.base24_semantic_projection import (
     KEYS,
     NATIVE_KEYS,
+    _market,
     _queries,
     revision_transitions,
 )
@@ -119,22 +120,22 @@ def _count(c: Any, query: str) -> int:
     return int(c.execute(query).fetchone()[0])
 
 
-def _reconstruct(c: Any, root: Path, cutoff: str) -> None:
-    """Rebuild all seven meanings from local native observations, never paths.
+def _reconstruct(c: Any, root: Path, cutoff: str, business_end: str) -> None:
+    """Rebuild seven meanings with one shared, bounded market TMP per month.
 
-    Selection preserves the predecessor's explicit latest-known snapshot rule.
-    It is not proof that this snapshot was known at an earlier session cutoff.
+    Year-wide, wide-row EXCEPT can exhaust the declared memory before spilling.
+    References are shared once; the three market consumers share one monthly
+    join. No semantic row or knowledge version is skipped to meet a budget.
     """
     visibility = (
-        f"knowledge_from<=TIMESTAMPTZ {_q(cutoff)} "
-        f"AND coalesce(knowledge_to,'infinity'::TIMESTAMPTZ)>TIMESTAMPTZ "
-        f"{_q(cutoff)}"
+        f"knowledge_from<=TIMESTAMPTZ {_q(cutoff)} AND "
+        f"coalesce(knowledge_to,'infinity'::TIMESTAMPTZ)>TIMESTAMPTZ {_q(cutoff)}"
     )
-    for name in NATIVE:
-        if name not in NATIVE_KEYS:
-            continue
+    market = {"dwd_security_bar", "dwd_tradability_state"}
+
+    def select(name: str, window: str = "true") -> None:
         keys = NATIVE_KEYS[name]
-        raw = f"(SELECT DISTINCT * FROM n_{name})"
+        raw = f"(SELECT DISTINCT * FROM n_{name} WHERE {window})"
         if _count(
             c,
             (
@@ -145,13 +146,14 @@ def _reconstruct(c: Any, root: Path, cutoff: str) -> None:
         ):
             raise HandoffError("AMBIGUOUS_NATIVE_VERSION:" + name)
         c.execute(
-            f"CREATE TEMP VIEW {name} AS SELECT * FROM "
-            f"{raw} WHERE {visibility} QUALIFY row_number() "
-            f"OVER (PARTITION BY {keys} ORDER BY knowledge_from "
-            f"DESC)=1"
+            f"CREATE OR REPLACE TEMP VIEW {name} AS SELECT "
+            f"* FROM {raw} WHERE {visibility} QUALIFY "
+            f"row_number() OVER (PARTITION BY {keys} ORDER "
+            f"BY knowledge_from DESC)=1"
         )
-    for name, query in _queries().items():
-        actual_schema = c.execute(f"SELECT * FROM {name} LIMIT 0").description
+
+    def compare(name: str, query: str, actual: str) -> None:
+        actual_schema = c.execute(f"SELECT * FROM ({actual}) LIMIT 0").description
         expected_schema = c.execute(f"SELECT * FROM ({query}) LIMIT 0").description
         if [(v[0], str(v[1])) for v in actual_schema] != [
             (v[0], str(v[1])) for v in expected_schema
@@ -161,11 +163,38 @@ def _reconstruct(c: Any, root: Path, cutoff: str) -> None:
             c,
             (
                 f"SELECT count(*) FROM ((({query}) EXCEPT "
-                f"ALL (SELECT * FROM {name})) UNION ALL ((SELECT "
-                f"* FROM {name}) EXCEPT ALL ({query})))"
+                f"ALL ({actual})) UNION ALL (({actual}) EXCEPT "
+                f"ALL ({query})))"
             ),
         ):
             raise HandoffError("SEMANTIC_VALUES:" + name)
+
+    for name in NATIVE:
+        if name in NATIVE_KEYS and name not in market:
+            select(name)
+    cursor, through = date(2026, 1, 1), date.fromisoformat(business_end)
+    while cursor <= through:
+        following = date(cursor.year + (cursor.month == 12), cursor.month % 12 + 1, 1)
+        window = (
+            f"observation_start>=TIMESTAMPTZ '{cursor}T00:00:00+08:00' AND "
+            f"observation_start<TIMESTAMPTZ '{following}T00:00:00+08:00'"
+        )
+        for name in sorted(market):
+            select(name, window)
+        for name, query in _market(c, cursor.isoformat(), following.isoformat()).items():
+            column = DATE_COLUMNS[name]
+            compare(
+                name,
+                query,
+                (
+                    f"SELECT * FROM {name} WHERE {column}>=DATE "
+                    f"'{cursor}' AND {column}<DATE '{following}'"
+                ),
+            )
+        cursor = following
+    for name, query in _queries().items():
+        if name not in {"daily_ohlcv_none", "daily_universe", "price_limit_execution_daily"}:
+            compare(name, query, f"SELECT * FROM {name}")
 
 
 def assess(root: Path, *, business_end: str, knowledge_cutoff: str) -> dict[str, Any]:
@@ -178,7 +207,7 @@ def assess(root: Path, *, business_end: str, knowledge_cutoff: str) -> dict[str,
     c = _connection(root)
     try:
         _views(c, root)
-        _reconstruct(c, root, knowledge_cutoff)
+        _reconstruct(c, root, knowledge_cutoff, business_end)
         counts = {name: _count(c, f"SELECT count(*) FROM {name}") for name in KEYS}
         for name, keys in KEYS.items():
             if _count(
@@ -265,7 +294,8 @@ def assess(root: Path, *, business_end: str, knowledge_cutoff: str) -> dict[str,
         ):
             raise HandoffError("NATIVE_PRICE_BASIS")
         c.execute("""CREATE TEMP TABLE denominator AS
-            SELECT DISTINCT t.listing_id,t.calendar_session_id,l.security_id,s.trade_date,s.venue_id,
+            SELECT DISTINCT t.listing_id,t.calendar_session_id,l.security_id,
+              s.trade_date,s.venue_id,
               (CAST(s.trade_date AS TIMESTAMP)+INTERVAL 15 HOUR)
                   AT TIME ZONE 'Asia/Shanghai' AS session_cutoff
             FROM n_dwd_tradability_state t JOIN sessions s USING(calendar_session_id)
@@ -301,24 +331,28 @@ def assess(root: Path, *, business_end: str, knowledge_cutoff: str) -> dict[str,
                 ),
             ),
         }
-        columns = []
+        # One immutable, exact native-version TMP per family is shared by its
+        # two clock checks. Avoid a twelve-way correlated plan retaining all
+        # wide native tables simultaneously under the fixed memory budget.
+        c.execute("CREATE TEMP TABLE visibility AS SELECT * FROM denominator")
         for family, (table, relation) in core.items():
+            c.execute(
+                f"CREATE OR REPLACE TEMP TABLE core_versions AS SELECT DISTINCT * FROM n_{table}"
+            )
+            columns = []
             for mode, cutoff in [
                 ("historical", "d.session_cutoff"),
                 ("later", "TIMESTAMPTZ " + _q(knowledge_cutoff)),
             ]:
+                column = mode + "_" + family
+                c.execute(f"ALTER TABLE visibility ADD COLUMN {column} BOOLEAN")
                 columns.append(
-                    f"(SELECT count(*)=1 FROM (SELECT DISTINCT "
-                    f"* FROM n_{table}) x WHERE {relation} AND "
-                    f"x.knowledge_from<={cutoff} AND "
-                    f"coalesce(x.knowledge_to,'infinity'::TIMESTAMPTZ)>{cutoff}) "
-                    f"AS {mode}_{family}"
+                    f"{column}=(SELECT count(*)=1 FROM core_versions "
+                    f"x WHERE {relation} AND x.knowledge_from<={cutoff} "
+                    f"AND coalesce(x.knowledge_to,'infinity'::TIMESTAMPTZ)>{cutoff})"
                 )
-        c.execute(
-            "CREATE TEMP TABLE visibility AS SELECT d.*,"
-            + ",".join(columns)
-            + " FROM denominator d"
-        )
+            c.execute("UPDATE visibility d SET " + ",".join(columns))
+        c.execute("DROP TABLE core_versions")
         total = _count(c, "SELECT count(*) FROM denominator")
         clocks = {}
         for mode in ("historical", "later"):

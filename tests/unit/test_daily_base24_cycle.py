@@ -388,3 +388,28 @@ def test_market_budget_matches_measured_full_universe_and_remains_bounded(monkey
     market = next(call for call in calls if call[0] == "market")
     assert market[1][-2:] == ("--budget", "7200")
     assert market[2]["timeout"] == 7300
+
+
+def test_busy_date_timer_keeps_active_writer_without_attempt_or_pointer_change(
+    monkeypatch, tmp_path, capsys
+):
+    import fcntl
+
+    marker = tmp_path / "DATES.json"
+    marker.write_text("retained-state")
+    day = "2026-10-08"
+    lock_path = tmp_path / (day + ".lock")
+    monkeypatch.setattr(cycle, "load", lambda p: {"root": str(tmp_path)})
+    monkeypatch.setattr(sys, "argv", ["cycle", "--config", "config.json", "--day", day])
+    monkeypatch.setattr(
+        cycle, "resources", lambda *a, **kw: pytest.fail("busy date must not start")
+    )
+    with lock_path.open("a+") as held:
+        fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        assert cycle.main() == 0
+    assert json.loads(capsys.readouterr().out) == {
+        "status": "DATE_WRITER_ALREADY_ACTIVE",
+        "market_date": day,
+    }
+    assert sorted(p.name for p in tmp_path.iterdir()) == [day + ".lock", "DATES.json"]
+    assert marker.read_text() == "retained-state"

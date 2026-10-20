@@ -607,7 +607,13 @@ def main() -> int:
     disjoint_output(run, exact_inputs)
     disjoint_output(lock_path, exact_inputs)
     with lock_path.open("a+") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            # A bounded source continuation holds the same date lock. A recovery
+            # timer must leave it running rather than start a competing writer.
+            print(json.dumps({"status": "DATE_WRITER_ALREADY_ACTIVE", "market_date": str(day)}))
+            return 0
         index_path = root / "DATES.json"
         if index_path.exists() and not args.native_only:
             old = object_at(index_path).get("dates", {}).get(str(day), {})

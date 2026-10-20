@@ -42,6 +42,10 @@ class NativeCaptureClient:
             # Preserve that original response, then allow one fresh observation.
             if str(self.client.login().error_code) != "0":
                 return response
+            from quanthus.providers.baostock_transport import set_socket_timeout
+
+            if not set_socket_timeout(12):
+                raise ValueError("DAILY_NATIVE_RELOGIN_FINITE_TIMEOUT_REQUIRED")
         raise AssertionError("unreachable bounded native request loop")
 
     def _observed_query(self, *args: Any, **kwargs: Any) -> Any:

@@ -278,6 +278,10 @@ def test_native_expired_session_retains_failure_and_retries_only_once(
     evidence.clock = lambda: "2026-10-20T13:30:00+00:00"
     evidence.capture = lambda **kw: observations.append(json.loads(kw["raw"])["error_code"])
     monkeypatch.setitem(sys.modules, evidence.__name__, evidence)
+    timeouts = []
+    transport = types.ModuleType("quanthus.providers.baostock_transport")
+    transport.set_socket_timeout = lambda seconds: timeouts.append(seconds) or True
+    monkeypatch.setitem(sys.modules, transport.__name__, transport)
     monkeypatch.setattr(worker.time, "sleep", lambda seconds: None)
     response = worker.NativeCaptureClient(client, tmp_path).query_history_k_data_plus(
         "sz.000001", "date,volume", frequency="5"
@@ -285,6 +289,7 @@ def test_native_expired_session_retains_failure_and_retries_only_once(
     assert response.error_code == second_error
     assert observations == ["10001001", second_error]
     assert len(logins) == 1 and not responses
+    assert timeouts == [12]  # login creates a new socket; restore its read deadline.
 
 
 def test_native_source_error_does_not_build_product(monkeypatch, tmp_path):

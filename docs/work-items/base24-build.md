@@ -123,6 +123,40 @@ Docs-impact: none for governing architecture or existing consumer behavior. This
 additive P10 observation implements the already required late-revision boundary;
 it does not change an existing window, policy threshold or activation gate.
 
+### 2026-10-20 bounded Daily share-volume processing revision
+
+`daily_base24_precision.py` and `test_daily_base24_precision.py` implement
+`p10-cn02-exact-share-volume-revision-v1` for selected Tencent fallback daily rows.
+The adapter consumes a verified existing ODS release and newly captured lossless
+BaoStock daily responses. It changes only the share-volume value and the new
+row's source/knowledge/build metadata. OHLC, amount, status, valuation and every
+unselected row remain unchanged. The old row file, original manifest and exact
+new responses are physical members of the new immutable processing revision.
+Provider acquisition/publication remain unknown where unknown. New observations
+do not become historical PIT or backdated acceptance.
+
+The offline verifier replays the exact allowed changes and unchanged artifacts
+without opening original paths. Hash-valid repackaging cannot authorize other
+price changes, unselected-row changes or invalid capture clocks. READY is written
+last and failed attempts remain evidence. A source revision is not a completed
+Daily: source reconciliation, native-5m binding, DWD materialization and explicit
+independent cold acceptance remain necessary. Existing comparison tolerances,
+quality gates, Base identity and consumer activation rules are unchanged.
+
+`daily_base24_native_rebind.py` gives those new daily revisions an explicit
+processing binding for retained original 5m responses. It preserves original
+compressed bytes, raw hashes, receipt/quality clocks and archived daily identities
+as local evidence; no derived receipt masquerades as a new provider capture.
+`native5m_daily_source.py` invokes its offline provenance replay for this opt-in
+processing contract, then applies the unchanged full raw/grid/Decimal/volume and
+terminal-close verification. A remaining R3 still prevents full composite
+qualification while the independently accepted daily core remains available.
+The contract regression is `test_daily_base24_native_rebind.py`.
+
+Docs-impact: none for governing architecture or existing consumer behavior. This
+bounded processing adapter applies permanent P10 provenance and immutable-revision
+rules; it does not replace a sealed acquisition or qualify future data by itself.
+
 ### 2026-10-20 ODS repeated-read correction
 
 The Owner's five specific duplicate-read findings are tracked together under

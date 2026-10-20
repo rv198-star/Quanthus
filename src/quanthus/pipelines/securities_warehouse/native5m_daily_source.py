@@ -252,6 +252,10 @@ def verify_native5m_source(
         statuses[code] = status
     if set(statuses) != set(daily):
         raise ValueError("NATIVE5M_QUALITY_POPULATION_INVALID")
+    if "processing_revision" in manifest:
+        from .daily_base24_native_rebind import verify_binding
+
+        verify_binding(root, ref, statuses)
     pq = importlib.import_module("pyarrow.parquet")
     pf = pq.ParquetFile(root / "minute-real-observed.parquet")
     if pf.schema_arrow != minute_schema():

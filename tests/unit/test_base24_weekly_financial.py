@@ -135,3 +135,59 @@ def test_decoder_retains_existing_bomb_bound_and_legacy_numeric_mode():
     )
     with pytest.raises(RuntimeError, match="decompression bound"):
         decode_financial_envelope(row, preserve_numeric_tokens=True, max_raw_bytes=1)
+
+
+def weekly_config():
+    return json.loads(Path("config/pipelines/base24-weekly-governance.v1.json").read_text())
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("schema_version", "legacy"),
+        ("purpose", "isolated_daily_governance"),
+        ("consumer_admission", "GRANTED"),
+        ("execution_authorized", True),
+    ],
+)
+def test_weekly_reference_role_cannot_inherit_daily_or_execution(field, value, monkeypatch):
+    cfg = weekly_config()
+    cfg[field] = value
+    monkeypatch.setattr(
+        adapter, "read_native_tables", lambda *_: pytest.fail("invalid role opened Base")
+    )
+    with pytest.raises(RuntimeError, match="REFERENCE_ROLE"):
+        adapter.weekly_parent(Path("/unreachable"), cfg)
+
+
+@pytest.mark.parametrize("mutation", ["duplicate-receipt", "bad-receipt", "extra-table"])
+def test_weekly_reference_closure_rejects_incomplete_evidence(mutation, monkeypatch):
+    cfg = weekly_config()
+    ref = cfg["weekly_identity_reference"]
+    if mutation == "duplicate-receipt":
+        ref["acceptance_receipts"] = [ref["acceptance_receipts"][0]] * 2
+    elif mutation == "bad-receipt":
+        ref["acceptance_receipts"] = [{}, {}]
+    else:
+        ref["tables"].append("dwd_security_bar")
+    monkeypatch.setattr(
+        adapter, "read_native_tables", lambda *_: pytest.fail("invalid closure opened Base")
+    )
+    with pytest.raises(RuntimeError, match="REFERENCE_ROLE"):
+        adapter.weekly_parent(Path("/unreachable"), cfg)
+
+
+def test_weekly_explicit_role_reaches_only_exact_native_identity_tables(monkeypatch):
+    class Sentinel(Exception):
+        pass
+
+    calls = []
+
+    def native(base, cfg, tables):
+        calls.append((base, tables))
+        raise Sentinel
+
+    monkeypatch.setattr(adapter, "read_native_tables", native)
+    with pytest.raises(Sentinel):
+        adapter.weekly_parent(Path("/unreachable"), weekly_config())
+    assert calls == [(Path("/unreachable"), ("dwd_security", "dwd_security_identifier"))]

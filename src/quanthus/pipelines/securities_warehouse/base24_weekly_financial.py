@@ -7,10 +7,12 @@ Old Base22/23 adapters and the legacy decoder's default numeric mode stay intact
 
 from __future__ import annotations
 
+import importlib
 import json
 from collections import Counter
 from datetime import date, datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 from .base22 import digest
@@ -22,11 +24,48 @@ from .financial_reporting import (
     FinancialStatementSource,
     _expand_decoded_financial_envelope,
     decode_financial_envelope,
+    financial_company_resolver_from_listed_company_rows,
     financial_reporting_schemas,
     iter_statement_reports,
 )
+from .native_base24_reader import read_native_tables
 
 CONTRACT = "p10-base24-weekly-exact-statement-observation-v1"
+REFERENCE_TABLES = ("dwd_security", "dwd_security_identifier")
+
+
+def weekly_parent(base: Path, config: dict[str, Any]) -> tuple[Any, FinancialCompanyResolver]:
+    """Qualify only the explicit weekly identity role against whole-Base cold receipts."""
+    reference = config.get("weekly_identity_reference", {})
+    receipts = reference.get("acceptance_receipts", [])
+    if (
+        config.get("schema_version") != "quanthus.base24-weekly-governance.v1"
+        or config.get("purpose") != "isolated_weekly_governance"
+        or config.get("consumer_admission") != "NOT_GRANTED"
+        or config.get("execution_authorized") is not False
+        or reference.get("tables") != list(REFERENCE_TABLES)
+        or reference.get("status") != "accepted_reference_only"
+        or reference.get("trading_or_research_admission") is not False
+        or not isinstance(receipts, list)
+        or len({s for s in receipts if isinstance(s, str)}) < 2
+        or any(
+            not isinstance(s, str)
+            or len(s) != 71
+            or not s.startswith("sha256:")
+            or any(c not in "0123456789abcdef" for c in s[7:])
+            for s in receipts
+        )
+    ):
+        raise BoundedError("BASE24_WEEKLY_REFERENCE_ROLE_INVALID")
+    native = read_native_tables(base, config, REFERENCE_TABLES)
+    pq = importlib.import_module("pyarrow.parquet")
+    rows = {
+        t: [row for p in native.files(t) for row in pq.ParquetFile(p).read().to_pylist()]
+        for t in REFERENCE_TABLES
+    }
+    return native, financial_company_resolver_from_listed_company_rows(
+        rows["dwd_security"], rows["dwd_security_identifier"]
+    )
 
 
 def statement_observation(

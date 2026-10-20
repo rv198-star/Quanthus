@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 from .base22 import canonical, file_sha
 from .base22_sources import _tree, disjoint_output, physical_path
 from .base24_image import KIND as BASE_KIND
-from .daily_core_domain import verify_daily_domain_increment
+from .daily_core_domain import _TABLE_KEYS, verify_daily_domain_increment
 from .native5m_daily_source import verify_native5m_source
 from .native_base24_reader import require_daily_core_governance
 
@@ -183,6 +183,26 @@ def _identity(core: Path, native: Path, config: Path, code_revision: str) -> dic
     }
 
 
+def _table_paths(root: Path) -> dict[str, list[str]]:
+    paths = {"dwd_security_bar": ["payload/1d.parquet", "payload/5m.parquet"]}
+    for table in sorted(set(_TABLE_KEYS) - {"dwd_security_bar"}):
+        files = sorted(root.glob(f"members/core/payload/*/{table}/market_date=*/*.parquet"))
+        if not files:
+            raise ValueError("BASE24_DAILY_CANONICAL_TABLE_PATHS_INVALID")
+        paths[table] = [p.relative_to(root).as_posix() for p in files]
+    return paths
+
+
+def read_tables(root: Path) -> dict[str, tuple[Path, ...]]:
+    """Qualify once per Job, then share all seven immutable local table paths.
+
+    Archived core bars are provenance only. Only the two canonical bar files
+    enter the reader; no old price-basis alias or one-minute prerequisite leaks in.
+    """
+    result = verify(root)
+    return {table: tuple(root / p for p in paths) for table, paths in result["table_paths"].items()}
+
+
 def build(
     *, core: Path, native5m: Path, config: Path, output: Path, code_revision: str
 ) -> dict[str, Any]:
@@ -264,6 +284,7 @@ def build(
             "built_at": datetime.now(timezone.utc).isoformat(),
             "source_proof": proof,
             "row_counts": {"1d": len(original), "5m": rows},
+            "table_paths": _table_paths(stage),
             "consumer_admission": "NOT_GRANTED",
             "execution_authorized": False,
             "files": inventory,
@@ -335,6 +356,11 @@ def _verify(
         physical_hashes[relative] = entry["sha256"]
     if _tree(root) != declared | {"manifest.json", "READY"}:
         raise ValueError("BASE24_DAILY_PHYSICAL_INVENTORY_INVALID")
+    table_paths = _table_paths(root)
+    if manifest.get("table_paths") != table_paths or any(
+        path not in declared for paths in table_paths.values() for path in paths
+    ):
+        raise ValueError("BASE24_DAILY_CANONICAL_TABLE_PATHS_INVALID")
     cfg = root / "config.json"
     core, native = root / "members/core", root / "members/native5m"
     if _identity(core, native, cfg, manifest["identity"]["code"]) != manifest["identity"]:
@@ -406,6 +432,7 @@ def _verify(
         "identity": manifest["identity"],
         "market_date": manifest["market_date"],
         "row_counts": manifest["row_counts"],
+        "table_paths": table_paths,
         "source_grades": proof["grades"],
         "consumer_admission": "NOT_GRANTED",
         "execution_authorized": False,

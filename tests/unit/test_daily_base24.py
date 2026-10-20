@@ -29,7 +29,7 @@ def seal(root, manifest):
             "size_bytes": p.stat().st_size,
         }
         for p in sorted(root.rglob("*"))
-        if p.is_file() and p.name not in {"manifest.json", "READY"}
+        if p.is_file() and p not in {root / "manifest.json", root / "READY"}
     ]
     import hashlib
 
@@ -259,3 +259,46 @@ def test_build_reuse_rejects_changed_copied_source(inputs, monkeypatch):
     stage = inputs["output"].with_name("." + inputs["output"].name + ".staging")
     assert (stage / "FAILURE.safe.json").is_file() and not (stage / "READY").exists()
     assert (inputs["native5m"] / "ods/raw/000001.json.gz").read_bytes() == original
+
+
+def test_all_seven_canonical_tables_share_one_verification(inputs, monkeypatch):
+    product.build(**inputs)
+    verify = product.verify
+    calls = []
+
+    def counted(root):
+        calls.append(root)
+        return verify(root)
+
+    monkeypatch.setattr(product, "verify", counted)
+    tables = product.read_tables(inputs["output"])
+    assert calls == [inputs["output"]]
+    assert set(tables) == set(_TABLE_KEYS)
+    assert [p.relative_to(inputs["output"]).as_posix() for p in tables["dwd_security_bar"]] == [
+        "payload/1d.parquet",
+        "payload/5m.parquet",
+    ]
+    assert {
+        pq.ParquetFile(p).read()["price_basis"][0].as_py() for p in tables["dwd_security_bar"]
+    } == {"UNADJUSTED"}
+    assert all(
+        p.is_file() and p.is_relative_to(inputs["output"]) for ps in tables.values() for p in ps
+    )
+
+
+@pytest.mark.parametrize("mutation", ["missing-table", "archive-bar", "unknown-table"])
+def test_repacked_table_mapping_cannot_hide_or_alias_data(inputs, mutation):
+    product.build(**inputs)
+    root = inputs["output"]
+    manifest = json.loads((root / "manifest.json").read_text())
+    if mutation == "missing-table":
+        manifest["table_paths"].pop("dwd_tradability_state")
+    elif mutation == "archive-bar":
+        manifest["table_paths"]["dwd_security_bar"] = [
+            "members/core/payload/test/dwd_security_bar/market_date=2026-10-08/part-00000.parquet"
+        ]
+    else:
+        manifest["table_paths"]["unknown"] = ["payload/1d.parquet"]
+    seal(root, manifest)
+    with pytest.raises(ValueError, match="CANONICAL_TABLE_PATHS"):
+        product.read_tables(root)

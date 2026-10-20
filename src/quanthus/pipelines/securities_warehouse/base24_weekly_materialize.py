@@ -40,6 +40,7 @@ def materialize_statements(
     through: date,
     output: Path,
     budget: Budget,
+    expected_source_revision: str | None = None,
 ) -> dict[str, Any]:
     """Emit physical typed atoms and check global keys/references under one budget.
 
@@ -127,6 +128,11 @@ def materialize_statements(
         for batch in pf.iter_batches(batch_size=16, use_threads=False):
             budget.check()
             for raw in batch.to_pylist():
+                if (
+                    expected_source_revision is not None
+                    and raw["source_revision"] != expected_source_revision
+                ):
+                    raise BoundedError("WEEKLY_FROZEN_SOURCE_REVISION_DIFFERS")
                 key = (raw["security_id"], raw["provider_source"])
                 if key in seen or key not in wanted:
                     raise BoundedError("WEEKLY_RAW_RECEIPT_MATRIX_DIFFERS")

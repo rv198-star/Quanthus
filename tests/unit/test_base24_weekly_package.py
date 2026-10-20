@@ -53,7 +53,22 @@ def product(tmp_path):
     contract = weekly_config()
     contract["layers"] = cfg["layers"]
     control = tmp_path / "datasets.json"
-    control.write_text('{"scope":"synthetic original weekly"}')
+    control.write_text(
+        json.dumps(
+            {
+                "datasets": [
+                    dict(
+                        name="financial_statements",
+                        status="ready",
+                        row_count=3,
+                        sha256=inputs["source_sha256"],
+                        watermark=THROUGH.isoformat(),
+                        source_revision="v1",
+                    )
+                ]
+            }
+        )
+    )
     limits = Limits(memory_bytes=128 * 1024**2, allocated_bytes=128 * 1024**2, free_floor_bytes=1)
     with Budget(
         tmp_path / "build", [root, inputs["source"], inputs["receipts"], control], limits
@@ -99,7 +114,16 @@ def test_self_contained_two_moves_and_source_independent_reproduction(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "mutation", ["missing", "corrupt", "extra-repacked", "fact-repacked", "role-repacked"]
+    "mutation",
+    [
+        "missing",
+        "corrupt",
+        "extra-repacked",
+        "fact-repacked",
+        "role-repacked",
+        "control-repacked",
+        "revision-repacked",
+    ],
 )
 def test_corruption_and_fully_repacked_semantic_tampering_fail_closed(tmp_path, mutation):
     root, result, limits, _ = product(tmp_path)
@@ -124,12 +148,22 @@ def test_corruption_and_fully_repacked_semantic_tampering_fail_closed(tmp_path, 
             manifest["files"][fact.relative_to(root).as_posix()] = dict(
                 sha256=file_sha(fact), bytes=fact.stat().st_size
             )
-        else:
+        elif mutation == "role-repacked":
             cfg = root / "weekly-config.json"
             body = json.loads(cfg.read_text())
             body["purpose"] = "production_execution"
             cfg.write_bytes(canonical(body) + b"\n")
             manifest["files"][cfg.name] = dict(sha256=file_sha(cfg), bytes=cfg.stat().st_size)
+        else:
+            control = root / "sources/datasets.json"
+            body = json.loads(control.read_text())
+            body["datasets"][0][
+                "status" if mutation == "control-repacked" else "source_revision"
+            ] = "failed" if mutation == "control-repacked" else "unapproved-revision"
+            control.write_bytes(canonical(body) + b"\n")
+            manifest["files"]["sources/datasets.json"] = dict(
+                sha256=file_sha(control), bytes=control.stat().st_size
+            )
         (root / "manifest.json").write_bytes(canonical(manifest) + b"\n")
         result["manifest_sha256"] = file_sha(root / "manifest.json")
         (root / "READY").write_text(result["manifest_sha256"] + "\n")

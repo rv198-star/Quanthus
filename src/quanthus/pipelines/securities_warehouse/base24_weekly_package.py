@@ -25,6 +25,28 @@ KIND = "base24_weekly_original_financial_observation_v1"
 SOURCE_NAMES = ("financial_statements.parquet", "financial_statements.parquet.receipts.parquet")
 
 
+def _financial_control(path: Path, source_sha: str, envelopes: int, through: date) -> str:
+    selected = [
+        d
+        for d in json.loads(path.read_bytes())["datasets"]
+        if d.get("name") == "financial_statements"
+    ]
+    if len(selected) != 1:
+        raise BoundedError("WEEKLY_FINANCIAL_DATASET_CONTROL_MISSING")
+    row = selected[0]
+    if (
+        row.get("status") != "ready"
+        or row.get("sha256") != source_sha
+        or type(row.get("row_count")) is not int
+        or row["row_count"] != envelopes
+        or row.get("watermark") != through.isoformat()
+        or not isinstance(row.get("source_revision"), str)
+        or not row["source_revision"]
+    ):
+        raise BoundedError("WEEKLY_FINANCIAL_DATASET_CONTROL_DIFFERS")
+    return str(row["source_revision"])
+
+
 def _closure(root: Path) -> set[str]:
     materialization = json.loads(_member(root, "references/MATERIALIZATION.json").read_bytes())
     return (
@@ -89,6 +111,9 @@ def seal_financial_weekly(
     """Build one new immutable domain package. READY is the last product write."""
     if re.fullmatch(r"[0-9a-f]{40}", code_revision) is None:
         raise BoundedError("WEEKLY_CODE_IDENTITY_INVALID")
+    if file_sha(physical_path(source_control)) != source_control_sha256:
+        raise BoundedError("WEEKLY_FINANCIAL_DATASET_CONTROL_HASH_DIFFERS")
+    revision = _financial_control(source_control, source_sha256, expected_envelopes, through)
     parent, resolver = weekly_parent(base, config)
     output = budget.destination(output)
     if output.exists():
@@ -128,6 +153,7 @@ def seal_financial_weekly(
         through=through,
         output=output / "tables",
         budget=budget,
+        expected_source_revision=revision,
     )
     files = {
         n: {"sha256": file_sha(output / n), "bytes": (output / n).stat().st_size}
@@ -198,6 +224,12 @@ def verify_financial_weekly(root: Path, *, manifest_sha256: str, budget: Budget)
         raise BoundedError("WEEKLY_REFERENCE_BINDING_DIFFERS")
     observed = datetime.fromisoformat(manifest["governance_observed_at"])
     through = date.fromisoformat(manifest["business_through"])
+    revision = _financial_control(
+        root / "sources/datasets.json",
+        files["sources/" + SOURCE_NAMES[0]]["sha256"],
+        manifest["source_envelopes"],
+        through,
+    )
     reproduced = materialize_statements(
         source=root / "sources" / SOURCE_NAMES[0],
         receipts=root / "sources" / SOURCE_NAMES[1],
@@ -209,6 +241,7 @@ def verify_financial_weekly(root: Path, *, manifest_sha256: str, budget: Budget)
         through=through,
         output=budget.root / "reproduced-tables",
         budget=budget,
+        expected_source_revision=revision,
     )
     if reproduced != manifest["projection"]:
         raise BoundedError("WEEKLY_REPRODUCED_PROJECTION_DIFFERS")

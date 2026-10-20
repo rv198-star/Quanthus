@@ -209,6 +209,52 @@ def test_provider_native_boundary_preserves_each_pinned_date_type(monkeypatch, t
     assert worker.main() == 0
 
 
+@pytest.mark.parametrize(
+    "error,rows", [("0", [["exact", "12.34000000000"]]), ("provider_error", [])]
+)
+def test_native_client_paces_and_retains_actual_success_or_error(
+    monkeypatch, tmp_path, error, rows
+):
+    now = [0.0]
+    sleeps, captures, queries = [], [], []
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        now[0] += seconds
+
+    def query(*args, **kwargs):
+        queries.append((args, kwargs))
+        iterator = iter(rows)
+        response = types.SimpleNamespace(fields=["f1", "f2"], error_code=error, error_msg="message")
+        response.next = lambda: (
+            setattr(response, "row", next(iterator, None)) or response.row is not None
+        )
+        response.get_row_data = lambda: response.row
+        return response
+
+    evidence = types.ModuleType("quanthus.providers.acquisition_evidence")
+    evidence.clock = lambda: "2026-10-20T13:30:00+00:00"
+    evidence.capture = lambda **kw: captures.append(kw)
+    monkeypatch.setitem(sys.modules, evidence.__name__, evidence)
+    monkeypatch.setattr(worker.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(worker.time, "sleep", sleep)
+    client = worker.NativeCaptureClient(
+        types.SimpleNamespace(query_history_k_data_plus=query), tmp_path
+    )
+    for _ in range(2):
+        response = client.query_history_k_data_plus("sz.000001", "f1,f2", frequency="5")
+        observed = []
+        while str(response.error_code) == "0" and response.next():
+            observed.append(response.get_row_data())
+        assert observed == rows
+    assert sleeps == [1.0] and len(queries) == 2  # No hidden retries.
+    for item in captures:
+        assert json.loads(item["raw"])["rows"] == rows
+        assert json.loads(item["raw"])["error_code"] == error
+        assert item["started_at"] == item["completed_at"] == evidence.clock()
+        assert item["root"] == tmp_path
+
+
 def test_native_source_error_does_not_build_product(monkeypatch, tmp_path):
     monkeypatch.setattr(cycle, "resources", lambda *a, **kw: {})
     for name in ["market", "events"]:

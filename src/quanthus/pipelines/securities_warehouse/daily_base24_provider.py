@@ -14,11 +14,79 @@ import io
 import json
 import os
 import subprocess
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 COLLECTOR = "f839af0033ab4aa8cbe6d9fb933f29db88792e91"
+
+
+class NativeCaptureClient:
+    """Pace each of at most two SDK sessions and retain failed SDK responses."""
+
+    def __init__(self, client: Any, evidence_root: Path) -> None:
+        self.client = client
+        self.evidence_root = evidence_root
+        self.previous_start: float | None = None
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.client, name)
+
+    def query_history_k_data_plus(self, *args: Any, **kwargs: Any) -> Any:
+        from types import SimpleNamespace
+
+        from quanthus.providers.acquisition_evidence import (  # type: ignore[import-untyped]
+            capture,
+            clock,
+        )
+
+        if self.previous_start is not None:
+            time.sleep(max(0.0, 1.0 - (time.monotonic() - self.previous_start)))
+        self.previous_start = time.monotonic()
+        began = clock()
+        response = self.client.query_history_k_data_plus(*args, **kwargs)
+        rows = []
+        while str(response.error_code) == "0" and response.next():
+            rows.append(response.get_row_data())
+            if len(rows) > 60:
+                break  # Preserve the over-limit original; the pinned parser rejects it.
+        capture(
+            root=self.evidence_root,
+            request={
+                "provider": "baostock",
+                "api": "query_history_k_data_plus",
+                "code": args[0],
+                "fields": args[1],
+                **kwargs,
+            },
+            raw=json.dumps(
+                {
+                    "fields": response.fields,
+                    "rows": rows,
+                    "error_code": response.error_code,
+                    "error_msg": response.error_msg,
+                    "representation": "lossless_sdk_strings",
+                },
+                sort_keys=True,
+            ).encode(),
+            started_at=began,
+            completed_at=clock(),
+            status=str(response.error_code),
+        )
+        iterator = iter(rows)
+        replay = SimpleNamespace(
+            fields=response.fields,
+            error_code=response.error_code,
+            error_msg=response.error_msg,
+        )
+        def next_row() -> bool:
+            replay.row = next(iterator, None)
+            return replay.row is not None
+
+        replay.next = next_row
+        replay.get_row_data = lambda: replay.row
+        return replay
 
 
 def runtime(path: Path) -> None:
@@ -45,7 +113,7 @@ def calendar(start: date, end: date, output: Path, home: Path | None = None) -> 
         encoded,
         file_digest,
     )
-    from quanthus.providers.acquisition_evidence import (  # type: ignore[import-untyped]
+    from quanthus.providers.acquisition_evidence import (
         capture,
         clock,
     )
@@ -304,6 +372,8 @@ def main() -> int:
                     "population": value["population"],
                 }
             elif args.action == "capture":
+                import baostock
+
                 value = reference(args.reference)
                 result = capture_shard(
                     codes=sorted(value["securities"]),
@@ -311,6 +381,7 @@ def main() -> int:
                     market_manifest_sha=value["source_ods_manifest_sha256"],
                     output=args.output,
                     shard_index=args.shard_index,
+                    client=NativeCaptureClient(baostock, args.output / "original-responses"),
                 )
             else:
                 result = build(

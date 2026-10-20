@@ -105,6 +105,24 @@ provenance and purpose boundaries; this checkpoint records its contract and test
 route without altering an approved consumer gate. Real domain completion requires
 separate full-cohort and independent-cold receipts, not these engineering tests.
 
+`base24_late_disclosure.py` adds a separate two-table governance projection for
+rolling announcements whose business dates precede the ordinary Daily window.
+It consumes exact source revisions, a frozen Base/prior-Daily document census and
+date-effective security/listing identities. Repeated captures select the latest
+real acquisition; same-clock contradictions and unavailable dated identities remain
+held. New and changed document fields receive the actual governance observation
+clock without rewriting prior rows, dates or the ordinary Daily contract.
+Its self-contained offline verifier replays the frozen census projection and exact
+physical member set. That subset does not independently prove absence from the
+original complete Base; the enclosing handoff must also bind the separately
+qualified full prior-document census. Neither this metadata projection nor matching
+title/URI fields qualify original body contents, historical PIT, complete Daily,
+consumer admission or the production writer.
+
+Docs-impact: none for governing architecture or existing consumer behavior. This
+additive P10 observation implements the already required late-revision boundary;
+it does not change an existing window, policy threshold or activation gate.
+
 ### 2026-10-20 ODS repeated-read correction
 
 The Owner's five specific duplicate-read findings are tracked together under

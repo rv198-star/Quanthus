@@ -34,8 +34,11 @@ and the condition for reconsidering it. Existing OCI services remain unchanged.
 
 Data preservation does not wait for ARM-to-x86 application builds or application
 consumer qualification. Copy retained artifacts as private opaque bytes under a
-frozen file inventory, verify every destination file against source SHA256 and
-detect source changes before sealing the archive. Record original lineage and use
+frozen file inventory and detect source changes before sealing the archive. Direct
+file copies require every destination file to match its source SHA256. A recovery
+archive requires source-to-target archive SHA256 and a checksum-bound exact source
+namespace. Report archive preservation separately from payload extraction, semantic
+validation and application restoration. Record original lineage and use
 restrictions; do not label preserved historical data Base 2.4-compatible. If a live
 root changes, hold that root or copy a provably immutable subset; continue other
 roots. A live PostgreSQL data directory is excluded: preserve a consistent logical

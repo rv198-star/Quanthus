@@ -255,6 +255,38 @@ def test_native_client_paces_and_retains_actual_success_or_error(
         assert item["root"] == tmp_path
 
 
+@pytest.mark.parametrize("second_error", ["0", "10001001"])
+def test_native_expired_session_retains_failure_and_retries_only_once(
+    monkeypatch, tmp_path, second_error
+):
+    from collections import deque
+
+    responses = deque(["10001001", second_error])
+    observations, logins = [], []
+
+    def query(*args, **kwargs):
+        error = responses.popleft()
+        return types.SimpleNamespace(
+            fields=[], error_code=error, error_msg="original SDK state", next=lambda: False
+        )
+
+    client = types.SimpleNamespace(
+        query_history_k_data_plus=query,
+        login=lambda: logins.append(True) or types.SimpleNamespace(error_code="0"),
+    )
+    evidence = types.ModuleType("quanthus.providers.acquisition_evidence")
+    evidence.clock = lambda: "2026-10-20T13:30:00+00:00"
+    evidence.capture = lambda **kw: observations.append(json.loads(kw["raw"])["error_code"])
+    monkeypatch.setitem(sys.modules, evidence.__name__, evidence)
+    monkeypatch.setattr(worker.time, "sleep", lambda seconds: None)
+    response = worker.NativeCaptureClient(client, tmp_path).query_history_k_data_plus(
+        "sz.000001", "date,volume", frequency="5"
+    )
+    assert response.error_code == second_error
+    assert observations == ["10001001", second_error]
+    assert len(logins) == 1 and not responses
+
+
 def test_native_source_error_does_not_build_product(monkeypatch, tmp_path):
     monkeypatch.setattr(cycle, "resources", lambda *a, **kw: {})
     for name in ["market", "events"]:

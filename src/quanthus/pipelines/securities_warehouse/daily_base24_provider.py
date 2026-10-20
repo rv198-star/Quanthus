@@ -34,6 +34,17 @@ class NativeCaptureClient:
         return getattr(self.client, name)
 
     def query_history_k_data_plus(self, *args: Any, **kwargs: Any) -> Any:
+        for attempt in range(2):
+            response = self._observed_query(*args, **kwargs)
+            if str(response.error_code) != "10001001" or attempt:
+                return response
+            # Anonymous SDK sessions can lose login while sibling shards end.
+            # Preserve that original response, then allow one fresh observation.
+            if str(self.client.login().error_code) != "0":
+                return response
+        raise AssertionError("unreachable bounded native request loop")
+
+    def _observed_query(self, *args: Any, **kwargs: Any) -> Any:
         from types import SimpleNamespace
 
         from quanthus.providers.acquisition_evidence import (  # type: ignore[import-untyped]
@@ -80,6 +91,7 @@ class NativeCaptureClient:
             error_code=response.error_code,
             error_msg=response.error_msg,
         )
+
         def next_row() -> bool:
             replay.row = next(iterator, None)
             return replay.row is not None

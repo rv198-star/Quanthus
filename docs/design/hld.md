@@ -141,6 +141,10 @@ evidence starts with the first accepted DWD release after activation.
 
 The Owner's 2026-10-20 target placement consolidates the entire Quanthus project on
 CN02, replacing CN01's acquisition/build role and OCI's application/platform role.
+The target Daily path uses daily and supplier-native 5m on T after close; T+1 is
+recovery/revision only. Required OCI functions and referenced state are selected
+for migration; obsolete services and historical image inventories are not copied
+wholesale. Data readiness on T does not change the T+1-open execution profile.
 Base 2.4 is its data foundation, not proof of that whole-project migration. The
 [CN02 migration work item](../work-items/cn02-project-migration.md) owns the exact
 deployment inventory, database/artifact and secret continuity, resource/architecture

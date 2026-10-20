@@ -12,12 +12,15 @@
 
 ## Goal and completion boundary
 
-CN02 must host the Quanthus code, acquisition/build schedules, ODS/DWD Base and
-increments, existing application-specific analytical artifacts, PostgreSQL platform
-state, API, Web, Workers, production control interface, notifications and backup
-operations currently assigned to CN01 and OCI. Ordinary Quanthus operation must no
-longer require either old node. Base 2.4 is the completed data foundation; its image
-acceptance does not establish project migration or consumer activation.
+CN02 must host the Quanthus functions and retained state needed to replace CN01 and
+OCI: code, acquisition/build schedules, ODS/DWD Base and increments, referenced
+application-specific analytical artifacts, PostgreSQL platform state, API, Web,
+necessary Workers, production control interface, notifications and backups.
+Migration selects the required functions and dependencies; it does not reproduce
+every historical image, service or data copy on the old nodes. Ordinary Quanthus
+operation must no longer require either old node. Base 2.4 is the completed data
+foundation; its image acceptance does not establish project migration or consumer
+activation.
 
 The Owner's clarification supersedes the earlier restriction that the migration
 queue covered OCI DWS/ADM data but excluded platform/business services. It authorizes
@@ -63,6 +66,66 @@ complete inventory of OCI analytical artifacts. The retained development bundle
 is legacy ADS evidence, not proof of an active generic DWS service or of Base 2.4
 compatibility. Inventory what exists; do not build a new generic warehouse layer.
 
+## Daily target: daily and native 5m, completed on T
+
+The Owner confirmed on 2026-10-20 that CN01's historical T/T+1 acquisition covered
+both 1m and 5m. The CN02 successor must instead use the Base 2.4 default in
+`config/pipelines/base24-default-frequency.v1.json`: daily and supplier-native 5m.
+Do not inherit an independent 1m collector, 1m checkpoint, shared 1m completion
+marker, 1m alert or fixed T+1 wait as a prerequisite of this default product.
+Shared source receipts still needed by 5m remain dependencies; do not remove
+them solely because an old filename contains `1m`.
+
+The main path is T-day market close -> daily/native-5m source availability -> one
+immutable qualified ODS closure -> DWD projection -> validation and immutable
+publication -> delivery. Record source availability, acquisition, validation,
+publication and delivery times in Asia/Shanghai, with the exact date/universe,
+input identities and required-domain outcome. Demonstrate completion on the actual
+T day on CN02 before claiming T+0 acceptance. Removing the 1m dependency makes this
+the target; it does not prove that every provider delivers complete 5m on T.
+
+T+1 is a bounded recovery/revision path for failed or genuinely late observations,
+not a scheduled prerequisite for publishing an already qualified T-day product.
+Preserve actual knowledge/acquisition times and immutable revisions. Do not publish
+missing 5m as complete, relax its qualification thresholds or infer same-day
+knowledge. Delayed Weekly/noncritical domains carry their own scope and status;
+they do not hold unrelated qualified Daily output unless its existing consumer
+contract requires them. Data availability on T does not change the active
+`close-to-next-open-v1` execution rule: earliest execution remains T+1 open.
+
+## Select OCI assets before transfer
+
+For each installed Quanthus unit, image, volume and artifact root, record its
+actual consumer/reference, current function, source/configuration identity,
+replacement and disposition in the sole live inventory. A running container, a
+recent tag or a failed old unit alone proves neither necessity nor obsolescence.
+Use the following dispositions; an undecided dependency blocks only that asset.
+
+| Disposition | Required evidence and handling |
+| --- | --- |
+| Rebuild required role | An API, Web, Worker or control role is needed by the retained application; select reviewed Git/config identities, build for CN02 x86-64 and qualify the role in isolation |
+| Migrate referenced state | Database or artifact bytes are referenced by retained users, Jobs, Runs, publication or recovery contracts; preserve exact identities and transfer/restore evidence |
+| Archive for rollback/history | Old code, configuration, image identity or sealed data is needed only for rollback or historical reproduction; retain an exact recoverable archive, without enabling its old workflow on CN02 |
+| Omit obsolete/redundant function | No retained consumer or rollback requirement remains and an approved replacement or explicit scope exclusion is recorded; do not install it on CN02 |
+| Hold unresolved asset | Consumer, source identity, secret continuity or replacement is unproven; name the missing evidence, continue independent assets and make no retirement claim |
+
+OCI-to-CN01 mirror clients become unnecessary in the target's ordinary local data
+path. Historical cloud-restore units, one-off replay/repair units, duplicate caches,
+temporary OAuth/proxy bridges and unused image versions are omission candidates,
+not a default migration list. Check their remaining consumer/backup/rollback
+dependencies first. A shared backup/notification/proxy function still needed by
+Quanthus needs an explicit CN02 replacement; do not drop it on the strength of its
+age. Unrelated applications stay outside this inventory and migration.
+
+The initial OCI image inspection found ARM64 application images without a declared
+Git revision label. Selected visible code/configuration bytes also differed from
+the commit named by their tag. Preserve that drift evidence; do not relabel the
+old image as an exact Git build, copy it as an x86-64 runtime, or silently carry
+unknown patches into CN02. Resolve necessary changes against versioned repository
+state before target builds. This finding is not evidence of market-data corruption.
+Source services/images remain untouched until the separately confirmed retirement
+procedure; selecting an asset out of the target does not authorize deleting it.
+
 ## Dependency graph and parallel execution
 
 ```mermaid
@@ -98,9 +161,9 @@ must not be swept by the earlier non-2.4 backup cleanup request.
 
 | Package | Concrete work | Completion evidence |
 | --- | --- | --- |
-| M1 deployment closure | Resolve every Quanthus writer, reader, service, timer, path/socket trigger, container, volume, code SHA, public route and backup destination on both old nodes | All installed entries accounted for; unproven entries named; exact retained configuration identities; no reliance on repository examples alone |
+| M1 deployment closure | Resolve and classify every Quanthus writer, reader, service, timer, path/socket trigger, container, volume, code SHA, public route and backup destination on both old nodes | Each installed entry has a disposition and consumer/replacement evidence or a named hold; exact retained configuration identities; no reliance on repository examples alone |
 | M2 target runtime | Distribute pinned code through GitHub; build target-platform images; prepare distinct CN02 paths, mounts, loopback ports and bounded resources | Clean source identities, image digests, target architecture, collision/capacity checks and isolated startup; no credentials committed or old production volumes mounted writable |
-| M3 data continuation | Finish existing-source Daily/Weekly adapters, exact Base binding, late revision and domain qualification | Per-date/domain receipts, source truth and existing cold tests; unresolved local uses explicitly held; no rewriting the sealed Base or changing frozen gates |
+| M3 data continuation | Finish existing-source daily/native-5m and Weekly adapters, exact Base binding, T-day main path and bounded late revisions | Per-date/domain receipts, actual CN02 T-day timestamps and existing cold tests; no 1m or mandatory T+1 wait; unresolved uses explicitly held; no rewriting the sealed Base or changing frozen gates |
 | M4 durable state and artifacts | Freeze PostgreSQL/Run/ADM/publication/config inventories; perform consistent logical database backup and exact opaque artifact transfer | Full input/output hashes, database schema/state census, artifact-reference closure, source preservation and isolated restoration; separate secret provisioning |
 | M5 application and edge | Qualify API/Web, auth/MFA continuity, Workers, control interface, notifications, backups and public route on CN02 | Allowed read/health/synthetic checks, port/TLS/access checks, database/queue/lease behavior and backup restoration; no trading/research activation or accidental production notification |
 | M6 single-writer cutover | Produce and review drain order, final transfer, exact commands, failure conditions and paired rollback; then execute only the separately confirmed cutover | Old writers/submitters fenced before enabling new writers; actual CN02 scheduled run and delivery; no normal runtime reads, code, database, queue, remote fetch or proxy dependency on CN01/OCI |

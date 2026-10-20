@@ -175,6 +175,14 @@ preparation; it does not assert deployment or authorize an unreviewed node cutov
 Base image, Daily/Weekly, project migration and production activation remain
 separate completion claims.
 
+The same-day clarification also requires selecting OCI services/images by retained
+consumer and rollback dependencies rather than copying every historical deployment.
+CN01's old combined 1m/5m T/T+1 schedule is not the target schedule: the CN02 default
+uses daily plus native 5m on T after close, with T+1 reserved for failed/late
+observations. The [migration work item](cn02-project-migration.md) owns the asset
+dispositions and actual T-day acceptance evidence; this does not change the
+strategy's existing earliest-execution rule.
+
 Preparation for steps 3 and 4 may overlap ODS/backup waits. Reuse the existing
 CN01 flow rather than create a second generic scheduler. Weekly patches and late
 Daily corrections must be immutable successors, not edits to the sealed Base.

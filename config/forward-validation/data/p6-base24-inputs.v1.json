@@ -1,0 +1,17 @@
+{
+  "schema_version": "quanthus.p10-base24-p6-source-handoff.v1",
+  "scope": {
+    "business_start": "2026-01-01",
+    "venues": [
+      "SSE",
+      "SZSE"
+    ]
+  },
+  "historical_close_local_time": "15:00:00",
+  "minimum_history_sessions": 120,
+  "minimum_feature_sessions": 61,
+  "candidate_history_sessions": 22,
+  "clock_rule": "knowledge_from<=cutoff<knowledge_to; unknown fails",
+  "official_execution_authorized": false,
+  "legacy_runtime_changed": false
+}

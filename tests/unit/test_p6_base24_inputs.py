@@ -364,3 +364,18 @@ def test_versioned_configuration_matches_sealed_contract():
         json.loads(Path("config/forward-validation/data/p6-base24-inputs.v1.json").read_bytes())
         == handoff.CONFIG
     )
+
+
+def test_offline_checks_do_not_write_to_the_immutable_handoff(view, tmp_path):
+    from quanthus.pipelines.securities_warehouse.base22_sources import _fingerprint, _tree
+
+    root = build(view, tmp_path)
+    before = {k: _fingerprint(root / k) for k in _tree(root)}
+    scratch = tmp_path / "private-check-scratch"
+    scratch.mkdir()
+    open_base24_inputs(root, manifest_sha256=file_sha(root / "manifest.json"), scratch_root=scratch)
+    assert before == {k: _fingerprint(root / k) for k in _tree(root)}
+    assert not list(scratch.iterdir())
+    with pytest.raises(handoff.HandoffError, match="SCRATCH_INSIDE_HANDOFF"):
+        handoff.verify(root, file_sha(root / "manifest.json"), scratch_root=root)
+    assert before == {k: _fingerprint(root / k) for k in _tree(root)}

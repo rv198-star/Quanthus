@@ -11,6 +11,7 @@ import importlib
 import json
 from datetime import date, datetime, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from quanthus.backtest.base24_semantic_projection import (
@@ -197,14 +198,34 @@ def _reconstruct(c: Any, root: Path, cutoff: str, business_end: str) -> None:
             compare(name, query, f"SELECT * FROM {name}")
 
 
-def assess(root: Path, *, business_end: str, knowledge_cutoff: str) -> dict[str, Any]:
+def assess(
+    root: Path, *, business_end: str, knowledge_cutoff: str, scratch_root: Path | None = None
+) -> dict[str, Any]:
+    """Use disposable scratch outside the immutable handoff, never a cache."""
+    root = physical_path(root)
+    if scratch_root is not None:
+        scratch_root = physical_path(scratch_root)
+        if scratch_root == root or root in scratch_root.parents:
+            raise HandoffError("SCRATCH_INSIDE_HANDOFF")
+    with TemporaryDirectory(prefix="quanthus-p6-check-", dir=scratch_root) as directory:
+        return _assess(
+            root,
+            business_end=business_end,
+            knowledge_cutoff=knowledge_cutoff,
+            scratch=Path(directory),
+        )
+
+
+def _assess(
+    root: Path, *, business_end: str, knowledge_cutoff: str, scratch: Path
+) -> dict[str, Any]:
     """Recompute safe purpose counts from the local closure, all native versions.
 
     Strict historical visibility uses EXISTS over all original versions, not the
     latest snapshot alone. Later warm-up availability is a distinct measurement.
     This is a P10 source assessment, not candidate scanning or activation.
     """
-    c = _connection(root)
+    c = _connection(scratch)
     try:
         _views(c, root)
         _reconstruct(c, root, knowledge_cutoff, business_end)
@@ -616,7 +637,12 @@ def build(
         c.close()
     if any(_fingerprint(p) != value for p, value in fingerprints.items()):
         raise HandoffError("SOURCE_CHANGED_DURING_BUILD")
-    assessment = assess(output, business_end=business_end, knowledge_cutoff=sm["knowledge_cutoff"])
+    assessment = assess(
+        output,
+        business_end=business_end,
+        knowledge_cutoff=sm["knowledge_cutoff"],
+        scratch_root=output.parent,
+    )
     _write(
         output / "source-evidence.json",
         {
@@ -662,7 +688,7 @@ def build(
     return result
 
 
-def verify(root: Path, expected_sha256: str) -> dict[str, Any]:
+def verify(root: Path, expected_sha256: str, *, scratch_root: Path | None = None) -> dict[str, Any]:
     """Local-only cold validation, including recomputation of purpose findings."""
     root = physical_path(root)
     if (
@@ -708,7 +734,12 @@ def verify(root: Path, expected_sha256: str) -> dict[str, Any]:
         raise HandoffError("SOURCE_BINDING_DRIFT")
     if _read(root / "contract.json") != CONFIG:
         raise HandoffError("POLICY_DRIFT")
-    actual = assess(root, business_end=m["business_end"], knowledge_cutoff=m["knowledge_cutoff"])
+    actual = assess(
+        root,
+        business_end=m["business_end"],
+        knowledge_cutoff=m["knowledge_cutoff"],
+        scratch_root=scratch_root,
+    )
     if actual != _read(root / "assessment.json"):
         raise HandoffError("ASSESSMENT_RECONSTRUCTION")
     return actual

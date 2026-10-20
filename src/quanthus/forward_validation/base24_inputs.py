@@ -113,10 +113,12 @@ class P6Base24Inputs:
         )
 
 
-def open_base24_inputs(root: Path, *, manifest_sha256: str) -> P6Base24Inputs:
+def open_base24_inputs(
+    root: Path, *, manifest_sha256: str, scratch_root: Path | None = None
+) -> P6Base24Inputs:
     """Bind the exact standalone P10 handoff; never dereference old source roots."""
     root = physical_path(root)
-    assessment = verify(root, manifest_sha256)
+    assessment = verify(root, manifest_sha256, scratch_root=scratch_root)
     manifest = json.loads((root / "manifest.json").read_bytes())
     identity = digest_value(
         {

@@ -78,6 +78,9 @@ Market reconstruction shares one monthly join across three outputs; each native
 family shares one bounded version table across its two clock checks. No year-wide
 wide-row difference or twelve-way retained join is required.
 No network, original Base, Daily, correction, old path or source cache is needed.
+Bounded DuckDB spills use a fresh disposable directory outside the immutable
+handoff (`scratch_root` or the ordinary temporary directory). Scratch inside the
+image is rejected; the directory is removed after the check and is never a cache.
 
 ## Acceptance and next boundary
 

@@ -5,8 +5,8 @@
 | Design status | approved |
 | Delivery gate | not-applicable |
 | Current phase | P6 implementation open; P5 optional research deferred |
-| Version | 0.15 |
-| Effective date | 2026-10-03 |
+| Version | 0.16 |
+| Effective date | 2026-10-20 |
 | Governing policy | `config/p0-policy.v1.json` |
 | Governing gate | `config/p3-gates.v1.json` |
 | Platform gate | `config/platform-kernel-gates.v1.json` |
@@ -138,6 +138,17 @@ aggregate decision into an isolated P2 fixed-unit paper ledger. P5 is not a pred
 evidence starts with the first accepted DWD release after activation.
 
 ## 3. Data platform and storage design
+
+The Owner's 2026-10-20 target placement consolidates the entire Quanthus project on
+CN02, replacing CN01's acquisition/build role and OCI's application/platform role.
+Base 2.4 is its data foundation, not proof of that whole-project migration. The
+[CN02 migration work item](../work-items/cn02-project-migration.md) owns the exact
+deployment inventory, database/artifact and secret continuity, resource/architecture
+qualification, isolated acceptance, single-writer cutover and rollback preparation.
+This target does not claim that services, endpoints or current data writers have
+already moved. Until the separately confirmed cutover, installed roles and all
+frozen data, research and activation gates remain effective. P10 and business-line
+ownership do not change with node placement.
 
 The current file-first analytical architecture is distributed across CN01, Hermes, and OCI and is
 governed by ADR 0007:

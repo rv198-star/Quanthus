@@ -166,13 +166,22 @@ authorized work items, not statements of completion or a production switch:
 | 3 | Adapt CN01's existing ODS/DWD Daily and Weekly mechanisms for CN02 Base 2.4 | Inspect deployed version/configuration; bind exact ODS/DWD identities; daily plus native 5m without a 1m prerequisite; weekly changed/no-change/failed domains explicit; preserve clocks and late revisions; isolated representative runs, retry/idempotency and actual T-day evidence precede the single-writer handoff |
 | 4 | Migrate OCI's existing DWS/ADM data to CN02 and qualify Base 2.4 compatibility | Freeze inventory/manifests and dependency graph; opaque byte transfer preserves old lineage; directly reuse only semantically identical admitted dependencies, rebuild affected partitions through the owning business code; verify CN02 readers before changing endpoints; retain OCI originals until independently verified |
 
+The Owner clarified on 2026-10-20 that the final objective is the entire Quanthus
+project on CN02, replacing both CN01 and OCI. The broader
+[CN02 project migration](cn02-project-migration.md) now owns platform/services,
+database, Run/ADM artifacts, endpoints and old-node retirement as well as the data
+handoff. This supersedes the earlier data-only limitation below for future
+preparation; it does not assert deployment or authorize an unreviewed node cutover.
+Base image, Daily/Weekly, project migration and production activation remain
+separate completion claims.
+
 Preparation for steps 3 and 4 may overlap ODS/backup waits. Reuse the existing
 CN01 flow rather than create a second generic scheduler. Weekly patches and late
 Daily corrections must be immutable successors, not edits to the sealed Base.
 Migration authority does not make protected research results readable or open
 training; P10 shared consistency and business-line feature/model ownership remain
-separate. The new instruction covers DWS/ADM data migration, not an automatic
-migration of OCI platform/business services. Do not label an old derived artifact
+separate. The earlier queue covered DWS/ADM data; the 2026-10-20 clarification above
+adds platform/business migration under its separate work item. Do not label an old derived artifact
 as Base 2.4-compatible merely by changing its path or manifest text. Cleanup is a
 dependency-aware allowlist, never deletion of every path outside a Base directory.
 
@@ -420,7 +429,10 @@ paired rollback. Verify CN02 private/outbound delivery capability, OCI actual re
 one GDrive archive entry and stage-specific notices. Do not assume inbound public
 SSH exists on CN02 or damage its unrelated marketplace service. Coordinate supplier
 sessions/concurrency/request ceilings across historical, Daily and financial Jobs.
-This data-writer direction does not move OCI business/platform services.
+This earlier data-writer direction alone did not move OCI business/platform
+services. The Owner's later 2026-10-20 whole-project instruction is routed through
+[the CN02 migration work item](cn02-project-migration.md), with a separate actual
+deployment/cutover gate.
 
 ## Capacity and lifecycle
 

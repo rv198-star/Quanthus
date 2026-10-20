@@ -10,6 +10,12 @@ Acquisition and shared quality/governance belong to P10 under
 Legacy ids and historical rows below remain traceability, not permission for business lines to
 recover/repair data. The reviewed live routing inventory is `config/data-ownership.v1.json`.
 
+## Whole-project CN02 migration
+
+| ID | Title | Depends on | Disposition |
+| --- | --- | --- | --- |
+| META-OPS-CN02-001 | Consolidate the Quanthus project from CN01 and OCI onto CN02 | Owner clarification 2026-10-20 | [Migration work item](cn02-project-migration.md); deployment inventory and preparation; cutover not executed |
+
 ## P10 permanent data line
 
 | ID | Title | Depends on | Disposition |

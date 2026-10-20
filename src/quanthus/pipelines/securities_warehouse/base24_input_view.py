@@ -276,6 +276,21 @@ def open_input_view(
             if table == "dwd_security_bar":
                 relative = ["payload/1d.parquet"]
             paths[table].extend(root / name for name in relative)
+        references = []
+        # Core references contain identities first observed after the Base
+        # cutoff. They are already verified members of this canonical Daily,
+        # not old-root fallbacks; omitting them strands otherwise valid bars.
+        for member in manifest.get("files", []):
+            parts = Path(member["path"]).parts
+            if (
+                len(parts) == 5
+                and parts[:3] == ("members", "core", "reference")
+                and parts[3] in {"dwd_security", "dwd_listing", "dwd_security_identifier"}
+                and parts[4] == "part-00000.parquet"
+            ):
+                table = parts[3]
+                paths[table].append(physical_path(root / member["path"]))
+                references.append({"table": table, **member})
         original_prior = core.get("prior")
         linked = original_prior.get("manifest_sha256") if original_prior else None
         receipts.append(
@@ -283,6 +298,7 @@ def open_input_view(
                 "market_date": receipt["market_date"],
                 "manifest_sha256": receipt["manifest_sha256"],
                 "core_manifest_sha256": manifest["identity"]["core"],
+                "reference_members": references,
                 "original_prior": original_prior,
                 "selected_previous_core": prior_core,
                 "prior_relation": "FIRST_SELECTED_DATE"

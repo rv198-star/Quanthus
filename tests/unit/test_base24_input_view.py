@@ -258,3 +258,41 @@ def test_legacy_or_unsealed_daily_not_admitted_by_new_reader(inputs, tmp_path):
     inputs.update(scope=reader.ReadScope(date(2026, 9, 1), day, stamp(30)), daily=(selection,))
     with pytest.raises(ValueError, match="SCOPE_OR_SEAL"):
         reader.open_input_view(**inputs)
+
+
+def test_verified_daily_identity_references_are_bound_without_old_root_fallback(
+    inputs, tmp_path, monkeypatch
+):
+    from dataclasses import replace
+
+    day = date(2026, 10, 8)
+    selection = daily_fixture(tmp_path, inputs, None, day)
+    name = "members/core/reference/dwd_listing/part-00000.parquet"
+    path = selection.root / name
+    path.parent.mkdir(parents=True)
+    original = inputs["base_root"] / "payload/dwd_listing/all/part.parquet"
+    path.write_bytes(original.read_bytes())
+    manifest = json.loads((selection.root / "manifest.json").read_bytes())
+    manifest["files"] = [
+        {"path": name, "sha256": file_sha(path), "size_bytes": path.stat().st_size}
+    ]
+    (selection.root / "manifest.json").write_text(json.dumps(manifest))
+    selection = replace(selection, manifest_sha256=file_sha(selection.root / "manifest.json"))
+    monkeypatch.setattr(
+        reader.daily_base24,
+        "verify",
+        lambda root: {
+            "manifest_sha256": file_sha(root / "manifest.json"),
+            "market_date": str(day),
+            "table_paths": {"dwd_security_bar": ["payload/1d.parquet"]},
+        },
+    )
+    inputs.update(scope=reader.ReadScope(date(2026, 9, 1), day, stamp(30)), daily=(selection,))
+    view = reader.open_input_view(**inputs)
+    assert len(view._files["dwd_listing"]) == 2
+    assert view._files["dwd_listing"][1].path == path
+    assert view.receipt()["Daily"][0]["reference_members"][0]["sha256"] == file_sha(path)
+    assert sum(b.num_rows for b in view.iter_batches("dwd_listing")) == 2
+    path.unlink()
+    with pytest.raises((reader.InputViewError, ValueError, FileNotFoundError)):
+        list(view.iter_batches("dwd_listing"))

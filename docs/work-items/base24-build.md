@@ -67,6 +67,44 @@ namespace and device/inode/size/mtime/ctime of every untouched member replace an
 otherwise duplicate full read. This optimization never constitutes image acceptance
 by itself. The running builder and frozen cold-worker code remain unchanged.
 
+### 2026-10-20 completed images and additive Weekly industry observation
+
+The completed ODS image now has manifest
+`1d9a5b0404a7ab685c519736be033f0800e78a77f9803cf6edfaf06fea4189ab`
+and independent acceptance receipt
+`efb11282a498c1b4d10de5cc388235357a94ffb9ea73fcaf2f9ebf99af0139ce`.
+This supersedes the older ODS-running checkpoint above. The accepted DWD identity
+is unchanged. DWD cloud commit has been independently checked; ODS cloud transfer
+is a separate in-progress job. Neither upload nor local image acceptance opens
+consumer admission or switches the writer.
+
+October 8 and October 9 isolated Daily products have passed two physical moves,
+new-process seven-table reads with old source paths and networking denied, and
+missing/corrupt-file rejection. These historical replays do not prove natural
+T-day execution, full October coverage, or Weekly completion. Continue from the
+sole live gap ledger and its exact evidence paths rather than the older checkpoints.
+
+`base24_weekly_industry.py` and `test_base24_weekly_industry.py` implement the
+additive `p10-base24-weekly-dated-static-industry-v1` observation contract. The
+explicit six-table identity/taxonomy role in
+`config/pipelines/base24-weekly-governance.v1.json` pins the accepted Base while
+retaining the source's own original provider and dataset revisions separately.
+The entire normalized cohort and original per-security receipts must match.
+Original missing response hashes remain missing. Acquisition, provider update,
+source-declared snapshot date and new governance observation remain separate;
+no update date becomes a historical membership start or PIT cutoff. The output
+qualifies only the exact source cohort, with no full-current-market, historical
+PIT, research or execution admission. Native history and September behavior stay
+unchanged. The offline reader replays the source, checks exact physical closure,
+physical schema, keys and company/taxonomy references, and never opens archived
+source paths.
+
+Docs-impact: none for the governing architecture or existing consumer behavior.
+This isolated additive adapter implements the existing permanent P10 source,
+provenance and purpose boundaries; this checkpoint records its contract and test
+route without altering an approved consumer gate. Real domain completion requires
+separate full-cohort and independent-cold receipts, not these engineering tests.
+
 ### 2026-10-20 ODS repeated-read correction
 
 The Owner's five specific duplicate-read findings are tracked together under

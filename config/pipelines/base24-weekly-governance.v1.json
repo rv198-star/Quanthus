@@ -36,5 +36,27 @@
     ]
   },
   "scope": "original financial envelopes and original per-security receipts; independent atomic projection; all other weekly datasets require explicit qualified handlers or held state",
-  "note": "Exact two identity tables verified against the accepted whole Base2.4 DWD cold receipts. This does not accept any future weekly product, widen Daily admission, infer historical PIT or activate execution."
+  "note": "Exact two identity tables verified against the accepted whole Base2.4 DWD cold receipts. This does not accept any future weekly product, widen Daily admission, infer historical PIT or activate execution.",
+  "weekly_industry_reference": {
+    "status": "accepted_reference_only",
+    "tables": [
+      "dwd_security",
+      "dwd_security_identifier",
+      "dwd_listed_company",
+      "dwd_industry_node",
+      "dwd_industry_scheme",
+      "dwd_trading_venue"
+    ],
+    "trading_or_research_admission": false,
+    "acceptance_receipts": [
+      "sha256:8e964290e2a6740c520b364299ab90a3d30f296d5f92fbb0eba280788a135b6c",
+      "sha256:e61a3871dcede8f3019bab8180692fd99dd80a22062704f57b71ee64c5b6b313"
+    ]
+  },
+  "industry_snapshot_source": {
+    "provider_revision": "quanthus-fundamentals-provider-v1",
+    "qualification": "NORMALIZED_PROVIDER_DATED_SNAPSHOT_NOT_RAW_RECONSTRUCTION_OR_HISTORICAL_PIT",
+    "cohort": "exact original normalized member and original per-security receipt cohort; no full-current-market or historical PIT claim",
+    "provider_update_date": "original provenance only; never membership start or knowledge cutoff"
+  }
 }

@@ -168,6 +168,8 @@ def _text(value: object, field: str) -> str:
 def _unpack_byte_literal(value: object) -> bytes:
     if not isinstance(value, (bytes, bytearray, memoryview)):
         raise FinancialReportingBuildError("raw_payload_gzip must be bytes")
+    if bytes(value).startswith(b"\x1f\x8b"):
+        return bytes(value)
     try:
         decoded = ast.literal_eval(bytes(value).decode("ascii"))
     except (SyntaxError, UnicodeDecodeError, ValueError) as exc:
@@ -180,7 +182,10 @@ def _unpack_byte_literal(value: object) -> bytes:
 
 
 def decode_financial_envelope(
-    row: Mapping[str, Any], *, max_raw_bytes: int | None = None
+    row: Mapping[str, Any],
+    *,
+    max_raw_bytes: int | None = None,
+    preserve_numeric_tokens: bool = False,
 ) -> DecodedFinancialEnvelope:
     """Losslessly unpack, decompress, hash-check, and parse one ODS envelope."""
 
@@ -209,7 +214,7 @@ def decode_financial_envelope(
     if actual_sha256 != declared_sha256:
         raise FinancialReportingBuildError("raw payload SHA-256 differs from its envelope")
     try:
-        payload = json.loads(raw)
+        payload = json.loads(raw, parse_float=str) if preserve_numeric_tokens else json.loads(raw)
     except json.JSONDecodeError as exc:
         raise FinancialReportingBuildError("raw financial payload is not JSON") from exc
     if not isinstance(payload, Mapping):

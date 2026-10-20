@@ -74,6 +74,18 @@ bytes under an exact inventory; they must not be rendered into review reports.
 
 ### Daily activation successor authority
 
+The source SDK adapter retains every original response before checking the
+returned security identity. A successful SDK status does not admit rows for a
+different requested security. Expired login, network receive error10002007 or
+that local identity rejection permits one paced query retry after a new login
+and restoration of the finite12-second socket deadline. A second failure stays
+unqualified; the next security must reopen the connection before querying, so a
+late response cannot silently shift the remaining shard. Original SDK status,
+strings and clocks remain unchanged in evidence; local identity rejection has a
+distinct code. These cases are covered by `test_daily_base24_cycle.py` and do not
+increase the two-worker or two-query-per-call ceilings. Installed revision and
+real-run acceptance remain separate facts in the current ledger.
+
 The Owner explicitly approved real CN02 Daily activation on 2026-10-20 and
 requested backfill from October 8 through the current date. This fulfills the
 separate confirmation requirement for this Daily acquisition/build single-writer

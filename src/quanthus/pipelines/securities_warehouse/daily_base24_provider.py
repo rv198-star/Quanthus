@@ -29,24 +29,38 @@ class NativeCaptureClient:
         self.client = client
         self.evidence_root = evidence_root
         self.previous_start: float | None = None
+        self.reconnect_before_query = False
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.client, name)
 
     def query_history_k_data_plus(self, *args: Any, **kwargs: Any) -> Any:
+        if self.reconnect_before_query and not self._reconnect():
+            raise ValueError("DAILY_NATIVE_RELOGIN_FAILED")
         for attempt in range(2):
             response = self._observed_query(*args, **kwargs)
-            if str(response.error_code) != "10001001" or attempt:
+            self.reconnect_before_query = str(response.error_code) in {
+                "10001001",
+                "10002007",
+                "DAILY_NATIVE_SECURITY_MISMATCH",
+            }
+            if not self.reconnect_before_query or attempt:
                 return response
-            # Anonymous SDK sessions can lose login while sibling shards end.
-            # Preserve that original response, then allow one fresh observation.
-            if str(self.client.login().error_code) != "0":
+            # A receive timeout can leave a late reply queued for the next code.
+            # Keep the original evidence and reopen before one paced retry.
+            if not self._reconnect():
                 return response
-            from quanthus.providers.baostock_transport import set_socket_timeout
-
-            if not set_socket_timeout(12):
-                raise ValueError("DAILY_NATIVE_RELOGIN_FINITE_TIMEOUT_REQUIRED")
         raise AssertionError("unreachable bounded native request loop")
+
+    def _reconnect(self) -> bool:
+        if str(self.client.login().error_code) != "0":
+            return False
+        from quanthus.providers.baostock_transport import set_socket_timeout
+
+        if not set_socket_timeout(12):
+            raise ValueError("DAILY_NATIVE_RELOGIN_FINITE_TIMEOUT_REQUIRED")
+        self.reconnect_before_query = False
+        return True
 
     def _observed_query(self, *args: Any, **kwargs: Any) -> Any:
         from types import SimpleNamespace
@@ -95,6 +109,13 @@ class NativeCaptureClient:
             error_code=response.error_code,
             error_msg=response.error_msg,
         )
+        if str(response.error_code) == "0" and "code" in response.fields:
+            position = response.fields.index("code")
+            if any(len(row) != len(response.fields) or row[position] != args[0] for row in rows):
+                # Capture above retains the SDK's original success/status/rows.
+                # This distinct local rejection never masquerades as provider bytes.
+                replay.error_code = "DAILY_NATIVE_SECURITY_MISMATCH"
+                replay.error_msg = "response security differs from the exact request"
 
         def next_row() -> bool:
             replay.row = next(iterator, None)

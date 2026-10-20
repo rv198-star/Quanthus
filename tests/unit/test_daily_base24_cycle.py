@@ -296,6 +296,84 @@ def test_native_expired_session_retains_failure_and_retries_only_once(
     assert timeouts == [12]  # login creates a new socket; restore its read deadline.
 
 
+@pytest.mark.parametrize("first_error", ["10002007", "0"])
+@pytest.mark.parametrize("second_valid", [True, False])
+def test_native_network_or_wrong_security_reconnects_once(
+    monkeypatch, tmp_path, first_error, second_valid
+):
+    from collections import deque
+
+    responses = deque(
+        [(first_error, "sh.600002"), ("0", "sh.600001" if second_valid else "sh.600003")]
+    )
+    captured, logins, timeouts = [], [], []
+
+    def query(*args, **kwargs):
+        error, code = responses.popleft()
+        iterator = iter([["2026-10-19", code]])
+        response = types.SimpleNamespace(fields=["date", "code"], error_code=error, error_msg="SDK")
+        response.next = lambda: (
+            setattr(response, "row", next(iterator, None)) or response.row is not None
+        )
+        response.get_row_data = lambda: response.row
+        return response
+
+    client = types.SimpleNamespace(
+        query_history_k_data_plus=query,
+        login=lambda: logins.append(True) or types.SimpleNamespace(error_code="0"),
+    )
+    evidence = types.ModuleType("quanthus.providers.acquisition_evidence")
+    evidence.clock = lambda: "2026-10-20T14:00:00+00:00"
+    evidence.capture = lambda **kw: captured.append(kw)
+    monkeypatch.setitem(sys.modules, evidence.__name__, evidence)
+    transport = types.ModuleType("quanthus.providers.baostock_transport")
+    transport.set_socket_timeout = lambda seconds: timeouts.append(seconds) or True
+    monkeypatch.setitem(sys.modules, transport.__name__, transport)
+    monkeypatch.setattr(worker.time, "sleep", lambda seconds: None)
+    response = worker.NativeCaptureClient(client, tmp_path).query_history_k_data_plus(
+        "sh.600001", "date,code", frequency="d"
+    )
+    assert not responses and logins == [True] and timeouts == [12]
+    assert response.error_code == ("0" if second_valid else "DAILY_NATIVE_SECURITY_MISMATCH")
+    assert len(captured) == 2
+    # The SDK said success for a wrong identity; preserve that exact observation.
+    assert json.loads(captured[0]["raw"])["error_code"] == first_error
+    assert captured[0]["status"] == first_error
+    if first_error == "0":
+        assert json.loads(captured[0]["raw"])["rows"] == [["2026-10-19", "sh.600002"]]
+
+
+def test_native_exhausted_network_retry_reconnects_before_next_security(monkeypatch, tmp_path):
+    from collections import deque
+
+    states = deque(["10002007", "10002007", "0"])
+    events = []
+
+    def query(*args, **kwargs):
+        code = states.popleft()
+        events.append("query:" + code)
+        return types.SimpleNamespace(
+            fields=[], error_code=code, error_msg="SDK", next=lambda: False
+        )
+
+    client = types.SimpleNamespace(
+        query_history_k_data_plus=query,
+        login=lambda: events.append("login") or types.SimpleNamespace(error_code="0"),
+    )
+    evidence = types.ModuleType("quanthus.providers.acquisition_evidence")
+    evidence.clock = lambda: "2026-10-20T14:00:00+00:00"
+    evidence.capture = lambda **kw: None
+    monkeypatch.setitem(sys.modules, evidence.__name__, evidence)
+    transport = types.ModuleType("quanthus.providers.baostock_transport")
+    transport.set_socket_timeout = lambda seconds: seconds == 12
+    monkeypatch.setitem(sys.modules, transport.__name__, transport)
+    monkeypatch.setattr(worker.time, "sleep", lambda seconds: None)
+    observed = worker.NativeCaptureClient(client, tmp_path)
+    assert observed.query_history_k_data_plus("sh.600001", "date,code").error_code == "10002007"
+    assert observed.query_history_k_data_plus("sh.600002", "date,code").error_code == "0"
+    assert events == ["query:10002007", "login", "query:10002007", "login", "query:0"]
+
+
 def test_native_source_error_does_not_build_product(monkeypatch, tmp_path):
     monkeypatch.setattr(cycle, "resources", lambda *a, **kw: {})
     for name in ["market", "events"]:

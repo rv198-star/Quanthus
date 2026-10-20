@@ -159,6 +159,10 @@ def test_native_shared_reference_exact_bounded_shards(monkeypatch, tmp_path):
 @pytest.mark.parametrize("action", ["reference", "capture"])
 def test_provider_native_boundary_preserves_each_pinned_date_type(monkeypatch, tmp_path, action):
     """The pinned reference uses ISO strings; its capture API uses date objects."""
+    # main is a subprocess entry point. Isolate its process-wide policy and SDK
+    # import here so this synthetic boundary test cannot affect later tests.
+    monkeypatch.setenv("HERMES_ODS_PREVENTION_POLICY", "synthetic-boundary-only")
+    monkeypatch.setitem(sys.modules, "baostock", types.ModuleType("baostock"))
     common = types.ModuleType("quanthus.pipelines.p10_delivery_common")
     common.file_digest = lambda path: "sha256:" + "a" * 64
     delivery = types.ModuleType("quanthus.pipelines.p10_native_minute_delivery")

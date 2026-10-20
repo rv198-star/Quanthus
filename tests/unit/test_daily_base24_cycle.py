@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import threading
 import time
@@ -257,7 +258,14 @@ def test_closed_session_acquires_events_without_price_requests(monkeypatch, tmp_
     assert "2026-10-09" in calls[2][1]
 
 
-def test_catalog_must_match_both_exact_frozen_sources_before_core(monkeypatch, tmp_path):
+@pytest.mark.parametrize("previous_policy", [None, "previous-frozen-policy"])
+def test_catalog_must_match_both_exact_frozen_sources_before_core(
+    monkeypatch, tmp_path, previous_policy
+):
+    if previous_policy is None:
+        monkeypatch.delenv("HERMES_ODS_PREVENTION_POLICY", raising=False)
+    else:
+        monkeypatch.setenv("HERMES_ODS_PREVENTION_POLICY", previous_policy)
     day = date(2026, 10, 20)
     market, events = [tmp_path / "sources/daily" / str(day) / x for x in ["market", "events"]]
     for root in [market, events]:
@@ -280,11 +288,13 @@ def test_catalog_must_match_both_exact_frozen_sources_before_core(monkeypatch, t
     )
     with pytest.raises(ValueError, match="ANOTHER_REVISION"):
         cycle.assemble({}, run, day, market, events)
+    assert os.environ.get("HERMES_ODS_PREVENTION_POLICY") == previous_policy
     assert not (run / "core-receipt.json").exists()
     assert not (tmp_path / "DATES.json").exists()
 
 
 def test_r3_keeps_core_published_without_composite_or_full_ready(monkeypatch, tmp_path):
+    monkeypatch.delenv("HERMES_ODS_PREVENTION_POLICY", raising=False)
     day = date(2026, 10, 20)
     market, events = [tmp_path / "sources/daily" / str(day) / x for x in ["market", "events"]]
     for root in [market, events]:
@@ -328,6 +338,7 @@ def test_r3_keeps_core_published_without_composite_or_full_ready(monkeypatch, tm
     )
     monkeypatch.setattr(cycle, "build", lambda **kw: pytest.fail("R3 must not enter composite"))
     result = cycle.assemble(config, run, day, market, events, native)
+    assert "HERMES_ODS_PREVENTION_POLICY" not in os.environ
     assert result["status"] == "CORE_READY_5M_HELD_SOURCE_QUALITY"
     assert (tmp_path / "CURRENT_DAILY_CORE_BASE24.json").is_file()
     assert not (tmp_path / "CURRENT_DAILY_1D5M_BASE24.json").exists()

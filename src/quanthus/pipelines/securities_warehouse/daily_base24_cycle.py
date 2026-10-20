@@ -377,7 +377,6 @@ def assemble(
 ) -> dict[str, Any]:
     """Materialize core once before optional 5m; retain useful independent work."""
     resources(run)
-    os.environ["HERMES_ODS_PREVENTION_POLICY"] = "p10-acquisition-prevention-v1"
     market, events = physical_path(market), physical_path(events)
     if market.parent != events.parent or market.parent.name != str(day):
         raise ValueError("DAILY_CYCLE_EXACT_SAME_DATE_SOURCE_ROOT_REQUIRED")
@@ -400,12 +399,20 @@ def assemble(
         },
     )
     started = time.monotonic()
-    catalog = build_daily_ods_catalog(
-        release_root=sources,
-        market_date=day,
-        output=run / "catalog",
-        product_scope=DAILY_CORE_PRODUCT_SCOPE,
-    )
+    previous_policy = os.environ.get("HERMES_ODS_PREVENTION_POLICY")
+    try:
+        os.environ["HERMES_ODS_PREVENTION_POLICY"] = "p10-acquisition-prevention-v1"
+        catalog = build_daily_ods_catalog(
+            release_root=sources,
+            market_date=day,
+            output=run / "catalog",
+            product_scope=DAILY_CORE_PRODUCT_SCOPE,
+        )
+    finally:
+        if previous_policy is None:
+            os.environ.pop("HERMES_ODS_PREVENTION_POLICY", None)
+        else:
+            os.environ["HERMES_ODS_PREVENTION_POLICY"] = previous_policy
     selected = object_at(catalog.root / "catalog.json")["lanes"]
     if {item["lane"]: item["release_manifest_sha256"] for item in selected} != expected:
         raise ValueError("DAILY_CYCLE_CATALOG_SELECTED_ANOTHER_REVISION")

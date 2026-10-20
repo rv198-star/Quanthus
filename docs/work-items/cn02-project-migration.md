@@ -22,6 +22,37 @@ operation must no longer require either old node. Base 2.4 is the completed data
 foundation; its image acceptance does not establish project migration or consumer
 activation.
 
+### Current sequence: preserve data first, defer OCI systems
+
+The Owner subsequently directed on 2026-10-20 that OCI application/system rebuilds
+may wait until development needs them. This supersedes the immediate runtime-build
+sequence below, without discarding the eventual consolidation target. The current
+batch inventories and preserves selected data on CN02; it does not rebuild, load,
+start or switch OCI API/Web/Workers/control/backup services. Keep a separate deferred
+service/image list with source identity, purpose, data/configuration/secret references
+and the condition for reconsidering it. Existing OCI services remain unchanged.
+
+Data preservation does not wait for ARM-to-x86 application builds or application
+consumer qualification. Copy retained artifacts as private opaque bytes under a
+frozen file inventory, verify every destination file against source SHA256 and
+detect source changes before sealing the archive. Record original lineage and use
+restrictions; do not label preserved historical data Base 2.4-compatible. If a live
+root changes, hold that root or copy a provably immutable subset; continue other
+roots. A live PostgreSQL data directory is excluded: preserve a consistent logical
+dump separately, without deploying a target database now. Authentication secrets
+are not included in the readable inventory or review export.
+
+The data list must show exact source/destination, type, bytes/file count, source
+identity, use/consumer, dependencies, verification and current disposition. Initially
+observed roots include candidate/event/expert Runs, two historical Daily trees,
+attribution publications and the portable development bundle. Treat those roots as
+candidates pending exact inventories, not an instruction to duplicate obsolete data
+or a claim that all OCI analytical data has been found. Preserve originals until a
+separately approved dependency-safe retirement. Future rebuild is triggered by an
+actual development/consumer need, followed by the original isolation, compatibility,
+resource and activation checks. Data preserved, application restored and production
+cutover must be reported as distinct states.
+
 The Owner's clarification supersedes the earlier restriction that the migration
 queue covered OCI DWS/ADM data but excluded platform/business services. It authorizes
 inventory and migration preparation across the project. The previously requested
@@ -150,6 +181,13 @@ Do not wait for ODS upload to discover application or database dependencies. Onl
 deletions whose recovery proof depends on that upload must wait for its cloud
 commit. Do not start duplicate collectors or Workers against the production queue
 as a way to parallelize the migration.
+
+Under the current data-first sequence, run the artifact inventory/transfer branch
+directly after its capacity and source-stability checks. M2 and M5, and OCI's part
+of M6/M7, are deferred until needed; they do not block preservation acceptance.
+The graph retains the eventual application/cutover dependencies rather than asserting
+that those deferred steps are executing now. CN02 Daily/Weekly preparation continues
+independently of the deferred OCI application rebuild.
 
 Each prerequisite has one materialization owner. The existing accepted Base,
 Daily and Weekly products keep their original producer/input identities; reuse

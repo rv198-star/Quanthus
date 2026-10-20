@@ -183,6 +183,11 @@ observations. The [migration work item](cn02-project-migration.md) owns the asse
 dispositions and actual T-day acceptance evidence; this does not change the
 strategy's existing earliest-execution rule.
 
+The Owner's subsequent 2026-10-20 direction makes OCI data preservation the immediate
+step and defers its application/system rebuilds until development needs them. Keep
+an exact transferred-data list and a separate deferred-service list in the migration
+work item; data copying is not application restoration or production cutover.
+
 Preparation for steps 3 and 4 may overlap ODS/backup waits. Reuse the existing
 CN01 flow rather than create a second generic scheduler. Weekly patches and late
 Daily corrections must be immutable successors, not edits to the sealed Base.

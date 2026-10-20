@@ -145,6 +145,9 @@ The target Daily path uses daily and supplier-native 5m on T after close; T+1 is
 recovery/revision only. Required OCI functions and referenced state are selected
 for migration; obsolete services and historical image inventories are not copied
 wholesale. Data readiness on T does not change the T+1-open execution profile.
+The current migration sequence preserves selected OCI data first; application and
+system rebuilds are deferred until development needs them. Data preservation does
+not establish application restoration or node cutover.
 Base 2.4 is its data foundation, not proof of that whole-project migration. The
 [CN02 migration work item](../work-items/cn02-project-migration.md) owns the exact
 deployment inventory, database/artifact and secret continuity, resource/architecture

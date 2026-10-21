@@ -209,7 +209,7 @@ def _latest(c: Any, root: Path, cutoff: str) -> None:
 
 def _action_rows(c: Any, policy: dict[str, Any]) -> list[dict[str, Any]]:
     terms: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for term_row in _rows(c, "SELECT * FROM p_dwd_corporate_action_term"):
+    for term_row in sorted(_rows(c, "SELECT * FROM p_dwd_corporate_action_term"), key=_digest):
         terms[term_row["corporate_action_id"]].append(term_row)
     actions = _rows(c, "SELECT * FROM p_dwd_corporate_action ORDER BY corporate_action_id")
     # Reference selection uses an actual interval containing the event, not the
@@ -454,6 +454,13 @@ def _state_row(
         row.get("regimes") or [],
     )
     dated = row.get("dated_status") or []
+    # These native joins return unordered collections. Their traversal order is
+    # not source evidence; preserve every typed value and duplicate, while
+    # making the evidence identity independent of the database hash-join order.
+    evidence = dict(row)
+    for name in ("statuses", "lifecycle", "regimes", "dated_status"):
+        if isinstance(row.get(name), list):
+            evidence[name] = sorted(row[name], key=_digest)
     status, status_basis = resolve_status(
         [s["value"] for s in statuses if s["kind"] == "SPECIAL_TREATMENT"],
         [s["value"] for s in dated],
@@ -479,7 +486,7 @@ def _state_row(
         execution_source_qualified=False,
         qualified_entry_allowed=False,
         reason_code="MARKET_OBSERVATION_MISSING",
-        evidence_digest=_digest(row),
+        evidence_digest=_digest(evidence),
         execution_authorized=False,
     )
     try:

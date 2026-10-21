@@ -231,6 +231,59 @@ def test_native_execution_positive_preserves_original_bounds_and_no_runtime_auth
     assert result["execution_authorized"] is False
 
 
+@pytest.mark.parametrize("collection", ["statuses", "lifecycle", "regimes", "dated_status"])
+def test_market_evidence_is_stable_under_unordered_native_join_rows(collection):
+    row = market_row()
+    if len(row[collection]) == 1:
+        row[collection] = [*row[collection], {**row[collection][0], "evidence": "second"}]
+    original = list(row[collection])
+    reordered = {**row, collection: list(reversed(original))}
+    assert state(row) == state(reordered)
+    assert row[collection] == original
+
+
+def test_market_evidence_still_binds_changed_values():
+    row = market_row()
+    changed = {**row, "amount": Decimal("10.0000000001")}
+    assert state(row)["evidence_digest"] != state(changed)["evidence_digest"]
+
+
+def test_action_evidence_is_stable_under_unordered_native_terms(monkeypatch):
+    from quanthus.pipelines.securities_warehouse import base24_p6_purpose as purpose
+
+    when = datetime(2026, 9, 30, tzinfo=timezone.utc)
+    known = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    common = dict(
+        corporate_action_id="a", effective_at=when, knowledge_from=known, visible_versions=1
+    )
+    terms = [
+        dict(common, term_type="CASH_AMOUNT_PER_SHARE", option_id=None,
+             amount_per_share=Decimal("2"), currency="CNY"),
+        dict(common, term_type="BONUS_SHARES_PER_SHARE", option_id=None,
+             ratio_numerator=Decimal("1"), ratio_denominator=Decimal("10")),
+    ]
+    action = dict(common, security_id="s", ex_date=when.date(),
+                  action_status="IMPLEMENTED", action_type="MIXED_DISTRIBUTION")
+    ref = dict(corporate_action_id="a", prior_close=Decimal("10"),
+               factor_before=Decimal("1"), factor_after=Decimal("1.375"),
+               bar_known=known, factor_known=known)
+
+    def rows(_connection, query):
+        if query.startswith("SELECT * FROM p_dwd_corporate_action_term"):
+            return list(terms)
+        if query.startswith("SELECT * FROM p_dwd_corporate_action ORDER"):
+            return [action]
+        return [ref]
+
+    monkeypatch.setattr(purpose, "_rows", rows)
+    policy = json.loads(Path("config/p1-corporate-action-normalization.v3.json").read_bytes())
+    original = purpose._action_rows(None, policy)
+    terms.reverse()
+    reordered = purpose._action_rows(None, policy)
+    assert original[0]["qualified"] is True
+    assert original == reordered
+
+
 def test_missing_native_bounds_are_derived_separately_with_exact_frozen_policy():
     row = {**market_row(), "upper_price": None, "lower_price": None}
     result = state(row)

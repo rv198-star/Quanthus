@@ -134,6 +134,12 @@ prior close using the existing Decimal factor tolerance. These later-snapshot
 findings do not recover historical publication, an old normalization manifest or
 an authority grant. An exact factor match is source evidence, not paper authority.
 
+Evidence identities canonicalize only the unordered native status, lifecycle,
+regime and dated-state collections, and native action terms. All typed values,
+precision and duplicates remain represented. Database join traversal order cannot
+change the identity; changed observations still change it. Cold verification
+compares the complete recomputed outputs, including these identities.
+
 `open_base24_qualified_context` verifies the successor offline and requires an
 explicit aware decision cutoff at or after the real source snapshot cutoff. It
 exposes qualified unadjusted warmup rows and separate state/action qualifications

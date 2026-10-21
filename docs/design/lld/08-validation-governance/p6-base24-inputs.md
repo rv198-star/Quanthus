@@ -148,3 +148,60 @@ official Daily visibility receipt or an activation. The old v1 consumer and
 frozen runtime are unchanged. Future formal integration must bind the exact
 qualified scope, satisfy the frozen feature/action gates and record its own
 consumer acceptance and node/runtime activation.
+
+## Bounded P6 runtime consumer
+
+`forward_validation/base24_runtime.py` adds a separate, opt-in runtime consumer
+for the qualified context. It is a P6 consumer implementation, not another P10
+repair pipeline. Its input stage graph is: reuse one unchanged qualified source;
+verify the exact target native Daily and original dated provider-status release;
+qualify only that target's execution conditions; select the complete 61-session
+feature window and retain the full per-listing disposition; seal one portable
+input; share it between the existing feature engine and candidate-input reader.
+The 22-session numeric candidate rule and its 120-session listing-age requirement
+remain unchanged. Listing age is an observed lower bound from the admitted 2026
+listing census, not the length of the 61-row feature window.
+
+The original concentration mapping stays byte-identical inside the closure.
+A separate mapping binds its exact stock-code/market memberships to the dated
+native listing and security identities. It preserves industry values, source
+retrieval time and static-concentration-only use. Missing or ambiguous identities
+hold the affected input; there is no historical industry or alias backfill.
+Every implemented action in the consumed feature window holds that security
+under this conservative consumer scope. Empty normalized-action tables describe
+only the retained action-free window, never market-wide action completeness.
+A held target can remain available as context without authorizing a new entry
+or forcing a sale. All held listings and reason counts remain explicit.
+
+`open_runtime_inputs` checks the exact physical closure, hashes, schemas,
+Decimal columns, keys, full window, calendar/market relations, source knowledge,
+concentration bridge, candidate values and target entry flags offline. Original
+source paths are not opened. `context_bundle()` and `materialize_feature_panel`
+without a clock are read-only input acceptance. They grant no historical event,
+prospective observation or order authority. `bundle(clock)` and
+`candidate_series(clock)` require the exact target and actual input availability.
+The latter streams only the qualified current-entry scope into the existing
+numeric scanner; native knowledge instants and Decimal values remain intact.
+
+The opt-in clock is `quanthus.p6-after-close-decision-clock.v1`. It records T's
+15:00 observation end, real materialized-input availability and actual decision
+as separate instants. Availability cannot be backdated to the source snapshot's
+knowledge cutoff. The existing conservative next-calendar-day 09:00 seal guard
+remains; it never asserts that the next calendar day is a trading session. An
+optional next opening requires an authoritative binding. Actual next-open fills
+still wait for the next admitted READY trading session.
+
+`EventRecord` supports this clock only as an explicit `prospective_clock` field
+on a prospective event. Legacy serialization, identity and the legacy T-close
+knowledge check remain unchanged. The scanner's opt-in policy validates the
+bound target and actual decision deadline; the official decision adapter reads
+the record's decision instant. These code paths are not a mandate, deployment
+or activation of the frozen Base 2.1 runtime. A successor runtime/source binding,
+its own activation decision and a legally timed future Daily remain necessary
+for official evidence. A past Daily may pass data acceptance and still fail
+prospective timing. Never count a read-only acceptance run as an official cycle.
+
+Regressions: `tests/unit/test_p6_base24_runtime.py`, existing event-contract and
+scanner tests, and the official-cycle tests. Real acceptance records must retain
+safe scope/hold counts, exact input and code identities, unchanged-source proof,
+two independent source-free processes and missing/corrupt-copy failures.

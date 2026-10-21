@@ -649,7 +649,7 @@ def _paper_and_shadow(
             sealed = SealedAggregateDecision(
                 decision_digest=decision.digest,
                 snapshot=projection.bundle.snapshot,
-                decided_at=candidate.record.signal_close,
+                decided_at=candidate.record.decision_at,
                 security_code=candidate.listing_code,
                 unit_id=unit_id,
                 final_action=decision.action.final_action.value,

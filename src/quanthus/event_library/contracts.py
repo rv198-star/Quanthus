@@ -9,6 +9,10 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from quanthus.forward_validation.base24_runtime import AfterCloseDecisionClock
 
 
 class EventContractError(ValueError):
@@ -147,6 +151,7 @@ class EventRecord:
     split_policy_version: str
     split_policy_digest: str
     split_assignment: SplitAssignment
+    prospective_clock_json: str | None = None
 
     def __post_init__(self) -> None:
         for path, value in (
@@ -167,15 +172,35 @@ class EventRecord:
         _require_aware(self.signal_close, "signal_close")
         if self.signal_close.date() != self.identity.signal_date:
             raise EventContractError("signal_close date must match identity.signal_date")
-        if self.knowledge_cutoff > self.signal_close:
+        if self.prospective_clock_json is not None:
+            clock = prospective_clock(self.prospective_clock_json)
+            if (
+                self.split_assignment != SplitAssignment.PROSPECTIVE
+                or clock.market_date != self.identity.signal_date
+                or clock.observation_end != self.signal_close
+                or not clock.source_available_at <= self.knowledge_cutoff <= clock.decision_at
+            ):
+                raise EventContractError("prospective decision clock does not bind event")
+            object.__setattr__(
+                self,
+                "prospective_clock_json",
+                canonical_json_bytes(clock.to_dict()).decode("utf-8"),
+            )
+        elif self.knowledge_cutoff > self.signal_close:
             raise EventContractError("knowledge_cutoff must not be after T close")
+
+    @property
+    def decision_at(self) -> datetime:
+        if self.prospective_clock_json is None:
+            return self.signal_close
+        return prospective_clock(self.prospective_clock_json).decision_at
 
     @property
     def event_id(self) -> str:
         return self.identity.event_id
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "event_id": self.event_id,
             **self.identity.to_dict(),
             "candidate_rule_digest": self.candidate_rule_digest,
@@ -190,6 +215,32 @@ class EventRecord:
             "split_policy_digest": self.split_policy_digest,
             "split_assignment": self.split_assignment.value,
         }
+        if self.prospective_clock_json is not None:
+            payload["prospective_clock"] = json.loads(self.prospective_clock_json)
+        return payload
+
+
+def prospective_clock(value: str) -> AfterCloseDecisionClock:
+    """Strict opt-in clock; the legacy T-close event contract stays unchanged."""
+    from quanthus.forward_validation.base24_runtime import AfterCloseDecisionClock
+
+    try:
+        raw = json.loads(value)
+        clock = AfterCloseDecisionClock(
+            market_date=date.fromisoformat(raw["market_date"]),
+            source_available_at=datetime.fromisoformat(raw["source_available_at"]),
+            decision_at=datetime.fromisoformat(raw["decision_at"]),
+            next_session_open=(
+                None
+                if raw["next_session_open"] is None
+                else datetime.fromisoformat(raw["next_session_open"])
+            ),
+        )
+        if raw != clock.to_dict():
+            raise EventContractError("prospective clock version or fields differ")
+        return clock
+    except (ValueError, KeyError, TypeError) as exc:
+        raise EventContractError("invalid prospective decision clock") from exc
 
 
 def event_record_from_dict(value: object) -> EventRecord:
@@ -216,7 +267,8 @@ def event_record_from_dict(value: object) -> EventRecord:
             "split_policy_version",
             "split_policy_digest",
             "split_assignment",
-        },
+        }
+        | ({"prospective_clock"} if "prospective_clock" in raw else set()),
         "event_record",
     )
     identity = EventIdentity(
@@ -265,14 +317,17 @@ def event_record_from_dict(value: object) -> EventRecord:
         ),
         isolation_group_id=_require_text(raw["isolation_group_id"], "isolation_group_id"),
         split_policy_id=_require_text(raw["split_policy_id"], "split_policy_id"),
-        split_policy_version=_require_text(
-            raw["split_policy_version"], "split_policy_version"
-        ),
+        split_policy_version=_require_text(raw["split_policy_version"], "split_policy_version"),
         split_policy_digest=require_sha256_digest(
             _require_text(raw["split_policy_digest"], "split_policy_digest"),
             "split_policy_digest",
         ),
         split_assignment=split_assignment,
+        prospective_clock_json=(
+            None
+            if "prospective_clock" not in raw
+            else canonical_json_bytes(raw["prospective_clock"]).decode("utf-8")
+        ),
     )
 
 

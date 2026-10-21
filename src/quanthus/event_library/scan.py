@@ -24,6 +24,7 @@ from quanthus.event_library.contracts import (
     EventIdentity,
     EventRecord,
     SplitAssignment,
+    prospective_clock,
     require_sha256_digest,
     sha256_digest,
 )
@@ -34,6 +35,13 @@ from quanthus.event_library.splits import SplitPolicy, SplitPolicyError, assign_
 
 class CandidateScanError(ValueError):
     """Raised when candidate scan inputs violate PIT, identity, or reconciliation contracts."""
+
+
+def _prospective_deadline(source_policy: Any, current: CandidateDailyInput) -> datetime:
+    clock = prospective_clock(source_policy.prospective_clock_json)
+    if clock.market_date != current.session_date or clock.observation_end != current.close_at:
+        raise CandidateScanError("prospective clock differs from scanned target")
+    return clock.decision_at
 
 
 class CandidateReason(str, Enum):
@@ -171,9 +179,7 @@ class CandidateFeatureEvidence:
         return {
             "feature_start": self.feature_start.isoformat(),
             "signal_date": self.signal_date.isoformat(),
-            "t_minus_1_range_activity_ratio": _fraction_text(
-                self.t_minus_1_range_activity_ratio
-            ),
+            "t_minus_1_range_activity_ratio": _fraction_text(self.t_minus_1_range_activity_ratio),
             "t_minus_1_turnover_activity_ratio": _fraction_text(
                 self.t_minus_1_turnover_activity_ratio
             ),
@@ -231,8 +237,7 @@ class CandidateScanCounters:
             *self.reason_counts.values(),
         )
         if any(
-            not isinstance(value, int) or isinstance(value, bool) or value < 0
-            for value in values
+            not isinstance(value, int) or isinstance(value, bool) or value < 0 for value in values
         ):
             raise CandidateScanError("scan counters must be non-negative integers")
         cooldown = self.reason_counts.get(CandidateReason.SAME_SECURITY_ISOLATION.value, 0)
@@ -472,9 +477,7 @@ class CandidateScanShard:
             or not isinstance(raw_values, list)
             or not isinstance(reason_counts, Mapping)
             or any(
-                not isinstance(key, str)
-                or not isinstance(count, int)
-                or isinstance(count, bool)
+                not isinstance(key, str) or not isinstance(count, int) or isinstance(count, bool)
                 for key, count in reason_counts.items()
             )
         ):
@@ -547,15 +550,11 @@ class CandidateScanShard:
                         ),
                         signal_date=date.fromisoformat(str(raw["signal_date"])),
                         signal_close=datetime.fromisoformat(str(raw["signal_close"])),
-                        knowledge_cutoff=datetime.fromisoformat(
-                            str(raw["knowledge_cutoff"])
-                        ),
+                        knowledge_cutoff=datetime.fromisoformat(str(raw["knowledge_cutoff"])),
                         feature_start=date.fromisoformat(str(raw["feature_start"])),
                         entry_date=date.fromisoformat(str(raw["entry_date"])),
                         feature_evidence=evidence,
-                        eligibility_evidence_digest=str(
-                            raw["eligibility_evidence_digest"]
-                        ),
+                        eligibility_evidence_digest=str(raw["eligibility_evidence_digest"]),
                         rank_digest=str(raw["rank_digest"]),
                     )
                 )
@@ -711,11 +710,7 @@ def _rolling_medians(
             medians.append(None)
             continue
         middle = window_size // 2
-        median = (
-            ordered[middle]
-            if window_size % 2
-            else (ordered[middle - 1] + ordered[middle]) / 2
-        )
+        median = ordered[middle] if window_size % 2 else (ordered[middle - 1] + ordered[middle]) / 2
         medians.append(median)
     return tuple(medians)
 
@@ -762,6 +757,7 @@ def _precomputed_window_reason(
     current_index: int,
     expected_dates: Sequence[date],
     card: CandidateRuleCard,
+    knowledge_deadline: datetime | None = None,
 ) -> CandidateReason | None:
     window = rows[first_index : current_index + 1]
     if tuple(item.session_date for item in window) != tuple(expected_dates):
@@ -781,7 +777,7 @@ def _precomputed_window_reason(
     if prior.adjustment_effective is not False or current.adjustment_effective is not False:
         return CandidateReason.CORPORATE_ACTION_BOUNDARY
     for index in range(first_index, current_index + 1):
-        if rows[index].knowledge_cutoff > current.close_at:
+        if rows[index].knowledge_cutoff > (knowledge_deadline or current.close_at):
             return CandidateReason.KNOWLEDGE_AFTER_T_CLOSE
         reason = row_reasons[index]
         if reason is not None:
@@ -793,8 +789,7 @@ def _triggered(features: CandidateFeatureEvidence, card: CandidateRuleCard) -> b
     thresholds = {item.threshold_id: Fraction(item.value) for item in card.thresholds}
     return (
         features.t_minus_1_range_activity_ratio <= thresholds["quiet_range_ratio_max"]
-        and features.t_minus_1_turnover_activity_ratio
-        <= thresholds["quiet_turnover_ratio_max"]
+        and features.t_minus_1_turnover_activity_ratio <= thresholds["quiet_turnover_ratio_max"]
         and features.t_range_activity_ratio >= thresholds["active_range_ratio_min"]
         and features.t_turnover_activity_ratio >= thresholds["active_turnover_ratio_min"]
     )
@@ -941,6 +936,11 @@ def _scan_security_series(
             current_index=local_index,
             expected_dates=expected_dates,
             card=card,
+            knowledge_deadline=(
+                None
+                if getattr(source_policy, "prospective_clock_json", None) is None
+                else _prospective_deadline(source_policy, current)
+            ),
         )
         if reason is not None:
             reasons[reason.value] += 1
@@ -1048,6 +1048,7 @@ def _finalize_raw_candidates(
     snapshot_manifest_digest: str,
     card: CandidateRuleCard,
     split_policy: SplitPolicy,
+    prospective_clock_json: str | None = None,
 ) -> CandidateScanResult:
     ordered_raw = sorted(raw, key=lambda item: (item.signal_date, item.security_id))
     isolated: list[_RawCandidate] = []
@@ -1148,6 +1149,7 @@ def _finalize_raw_candidates(
             split_policy_version=split_policy.policy_version,
             split_policy_digest=split_policy.semantic_digest,
             split_assignment=assignment,
+            prospective_clock_json=prospective_clock_json,
         )
         assert candidate.industry_id is not None
         events.append(
@@ -1333,8 +1335,7 @@ def finalize_candidate_scan_shards(
         overlap = owned_security_ids.intersection(shard.security_ids)
         if overlap:
             raise CandidateScanError(
-                "candidate scan shards overlap security ownership: "
-                + ",".join(sorted(overlap)[:5])
+                "candidate scan shards overlap security ownership: " + ",".join(sorted(overlap)[:5])
             )
         owned_security_ids.update(shard.security_ids)
         raw.extend(shard.raw_candidates)
@@ -1350,6 +1351,7 @@ def finalize_candidate_scan_shards(
         snapshot_manifest_digest=snapshot_manifest_digest,
         card=card,
         split_policy=split_policy,
+        prospective_clock_json=getattr(source_policy, "prospective_clock_json", None),
     )
 
 

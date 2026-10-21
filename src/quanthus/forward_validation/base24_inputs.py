@@ -166,6 +166,14 @@ class P6Base24QualifiedContext:
     def execution_authorized(self) -> bool:
         return False
 
+    def check_unchanged(self) -> None:
+        """Reuse the in-Job qualification only while its complete closure is unchanged."""
+        if _tree(self.root) != set(self.fingerprints):
+            fail("p6_base24_member_changed", "physical file set")
+        for rel, fingerprint in self.fingerprints.items():
+            if _fingerprint(physical_path(self.root / rel)) != fingerprint:
+                fail("p6_base24_member_changed", rel)
+
     def iter_batches(self, dataset: str, *, batch_size: int = 8192) -> Iterator[Any]:
         if (
             dataset not in {"daily_ohlcv_none", "execution_qualification", "action_qualification"}
@@ -174,12 +182,7 @@ class P6Base24QualifiedContext:
         ):
             fail("p6_base24_reader_scope", dataset)
 
-        def unchanged() -> None:
-            for rel, fingerprint in self.fingerprints.items():
-                if _fingerprint(physical_path(self.root / rel)) != fingerprint:
-                    fail("p6_base24_member_changed", rel)
-
-        unchanged()
+        self.check_unchanged()
         from quanthus.pipelines.securities_warehouse.base24_p6_handoff import _connection, _q
 
         with TemporaryDirectory(
@@ -211,7 +214,7 @@ class P6Base24QualifiedContext:
                 yield from c.execute(query).to_arrow_reader(batch_size=batch_size)
             finally:
                 c.close()
-        unchanged()
+        self.check_unchanged()
 
 
 def open_base24_qualified_context(

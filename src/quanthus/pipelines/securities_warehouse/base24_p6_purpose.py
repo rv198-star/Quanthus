@@ -13,6 +13,7 @@ import json
 import logging
 import math
 import os
+import re
 import shutil
 from bisect import bisect_left
 from collections import Counter, defaultdict
@@ -323,6 +324,11 @@ def _action_rows(c: Any, policy: dict[str, Any]) -> list[dict[str, Any]]:
 def _dated_status(c: Any, root: Path, cutoff: str) -> None:
     """Only an actual dated observation can attest provider state on that day."""
     selected = source._read(root / "evidence/status-selection.json")
+    if any(
+        not isinstance(sha, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", sha)
+        for sha in selected
+    ):
+        raise PurposeError("STATUS_LOCAL_SELECTION")
     paths = [root / "evidence/status" / (sha[7:] + ".parquet") for sha in selected]
     if not paths:
         c.execute("""CREATE VIEW dated_status AS SELECT NULL::VARCHAR stock_code,

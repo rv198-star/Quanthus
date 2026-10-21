@@ -423,3 +423,19 @@ def test_configured_scratch_inside_source_is_rejected_before_any_write(tmp_path,
     with pytest.raises(purpose.PurposeError, match="SCRATCH_SOURCE_OVERLAP"):
         purpose.verify(root, "sha256:" + "a" * 64)
     assert {p.name: p.read_bytes() for p in root.iterdir()} == before
+
+
+def test_status_selection_cannot_dereference_outside_image(tmp_path, monkeypatch):
+    from quanthus.pipelines.securities_warehouse import base24_p6_purpose as purpose
+
+    (tmp_path / "evidence").mkdir()
+    (tmp_path / "evidence/status-selection.json").write_text(
+        json.dumps({"sha256:/old/source/private": {}})
+    )
+
+    def unexpected_hash(path):
+        pytest.fail("No source member may be opened for an invalid selection")
+
+    monkeypatch.setattr(purpose, "file_sha", unexpected_hash)
+    with pytest.raises(purpose.PurposeError, match="STATUS_LOCAL_SELECTION"):
+        purpose._dated_status(None, tmp_path, "2026-10-21T00:00:00+00:00")

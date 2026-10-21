@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+: "${QUANTHUS_HOST_PYTHON:?set the existing host Python 3.10+ runtime}"
+export PYTHONPATH="${ROOT}/src"
+exec "${QUANTHUS_HOST_PYTHON}" -m quanthus.p10_container_control "$@"

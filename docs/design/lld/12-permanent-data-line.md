@@ -112,6 +112,16 @@ diagnostics, and continue only previously authorized business/synthetic engineer
 
 ## 5. Execution and invariants
 
+`P10-DATA-OPS-016` / [#537](https://github.com/rv198-star/Quanthus/issues/537)
+prepares one versioned pipeline image for separate Daily/recovery/Weekly jobs,
+covering acquisition through ODS/DWD verification and sealing. Host systemd retains
+the scheduling clock. Under the Owner's 2026-10-22 direction, lightweight operational
+API mail runs in the host wrapper; it adds no separate container or image and does
+not open strategy/forward-email transport. See the
+[container operations runbook](../../operations/p10-container-jobs.md) for exact
+entry points, qualification gaps and controlled switching. Image preparation does
+not activate deployment, complete held Weekly domains or grant consumer acceptance.
+
 GitHub remains normal code distribution and NexusAgent default remote control. The existing SSH
 override belongs only to #424, not all P10. Routing authorizes no deployment, timer activation,
 new collection, cleanup, credential change, Base mutation or P6 production change. Every child

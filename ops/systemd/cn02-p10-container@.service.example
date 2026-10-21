@@ -1,0 +1,19 @@
+[Unit]
+Description=CN02 P10 container job %i through ODS/DWD verification and host API notification
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=agentdock
+Group=agentdock
+EnvironmentFile=/etc/quanthus/p10-container-host.env
+WorkingDirectory=/opt/quanthus/p10-current
+ExecStart=/opt/quanthus/p10-current/ops/bin/run-p10-container-job %i --deployment /etc/quanthus/p10-container-deployment.json
+TimeoutStartSec=213min
+KillMode=control-group
+NoNewPrivileges=true
+ProtectHome=true
+UMask=0077
+StandardOutput=journal
+StandardError=journal

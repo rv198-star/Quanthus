@@ -1,0 +1,87 @@
+name: quanthus-data
+
+x-job: &job
+  image: ${QUANTHUS_PIPELINE_IMAGE:?use a qualified immutable image digest}
+  profiles: [manual]
+  user: ${QUANTHUS_DATA_UID:?}:${QUANTHUS_DATA_GID:?}
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: "no"
+  stop_grace_period: 30s
+  mem_limit: 4g
+  pids_limit: 128
+  environment:
+    TZ: Asia/Shanghai
+    PYTHONDONTWRITEBYTECODE: "1"
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,size=128m,mode=1777
+    - /data:rw,nosuid,nodev,noexec,size=16m,mode=0770,uid=${QUANTHUS_DATA_UID},gid=${QUANTHUS_DATA_GID}
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+x-daily-volumes: &daily-volumes
+  - type: bind
+    source: ${QUANTHUS_BASE_ROOT:?}
+    target: /data/base
+    read_only: true
+    bind: {create_host_path: false}
+  - type: bind
+    source: ${QUANTHUS_HISTORY_ROOT:?}
+    target: /data/history
+    read_only: true
+    bind: {create_host_path: false}
+  - type: bind
+    source: ${QUANTHUS_RUNTIME_ROOT:?}
+    target: /data/runtime
+    bind: {create_host_path: false}
+  - type: bind
+    source: ${QUANTHUS_DAILY_CONFIG:?}
+    target: /run/config/daily.json
+    read_only: true
+    bind: {create_host_path: false}
+  - type: bind
+    source: ${QUANTHUS_EVENT_ROOT:?}
+    target: /run/events
+    bind: {create_host_path: false}
+
+services:
+  daily:
+    <<: *job
+    command: ["--help"]
+    volumes: *daily-volumes
+  recovery:
+    <<: *job
+    command: ["--help"]
+    volumes: *daily-volumes
+  weekly:
+    <<: *job
+    command: ["--help"]
+    volumes:
+      - type: bind
+        source: ${QUANTHUS_BASE_ROOT:?}
+        target: /data/base
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_WEEKLY_INPUT_ROOT:?}
+        target: /data/weekly-input
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_WEEKLY_JOB_ROOT:?}
+        target: /data/weekly-jobs
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_WEEKLY_CONFIG:?}
+        target: /run/config/weekly.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_EVENT_ROOT:?}
+        target: /run/events
+        bind: {create_host_path: false}

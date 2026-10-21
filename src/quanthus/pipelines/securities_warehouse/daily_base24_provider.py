@@ -129,11 +129,21 @@ class NativeCaptureClient:
 def runtime(path: Path) -> None:
     if path.is_symlink() or not path.is_absolute():
         raise ValueError("DAILY_COLLECTOR_PHYSICAL_ABSOLUTE_PATH_REQUIRED")
-    sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=path, text=True).strip()
-    if sha != COLLECTOR or subprocess.check_output(
-        ["git", "status", "--porcelain", "--untracked-files=no"], cwd=path
-    ):
-        raise ValueError("DAILY_COLLECTOR_REVISION_OR_TRACKED_STATE_DIFFERS")
+    if (path / "SOURCE.json").exists():
+        # The image carries a sealed source export, not .git or a host checkout.
+        spec = importlib.util.spec_from_file_location(
+            "p10_container_code", Path(__file__).with_name("container_code.py")
+        )
+        assert spec is not None and spec.loader is not None
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        helper.verify_bundle(path, COLLECTOR)
+    else:
+        sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=path, text=True).strip()
+        if sha != COLLECTOR or subprocess.check_output(
+            ["git", "status", "--porcelain", "--untracked-files=no"], cwd=path
+        ):
+            raise ValueError("DAILY_COLLECTOR_REVISION_OR_TRACKED_STATE_DIFFERS")
     # Verify the imported namespace too: PYTHONPATH alone is not proof of origin.
     import quanthus.providers.security_universe as universe  # type: ignore[import-untyped]
 

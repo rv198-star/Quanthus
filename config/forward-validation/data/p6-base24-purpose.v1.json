@@ -1,0 +1,13 @@
+{
+  "schema_version": "quanthus.p10-base24-p6-purpose-qualification.v1",
+  "purpose": "later_snapshot_source_qualification",
+  "historical_pit_granted": false,
+  "paper_entry_granted": false,
+  "execution_authorized": false,
+  "native_units": "cash_per_share_and_explicit_share_ratios_no_factor_unit_inference",
+  "ipo_window": "exact_original_rule_duration_and_observed_provider_trading_sessions",
+  "unknown_or_conflicting": "hold_affected_key_preserve_native_values",
+  "status_freshness": "exact_dated_provider_observation_not_open_interval_persistence",
+  "company_action_day_execution": "hold_until_exact_reference_price_qualified",
+  "policy_changes": false
+}

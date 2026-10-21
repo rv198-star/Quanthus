@@ -95,3 +95,44 @@ source-purpose findings. Formal admission still needs the missing P10 purpose
 qualifications, P6 consumer acceptance and the separate node/runtime activation,
 rollback, legal future-cycle and independent reproduction steps. No frozen
 cutoff, observation budget, policy or visibility exception is relaxed here.
+
+## Native source-purpose successor
+
+`base24_p6_purpose.py` and
+`config/forward-validation/data/p6-base24-purpose.v1.json` own a separate
+`quanthus.p10-base24-p6-purpose-qualification.v1` source qualification. It embeds
+the immutable diagnostic handoff, the exact original ODS IPO-rule member, and
+the byte-pinned existing price-limit v2 and corporate-action normalization v3
+policies. It does not rewrite the strict diagnostic's negative historical result.
+
+One monthly market join serves later-context and execution-source checks.
+Canonical and provider status conflicts remain held; UNKNOWN never implies
+NORMAL. Provider status must have an exact dated raw observation and a real,
+timezone-aware acquisition time visible at the declared snapshot. An old open
+interval does not attest that status remained unchanged on a later day. The
+original ODS inventory and selected status members travel inside the handoff;
+equal-time conflicting observations remain ambiguous. This qualification does
+not supply future Daily visibility evidence. IPO duration comes from the
+original interval id and native source hash.
+Complete provider-session history is required inside an initial window; a proven
+lower-bound session count can establish exit from that window. Unsupported or
+absent rules, incompatible native bounds, unknown identities and policy
+exclusions hold only the affected keys. Native state and prices are never flipped
+or repaired by this consumer. Event-day execution stays held without an exact
+action reference price.
+
+Actions keep native per-share currency and explicit share ratios. Alternatives,
+unknown terms, same-event ambiguity and unavailable knowledge remain held.
+Implemented terms are checked against original interval factors and the actual
+prior close using the existing Decimal factor tolerance. These later-snapshot
+findings do not recover historical publication, an old normalization manifest or
+an authority grant. An exact factor match is source evidence, not paper authority.
+
+`open_base24_qualified_context` verifies the successor offline and requires an
+explicit aware decision cutoff at or after the real source snapshot cutoff. It
+exposes qualified unadjusted warmup rows and separate state/action qualifications
+in bounded batches. This API does not create a historical replay bundle, an
+official Daily visibility receipt or an activation. The old v1 consumer and
+frozen runtime are unchanged. Future formal integration must bind the exact
+qualified scope, satisfy the frozen feature/action gates and record its own
+consumer acceptance and node/runtime activation.

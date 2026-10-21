@@ -319,10 +319,12 @@ def test_mail_failure_stays_in_task_and_does_not_change_data_event(tmp_path, mon
 
 
 @pytest.mark.parametrize("mail_retry", [False, True])
+@pytest.mark.parametrize("access", ["direct", "sudo-noninteractive"])
 def test_backup_or_mail_retry_launches_only_same_image_delivery_role(
-    tmp_path, monkeypatch, mail_retry
+    tmp_path, monkeypatch, mail_retry, access
 ):
     config = deployment(tmp_path)
+    config["docker_access"] = access
     path = Path(config["state"]) / "events/event.json"
     path.parent.mkdir()
     write(path, safe_event())
@@ -330,6 +332,7 @@ def test_backup_or_mail_retry_launches_only_same_image_delivery_role(
 
     def run(args, **kwargs):
         calls.append(args)
+        assert args[: len(host.docker_command(config))] == host.docker_command(config)
         assert "backup" in args and "daily" not in args and "weekly" not in args
         assert kwargs["env"].get("RCLONE_CONFIG") is None
         return SimpleNamespace(returncode=0)

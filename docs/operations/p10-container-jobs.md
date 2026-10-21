@@ -63,10 +63,13 @@ reference including its complete registry digest. No mutable default/tag fallbac
 is provided. `PINNED_RCLONE_IMAGE` likewise requires an actually verified
 `rclone/rclone:<tag>@sha256:<full digest>`. Its official static binary is copied
 into the pipeline image; there is no separate rclone runtime image/service.
-Registry access/digest selection and building were not completed in
-the current agentdock session: the Docker daemon socket denies this user and public
-Docker registry metadata requests timed out. Do not add a user to the Docker group,
-change socket ACLs or substitute another daemon to bypass this refusal.
+The Owner authorized existing noninteractive sudo for CN02 Docker control.
+`sudo -n docker version` has verified daemon access; no user-group or socket-ACL
+change is required. Direct registry access timed out, while the existing CN02
+loopback proxy can reach the official registry with TLS verification. Freeze and
+verify the actual registry manifest and every software blob before building; do
+not change the running Docker service or accept an unverified mirror. Registry
+access alone does not qualify the pipeline image.
 
 `ops/data/runtime.lock` pins the 33 runtime packages from the actual CN02 Python
 3.10 environment and published wheel hashes, excluding test/development tools. This
@@ -81,6 +84,16 @@ and Compose file SHA256. `.env` auto-loading and ambient Docker/Compose selectio
 variables are excluded. The Compose project is `quanthus-data`; data jobs have a
 manual profile and help-only default. Backup has a `delivery` profile, and the cleaner has a `maintenance`
 profile; a default `compose up` starts none of these roles.
+
+`docker_access` defaults to `direct` for existing deployments. CN02's example uses
+the Owner-approved `sudo-noninteractive` mode: the unprivileged host wrapper invokes
+only `/usr/bin/docker` through `sudo -n`, preserving its explicit Compose variables
+and selecting `unix:///var/run/docker.sock`. Startup and named-container stop use
+the same mode. A sudo denial remains a failed job with retained evidence; there is
+no password prompt or automatic privilege fallback. Run the Python wrapper as
+`agentdock`, not under sudo: its scratch markers, leases and state must retain the
+same UID as the non-root container. ODS/DWD, TMP, state and credentials stay in host
+bind mounts; images contain code and runtime dependencies only.
 
 Container configuration is separate from the currently running host configuration.
 Its Daily `pipeline_revision` must equal the image's bundled revision and collector

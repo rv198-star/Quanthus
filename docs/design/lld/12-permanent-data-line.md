@@ -123,6 +123,13 @@ not open strategy/forward-email transport. See the
 entry points, qualification gaps and controlled switching. Image preparation does
 not activate deployment, complete held Weekly domains or grant consumer acceptance.
 
+The Owner authorized existing noninteractive sudo for CN02 Docker control. A
+deployment selects `docker_access=direct|sudo-noninteractive`; only the fixed
+local Docker client is elevated. The host wrapper, leases and receipts retain the
+operator UID, and the container retains its configured non-root UID/GID. Sudo
+preserves only the explicit Compose interpolation variables, pins the local daemon
+socket, and never prompts for a password or changes user groups/socket ACLs.
+
 The same job wrapper owns a unique leased scratch directory below the configured
 `QUANTHUS_TMP_ROOT`; containers receive only that run's directory as `/data/tmp`
 and `TMPDIR`. Policy `p10-success-tmp-72h-v1` permits reclamation only after a

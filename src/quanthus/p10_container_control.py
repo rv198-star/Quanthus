@@ -24,6 +24,7 @@ from quanthus.pipelines.securities_warehouse.container_jobs import event
 
 def settings(path: Path) -> dict[str, Any]:
     value: dict[str, Any] = json.loads(path.read_bytes())
+    docker_command(value)  # Validate the fixed access mode before any state writes.
     if (
         value.get("kind") != "p10-container-deployment-v1"
         or not re.fullmatch(r"[0-9a-f]{40}", str(value.get("revision")))
@@ -69,6 +70,36 @@ def settings(path: Path) -> dict[str, Any]:
     return value
 
 
+def docker_command(config: dict[str, Any], *arguments: str) -> list[str]:
+    """Elevate only local Docker control; keep the host wrapper and TMP unprivileged."""
+    access = config.get("docker_access", "direct")
+    if access not in ("direct", "sudo-noninteractive"):
+        raise ValueError("P10_CONTAINER_DOCKER_ACCESS_INVALID")
+    if access == "direct":
+        return ["docker", *arguments]
+    # subprocess receives an already minimal environment. Preserve only Compose
+    # interpolation, never ambient daemon/context, proxy or Python settings.
+    preserved = sorted(
+        set(config.get("compose_env", {}))
+        | {
+            "COMPOSE_DISABLE_ENV_FILE",
+            "QUANTHUS_PIPELINE_IMAGE",
+            "QUANTHUS_EVENT_ROOT",
+            "QUANTHUS_MAIL_ROOT",
+            "QUANTHUS_JOB_TMP",
+        }
+    )
+    return [
+        "sudo",
+        "-n",
+        "--preserve-env=" + ",".join(preserved),
+        "--",
+        "/usr/bin/docker",
+        "--host=unix:///var/run/docker.sock",
+        *arguments,
+    ]
+
+
 def protected_paths(config: dict[str, Any]) -> list[Path]:
     return [Path(config["state"])] + [
         Path(value)
@@ -81,7 +112,9 @@ def protected_paths(config: dict[str, Any]) -> list[Path]:
 def cleanup_container(config: dict[str, Any], mode: str, *, apply: bool = False) -> dict[str, str]:
     """Host preflight/launch only. All housekeeping runs behind the TMP-only mount."""
     p10_tmp.check_root(Path(config["compose_env"]["QUANTHUS_TMP_ROOT"]), protected_paths(config))
-    prefix = ["docker", "compose", "--project-name", "quanthus-data", "--file", config["compose"]]
+    prefix = docker_command(
+        config, "compose", "--project-name", "quanthus-data", "--file", config["compose"]
+    )
     env = {
         "PATH": os.defpath,
         **config["compose_env"],
@@ -136,7 +169,7 @@ def delivery_container(config: dict[str, Any], target: Path | None = None) -> di
         "COMPOSE_DISABLE_ENV_FILE": "1",
     }
     command = [
-        "docker",
+        *docker_command(config),
         "compose",
         "--project-name",
         "quanthus-data",
@@ -166,7 +199,7 @@ def delivery_container(config: dict[str, Any], target: Path | None = None) -> di
     except (OSError, subprocess.TimeoutExpired):
         with contextlib.suppress(OSError, subprocess.TimeoutExpired):
             subprocess.run(
-                ["docker", "stop", "--time", "30", run_id],
+                docker_command(config, "stop", "--time", "30", run_id),
                 env=env,
                 check=False,
                 capture_output=True,
@@ -179,6 +212,9 @@ def delivery_container(config: dict[str, Any], target: Path | None = None) -> di
 
 
 def run(config: dict[str, Any], role: str, day: date) -> dict[str, Any]:
+    prefix = docker_command(
+        config, "compose", "--project-name", "quanthus-data", "--file", config["compose"]
+    )
     if role not in {"daily", "recovery", "weekly"}:
         raise ValueError("P10_CONTAINER_ROLE_INVALID")
     tmp_root = Path(config["compose_env"]["QUANTHUS_TMP_ROOT"])
@@ -193,7 +229,6 @@ def run(config: dict[str, Any], role: str, day: date) -> dict[str, Any]:
         (state / name).mkdir(exist_ok=True)
     run_id = f"{role}-{day}-{uuid.uuid4().hex}"
     target = state / "events" / (run_id + ".json")
-    prefix = ["docker", "compose", "--project-name", "quanthus-data", "--file", config["compose"]]
     env = {
         "PATH": os.defpath,
         "HOME": os.environ.get("HOME", "/srv/agentdock"),
@@ -251,7 +286,7 @@ def run(config: dict[str, Any], role: str, day: date) -> dict[str, Any]:
             # Names are unique to this invocation. Never stop another job/container.
             with contextlib.suppress(OSError, subprocess.TimeoutExpired):
                 subprocess.run(
-                    ["docker", "stop", "--time", "30", run_id],
+                    docker_command(config, "stop", "--time", "30", run_id),
                     env=env,
                     timeout=40,
                     capture_output=True,

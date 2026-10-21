@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -304,12 +305,15 @@ def test_daemon_start_failure_retains_event_without_host_mail(tmp_path, monkeypa
     assert json.loads((scratch[0] / ".p10-tmp.json").read_bytes())["status"] == "failed"
 
 
-def test_successful_dwd_is_not_rebuilt_on_email_failure(tmp_path, monkeypatch):
+@pytest.mark.parametrize("access", ["direct", "sudo-noninteractive"])
+def test_successful_dwd_is_not_rebuilt_on_email_failure(tmp_path, monkeypatch, access):
     config = deployment(tmp_path)
+    config["docker_access"] = access
     calls = []
 
     def start(command, **kwargs):
         calls.append(command)
+        assert command[: len(host.docker_command(config))] == host.docker_command(config)
         assert kwargs["env"].get("QUANTHUS_RESEND_API_KEY") is None
         run_id = command[command.index("--name") + 1]
         scratch = Path(kwargs["env"]["QUANTHUS_JOB_TMP"])
@@ -329,6 +333,78 @@ def test_successful_dwd_is_not_rebuilt_on_email_failure(tmp_path, monkeypatch):
     assert len(calls) == 1
     scratch = next(Path(config["compose_env"]["QUANTHUS_TMP_ROOT"]).iterdir())
     assert json.loads((scratch / ".p10-tmp.json").read_bytes())["status"] == "succeeded"
+
+
+@pytest.mark.parametrize("access", ["direct", "sudo-noninteractive"])
+def test_docker_access_is_explicit_local_and_preserves_only_compose_environment(tmp_path, access):
+    config = deployment(tmp_path)
+    config["docker_access"] = access
+    path = tmp_path / "deployment.json"
+    path.write_text(json.dumps(config))
+    assert host.settings(path)["docker_access"] == access
+    command = host.docker_command(config, "version")
+    if access == "direct":
+        assert command == ["docker", "version"]
+    else:
+        assert command[:2] == ["sudo", "-n"]
+        assert command[-4:] == [
+            "--",
+            "/usr/bin/docker",
+            "--host=unix:///var/run/docker.sock",
+            "version",
+        ]
+        preserved = next(v for v in command if v.startswith("--preserve-env=")).split("=", 1)[1]
+        assert set(preserved.split(",")) == set(config["compose_env"]) | {
+            "COMPOSE_DISABLE_ENV_FILE",
+            "QUANTHUS_PIPELINE_IMAGE",
+            "QUANTHUS_EVENT_ROOT",
+            "QUANTHUS_MAIL_ROOT",
+            "QUANTHUS_JOB_TMP",
+        }
+        assert not {"HOME", "DOCKER_HOST", "DOCKER_CONTEXT", "PYTHONPATH", "HTTPS_PROXY"} & set(
+            preserved.split(",")
+        )
+
+
+@pytest.mark.parametrize("access", ["sudo", "sudo -S docker", ["sudo", "docker"], None])
+def test_invalid_docker_access_rejected_before_state_writes(tmp_path, access):
+    config = deployment(tmp_path)
+    config["docker_access"] = access
+    path = tmp_path / "deployment.json"
+    path.write_text(json.dumps(config))
+    with pytest.raises(ValueError, match="DOCKER_ACCESS"):
+        host.settings(path)
+    assert not list(Path(config["state"]).iterdir())
+
+
+def test_sudo_denial_stops_only_named_job_and_keeps_agentdock_scratch(tmp_path, monkeypatch):
+    config = deployment(tmp_path)
+    config["docker_access"] = "sudo-noninteractive"
+    commands = []
+
+    def denied(command, **kwargs):
+        commands.append(command)
+        raise PermissionError("synthetic noninteractive sudo denial")
+
+    def stop(command, **kwargs):
+        commands.append(command)
+
+    monkeypatch.setattr(host.subprocess, "Popen", denied)
+    monkeypatch.setattr(host.subprocess, "run", stop)
+    with pytest.raises(RuntimeError, match="JOB_FAILED"):
+        host.run(config, "daily", DAY)
+    prefix = host.docker_command(config)
+    assert len(commands) == 2
+    assert all(command[: len(prefix)] == prefix for command in commands)
+    assert commands[1][len(prefix) : len(prefix) + 4] == [
+        "stop",
+        "--time",
+        "30",
+        commands[0][commands[0].index("--name") + 1],
+    ]
+    scratch = next(Path(config["compose_env"]["QUANTHUS_TMP_ROOT"]).iterdir())
+    assert scratch.stat().st_uid == os.getuid()
+    assert json.loads((scratch / ".p10-tmp.json").read_bytes())["status"] == "failed"
 
 
 @pytest.mark.parametrize("mutation", ["image", "compose", "secret", "overlap"])

@@ -68,13 +68,16 @@ def test_cleaner_state_or_lock_link_never_mutates_other_files(tmp_path, member):
 
 
 @pytest.mark.parametrize("mode", ["once", "start", "stop"])
-def test_host_only_launches_cleanup_container(tmp_path, monkeypatch, mode):
+@pytest.mark.parametrize("access", ["direct", "sudo-noninteractive"])
+def test_host_only_launches_cleanup_container(tmp_path, monkeypatch, mode, access):
     config = deployment(tmp_path)
+    config["docker_access"] = access
     calls = []
     monkeypatch.setattr(host.p10_tmp, "clean", lambda *a, **k: pytest.fail("host deletion"))
 
     def run(command, **kwargs):
         calls.append(command)
+        assert command[: len(host.docker_command(config))] == host.docker_command(config)
         assert kwargs["env"].get("DOCKER_HOST") is None
         assert kwargs["env"].get("COMPOSE_DISABLE_ENV_FILE") == "1"
         assert "cleanup" in command

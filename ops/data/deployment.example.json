@@ -1,5 +1,6 @@
 {
   "kind": "p10-container-deployment-v1",
+  "docker_access": "sudo-noninteractive",
   "revision": "REPLACE_WITH_FULL_VERIFIED_GIT_SHA",
   "image": "REPLACE_WITH_QUALIFIED_IMAGE_DIGEST",
   "compose": "/opt/quanthus/p10-current/ops/data/compose.yaml",

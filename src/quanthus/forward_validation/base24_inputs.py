@@ -29,6 +29,7 @@ from quanthus.pipelines.securities_warehouse.base22_sources import (
     physical_path,
 )
 from quanthus.pipelines.securities_warehouse.base24_p6_handoff import verify
+from quanthus.pipelines.securities_warehouse.base24_p6_purpose import _scratch_parent
 from quanthus.pipelines.securities_warehouse.base24_p6_purpose import verify as verify_purposes
 
 VERSION = "quanthus.p6-base24-consumer-binding.v1"
@@ -181,7 +182,9 @@ class P6Base24QualifiedContext:
         unchanged()
         from quanthus.pipelines.securities_warehouse.base24_p6_handoff import _connection, _q
 
-        with TemporaryDirectory(prefix="p6-later-context-") as directory:
+        with TemporaryDirectory(
+            prefix="p6-later-context-", dir=_scratch_parent(self.root)
+        ) as directory:
             c = _connection(Path(directory))
             try:
                 status = (

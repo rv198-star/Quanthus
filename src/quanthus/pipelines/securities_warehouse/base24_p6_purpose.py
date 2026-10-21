@@ -12,6 +12,7 @@ import importlib
 import json
 import logging
 import math
+import os
 import shutil
 from bisect import bisect_left
 from collections import Counter, defaultdict
@@ -900,9 +901,18 @@ def build(
     return result
 
 
-def verify(root: Path, manifest_sha256: str) -> dict[str, Any]:
+def _scratch_parent(root: Path, supplied: Path | None = None) -> Path:
+    # Inspect the configured path before tempfile can probe it with a test write.
+    parent = physical_path(supplied or Path(os.environ.get("TMPDIR", "/tmp")))
+    if parent == root or root in parent.parents:
+        raise PurposeError("SCRATCH_SOURCE_OVERLAP")
+    return parent
+
+
+def verify(root: Path, manifest_sha256: str, *, scratch_root: Path | None = None) -> dict[str, Any]:
     """Recompute the complete qualification using only local physical evidence."""
     root = physical_path(root)
+    scratch_parent = _scratch_parent(root, scratch_root)
     original_set = _tree(root)
     before = {rel: _fingerprint(root / rel) for rel in original_set}
     if file_sha(root / "manifest.json") != manifest_sha256:
@@ -925,8 +935,8 @@ def verify(root: Path, manifest_sha256: str) -> dict[str, Any]:
     if file_sha(root / "evidence/ipo-rules.parquet") != manifest["ipo_source_sha256"]:
         raise PurposeError("IPO_SOURCE_HASH")
     _policies(root)
-    source.verify(root / "source", manifest["source_manifest_sha256"])
-    with TemporaryDirectory(prefix="p6-purpose-cold-") as directory:
+    source.verify(root / "source", manifest["source_manifest_sha256"], scratch_root=scratch_parent)
+    with TemporaryDirectory(prefix="p6-purpose-cold-", dir=scratch_parent) as directory:
         scratch = Path(directory)
         expected = scratch / "expected"
         expected.mkdir()

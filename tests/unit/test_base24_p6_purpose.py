@@ -409,3 +409,17 @@ def test_dated_state_is_local_exact_date_late_knowledge_and_equal_time_conflicts
             assert all(str(tmp_path) not in r[-1] for r in rows)
         finally:
             c.close()
+
+
+def test_configured_scratch_inside_source_is_rejected_before_any_write(tmp_path, monkeypatch):
+    from quanthus.pipelines.securities_warehouse import base24_p6_purpose as purpose
+
+    root = tmp_path / "image"
+    root.mkdir()
+    payload = root / "protected"
+    payload.write_bytes(b"immutable bytes")
+    before = {p.name: p.read_bytes() for p in root.iterdir()}
+    monkeypatch.setenv("TMPDIR", str(root))
+    with pytest.raises(purpose.PurposeError, match="SCRATCH_SOURCE_OVERLAP"):
+        purpose.verify(root, "sha256:" + "a" * 64)
+    assert {p.name: p.read_bytes() for p in root.iterdir()} == before

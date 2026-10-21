@@ -114,9 +114,10 @@ diagnostics, and continue only previously authorized business/synthetic engineer
 
 `P10-DATA-OPS-016` / [#537](https://github.com/rv198-star/Quanthus/issues/537)
 prepares one versioned pipeline image for separate Daily/recovery/Weekly jobs,
-covering acquisition through ODS/DWD verification and sealing. Host systemd retains
-the scheduling clock. Under the Owner's 2026-10-22 direction, lightweight operational
-API mail runs in the host wrapper; it adds no separate container or image and does
+covering acquisition through ODS/DWD verification and sealing, API notification,
+Base 2.4 Daily/Weekly GDrive backup and temporary-file housekeeping. Host systemd retains
+the Daily/Weekly scheduling clock. Under the Owner's 2026-10-22 direction, lightweight operational
+API mail runs inside each data task; it adds no separate mail container/image and does
 not open strategy/forward-email transport. See the
 [container operations runbook](../../operations/p10-container-jobs.md) for exact
 entry points, qualification gaps and controlled switching. Image preparation does
@@ -128,7 +129,28 @@ and `TMPDIR`. Policy `p10-success-tmp-72h-v1` permits reclamation only after a
 verified complete/closed job, 72 hours after completion, with no active lease.
 Failed, held, interrupted, unknown or unsafe trees are retained. Base, original
 captures, Daily/Weekly products, evidence and notification state are never scratch.
-Cleanup defaults to preview; its off-hours timer remains an uninstalled template.
+The Owner subsequently chose a same-image, independently running `cleanup` role:
+its own in-container clock sweeps at 03:30 Asia/Shanghai, catches up one missed
+slot on restart, and persists the last successful slot. Only TMP is mounted;
+network, data products, credentials and the Docker socket are absent. Manual
+one-shot cleanup defaults to preview. The host only validates mounts and starts
+or stops the container; it no longer performs deletion or schedules cleanup.
+The earlier uninstalled host cleanup unit/timer examples are superseded and removed.
+
+Owner scope also includes fixed directories for original ODS, sealed DWD and
+GDrive backup. Formal products are retained: cloud upload is not local deletion
+authority. Backup has a separate read-only source role and durable verified-copy
+receipts; it must not recollect/rebuild data or relabel partial data qualified.
+The older Base 2.3 / 1m archive admission contract cannot admit Base 2.4 / 1d+5m.
+The prepared replacement (`config/pipelines/base24-backup.v1.json`,
+`src/quanthus/p10_gdrive_backup.py`) binds Base 2.4 and 1d/5m, separate ODS/DWD
+folder IDs, exact frozen package inventory and upstream qualification receipts.
+Immutable copy and complete cloud size/MD5 checks establish backed-up bytes only;
+partial data remains partial. Exact live selection generation/queueing, image
+qualification and approved Drive folder mapping remain activation gates. Retired
+2.3 series are excluded from automatic sync; historical cloud archives stay.
+Host-side triggers never send API mail or perform cleanup. A daemon failure retains
+an unsent event for recovery, rather than claiming an in-container sender ran.
 
 GitHub remains normal code distribution and NexusAgent default remote control. The existing SSH
 override belongs only to #424, not all P10. Routing authorizes no deployment, timer activation,

@@ -1,7 +1,8 @@
-"""Host-side operational API mail; no data imports or notification container."""
+"""Task-local operational API mail; no data imports or notification service."""
 
 from __future__ import annotations
 
+import argparse
 import fcntl
 import hashlib
 import json
@@ -120,3 +121,27 @@ def deliver(event: Path, state: Path, secret: Path, *, attempts: int = 2) -> str
                 if attempt + 1 < attempts:
                     time.sleep(1)
         raise RuntimeError("P10_OPERATIONAL_MAIL_FAILED_EVENT_RETAINED")
+
+
+def notify(event: Path, state: Path, secret: Path) -> str:
+    """Notification failure never changes the sealed data job's disposition."""
+    try:
+        return deliver(event, state, secret)
+    except Exception:
+        return "failed_event_retained"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--event", type=Path, required=True)
+    args = parser.parse_args()
+    if args.event.parent.resolve() != Path("/run/events"):
+        raise ValueError("P10_MAIL_EVENT_DESTINATION_INVALID")
+    result = notify(args.event, Path("/run/mail"), Path("/run/secrets/mail.json"))
+    print(json.dumps({"mail": result}))
+    if result == "failed_event_retained":
+        raise SystemExit(2)
+
+
+if __name__ == "__main__":
+    main()

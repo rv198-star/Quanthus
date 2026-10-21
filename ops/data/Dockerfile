@@ -1,4 +1,6 @@
 ARG PYTHON_IMAGE
+ARG RCLONE_IMAGE
+FROM ${RCLONE_IMAGE} AS backup_binary
 FROM ${PYTHON_IMAGE} AS dependencies
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 COPY runtime.lock /build/runtime.lock
@@ -14,6 +16,7 @@ LABEL org.opencontainers.image.source="https://github.com/rv198-star/Quanthus" \
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/opt/pipeline/src HOME=/tmp TZ=Asia/Shanghai
 COPY --from=dependencies /runtime/ /usr/local/
+COPY --from=backup_binary /usr/local/bin/rclone /usr/local/bin/rclone
 COPY pipeline /opt/pipeline
 COPY collector /opt/collector
 RUN python -c "from pathlib import Path; from quanthus.pipelines.securities_warehouse.container_code import verify_bundle; from quanthus.pipelines.securities_warehouse.daily_base24_provider import COLLECTOR; verify_bundle(Path('/opt/pipeline'), '${PIPELINE_REVISION}'); verify_bundle(Path('/opt/collector'), COLLECTOR)" \

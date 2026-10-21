@@ -12,7 +12,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from quanthus.p10_operational_mail import atomic, validate
+from quanthus.p10_operational_mail import atomic, notify, validate
 
 from .container_code import verify_bundle
 
@@ -172,9 +172,11 @@ def main() -> None:
             args.event,
             event(args.role, args.day, args.run_id, revision, {"status": "CONTAINER_RUN_FAILED"}),
         )
+        notify(args.event, Path("/run/mail"), Path("/run/secrets/mail.json"))
         raise
     atomic(args.event, value)
-    print(json.dumps(value, sort_keys=True))
+    mail = notify(args.event, Path("/run/mail"), Path("/run/secrets/mail.json"))
+    print(json.dumps({"event": value, "mail": mail}, sort_keys=True))
 
 
 if __name__ == "__main__":

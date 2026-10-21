@@ -109,12 +109,17 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--collector-repo", type=Path)
     parser.add_argument("--python-image")
+    parser.add_argument("--rclone-image")
     args = parser.parse_args()
     if args.collector_repo is not None:
         from .daily_base24_provider import COLLECTOR
 
         if not re.fullmatch(r"python:[a-zA-Z0-9.-]+@sha256:[0-9a-f]{64}", args.python_image or ""):
             raise ValueError("CONTAINER_PINNED_PYTHON_IMAGE_REQUIRED")
+        if not re.fullmatch(
+            r"rclone/rclone:[a-zA-Z0-9.-]+@sha256:[0-9a-f]{64}", args.rclone_image or ""
+        ):
+            raise ValueError("CONTAINER_PINNED_RCLONE_IMAGE_REQUIRED")
         for root in (args.repo, args.collector_repo):
             a, b = args.output.resolve(), root.resolve()
             if a.is_relative_to(b) or b.is_relative_to(a):
@@ -129,6 +134,7 @@ def main() -> None:
             )
             (args.output / name).write_bytes(content)
         (args.output / "python-image.txt").write_text(args.python_image + "\n", encoding="ascii")
+        (args.output / "rclone-image.txt").write_text(args.rclone_image + "\n", encoding="ascii")
         print(json.dumps({"revision": args.revision, "context": str(args.output)}))
     else:
         value = bundle(args.repo, args.revision, args.output)

@@ -7,19 +7,27 @@ qualified image and container acceptance; current host timers remain in service.
 
 ## Boundary
 
-One pipeline image, three explicit one-shot roles: Daily, recovery and Weekly.
+One pipeline image, three explicit one-shot data roles: Daily, recovery and Weekly,
+plus separately scoped backup and housekeeping roles using that same image.
+Acquisition, ODS/DWD build, API mail, GDrive transport and TMP cleanup all ship
+in this image. Roles share a release, not writable source directories.
 Daily invokes the existing `daily_base24_cycle` through source acquisition, ODS
 catalog, one immutable daily core, native 5m, complete DWD verification and sealing.
 It does not stop at provider success. A held 5m source reports partial delivery;
 an authoritative closed date reports its event disposition. Neither is full Daily
 success. Existing date locks, READY ordering and consumer/PIT gates remain active.
 
-The Owner explicitly chose **no mail container or mail image**. The host wrapper
-calls the lightweight external API after a terminal event, including Docker start
-failure. Safe events and idempotent mail receipts persist outside the container.
-Mail failure leaves qualified data intact; replaying mail does not invoke collection.
-There is no message broker, internal cron or new scheduler. Resend is the existing
-operational provider; strategy/forward-email transport is outside this issue.
+The lightweight external API call runs **inside each data job**, immediately after
+its small durable terminal event. There is no standalone mail container/image,
+message broker or mail daemon. Mail failure leaves sealed data intact; retry uses
+the same image's backup role with a mail-only command and never invokes collection.
+The host triggers/observes Docker only and does not read API credentials or send
+mail. If Docker cannot start, the host retains an unsent failure event; an
+in-container sender cannot run during a daemon outage. Replay that event after
+Docker recovers. Strategy/forward-email transport remains outside this work.
+
+Daily/recovery retain the existing host timer clock; no second in-container data
+cron is enabled. Only housekeeping has the small internal clock described below.
 
 The initial Weekly entry binds and verifies the already implemented financial
 statement domain with its original envelopes/receipts. It reports other domains
@@ -41,16 +49,21 @@ set, sizes and full hashes. The old host Git-checkout verification remains valid
 PYTHONPATH=src python3 -m quanthus.pipelines.securities_warehouse.container_code \
   --repo "$QUANTHUS_REPO" --revision "$QUANTHUS_FULL_SHA" \
   --collector-repo "$QUANTHUS_COLLECTOR_REPO" \
-  --python-image "$PINNED_PYTHON_IMAGE" --output "$NEW_BUILD_CONTEXT"
+  --python-image "$PINNED_PYTHON_IMAGE" --rclone-image "$PINNED_RCLONE_IMAGE" \
+  --output "$NEW_BUILD_CONTEXT"
 docker build --target pipeline \
   --build-arg PYTHON_IMAGE="$PINNED_PYTHON_IMAGE" \
+  --build-arg RCLONE_IMAGE="$PINNED_RCLONE_IMAGE" \
   --build-arg PIPELINE_REVISION="$QUANTHUS_FULL_SHA" \
   --file "$NEW_BUILD_CONTEXT/Dockerfile" "$NEW_BUILD_CONTEXT"
 ```
 
 `PINNED_PYTHON_IMAGE` must be an actually verified official Python 3.10 slim
 reference including its complete registry digest. No mutable default/tag fallback
-is provided. Registry access/digest selection and building were not completed in
+is provided. `PINNED_RCLONE_IMAGE` likewise requires an actually verified
+`rclone/rclone:<tag>@sha256:<full digest>`. Its official static binary is copied
+into the pipeline image; there is no separate rclone runtime image/service.
+Registry access/digest selection and building were not completed in
 the current agentdock session: the Docker daemon socket denies this user and public
 Docker registry metadata requests timed out. Do not add a user to the Docker group,
 change socket ACLs or substitute another daemon to bypass this refusal.
@@ -65,8 +78,9 @@ the image build and smoke tests. No claim that the unbuilt image is qualified.
 Copy and complete `ops/data/deployment.example.json` privately; placeholders fail
 closed. Pin the actual image ID (`sha256:...`) or repository digest, full code SHA
 and Compose file SHA256. `.env` auto-loading and ambient Docker/Compose selection
-variables are excluded. The Compose project is `quanthus-data`; all services have a
-manual profile and help-only default, so a default `compose up` does no collection.
+variables are excluded. The Compose project is `quanthus-data`; data jobs have a
+manual profile and help-only default. Backup has a `delivery` profile, and the cleaner has a `maintenance`
+profile; a default `compose up` starts none of these roles.
 
 Container configuration is separate from the currently running host configuration.
 Its Daily `pipeline_revision` must equal the image's bundled revision and collector
@@ -80,7 +94,11 @@ must be `/opt/collector`. Translate only these mounted locations:
 | `/data/weekly-input` | Exact qualified Weekly source/receipts/config | Read only |
 | `/data/weekly-jobs` | New bounded Weekly run parents | Read/write |
 | `/run/config/*.json` | Separate pinned role configurations | Read only |
-| `/run/events` | Small safe terminal events | Read/write |
+| `/run/events` | Small safe terminal events | Jobs write; delivery reads |
+| `/run/mail` | API idempotency receipts | Read/write; persistent |
+| `/run/secrets/mail.json` | Existing API settings | Read only; runtime injection |
+| `/run/backup` | Frozen archives and verified-copy receipts | Backup role only; persistent |
+| `/run/secrets/gdrive` | Existing private rclone settings directory | Backup only; token refresh may write |
 | `/data` | Ephemeral prior-descriptor namespace, 16 MiB tmpfs | Temporary |
 | `/data/tmp` | Unique leased run under host `QUANTHUS_TMP_ROOT` | Disposable TMP only |
 
@@ -99,10 +117,13 @@ The initial financial Weekly plan has kind `p10-container-weekly-financial-v1`,
 free-floor, RSS and elapsed budgets. An existing sealed/failed job is preserved;
 reuse requires an explicit new plan/disposition, not output overwrite.
 
-The host mail secret is an existing authorized private JSON file with `api_key`,
-`sender` and `recipients`. It is never mounted into the pipeline or printed. No real
-mail is sent by tests. `mail_secret` may be omitted while preparing isolated tests;
-the wrapper then reports `not_configured`, not successful mail activation.
+`QUANTHUS_MAIL_SECRET` names an existing authorized private JSON file with
+`api_key`, `sender` and `recipients`, mounted read-only into data/delivery roles.
+No secret values go in Compose environment, code, logs, plans or image layers.
+`QUANTHUS_GDRIVE_CONFIG_ROOT` names an existing private directory containing
+`rclone.conf`; only backup receives it. That directory may be written for token
+refresh, not mounted as an immutable single file. No new authorization, credential
+copy or live API call was performed by the engineering tests.
 
 ## Fixed scratch and conservative cleanup
 
@@ -133,12 +154,29 @@ Preview is the default:
 ops/bin/run-p10-container-job clean-tmp --deployment /etc/quanthus/p10-container-deployment.json
 ```
 
-Only the same command with `--apply` removes eligible owned TMP. Review the preview
-before the first activation. The supplied `cn02-p10-tmp-clean.service.example` and
-`.timer.example` propose one daily sweep at **03:30 Asia/Shanghai**, with up to five
-minutes jitter. They are **not installed or enabled** in this task. They do not
-require Docker access, invoke collection or send mail. With disabled deployment,
-no real cleanup is performed. Preserve the existing operational timers.
+The host command now only starts a one-shot **cleanup container**; default is
+preview, and `--apply` explicitly enables removal there. The host wrapper itself
+does no deletion. Review the preview before activation.
+
+Under the Owner's revised instruction, `cleanup-start --deployment FILE` starts
+the same-image `cleanup` service; its container-local clock sweeps at **03:30
+Asia/Shanghai**, including one catch-up sweep after restart. `.p10-cleaner.json`
+persists the completed slot, and `.p10-cleaner.lock` prevents a duplicate scheduler.
+Clock rollback does not repeat a completed slot; an unsuccessful sweep does not
+advance its receipt and retries after five minutes. SIGTERM/INT interrupts idle
+waiting. This is a TMP-specific clock, not a general workflow scheduler.
+
+The cleaner has exactly one bind, the entire owned TMP root at `/work/tmp`, and
+`network_mode: none`. It has no Base, ODS/DWD/Daily/Weekly, secret, notification or
+Docker socket mount. It uses the job UID/GID, a read-only root, no capabilities,
+128 MiB memory limit and bounded Docker log rotation. Per-job leases remain visible
+through the shared TMP inode and still block reclamation. These are configuration
+and synthetic guarantees; actual kernel/container mount and stop acceptance is
+still required. `cleanup-stop --deployment FILE` stops only this role.
+
+The prior uninstalled host cleanup service/timer examples were removed. The new
+service is not started by this task; existing host data timers remain unchanged.
+Docker access is needed to launch the cleaner, not for its in-container sweeps.
 
 Original provider captures, `collector-home`, ODS/DWD/Daily/Weekly products, READY,
 manifests, failure receipts, job evidence and mail outbox remain outside this TMP
@@ -147,10 +185,85 @@ as disposable, age-delete `/tmp` globally or run blanket Docker prune. Container
 `/tmp` and ephemeral `/data` are automatically released with `--rm`; retained logs,
 images and governed caches have separate retention scopes.
 
+## Whole data lifecycle: directories and GDrive
+
+The Owner clarified that final ODS/DWD need fixed directories and backup, with
+**no automatic deletion of formal products**. These responsibilities share one
+versioned deployment, while each role receives only the paths it needs.
+
+| Scope | Fixed root/selection | Retention and access |
+| --- | --- | --- |
+| Accepted Base DWD | `QUANTHUS_BASE_ROOT` → `/data/base` | Read only; keep |
+| Original Daily ODS and acquisition receipts | Existing captures below `QUANTHUS_RUNTIME_ROOT`; select exact source release paths/digests from the cycle, not a latest-directory guess | Persist; never TMP |
+| Daily DWD core and final 1d/5m | `QUANTHUS_RUNTIME_ROOT` → `/data/runtime`; exact `core` / `product` / manifest identities in `DATES.json` and immutable run receipts | Persist; keep partial scope explicit |
+| Weekly source and products | `QUANTHUS_WEEKLY_INPUT_ROOT` / `QUANTHUS_WEEKLY_JOB_ROOT` | Persist with their domain qualification; no cleanup mount |
+| Temporary processing files | `QUANTHUS_TMP_ROOT` | Only scoped successful scratch eligible for reclamation |
+| GDrive archive receipts and retry state | Separate backup state, outside TMP and source roots; exact path frozen with backup adapter | Persist independently of data jobs |
+
+Automatic backup policy is now **Base 2.4 Daily and Weekly only**, with `1d/5m`;
+Base 2.1/2.2/2.3/2.3.1 are retired from automatic selection. Existing cloud archives
+are historical records and are not deleted. Policy:
+`config/pipelines/base24-backup.v1.json`. It binds the accepted DWD Base manifest,
+not just the version label, and excludes a whole-Base upload from this increment
+transport. The old `9c9abe7e...` publisher hard-requires Base 2.3 plus 1m and must
+not be connected as a fallback.
+
+`p10_gdrive_backup` consumes an **explicit frozen upstream selection**, never a
+latest-directory scan. Required fields are `kind=p10-base24-backup-selection-v1`,
+policy SHA256 (bare hex), exact image `code_revision`, `base_version`/`base_manifest_sha256`,
+`intervals=["1d","5m"]`, `execution_authorized=false`,
+`formal_product_deletion="forbidden"`, the configured `remote_name`, distinct
+approved `folder_ids.ODS` and `.DWD`, and at most 32 `packages`. Each package has a
+safe unique `id`, `layer=ODS|DWD`, `cadence=daily|weekly`, `business_date`, physical
+mounted `root`, complete `files` mapping (relative path → `bytes` and bare
+`sha256`), a `qualification_receipt` member, `qualification=qualified_scope|partial_scope`
+and retained `limitations` (mandatory for partial scope). `limits` explicitly bind
+`max_source_bytes`, `max_archive_bytes`, `free_floor_bytes` and `timeout_seconds`.
+
+The upstream data stage owns semantic qualification and must freeze this selection
+from its exact verified receipts. This transport does not establish admission from
+a self-declared version or receipt filename. Automatic creation/queueing of that
+selection for the current live Daily/Weekly paths, and the real folder IDs, remain
+activation prerequisites; no production selection was fabricated here.
+
+Preflight rejects wrong versions/intervals, missing proof, file-set changes,
+unsafe paths/links, unreadable trees, state/source overlap and insufficient disk
+before creating job state. The backup role sees Daily/Weekly inputs **read-only**,
+no Base writable root. It streams each selected source once into deterministic
+uncompressed tar while checking its frozen SHA256 and stat identity; it then hashes
+the archive for restoration and cloud MD5. Scratch/retained archive space is bounded
+before writing; interrupted packs remain evidence and are never overwritten.
+Retrying an upload reuses a hash-verified packed archive, not a data rebuild.
+
+ODS and DWD go to their **distinct exact folder IDs**. Below each ID, the proposed
+new increment namespace is `<daily|weekly>/base-2.4/<date>/<selection-sha>/<package-id>`;
+verify it against the existing layout before activation rather than matching folder
+names. Each immutable directory contains `data.tar` and a safe `backup.json` with
+the full source inventory, original qualification/limitations, Base identity and
+archive SHA256/MD5. It omits host source paths and credentials. Use
+[rclone copy](https://rclone.org/commands/rclone_copy/) with `--immutable --checksum`,
+then independently list and compare the **exact file set, bytes and MD5** (including
+metadata). Missing hashes, extras, duplicates or mismatches prevent the local
+`VERIFIED.json`. TLS verification is kept; retries/timeouts are finite and ambient
+rclone credentials/options are excluded. No deleting `sync` operation is used.
+
+A data-build success, upload exit zero and cloud-byte verification remain distinct.
+`cloud_bytes_verified` never changes consumer admission, upgrades partial Weekly,
+or authorizes deleting formal local products. Backup state/failed evidence is not
+eligible for the TMP cleaner. Archive retention/compaction is a later explicit
+policy, not automatic in this release.
+
+No active CN02 GDrive timer or installed host `rclone` was found during read-only
+inspection. This is the new **prepared** adapter, not evidence that live automatic
+sync was already switched. Image/runtime qualification, exact current selections,
+folder mapping, credential mount validation, a fake-cloud container test and a
+separately authorized real backup are still open in #537.
+
 ## Operation, checks and rollback
 
 `ops/bin/run-p10-container-job ROLE --deployment FILE [--day YYYY-MM-DD]` starts a
-single job. `ROLE=mail --event FILE` retries only the retained event. On ordinary
+single job. `ROLE=backup` sends only the frozen selection; `ROLE=mail --event FILE`
+retries only the retained event using the same-image delivery role. On ordinary
 failure/timeout/termination the wrapper attempts to stop only its uniquely named
 container and records a failure event. Daemon/host hard failure can prevent cleanup;
 actual container/process-tree cleanup and natural timer behavior still need runtime
@@ -166,7 +279,8 @@ restores the prior pinned host entry after verifying no live writer remains.
 Before activation: complete image build, import/CLI smoke in a non-root read-only
 container, identical-input Daily semantics, supported Weekly semantics, two role
 locks, stop/timeout/child cleanup, source/path isolation, mail retry/dedup with a fake
-endpoint, and actual resource/space measurements. All tests must use disposable
+endpoint, immutable backup with fake Drive including interruption/missing hashes,
+and actual resource/space measurements. All tests must use disposable
 synthetic data or separately approved isolated inputs. Containerizing the current
 contract grants no new provider calls, research access, full Weekly admission or
 production consumer authority. Record unavailable checks explicitly in the handoff.

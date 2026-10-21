@@ -1,4 +1,4 @@
-"""P10 end-of-pipeline boundaries and host notifications without Docker/network."""
+"""P10 end-of-pipeline boundaries and task-local notifications without Docker/network."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import io
 import json
 import shutil
 import subprocess
+import sys
 from dataclasses import asdict
 from datetime import date
 from pathlib import Path
@@ -188,6 +189,60 @@ def test_mail_rejects_payload_fields_before_sending(tmp_path, monkeypatch):
         mail.deliver(event, tmp_path / "sent", tmp_path / "no-secret-needed")
 
 
+@pytest.mark.parametrize("fails", [False, True])
+def test_container_entry_writes_event_then_calls_light_api_inside_job(tmp_path, monkeypatch, fails):
+    bundle = tmp_path / "pipeline"
+    bundle.mkdir()
+    (bundle / "SOURCE.json").write_text(json.dumps({"revision": SHA}))
+    monkeypatch.setattr(
+        jobs,
+        "__file__",
+        str(bundle / "src/quanthus/pipelines/securities_warehouse/container_jobs.py"),
+    )
+    monkeypatch.setattr(jobs, "verify_bundle", lambda *a: None)
+    config = tmp_path / "daily.json"
+    config.write_text(json.dumps({"pipeline_revision": SHA, "collector": "/opt/collector"}))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "container_jobs",
+            "daily",
+            "--config",
+            str(config),
+            "--day",
+            str(DAY),
+            "--run-id",
+            "daily-test",
+            "--event",
+            "/run/events/daily-test.json",
+        ],
+    )
+    written, notices = [], []
+    monkeypatch.setattr(jobs, "atomic", lambda path, value: written.append(value))
+
+    def notify(*a):
+        assert written, "persist event before mail API"
+        notices.append(a)
+        return "failed_event_retained"
+
+    def daily(*a):
+        if fails:
+            raise RuntimeError("synthetic pipeline failure")
+        return {"status": "QUALIFIED_1D_NATIVE5M", "product_manifest_sha256": "sha256:" + "b" * 64}
+
+    monkeypatch.setattr(jobs, "notify", notify)
+    monkeypatch.setattr(jobs, "daily", daily)
+    if fails:
+        with pytest.raises(RuntimeError, match="synthetic pipeline"):
+            jobs.main()
+    else:
+        jobs.main()  # An API error does not fail a sealed data job.
+    assert len(notices) == 1
+    assert notices[0][1:] == (Path("/run/mail"), Path("/run/secrets/mail.json"))
+    assert written[0]["status"] == ("failed" if fails else "complete")
+
+
 def deployment(tmp_path):
     state = tmp_path / "state"
     state.mkdir()
@@ -199,17 +254,21 @@ def deployment(tmp_path):
         "RUNTIME_ROOT",
         "WEEKLY_JOB_ROOT",
         "TMP_ROOT",
+        "BACKUP_ROOT",
+        "GDRIVE_CONFIG_ROOT",
     ):
         root = tmp_path / key
         root.mkdir()
         env["QUANTHUS_" + key] = str(root)
-    for label in ("daily", "weekly"):
+    for label in ("daily", "weekly", "backup", "mail"):
         (tmp_path / (label + ".json")).write_text("{}")
     env.update(
         QUANTHUS_DATA_UID="998",
         QUANTHUS_DATA_GID="998",
         QUANTHUS_DAILY_CONFIG=str(tmp_path / "daily.json"),
         QUANTHUS_WEEKLY_CONFIG=str(tmp_path / "weekly.json"),
+        QUANTHUS_BACKUP_SELECTION=str(tmp_path / "backup.json"),
+        QUANTHUS_MAIL_SECRET=str(tmp_path / "mail.json"),
     )
     compose = Path(__file__).parents[2] / "ops/data/compose.yaml"
     return dict(
@@ -224,21 +283,20 @@ def deployment(tmp_path):
     )
 
 
-def test_daemon_start_failure_still_notifies_on_host(tmp_path, monkeypatch):
+def test_daemon_start_failure_retains_event_without_host_mail(tmp_path, monkeypatch):
     config = deployment(tmp_path)
-    config["mail_secret"] = "/not-mounted-in-container"
 
     def denied(*args, **kwargs):
         raise PermissionError("synthetic daemon denial")
 
-    notices = []
     monkeypatch.setattr(host.subprocess, "Popen", denied)
     monkeypatch.setattr(host.subprocess, "run", lambda *a, **k: None)
-    monkeypatch.setattr(host, "deliver", lambda *a, **k: notices.append(a) or "sent")
+    monkeypatch.setattr(mail.request, "urlopen", lambda *a, **k: pytest.fail("host API call"))
     with pytest.raises(RuntimeError, match="JOB_FAILED"):
         host.run(config, "daily", DAY)
-    assert len(notices) == 1
-    value = json.loads(notices[0][0].read_bytes())
+    events = list((Path(config["state"]) / "events").glob("*.json"))
+    assert len(events) == 1
+    value = json.loads(events[0].read_bytes())
     assert value["status"] == "failed"
     assert value["manifests"] == []
     scratch = list(Path(config["compose_env"]["QUANTHUS_TMP_ROOT"]).iterdir())
@@ -248,7 +306,6 @@ def test_daemon_start_failure_still_notifies_on_host(tmp_path, monkeypatch):
 
 def test_successful_dwd_is_not_rebuilt_on_email_failure(tmp_path, monkeypatch):
     config = deployment(tmp_path)
-    config["mail_secret"] = "/host-only"
     calls = []
 
     def start(command, **kwargs):
@@ -265,13 +322,10 @@ def test_successful_dwd_is_not_rebuilt_on_email_failure(tmp_path, monkeypatch):
 
     monkeypatch.setattr(host.subprocess, "Popen", start)
 
-    def fail(*args, **kwargs):
-        raise RuntimeError("email unavailable")
-
-    monkeypatch.setattr(host, "deliver", fail)
+    monkeypatch.setattr(mail.request, "urlopen", lambda *a, **k: pytest.fail("host API call"))
     result = host.run(config, "daily", DAY)
     assert result["status"] == "complete"
-    assert result["mail"] == "failed_event_retained"
+    assert result["mail"] == "container_owned_see_receipt"
     assert len(calls) == 1
     scratch = next(Path(config["compose_env"]["QUANTHUS_TMP_ROOT"]).iterdir())
     assert json.loads((scratch / ".p10-tmp.json").read_bytes())["status"] == "succeeded"

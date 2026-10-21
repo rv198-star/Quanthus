@@ -1,4 +1,4 @@
-"""Host scheduler wrapper for P10 jobs and lightweight API notifications."""
+"""Host triggers only: all P10 data, mail, backup and cleanup work is in one image."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from quanthus import p10_tmp
-from quanthus.p10_operational_mail import atomic, deliver, validate
+from quanthus.p10_operational_mail import atomic, validate
 from quanthus.pipelines.securities_warehouse.container_code import digest
 from quanthus.pipelines.securities_warehouse.container_jobs import event
 
@@ -48,6 +48,10 @@ def settings(path: Path) -> dict[str, Any]:
         "QUANTHUS_WEEKLY_INPUT_ROOT",
         "QUANTHUS_WEEKLY_JOB_ROOT",
         "QUANTHUS_TMP_ROOT",
+        "QUANTHUS_MAIL_SECRET",
+        "QUANTHUS_BACKUP_SELECTION",
+        "QUANTHUS_BACKUP_ROOT",
+        "QUANTHUS_GDRIVE_CONFIG_ROOT",
     }
     if set(value["compose_env"]) != allowed or any(
         not isinstance(v, str) or not v or "\n" in v for v in value["compose_env"].values()
@@ -69,8 +73,109 @@ def protected_paths(config: dict[str, Any]) -> list[Path]:
     return [Path(config["state"])] + [
         Path(value)
         for key, value in config["compose_env"].items()
-        if key.endswith(("_ROOT", "_CONFIG")) and key != "QUANTHUS_TMP_ROOT"
+        if key.endswith(("_ROOT", "_CONFIG", "_SECRET", "_SELECTION"))
+        and key != "QUANTHUS_TMP_ROOT"
     ]
+
+
+def cleanup_container(config: dict[str, Any], mode: str, *, apply: bool = False) -> dict[str, str]:
+    """Host preflight/launch only. All housekeeping runs behind the TMP-only mount."""
+    p10_tmp.check_root(Path(config["compose_env"]["QUANTHUS_TMP_ROOT"]), protected_paths(config))
+    prefix = ["docker", "compose", "--project-name", "quanthus-data", "--file", config["compose"]]
+    env = {
+        "PATH": os.defpath,
+        **config["compose_env"],
+        "QUANTHUS_PIPELINE_IMAGE": config["image"],
+        # Unused by cleanup; satisfy interpolation without mounting any live outputs.
+        "QUANTHUS_EVENT_ROOT": str(Path(config["state"]) / "events"),
+        "QUANTHUS_MAIL_ROOT": str(Path(config["state"]) / "mail"),
+        "QUANTHUS_JOB_TMP": config["compose_env"]["QUANTHUS_TMP_ROOT"],
+        "COMPOSE_DISABLE_ENV_FILE": "1",
+    }
+    if mode == "start":
+        command = [*prefix, "up", "--detach", "--no-deps", "cleanup"]
+    elif mode == "stop":
+        command = [*prefix, "stop", "--timeout", "30", "cleanup"]
+    elif mode == "once":
+        command = [
+            *prefix,
+            "run",
+            "--rm",
+            "--no-deps",
+            "-T",
+            "cleanup",
+            "once",
+            "--root",
+            "/work/tmp",
+        ]
+        if apply:
+            command.append("--apply")
+    else:
+        raise ValueError("P10_CLEANER_MODE_INVALID")
+    result = subprocess.run(command, env=env, check=False, timeout=600)
+    if result.returncode:
+        raise RuntimeError("P10_CLEANER_CONTAINER_COMMAND_FAILED")
+    return {"status": "container_command_completed", "mode": mode}
+
+
+def delivery_container(config: dict[str, Any], target: Path | None = None) -> dict[str, str]:
+    """Retry backup/mail only, without entering a collector or writable data mount."""
+    state = Path(config["state"])
+    if target is not None and (
+        target.parent.resolve() != state / "events" or not target.is_file() or target.is_symlink()
+    ):
+        raise ValueError("P10_MAIL_EVENT_DESTINATION_INVALID")
+    run_id = "delivery-" + uuid.uuid4().hex
+    env = {
+        "PATH": os.defpath,
+        **config["compose_env"],
+        "QUANTHUS_PIPELINE_IMAGE": config["image"],
+        "QUANTHUS_EVENT_ROOT": str(state / "events"),
+        "QUANTHUS_MAIL_ROOT": str(state / "mail"),
+        "QUANTHUS_JOB_TMP": config["compose_env"]["QUANTHUS_TMP_ROOT"],
+        "COMPOSE_DISABLE_ENV_FILE": "1",
+    }
+    command = [
+        "docker",
+        "compose",
+        "--project-name",
+        "quanthus-data",
+        "--file",
+        config["compose"],
+        "run",
+        "--rm",
+        "--no-deps",
+        "-T",
+        "--name",
+        run_id,
+    ]
+    if target is None:
+        command += ["backup", "--selection", "/run/config/backup.json"]
+    else:
+        command += [
+            "--entrypoint",
+            "python",
+            "backup",
+            "-m",
+            "quanthus.p10_operational_mail",
+            "--event",
+            "/run/events/" + target.name,
+        ]
+    try:
+        result = subprocess.run(command, env=env, check=False, timeout=config["timeout_seconds"])
+    except (OSError, subprocess.TimeoutExpired):
+        with contextlib.suppress(OSError, subprocess.TimeoutExpired):
+            subprocess.run(
+                ["docker", "stop", "--time", "30", run_id],
+                env=env,
+                check=False,
+                capture_output=True,
+                timeout=40,
+            )
+        raise RuntimeError("P10_DELIVERY_CONTAINER_FAILED") from None
+    if result.returncode:
+        raise RuntimeError("P10_DELIVERY_CONTAINER_FAILED")
+    return {"status": "container_command_completed", "role": "backup" if target is None else "mail"}
 
 
 def run(config: dict[str, Any], role: str, day: date) -> dict[str, Any]:
@@ -95,6 +200,7 @@ def run(config: dict[str, Any], role: str, day: date) -> dict[str, Any]:
         **config["compose_env"],
         "QUANTHUS_PIPELINE_IMAGE": config["image"],
         "QUANTHUS_EVENT_ROOT": str(state / "events"),
+        "QUANTHUS_MAIL_ROOT": str(state / "mail"),
     }
     # Do not accidentally select a different daemon, Compose file, profile or .env.
     env["COMPOSE_DISABLE_ENV_FILE"] = "1"
@@ -177,13 +283,13 @@ def run(config: dict[str, Any], role: str, day: date) -> dict[str, Any]:
                 }.items()
             ):
                 raise ValueError("P10_CONTAINER_EVENT_IDENTITY_DIFFERS")
-        mail = "not_configured"
-        if config.get("mail_secret"):
-            try:
-                mail = deliver(target, state / "mail", Path(config["mail_secret"]))
-            except Exception:
-                mail = "failed_event_retained"
-        result = {"status": value["status"], "event": str(target), "mail": mail}
+        # The job sends its own API notice. A daemon/host failure retains an unsent
+        # safe event for same-image mail retry; the host never reads the secret.
+        result = {
+            "status": value["status"],
+            "event": str(target),
+            "mail": "container_owned_see_receipt" if not failed else "event_retained_unsent",
+        }
         if failed or interrupted or value["status"] == "failed":
             raise RuntimeError("P10_CONTAINER_JOB_FAILED_SEE_RETAINED_EVENT")
         scratch.status = "succeeded" if value["status"] in {"complete", "closed"} else "held"
@@ -192,7 +298,19 @@ def run(config: dict[str, Any], role: str, day: date) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("role", choices=["daily", "recovery", "weekly", "mail", "clean-tmp"])
+    parser.add_argument(
+        "role",
+        choices=[
+            "daily",
+            "recovery",
+            "weekly",
+            "mail",
+            "backup",
+            "clean-tmp",
+            "cleanup-start",
+            "cleanup-stop",
+        ],
+    )
     parser.add_argument("--deployment", type=Path, required=True)
     parser.add_argument("--day", type=date.fromisoformat)
     parser.add_argument("--event", type=Path)
@@ -204,15 +322,15 @@ def main() -> None:
     if args.apply and args.role != "clean-tmp":
         parser.error("--apply is only valid with clean-tmp")
     if args.role == "clean-tmp":
-        result: Any = p10_tmp.clean(
-            Path(config["compose_env"]["QUANTHUS_TMP_ROOT"]),
-            protected_paths(config),
-            apply=args.apply,
-        )
+        result: Any = cleanup_container(config, "once", apply=args.apply)
+    elif args.role in {"cleanup-start", "cleanup-stop"}:
+        result = cleanup_container(config, args.role.removeprefix("cleanup-"))
     elif args.role == "mail":
-        if args.event is None or args.event.parent.resolve() != Path(config["state"]) / "events":
+        if args.event is None:
             raise ValueError("P10_MAIL_EVENT_DESTINATION_INVALID")
-        result = deliver(args.event, Path(config["state"]) / "mail", Path(config["mail_secret"]))
+        result = delivery_container(config, args.event)
+    elif args.role == "backup":
+        result = delivery_container(config)
     else:
         day = args.day or datetime.now(ZoneInfo("Asia/Shanghai")).date()
         if day > datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai")).date():

@@ -6,6 +6,7 @@ import io
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 from dataclasses import asdict
@@ -266,6 +267,7 @@ def deployment(tmp_path):
     env.update(
         QUANTHUS_DATA_UID="998",
         QUANTHUS_DATA_GID="998",
+        QUANTHUS_PRIOR_ANCHOR=str(tmp_path),
         QUANTHUS_DAILY_CONFIG=str(tmp_path / "daily.json"),
         QUANTHUS_WEEKLY_CONFIG=str(tmp_path / "weekly.json"),
         QUANTHUS_BACKUP_SELECTION=str(tmp_path / "backup.json"),
@@ -377,6 +379,76 @@ def test_invalid_docker_access_rejected_before_state_writes(tmp_path, access):
     assert not list(Path(config["state"]).iterdir())
 
 
+def test_sudo_under_no_new_privileges_is_rejected_before_writes(tmp_path, monkeypatch):
+    config = deployment(tmp_path)
+    config["docker_access"] = "sudo-noninteractive"
+    path = tmp_path / "deployment.json"
+    path.write_text(json.dumps(config))
+    monkeypatch.setattr(host, "no_new_privileges", lambda: True)
+    with pytest.raises(ValueError, match="SUDO_BLOCKED_BY_NO_NEW_PRIVILEGES"):
+        host.settings(path)
+    assert not list(Path(config["state"]).iterdir())
+    assert not list(Path(config["compose_env"]["QUANTHUS_TMP_ROOT"]).iterdir())
+
+
+@pytest.mark.parametrize("target", [None, "event.json"])
+def test_delivery_termination_stops_only_its_named_container_and_restores_handlers(
+    tmp_path, monkeypatch, target
+):
+    config = deployment(tmp_path)
+    config["docker_access"] = "sudo-noninteractive"
+    if target:
+        events = Path(config["state"]) / "events"
+        events.mkdir()
+        target = events / target
+        target.write_text(json.dumps(safe_event()))
+    before = {s: signal.getsignal(s) for s in (signal.SIGTERM, signal.SIGINT)}
+    calls = []
+
+    def execute(command, **kwargs):
+        calls.append(command)
+        if len(calls) == 1:
+            handler = signal.getsignal(signal.SIGTERM)
+            assert callable(handler), "delivery must install a termination handler"
+            handler(signal.SIGTERM, None)
+            pytest.fail("delivery ignored termination")
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(host.subprocess, "run", execute)
+    with pytest.raises(RuntimeError, match="DELIVERY_CONTAINER_FAILED"):
+        host.delivery_container(config, target)
+    name = calls[0][calls[0].index("--name") + 1]
+    assert calls[1] == host.docker_command(config, "stop", "--time", "30", name)
+    assert {s: signal.getsignal(s) for s in before} == before
+
+
+def test_host_systemd_launcher_allows_explicit_sudo_but_container_keeps_nnp():
+    root = Path(__file__).parents[2]
+    unit = (root / "ops/systemd/cn02-p10-container@.service.example").read_text()
+    assert "NoNewPrivileges=false" in unit
+    assert "no-new-privileges:true" in (root / "ops/data/compose.yaml").read_text()
+
+
+def test_daily_preserves_absolute_predecessor_paths_without_binding_parent():
+    root = Path(__file__).parents[2]
+    compose = (root / "ops/data/compose.yaml").read_text()
+    daily = compose.split("x-daily-volumes:", 1)[1].split("services:", 1)[0]
+    for key in ("BASE_ROOT", "HISTORY_ROOT", "RUNTIME_ROOT"):
+        assert f"target: ${{QUANTHUS_{key}:?}}" in daily
+    assert "${QUANTHUS_PRIOR_ANCHOR:?exact common parent required}:rw," in compose
+    assert "source: ${QUANTHUS_PRIOR_ANCHOR" not in compose
+
+
+def test_prior_anchor_cannot_be_arbitrary_ancestor(tmp_path):
+    value = deployment(tmp_path)
+    value["compose_env"]["QUANTHUS_PRIOR_ANCHOR"] = str(tmp_path.parent)
+    config = tmp_path / "deployment.json"
+    config.write_text(json.dumps(value))
+    with pytest.raises(ValueError, match="EXACT_PRIOR_ANCHOR"):
+        host.settings(config)
+    assert not list(Path(value["state"]).iterdir())
+
+
 def test_sudo_denial_stops_only_named_job_and_keeps_agentdock_scratch(tmp_path, monkeypatch):
     config = deployment(tmp_path)
     config["docker_access"] = "sudo-noninteractive"
@@ -422,6 +494,37 @@ def test_deployment_checks_before_creating_any_state_outputs(tmp_path, mutation)
     config.write_text(json.dumps(value))
     with pytest.raises(ValueError):
         host.settings(config)
+    assert not list(Path(value["state"]).iterdir())
+
+
+@pytest.mark.parametrize("writable", ["RUNTIME_ROOT", "WEEKLY_JOB_ROOT", "BACKUP_ROOT"])
+@pytest.mark.parametrize("relation", ["same", "parent", "child"])
+def test_writable_mount_cannot_bypass_readonly_source(tmp_path, writable, relation):
+    value = deployment(tmp_path)
+    source = Path(value["compose_env"]["QUANTHUS_BASE_ROOT"])
+    if relation == "same":
+        output = source
+    elif relation == "parent":
+        output = source.parent
+    else:
+        output = source / "new-output"
+        output.mkdir()
+    value["compose_env"]["QUANTHUS_" + writable] = str(output)
+    path = tmp_path / "deployment.json"
+    path.write_text(json.dumps(value))
+    with pytest.raises(ValueError, match="WRITABLE_SOURCE_OVERLAP"):
+        host.settings(path)
+    assert not list(Path(value["state"]).iterdir())
+
+
+@pytest.mark.parametrize("key", ["QUANTHUS_MAIL_SECRET", "QUANTHUS_RUNTIME_ROOT"])
+def test_missing_mount_is_rejected_before_any_job_state(tmp_path, key):
+    value = deployment(tmp_path)
+    value["compose_env"][key] = str(tmp_path / "missing")
+    path = tmp_path / "deployment.json"
+    path.write_text(json.dumps(value))
+    with pytest.raises((OSError, ValueError)):
+        host.settings(path)
     assert not list(Path(value["state"]).iterdir())
 
 

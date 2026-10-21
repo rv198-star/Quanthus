@@ -12,7 +12,9 @@ WorkingDirectory=/opt/quanthus/p10-current
 ExecStart=/opt/quanthus/p10-current/ops/bin/run-p10-container-job %i --deployment /etc/quanthus/p10-container-deployment.json
 TimeoutStartSec=213min
 KillMode=control-group
-NoNewPrivileges=true
+# The agentdock host launcher uses the Owner-approved sudo -n Docker control.
+# Container processes separately retain no-new-privileges and run as UID 998.
+NoNewPrivileges=false
 ProtectHome=true
 UMask=0077
 StandardOutput=journal

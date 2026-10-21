@@ -10,6 +10,7 @@
   "compose_env": {
     "QUANTHUS_DATA_UID": "998",
     "QUANTHUS_DATA_GID": "998",
+    "QUANTHUS_PRIOR_ANCHOR": "/srv/quanthus-base22-data/jobs",
     "QUANTHUS_DAILY_CONFIG": "/etc/quanthus/container-daily.json",
     "QUANTHUS_WEEKLY_CONFIG": "/etc/quanthus/container-weekly-financial.json",
     "QUANTHUS_BASE_ROOT": "/srv/quanthus-base22-data/jobs/base24-complete-dwd-bounded-c902994",

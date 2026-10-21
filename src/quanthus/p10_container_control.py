@@ -22,9 +22,19 @@ from quanthus.pipelines.securities_warehouse.container_code import digest
 from quanthus.pipelines.securities_warehouse.container_jobs import event
 
 
+def no_new_privileges() -> bool:
+    """Inspect the actual launcher, including inherited systemd restrictions."""
+    for line in Path("/proc/self/status").read_text().splitlines():
+        if line.startswith("NoNewPrivs:"):
+            return line.split()[1] == "1"
+    raise ValueError("P10_CONTAINER_NO_NEW_PRIVILEGES_UNDETERMINED")
+
+
 def settings(path: Path) -> dict[str, Any]:
     value: dict[str, Any] = json.loads(path.read_bytes())
     docker_command(value)  # Validate the fixed access mode before any state writes.
+    if value.get("docker_access") == "sudo-noninteractive" and no_new_privileges():
+        raise ValueError("P10_CONTAINER_SUDO_BLOCKED_BY_NO_NEW_PRIVILEGES")
     if (
         value.get("kind") != "p10-container-deployment-v1"
         or not re.fullmatch(r"[0-9a-f]{40}", str(value.get("revision")))
@@ -41,6 +51,7 @@ def settings(path: Path) -> dict[str, Any]:
     allowed = {
         "QUANTHUS_DATA_UID",
         "QUANTHUS_DATA_GID",
+        "QUANTHUS_PRIOR_ANCHOR",
         "QUANTHUS_DAILY_CONFIG",
         "QUANTHUS_WEEKLY_CONFIG",
         "QUANTHUS_BASE_ROOT",
@@ -61,11 +72,54 @@ def settings(path: Path) -> dict[str, Any]:
     state = Path(value["state"])
     if not state.is_absolute() or state.resolve() != state or not state.is_dir():
         raise ValueError("P10_CONTAINER_PHYSICAL_STATE_REQUIRED")
+    roots: dict[str, Path] = {}
+    for key, name in value["compose_env"].items():
+        if key == "QUANTHUS_TMP_ROOT":
+            continue  # The existing TMP validator owns its stricter contract/reason codes.
+        if not key.endswith(("_ROOT", "_CONFIG", "_SECRET", "_SELECTION")):
+            continue
+        path = Path(name)
+        if (
+            not path.is_absolute()
+            or path.resolve(strict=True) != path
+            or not (path.is_dir() if key.endswith("_ROOT") else path.is_file())
+        ):
+            raise ValueError("P10_CONTAINER_PHYSICAL_MOUNT_REQUIRED")
+        roots[key] = path
+    anchor = Path(value["compose_env"]["QUANTHUS_PRIOR_ANCHOR"])
+    if (
+        not anchor.is_absolute()
+        or anchor.resolve(strict=True) != anchor
+        or anchor == Path("/")
+        or anchor
+        != Path(
+            os.path.commonpath(
+                [
+                    roots[k]
+                    for k in (
+                        "QUANTHUS_BASE_ROOT",
+                        "QUANTHUS_HISTORY_ROOT",
+                        "QUANTHUS_RUNTIME_ROOT",
+                    )
+                ]
+            )
+        )
+    ):
+        raise ValueError("P10_CONTAINER_EXACT_PRIOR_ANCHOR_REQUIRED")
     # State/outbox must not mutate any mounted source, including ancestors.
     for key in ("QUANTHUS_BASE_ROOT", "QUANTHUS_HISTORY_ROOT", "QUANTHUS_WEEKLY_INPUT_ROOT"):
-        source = Path(value["compose_env"][key]).resolve(strict=True)
+        source = roots[key]
         if state.is_relative_to(source) or source.is_relative_to(state):
             raise ValueError("P10_CONTAINER_STATE_SOURCE_OVERLAP")
+        for writable in (
+            "QUANTHUS_RUNTIME_ROOT",
+            "QUANTHUS_WEEKLY_JOB_ROOT",
+            "QUANTHUS_BACKUP_ROOT",
+            "QUANTHUS_GDRIVE_CONFIG_ROOT",
+        ):
+            output = roots[writable]
+            if output.is_relative_to(source) or source.is_relative_to(output):
+                raise ValueError("P10_CONTAINER_WRITABLE_SOURCE_OVERLAP")
     p10_tmp.check_root(Path(value["compose_env"]["QUANTHUS_TMP_ROOT"]), protected_paths(value))
     return value
 
@@ -194,9 +248,18 @@ def delivery_container(config: dict[str, Any], target: Path | None = None) -> di
             "--event",
             "/run/events/" + target.name,
         ]
+
+    def stop(signum: int, frame: Any) -> None:
+        raise InterruptedError("P10_DELIVERY_STOP_REQUESTED")
+
+    handlers = {s: signal.signal(s, stop) for s in (signal.SIGTERM, signal.SIGINT)}
     try:
         result = subprocess.run(command, env=env, check=False, timeout=config["timeout_seconds"])
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired, InterruptedError):
+        # A terminated Compose CLI does not terminate its daemon-owned container.
+        # Keep its source mounts read-only and stop only this invocation's name.
+        for s in handlers:
+            signal.signal(s, signal.SIG_IGN)
         with contextlib.suppress(OSError, subprocess.TimeoutExpired):
             subprocess.run(
                 docker_command(config, "stop", "--time", "30", run_id),
@@ -206,6 +269,9 @@ def delivery_container(config: dict[str, Any], target: Path | None = None) -> di
                 timeout=40,
             )
         raise RuntimeError("P10_DELIVERY_CONTAINER_FAILED") from None
+    finally:
+        for s, handler in handlers.items():
+            signal.signal(s, handler)
     if result.returncode:
         raise RuntimeError("P10_DELIVERY_CONTAINER_FAILED")
     return {"status": "container_command_completed", "role": "backup" if target is None else "mail"}

@@ -2,8 +2,9 @@
 
 Work item: [P10-DATA-OPS-016 / #537](https://github.com/rv198-star/Quanthus/issues/537).
 Governing design: [LLD 12](../design/lld/12-permanent-data-line.md).
-Design status: approved by Owner 2026-10-22. Delivery gate: blocked pending a
-qualified image and container acceptance; current host timers remain in service.
+Design status: approved by Owner 2026-10-22. An immutable image has been built and
+tested; the complete production switch remains blocked by live delivery/Weekly
+wiring. Current host timers remain in service. Image tests alone do not close it.
 
 ## Boundary
 
@@ -71,6 +72,14 @@ verify the actual registry manifest and every software blob before building; do
 not change the running Docker service or accept an unverified mirror. Registry
 access alone does not qualify the pipeline image.
 
+The 2026-10-22 switch audit reproduced a systemd-specific failure: inherited
+`NoNewPrivileges=true` prevents `sudo -n` from elevating. The host service template
+therefore sets `NoNewPrivileges=false` for the explicitly approved Docker control;
+the host Python/TMP owner remains `agentdock`. Every container still has
+`no-new-privileges:true`, non-root UID/GID and no capabilities. The launcher checks
+its actual `/proc/self/status` before creating state and rejects a conflicting
+systemd sandbox. Interactive `sudo` success is insufficient service acceptance.
+
 `ops/data/runtime.lock` pins the 33 runtime packages from the actual CN02 Python
 3.10 environment and published wheel hashes, excluding test/development tools. This
 locks package artifacts; successful installation/ABI compatibility still requires
@@ -97,13 +106,16 @@ bind mounts; images contain code and runtime dependencies only.
 
 Container configuration is separate from the currently running host configuration.
 Its Daily `pipeline_revision` must equal the image's bundled revision and collector
-must be `/opt/collector`. Translate only these mounted locations:
+must be `/opt/collector`. Daily preserves the absolute host addresses of Base,
+bootstrap history and runtime: existing DATES and bootstrap records contain these
+paths. Renaming their mounts to `/data/*` does not rewrite those records. The
+separate Weekly plan continues to use its explicit `/data/*` locations.
 
 | Container location | Purpose | Access |
 | --- | --- | --- |
-| `/data/base` | Exact accepted Base DWD | Read only |
-| `/data/history` | Explicit bootstrap cores, preserving their relative layouts | Read only |
-| `/data/runtime` | Existing Daily root, original captures, locks, DATES, outputs | Read/write |
+| Exact `QUANTHUS_BASE_ROOT` (Daily), `/data/base` (Weekly) | Exact accepted Base DWD | Read only |
+| Exact `QUANTHUS_HISTORY_ROOT` | Explicit bootstrap cores at their preserved addresses | Read only |
+| Exact `QUANTHUS_RUNTIME_ROOT` (Daily), `/data/runtime` (backup) | Existing Daily root, captures, locks, DATES, outputs | Daily read/write; backup read only |
 | `/data/weekly-input` | Exact qualified Weekly source/receipts/config | Read only |
 | `/data/weekly-jobs` | New bounded Weekly run parents | Read/write |
 | `/run/config/*.json` | Separate pinned role configurations | Read only |
@@ -112,14 +124,25 @@ must be `/opt/collector`. Translate only these mounted locations:
 | `/run/secrets/mail.json` | Existing API settings | Read only; runtime injection |
 | `/run/backup` | Frozen archives and verified-copy receipts | Backup role only; persistent |
 | `/run/secrets/gdrive` | Existing private rclone settings directory | Backup only; token refresh may write |
-| `/data` | Ephemeral prior-descriptor namespace, 16 MiB tmpfs | Temporary |
+| `QUANTHUS_PRIOR_ANCHOR` | Empty common-parent namespace and prior descriptors, 16 MiB tmpfs | Temporary; no parent host bind |
 | `/data/tmp` | Unique leased run under host `QUANTHUS_TMP_ROOT` | Disposable TMP only |
 
-The Daily `prior_anchor` becomes `/data`; the prior descriptor can refer to both
-mounted history and the same persisted runtime. No writable ancestor of the real
-Base is mounted. No historical whole-Base copy is required. Configuration path
-translation and exact predecessor binding require isolated comparison before a
-real switch. Do not point an unfinished container test at writable live runtime.
+Set Daily `prior_anchor` and `QUANTHUS_PRIOR_ANCHOR` to the exact common parent of
+the three Daily roots. That parent is an empty container tmpfs, with only the
+three explicit child bind mounts overlaid. The actual host parent is never bound.
+Preflight rejects a broader ancestor, nonphysical/missing mounts, and every
+read/write root overlapping a read-only source in either direction. A read-only
+alias alone does not protect a source also exposed through another writable bind.
+No historical whole-Base copy or mutation of existing DATES is required. Archived
+entries outside these exact roots need explicit additional read-only bindings
+before their replay; they are not implicitly exposed by mounting the whole parent.
+Do not point an unfinished container test at writable live runtime.
+
+The audit rebuilt the same frozen 2026-10-21 ODS/native inputs on the host and in
+a network-disabled container. All 16 output Parquet files matched in schema,
+row counts and typed row digests (including Decimal and timestamps), and selected
+source bytes/production DATES were unchanged. This qualifies that isolated Daily
+replay, not natural timer execution or new provider availability.
 
 The initial financial Weekly plan has kind `p10-container-weekly-financial-v1`,
 `domains=["financial_statements"]`, `execution_authorized=false`, exact
@@ -267,10 +290,11 @@ eligible for the TMP cleaner. Archive retention/compaction is a later explicit
 policy, not automatic in this release.
 
 No active CN02 GDrive timer or installed host `rclone` was found during read-only
-inspection. This is the new **prepared** adapter, not evidence that live automatic
-sync was already switched. Image/runtime qualification, exact current selections,
-folder mapping, credential mount validation, a fake-cloud container test and a
-separately authorized real backup are still open in #537.
+inspection. The image's rclone and fake-cloud transport tests pass, but the live
+adapter is still **prepared**. Automatic selection/queueing of new Daily/Weekly
+products, exact folder mapping, supported credential injection and real egress/
+upload verification remain open in #537. A retained Duplicati OAuth bridge is not
+an rclone config and must not be passed to that adapter as if it were one.
 
 ## Operation, checks and rollback
 
@@ -278,15 +302,18 @@ separately authorized real backup are still open in #537.
 single job. `ROLE=backup` sends only the frozen selection; `ROLE=mail --event FILE`
 retries only the retained event using the same-image delivery role. On ordinary
 failure/timeout/termination the wrapper attempts to stop only its uniquely named
-container and records a failure event. Daemon/host hard failure can prevent cleanup;
-actual container/process-tree cleanup and natural timer behavior still need runtime
-acceptance. No success is inferred from Docker exit zero without a matching event.
+container and records a data-job failure event. Backup/mail retry termination also
+stops its own named container, preserving archives/events, and restores the host's
+signal handlers. Daemon/host hard failure can prevent cleanup; natural timer behavior
+still needs runtime acceptance. No success is inferred from Docker exit zero
+without a matching event.
 
 Keep current 17:30 / 21:15 Shanghai host scheduling. The template
 `ops/systemd/cn02-p10-container@.service.example` is not installed or enabled. A
-switch must quiesce the original writer, retain its exact service/config/environment,
-verify the role and image, then replace only its ExecStart. Do not enable both
-schedulers. Rollback stops the named new job, retains state/failure evidence, and
+switch must quiesce the original writer, retain its exact unit/drop-ins/config/
+environment, and verify the role and image. Use the dedicated container unit;
+replacing only the old ExecStart would inherit its sudo-blocking sandbox drop-in.
+Do not enable both schedulers. Rollback stops the named new job, retains state/failure evidence, and
 restores the prior pinned host entry after verifying no live writer remains.
 
 Before activation: complete image build, import/CLI smoke in a non-root read-only

@@ -20,6 +20,7 @@ x-job: &job
   tmpfs:
     - /tmp:rw,nosuid,nodev,size=128m,mode=1777
     - /data:rw,nosuid,nodev,noexec,size=16m,mode=0770,uid=${QUANTHUS_DATA_UID},gid=${QUANTHUS_DATA_GID}
+    - ${QUANTHUS_PRIOR_ANCHOR:?exact common parent required}:rw,nosuid,nodev,noexec,size=16m,mode=0770,uid=${QUANTHUS_DATA_UID},gid=${QUANTHUS_DATA_GID}
   logging:
     driver: json-file
     options:
@@ -33,17 +34,17 @@ x-daily-volumes: &daily-volumes
     bind: {create_host_path: false}
   - type: bind
     source: ${QUANTHUS_BASE_ROOT:?}
-    target: /data/base
+    target: ${QUANTHUS_BASE_ROOT:?}
     read_only: true
     bind: {create_host_path: false}
   - type: bind
     source: ${QUANTHUS_HISTORY_ROOT:?}
-    target: /data/history
+    target: ${QUANTHUS_HISTORY_ROOT:?}
     read_only: true
     bind: {create_host_path: false}
   - type: bind
     source: ${QUANTHUS_RUNTIME_ROOT:?}
-    target: /data/runtime
+    target: ${QUANTHUS_RUNTIME_ROOT:?}
     bind: {create_host_path: false}
   - type: bind
     source: ${QUANTHUS_DAILY_CONFIG:?}

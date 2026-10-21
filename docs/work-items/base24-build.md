@@ -4,16 +4,17 @@
 | --- | --- |
 | Parent | [Permanent P10](../design/lld/12-permanent-data-line.md); [work-item index](index.md) |
 | Design status | draft |
-| Delivery gate | blocked |
+| Delivery gate | accepted-conditional |
+| Acceptance scope | recorded governance image pair; consumer gates remain separate |
 | Requirement input | [Owner-supplied REQ-P10-BASE24-001 v1.3](base24-requirements.v1.3.md), 2026-10-16 |
 | Predecessor | [2.3.1 priority batches](base231-priority-batches.md) |
 | Authority | Current build line targets 2.4 directly; CN02 is the future Daily writer; T-day after-close is the main target, T+1 is recovery/revision only |
 
-This node is an implementation/takeover plan for received requirements, not a deployed
-policy or new acceptance. The Owner's product direction is recorded below; frozen old
-contracts stay effective until an explicit opt-in successor, tests and governing LLD
-updates agree. No production switch, credentials, service/timer action, cloud upload,
-old data deletion, research activation or paid acquisition follows from this plan.
+This node records the implementation/takeover plan and subsequent delivery evidence.
+The newest dated checkpoint below owns the current delivery state; older checkpoints
+remain historical. Frozen consumer contracts stay effective. No production switch,
+credentials, service/timer action, cloud upload, old data deletion, research activation
+or paid acquisition follows from a planning entry or an image acceptance receipt.
 
 The v1.3 input supersedes v1.0's fixed T+1 main-flow design. Unpublished target
 version/configuration/output declarations may move directly to2.4. Sealed2.3.1
@@ -21,6 +22,46 @@ images/manifests/receipts retain their original identities. Continue the existin
 isolated branch/worktree; a version change alone does not require another copy.
 
 ## Current recovery checkpoint
+
+### 2026-10-21 reconciled image acceptance and delivery status
+
+The physical ODS/DWD pair is built and has recorded independent cold acceptance
+for the purpose-qualified governance contract. The DWD manifest still says
+`NOT_RUN_SEPARATE_RECEIPTS_REQUIRED` because it was sealed before those tests.
+This is preserved build history, not the effective cold-test state. Do not modify
+either sealed manifest to repair a status presentation defect.
+
+`config/pipelines/base24-acceptance-bindings.v1.json` pins both manifests and their
+exact acceptance bytes. The local delivery entry is
+`/srv/agentdock/AgentDock/deliveries/base-2.4/README.md`; its release directory
+contains local acceptance copies, a locations index, resolved status and checksums.
+The index is an entry point, not a relocated physical image. Read the exact roots
+with the existing integrity-checking readers. Archived `source` paths in receipts
+are never used for discovery or runtime fallback.
+
+The status reader reconciles metadata without scanning payloads:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m quanthus.pipelines.securities_warehouse.base24_release_status \
+  --binding config/pipelines/base24-acceptance-bindings.v1.json \
+  --evidence-root /path/to/the/delivery-release-directory \
+  --dwd-root /srv/quanthus-base22-data/jobs/base24-complete-dwd-bounded-c902994 \
+  --ods-root /srv/quanthus-base22-data/jobs/base24-complete-ods-bounded-c902994
+```
+
+Its `PASS_RECORDED_PAIRED_IMAGE_ACCEPTANCE` means the exact pair's recorded
+acceptance is complete. It explicitly reports that current payload verification
+was not rerun by this status query. It preserves all 35 DWD limitation entries,
+`consumer_admission=NOT_GRANTED` and `execution_authorized=false`. Governance
+reads remain available under their existing contract and physical reader checks;
+this status is not universal production/research admission or full-market/PIT
+qualification. October products, dated industry membership and Shenwan index
+series are separate scopes; none inherits qualification from the Base status.
+
+The continuation worktree is now physically
+`/srv/agentdock/projects/Quanthus/.worktrees/base22-standalone`, owned by
+`agentdock`, on `codex/base22-standalone`. `/root/Quanthus` is only the retained
+compatibility path. Earlier paths and HEADs below are historical checkpoints.
 
 Continue CN02 `/root/Quanthus/.worktrees/base22-standalone`, branch
 `codex/base22-standalone`. The inherited, clean engineering checkpoint is

@@ -22,6 +22,22 @@ date. No downstream module may read vendor frames directly.
 
 ## 2. Scope
 
+Base 2.4 delivery status is resolved by `base24_release_status.py` with the exact
+manifest and receipt pins in `config/pipelines/base24-acceptance-bindings.v1.json`.
+The sealed manifest records build-time state; later independent acceptance is an
+additive, hash-bound receipt, never an in-place manifest rewrite. The resolver
+requires both ODS and DWD receipts, two distinct source-hidden/network-denied cold
+processes per image, and the exact missing/corrupt rejection evidence. Only the
+two independent-acceptance checks may supersede their sealed `NOT_RUN` values;
+failed schema, key, lineage or other structural checks cannot be overridden.
+The original limitation registry remains effective. This metadata reconciliation
+reports recorded image acceptance separately from current payload verification,
+October Daily/Weekly qualification and research/trading consumer admission. It
+does not replace physical reader integrity checks or grant those consumer uses.
+The local delivery index locates physical image roots and carries its own receipt
+copies; it is not another image or an external runtime dependency. See the current
+[Base 2.4 delivery checkpoint](../../work-items/base24-build.md).
+
 The CN02 successor's isolated frozen-input Daily orchestration is owned by
 `src/quanthus/pipelines/securities_warehouse/daily_base24_job.py` and
 `config/pipelines/base24-daily-window.v1.json` under `P10-DATA-BASE24-050` and

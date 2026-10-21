@@ -198,15 +198,18 @@ def deployment(tmp_path):
         "WEEKLY_INPUT_ROOT",
         "RUNTIME_ROOT",
         "WEEKLY_JOB_ROOT",
+        "TMP_ROOT",
     ):
         root = tmp_path / key
         root.mkdir()
         env["QUANTHUS_" + key] = str(root)
+    for label in ("daily", "weekly"):
+        (tmp_path / (label + ".json")).write_text("{}")
     env.update(
         QUANTHUS_DATA_UID="998",
         QUANTHUS_DATA_GID="998",
-        QUANTHUS_DAILY_CONFIG="/private/daily.json",
-        QUANTHUS_WEEKLY_CONFIG="/private/weekly.json",
+        QUANTHUS_DAILY_CONFIG=str(tmp_path / "daily.json"),
+        QUANTHUS_WEEKLY_CONFIG=str(tmp_path / "weekly.json"),
     )
     compose = Path(__file__).parents[2] / "ops/data/compose.yaml"
     return dict(
@@ -238,6 +241,9 @@ def test_daemon_start_failure_still_notifies_on_host(tmp_path, monkeypatch):
     value = json.loads(notices[0][0].read_bytes())
     assert value["status"] == "failed"
     assert value["manifests"] == []
+    scratch = list(Path(config["compose_env"]["QUANTHUS_TMP_ROOT"]).iterdir())
+    assert len(scratch) == 1
+    assert json.loads((scratch[0] / ".p10-tmp.json").read_bytes())["status"] == "failed"
 
 
 def test_successful_dwd_is_not_rebuilt_on_email_failure(tmp_path, monkeypatch):
@@ -249,6 +255,8 @@ def test_successful_dwd_is_not_rebuilt_on_email_failure(tmp_path, monkeypatch):
         calls.append(command)
         assert kwargs["env"].get("QUANTHUS_RESEND_API_KEY") is None
         run_id = command[command.index("--name") + 1]
+        scratch = Path(kwargs["env"]["QUANTHUS_JOB_TMP"])
+        assert scratch.name == run_id and scratch.is_dir()
         target = Path(config["state"]) / "events" / (run_id + ".json")
         value = safe_event()
         value["run_id"] = run_id
@@ -265,6 +273,8 @@ def test_successful_dwd_is_not_rebuilt_on_email_failure(tmp_path, monkeypatch):
     assert result["status"] == "complete"
     assert result["mail"] == "failed_event_retained"
     assert len(calls) == 1
+    scratch = next(Path(config["compose_env"]["QUANTHUS_TMP_ROOT"]).iterdir())
+    assert json.loads((scratch / ".p10-tmp.json").read_bytes())["status"] == "succeeded"
 
 
 @pytest.mark.parametrize("mutation", ["image", "compose", "secret", "overlap"])

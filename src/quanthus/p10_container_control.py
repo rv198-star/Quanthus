@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from quanthus import p10_tmp
 from quanthus.p10_operational_mail import atomic, deliver, validate
 from quanthus.pipelines.securities_warehouse.container_code import digest
 from quanthus.pipelines.securities_warehouse.container_jobs import event
@@ -46,6 +47,7 @@ def settings(path: Path) -> dict[str, Any]:
         "QUANTHUS_HISTORY_ROOT",
         "QUANTHUS_WEEKLY_INPUT_ROOT",
         "QUANTHUS_WEEKLY_JOB_ROOT",
+        "QUANTHUS_TMP_ROOT",
     }
     if set(value["compose_env"]) != allowed or any(
         not isinstance(v, str) or not v or "\n" in v for v in value["compose_env"].values()
@@ -59,12 +61,24 @@ def settings(path: Path) -> dict[str, Any]:
         source = Path(value["compose_env"][key]).resolve(strict=True)
         if state.is_relative_to(source) or source.is_relative_to(state):
             raise ValueError("P10_CONTAINER_STATE_SOURCE_OVERLAP")
+    p10_tmp.check_root(Path(value["compose_env"]["QUANTHUS_TMP_ROOT"]), protected_paths(value))
     return value
+
+
+def protected_paths(config: dict[str, Any]) -> list[Path]:
+    return [Path(config["state"])] + [
+        Path(value)
+        for key, value in config["compose_env"].items()
+        if key.endswith(("_ROOT", "_CONFIG")) and key != "QUANTHUS_TMP_ROOT"
+    ]
 
 
 def run(config: dict[str, Any], role: str, day: date) -> dict[str, Any]:
     if role not in {"daily", "recovery", "weekly"}:
         raise ValueError("P10_CONTAINER_ROLE_INVALID")
+    tmp_root = Path(config["compose_env"]["QUANTHUS_TMP_ROOT"])
+    protected = protected_paths(config)
+    p10_tmp.check_root(tmp_root, protected)
     state = Path(config["state"])
     for name in ("events", "logs", "mail"):
         path = state / name
@@ -104,11 +118,14 @@ def run(config: dict[str, Any], role: str, day: date) -> dict[str, Any]:
         "/run/events/" + target.name,
     ]
     lock_name = "weekly" if role == "weekly" else "daily"
-    with (state / (lock_name + ".lock")).open("a") as lock:
+    with contextlib.ExitStack() as stack:
+        lock = stack.enter_context((state / (lock_name + ".lock")).open("a"))
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return {"status": "busy", "role": role}
+        scratch = stack.enter_context(p10_tmp.job(tmp_root, run_id, protected))
+        env["QUANTHUS_JOB_TMP"] = str(scratch.path)
         process = None
         interrupted = False
 
@@ -169,23 +186,33 @@ def run(config: dict[str, Any], role: str, day: date) -> dict[str, Any]:
         result = {"status": value["status"], "event": str(target), "mail": mail}
         if failed or interrupted or value["status"] == "failed":
             raise RuntimeError("P10_CONTAINER_JOB_FAILED_SEE_RETAINED_EVENT")
+        scratch.status = "succeeded" if value["status"] in {"complete", "closed"} else "held"
         return result
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("role", choices=["daily", "recovery", "weekly", "mail"])
+    parser.add_argument("role", choices=["daily", "recovery", "weekly", "mail", "clean-tmp"])
     parser.add_argument("--deployment", type=Path, required=True)
     parser.add_argument("--day", type=date.fromisoformat)
     parser.add_argument("--event", type=Path)
+    parser.add_argument(
+        "--apply", action="store_true", help="Delete only eligible owned TMP; default is dry-run"
+    )
     args = parser.parse_args()
     config = settings(args.deployment)
-    if args.role == "mail":
+    if args.apply and args.role != "clean-tmp":
+        parser.error("--apply is only valid with clean-tmp")
+    if args.role == "clean-tmp":
+        result: Any = p10_tmp.clean(
+            Path(config["compose_env"]["QUANTHUS_TMP_ROOT"]),
+            protected_paths(config),
+            apply=args.apply,
+        )
+    elif args.role == "mail":
         if args.event is None or args.event.parent.resolve() != Path(config["state"]) / "events":
             raise ValueError("P10_MAIL_EVENT_DESTINATION_INVALID")
-        result: Any = deliver(
-            args.event, Path(config["state"]) / "mail", Path(config["mail_secret"])
-        )
+        result = deliver(args.event, Path(config["state"]) / "mail", Path(config["mail_secret"]))
     else:
         day = args.day or datetime.now(ZoneInfo("Asia/Shanghai")).date()
         if day > datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Shanghai")).date():

@@ -82,6 +82,7 @@ must be `/opt/collector`. Translate only these mounted locations:
 | `/run/config/*.json` | Separate pinned role configurations | Read only |
 | `/run/events` | Small safe terminal events | Read/write |
 | `/data` | Ephemeral prior-descriptor namespace, 16 MiB tmpfs | Temporary |
+| `/data/tmp` | Unique leased run under host `QUANTHUS_TMP_ROOT` | Disposable TMP only |
 
 The Daily `prior_anchor` becomes `/data`; the prior descriptor can refer to both
 mounted history and the same persisted runtime. No writable ancestor of the real
@@ -102,6 +103,49 @@ The host mail secret is an existing authorized private JSON file with `api_key`,
 `sender` and `recipients`. It is never mounted into the pipeline or printed. No real
 mail is sent by tests. `mail_secret` may be omitted while preparing isolated tests;
 the wrapper then reports `not_configured`, not successful mail activation.
+
+## Fixed scratch and conservative cleanup
+
+The deployment sets `compose_env.QUANTHUS_TMP_ROOT`, proposed as
+`/srv/quanthus-base22-data/tmp/p10`. It must already be a physical directory owned
+by the job user, outside every mounted source, output and state/config path in
+both ancestor directions. Deployment preflight rejects overlap and symlinks before
+creating a run. Each invocation creates a new private `<role>-<date>-<uuid>` child,
+writes `.p10-tmp.json`, and holds `.lease` until the job finishes. Compose binds
+only that child at `/data/tmp`, with `TMPDIR` and `QUANTHUS_TMP_ROOT` set there.
+Large generic temporary files therefore stay on the data disk rather than the
+container writable layer or small memory-backed `/tmp`. Existing explicitly
+budgeted builder scratch/evidence paths retain their own contracts; they are not
+silently relocated or made eligible for automatic deletion by this wrapper.
+
+Versioned policy `p10-success-tmp-72h-v1` retains successful scratch for **72 hours
+after completion**. Only terminal `complete` or authoritative `closed` qualifies;
+partial Weekly/held minutes, failures, interrupted/running jobs and unknown
+directories remain. An active lease always prevents reclamation. The cleaner
+rejects links, shared hardlinked files, different-device trees, foreign ownership,
+invalid markers/times and scan errors. No path is selected just because it is old.
+Host failure leaving an orphan container also leaves its marker running, not
+eligible. Failed scratch requires a separate explicit retention disposition.
+
+Preview is the default:
+
+```bash
+ops/bin/run-p10-container-job clean-tmp --deployment /etc/quanthus/p10-container-deployment.json
+```
+
+Only the same command with `--apply` removes eligible owned TMP. Review the preview
+before the first activation. The supplied `cn02-p10-tmp-clean.service.example` and
+`.timer.example` propose one daily sweep at **03:30 Asia/Shanghai**, with up to five
+minutes jitter. They are **not installed or enabled** in this task. They do not
+require Docker access, invoke collection or send mail. With disabled deployment,
+no real cleanup is performed. Preserve the existing operational timers.
+
+Original provider captures, `collector-home`, ODS/DWD/Daily/Weekly products, READY,
+manifests, failure receipts, job evidence and mail outbox remain outside this TMP
+root. Do not point the cleaner at the current Daily root, bulk-import old folders
+as disposable, age-delete `/tmp` globally or run blanket Docker prune. Container
+`/tmp` and ephemeral `/data` are automatically released with `--rm`; retained logs,
+images and governed caches have separate retention scopes.
 
 ## Operation, checks and rollback
 

@@ -122,6 +122,14 @@ not open strategy/forward-email transport. See the
 entry points, qualification gaps and controlled switching. Image preparation does
 not activate deployment, complete held Weekly domains or grant consumer acceptance.
 
+The same job wrapper owns a unique leased scratch directory below the configured
+`QUANTHUS_TMP_ROOT`; containers receive only that run's directory as `/data/tmp`
+and `TMPDIR`. Policy `p10-success-tmp-72h-v1` permits reclamation only after a
+verified complete/closed job, 72 hours after completion, with no active lease.
+Failed, held, interrupted, unknown or unsafe trees are retained. Base, original
+captures, Daily/Weekly products, evidence and notification state are never scratch.
+Cleanup defaults to preview; its off-hours timer remains an uninstalled template.
+
 GitHub remains normal code distribution and NexusAgent default remote control. The existing SSH
 override belongs only to #424, not all P10. Routing authorizes no deployment, timer activation,
 new collection, cleanup, credential change, Base mutation or P6 production change. Every child

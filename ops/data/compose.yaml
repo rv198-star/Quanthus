@@ -15,6 +15,8 @@ x-job: &job
   environment:
     TZ: Asia/Shanghai
     PYTHONDONTWRITEBYTECODE: "1"
+    TMPDIR: /data/tmp
+    QUANTHUS_TMP_ROOT: /data/tmp
   tmpfs:
     - /tmp:rw,nosuid,nodev,size=128m,mode=1777
     - /data:rw,nosuid,nodev,noexec,size=16m,mode=0770,uid=${QUANTHUS_DATA_UID},gid=${QUANTHUS_DATA_GID}
@@ -25,6 +27,10 @@ x-job: &job
       max-file: "3"
 
 x-daily-volumes: &daily-volumes
+  - type: bind
+    source: ${QUANTHUS_JOB_TMP:?owned leased per-run TMP required}
+    target: /data/tmp
+    bind: {create_host_path: false}
   - type: bind
     source: ${QUANTHUS_BASE_ROOT:?}
     target: /data/base
@@ -62,6 +68,10 @@ services:
     <<: *job
     command: ["--help"]
     volumes:
+      - type: bind
+        source: ${QUANTHUS_JOB_TMP:?owned leased per-run TMP required}
+        target: /data/tmp
+        bind: {create_host_path: false}
       - type: bind
         source: ${QUANTHUS_BASE_ROOT:?}
         target: /data/base

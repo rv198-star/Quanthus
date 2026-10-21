@@ -231,6 +231,21 @@ def test_native_execution_positive_preserves_original_bounds_and_no_runtime_auth
     assert result["execution_authorized"] is False
 
 
+def test_missing_native_bounds_are_derived_separately_with_exact_frozen_policy():
+    row = {**market_row(), "upper_price": None, "lower_price": None}
+    result = state(row)
+    assert result["execution_source_qualified"] is True
+    assert (result["source_upper_price"], result["source_lower_price"]) == (None, None)
+    assert (result["qualified_upper_price"], result["qualified_lower_price"]) == (
+        Decimal("11"),
+        Decimal("9"),
+    )
+    assert result["bound_basis"] == "FROZEN_POLICY_DERIVED_NATIVE_NULLS_PRESERVED"
+    assert row["upper_price"] is None
+    row["upper_price"] = Decimal("12")
+    assert state(row)["reason_code"] == "NATIVE_PRICE_BOUND_DISAGREEMENT"
+
+
 @pytest.mark.parametrize(
     "change,reason",
     [

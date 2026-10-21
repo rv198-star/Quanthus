@@ -41,6 +41,7 @@ CONTRACT: dict[str, Any] = {
     "ipo_window": "exact_original_rule_duration_and_observed_provider_trading_sessions",
     "unknown_or_conflicting": "hold_affected_key_preserve_native_values",
     "status_freshness": "exact_dated_provider_observation_not_open_interval_persistence",
+    "missing_native_bounds": "derive_separate_values_preserve_source_nulls_reject_conflicts",
     "company_action_day_execution": "hold_until_exact_reference_price_qualified",
     "policy_changes": False,
 }
@@ -471,6 +472,9 @@ def _state_row(
         source_can_sell=row["can_sell"],
         source_upper_price=row["upper_price"],
         source_lower_price=row["lower_price"],
+        qualified_upper_price=None,
+        qualified_lower_price=None,
+        bound_basis=None,
         warmup_eligible=False,
         execution_source_qualified=False,
         qualified_entry_allowed=False,
@@ -564,11 +568,20 @@ def _state_row(
         lower = None if decision.lower_limit_pct is None else decision.lower_limit_pct / 100
         if (upper, lower) != (selected["upper_ratio"], selected["lower_ratio"]):
             raise PurposeError("NATIVE_REGIME_POLICY_DISAGREEMENT")
-        if row["is_tradable"] and (row["upper_price"], row["lower_price"]) != (
-            decision.upper_limit_price,
-            decision.lower_limit_price,
-        ):
-            raise PurposeError("NATIVE_PRICE_BOUND_DISAGREEMENT")
+        native_bounds = (row["upper_price"], row["lower_price"])
+        expected_bounds = (decision.upper_limit_price, decision.lower_limit_price)
+        if row["is_tradable"]:
+            if native_bounds == (None, None):
+                result["bound_basis"] = "FROZEN_POLICY_DERIVED_NATIVE_NULLS_PRESERVED"
+            elif native_bounds == expected_bounds:
+                result["bound_basis"] = "NATIVE_AND_FROZEN_POLICY_AGREE"
+            else:
+                raise PurposeError("NATIVE_PRICE_BOUND_DISAGREEMENT")
+            if selected["kind"] != "NO_LIMIT" and None in expected_bounds:
+                raise PurposeError("REFERENCE_PRICE_UNAVAILABLE")
+            result.update(
+                qualified_upper_price=expected_bounds[0], qualified_lower_price=expected_bounds[1]
+            )
         result.update(
             execution_source_qualified=True,
             qualified_entry_allowed=decision.entry_policy_allows
@@ -599,6 +612,9 @@ def _schemas() -> tuple[Any, Any]:
             ("source_can_sell", pa.bool_()),
             ("source_upper_price", value),
             ("source_lower_price", value),
+            ("qualified_upper_price", value),
+            ("qualified_lower_price", value),
+            ("bound_basis", pa.string()),
             ("warmup_eligible", pa.bool_()),
             ("execution_source_qualified", pa.bool_()),
             ("qualified_entry_allowed", pa.bool_()),
@@ -734,6 +750,9 @@ def _produce(root: Path, out: Path, scratch: Path) -> dict[str, Any]:
                             qualified.update(
                                 execution_source_qualified=False,
                                 qualified_entry_allowed=False,
+                                qualified_upper_price=None,
+                                qualified_lower_price=None,
+                                bound_basis="ACTION_REFERENCE_REQUIRED",
                                 reason_code="ACTION_REFERENCE_REQUIRED",
                             )
                         for key in (

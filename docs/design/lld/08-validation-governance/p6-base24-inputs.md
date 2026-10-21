@@ -121,6 +121,12 @@ exclusions hold only the affected keys. Native state and prices are never flippe
 or repaired by this consumer. Event-day execution stays held without an exact
 action reference price.
 
+When both native price bounds are null, a separate pair of qualified bounds may
+be derived from the pinned policy, exact dated status, qualified IPO rule and
+actual previous provider-trading close. Original nulls remain physical source
+values. A nonnull or partially populated native pair that disagrees remains
+held; no source value is overwritten. Missing reference prices are not filled.
+
 Actions keep native per-share currency and explicit share ratios. Alternatives,
 unknown terms, same-event ambiguity and unavailable knowledge remain held.
 Implemented terms are checked against original interval factors and the actual

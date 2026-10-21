@@ -8,6 +8,7 @@
   "ipo_window": "exact_original_rule_duration_and_observed_provider_trading_sessions",
   "unknown_or_conflicting": "hold_affected_key_preserve_native_values",
   "status_freshness": "exact_dated_provider_observation_not_open_interval_persistence",
+  "missing_native_bounds": "derive_separate_values_preserve_source_nulls_reject_conflicts",
   "company_action_day_execution": "hold_until_exact_reference_price_qualified",
   "policy_changes": false
 }

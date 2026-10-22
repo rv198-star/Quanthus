@@ -9,6 +9,10 @@ x-job: &job
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
   restart: "no"
+  env_file:
+    - path: ${QUANTHUS_MAIL_ENV:?private runtime mail env required}
+      required: true
+      format: raw
   stop_grace_period: 30s
   mem_limit: 4g
   pids_limit: 128
@@ -59,11 +63,6 @@ x-daily-volumes: &daily-volumes
     source: ${QUANTHUS_MAIL_ROOT:?}
     target: /run/mail
     bind: {create_host_path: false}
-  - type: bind
-    source: ${QUANTHUS_MAIL_SECRET:?existing private mail settings}
-    target: /run/secrets/mail.json
-    read_only: true
-    bind: {create_host_path: false}
 
 services:
   backup:
@@ -111,20 +110,17 @@ services:
         source: ${QUANTHUS_MAIL_ROOT:?}
         target: /run/mail
         bind: {create_host_path: false}
-      - type: bind
-        source: ${QUANTHUS_MAIL_SECRET:?}
-        target: /run/secrets/mail.json
-        read_only: true
-        bind: {create_host_path: false}
     environment:
       TZ: Asia/Shanghai
       PYTHONDONTWRITEBYTECODE: "1"
+      QUANTHUS_GDRIVE_PROXY: ${QUANTHUS_DELIVERY_PROXY:-http://127.0.0.1:10800}
       TMPDIR: /run/backup
-      HTTP_PROXY: http://127.0.0.1:10800
-      HTTPS_PROXY: http://127.0.0.1:10800
+      HTTP_PROXY: ${QUANTHUS_DELIVERY_PROXY:-http://127.0.0.1:10800}
+      HTTPS_PROXY: ${QUANTHUS_DELIVERY_PROXY:-http://127.0.0.1:10800}
   cleanup:
     <<: *job
     profiles: [maintenance]
+    env_file: []
     entrypoint: ["python", "-m", "quanthus.p10_tmp_schedule"]
     command: ["schedule", "--root", "/work/tmp", "--apply"]
     network_mode: none
@@ -182,9 +178,4 @@ services:
       - type: bind
         source: ${QUANTHUS_MAIL_ROOT:?}
         target: /run/mail
-        bind: {create_host_path: false}
-      - type: bind
-        source: ${QUANTHUS_MAIL_SECRET:?}
-        target: /run/secrets/mail.json
-        read_only: true
         bind: {create_host_path: false}

@@ -79,7 +79,23 @@ def deliver(event: Path, state: Path, secret: Path, *, attempts: int = 2) -> str
         receipt = state / (key + ".json")
         if receipt.exists() and json.loads(receipt.read_bytes()).get("status") == "sent":
             return "already_sent"
-        settings = json.loads(secret.read_bytes())
+        # Runtime injection only: never bake a key into image ENV/ARG/layers.
+        # Legacy file input remains readable for earlier independent send receipts.
+        if "QUANTHUS_RESEND_API_KEY" in os.environ:
+            settings = {
+                "api_key": os.environ["QUANTHUS_RESEND_API_KEY"],
+                "sender": os.environ.get("QUANTHUS_RESEND_FROM", "report@mindthus.com"),
+                "recipients": [
+                    v.strip()
+                    for v in os.environ.get("QUANTHUS_RESEND_TO", "61718@qq.com").split(",")
+                ],
+            }
+        else:
+            settings = json.loads(secret.read_bytes())
+        timeout = int(os.environ.get("QUANTHUS_RESEND_TIMEOUT_SECONDS", "15"))
+        attempts = int(os.environ.get("QUANTHUS_RESEND_RETRIES", str(attempts - 1))) + 1
+        if not 1 <= timeout <= 30 or attempts not in {1, 2}:
+            raise ValueError("P10_MAIL_NOTIFICATION_BUDGET_INVALID")
         if (
             set(settings) != {"api_key", "sender", "recipients"}
             or not isinstance(settings["api_key"], str)
@@ -112,7 +128,7 @@ def deliver(event: Path, state: Path, secret: Path, *, attempts: int = 2) -> str
                     },
                     method="POST",
                 )
-                with request.urlopen(req, timeout=15) as response:
+                with request.urlopen(req, timeout=timeout) as response:
                     reply = json.loads(response.read(8192))
                 if not isinstance(reply.get("id"), str) or not reply["id"]:
                     raise ValueError("P10_MAIL_PROVIDER_RECEIPT_MISSING")

@@ -208,7 +208,9 @@ def bridge_config(secret: Path, remote: str, until: float) -> Path:
         or not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", remote)
     ):
         raise ValueError("P10_BACKUP_EXISTING_BROKER_INVALID")
-    proxy = "http://127.0.0.1:10800"
+    proxy = os.environ.get("QUANTHUS_GDRIVE_PROXY", "http://127.0.0.1:10800")
+    if not re.fullmatch(r"http://127\.0\.0\.1:[0-9]{1,5}", proxy):
+        raise ValueError("P10_BACKUP_LOOPBACK_PROXY_REQUIRED")
     opener = request.build_opener(request.ProxyHandler({"https": proxy, "http": proxy}))
     req = request.Request(
         settings["oauth_url"],
@@ -279,7 +281,10 @@ def cloud(args: list[str], plan: dict[str, Any], secret: Path, until: float) -> 
     # Never inherit alternate remotes, credentials, TLS-disable or arbitrary flags.
     env = {"PATH": os.defpath, "HOME": "/tmp", "TMPDIR": os.environ.get("TMPDIR", "/tmp")}
     if broker:
-        env.update(HTTP_PROXY="http://127.0.0.1:10800", HTTPS_PROXY="http://127.0.0.1:10800")
+        env.update(
+            HTTP_PROXY=os.environ.get("QUANTHUS_GDRIVE_PROXY", "http://127.0.0.1:10800"),
+            HTTPS_PROXY=os.environ.get("QUANTHUS_GDRIVE_PROXY", "http://127.0.0.1:10800"),
+        )
     with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
         result = subprocess.run(
             command, env=env, stdout=stdout, stderr=stderr, timeout=timeout, check=False

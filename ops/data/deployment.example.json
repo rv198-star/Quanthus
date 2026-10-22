@@ -8,6 +8,7 @@
   "state": "/var/lib/quanthus/container-jobs",
   "timeout_seconds": 12600,
   "compose_env": {
+    "QUANTHUS_DELIVERY_PROXY": "http://127.0.0.1:10800",
     "QUANTHUS_DATA_UID": "998",
     "QUANTHUS_DATA_GID": "998",
     "QUANTHUS_PRIOR_ANCHOR": "/srv/quanthus-base22-data/jobs",
@@ -18,7 +19,7 @@
     "QUANTHUS_RUNTIME_ROOT": "/srv/quanthus-base22-data/jobs/cn02-base24-daily-runtime",
     "QUANTHUS_WEEKLY_INPUT_ROOT": "REPLACE_WITH_QUALIFIED_WEEKLY_INPUT_DIRECTORY",
     "QUANTHUS_WEEKLY_JOB_ROOT": "REPLACE_WITH_OWNED_WEEKLY_JOB_PARENT",
-    "QUANTHUS_MAIL_SECRET": "/etc/quanthus/operational-mail.json",
+    "QUANTHUS_MAIL_ENV": "/srv/agentdock/.config/quanthus-p10/operational-mail.env",
     "QUANTHUS_BACKUP_SELECTION": "/etc/quanthus/base24-backup-selection.json",
     "QUANTHUS_BACKUP_ROOT": "/srv/quanthus-base22-data/backup/base24-increments",
     "QUANTHUS_GDRIVE_CONFIG_ROOT": "REPLACE_WITH_EXISTING_AUTHORIZED_PRIVATE_RCLONE_DIRECTORY",

@@ -60,15 +60,20 @@ def settings(path: Path) -> dict[str, Any]:
         "QUANTHUS_WEEKLY_INPUT_ROOT",
         "QUANTHUS_WEEKLY_JOB_ROOT",
         "QUANTHUS_TMP_ROOT",
-        "QUANTHUS_MAIL_SECRET",
+        "QUANTHUS_MAIL_ENV",
         "QUANTHUS_BACKUP_SELECTION",
         "QUANTHUS_BACKUP_ROOT",
         "QUANTHUS_GDRIVE_CONFIG_ROOT",
     }
-    if set(value["compose_env"]) != allowed or any(
+    optional = {"QUANTHUS_DELIVERY_PROXY"}
+    if set(value["compose_env"]) not in (allowed, allowed | optional) or any(
         not isinstance(v, str) or not v or "\n" in v for v in value["compose_env"].values()
     ):
         raise ValueError("P10_CONTAINER_ENVIRONMENT_INVALID")
+    if "QUANTHUS_DELIVERY_PROXY" in value["compose_env"] and not re.fullmatch(
+        r"http://127\.0\.0\.1:[0-9]{1,5}", value["compose_env"]["QUANTHUS_DELIVERY_PROXY"]
+    ):
+        raise ValueError("P10_CONTAINER_LOOPBACK_DELIVERY_PROXY_REQUIRED")
     state = Path(value["state"])
     if not state.is_absolute() or state.resolve() != state or not state.is_dir():
         raise ValueError("P10_CONTAINER_PHYSICAL_STATE_REQUIRED")
@@ -76,7 +81,7 @@ def settings(path: Path) -> dict[str, Any]:
     for key, name in value["compose_env"].items():
         if key == "QUANTHUS_TMP_ROOT":
             continue  # The existing TMP validator owns its stricter contract/reason codes.
-        if not key.endswith(("_ROOT", "_CONFIG", "_SECRET", "_SELECTION")):
+        if not key.endswith(("_ROOT", "_CONFIG", "_ENV", "_SELECTION")):
             continue
         path = Path(name)
         if (
@@ -85,6 +90,8 @@ def settings(path: Path) -> dict[str, Any]:
             or not (path.is_dir() if key.endswith("_ROOT") else path.is_file())
         ):
             raise ValueError("P10_CONTAINER_PHYSICAL_MOUNT_REQUIRED")
+        if key == "QUANTHUS_MAIL_ENV" and (path.stat().st_mode & 0o077):
+            raise ValueError("P10_CONTAINER_PRIVATE_MAIL_ENV_REQUIRED")
         roots[key] = path
     anchor = Path(value["compose_env"]["QUANTHUS_PRIOR_ANCHOR"])
     if (
@@ -158,8 +165,7 @@ def protected_paths(config: dict[str, Any]) -> list[Path]:
     return [Path(config["state"])] + [
         Path(value)
         for key, value in config["compose_env"].items()
-        if key.endswith(("_ROOT", "_CONFIG", "_SECRET", "_SELECTION"))
-        and key != "QUANTHUS_TMP_ROOT"
+        if key.endswith(("_ROOT", "_CONFIG", "_ENV", "_SELECTION")) and key != "QUANTHUS_TMP_ROOT"
     ]
 
 

@@ -116,6 +116,14 @@ def test_compose_cleaner_has_no_data_credentials_network_or_socket_mounts(tmp_pa
     cleaner = value["services"]["cleanup"]
     assert cleaner["image"] == value["services"]["daily"]["image"]
     assert cleaner["network_mode"] == "none" and cleaner["read_only"]
+    assert "QUANTHUS_RESEND_API_KEY" not in cleaner["environment"]
+    # Compose config serializes dollar signs escaped for a reusable config.
+    # Actual raw-env runtime injection is separately exercised in the container probe.
+    for role in ("daily", "recovery", "weekly", "backup"):
+        assert (
+            value["services"][role]["environment"]["QUANTHUS_RESEND_API_KEY"]
+            == "synthetic-$$literal-key"
+        )
     assert cleaner["cap_drop"] == ["ALL"]
     assert cleaner["profiles"] == ["maintenance"]
     assert cleaner["entrypoint"] == ["python", "-m", "quanthus.p10_tmp_schedule"]
@@ -136,7 +144,6 @@ def test_compose_cleaner_has_no_data_credentials_network_or_socket_mounts(tmp_pa
             "/data/weekly-jobs",
             "/data/weekly-input",
             "/run/events",
-            "/run/secrets/mail.json",
             "/run/config/backup.json",
         )
     )

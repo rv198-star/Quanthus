@@ -264,7 +264,10 @@ def deployment(tmp_path):
         root.mkdir()
         env["QUANTHUS_" + key] = str(root)
     for label in ("daily", "weekly", "backup", "mail"):
-        (tmp_path / (label + ".json")).write_text("{}")
+        (tmp_path / (label + ".json")).write_text(
+            "QUANTHUS_RESEND_API_KEY=synthetic-$literal-key\n" if label == "mail" else "{}"
+        )
+    (tmp_path / "mail.json").chmod(0o600)
     env.update(
         QUANTHUS_DATA_UID="998",
         QUANTHUS_DATA_GID="998",
@@ -272,7 +275,7 @@ def deployment(tmp_path):
         QUANTHUS_DAILY_CONFIG=str(tmp_path / "daily.json"),
         QUANTHUS_WEEKLY_CONFIG=str(tmp_path / "weekly.json"),
         QUANTHUS_BACKUP_SELECTION=str(tmp_path / "backup.json"),
-        QUANTHUS_MAIL_SECRET=str(tmp_path / "mail.json"),
+        QUANTHUS_MAIL_ENV=str(tmp_path / "mail.json"),
     )
     compose = Path(__file__).parents[2] / "ops/data/compose.yaml"
     return dict(
@@ -518,7 +521,7 @@ def test_writable_mount_cannot_bypass_readonly_source(tmp_path, writable, relati
     assert not list(Path(value["state"]).iterdir())
 
 
-@pytest.mark.parametrize("key", ["QUANTHUS_MAIL_SECRET", "QUANTHUS_RUNTIME_ROOT"])
+@pytest.mark.parametrize("key", ["QUANTHUS_MAIL_ENV", "QUANTHUS_RUNTIME_ROOT"])
 def test_missing_mount_is_rejected_before_any_job_state(tmp_path, key):
     value = deployment(tmp_path)
     value["compose_env"][key] = str(tmp_path / "missing")
@@ -594,3 +597,42 @@ def test_host_preserves_container_failure_event_identity_for_mail_dedup(tmp_path
     with pytest.raises(RuntimeError, match="RETAINED_EVENT"):
         host.run(config, "daily", DAY)
     assert original[0][0].read_bytes() == original[0][1]
+
+
+@pytest.mark.parametrize("status", ["QUALIFIED_1D_NATIVE5M", "CONTAINER_RUN_FAILED"])
+def test_runtime_mail_env_sends_success_and_failure_without_secret_file(
+    tmp_path, monkeypatch, status
+):
+    value = safe_event(status)
+    path = tmp_path / "event.json"
+    path.write_text(json.dumps(value))
+    monkeypatch.setenv("QUANTHUS_RESEND_API_KEY", "synthetic-runtime-key")
+    monkeypatch.setenv("QUANTHUS_RESEND_FROM", "from@example.invalid")
+    monkeypatch.setenv("QUANTHUS_RESEND_TO", "to@example.invalid")
+    monkeypatch.setenv("QUANTHUS_RESEND_TIMEOUT_SECONDS", "8")
+    seen = []
+
+    def api(req, timeout):
+        assert req.get_header("Authorization") == "Bearer synthetic-runtime-key"
+        assert timeout == 8
+        seen.append(json.loads(req.data))
+        return io.BytesIO(b'{"id":"synthetic-mail-id"}')
+
+    monkeypatch.setattr(mail.request, "urlopen", api)
+    assert mail.deliver(path, tmp_path / "sent", tmp_path / "does-not-exist") == "sent"
+    assert len(seen) == 1 and value["status"] in seen[0]["subject"]
+    assert "synthetic-runtime-key" not in "".join(
+        p.read_text() for p in (tmp_path / "sent").glob("*.json")
+    )
+
+
+@pytest.mark.parametrize(
+    "name,value", [("QUANTHUS_RESEND_RETRIES", "9"), ("QUANTHUS_RESEND_TIMEOUT_SECONDS", "90")]
+)
+def test_notification_env_cannot_remove_bounded_retry_contract(tmp_path, monkeypatch, name, value):
+    path = tmp_path / "event.json"
+    path.write_text(json.dumps(safe_event()))
+    monkeypatch.setenv(name, value)
+    monkeypatch.setattr(mail.request, "urlopen", lambda *a, **k: pytest.fail("no API call"))
+    with pytest.raises(ValueError, match="BUDGET_INVALID"):
+        mail.deliver(path, tmp_path / "mail", private_mail(tmp_path))

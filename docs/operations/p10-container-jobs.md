@@ -121,7 +121,7 @@ separate Weekly plan continues to use its explicit `/data/*` locations.
 | `/run/config/*.json` | Separate pinned role configurations | Read only |
 | `/run/events` | Small safe terminal events | Jobs write; delivery reads |
 | `/run/mail` | API idempotency receipts | Read/write; persistent |
-| `/run/secrets/mail.json` | Existing API settings | Read only; runtime injection |
+| Container runtime environment | Existing operational mail API settings via private `env_file` | Daily/Weekly/delivery only; never image layers |
 | `/run/backup` | Frozen archives and verified-copy receipts | Backup role only; persistent |
 | `/run/secrets/gdrive` | Existing private rclone settings directory | Backup only; token refresh may write |
 | `QUANTHUS_PRIOR_ANCHOR` | Empty common-parent namespace and prior descriptors, 16 MiB tmpfs | Temporary; no parent host bind |
@@ -153,9 +153,16 @@ The initial financial Weekly plan has kind `p10-container-weekly-financial-v1`,
 free-floor, RSS and elapsed budgets. An existing sealed/failed job is preserved;
 reuse requires an explicit new plan/disposition, not output overwrite.
 
-`QUANTHUS_MAIL_SECRET` names an existing authorized private JSON file with
-`api_key`, `sender` and `recipients`, mounted read-only into data/delivery roles.
-No secret values go in Compose environment, code, logs, plans or image layers.
+`QUANTHUS_MAIL_ENV` names a physical host env file with mode 0600. Compose injects
+`QUANTHUS_RESEND_API_KEY`, `QUANTHUS_RESEND_FROM`, `QUANTHUS_RESEND_TO`,
+`QUANTHUS_RESEND_TIMEOUT_SECONDS` (1..30), and `QUANTHUS_RESEND_RETRIES` (0..1)
+at container creation. The Key is a runtime environment variable, never Dockerfile
+`ENV`, a build argument or image content. Use `format: raw` so literal credential
+characters are not interpolated. The cleaner explicitly overrides `env_file=[]`
+and receives no mail settings. Retain no secret values in resolved-Compose dumps,
+inspect output, logs, plans, source bundles or handoffs. Earlier private JSON
+sender input remains supported for old independent receipts, not the production
+configuration. All five terminal statuses notify; no success-only switch exists.
 `QUANTHUS_GDRIVE_CONFIG_ROOT` names an existing private directory containing
 `rclone.conf` or the existing `oauth-bridge.json`; only backup receives it. That
 directory may be written for token refresh, not mounted as an immutable single file.
@@ -369,3 +376,22 @@ Weekly remains explicitly domain-qualified: the financial entry must have an
 exact qualified source/config/receipt plan; it cannot be scheduled with placeholder
 inputs or presented as refreshed complete Weekly. Unavailable Weekly sources
 block that scope and must not block an independently qualified Daily switch.
+
+## Runtime configuration surface
+
+| Setting | Configuration and bounds |
+| --- | --- |
+| Operational email API key, sender and recipients | Private runtime `QUANTHUS_MAIL_ENV`; see `operational-mail.env.example` |
+| Email timeout and retry count | Runtime env above, bounded independently of data collection |
+| Source/history/runtime, Weekly input/output, TMP, backup state and private credential roots | Existing explicit `QUANTHUS_*` Compose variables; physical/disjoint paths validated before launch |
+| Non-root data UID/GID | `QUANTHUS_DATA_UID` / `QUANTHUS_DATA_GID`, aligned with mounted host ownership |
+| Existing transport proxy | Optional `QUANTHUS_DELIVERY_PROXY`, loopback HTTP only; defaults to CN02's existing port 10800; transport role alone |
+| Image and code identity | Exact immutable image ID/full SHA in deployment; no mutable `latest` fallback |
+| Cloud destinations, Base identity and write limits | Exact versioned routing/backup contract, not ambient remote/token overrides |
+| Business timezone, Daily clock, data-quality and consumer gates | Asia/Shanghai and versioned policies/units; no arbitrary env override |
+
+Docker environment values are inspectable by authorized daemon administrators.
+Do not export unredacted `compose config`/`docker inspect` after provisioning.
+The checked-in examples contain placeholders only. An empty key is rejected and
+never silently falls back to another identity. Success/failure notification tests
+must name themselves as channel acceptance tests rather than today's data result.

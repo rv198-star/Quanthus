@@ -177,16 +177,16 @@ class EventRecord:
         if self.snapshot_replay_clock_json is not None:
             from quanthus.backtest.snapshot_clock import SnapshotReplayClock
 
-            clock = SnapshotReplayClock.from_json(self.snapshot_replay_clock_json)
+            replay_clock = SnapshotReplayClock.from_json(self.snapshot_replay_clock_json)
             if (
                 self.prospective_clock_json is not None
                 or self.split_assignment != SplitAssignment.SNAPSHOT_REPLAY
-                or clock.market_date != self.identity.signal_date
-                or self.signal_close != clock.simulated_close
-                or self.knowledge_cutoff != clock.knowledge_cutoff
+                or replay_clock.market_date != self.identity.signal_date
+                or self.signal_close != replay_clock.simulated_close
+                or self.knowledge_cutoff != replay_clock.knowledge_cutoff
             ):
                 raise EventContractError("snapshot mechanism clock does not bind event")
-            object.__setattr__(self, "snapshot_replay_clock_json", clock.to_json())
+            object.__setattr__(self, "snapshot_replay_clock_json", replay_clock.to_json())
         elif self.split_assignment == SplitAssignment.SNAPSHOT_REPLAY:
             raise EventContractError("snapshot replay requires its explicit two-clock contract")
         elif self.prospective_clock_json is not None:

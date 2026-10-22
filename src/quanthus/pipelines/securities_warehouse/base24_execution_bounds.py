@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from .base22 import digest
@@ -37,7 +37,7 @@ def repair_stale_bounds(
         and authority_known <= repair_at,
         "BOUND_AUTHORITY",
     )
-    args = dict(
+    args: dict[str, Any] = dict(
         prior=prior,
         ordinal=ordinal,
         complete=complete,

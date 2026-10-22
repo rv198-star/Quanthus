@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -197,3 +198,34 @@ def test_platform_environment_wires_explicit_base24_projection(monkeypatch, tmp_
     assert observed["p6_runtime_path"] == CONFIG
     assert observed["p6_forward_run_root"] == tmp_path
     assert observed["p6_worker_revision"] == "a" * 40
+
+
+def test_platform_image_build_context_contains_every_declared_copy(tmp_path):
+    """Exercise the real context builder without invoking a Docker daemon or network."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    docker = fake_bin / "docker"
+    docker.write_text(
+        f"#!{sys.executable}\n"
+        "import pathlib, shlex, sys\n"
+        "args = sys.argv[1:]\n"
+        "assert args[0] == 'build'\n"
+        "context = pathlib.Path(args[-1])\n"
+        "dockerfile = pathlib.Path(args[args.index('--file') + 1])\n"
+        "lines = dockerfile.read_text().replace('\\\\\\n', ' ').splitlines()\n"
+        "for line in lines:\n"
+        " if line.startswith('COPY '):\n"
+        "  for source in shlex.split(line)[1:-1]:\n"
+        "   assert (context / source).exists(), 'missing COPY input: ' + source\n"
+        "print('complete lean platform build context')\n"
+    )
+    docker.chmod(0o755)
+    result = subprocess.run(
+        ["bash", str(ROOT / "ops/bin/build-platform-image"), "synthetic-context-only"],
+        env={**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}"},
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "complete lean platform build context" in result.stdout

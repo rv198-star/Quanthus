@@ -622,7 +622,10 @@ def test_runtime_mail_env_sends_success_and_failure_without_secret_file(
 
     monkeypatch.setattr(mail.request, "urlopen", api)
     assert mail.deliver(path, tmp_path / "sent", tmp_path / "does-not-exist") == "sent"
-    assert len(seen) == 1 and value["status"] in seen[0]["subject"]
+    expected = "失败" if value["status"] == "failed" else "完成"
+    assert len(seen) == 1 and expected in seen[0]["subject"]
+    assert "数据日期：" in seen[0]["text"]
+    assert not seen[0]["text"].startswith("{")
     assert "synthetic-runtime-key" not in "".join(
         p.read_text() for p in (tmp_path / "sent").glob("*.json")
     )

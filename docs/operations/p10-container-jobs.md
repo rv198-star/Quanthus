@@ -27,6 +27,15 @@ mail. If Docker cannot start, the host retains an unsent failure event; an
 in-container sender cannot run during a daemon outage. Replay that event after
 Docker recovers. Strategy/forward-email transport remains outside this work.
 
+Operational subjects and bodies are Chinese summaries: market date, outcome,
+qualified/held scope and the event clock in Asia/Shanghai. Explicit late recovery
+retains its missed-deadline label. A generic failure event cannot establish the
+underlying cause; refer to its run log rather than inventing a diagnosis. GDrive
+backup is confirmed separately. Run ID, short code revision and reason code stay
+in a troubleshooting footer. The durable JSON event, delivery idempotency key and
+existing send receipts are unchanged; a format update never resends old events.
+This is presentation only (`docs-impact: none` for governing data/PIT gates).
+
 Daily/recovery retain the existing host timer clock; no second in-container data
 cron is enabled. Only housekeeping has the small internal clock described below.
 

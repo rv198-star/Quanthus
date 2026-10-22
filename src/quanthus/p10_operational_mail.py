@@ -14,6 +14,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from urllib import request
+from zoneinfo import ZoneInfo
 
 EVENT_KEYS = {
     "kind",
@@ -59,6 +60,78 @@ def validate(value: dict[str, Any]) -> None:
         raise ValueError("P10_EVENT_CLOCK_REQUIRES_ZONE")
     if value["status"] == "complete" and not value["manifests"]:
         raise ValueError("P10_COMPLETE_EVENT_REQUIRES_VERIFIED_MANIFEST")
+
+
+def render_event(value: dict[str, Any]) -> tuple[str, str]:
+    """Present only the validated terminal event; never infer data or backup gates."""
+    validate(value)
+    role = {"daily": "每日数据", "recovery": "数据补建", "weekly": "每周数据"}[value["role"]]
+    status = {
+        "complete": "完成",
+        "partial": "部分完成",
+        "closed": "休市处理完成",
+        "busy": "已有任务运行",
+        "failed": "失败",
+    }[value["status"]]
+    late = value["reason"].startswith("LATE_RECOVERY_")
+    reason = value["reason"].removeprefix("LATE_RECOVERY_")
+    descriptions = {
+        ("complete", "QUALIFIED_1D_NATIVE5M"): "日频和 5 分钟 ODS/DWD 已构建完成，并通过验证。",
+        ("partial", "CORE_READY_5M_HELD_SOURCE_QUALITY"): (
+            "日频核心数据已就绪；5 分钟来源未通过质量检查，完整 Daily 尚未完成。"
+        ),
+        ("partial", "CORE_READY_5M_PENDING"): (
+            "日频核心数据已就绪；5 分钟数据仍待完成，完整 Daily 尚未完成。"
+        ),
+        ("partial", "WEEKLY_FINANCIAL_VERIFIED_OTHER_DOMAINS_HELD"): (
+            "每周财务数据已通过验证；其他领域仍暂缓，完整 Weekly 尚未完成。"
+        ),
+        ("closed", "AUTHORITATIVE_CLOSED_EVENT_SOURCE_READY"): (
+            "交易日历确认当日休市，事件来源已就绪；此结果不代表交易日行情构建成功。"
+        ),
+        ("busy", "DATE_WRITER_ALREADY_ACTIVE"): (
+            "同一日期已有构建任务运行，本次未重复启动。请等待在途任务的最终结果。"
+        ),
+        ("failed", "CONTAINER_RUN_FAILED"): (
+            "采集或构建任务未完成。本通知没有具体故障详情，需要查看对应运行日志。"
+        ),
+    }
+    fallback = {
+        "complete": "任务已完成，并取得验收清单；具体通过范围以对应运行记录为准。",
+        "partial": "任务仅部分完成，尚不能视为完整交付；具体范围请查看运行记录。",
+        "closed": "任务报告休市处理完成；具体处理范围请查看运行记录。",
+        "busy": "已有任务占用运行资源；最终结果请查看运行记录。",
+        "failed": "任务失败，尚未确认完整交付；具体原因请查看运行日志。",
+    }
+    subject = f"【Quanthus】{value['market_date']} {role}{status}"
+    if late:
+        subject += "（延迟）"
+    test = value["reason"].startswith("ACCEPTANCE_")
+    if test:
+        subject = "[通道验收测试] " + subject
+    observed = datetime.fromisoformat(value["observed_at"]).astimezone(ZoneInfo("Asia/Shanghai"))
+    lines = [
+        f"数据日期：{value['market_date']}",
+        f"处理结果：{role}{status}",
+        descriptions.get((value["status"], reason), fallback[value["status"]]),
+        f"记录时间：{observed:%Y-%m-%d %H:%M:%S}（北京时间）",
+    ]
+    if test:
+        lines.insert(0, "这是邮件通道验收测试，不代表真实数据任务结果。")
+    if late:
+        lines.append("时效说明：本次属于延迟补建，未达到原定按时交付目标。")
+    lines.extend(
+        [
+            "",
+            "GDrive 备份由独立同步任务确认，本通知仅说明数据任务结果。",
+            "",
+            "排查信息（需要时使用）：",
+            f"任务编号：{value['run_id']}",
+            f"代码版本：{value['pipeline_revision'][:12]}",
+            f"状态代码：{value['reason']}",
+        ]
+    )
+    return subject, "\n".join(lines)
 
 
 def deliver(event: Path, state: Path, secret: Path, *, attempts: int = 2) -> str:
@@ -107,12 +180,12 @@ def deliver(event: Path, state: Path, secret: Path, *, attempts: int = 2) -> str
             or any(not isinstance(x, str) or "@" not in x for x in settings["recipients"])
         ):
             raise ValueError("P10_MAIL_PRIVATE_SETTINGS_INVALID")
+        subject, body = render_event(value)
         payload = {
             "from": settings["sender"],
             "to": settings["recipients"],
-            "subject": ("[通道验收测试] " if value["reason"].startswith("ACCEPTANCE_") else "")
-            + f"Quanthus {value['role']} {value['market_date']}: {value['status']}",
-            "text": encoded.decode(),
+            "subject": subject,
+            "text": body,
         }
         for attempt in range(attempts):
             try:

@@ -54,18 +54,21 @@ def overlay(c: Any, name: str, patch: str, keys: tuple[str, ...]) -> dict[str, i
     }
 
 
-def attach(
-    c: Any, *, source: Path, repair: Path, manifest_sha: str, cutoff: datetime
-) -> dict[str, Any]:
-    """Attach already frozen native repair data to shared job-local source views."""
-    receipt = verify(repair, manifest_sha)
-    plan = json.loads((repair / "plan.json").read_bytes())
-    _require(_instant(plan["context_cutoff"]) <= cutoff, "REPAIR_NOT_YET_AVAILABLE")
-    for table in ("dwd_security", "dwd_listing", "dwd_trading_venue", "dwd_trading_calendar"):
+def select_references(c: Any, source: Path, cutoff: datetime) -> None:
+    """Only affected keys require repair admission; unrelated defects stay disclosed."""
+    scope = {
+        "dwd_listing": "listing_id IN (SELECT listing_id FROM dwd_tradability_state)",
+        "dwd_security": "security_id IN (SELECT security_id FROM dwd_listing)",
+        "dwd_trading_venue": "venue_id IN (SELECT venue_id FROM dwd_listing)",
+        "dwd_trading_calendar": (
+            "calendar_session_id IN (SELECT calendar_session_id FROM dwd_tradability_state)"
+        ),
+    }
+    for table, predicate in scope.items():
         path = source / "source/native" / (table + ".parquet")
         c.execute(
             f"CREATE TEMP TABLE {table} AS SELECT DISTINCT * FROM read_parquet({_q(path)}) "
-            f"WHERE knowledge_from<=TIMESTAMPTZ {_q(cutoff.isoformat())} AND "
+            f"WHERE ({predicate}) AND knowledge_from<=TIMESTAMPTZ {_q(cutoff.isoformat())} AND "
             f"coalesce(knowledge_to,'infinity'::TIMESTAMPTZ)>TIMESTAMPTZ {_q(cutoff.isoformat())}"
         )
         _require(
@@ -76,6 +79,15 @@ def attach(
             == 0,
             "REPAIR_REFERENCE_VERSION_AMBIGUOUS",
         )
+
+
+def attach(
+    c: Any, *, source: Path, repair: Path, manifest_sha: str, cutoff: datetime
+) -> dict[str, Any]:
+    """Attach already frozen native repair data to shared job-local source views."""
+    receipt = verify(repair, manifest_sha)
+    plan = json.loads((repair / "plan.json").read_bytes())
+    _require(_instant(plan["context_cutoff"]) <= cutoff, "REPAIR_NOT_YET_AVAILABLE")
     c.execute(
         "CREATE TEMP TABLE dwd_tradability_state AS SELECT * FROM read_parquet("
         + _q(repair / "bounds/dwd_tradability_state.parquet")
@@ -84,6 +96,7 @@ def attach(
         + _q(repair / "single-day/dwd_tradability_state.parquet")
         + ")"
     )
+    select_references(c, source, cutoff)
     c.execute(
         "CREATE TEMP TABLE dwd_security_bar AS SELECT DISTINCT b.* FROM read_parquet("
         + _q(source / "source/native/dwd_security_bar.parquet")

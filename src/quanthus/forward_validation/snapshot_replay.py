@@ -484,7 +484,11 @@ def prepare_history(
         "claims": raw["claims"],
         "census": census,
         "files": files,
-        "elapsed_seconds": str(time.monotonic() - started),
+        "elapsed_seconds": (
+            "recorded_by_job_stage_owner"
+            if repair_root is not None
+            else str(time.monotonic() - started)
+        ),
         "source_unchanged": True,
         "physical_history_build_count": 1,
     }

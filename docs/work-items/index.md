@@ -100,6 +100,9 @@ status and retained target-profile activation blockers are in `config/p2-gates.v
 
 ## P3 rule-only vertical slice
 
+2026-10-22 的[目标审计与 Base 2.4 落地提案](p3-base24-goal-audit-and-plan-20261022.md)
+区分已接受能力、未完成的 #317 比较与暂缓研究；它是 draft，不改变下列历史门槛或激活 B/D。
+
 P3 is accepted under `config/p3-gates.v1.json`. The phase gate closes the reusable rule-only
 historical capability slice and opens P4. The governed V1 is frozen as a composition/regression
 fixture, not a formal strategy lineage. `P3-LABEL-004`, `P3-ATTR-001`, and `P3-DASH-001` are

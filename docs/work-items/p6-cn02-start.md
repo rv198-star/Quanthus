@@ -15,6 +15,12 @@ it does not establish strategy profitability or historical information availabil
 
 ## Current recovery checkpoint
 
+**Later bounded continuation (Owner 2026-10-23):** consume the #538 repaired-input
+successor for a fixed-snapshot regression under
+[p6-538-regression.md](p6-538-regression.md). This is a new isolated comparison;
+retain the completed scope and old ledgers below. Prospective work stays cancelled.
+
+
 **P6 is closed under the Owner's 2026-10-23 revised scope: 100% complete, 0%
 remaining.** Read the [scope closeout](../acceptance/p6-owner-scope-closeout-20261023.md)
 and `config/forward-validation/entry/p6-owner-closeout-20261023.v1.json` first.

@@ -279,7 +279,11 @@ def cloud(args: list[str], plan: dict[str, Any], secret: Path, until: float) -> 
         "1",
     ]
     # Never inherit alternate remotes, credentials, TLS-disable or arbitrary flags.
-    env = {"PATH": os.defpath, "HOME": "/tmp", "TMPDIR": os.environ.get("TMPDIR", "/tmp")}
+    env = {
+        "PATH": "/usr/local/bin:" + os.defpath,
+        "HOME": "/tmp",
+        "TMPDIR": os.environ.get("TMPDIR", "/tmp"),
+    }
     if broker:
         env.update(
             HTTP_PROXY=os.environ.get("QUANTHUS_GDRIVE_PROXY", "http://127.0.0.1:10800"),

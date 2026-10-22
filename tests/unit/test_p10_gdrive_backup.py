@@ -288,6 +288,7 @@ def test_rclone_uses_finite_copy_without_inherited_credentials_or_tls_override(
 ):
     def run(command, **kwargs):
         assert command[:2] == ["rclone", "copy"]
+        assert kwargs["env"]["PATH"].split(":")[0] == "/usr/local/bin"
         assert "--no-check-certificate" not in command
         assert "RCLONE_CONFIG" not in kwargs["env"]
         assert "RCLONE_DRIVE_TOKEN" not in kwargs["env"]

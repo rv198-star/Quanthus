@@ -1,0 +1,11 @@
+# The context preparation command emits tracked code/config bundles only.
+**/.git
+**/.worktrees
+**/.venv*
+**/__pycache__
+**/*.pyc
+**/*.env
+**/*credential*
+**/*.parquet
+**/*.db
+**/*.sqlite*

@@ -1,0 +1,11 @@
+[Unit]
+Description=Retry only pending P10 mail/backups, never data acquisition
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=15min
+AccuracySec=1min
+Unit=cn02-p10-delivery.service
+
+[Install]
+WantedBy=timers.target

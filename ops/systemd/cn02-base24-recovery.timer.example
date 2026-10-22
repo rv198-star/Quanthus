@@ -1,0 +1,11 @@
+[Unit]
+Description=CN02 one bounded late recovery opportunity, after the T-day delivery deadline
+
+[Timer]
+OnCalendar=*-*-* 21:15:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=false
+Unit=cn02-base24-recovery.service
+
+[Install]
+WantedBy=timers.target

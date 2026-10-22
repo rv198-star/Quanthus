@@ -1,0 +1,21 @@
+[Unit]
+Description=Start same-image TMP-only internal daily cleaner
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=agentdock
+Group=agentdock
+EnvironmentFile=/etc/quanthus/p10-container-host.env
+WorkingDirectory=/opt/quanthus/p10-current
+ExecStart=/opt/quanthus/p10-current/ops/bin/run-p10-container-job cleanup-start --deployment /etc/quanthus/p10-container-deployment.json
+ExecStop=/opt/quanthus/p10-current/ops/bin/run-p10-container-job cleanup-stop --deployment /etc/quanthus/p10-container-deployment.json
+TimeoutStartSec=3min
+NoNewPrivileges=false
+ProtectHome=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

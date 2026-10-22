@@ -1,0 +1,11 @@
+[Unit]
+Description=CN02 calendar-aware T-day Daily, daily and native5m only
+
+[Timer]
+OnCalendar=*-*-* 17:30:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=false
+Unit=cn02-base24-cycle.service
+
+[Install]
+WantedBy=timers.target

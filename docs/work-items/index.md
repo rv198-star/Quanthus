@@ -35,6 +35,7 @@ the P6 critical path.
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03 | open epic |
+| P10-DATA-OPS-016 | Integrate the CN02 acquisition/container operational stack | P10-DATA-000 | [#537](https://github.com/rv198-star/Quanthus/issues/537); [source integration](p10-container-main-integration.md); release activation and full Weekly acceptance remain separate |
 
 The bounded [P6 main integration](p6-main-integration.md) separates the required
 P10 source interfaces, P6 consumer and #538 regression into dependent PRs. Its

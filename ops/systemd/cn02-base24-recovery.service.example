@@ -1,0 +1,20 @@
+[Unit]
+Description=CN02 bounded late Daily recovery; no mandatory next-day dependency
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/quanthus/cn02-base24-cycle.env
+WorkingDirectory=/opt/quanthus/cn02-base24-current
+ExecStart=/opt/quanthus/cn02-base24-current/ops/bin/run-cn02-base24-cycle --recovery
+TimeoutStartSec=12600
+KillMode=control-group
+Slice=cn02-base24-collector.slice
+MemoryMax=4G
+Nice=5
+UMask=0077
+StandardOutput=journal
+StandardError=journal

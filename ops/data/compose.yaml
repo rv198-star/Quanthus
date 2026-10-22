@@ -1,0 +1,181 @@
+name: quanthus-data
+
+x-job: &job
+  image: ${QUANTHUS_PIPELINE_IMAGE:?use a qualified immutable image digest}
+  profiles: [manual]
+  user: ${QUANTHUS_DATA_UID:?}:${QUANTHUS_DATA_GID:?}
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: "no"
+  env_file:
+    - path: ${QUANTHUS_MAIL_ENV:?private runtime mail env required}
+      required: true
+      format: raw
+  stop_grace_period: 30s
+  mem_limit: 4g
+  pids_limit: 128
+  environment:
+    TZ: Asia/Shanghai
+    PYTHONDONTWRITEBYTECODE: "1"
+    TMPDIR: /data/tmp
+    QUANTHUS_TMP_ROOT: /data/tmp
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,size=128m,mode=1777
+    - /data:rw,nosuid,nodev,noexec,size=16m,mode=0770,uid=${QUANTHUS_DATA_UID},gid=${QUANTHUS_DATA_GID}
+    - ${QUANTHUS_PRIOR_ANCHOR:?exact common parent required}:rw,nosuid,nodev,noexec,size=16m,mode=0770,uid=${QUANTHUS_DATA_UID},gid=${QUANTHUS_DATA_GID}
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+x-daily-volumes: &daily-volumes
+  - type: bind
+    source: ${QUANTHUS_JOB_TMP:?owned leased per-run TMP required}
+    target: /data/tmp
+    bind: {create_host_path: false}
+  - type: bind
+    source: ${QUANTHUS_BASE_ROOT:?}
+    target: ${QUANTHUS_BASE_ROOT:?}
+    read_only: true
+    bind: {create_host_path: false}
+  - type: bind
+    source: ${QUANTHUS_HISTORY_ROOT:?}
+    target: ${QUANTHUS_HISTORY_ROOT:?}
+    read_only: true
+    bind: {create_host_path: false}
+  - type: bind
+    source: ${QUANTHUS_RUNTIME_ROOT:?}
+    target: ${QUANTHUS_RUNTIME_ROOT:?}
+    bind: {create_host_path: false}
+  - type: bind
+    source: ${QUANTHUS_DAILY_CONFIG:?}
+    target: /run/config/daily.json
+    read_only: true
+    bind: {create_host_path: false}
+  - type: bind
+    source: ${QUANTHUS_EVENT_ROOT:?}
+    target: /run/events
+    bind: {create_host_path: false}
+  - type: bind
+    source: ${QUANTHUS_MAIL_ROOT:?}
+    target: /run/mail
+    bind: {create_host_path: false}
+
+services:
+  backup:
+    <<: *job
+    # Transport only: reuse the existing loopback proxy; no ports or Docker socket.
+    network_mode: host
+    profiles: [delivery]
+    entrypoint: ["python", "-m", "quanthus.p10_gdrive_backup"]
+    command: ["--help"]
+    volumes:
+      - type: bind
+        source: ${QUANTHUS_RUNTIME_ROOT:?}
+        target: ${QUANTHUS_RUNTIME_ROOT:?}
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_WEEKLY_JOB_ROOT:?}
+        target: /data/weekly-jobs
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_WEEKLY_INPUT_ROOT:?}
+        target: /data/weekly-input
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_BACKUP_SELECTION:?exact Base2.4 increment selection}
+        target: /run/config/backup.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_BACKUP_ROOT:?durable upload and receipts}
+        target: /run/backup
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_GDRIVE_CONFIG_ROOT:?existing private rclone config directory}
+        target: /run/secrets/gdrive
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_EVENT_ROOT:?}
+        target: /run/events
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_MAIL_ROOT:?}
+        target: /run/mail
+        bind: {create_host_path: false}
+    environment:
+      TZ: Asia/Shanghai
+      PYTHONDONTWRITEBYTECODE: "1"
+      QUANTHUS_GDRIVE_PROXY: ${QUANTHUS_DELIVERY_PROXY:-http://127.0.0.1:10800}
+      TMPDIR: /run/backup
+      HTTP_PROXY: ${QUANTHUS_DELIVERY_PROXY:-http://127.0.0.1:10800}
+      HTTPS_PROXY: ${QUANTHUS_DELIVERY_PROXY:-http://127.0.0.1:10800}
+  cleanup:
+    <<: *job
+    profiles: [maintenance]
+    env_file: []
+    entrypoint: ["python", "-m", "quanthus.p10_tmp_schedule"]
+    command: ["schedule", "--root", "/work/tmp", "--apply"]
+    network_mode: none
+    restart: unless-stopped
+    mem_limit: 128m
+    pids_limit: 32
+    environment:
+      TZ: Asia/Shanghai
+      PYTHONDONTWRITEBYTECODE: "1"
+      TMPDIR: /tmp
+    volumes:
+      - type: bind
+        source: ${QUANTHUS_TMP_ROOT:?owned physical TMP root required}
+        target: /work/tmp
+        bind: {create_host_path: false}
+  daily:
+    <<: *job
+    command: ["--help"]
+    volumes: *daily-volumes
+  recovery:
+    <<: *job
+    command: ["--help"]
+    volumes: *daily-volumes
+  weekly:
+    <<: *job
+    command: ["--help"]
+    volumes:
+      - type: bind
+        source: ${QUANTHUS_JOB_TMP:?owned leased per-run TMP required}
+        target: /data/tmp
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_BASE_ROOT:?}
+        target: /data/base
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_WEEKLY_INPUT_ROOT:?}
+        target: /data/weekly-input
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_WEEKLY_JOB_ROOT:?}
+        target: /data/weekly-jobs
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_WEEKLY_CONFIG:?}
+        target: /run/config/weekly.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_EVENT_ROOT:?}
+        target: /run/events
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${QUANTHUS_MAIL_ROOT:?}
+        target: /run/mail
+        bind: {create_host_path: false}

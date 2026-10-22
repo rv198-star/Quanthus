@@ -1,0 +1,17 @@
+[Unit]
+Description=CN02 Base2.4 daily/native5m isolated frozen-input build (not collector)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/quanthus/current
+EnvironmentFile=/etc/quanthus/cn02-base24-daily.env
+ExecStart=/opt/quanthus/current/ops/bin/run-cn02-base24-daily --scheduled
+TimeoutStartSec=211min
+KillMode=control-group
+Nice=5
+UMask=0077
+StandardOutput=journal
+StandardError=journal

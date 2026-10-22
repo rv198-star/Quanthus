@@ -1,0 +1,17 @@
+[Unit]
+Description=CN02 same-image operational mail and verified Base2.4 increment backup
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=agentdock
+Group=agentdock
+EnvironmentFile=/etc/quanthus/p10-container-host.env
+WorkingDirectory=/opt/quanthus/p10-current
+ExecStart=/opt/quanthus/p10-current/ops/bin/run-p10-container-job backup --deployment /etc/quanthus/p10-container-deployment.json
+TimeoutStartSec=213min
+KillMode=control-group
+NoNewPrivileges=false
+ProtectHome=true
+UMask=0077

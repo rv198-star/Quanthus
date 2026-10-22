@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+: "${QUANTHUS_DAILY_PYTHON:?set the retained CN02 Python runtime}"
+: "${QUANTHUS_DAILY_CYCLE_CONFIG:?set the private pinned CN02 collector configuration}"
+cd -- "${ROOT}"
+export PYTHONPATH="${ROOT}/src"
+exec "${QUANTHUS_DAILY_PYTHON}" -m quanthus.pipelines.securities_warehouse.daily_base24_cycle \
+    --config "${QUANTHUS_DAILY_CYCLE_CONFIG}" "$@"

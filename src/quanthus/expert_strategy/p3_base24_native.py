@@ -44,24 +44,32 @@ KEYS = {
     "dwd_security": ("security_id", "effective_from"),
     "dwd_listing": ("listing_id", "effective_from"),
     "dwd_trading_venue": ("venue_id", "effective_from"),
-    "dwd_trading_calendar": ("calendar_session_id",),
-    "dwd_security_bar": ("listing_id", "calendar_session_id"),
-    "dwd_tradability_state": ("listing_id", "calendar_session_id"),
+    "dwd_trading_calendar": ("venue_id", "trade_date", "session_type"),
+    "dwd_security_bar": ("listing_id", "observation_start", "interval_size", "price_basis"),
+    "dwd_tradability_state": ("listing_id", "calendar_session_id", "observation_start"),
     "dwd_price_limit_regime": ("price_limit_regime_id", "effective_from"),
-    "dwd_listing_status_interval": ("listing_status_id", "effective_from"),
+    "dwd_listing_status_interval": ("listing_id", "status_type", "effective_from"),
     "dwd_security_identifier": (
-        "security_id",
         "identifier_namespace",
         "identifier_value",
         "effective_from",
     ),
-    "dwd_corporate_action": ("corporate_action_id",),
-    "dwd_corporate_action_term": ("corporate_action_term_id",),
+    "dwd_corporate_action": ("corporate_action_id", "effective_at"),
+    "dwd_corporate_action_term": (
+        "corporate_action_id",
+        "corporate_action_term_id",
+        "effective_at",
+    ),
     "dwd_adjustment_factor": ("adjustment_factor_id", "effective_from"),
-    "dwd_quality_exception": ("quality_exception_id",),
+    "dwd_quality_exception": (
+        "affected_table",
+        "affected_business_key_json",
+        "rule_id",
+        "affected_effective_at",
+    ),
     "dwd_company_industry_membership": ("company_id", "industry_node_id", "effective_from"),
     "dwd_industry_node": ("industry_node_id", "effective_from"),
-    "dwd_industry_scheme": ("industry_scheme_id", "effective_from"),
+    "dwd_industry_scheme": ("industry_scheme_id", "scheme_version", "effective_from"),
 }
 _SHA = re.compile(r"sha256:[0-9a-f]{64}\Z")
 INTERVAL_TABLES = frozenset(t for t, keys in KEYS.items() if "effective_from" in keys)
@@ -69,8 +77,16 @@ FIELDS = {
     "dwd_security": ("company_id", "instrument_type"),
     "dwd_listing": ("security_id", "venue_id", "listing_code"),
     "dwd_trading_venue": ("mic_code",),
-    "dwd_trading_calendar": ("venue_id", "trade_date", "is_open", "open_at", "close_at"),
+    "dwd_trading_calendar": (
+        "calendar_session_id",
+        "venue_id",
+        "trade_date",
+        "is_open",
+        "open_at",
+        "close_at",
+    ),
     "dwd_security_bar": (
+        "calendar_session_id",
         "interval_size",
         "price_basis",
         "open",
@@ -83,7 +99,7 @@ FIELDS = {
     "dwd_tradability_state": ("is_tradable", "can_buy", "can_sell"),
     "dwd_price_limit_regime": ("venue_id", "listing_id"),
     "dwd_listing_status_interval": ("listing_id",),
-    "dwd_security_identifier": ("venue_id",),
+    "dwd_security_identifier": ("security_id", "venue_id"),
     "dwd_corporate_action": ("security_id",),
     "dwd_corporate_action_term": ("corporate_action_id",),
     "dwd_adjustment_factor": ("security_id",),
@@ -130,7 +146,11 @@ CONTRACT = {
     "materialization": (
         "one_job_local_native_closure; exact_values_and_versions; no_global_snapshot"
     ),
-    "warmup": "60_common_SSE_SZSE_open_dates_known_before_decision_start",
+    "warmup": (
+        "exact_60_authoritative_SSE_SZSE_sessions_pinned_in_run_plan; missing_or_late_rejected"
+    ),
+    "market_scope": "provably_excluded_markets_do_not_block; unknown_scope_fails_closed",
+    "daily_state": "latest_completed_observation_start_per_listing_session_at_knowledge_cutoff",
     "disposition": "input_engineering_only; not_legacy_equivalence; not_B_or_D_admission",
     "not_proven": [
         "economic_PIT_qualification",
@@ -332,6 +352,27 @@ def _connect(root: Path, temp: Path | None = None) -> Any:
     return c
 
 
+class _BoundedConnection:
+    """Check every SQL boundary; interrupt only cancels an executing query."""
+
+    def __init__(self, connection: Any, deadline: float | None) -> None:
+        self.connection = connection
+        self.deadline = deadline
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.connection, name)
+
+    def execute(self, *args: Any, **kwargs: Any) -> Any:
+        _deadline(self.deadline)
+        try:
+            result = self.connection.execute(*args, **kwargs)
+        except Exception:
+            _deadline(self.deadline)
+            raise
+        _deadline(self.deadline)
+        return result
+
+
 def _zero(c: Any, sql: str, reason: str) -> None:
     if c.execute(sql).fetchone()[0]:
         raise InputError(reason)
@@ -355,25 +396,53 @@ def _unambiguous(c: Any, query: str, table: str, reason: str) -> None:
     )
 
 
-def _warmup(c: Any) -> list[str]:
+def _warmup_binding(value: Any) -> list[dict[str, str]]:
+    if (
+        not isinstance(value, dict)
+        or value.get("schema_version") != "quanthus.p3-warmup-calendar.v1"
+        or not isinstance(value.get("authority_reference"), str)
+        or not value["authority_reference"].strip()
+        or not _SHA.fullmatch(str(value.get("authority_evidence_sha256")))
+        or not isinstance(value.get("sessions"), list)
+        or len(value["sessions"]) != SCOPE["warmup_sessions"]
+    ):
+        raise InputError("WARMUP_CALENDAR_AUTHORITY_REQUIRED")
+    sessions: list[dict[str, str]] = value["sessions"]
+    dates = []
+    for session in sessions:
+        if not isinstance(session, dict) or set(session) != {"trade_date", "XSHG", "XSHE"}:
+            raise InputError("WARMUP_CALENDAR_BINDING_INVALID")
+        try:
+            day = date.fromisoformat(session["trade_date"])
+        except (ValueError, TypeError):
+            raise InputError("WARMUP_CALENDAR_BINDING_INVALID") from None
+        if (
+            day.isoformat() != session["trade_date"]
+            or day >= date(2025, 1, 1)
+            or any(
+                not isinstance(session[m], str) or not session[m].strip() for m in ("XSHG", "XSHE")
+            )
+            or session["XSHG"] == session["XSHE"]
+        ):
+            raise InputError("WARMUP_CALENDAR_BINDING_INVALID")
+        dates.append(day)
+    if dates != sorted(set(dates)) or any(
+        len({s[m] for s in sessions}) != 60 for m in ("XSHG", "XSHE")
+    ):
+        raise InputError("WARMUP_CALENDAR_BINDING_INVALID")
+    return sessions
+
+
+def _warmup(c: Any, binding: dict[str, Any]) -> list[str]:
+    sessions = _warmup_binding(binding)
+    dates = [s["trade_date"] for s in sessions]
     cutoff = datetime(2025, 1, 1, tzinfo=TZ)
     calendar = _visible_query("dwd_trading_calendar", cutoff)
     venues = _visible_query("dwd_trading_venue", cutoff)
-    rows = c.execute(f"""SELECT c.trade_date FROM ({calendar}) c
-        JOIN ({venues}) v ON c.venue_id=v.venue_id
-        WHERE v.mic_code IN ('XSHG','XSHE') AND c.is_open
-        AND c.trade_date < DATE '2025-01-01'
-        AND CAST(v.effective_from AS DATE)<=c.trade_date
-        AND (v.effective_to IS NULL OR CAST(v.effective_to AS DATE)>c.trade_date)
-        GROUP BY c.trade_date HAVING count(DISTINCT v.mic_code)=2
-        ORDER BY c.trade_date DESC LIMIT 60""").fetchall()
-    if len(rows) != 60:
-        raise InputError("WARMUP_CALENDAR_NOT_QUALIFIED")
-    # Validate the candidate range before accepting its 60 dates. Include closed
-    # versions and all revisions of a selected session, not only rows that made
-    # the open-day aggregate. Unrelated earlier calendar history stays out of scope.
+    # The caller freezes authoritative membership before any market-row access.
+    # Missing/late metadata must never cause an earlier session to be substituted.
     selected = (
-        f"SELECT * FROM ({calendar}) WHERE trade_date>=DATE {_q(rows[-1][0].isoformat())} "
+        f"SELECT * FROM ({calendar}) WHERE trade_date>=DATE {_q(dates[0])} "
         "AND trade_date<DATE '2025-01-01' "
         f"AND venue_id IN (SELECT venue_id FROM ({venues}) WHERE mic_code IN ('XSHE','XSHG'))"
     )
@@ -391,7 +460,32 @@ def _warmup(c: Any) -> list[str]:
         ),
     ):
         _unambiguous(c, query, table, "AMBIGUOUS_WARMUP_VERSION")
-    return [r[0].isoformat() for r in reversed(rows)]
+    expected = ",".join(
+        f"(DATE {_q(s['trade_date'])},{_q(m)},{_q(s[m])})"
+        for s in sessions
+        for m in ("XSHG", "XSHE")
+    )
+    _zero(
+        c,
+        f"""WITH expected(day,mic,session_id) AS (VALUES {expected})
+        SELECT count(*) FROM expected e WHERE NOT EXISTS (
+            SELECT 1 FROM ({calendar}) c JOIN ({venues}) v ON c.venue_id=v.venue_id
+            WHERE c.trade_date=e.day AND c.calendar_session_id=e.session_id
+            AND v.mic_code=e.mic AND c.is_open
+            AND CAST(v.effective_from AS DATE)<=e.day
+            AND (v.effective_to IS NULL OR CAST(v.effective_to AS DATE)>e.day))""",
+        "WARMUP_CALENDAR_NOT_QUALIFIED",
+    )
+    actual = c.execute(f"""SELECT c.trade_date FROM ({selected}) c
+        JOIN ({venues}) v ON c.venue_id=v.venue_id
+        WHERE v.mic_code IN ('XSHG','XSHE') AND c.is_open
+        AND CAST(v.effective_from AS DATE)<=c.trade_date
+        AND (v.effective_to IS NULL OR CAST(v.effective_to AS DATE)>c.trade_date)
+        GROUP BY c.trade_date HAVING count(DISTINCT v.mic_code)=2
+        ORDER BY c.trade_date""").fetchall()
+    if [r[0].isoformat() for r in actual] != dates:
+        raise InputError("WARMUP_CALENDAR_MEMBERSHIP_DIFFERS")
+    return dates
 
 
 def _predicate(table: str, warmup: list[str]) -> str:
@@ -411,7 +505,7 @@ def _predicate(table: str, warmup: list[str]) -> str:
     else:
         field = "effective_at"
     result = f"({field} IS NULL OR CAST({field} AS DATE) BETWEEN DATE '{start}' AND {end})"
-    if table in {"dwd_trading_calendar", "dwd_security_bar", "dwd_tradability_state"}:
+    if table in {"dwd_security_bar", "dwd_tradability_state"}:
         dates = ",".join(f"DATE {_q(day)}" for day in warmup)
         result += (
             f" AND ({field} IS NULL OR CAST({field} AS DATE)>=DATE '2025-01-01' "
@@ -472,6 +566,17 @@ def _schema(c: Any) -> dict[str, dict[str, str]]:
 def _semantics(c: Any, *, warmup: list[str] | None = None) -> dict[str, Any]:
     summary = {}
     schemas = _schema(c)
+    _zero(
+        c,
+        "SELECT count(*) FROM raw_dwd_trading_calendar WHERE trade_date IS NULL",
+        "CALENDAR_TRADE_DATE_UNKNOWN",
+    )
+    for table in ("dwd_security_bar", "dwd_tradability_state"):
+        _zero(
+            c,
+            f"SELECT count(*) FROM raw_{table} WHERE observation_start IS NULL",
+            "CALENDAR_DATE:" + table,
+        )
     for table, keys in KEYS.items():
         key = ",".join(keys)
         nulls = " OR ".join(f"{k} IS NULL" for k in keys)
@@ -521,11 +626,6 @@ def _semantics(c: Any, *, warmup: list[str] | None = None) -> dict[str, Any]:
         "SELECT count(*) FROM raw_dwd_security_bar WHERE interval_size IS DISTINCT FROM '1d' "
         "OR price_basis IS DISTINCT FROM 'UNADJUSTED'",
         "CANONICAL_DAILY_BASIS_REQUIRED",
-    )
-    _zero(
-        c,
-        "SELECT count(*) FROM raw_dwd_trading_calendar WHERE trade_date IS NULL",
-        "CALENDAR_TRADE_DATE_UNKNOWN",
     )
     for table in ("dwd_security_bar", "dwd_tradability_state"):
         _zero(
@@ -632,6 +732,7 @@ def _input_plan(plan: dict[str, Any], *, source_sha: str, implementation_sha: st
         or not plan["new_input_scope_id"].startswith("P3-BASE24-INPUT-")
     ):
         raise InputError("INPUT_ONLY_RUN_PLAN_NOT_ACTIVATED")
+    _warmup_binding(plan.get("warmup_calendar"))
 
 
 def prepare(
@@ -747,7 +848,7 @@ def prepare(
         (staging / "checkpoints").mkdir(exist_ok=True)
         temp = tempfile.TemporaryDirectory(prefix=".p3-query-", dir=output.parent)
         try:
-            c = _connect(source, Path(temp.name))
+            c = _BoundedConnection(_connect(source, Path(temp.name)), deadline)
         except BaseException:
             temp.cleanup()
             raise
@@ -756,7 +857,7 @@ def prepare(
         timer.start()
         try:
             _schema(c)
-            warmup = _warmup(c)
+            warmup = _warmup(c, run_plan["warmup_calendar"])
             # Validate the selected window, not unrelated historical/BSE gaps.
             for table in KEYS:
                 c.execute(
@@ -819,7 +920,7 @@ def prepare(
             temp.cleanup()
         with NativeView(staging, temp_parent=output.parent, deadline=deadline) as view:
             summary = _semantics(view.connection, warmup=warmup)
-            if _warmup(view.connection) != warmup:
+            if _warmup(view.connection, run_plan["warmup_calendar"]) != warmup:
                 raise InputError("COPIED_CALENDAR_DIFFERS")
         check_budget()
         for table in KEYS:
@@ -885,6 +986,11 @@ def _publish(staging: Path, output: Path) -> None:
         raise InputError("STAGING_FILE_SET_DIFFERS")
     if ready.exists() and ready.read_text().strip() != digest:
         raise InputError("READY_IDENTITY_DIFFERS")
+    final_bytes = sum((staging / name).stat().st_size for name in expected)
+    if not ready.exists():
+        final_bytes += len((digest + "\n").encode("utf-8"))
+    if final_bytes > _json(staging / "identity.json")["max_output_bytes"]:
+        raise InputError("OUTPUT_BUDGET_EXCEEDED")
     for path in (staging / "native", staging / "checkpoints", staging):
         _sync_directory(path)
     if not ready.exists():
@@ -997,13 +1103,14 @@ def _verify(root: Path, *, manifest_sha256: str, ready_required: bool) -> dict[s
         if saved.get("rows") != m["semantic_summary"][table]["rows"]:
             raise InputError("ROW_CHECKPOINT_DIFFERS")
     with NativeView(root, deadline=deadline) as view:
-        warmup = _warmup(view.connection)
+        warmup = _warmup(view.connection, plan["warmup_calendar"])
         if _semantics(view.connection, warmup=warmup) != m["semantic_summary"]:
             raise InputError("SEMANTIC_CENSUS_DIFFERS")
         if warmup != m["warmup_dates"]:
             raise InputError("WARMUP_CENSUS_DIFFERS")
     if any(_fingerprint(root / n) != fingerprint for n, fingerprint in fingerprints.items()):
         raise InputError("PREPARED_FILES_CHANGED_DURING_VERIFY")
+    _deadline(deadline)
     return {**m, "manifest_sha256": manifest_sha256}
 
 
@@ -1021,7 +1128,13 @@ class NativeView:
             t: _fingerprint(_member(self.root, f"native/{t}.parquet")) for t in KEYS
         }
         try:
-            self.connection = _connect(self.root, Path(self.temp.name))
+            connection = _connect(self.root, Path(self.temp.name))
+            self.connection = _BoundedConnection(connection, deadline)
+            try:
+                _deadline(deadline)
+            except BaseException:
+                connection.close()
+                raise
         except BaseException:
             self.temp.cleanup()
             raise
@@ -1051,6 +1164,9 @@ class NativeView:
             raise InputError("PREPARED_FILES_CHANGED_DURING_READ")
 
     def at(self, cutoff: datetime) -> None:
+        self._at(cutoff, market_only=False)
+
+    def _at(self, cutoff: datetime, *, market_only: bool) -> None:
         self._unchanged()
         if cutoff.tzinfo is None or cutoff.utcoffset() is None:
             raise InputError("AWARE_CUTOFF_REQUIRED")
@@ -1061,24 +1177,89 @@ class NativeView:
         try:
             for table in KEYS:
                 query = _visible_query(table, cutoff)
-                _unambiguous(self.connection, query, table, "AMBIGUOUS_ASOF_VERSION")
+                if not market_only:
+                    _unambiguous(self.connection, query, table, "AMBIGUOUS_ASOF_VERSION")
                 self.connection.execute(f"CREATE OR REPLACE TEMP VIEW {table} AS {query}")
+            if market_only:
+                self._market_scope(cutoff)
             self._unchanged()
             self.connection.execute("COMMIT")
         except BaseException:
             self.connection.execute("ROLLBACK")
             raise
 
+    def _market_scope(self, cutoff: datetime) -> None:
+        c = self.connection
+        active_listing = (
+            "l.listing_id=b.listing_id AND l.effective_from<=b.observation_start "
+            "AND (l.effective_to IS NULL OR l.effective_to>b.observation_start)"
+        )
+        # Exclusion needs affirmative evidence at this cutoff. An unavailable
+        # listing/venue/security never silently removes an in-scope candidate.
+        outside = []
+        for table, alias, identity, field, values in (
+            ("dwd_trading_venue", "v", "venue_id", "mic_code", "('XSHE','XSHG')"),
+            ("dwd_security", "s", "security_id", "instrument_type", "('A_SHARE')"),
+        ):
+            active = (
+                f"{alias}.{identity}=l.{identity} AND {alias}.effective_from<=b.observation_start "
+                f"AND ({alias}.effective_to IS NULL OR {alias}.effective_to>b.observation_start)"
+            )
+            outside.append(
+                f"(EXISTS (SELECT 1 FROM {table} {alias} WHERE {active} "
+                f"AND {alias}.{field} NOT IN {values}) AND NOT EXISTS "
+                f"(SELECT 1 FROM {table} {alias} WHERE {active} "
+                f"AND ({alias}.{field} IN {values} OR {alias}.{field} IS NULL)))"
+            )
+        excluded = (
+            f"EXISTS (SELECT 1 FROM dwd_listing l WHERE {active_listing}) AND NOT EXISTS "
+            f"(SELECT 1 FROM dwd_listing l WHERE {active_listing} AND NOT ({' OR '.join(outside)}))"
+        )
+        c.execute(
+            "CREATE OR REPLACE TEMP VIEW p3_market_bars AS SELECT * FROM dwd_security_bar b "
+            f"WHERE b.observation_end<=TIMESTAMPTZ {_q(cutoff.isoformat())} AND NOT ({excluded})"
+        )
+        queries = {
+            "dwd_security_bar": "SELECT * FROM p3_market_bars",
+            "dwd_listing": f"SELECT l.* FROM dwd_listing l WHERE EXISTS "
+            f"(SELECT 1 FROM p3_market_bars b WHERE {active_listing})",
+            "dwd_trading_calendar": "SELECT c.* FROM dwd_trading_calendar c WHERE EXISTS "
+            "(SELECT 1 FROM p3_market_bars b WHERE c.calendar_session_id=b.calendar_session_id)",
+            "dwd_tradability_state": "SELECT t.* FROM dwd_tradability_state t WHERE "
+            f"t.observation_end<=TIMESTAMPTZ {_q(cutoff.isoformat())} AND EXISTS "
+            "(SELECT 1 FROM p3_market_bars b WHERE t.listing_id=b.listing_id "
+            "AND t.calendar_session_id=b.calendar_session_id)",
+        }
+        for table, alias, identity in (
+            ("dwd_security", "s", "security_id"),
+            ("dwd_trading_venue", "v", "venue_id"),
+        ):
+            queries[table] = (
+                f"SELECT {alias}.* FROM {table} {alias} WHERE EXISTS "
+                f"(SELECT 1 FROM p3_market_bars b JOIN dwd_listing l ON {active_listing} "
+                f"WHERE {alias}.{identity}=l.{identity} "
+                f"AND {alias}.effective_from<=b.observation_start "
+                f"AND ({alias}.effective_to IS NULL OR {alias}.effective_to>b.observation_start))"
+            )
+        for table, query in queries.items():
+            _unambiguous(c, query, table, "AMBIGUOUS_ASOF_VERSION")
+        c.execute(
+            "CREATE OR REPLACE TEMP VIEW p3_market_states AS "
+            + queries["dwd_tradability_state"]
+            + " QUALIFY row_number() OVER (PARTITION BY listing_id,calendar_session_id "
+            "ORDER BY observation_start DESC)=1"
+        )
+
     def market_batches(self, cutoff: datetime, *, batch_size: int = 8192) -> Iterator[Any]:
         """Exact native values at cutoff; no fabricated eligibility or legacy casts."""
         if type(batch_size) is not int or not 1 <= batch_size <= 65536:
             raise InputError("BATCH_SIZE_INVALID")
-        self.at(cutoff)
+        self._at(cutoff, market_only=True)
         c = self.connection
         bounded = f"b.observation_end<=TIMESTAMPTZ {_q(cutoff.isoformat())}"
         _zero(
             c,
-            f"SELECT count(*) FROM dwd_security_bar b WHERE {bounded} AND NOT EXISTS "
+            f"SELECT count(*) FROM p3_market_bars b WHERE {bounded} AND NOT EXISTS "
             "(SELECT 1 FROM dwd_trading_calendar c "
             "WHERE c.calendar_session_id=b.calendar_session_id "
             "AND c.trade_date=CAST(b.observation_start AS DATE))",
@@ -1086,7 +1267,7 @@ class NativeView:
         )
         _zero(
             c,
-            f"SELECT count(*) FROM dwd_security_bar b WHERE {bounded} AND NOT EXISTS "
+            f"SELECT count(*) FROM p3_market_bars b WHERE {bounded} AND NOT EXISTS "
             "(SELECT 1 FROM dwd_listing l JOIN dwd_trading_calendar c ON c.venue_id=l.venue_id "
             "JOIN dwd_security s ON s.security_id=l.security_id "
             "JOIN dwd_trading_venue v ON v.venue_id=l.venue_id "
@@ -1101,7 +1282,7 @@ class NativeView:
         )
         state_bounded = f"t.observation_end<=TIMESTAMPTZ {_q(cutoff.isoformat())}"
         linked_state = (
-            f"{state_bounded} AND EXISTS (SELECT 1 FROM dwd_security_bar b WHERE {bounded} "
+            f"{state_bounded} AND EXISTS (SELECT 1 FROM p3_market_bars b WHERE {bounded} "
             "AND b.listing_id=t.listing_id AND b.calendar_session_id=t.calendar_session_id)"
         )
         _zero(
@@ -1128,7 +1309,7 @@ class NativeView:
             l.knowledge_from AS listing_knowledge_from, s.knowledge_from AS security_knowledge_from,
             l.effective_from AS listing_effective_from, s.effective_from AS security_effective_from,
             t.is_tradable,t.can_buy,t.can_sell
-            FROM dwd_security_bar b
+            FROM p3_market_bars b
             JOIN dwd_trading_calendar c USING(calendar_session_id)
             JOIN dwd_listing l ON l.listing_id=b.listing_id AND l.venue_id=c.venue_id
                 AND l.effective_from<=b.observation_start
@@ -1139,7 +1320,7 @@ class NativeView:
             JOIN dwd_trading_venue v ON v.venue_id=l.venue_id
                 AND v.effective_from<=b.observation_start
                 AND (v.effective_to IS NULL OR v.effective_to>b.observation_start)
-            LEFT JOIN dwd_tradability_state t ON t.listing_id=b.listing_id
+            LEFT JOIN p3_market_states t ON t.listing_id=b.listing_id
                 AND t.calendar_session_id=b.calendar_session_id
                 AND {state_bounded}
             WHERE v.mic_code IN ('XSHE','XSHG') AND s.instrument_type='A_SHARE'
@@ -1153,7 +1334,9 @@ class NativeView:
             + ") GROUP BY ALL HAVING count(*)>1)",
             "AMBIGUOUS_MARKET_IDENTITY",
         )
-        yield from c.execute(query).to_arrow_reader(batch_size)
+        for batch in c.execute(query).to_arrow_reader(batch_size):
+            self._unchanged()
+            yield batch
         self._unchanged()
 
     def input_census(self, cutoff: datetime) -> dict[str, Any]:

@@ -11,12 +11,13 @@
     "warmup_sessions": 60
   },
   "source_manifest_sha256": "sha256:ec8adacf91b55062e4873ca6f18216fc4d41c1c6c6f59bc172255606a2f0a6dd",
-  "contract_digest": "sha256:d4efd5ec739e89557bdb98802d9469e303e5e92c97029dce5db56472cbcc05f4",
+  "contract_digest": "sha256:53f7e07e9317126a81697870e591504766f14402aae00b6449a67bc7006d3c75",
   "implementation_sha256": null,
   "code_revision": null,
   "input_read_authorized": false,
   "strategy_execution_authorized": false,
   "max_output_bytes": 4294967296,
   "wall_seconds": 3600,
-  "status": "inactive_example_not_a_new_B_attempt_or_D_activation"
+  "status": "inactive_example_not_a_new_B_attempt_or_D_activation",
+  "warmup_calendar": null
 }

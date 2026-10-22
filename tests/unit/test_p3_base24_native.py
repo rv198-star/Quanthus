@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -173,6 +174,9 @@ def source(tmp_path: Path) -> Path:
         )
         fields.update(extra.get(table, {}))
         defaults = dict(
+            session_type="REGULAR",
+            scheme_version="v1",
+            status_type="LISTED",
             knowledge_from=EARLY,
             effective_from=EARLY,
             observation_start=CLOCK,
@@ -189,6 +193,7 @@ def source(tmp_path: Path) -> Path:
             root / "native" / f"{table}.parquet",
         )
     seal(root)
+    freeze_warmup_authority(root)
     return root
 
 
@@ -197,8 +202,46 @@ def mutate(source: Path, table: str, change) -> None:
     t = pq.read_table(p)
     rows = t.to_pylist()
     change(rows)
+    for row in rows:
+        for key, value in (
+            ("session_type", "REGULAR"),
+            ("scheme_version", "v1"),
+            ("status_type", "LISTED"),
+        ):
+            row.setdefault(key, value)
     pq.write_table(pa.Table.from_pylist(rows, schema=t.schema), p)
     seal(source)
+
+
+def freeze_warmup_authority(source: Path) -> None:
+    """Synthetic authority independent of later payload mutation; never live inference."""
+    rows = pq.read_table(source / "native/dwd_trading_calendar.parquet").to_pylist()
+    boundary = datetime(2025, 1, 1, tzinfo=TZ)
+    visible = [
+        row
+        for row in rows
+        if row["knowledge_from"] is not None
+        and row["knowledge_from"] <= boundary
+        and (row["knowledge_to"] is None or row["knowledge_to"] > boundary)
+        and row["trade_date"] < boundary.date()
+        and row["is_open"]
+    ]
+    dates = sorted(
+        {r["trade_date"] for r in visible if r["venue_id"] == "sh"}
+        & {r["trade_date"] for r in visible if r["venue_id"] == "sz"}
+    )[-60:]
+    write(
+        source.parent / "synthetic-warmup-authority.json",
+        {
+            "schema_version": "quanthus.p3-warmup-calendar.v1",
+            "authority_reference": "synthetic-only-qualified-calendar",
+            "authority_evidence_sha256": SHA,
+            "sessions": [
+                {"trade_date": day.isoformat(), "XSHG": f"sh-{day}", "XSHE": f"sz-{day}"}
+                for day in dates
+            ],
+        },
+    )
 
 
 def build(source: Path, output: Path, **kwargs):
@@ -214,6 +257,10 @@ def build(source: Path, output: Path, **kwargs):
 
 
 def make_plan(source, **kwargs):
+    authority = source.parent / "synthetic-warmup-authority.json"
+    if not authority.exists():
+        # One overlap fixture moves the source one level deeper before admission.
+        authority = source.parent.parent / "synthetic-warmup-authority.json"
     return {
         "schema_version": "quanthus.p3-base24-input-run-plan.v1",
         "purpose": "input_qualification_only",
@@ -229,6 +276,7 @@ def make_plan(source, **kwargs):
         "code_revision": "b" * 40,
         "max_output_bytes": kwargs.get("max_output_bytes", 4 * 1024**3),
         "wall_seconds": kwargs.get("wall_seconds", 3600),
+        "warmup_calendar": json.loads(authority.read_text()),
     }
 
 
@@ -552,6 +600,9 @@ def test_visibility_exceptions_remain_unavailable(source, tmp_path):
     records = [
         dict(
             quality_exception_id=f"q{i}",
+            affected_table="dwd_security_bar",
+            affected_business_key_json=json.dumps({"synthetic": i}),
+            rule_id="visibility-unavailable",
             affected_effective_at=CLOCK,
             knowledge_from=None,
             source_record_id=f"r{i}",
@@ -717,6 +768,7 @@ def test_warmup_only_reads_exact_common_sessions_not_interval_holes(source, tmp_
                 row["is_open"] = False
 
     mutate(source, "dwd_trading_calendar", calendar_change)
+    freeze_warmup_authority(source)  # Explicit known-closed authoritative revision.
 
     def bar_change(rows):
         rows.append(
@@ -1097,8 +1149,314 @@ def test_warmup_revision_boundary_uses_the_new_known_calendar(source, tmp_path):
         rows.append(revision)
 
     mutate(source, "dwd_trading_calendar", change)
+    freeze_warmup_authority(source)  # Half-open revision is known at the boundary.
     result = build(source, tmp_path / "out")
     assert "2024-12-31" not in result["warmup_dates"]
     assert len(result["warmup_dates"]) == 60
     shutil.rmtree(source)
     native.verify(tmp_path / "out", manifest_sha256=result["manifest_sha256"])
+
+
+def rewrite_prepared_table(root, table, change):
+    path = root / "native" / (table + ".parquet")
+    data = pq.read_table(path)
+    rows = data.to_pylist()
+    change(rows)
+    pq.write_table(pa.Table.from_pylist(rows, schema=data.schema), path)
+    write(
+        root / "checkpoints" / (table + ".json"),
+        {
+            "member": {"bytes": path.stat().st_size, "sha256": sha(path)},
+            "rows": len(rows),
+        },
+    )
+    manifest = json.loads((root / "manifest.json").read_text())
+    manifest["semantic_summary"][table]["rows"] = len(rows)
+    write(root / "manifest.json", manifest)
+    return reseal_prepared(root)
+
+
+@pytest.mark.parametrize("mode", ["build", "cold"])
+@pytest.mark.parametrize("defect", ["missing", "late"])
+def test_frozen_warmup_never_substitutes_an_earlier_session(source, tmp_path, mode, defect):
+    root = tmp_path / "out"
+
+    def change(rows):
+        target = next(r for r in rows if r["calendar_session_id"] == "sh-2024-12-31")
+        if defect == "missing":
+            rows.remove(target)
+        else:
+            target["knowledge_from"] = CLOCK + timedelta(days=1)
+
+    if mode == "build":
+        marker = CLOCK.replace(year=2024, month=10, day=8)
+        mutate(
+            source,
+            "dwd_security_bar",
+            lambda rows: rows.append(
+                {
+                    **rows[0],
+                    "calendar_session_id": "sz-2024-10-08",
+                    "observation_start": marker,
+                    "observation_end": marker,
+                }
+            ),
+        )
+        mutate(source, "dwd_trading_calendar", change)
+        with pytest.raises(native.InputError, match="WARMUP_CALENDAR"):
+            build(source, root)
+        assert not list((tmp_path / ".out.job/native").glob("*.parquet"))
+    else:
+        build(source, root)
+        digest = rewrite_prepared_table(root, "dwd_trading_calendar", change)
+        shutil.rmtree(source)
+        with pytest.raises(native.InputError, match="WARMUP_CALENDAR"):
+            native.verify(root, manifest_sha256=digest)
+
+
+@pytest.mark.parametrize("mode", ["build", "cold"])
+def test_conflicting_security_identifier_is_rejected_with_native_model_key(source, tmp_path, mode):
+    mutate(source, "dwd_security", lambda rows: rows.append({**rows[0], "security_id": "s2"}))
+
+    def identifiers(rows):
+        rows.extend(
+            {
+                "security_id": security,
+                "identifier_namespace": "SSE_SZSE_CODE",
+                "identifier_value": "000001",
+                "venue_id": "sz",
+                "effective_from": EARLY,
+                "knowledge_from": EARLY,
+                "source_record_id": security,
+                "source_revision": "v1",
+                "source_artifact_sha256": SHA,
+            }
+            for security in ("s", "s2")
+        )
+
+    root = tmp_path / "out"
+    if mode == "build":
+        mutate(source, "dwd_security_identifier", identifiers)
+        with pytest.raises(
+            native.InputError, match="CONFLICTING_NATIVE_VERSION:dwd_security_identifier"
+        ):
+            build(source, root)
+    else:
+        build(source, root)
+        digest = rewrite_prepared_table(root, "dwd_security_identifier", identifiers)
+        shutil.rmtree(source)
+        with pytest.raises(
+            native.InputError, match="CONFLICTING_NATIVE_VERSION:dwd_security_identifier"
+        ):
+            native.verify(root, manifest_sha256=digest)
+
+
+def test_distinct_state_observations_retained_and_latest_completed_selected(source, tmp_path):
+    mutate(
+        source,
+        "dwd_tradability_state",
+        lambda rows: rows.append(
+            {
+                **rows[0],
+                "observation_start": CLOCK.replace(hour=9),
+                "observation_end": CLOCK.replace(hour=9),
+                "can_buy": True,
+            }
+        ),
+    )
+    result = build(source, tmp_path / "out")
+    assert result["semantic_summary"]["dwd_tradability_state"]["rows"] == 2
+    with native.open_prepared(tmp_path / "out", manifest_sha256=result["manifest_sha256"]) as view:
+        assert next(view.market_batches(CLOCK)).to_pylist()[0]["can_buy"] is None
+        assert view.input_census(CLOCK)["tables"]["dwd_tradability_state"]["visible_versions"] == 2
+
+
+@pytest.mark.parametrize("market", ["XBEI", "XSHE"])
+def test_market_gate_only_ignores_provably_excluded_late_identity(source, tmp_path, market):
+    mutate(
+        source,
+        "dwd_security",
+        lambda rows: rows.append(
+            {
+                **rows[0],
+                "security_id": "other-security",
+                "knowledge_from": CLOCK + timedelta(days=1),
+            }
+        ),
+    )
+    mutate(
+        source,
+        "dwd_listing",
+        lambda rows: rows.append(
+            {
+                **rows[0],
+                "listing_id": "other-listing",
+                "security_id": "other-security",
+                "venue_id": "other",
+            }
+        ),
+    )
+    mutate(
+        source,
+        "dwd_trading_venue",
+        lambda rows: rows.append(
+            {
+                **rows[0],
+                "venue_id": "other",
+                "mic_code": market,
+            }
+        ),
+    )
+    mutate(
+        source,
+        "dwd_trading_calendar",
+        lambda rows: rows.append(
+            {
+                **next(r for r in rows if r["calendar_session_id"] == "sz-2025-01-02"),
+                "calendar_session_id": "other-session",
+                "venue_id": "other",
+            }
+        ),
+    )
+    mutate(
+        source,
+        "dwd_security_bar",
+        lambda rows: rows.append(
+            {
+                **rows[0],
+                "listing_id": "other-listing",
+                "calendar_session_id": "other-session",
+            }
+        ),
+    )
+    result = build(source, tmp_path / "out")
+    with native.open_prepared(tmp_path / "out", manifest_sha256=result["manifest_sha256"]) as view:
+        if market == "XBEI":
+            assert sum(b.num_rows for b in view.market_batches(CLOCK)) == 1
+        else:
+            with pytest.raises(native.InputError, match="ASOF_IDENTITY_UNAVAILABLE"):
+                list(view.market_batches(CLOCK))
+
+
+@pytest.mark.parametrize("mode", ["build", "resume"])
+@pytest.mark.parametrize("delta", [-1, 0, 1])
+def test_ready_is_included_in_exact_publication_budget(source, tmp_path, monkeypatch, mode, delta):
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return EARLY
+
+    monkeypatch.setattr(native, "datetime", FixedDatetime)
+    monkeypatch.setattr(native.time, "monotonic", lambda: 1000.0)
+    reference = tmp_path / "reference"
+    reference_budget = 999999
+    build(source, reference, max_output_bytes=reference_budget)
+    size = sum(p.stat().st_size for p in reference.rglob("*") if p.is_file())
+    if len(str(size)) != len(str(reference_budget)):
+        reference_budget = 10 ** len(str(size)) - 1
+        reference = tmp_path / "same-width-reference"
+        build(source, reference, max_output_bytes=reference_budget)
+        size = sum(p.stat().st_size for p in reference.rglob("*") if p.is_file())
+    limit = size + delta
+    assert len(str(limit)) == len(str(reference_budget))
+    output = tmp_path / "out"
+    if mode == "resume":
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                native, "_publish", lambda *_: (_ for _ in ()).throw(RuntimeError("stop"))
+            )
+            with pytest.raises(RuntimeError, match="stop"):
+                build(source, output, max_output_bytes=limit)
+    if delta < 0:
+        with pytest.raises(native.InputError, match="OUTPUT_BUDGET_EXCEEDED"):
+            build(source, output, max_output_bytes=limit)
+        assert not output.exists()
+        assert not (tmp_path / ".out.job/READY").exists()
+    else:
+        result = build(source, output, max_output_bytes=limit)
+        assert sum(p.stat().st_size for p in output.rglob("*") if p.is_file()) <= limit
+        native.verify(output, manifest_sha256=result["manifest_sha256"])
+
+
+def test_verifier_deadline_expiring_between_sql_stages_cannot_succeed(
+    source, tmp_path, monkeypatch
+):
+    result = build(source, tmp_path / "out", wall_seconds=2)
+    original = native.NativeView.__init__
+
+    def delayed(self, *args, **kwargs):
+        original(self, *args, **kwargs)
+        time.sleep(2.2)
+
+    monkeypatch.setattr(native.NativeView, "__init__", delayed)
+    with pytest.raises(native.InputError, match="WALL_BUDGET_EXCEEDED"):
+        native.verify(tmp_path / "out", manifest_sha256=result["manifest_sha256"])
+
+
+def test_deadline_interrupts_executing_sql(source):
+    with (
+        native.NativeView(source, deadline=time.monotonic() + 0.2) as view,
+        pytest.raises(native.InputError, match="WALL_BUDGET_EXCEEDED"),
+    ):
+        view.connection.execute("SELECT sum(i) FROM range(10000000000) t(i)")
+
+
+def test_native_keys_match_all_locked_model_business_keys():
+    root = Path(__file__).resolve().parents[2]
+    model = json.loads((root / "config/pipelines/dwd-domain-model.v1.json").read_text())
+    expected = {
+        t["name"]: tuple(t["business_key"]) for t in model["tables"] if t["name"] in native.KEYS
+    }
+    assert expected == native.KEYS
+
+
+def test_unused_industry_ambiguity_does_not_block_market_but_census_remains_strict(
+    source, tmp_path
+):
+    def change(rows):
+        row = {
+            "industry_scheme_id": "unused",
+            "scheme_version": "v1",
+            "effective_from": EARLY,
+            "knowledge_from": EARLY,
+            "source_record_id": "unused",
+            "source_revision": "v1",
+            "source_artifact_sha256": SHA,
+        }
+        rows.extend([row, {**row, "knowledge_from": EARLY + timedelta(days=1)}])
+
+    mutate(source, "dwd_industry_scheme", change)
+    result = build(source, tmp_path / "out")
+    with native.open_prepared(tmp_path / "out", manifest_sha256=result["manifest_sha256"]) as view:
+        assert sum(b.num_rows for b in view.market_batches(CLOCK)) == 1
+        with pytest.raises(native.InputError, match="AMBIGUOUS_ASOF_VERSION:dwd_industry_scheme"):
+            view.input_census(CLOCK)
+
+
+@pytest.mark.parametrize("defect", ["missing", "duplicate", "evidence"])
+def test_warmup_authority_must_be_frozen_before_payload_access(
+    source, tmp_path, monkeypatch, defect
+):
+    plan = make_plan(source)
+    if defect == "missing":
+        plan.pop("warmup_calendar")
+    elif defect == "duplicate":
+        plan["warmup_calendar"]["sessions"][-1] = plan["warmup_calendar"]["sessions"][0]
+    else:
+        plan["warmup_calendar"]["authority_evidence_sha256"] = "unqualified"
+    original = Path.open
+
+    def guarded(path, *args, **kwargs):
+        assert path.suffix != ".parquet"
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guarded)
+    with pytest.raises(native.InputError, match="WARMUP_CALENDAR"):
+        native.prepare(
+            source,
+            tmp_path / "out",
+            source_manifest_sha256=plan["source_manifest_sha256"],
+            code_revision=plan["code_revision"],
+            run_plan=plan,
+        )
+    assert not (tmp_path / ".out.job").exists()

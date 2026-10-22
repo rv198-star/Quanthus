@@ -22,42 +22,53 @@
       "effective_from"
     ],
     "dwd_trading_calendar": [
-      "calendar_session_id"
+      "venue_id",
+      "trade_date",
+      "session_type"
     ],
     "dwd_security_bar": [
       "listing_id",
-      "calendar_session_id"
+      "observation_start",
+      "interval_size",
+      "price_basis"
     ],
     "dwd_tradability_state": [
       "listing_id",
-      "calendar_session_id"
+      "calendar_session_id",
+      "observation_start"
     ],
     "dwd_price_limit_regime": [
       "price_limit_regime_id",
       "effective_from"
     ],
     "dwd_listing_status_interval": [
-      "listing_status_id",
+      "listing_id",
+      "status_type",
       "effective_from"
     ],
     "dwd_security_identifier": [
-      "security_id",
       "identifier_namespace",
       "identifier_value",
       "effective_from"
     ],
     "dwd_corporate_action": [
-      "corporate_action_id"
+      "corporate_action_id",
+      "effective_at"
     ],
     "dwd_corporate_action_term": [
-      "corporate_action_term_id"
+      "corporate_action_id",
+      "corporate_action_term_id",
+      "effective_at"
     ],
     "dwd_adjustment_factor": [
       "adjustment_factor_id",
       "effective_from"
     ],
     "dwd_quality_exception": [
-      "quality_exception_id"
+      "affected_table",
+      "affected_business_key_json",
+      "rule_id",
+      "affected_effective_at"
     ],
     "dwd_company_industry_membership": [
       "company_id",
@@ -70,12 +81,15 @@
     ],
     "dwd_industry_scheme": [
       "industry_scheme_id",
+      "scheme_version",
       "effective_from"
     ]
   },
   "knowledge_selection": "original_half_open_intervals; unknown_excluded; ambiguity_rejected",
   "materialization": "one_job_local_native_closure; exact_values_and_versions; no_global_snapshot",
-  "warmup": "60_common_SSE_SZSE_open_dates_known_before_decision_start",
+  "warmup": "exact_60_authoritative_SSE_SZSE_sessions_pinned_in_run_plan; missing_or_late_rejected",
+  "market_scope": "provably_excluded_markets_do_not_block; unknown_scope_fails_closed",
+  "daily_state": "latest_completed_observation_start_per_listing_session_at_knowledge_cutoff",
   "disposition": "input_engineering_only; not_legacy_equivalence; not_B_or_D_admission",
   "not_proven": [
     "economic_PIT_qualification",

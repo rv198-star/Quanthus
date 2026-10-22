@@ -12,9 +12,10 @@ recover/repair data. The reviewed live routing inventory is `config/data-ownersh
 
 ## Whole-project CN02 migration
 
-P6 startup on the migrated node is tracked in
-[P6-R1: CN02 Base 2.4 startup](p6-cn02-start.md). Its recovered database,
-disabled rehearsal and official prospective activation are separate gates.
+P6 on the migrated node is tracked in
+[P6-R1 / P6-HISTORY-001](p6-cn02-start.md). The current Owner direction is
+historical replay with fixed time slices. The recovered database, disabled
+rehearsal and deferred official prospective activation are separate gates.
 
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |

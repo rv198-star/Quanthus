@@ -2,12 +2,20 @@
 
 | Field | Value |
 | --- | --- |
-| Phase | P6 prospective-MVP implementation; P5 optional research deferred |
-| Status | Production activation enabled; `P6-ACTIVATE-001` waits only for first legal official-cycle reproduction; review budget remains open |
+| Phase | P6 historical-replay successor; prospective MVP retained; P5 optional research deferred |
+| Status | Historical intervals fixed; source admission and actual replay are separate gates. Earlier prospective activation is retained history, not current CN02 admission. |
 | Governing requirements | FR-GOV-001/002, NFR-004 |
 | Detailed design | `08-validation-governance/p6-forward-validation.md` |
 
 ## 1. Goal
+
+The Owner's 2026-10-22 current execution direction is the separate
+[P6 historical replay successor](08-validation-governance/p6-historical-replay.md),
+using existing data and fixed intervals without waiting for future observations.
+It preserves the frozen prospective program and all protected partitions;
+historical input qualification and actual replay completion remain separate.
+Earlier production-activation records are retained program checkpoints,
+not evidence of an enabled or historically qualified CN02 run.
 
 Make rule evolution evidence-driven and make repeated historical tuning visible. Validation
 discipline has higher priority than a favorable performance number.

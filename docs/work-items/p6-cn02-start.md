@@ -10,6 +10,24 @@
 
 ## Current recovery checkpoint
 
+**Current routing is historical replay.** After the initial startup report,
+the Owner corrected the prospective-only direction and explicitly chose
+existing historical data, then approved fixing the time slices and proceeding.
+The successor [historical replay design](../design/lld/08-validation-governance/p6-historical-replay.md)
+and `config/forward-validation/runtime/p6-historical-replay-plan.v1.json` own
+this work as P6-HISTORY-001. Use shared 2026-01-05--07-06 warmup, decisions
+2026-07-07--09-14, and 2026-09-15--10-20 target tail. S1/S2/S3 are continuous
+reporting slices, not independent reset runs. Do not wait for future Daily or
+OCI single-writer reconciliation to execute isolated historical work.
+
+The historical input admission module is pre-result work; it does not contain
+the actual historical strategy orchestrator or turn the existing P10 negative
+historical-purpose assessment into a grant. Missing source qualification stops
+that strategy step. It must not be reported as a successful zero-trade replay.
+The installed controller stays disabled. The prospective startup implementation
+below is retained, deferred material; its future-day sequence is not the current
+historical task plan. Old sealed handoffs remain unchanged.
+
 The startup branch is based on `f3eaf29d3f1313db910540dc13ebde988d148692`.
 The CN02 P10 production worktree and image remain separate. Read the latest
 node-local startup handoff for installed image, database and rehearsal identities;

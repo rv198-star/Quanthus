@@ -16,7 +16,9 @@ from quanthus.pipelines.contracts import (
     OdsVerificationResult,
     verify_ods_release,
 )
-from quanthus.pipelines.securities_warehouse.daily_ods_catalog import DailyOdsCatalogError
+from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (
+    DailyOdsCatalogError as DailyOdsCatalogError,
+)
 
 _LANES = {
     "market_daily_core": ("daily", "hermes-market-daily-core-"),
@@ -103,6 +105,64 @@ def _write_atomic(path: Path, payload: bytes) -> None:
         raise
 
 
+def _prevention_admits(
+    item: Path, verified: OdsVerificationResult, market_date: date, lane: str
+) -> bool:
+    if os.environ.get(
+        "HERMES_ODS_PREVENTION_POLICY"
+    ) != "p10-acquisition-prevention-v1" or lane not in {
+        "market_daily_core",
+        "calendar_daily_events",
+    }:
+        return True
+    artifacts = {a.name: a for a in verified.release.artifacts}
+    if not {"source_universe", "acquisition_quality", "original_responses"} <= artifacts.keys():
+        return False
+    try:
+        universe = json.loads((item / artifacts["source_universe"].relative_path).read_text())
+        quality = json.loads((item / artifacts["acquisition_quality"].relative_path).read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(universe, Mapping)
+        and isinstance(quality, Mapping)
+        and universe.get("policy_id") == "p10-acquisition-prevention-v1"
+        and universe.get("market_date") == market_date.isoformat()
+        and quality.get("policy_id") == "p10-acquisition-prevention-v1"
+    )
+
+
+def _check_bound_prevention_sources(root: Path, output: Path, market_date: date) -> None:
+    if os.environ.get("HERMES_ODS_PREVENTION_POLICY") != "p10-acquisition-prevention-v1":
+        return
+    catalog = json.loads((output / "catalog.json").read_text(encoding="ascii"))
+    for bound in catalog["lanes"]:
+        lane = bound["lane"]
+        relative = Path(bound["release_path"])
+        source = root / relative
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or not source.resolve().is_relative_to(root)
+        ):
+            raise DailyOdsCatalogError("cached catalog source escapes release_root")
+        try:
+            verified = verify_ods_release(source)
+        except OdsReleaseError as exc:
+            raise DailyOdsCatalogError("cached catalog source is not READY") from exc
+        if (
+            verified.manifest_sha256 != bound["release_manifest_sha256"]
+            or verified.release.market_date != market_date
+            or verified.release.release_id != bound["release_id"]
+            or verified.release.schedule != "daily"
+            or not verified.release.release_id.startswith(_LANES[lane][1])
+            or not _prevention_admits(source, verified, market_date, lane)
+        ):
+            raise DailyOdsCatalogError(
+                "cached catalog source fails acquisition prevention admission"
+            )
+
+
 def _select_lane(release_root: Path, market_date: date, lane: str) -> OdsVerificationResult:
     relative_root, release_prefix = _LANES[lane]
     date_root = release_root.joinpath(*relative_root.split("/"), market_date.isoformat())
@@ -121,6 +181,8 @@ def _select_lane(release_root: Path, market_date: date, lane: str) -> OdsVerific
                 and release.market_date == market_date
                 and release.release_id.startswith(release_prefix)
             ):
+                if not _prevention_admits(item, verified, market_date, lane):
+                    continue
                 candidates.append(verified)
     if not candidates:
         raise DailyOdsCatalogError(f"required ODS lane is absent or not READY: {lane}")
@@ -165,6 +227,7 @@ def build_daily_ods_catalog(
         existing = verify_daily_ods_catalog(output)
         if existing.market_date != market_date or existing.product_scope != product_scope:
             raise DailyOdsCatalogError("existing catalog product identity differs")
+        _check_bound_prevention_sources(release_root, output, market_date)
         return existing
     required_lanes = _REQUIRED_LANES_BY_SCOPE[product_scope]
     selected = {lane: _select_lane(release_root, market_date, lane) for lane in required_lanes}

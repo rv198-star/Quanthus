@@ -1,0 +1,33 @@
+{
+  "design_status": "candidate_not_activated",
+  "owner": "P10",
+  "issue": 473,
+  "contract": {
+    "policy_version": "p10-daily-unadjusted-v1",
+    "schema_version": "quanthus.daily-price-basis.v1",
+    "source_family": "market_daily_core/daily_ohlcv_none_delta",
+    "interval_size": "1d",
+    "source_price_basis": "none",
+    "canonical_price_basis": "UNADJUSTED",
+    "physical_schema": "dwd_security_bar:20-fields:decimal38_10:utc-us:v1",
+    "other_intervals": "preserved_without_mapping",
+    "decision_admissible": false,
+    "unavailable_reason": "P10_CONSUMER_AND_PIT_ADMISSION_REQUIRED"
+  },
+  "source_applicability": {
+    "entrypoint": "build_daily_domain_increment",
+    "catalog_kind": "daily_ods_input_catalog",
+    "ods_release_schema_version": 1,
+    "source_family": "market_daily_core/daily_ohlcv_none_delta",
+    "source_binding": "verified four-lane catalog, exact release manifest, member SHA and source_revision",
+    "legacy_package_adaptation": "not_supported; separate frozen replacement handoff required"
+  },
+  "publication": {
+    "kind": "cn01_daily_dwd_price_basis_candidate",
+    "schema_version": 2,
+    "default_verifier_admission": false,
+    "CURRENT_admission": false,
+    "P6_activation": false,
+    "historical_rebuild_authorized": false
+  }
+}

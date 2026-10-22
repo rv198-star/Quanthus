@@ -1,0 +1,1007 @@
+{
+  "schema_version": 1,
+  "contract_id": "p10-base22-independent-image-v1",
+  "candidate_kind": "dwd_base22_independent_candidate",
+  "through_date": "2026-08-31",
+  "business_timezone": "Asia/Shanghai",
+  "history_through_date": "2026-07-31",
+  "model_sha256": "sha256:7ccfbebbe8f06622363228cfa85abca23adb1b4ff8f5fff8c6c07cbc8d633dd7",
+  "extension_sha256": "sha256:b34a9b60fec803cbc8f14fda12694dbe2a4f28972f8a9784f9cf12bce1159cb1",
+  "price_basis_policy": "p10-base22-unadjusted-v1",
+  "execution_scope": "synthetic_only_pending_real_input_authority",
+  "stages": {
+    "freeze": [],
+    "repaired_history": [
+      "freeze"
+    ],
+    "august_projection": [
+      "repaired_history"
+    ],
+    "merge": [
+      "repaired_history",
+      "august_projection"
+    ],
+    "seal": [
+      "merge"
+    ],
+    "independent_verification": [
+      "seal"
+    ]
+  },
+  "tables": {
+    "dwd_listed_company": {
+      "domain": "listed_company",
+      "source_families": [
+        "release_artifacts/security_master",
+        "static_sources/announcement_orgid_map",
+        "static_sources/security_master",
+        "weekly_artifacts/security_lifecycle"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "company_id",
+        "effective_from"
+      ],
+      "version_key": [
+        "company_id",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_company_identifier": {
+      "domain": "listed_company",
+      "source_families": [
+        "static_sources/announcement_orgid_map"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "identifier_namespace",
+        "identifier_value",
+        "effective_from"
+      ],
+      "version_key": [
+        "identifier_namespace",
+        "identifier_value",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_security": {
+      "domain": "listed_company",
+      "source_families": [
+        "release_artifacts/security_master",
+        "static_sources/security_master",
+        "weekly_artifacts/security_lifecycle"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "security_id",
+        "effective_from"
+      ],
+      "version_key": [
+        "security_id",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_security_identifier": {
+      "domain": "listed_company",
+      "source_families": [
+        "release_artifacts/security_master",
+        "static_sources/security_master",
+        "weekly_artifacts/security_lifecycle"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "identifier_namespace",
+        "identifier_value",
+        "effective_from"
+      ],
+      "version_key": [
+        "identifier_namespace",
+        "identifier_value",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_listing": {
+      "domain": "listed_company",
+      "source_families": [
+        "release_artifacts/security_master",
+        "static_sources/security_master",
+        "weekly_artifacts/security_lifecycle"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "listing_id",
+        "effective_from"
+      ],
+      "version_key": [
+        "listing_id",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_trading_venue": {
+      "domain": "listed_company",
+      "source_families": [
+        "hotfix_artifacts/trading_calendar_history_hotfix",
+        "release_artifacts/trading_calendar",
+        "static_sources/trading_calendar"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "venue_id",
+        "effective_from"
+      ],
+      "version_key": [
+        "venue_id",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_security_bar": {
+      "domain": "security_market_observation",
+      "source_families": [
+        "hotfix_artifacts/daily_ohlcv_none_hotfix",
+        "hotfix_artifacts/minute_1m_hotfix",
+        "hotfix_artifacts/minute_5m_hotfix",
+        "release_artifacts/daily_ohlcv_none_delta",
+        "release_artifacts/intraday_bars",
+        "static_sources/daily_ohlcv_unadjusted",
+        "static_sources/minute_1m_research_archive",
+        "static_sources/minute_5m_formal_archive"
+      ],
+      "cutoff_field": "observation_start",
+      "business_key": [
+        "listing_id",
+        "observation_start",
+        "interval_size",
+        "price_basis"
+      ],
+      "version_key": [
+        "listing_id",
+        "observation_start",
+        "interval_size",
+        "price_basis",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "interval_size",
+        "observation_start_year",
+        "observation_start_month"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_security_valuation": {
+      "domain": "security_market_observation",
+      "source_families": [
+        "hotfix_artifacts/valuation_history_hotfix",
+        "release_artifacts/valuation_daily_delta",
+        "static_sources/valuation_daily",
+        "static_sources/valuation_history_july_repair"
+      ],
+      "cutoff_field": "observation_start",
+      "business_key": [
+        "security_id",
+        "observation_start",
+        "measure_type",
+        "methodology"
+      ],
+      "version_key": [
+        "security_id",
+        "observation_start",
+        "measure_type",
+        "methodology",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "observation_start_year",
+        "observation_start_month"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_adjustment_factor": {
+      "domain": "security_market_observation",
+      "source_families": [
+        "release_artifacts/adjustment_evidence_delta",
+        "release_artifacts/factor_evidence_delta",
+        "static_sources/adjustment_factors_pit",
+        "weekly_artifacts/adjustment_evidence"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "adjustment_factor_id",
+        "effective_from"
+      ],
+      "version_key": [
+        "adjustment_factor_id",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_adjustment_factor_input": {
+      "domain": "security_market_observation",
+      "source_families": [
+        "release_artifacts/adjustment_evidence_delta",
+        "release_artifacts/corporate_actions_delta",
+        "release_artifacts/dividends_delta",
+        "release_artifacts/factor_evidence_delta",
+        "static_sources/adjustment_factors_pit",
+        "static_sources/corporate_actions",
+        "static_sources/dividend_history",
+        "weekly_artifacts/adjustment_evidence",
+        "weekly_artifacts/corporate_actions",
+        "weekly_artifacts/dividends"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "adjustment_factor_id",
+        "input_type",
+        "input_evidence_digest",
+        "effective_from"
+      ],
+      "version_key": [
+        "adjustment_factor_id",
+        "input_type",
+        "input_evidence_digest",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_market_index": {
+      "domain": "security_market_observation",
+      "source_families": [
+        "release_artifacts/index_daily_delta",
+        "static_sources/index_daily",
+        "static_sources/index_daily_metadata"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "index_id",
+        "effective_from"
+      ],
+      "version_key": [
+        "index_id",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_index_bar": {
+      "domain": "security_market_observation",
+      "source_families": [
+        "release_artifacts/index_daily_delta",
+        "static_sources/index_daily"
+      ],
+      "cutoff_field": "observation_start",
+      "business_key": [
+        "index_id",
+        "observation_start",
+        "interval_size"
+      ],
+      "version_key": [
+        "index_id",
+        "observation_start",
+        "interval_size",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "interval_size",
+        "observation_start_year",
+        "observation_start_month"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_trading_calendar": {
+      "domain": "tradability_state",
+      "source_families": [
+        "hotfix_artifacts/trading_calendar_history_hotfix",
+        "release_artifacts/trading_calendar",
+        "static_sources/trading_calendar"
+      ],
+      "cutoff_field": "trade_date",
+      "business_key": [
+        "venue_id",
+        "trade_date",
+        "session_type"
+      ],
+      "version_key": [
+        "venue_id",
+        "trade_date",
+        "session_type",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "trade_date_year"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_security_status_interval": {
+      "domain": "tradability_state",
+      "source_families": [
+        "hotfix_artifacts/daily_status_observation_hotfix",
+        "static_sources/st_status_pit",
+        "weekly_artifacts/st_announcement_trail"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "security_id",
+        "status_type",
+        "effective_from"
+      ],
+      "version_key": [
+        "security_id",
+        "status_type",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_listing_status_interval": {
+      "domain": "tradability_state",
+      "source_families": [
+        "release_artifacts/security_master",
+        "release_artifacts/suspensions_delta",
+        "static_sources/security_master",
+        "static_sources/suspensions",
+        "weekly_artifacts/security_lifecycle"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "listing_id",
+        "status_type",
+        "effective_from"
+      ],
+      "version_key": [
+        "listing_id",
+        "status_type",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_price_limit_regime": {
+      "domain": "tradability_state",
+      "source_families": [
+        "static_sources/price_limit_regime"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "price_limit_regime_id",
+        "effective_from"
+      ],
+      "version_key": [
+        "price_limit_regime_id",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_tradability_state": {
+      "domain": "tradability_state",
+      "source_families": [
+        "hotfix_artifacts/daily_status_observation_hotfix",
+        "hotfix_artifacts/trading_calendar_history_hotfix",
+        "release_artifacts/daily_status_observation_delta",
+        "release_artifacts/suspensions_delta",
+        "release_artifacts/trading_calendar",
+        "static_sources/price_limit_regime",
+        "static_sources/st_status_pit",
+        "static_sources/suspensions",
+        "static_sources/trading_calendar",
+        "weekly_artifacts/st_announcement_trail"
+      ],
+      "cutoff_field": "observation_start",
+      "business_key": [
+        "listing_id",
+        "calendar_session_id",
+        "observation_start"
+      ],
+      "version_key": [
+        "listing_id",
+        "calendar_session_id",
+        "observation_start",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "observation_start_year",
+        "observation_start_month"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_observation_gap": {
+      "domain": "tradability_state",
+      "source_families": [
+        "release_artifacts/intraday_coverage",
+        "static_sources/delist_boundary_exceptions",
+        "static_sources/source_evidence_delist_boundaries",
+        "static_sources/source_evidence_tradability_c2_s1"
+      ],
+      "cutoff_field": "affected_effective_at",
+      "business_key": [
+        "listing_id",
+        "calendar_session_id",
+        "interval_size",
+        "affected_effective_at"
+      ],
+      "version_key": [
+        "listing_id",
+        "calendar_session_id",
+        "interval_size",
+        "affected_effective_at",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "affected_effective_at_year",
+        "affected_effective_at_month"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_disclosure": {
+      "domain": "disclosure_company_event",
+      "source_families": [
+        "release_artifacts/announcements_delta",
+        "release_artifacts/financial_disclosures_delta",
+        "static_sources/announcement_archive",
+        "weekly_artifacts/st_announcement_trail"
+      ],
+      "cutoff_field": "effective_at",
+      "business_key": [
+        "disclosure_id",
+        "effective_at"
+      ],
+      "version_key": [
+        "disclosure_id",
+        "effective_at",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "effective_at_year",
+        "effective_at_month"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_disclosure_subject": {
+      "domain": "disclosure_company_event",
+      "source_families": [
+        "release_artifacts/announcements_delta",
+        "release_artifacts/financial_disclosures_delta",
+        "static_sources/announcement_archive"
+      ],
+      "cutoff_field": "effective_at",
+      "business_key": [
+        "disclosure_id",
+        "disclosure_subject_id",
+        "effective_at"
+      ],
+      "version_key": [
+        "disclosure_id",
+        "disclosure_subject_id",
+        "effective_at",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "effective_at_year",
+        "effective_at_month"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_corporate_action": {
+      "domain": "disclosure_company_event",
+      "source_families": [
+        "release_artifacts/corporate_actions_delta",
+        "release_artifacts/dividends_delta",
+        "static_sources/corporate_actions",
+        "static_sources/dividend_history",
+        "weekly_artifacts/corporate_actions",
+        "weekly_artifacts/dividends"
+      ],
+      "cutoff_field": "effective_at",
+      "business_key": [
+        "corporate_action_id",
+        "effective_at"
+      ],
+      "version_key": [
+        "corporate_action_id",
+        "effective_at",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "effective_at_year",
+        "effective_at_month"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_corporate_action_term": {
+      "domain": "disclosure_company_event",
+      "source_families": [
+        "release_artifacts/corporate_actions_delta",
+        "release_artifacts/dividends_delta",
+        "static_sources/corporate_actions",
+        "static_sources/dividend_history",
+        "weekly_artifacts/corporate_actions",
+        "weekly_artifacts/dividends"
+      ],
+      "cutoff_field": "effective_at",
+      "business_key": [
+        "corporate_action_id",
+        "corporate_action_term_id",
+        "effective_at"
+      ],
+      "version_key": [
+        "corporate_action_id",
+        "corporate_action_term_id",
+        "effective_at",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "effective_at_year"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_financial_report": {
+      "domain": "financial_reporting",
+      "source_families": [
+        "hotfix_artifacts/fundamentals_financial_quarterly_parquet",
+        "hotfix_artifacts/fundamentals_financial_statements_parquet",
+        "release_artifacts/financial_disclosures_delta",
+        "static_sources/financial_quarterly",
+        "weekly_artifacts/financial_quarterly",
+        "weekly_artifacts/financial_statements"
+      ],
+      "cutoff_field": "period_end",
+      "business_key": [
+        "financial_report_id",
+        "period_end"
+      ],
+      "version_key": [
+        "financial_report_id",
+        "period_end",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "period_end_year"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_financial_concept": {
+      "domain": "financial_reporting",
+      "source_families": [
+        "hotfix_artifacts/fundamentals_financial_quarterly_parquet",
+        "hotfix_artifacts/fundamentals_financial_statements_parquet",
+        "static_sources/financial_quarterly",
+        "weekly_artifacts/financial_quarterly",
+        "weekly_artifacts/financial_statements"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "financial_concept_id",
+        "taxonomy_version",
+        "effective_from"
+      ],
+      "version_key": [
+        "financial_concept_id",
+        "taxonomy_version",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_financial_fact": {
+      "domain": "financial_reporting",
+      "source_families": [
+        "hotfix_artifacts/fundamentals_financial_quarterly_parquet",
+        "hotfix_artifacts/fundamentals_financial_statements_parquet",
+        "static_sources/financial_quarterly",
+        "weekly_artifacts/financial_quarterly",
+        "weekly_artifacts/financial_statements"
+      ],
+      "cutoff_field": "period_end",
+      "business_key": [
+        "financial_report_id",
+        "financial_concept_id",
+        "unit_code",
+        "context_hash",
+        "period_end"
+      ],
+      "version_key": [
+        "financial_report_id",
+        "financial_concept_id",
+        "unit_code",
+        "context_hash",
+        "period_end",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "period_end_year"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_industry_scheme": {
+      "domain": "industry_classification",
+      "source_families": [
+        "hotfix_artifacts/fundamentals_industry_membership_parquet",
+        "weekly_artifacts/industry_membership"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "industry_scheme_id",
+        "scheme_version",
+        "effective_from"
+      ],
+      "version_key": [
+        "industry_scheme_id",
+        "scheme_version",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_industry_node": {
+      "domain": "industry_classification",
+      "source_families": [
+        "hotfix_artifacts/fundamentals_industry_membership_parquet",
+        "weekly_artifacts/industry_membership"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "industry_node_id",
+        "effective_from"
+      ],
+      "version_key": [
+        "industry_node_id",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_company_industry_membership": {
+      "domain": "industry_classification",
+      "source_families": [
+        "hotfix_artifacts/fundamentals_industry_membership_parquet",
+        "weekly_artifacts/industry_membership"
+      ],
+      "cutoff_field": "effective_from",
+      "business_key": [
+        "company_id",
+        "industry_node_id",
+        "effective_from"
+      ],
+      "version_key": [
+        "company_id",
+        "industry_node_id",
+        "effective_from",
+        "knowledge_from"
+      ],
+      "partition_by": [],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_share_capital_observation": {
+      "domain": "ownership_capital",
+      "source_families": [
+        "hotfix_artifacts/fundamentals_raw_f10_parquet",
+        "weekly_artifacts/raw_f10"
+      ],
+      "cutoff_field": "observation_start",
+      "business_key": [
+        "security_id",
+        "capital_type",
+        "observation_start"
+      ],
+      "version_key": [
+        "security_id",
+        "capital_type",
+        "observation_start",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "observation_start_year"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_shareholder_count_observation": {
+      "domain": "ownership_capital",
+      "source_families": [
+        "static_sources/shareholder_count",
+        "weekly_artifacts/shareholder_count"
+      ],
+      "cutoff_field": "period_end",
+      "business_key": [
+        "shareholder_count_observation_id",
+        "period_end"
+      ],
+      "version_key": [
+        "shareholder_count_observation_id",
+        "period_end",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "period_end_year"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_shareholding_change": {
+      "domain": "ownership_capital",
+      "source_families": [
+        "release_artifacts/financial_disclosures_delta"
+      ],
+      "cutoff_field": "effective_at",
+      "business_key": [
+        "shareholding_change_id",
+        "effective_at"
+      ],
+      "version_key": [
+        "shareholding_change_id",
+        "effective_at",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "effective_at_year",
+        "effective_at_month"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_shareholding_observation": {
+      "domain": "ownership_capital",
+      "source_families": [
+        "hotfix_artifacts/fundamentals_raw_f10_parquet",
+        "weekly_artifacts/raw_f10"
+      ],
+      "cutoff_field": "observation_start",
+      "business_key": [
+        "company_id",
+        "security_id",
+        "shareholder_source_name",
+        "holding_type",
+        "observation_start",
+        "holder_rank"
+      ],
+      "version_key": [
+        "company_id",
+        "security_id",
+        "shareholder_source_name",
+        "holding_type",
+        "observation_start",
+        "holder_rank",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "observation_start_year"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    },
+    "dwd_quality_exception": {
+      "domain": "governance_sidecar",
+      "source_families": [
+        "release_artifacts/adjustment_evidence_delta",
+        "release_artifacts/factor_evidence_delta",
+        "release_artifacts/intraday_coverage",
+        "static_sources/delist_boundary_exceptions",
+        "static_sources/factor_pit_exceptions",
+        "static_sources/source_evidence_adjustment_factor_exceptions",
+        "static_sources/source_evidence_delist_boundaries",
+        "static_sources/source_evidence_delist_placeholder_decisions",
+        "static_sources/source_evidence_delisted_history_decisions",
+        "static_sources/source_evidence_invalid_ohlc",
+        "static_sources/source_evidence_st_semantics_audit",
+        "static_sources/source_evidence_tradability_c2_s1",
+        "static_sources/source_evidence_volume_amount_null_decision",
+        "weekly_artifacts/adjustment_evidence"
+      ],
+      "cutoff_field": "affected_effective_at",
+      "business_key": [
+        "affected_table",
+        "affected_business_key_json",
+        "rule_id",
+        "affected_effective_at"
+      ],
+      "version_key": [
+        "affected_table",
+        "affected_business_key_json",
+        "rule_id",
+        "affected_effective_at",
+        "knowledge_from"
+      ],
+      "partition_by": [
+        "detected_at_year"
+      ],
+      "duplicate_policy": "same_source_duplicate_fails_cross_source_identical_row_deduplicates",
+      "revision_policy": "retain_knowledge_versions_conflicts_require_exact_authorized_replacement",
+      "reuse_rule": "verified_healthy_history_materialized_in_image",
+      "rebuild_rule": "exact_repair_or_august_projection_with_source_closure",
+      "coverage_rule": "frozen_partition_row_and_key_census_plus_august_change_or_no_change_evidence",
+      "missing_policy": "fail_closed_no_inference"
+    }
+  },
+  "real_data_gates": {
+    "470": "native_5201_and_exact_50_identity_industry_exceptions_not_backdated",
+    "471": "exact_original_normalization_manifest_or_authorized_new_revision_full_member_closure",
+    "472": "raw_accepted_source_output_key_hash_correspondence_and_state_gap_disposition",
+    "473": "decimal_precision_and_original_time_preservation_canonical_basis_statistics",
+    "474": "field_time_provenance_unknown_unavailable_and_4173_factor_exceptions_preserved"
+  }
+}

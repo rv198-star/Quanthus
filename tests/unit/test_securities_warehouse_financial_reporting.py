@@ -10,7 +10,7 @@ import shutil
 import sqlite3
 import unittest
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -1544,6 +1544,33 @@ class FinancialEnvelopeTests(unittest.TestCase):
         self.assertEqual(_plan_date("2026-07-31", "through_date").isoformat(), "2026-07-31")
         with self.assertRaisesRegex(FinancialReportingBuildError, "YYYY-MM-DD"):
             _plan_date("20260731", "through_date")
+
+    def test_plan_date_rejects_noncanonical_or_invalid_dates(self) -> None:
+        for value in (
+            "2026-W31-5",
+            "20260731",
+            "2026-7-31",
+            " 2026-07-31",
+            "2026-07-31 ",
+            "2026-07-31\n",
+            "2026-07-31T00:00:00",
+            "２０２６-０７-３１",
+            "2026-02-30",
+            "2025-02-29",
+            "0000-01-01",
+            "",
+            None,
+            20260731,
+            date(2026, 7, 31),
+        ):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    FinancialReportingBuildError, "through_date must use .*YYYY-MM-DD"
+                ),
+            ):
+                _plan_date(value, "through_date")
+        self.assertEqual(_plan_date("2024-02-29", "through_date"), date(2024, 2, 29))
 
     def test_decodes_byte_literal_gzip_and_hash_checks_payload(self) -> None:
         row = _envelope(

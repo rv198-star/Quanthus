@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import importlib.metadata
 import json
 from dataclasses import replace
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -99,9 +101,41 @@ def test_repository_p4_research_adm_contract_is_frozen() -> None:
     assert policy.semantic_digest == policy.computed_semantic_digest
 
 
+def _bind_baostock_metadata(monkeypatch: pytest.MonkeyPatch, version: str) -> None:
+    original_version = importlib.metadata.version
+
+    def fixture_version(package: str) -> str:
+        return version if package == "baostock" else original_version(package)
+
+    monkeypatch.setattr(importlib.metadata, "version", fixture_version)
+
+
+def test_historical_industry_rejects_unqualified_provider_before_collection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _bind_baostock_metadata(monkeypatch, "0.9.4")
+    policy = load_p4_research_adm_policy(POLICY)
+    provider = _BaoStockFixture()
+    with (
+        mock.patch.object(provider, "login") as login,
+        mock.patch.object(provider, "query_stock_industry") as query,
+    ):
+        with pytest.raises(ResearchADMError, match="provider version differs"):
+            collect_p4_historical_industry_supplement(
+                ["000001", "600001"],
+                hierarchy_path=HIERARCHY,
+                binding=replace(policy.historical_industry_reference, expected_security_count=2),
+                bs_module=provider,
+            )
+        login.assert_not_called()
+        query.assert_not_called()
+
+
 def test_historical_industry_supplement_is_deterministic_and_checksum_bound(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _bind_baostock_metadata(monkeypatch, _BaoStockFixture.__version__)
     policy = load_p4_research_adm_policy(POLICY)
     provider = _BaoStockFixture()
     memberships, receipt = collect_p4_historical_industry_supplement(
@@ -110,6 +144,7 @@ def test_historical_industry_supplement_is_deterministic_and_checksum_bound(
         bs_module=provider,
     )
 
+    assert receipt["provider_version"] == "0.9.3"
     assert memberships == {
         "000001": {
             "industry_code": "I65",

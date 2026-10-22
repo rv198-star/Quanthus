@@ -22,6 +22,14 @@ date. No downstream module may read vendor frames directly.
 
 ## 2. Scope
 
+The opt-in P10 Base 2.4 source interfaces are integrated under
+[the bounded P6 main-integration work item](../../work-items/p6-main-integration.md).
+`native_base24_reader.py`, `base24_input_view.py`, `base24_p6_handoff.py` and
+`base24_p6_purpose.py` own standalone reading, explicit source projection and
+purpose qualification. They preserve physical hashes, field times and scoped
+unavailable uses; a readable governance snapshot is not historical PIT or an
+execution admission. Existing frozen legacy interfaces retain their contracts.
+
 Physical data contracts and P1 historical acceptance remain here. From 2026-10-03 acquisition,
 shared quality/governance, maintenance and source recovery/repair belong to P10 under
 [`12-permanent-data-line.md`](12-permanent-data-line.md). Other lines only register data defects

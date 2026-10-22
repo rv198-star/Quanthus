@@ -16,6 +16,10 @@ recover/repair data. The reviewed live routing inventory is `config/data-ownersh
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03 | open epic |
 
+The bounded [P6 main integration](p6-main-integration.md) separates the required
+P10 source interfaces, P6 consumer and #538 regression into dependent PRs. Its
+code merges do not replace #539's future full-Base publication acceptance.
+
 #424 keeps its subgroup scope and execution gates. P3 #412 and P5 #402 retain input admission,
 research and explicit business disposition; source recovery/repair belongs to P10. They may
 continue permitted business work but their required-data gates remain unaccepted.

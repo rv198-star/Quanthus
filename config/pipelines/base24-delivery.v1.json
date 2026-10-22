@@ -1,0 +1,65 @@
+{
+  "contract_id": "p10-base24-purpose-qualified-1d5m-delivery-v1",
+  "purpose": "p10_governance_baseline_1d_native5m_with_disclosed_coverage",
+  "business_through": "2026-09-30",
+  "business_timezone": "Asia/Shanghai",
+  "predecessor_contract": "p10-base23-purpose-qualified-delivery-v1",
+  "frequency_policy_sha256": "sha256:12cac14c023edb2c151be28fb90ce5da57b8562eeca80dbf5c2d2ea2b001608e",
+  "required_intervals": ["1d", "5m"],
+  "optional_1m_disposition": "NOT_INCLUDED_RETAINED_SOURCE_NOT_DELETED",
+  "supplier_native_5m_required": true,
+  "derive_5m_from_1m": false,
+  "model_sha256": "sha256:7ccfbebbe8f06622363228cfa85abca23adb1b4ff8f5fff8c6c07cbc8d633dd7",
+  "extension_sha256": "sha256:b34a9b60fec803cbc8f14fda12694dbe2a4f28972f8a9784f9cf12bce1159cb1",
+  "required_structural_checks": [
+    "exact_physical_tables_partitions_files",
+    "all_file_hashes",
+    "physical_schema",
+    "global_keys_and_knowledge_versions",
+    "business_cutoff_and_original_times",
+    "calendar_date_and_venue",
+    "foreign_keys_and_table_source_closure",
+    "recomputed_typed_partition_summaries",
+    "registered_capacity",
+    "two_independent_source_denied_cold_runs",
+    "missing_and_corrupt_fail_closed"
+  ],
+  "schema_successors": {
+    "dwd_shareholder_count_observation": {
+      "additive_column": "average_holding_exact",
+      "arrow_type": "decimal256(41,13)",
+      "nullable": true,
+      "legacy_column_retained": "average_holding"
+    },
+    "dwd_shareholding_observation": {
+      "additional_nullable_business_key_fields": [
+        "share_nature",
+        "holding_percentage_unit"
+      ]
+    }
+  },
+  "governance_read_use": "governance_baseline",
+  "restricted_uses": [
+    "trading_entry",
+    "historical_pit",
+    "canonical_adjusted_price",
+    "cross_provider_exact_price",
+    "complete_holder_matrix",
+    "complete_market_coverage",
+    "original_revision_reproduction"
+  ],
+  "permanent_protections": {
+    "original_visibility_unavailable": 4173,
+    "tail_conflicts": "KEEP_OLD_THREE_KEYS_PENDING_AUTHORITY",
+    "consumer_admission": "NOT_GRANTED",
+    "source_truth_or_PIT_inference": false,
+    "frozen_policy_changes": false
+  },
+  "delivery_rule": "The default Base 2.4 market profile contains daily and supplier-native five-minute observations only. Local disclosed limitations do not block unrelated qualified domains; structural, lineage, calendar and required-frequency failures remain hard failures.",
+  "readiness": {
+    "MATERIALIZED": "All selected physical entities exist; not yet independently accepted.",
+    "READY": "Structural build checks passed; isolated candidate only.",
+    "ACCEPTANCE": "Two separate source-denied cold receipts and damage negatives are required before release review."
+  },
+  "transition_rule": "Reuse exact independently verified Base 2.3.1 files for unchanged tables and replace dwd_security_bar as one whole qualified domain. Preserve original clocks and limitations. Do not derive native five-minute bars from one-minute data or include one-minute rows in the default image."
+}

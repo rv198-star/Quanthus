@@ -15,6 +15,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from quanthus.pipelines.contracts import OdsReleaseError, verify_ods_release
+from quanthus.pipelines.securities_warehouse.base24_image import KIND as NATIVE_BASE24_KIND
 from quanthus.pipelines.securities_warehouse.daily_core_ods_catalog import (
     DAILY_CORE_PRODUCT_SCOPE,
     LEGACY_PRODUCT_SCOPE,
@@ -809,6 +810,25 @@ def verify_daily_domain_increment(root: Path) -> DailyDomainResult:
         raise DailyDomainBuildError("daily DWD READY is unreadable") from exc
     if ready != manifest_sha:
         raise DailyDomainBuildError("daily DWD manifest or READY differs")
+    if manifest.get("base", {}).get("kind") == NATIVE_BASE24_KIND:
+        identity = manifest.get("job_identity")
+        if (
+            manifest.get("kind") != "cn01_daily_core_dwd_increment"
+            or manifest.get("purpose") != "isolated_daily_governance"
+            or manifest.get("consumer_admission") != "NOT_GRANTED"
+            or manifest.get("execution_authorized") is not False
+            or not isinstance(identity, dict)
+            or set(identity) != {"base", "catalog", "code", "config", "prior"}
+            or identity["base"] != manifest["base"]
+            or identity["catalog"] != manifest.get("catalog_sha256")
+            or identity["code"] != manifest.get("code_revision")
+            or identity["prior"] != manifest.get("prior")
+            or not isinstance(identity["config"], str)
+            or len(identity["config"]) != 71
+            or not identity["config"].startswith("sha256:")
+            or any(ch not in "0123456789abcdef" for ch in identity["config"][7:])
+        ):
+            raise DailyDomainBuildError("Base 2.4 Daily governance/job identity differs")
     if manifest.get("kind") == "cn01_daily_core_dwd_increment":
         if (
             manifest.get("schema_version") != 2

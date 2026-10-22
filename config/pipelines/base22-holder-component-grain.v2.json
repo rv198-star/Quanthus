@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "contract_id": "p10-base22-literal-holder-components-v2",
+  "scope": "candidate_intermediate_only",
+  "table": "dwd_shareholding_observation",
+  "base_contract_sha256": "sha256:a57938ee94a91510133cbfbe78373c32c38673a5a3780dd759d250d8ddefe97c",
+  "business_key": [
+    "company_id",
+    "security_id",
+    "shareholder_source_name",
+    "holding_type",
+    "observation_start",
+    "holder_rank",
+    "share_nature",
+    "holding_percentage_unit"
+  ],
+  "version_key": [
+    "company_id",
+    "security_id",
+    "shareholder_source_name",
+    "holding_type",
+    "observation_start",
+    "holder_rank",
+    "share_nature",
+    "holding_percentage_unit",
+    "knowledge_from"
+  ],
+  "physical_schema": "unchanged_pinned_v1_1",
+  "nullable_component": "canonical_null_for_unsplit_or_floating_source_row",
+  "component_labels": [
+    "无限售A股",
+    "无限售B股",
+    "无限售H股",
+    "流通A股",
+    "流通B股",
+    "流通H股",
+    "限售A股",
+    "限售B股",
+    "限售H股"
+  ],
+  "ratio_basis_labels": [
+    "占A股",
+    "占B股",
+    "占H股"
+  ],
+  "rank_rule": "source_named_group_ordinal_not_a_claim_of_ten_total",
+  "revision_rule": "new_governance_complete_group_close_old_open_literal_components",
+  "consumer_admission": "NOT_GRANTED",
+  "full_image_integration": "SEPARATE_GATE",
+  "max_source_named_groups": 64,
+  "percentage_component_units": [
+    "PERCENT",
+    "PERCENT_OF_LITERAL_A_SHARES",
+    "PERCENT_OF_LITERAL_B_SHARES",
+    "PERCENT_OF_LITERAL_H_SHARES"
+  ]
+}

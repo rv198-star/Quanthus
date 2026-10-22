@@ -168,6 +168,8 @@ def _text(value: object, field: str) -> str:
 def _unpack_byte_literal(value: object) -> bytes:
     if not isinstance(value, (bytes, bytearray, memoryview)):
         raise FinancialReportingBuildError("raw_payload_gzip must be bytes")
+    if bytes(value).startswith(b"\x1f\x8b"):
+        return bytes(value)
     try:
         decoded = ast.literal_eval(bytes(value).decode("ascii"))
     except (SyntaxError, UnicodeDecodeError, ValueError) as exc:
@@ -179,12 +181,27 @@ def _unpack_byte_literal(value: object) -> bytes:
     return decoded
 
 
-def decode_financial_envelope(row: Mapping[str, Any]) -> DecodedFinancialEnvelope:
+def decode_financial_envelope(
+    row: Mapping[str, Any],
+    *,
+    max_raw_bytes: int | None = None,
+    preserve_numeric_tokens: bool = False,
+) -> DecodedFinancialEnvelope:
     """Losslessly unpack, decompress, hash-check, and parse one ODS envelope."""
 
     packed = _unpack_byte_literal(row.get("raw_payload_gzip"))
     try:
-        raw = gzip.decompress(packed)
+        if max_raw_bytes is None:
+            raw = gzip.decompress(packed)
+        else:
+            import io
+
+            if max_raw_bytes <= 0:
+                raise FinancialReportingBuildError("raw envelope byte bound must be positive")
+            with gzip.GzipFile(fileobj=io.BytesIO(packed)) as stream:
+                raw = stream.read(max_raw_bytes + 1)
+            if len(raw) > max_raw_bytes:
+                raise FinancialReportingBuildError("raw envelope exceeds its decompression bound")
     except OSError as exc:
         raise FinancialReportingBuildError("raw_payload_gzip is not a valid gzip stream") from exc
     declared_bytes = row.get("raw_payload_bytes")
@@ -197,7 +214,7 @@ def decode_financial_envelope(row: Mapping[str, Any]) -> DecodedFinancialEnvelop
     if actual_sha256 != declared_sha256:
         raise FinancialReportingBuildError("raw payload SHA-256 differs from its envelope")
     try:
-        payload = json.loads(raw)
+        payload = json.loads(raw, parse_float=str) if preserve_numeric_tokens else json.loads(raw)
     except json.JSONDecodeError as exc:
         raise FinancialReportingBuildError("raw financial payload is not JSON") from exc
     if not isinstance(payload, Mapping):
@@ -1298,11 +1315,33 @@ def expand_financial_envelope(
 ) -> FinancialEnvelopeRows:
     """Expand one losslessly decoded provider envelope into atomic #61 DWD rows."""
 
+    return _expand_decoded_financial_envelope(
+        row,
+        envelope=decode_financial_envelope(row),
+        source=source,
+        company_resolver=company_resolver,
+        through_date=through_date,
+    )
+
+
+def _expand_decoded_financial_envelope(
+    row: Mapping[str, Any],
+    *,
+    envelope: DecodedFinancialEnvelope,
+    source: FinancialStatementSource,
+    company_resolver: FinancialCompanyResolver,
+    through_date: date | None,
+) -> FinancialEnvelopeRows:
+    """Shared expansion of an already hash-verified, job-local raw dependency.
+
+    Public entry points still verify original raw bytes before calling this helper.
+    The P10 adapter owns its versioned exact scalar and publication semantics.
+    """
+
     stock_code, statement_type = _row_identity(row)
     source_name = _text(row.get("source"), "source")
     source_revision = _text(row.get("source_revision"), "source_revision")
     knowledge_from = _utc_timestamp(row.get("acquired_at"), "acquired_at")
-    envelope = decode_financial_envelope(row)
     reports: list[dict[str, Any]] = []
     concepts: dict[tuple[str, datetime, str], dict[str, Any]] = {}
     facts: list[dict[str, Any]] = []

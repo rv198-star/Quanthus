@@ -337,21 +337,60 @@ def _zero(c: Any, sql: str, reason: str) -> None:
         raise InputError(reason)
 
 
+def _visible_query(table: str, cutoff: datetime) -> str:
+    clock = f"TIMESTAMPTZ {_q(cutoff.isoformat())}"
+    return (
+        f"SELECT DISTINCT * FROM raw_{table} WHERE knowledge_from<={clock} "
+        f"AND (knowledge_to IS NULL OR knowledge_to>{clock})"
+    )
+
+
+def _unambiguous(c: Any, query: str, table: str, reason: str) -> None:
+    _zero(
+        c,
+        "SELECT count(*) FROM (SELECT "
+        + ",".join(KEYS[table])
+        + f" FROM ({query}) GROUP BY ALL HAVING count(*)>1)",
+        reason + ":" + table,
+    )
+
+
 def _warmup(c: Any) -> list[str]:
-    rows = c.execute("""SELECT c.trade_date FROM raw_dwd_trading_calendar c
-        JOIN raw_dwd_trading_venue v ON c.venue_id=v.venue_id
+    cutoff = datetime(2025, 1, 1, tzinfo=TZ)
+    calendar = _visible_query("dwd_trading_calendar", cutoff)
+    venues = _visible_query("dwd_trading_venue", cutoff)
+    rows = c.execute(f"""SELECT c.trade_date FROM ({calendar}) c
+        JOIN ({venues}) v ON c.venue_id=v.venue_id
         WHERE v.mic_code IN ('XSHG','XSHE') AND c.is_open
         AND c.trade_date < DATE '2025-01-01'
-        AND c.knowledge_from <= TIMESTAMPTZ '2025-01-01 00:00:00+08'
-        AND (c.knowledge_to IS NULL OR c.knowledge_to > TIMESTAMPTZ '2025-01-01 00:00:00+08')
-        AND v.knowledge_from <= TIMESTAMPTZ '2025-01-01 00:00:00+08'
-        AND (v.knowledge_to IS NULL OR v.knowledge_to > TIMESTAMPTZ '2025-01-01 00:00:00+08')
         AND CAST(v.effective_from AS DATE)<=c.trade_date
         AND (v.effective_to IS NULL OR CAST(v.effective_to AS DATE)>c.trade_date)
         GROUP BY c.trade_date HAVING count(DISTINCT v.mic_code)=2
         ORDER BY c.trade_date DESC LIMIT 60""").fetchall()
     if len(rows) != 60:
         raise InputError("WARMUP_CALENDAR_NOT_QUALIFIED")
+    # Validate the candidate range before accepting its 60 dates. Include closed
+    # versions and all revisions of a selected session, not only rows that made
+    # the open-day aggregate. Unrelated earlier calendar history stays out of scope.
+    selected = (
+        f"SELECT * FROM ({calendar}) WHERE trade_date>=DATE {_q(rows[-1][0].isoformat())} "
+        "AND trade_date<DATE '2025-01-01' "
+        f"AND venue_id IN (SELECT venue_id FROM ({venues}) WHERE mic_code IN ('XSHE','XSHG'))"
+    )
+    for table, query in (
+        (
+            "dwd_trading_calendar",
+            f"SELECT * FROM ({calendar}) WHERE calendar_session_id IN "
+            f"(SELECT calendar_session_id FROM ({selected}))",
+        ),
+        (
+            "dwd_trading_venue",
+            f"SELECT * FROM ({venues}) v WHERE EXISTS (SELECT 1 FROM ({selected}) c "
+            "WHERE c.venue_id=v.venue_id AND CAST(v.effective_from AS DATE)<=c.trade_date "
+            "AND (v.effective_to IS NULL OR CAST(v.effective_to AS DATE)>c.trade_date))",
+        ),
+    ):
+        _unambiguous(c, query, table, "AMBIGUOUS_WARMUP_VERSION")
     return [r[0].isoformat() for r in reversed(rows)]
 
 
@@ -491,6 +530,11 @@ def _semantics(c: Any, *, warmup: list[str] | None = None) -> dict[str, Any]:
     for table in ("dwd_security_bar", "dwd_tradability_state"):
         _zero(
             c,
+            f"SELECT count(*) FROM raw_{table} WHERE observation_end<observation_start",
+            "OBSERVATION_INTERVAL_INVALID:" + table,
+        )
+        _zero(
+            c,
             f"SELECT count(*) FROM raw_{table} b WHERE NOT EXISTS "
             "(SELECT 1 FROM raw_dwd_trading_calendar c WHERE "
             "c.calendar_session_id=b.calendar_session_id "
@@ -552,6 +596,23 @@ def _tree(root: Path) -> set[str]:
                 raise InputError("INDEPENDENT_REGULAR_FILES_REQUIRED")
             result.add(p.relative_to(root).as_posix())
     return result
+
+
+def _required_files() -> set[str]:
+    return (
+        {f"native/{t}.parquet" for t in KEYS}
+        | {f"checkpoints/{t}.json" for t in KEYS}
+        | {
+            "identity.json",
+            "source-metadata.json",
+            "stages.json",
+            "contract.json",
+            "LOCK",
+            "original-manifest.json",
+            "original-native-closure.json",
+            "run-plan.json",
+        }
+    )
 
 
 def _input_plan(plan: dict[str, Any], *, source_sha: str, implementation_sha: str) -> None:
@@ -647,7 +708,12 @@ def prepare(
             raise InputError("SOURCE_MUTATED_DURING_VERIFY")
         frozen[table] = before
     staging.mkdir(mode=0o700, exist_ok=True)
-    _tree(staging)  # Validate resumed trees before touching LOCK or any receipt.
+    existing = _tree(staging)  # Before touching LOCK or any receipt.
+    allowed = _required_files()
+    if "manifest.json" in existing:
+        allowed |= {"manifest.json", "READY"}
+    if not existing <= allowed:
+        raise InputError("STAGING_FILE_SET_DIFFERS")
     lock = physical(staging / "LOCK").open("a")
     try:
         try:
@@ -786,6 +852,8 @@ def prepare(
             _write(
                 staging / "stages.json", {"stages": stages, "source_materializations_per_job": 1}
             )
+        if _tree(staging) != _required_files():
+            raise InputError("STAGING_FILE_SET_DIFFERS")
         files = {n: _entry(staging / n) for n in sorted(_tree(staging))}
         manifest = {
             "schema_version": SCHEMA,
@@ -810,11 +878,18 @@ def prepare(
 
 
 def _publish(staging: Path, output: Path) -> None:
+    digest = _sha(staging / "manifest.json")
+    ready = staging / "READY"
+    expected = _required_files() | {"manifest.json"} | ({"READY"} if ready.exists() else set())
+    if _tree(staging) != expected:
+        raise InputError("STAGING_FILE_SET_DIFFERS")
+    if ready.exists() and ready.read_text().strip() != digest:
+        raise InputError("READY_IDENTITY_DIFFERS")
     for path in (staging / "native", staging / "checkpoints", staging):
         _sync_directory(path)
-    if not (staging / "READY").exists():
-        with (staging / "READY").open("x") as f:
-            f.write(_sha(staging / "manifest.json") + "\n")
+    if not ready.exists():
+        with ready.open("x") as f:
+            f.write(digest + "\n")
             f.flush()
             os.fsync(f.fileno())
     if output.exists():
@@ -854,20 +929,7 @@ def _verify(root: Path, *, manifest_sha256: str, ready_required: bool) -> dict[s
         or m.get("value_preservation_checked_tables") != sorted(KEYS)
     ):
         raise InputError("PREPARED_CONTRACT_DIFFERS")
-    required = (
-        {f"native/{t}.parquet" for t in KEYS}
-        | {f"checkpoints/{t}.json" for t in KEYS}
-        | {
-            "identity.json",
-            "source-metadata.json",
-            "stages.json",
-            "contract.json",
-            "LOCK",
-            "original-manifest.json",
-            "original-native-closure.json",
-            "run-plan.json",
-        }
-    )
+    required = _required_files()
     extra = {"manifest.json"} | ({"READY"} if (root / "READY").exists() else set())
     if set(m.get("files", {})) != required or _tree(root) != required | extra:
         raise InputError("PHYSICAL_FILE_SET_DIFFERS")
@@ -995,20 +1057,17 @@ class NativeView:
         day = cutoff.astimezone(TZ).date()
         if not date(2025, 1, 1) <= day <= date(2026, 9, 17):
             raise InputError("FROZEN_DECISION_WINDOW")
-        for table, keys in KEYS.items():
-            query = (
-                f"SELECT DISTINCT * FROM raw_{table} WHERE knowledge_from <= "
-                f"TIMESTAMPTZ {_q(cutoff.isoformat())} AND (knowledge_to IS NULL OR "
-                f"knowledge_to > TIMESTAMPTZ {_q(cutoff.isoformat())})"
-            )
-            _zero(
-                self.connection,
-                "SELECT count(*) FROM (SELECT "
-                + ",".join(keys)
-                + f" FROM ({query}) GROUP BY ALL HAVING count(*)>1)",
-                "AMBIGUOUS_ASOF_VERSION:" + table,
-            )
-            self.connection.execute(f"CREATE OR REPLACE TEMP VIEW {table} AS {query}")
+        self.connection.execute("BEGIN TRANSACTION")
+        try:
+            for table in KEYS:
+                query = _visible_query(table, cutoff)
+                _unambiguous(self.connection, query, table, "AMBIGUOUS_ASOF_VERSION")
+                self.connection.execute(f"CREATE OR REPLACE TEMP VIEW {table} AS {query}")
+            self._unchanged()
+            self.connection.execute("COMMIT")
+        except BaseException:
+            self.connection.execute("ROLLBACK")
+            raise
 
     def market_batches(self, cutoff: datetime, *, batch_size: int = 8192) -> Iterator[Any]:
         """Exact native values at cutoff; no fabricated eligibility or legacy casts."""
@@ -1040,6 +1099,29 @@ class NativeView:
             "AND (v.effective_to IS NULL OR v.effective_to>b.observation_start))",
             "ASOF_IDENTITY_UNAVAILABLE",
         )
+        state_bounded = f"t.observation_end<=TIMESTAMPTZ {_q(cutoff.isoformat())}"
+        linked_state = (
+            f"{state_bounded} AND EXISTS (SELECT 1 FROM dwd_security_bar b WHERE {bounded} "
+            "AND b.listing_id=t.listing_id AND b.calendar_session_id=t.calendar_session_id)"
+        )
+        _zero(
+            c,
+            f"SELECT count(*) FROM dwd_tradability_state t WHERE {linked_state} AND NOT EXISTS "
+            "(SELECT 1 FROM dwd_trading_calendar c "
+            "WHERE c.calendar_session_id=t.calendar_session_id "
+            "AND c.trade_date=CAST(t.observation_start AS DATE))",
+            "ASOF_STATE_CALENDAR_DATE",
+        )
+        _zero(
+            c,
+            f"SELECT count(*) FROM dwd_tradability_state t WHERE {linked_state} AND NOT EXISTS "
+            "(SELECT 1 FROM dwd_trading_calendar c JOIN dwd_listing l ON l.venue_id=c.venue_id "
+            "WHERE c.calendar_session_id=t.calendar_session_id "
+            "AND c.trade_date=CAST(t.observation_start AS DATE) AND l.listing_id=t.listing_id "
+            "AND l.effective_from<=t.observation_start "
+            "AND (l.effective_to IS NULL OR l.effective_to>t.observation_start))",
+            "ASOF_STATE_LISTING_VENUE",
+        )
         query = f"""SELECT b.*, s.security_id, s.company_id, s.instrument_type, l.listing_code,
             l.venue_id, c.trade_date, c.open_at, c.close_at,
             b.knowledge_from AS bar_knowledge_from, t.knowledge_from AS state_knowledge_from,
@@ -1059,6 +1141,7 @@ class NativeView:
                 AND (v.effective_to IS NULL OR v.effective_to>b.observation_start)
             LEFT JOIN dwd_tradability_state t ON t.listing_id=b.listing_id
                 AND t.calendar_session_id=b.calendar_session_id
+                AND {state_bounded}
             WHERE v.mic_code IN ('XSHE','XSHG') AND s.instrument_type='A_SHARE'
                 AND c.trade_date=CAST(b.observation_start AS DATE)
                 AND b.observation_end<=TIMESTAMPTZ {_q(cutoff.isoformat())}

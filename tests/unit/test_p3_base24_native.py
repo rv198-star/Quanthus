@@ -877,3 +877,228 @@ print(json.dumps(m["semantic_summary"],sort_keys=True))
         summaries.append(json.loads(p.stdout))
         original = copy
     assert summaries == [result["semantic_summary"]] * 2
+
+
+@pytest.mark.parametrize("end", [CLOCK + timedelta(hours=1), None])
+def test_state_observation_not_complete_at_cutoff_stays_unavailable(source, tmp_path, end):
+    mutate(
+        source,
+        "dwd_tradability_state",
+        lambda rows: rows[0].update(observation_end=end, can_buy=True),
+    )
+    result = build(source, tmp_path / "out")
+    with native.open_prepared(tmp_path / "out", manifest_sha256=result["manifest_sha256"]) as v:
+        row = next(v.market_batches(CLOCK)).to_pylist()[0]
+        assert row["can_buy"] is None
+        assert row["is_tradable"] is None
+        assert row["state_knowledge_from"] is None
+        if end is not None:
+            row = next(v.market_batches(end)).to_pylist()[0]
+            assert row["can_buy"] is True
+            assert row["state_knowledge_from"] == EARLY
+
+
+def test_asof_state_calendar_cannot_borrow_a_later_calendar_revision(source, tmp_path):
+    earlier = CLOCK - timedelta(days=1)
+    later = CLOCK + timedelta(days=1)
+
+    def calendar(rows):
+        original = next(r for r in rows if r["calendar_session_id"] == "sz-2025-01-02")
+        revised = {**original, "trade_date": earlier.date(), "knowledge_from": later}
+        original["knowledge_to"] = later
+        rows.append(revised)
+
+    mutate(source, "dwd_trading_calendar", calendar)
+    mutate(
+        source,
+        "dwd_tradability_state",
+        lambda rows: rows[0].update(
+            observation_start=earlier, observation_end=earlier, can_buy=True
+        ),
+    )
+    result = build(source, tmp_path / "out")
+    with (
+        native.open_prepared(tmp_path / "out", manifest_sha256=result["manifest_sha256"]) as v,
+        pytest.raises(native.InputError, match="ASOF_STATE_CALENDAR_DATE"),
+    ):
+        list(v.market_batches(CLOCK))
+
+
+def add_warmup_conflict(rows, table):
+    if table == "dwd_trading_calendar":
+        row = next(r for r in rows if r["calendar_session_id"] == "sz-2024-12-31")
+        changed = {"is_open": False}
+    else:
+        row = next(r for r in rows if r["venue_id"] == "sz")
+        changed = {"mic_code": "XBSE"}
+    rows.append(
+        {
+            **row,
+            **changed,
+            "knowledge_from": datetime(2024, 12, 1, tzinfo=TZ),
+            "knowledge_to": datetime(2025, 1, 1, 12, tzinfo=TZ),
+        }
+    )
+
+
+@pytest.mark.parametrize("table", ["dwd_trading_calendar", "dwd_trading_venue"])
+@pytest.mark.parametrize("mode", ["build", "cold"])
+def test_warmup_rejects_conflicts_at_its_own_cutoff(source, tmp_path, table, mode):
+    root = tmp_path / "out"
+    if mode == "build":
+        mutate(source, table, lambda rows: add_warmup_conflict(rows, table))
+        with pytest.raises(native.InputError, match="AMBIGUOUS_WARMUP_VERSION"):
+            build(source, root)
+        assert not list((tmp_path / ".out.job/native").glob("*.parquet"))
+    else:
+        build(source, root)
+        p = root / "native" / (table + ".parquet")
+        data = pq.read_table(p)
+        rows = data.to_pylist()
+        add_warmup_conflict(rows, table)
+        pq.write_table(pa.Table.from_pylist(rows, schema=data.schema), p)
+        write(
+            root / "checkpoints" / (table + ".json"),
+            {"member": {"bytes": p.stat().st_size, "sha256": sha(p)}, "rows": len(rows)},
+        )
+        manifest = json.loads((root / "manifest.json").read_text())
+        manifest["semantic_summary"][table]["rows"] = len(rows)
+        write(root / "manifest.json", manifest)
+        digest = reseal_prepared(root)
+        shutil.rmtree(source)
+        with pytest.raises(native.InputError, match="AMBIGUOUS_WARMUP_VERSION"):
+            native.verify(root, manifest_sha256=digest)
+
+
+@pytest.mark.parametrize("name", ["unexpected.txt", "READY"])
+def test_resume_rejects_unexpected_files_before_touching_checkpoints(
+    source, tmp_path, monkeypatch, name
+):
+    original = native._zero
+
+    def stop_after_checkpoint(c, sql, reason):
+        if reason == "MATERIALIZATION_CHANGED_VALUES":
+            raise RuntimeError("synthetic interruption")
+        original(c, sql, reason)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(native, "_zero", stop_after_checkpoint)
+        with pytest.raises(RuntimeError, match="synthetic interruption"):
+            build(source, tmp_path / "out")
+    stage = tmp_path / ".out.job"
+    (stage / name).write_text("unowned or stale receipt\n")
+    before = {n: sha(stage / n) for n in native._tree(stage)}
+    with pytest.raises(native.InputError, match="STAGING_FILE_SET_DIFFERS"):
+        build(source, tmp_path / "out")
+    assert not (tmp_path / "out").exists()
+    assert before == {n: sha(stage / n) for n in native._tree(stage)}
+
+
+def test_failed_cutoff_change_cannot_leave_mixed_views(source, tmp_path):
+    later = CLOCK + timedelta(hours=1)
+
+    def securities(rows):
+        revised = {**rows[0], "company_id": "later-company", "knowledge_from": later}
+        rows[0]["knowledge_to"] = later
+        rows.append(revised)
+
+    mutate(source, "dwd_security", securities)
+    mutate(
+        source,
+        "dwd_security_bar",
+        lambda rows: rows.append({**rows[0], "close": Decimal("1.7"), "knowledge_from": later}),
+    )
+    result = build(source, tmp_path / "out")
+    with native.open_prepared(tmp_path / "out", manifest_sha256=result["manifest_sha256"]) as v:
+        v.at(CLOCK)
+        with pytest.raises(native.InputError, match="AMBIGUOUS_ASOF_VERSION"):
+            v.at(later)
+        # A failed transition must preserve the whole previous snapshot, not only
+        # the table that failed after other views have already advanced.
+        assert v.connection.execute("SELECT company_id FROM dwd_security").fetchone() == ("co",)
+        assert v.connection.execute("SELECT close FROM dwd_security_bar").fetchone() == (
+            Decimal("1.1000000001"),
+        )
+
+
+@pytest.mark.parametrize("table", ["dwd_security_bar", "dwd_tradability_state"])
+@pytest.mark.parametrize("mode", ["build", "cold"])
+def test_reversed_observation_interval_cannot_be_consumed(source, tmp_path, table, mode):
+    root = tmp_path / "out"
+    if mode == "build":
+        mutate(
+            source, table, lambda rows: rows[0].update(observation_end=CLOCK - timedelta(hours=1))
+        )
+        with pytest.raises(native.InputError, match="OBSERVATION_INTERVAL_INVALID"):
+            build(source, root)
+        assert not (root / "READY").exists()
+    else:
+        build(source, root)
+        p = root / "native" / (table + ".parquet")
+        data = pq.read_table(p)
+        rows = data.to_pylist()
+        rows[0]["observation_end"] = CLOCK - timedelta(hours=1)
+        pq.write_table(pa.Table.from_pylist(rows, schema=data.schema), p)
+        write(
+            root / "checkpoints" / (table + ".json"),
+            {"member": {"bytes": p.stat().st_size, "sha256": sha(p)}, "rows": len(rows)},
+        )
+        digest = reseal_prepared(root)
+        shutil.rmtree(source)
+        with pytest.raises(native.InputError, match="OBSERVATION_INTERVAL_INVALID"):
+            native.verify(root, manifest_sha256=digest)
+
+
+def test_asof_state_venue_cannot_borrow_a_later_listing_revision(source, tmp_path):
+    noon = CLOCK.replace(hour=12)
+    later = CLOCK + timedelta(days=1)
+
+    def listings(rows):
+        original = dict(rows[0])
+        rows[0]["effective_to"] = noon
+        rows.extend(
+            [
+                {
+                    **original,
+                    "effective_from": noon,
+                    "venue_id": "sh",
+                    "knowledge_to": later,
+                },
+                {**original, "effective_from": noon, "knowledge_from": later},
+            ]
+        )
+
+    mutate(source, "dwd_listing", listings)
+    mutate(
+        source,
+        "dwd_security_bar",
+        lambda rows: rows[0].update(observation_start=CLOCK.replace(hour=9)),
+    )
+    mutate(
+        source,
+        "dwd_tradability_state",
+        lambda rows: rows[0].update(observation_start=CLOCK.replace(hour=14)),
+    )
+    result = build(source, tmp_path / "out")
+    with (
+        native.open_prepared(tmp_path / "out", manifest_sha256=result["manifest_sha256"]) as v,
+        pytest.raises(native.InputError, match="ASOF_STATE_LISTING_VENUE"),
+    ):
+        list(v.market_batches(CLOCK))
+
+
+def test_warmup_revision_boundary_uses_the_new_known_calendar(source, tmp_path):
+    boundary = datetime(2025, 1, 1, tzinfo=TZ)
+
+    def change(rows):
+        original = next(r for r in rows if r["calendar_session_id"] == "sz-2024-12-31")
+        revision = {**original, "knowledge_from": boundary, "is_open": False}
+        original["knowledge_to"] = boundary
+        rows.append(revision)
+
+    mutate(source, "dwd_trading_calendar", change)
+    result = build(source, tmp_path / "out")
+    assert "2024-12-31" not in result["warmup_dates"]
+    assert len(result["warmup_dates"]) == 60
+    shutil.rmtree(source)
+    native.verify(tmp_path / "out", manifest_sha256=result["manifest_sha256"])

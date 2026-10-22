@@ -22,7 +22,25 @@ operation must no longer require either old node. Base 2.4 is the completed data
 foundation; its image acceptance does not establish project migration or consumer
 activation.
 
+### Current runtime ownership: CN02 only
+
+On 2026-10-22 the Owner explicitly retired OCI from all future Quanthus
+responsibility. CN02 is the sole target for Quanthus execution and retained
+project state. This supersedes the deferred OCI-system route below: do not plan
+new OCI execution, source recovery or service reconstruction, and do not require
+an OCI connectivity check or current remote-writer receipt to advance CN02 P6.
+Retain already preserved OCI-origin data and sealed records as historical
+evidence with their original identities and use restrictions.
+
+This is an ownership decision, not a claim that an OCI service was inspected or
+stopped. No remote service changes follow from this update. CN02 still enforces
+one admitted writer, an exact local runtime/source/activation binding and its
+existing readiness, rollback and consumer gates.
+
 ### Current sequence: preserve data first, defer OCI systems
+
+This earlier sequence is retained as history and is superseded by the CN02-only
+runtime decision above.
 
 The Owner subsequently directed on 2026-10-20 that OCI application/system rebuilds
 may wait until development needs them. This supersedes the immediate runtime-build

@@ -19,6 +19,9 @@ rehearsal and deferred official prospective activation are separate gates.
 The fixed-snapshot mechanism run, fresh independent reproduction and read-only
 semantic review now have [bounded engineering acceptance](../acceptance/p6-fixed-snapshot-mechanism-20261022.md).
 They add zero official prospective observations and do not accept P6-REVIEW-001.
+The Owner's later [CN02-only runtime decision](cn02-project-migration.md#current-runtime-ownership-cn02-only)
+retires OCI from future Quanthus responsibility; no OCI inspection remains on
+the P6 critical path.
 
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |

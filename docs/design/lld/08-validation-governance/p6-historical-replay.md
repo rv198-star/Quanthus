@@ -16,8 +16,10 @@ without waiting for new Daily products or 66 future trading days. This is a
 separate historical successor. The accepted prospective contract, original
 activation, ledger, failed Jobs and budget remain immutable and do not admit or
 receive historical runs. The previously installed controller remains disabled.
-Reconciliation with the old OCI writer and a new prospective activation are not
-predecessors of an isolated historical run.
+The Owner's later [CN02-only runtime decision](../../../work-items/cn02-project-migration.md#current-runtime-ownership-cn02-only)
+retired OCI from future Quanthus responsibility. OCI inspection is not a
+remaining dependency. A new prospective activation is also not a predecessor
+of an isolated historical run.
 
 The purpose is to exercise the frozen candidate, expert/veto, next-open paper,
 position/accounting and target-settlement chain. It does not authorize tuning,

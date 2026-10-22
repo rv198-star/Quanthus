@@ -21,6 +21,11 @@ production-readiness packet in the successor handoff, not by rerunning this
 closure. Reconcile older GitHub PENDING records with current evidence without
 closing unfinished gates.
 
+The Owner's later 2026-10-22 [CN02-only runtime decision](cn02-project-migration.md#current-runtime-ownership-cn02-only)
+removes OCI from future Quanthus responsibility. Do not query OCI or carry its
+current-writer reconciliation as a remaining P6 dependency. Preserved OCI
+records remain history; local CN02 single-writer and activation gates remain.
+
 **Current routing is historical replay.** After the initial startup report,
 the Owner corrected the prospective-only direction and explicitly chose
 existing historical data, then approved fixing the time slices and proceeding.
@@ -29,7 +34,7 @@ and `config/forward-validation/runtime/p6-historical-replay-plan.v1.json` own
 this work as P6-HISTORY-001. Use shared 2026-01-05--07-06 warmup, decisions
 2026-07-07--09-14, and 2026-09-15--10-20 target tail. S1/S2/S3 are continuous
 reporting slices, not independent reset runs. Do not wait for future Daily or
-OCI single-writer reconciliation to execute isolated historical work.
+any new prospective activation to execute isolated historical work.
 
 The Owner then explicitly selected fixed-snapshot mechanism replay after the
 strict admission found later knowledge versions. Current execution uses
@@ -91,11 +96,10 @@ The existing P2 paper engine and the independent reproduction path are reused.
    concurrency one, no market-data mounts and controller explicitly disabled.
 4. Verify the real prepared Base 2.4 input and continuous frame interface without
    candidate/expert/order execution or historical result inspection.
-5. Before enabling official admission, reconcile/fence the prior OCI P6 writer,
+5. Before enabling official admission, verify CN02-local single-writer admission,
    bind the exact new source/runtime/deployment and new activation, and complete
-   readiness and rollback evidence. Absence of NexusAgent is a control-channel
-   limitation, not proof that OCI is offline or permission to revive a retired
-   SSH control path.
+   readiness and rollback evidence. The Owner retired OCI from this route;
+   current OCI inspection or a remote fencing receipt is not a prerequisite.
 6. Consume the first actual qualified Daily strictly after the new activation
    date, freeze one immutable intake/decision instant before queue submission,
    and reproduce the first legal official cycle independently before continuing.
@@ -121,7 +125,7 @@ mandate. It requires an independently prepared, enabled decision at
 `<run_root>/activation/base24-enabled.json`, binding the exact running revision
 and verified disabled rehearsal. Both the activation directory and qualified
 Daily root must be separate read-only mounts before admission is enabled.
-The activation must follow the single-writer reconciliation, readiness and
+The activation must follow the CN02-local single-writer checks, readiness and
 rollback gates above; the mere existence of this file is not their acceptance.
 
 P10's successor pointer is `<qualified_daily_root>/CURRENT.json`, with exactly

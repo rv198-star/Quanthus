@@ -16,6 +16,9 @@ It preserves the frozen prospective program and all protected partitions;
 historical input qualification and actual replay completion remain separate.
 Earlier production-activation records are retained program checkpoints,
 not evidence of an enabled or historically qualified CN02 run.
+The Owner's later [CN02-only runtime decision](../../work-items/cn02-project-migration.md#current-runtime-ownership-cn02-only)
+retires OCI from future Quanthus responsibility; it is no longer an execution
+target or a pending P6 dependency.
 
 Make rule evolution evidence-driven and make repeated historical tuning visible. Validation
 discipline has higher priority than a favorable performance number.
@@ -75,8 +78,9 @@ emergency fix. Exceeding the budget downgrades that period's research credibilit
 
 ## 7. Acceptance
 
-Production activation is now enabled, but the engineering checkpoint still requires the first
-legal post-activation prospective cycle and independent reproduction. Full P6 acceptance
+The earlier production activation is retained history; CN02 does not inherit
+it. A new CN02 activation and its first legal post-activation prospective cycle
+with independent reproduction remain separate engineering gates. Full P6 acceptance
 additionally waits for the predeclared real-calendar observation budget and target-maturity tail,
 closes and reconciles the paper ledger, records a signed human review, and proves zero notification,
 broker, or live-capital authority. A negative or inconclusive result may close P6 honestly;

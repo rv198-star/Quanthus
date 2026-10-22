@@ -1,0 +1,42 @@
+{
+  "schema_version": "quanthus.p3-base24-domain-ports.v1",
+  "request_digest": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde",
+  "candidate_rule_digest": "sha256:b04464c838705e71331515332ceb9e796ce26698c784d4615cff00dfdcf41c50",
+  "purpose": "native_consumer_integration_engineering",
+  "source": "verified_once_only_job_local_native_closure",
+  "identity_mapping": {
+    "instrument_type": {"A_SHARE": "common_equity"},
+    "mic_code": {"XSHG": "SSE", "XSHE": "SZSE"},
+    "price_basis": {"none": "UNADJUSTED", "UNADJUSTED": "UNADJUSTED"},
+    "values": "preserve_native_Decimal_scale_and_timestamp_instants"
+  },
+  "support_binding": ["source_manifest_sha256", "complete_typed_row_sha256", "listing_id", "market_date", "qualified_evidence_sha256"],
+  "support_semantics": "A port declaration does not qualify evidence; real support must belong to the independently admitted B closure. No historic use of a later P6 qualification.",
+  "required_native_clocks": ["bar", "security", "listing", "venue", "calendar"],
+  "state_clock_unavailable": "preserve_unknown_not_suspended; block_affected_entry",
+  "historical_clock_override": false,
+  "static_industry": "nonblank_string_for_concentration_only_not_historical_PIT; invalid_values_block_affected_key",
+  "common_mask": {
+    "variants": ["B", "T", "R", "TR"],
+    "candidate_history_sessions": 22,
+    "required_feature_fields": ["total_return_index", "sma20", "sma60", "momentum20", "rsi14", "realized_volatility20"],
+    "computation": "one_union_complete_case_mask_shared_by_all_variants",
+    "candidate_rules": "existing_exact_P4_window_rule; no new thresholds",
+    "historical_execution_support": "not_required_for_candidate_price_history",
+    "listing_sessions": "preserve_unknown; only_signal_day_age_is_required_by_existing_P4_rule; do_not_fill_unused_historical_counts",
+    "missing_observation": "block_and_count_affected_key; no_global_abort_or_forced_sale"
+  },
+  "execution_port": {
+    "adapter": "P1DailyExecutionEvidence_then_existing_market_session_from_p1",
+    "role": "execution_only; never_strategy_decision_view",
+    "native_flags_grant_authority": false,
+    "next_session": "caller_must_bind_authoritative_next_session_in_B; never_guess_weekday",
+    "company_action": "unknown_or_effective_action_not_executed_by_this_port; requires_separate_qualified_P2_action_path"
+  },
+  "lifecycle": "stream_ports_once_into_job_local_shared_TMP; not_ADM_or_cross_job_cache",
+  "legacy_replay_equivalence": false,
+  "formal_candidate_scan_or_feature_panel_materialized": false,
+  "B_accepted": false,
+  "D_activated": false,
+  "execution_authorized": false
+}

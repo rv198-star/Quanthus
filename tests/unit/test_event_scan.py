@@ -283,6 +283,22 @@ def _entry_evidence(
 
 
 class EventForwardScanTests(unittest.TestCase):
+    def test_unknown_listing_age_only_blocks_the_current_session_in_both_scan_paths(self):
+        for index in (0, 20, 21):
+            with self.subTest(index=index):
+                rows = _series("600001", signal_indices=(43,))
+                rows[index] = replace(rows[index], listing_sessions=None)
+                reference, optimized = _reference_security_scan(rows)
+                self.assertEqual(reference, optimized)
+                raw, reasons, evaluated = reference
+                self.assertEqual(evaluated, 1)
+                if index == 21:
+                    self.assertEqual(raw, [])
+                    self.assertEqual(reasons, Counter({CandidateReason.MISSING_INPUT.value: 1}))
+                else:
+                    self.assertEqual(len(raw), 1)
+                    self.assertEqual(reasons, Counter())
+
     def test_exact_rolling_scan_matches_reference_for_deterministic_random_series(
         self,
     ) -> None:

@@ -114,6 +114,18 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**Domain-port continuation, 2026-10-23:** the Owner requested fixing the startup blockers and
+continuing. The native P4 row conversion, shared B/T/R/TR complete-case mask and separate P2
+execution-evidence port are now implemented in `p3_base24_bridge.py`. They consume the verified
+job-local native closure, retain original clocks/Decimal values and reject unsupported source/key
+substitution. This is consumer engineering, not a formal candidate/feature-panel build or B/D
+acceptance. An explicit P10 review checked eight exact sealed metadata members and retained the
+five required historical-purpose gaps; it did not find original availability proof in that
+selected evidence or infer global absence. The previous clock measurement is referenced without
+pretending it was rerun. See [the domain ports and remaining boundary](p3-base24-goal-audit-and-plan-20261022.md#14-原生消费端口与历史资格边界).
+Do not pass a later P6 qualification as historical support, recreate the spent B attempt, or
+start real strategy results until the independently qualified new B identity and D gate exist.
+
 **Base 2.4 startup, 2026-10-23:** the Owner requested P3 continuation after the input-engineering
 reverification. The new input-only scope `P3-BASE24-INPUT-20261023-CLOCK-001` ran against published
 projection manifest `ec8adacf91b55062e4873ca6f18216fc4d41c1c6c6f59bc172255606a2f0a6dd` at code
@@ -124,8 +136,8 @@ historical use. Current raw clocks yield no daily bars visible at their own busi
 2024 calendar versions visible before 2025; warehouse lateness alone does not prove economic
 unavailability. P10 #474 must supply an exact, purpose-qualified clock/evidence contract before
 formal B/D continuation. Preserve #470/#473, the original 4,173 unavailable factor exceptions and
-all frozen windows. The candidate/common-mask/P2 bridge is still incomplete and cannot be accepted
-by this diagnostic. See [the startup result and recovery command](p3-base24-goal-audit-and-plan-20261022.md#13-2026-10-23-p3-启动的实际结果).
+all frozen windows. The consumer bridge was incomplete at that diagnostic; the successor ports
+above do not change its historical-purpose verdict. See [the startup result and recovery command](p3-base24-goal-audit-and-plan-20261022.md#13-2026-10-23-p3-启动的实际结果).
 The earlier receipts and spent formal attempt below remain historical evidence.
 
 **Current ownership supersession, 2026-10-03:** P10 permanently owns all source recovery,

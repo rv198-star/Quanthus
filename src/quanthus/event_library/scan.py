@@ -132,7 +132,7 @@ class CandidateDailyInput:
     close_price: Decimal | None
     turnover: Decimal | None
     is_tradable: bool | None
-    listing_sessions: int
+    listing_sessions: int | None
     adjustment_effective: bool | None
     source_evidence_digest: str
 
@@ -150,10 +150,15 @@ class CandidateDailyInput:
         _require_aware(self.knowledge_cutoff, "knowledge_cutoff")
         if self.close_at.date() != self.session_date:
             raise CandidateScanError("close_at date must match session_date")
-        if not isinstance(self.listing_sessions, int) or isinstance(self.listing_sessions, bool):
-            raise CandidateScanError("listing_sessions must be an integer")
-        if self.listing_sessions < 0:
-            raise CandidateScanError("listing_sessions must not be negative")
+        # Only the signal day's age is consumed by the eligibility rule. Preserve
+        # unknown ages on earlier price observations rather than inventing a count.
+        if self.listing_sessions is not None:
+            if not isinstance(self.listing_sessions, int) or isinstance(
+                self.listing_sessions, bool
+            ):
+                raise CandidateScanError("listing_sessions must be an integer or None")
+            if self.listing_sessions < 0:
+                raise CandidateScanError("listing_sessions must not be negative")
         require_sha256_digest(self.source_evidence_digest, "source_evidence_digest")
 
 
@@ -587,6 +592,8 @@ def _window_reason(
         return CandidateReason.VENUE_NOT_ALLOWED
     if current.instrument_type not in card.eligibility.instrument_types:
         return CandidateReason.INSTRUMENT_NOT_ALLOWED
+    if current.listing_sessions is None:
+        return CandidateReason.MISSING_INPUT
     if current.listing_sessions < card.eligibility.minimum_listing_sessions:
         return CandidateReason.INSUFFICIENT_LISTING_HISTORY
     if prior.is_tradable is not True:
@@ -772,6 +779,8 @@ def _precomputed_window_reason(
         return CandidateReason.VENUE_NOT_ALLOWED
     if current.instrument_type not in card.eligibility.instrument_types:
         return CandidateReason.INSTRUMENT_NOT_ALLOWED
+    if current.listing_sessions is None:
+        return CandidateReason.MISSING_INPUT
     if current.listing_sessions < card.eligibility.minimum_listing_sessions:
         return CandidateReason.INSUFFICIENT_LISTING_HISTORY
     if prior.is_tradable is not True:

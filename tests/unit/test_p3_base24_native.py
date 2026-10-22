@@ -880,7 +880,7 @@ def test_two_new_processes_without_source_cache_or_native_network(source, tmp_pa
 import ctypes, ctypes.util, errno, json, socket, sys
 from datetime import datetime
 from pathlib import Path
-from quanthus.expert_strategy.p3_base24_native import verify, NativeView
+from quanthus.expert_strategy.p3_base24_native import open_prepared
 sec = ctypes.CDLL(ctypes.util.find_library("seccomp"), use_errno=True)
 sec.seccomp_init.argtypes=[ctypes.c_uint32]; sec.seccomp_init.restype=ctypes.c_void_p
 sec.seccomp_syscall_resolve_name.argtypes=[ctypes.c_char_p]
@@ -896,11 +896,18 @@ assert sec.seccomp_load(ctx)==0
 sec.seccomp_release(ctx)
 try: socket.socket(); raise AssertionError("native network was allowed")
 except PermissionError: pass
-m=verify(Path(sys.argv[1]),manifest_sha256=sys.argv[2])
-with NativeView(Path(sys.argv[1])) as v:
-    batches=list(v.market_batches(datetime.fromisoformat("2025-01-02T15:00:00+08:00")))
-    assert sum(len(b) for b in batches)==1
-print(json.dumps(m["semantic_summary"],sort_keys=True))
+from quanthus.expert_strategy.p3_base24_bridge import ports_for_dates
+from decimal import Decimal
+cutoff=datetime.fromisoformat("2025-01-02T15:00:00+08:00")
+with open_prepared(Path(sys.argv[1]),manifest_sha256=sys.argv[2]) as v:
+    m=v.prepared_manifest
+    ports=list(ports_for_dates(v,cutoff=cutoff,dates=[cutoff.date()],supports={},static_industry={}))
+    assert len(ports)==1
+    assert ports[0].candidate is not None and ports[0].candidate.listing_sessions is None
+    assert not ports[0].bar.is_executable
+    assert ports[0].bar.close_price == Decimal("1.1000000001")
+print(json.dumps({"summary":m["semantic_summary"],
+                 "ports":[p.source_evidence_digest for p in ports]},sort_keys=True))
 """
     original = tmp_path / "out"
     summaries = []
@@ -929,7 +936,8 @@ print(json.dumps(m["semantic_summary"],sort_keys=True))
         assert p.returncode == 0, p.stderr
         summaries.append(json.loads(p.stdout))
         original = copy
-    assert summaries == [result["semantic_summary"]] * 2
+    assert [s["summary"] for s in summaries] == [result["semantic_summary"]] * 2
+    assert summaries[0]["ports"] == summaries[1]["ports"]
 
 
 @pytest.mark.parametrize("end", [CLOCK + timedelta(hours=1), None])
@@ -1641,3 +1649,16 @@ def test_startup_temp_cannot_contain_the_source(source, tmp_path):
             temp_parent=tmp_path,
         )
     assert before == {p: sha(p) for p in source.rglob("*") if p.is_file()}
+
+
+def test_domain_ports_require_verified_native_input_before_streaming(source, monkeypatch):
+    from quanthus.expert_strategy.p3_base24_bridge import ports_for_dates
+
+    with native.NativeView(source) as view:
+        monkeypatch.setattr(view, "market_batches", lambda *_: pytest.fail("unverified stream"))
+        with pytest.raises(native.InputError, match="BRIDGE_VERIFIED_PREPARED_INPUT_REQUIRED"):
+            list(
+                ports_for_dates(
+                    view, cutoff=CLOCK, dates=[CLOCK.date()], supports={}, static_industry={}
+                )
+            )

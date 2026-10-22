@@ -1121,6 +1121,7 @@ class NativeView:
         self, root: Path, *, temp_parent: Path | None = None, deadline: float | None = None
     ) -> None:
         self.root = physical(root)
+        self.prepared_manifest: dict[str, Any] | None = None
         self.temp = tempfile.TemporaryDirectory(prefix="p3-native-read-", dir=temp_parent)
         self.deadline = deadline
         self.timer: threading.Timer | None = None
@@ -1315,9 +1316,13 @@ class NativeView:
             "ASOF_STATE_LISTING_VENUE",
         )
         query = f"""SELECT b.*, s.security_id, s.company_id, s.instrument_type, l.listing_code,
-            l.venue_id, c.trade_date, c.open_at, c.close_at,
+            l.venue_id, v.mic_code, c.trade_date, c.open_at, c.close_at,
             b.knowledge_from AS bar_knowledge_from, t.knowledge_from AS state_knowledge_from,
             l.knowledge_from AS listing_knowledge_from, s.knowledge_from AS security_knowledge_from,
+            c.knowledge_from AS calendar_knowledge_from, v.knowledge_from AS venue_knowledge_from,
+            t.knowledge_to AS state_knowledge_to, l.knowledge_to AS listing_knowledge_to,
+            s.knowledge_to AS security_knowledge_to, c.knowledge_to AS calendar_knowledge_to,
+            v.knowledge_to AS venue_knowledge_to,
             l.effective_from AS listing_effective_from, s.effective_from AS security_effective_from,
             t.is_tradable,t.can_buy,t.can_sell
             FROM p3_market_bars b
@@ -1384,6 +1389,7 @@ def open_prepared(root: Path, *, manifest_sha256: str) -> NativeView:
     if view.fingerprints != frozen:
         view.__exit__()
         raise InputError("PREPARED_FILES_CHANGED_DURING_OPEN")
+    view.prepared_manifest = manifest
     return view
 
 

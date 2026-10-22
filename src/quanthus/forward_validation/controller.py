@@ -26,7 +26,7 @@ from quanthus.forward_validation.activation import (
     load_prospective_runtime_config,
     make_activation_decision_payload,
 )
-from quanthus.forward_validation.official_cycle import OfficialCycleJobInput
+from quanthus.forward_validation.official_cycle import OfficialCycleJobInput, P6Runtime
 from quanthus.forward_validation.reproduction import (
     OfficialCycleReproductionJobInput,
 )
@@ -225,7 +225,7 @@ def _dwd_mounts_read_only(runtime: P6ProspectiveRuntimeConfig) -> bool:
 def _disabled_rehearsal_job(
     store: PlatformStore,
     *,
-    runtime: P6ProspectiveRuntimeConfig,
+    runtime: P6Runtime,
     code_revision: str,
 ):
     config = load_forward_worker_config(runtime.bindings["forward_worker"], root=runtime.root)

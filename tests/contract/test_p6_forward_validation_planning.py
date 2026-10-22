@@ -31,17 +31,17 @@ def test_p6_is_one_execution_epic_with_eight_dependency_gated_children() -> None
     )
     assert {"P6-000", *P6_CHILD_IDS} == P6_IDS
     assert items["P6-000"].issue_type == "epic"
-    assert items["P6-000"].status == "ready"
+    assert items["P6-000"].status == "closed"
     assert items["P6-GOV-001"].status == "closed"
     assert items["P6-DATA-001"].status == "closed"
     assert items["P6-SCORE-001"].status == "closed"
     assert items["P6-GOV-002"].status == "closed"
     assert items["P6-PAPER-001"].status == "closed"
     assert items["P6-WEB-001"].status == "closed"
-    assert items["P6-ACTIVATE-001"].status == "ready"
-    assert all(items[item_id].status == "blocked" for item_id in P6_CHILD_IDS[7:])
+    assert items["P6-ACTIVATE-001"].status == "closed"
+    assert all(items[item_id].status == "closed" for item_id in P6_CHILD_IDS[7:])
     assert all(items[item_id].phase == "P6" for item_id in P6_IDS)
-    assert next(chapter for chapter in CHAPTERS if chapter.number == "08").status == "ready"
+    assert next(chapter for chapter in CHAPTERS if chapter.number == "08").status == "closed"
 
 
 def test_p6_reuses_old_stable_ids_and_encodes_the_exact_dependency_chain() -> None:
@@ -101,7 +101,8 @@ def test_p6_issue_bodies_are_construction_ready_and_epic_links_all_children() ->
     }
 
     epic = p6_epic_body(items["P6-000"], "rv198-star/Quanthus", urls)
-    assert "## Blocking work items" in epic
+    assert "## Historical children and disposition" in epic
+    assert "cancelled by Owner; not accepted" in epic
     assert all(f"[{item_id}]({urls[item_id]})" in epic for item_id in P6_CHILD_IDS)
 
     for item_id in P6_IDS:

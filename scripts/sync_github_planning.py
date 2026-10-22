@@ -534,6 +534,8 @@ P6_CHILD_IDS = (
     "P6-REVIEW-001",
 )
 P6_IDS = frozenset({"P6-000", *P6_CHILD_IDS})
+P6_CANCELLED_IDS = frozenset({"P6-ACTIVATE-001", "P6-REVIEW-001"})
+P6_CLOSEOUT_PATH = "docs/acceptance/p6-owner-scope-closeout-20261023.md"
 P6_IMPLEMENTATION_SPECS = {
     "P6-000": IssueImplementationSpec(
         design_path=P6_DESIGN_PATH,
@@ -799,7 +801,7 @@ CHAPTERS = (
         "P6",
         "governance",
         MILESTONES[5],
-        "ready",
+        "closed",
     ),
     ChapterSpec("09", "docs/design/lld/09-roadmap.md", "meta", "roadmap", MILESTONES[0], "ready"),
     ChapterSpec(
@@ -853,8 +855,9 @@ PHASE_GATES = {
     ),
     "P5": "Optional research is deferred and is not a predecessor of P6.",
     "P6": (
-        "Prospective validation implementation is open at P6-GOV-001. Later work remains "
-        "dependency-gated, and full acceptance waits for real-calendar evidence maturity."
+        "P6 is complete under the Owner historical-mechanism scope of 2026-10-23. "
+        "Remaining prospective activation and 66+20-session review are cancelled, "
+        "not accepted; no production or P7 authority follows."
     ),
     "P7": "Blocked until frozen simulation supports an explicit live/no-live decision.",
     "PK": (
@@ -1121,6 +1124,16 @@ def task_body(item: WorkItem, repository: str) -> str:
             "\n\nThis is a bounded prospective-validation increment. It does not depend on P5 "
             "or authorize notification, broker connection, actual fills, or live capital."
         )
+        if item.stable_id in P6_CANCELLED_IDS or item.stable_id == "P6-000":
+            authority_note += (
+                "\n\n## Owner scope closeout — 2026-10-23\n\n"
+                "The Owner completed P6 under the accepted historical mechanism scope and "
+                "cancelled prospective activation and the 66-session plus 20-session tail. "
+                "These two future work items are not planned, not accepted. The original "
+                "implementation contract below is retained history, not a continuation task. "
+                "No P7, strict historical PIT, economic or production authority is granted. "
+                f"[Closeout decision]({repo_url(repository, P6_CLOSEOUT_PATH)})."
+            )
     elif item.phase == "P10":
         authority_note = (
             "\n\nOwnership/routing only: no automatic collection, deployment, cleanup or "
@@ -1216,11 +1229,13 @@ def p3_strat_003_epic_body(item: WorkItem, repository: str, task_urls: dict[str,
 
 def p6_epic_body(item: WorkItem, repository: str, task_urls: dict[str, str]) -> str:
     checklist = "\n".join(
-        f"- [ ] [{stable_id}]({task_urls[stable_id]})" for stable_id in P6_CHILD_IDS
+        f"- [{stable_id}]({task_urls[stable_id]}) — "
+        + ("cancelled by Owner; not accepted" if stable_id in P6_CANCELLED_IDS else "accepted")
+        for stable_id in P6_CHILD_IDS
     )
     return task_body(item, repository).replace(
         "## Acceptance evidence\n",
-        f"## Blocking work items\n\n{checklist}\n\n## Acceptance evidence\n",
+        f"## Historical children and disposition\n\n{checklist}\n\n## Acceptance evidence\n",
         1,
     )
 
@@ -1387,6 +1402,10 @@ class GitHub:
         ]
         desired_labels = sorted(set(labels + unmanaged))
         should_close = "status:closed" in desired_labels
+        cancelled_p6 = any(title.startswith(f"[{key}]") for key in P6_CANCELLED_IDS)
+        close_payload = {"state": "closed"}
+        if cancelled_p6:
+            close_payload["state_reason"] = "not_planned"
         if title.startswith(f"[{P10_EPIC_ID}]") and should_close:
             raise ValueError("the permanent P10 epic cannot be automatically closed")
         existing_body = None if existing is None else existing.get("body")
@@ -1422,7 +1441,7 @@ class GitHub:
                 created = self.api(
                     "PATCH",
                     f"/repos/{self.repository}/issues/{created['number']}",
-                    {"state": "closed"},
+                    close_payload,
                 )
             return created, "created"
         current_milestone = existing.get("milestone")
@@ -1435,11 +1454,15 @@ class GitHub:
             and sorted(existing_labels) == desired_labels
             and current_milestone_number == milestone
             and (not should_close or existing.get("state", "").casefold() == "closed")
+            and (
+                not should_close or not cancelled_p6
+                or existing.get("state_reason") == "not_planned"
+            )
         )
         if unchanged:
             return existing, "reused"
         if should_close:
-            payload["state"] = "closed"
+            payload.update(close_payload)
         endpoint = f"/repos/{self.repository}/issues/{existing['number']}"
         return self.api("PATCH", endpoint, payload), "updated"
 

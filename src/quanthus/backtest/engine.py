@@ -1209,6 +1209,10 @@ class BacktestEngine:
         initial_cash: Decimal,
     ) -> ExecutionProfile:
         profile = self._validate_run(run)
+        if signal.snapshot_replay_clock_json is not None and run.official:
+            raise BacktestInputError(
+                "fixed snapshot mechanism evidence cannot enter an official run"
+            )
         if signal.profile_id != profile.profile_id:
             raise BacktestInputError("signal profile_id does not match run profile")
         if run.data_snapshot_id != signal.snapshot.snapshot_id:

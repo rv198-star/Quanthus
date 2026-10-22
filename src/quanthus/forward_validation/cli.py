@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from quanthus.forward_validation.activation import load_prospective_runtime_config
+from quanthus.forward_validation.base24_cycle import load_cycle_runtime
 from quanthus.forward_validation.official_cycle import OfficialCycleJobInput, run_official_cycle
 from quanthus.forward_validation.reproduction import (
     OfficialCycleReproductionJobInput,
@@ -62,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
         terminal_stage = "rehearsal-sealed"
     elif mode == "official_cycle":
         job_input = OfficialCycleJobInput.from_dict(raw)
-        runtime = load_prospective_runtime_config(args.runtime_config, root=root)
+        runtime = load_cycle_runtime(args.runtime_config, root=root)
         if runtime.bindings["forward_worker"] != config.path:
             raise RuntimeError("prospective runtime does not bind the loaded P6 Forward Worker")
         print(
@@ -98,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         terminal_stage = "official-cycle-sealed"
     elif mode == "official_reproduction":
         job_input = OfficialCycleReproductionJobInput.from_dict(raw)
-        runtime = load_prospective_runtime_config(args.runtime_config, root=root)
+        runtime = load_cycle_runtime(args.runtime_config, root=root)
         if runtime.bindings["forward_worker"] != config.path:
             raise RuntimeError("prospective runtime does not bind the loaded P6 Forward Worker")
         print(

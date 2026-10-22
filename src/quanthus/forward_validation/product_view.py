@@ -13,17 +13,21 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn, cast
 
 from quanthus.forward_validation.activation import (
+    activation_decision_from_mapping,
     load_activation_decision,
     load_owner_activation_mandate,
     load_prospective_runtime_config,
 )
+from quanthus.forward_validation.base24_contract import load_runtime as load_base24_runtime
 from quanthus.forward_validation.contracts import ForwardValidationContractError
 from quanthus.platform.jobs import P6_FORWARD_CYCLE_JOB
+from quanthus.platform.models import JobRecord
 from quanthus.platform.persistence import PlatformStore
 
 _SCHEMA = "quanthus.p6-forward-product-view.v1"
@@ -41,7 +45,7 @@ class ForwardProductViewError(ValueError):
         super().__init__(f"{reason_code}: {detail}")
 
 
-def _fail(reason: str, detail: str) -> None:
+def _fail(reason: str, detail: str) -> NoReturn:
     raise ForwardProductViewError(reason, detail)
 
 
@@ -56,7 +60,7 @@ def _load(path: Path) -> dict[str, Any]:
         raise ForwardProductViewError("forward_product_view_invalid_json", str(path)) from exc
     if not isinstance(value, dict):
         _fail("field_mismatch", f"{path} must contain one object")
-    return value
+    return cast(dict[str, Any], value)
 
 
 def _digest(value: object, field: str) -> str:
@@ -248,9 +252,28 @@ class ForwardValidationProductView:
         store: PlatformStore,
         config_path: Path | None = None,
         candidate_run_root: Path | None = None,
+        runtime_path: Path | None = None,
+        forward_run_root: Path | None = None,
+        worker_revision: str | None = None,
     ) -> None:
         self.root = root.resolve()
         self.store = store
+        self.base24_runtime = None
+        self.forward_run_root = forward_run_root
+        self.worker_revision = worker_revision
+        if any(value is not None for value in (runtime_path, forward_run_root, worker_revision)):
+            if (
+                runtime_path is None
+                or forward_run_root is None
+                or not forward_run_root.is_absolute()
+                or not isinstance(worker_revision, str)
+                or re.fullmatch(r"[0-9a-f]{40}", worker_revision) is None
+            ):
+                _fail(
+                    "base24_view_configuration",
+                    "runtime, absolute run root and Worker SHA required",
+                )
+            self.base24_runtime = load_base24_runtime(runtime_path, root=self.root)
         self.candidate_run_root = (
             None if candidate_run_root is None else candidate_run_root.resolve()
         )
@@ -261,6 +284,8 @@ class ForwardValidationProductView:
         )
 
     def _activation_decision(self) -> dict[str, object] | None:
+        if self.base24_runtime is not None:
+            return self._base24_activation_decision()
         if self.candidate_run_root is None:
             return None
         activation_root = (self.candidate_run_root / "p6-forward/activation").resolve()
@@ -309,8 +334,58 @@ class ForwardValidationProductView:
             "deployment_revision": decision.deployment_revision,
         }
 
-    def _latest_job(self) -> dict[str, object] | None:
-        jobs = self.store.list_jobs(P6_FORWARD_CYCLE_JOB, 1)
+    def _base24_activation_decision(self) -> dict[str, object] | None:
+        assert self.forward_run_root is not None and self.base24_runtime is not None
+        path = self.forward_run_root / "activation/base24-enabled.json"
+        if any(parent.is_symlink() for parent in (path, *path.parents)):
+            _fail("path_escape", "Base 2.4 activation must use physical paths")
+        if not path.is_file():
+            return None
+        try:
+            decision = activation_decision_from_mapping(
+                _load(path), runtime=cast(Any, self.base24_runtime), path=path
+            )
+        except ForwardValidationContractError as exc:
+            _fail("activation_projection_drift", str(exc))
+        if (
+            decision.deployment_revision != self.worker_revision
+            or decision.decision_at > datetime.now(timezone.utc)
+        ):
+            _fail("activation_projection_drift", "Worker revision or activation time differs")
+        return {
+            "decision_id": decision.decision_id,
+            "decision_at": decision.decision_at.isoformat(),
+            "activation_market_date": decision.activation_market_date.isoformat(),
+            "decision_digest": decision.decision_digest,
+            "deployment_revision": decision.deployment_revision,
+            "state": decision.state,
+        }
+
+    def _base24_jobs(self, activation: Mapping[str, object] | None) -> tuple[JobRecord, ...]:
+        assert self.base24_runtime is not None and self.worker_revision is not None
+        jobs = self.store.list_jobs(P6_FORWARD_CYCLE_JOB, 200)
+        if len(jobs) >= 200:
+            _fail("base24_view_job_census_limit", "complete bounded Job census required")
+        selected = []
+        for job in jobs:
+            value = job.input_ref
+            if value.get("mode") == "disabled_rehearsal":
+                expected = f"production-preactivation-{self.worker_revision[:12]}"
+                if value.get("rehearsal_id") == expected:
+                    selected.append(job)
+            elif (
+                activation is not None
+                and value.get("runtime_sha256") == self.base24_runtime.config_sha256
+                and isinstance(value.get("activation_decision"), Mapping)
+                and value["activation_decision"].get("decision_digest")
+                == activation["decision_digest"]
+            ):
+                selected.append(job)
+        return tuple(selected)
+
+    def _latest_job(self, jobs: tuple[JobRecord, ...] | None = None) -> dict[str, object] | None:
+        if jobs is None:
+            jobs = self.store.list_jobs(P6_FORWARD_CYCLE_JOB, 1)
         if not jobs:
             return None
         job = jobs[0]
@@ -335,9 +410,11 @@ class ForwardValidationProductView:
             "summary": summary,
         }
 
-    def _official_evidence(self, sessions_per_block: int) -> dict[str, object]:
-        official: list[dict[str, object]] = []
-        for job in self.store.list_jobs(P6_FORWARD_CYCLE_JOB, 100):
+    def _official_evidence(
+        self, sessions_per_block: int, jobs: tuple[JobRecord, ...] | None = None
+    ) -> dict[str, object]:
+        official: list[dict[str, Any]] = []
+        for job in jobs if jobs is not None else self.store.list_jobs(P6_FORWARD_CYCLE_JOB, 100):
             if (
                 job.state != "succeeded"
                 or job.input_ref.get("mode") != "official_cycle"
@@ -388,8 +465,8 @@ class ForwardValidationProductView:
 
     def health_summary(self) -> dict[str, object]:
         observed = self.candidate(_TARGET_STRATEGY, _TARGET_VERSION)
-        admission = observed["admission"]
-        evidence = observed["evidence"]
+        admission = cast(Mapping[str, Any], observed["admission"])
+        evidence = cast(Mapping[str, Any], observed["evidence"])
         return {
             "state": observed["state"],
             "admission_state": admission["state"],
@@ -412,7 +489,13 @@ class ForwardValidationProductView:
         paper_runtime = paper["execution"]
         roles = score["roles"]
         activation_decision = self._activation_decision()
-        activated = activation_decision is not None
+        admission_state = (
+            "disabled"
+            if activation_decision is None
+            else str(activation_decision.get("state", "enabled"))
+        )
+        activated = admission_state == "enabled"
+        jobs = self._base24_jobs(activation_decision) if self.base24_runtime is not None else None
         source_digests = {
             "web_projection": self.config.config_sha256,
             "strategy_card": self.config.strategy_card_sha256,
@@ -428,9 +511,11 @@ class ForwardValidationProductView:
         }
         if activation_decision is not None:
             source_digests["activation_decision"] = str(activation_decision["decision_digest"])
+        if self.base24_runtime is not None:
+            source_digests["runtime"] = self.base24_runtime.config_sha256
         evidence = (
-            self._official_evidence(int(budget["sessions_per_block"]))
-            if activated
+            self._official_evidence(int(budget["sessions_per_block"]), jobs)
+            if activation_decision is not None
             else {
                 "state": "waiting_activation",
                 "official_collection_sessions_completed": 0,
@@ -443,8 +528,8 @@ class ForwardValidationProductView:
         )
         return {
             "state": (
-                "prospective_activation_enabled"
-                if activated
+                f"prospective_activation_{admission_state}"
+                if activation_decision is not None
                 else "engineering_ready_activation_disabled"
             ),
             "read_only": True,
@@ -454,7 +539,7 @@ class ForwardValidationProductView:
                 "strategy_semantic_digest": _TARGET_DIGEST,
             },
             "admission": {
-                "state": "enabled" if activated else "disabled",
+                "state": admission_state,
                 "activation_owner": activation["activation_owner"],
                 "first_official_market_date_rule": activation["first_official_market_date_rule"],
                 "required_release_state": activation["required_release_state"],
@@ -475,7 +560,7 @@ class ForwardValidationProductView:
                     "cross_section_increases_independent_progress"
                 ],
             },
-            "latest_forward_job": self._latest_job(),
+            "latest_forward_job": self._latest_job(jobs),
             "scorecards": {
                 "state": "active_prospective" if activated else "frozen_pre_result",
                 "roles": {
@@ -524,7 +609,7 @@ class ForwardValidationProductView:
             "limitations": [
                 *(
                     []
-                    if activated
+                    if activation_decision is not None
                     else [
                         "No official prospective observation exists before a separate "
                         "P6-ACTIVATE-001 decision."

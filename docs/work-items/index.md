@@ -10,6 +10,26 @@ Acquisition and shared quality/governance belong to P10 under
 Legacy ids and historical rows below remain traceability, not permission for business lines to
 recover/repair data. The reviewed live routing inventory is `config/data-ownership.v1.json`.
 
+## Whole-project CN02 migration
+
+P6 on the migrated node is tracked in
+[P6-R1 / P6-HISTORY-001](p6-cn02-start.md). The Owner closed this line on 2026-10-23 under
+the completed historical-mechanism scope. The [scope closeout](../acceptance/p6-owner-scope-closeout-20261023.md)
+cancels prospective activation and the 66+20-session collection/review; it does
+not claim their acceptance. P6 has no remaining scheduled work. The earlier
+historical route and its evidence remain retained. The recovered database, disabled
+rehearsal and deferred official prospective activation are separate gates.
+The fixed-snapshot mechanism run, fresh independent reproduction and read-only
+semantic review now have [bounded engineering acceptance](../acceptance/p6-fixed-snapshot-mechanism-20261022.md).
+They add zero official prospective observations and do not accept P6-REVIEW-001.
+The Owner's later [CN02-only runtime decision](cn02-project-migration.md#current-runtime-ownership-cn02-only)
+retires OCI from future Quanthus responsibility; no OCI inspection remains on
+the P6 critical path.
+
+| ID | Title | Depends on | Disposition |
+| --- | --- | --- | --- |
+| META-OPS-CN02-001 | Consolidate the Quanthus project from CN01 and OCI onto CN02 | Owner clarification 2026-10-20 | [Migration work item](cn02-project-migration.md); deployment inventory and preparation; cutover not executed |
+
 ## P10 permanent data line
 
 | ID | Title | Depends on | Disposition |
@@ -481,23 +501,27 @@ need or independently new admissible evidence.
 | P5-GBDT-001 | Train constrained GBDT research pipeline | P5 | deferred; optional research |
 | P5-PROMOTE-001 | Implement model promotion/shadow gate | P5 | deferred; optional research |
 | P5-STAGE-001 | Learned Stage assessment dual-track research | P5 | blocked pending bounded input/reference qualification; #400/#402 reopened under Owner continuation; A/#401 accepted preregistration-only; B exact-input census active, C partial, D/#404 synthetic recovery active, E/F/G NOT_RUN; `docs/work-items/p5-stage-001.md` current recovery checkpoint |
-| P6-000 | Coordinate the bounded P6 prospective-validation program | P6 | open epic |
+| P6-000 | Coordinate the bounded P6 prospective-validation program | P6 | closed under Owner-revised historical scope; `docs/acceptance/p6-owner-scope-closeout-20261023.md` |
 | P6-GOV-001 | Freeze entry proposal, observation budget, stop rules, and rollback | P6 | closed by `docs/acceptance/p6-gov001-prospective-mvp-entry-20260917.md`; proposal is entry-only and grants no activation/downstream authority |
 | P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6 | closed by `docs/acceptance/p6-data001-prospective-boundary-20260917.md`; owner value checkpoint accepted, no activation/prospective read |
 | P6-SCORE-001 | Freeze role-specific forward scorecards and loss attribution | P6 | closed by `docs/acceptance/p6-score001-forward-scorecards-20260917.md`; pre-result role cards and material-loss attribution frozen |
 | P6-GOV-002 | Implement composite Forward Worker and disabled-state rehearsal | P6 | closed by `docs/acceptance/p6-gov002-forward-worker-20260917.md`; existing replay queue/worker only, disabled rehearsal sealed/recoverable, official cycles still blocked |
 | P6-PAPER-001 | Implement isolated P2 paper lane and fixed-unit ledger | P6 | closed by `docs/acceptance/p6-paper001-paper-lane-20260917.md`; exact P2 reuse, fixed-unit/non-compounding paper authority, balanced ledger |
 | P6-WEB-001 | Project forward and paper evidence in candidate detail | P6 | closed by `docs/acceptance/p6-web001-forward-paper-product-view-20260917.md`; digest-bound read-only candidate detail projection, no activation/write authority |
-| P6-ACTIVATE-001 | Authorize and run the first official prospective cycle | P6 | ready |
-| P6-REVIEW-001 | Complete the time-matured simulation review | P6 | blocked by P6-ACTIVATE-001 and closed budget |
+| P6-ACTIVATE-001 | Authorize and run the first official prospective cycle | P6 | closed as Owner-cancelled / not planned, not accepted; `docs/acceptance/p6-owner-scope-closeout-20261023.md` |
+| P6-REVIEW-001 | Complete the time-matured simulation review | P6 | closed as Owner-cancelled / not planned, not accepted; `docs/acceptance/p6-owner-scope-closeout-20261023.md` |
 
 P6 runtime closeout on 2026-09-19 is recorded in
 `docs/acceptance/p6-activate001-production-activation-status-20260919.md`. The independent closeout
 review and repair are recorded append-only in
 `docs/acceptance/p6-activate001-closeout-repair-20260919.md`. Production activation is enabled and
-official collection is `0 / 66`; `P6-ACTIVATE-001` remains open only because its frozen acceptance
+official collection was `0 / 66`; `P6-ACTIVATE-001` remains open because its frozen acceptance
 requires the first legal post-activation official cycle plus independent reproduction.
 `P6-REVIEW-001` already exists as GitHub #120 and must not be duplicated.
+That activation statement describes the archived old-node checkpoint. The current
+CN02 closeout above keeps the local controller disabled; deployment and
+prospective continuation are no longer scheduled under this scope. Do not infer current
+production state or a repaired historical PIT source from old planning rows.
 
 | P7-LIVE-001 | Define email-advice and actual-operation reporting boundary; defer broker adapter | P7 | blocked by P6 review |
 | P7-RECON-001 | Reconcile advice with operator-reported fills, changes, or no action | P7 | blocked by P7-LIVE-001 |

@@ -1,0 +1,21 @@
+{
+  "contract": "quanthus.base24-recorded-delivery-status.v1",
+  "version": "2.4",
+  "business_through": "2026-09-30",
+  "business_timezone": "Asia/Shanghai",
+  "purpose": "governance_baseline",
+  "consumer_admission": "NOT_GRANTED",
+  "execution_authorized": false,
+  "products": {
+    "dwd": {
+      "manifest_sha256": "sha256:04345d9cfb7d99dae9e65b11bd28591095156e48378b5b44245fc3d36a944b3a",
+      "acceptance_path": "evidence/dwd-independent-acceptance.safe.json",
+      "acceptance_sha256": "sha256:3983c790ff5fb8076e835c1d80f26f4ef6505e34645aaecf3416d6e8cc7ba362"
+    },
+    "ods": {
+      "manifest_sha256": "sha256:1d9a5b0404a7ab685c519736be033f0800e78a77f9803cf6edfaf06fea4189ab",
+      "acceptance_path": "evidence/ods-independent-acceptance.safe.json",
+      "acceptance_sha256": "sha256:efb11282a498c1b4d10de5cc388235357a94ffb9ea73fcaf2f9ebf99af0139ce"
+    }
+  }
+}

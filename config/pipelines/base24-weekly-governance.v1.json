@@ -1,0 +1,62 @@
+{
+  "through_date": "2026-09-30",
+  "business_timezone": "Asia/Shanghai",
+  "layers": {
+    "dwd": {
+      "format": "native_base24",
+      "package_id": "base24-complete-dwd-bounded-c902994",
+      "manifest_sha256": "sha256:04345d9cfb7d99dae9e65b11bd28591095156e48378b5b44245fc3d36a944b3a",
+      "content_digest": "sha256:b60b36ed63c160a271af047fb0c1ec98a09977c931b3f5f1f25aa0651f2ffd64",
+      "materialization_sha256": "sha256:353eb6ef8a5d9caa2d734bd9e4506616a7017708d85cfe9d9e712c8603bcfa41"
+    }
+  },
+  "consumer_admission": "NOT_GRANTED",
+  "execution_authorized": false,
+  "base_image_acceptance": {
+    "DWD": "sha256:3983c790ff5fb8076e835c1d80f26f4ef6505e34645aaecf3416d6e8cc7ba362",
+    "ODS": "sha256:efb11282a498c1b4d10de5cc388235357a94ffb9ea73fcaf2f9ebf99af0139ce",
+    "purpose": "completed local physical/cold acceptance; governance parent use only"
+  },
+  "schema_version": "quanthus.base24-weekly-governance.v1",
+  "purpose": "isolated_weekly_governance",
+  "financial_statement_source": {
+    "provider_revision": "quanthus-fundamentals-provider-v1",
+    "dataset_revision": "preserve exact original datasets.json revision separately; never equate it to provider revision"
+  },
+  "weekly_identity_reference": {
+    "status": "accepted_reference_only",
+    "tables": [
+      "dwd_security",
+      "dwd_security_identifier"
+    ],
+    "trading_or_research_admission": false,
+    "acceptance_receipts": [
+      "sha256:8e964290e2a6740c520b364299ab90a3d30f296d5f92fbb0eba280788a135b6c",
+      "sha256:e61a3871dcede8f3019bab8180692fd99dd80a22062704f57b71ee64c5b6b313"
+    ]
+  },
+  "scope": "original financial envelopes and original per-security receipts; independent atomic projection; all other weekly datasets require explicit qualified handlers or held state",
+  "note": "Exact two identity tables verified against the accepted whole Base2.4 DWD cold receipts. This does not accept any future weekly product, widen Daily admission, infer historical PIT or activate execution.",
+  "weekly_industry_reference": {
+    "status": "accepted_reference_only",
+    "tables": [
+      "dwd_security",
+      "dwd_security_identifier",
+      "dwd_listed_company",
+      "dwd_industry_node",
+      "dwd_industry_scheme",
+      "dwd_trading_venue"
+    ],
+    "trading_or_research_admission": false,
+    "acceptance_receipts": [
+      "sha256:8e964290e2a6740c520b364299ab90a3d30f296d5f92fbb0eba280788a135b6c",
+      "sha256:e61a3871dcede8f3019bab8180692fd99dd80a22062704f57b71ee64c5b6b313"
+    ]
+  },
+  "industry_snapshot_source": {
+    "provider_revision": "quanthus-fundamentals-provider-v1",
+    "qualification": "NORMALIZED_PROVIDER_DATED_SNAPSHOT_NOT_RAW_RECONSTRUCTION_OR_HISTORICAL_PIT",
+    "cohort": "exact original normalized member and original per-security receipt cohort; no full-current-market or historical PIT claim",
+    "provider_update_date": "original provenance only; never membership start or knowledge cutoff"
+  }
+}

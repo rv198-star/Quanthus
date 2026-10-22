@@ -1,0 +1,31 @@
+{
+  "schema_version": "quanthus.p3-base24-native-batch-contract.v1",
+  "purpose": "native_consumer_engineering_not_historical_qualification",
+  "request_digest": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde",
+  "source": "verified_job_local_native_closure_plus_separately_qualified_key_bound_support",
+  "entrypoints": ["cutoffs_from_native", "materialize_job", "NativeCompositeBackend"],
+  "scope": {"decision_start": "2025-01-01", "decision_end": "2026-09-17", "execution_end": "2026-09-18", "warmup_sessions": 60},
+  "variants": ["B", "T", "R", "TR"],
+  "stages": [
+    "one_ordered_native_history_stream_per_cutoff",
+    "one_existing_feature_SQL_evaluation_per_cutoff",
+    "one_global_P4_isolation_concentration_and_split_finalization",
+    "one_shared_feature_panel_and_union_mask",
+    "existing_four_variant_expert_and_P2_execution"
+  ],
+  "identity": ["complete_source_manifest", "qualification", "industry", "all_quanthus_python_and_config_json_hashes", "python_duckdb_arrow_versions", "scope", "calendar", "all_output_file_hashes"],
+  "history_TMP": "consumed_once_then_removed_only_after_success;_failed_job_retained;no_cross_job_cache",
+  "known_action": "qualified_source_bound_normalized_cash_and_bonus_terms;original_Decimal_and_known_at;existing_P2_reference_mark_and_ledger;no_new_entry_authority",
+  "unknown_action": "exception_for_features;affected_held_step_blocked;no_zero_fill_or_forced_sale",
+  "same_day_actions": "require_explicit_qualified_aggregate;never_guess_compounding",
+  "cold_reads": "only_job_files_and_ordinary_code;no_legacy_provider_or_network_fallback",
+  "independent_reproduction": "rebuild_prerequisite_in_separate_job;not_cache_reuse",
+  "job_process_budget": "frozen_runtime.v1.json_and_runtime.v1.1.json_outer_job_bounds_still_apply;full_real_scope_performance_not_qualified_by_synthetic_tests",
+  "admission": "new_independently_accepted_B_identity_and_existing_D_activation_required_before_real_result_execution",
+  "synthetic_scope": "explicit_engineering_only_never_formal_window_acceptance",
+  "legacy_equivalence": false,
+  "B_accepted": false,
+  "D_activated": false,
+  "p6_mutation_authorized": false,
+  "execution_authorized": false
+}

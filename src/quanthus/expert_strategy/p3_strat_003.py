@@ -529,7 +529,7 @@ class P3Strat003CompositeBackend:
         self.request = P3Strat003Request.load(self.repository_root)
         self._opened_at = time.perf_counter()
         runtime_started = time.perf_counter()
-        self.runtime = P3Strat003ReplayRuntime(
+        self.runtime = self._open_runtime(
             self.repository_root,
             decision_start=decision_start,
             decision_end=decision_end,
@@ -551,6 +551,9 @@ class P3Strat003CompositeBackend:
                 }
             ),
         )
+
+    def _open_runtime(self, *args: Any, **kwargs: Any) -> P3Strat003ReplayRuntime:
+        return P3Strat003ReplayRuntime(*args, **kwargs)
 
     def close(self) -> None:
         self.runtime.close()

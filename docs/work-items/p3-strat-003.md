@@ -114,6 +114,20 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**Prerequisite repair, 2026-10-23:** exact 60-session membership is now derived from the
+SSE/SZSE 2024 official notices (both declared 2023-12-26), reconciled against all 732 native
+2024 exchange/date metadata rows, and pinned to the native session identities for
+2024-10-09 through 2024-12-31. This does not backdate warehouse clocks or qualify historical
+market values. `p3_base24_batch.py` now connects verified native streams, the existing P4
+scan and baseline feature SQL to the existing B/T/R/TR runtime; synthetic execution includes
+actual P2 fills, independent prerequisite rebuild, two relocations and two new processes
+with kernel network denial. Qualified action terms can replay; unavailable terms block the
+affected held-position step without inventing adjustments or selling. Six additional exact
+sealed metadata members were physically verified by P10: original historical-purpose proof
+is still not recovered in that selection. No real candidate/features, new B acceptance or D
+results were produced. Continue from [the current three-prerequisite disposition](p3-base24-goal-audit-and-plan-20261022.md#15-三项前置修复的实际交付),
+not from an older engineering-only claim or spent formal B attempt.
+
 **Domain-port continuation, 2026-10-23:** the Owner requested fixing the startup blockers and
 continuing. The native P4 row conversion, shared B/T/R/TR complete-case mask and separate P2
 execution-evidence port are now implemented in `p3_base24_bridge.py`. They consume the verified

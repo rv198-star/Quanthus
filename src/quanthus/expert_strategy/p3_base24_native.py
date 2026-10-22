@@ -1167,12 +1167,13 @@ class NativeView:
     def at(self, cutoff: datetime) -> None:
         self._at(cutoff, market_only=False)
 
-    def _at(self, cutoff: datetime, *, market_only: bool) -> None:
+    def _at(self, cutoff: datetime, *, market_only: bool, execution_only: bool = False) -> None:
         self._unchanged()
         if cutoff.tzinfo is None or cutoff.utcoffset() is None:
             raise InputError("AWARE_CUTOFF_REQUIRED")
         day = cutoff.astimezone(TZ).date()
-        if not date(2025, 1, 1) <= day <= date(2026, 9, 17):
+        last = date(2026, 9, 18) if execution_only else date(2026, 9, 17)
+        if not date(2025, 1, 1) <= day <= last:
             raise InputError("FROZEN_DECISION_WINDOW")
         self.connection.execute("BEGIN TRANSACTION")
         try:
@@ -1263,10 +1264,49 @@ class NativeView:
 
     def market_batches(self, cutoff: datetime, *, batch_size: int = 8192) -> Iterator[Any]:
         """Exact native values at cutoff; no fabricated eligibility or legacy casts."""
+        yield from self._market_batches(cutoff, batch_size=batch_size)
+
+    def execution_batches(
+        self,
+        cutoff: datetime,
+        *,
+        decision_date: date,
+        batch_size: int = 8192,
+    ) -> Iterator[Any]:
+        """Execution-side next session only; never extends the decision window."""
+        day = cutoff.astimezone(TZ).date()
+        if not date(2025, 1, 1) <= decision_date <= date(2026, 9, 17) or day <= decision_date:
+            raise InputError("FROZEN_EXECUTION_WINDOW")
+        yield from self._market_batches(
+            cutoff,
+            batch_size=batch_size,
+            execution_after=decision_date,
+        )
+
+    def _market_batches(
+        self,
+        cutoff: datetime,
+        *,
+        batch_size: int,
+        execution_after: date | None = None,
+    ) -> Iterator[Any]:
         if type(batch_size) is not int or not 1 <= batch_size <= 65536:
             raise InputError("BATCH_SIZE_INVALID")
-        self._at(cutoff, market_only=True)
+        self._at(cutoff, market_only=True, execution_only=execution_after is not None)
         c = self.connection
+        if execution_after is not None:
+            next_open = c.execute(
+                "SELECT trade_date FROM dwd_trading_calendar c "
+                "JOIN dwd_trading_venue v USING(venue_id) "
+                "WHERE c.is_open AND c.trade_date>? AND v.mic_code IN ('XSHG','XSHE') "
+                "AND v.effective_from<=c.open_at "
+                "AND (v.effective_to IS NULL OR v.effective_to>c.close_at) "
+                "GROUP BY trade_date HAVING count(DISTINCT v.mic_code)=2 "
+                "ORDER BY trade_date LIMIT 1",
+                [execution_after],
+            ).fetchone()
+            if next_open is None or next_open[0] != cutoff.astimezone(TZ).date():
+                raise InputError("ASOF_EXACT_NEXT_SESSION_UNAVAILABLE")
         bounded = f"b.observation_end<=TIMESTAMPTZ {_q(cutoff.isoformat())}"
         _zero(
             c,
@@ -1315,6 +1355,11 @@ class NativeView:
             "AND (l.effective_to IS NULL OR l.effective_to>t.observation_start))",
             "ASOF_STATE_LISTING_VENUE",
         )
+        execution_filter = (
+            "AND c.trade_date=DATE " + _q(cutoff.astimezone(TZ).date().isoformat())
+            if execution_after is not None
+            else ""
+        )
         query = f"""SELECT b.*, s.security_id, s.company_id, s.instrument_type, l.listing_code,
             l.venue_id, v.mic_code, c.trade_date, c.open_at, c.close_at,
             b.knowledge_from AS bar_knowledge_from, t.knowledge_from AS state_knowledge_from,
@@ -1342,7 +1387,8 @@ class NativeView:
             WHERE v.mic_code IN ('XSHE','XSHG') AND s.instrument_type='A_SHARE'
                 AND c.trade_date=CAST(b.observation_start AS DATE)
                 AND b.observation_end<=TIMESTAMPTZ {_q(cutoff.isoformat())}
-            ORDER BY b.listing_id,b.observation_start"""
+            {execution_filter}
+            ORDER BY s.security_id,b.observation_start,b.listing_id"""
         _zero(
             c,
             "SELECT count(*) FROM (SELECT listing_id,calendar_session_id FROM ("

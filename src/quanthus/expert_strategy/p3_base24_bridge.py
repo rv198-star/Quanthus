@@ -195,6 +195,7 @@ class DecisionPort:
     open_at: datetime
     close_at: datetime
     execution_only: bool
+    adjustment_effective: bool | None = None
 
 
 def decision_port(
@@ -416,6 +417,7 @@ def decision_port(
         row["open_at"],
         row["close_at"],
         execution_only,
+        adjustment,
     )
 
 

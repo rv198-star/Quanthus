@@ -9,7 +9,7 @@ import os
 import random
 import tempfile
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import date, datetime, time
@@ -23,6 +23,7 @@ from quanthus.backtest.contracts import (
     MARKET_TIMEZONE,
     BacktestRunSpec,
     BacktestSignal,
+    CorporateActionStep,
     EngineEvent,
     EventType,
     OpenExecutionState,
@@ -274,40 +275,15 @@ class FormalP2ReplayRuntime:
                 "formal_attribution_population_duplicate",
                 "formal event population duplicates a security-date",
             )
-        provider_config = load_replay_data_provider_config(
-            self.repository_root / self.provider_config,
-            allowed_partitions=self.allowed_provider_partitions,
+        self.feature_registry = load_feature_registry(
+            self.repository_root / "config/p3-baseline-features.research.v1.json"
         )
-        provider = ReplayDataProvider(provider_config)
-        self.session = self.stack.enter_context(
-            provider.open(
-                scope_start=self._provider_scope_start(),
-                scope_end=self.decision_end,
-            )
-        )
-        self.frames = self.session.reader.frames(self.decision_start, self.decision_end)
+        self._open_data_inputs()
         if self.frames[-1].execution_date != self.execution_end:
             raise ExpertEvaluationError(
                 "formal_attribution_scope_mismatch",
                 f"replay does not end at {self.execution_end.isoformat()}",
             )
-        self.feature_registry = load_feature_registry(
-            self.repository_root / "config/p3-baseline-features.research.v1.json"
-        )
-        selected = tuple(sorted({item.panel_security_id for item in self.events}))
-        panel_path = Path(self.temporary.name) / "formal-feature-panel.parquet"
-        self.panel = self.stack.enter_context(
-            BaselineFeaturePanel.build(
-                self.session.reader.bundle,
-                self.feature_registry,
-                scope_start=self.decision_start,
-                scope_end=self.execution_end,
-                output=panel_path,
-                data_content_digest=self.session.reader.data_content_digest,
-                data_manifest_sha256=self.session.reader.data_manifest_sha256,
-                allowed_security_ids=selected,
-            )
-        )
         self.p0_policy = load_policy(self.repository_root / "config/p0-policy.v1.json")
         self.engine = BacktestEngine(
             load_execution_policy(
@@ -327,6 +303,36 @@ class FormalP2ReplayRuntime:
         self.trend_spec = trend_spec
         self.trend_config = load_trend_stability_config(
             self.repository_root / "config/expert-evaluations/experts/trend-stability.v1.json"
+        )
+
+    def _open_data_inputs(self) -> None:
+        """Default legacy source; a bounded subclass may bind a native prerequisite."""
+        provider_config = load_replay_data_provider_config(
+            self.repository_root / self.provider_config,
+            allowed_partitions=self.allowed_provider_partitions,
+        )
+        provider = ReplayDataProvider(provider_config)
+        self.session = self.stack.enter_context(
+            provider.open(scope_start=self._provider_scope_start(), scope_end=self.decision_end)
+        )
+        self.frames: Sequence[StrategyReplayFrame] = self.session.reader.frames(
+            self.decision_start, self.decision_end
+        )
+        self.data_snapshot_id = self.session.reader.bundle.snapshot.snapshot_id
+        self.data_content_digest = self.session.reader.data_content_digest
+        self.data_manifest_sha256 = self.session.reader.data_manifest_sha256
+        selected = tuple(sorted({item.panel_security_id for item in self.events}))
+        self.panel = self.stack.enter_context(
+            BaselineFeaturePanel.build(
+                self.session.reader.bundle,
+                self.feature_registry,
+                scope_start=self.decision_start,
+                scope_end=self.execution_end,
+                output=Path(self.temporary.name) / "formal-feature-panel.parquet",
+                data_content_digest=self.data_content_digest,
+                data_manifest_sha256=self.data_manifest_sha256,
+                allowed_security_ids=selected,
+            )
         )
 
     def _load_event_population(
@@ -416,7 +422,7 @@ class FormalP2ReplayRuntime:
         run = BacktestRunSpec(
             code_version=self._code_version(),
             parameter_hash=digest_value(self._parameter_payload(intervention_id)),
-            data_snapshot_id=self.session.reader.bundle.snapshot.snapshot_id,
+            data_snapshot_id=self.data_snapshot_id,
             feature_version=self.panel.report.digest,
             rule_version=self.registry.card.strategy_version,
             run_id=(
@@ -426,8 +432,8 @@ class FormalP2ReplayRuntime:
             execution_policy_version=self.engine.policy.policy_version,
             execution_profile_id=self.engine.policy.active_profile.profile_id,
             schedule_version=self.engine.policy.active_profile.schedule_version,
-            data_content_digest=self.session.reader.data_content_digest,
-            data_manifest_sha256=self.session.reader.data_manifest_sha256,
+            data_content_digest=self.data_content_digest,
+            data_manifest_sha256=self.data_manifest_sha256,
         )
         decisions: list[dict[str, Any]] = []
         transitions: list[PositionTransition] = []
@@ -843,7 +849,7 @@ class FormalP2ReplayRuntime:
             decision_digest,
         )
         sessions = []
-        actions = []
+        actions: list[CorporateActionStep] = []
         mark = runtime.ledger.last_mark_price
         for candidate in self.frames[frame_index:]:
             if mark is None:

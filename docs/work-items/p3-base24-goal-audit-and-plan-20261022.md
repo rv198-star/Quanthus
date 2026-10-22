@@ -506,6 +506,56 @@ native 清单为 **1,010,740,231 bytes**，声明保留原生版本、legacy equ
   保留整个预热跨度的日历元数据，市场观察仍只保留精确获准的 60 日。
   运行单声明及证据 SHA 本身不授予来源资格或真实输入读取授权；inactive 示例
   的 `warmup_calendar` 保持 null，必须另行填入已资格证据后才可激活。
+
+## 13. 2026-10-23 P3 启动的实际结果
+
+Owner 在复验后要求启动 P3。新增
+[p3_base24_startup.py](../../src/quanthus/expert_strategy/p3_base24_startup.py)
+只做已发布原生闭包的时间字段诊断，不修改来源，不使用旧 B attempt，不生成候选、标签、
+策略收益或 P6 记录。运行前登记新 scope `P3-BASE24-INPUT-20261023-CLOCK-001`、精确输入、
+代码、列投影、磁盘/内存快照和 300 秒上限；schema/目的/范围/授权/代码漂移在 payload 前拒绝。
+DuckDB 保持 2 线程、2 GB、最多 1 GB spill；文件哈希及每表查询边界检查剩余空间和 4 GiB RSS
+阈值，运行 SQL 设时限中断。RSS 边界检查不是内核硬限制。
+
+实际代码 `4633f22cd2a8c953eef50f85d2f563ad22798f79`；来源仍为 §9 已交付 projection，
+manifest `sha256:ec8adacf91b55062e4873ca6f18216fc4d41c1c6c6f59bc172255606a2f0a6dd`。
+16 个原生文件共 1,010,740,231 bytes 的 SHA 全部匹配，读取前后文件及关键元数据指纹不变。
+实际诊断耗时 49.41 秒，其中哈希 43.876 秒，峰值 RSS 618,217,472 bytes；没有构建研究 TMP
+或写 READY。临时查询目录已由本次诊断回收；原始来源未改。
+
+| 实际统计（原生版本数） | 诊断结果 | 解释限度 |
+| --- | --- | --- |
+| 2025-01-01..2026-09-18 日线 | 2,148,903 条，全部原始 `knowledge_from` 晚于各自上海业务日收盘；当日可见 0 条 | 所有来源市场的时钟诊断，不是已接受的 P3 证券/配对分母；不等于行情当年不公开 |
+| 同范围状态 | 2,257,349 条，当日可见 0 条 | 不补造可交易或来源时间；不以状态缺失强制卖出 |
+| 2024 日历元数据 | 1,098 个版本，2025 年初可见 0 个，基于这些可见版本的 SSE/SZSE 共同开市日 0 个 | 未选 60 日，不用更早日期补位；未读任何 2024 行情观察 |
+| 现有 P10 readiness / source binding | 明确 P3 `NOT_ADMITTED`、历史 PIT `NOT_GRANTED_BY_PHYSICAL_VIEW` | 物理一致性不能代替历史用途合同；没有把晚入库直接判成泄漏 |
+
+当前可复用：已复验的原生读取工程、新的只读时钟诊断、源身份和安全统计。原始时间保持，
+`consumer_admission=NOT_GRANTED`、`B_accepted=false`、`D_activated=false`。
+这次不是完整新 B、候选/common-mask/P2 消费桥或四组实验的验收。
+
+最小下一步落在现有 P10 #474：对这个精确闭包给出 bar/state/security/listing/calendar/factor
+各族的原仓库时间、来源观测/发布时刻、经济可知性和用途映射，绑定原文件/字段证据；不能
+倒填收盘时间。日历须先独立提供精确 60 日资格。公司行动/执行语义若仍 unavailable，
+在 P3 所需消费者中显式阻断；行业只要求已冻结的静态集中度用途，不新增历史行业 PIT 要求。
+未知继续未知，4,173 项原例外不清零。#470/#473 各自资格仍需保留，不能被时钟诊断关闭。
+若 P10 无法提供必要历史资格，冻结比较继续暂缓；不能自行改成回顾性 current-record 实验、
+缩窗、补采或打开 D 结果。只有新来源合同成立后才有可检验语义接通剩余消费桥。
+
+本次安全回执根为 `/srv/agentdock/.codex/p3-start-20261022T175857Z-3b702f8/`，包含运行前
+`input-clock-plan.json`、`real-clock-assessment.json`、命令回执和实际检查日志。
+只读导出与 SHA256 另见该轮 handoff；已有导出不覆盖。
+
+复核同身份诊断（再次执行是新诊断，不是正式 B 或自动重试额度）：
+
+```bash
+PYTHONPATH=src python -m quanthus.expert_strategy.p3_base24_startup \
+  --root "$P3_PUBLISHED_SOURCE" --manifest-sha256 "$P3_SOURCE_SHA" \
+  --plan "$P3_STARTUP_CLOCK_PLAN" --temp-parent "$P3_ISOLATED_TEMP_PARENT"
+```
+
+它只投影时间、键和分类元数据；文件 SHA 会读取不透明字节，但不解码或输出真实价格。
+完整物理 schema/业务键/跨表语义/PIT 接受仍由独立输入验收承担，不从本次计数推断。
 - 16 表原生业务键逐一对齐锁定 DWD 模型，不把映射目标证券加入标识唯一键，
   不把独立状态观察合成版本冲突。每日行情消费另外明确选择同 listing/session
   下、知识截止可见且观察已完成的最新 `observation_start` 状态；保留所有原生观察，

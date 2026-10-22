@@ -114,6 +114,20 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**Base 2.4 startup, 2026-10-23:** the Owner requested P3 continuation after the input-engineering
+reverification. The new input-only scope `P3-BASE24-INPUT-20261023-CLOCK-001` ran against published
+projection manifest `ec8adacf91b55062e4873ca6f18216fc4d41c1c6c6f59bc172255606a2f0a6dd` at code
+`4633f22cd2a8c953eef50f85d2f563ad22798f79`. All 16 native member hashes matched; input clocks were
+counted without selecting prices, outcomes, or pre-2025 market observations. This is a new startup
+diagnostic, not another formal B attempt. The existing P10 handoff explicitly does not grant P3
+historical use. Current raw clocks yield no daily bars visible at their own business close and no
+2024 calendar versions visible before 2025; warehouse lateness alone does not prove economic
+unavailability. P10 #474 must supply an exact, purpose-qualified clock/evidence contract before
+formal B/D continuation. Preserve #470/#473, the original 4,173 unavailable factor exceptions and
+all frozen windows. The candidate/common-mask/P2 bridge is still incomplete and cannot be accepted
+by this diagnostic. See [the startup result and recovery command](p3-base24-goal-audit-and-plan-20261022.md#13-2026-10-23-p3-启动的实际结果).
+The earlier receipts and spent formal attempt below remain historical evidence.
+
 **Current ownership supersession, 2026-10-03:** P10 permanently owns all source recovery,
 acquisition, data-quality diagnosis/repair and availability evidence. The completed receipts below
 remain immutable. Their former next-source-action instructions no longer authorize P3 data work.

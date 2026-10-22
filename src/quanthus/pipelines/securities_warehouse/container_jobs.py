@@ -125,7 +125,9 @@ def event(
         "role": role,
         "market_date": str(day),
         "status": mapped[status],
-        "reason": status,
+        "reason": ("LATE_RECOVERY_" + status)
+        if result.get("delivery_timing") == "LATE_RECOVERY_NOT_ON_TIME_SUCCESS"
+        else status,
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "pipeline_revision": revision,
         "manifests": manifests,

@@ -338,7 +338,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "action",
-        choices=["calendar", "universe", "market", "events", "reference", "capture", "native"],
+        choices=[
+            "calendar",
+            "universe",
+            "market",
+            "events",
+            "reference",
+            "capture",
+            "native",
+            "seed",
+        ],
     )
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -350,6 +359,7 @@ def main() -> int:
     parser.add_argument("--events", type=Path)
     parser.add_argument("--reference", type=Path)
     parser.add_argument("--capture-root", type=Path)
+    parser.add_argument("--seed", type=Path)
     parser.add_argument("--shard-index", type=int)
     parser.add_argument("--budget", type=int, default=3600)
     parser.add_argument("--market-seed-inventory", type=Path)
@@ -418,6 +428,15 @@ def main() -> int:
                     "market_date": value["market_date"],
                     "population": value["population"],
                 }
+            elif args.action == "seed":
+                spec = importlib.util.spec_from_file_location(
+                    "p10_native_capture_resume",
+                    Path(__file__).with_name("native_capture_resume.py"),
+                )
+                assert spec is not None and spec.loader is not None
+                helper = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(helper)
+                result = helper.seed_capture(args.seed, args.output, reference(args.reference))
             elif args.action == "capture":
                 import baostock
 

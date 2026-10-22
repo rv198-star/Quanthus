@@ -41,7 +41,7 @@ Unsupported nonempty domains are rejected rather than ignored.
 
 Use a fresh task-owned context outside both source repositories. No untracked
 source, host `.git`, credentials, venv, payload or historical run is copied. The
-context generator exports only exact tracked `src` and `config`, plus the versioned
+context generator exports only exact tracked `src`, `config` and `pyproject.toml`, plus the versioned
 Dockerfile and hash-locked requirements. The separate collector is pinned to
 `f839af0033ab4aa8cbe6d9fb933f29db88792e91`. Both code bundles verify their exact file
 set, sizes and full hashes. The old host Git-checkout verification remains valid.
@@ -405,3 +405,27 @@ regular tar members, never new hardlinks or symlinks. Other source packages and
 all state/config files retain the strict single-link requirement. This handles
 existing source representation without making another full copy or weakening
 image/runtime independence.
+
+## One bounded native-capture recovery batch
+
+Policy `base24-native-recovery.v1.json` permits one additional native batch per
+market date only under the explicit recovery role, after the original one-hour
+batch stopped with `DAILY_CYCLE_NATIVE_CAPTURE_INCOMPLETE`. It does not authorize
+a third full Daily acquisition. The original date lock, immutable core, exact
+market/events manifests, reference digest and complete member hashes are checked
+before reuse; failed/mismatched/unknown source members remain rejected.
+
+Copy verified capture bytes and original acquisition receipts into a fresh run as
+independent regular files. Completed shards make no provider requests. A paired
+partial shard retains its original receipts and requests only missing securities.
+A second recovery batch is rejected. Each batch still has two workers, a 3600s
+limit and the original resource/source-quality gates. Registration freezes the
+policy hash, seed identity and actual remaining scope before new requests. No old
+source, receipt, core or failure is overwritten.
+
+This is late recovery, not on-time success: retain the 20:45/21:00 deadline miss,
+actual acquisition clocks and `LATE_RECOVERY_NOT_ON_TIME_SUCCESS` in the resulting
+receipt. Terminal mail explicitly prefixes the reason with `LATE_RECOVERY_`. A
+quality-held source stays partial. Research, PIT and next-open admission are
+unchanged. The same existing 21:15 recovery timer can consume this bounded path;
+normal Daily never silently extends its intake window.

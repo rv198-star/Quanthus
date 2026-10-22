@@ -14,6 +14,7 @@ import fcntl
 import json
 import math
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -210,27 +211,49 @@ def provider(
 
 
 def native(
-    config: dict[str, Any], run: Path, day: date, market: Path, events: Path
+    config: dict[str, Any],
+    run: Path,
+    day: date,
+    market: Path,
+    events: Path,
+    seed: Path | None = None,
 ) -> dict[str, Any]:
     resources(run)
     reference = run / "daily-reference.json"
-    value = provider(
-        config,
-        run,
-        "reference",
-        "reference",
-        "--day",
-        str(day),
-        "--market",
-        str(market),
-        "--events",
-        str(events),
-        "--output",
-        str(reference),
-    )
-    shards = math.ceil(value["population"] / 50)
     capture = run / "capture-5m"
-    capture.mkdir()
+    completed: set[int] = set()
+    if seed is None:
+        value = provider(
+            config,
+            run,
+            "reference",
+            "reference",
+            "--day",
+            str(day),
+            "--market",
+            str(market),
+            "--events",
+            str(events),
+            "--output",
+            str(reference),
+        )
+        capture.mkdir()
+    else:
+        shutil.copyfile(seed.parent / "daily-reference.json", reference)
+        value = provider(
+            config,
+            run,
+            "seed",
+            "seed",
+            "--reference",
+            str(reference),
+            "--seed",
+            str(seed),
+            "--output",
+            str(capture),
+        )
+        completed = set(value["complete_shards"])
+    shards = math.ceil(value["population"] / 50)
     write(
         run / "native-write-budget.json",
         {
@@ -243,6 +266,10 @@ def native(
             "expected_symbols": value["population"],
             "max_capture_logical_bytes": 256 * 1024**2,
             "max_seconds": 3600,
+            "resume_seed": str(seed) if seed else None,
+            "reused_securities": value.get("reused_securities", 0),
+            "remaining_securities": value.get("remaining_securities", value["population"]),
+            "seed_inventory_sha256": value.get("seed_inventory_sha256"),
             "acquisition_clock": "actual CN02 observation; never backdated",
         },
     )
@@ -266,7 +293,7 @@ def native(
 
     began = time.monotonic()
     with concurrent.futures.ThreadPoolExecutor(max_workers=config["native_workers"]) as pool:
-        futures = [pool.submit(one, i) for i in range(shards)]
+        futures = [pool.submit(one, i) for i in range(shards) if i not in completed]
         for future in concurrent.futures.as_completed(futures):
             result = future.result()
             if result["errors"] or time.monotonic() - began > 3600:
@@ -460,10 +487,15 @@ def finish_native(
     market: Path,
     events: Path,
     native_root: Path | None = None,
+    seed: Path | None = None,
 ) -> dict[str, Any]:
     """One native tail for both first construction and a verified core continuation."""
     if native_root is None:
-        result = native(config, run, day, market, events)
+        result = (
+            native(config, run, day, market, events, seed)
+            if seed
+            else native(config, run, day, market, events)
+        )
         native_root = Path(result["package_path"])
     native_manifest = object_at(native_root / "manifest.json")
     value["native_source"] = str(native_root)
@@ -654,6 +686,67 @@ def reference_continuation(
     return dict(old), market, events
 
 
+def capture_continuation(
+    config: dict[str, Any],
+    day: date,
+    old: dict[str, Any],
+) -> tuple[dict[str, Any], Path, Path, Path]:
+    """One additional bounded native batch, only in explicit late recovery mode."""
+    root = physical_path(Path(config["root"]))
+    policy = Path(__file__).resolve().parents[4] / "config/pipelines/base24-native-recovery.v1.json"
+    rules = object_at(policy)
+    if (
+        not config.get("recovery_mode")
+        or rules["max_resume_batches_per_date"] != 1
+        or rules["max_seconds_per_batch"] != 3600
+        or rules["native_workers_max"] != 2
+        or old.get("status") != "CORE_READY_5M_FAILED"
+        or old.get("market_date") != str(day)
+        or old.get("base_manifest_sha256") != config["base_manifest_sha256"]
+        or old.get("config_sha256") != config["release_config_sha256"]
+        or list(root.glob(str(day) + "-*/native-capture-resume.json"))
+    ):
+        raise ValueError("DAILY_CYCLE_NATIVE_RESUME_NOT_ELIGIBLE")
+    matches = []
+    for path in root.glob(str(day) + "-*/failure.json"):
+        if object_at(path).get("reason") != rules["failure_reason"]:
+            continue
+        receipt = object_at(path.parent / "core-receipt.json")
+        if {k: v for k, v in receipt.items() if k != "status"} == {
+            k: v for k, v in old.items() if k != "status"
+        }:
+            matches.append(path.parent)
+    if len(matches) != 1:
+        raise ValueError("DAILY_CYCLE_NATIVE_RESUME_EXACT_FAILURE_REQUIRED")
+    previous = physical_path(matches[0])
+    budget = object_at(previous / "native-write-budget.json")
+    if budget["reference_sha256"] != file_sha(previous / "daily-reference.json") or budget.get(
+        "resume_seed"
+    ):
+        raise ValueError("DAILY_CYCLE_NATIVE_RESUME_REFERENCE_CHANGED")
+    core = physical_path(Path(old["core"]))
+    if core.parent.parent != root or not core.parent.name.startswith(str(day) + "-"):
+        raise ValueError("DAILY_CYCLE_NATIVE_RESUME_CORE_ROOT_DIFFERS")
+    market, events = [
+        physical_path(Path(object_at(core.parent / (label + "-source.json"))["release_dir"]))
+        for label in ["market", "events"]
+    ]
+    expected = {
+        "market_daily_core": file_sha(market / "release.json"),
+        "calendar_daily_events": file_sha(events / "release.json"),
+    }
+    if (
+        market.parent != events.parent
+        or market.parent.name != str(day)
+        or expected != old["source_manifest_sha256"]
+        or budget["market_manifest_sha256"] != expected["market_daily_core"]
+        or budget["events_manifest_sha256"] != expected["calendar_daily_events"]
+        or verify_daily_domain_increment(core).manifest_sha256 != old["core_manifest_sha256"]
+    ):
+        raise ValueError("DAILY_CYCLE_NATIVE_RESUME_INPUT_CHANGED")
+    return dict(old), market, events, physical_path(previous / "capture-5m")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
@@ -685,6 +778,7 @@ def main() -> int:
             print(json.dumps({"status": "DATE_WRITER_ALREADY_ACTIVE", "market_date": str(day)}))
             return 0
         continuation = None
+        capture_resume = None
         index_path = root / "DATES.json"
         if index_path.exists() and not args.native_only:
             old = object_at(index_path).get("dates", {}).get(str(day), {})
@@ -703,14 +797,40 @@ def main() -> int:
                 print(json.dumps({"status": "VERIFIED_CLOSED_SOURCE_REUSE", "entry": old}))
                 return 0
             if old.get("status") == "CORE_READY_5M_FAILED":
-                continuation = reference_continuation(config, day, old)
+                if args.recovery:
+                    # A capture-budget failure can reuse source bytes. Reference
+                    # failure retains its separately bounded pre-acquisition path.
+                    failures = [
+                        object_at(p).get("reason") for p in root.glob(str(day) + "-*/failure.json")
+                    ]
+                    if "DAILY_CYCLE_NATIVE_CAPTURE_INCOMPLETE" in failures:
+                        capture_resume = capture_continuation(config, day, old)
+                    else:
+                        continuation = reference_continuation(config, day, old)
+                else:
+                    continuation = reference_continuation(config, day, old)
                 if any([args.market, args.events, args.native]):
                     raise ValueError("DAILY_CYCLE_CONTINUATION_EXACT_INPUTS_ALREADY_FROZEN")
         if not args.native_only:
             time_gate(day, "delivery", args.recovery)
         previous_attempts = list(root.glob(str(day) + "-*/registration.json"))
-        if not args.native_only and continuation is None and len(previous_attempts) >= 2:
+        if (
+            not args.native_only
+            and continuation is None
+            and capture_resume is None
+            and len(previous_attempts) >= 2
+        ):
             raise ValueError("DAILY_CYCLE_TWO_ATTEMPT_BUDGET_EXHAUSTED_REQUIRES_DISPOSITION")
+        if capture_resume is not None:
+            disjoint_output(
+                run,
+                [
+                    capture_resume[1],
+                    capture_resume[2],
+                    capture_resume[3],
+                    Path(capture_resume[0]["core"]),
+                ],
+            )
         resources(root)
         run.mkdir(mode=0o700)
         write(
@@ -724,6 +844,36 @@ def main() -> int:
             },
         )
         try:
+            if capture_resume is not None:
+                value, market, events, seed = capture_resume
+                policy = (
+                    Path(__file__).resolve().parents[4]
+                    / "config/pipelines/base24-native-recovery.v1.json"
+                )
+                write(
+                    run / "native-capture-resume.json",
+                    {
+                        "policy_sha256": file_sha(policy),
+                        "policy": object_at(policy),
+                        "seed": str(seed),
+                        "seed_reference_sha256": file_sha(seed.parent / "daily-reference.json"),
+                        "core_manifest_sha256": value["core_manifest_sha256"],
+                        "source_manifest_sha256": value["source_manifest_sha256"],
+                        "original_pipeline_revision": value.get("pipeline_revision"),
+                        "continuation_pipeline_revision": config["pipeline_revision"],
+                        "market_date": str(day),
+                        "budget": resources(root),
+                    },
+                )
+                value.update(
+                    status="CORE_READY_5M_PENDING",
+                    pipeline_revision=config["pipeline_revision"],
+                    delivery_timing="LATE_RECOVERY_NOT_ON_TIME_SUCCESS",
+                )
+                write(run / "core-receipt.json", value)
+                result = finish_native(config, run, day, value, market, events, seed=seed)
+                print(json.dumps({"run": str(run), "result": result}, sort_keys=True))
+                return 0
             if continuation is not None:
                 value, market, events = continuation
                 disjoint_output(run, [market, events, Path(value["core"])])

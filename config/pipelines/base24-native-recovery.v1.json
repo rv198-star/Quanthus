@@ -1,0 +1,14 @@
+{
+  "schema_version": "quanthus.base24-native-recovery.v1",
+  "policy_id": "p10-native-capture-resume-v1",
+  "requires_recovery_mode": true,
+  "max_resume_batches_per_date": 1,
+  "max_seconds_per_batch": 3600,
+  "max_seed_bytes": 268435456,
+  "native_workers_max": 2,
+  "failure_reason": "DAILY_CYCLE_NATIVE_CAPTURE_INCOMPLETE",
+  "reuse": "verified independent source bytes; completed securities are never requested again",
+  "deadline_disposition": "LATE_RECOVERY_NOT_ON_TIME_SUCCESS",
+  "full_daily_reacquisition": false,
+  "consumer_admission": "UNCHANGED"
+}

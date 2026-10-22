@@ -156,6 +156,13 @@ Immutable copy and complete cloud size/MD5 checks establish backed-up bytes only
 partial data remains partial. Exact live selection generation/queueing, image
 qualification and approved Drive folder mapping remain activation gates. Retired
 2.3 series are excluded from automatic sync; historical cloud archives stay.
+A native capture budget failure may use the separately versioned
+`config/pipelines/base24-native-recovery.v1.json` in explicit recovery mode:
+one additional 3,600-second, at-most-two-worker batch per date reuses independently
+copied, hash-verified original capture bytes and the same qualified core/source
+closure. Completed securities are not acquired again. This does not extend the
+normal intake/delivery windows or qualify source rows; terminal events identify
+late recovery, with original acquisition clocks and consumer gates unchanged.
 Host-side triggers never send API mail or perform cleanup. A daemon failure retains
 an unsent event for recovery, rather than claiming an in-container sender ran.
 

@@ -45,14 +45,23 @@ as additional official observations. The original 17 settled targets and complet
 mechanism run remain sealed.
 
 The Owner now handles #538 on a separate data-quality branch and instructed P6
-to continue. Do not duplicate that repair work here. The next engineering scope
-is exact-image CN02 readiness: actual isolated PostgreSQL/Worker rehearsal,
-idempotency, sealed-run recovery and disabled admission, followed by the
-[Base 2.4 read-only runtime projection](../design/lld/08-validation-governance/p6-base24-inputs.md#read-only-cn02-runtime-projection).
-The projection must bind the successor activation and expected Worker revision;
-legacy activation/jobs cannot contribute successor progress. Keep runtime
-receipts tied to the actual tested image. This preparation does not enable a
-production controller or reopen the completed historical replay.
+to continue. Do not duplicate that repair work here. The bounded exact-image
+CN02 readiness checks now pass: actual isolated PostgreSQL/Worker rehearsal,
+idempotency, sealed-run recovery, restart without a new Job and disabled admission.
+The repaired
+[Base 2.4 read-only runtime projection](../design/lld/08-validation-governance/p6-base24-inputs.md#read-only-cn02-runtime-projection)
+binds the successor activation and expected Worker revision; legacy activation
+and Jobs cannot contribute successor progress. The exact tested runtime revision
+is `a200f6d3d2dfd6242c346c933ee26e3ac46d9f0e`; its image is
+`sha256:6b6ec9b360191702ba70c6f442558af0b87ca309e76e1181140f1e57d6afc627`.
+Safe receipts and check limitations are retained in the node-local handoff
+`/srv/agentdock/AgentDock/base22-review-afe2526/p6-runtime-readiness-20261022T162632Z-a200f6d/`.
+The lean source build context and read-only projection were exercised separately;
+the standard Python 3.11 API image was not built because the registry pull timed out.
+Do not conflate these checks with public API deployment or original P6 activation.
+The installed controller remains disabled and unchanged. Preserve the completed
+historical replay and engineering receipts; continue only the remaining applicable
+review/activation gates, not another unchanged mechanism replay or P10 repair.
 
 **Current routing is historical replay.** After the initial startup report,
 the Owner corrected the prospective-only direction and explicitly chose

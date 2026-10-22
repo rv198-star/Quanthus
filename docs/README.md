@@ -6,7 +6,7 @@ nodes.
 
 | Field | Value |
 | --- | --- |
-| Current phase | P6 implementation open; P5 optional research deferred |
+| Current phase | P6 closed under Owner historical scope; P5 optional research deferred |
 | Gate source | `config/p3-gates.v1.json` |
 
 Permanent data ownership: P10 owns acquisition and shared quality/governance under
@@ -16,6 +16,11 @@ bypass, temporary ignore or acceptance of a known limitation; they do not recove
 data. Historical evidence and existing safety/research/production gates remain unchanged.
 
 ## Current branch
+
+P6 is closed under the Owner's 2026-10-23 historical-mechanism scope.
+The [closeout](acceptance/p6-owner-scope-closeout-20261023.md) cancels the
+remaining prospective activation and 66+20-session observation/review work;
+it does not accept those unperformed gates or open P7. P10 #538 stays separate.
 
 - P1 is accepted with the versioned C1 fail-closed condition.
 - P2 is conditionally accepted for historical and paper research under the frozen

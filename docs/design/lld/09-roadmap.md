@@ -16,7 +16,7 @@ and live operation. A later phase cannot compensate for an untrusted earlier pha
 | P3 | Rule-only vertical slice and shadow experts | Multi-year closed loop is auditable | P2 |
 | P4 | Event library and daily group report | Three leading differentiators | P3 |
 | P5 | Optional research scoring layer | Beats rule baseline and passes promotion gate | P4; deferred and not a P6 predecessor |
-| P6 | Prospective Shadow and fixed-unit paper operation | Frozen behavior accumulates time-matured evidence; no notification or live-fill claims | P3/P4 and Expert Strategy MVP |
+| P6 | Completed historical-mechanism and paper-flow validation | Owner scope closeout 2026-10-23; future prospective work cancelled, not accepted | P3/P4 and Expert Strategy MVP |
 | P7 | Operator-assisted small-capital operation | Every advice closes with an accepted actual/no-action report and reconciliation | P6 |
 | P10 | Permanent acquisition, shared data quality/governance and versioned supply | Each bounded repair/publication passes its own gates; standing line remains open | Parallel permanent line; P1 historical foundation retained |
 
@@ -27,8 +27,9 @@ that cannot meet its existing hard gate. P10 is not a sequential release after P
 accept P3/P5 or activate training/production. See
 [`12-permanent-data-line.md`](12-permanent-data-line.md) and ADR 0015.
 
-P5 research may run beside P6 frozen simulation but is optional and deferred; P6 does not wait for
-it. A development build cannot alter the active simulation policy.
+P6 is closed under the [Owner-revised historical scope](../../acceptance/p6-owner-scope-closeout-20261023.md).
+This does not open P7 or accept the cancelled prospective gates. P5 remains optional
+and deferred. A development build cannot alter a frozen simulation policy.
 
 Platform Kernel is a separate engineering track rather than P8. It may proceed beside P4 when its
 own predecessor gate passes, but it cannot weaken a P1-P7 domain gate or redefine Quanthus data,

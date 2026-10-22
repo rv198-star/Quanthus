@@ -4,9 +4,9 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | not-applicable |
-| Current phase | P6 implementation open; P5 optional research deferred |
-| Version | 0.16 |
-| Effective date | 2026-10-20 |
+| Current phase | P6 closed under Owner historical scope; P5 optional research deferred |
+| Version | 0.17 |
+| Effective date | 2026-10-23 |
 | Governing policy | `config/p0-policy.v1.json` |
 | Governing gate | `config/p3-gates.v1.json` |
 | Platform gate | `config/platform-kernel-gates.v1.json` |
@@ -129,6 +129,11 @@ receive an isolated complete-strategy replay plus one predeclared joint replay. 
 budget, not a permanent architectural maximum; adding experts requires a later versioned proposal.
 Its terminal lifecycle decision also owns the forward-Shadow disposition: negative or replacement
 decisions close with the current version disabled instead of forcing it into prospective operation.
+
+The Owner [closed P6 under its completed historical mechanism scope](../acceptance/p6-owner-scope-closeout-20261023.md)
+on 2026-10-23 and cancelled the remaining prospective work. No active future
+observation or production activation is scheduled; P7 remains separately gated.
+The following prospective architecture is retained for a separately authorized successor.
 
 P6 activates one frozen formal strategy only through a separate human entry and activation
 decision. The existing PostgreSQL Replay Worker consumes one composite daily forward-cycle Job,

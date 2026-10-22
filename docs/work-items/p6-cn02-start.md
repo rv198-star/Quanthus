@@ -4,8 +4,8 @@
 | --- | --- |
 | Parent | [Work-item index](index.md); [P6 design](../design/lld/08-validation-governance/p6-forward-validation.md) |
 | Design status | approved: Owner requested P6 startup on 2026-10-22 |
-| Delivery gate | open; restored rehearsal is distinct from official activation |
-| Live work | P6-R1 / #511 and P6-ACTIVATE-001 / #209 |
+| Delivery gate | accepted for the Owner-revised historical scope; remaining prospective work cancelled, not accepted |
+| Historical tracking | P6-R1 / #511, P6-ACTIVATE-001 / #209 and P6-REVIEW-001 / #120; future work cancelled |
 | Source interface | [Base 2.4 input design](../design/lld/08-validation-governance/p6-base24-inputs.md) |
 
 The purpose is to verify that candidate signals pass through the frozen expert
@@ -14,6 +14,16 @@ and settlement. The selected historical snapshot mode exercises that mechanism;
 it does not establish strategy profitability or historical information availability.
 
 ## Current recovery checkpoint
+
+**P6 is closed under the Owner's 2026-10-23 revised scope: 100% complete, 0%
+remaining.** Read the [scope closeout](../acceptance/p6-owner-scope-closeout-20261023.md)
+and `config/forward-validation/entry/p6-owner-closeout-20261023.v1.json` first.
+The Owner cancelled prospective activation and the future 66-session collection
+plus 20-session tail/review. They were not performed or accepted. Do not resume
+them from older OPEN issues, handoffs or the retained startup sequence below.
+P10 #538 remains independent; no new deployment, P7 or economic qualification
+follows. The controller stays disabled. All remaining text is retained evidence
+and historical implementation context, not an active execution queue.
 
 The fixed-snapshot mechanism run and fresh independent reproduction are now
 complete. [Accepted engineering evidence](../acceptance/p6-fixed-snapshot-mechanism-20261022.md)
@@ -60,10 +70,11 @@ The lean source build context and read-only projection were exercised separately
 the standard Python 3.11 API image was not built because the registry pull timed out.
 Do not conflate these checks with public API deployment or original P6 activation.
 The installed controller remains disabled and unchanged. Preserve the completed
-historical replay and engineering receipts; continue only the remaining applicable
-review/activation gates, not another unchanged mechanism replay or P10 repair.
+historical replay and engineering receipts. The later Owner closeout above
+cancels continuation of the remaining review/activation gates; do not rerun the
+unchanged mechanism or duplicate P10 repair.
 
-**Current routing is historical replay.** After the initial startup report,
+**Completed historical route (retained context).** After the initial startup report,
 the Owner corrected the prospective-only direction and explicitly chose
 existing historical data, then approved fixing the time slices and proceeding.
 The successor [historical replay design](../design/lld/08-validation-governance/p6-historical-replay.md)

@@ -2,12 +2,19 @@
 
 | Field | Value |
 | --- | --- |
-| Phase | P6 historical-replay successor; prospective MVP retained; P5 optional research deferred |
-| Status | Fixed-snapshot mechanism replay selected; historical PIT/economic acceptance remains separate. Earlier prospective activation is retained history, not current CN02 admission. |
+| Phase | P6 closed under Owner historical scope; prospective contracts archived; P5 optional research deferred |
+| Status | Completed under the Owner decision of 2026-10-23; remaining prospective work cancelled, not accepted; no new production authority. |
 | Governing requirements | FR-GOV-001/002, NFR-004 |
 | Detailed design | `08-validation-governance/p6-forward-validation.md` |
 
 ## 1. Goal
+
+The Owner [closed the current P6 line](../../acceptance/p6-owner-scope-closeout-20261023.md)
+on 2026-10-23 with the historical-mechanism work complete. Prospective activation
+and the 66+20-session observation/review sequence are cancelled, not passed.
+Current scope is 100% complete with no scheduled remainder; P10 #538 and P7
+retain their independent gates. Earlier contracts below remain archival and do
+not schedule work. The controller stays disabled.
 
 The Owner's 2026-10-22 current execution direction is the separate
 [P6 historical replay successor](08-validation-governance/p6-historical-replay.md),
@@ -66,17 +73,21 @@ emergency fix. Exceeding the budget downgrades that period's research credibilit
 
 | ID | Work | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
-| P6-000 | Coordinate the bounded P6 prospective-validation program | META-DOC-001, accepted P3/P4 and Expert Strategy MVP | All eight children accepted |
+| P6-000 | Coordinate the bounded P6 prospective-validation program | META-DOC-001, accepted P3/P4 and Expert Strategy MVP | Owner scope closeout: six original children accepted, two cancelled; `docs/acceptance/p6-owner-scope-closeout-20261023.md` |
 | P6-GOV-001 | Freeze entry proposal, observation budget, stop rules, and rollback | P6-000 entry authority | `docs/acceptance/p6-gov001-prospective-mvp-entry-20260917.md` |
 | P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6-GOV-001 plus explicit post-entry owner value review | `docs/acceptance/p6-data001-prospective-boundary-20260917.md` |
 | P6-SCORE-001 | Freeze role-specific expert, aggregator, strategy, and paper scorecards | P6-DATA-001, P3-ATTR-001 | `docs/acceptance/p6-score001-forward-scorecards-20260917.md` |
 | P6-GOV-002 | Implement the composite Forward Worker and disabled-state lifecycle rehearsal | P6-SCORE-001, PK-WORKER-000 | `docs/acceptance/p6-gov002-forward-worker-20260917.md` |
 | P6-PAPER-001 | Implement the isolated P2 paper lane and fixed-unit ledger | P6-GOV-002, P2-ACCEPT-001 | `docs/acceptance/p6-paper001-paper-lane-20260917.md` |
 | P6-WEB-001 | Project forward and paper evidence in candidate detail | P6-PAPER-001 | `docs/acceptance/p6-web001-forward-paper-product-view-20260917.md` |
-| P6-ACTIVATE-001 | Authorize and run the first official post-activation forward cycle | P6-WEB-001 | `docs/acceptance/p6-activate001-production-activation-status-20260919.md`; signed activation enabled, first legal official-cycle reproduction pending |
-| P6-REVIEW-001 | Complete the time-matured simulation review and any authorized reveal | P6-ACTIVATE-001 plus closed budget | GitHub #120; signed review package and closed ledger after the real-calendar budget matures |
+| P6-ACTIVATE-001 | Authorize and run the first official post-activation forward cycle | P6-WEB-001 | Owner-cancelled, not accepted; old activation evidence retained; `docs/acceptance/p6-owner-scope-closeout-20261023.md` |
+| P6-REVIEW-001 | Complete the time-matured simulation review and any authorized reveal | P6-ACTIVATE-001 plus closed budget | GitHub #120; Owner-cancelled, not accepted; `docs/acceptance/p6-owner-scope-closeout-20261023.md` |
 
 ## 7. Acceptance
+
+Current programme closure follows the explicit Owner scope decision above,
+not fulfillment of the two cancelled gates. The following original prospective
+acceptance remains preserved for any separately authorized future programme.
 
 The earlier production activation is retained history; CN02 does not inherit
 it. A new CN02 activation and its first legal post-activation prospective cycle

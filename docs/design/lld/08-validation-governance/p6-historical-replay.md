@@ -11,6 +11,12 @@
 
 ## Purpose and authority
 
+The Owner [closed this P6 line on 2026-10-23](../../../acceptance/p6-owner-scope-closeout-20261023.md)
+under its completed historical-mechanism scope. The original prospective activation
+and 66+20-session review are cancelled, not accepted. There is no scheduled
+remainder and no new production, PIT/economic or P7 authority. The approved
+historical route below is retained completed context, not a rerun request.
+
 The current Owner direction is to advance P6 using existing historical data,
 without waiting for new Daily products or 66 future trading days. This is a
 separate historical successor. The accepted prospective contract, original

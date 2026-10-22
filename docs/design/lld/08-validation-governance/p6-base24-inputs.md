@@ -15,6 +15,11 @@ entry proposal, activation history, access ledger and prior failed official jobs
 It does not activate a CN02 worker or count a historical day as a prospective day.
 The old Base 2.1/correction/exact-prior Daily reader remains unchanged.
 
+Owner requested P6 startup on 2026-10-22. The explicit successor cycle adapter,
+runtime binding, empty-action frame compatibility and CN02 startup gates are
+tracked in [P6-R1](../../../work-items/p6-cn02-start.md). Its additive runtime
+does not activate official admission or inherit the old OCI activation by itself.
+
 ## Ownership and dependencies
 
 P10 owns the one source materialization and source-purpose assessment. P6 verifies

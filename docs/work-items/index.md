@@ -12,6 +12,10 @@ recover/repair data. The reviewed live routing inventory is `config/data-ownersh
 
 ## Whole-project CN02 migration
 
+P6 startup on the migrated node is tracked in
+[P6-R1: CN02 Base 2.4 startup](p6-cn02-start.md). Its recovered database,
+disabled rehearsal and official prospective activation are separate gates.
+
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
 | META-OPS-CN02-001 | Consolidate the Quanthus project from CN01 and OCI onto CN02 | Owner clarification 2026-10-20 | [Migration work item](cn02-project-migration.md); deployment inventory and preparation; cutover not executed |

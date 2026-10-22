@@ -222,3 +222,36 @@ conflicts, IPO rules, price bounds, P6 admission and historical PIT remain separ
 checks. It grants no execution authority. Tests live in
 `tests/unit/test_base24_status_evidence.py`; the bounded issue owns exact source
 selection, repair receipts and consumer handoff, without P6 ledger changes.
+
+### Successor evidence for current rule scope and instrument corrections
+
+`base24_execution_evidence.py` implements the separately identified
+`p10-current-rule-window-exclusion-and-instrument-correction.v1` contract.
+The stage graph is exact retained originals → one immutable evidence packet →
+bounded successor qualification and safe disposition; cold reconstruction is an
+explicit independent mode. This does not reconstruct an old IPO rule or waive
+missing evidence. The pinned complete SSE trading rules effective 2026-07-06 and
+their actual retrieval receipt can prove current-window exclusion only for an
+SSE main-board listing with six distinct, sourced, eligible observations in that
+same listing, matched to unique open calendar sessions. Listing age or an exchange
+calendar count alone is insufficient. Other venues, an initial window, ambiguous
+identity and special lifecycle cases remain held. The old qualification call
+without explicit evidence preserves its original IPO gate.
+
+The same retained SSE rule supports a new version of the stale SSE ST overlay:
+the preceding effective interval remains 5%, the successor interval starts on
+2026-07-06, and the actual new repair knowledge time is recorded separately. No
+SZSE fact is inferred from SSE evidence and no frozen price policy is changed.
+
+An exclusive company-bond risk-warning title cannot establish an equity ST
+interval. Withdrawal requires the exact native → raw interval → announcement
+identity chain and produces a new UNKNOWN equity assertion, never inferred NORMAL.
+The prior record and its times remain in the evidence. An actual exact-date
+provider observation and all other gates are still necessary. Partial revocations,
+mixed instruments and uncertain event titles are not silently adjudicated.
+
+Each successor retains original bytes, actual clocks, source and code identities,
+and the prior P6 ledger. A new governance correction is not backdated to a frozen
+P6 snapshot. Bounded requalification may evaluate the successor but does not grant
+consumer admission, historical PIT acceptance or trading authority. Tests are in
+`tests/unit/test_base24_execution_evidence.py`.

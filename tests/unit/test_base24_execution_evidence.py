@@ -327,7 +327,10 @@ def test_notice_date_conflict_is_preserved_as_bound_not_backdated():
             dict(day="2024-07-02", text="起始日2024年7月2日"),
         ],
     )
-    text = "000001交易所批准撤销，简称由“*ST例子”变更为“例子”。2022年7月2日起撤销，起始日2024年7月2日。"
+    text = (
+        "000001交易所批准撤销，简称由“*ST例子”变更为“例子”。"
+        "2022年7月2日起撤销，起始日2024年7月2日。"
+    )
     with pytest.raises(repair.RepairError, match="NOTICE_NOT_YET_EFFECTIVE"):
         adjudicate_body(text, selection, date(2023, 7, 1))
     adjudicate_body(text, selection, date(2026, 7, 1))

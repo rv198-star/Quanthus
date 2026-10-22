@@ -1,0 +1,11 @@
+[Unit]
+Description=CN02 container T-day acquisition through ODS/DWD, daily and native5m
+
+[Timer]
+OnCalendar=*-*-* 17:30:00 Asia/Shanghai
+AccuracySec=1s
+Persistent=false
+Unit=cn02-p10-container@daily.service
+
+[Install]
+WantedBy=timers.target

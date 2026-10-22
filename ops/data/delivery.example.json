@@ -1,0 +1,17 @@
+{
+  "kind": "p10-base24-delivery-routing-v1",
+  "code_revision": "REPLACE_WITH_FULL_VERIFIED_GIT_SHA",
+  "base_manifest_sha256": "sha256:04345d9cfb7d99dae9e65b11bd28591095156e48378b5b44245fc3d36a944b3a",
+  "remote_name": "gdrive",
+  "folder_ids": {
+    "ODS": "REPLACE_WITH_APPROVED_ODS_ROOT_ID",
+    "DWD": "REPLACE_WITH_APPROVED_DWD_ROOT_ID"
+  },
+  "notify_statuses": ["complete", "partial", "closed", "busy", "failed"],
+  "limits": {
+    "max_source_bytes": 536870912,
+    "max_archive_bytes": 805306368,
+    "free_floor_bytes": 8589934592,
+    "timeout_seconds": 7200
+  }
+}

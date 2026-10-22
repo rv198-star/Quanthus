@@ -142,6 +142,52 @@ diagnostics, and continue only previously authorized business/synthetic engineer
 
 ## 5. Execution and invariants
 
+`P10-DATA-OPS-016` / [#537](https://github.com/rv198-star/Quanthus/issues/537)
+owns the versioned CN02 acquisition/container stack. The Owner's 2026-10-23
+[source integration](../../work-items/p10-container-main-integration.md) brings
+Daily/recovery acquisition through ODS/DWD verification and sealing, scoped
+Weekly, operational API mail, Base 2.4 increment backup and TMP housekeeping into
+main. It does not switch a running release or establish natural-run stability.
+The [runbook](../../operations/p10-container-jobs.md) owns deployment and rollback.
+
+One immutable image supplies separate roles with explicit mounts. Data roles run
+as the configured non-root UID/GID with a read-only root, no capabilities and no
+Docker socket; payloads, state, TMP and private credentials remain on host binds.
+The host only schedules/controls Docker. Existing approved sudo may elevate the
+fixed local Docker client, never the Python job, scratch owner or container user.
+Pin pipeline/collector revisions, image and Compose digests before activation.
+Do not inherit ambient Docker contexts, Compose files, remotes or credential flags.
+
+Daily defaults to 1d and native 5m; 1m is not a prerequisite. One immutable core
+feeds every in-job native/composite consumer. Date locks, acquisition evidence,
+READY ordering, actual knowledge clocks and consumer gates remain unchanged.
+Normal Daily and late recovery retain separate versioned intake/deadline rules.
+Recovery copies verified capture bytes, skips completed securities, preserves
+failed attempts and never resets a consumed budget. Login-only repair is bounded
+by the original recovery deadline. Weekly's implemented entry qualifies financial
+statements only; unsupported nonempty domains fail closed and remain held.
+
+API mail runs inside the data task with private runtime environment injection,
+bounded retries and durable event/idempotency receipts. Success, partial, closed,
+busy and failure are distinct outcomes. Mail or backup failure cannot recollect
+data or invalidate a sealed product; an unavailable daemon leaves an unsent event.
+Retry uses the same image's transport role, independently of collection. Backup
+freezes exact upstream package identities and qualifications, separates ODS/DWD
+Drive roots, writes immutable copies and checks the exact remote set/size/hash.
+Only Base 2.4 Daily/Weekly 1d/5m selections qualify for this route. Retired 2.3
+archives are not resynchronized. Backup does not grant consumer admission or
+authorize local formal-product deletion.
+
+Each job leases a unique owned child of physical, disjoint `QUANTHUS_TMP_ROOT`.
+Only complete/authoritatively closed scratch is eligible 72 hours after completion,
+with no active lease. Failed, held, interrupted, unknown, linked or unsafe trees
+remain. The same-image cleaner has an internal 03:30 Asia/Shanghai clock with
+restart catch-up and a persistent completed slot; its only bind is TMP and its
+network is disabled. It has no formal products, secrets or Docker socket. Manual
+cleanup defaults to preview. Original captures, evidence and formal ODS/DWD are
+never scratch. Exact interfaces/configuration and tests are indexed in the
+integration work item; runtime activation and full Weekly acceptance stay separate.
+
 GitHub remains normal code distribution and NexusAgent default remote control. The existing SSH
 override belongs only to #424, not all P10. Routing authorizes no deployment, timer activation,
 new collection, cleanup, credential change, Base mutation or P6 production change. Every child
@@ -157,6 +203,7 @@ independent cold construction remain governed.
 | ID | Title | Dependency | Acceptance evidence |
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03; P1 historical foundation retained | Ownership/routing contracts and verified live issue migration; bounded repairs/handoffs need separate evidence and standing epic remains open |
+| P10-DATA-OPS-016 | Integrate acquisition through ODS/DWD, notification, backup and housekeeping in one pipeline image | P10-DATA-000; Owner source-integration instruction 2026-10-23 | [#537](https://github.com/rv198-star/Quanthus/issues/537); [integration](../../work-items/p10-container-main-integration.md); source checks do not accept full Weekly or activate a release |
 
 Governed assets: `config/data-ownership.v1.json`, `scripts/sync_github_planning.py`,
 `scripts/sync_p10_data_issues.py`, `tests/contract/test_p10_data_ownership.py`, root `AGENTS.md`

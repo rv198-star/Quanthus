@@ -1,0 +1,12 @@
+{
+  "policy_id": "p10-base24-increments-backup-v1",
+  "base_version": "2.4",
+  "base_manifest_sha256": "sha256:04345d9cfb7d99dae9e65b11bd28591095156e48378b5b44245fc3d36a944b3a",
+  "intervals": ["1d", "5m"],
+  "cadences": ["daily", "weekly"],
+  "layers": ["ODS", "DWD"],
+  "retired_automatic_sync": ["2.1", "2.2", "2.3", "2.3.1"],
+  "formal_product_deletion": "forbidden",
+  "remote_mutation": "immutable_copy_only",
+  "qualification": "Backup verifies selected bytes, not consumer admission. Selection must bind the upstream qualification receipt and exact package inventory; partial domains retain their limitation. No latest-directory or legacy Base2.3 admission fallback."
+}

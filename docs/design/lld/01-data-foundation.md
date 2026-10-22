@@ -39,6 +39,13 @@ prerequisites with explicit TMP lifecycles. This opt-in 1d/native-5m profile
 preserves actual knowledge clocks, the exact 33-table DWD model and independent
 cold-verification requirements; merging it does not rebuild or switch a Base.
 
+The [P10 collection/container integration](../../work-items/p10-container-main-integration.md)
+adds the CN02 1d/native-5m Daily cycle, frozen-input intake, bounded recovery and
+same-image notification/backup/TMP roles. Its operational boundary is owned by
+[LLD 12](12-permanent-data-line.md#5-execution-and-invariants). Legacy Daily
+interfaces remain frozen; Weekly financial qualification is scoped, and source
+integration does not activate timers or modify warehouse products.
+
 Physical data contracts and P1 historical acceptance remain here. From 2026-10-03 acquisition,
 shared quality/governance, maintenance and source recovery/repair belong to P10 under
 [`12-permanent-data-line.md`](12-permanent-data-line.md). Other lines only register data defects

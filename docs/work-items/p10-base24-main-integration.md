@@ -5,7 +5,7 @@
 | Parent | [Work-item index](index.md); [Base 2.4 / #527](https://github.com/rv198-star/Quanthus/issues/527) |
 | Governing design | [Data foundation](../design/lld/01-data-foundation.md); [permanent P10](../design/lld/12-permanent-data-line.md) |
 | Design status | approved: Owner requested the completed Base 2.4 construction code be integrated on 2026-10-23 |
-| Delivery gate | open: integrated-source verification and publication pending |
+| Delivery gate | accepted-conditional for local source verification; hosted CI unavailable because of account billing |
 
 ## Exact source and integration scope
 
@@ -117,3 +117,28 @@ checksummed read-only handoff. Earlier image receipts and long-branch test repor
 are not tests of this merge. Hosted CI availability and unrun runtimes must be
 reported separately. This source integration grants no new data qualification or
 production activation.
+
+## Completed local verification checkpoint
+
+The exact integrated construction tree recorded by
+`a3b68a51babf551a6b46bd306c45709f82fd503c` passed `make check` on Python 3.10.12:
+4,831 passed, 20 skipped and eight deprecation warnings. Doctor, compilation and
+planning checks also passed. The full run started on the exact staged contents
+before their metadata-only commit; its frozen tree
+`09a2ec89af3b2136e5a2a06dc78cdff76ea5a690` matches that commit, and no source,
+configuration or test file changed during the run.
+
+The selected 405-case synthetic set passed before the added boundary tests; the
+final shard/salvage subset passed 30 cases. These overlap with the full run and
+must not be summed. All 12 new path/scan-error cases first failed against the
+unfixed implementation, then passed. Changed-file Ruff and strict mypy for all
+27 new production modules pass. A full Ruff scan retains 216 existing findings
+in 25 files, all byte-identical to starting main, with zero changed-file findings.
+
+[#553](https://github.com/rv198-star/Quanthus/pull/553) carries this integration.
+GitHub's jobs did not start because account billing/spending admission failed;
+this is not hosted CI success. Python 3.12, a new Web run and whole-repository mypy
+were not run locally. The 20 skips require production expert artifacts, a test
+PostgreSQL DSN or optional sklearn/torch dependencies. Eight warnings concern the
+existing Arrow batch API. This final checkpoint changes documentation only and
+does not claim a new real-data build, data acceptance or production activation.

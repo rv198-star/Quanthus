@@ -29,9 +29,13 @@ from quanthus.forward_validation.base24_contract import (
     CLOCK_VERSION as CLOCK_VERSION,
 )
 from quanthus.forward_validation.base24_contract import (
-    RELEASE_SCHEMA,
-    RUNTIME_SCHEMA,
-    P6Base24CycleRuntime,
+    RELEASE_SCHEMA as RELEASE_SCHEMA,
+)
+from quanthus.forward_validation.base24_contract import (
+    RUNTIME_SCHEMA as RUNTIME_SCHEMA,
+)
+from quanthus.forward_validation.base24_contract import (
+    P6Base24CycleRuntime as P6Base24CycleRuntime,
 )
 from quanthus.forward_validation.base24_contract import (
     load_cycle_runtime as load_cycle_runtime,

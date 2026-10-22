@@ -273,3 +273,16 @@ interval. The target still requires an actual exact-date provider observation an
 all other frozen qualification checks. New acquisition/repair knowledge is never
 assigned to the old replay snapshot. The current issue's receipt controls the
 bounded fetch budget; these adapters do not authorize further acquisition.
+
+The one-day supplement adapter (`base24_single_observation.py`) requires the exact
+approved unadjusted request, complete response/receipt, unique native listing and
+same-venue calendar. It preserves Decimal values and actual retrieval time, keeps
+provider acquisition unknown, leaves native limit prices null, and reproduces the
+two new native rows offline from embedded originals. It cannot alter an old row.
+
+An exact stale 5% native-bound defect may receive an additive successor through
+`base24_execution_bounds.py`: current exchange authority, actual reference close,
+all existing identity/status/window checks and the frozen policy must agree. Both
+old bounds must reproduce the diagnosed former 5% formula. Only the two bounds
+and new state knowledge time change; OHLCV, flags and original records remain.
+A missing reference, another mismatch or another failed gate stays blocked.

@@ -244,6 +244,8 @@ def prepare_history(
     industry_sha256: str,
     knowledge_cutoff: datetime,
     code_revision: str,
+    repair_root: Path | None = None,
+    repair_manifest_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Materialize one job-local action-free fixture, preserving native fields."""
     import duckdb
@@ -288,6 +290,15 @@ def prepare_history(
         "code_revision": code_revision,
         "policy_hashes": policy_hashes,
     }
+    if (repair_root is None) != (repair_manifest_sha256 is None):
+        fail("p6_snapshot_repair_identity", "both root and exact manifest are required")
+    if repair_root is not None:
+        repair_root = physical_path(repair_root)
+        output = disjoint_output(output, [repair_root])
+        closure["p10_repair_manifest"] = str(repair_manifest_sha256)
+        closure["p10_repair_view_code"] = file_sha(
+            Path(__file__).parents[1] / "pipelines/securities_warehouse/base24_repair_view.py"
+        )
     identity = digest_value(closure)
     output.mkdir(parents=True)
     (output / "tables").mkdir()
@@ -320,6 +331,17 @@ def prepare_history(
             "GROUP BY 1,2 HAVING count(*)<>1)"
         ).fetchone()[0]:
             fail("p6_snapshot_duplicate", "qualification listing/date")
+        if repair_root is not None and repair_manifest_sha256 is not None:
+            from quanthus.pipelines.securities_warehouse.base24_repair_view import attach
+
+            repair_receipt = attach(
+                c,
+                source=source,
+                repair=repair_root,
+                manifest_sha=repair_manifest_sha256,
+                cutoff=knowledge_cutoff,
+            )
+            _write(output / "p10-repair-receipt.safe.json", repair_receipt)
         c.execute("CREATE TABLE industry(stock_code VARCHAR,exchange VARCHAR,industry_id VARCHAR)")
         c.executemany(
             "INSERT INTO industry VALUES (?,?,?)",
@@ -462,7 +484,11 @@ def prepare_history(
         "claims": raw["claims"],
         "census": census,
         "files": files,
-        "elapsed_seconds": str(time.monotonic() - started),
+        "elapsed_seconds": (
+            "recorded_by_job_stage_owner"
+            if repair_root is not None
+            else str(time.monotonic() - started)
+        ),
         "source_unchanged": True,
         "physical_history_build_count": 1,
     }

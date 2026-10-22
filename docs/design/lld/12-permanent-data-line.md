@@ -173,3 +173,90 @@ and uses `CURRENT_DAILY_CORE.json` plus immutable dated descriptors. It does not
 change the old four-lane CURRENT, assert 1m/5m acceptance, or activate P6/training.
 Dedicated CN01/Hermes daily-core services and OCI core-only mirroring are allowed
 after their baseline, physical-source, contract and runtime verification.
+
+
+## Bounded dated-status evidence — P10-DATA-P6-BASE24-EXEC-001
+
+Issue #538's additive `securities_warehouse/base24_status_evidence.py` publishes
+`quanthus.p10-dated-status-evidence.v1` from exact retained ODS members. It embeds
+the original inventory, complete selected response bytes, exact security/date
+requests and actual source capture times. A source response's `fetched_at` or
+its preserved `acquired_at` is required; file time, build time and a synthetic
+next-day cutoff cannot substitute. Unknown, duplicate and inconsistent source
+identities fail closed. Equal-time status disagreement remains unavailable.
+The existing latest-visible-observation rule applies only to the same exact
+security/date; it never carries state into another date.
+
+One immutable observation set serves qualification and safe reporting. Independent
+offline verification recomputes the observations and dispositions from embedded
+originals, validates the exact physical inventory and fails on semantic tampering
+as well as damaged bytes. READY is last. Source files and old products are not
+modified. This product qualifies dated provider evidence only: canonical status
+conflicts, IPO rules, price bounds, P6 admission and historical PIT remain separate
+checks. It grants no execution authority. Tests live in
+`tests/unit/test_base24_status_evidence.py`; the bounded issue owns exact source
+selection, repair receipts and consumer handoff, without P6 ledger changes.
+
+### Successor evidence for current rule scope and instrument corrections
+
+`base24_execution_evidence.py` implements the separately identified
+`p10-current-rule-window-exclusion-and-instrument-correction.v1` contract.
+The stage graph is exact retained originals → one immutable evidence packet →
+bounded successor qualification and safe disposition; cold reconstruction is an
+explicit independent mode. This does not reconstruct an old IPO rule or waive
+missing evidence. The pinned complete SSE trading rules effective 2026-07-06 and
+their actual retrieval receipt can prove current-window exclusion only for an
+SSE main-board listing with six distinct, sourced, eligible observations in that
+same listing, matched to unique open calendar sessions. Listing age or an exchange
+calendar count alone is insufficient. Other venues, an initial window, ambiguous
+identity and special lifecycle cases remain held. The old qualification call
+without explicit evidence preserves its original IPO gate.
+
+The same retained SSE rule supports a new version of the stale SSE ST overlay:
+the preceding effective interval remains 5%, the successor interval starts on
+2026-07-06, and the actual new repair knowledge time is recorded separately. No
+SZSE fact is inferred from SSE evidence and no frozen price policy is changed.
+
+An exclusive company-bond risk-warning title cannot establish an equity ST
+interval. Withdrawal requires the exact native → raw interval → announcement
+identity chain and produces a new UNKNOWN equity assertion, never inferred NORMAL.
+The prior record and its times remain in the evidence. An actual exact-date
+provider observation and all other gates are still necessary. Partial revocations,
+mixed instruments and uncertain event titles are not silently adjudicated.
+
+Each successor retains original bytes, actual clocks, source and code identities,
+and the prior P6 ledger. A new governance correction is not backdated to a frozen
+P6 snapshot. Bounded requalification may evaluate the successor but does not grant
+consumer admission, historical PIT acceptance or trading authority. Tests are in
+`tests/unit/test_base24_execution_evidence.py`.
+
+
+The approved bounded official supplement extends current-window evidence to SZSE
+main-board and ChiNext with the separately pinned complete SZSE 2026 rules and
+actual receipt; SSE authority is never reused across venues. The old qualification
+interface still requires its original IPO source. The source-side ST overlay is
+versioned by venue, retaining the preceding fragment's original source identity.
+
+`base24_official_notice.py` can withdraw an erroneous retained ST assertion only
+through the exact native interval → raw event → official index → complete PDF
+chain. An exact reviewed name transition, operative approval and effective-date
+bound are frozen and recomputed offline. A document containing conflicting dates
+retains both and is usable only after both bounds; it does not acquire an invented
+precise historical timestamp. Withdrawal yields UNKNOWN, not a continuous NORMAL
+interval. The target still requires an actual exact-date provider observation and
+all other frozen qualification checks. New acquisition/repair knowledge is never
+assigned to the old replay snapshot. The current issue's receipt controls the
+bounded fetch budget; these adapters do not authorize further acquisition.
+
+The one-day supplement adapter (`base24_single_observation.py`) requires the exact
+approved unadjusted request, complete response/receipt, unique native listing and
+same-venue calendar. It preserves Decimal values and actual retrieval time, keeps
+provider acquisition unknown, leaves native limit prices null, and reproduces the
+two new native rows offline from embedded originals. It cannot alter an old row.
+
+An exact stale 5% native-bound defect may receive an additive successor through
+`base24_execution_bounds.py`: current exchange authority, actual reference close,
+all existing identity/status/window checks and the frozen policy must agree. Both
+old bounds must reproduce the diagnosed former 5% formula. Only the two bounds
+and new state knowledge time change; OHLCV, flags and original records remain.
+A missing reference, another mismatch or another failed gate stays blocked.

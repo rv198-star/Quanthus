@@ -446,6 +446,7 @@ def _state_row(
     prior: Decimal | None,
     policy: dict[str, Any],
     raw_sha: str,
+    window_proof: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Qualify original state; never change source flags, bounds, or missing bars."""
     statuses, lifecycle, regimes = (
@@ -458,6 +459,8 @@ def _state_row(
     # not source evidence; preserve every typed value and duplicate, while
     # making the evidence identity independent of the database hash-join order.
     evidence = dict(row)
+    if window_proof is not None:
+        evidence["successor_window_proof"] = window_proof
     for name in ("statuses", "lifecycle", "regimes", "dated_status"):
         if isinstance(row.get(name), list):
             evidence[name] = sorted(row[name], key=_digest)
@@ -538,10 +541,30 @@ def _state_row(
         ):
             raise PurposeError("SUSPENSION_STATE_CONFLICT")
         ipo = [r for r in regimes if r["ipo"] is not None]
-        if len(ipo) != 1 or ipo[0]["raw_evidence"] != raw_sha or ipo[0]["versions"] != 1:
-            raise PurposeError("IPO_SOURCE_CLOSURE")
-        initial = ipo_window(ipo[0]["rule"], ipo[0]["duration"], ordinal, complete)
-        result.update(ipo_rule=ipo[0]["rule"], in_ipo_window=initial)
+        if window_proof is not None:
+            from .base24_execution_evidence import RepairError, validate_window_proof
+
+            if ipo:
+                raise PurposeError("SUCCESSOR_CANNOT_REPLACE_EXISTING_IPO_RULE")
+            try:
+                validate_window_proof(window_proof, row)
+            except RepairError as exc:
+                raise PurposeError(str(exc)) from exc
+            initial, window_rule, window_duration = False, None, 0
+            result.update(
+                ipo_rule=(
+                    "CURRENT_SSE_RULE_WINDOW_EXCLUDED"
+                    if row["board"] == "SSE_main"
+                    else "CURRENT_SZSE_RULE_WINDOW_EXCLUDED"
+                ),
+                in_ipo_window=False,
+            )
+        else:
+            if len(ipo) != 1 or ipo[0]["raw_evidence"] != raw_sha or ipo[0]["versions"] != 1:
+                raise PurposeError("IPO_SOURCE_CLOSURE")
+            initial = ipo_window(ipo[0]["rule"], ipo[0]["duration"], ordinal, complete)
+            window_rule, window_duration = ipo[0]["rule"], int(ipo[0]["duration"])
+            result.update(ipo_rule=ipo[0]["rule"], in_ipo_window=initial)
         eligible = [
             r
             for r in regimes
@@ -564,9 +587,9 @@ def _state_row(
             market_date=row["market_date"].isoformat(),
             status_known=True,
             is_st_class=status == "ST",
-            listing_window_rule=ipo[0]["rule"],
+            listing_window_rule=window_rule,
             eligible_session_index=ordinal,
-            ipo_window_sessions=int(ipo[0]["duration"]),
+            ipo_window_sessions=window_duration,
             observed_tradestatus="1" if row["is_tradable"] else "0",
             prior_trading_close=prior,
             policy=policy,

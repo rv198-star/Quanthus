@@ -47,3 +47,13 @@ qualification selection; P6 consumes it without a private source-repair pipeline
 The job's preregistration records filesystem/device/free bytes and inodes, resource
 limits, input hashes, output paths and retention before materialization. Preserve
 all failed attempts; no source cleanup, production service, CURRENT, push or PR.
+
+## Completed recovery checkpoint
+
+The bounded continuation is complete. See
+[acceptance and exact identities](../acceptance/p6-538-regression-20261023.md).
+The repaired input changes the original 125 held targets to settled in a new later
+fixed snapshot; the original 17 settled controls retain their mechanism fields.
+Independent history reconstruction is byte-identical, and both fresh replay modes
+match all 70 cycles. Do not rerun this unchanged closure as additional progress.
+Full Base incorporation remains separately pending under P10 #539.

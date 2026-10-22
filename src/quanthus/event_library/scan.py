@@ -937,7 +937,7 @@ def _scan_security_series(
             expected_dates=expected_dates,
             card=card,
             knowledge_deadline=(
-                None
+                getattr(source_policy, "snapshot_replay_cutoff", None)
                 if getattr(source_policy, "prospective_clock_json", None) is None
                 else _prospective_deadline(source_policy, current)
             ),
@@ -1049,7 +1049,10 @@ def _finalize_raw_candidates(
     card: CandidateRuleCard,
     split_policy: SplitPolicy,
     prospective_clock_json: str | None = None,
+    snapshot_replay_cutoff: datetime | None = None,
 ) -> CandidateScanResult:
+    from quanthus.backtest.snapshot_clock import SnapshotReplayClock
+
     ordered_raw = sorted(raw, key=lambda item: (item.signal_date, item.security_id))
     isolated: list[_RawCandidate] = []
     last_accepted_index: dict[str, int] = {}
@@ -1150,6 +1153,10 @@ def _finalize_raw_candidates(
             split_policy_digest=split_policy.semantic_digest,
             split_assignment=assignment,
             prospective_clock_json=prospective_clock_json,
+            snapshot_replay_clock_json=(
+                None if snapshot_replay_cutoff is None
+                else SnapshotReplayClock(candidate.signal_date, snapshot_replay_cutoff).to_json()
+            ),
         )
         assert candidate.industry_id is not None
         events.append(
@@ -1352,6 +1359,7 @@ def finalize_candidate_scan_shards(
         card=card,
         split_policy=split_policy,
         prospective_clock_json=getattr(source_policy, "prospective_clock_json", None),
+        snapshot_replay_cutoff=getattr(source_policy, "snapshot_replay_cutoff", None),
     )
 
 

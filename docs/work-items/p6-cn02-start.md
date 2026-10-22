@@ -20,10 +20,15 @@ this work as P6-HISTORY-001. Use shared 2026-01-05--07-06 warmup, decisions
 reporting slices, not independent reset runs. Do not wait for future Daily or
 OCI single-writer reconciliation to execute isolated historical work.
 
-The historical input admission module is pre-result work; it does not contain
-the actual historical strategy orchestrator or turn the existing P10 negative
-historical-purpose assessment into a grant. Missing source qualification stops
-that strategy step. It must not be reported as a successful zero-trade replay.
+The Owner then explicitly selected fixed-snapshot mechanism replay after the
+strict admission found later knowledge versions. Current execution uses
+`p6-fixed-snapshot-replay.v1.json` and `forward_validation/snapshot_replay.py`:
+real later cutoff, separate historical simulation clock, unchanged expert/veto
+and P2 semantics, one shared history/panel/scan, continuous ledger and fresh
+independent reproduction. This engineering use does not accept historical PIT
+or strategy economics and must not flip P10's negative historical-purpose flag.
+Disclose actual exercised paths and held scopes rather than call an empty run
+complete mechanism coverage. The strict admission remains retained evidence.
 The installed controller stays disabled. The prospective startup implementation
 below is retained, deferred material; its future-day sequence is not the current
 historical task plan. Old sealed handoffs remain unchanged.

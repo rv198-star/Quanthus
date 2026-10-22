@@ -96,6 +96,7 @@ class SplitAssignment(str, Enum):
     ARBITRATION = "arbitration"
     PERMANENT_BLIND = "permanent_blind"
     PROSPECTIVE = "prospective"
+    SNAPSHOT_REPLAY = "snapshot_mechanism_replay"
 
 
 @dataclass(frozen=True)
@@ -152,6 +153,7 @@ class EventRecord:
     split_policy_digest: str
     split_assignment: SplitAssignment
     prospective_clock_json: str | None = None
+    snapshot_replay_clock_json: str | None = None
 
     def __post_init__(self) -> None:
         for path, value in (
@@ -172,7 +174,22 @@ class EventRecord:
         _require_aware(self.signal_close, "signal_close")
         if self.signal_close.date() != self.identity.signal_date:
             raise EventContractError("signal_close date must match identity.signal_date")
-        if self.prospective_clock_json is not None:
+        if self.snapshot_replay_clock_json is not None:
+            from quanthus.backtest.snapshot_clock import SnapshotReplayClock
+
+            clock = SnapshotReplayClock.from_json(self.snapshot_replay_clock_json)
+            if (
+                self.prospective_clock_json is not None
+                or self.split_assignment != SplitAssignment.SNAPSHOT_REPLAY
+                or clock.market_date != self.identity.signal_date
+                or self.signal_close != clock.simulated_close
+                or self.knowledge_cutoff != clock.knowledge_cutoff
+            ):
+                raise EventContractError("snapshot mechanism clock does not bind event")
+            object.__setattr__(self, "snapshot_replay_clock_json", clock.to_json())
+        elif self.split_assignment == SplitAssignment.SNAPSHOT_REPLAY:
+            raise EventContractError("snapshot replay requires its explicit two-clock contract")
+        elif self.prospective_clock_json is not None:
             clock = prospective_clock(self.prospective_clock_json)
             if (
                 self.split_assignment != SplitAssignment.PROSPECTIVE
@@ -191,6 +208,10 @@ class EventRecord:
 
     @property
     def decision_at(self) -> datetime:
+        if self.snapshot_replay_clock_json is not None:
+            from quanthus.backtest.snapshot_clock import SnapshotReplayClock
+
+            return SnapshotReplayClock.from_json(self.snapshot_replay_clock_json).knowledge_cutoff
         if self.prospective_clock_json is None:
             return self.signal_close
         return prospective_clock(self.prospective_clock_json).decision_at
@@ -217,6 +238,8 @@ class EventRecord:
         }
         if self.prospective_clock_json is not None:
             payload["prospective_clock"] = json.loads(self.prospective_clock_json)
+        if self.snapshot_replay_clock_json is not None:
+            payload["snapshot_replay_clock"] = json.loads(self.snapshot_replay_clock_json)
         return payload
 
 
@@ -268,7 +291,8 @@ def event_record_from_dict(value: object) -> EventRecord:
             "split_policy_digest",
             "split_assignment",
         }
-        | ({"prospective_clock"} if "prospective_clock" in raw else set()),
+        | ({"prospective_clock"} if "prospective_clock" in raw else set())
+        | ({"snapshot_replay_clock"} if "snapshot_replay_clock" in raw else set()),
         "event_record",
     )
     identity = EventIdentity(
@@ -327,6 +351,10 @@ def event_record_from_dict(value: object) -> EventRecord:
             None
             if "prospective_clock" not in raw
             else canonical_json_bytes(raw["prospective_clock"]).decode("utf-8")
+        ),
+        snapshot_replay_clock_json=(
+            None if "snapshot_replay_clock" not in raw
+            else canonical_json_bytes(raw["snapshot_replay_clock"]).decode("utf-8")
         ),
     )
 

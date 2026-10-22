@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Phase | P6 historical-replay successor; prospective MVP retained; P5 optional research deferred |
-| Status | Historical intervals fixed; source admission and actual replay are separate gates. Earlier prospective activation is retained history, not current CN02 admission. |
+| Status | Fixed-snapshot mechanism replay selected; historical PIT/economic acceptance remains separate. Earlier prospective activation is retained history, not current CN02 admission. |
 | Governing requirements | FR-GOV-001/002, NFR-004 |
 | Detailed design | `08-validation-governance/p6-forward-validation.md` |
 

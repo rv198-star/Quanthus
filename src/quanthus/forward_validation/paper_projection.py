@@ -19,6 +19,7 @@ from quanthus.backtest.contracts import (
     SnapshotRef,
 )
 from quanthus.backtest.engine import BacktestEngine
+from quanthus.backtest.snapshot_clock import SnapshotReplayClock
 from quanthus.forward_validation.contracts import fail
 from quanthus.forward_validation.paper_ledger import (
     P6PaperPolicy,
@@ -87,7 +88,7 @@ class PaperPendingIntent:
         return False
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "schema_version": "quanthus.p6-paper-pending-intent.v1",
             "paper_intent_id": self.paper_intent_id,
             "decision_digest": self.decision_digest,
@@ -111,6 +112,11 @@ class PaperPendingIntent:
                 "decision_version": self.signal.decision_version,
             },
         }
+        if self.signal.snapshot_replay_clock_json is not None:
+            signal = payload["signal"]
+            assert isinstance(signal, dict)
+            signal["snapshot_replay_clock"] = json.loads(self.signal.snapshot_replay_clock_json)
+        return payload
 
 
 def paper_pending_intent_from_dict(value: Mapping[str, object]) -> PaperPendingIntent:
@@ -147,7 +153,10 @@ def paper_pending_intent_from_dict(value: Mapping[str, object]) -> PaperPendingI
         "reason_code",
         "decision_version",
     }
-    if not isinstance(raw, dict) or set(raw) != signal_fields:
+    if not isinstance(raw, dict) or set(raw) != signal_fields | (
+        {"snapshot_replay_clock"}
+        if isinstance(raw, dict) and "snapshot_replay_clock" in raw else set()
+    ):
         fail("paper_intent_invalid", "paper signal fields differ")
     try:
         snapshot = SnapshotRef(
@@ -169,6 +178,10 @@ def paper_pending_intent_from_dict(value: Mapping[str, object]) -> PaperPendingI
             aggregate_score=Decimal(str(raw["aggregate_score"])),
             reason_code=str(raw["reason_code"]),
             decision_version=str(raw["decision_version"]),
+            snapshot_replay_clock_json=(
+                None if "snapshot_replay_clock" not in raw
+                else json.dumps(raw["snapshot_replay_clock"])
+            ),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("paper intent signal values are invalid") from exc
@@ -223,8 +236,15 @@ def _quantity(
 
 
 def project_paper_intent(
-    *, policy: P6PaperPolicy, ledger: PaperLedgerState, decision: SealedAggregateDecision
+    *, policy: P6PaperPolicy, ledger: PaperLedgerState, decision: SealedAggregateDecision,
+    snapshot_replay_clock: SnapshotReplayClock | None = None,
 ) -> PaperPendingIntent | None:
+    if snapshot_replay_clock is not None and (
+        snapshot_replay_clock.market_date != decision.snapshot.market_date
+        or snapshot_replay_clock.knowledge_cutoff != decision.snapshot.knowledge_cutoff
+        or decision.decided_at != snapshot_replay_clock.knowledge_cutoff
+    ):
+        fail("snapshot_mechanism_clock_binding", "paper projection")
     unit = ledger.unit(decision.unit_id)
     if decision.final_action == "no_action":
         return None
@@ -273,7 +293,8 @@ def project_paper_intent(
     signal = BacktestSignal(
         signal_id=signal_id,
         snapshot=decision.snapshot,
-        decision_at=decision.decided_at,
+        decision_at=(decision.decided_at if snapshot_replay_clock is None
+                     else snapshot_replay_clock.simulated_close),
         profile_id="close-to-next-open-v1",
         window_id=None,
         security_code=decision.security_code,
@@ -283,6 +304,9 @@ def project_paper_intent(
         aggregate_score=decision.aggregate_score,
         reason_code="p6_paper_projection:" + decision.reason_codes[0],
         decision_version=decision.decision_version,
+        snapshot_replay_clock_json=(
+            None if snapshot_replay_clock is None else snapshot_replay_clock.to_json()
+        ),
     )
     return PaperPendingIntent(
         paper_intent_id=_stable_id("paper_intent", decision.decision_digest, signal_id),

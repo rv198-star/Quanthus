@@ -13,6 +13,7 @@ import json
 import os
 import shutil
 from collections.abc import Mapping
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
@@ -28,6 +29,7 @@ from quanthus.backtest.inputs import (
     buy_open_rejection_reason,
     market_session_from_p1,
 )
+from quanthus.backtest.snapshot_clock import SnapshotReplayClock
 from quanthus.event_library.contracts import EventIdentity, EventRecord, event_record_from_dict
 from quanthus.expert_evaluation import ExpertEvaluationSpec, artifact_from_bytes
 from quanthus.expert_evaluation.experts.trend_stability import (
@@ -248,6 +250,7 @@ class ProspectiveTrendObservation:
     raw_value: str | None
     evidence_digest: str
     knowledge_cutoff: datetime
+    snapshot_mechanism_only: bool = False
 
     @property
     def digest(self) -> str:
@@ -255,8 +258,14 @@ class ProspectiveTrendObservation:
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "schema_version": "quanthus.p6-prospective-trend-observation.v1",
-            "population": "p6_prospective_daily_candidates",
+            "schema_version": (
+                "quanthus.p6-fixed-snapshot-trend-observation.v1" if self.snapshot_mechanism_only
+                else "quanthus.p6-prospective-trend-observation.v1"
+            ),
+            "population": (
+                "p6_fixed_snapshot_mechanism_candidates" if self.snapshot_mechanism_only
+                else "p6_prospective_daily_candidates"
+            ),
             "partition": "prospective",
             "event_id": self.event_id,
             "market_date": self.market_date.isoformat(),
@@ -524,10 +533,12 @@ def _build_entry_decisions(
     *,
     runtime: P6Runtime,
     projection: P6ProspectiveProjection,
+    candidates: Any | None = None,
 ) -> tuple[list[dict[str, Any]], list[tuple[Any, Any, ProspectiveTrendObservation]]]:
-    candidates = scan_projection_candidates(
-        projection, candidate_rule=runtime.bindings["candidate_rule"]
-    )
+    if candidates is None:
+        candidates = scan_projection_candidates(
+            projection, candidate_rule=runtime.bindings["candidate_rule"]
+        )
     registry = ExpertStrategyRegistry(runtime.root)
     runner = FormalStrategyRunner(registry.card, registry.topology_manifest.digest)
     trend_config = load_trend_stability_config(runtime.bindings["trend_expert"])
@@ -558,6 +569,7 @@ def _build_entry_decisions(
                 raw_value=raw_value,
                 evidence_digest=_feature_evidence(feature, event.event_id),
                 knowledge_cutoff=event.knowledge_cutoff,
+                snapshot_mechanism_only=event.snapshot_replay_clock_json is not None,
             )
             context = build_formal_expert_context(
                 event=event,
@@ -594,6 +606,7 @@ def _paper_and_shadow(
     decisions: list[tuple[Any, Any, ProspectiveTrendObservation]],
     ledger: PaperLedgerState,
     unavailable_unit_ids: set[str],
+    snapshot_replay_clock: SnapshotReplayClock | None = None,
 ) -> tuple[
     PaperLedgerState,
     list[dict[str, object]],
@@ -670,7 +683,10 @@ def _paper_and_shadow(
                 target_maximum_position=decision.target_maximum_position,
                 reason_codes=decision.action.reason_codes,
             )
-            intent = project_paper_intent(policy=paper_policy, ledger=ledger, decision=sealed)
+            intent = project_paper_intent(
+                policy=paper_policy, ledger=ledger, decision=sealed,
+                snapshot_replay_clock=snapshot_replay_clock,
+            )
             if intent is None:
                 fail("paper_intent_missing", candidate.record.event_id)
             pending.append(intent)
@@ -752,6 +768,7 @@ def _settle_prior_intents(
     runtime: P6Runtime,
     projection: P6ProspectiveProjection,
     prior: P6ForwardState,
+    reader: HistoricalReplayFrameReader | None = None,
 ) -> tuple[
     PaperLedgerState,
     tuple[PaperPendingIntent, ...],
@@ -766,7 +783,8 @@ def _settle_prior_intents(
     retained_contexts: dict[str, Mapping[str, object]] = {}
     settlements: list[dict[str, object]] = []
     current = projection.signal_market_date
-    with HistoricalReplayFrameReader(projection.bundle) as reader:
+    with (HistoricalReplayFrameReader(projection.bundle) if reader is None
+          else nullcontext(reader)) as reader:
         for intent in sorted(prior.pending_intents, key=lambda item: item.paper_intent_id):
             context = prior.pending_contexts.get(intent.paper_intent_id)
             if context is None:
@@ -852,7 +870,8 @@ def _held_event(source: EventRecord, projection: P6ProspectiveProjection) -> Eve
         source.candidate_rule_digest,
         source.snapshot_manifest_digest,
         cutoff,
-        cutoff,
+        (cutoff if source.snapshot_replay_clock_json is None else
+         SnapshotReplayClock(projection.signal_market_date, cutoff).simulated_close),
         source.eligibility_evidence_digest,
         source.feature_window_manifest_digest,
         source.isolation_group_id,
@@ -860,6 +879,10 @@ def _held_event(source: EventRecord, projection: P6ProspectiveProjection) -> Eve
         source.split_policy_version,
         source.split_policy_digest,
         source.split_assignment,
+        snapshot_replay_clock_json=(
+            None if source.snapshot_replay_clock_json is None else
+            SnapshotReplayClock(projection.signal_market_date, cutoff).to_json()
+        ),
     )
 
 
@@ -870,6 +893,8 @@ def _review_held_positions(
     ledger: PaperLedgerState,
     positions: dict[str, dict[str, object]],
     pending_intents: tuple[PaperPendingIntent, ...],
+    reader: HistoricalReplayFrameReader | None = None,
+    snapshot_replay_clock: SnapshotReplayClock | None = None,
 ) -> tuple[
     PaperLedgerState,
     dict[str, dict[str, object]],
@@ -887,7 +912,8 @@ def _review_held_positions(
     new_intents: list[PaperPendingIntent] = []
     contexts: dict[str, dict[str, object]] = {}
     current = projection.signal_market_date
-    with HistoricalReplayFrameReader(projection.bundle) as reader, projection.feature_panel() as panel:
+    with (HistoricalReplayFrameReader(projection.bundle) if reader is None
+          else nullcontext(reader)) as reader, projection.feature_panel() as panel:
         for unit_id in sorted(positions):
             metadata = positions[unit_id]
             unit = ledger.unit(unit_id)
@@ -1003,7 +1029,10 @@ def _review_held_positions(
                 target_maximum_position=decision.target_maximum_position,
                 reason_codes=decision.action.reason_codes,
             )
-            intent = project_paper_intent(policy=policy, ledger=ledger, decision=sealed)
+            intent = project_paper_intent(
+                policy=policy, ledger=ledger, decision=sealed,
+                snapshot_replay_clock=snapshot_replay_clock,
+            )
             if intent is None:
                 decisions[-1]["paper_disposition"] = "no_reduction_quantity"
                 continue
@@ -1063,11 +1092,13 @@ def _settle_forecasts(
     *,
     projection: P6ProspectiveProjection,
     forecasts: tuple[Mapping[str, object], ...],
+    reader: HistoricalReplayFrameReader | None = None,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     updated = [dict(item) for item in forecasts]
     settlements: list[dict[str, object]] = []
     current = projection.signal_market_date
-    with HistoricalReplayFrameReader(projection.bundle) as reader, projection.feature_panel() as panel:
+    with (HistoricalReplayFrameReader(projection.bundle) if reader is None
+          else nullcontext(reader)) as reader, projection.feature_panel() as panel:
         for item in updated:
             status = str(item.get("status"))
             if status in {"abstained", "settled", "not_executable", "unavailable"}:

@@ -96,6 +96,7 @@ class BacktestSignal:
     aggregate_score: Decimal
     reason_code: str
     decision_version: str
+    snapshot_replay_clock_json: str | None = None
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -120,7 +121,20 @@ class BacktestSignal:
         if not self.aggregate_score.is_finite():
             raise ValueError("aggregate_score must be finite")
         _require_aware(self.decision_at, "decision_at")
-        if self.snapshot.knowledge_cutoff > self.decision_at:
+        if self.snapshot_replay_clock_json is not None:
+            from quanthus.backtest.snapshot_clock import SnapshotReplayClock
+
+            clock = SnapshotReplayClock.from_json(self.snapshot_replay_clock_json)
+            if (
+                clock.market_date != self.snapshot.market_date
+                or clock.knowledge_cutoff != self.snapshot.knowledge_cutoff
+                or self.decision_at != clock.simulated_close
+                or self.profile_id != "close-to-next-open-v1"
+                or self.window_id is not None
+            ):
+                raise ValueError("snapshot mechanism clock does not bind signal")
+            object.__setattr__(self, "snapshot_replay_clock_json", clock.to_json())
+        elif self.snapshot.knowledge_cutoff > self.decision_at:
             raise ValueError("signal decision cannot precede snapshot knowledge_cutoff")
         local_decision_date = self.decision_at.astimezone(MARKET_TIMEZONE).date()
         if local_decision_date != self.snapshot.market_date:

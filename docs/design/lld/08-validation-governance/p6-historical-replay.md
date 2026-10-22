@@ -4,10 +4,10 @@
 | --- | --- |
 | Parent | [Validation governance](../08-validation-governance.md) |
 | Design status | approved direction: Owner explicitly chose historical replay on 2026-10-22 |
-| Delivery gate | blocked for strategy execution; calendar plan and input admission are executable |
+| Delivery gate | open for fixed-snapshot mechanism replay; strict historical PIT remains blocked |
 | Work item | P6-HISTORY-001; routing in [P6 CN02 work item](../../../work-items/p6-cn02-start.md) |
-| Frozen plan | `config/forward-validation/runtime/p6-historical-replay-plan.v1.json` |
-| Code and tests | `forward_validation/historical_admission.py`; `test_p6_historical_admission.py` |
+| Frozen plans | `config/forward-validation/runtime/p6-historical-replay-plan.v1.json`; successor `p6-fixed-snapshot-replay.v1.json` in that directory |
+| Code and tests | `forward_validation/historical_admission.py`, `snapshot_replay.py`; `test_p6_historical_admission.py`, `test_p6_snapshot_replay.py` |
 
 ## Purpose and authority
 
@@ -24,6 +24,45 @@ position/accounting and target-settlement chain. It does not authorize tuning,
 training, P3/P5 research-result access, blind 2025 access, notification, a broker
 or live capital. Dates are fixed before any result-bearing read. Known source
 limitations remain truthful; a completed input scan is not a completed P6 replay.
+
+## Selected fixed-snapshot mechanism mode
+
+After strict admission found July versions first known in August, the Owner
+chose fixed-snapshot mechanism replay. The successor contract binds the same
+dates and unchanged candidate/expert/P2 policies, and permits this engineering
+use of the actual later snapshot. Strict historical PIT/economic acceptance
+remains unavailable; P10's negative finding and the old prospective contract
+remain unchanged. That separate limitation does not stop the selected mode.
+
+The actual intake cutoff must follow the real source cutoff and materialization
+time. Native timestamps and Decimal columns stay unchanged, including unknowns.
+A second clock visits historical dates with a versioned regular-session
+simulation assumption. Every event and paper signal carries the explicit
+`quanthus.p6-fixed-snapshot-clock.v1`; native calendar nulls remain null. P2
+rejects such signals in an official Run. Without this opt-in, old clock checks
+and serialized bytes keep their previous behavior.
+
+The consumer bypass is a disclosed hindsight engineering cohort: retained
+dated concentration identities without an implemented or undated action in the
+whole consumed interval. Empty action tables describe only that action-free
+cohort. Static industry and whole-window cohort/continuity selection are not
+historical PIT or a market-representative strategy sample. `A_SHARE` maps to
+the existing rule's `common_equity`; other instruments remain rule-restricted.
+Candidate arithmetic uses native Decimals; existing feature/P2 representations
+remain unchanged. Unknown native bar/identity/state clocks hold affected
+candidate rows, and P10's per-date execution qualification still controls fills.
+Missing status/limits never become guessed values or a forced sale.
+
+The graph is: verify/freeze inputs -> one physical history -> one full-window
+feature panel and candidate scan -> one frame reader -> smoke and a fresh
+continuous main ledger -> explicit independent reproduction with freshly built
+prerequisites. Smoke and main share immutable TMP, but no state. One bounded
+daily evidence join serves pending orders, positions and targets. This does not
+publish a new data product or authorize acquisition, source repair, old ledger
+writes, activation, notification, broker or live capital. Export only safe
+counts, identities, dispositions and reconciliation; keep raw simulations private.
+Disclose any unexercised candidate/fill/held path instead of treating empty
+output as evidence that all mechanisms ran.
 
 ## Fixed historical intervals
 
@@ -50,7 +89,8 @@ warmup alone does not establish valid security history.
 A published open date with an absent closing instant still belongs to date
 planning. Preserve and disclose the unavailable clock per venue/date; do not
 infer an execution coordinate or fill it with the usual closing time. It fails
-the affected clock check without preventing checks of other dated inputs.
+the affected strict-PIT clock check without preventing checks of other dated
+inputs. The separately labeled simulation clock does not repair that evidence.
 
 S1/S2/S3 are reporting views over one continuous run. Capital, holdings, pending
 orders and unsettled targets cross their boundaries. Do not reset them, reuse
@@ -61,7 +101,7 @@ must use a fresh isolated ledger and reproduce the smoke prefix deterministicall
 The target tail adds no new entries; retain unresolved positions/targets with
 their actual terminal disposition rather than force a final sale or invent a label.
 
-## Stage graph and present executable boundary
+## Retained strict-PIT admission graph
 
 1. Bind exact source manifest, full physical inventory, calendar and frozen
    policy closure; freeze the above intervals and resource budget.

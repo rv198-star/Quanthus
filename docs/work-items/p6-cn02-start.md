@@ -44,6 +44,16 @@ values, change source precedence, rerun the unchanged replay or count diagnosis
 as additional official observations. The original 17 settled targets and complete
 mechanism run remain sealed.
 
+The Owner now handles #538 on a separate data-quality branch and instructed P6
+to continue. Do not duplicate that repair work here. The next engineering scope
+is exact-image CN02 readiness: actual isolated PostgreSQL/Worker rehearsal,
+idempotency, sealed-run recovery and disabled admission, followed by the
+[Base 2.4 read-only runtime projection](../design/lld/08-validation-governance/p6-base24-inputs.md#read-only-cn02-runtime-projection).
+The projection must bind the successor activation and expected Worker revision;
+legacy activation/jobs cannot contribute successor progress. Keep runtime
+receipts tied to the actual tested image. This preparation does not enable a
+production controller or reopen the completed historical replay.
+
 **Current routing is historical replay.** After the initial startup report,
 the Owner corrected the prospective-only direction and explicitly chose
 existing historical data, then approved fixing the time slices and proceeding.

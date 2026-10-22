@@ -210,3 +210,33 @@ Regressions: `tests/unit/test_p6_base24_runtime.py`, existing event-contract and
 scanner tests, and the official-cycle tests. Real acceptance records must retain
 safe scope/hold counts, exact input and code identities, unchanged-source proof,
 two independent source-free processes and missing/corrupt-copy failures.
+
+## Read-only CN02 runtime projection
+
+`forward_validation/base24_contract.py` owns the canonical repository-only
+successor runtime loader. The Worker re-exports that loader through
+`base24_cycle.py`; the lean API imports it directly without market readers,
+DuckDB, PyArrow or a queue controller. Frozen policy bytes and runtime schemas
+are unchanged by this shared loader.
+
+The API explicitly selects this route with all three environment variables:
+`QUANTHUS_P6_RUNTIME_CONFIG`, `QUANTHUS_P6_FORWARD_RUN_ROOT`, and
+`QUANTHUS_P6_EXPECTED_WORKER_REVISION`. They identify the Base 2.4 runtime JSON,
+the absolute read-only P6 run root, and the full expected Worker Git SHA.
+Partial configuration fails closed. With none configured, the existing legacy
+projection retains its own contract.
+
+`product_view.py` reads only `activation/base24-enabled.json` under that run
+root and uses the canonical activation validator. It rejects symbolic paths,
+future decisions and a different Worker revision, and never inherits the old
+activation pointer or owner mandate. Missing, disabled and paused admission are
+shown without granting execution. Official progress is scoped to the exact
+runtime and activation digest; earlier activations remain in the ledger and
+are not counted as successor observations. A 200-Job census limit fails closed
+rather than silently reporting a truncated count. An exact-revision disabled
+rehearsal can be shown, but contributes no official sessions.
+
+This read-only display does not prove deployed readiness, verify market payloads
+or grant activation. Those still require the corresponding runtime receipts.
+Regression coverage is in `tests/platform/test_p6_base24_product_view.py`, with
+the original product-view, runtime and controller suites retained.

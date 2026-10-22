@@ -47,6 +47,11 @@ that the prospective 66-session budget has passed. The 61/22 feature/candidate
 windows and 120-session listing-age rule still apply per security; calendar
 warmup alone does not establish valid security history.
 
+A published open date with an absent closing instant still belongs to date
+planning. Preserve and disclose the unavailable clock per venue/date; do not
+infer an execution coordinate or fill it with the usual closing time. It fails
+the affected clock check without preventing checks of other dated inputs.
+
 S1/S2/S3 are reporting views over one continuous run. Capital, holdings, pending
 orders and unsettled targets cross their boundaries. Do not reset them, reuse
 warmup as observations, claim that these adjacent slices are independent, or

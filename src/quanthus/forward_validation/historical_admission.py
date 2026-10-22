@@ -89,6 +89,7 @@ def bind_calendar(plan: Mapping[str, Any], rows: Sequence[Mapping[str, Any]]) ->
         fail("p6_history_authority", "historical successor cannot inherit prospective authority")
     calendars: dict[str, list[str]] = {v: [] for v in scope["venues"]}
     seen: set[tuple[str, str]] = set()
+    unknown_closes: list[dict[str, str]] = []
     for r in rows:
         day, venue = str(r["trade_date"]), str(r["exchange"])
         if venue not in calendars or not scope["start"] <= day <= scope["end"]:
@@ -100,6 +101,12 @@ def bind_calendar(plan: Mapping[str, Any], rows: Sequence[Mapping[str, Any]]) ->
             close = r["close_at"]
             from zoneinfo import ZoneInfo
 
+            if close is None:
+                # The date is still published. Preserve the absent clock;
+                # no fill coordinate or historical PIT qualification follows.
+                unknown_closes.append({"venue": venue, "market_date": day})
+                calendars[venue].append(day)
+                continue
             if (
                 not isinstance(close, datetime)
                 or close.tzinfo is None
@@ -128,6 +135,9 @@ def bind_calendar(plan: Mapping[str, Any], rows: Sequence[Mapping[str, Any]]) ->
         **groups,
         "all_sessions": a,
         "report_slices": dict(zip(("S1", "S2", "S3"), selected, strict=True)),
+        "open_dates_with_unknown_close": sorted(
+            unknown_closes, key=lambda r: (r["market_date"], r["venue"])
+        ),
     }
 
 
@@ -232,7 +242,7 @@ def run_admission(
                 b.date,b.dwd_listing_id,b.identity_exchange,
                 b.dwd_bar_knowledge_from,b.dwd_bar_knowledge_to,
                 b.dwd_security_knowledge_from,b.dwd_listing_knowledge_from,
-                b.dwd_state_knowledge_from,k.close_at,
+                b.dwd_state_knowledge_from,k.close_at,k.trade_date bound_session_date,
                 b.dwd_bar_knowledge_from IS NOT NULL
                 AND b.dwd_bar_knowledge_from<=k.close_at
                 AND (b.dwd_bar_knowledge_to IS NULL OR b.dwd_bar_knowledge_to>k.close_at)
@@ -251,7 +261,9 @@ def run_admission(
             assert duplicates is not None
             if duplicates[0]:
                 fail("p6_history_duplicate", "listing/session is not unique")
-            missing = c.execute("SELECT count(*) FROM admission WHERE close_at IS NULL").fetchone()
+            missing = c.execute(
+                "SELECT count(*) FROM admission WHERE bound_session_date IS NULL"
+            ).fetchone()
             assert missing is not None
             if missing[0]:
                 fail("p6_history_calendar", "bar date/venue has no open session")
@@ -259,7 +271,8 @@ def run_admission(
                 count(*) FILTER(WHERE bar_at_close),
                 count(*) FILTER(WHERE bar_at_close AND identity_state_at_close),
                 count(*) FILTER(WHERE dwd_bar_knowledge_from IS NULL),
-                min(dwd_bar_knowledge_from),max(dwd_bar_knowledge_from)
+                min(dwd_bar_knowledge_from),max(dwd_bar_knowledge_from),
+                count(*) FILTER(WHERE close_at IS NULL)
                 FROM admission GROUP BY date ORDER BY date""").fetchall()
         finally:
             c.close()
@@ -272,6 +285,7 @@ def run_admission(
             "bar_knowledge_unknown": r[4],
             "earliest_bar_knowledge_from": None if r[5] is None else r[5].isoformat(),
             "latest_bar_knowledge_from": None if r[6] is None else r[6].isoformat(),
+            "calendar_close_unknown_rows": r[7],
         }
         for r in raw
     }

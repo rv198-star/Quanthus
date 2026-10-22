@@ -88,6 +88,19 @@ def test_exact_two_venue_calendar_partitions_once_and_smoke_is_prefix():
     ]
 
 
+def test_missing_session_close_keeps_published_dates_without_inventing_a_clock():
+    p, rows = synthetic_calendar()
+    rows[240]["close_at"] = None
+    rows[241]["close_at"] = None
+    bound = history.bind_calendar(p, rows)
+    assert len(bound["all_sessions"]) == 190
+    assert bound["open_dates_with_unknown_close"] == [
+        {"market_date": str(rows[240]["trade_date"]), "venue": "SSE"},
+        {"market_date": str(rows[241]["trade_date"]), "venue": "SZSE"},
+    ]
+    assert rows[240]["close_at"] is rows[241]["close_at"] is None
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
@@ -299,3 +312,38 @@ def test_output_inside_source_rejected_without_touching_source(tmp_path):
             repository_root=ROOT,
         )
     assert before == {str(f): f.read_bytes() for f in root.rglob("*") if f.is_file()}
+
+
+def test_unknown_calendar_close_blocks_only_its_rows_and_is_never_filled(tmp_path):
+    root, plan_path = source_fixture(tmp_path, clock="known")
+    p = json.loads(plan_path.read_bytes())
+    calendar = root / p["source"]["calendar_member"]
+    table = pq.read_table(calendar)
+    rows = table.to_pylist()
+    first = p["decisions"]["start"]
+    for r in rows:
+        if str(r["trade_date"]) == first:
+            r["close_at"] = None
+    pq.write_table(pa.Table.from_pylist(rows, schema=table.schema), calendar)
+    m = json.loads((root / "manifest.json").read_bytes())
+    rel = p["source"]["calendar_member"]
+    m["files"][rel] = {"bytes": calendar.stat().st_size, "sha256": file_sha(calendar)}
+    (root / "manifest.json").write_bytes(canonical_json_bytes(m) + b"\n")
+    p["source"]["manifest_sha256"] = file_sha(root / "manifest.json")
+    p["source"]["calendar_sha256"] = file_sha(calendar)
+    (root / "READY").write_text(p["source"]["manifest_sha256"] + "\n")
+    plan_path.write_text(json.dumps(p))
+    before = calendar.read_bytes()
+    result = history.run_admission(
+        plan_path=plan_path,
+        source=root,
+        output=tmp_path / "scoped-hold",
+        code_revision="a" * 40,
+        repository_root=ROOT,
+    )
+    assert result["status"] == "BLOCKED"
+    assert result["days_with_necessary_historical_clocks"] == 69
+    assert result["smoke"][0]["calendar_close_unknown_rows"] == 2
+    assert result["smoke"][0]["bar_visible_at_close"] == 0
+    assert all(r["calendar_close_unknown_rows"] == 0 for r in result["daily_admission"][1:])
+    assert calendar.read_bytes() == before

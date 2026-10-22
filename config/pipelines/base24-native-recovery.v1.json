@@ -10,5 +10,13 @@
   "reuse": "verified independent source bytes; completed securities are never requested again",
   "deadline_disposition": "LATE_RECOVERY_NOT_ON_TIME_SUCCESS",
   "full_daily_reacquisition": false,
-  "consumer_admission": "UNCHANGED"
+  "consumer_admission": "UNCHANGED",
+  "login_only_repair": {
+    "max_batches": 1,
+    "max_failed_shards": 4,
+    "max_seconds": 900,
+    "deadline": "within original resume capture UTC + max_seconds; no extra hour",
+    "source_rows_before_retry": 0,
+    "preserve_original_failed_logs": true
+  }
 }

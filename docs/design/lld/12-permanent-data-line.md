@@ -163,6 +163,11 @@ copied, hash-verified original capture bytes and the same qualified core/source
 closure. Completed securities are not acquired again. This does not extend the
 normal intake/delivery windows or qualify source rows; terminal events identify
 late recovery, with original acquisition clocks and consumer gates unchanged.
+A login-only transport repair may retry at most four empty pre-query shards once,
+for at most 900 seconds within the original recovery capture deadline. It grants
+no further hour, retries no failed row and preserves original failed logs. Initial
+SDK login has one paced retry with both actual responses retained; a worker
+exception cancels queued work.
 Host-side triggers never send API mail or perform cleanup. A daemon failure retains
 an unsent event for recovery, rather than claiming an in-container sender ran.
 

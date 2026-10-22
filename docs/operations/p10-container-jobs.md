@@ -429,3 +429,11 @@ receipt. Terminal mail explicitly prefixes the reason with `LATE_RECOVERY_`. A
 quality-held source stays partial. Research, PIT and next-open admission are
 unchanged. The same existing 21:15 recovery timer can consume this bounded path;
 normal Daily never silently extends its intake window.
+
+A failed recovery caused only by up to four empty, pre-query SDK login failures
+can perform one login-only repair under `login_only_repair` in the same policy.
+It independently copies the completed capture and retains original errors. Its
+900-second ceiling is also bounded by the original recovery capture deadline;
+there is no additional hour or retry of failed market rows. Initial SDK login
+keeps its original responses and performs one paced retry. Worker exceptions
+cancel queued work rather than letting a failed executor drain an unbounded queue.

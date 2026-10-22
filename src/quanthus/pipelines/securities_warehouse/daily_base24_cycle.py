@@ -14,6 +14,7 @@ import fcntl
 import json
 import math
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -253,6 +254,8 @@ def native(
             str(capture),
         )
         completed = set(value["complete_shards"])
+    capture_seconds = config.get("native_capture_seconds", 3600)
+    deadline = config.get("native_capture_deadline")
     shards = math.ceil(value["population"] / 50)
     write(
         run / "native-write-budget.json",
@@ -265,7 +268,8 @@ def native(
             "expected_shards": shards,
             "expected_symbols": value["population"],
             "max_capture_logical_bytes": 256 * 1024**2,
-            "max_seconds": 3600,
+            "max_seconds": capture_seconds,
+            "original_capture_deadline": deadline,
             "resume_seed": str(seed) if seed else None,
             "reused_securities": value.get("reused_securities", 0),
             "remaining_securities": value.get("remaining_securities", value["population"]),
@@ -275,6 +279,8 @@ def native(
     )
 
     def one(index: int) -> dict[str, Any]:
+        if deadline and datetime.now(timezone.utc) >= datetime.fromisoformat(deadline):
+            raise ValueError("DAILY_CYCLE_NATIVE_CAPTURE_INCOMPLETE")
         return provider(
             config,
             run,
@@ -294,12 +300,18 @@ def native(
     began = time.monotonic()
     with concurrent.futures.ThreadPoolExecutor(max_workers=config["native_workers"]) as pool:
         futures = [pool.submit(one, i) for i in range(shards) if i not in completed]
-        for future in concurrent.futures.as_completed(futures):
-            result = future.result()
-            if result["errors"] or time.monotonic() - began > 3600:
-                for pending in futures:
-                    pending.cancel()
-                raise ValueError("DAILY_CYCLE_NATIVE_CAPTURE_INCOMPLETE")
+        try:
+            for future in concurrent.futures.as_completed(futures):
+                result = future.result()
+                expired = deadline and datetime.now(timezone.utc) >= datetime.fromisoformat(
+                    deadline
+                )
+                if result["errors"] or time.monotonic() - began > capture_seconds or expired:
+                    raise ValueError("DAILY_CYCLE_NATIVE_CAPTURE_INCOMPLETE")
+        except BaseException:
+            for pending in futures:
+                pending.cancel()
+            raise
     return provider(
         config,
         run,
@@ -686,6 +698,53 @@ def reference_continuation(
     return dict(old), market, events
 
 
+def login_repair_plan(previous: Path, rules: dict[str, Any]) -> dict[str, Any]:
+    """Repair only up to four pre-query login failures within the original budget."""
+    if (
+        not (previous / "native-capture-resume.json").is_file()
+        or list(previous.parent.glob(previous.name[:10] + "-*/native-login-repair.json"))
+        or not (previous / "failure.json").is_file()
+        or not re.fullmatch(
+            r"DAILY_CYCLE_PROVIDER_FAILED_capture-[0-9]{3}",
+            object_at(previous / "failure.json").get("reason", ""),
+        )
+    ):
+        raise ValueError("DAILY_CYCLE_LOGIN_REPAIR_NOT_ELIGIBLE")
+    failed = []
+    for log in sorted(previous.glob("capture-*.log")):
+        if (previous / (log.stem + ".receipt.json")).exists():
+            continue
+        shard = previous / "capture-5m" / log.stem.replace("capture-", "shard-")
+        if (
+            not re.fullmatch(r"capture-[0-9]{3}", log.stem)
+            or not log.read_text().endswith("ValueError: native 5m login failed\n")
+            or not shard.is_dir()
+            or (shard / "summary.json").exists()
+            or (shard / "failures").exists()
+            or not (shard / "raw").is_dir()
+            or not (shard / "receipts").is_dir()
+            or any((shard / "raw").iterdir())
+            or any((shard / "receipts").iterdir())
+        ):
+            raise ValueError("DAILY_CYCLE_LOGIN_REPAIR_PREQUERY_ONLY")
+        failed.append(int(log.stem[-3:]))
+    budget = object_at(previous / "native-write-budget.json")
+    deadline = datetime.fromisoformat(budget["UTC"]) + timedelta(seconds=budget["max_seconds"])
+    remaining = int((deadline - datetime.now(timezone.utc)).total_seconds())
+    failed_index = int(object_at(previous / "failure.json")["reason"][-3:])
+    if (
+        not 1 <= len(failed) <= rules["max_failed_shards"]
+        or failed_index not in failed
+        or remaining <= 0
+    ):
+        raise ValueError("DAILY_CYCLE_LOGIN_REPAIR_SCOPE_OR_DEADLINE")
+    return {
+        "failed_shards": failed,
+        "max_seconds": min(rules["max_seconds"], remaining),
+        "original_capture_deadline": deadline.isoformat(),
+    }
+
+
 def capture_continuation(
     config: dict[str, Any],
     day: date,
@@ -704,12 +763,20 @@ def capture_continuation(
         or old.get("market_date") != str(day)
         or old.get("base_manifest_sha256") != config["base_manifest_sha256"]
         or old.get("config_sha256") != config["release_config_sha256"]
-        or list(root.glob(str(day) + "-*/native-capture-resume.json"))
     ):
         raise ValueError("DAILY_CYCLE_NATIVE_RESUME_NOT_ELIGIBLE")
+    resumed = list(root.glob(str(day) + "-*/native-capture-resume.json"))
+    repair = None
+    if resumed:
+        if len(resumed) != 1:
+            raise ValueError("DAILY_CYCLE_LOGIN_REPAIR_EXACT_RESUME_REQUIRED")
+        repair = login_repair_plan(resumed[0].parent, rules["login_only_repair"])
     matches = []
     for path in root.glob(str(day) + "-*/failure.json"):
-        if object_at(path).get("reason") != rules["failure_reason"]:
+        if repair is not None:
+            if path.parent != resumed[0].parent:
+                continue
+        elif object_at(path).get("reason") != rules["failure_reason"]:
             continue
         receipt = object_at(path.parent / "core-receipt.json")
         if {k: v for k, v in receipt.items() if k != "status"} == {
@@ -720,8 +787,8 @@ def capture_continuation(
         raise ValueError("DAILY_CYCLE_NATIVE_RESUME_EXACT_FAILURE_REQUIRED")
     previous = physical_path(matches[0])
     budget = object_at(previous / "native-write-budget.json")
-    if budget["reference_sha256"] != file_sha(previous / "daily-reference.json") or budget.get(
-        "resume_seed"
+    if budget["reference_sha256"] != file_sha(previous / "daily-reference.json") or (
+        budget.get("resume_seed") and repair is None
     ):
         raise ValueError("DAILY_CYCLE_NATIVE_RESUME_REFERENCE_CHANGED")
     core = physical_path(Path(old["core"]))
@@ -744,6 +811,10 @@ def capture_continuation(
         or verify_daily_domain_increment(core).manifest_sha256 != old["core_manifest_sha256"]
     ):
         raise ValueError("DAILY_CYCLE_NATIVE_RESUME_INPUT_CHANGED")
+    if repair is not None:
+        config["native_login_repair"] = repair
+        config["native_capture_seconds"] = repair["max_seconds"]
+        config["native_capture_deadline"] = repair["original_capture_deadline"]
     return dict(old), market, events, physical_path(previous / "capture-5m")
 
 
@@ -851,7 +922,12 @@ def main() -> int:
                     / "config/pipelines/base24-native-recovery.v1.json"
                 )
                 write(
-                    run / "native-capture-resume.json",
+                    run
+                    / (
+                        "native-login-repair.json"
+                        if config.get("native_login_repair")
+                        else "native-capture-resume.json"
+                    ),
                     {
                         "policy_sha256": file_sha(policy),
                         "policy": object_at(policy),
@@ -863,6 +939,7 @@ def main() -> int:
                         "continuation_pipeline_revision": config["pipeline_revision"],
                         "market_date": str(day),
                         "budget": resources(root),
+                        "login_repair": config.get("native_login_repair"),
                     },
                 )
                 value.update(

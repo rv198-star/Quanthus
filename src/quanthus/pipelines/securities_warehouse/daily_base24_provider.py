@@ -34,6 +34,31 @@ class NativeCaptureClient:
     def __getattr__(self, name: str) -> Any:
         return getattr(self.client, name)
 
+    def login(self) -> Any:
+        """One paced retry of initial login, retaining both actual SDK responses."""
+        from quanthus.providers.acquisition_evidence import (  # type: ignore[import-untyped]
+            capture,
+            clock,
+        )
+
+        for attempt in range(2):
+            began = clock()
+            response = self.client.login()
+            capture(
+                root=self.evidence_root,
+                request={"provider": "baostock", "api": "login"},
+                raw=json.dumps(
+                    {"error_code": str(response.error_code), "error_msg": response.error_msg}
+                ).encode(),
+                started_at=began,
+                completed_at=clock(),
+                status=str(response.error_code),
+            )
+            if str(response.error_code) == "0" or attempt:
+                return response
+            time.sleep(1.0)
+        raise AssertionError("unreachable bounded login retry")
+
     def query_history_k_data_plus(self, *args: Any, **kwargs: Any) -> Any:
         if self.reconnect_before_query and not self._reconnect():
             raise ValueError("DAILY_NATIVE_RELOGIN_FAILED")
@@ -65,7 +90,7 @@ class NativeCaptureClient:
     def _observed_query(self, *args: Any, **kwargs: Any) -> Any:
         from types import SimpleNamespace
 
-        from quanthus.providers.acquisition_evidence import (  # type: ignore[import-untyped]
+        from quanthus.providers.acquisition_evidence import (
             capture,
             clock,
         )

@@ -68,13 +68,15 @@ x-daily-volumes: &daily-volumes
 services:
   backup:
     <<: *job
+    # Transport only: reuse the existing loopback proxy; no ports or Docker socket.
+    network_mode: host
     profiles: [delivery]
     entrypoint: ["python", "-m", "quanthus.p10_gdrive_backup"]
     command: ["--help"]
     volumes:
       - type: bind
         source: ${QUANTHUS_RUNTIME_ROOT:?}
-        target: /data/runtime
+        target: ${QUANTHUS_RUNTIME_ROOT:?}
         read_only: true
         bind: {create_host_path: false}
       - type: bind
@@ -118,6 +120,8 @@ services:
       TZ: Asia/Shanghai
       PYTHONDONTWRITEBYTECODE: "1"
       TMPDIR: /run/backup
+      HTTP_PROXY: http://127.0.0.1:10800
+      HTTPS_PROXY: http://127.0.0.1:10800
   cleanup:
     <<: *job
     profiles: [maintenance]

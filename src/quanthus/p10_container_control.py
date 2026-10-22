@@ -237,7 +237,17 @@ def delivery_container(config: dict[str, Any], target: Path | None = None) -> di
         run_id,
     ]
     if target is None:
-        command += ["backup", "--selection", "/run/config/backup.json"]
+        command += [
+            "--entrypoint",
+            "python",
+            "backup",
+            "-m",
+            "quanthus.p10_delivery",
+            "--routing",
+            "/run/config/backup.json",
+            "--runtime",
+            config["compose_env"]["QUANTHUS_RUNTIME_ROOT"],
+        ]
     else:
         command += [
             "--entrypoint",
@@ -368,7 +378,7 @@ def run(config: dict[str, Any], role: str, day: date) -> dict[str, Any]:
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
-        if failed or not target.exists():
+        if not target.exists():
             value = event(role, day, run_id, config["revision"], {"status": "CONTAINER_RUN_FAILED"})
             atomic(target, value)
         else:

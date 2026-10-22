@@ -126,11 +126,13 @@ def test_compose_cleaner_has_no_data_credentials_network_or_socket_mounts(tmp_pa
     assert len({v["image"] for v in value["services"].values()}) == 1
     backup = value["services"]["backup"]
     assert backup["profiles"] == ["delivery"]
+    assert backup["network_mode"] == "host"
+    assert backup["environment"]["HTTPS_PROXY"] == "http://127.0.0.1:10800"
     mounted = {v["target"]: v for v in backup["volumes"]}
     assert all(
         mounted[p]["read_only"]
         for p in (
-            "/data/runtime",
+            config["compose_env"]["QUANTHUS_RUNTIME_ROOT"],
             "/data/weekly-jobs",
             "/data/weekly-input",
             "/run/events",

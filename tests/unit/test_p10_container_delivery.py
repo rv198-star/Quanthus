@@ -151,6 +151,7 @@ def test_lightweight_api_delivery_deduplicates_across_restarts(tmp_path, monkeyp
         calls.append(req)
         assert timeout == 15
         assert req.full_url == "https://api.resend.com/emails"
+        assert req.get_header("User-agent") == "Quanthus-Warehouse-Notifier/1.0"
         return io.BytesIO(b'{"id":"synthetic-mail-id"}')
 
     monkeypatch.setattr(mail.request, "urlopen", api)
@@ -575,3 +576,21 @@ def test_weekly_runs_real_bounded_financial_build_and_verifier(tmp_path):
     path.write_text(json.dumps(plan))
     with pytest.raises(ValueError, match="WEEKLY_SCOPE"):
         jobs.weekly(path, DAY, SHA)
+
+
+def test_host_preserves_container_failure_event_identity_for_mail_dedup(tmp_path, monkeypatch):
+    config = deployment(tmp_path)
+    original = []
+
+    def start(command, **kwargs):
+        run_id = command[command.index("--name") + 1]
+        path = Path(config["state"]) / "events" / (run_id + ".json")
+        value = jobs.event("daily", DAY, run_id, SHA, {"status": "CONTAINER_RUN_FAILED"})
+        path.write_text(json.dumps(value))
+        original.append((path, path.read_bytes()))
+        return SimpleNamespace(wait=lambda **k: 1, poll=lambda: 1)
+
+    monkeypatch.setattr(host.subprocess, "Popen", start)
+    with pytest.raises(RuntimeError, match="RETAINED_EVENT"):
+        host.run(config, "daily", DAY)
+    assert original[0][0].read_bytes() == original[0][1]

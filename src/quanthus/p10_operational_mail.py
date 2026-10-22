@@ -94,7 +94,8 @@ def deliver(event: Path, state: Path, secret: Path, *, attempts: int = 2) -> str
         payload = {
             "from": settings["sender"],
             "to": settings["recipients"],
-            "subject": f"Quanthus {value['role']} {value['market_date']}: {value['status']}",
+            "subject": ("[通道验收测试] " if value["reason"].startswith("ACCEPTANCE_") else "")
+            + f"Quanthus {value['role']} {value['market_date']}: {value['status']}",
             "text": encoded.decode(),
         }
         for attempt in range(attempts):
@@ -105,6 +106,8 @@ def deliver(event: Path, state: Path, secret: Path, *, attempts: int = 2) -> str
                     headers={
                         "Authorization": "Bearer " + settings["api_key"],
                         "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "User-Agent": "Quanthus-Warehouse-Notifier/1.0",
                         "Idempotency-Key": key,
                     },
                     method="POST",

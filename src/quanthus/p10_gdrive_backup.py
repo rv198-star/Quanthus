@@ -19,9 +19,10 @@ import subprocess
 import tarfile
 import tempfile
 import time
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib import request
 
 from quanthus.p10_operational_mail import atomic
 from quanthus.pipelines.securities_warehouse.container_code import digest, verify_bundle
@@ -197,10 +198,64 @@ def pack(package: dict[str, Any], output: Path, until: float) -> None:
         raise ValueError("P10_BACKUP_SOURCE_SET_CHANGED_DURING_PACK")
 
 
+def bridge_config(secret: Path, remote: str, until: float) -> Path:
+    """Reuse the already authorized Duplicati broker, without exposing tokens to argv."""
+    settings = json.loads(secret.read_bytes())
+    if (
+        set(settings) != {"authid", "oauth_url", "refresh_secret"}
+        or settings["oauth_url"] != "https://duplicati-oauth-handler.appspot.com/refresh"
+        or any(not isinstance(v, str) or not v for v in settings.values())
+        or not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", remote)
+    ):
+        raise ValueError("P10_BACKUP_EXISTING_BROKER_INVALID")
+    proxy = "http://127.0.0.1:10800"
+    opener = request.build_opener(request.ProxyHandler({"https": proxy, "http": proxy}))
+    req = request.Request(
+        settings["oauth_url"],
+        headers={
+            "X-AuthID": settings["authid"],
+            "User-Agent": "Duplicati/2.4.0",
+        },
+    )
+    try:
+        with opener.open(req, timeout=max(1, min(60, until - time.monotonic()))) as response:
+            raw = response.read(65537)
+        if len(raw) > 65536:
+            raise ValueError("oversize")
+        token = json.loads(raw)["access_token"]
+        if not isinstance(token, str) or not token or any(c in token for c in "\r\n"):
+            raise ValueError("invalid token")
+    except Exception:
+        raise RuntimeError("P10_BACKUP_EXISTING_BROKER_REFRESH_FAILED") from None
+    expiry = (datetime.now(timezone.utc) + timedelta(minutes=45)).isoformat()
+    # No invented OAuth refresh identity/client secret. Refresh through the existing
+    # broker before each bounded rclone command, using a private same-directory file.
+    target = secret.parent / "rclone.conf"
+    temporary = secret.parent / (".rclone-" + os.urandom(8).hex())
+    with temporary.open("x", encoding="utf-8") as stream:
+        temporary.chmod(0o600)
+        stream.write(
+            f"[{remote}]\ntype = drive\nscope = drive\ntoken = "
+            + json.dumps(
+                {
+                    "access_token": token,
+                    "token_type": "Bearer",
+                    "expiry": expiry,
+                }
+            )
+            + "\n"
+        )
+    os.replace(temporary, target)
+    return target
+
+
 def cloud(args: list[str], plan: dict[str, Any], secret: Path, until: float) -> str:
     timeout = min(600, int(until - time.monotonic()))
     if timeout < 1:
         raise TimeoutError("P10_BACKUP_JOB_TIMEOUT")
+    broker = secret.name == "oauth-bridge.json"
+    if broker:
+        secret = bridge_config(secret, plan["remote_name"], until)
     command = [
         "rclone",
         *args,
@@ -223,6 +278,8 @@ def cloud(args: list[str], plan: dict[str, Any], secret: Path, until: float) -> 
     ]
     # Never inherit alternate remotes, credentials, TLS-disable or arbitrary flags.
     env = {"PATH": os.defpath, "HOME": "/tmp", "TMPDIR": os.environ.get("TMPDIR", "/tmp")}
+    if broker:
+        env.update(HTTP_PROXY="http://127.0.0.1:10800", HTTPS_PROXY="http://127.0.0.1:10800")
     with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
         result = subprocess.run(
             command, env=env, stdout=stdout, stderr=stderr, timeout=timeout, check=False
@@ -394,7 +451,10 @@ def main() -> None:
     verify_bundle(root, revision)
     if json.loads(args.selection.read_bytes()).get("code_revision") != revision:
         raise ValueError("P10_BACKUP_IMAGE_SELECTION_REVISION_DIFFERS")
-    result = backup(args.selection, Path("/run/backup"), Path("/run/secrets/gdrive/rclone.conf"))
+    secret = Path("/run/secrets/gdrive/oauth-bridge.json")
+    if not secret.exists():
+        secret = secret.with_name("rclone.conf")
+    result = backup(args.selection, Path("/run/backup"), secret)
     print(json.dumps(result, sort_keys=True))
 
 

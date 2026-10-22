@@ -2,9 +2,9 @@
 
 Work item: [P10-DATA-OPS-016 / #537](https://github.com/rv198-star/Quanthus/issues/537).
 Governing design: [LLD 12](../design/lld/12-permanent-data-line.md).
-Design status: approved by Owner 2026-10-22. An immutable image has been built and
-tested; the complete production switch remains blocked by live delivery/Weekly
-wiring. Current host timers remain in service. Image tests alone do not close it.
+Design and production switch authorized by Owner 2026-10-22. The active image,
+timer switch and natural-run outcome are recorded in the deployment receipt and
+work item; image tests alone do not establish natural-run acceptance.
 
 ## Boundary
 
@@ -157,9 +157,17 @@ reuse requires an explicit new plan/disposition, not output overwrite.
 `api_key`, `sender` and `recipients`, mounted read-only into data/delivery roles.
 No secret values go in Compose environment, code, logs, plans or image layers.
 `QUANTHUS_GDRIVE_CONFIG_ROOT` names an existing private directory containing
-`rclone.conf`; only backup receives it. That directory may be written for token
-refresh, not mounted as an immutable single file. No new authorization, credential
-copy or live API call was performed by the engineering tests.
+`rclone.conf` or the existing `oauth-bridge.json`; only backup receives it. That
+directory may be written for token refresh, not mounted as an immutable single file.
+The bridge uses the already authorized Duplicati HTTPS refresh endpoint and writes
+a short-lived, mode-0600 rclone token file before each bounded transport command.
+It never invents an OAuth refresh token or client identity. Transport alone uses
+host networking to reach the existing loopback proxy on port 10800, with verified
+TLS, no listening ports, no capabilities and no Docker socket. Data roles keep
+their ordinary network namespace. Failed direct job-local mail is retried through
+this transport role; neither failure recollects data. The existing Hermes notification API settings may be provisioned privately under
+the Owner-approved migration. Keep original settings unchanged and exclude every
+secret value from images, plans, logs and handoffs.
 
 ## Fixed scratch and conservative cleanup
 
@@ -324,3 +332,40 @@ and actual resource/space measurements. All tests must use disposable
 synthetic data or separately approved isolated inputs. Containerizing the current
 contract grants no new provider calls, research access, full Weekly admission or
 production consumer authority. Record unavailable checks explicitly in the handoff.
+
+## Production triggers and retained rollback
+
+Install the immutable release's `cn02-p10-container@.service.example` as
+`cn02-p10-container@.service`, plus the versioned Daily/recovery timers, delivery
+service/timer and cleaner service. Daily starts at 17:30 Shanghai and recovery at
+21:15. Quiesce and disable only the superseded host timers after verifying no
+active writer. Preserve their files, drop-ins, release, environment and config;
+record enabled/active states and full hashes before the switch. Do not enable both
+sets of data timers. Rollback stops the new timers and any active new writer,
+verifies date locks are free, stops the cleaner, then restores the recorded old
+timer state. Do not delete products or rewrite DATES during rollback.
+
+Both `OnSuccess` and `OnFailure` trigger the same-image delivery service. Its
+15-minute retry timer only drains existing small events and exact qualified date
+entries; it cannot collect or change data. Success, partial, closed, busy and
+failure all receive API mail, deduplicated against the durable event. A daemon
+outage leaves an unsent event and is retried when Docker returns. Preserve an
+already written terminal event even when the data container exits nonzero, so
+its idempotency identity is not replaced by a second host timestamp.
+
+The deployment's backup config is `kind=p10-base24-delivery-routing-v1`, with
+exact `code_revision`, accepted `base_manifest_sha256`, distinct approved ODS/DWD
+root folder IDs, `remote_name`, all five `notify_statuses` and explicit transport
+limits. `p10_delivery` freezes the matching DATES entry and its market/events,
+sealed native acquisition package and DWD product (or independently qualified
+core). Native acquisition backup retains the original raw observations together
+with adapter/grade evidence; this is not separate consumer admission. Frozen
+selections and transport failures are retained, and already verified byte copies
+are reused. No latest-directory guess, whole-Base upload, retired-2.3 selection
+or automatic formal-product deletion is permitted. A stale date/event manifest
+identity is rejected instead of silently selecting a newer revision.
+
+Weekly remains explicitly domain-qualified: the financial entry must have an
+exact qualified source/config/receipt plan; it cannot be scheduled with placeholder
+inputs or presented as refreshed complete Weekly. Unavailable Weekly sources
+block that scope and must not block an independently qualified Daily switch.

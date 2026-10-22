@@ -2,6 +2,8 @@
 Description=CN02 P10 container job %i through ODS/DWD verification and task-local API notification
 After=network-online.target docker.service
 Wants=network-online.target
+OnSuccess=cn02-p10-delivery.service
+OnFailure=cn02-p10-delivery.service
 
 [Service]
 Type=oneshot

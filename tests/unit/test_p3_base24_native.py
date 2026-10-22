@@ -17,6 +17,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from quanthus.expert_strategy import p3_base24_native as native
+from quanthus.expert_strategy import p3_base24_startup as startup
 
 TZ = ZoneInfo("Asia/Shanghai")
 CLOCK = datetime(2025, 1, 2, 15, tzinfo=TZ)
@@ -1513,3 +1514,130 @@ def test_completion_filter_cannot_hide_ambiguous_knowledge_versions(source, tmp_
         pytest.raises(native.InputError, match="AMBIGUOUS_ASOF_VERSION:" + table),
     ):
         list(view.market_batches(CLOCK))
+
+
+def startup_plan(source):
+    return {
+        "schema_version": startup.PLAN_SCHEMA,
+        "purpose": startup.PURPOSE,
+        "request_digest": native.REQUEST,
+        "source_manifest_sha256": sha(source / "manifest.json"),
+        "implementation_sha256": sha(Path(startup.__file__)),
+        "native_implementation_sha256": sha(Path(native.__file__)),
+        "scope": dict(native.SCOPE),
+        "input_clock_read_authorized": True,
+        "warmup_market_rows_read_authorized": False,
+        "strategy_execution_authorized": False,
+        "code_revision": "b" * 40,
+        "input_scope_id": "P3-BASE24-INPUT-synthetic-clock-assessment",
+        "authority_reference": "synthetic-only-input-clock-assessment",
+        "wall_seconds": 60,
+    }
+
+
+def clock_assessment(source, tmp_path, plan=None):
+    temp = tmp_path / "clock-temp"
+    temp.mkdir(exist_ok=True)
+    return startup.assess_source_clocks(
+        source,
+        manifest_sha256=sha(source / "manifest.json"),
+        plan=startup_plan(source) if plan is None else plan,
+        temp_parent=temp,
+    )
+
+
+def test_startup_clock_census_never_grants_historical_use(source, tmp_path):
+    before = {p: sha(p) for p in source.rglob("*") if p.is_file()}
+    result = clock_assessment(source, tmp_path)
+    assert result["native_file_hashes_verified"] == 16
+    assert result["tables"]["dwd_security_bar"]["visible_at_business_close"] == 1
+    assert result["warmup_metadata"]["common_open_dates_from_visible_versions"] >= 60
+    assert result["warmup_metadata"]["exact_60_session_authority_established"] is False
+    assert result["price_or_outcome_columns_selected"] is False
+    assert result["retained_clock_census_is_economic_PIT_qualification"] is False
+    assert result["consumer_admission"] == "NOT_GRANTED"
+    assert result["B_accepted"] is result["D_activated"] is False
+    assert before == {p: sha(p) for p in source.rglob("*") if p.is_file()}
+    assert not list((tmp_path / "clock-temp").iterdir())
+
+
+@pytest.mark.parametrize("table", ["dwd_security_bar", "dwd_tradability_state"])
+def test_startup_clock_census_preserves_late_unknown_and_expired_versions(source, tmp_path, table):
+    def change(rows):
+        old = rows[0]
+        rows[:] = [
+            {**old, "knowledge_from": CLOCK},
+            {**old, "knowledge_from": CLOCK + timedelta(microseconds=1)},
+            {**old, "knowledge_from": None},
+            {**old, "knowledge_from": EARLY, "knowledge_to": CLOCK},
+            # These may not enter the census by a UTC/Shanghai date error or a
+            # convenient unqualified pre-2025 warmup selection.
+            {**old, "observation_start": datetime(2024, 12, 31, 23, 59, tzinfo=TZ)},
+            {**old, "observation_start": datetime(2026, 9, 19, 0, 0, tzinfo=TZ)},
+        ]
+
+    mutate(source, table, change)
+    result = clock_assessment(source, tmp_path)["tables"][table]
+    assert result["native_versions"] == 4
+    assert result["known_after_business_close"] == 1
+    assert result["unknown_knowledge"] == 1
+    assert result["expired_by_business_close"] == 1
+    assert result["visible_at_business_close"] == 1
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("purpose", "strategy_comparison"),
+        ("input_clock_read_authorized", False),
+        ("input_clock_read_authorized", 1),
+        ("warmup_market_rows_read_authorized", True),
+        ("strategy_execution_authorized", True),
+        ("request_digest", SHA),
+        ("implementation_sha256", SHA),
+        ("native_implementation_sha256", SHA),
+        ("authority_reference", ""),
+        ("wall_seconds", 0),
+    ],
+)
+def test_startup_rejects_scope_or_authority_drift_before_payload(
+    source,
+    tmp_path,
+    monkeypatch,
+    field,
+    value,
+):
+    plan = startup_plan(source)
+    plan[field] = value
+
+    def denied(*args, **kwargs):
+        pytest.fail("invalid plan must fail before source metadata or payload access")
+
+    monkeypatch.setattr(native, "source_metadata", denied)
+    with pytest.raises(native.InputError, match="STARTUP_CLOCK_"):
+        clock_assessment(source, tmp_path, plan)
+
+
+def test_startup_refuses_changed_payload_before_querying(source, tmp_path, monkeypatch):
+    plan = startup_plan(source)
+    with (source / "native/dwd_security_bar.parquet").open("ab") as stream:
+        stream.write(b"synthetic corruption")
+
+    def denied(*args, **kwargs):
+        pytest.fail("corrupt source must fail before DuckDB open")
+
+    monkeypatch.setattr(native, "_connect", denied)
+    with pytest.raises(native.InputError, match="MEMBER_CHANGED_OR_INVALID"):
+        clock_assessment(source, tmp_path, plan)
+
+
+def test_startup_temp_cannot_contain_the_source(source, tmp_path):
+    before = {p: sha(p) for p in source.rglob("*") if p.is_file()}
+    with pytest.raises(native.InputError, match="STARTUP_TEMP_SOURCE_OVERLAP"):
+        startup.assess_source_clocks(
+            source,
+            manifest_sha256=sha(source / "manifest.json"),
+            plan=startup_plan(source),
+            temp_parent=tmp_path,
+        )
+    assert before == {p: sha(p) for p in source.rglob("*") if p.is_file()}

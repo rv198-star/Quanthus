@@ -85,6 +85,7 @@ cp "$REPOSITORY_ROOT/src/quanthus/expert_evaluation/__init__.py" \
     "$BUILD_CONTEXT/src/quanthus/expert_evaluation/"
 cp "$REPOSITORY_ROOT/src/quanthus/forward_validation/__init__.py" \
     "$REPOSITORY_ROOT/src/quanthus/forward_validation/activation.py" \
+    "$REPOSITORY_ROOT/src/quanthus/forward_validation/base24_contract.py" \
     "$REPOSITORY_ROOT/src/quanthus/forward_validation/contracts.py" \
     "$REPOSITORY_ROOT/src/quanthus/forward_validation/serialization.py" \
     "$REPOSITORY_ROOT/src/quanthus/forward_validation/product_view.py" \

@@ -1,0 +1,26 @@
+{
+  "schema_version": "quanthus.p6-base24-cycle-runtime.v1",
+  "work_item": "P6-R1",
+  "state": "PRE_ACTIVATION",
+  "frozen_policy_reference": {
+    "path": "config/forward-validation/activation/p6-prospective-runtime.v1.json",
+    "sha256": "sha256:b8935da7f639d67632de3aef66be50082b59dc3a1d0281f694ea121954d919ce"
+  },
+  "qualified_daily": {
+    "root_env": "QUANTHUS_P6_BASE24_DAILY_ROOT",
+    "default_root": "/data/p6-base24-daily",
+    "schema_version": "quanthus.p6-base24-qualified-daily.v1",
+    "legacy_equivalence": false
+  },
+  "clock_version": "quanthus.p6-after-close-decision-clock.v1",
+  "source_scope": "qualified_action_free_window_with_per_listing_holds",
+  "first_official_session": "strictly_after_new_activation_market_date",
+  "authority": {
+    "official_execution_authorized": false,
+    "paper_only": true,
+    "notification_authorized": false,
+    "broker_authorized": false,
+    "live_capital_authorized": false,
+    "protected_historical_partitions_authorized": false
+  }
+}

@@ -4,9 +4,9 @@
 | --- | --- |
 | Design status | approved |
 | Delivery gate | not-applicable |
-| Current phase | P6 implementation open; P5 optional research deferred |
-| Version | 0.6 |
-| Effective date | 2026-08-26 |
+| Current phase | P6 closed under Owner historical scope; P5 optional research deferred |
+| Version | 0.7 |
+| Effective date | 2026-10-23 |
 | Product type | Internal research and trading decision system |
 | Market | China A-shares, SSE and SZSE |
 | Governing gate | `config/p3-gates.v1.json` |
@@ -156,7 +156,7 @@ One person may hold several roles, but the artifacts and gates remain separate.
 | P3 | Rule-only vertical slice | Multi-year replay survives and every decision is auditable |
 | P4 | Event library and three-class dataset | Three leading differentiators are reproducible |
 | P5 | Optional research scoring layer | Model beats frozen baseline without regime collapse |
-| P6 | Prospective Shadow and fixed-unit paper operation | Frozen behavior accumulates a predeclared, time-matured evidence budget; no notification or live-fill claims |
+| P6 | Completed historical-mechanism and paper-flow validation | Owner scope closeout 2026-10-23; future prospective budget cancelled, not accepted; no production or P7 authority |
 | P7 | Operator-assisted small-capital operation | Every advice reconciles to reported fills, modified/partial action, or no action |
 
 ## 9. Data and validation partitions
@@ -207,12 +207,14 @@ and material-loss attribution before results. `P6-GOV-002` then admitted the exi
 P6 job kind and passed disabled-state sealing/recovery/fencing with zero prospective side effects.
 `P6-PAPER-001` subsequently accepted the isolated five-unit fixed-notional P2 paper lane without
 actual execution authority. `P6-WEB-001` then accepted the read-only Forward/Paper candidate-detail
-projection with no activation or mutation controls. Production activation is now enabled under
-`P6-ACTIVATE-001`, while official prospective collection remains `0 / 66` until the first legal
-post-activation READY trading-session release; the frozen gate still requires that first official
-cycle and independent reproduction before the work item closes. `P6-REVIEW-001` already exists as
-GitHub #120 and waits for the closed real-calendar budget. P5 model research is optional, deferred,
-and not a P6 dependency. Official prospective evidence begins only
+projection with no activation or mutation controls. The older activation and `0 / 66`
+collection checkpoint remain historical evidence. On 2026-10-23 the Owner
+[closed P6 under the accepted historical-mechanism scope](../acceptance/p6-owner-scope-closeout-20261023.md).
+P6-ACTIVATE-001 and P6-REVIEW-001 / #120 are cancelled, not accepted; the future
+66-session collection and 20-session tail are no longer current work. The CN02
+controller remains disabled. No strict PIT, economic, production or P7 authority
+is inferred. P5 model research is optional, deferred, and not a P6 dependency.
+In any separately authorized future programme, official prospective evidence begins only
 after a separate immutable activation decision and cannot be
 backfilled from earlier 2026 history. The next executable work is listed in
 `docs/work-items/index.md`. The approved

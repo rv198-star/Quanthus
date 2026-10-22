@@ -1,0 +1,31 @@
+{
+  "schema_version": "quanthus.p6-fixed-snapshot-replay.v1",
+  "work_item": "P6-HISTORY-001",
+  "mode": "fixed_snapshot_mechanism_replay",
+  "window_plan": {
+    "path": "config/forward-validation/runtime/p6-historical-replay-plan.v1.json",
+    "sha256": "sha256:0adb809eac537f768af21b5013b304df281311bd07d460c73e97927dbd01362b"
+  },
+  "source_scope": "retained_2026_action_free_concentration_cohort",
+  "cohort_is_hindsight_engineering_fixture": true,
+  "original_times": "retain_native_columns_unknown_stays_unknown",
+  "knowledge_clock": "actual_frozen_run_intake_not_historical_close",
+  "simulation_clock": "regular_shanghai_close_to_next_open",
+  "entry_and_execution_gates": "unchanged_policies_and_per_date_p10_qualification",
+  "shared_tmp": ["physical_history", "feature_panel", "candidate_scan", "frame_reader"],
+  "slice_ledger_reset": false,
+  "claims": {
+    "mechanism_test": true,
+    "historical_pit": false,
+    "economic_validation": false,
+    "official_prospective_observation": false,
+    "production_admission": false
+  },
+  "authority": {
+    "old_ledger_write": false,
+    "notification": false,
+    "broker": false,
+    "live_capital": false,
+    "protected_partitions": false
+  }
+}

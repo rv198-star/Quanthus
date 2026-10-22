@@ -17,9 +17,12 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-from quanthus.forward_validation.activation import P6ProspectiveRuntimeConfig
 from quanthus.forward_validation.contracts import fail
-from quanthus.forward_validation.official_cycle import OfficialCycleJobInput, run_official_cycle
+from quanthus.forward_validation.official_cycle import (
+    OfficialCycleJobInput,
+    P6Runtime,
+    run_official_cycle,
+)
 from quanthus.forward_validation.runner import verify_forward_run
 from quanthus.forward_validation.serialization import canonical_json_bytes
 from quanthus.platform.jobs import input_digest
@@ -187,7 +190,7 @@ def find_official_reproduction_for_input(
 def run_official_reproduction(
     *,
     job_input: OfficialCycleReproductionJobInput,
-    runtime: P6ProspectiveRuntimeConfig,
+    runtime: P6Runtime,
     staging: Path,
     primary_run_root: Path,
     reproduction_root: Path,

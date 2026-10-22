@@ -16,6 +16,9 @@ P6 on the migrated node is tracked in
 [P6-R1 / P6-HISTORY-001](p6-cn02-start.md). The current Owner direction is
 historical replay with fixed time slices. The recovered database, disabled
 rehearsal and deferred official prospective activation are separate gates.
+The fixed-snapshot mechanism run, fresh independent reproduction and read-only
+semantic review now have [bounded engineering acceptance](../acceptance/p6-fixed-snapshot-mechanism-20261022.md).
+They add zero official prospective observations and do not accept P6-REVIEW-001.
 
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
@@ -522,9 +525,13 @@ P6 runtime closeout on 2026-09-19 is recorded in
 `docs/acceptance/p6-activate001-production-activation-status-20260919.md`. The independent closeout
 review and repair are recorded append-only in
 `docs/acceptance/p6-activate001-closeout-repair-20260919.md`. Production activation is enabled and
-official collection is `0 / 66`; `P6-ACTIVATE-001` remains open only because its frozen acceptance
+official collection was `0 / 66`; `P6-ACTIVATE-001` remains open because its frozen acceptance
 requires the first legal post-activation official cycle plus independent reproduction.
 `P6-REVIEW-001` already exists as GitHub #120 and must not be duplicated.
+That activation statement describes the archived old-node checkpoint. The current
+CN02 recovery route above keeps the local controller disabled pending its own
+deployment/source/activation and single-writer evidence. Do not infer current
+production state or a repaired historical PIT source from old planning rows.
 
 | P7-LIVE-001 | Define email-advice and actual-operation reporting boundary; defer broker adapter | P7 | blocked by P6 review |
 | P7-RECON-001 | Reconcile advice with operator-reported fills, changes, or no action | P7 | blocked by P7-LIVE-001 |

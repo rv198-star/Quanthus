@@ -10,6 +10,17 @@
 
 ## Current recovery checkpoint
 
+The fixed-snapshot mechanism run and fresh independent reproduction are now
+complete. [Accepted engineering evidence](../acceptance/p6-fixed-snapshot-mechanism-20261022.md)
+records the exact producer revision, scope, safe handoff and verification limits.
+Do not rerun the unchanged history/feature/replay closure as new progress.
+The read-only `forward_validation/review.py` semantic review also passes over
+the retained artifacts without rerunning the strategy. It grants no original
+official budget credit or production authority. Continue from the concrete
+production-readiness packet in the successor handoff, not by rerunning this
+closure. Reconcile older GitHub PENDING records with current evidence without
+closing unfinished gates.
+
 **Current routing is historical replay.** After the initial startup report,
 the Owner corrected the prospective-only direction and explicitly chose
 existing historical data, then approved fixing the time slices and proceeding.

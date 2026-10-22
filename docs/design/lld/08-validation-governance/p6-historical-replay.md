@@ -4,7 +4,7 @@
 | --- | --- |
 | Parent | [Validation governance](../08-validation-governance.md) |
 | Design status | approved direction: Owner explicitly chose historical replay on 2026-10-22 |
-| Delivery gate | open for fixed-snapshot mechanism replay; strict historical PIT remains blocked |
+| Delivery gate | fixed-snapshot mechanism replay accepted for engineering; strict historical PIT remains blocked |
 | Work item | P6-HISTORY-001; routing in [P6 CN02 work item](../../../work-items/p6-cn02-start.md) |
 | Frozen plans | `config/forward-validation/runtime/p6-historical-replay-plan.v1.json`; successor `p6-fixed-snapshot-replay.v1.json` in that directory |
 | Code and tests | `forward_validation/historical_admission.py`, `snapshot_replay.py`; `test_p6_historical_admission.py`, `test_p6_snapshot_replay.py` |
@@ -100,6 +100,31 @@ does not seed the main run with a second exposure to results. Final replay
 must use a fresh isolated ledger and reproduce the smoke prefix deterministically.
 The target tail adds no new entries; retain unresolved positions/targets with
 their actual terminal disposition rather than force a final sale or invent a label.
+
+## Read-only mechanism review
+
+`forward_validation/review.py::review_snapshot_replay` consumes the exact sealed
+history, continuous primary run, shared smoke prerequisites and independently
+rebuilt run. The caller freezes all four manifest hashes before reading. The
+review never executes the strategy again, follows archived source paths or
+computes economic performance. It verifies exact physical inventories and
+member hashes, then processes one private cycle at a time.
+
+Recompute the ledger with the frozen paper policy and verify its continuous
+digest chain, event/decision/topology/governance bindings, both clocks,
+candidate/action/fill counts, zero official budget credit and absence of new
+candidates in the settlement tail. Recomputed values must agree with every
+primary, independent and smoke summary, even if a counterfeit's manifest and
+READY were fully regenerated. Compare independent physical files, smoke
+prefix, candidate stream and feature bytes. Disclose terminal and unresolved
+forecast counts; a short or unavailable tail never receives fabricated closure.
+
+The safe report may expose counts, reason codes, identities and reconciliation,
+but not prices, monetary ledger values, target labels or return/accuracy metrics.
+`VERIFIED` accepts this mechanism review only. It always grants zero official
+observation credit and cannot satisfy `P6-REVIEW-001` or switch production on.
+The bounded execution and independent evidence are recorded in
+[the mechanism acceptance](../../../acceptance/p6-fixed-snapshot-mechanism-20261022.md).
 
 ## Retained strict-PIT admission graph
 

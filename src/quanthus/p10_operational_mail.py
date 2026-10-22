@@ -103,12 +103,11 @@ def render_event(value: dict[str, Any]) -> tuple[str, str]:
         "busy": "已有任务占用运行资源；最终结果请查看运行记录。",
         "failed": "任务失败，尚未确认完整交付；具体原因请查看运行日志。",
     }
-    subject = f"【Quanthus】{value['market_date']} {role}{status}"
-    if late:
-        subject += "（延迟）"
     test = value["reason"].startswith("ACCEPTANCE_")
+    label = status + ("·延迟" if late else "") + ("·测试" if test else "")
+    subject = f"【{label}】Quanthus {value['market_date']} {role}"
     if test:
-        subject = "[通道验收测试] " + subject
+        subject += "（通道验收测试）"
     observed = datetime.fromisoformat(value["observed_at"]).astimezone(ZoneInfo("Asia/Shanghai"))
     lines = [
         f"数据日期：{value['market_date']}",

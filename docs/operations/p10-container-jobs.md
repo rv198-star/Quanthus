@@ -27,7 +27,10 @@ mail. If Docker cannot start, the host retains an unsent failure event; an
 in-container sender cannot run during a daemon outage. Replay that event after
 Docker recovers. Strategy/forward-email transport remains outside this work.
 
-Operational subjects and bodies are Chinese summaries: market date, outcome,
+Operational subjects begin with the outcome, for example `【完成】` / `【失败】`
+or `【完成·延迟】`, before the project, market date and role so truncated previews
+retain the result. Acceptance tests also mark the leading result with `·测试`.
+Subjects and bodies are Chinese summaries: market date, outcome,
 qualified/held scope and the event clock in Asia/Shanghai. Explicit late recovery
 retains its missed-deadline label. A generic failure event cannot establish the
 underlying cause; refer to its run log rather than inventing a diagnosis. GDrive

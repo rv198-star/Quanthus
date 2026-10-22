@@ -16,8 +16,9 @@ main is `f5b87dab454a719240d56944cb2243ed8765113f`, with common ancestor
 main; importing that entire history would include unrelated collector and
 operational changes. Select only the P6 dependency closure and its tests/config.
 
-Preserve main's newer data-quality policies and Daily interfaces. Do not replace
-them with the older fork's versions. Existing worktrees, original commits, sealed
+Preserve main's newer data-quality policies and legacy Daily interfaces. Port
+only the explicit native-parent helpers required by the selected source readers;
+the main quality-digest implementation must remain identical. Existing worktrees, original commits, sealed
 inputs, acceptance receipts and ledgers remain unchanged. This is source-code
 integration, not production activation or a new warehouse publication.
 

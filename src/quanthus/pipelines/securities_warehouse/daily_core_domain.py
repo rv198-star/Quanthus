@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import os
 import shutil
@@ -15,6 +16,11 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from quanthus.pipelines.contracts import OdsReleaseError, verify_ods_release
+from quanthus.pipelines.securities_warehouse.base22_sources import (
+    SourceAssessmentError,
+    disjoint_output,
+    physical_path,
+)
 from quanthus.pipelines.securities_warehouse.base24_image import KIND as NATIVE_BASE24_KIND
 from quanthus.pipelines.securities_warehouse.daily_core_ods_catalog import (
     DAILY_CORE_PRODUCT_SCOPE,
@@ -27,6 +33,29 @@ from quanthus.pipelines.securities_warehouse.daily_domain import (
     DailyDomainBuildError,
     DailyDomainResult,
 )
+from quanthus.pipelines.securities_warehouse.native_base23_reader import (
+    KIND as NATIVE_BASE23_KIND,
+)
+from quanthus.pipelines.securities_warehouse.native_base23_reader import (
+    NativeBase23,
+    NativeBase23Error,
+    read_native_parent_references,
+    require_daily_core_parent_admission,
+    verify_native_prior_transition,
+)
+from quanthus.pipelines.securities_warehouse.native_base24_reader import (
+    read_native_parent_references as read_base24_parents,
+)
+from quanthus.pipelines.securities_warehouse.native_base24_reader import (
+    require_daily_core_governance,
+)
+
+# Shared with the focused SQL regression: unknown is never a normal ST observation.
+ST_BUY_SQL = "(o.tradestatus='1' AND coalesce(o.isST IN ('0','1'),false))"
+ST_REASON_SQL = """CASE WHEN o.tradestatus<>'1' THEN 'SOURCE_NOT_TRADABLE'
+    WHEN o.isST IS NULL OR o.isST NOT IN ('0','1') THEN 'ST_UNKNOWN'
+    WHEN o.isST='1' THEN 'ST_TRADABLE' ELSE 'NORMAL' END"""
+
 
 _TABLE_KEYS = {
     "dwd_trading_calendar": ("venue_id", "trade_date", "session_type"),
@@ -121,7 +150,13 @@ def _write_atomic(path: Path, value: object) -> None:
         raise
 
 
-def _base_files(base_root: Path, manifest: Mapping[str, Any], table: str) -> list[Path]:
+def _base_files(
+    base_root: Path,
+    manifest: Mapping[str, Any] | NativeBase23,
+    table: str,
+) -> list[Path]:
+    if isinstance(manifest, NativeBase23):
+        return manifest.files(table)
     result = []
     for raw in manifest.get("files", []):
         if not isinstance(raw, Mapping):
@@ -165,7 +200,8 @@ def _read_catalog(catalog_root: Path, release_root: Path) -> tuple[dict[str, Any
 
 def _artifact(selected: Mapping[str, Any], lane: str, name: str) -> tuple[Path, Any]:
     try:
-        return selected[lane]["artifacts"][name]
+        path, artifact = selected[lane]["artifacts"][name]
+        return Path(path), artifact
     except KeyError as exc:
         raise DailyDomainBuildError(f"required daily artifact is absent: {lane}/{name}") from exc
 
@@ -176,7 +212,43 @@ def _audit_non_output_daily_artifacts(
     """Account for recognized ODS-only inputs and fail closed on deferred non-empty inputs."""
 
     audited: list[dict[str, Any]] = []
+    scoped_exclusions = {}
+    for lane, value in selected.items():
+        quality = value["artifacts"].get("acquisition_quality")
+        if quality:
+            ledger = _object(quality[0])
+            policy_path = (
+                Path(__file__).resolve().parents[4]
+                / "config/pipelines/p10-acquisition-prevention.v1.json"
+            )
+            policy = _object(policy_path)
+            if ledger.get("policy_id") != policy["policy_id"] or ledger.get(
+                "policy_sha256"
+            ) != _sha256(policy_path):
+                raise DailyDomainBuildError("acquisition quality policy differs")
+            for entry in ledger["datasets"]:
+                if entry["dataset"] in policy["daily_core_excluded_domains"]:
+                    if (
+                        entry.get("current_refresh_proven") is not False
+                        or entry.get("watermark_advanced") is not False
+                    ):
+                        raise DailyDomainBuildError(
+                            "excluded source falsely claims current refresh"
+                        )
+                    scoped_exclusions[lane, entry["dataset"]] = entry
+                    audited.append(
+                        {
+                            "lane": lane,
+                            "artifact": entry["dataset"],
+                            "disposition": "unknown_source_excluded_from_daily_core",
+                            "reason": entry["reason_code"],
+                            "row_count": entry["projection_rows"],
+                            "blocked_uses": entry["blocked_uses"],
+                        }
+                    )
     for (lane, name), reason in sorted(_RECOGNIZED_ODS_ONLY_DAILY_ARTIFACTS.items()):
+        if (lane, name) in scoped_exclusions:
+            continue
         path, artifact = _artifact(selected, lane, name)
         row_count = int(parquet.ParquetFile(path).metadata.num_rows)
         audited.append(
@@ -191,6 +263,8 @@ def _audit_non_output_daily_artifacts(
         )
 
     for lane, name in _DEFERRED_DAILY_ARTIFACTS:
+        if (lane, name) in scoped_exclusions:
+            continue
         path, _artifact_contract = _artifact(selected, lane, name)
         row_count = int(parquet.ParquetFile(path).metadata.num_rows)
         if row_count:
@@ -199,6 +273,16 @@ def _audit_non_output_daily_artifacts(
                 f"({row_count} rows)"
             )
     return audited
+
+
+def _one(connection: Any, query: str, parameters: Sequence[Any] | None = None) -> tuple[Any, ...]:
+    cursor = (
+        connection.execute(query) if parameters is None else connection.execute(query, parameters)
+    )
+    row = cursor.fetchone()
+    if row is None:
+        raise DailyDomainBuildError("daily audit query returned no result")
+    return tuple(row)
 
 
 def _copy(connection: Any, query: str, output: Path) -> None:
@@ -225,8 +309,26 @@ def _path_relation(paths: Sequence[Path]) -> str:
     return "read_parquet([" + ",".join(_sql(str(path)) for path in paths) + "])"
 
 
-def _verify_base(base_root: Path, release_config: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def _verify_base(
+    base_root: Path,
+    release_config: Path,
+) -> tuple[dict[str, Any] | NativeBase23, dict[str, Any]]:
     manifest = _object(base_root / "manifest.json")
+    config = _object(release_config)
+    if manifest.get("kind") == NATIVE_BASE24_KIND:
+        try:
+            require_daily_core_governance(config)
+            native = read_base24_parents(base_root, config)
+        except NativeBase23Error as exc:
+            raise DailyDomainBuildError(str(exc)) from exc
+        return native, config
+    if manifest.get("kind") == NATIVE_BASE23_KIND:
+        try:
+            native = read_native_parent_references(base_root, config)
+            require_daily_core_parent_admission(config)
+        except NativeBase23Error as exc:
+            raise DailyDomainBuildError(str(exc)) from exc
+        return native, config
     manifest_sha = _sha256(base_root / "manifest.json")
     try:
         ready = (base_root / "READY").read_text(encoding="ascii").strip()
@@ -315,6 +417,13 @@ def _verify_daily_core_calendar_continuity(
         cursor += timedelta(days=1)
 
 
+def _reuse_base24_output(output: Path, identity: Mapping[str, Any]) -> DailyDomainResult:
+    result = verify_daily_domain_increment(output)
+    if _object(output / "manifest.json").get("job_identity") != dict(identity):
+        raise DailyDomainBuildError("existing Base 2.4 Daily job identity differs")
+    return result
+
+
 def build_daily_domain_increment(
     *,
     catalog_root: Path,
@@ -327,27 +436,72 @@ def build_daily_domain_increment(
 ) -> DailyDomainResult:
     """Build and audit one Base-seeded daily DWD package without mutating Base."""
 
+    requested_config = _object(release_config)
+    is_base24 = requested_config.get("layers", {}).get("dwd", {}).get("format") == "native_base24"
+    if is_base24:
+        try:
+            output = disjoint_output(output, [base_root, release_root, catalog_root])
+            physical_path(release_config)
+            if prior_pointer is not None:
+                physical_path(prior_pointer)
+        except SourceAssessmentError as exc:
+            raise DailyDomainBuildError(str(exc)) from exc
     output = output.resolve()
     release_root = release_root.resolve()
     base_root = base_root.resolve()
     for source_root, label in ((release_root, "ODS"), (base_root, "DWD Base")):
         if output == source_root or output.is_relative_to(source_root):
             raise DailyDomainBuildError(f"daily output must be outside the {label} root")
-    if output.exists():
+    if output.exists() and not is_base24:
+        if _object(output / "manifest.json").get("base", {}).get("kind") == NATIVE_BASE24_KIND:
+            raise DailyDomainBuildError("Base 2.4 Daily requires its explicit governance config")
         return verify_daily_domain_increment(output)
     catalog, selected = _read_catalog(catalog_root.resolve(), release_root)
     market_date = date.fromisoformat(catalog["market_date"])
     base_manifest, config = _verify_base(base_root, release_config.resolve())
+    if (
+        isinstance(base_manifest, NativeBase23)
+        and catalog.get("product_scope") != DAILY_CORE_PRODUCT_SCOPE
+    ):
+        raise DailyDomainBuildError("native Base parent references require daily-core-v1")
     base_through = date.fromisoformat(str(config["through_date"]))
     covered_after, prior = _prior_binding(prior_pointer, market_date, base_through)
+    base_transition = None
+    if isinstance(base_manifest, NativeBase23) and prior is not None:
+        assert prior_pointer is not None
+        descriptor = _object(prior_pointer)
+        prior_path = _safe_path(prior_pointer.parent.resolve(), descriptor.get("manifest_path"))
+        verify_daily_domain_increment(prior_path.parent)
+        try:
+            base_transition = verify_native_prior_transition(
+                native=base_manifest,
+                config=config,
+                prior=_object(prior_path),
+                prior_sha256=prior["manifest_sha256"],
+            )
+        except NativeBase23Error as exc:
+            raise DailyDomainBuildError(str(exc)) from exc
     if market_date <= covered_after:
         raise DailyDomainBuildError("daily market_date does not advance Base or CURRENT")
     if len(code_revision) != 40 or any(ch not in "0123456789abcdef" for ch in code_revision):
         raise DailyDomainBuildError("code_revision must be a full lowercase Git revision")
+    job_identity = None
+    if is_base24:
+        assert isinstance(base_manifest, NativeBase23)
+        job_identity = {
+            "base": dict(base_manifest.binding),
+            "catalog": _sha256(catalog_root / "catalog.json"),
+            "code": code_revision,
+            "config": _sha256(release_config),
+            "prior": prior,
+        }
+        if output.exists():
+            return _reuse_base24_output(output, job_identity)
 
     try:
         import duckdb
-        import pyarrow.parquet as pq
+
+        pq = importlib.import_module("pyarrow.parquet")
     except ModuleNotFoundError as exc:
         raise DailyDomainBuildError(
             "duckdb and pyarrow are required for daily DWD construction"
@@ -407,6 +561,28 @@ def build_daily_domain_increment(
     connection.execute("SET preserve_insertion_order=true")
     connection.execute("SET memory_limit='2GB'")
     try:
+        universe_artifact = selected["market_daily_core"]["artifacts"].get("source_universe")
+        if universe_artifact:
+            from quanthus.pipelines.securities_warehouse.base23_identity_overlay import (
+                build_overlay,
+            )
+
+            master, master_artifact = _artifact(selected, "market_daily_core", "security_master")
+            overlay = build_overlay(
+                universe=_object(universe_artifact[0]),
+                master=master,
+                listings=[
+                    row for path in listing_files for row in pq.ParquetFile(path).read().to_pylist()
+                ],
+                venues=[
+                    row for path in venue_files for row in pq.ParquetFile(path).read().to_pylist()
+                ],
+                output=work,
+                source_sha256=str(master_artifact.sha256),
+            )
+            if "dwd_listing" in overlay:
+                listing_files = [*listing_files, overlay["dwd_listing"]]
+                security_files = [*security_files, overlay["dwd_security"]]
         connection.execute(
             f"CREATE VIEW base_listing AS SELECT * FROM {_path_relation(listing_files)}"
         )
@@ -540,9 +716,10 @@ def build_daily_domain_increment(
             connection,
             f"""SELECT {_lineage(status_path, status_artifact, "o")},
             c.observation_start, c.observation_end, l.listing_id, c.calendar_session_id,
-            o.tradestatus='1' is_tradable, o.tradestatus='1' can_buy, o.tradestatus='1' can_sell,
-            CASE WHEN o.tradestatus<>'1' THEN 'SOURCE_NOT_TRADABLE'
-                 WHEN o.isST='1' THEN 'ST_TRADABLE' ELSE 'NORMAL' END::VARCHAR reason_code,
+            o.tradestatus='1' is_tradable,
+            {ST_BUY_SQL} can_buy,
+            o.tradestatus='1' can_sell,
+            {ST_REASON_SQL}::VARCHAR reason_code,
             NULL::DECIMAL(38,10) upper_price, NULL::DECIMAL(38,10) lower_price,
             {_sql(catalog["catalog_digest"])}::VARCHAR input_revision_digest
             FROM ({status_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
@@ -560,6 +737,22 @@ def build_daily_domain_increment(
         WHERE CAST(announce_date AS DATE)>{_sql(covered_after.isoformat())}::DATE
           AND CAST(announce_date AS DATE)<={_sql(market_date.isoformat())}::DATE"""
         effective = "CAST(o.publish_time AS TIMESTAMP) AT TIME ZONE 'Asia/Shanghai'"
+        held_disclosure_count = 0
+        if universe_artifact:
+            identity_clause = """EXISTS (SELECT 1 FROM base_listing l JOIN base_security s ON s.security_id=l.security_id
+                WHERE o.stock_code=l.listing_code
+                AND CAST(o.announce_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+                AND (l.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))
+                AND CAST(o.announce_date AS DATE)>=CAST(s.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+                AND (s.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(s.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE)))"""
+            held_path = work / "quality/disclosure-unavailable.parquet"
+            _copy(
+                connection,
+                f"SELECT o.*, 'LISTING_NOT_EFFECTIVE_OR_IDENTITY_UNAVAILABLE'::VARCHAR reason_code FROM ({ann_source}) o WHERE NOT {identity_clause}",
+                held_path,
+            )
+            held_disclosure_count = pq.ParquetFile(held_path).metadata.num_rows
+            ann_source = f"SELECT o.* FROM ({ann_source}) o WHERE {identity_clause}"
         disclosure_output = (
             work
             / f"payload/disclosure_company_event/dwd_disclosure/market_date={market_date}/part-00000.parquet"
@@ -609,12 +802,13 @@ def build_daily_domain_increment(
         audit_tables = []
         for table, path in outputs.items():
             keys = ",".join(_TABLE_KEYS[table])
-            rows, distinct_rows, missing_lineage = connection.execute(
+            rows, distinct_rows, missing_lineage = _one(
+                connection,
                 f"""SELECT count(*), count(DISTINCT ({keys})), count(*) FILTER (WHERE
                 record_source IS NULL OR source_record_id IS NULL OR source_revision IS NULL OR
                 source_artifact_sha256 IS NULL OR knowledge_from IS NULL) FROM read_parquet(?)""",
                 [str(path)],
-            ).fetchone()
+            )
             if rows != distinct_rows or missing_lineage:
                 raise DailyDomainBuildError(f"{table} failed business-key or lineage audit")
             row_counts[table] = int(rows)
@@ -626,34 +820,34 @@ def build_daily_domain_increment(
                 }
             )
         expected = {
-            "dwd_trading_calendar": connection.execute(
+            "dwd_trading_calendar": _one(
+                connection,
                 "SELECT count(*) FROM read_parquet(?) WHERE trade_date=cast(? AS DATE)",
                 [str(trading_calendar_path), market_date.isoformat()],
-            ).fetchone()[0],
+            )[0],
             "dwd_security_bar": sum(
-                int(
-                    connection.execute(
-                        "SELECT count(*) FROM read_parquet(?)", [str(item[0])]
-                    ).fetchone()[0]
-                )
+                int(_one(connection, "SELECT count(*) FROM read_parquet(?)", [str(item[0])])[0])
                 for item in bar_sources
             ),
-            "dwd_security_valuation": connection.execute(
-                "SELECT count(*)*4 FROM read_parquet(?)", [str(valuation_path)]
-            ).fetchone()[0],
-            "dwd_index_bar": connection.execute(
-                "SELECT count(*) FROM read_parquet(?)", [str(index_path)]
-            ).fetchone()[0],
-            "dwd_tradability_state": connection.execute(
-                "SELECT count(*) FROM read_parquet(?)", [str(status_path)]
-            ).fetchone()[0],
-            "dwd_disclosure": connection.execute(
+            "dwd_security_valuation": _one(
+                connection, "SELECT count(*)*4 FROM read_parquet(?)", [str(valuation_path)]
+            )[0],
+            "dwd_index_bar": _one(
+                connection, "SELECT count(*) FROM read_parquet(?)", [str(index_path)]
+            )[0],
+            "dwd_tradability_state": _one(
+                connection, "SELECT count(*) FROM read_parquet(?)", [str(status_path)]
+            )[0],
+            "dwd_disclosure": _one(
+                connection,
                 """SELECT count(*) FROM read_parquet(?)
                 WHERE CAST(announce_date AS DATE)>CAST(? AS DATE)
                   AND CAST(announce_date AS DATE)<=CAST(? AS DATE)""",
                 [str(announcements_path), covered_after.isoformat(), market_date.isoformat()],
-            ).fetchone()[0],
+            )[0],
         }
+        full_disclosure_population = expected["dwd_disclosure"]
+        expected["dwd_disclosure"] -= held_disclosure_count
         expected["dwd_disclosure_subject"] = expected["dwd_disclosure"]
         for table, count in expected.items():
             if row_counts[table] != count:
@@ -668,10 +862,40 @@ def build_daily_domain_increment(
             "tables": audit_tables,
             "source_conservation": expected,
             "ods_only_artifacts": ods_only_artifacts,
+            "disclosure_population": full_disclosure_population,
+            "held_disclosures": held_disclosure_count,
+            "held_disclosure_disposition": "unavailable; affected disclosure use held; original source preserved",
+            "source_limitations": {
+                "st_unknown": _one(
+                    connection,
+                    "SELECT count(*) FROM read_parquet(?) WHERE isST IS NULL OR isST NOT IN ('0','1')",
+                    [str(status_path)],
+                )[0],
+                "valuation_null_fields": {
+                    field: _one(
+                        connection,
+                        f"SELECT count(*) FROM read_parquet(?) WHERE {field} IS NULL",
+                        [str(valuation_path)],
+                    )[0]
+                    for field in ("pe_ttm", "pb", "ps_ttm", "pcf_ttm")
+                },
+                "unknown_st_blocks_new_positions": True,
+                "st_product_admission_unchanged": True,
+            },
             "result": "accepted",
         }
         audit_path = work / "audit.json"
         _write_atomic(audit_path, audit)
+        acquisition_universe = None
+        universe_artifact = selected["market_daily_core"]["artifacts"].get("source_universe")
+        if universe_artifact:
+            acquisition_universe = _object(universe_artifact[0])
+            if (
+                acquisition_universe.get("market_date") != market_date.isoformat()
+                or acquisition_universe.get("policy_id") != "p10-acquisition-prevention-v1"
+            ):
+                raise DailyDomainBuildError("daily universe has wrong date/policy")
+            _write_atomic(work / "source-universe.json", acquisition_universe)
         files = []
         for path in sorted(item for item in work.rglob("*") if item.is_file()):
             files.append(
@@ -700,11 +924,15 @@ def build_daily_domain_increment(
             "code_revision": code_revision,
             "catalog_digest": catalog["catalog_digest"],
             "catalog_sha256": _sha256(catalog_root / "catalog.json"),
-            "base": {
-                "package_id": base_manifest["package_id"],
-                "manifest_sha256": _sha256(base_root / "manifest.json"),
-                "content_digest": base_manifest["content_digest"],
-            },
+            "base": (
+                dict(base_manifest.binding)
+                if isinstance(base_manifest, NativeBase23)
+                else {
+                    "package_id": base_manifest["package_id"],
+                    "manifest_sha256": _sha256(base_root / "manifest.json"),
+                    "content_digest": base_manifest["content_digest"],
+                }
+            ),
             "prior": prior,
             "selected_releases": {
                 name: {
@@ -717,6 +945,16 @@ def build_daily_domain_increment(
             "files": files,
             "content_digest": content_digest,
         }
+        if isinstance(base_manifest, NativeBase23):
+            manifest["base"] = dict(base_manifest.binding)
+            manifest["base_transition"] = base_transition
+        if job_identity is not None:
+            manifest["job_identity"] = job_identity
+            manifest["purpose"] = "isolated_daily_governance"
+            manifest["consumer_admission"] = "NOT_GRANTED"
+            manifest["execution_authorized"] = False
+        if acquisition_universe:
+            manifest["acquisition_universe"] = acquisition_universe
         if product_scope == DAILY_CORE_PRODUCT_SCOPE:
             manifest["product_scope"] = DAILY_CORE_PRODUCT_SCOPE
             manifest["quality_policy"] = "p10-business-value-warehouse-quality.v1"
@@ -746,8 +984,20 @@ def build_daily_domain_increment(
         _write_atomic(work / "manifest.json", manifest)
         _write_atomic(work / "READY", (_sha256(work / "manifest.json") + "\n").encode("ascii"))
         os.replace(work, output)
-    except BaseException:
-        shutil.rmtree(work, ignore_errors=True)
+    except BaseException as exc:
+        if is_base24:
+            (work / "READY").unlink(missing_ok=True)
+            _write_atomic(
+                work / "FAILURE.safe.json",
+                {
+                    "status": "FAILED_NOT_READY",
+                    "exception_type": type(exc).__name__,
+                    "job_identity": job_identity,
+                    "source_prices_exported": False,
+                },
+            )
+        else:
+            shutil.rmtree(work, ignore_errors=True)
         raise
     finally:
         connection.close()
@@ -757,7 +1007,7 @@ def build_daily_domain_increment(
 def _verify_daily_core_payload(root: Path, manifest: Mapping[str, Any]) -> None:
     """Require declared core tables and reject actual intraday payload."""
     try:
-        import pyarrow.parquet as pq
+        pq = importlib.import_module("pyarrow.parquet")
 
         counts = manifest.get("row_counts", {})
         if set(counts) != set(_TABLE_KEYS):

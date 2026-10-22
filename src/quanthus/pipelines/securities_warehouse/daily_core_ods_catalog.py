@@ -16,7 +16,9 @@ from quanthus.pipelines.contracts import (
     OdsVerificationResult,
     verify_ods_release,
 )
-from quanthus.pipelines.securities_warehouse.daily_ods_catalog import DailyOdsCatalogError
+from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (
+    DailyOdsCatalogError as DailyOdsCatalogError,
+)
 
 _LANES = {
     "market_daily_core": ("daily", "hermes-market-daily-core-"),
@@ -128,6 +130,7 @@ def _prevention_admits(
         and universe.get("market_date") == market_date.isoformat()
         and quality.get("policy_id") == "p10-acquisition-prevention-v1"
     )
+
 
 def _check_bound_prevention_sources(root: Path, output: Path, market_date: date) -> None:
     if os.environ.get("HERMES_ODS_PREVENTION_POLICY") != "p10-acquisition-prevention-v1":

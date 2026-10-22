@@ -78,6 +78,35 @@ source network, no official controller, no notification, broker or live capital.
 Starting it does not silently authorize missing gates. Public API/Web migration,
 P3/P5, training and old-node shutdown are outside this startup.
 
+## Successor admission control
+
+The existing Worker dispatches the new runtime explicitly to
+`forward_validation/base24_controller.py`; the old runtime still uses its old
+controller. The successor never publishes an activation or inherits the old OCI
+mandate. It requires an independently prepared, enabled decision at
+`<run_root>/activation/base24-enabled.json`, binding the exact running revision
+and verified disabled rehearsal. Both the activation directory and qualified
+Daily root must be separate read-only mounts before admission is enabled.
+The activation must follow the single-writer reconciliation, readiness and
+rollback gates above; the mere existence of this file is not their acceptance.
+
+P10's successor pointer is `<qualified_daily_root>/CURRENT.json`, with exactly
+`schema_version=quanthus.p6-base24-current.v1`, `market_date`, `package_id`,
+`manifest_sha256` and `content_digest`. The package is at
+`packages/<market_date>/<package_id>`; its original actual visibility receipt is
+`receipts/<market_date>/<package_id>.json`, using the existing versioned receipt
+schema. Publication must record the actual READY/consumer observation instants.
+The controller does not synthesize a receipt from package creation time.
+
+Each new activation/date has one stable Job id. The first actual intake instant
+is frozen in that Job; repeated ticks reuse it, even after midnight. Changed
+source/receipt identities fail closed and failed/canceled cycles are not
+mechanically resubmitted. Historical Jobs from earlier activations remain intact
+and never become this activation's prior ledger. Another activation's active
+local Job blocks admission. The first successful cycle must independently
+reproduce before any subsequent admission. The fixed 66+20-session budget is
+unchanged. Official admission remains disabled until the external gates close.
+
 ## Checks
 
 `tests/unit/test_p6_base24_cycle.py` covers separate runtime binding, old-reader

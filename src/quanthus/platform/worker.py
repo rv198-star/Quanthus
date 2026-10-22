@@ -984,14 +984,31 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 if code_revision is None:
                     raise RuntimeError("P6 controller requires an exact runtime code revision")
-                controller_state = controller_tick(
-                    store,
-                    repository_root=Path("/app"),
-                    p6_forward_run_root=p6_forward_run_root,
-                    runtime_path=p6_runtime_path,
-                    mandate_path=mandate_path,
-                    code_revision=code_revision,
+                from quanthus.forward_validation.base24_cycle import (
+                    P6Base24CycleRuntime,
+                    load_cycle_runtime,
                 )
+
+                runtime = load_cycle_runtime(p6_runtime_path, root=Path("/app"))
+                if isinstance(runtime, P6Base24CycleRuntime):
+                    from quanthus.forward_validation.base24_controller import tick
+
+                    controller_state = tick(
+                        store,
+                        repository_root=Path("/app"),
+                        run_root=p6_forward_run_root,
+                        runtime_path=p6_runtime_path,
+                        code_revision=code_revision,
+                    )
+                else:
+                    controller_state = controller_tick(
+                        store,
+                        repository_root=Path("/app"),
+                        p6_forward_run_root=p6_forward_run_root,
+                        runtime_path=p6_runtime_path,
+                        mandate_path=mandate_path,
+                        code_revision=code_revision,
+                    )
                 print(
                     json.dumps(
                         {"event": "p6-controller", **controller_state},

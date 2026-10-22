@@ -1241,11 +1241,21 @@ class NativeView:
                 f"AND {alias}.effective_from<=b.observation_start "
                 f"AND ({alias}.effective_to IS NULL OR {alias}.effective_to>b.observation_start))"
             )
+        completed_states = queries["dwd_tradability_state"]
+        # Completion is an applicability filter, not a knowledge-version selector.
+        # Validate all visible versions of every consumed native key first.
+        for table in ("dwd_security_bar", "dwd_tradability_state"):
+            candidate = queries[table]
+            same_key = " AND ".join(f"all_versions.{key}=candidate.{key}" for key in KEYS[table])
+            queries[table] = (
+                f"SELECT all_versions.* FROM {table} all_versions WHERE EXISTS "
+                f"(SELECT 1 FROM ({candidate}) candidate WHERE {same_key})"
+            )
         for table, query in queries.items():
             _unambiguous(c, query, table, "AMBIGUOUS_ASOF_VERSION")
         c.execute(
             "CREATE OR REPLACE TEMP VIEW p3_market_states AS "
-            + queries["dwd_tradability_state"]
+            + completed_states
             + " QUALIFY row_number() OVER (PARTITION BY listing_id,calendar_session_id "
             "ORDER BY observation_start DESC)=1"
         )
@@ -1272,6 +1282,7 @@ class NativeView:
             "JOIN dwd_security s ON s.security_id=l.security_id "
             "JOIN dwd_trading_venue v ON v.venue_id=l.venue_id "
             "WHERE l.listing_id=b.listing_id AND c.calendar_session_id=b.calendar_session_id "
+            "AND s.instrument_type='A_SHARE' AND v.mic_code IN ('XSHE','XSHG') "
             "AND l.effective_from<=b.observation_start "
             "AND (l.effective_to IS NULL OR l.effective_to>b.observation_start) "
             "AND s.effective_from<=b.observation_start "

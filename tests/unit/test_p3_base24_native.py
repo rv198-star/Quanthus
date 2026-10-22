@@ -1251,7 +1251,16 @@ def test_conflicting_security_identifier_is_rejected_with_native_model_key(sourc
             native.verify(root, manifest_sha256=digest)
 
 
-def test_distinct_state_observations_retained_and_latest_completed_selected(source, tmp_path):
+@pytest.mark.parametrize("latest_pending", [False, True])
+def test_distinct_state_observations_retained_and_latest_completed_selected(
+    source, tmp_path, latest_pending
+):
+    if latest_pending:
+        mutate(
+            source,
+            "dwd_tradability_state",
+            lambda rows: rows[0].update(observation_end=CLOCK + timedelta(hours=1)),
+        )
     mutate(
         source,
         "dwd_tradability_state",
@@ -1267,7 +1276,8 @@ def test_distinct_state_observations_retained_and_latest_completed_selected(sour
     result = build(source, tmp_path / "out")
     assert result["semantic_summary"]["dwd_tradability_state"]["rows"] == 2
     with native.open_prepared(tmp_path / "out", manifest_sha256=result["manifest_sha256"]) as view:
-        assert next(view.market_batches(CLOCK)).to_pylist()[0]["can_buy"] is None
+        expected = True if latest_pending else None
+        assert next(view.market_batches(CLOCK)).to_pylist()[0]["can_buy"] is expected
         assert view.input_census(CLOCK)["tables"]["dwd_tradability_state"]["visible_versions"] == 2
 
 
@@ -1460,3 +1470,46 @@ def test_warmup_authority_must_be_frozen_before_payload_access(
             run_plan=plan,
         )
     assert not (tmp_path / ".out.job").exists()
+
+
+@pytest.mark.parametrize("field", ["instrument_type", "mic_code"])
+def test_unknown_market_scope_is_unavailable_not_an_empty_success(source, tmp_path, field):
+    if field == "instrument_type":
+        mutate(source, "dwd_security", lambda rows: rows[0].update(instrument_type=None))
+    else:
+
+        def change(rows):
+            old = next(row for row in rows if row["venue_id"] == "sz")
+            new = {**old, "effective_from": CLOCK.replace(month=1, day=1), "mic_code": None}
+            old["effective_to"] = new["effective_from"]
+            rows.append(new)
+
+        mutate(source, "dwd_trading_venue", change)
+    result = build(source, tmp_path / "out")
+    with (
+        native.open_prepared(tmp_path / "out", manifest_sha256=result["manifest_sha256"]) as view,
+        pytest.raises(native.InputError, match="ASOF_IDENTITY_UNAVAILABLE"),
+    ):
+        list(view.market_batches(CLOCK))
+
+
+@pytest.mark.parametrize("table", ["dwd_security_bar", "dwd_tradability_state"])
+def test_completion_filter_cannot_hide_ambiguous_knowledge_versions(source, tmp_path, table):
+    mutate(
+        source,
+        table,
+        lambda rows: rows.append(
+            {
+                **rows[0],
+                "knowledge_from": CLOCK - timedelta(hours=1),
+                "observation_end": CLOCK + timedelta(minutes=1),
+                "source_revision": "overlapping",
+            }
+        ),
+    )
+    result = build(source, tmp_path / "out")
+    with (
+        native.open_prepared(tmp_path / "out", manifest_sha256=result["manifest_sha256"]) as view,
+        pytest.raises(native.InputError, match="AMBIGUOUS_ASOF_VERSION:" + table),
+    ):
+        list(view.market_batches(CLOCK))

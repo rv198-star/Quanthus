@@ -30,18 +30,18 @@ from quanthus.pipelines.securities_warehouse.container_code import digest, verif
 POLICY = Path(__file__).resolve().parents[2] / "config/pipelines/base24-backup.v1.json"
 
 
-def physical(path: Path, *, directory: bool = False) -> os.stat_result:
+def physical(path: Path, *, directory: bool = False, source_links: bool = False) -> os.stat_result:
     info = path.lstat()
     if (
         path.resolve(strict=True) != path
         or not (stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode))
-        or (not directory and info.st_nlink != 1)
+        or (not directory and not source_links and info.st_nlink != 1)
     ):
         raise ValueError("P10_BACKUP_PHYSICAL_PATH_REQUIRED")
     return info
 
 
-def tree(root: Path) -> set[str]:
+def tree(root: Path, *, source_links: bool = False) -> set[str]:
     physical(root, directory=True)
 
     def failed(error: OSError) -> None:
@@ -53,7 +53,7 @@ def tree(root: Path) -> set[str]:
             physical(Path(base) / name, directory=True)
         for name in files:
             path = Path(base) / name
-            physical(path)
+            physical(path, source_links=source_links)
             found.add(path.relative_to(root).as_posix())
     return found
 
@@ -69,6 +69,20 @@ def relative(name: str) -> str:
     ):
         raise ValueError("P10_BACKUP_MEMBER_PATH_INVALID")
     return name
+
+
+def source_aliases(package: dict[str, Any]) -> bool:
+    value = package.get("read_only_source_links", False)
+    if type(value) is not bool or (
+        value
+        and (
+            package.get("layer") != "ODS"
+            or package.get("qualification_receipt") != "release.json"
+            or "READY" not in package.get("files", {})
+        )
+    ):
+        raise ValueError("P10_BACKUP_SOURCE_ALIAS_SCOPE_INVALID")
+    return value
 
 
 def selection(plan_path: Path, state: Path) -> tuple[dict[str, Any], str]:
@@ -124,15 +138,20 @@ def selection(plan_path: Path, state: Path) -> tuple[dict[str, Any], str]:
         root = Path(package["root"])
         physical(root, directory=True)
         protected.append(root)
+        aliases = source_aliases(package)
         files = package["files"]
-        if not isinstance(files, dict) or not files or tree(root) != set(files):
+        if (
+            not isinstance(files, dict)
+            or not files
+            or tree(root, source_links=aliases) != set(files)
+        ):
             raise ValueError("P10_BACKUP_EXACT_PACKAGE_SET_DIFFERS")
         for name, record in files.items():
             path = root / relative(name)
             if (
                 type(record["bytes"]) is not int
                 or record["bytes"] < 0
-                or physical(path).st_size != record["bytes"]
+                or physical(path, source_links=aliases).st_size != record["bytes"]
                 or not re.fullmatch(r"[0-9a-f]{64}", record["sha256"])
             ):
                 raise ValueError("P10_BACKUP_FROZEN_MEMBER_DIFFERS")
@@ -175,26 +194,34 @@ class _Reader:
 def pack(package: dict[str, Any], output: Path, until: float) -> None:
     """Read each source once while archiving; never persist an unverified archive."""
     root = Path(package["root"])
+    aliases = source_aliases(package)
     with output.open("xb") as target, tarfile.open(fileobj=target, mode="w|") as archive:
         for name, record in sorted(package["files"].items()):
             path = root / name
-            before = physical(path)
+            before = physical(path, source_links=aliases)
             info = tarfile.TarInfo(name)
             info.size, info.mode, info.mtime = before.st_size, 0o440, 0
             with path.open("rb") as stream:
                 reader = _Reader(stream, until)
                 archive.addfile(info, reader)
-            after = physical(path)
+            after = physical(path, source_links=aliases)
             if (
                 reader.sha.hexdigest() != record["sha256"]
                 or any(
                     getattr(before, k) != getattr(after, k)
-                    for k in ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")
+                    for k in (
+                        "st_dev",
+                        "st_ino",
+                        "st_size",
+                        "st_mtime_ns",
+                        "st_ctime_ns",
+                        "st_nlink",
+                    )
                 )
                 or after.st_size != record["bytes"]
             ):
                 raise ValueError("P10_BACKUP_SOURCE_CHANGED_DURING_PACK")
-    if tree(root) != set(package["files"]):
+    if tree(root, source_links=aliases) != set(package["files"]):
         raise ValueError("P10_BACKUP_SOURCE_SET_CHANGED_DURING_PACK")
 
 

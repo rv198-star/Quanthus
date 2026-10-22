@@ -31,6 +31,7 @@ def ready(tmp_path):
         p.mkdir()
         save(p / ("release.json" if n in {"market", "events"} else "manifest.json"), {"scope": n})
         (p / "data").write_bytes(b"synthetic " + n.encode())
+        (p / "READY").write_text("synthetic ready")
 
     def h(n):
         return "sha256:" + drive.digest(

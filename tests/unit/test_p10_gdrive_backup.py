@@ -342,3 +342,62 @@ def test_backup_or_mail_retry_launches_only_same_image_delivery_role(
     result = host.delivery_container(config, path if mail_retry else None)
     assert result["role"] == ("mail" if mail_retry else "backup")
     assert len(calls) == 1
+
+
+def test_explicit_sealed_ods_aliases_archive_independent_bytes_without_source_changes(
+    selected, fake_cloud, tmp_path
+):
+    plan, path, state, secret = selected
+    p = plan["packages"][0]
+    root = Path(p["root"])
+    alias = tmp_path / "original-provider-alias.bin"
+    alias.hardlink_to(root / "payload.bin")
+    (root / "READY").write_text("synthetic sealed input")
+    (root / "release.json").write_bytes((root / "qualification.json").read_bytes())
+    p.update(read_only_source_links=True, qualification_receipt="release.json")
+    for name in ["READY", "release.json"]:
+        p["files"][name] = {
+            "bytes": (root / name).stat().st_size,
+            "sha256": drive.digest(root / name),
+        }
+    write(path, plan)
+    before = alias.read_bytes(), alias.stat().st_ino, alias.stat().st_nlink
+    result = drive.backup(path, state, secret)
+    assert result["status"] == "cloud_bytes_verified"
+    assert before == (alias.read_bytes(), alias.stat().st_ino, alias.stat().st_nlink)
+    archive = next((state / drive.digest(path) / p["id"]).rglob("data.tar"))
+    with tarfile.open(archive) as tar:
+        assert all(m.isfile() and not m.islnk() and not m.issym() for m in tar.getmembers())
+        assert tar.extractfile("payload.bin").read() == before[0]
+
+
+def test_ods_alias_mutation_is_detected_and_never_uploaded(
+    selected, fake_cloud, tmp_path, monkeypatch
+):
+    plan, path, state, secret = selected
+    p = plan["packages"][0]
+    root = Path(p["root"])
+    alias = tmp_path / "original-provider-alias.bin"
+    alias.hardlink_to(root / "payload.bin")
+    for name in ["READY", "release.json"]:
+        (root / name).write_text("synthetic")
+        p["files"][name] = {
+            "bytes": (root / name).stat().st_size,
+            "sha256": drive.digest(root / name),
+        }
+    p.update(read_only_source_links=True, qualification_receipt="release.json")
+    write(path, plan)
+    original = drive._Reader.read
+    changed = []
+
+    def read(self, size=-1):
+        data = original(self, size)
+        if not changed:
+            alias.write_bytes(b"x" * alias.stat().st_size)
+            changed.append(True)
+        return data
+
+    monkeypatch.setattr(drive._Reader, "read", read)
+    with pytest.raises(ValueError, match="SOURCE_CHANGED"):
+        drive.backup(path, state, secret)
+    assert not fake_cloud[1]

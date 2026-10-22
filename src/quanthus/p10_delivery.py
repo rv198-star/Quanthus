@@ -36,7 +36,8 @@ def package(
     drive.physical(root, directory=True)
     if "sha256:" + digest(root / proof) != expected:
         raise ValueError("P10_DELIVERY_UPSTREAM_MANIFEST_CHANGED")
-    names = sorted(drive.tree(root))
+    aliases = layer == "ODS" and proof == "release.json"
+    names = sorted(drive.tree(root, source_links=aliases))
     if len(names) > 50000 or sum((root / name).stat().st_size for name in names) > remaining_bytes:
         raise ValueError("P10_DELIVERY_FREEZE_SOURCE_BUDGET")
     if time.monotonic() >= until:
@@ -53,6 +54,7 @@ def package(
         "root": str(root),
         "files": files,
         "qualification_receipt": proof,
+        "read_only_source_links": aliases,
         "qualification": "partial_scope" if partial else "qualified_scope",
         "limitations": ["Native 5m held; independently qualified daily core only"]
         if partial

@@ -395,3 +395,13 @@ Do not export unredacted `compose config`/`docker inspect` after provisioning.
 The checked-in examples contain placeholders only. An empty key is rejected and
 never silently falls back to another identity. Success/failure notification tests
 must name themselves as channel acceptance tests rather than today's data result.
+
+Existing ODS releases may retain read-only hardlink aliases to the original
+collector attempt. A frozen ODS selection can explicitly set
+`read_only_source_links=true` only for a `release.json`/READY-qualified package.
+The archiver rehashes every byte and compares inode, size, clocks and link count
+before/after reading; changing an alias fails closed. It writes only independent
+regular tar members, never new hardlinks or symlinks. Other source packages and
+all state/config files retain the strict single-link requirement. This handles
+existing source representation without making another full copy or weakening
+image/runtime independence.

@@ -38,10 +38,16 @@ def _statement(root: Path, table: str) -> str:
     return f"read_parquet({native._q(native._member(root, f'native/{table}.parquet'))})"
 
 
-def verify(root: Path, *, manifest_sha256: str, ready: bool = True) -> dict[str, Any]:
+def verify(
+    root: Path, *, manifest_sha256: str, ready: bool = True, deadline: float | None = None
+) -> dict[str, Any]:
     """Full offline input verification; never dereference archived source paths."""
     root = native.physical(root)
-    if native._sha(root / "manifest.json") != manifest_sha256:
+    deadline = min(
+        deadline if deadline is not None else time.monotonic() + 600, time.monotonic() + 600
+    )
+    native._deadline(deadline)
+    if native._sha(root / "manifest.json", deadline=deadline) != manifest_sha256:
         raise native.InputError("RETRO_MANIFEST_IDENTITY")
     if ready and native._member(root, "READY").read_text().strip() != manifest_sha256:
         raise native.InputError("RETRO_READY_IDENTITY")
@@ -60,7 +66,7 @@ def verify(root: Path, *, manifest_sha256: str, ready: bool = True) -> dict[str,
     if native._tree(root) != expected:
         raise native.InputError("RETRO_PHYSICAL_FILE_SET")
     for name, entry in sorted(m["files"].items()):
-        native._check_member(native._member(root, name), entry)
+        native._check_member(native._member(root, name), entry, deadline=deadline)
     plan = native._json(root / "plan.json")
     assessment = native._json(root / "source-assessment.json")
     if (
@@ -83,12 +89,13 @@ def verify(root: Path, *, manifest_sha256: str, ready: bool = True) -> dict[str,
     summary = {}
     with tempfile.TemporaryDirectory(prefix="p3-retro-cold-") as tmp:
         c = native._connect(root, Path(tmp))
-        timer = threading.Timer(600, c.interrupt)
+        timer = threading.Timer(max(0, deadline - time.monotonic()), c.interrupt)
         timer.daemon = True
         timer.start()
         try:
             schemas = native._schema(c)
             for table in native.KEYS:
+                native._deadline(deadline)
                 query = purpose.snapshot_query(table, cutoff)
                 native._unambiguous(c, query, table, "RETRO_AMBIGUOUS_VERSION")
                 c.execute(f"CREATE TEMP VIEW {table} AS SELECT * FROM raw_{table}")
@@ -134,6 +141,7 @@ def verify(root: Path, *, manifest_sha256: str, ready: bool = True) -> dict[str,
                 raise native.InputError("RETRO_DATE_VENUE_OR_WARMUP")
             if purpose.reference_counts(c) != assessment["tables"]["reference_defects"]:
                 raise native.InputError("RETRO_REFERENCE_CENSUS_DIFFERS")
+            native._deadline(deadline)
         finally:
             timer.cancel()
             timer.join()
@@ -213,7 +221,7 @@ def prepare(
         "max_output_bytes": MAX_OUTPUT,
         "wall_seconds": policy["budgets"]["wall_seconds"],
     }
-    staging.mkdir()
+    staging.mkdir(mode=0o700)
     (staging / "native").mkdir()
     (staging / "unavailable").mkdir()
     native._write(staging / "plan.json", plan)
@@ -273,12 +281,14 @@ def prepare(
     }
     native._write(staging / "manifest.json", manifest)
     sha = native._sha(staging / "manifest.json")
-    result = verify(staging, manifest_sha256=sha, ready=False)
+    result = verify(staging, manifest_sha256=sha, ready=False, deadline=deadline)
     for name in sorted(_physical_files() | {"manifest.json"}):
+        native._deadline(deadline)
         with (staging / name).open("rb") as f:
             os.fsync(f.fileno())
     for directory in (staging / "native", staging / "unavailable", staging):
         native._sync_directory(directory)
+    native._deadline(deadline)
     with (staging / "READY").open("x", encoding="utf-8") as f:
         f.write(sha + "\n")
         f.flush()

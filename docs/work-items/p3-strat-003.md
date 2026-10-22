@@ -127,6 +127,18 @@ activation. The original 4,173 factor-visibility policy stays unchanged. Continu
 [the purpose-specific disposition](p3-base24-goal-audit-and-plan-20261022.md#16-按用途收敛历史证据缺口),
 not by renaming the new artifact as strict-PIT input or retrying the spent B Job.
 
+**Actual bounded result, 2026-10-23:** the selected 16-file source closure was verified and
+one 232,280,216-byte physical retrospective input was sealed as manifest
+`sha256:6d680dc7685e40582439e99c0d1bf19637afc0bbfd28605bcbbdbc929c787735`.
+All 16 typed table comparisons matched their selected source rows without changing values
+or clocks. Two independent physical copies passed full offline verification in new processes
+with kernel filesystem/network isolation; missing-file and corrupt-byte disposable tests
+rejected access. Twenty-four archived price-limit listing references do not occur in the
+selected daily observations and are disclosed as unconsumed, not repaired. This closes the
+bounded physical-input work only: the new purpose still needs an explicit two-clock
+candidate/feature/execution integration and purpose-specific admission before any D results.
+Do not spend another source-recovery attempt on these same historical-clock gaps.
+
 **Prerequisite repair, 2026-10-23:** exact 60-session membership is now derived from the
 SSE/SZSE 2024 official notices (both declared 2023-12-26), reconciled against all 732 native
 2024 exchange/date metadata rows, and pinned to the native session identities for

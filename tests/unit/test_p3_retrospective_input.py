@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import time
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -100,6 +101,13 @@ def test_corrupt_input_fails_without_source_fallback(source, tmp_path):
     path.write_bytes(path.read_bytes() + b"damaged")
     with pytest.raises(native.InputError, match="MEMBER_CHANGED_OR_INVALID"):
         retro.verify(out, manifest_sha256=result["manifest_sha256"])
+
+
+def test_expired_whole_job_budget_cannot_start_another_verifier_window(source, tmp_path):
+    out = tmp_path / "out"
+    result = build(source, out, tmp_path)
+    with pytest.raises(native.InputError, match="WALL_BUDGET_EXCEEDED"):
+        retro.verify(out, manifest_sha256=result["manifest_sha256"], deadline=time.monotonic() - 1)
 
 
 @pytest.mark.parametrize(

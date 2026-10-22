@@ -199,3 +199,26 @@ Governed assets: `config/data-ownership.v1.json`, `scripts/sync_github_planning.
 `scripts/sync_p10_data_issues.py`, `tests/contract/test_p10_data_ownership.py`, root `AGENTS.md`
 and the work-item index. Verify selective/idempotent migration, preserved closed history,
 consumer separation and P10 planning. Green contracts or issue movement do not accept data.
+
+
+## Bounded dated-status evidence — P10-DATA-P6-BASE24-EXEC-001
+
+Issue #538's additive `securities_warehouse/base24_status_evidence.py` publishes
+`quanthus.p10-dated-status-evidence.v1` from exact retained ODS members. It embeds
+the original inventory, complete selected response bytes, exact security/date
+requests and actual source capture times. A source response's `fetched_at` or
+its preserved `acquired_at` is required; file time, build time and a synthetic
+next-day cutoff cannot substitute. Unknown, duplicate and inconsistent source
+identities fail closed. Equal-time status disagreement remains unavailable.
+The existing latest-visible-observation rule applies only to the same exact
+security/date; it never carries state into another date.
+
+One immutable observation set serves qualification and safe reporting. Independent
+offline verification recomputes the observations and dispositions from embedded
+originals, validates the exact physical inventory and fails on semantic tampering
+as well as damaged bytes. READY is last. Source files and old products are not
+modified. This product qualifies dated provider evidence only: canonical status
+conflicts, IPO rules, price bounds, P6 admission and historical PIT remain separate
+checks. It grants no execution authority. Tests live in
+`tests/unit/test_base24_status_evidence.py`; the bounded issue owns exact source
+selection, repair receipts and consumer handoff, without P6 ledger changes.

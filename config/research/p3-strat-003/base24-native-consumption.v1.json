@@ -1,0 +1,93 @@
+{
+  "schema_version": "quanthus.p3-base24-native-consumption.v1",
+  "request_digest": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde",
+  "scope": {
+    "decision_start": "2025-01-01",
+    "decision_end": "2026-09-17",
+    "execution_end": "2026-09-18",
+    "warmup_sessions": 60
+  },
+  "source_schema": "quanthus.base24-consumer-source-projection.v1",
+  "native_keys": {
+    "dwd_security": [
+      "security_id",
+      "effective_from"
+    ],
+    "dwd_listing": [
+      "listing_id",
+      "effective_from"
+    ],
+    "dwd_trading_venue": [
+      "venue_id",
+      "effective_from"
+    ],
+    "dwd_trading_calendar": [
+      "calendar_session_id"
+    ],
+    "dwd_security_bar": [
+      "listing_id",
+      "calendar_session_id"
+    ],
+    "dwd_tradability_state": [
+      "listing_id",
+      "calendar_session_id"
+    ],
+    "dwd_price_limit_regime": [
+      "price_limit_regime_id",
+      "effective_from"
+    ],
+    "dwd_listing_status_interval": [
+      "listing_status_id",
+      "effective_from"
+    ],
+    "dwd_security_identifier": [
+      "security_id",
+      "identifier_namespace",
+      "identifier_value",
+      "effective_from"
+    ],
+    "dwd_corporate_action": [
+      "corporate_action_id"
+    ],
+    "dwd_corporate_action_term": [
+      "corporate_action_term_id"
+    ],
+    "dwd_adjustment_factor": [
+      "adjustment_factor_id",
+      "effective_from"
+    ],
+    "dwd_quality_exception": [
+      "quality_exception_id"
+    ],
+    "dwd_company_industry_membership": [
+      "company_id",
+      "industry_node_id",
+      "effective_from"
+    ],
+    "dwd_industry_node": [
+      "industry_node_id",
+      "effective_from"
+    ],
+    "dwd_industry_scheme": [
+      "industry_scheme_id",
+      "effective_from"
+    ]
+  },
+  "knowledge_selection": "original_half_open_intervals; unknown_excluded; ambiguity_rejected",
+  "materialization": "one_job_local_native_closure; exact_values_and_versions; no_global_snapshot",
+  "warmup": "60_common_SSE_SZSE_open_dates_known_before_decision_start",
+  "disposition": "input_engineering_only; not_legacy_equivalence; not_B_or_D_admission",
+  "not_proven": [
+    "economic_PIT_qualification",
+    "P2_execution_equivalence",
+    "industry_admission",
+    "candidate_common_mask"
+  ],
+  "network": "no_acquisition; no_extension_install_or_autoload",
+  "runtime": {
+    "duckdb_threads": 2,
+    "duckdb_memory": "2GB",
+    "spill_limit": "1GB",
+    "arrow_batch_rows": 8192
+  }
+}

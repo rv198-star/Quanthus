@@ -1,0 +1,22 @@
+{
+  "schema_version": "quanthus.p3-base24-input-run-plan.v1",
+  "purpose": "input_qualification_only",
+  "new_input_scope_id": null,
+  "authority_reference": null,
+  "request_digest": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde",
+  "scope": {
+    "decision_start": "2025-01-01",
+    "decision_end": "2026-09-17",
+    "execution_end": "2026-09-18",
+    "warmup_sessions": 60
+  },
+  "source_manifest_sha256": "sha256:ec8adacf91b55062e4873ca6f18216fc4d41c1c6c6f59bc172255606a2f0a6dd",
+  "contract_digest": "sha256:d4efd5ec739e89557bdb98802d9469e303e5e92c97029dce5db56472cbcc05f4",
+  "implementation_sha256": null,
+  "code_revision": null,
+  "input_read_authorized": false,
+  "strategy_execution_authorized": false,
+  "max_output_bytes": 4294967296,
+  "wall_seconds": 3600,
+  "status": "inactive_example_not_a_new_B_attempt_or_D_activation"
+}

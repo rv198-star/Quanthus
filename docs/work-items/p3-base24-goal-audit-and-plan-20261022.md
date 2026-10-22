@@ -363,3 +363,108 @@ Owner 不需要参与逐文件读取、常规调试或机械验收；只有范�
   具体采用 `handoff.md`、`readiness.json`、`consumer-interface.v1.json`、
   `successor-source-binding.v1.json`、`evidence/missing-source-observation-impact.safe.json`。
   对这些文件的摘要复核不代表载荷或后续业务状态的重新验收。
+
+## 10. 2026-10-22 消费适配实现与运行方式
+
+Owner 在本次审计后明确要求落实代码并认真审计。本节记录此次**输入工程**交付；
+前面的完整研究排期仍是估计，不能作为脚本已运行的时长或 B/D 已获准的证据。
+
+实现入口为 [p3_base24_native.py](../../src/quanthus/expert_strategy/p3_base24_native.py)，
+契约为 [base24-native-consumption.v1.json](../../config/research/p3-strat-003/base24-native-consumption.v1.json)，
+回归为 [test_p3_base24_native.py](../../tests/unit/test_p3_base24_native.py)。
+这是独立于旧恢复程序的原生消费入口，没有复制整个 P10 交付分支或修改 P6 runtime。
+`docs-impact: none` 对已接受策略/执行行为：本入口未获研究消费准入，不改变原策略、
+缺失处置或发布接口。旧 LLD 已被冻结请求按 SHA 绑定，保持字节不变；新增未准入接口
+只在本工作记录及其新版本契约说明，不能通过改旧设计解除 B/D 门槛。
+
+### 已实现的依赖链
+
+`固定 metadata/运行单 → 核验 16 表来源 → 一次物化窗口内原生版本 → 语义核验 → READY → 离线核验/按时点读取`。
+它不生成 P4 candidate、P2 legacy bundle 或策略结果；这些不是可以用格式转换假定等价的输出。
+
+- `metadata` 只读取原 manifest、READY、native-closure；不打开 Parquet。
+- `prepare` 在任何写入前校验来源、输出及 sibling staging 的物理隔离和新运行单。
+  每表按 8192 行 Arrow 批次写 Parquet，保留全部选中列、Decimal 和原始时刻。
+  同一 Job 只有一个 native TMP，所有消费者使用它；不按变体再建四次。
+- 每表核对源文件 SHA、复制前后双向 `EXCEPT ALL`、行数、消费所需字段类型及全列 schema 摘要。
+  完成表有 checkpoint；相同输入、代码、契约、运行单和预算可复用，漂移拒绝。
+  没有 checkpoint 的半文件保留为失败证据，需新的唯一运行目录，不能覆盖猜测完成。
+- 精确固定 60 个共同 warmup 交易日；不能用起止区间顺带读额外的 2024 市场观察。
+  业务日期截至 2026-09-18，决策截止 09-17，knowledge 时间不会被倒填到 session close。
+- 冷验收仅使用包内原始元数据副本、完整文件清单/哈希和重算的 schema、行数、键、
+  日期/venue、引用与知识区间检查。原 source_root 只可作历史字符串，不再解引用。
+  `NativeView.market_batches(cutoff)` 根据原始半开知识区间选版本；unknown 不输出为已知，
+  重叠版本和当时不可用的必要身份直接报错，缺失 state 保留空值而不补可交易标记。
+- 输入包始终为 `consumer_admission=NOT_GRANTED`、`B_accepted=false`、`D_activated=false`；
+  旧 candidate loader 明确拒绝这个新 schema，不能当作 legacy 接口使用。
+
+### 自动执行、恢复与资源
+
+整个链没有模型/API 调用或逐文件审批。输入单和用途确定后，一次 CLI 调用即可连续完成
+输入物化与核验；出现已登记 checkpoint 可直接再次调用恢复。AI 的工作集中在规则实现、
+审计、首次接线及具体异常处理，不需要在每批之间“点下一步”。
+
+运行单绑定新 `P3-BASE24-INPUT-*` scope、授权记录、请求/来源/契约/实现摘要、Git SHA、
+写入和时间预算，包内保留原单与摘要。示例
+[base24-input-run-plan.example.v1.json](../../config/research/p3-strat-003/base24-input-run-plan.example.v1.json)
+默认未激活；不能把它的布尔值改成 true 当作来源资格或新 B 授权。
+
+DuckDB 限 2 线程、2 GB 内存、1 GB spill；默认输入示例最多写 4 GiB、每次 3600 秒。
+写前需预算输出加 1 GiB spill 与 1 GiB 安全余量；运行中检查输出大小、剩余空间和时限，
+SQL 到时中断。大型 Arrow 批次可能在下一检查前多写一批，失败文件不封存。
+这些是工程上限，不是对真实窗口已测得的资源需求或运行时保证；实际运行单仍需登记。
+查询 spill 在本 Job 的临时目录，完成或失败后关闭并清理；checkpoint/未完成成员保留。
+输入验收副本按合成测试独立复制，不能据此替代正式 D 的独立重建要求。
+
+运行方式（所有 JSON 输出仅含安全统计/原因码）：
+
+```bash
+PYTHONPATH=src python -m quanthus.expert_strategy.p3_base24_native metadata \
+  --root "$P3_SOURCE" --manifest-sha256 "$P3_SOURCE_SHA"
+
+# 只有新的精确 input-only 运行单已成立后执行；不复用旧 B attempt。
+PYTHONPATH=src python -m quanthus.expert_strategy.p3_base24_native prepare \
+  --root "$P3_SOURCE" --manifest-sha256 "$P3_SOURCE_SHA" \
+  --run-plan "$P3_INPUT_PLAN" --output "$P3_PREPARED"
+
+PYTHONPATH=src python -m quanthus.expert_strategy.p3_base24_native verify \
+  --root "$P3_PREPARED" --manifest-sha256 "$P3_PREPARED_SHA"
+
+PYTHONPATH=src python -m quanthus.expert_strategy.p3_base24_native census \
+  --root "$P3_PREPARED" --manifest-sha256 "$P3_PREPARED_SHA" \
+  --knowledge-cutoff "$P3_ADMITTED_CUTOFF"
+```
+
+`prepare` 非零退出后不会自动换来源、缩窗、重新采集或重启旧恢复流程。
+输入单/代码变更须使用新 Job；正常同身份 checkpoint 恢复不消费旧正式 B 尝试额度，
+也不会产生新的正式 B 额度。脚本完成物化仍不等于消费者接受输入。
+
+### 当前唯一缺口表（本次检查范围）
+
+本轮只重新核验已定位 projection 的元数据身份：manifest
+`sha256:ec8adacf91b55062e4873ca6f18216fc4d41c1c6c6f59bc172255606a2f0a6dd`，
+native 清单为 **1,010,740,231 bytes**，声明保留原生版本、legacy equivalence=false。
+这不是本轮 payload 全量核验。#412 仍 OPEN，更新时刻为 2026-10-03；本轮不查来源档案、
+不补采、不读真实价格、策略结果或重跑旧 B。
+
+| 缺口/影响步骤 | 本轮可复用成果 | 还需要什么 | 当前处置 |
+| --- | --- | --- | --- |
+| 历史知识资格：bar、factor、action、状态、身份/行业 | 原始时间与版本保持、as-of 选择、unknown/late 统计代码 | 覆盖冻结窗口且绑定实际来源的 P10 用途证据；物理采集时间不能替代经济可用时间 | 保持未准入，交 P10 资格职责；不自行推断 |
+| 新 B 精确输入范围与接续 | metadata 验证、已封存原生消费契约、inactive 运行单 | #412 明确新 scope/输入身份与准入记录；保留旧失败及已用尝试 | 暂缓真实 B，继续合成工程 |
+| P4 候选与共同缺失 mask、P2 执行消费 | 保留既有 runner、规则卡、合成回归；新包不能冒充旧 candidate | 在已资格字段语义上接通候选/执行消费并验证等价；当前 native reader 不是该完整桥接 | 未完成，不能以 16 表读取成功代替 |
+| D 主比较和独立复现 | 原四变体工程及冻结预算 | 新 B 接受、精确 D 激活、同身份主批次和独立重建 | NOT_RUN；无收益结论 |
+
+这里的缺口不是宣称 Base 2.4 数据损坏或全局无证据，而是本次 P3 消费尚未绑定相应资格。
+未满足资格前，不用已经声明较晚的快照批量生成无法接受的 candidate，也不据此延长脚本工期。
+原 17–28 小时包含尚未完成的接口/资格工程，不能解释为单纯等机器跑完。
+
+### 本轮审计覆盖
+
+新增回归覆盖原模型 schema、Decimal/上海时刻、后见修订、unknown/零/空/晚到、4173 类
+不可用记录保持、bar/state 日期与 venue、精确 warmup、来源变化、路径隔离、扫描失败、
+预算、checkpoint 复用和末尾封存恢复，以及完整重新封装后的契约/用途篡改。
+两次搬迁分别在新进程运行；合成来源已删除，环境/缓存隔离，libseccomp 在系统调用层
+禁止创建网络 socket 后扫描并比较摘要。破坏只发生在一次性合成文件，不是实际 Base 数据。
+这是本代理自审与测试，没有声称获得独立人员审查或真实 B/D 验收。
+精确命令、通过/失败/跳过、基线差异和 SHA256 放在新的只读交接目录，不能把旧 95 项
+回归结果当成新适配已通过。全仓检查如仍因冻结依赖版本不匹配失败，应保留该事实。

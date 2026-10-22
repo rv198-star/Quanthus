@@ -1,0 +1,34 @@
+{
+  "contract_id": "p10-base24-default-1d-native5m-v1",
+  "schema_version": 1,
+  "business_through": "2026-09-30",
+  "timezone": "Asia/Shanghai",
+  "required_frequencies": ["1d", "5m"],
+  "optional_1m": "NOT_INCLUDED",
+  "supplier_native_5m_required": true,
+  "derive_5m_from_1m": false,
+  "delete_retained_1m": false,
+  "legacy_reader_changed": false,
+  "excluded_seed_dataset_ids": [
+    "daily_intraday_1m_intraday_bars",
+    "daily_intraday_1m_intraday_coverage",
+    "daily_intraday_1m_intraday_meta",
+    "minute_1m_checkpoint",
+    "minute_1m_hotfix",
+    "minute_1m_research_archive",
+    "minute_1m_status"
+  ],
+  "excluded_increment_artifact_names": [
+    "intraday_1m_bars.parquet",
+    "intraday_1m_coverage.parquet",
+    "intraday_1m_meta.json"
+  ],
+  "preserved_shared_1m_lane_artifact_names": [
+    "acquisition_log.json",
+    "after_hours_fixed_price_trades.parquet",
+    "after_hours_fixed_price_trades.parquet.receipts.parquet",
+    "lane_status.json",
+    "ref_trading_calendar.parquet"
+  ],
+  "source_selection_is_admission": false
+}

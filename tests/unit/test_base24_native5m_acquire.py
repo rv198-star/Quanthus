@@ -1,0 +1,410 @@
+"""Checkpointed Base 2.4 acquisition seals only complete exact partitions."""
+
+import hashlib
+import json
+from datetime import datetime, timedelta
+from decimal import Decimal
+
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pytest
+
+from quanthus.pipelines.securities_warehouse.base24_native5m_acquire import (
+    Native5mAcquireError,
+    run_acquisition,
+)
+from quanthus.providers.native_5m_exact import SHANGHAI, ExactBar
+
+
+def _plan(windows=2):
+    rows = []
+    for index in range(windows):
+        code = f"sz.{index + 1:06d}"
+        start = "2020-01-02"
+        end = "2020-01-03"
+        import hashlib
+
+        identity = hashlib.sha256(f"SZSE\t{code[3:]}\t{start}\t{end}".encode()).hexdigest()
+        rows.append(
+            {
+                "partition_id": identity,
+                "code": code,
+                "venue": "SZSE",
+                "start_date": start,
+                "end_date": end,
+                "required_dates": ["2020-01-02", "2020-01-03"],
+                "expected_session_dates": ["2020-01-02", "2020-01-03"],
+                "required_security_days": 2,
+                "expected_source_days": 2,
+                "maximum_rows": 96,
+            }
+        )
+    return json.dumps(
+        {
+            "contract": "p10-base24-native5m-missing-window-plan-v1",
+            "business_through": "2026-09-30",
+            "frequency": "5",
+            "adjustflag": "3",
+            "source": "baostock.query_history_k_data_plus",
+            "required_security_days": windows * 2,
+            "missing_security_days": windows * 2,
+            "windows": rows,
+        },
+        sort_keys=True,
+    ).encode()
+
+
+def _bars(code):
+    values = ("1.00", "1.00", "1.00", "1.00", "0", "0.0")
+    rows = []
+    for day in (2, 3):
+        morning = datetime(2020, 1, day, 9, 35, tzinfo=SHANGHAI)
+        afternoon = datetime(2020, 1, day, 13, 5, tzinfo=SHANGHAI)
+        rows.extend(ExactBar(code, morning + timedelta(minutes=5 * i), values) for i in range(24))
+        rows.extend(ExactBar(code, afternoon + timedelta(minutes=5 * i), values) for i in range(24))
+    assert all(value.is_finite() for row in rows for value in row.values)
+    assert Decimal("0.0") in rows[0].values
+    return tuple(rows)
+
+
+def _selection(plan, indices, *, shard_id="node-a"):
+    value = json.loads(plan)
+    return json.dumps(
+        {
+            "contract": "p10-base24-native5m-selection-v1",
+            "parent_plan_sha256": hashlib.sha256(plan).hexdigest(),
+            "shard_id": shard_id,
+            "partition_ids": [value["windows"][index]["partition_id"] for index in indices],
+            "maximum_data_sends": len(indices) + 2,
+            "maximum_control_calls": 10,
+        },
+        sort_keys=True,
+    ).encode()
+
+
+def test_complete_partitions_seal_and_resume_without_fetch(tmp_path):
+    calls = []
+
+    def fetch(staging, request):
+        calls.append(request.code)
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(request.code.encode())
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 9}
+
+    plan = _plan()
+    first = run_acquisition(plan, tmp_path / "out", fetch, source_roots=(tmp_path / "source",))
+    assert first["completed"] == 2
+    assert first["reused"] == 0
+    assert len(calls) == 2
+    second = run_acquisition(
+        plan,
+        tmp_path / "out",
+        lambda *_: pytest.fail("completed partitions must be reused"),
+        source_roots=(tmp_path / "source",),
+    )
+    assert second["completed"] == 2
+    assert second["reused"] == 2
+    assert len(list((tmp_path / "out/partitions").glob("*/READY"))) == 2
+
+
+def test_selection_executes_only_frozen_partition_ids_and_resumes(tmp_path):
+    calls = []
+
+    def fetch(staging, request):
+        calls.append(request.code)
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(request.code.encode())
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 9}
+
+    plan = _plan(4)
+    selection = _selection(plan, [1, 3])
+    output = tmp_path / "out"
+    first = run_acquisition(
+        plan,
+        output,
+        fetch,
+        source_roots=(),
+        selection_bytes=selection,
+    )
+    assert calls == ["sz.000002", "sz.000004"]
+    assert first["plan_total"] == 4
+    assert first["total"] == 2
+    assert first["selection_sha256"] == hashlib.sha256(selection).hexdigest()
+    assert first["maximum_data_sends"] == 4
+    assert first["maximum_control_calls"] == 10
+    assert (output / "SELECTION.json").read_bytes() == selection
+    assert len(list((output / "partitions").glob("*/READY"))) == 2
+
+    second = run_acquisition(
+        plan,
+        output,
+        lambda *_: pytest.fail("selected completed partitions must be reused"),
+        source_roots=(),
+        selection_bytes=selection,
+    )
+    assert second["reused"] == 2
+
+
+@pytest.mark.parametrize("defect", ["parent", "unknown", "order", "changed-selection"])
+def test_invalid_or_changed_selection_fails_before_fetch_or_output_mutation(tmp_path, defect):
+    plan = _plan(3)
+    raw = json.loads(_selection(plan, [0, 2]))
+    output = tmp_path / "out"
+    marker = output / "keep"
+    if defect == "parent":
+        raw["parent_plan_sha256"] = "0" * 64
+    elif defect == "unknown":
+        raw["partition_ids"][1] = "f" * 64
+    elif defect == "order":
+        raw["partition_ids"].reverse()
+    else:
+        original = _selection(plan, [0], shard_id="node-a")
+        run_acquisition(
+            plan,
+            output,
+            lambda staging, request: (
+                _bars(request.code),
+                {"actual_requests": 0, "actual_bytes": 0},
+            ),
+            source_roots=(),
+            selection_bytes=original,
+        )
+        marker.write_text("unchanged")
+        raw = json.loads(_selection(plan, [2], shard_id="node-b"))
+    changed = json.dumps(raw, sort_keys=True).encode()
+    before = marker.read_bytes() if marker.exists() else None
+    with pytest.raises(Native5mAcquireError, match="SELECTION"):
+        run_acquisition(
+            plan,
+            output,
+            lambda *_: pytest.fail("invalid selection must fail before fetch"),
+            source_roots=(),
+            selection_bytes=changed,
+        )
+    if before is None:
+        assert not output.exists()
+    else:
+        assert marker.read_bytes() == before
+
+
+def test_failure_retained_without_ready_and_other_partition_continues(tmp_path):
+    def fetch(staging, request):
+        if request.code.endswith("000001"):
+            raise RuntimeError("bounded failure")
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(b"ok")
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 2}
+
+    result = run_acquisition(_plan(), tmp_path / "out", fetch, source_roots=())
+    assert result["completed"] == 1
+    assert result["failed"] == 1
+    assert len(list((tmp_path / "out/failures").glob("*/FAILURE.json"))) == 1
+    assert len(list((tmp_path / "out/partitions").glob("*/READY"))) == 1
+
+
+def test_failure_circuit_counts_only_consecutive_supplier_failures(tmp_path):
+    calls = []
+
+    def fetch(staging, request):
+        calls.append(request.code)
+        if request.code.endswith(("000001", "000003")):
+            raise RuntimeError("bounded failure")
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(b"ok")
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 2}
+
+    result = run_acquisition(
+        _plan(3),
+        tmp_path / "out",
+        fetch,
+        source_roots=(),
+        max_failures=2,
+    )
+    assert calls == ["sz.000001", "sz.000002", "sz.000003"]
+    assert result["failed"] == 2
+    assert result["completed"] == 1
+    assert result["failure_circuit"] == "consecutive"
+    assert result.get("stop_reason") is None
+
+
+def test_consecutive_supplier_failures_open_circuit(tmp_path):
+    calls = []
+
+    def fetch(*args):
+        calls.append(args[1].code)
+        raise RuntimeError("bounded failure")
+
+    result = run_acquisition(
+        _plan(3),
+        tmp_path / "out",
+        fetch,
+        source_roots=(),
+        max_failures=2,
+    )
+    assert calls == ["sz.000001", "sz.000002"]
+    assert result["failed"] == 2
+    assert result["stop_reason"] == "FAILURE_LIMIT"
+    assert result["consecutive_failures_at_stop"] == 2
+
+
+@pytest.mark.parametrize("defect,reason", [("partial", "BUCKET"), ("plan", "PARTITION")])
+def test_partial_day_or_changed_plan_fails_closed(tmp_path, defect, reason):
+    plan = json.loads(_plan(1))
+    if defect == "plan":
+        plan["windows"][0]["end_date"] = "2020-01-04"
+
+    def fetch(staging, request):
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(b"source")
+        return _bars(request.code)[:-1], {"actual_requests": 1, "actual_bytes": 6}
+
+    if defect == "plan":
+        with pytest.raises(Native5mAcquireError, match=reason):
+            run_acquisition(json.dumps(plan).encode(), tmp_path / "out", fetch, source_roots=())
+    else:
+        result = run_acquisition(
+            json.dumps(plan).encode(), tmp_path / "out", fetch, source_roots=()
+        )
+        assert result["failed"] == 1
+        failure = next((tmp_path / "out/failures").glob("*/FAILURE.json"))
+        assert reason in json.loads(failure.read_text())["reason_code"]
+
+
+def test_source_overlap_and_symlink_output_rejected_before_creation(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    before = list(source.iterdir())
+    with pytest.raises(Native5mAcquireError, match="OVERLAP"):
+        run_acquisition(_plan(1), source / "child", lambda *_: None, source_roots=(source,))
+    assert list(source.iterdir()) == before
+    target = tmp_path / "target"
+    target.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(target, target_is_directory=True)
+    with pytest.raises(Native5mAcquireError, match="SYMLINK"):
+        run_acquisition(_plan(1), link, lambda *_: None, source_roots=())
+
+
+def test_corrupt_sealed_partition_blocks_resume(tmp_path):
+    def fetch(staging, request):
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(b"ok")
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 2}
+
+    plan = _plan(1)
+    run_acquisition(plan, tmp_path / "out", fetch, source_roots=())
+    parquet = next((tmp_path / "out/partitions").glob("*/exact.parquet"))
+    with parquet.open("ab") as stream:
+        stream.write(b"corrupt")
+    with pytest.raises(Native5mAcquireError, match="SEALED_PARTITION_CHANGED"):
+        run_acquisition(plan, tmp_path / "out", fetch, source_roots=())
+
+
+def test_consistently_resealed_semantic_change_blocks_resume(tmp_path):
+    def fetch(staging, request):
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(b"ok")
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 2}
+
+    plan = _plan(1)
+    output = tmp_path / "out"
+    run_acquisition(plan, output, fetch, source_roots=())
+    partition = next((output / "partitions").iterdir())
+    parquet = partition / "exact.parquet"
+    table = pq.read_table(parquet)
+    changed = table.set_column(
+        table.schema.get_field_index("code"),
+        "code",
+        pa.array(["sz.999999"] * table.num_rows),
+    )
+    pq.write_table(changed, parquet, compression="zstd")
+    receipt_path = partition / "RECEIPT.json"
+    receipt = json.loads(receipt_path.read_text())
+    receipt["files"]["exact.parquet"] = hashlib.sha256(parquet.read_bytes()).hexdigest()
+    receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
+    (partition / "READY").write_text(hashlib.sha256(receipt_path.read_bytes()).hexdigest() + "\n")
+
+    with pytest.raises(Native5mAcquireError, match="SEALED_PARTITION_CHANGED"):
+        run_acquisition(plan, output, fetch, source_roots=())
+
+
+def test_bounded_pilot_reuses_same_full_plan_checkpoint(tmp_path):
+    calls = []
+
+    def fetch(staging, request):
+        calls.append(request.code)
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(b"ok")
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 2}
+
+    plan = _plan(2)
+    pilot = run_acquisition(plan, tmp_path / "out", fetch, source_roots=(), max_new_partitions=1)
+    assert pilot["status"] == "PARTIAL"
+    assert pilot["stop_reason"] == "NEW_PARTITION_LIMIT"
+    assert pilot["completed"] == pilot["actual_requests"] == 1
+    final = run_acquisition(plan, tmp_path / "out", fetch, source_roots=())
+    assert final["status"] == "COMPLETE"
+    assert final["reused"] == 1
+    assert final["actual_requests"] == 2
+
+
+def test_bounded_repeated_failure_is_held_and_other_windows_continue(tmp_path):
+    calls = []
+
+    def fetch(staging, request):
+        calls.append(request.code)
+        if request.code.endswith("000001"):
+            raise RuntimeError("bounded failure")
+        (staging / "wire").mkdir()
+        (staging / "wire/source.wire").write_bytes(b"ok")
+        return _bars(request.code), {"actual_requests": 1, "actual_bytes": 2}
+
+    output = tmp_path / "out"
+    result = run_acquisition(
+        _plan(),
+        output,
+        fetch,
+        source_roots=(),
+        max_failures=1,
+        max_attempts_per_partition=1,
+    )
+    assert result["status"] == "COMPLETE_WITH_HELD"
+    assert result["completed"] == 1
+    assert result["held"] == 1
+    assert (output / "READY").is_file()
+    held = next((output / "held").glob("*/HOLD.json"))
+    assert json.loads(held.read_text())["attempts"] == 1
+    resumed = run_acquisition(
+        _plan(),
+        output,
+        lambda *_: pytest.fail("terminal windows must be reused or held"),
+        source_roots=(),
+        max_attempts_per_partition=1,
+    )
+    assert resumed["status"] == "COMPLETE_WITH_HELD"
+    assert resumed["held"] == 1
+
+
+def test_changed_held_failure_receipt_blocks_resume(tmp_path):
+    output = tmp_path / "out"
+
+    def fetch(*_):
+        raise RuntimeError("bounded failure")
+
+    run_acquisition(
+        _plan(1),
+        output,
+        fetch,
+        source_roots=(),
+        max_attempts_per_partition=1,
+    )
+    failure = next((output / "failures").glob("*/FAILURE.json"))
+    failure.write_text(failure.read_text() + "changed")
+    with pytest.raises(Native5mAcquireError, match="HELD_PARTITION_CHANGED"):
+        run_acquisition(
+            _plan(1),
+            output,
+            fetch,
+            source_roots=(),
+            max_attempts_per_partition=1,
+        )

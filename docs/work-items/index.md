@@ -40,6 +40,10 @@ The bounded [P6 main integration](p6-main-integration.md) separates the required
 P10 source interfaces, P6 consumer and #538 regression into dependent PRs. Its
 code merges do not replace #539's future full-Base publication acceptance.
 
+The [Base 2.4 construction integration](p10-base24-main-integration.md) brings
+the remaining bounded ODS/DWD builders and synthetic regressions into main.
+It excludes collector deployment, container/timer operations and data switching.
+
 #424 keeps its subgroup scope and execution gates. P3 #412 and P5 #402 retain input admission,
 research and explicit business disposition; source recovery/repair belongs to P10. They may
 continue permitted business work but their required-data gates remain unaccepted.

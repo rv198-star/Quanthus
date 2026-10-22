@@ -30,6 +30,15 @@ purpose qualification. They preserve physical hashes, field times and scoped
 unavailable uses; a readable governance snapshot is not historical PIT or an
 execution admission. Existing frozen legacy interfaces retain their contracts.
 
+The remaining Base 2.4 construction modules are integrated separately under
+[the P10 construction work item](../../work-items/p10-base24-main-integration.md):
+bounded native-5m acquisition/qualification, monthly projection and ownership
+transfer, independent ODS materialization/verification, domain observation
+adapters and paired acceptance reconciliation. They share immutable job-local
+prerequisites with explicit TMP lifecycles. This opt-in 1d/native-5m profile
+preserves actual knowledge clocks, the exact 33-table DWD model and independent
+cold-verification requirements; merging it does not rebuild or switch a Base.
+
 Physical data contracts and P1 historical acceptance remain here. From 2026-10-03 acquisition,
 shared quality/governance, maintenance and source recovery/repair belong to P10 under
 [`12-permanent-data-line.md`](12-permanent-data-line.md). Other lines only register data defects

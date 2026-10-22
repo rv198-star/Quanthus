@@ -209,6 +209,8 @@ def test_exclusive_bond_withdrawal_is_unknown_not_inferred_normal():
 def test_sse_st_revision_preserves_old_record_and_splits_effective_interval():
     old = dict(
         price_limit_regime_id="old",
+        source_artifact_sha256="sha256:" + "b" * 64,
+        source_record_id="retained-old-source",
         listing_id=None,
         board_code=None,
         security_status="ST",
@@ -224,6 +226,11 @@ def test_sse_st_revision_preserves_old_record_and_splits_effective_interval():
     assert proof["replacement"]["upper_limit_ratio"] == Decimal("0.1")
     assert proof["replacement"]["knowledge_from"] == known
     assert proof["retained_historical_fragment"]["upper_limit_ratio"] == Decimal("0.05")
+    assert (
+        proof["retained_historical_fragment"]["source_artifact_sha256"]
+        == old["source_artifact_sha256"]
+    )
+    assert proof["retained_historical_fragment"]["source_record_id"] == old["source_record_id"]
     assert (
         proof["retained_historical_fragment"]["effective_to"]
         == proof["replacement"]["effective_from"]
@@ -267,3 +274,61 @@ def test_sealer_rejects_old_output_before_writing(tmp_path):
         repair.seal_evidence(tmp_path, "a" * 40)
     assert (tmp_path / "OUTPUTS.json").read_text() == "previous attempt"
     assert not (tmp_path / "READY").exists()
+
+
+@pytest.mark.parametrize("board", ["SZ_main", "ChiNext"])
+def test_szse_current_rule_cannot_be_inherited_from_sse(board):
+    listing, sessions, target, cutoff = evidence()
+    listing.update(board=board, venue="XSHE")
+    for row in sessions:
+        row["venue"] = "XSHE"
+    rule = repair.SseRule(repair.SZSE_RULE_SHA, cutoff)
+    assert (
+        repair.exclude_ipo_window(rule, listing, sessions, target, cutoff)["in_ipo_window"] is False
+    )
+    listing["board"] = "SSE_main"
+    with pytest.raises(repair.RepairError, match="CURRENT_RULE_SCOPE"):
+        repair.exclude_ipo_window(rule, listing, sessions, target, cutoff)
+
+
+def test_official_body_requires_actual_transition_and_effective_scope():
+    from quanthus.pipelines.securities_warehouse.base24_official_notice import adjudicate_body
+
+    text = "000001经交易所批准，简称由“*ST例子”变更为“例子”。2026年7月7日起复牌。"
+    selection = dict(
+        code="000001",
+        disposition="WITHDRAW_ST_ASSERTION",
+        new_name="例子",
+        transition="简称由“*ST例子”变更为“例子”",
+        operative_anchor="经交易所批准",
+        date_anchors=[dict(day="2026-07-07", text="2026年7月7日起复牌")],
+    )
+    adjudicate_body(text, selection, date(2026, 7, 8))
+    with pytest.raises(repair.RepairError, match="NOTICE_NOT_YET_EFFECTIVE"):
+        adjudicate_body(text, selection, date(2026, 7, 6))
+    with pytest.raises(repair.RepairError, match="NOTICE_TRANSITION"):
+        adjudicate_body("000001关于申请撤销退市风险警示的公告", selection, date(2026, 7, 8))
+    selection["new_name"] = "ST例子"
+    with pytest.raises(repair.RepairError, match="PARTIAL_WITHDRAWAL"):
+        adjudicate_body(text, selection, date(2026, 7, 8))
+
+
+def test_notice_date_conflict_is_preserved_as_bound_not_backdated():
+    from quanthus.pipelines.securities_warehouse.base24_official_notice import adjudicate_body
+
+    selection = dict(
+        code="000001",
+        disposition="WITHDRAW_ST_ASSERTION",
+        new_name="例子",
+        transition="简称由“*ST例子”变更为“例子”",
+        operative_anchor="交易所批准撤销",
+        date_anchors=[
+            dict(day="2022-07-02", text="2022年7月2日起撤销"),
+            dict(day="2024-07-02", text="起始日2024年7月2日"),
+        ],
+    )
+    text = "000001交易所批准撤销，简称由“*ST例子”变更为“例子”。2022年7月2日起撤销，起始日2024年7月2日。"
+    with pytest.raises(repair.RepairError, match="NOTICE_NOT_YET_EFFECTIVE"):
+        adjudicate_body(text, selection, date(2023, 7, 1))
+    adjudicate_body(text, selection, date(2026, 7, 1))
+    assert len(selection["date_anchors"]) == 2

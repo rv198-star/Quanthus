@@ -551,7 +551,14 @@ def _state_row(
             except RepairError as exc:
                 raise PurposeError(str(exc)) from exc
             initial, window_rule, window_duration = False, None, 0
-            result.update(ipo_rule="CURRENT_SSE_RULE_WINDOW_EXCLUDED", in_ipo_window=False)
+            result.update(
+                ipo_rule=(
+                    "CURRENT_SSE_RULE_WINDOW_EXCLUDED"
+                    if row["board"] == "SSE_main"
+                    else "CURRENT_SZSE_RULE_WINDOW_EXCLUDED"
+                ),
+                in_ipo_window=False,
+            )
         else:
             if len(ipo) != 1 or ipo[0]["raw_evidence"] != raw_sha or ipo[0]["versions"] != 1:
                 raise PurposeError("IPO_SOURCE_CLOSURE")

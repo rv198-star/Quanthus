@@ -255,3 +255,21 @@ and the prior P6 ledger. A new governance correction is not backdated to a froze
 P6 snapshot. Bounded requalification may evaluate the successor but does not grant
 consumer admission, historical PIT acceptance or trading authority. Tests are in
 `tests/unit/test_base24_execution_evidence.py`.
+
+
+The approved bounded official supplement extends current-window evidence to SZSE
+main-board and ChiNext with the separately pinned complete SZSE 2026 rules and
+actual receipt; SSE authority is never reused across venues. The old qualification
+interface still requires its original IPO source. The source-side ST overlay is
+versioned by venue, retaining the preceding fragment's original source identity.
+
+`base24_official_notice.py` can withdraw an erroneous retained ST assertion only
+through the exact native interval → raw event → official index → complete PDF
+chain. An exact reviewed name transition, operative approval and effective-date
+bound are frozen and recomputed offline. A document containing conflicting dates
+retains both and is usable only after both bounds; it does not acquire an invented
+precise historical timestamp. Withdrawal yields UNKNOWN, not a continuous NORMAL
+interval. The target still requires an actual exact-date provider observation and
+all other frozen qualification checks. New acquisition/repair knowledge is never
+assigned to the old replay snapshot. The current issue's receipt controls the
+bounded fetch budget; these adapters do not authorize further acquisition.

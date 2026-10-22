@@ -1,8 +1,8 @@
 """Bounded P10 successor evidence; never invent an original IPO rule or stock event.
 
-The retained SSE 2026 rule can establish that an already observed listing is
+The pinned exchange-specific 2026 rules can establish that an already observed listing is
 outside its current initial window. It does not reconstruct the rule on a
-security's historical IPO date. Other venues and unresolved events remain held.
+security's historical IPO date. Unsupported venues and unresolved events remain held.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 import zipfile
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -29,6 +30,21 @@ SSE_URI = (
     "https://www.sse.com.cn/lawandrules/sselawsrules2025/trade/universal/c/"
     "10816492/files/58bd5ce4dfc94b57a5391f60eb2719ab.docx"
 )
+SZSE_RULE_SHA = "sha256:9b66f8b0db70f84a25ef1ccb4ee2351001724e408117552d75f6d8993483c586"
+SZSE_URI = "https://www.szse.cn/lawrules/rule/trade/current/W020260424690713155663.pdf"
+
+
+def pdf_text(path: Path) -> str:
+    """Extract local evidence only; no URL retrieval or silent OCR guess."""
+    result = subprocess.run(
+        ["pdftotext", "-layout", str(path), "-"],
+        check=True,
+        capture_output=True,
+        timeout=30,
+    )
+    return re.sub(r"\s+", "", result.stdout.decode("utf-8"))
+
+
 EFFECTIVE = date(2026, 7, 6)
 
 
@@ -79,15 +95,35 @@ def load_sse_rule(body: Path, receipt: Path) -> SseRule:
     return SseRule(SSE_RULE_SHA, _instant(r["completed_at"]))
 
 
+def load_szse_rule(body: Path, receipt: Path) -> SseRule:
+    from .base22 import file_sha
+
+    r = json.loads(receipt.read_bytes())
+    _require(file_sha(body) == SZSE_RULE_SHA == r["body_sha256"], "OFFICIAL_RULE_HASH")
+    _require(
+        r["URI"] == SZSE_URI and r["http_status"] == 200 and r["error"] is None, "OFFICIAL_RECEIPT"
+    )
+    text = pdf_text(body)
+    for clause in (
+        "主板股票的价格涨跌幅限制比例为10%，创业板股票的价格涨跌幅限制比例为20%。",
+        "（一）首次公开发行上市后的前五个交易日；",
+        "4.5.1按照本所上市规则被实施风险警示的股票",
+        "10.9本规则自2026年7月6日起施行。",
+    ):
+        _require(clause in text, "OFFICIAL_CLAUSE")
+    return SseRule(SZSE_RULE_SHA, _instant(r["completed_at"]))
+
+
 def _rule_visible(rule: SseRule, board: str, day: date, cutoff: datetime) -> None:
     _require(
-        rule.source_sha256 == SSE_RULE_SHA
+        rule.source_sha256 in {SSE_RULE_SHA, SZSE_RULE_SHA}
         and rule.known.utcoffset() is not None
         and cutoff.utcoffset() is not None
         and rule.known <= cutoff,
         "CURRENT_RULE_UNAVAILABLE",
     )
-    _require(board == "SSE_main" and day >= EFFECTIVE, "CURRENT_RULE_SCOPE")
+    boards = {"SSE_main"} if rule.source_sha256 == SSE_RULE_SHA else {"SZ_main", "ChiNext"}
+    _require(board in boards and day >= EFFECTIVE, "CURRENT_RULE_SCOPE")
 
 
 def exclude_ipo_window(
@@ -105,7 +141,7 @@ def exclude_ipo_window(
     """
     _rule_visible(rule, listing["board"], target, cutoff)
     _require(
-        listing["venue"] == "XSHG"
+        listing["venue"] == ("XSHG" if rule.source_sha256 == SSE_RULE_SHA else "XSHE")
         and listing["versions"] == 1
         and listing["knowledge_from"] is not None
         and listing["knowledge_from"].utcoffset() is not None
@@ -265,7 +301,8 @@ def sse_st_successor(
     This is a new source revision observed now, not a mutation of the 1998
     record, an inference of the publication clock, or a SZSE rule assertion.
     """
-    _rule_visible(rule, "SSE_main" if mic == "XSHG" else "OTHER", EFFECTIVE, repair_at)
+    board = "SSE_main" if mic == "XSHG" else "SZ_main" if mic == "XSHE" else "OTHER"
+    _rule_visible(rule, board, EFFECTIVE, repair_at)
     _require(
         native["security_status"] == "ST"
         and native["board_code"] is None
@@ -279,12 +316,18 @@ def sse_st_successor(
     provenance = dict(
         record_source=CONTRACT,
         source_revision=CONTRACT,
-        source_record_id=SSE_URI + "#3.3.13+4.4.1+11.9",
+        source_record_id=(SSE_URI if mic == "XSHG" else SZSE_URI) + "#current-risk-warning-rule",
         source_artifact_sha256=rule.source_sha256,
         knowledge_from=repair_at,
         knowledge_to=None,
     )
-    prior = {**native, **provenance, "effective_to": boundary}
+    prior = {
+        **native,
+        **provenance,
+        "effective_to": boundary,
+        "source_artifact_sha256": native["source_artifact_sha256"],
+        "source_record_id": native["source_record_id"],
+    }
     replacement = {
         **native,
         **provenance,
@@ -341,6 +384,11 @@ def replay_package(root: Path) -> dict[str, Any]:
     repair_at = _instant(spec["repair_known_at"])
     _require(repair_at >= cutoff, "REPAIR_CLOCK")
     rule = load_sse_rule(root / "sse-rule-docx.raw", root / "sse-rule-docx.receipt.json")
+    sz_rule = (
+        load_szse_rule(root / "szse-rule.raw", root / "szse-rule.receipt.json")
+        if spec.get("official_supplement")
+        else None
+    )
     c = duckdb.connect()
     c.execute("SET memory_limit='1GB'")
     c.execute("SET threads=1")
@@ -437,13 +485,18 @@ def replay_package(root: Path) -> dict[str, Any]:
             )
             if len(sessions) == 6:
                 break
-        windows.append(exclude_ipo_window(rule, listing, sessions, day, cutoff))
+        # Source rows retain the original snapshot; newly retrieved authority is new knowledge.
+        authority = rule if listing["venue"] == "XSHG" else sz_rule
+        if authority is None:
+            raise RepairError("CURRENT_RULE_UNAVAILABLE")
+        windows.append(exclude_ipo_window(authority, listing, sessions, day, repair_at))
 
     raw_path = root / "raw-ref_st_status_pit.parquet"
     event_path = root / "raw-events_audit.parquet"
     raw_rows = pq.read_table(raw_path).to_pylist()
     events = pq.read_table(event_path).to_pylist()
     withdrawals = {}
+    notice_withdrawals = {}
     classifications = []
     for request in spec["status_requests"]:
         code, day = request["code"], date.fromisoformat(request["day"])
@@ -490,6 +543,22 @@ def replay_package(root: Path) -> dict[str, Any]:
                     repair_at=repair_at,
                 )
                 withdrawals[claim["security_status_id"]] = proof
+            elif spec.get("official_supplement"):
+                from .base24_official_notice import withdraw_notice_claim
+
+                ident = str(event["ann_id"])
+                if ident in spec["official_supplement"]["notices"]:
+                    proof = withdraw_notice_claim(
+                        root,
+                        spec["official_supplement"]["notices"][ident],
+                        claim,
+                        raw_row,
+                        event,
+                        repair_at=repair_at,
+                        raw_sha256=spec["files"][raw_path.name],
+                        target=day,
+                    )
+                    notice_withdrawals[claim["security_status_id"]] = proof
     regimes = rows(
         """SELECT r.* EXCLUDE(versions) FROM dwd_price_limit_regime r
       JOIN dwd_trading_venue v USING(venue_id) WHERE v.mic_code='XSHG'
@@ -498,6 +567,17 @@ def replay_package(root: Path) -> dict[str, Any]:
     )
     _require(len(regimes) == 1, "ST_REGIME_IDENTITY")
     st_revision = sse_st_successor(rule, regimes[0], mic="XSHG", repair_at=repair_at)
+    sz_revision = None
+    if sz_rule is not None:
+        sz_regimes = rows(
+            """SELECT r.* EXCLUDE(versions) FROM dwd_price_limit_regime r
+          JOIN dwd_trading_venue v USING(venue_id) WHERE v.mic_code='XSHE'
+          AND r.security_status='ST' AND r.board_code IS NULL
+          AND r.versions=1 AND v.versions=1""",
+            [],
+        )
+        _require(len(sz_regimes) == 1, "ST_REGIME_IDENTITY")
+        sz_revision = sse_st_successor(sz_rule, sz_regimes[0], mic="XSHE", repair_at=repair_at)
     c.close()
     return dict(
         contract_id=CONTRACT,
@@ -507,6 +587,8 @@ def replay_package(root: Path) -> dict[str, Any]:
         bond_claim_withdrawals=list(withdrawals.values()),
         event_classifications=classifications,
         sse_st_revision=st_revision,
+        szse_st_revision=sz_revision,
+        official_notice_withdrawals=list(notice_withdrawals.values()),
         consumer_admission_granted=False,
         historical_pit_granted=False,
     )
@@ -527,6 +609,7 @@ def seal_evidence(root: Path, code_revision: str) -> str:
         contract_id=CONTRACT,
         code_revision=code_revision,
         module_sha256=file_sha(Path(__file__)),
+        notice_module_sha256=file_sha(Path(__file__).with_name("base24_official_notice.py")),
         consumer_admission_granted=False,
     )
     (root / "ENGINE.json").write_bytes(canonical(engine))
@@ -563,6 +646,8 @@ def verify_evidence(root: Path, manifest_sha256: str, *, ready: bool = True) -> 
     engine = json.loads((root / "ENGINE.json").read_bytes())
     _require(
         engine["module_sha256"] == file_sha(Path(__file__))
+        and engine["notice_module_sha256"]
+        == file_sha(Path(__file__).with_name("base24_official_notice.py"))
         and engine["contract_id"] == CONTRACT
         and engine["consumer_admission_granted"] is False,
         "ENGINE_IDENTITY",

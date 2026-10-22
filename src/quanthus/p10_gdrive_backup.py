@@ -451,7 +451,11 @@ def backup(plan_path: Path, state: Path, secret: Path) -> dict[str, Any]:
                 len(names) != len(set(names))
                 or set(names) != set(expected)
                 or any(
-                    (v.get("Size"), v.get("Hashes", {}).get("MD5")) != expected[v["Name"]]
+                    (
+                        v.get("Size"),
+                        v.get("Hashes", {}).get("md5", v.get("Hashes", {}).get("MD5")),
+                    )
+                    != expected[v["Name"]]
                     for v in observed
                 )
             ):

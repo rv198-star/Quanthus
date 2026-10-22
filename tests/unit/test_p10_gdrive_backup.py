@@ -138,6 +138,26 @@ def test_four_scopes_separate_folder_ids_archive_inventory_and_source_unchanged(
     assert all("synthetic secret" not in p.read_text() for p in state.rglob("*.json"))
 
 
+def test_native_rclone_lsjson_lowercase_md5(selected, fake_cloud, monkeypatch):
+    """The actual pinned rclone emits Hashes.md5, not Hashes.MD5."""
+    plan, path, state, secret = selected
+    _, _, original = fake_cloud
+
+    def native_reply(args, plan, secret, until):
+        reply = original(args, plan, secret, until)
+        if args[0] == "lsjson":
+            records = json.loads(reply)
+            for record in records:
+                record["Hashes"] = {"md5": record["Hashes"]["MD5"]}
+            return json.dumps(records)
+        return reply
+
+    monkeypatch.setattr(drive, "cloud", native_reply)
+    result = drive.backup(path, state, secret)
+    assert result["status"] == "cloud_bytes_verified"
+    assert len(result["packages"]) == len(plan["packages"])
+
+
 @pytest.mark.parametrize(
     "mutation",
     [

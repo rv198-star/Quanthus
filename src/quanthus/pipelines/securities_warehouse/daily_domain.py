@@ -9,7 +9,6 @@ import json
 import os
 import shutil
 import tempfile
-import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -17,7 +16,6 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from quanthus.pipelines.contracts import OdsReleaseError, verify_ods_release
-from quanthus.pipelines.securities_warehouse import daily_price_basis
 from quanthus.pipelines.securities_warehouse.daily_ods_catalog import (
     DailyOdsCatalogError,
     verify_daily_ods_catalog,
@@ -283,11 +281,9 @@ def build_daily_domain_increment(
     output: Path,
     code_revision: str,
     prior_pointer: Path | None = None,
-    price_basis_policy: str | None = None,
 ) -> DailyDomainResult:
     """Build and audit one Base-seeded daily DWD package without mutating Base."""
 
-    basis_contract = daily_price_basis.contract(price_basis_policy)
     output = output.resolve()
     release_root = release_root.resolve()
     base_root = base_root.resolve()
@@ -295,7 +291,7 @@ def build_daily_domain_increment(
         if output == source_root or output.is_relative_to(source_root):
             raise DailyDomainBuildError(f"daily output must be outside the {label} root")
     if output.exists():
-        return verify_daily_domain_increment(output, price_basis_policy=price_basis_policy)
+        return verify_daily_domain_increment(output)
     catalog, selected = _read_catalog(catalog_root.resolve(), release_root)
     market_date = date.fromisoformat(catalog["market_date"])
     base_manifest, config = _verify_base(base_root, release_config.resolve())
@@ -430,18 +426,7 @@ def build_daily_domain_increment(
             work
             / f"payload/security_market_observation/dwd_security_bar/market_date={market_date}/part-00000.parquet"
         )
-        bar_query = " UNION ALL ".join(bar_parts)
-        basis_started = time.monotonic() if basis_contract is not None else None
-        if basis_contract is not None:
-            bar_query = daily_price_basis.prepare(connection, bar_query, daily_artifact)
-        _copy(connection, bar_query, bar_output)
-        basis_materialized = time.monotonic() if basis_contract is not None else None
-        basis_equality = (
-            daily_price_basis.verify_preservation(connection, bar_output)
-            if basis_contract is not None else None
-        )
-
-        basis_verified = time.monotonic() if basis_contract is not None else None
+        _copy(connection, " UNION ALL ".join(bar_parts), bar_output)
 
         valuation_source = f"""SELECT *, concat({_sql(valuation_path.name)},'#code=',stock_code,'&date=',date) source_record_id
         FROM read_parquet({_sql(str(valuation_path))})"""
@@ -621,26 +606,6 @@ def build_daily_domain_increment(
             "ods_only_artifacts": ods_only_artifacts,
             "result": "accepted",
         }
-        if basis_contract is not None:
-            audit["price_basis"] = {
-                "contract": basis_contract,
-                "stage_metrics": {
-                    "lifecycle": "TMP", "disposition": "built_once_no_reuse",
-                    "materialization_seconds": basis_materialized - basis_started,
-                    "independent_readback_seconds": basis_verified - basis_materialized,
-                    "output_bytes": bar_output.stat().st_size,
-                },
-                "source_family": daily_price_basis.SOURCE_FAMILY,
-                "source_artifact_sha256": daily_artifact.sha256,
-                "source_revision": daily_artifact.source_revision,
-                "equality": basis_equality,
-                "coverage": daily_price_basis.coverage(
-                    connection, calendar_output, status_output, market_date.isoformat()
-                ),
-                "independent_cold_construction": "NOT_PERFORMED",
-                "historical_replacement_comparison": "NOT_PERFORMED",
-                "consumer_acceptance": "NOT_REQUESTED",
-            }
         audit_path = work / "audit.json"
         _write_atomic(audit_path, audit)
         files = []
@@ -684,13 +649,6 @@ def build_daily_domain_increment(
             "files": files,
             "content_digest": content_digest,
         }
-        if basis_contract is not None:
-            manifest.update({
-                "schema_version": 2,
-                "kind": daily_price_basis.CANDIDATE_KIND,
-                "package_id": package_id + "-" + daily_price_basis.POLICY,
-                "price_basis_contract": basis_contract,
-            })
         _write_atomic(work / "manifest.json", manifest)
         _write_atomic(work / "READY", (_sha256(work / "manifest.json") + "\n").encode("ascii"))
         os.replace(work, output)
@@ -699,26 +657,18 @@ def build_daily_domain_increment(
         raise
     finally:
         connection.close()
-    return verify_daily_domain_increment(output, price_basis_policy=price_basis_policy)
+    return verify_daily_domain_increment(output)
 
 
-def verify_daily_domain_increment(root: Path, *, price_basis_policy: str | None = None) -> DailyDomainResult:
+def verify_daily_domain_increment(root: Path) -> DailyDomainResult:
     root = root.resolve()
     manifest = _object(root / "manifest.json")
     manifest_sha = _sha256(root / "manifest.json")
     try:
-        daily_price_basis.validate_manifest(manifest, price_basis_policy)
-    except ValueError as exc:
-        raise DailyDomainBuildError(str(exc)) from exc
-    try:
         ready = (root / "READY").read_text(encoding="ascii").strip()
     except OSError as exc:
         raise DailyDomainBuildError("daily DWD READY is unreadable") from exc
-    expected_kind = (
-        daily_price_basis.CANDIDATE_KIND if price_basis_policy is not None
-        else "cn01_daily_dwd_domain_increment"
-    )
-    if ready != manifest_sha or manifest.get("kind") != expected_kind:
+    if ready != manifest_sha or manifest.get("kind") != "cn01_daily_dwd_domain_increment":
         raise DailyDomainBuildError("daily DWD manifest or READY differs")
     expected = set()
     payload_bytes = 0
@@ -745,11 +695,6 @@ def verify_daily_domain_increment(root: Path, *, price_basis_policy: str | None 
     digest = "sha256:" + hashlib.sha256(_canonical_bytes(files)).hexdigest()
     if digest != manifest.get("content_digest"):
         raise DailyDomainBuildError("daily DWD content digest differs")
-    if price_basis_policy is not None:
-        try:
-            daily_price_basis.verify_candidate_payload(root, manifest)
-        except (ValueError, KeyError, OSError) as exc:
-            raise DailyDomainBuildError(str(exc)) from exc
     return DailyDomainResult(
         root=root,
         package_id=str(manifest["package_id"]),

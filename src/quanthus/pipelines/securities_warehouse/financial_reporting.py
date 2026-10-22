@@ -1086,6 +1086,8 @@ def _report_date(value: object, field: str) -> date:
 def _plan_date(value: object, field: str) -> date:
     if not isinstance(value, str) or not value:
         raise FinancialReportingBuildError(f"{field} must use YYYY-MM-DD")
+    if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value) is None:
+        raise FinancialReportingBuildError(f"{field} must use a valid YYYY-MM-DD date")
     try:
         return date.fromisoformat(value)
     except ValueError as exc:

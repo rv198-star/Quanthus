@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from unittest import mock
@@ -41,6 +42,13 @@ def _sha256(path: Path) -> str:
     return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
 
 
+def _load_test_policy(path: Path) -> dual_lane.DualLanePolicy:
+    # Validate the frozen-shaped fixture first. Only synthetic behavior tests bind
+    # their in-memory runtime to the executing test stack, including spawned workers.
+    # Production policy loading and candidate runtime equality remain unchanged.
+    return replace(load_dual_lane_policy(path), runtime=dual_lane._runtime_identity())
+
+
 def _acquire_lease_process(
     policy_path: str,
     root: str,
@@ -51,7 +59,7 @@ def _acquire_lease_process(
     try:
         lease = dual_lane.acquire_fenced_lease(
             root=Path(root),
-            policy=load_dual_lane_policy(Path(policy_path)),
+            policy=_load_test_policy(Path(policy_path)),
             owner=owner,
             clock=lambda: datetime.fromisoformat(now),
         )
@@ -71,7 +79,7 @@ def _arbitrate_process(
     results,
 ) -> None:
     try:
-        policy = load_dual_lane_policy(Path(policy_path))
+        policy = _load_test_policy(Path(policy_path))
         epoch = verify_epoch_input(Path(epoch_path))
         result = arbitrate_and_publish(
             market_date=date.fromisoformat(market_date),
@@ -97,7 +105,7 @@ class DualLaneTests(unittest.TestCase):
         self.root = Path(temporary.name)
         self.policy_path = self.root / "dual-lane-policy.json"
         self._write_json(self.policy_path, self._policy_payload())
-        self.policy = load_dual_lane_policy(self.policy_path)
+        self.policy = _load_test_policy(self.policy_path)
         self.universe_path = self.root / "p1-universe.json"
         self._write_json(
             self.universe_path,
@@ -196,12 +204,7 @@ class DualLaneTests(unittest.TestCase):
             },
             "runtime": {
                 "python_series": "3.10",
-                "packages": {
-                    "duckdb": "1.5.5",
-                    "polars": "1.43.0",
-                    "pyarrow": "23.0.1",
-                    "quanthus": "0.1.0.dev0",
-                },
+                "packages": dual_lane._runtime_identity()["packages"],
             },
             "schedule": {
                 "epoch_publish_time": "16:30:00",
@@ -848,6 +851,33 @@ class DualLaneTests(unittest.TestCase):
                 market_date=market_date,
                 preferred_attempt=event_attempt.name,
             )
+
+    def test_production_policy_rejects_unfrozen_python_series(self) -> None:
+        payload = self._policy_payload()
+        runtime = payload["runtime"]
+        assert isinstance(runtime, dict)
+        runtime["python_series"] = "3.12"
+        self._write_json(self.policy_path, payload)
+        with self.assertRaisesRegex(DualLaneError, "must freeze Python 3.10"):
+            load_dual_lane_policy(self.policy_path)
+
+    def test_candidate_rejects_mismatched_runtime_before_publication(self) -> None:
+        market_date = date(2026, 7, 24)
+        epoch = self._epoch(market_date)
+        actual = dual_lane._runtime_identity()
+        for component in ("python_series", "duckdb", "polars", "pyarrow", "quanthus"):
+            with self.subTest(component=component):
+                mismatched = {**actual, "packages": dict(actual["packages"])}
+                if component == "python_series":
+                    mismatched[component] = "0.0"
+                else:
+                    mismatched["packages"][component] = "mismatched-test-version"
+                with (
+                    mock.patch.object(dual_lane, "_runtime_identity", return_value=mismatched),
+                    self.assertRaisesRegex(DualLaneError, "candidate runtime differs"),
+                ):
+                    self._candidate(epoch=epoch, lane="cn01", variant=component)
+                self.assertFalse((self.root / "candidates").exists())
 
     def test_candidate_requires_exact_current_descriptor(self) -> None:
         market_date = date(2026, 7, 24)

@@ -1,0 +1,20 @@
+{
+  "schema_version": "quanthus.p3-base24-retrospective-purpose.v1",
+  "purpose_id": "p3-base24-retrospective-input-v1",
+  "owner_direction": "2026-10-23: try the bounded evidence/purpose-contract route; keep P3 moving without an indefinite search for historical versions",
+  "original_request_digest": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde",
+  "original_strict_request_replaced": false,
+  "input_grade": "R2_RETROSPECTIVE_SNAPSHOT_NOT_HISTORICAL_PIT",
+  "knowledge_selection": "original half-open knowledge intervals at the exact source snapshot; unknown knowledge excluded and counted; conflicting versions rejected",
+  "business_scope": {"decision_start": "2025-01-01", "decision_end": "2026-09-17", "execution_end": "2026-09-18", "warmup_sessions": 60},
+  "information_cutoff": "exact source manifest knowledge_cutoff; never historical T close",
+  "feature_business_boundary": "historical T; no later business observations in a T feature",
+  "time_mutation": "forbidden; retain source knowledge/acquisition/publication/effective fields and original Decimal values",
+  "repair_scope": "P10 evaluates the selected immutable archive only; no new collection or unbounded source search",
+  "allowed": ["result-blind source and input qualification", "new job-local retrospective input preparation"],
+  "not_authorized_by_this_contract": ["original strict B acceptance", "D result execution", "strict historical availability claims", "live trading", "P6 mutation", "source or CURRENT mutation", "parameter or window search"],
+  "critical_guards": ["security/date/venue identity", "exact warmup membership", "source hashes and lineage", "schema and Decimal types", "key/version ambiguity", "business-date bounds", "unknown action and execution support remains unavailable"],
+  "original_4173_factor_visibility_exceptions": "unchanged; not inferred or cleared; this is a preserved policy count, not a newly measured denominator",
+  "no_result_claim": "retrospective input acceptance is not causal/PIT research acceptance or evidence of deployable performance",
+  "budgets": {"wall_seconds": 600, "duckdb_threads": 2, "duckdb_memory": "2GB", "spill_bytes": 1073741824, "rss_bytes": 4294967296, "minimum_free_bytes": 8589934592}
+}

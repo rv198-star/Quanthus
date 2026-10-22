@@ -114,6 +114,19 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**Purpose-specific continuation, 2026-10-23:** the Owner requested trying the bounded
+evidence/purpose-contract route instead of indefinitely recovering historical versions. The
+additive `base24-retrospective-purpose.v1.json` permits a result-blind, fixed-snapshot input
+assessment and physical job-local preparation. It does not replace the strict frozen request or
+infer any historical clock. `p3_purpose.py` checks the selected archive with original knowledge
+intervals at its declared snapshot; `p3_retrospective_input.py` preserves those clocks, separates
+unknown-clock records, and verifies the new input without reopening source roots. Strict
+NativeView admission rejects this distinct artifact. This advances retrospective input work;
+it is not original B acceptance, candidate/feature integration for the new purpose, or D
+activation. The original 4,173 factor-visibility policy stays unchanged. Continue from
+[the purpose-specific disposition](p3-base24-goal-audit-and-plan-20261022.md#16-按用途收敛历史证据缺口),
+not by renaming the new artifact as strict-PIT input or retrying the spent B Job.
+
 **Prerequisite repair, 2026-10-23:** exact 60-session membership is now derived from the
 SSE/SZSE 2024 official notices (both declared 2023-12-26), reconciled against all 732 native
 2024 exchange/date metadata rows, and pinned to the native session identities for

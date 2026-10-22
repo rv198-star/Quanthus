@@ -8,6 +8,11 @@
 | Live work | P6-R1 / #511 and P6-ACTIVATE-001 / #209 |
 | Source interface | [Base 2.4 input design](../design/lld/08-validation-governance/p6-base24-inputs.md) |
 
+The purpose is to verify that candidate signals pass through the frozen expert
+and veto path into auditable next-open paper decisions, fills, position management
+and settlement. The selected historical snapshot mode exercises that mechanism;
+it does not establish strategy profitability or historical information availability.
+
 ## Current recovery checkpoint
 
 The fixed-snapshot mechanism run and fresh independent reproduction are now
@@ -25,6 +30,19 @@ The Owner's later 2026-10-22 [CN02-only runtime decision](cn02-project-migration
 removes OCI from future Quanthus responsibility. Do not query OCI or carry its
 current-writer reconciliation as a remaining P6 dependency. Preserved OCI
 records remain history; local CN02 single-writer and activation gates remain.
+
+The next bounded input work is [P10-DATA-P6-BASE24-EXEC-001 / #538](https://github.com/rv198-star/Quanthus/issues/538).
+All 125 held target records have now been traced through the existing P10
+qualification and native context: 78 keys for 77 securities have no original IPO
+rule in the selected embedded member; 24 have no exact dated status in its 48
+status members; 22 have canonical/provider status conflicts; one has no native
+bar/state for 002569 on 2026-08-03. These are scoped findings, not global source
+absence or 125 approved collection requests. None was newly qualified or repaired.
+P6's recorded disposition is `temporarily_ignore`: preserve these held targets,
+continue admitted scopes, and leave shared source work to P10. Do not guess
+values, change source precedence, rerun the unchanged replay or count diagnosis
+as additional official observations. The original 17 settled targets and complete
+mechanism run remain sealed.
 
 **Current routing is historical replay.** After the initial startup report,
 the Owner corrected the prospective-only direction and explicitly chose

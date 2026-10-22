@@ -35,7 +35,8 @@ def source_bundle(tmp_path):
     (repo / "config").mkdir()
     (repo / "src/module.py").write_text("value = 1\n")
     (repo / "config/schema.json").write_text("{}\n")
-    subprocess.run(["git", "add", "src", "config"], cwd=repo, check=True)
+    (repo / "pyproject.toml").write_text('[project]\nname="fixture"\nversion="0"\n')
+    subprocess.run(["git", "add", "src", "config", "pyproject.toml"], cwd=repo, check=True)
     subprocess.run(
         [
             "git",
@@ -64,7 +65,8 @@ def test_bundled_code_survives_two_moves_without_git_checkout(source_bundle, tmp
         moved = tmp_path / f"move-{index}"
         shutil.copytree(root, moved)
         shutil.rmtree(root)
-        assert len(code.verify_bundle(moved, revision)["files"]) == 2
+        assert len(code.verify_bundle(moved, revision)["files"]) == 3
+        assert (moved / "pyproject.toml").read_text().startswith("[project]")
         assert not (moved / "private.env").exists()
         root = moved
 

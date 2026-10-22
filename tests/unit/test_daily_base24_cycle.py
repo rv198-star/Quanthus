@@ -631,3 +631,141 @@ def test_busy_date_timer_keeps_active_writer_without_attempt_or_pointer_change(
     }
     assert sorted(p.name for p in tmp_path.iterdir()) == [day + ".lock", "DATES.json"]
     assert marker.read_text() == "retained-state"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [None, "failure", "capture", "reference", "base", "policy", "source", "core", "date", "repeat"],
+)
+def test_reference_failure_resumes_only_verified_core_before_any_new_write(
+    monkeypatch, tmp_path, mutation
+):
+    day = date(2026, 10, 20)
+    previous = tmp_path / (str(day) + "-previous")
+    previous.mkdir()
+    core = previous / "core"
+    core.mkdir()
+    cycle.write(core / "manifest.json", {})
+    market, events = [tmp_path / "sources/daily" / str(day) / x for x in ["market", "events"]]
+    for path in [market, events]:
+        path.mkdir(parents=True)
+        cycle.write(path / "release.json", {})
+    config = {
+        "root": str(tmp_path),
+        "base_manifest_sha256": "base",
+        "release_config_sha256": "policy",
+        "pipeline_revision": "b" * 40,
+    }
+    old = {
+        "market_date": str(day),
+        "status": "CORE_READY_5M_FAILED",
+        "core": str(core),
+        "core_manifest_sha256": cycle.file_sha(core / "manifest.json"),
+        "base_manifest_sha256": "base",
+        "config_sha256": "policy",
+        "source_manifest_sha256": {
+            "market_daily_core": cycle.file_sha(market / "release.json"),
+            "calendar_daily_events": cycle.file_sha(events / "release.json"),
+        },
+    }
+    failure = {"reason": "DAILY_CYCLE_PROVIDER_FAILED_reference"}
+    if mutation == "failure":
+        failure["reason"] = "different"
+    if mutation == "capture":
+        (previous / "capture-5m").mkdir()
+    if mutation == "reference":
+        cycle.write(previous / "daily-reference.json", {})
+    if mutation == "base":
+        old["base_manifest_sha256"] = "changed"
+    if mutation == "policy":
+        old["config_sha256"] = "changed"
+    if mutation == "date":
+        old["market_date"] = "2026-10-19"
+    if mutation == "source":
+        (market / "release.json").write_text('{"changed": true}')
+    if mutation == "repeat":
+        attempted = tmp_path / (str(day) + "-attempted")
+        attempted.mkdir()
+        cycle.write(attempted / "native-continuation.json", {})
+    cycle.write(previous / "core-receipt.json", old)
+    cycle.write(previous / "failure.json", failure)
+    cycle.write(previous / "market-source.json", {"release_dir": str(market)})
+    cycle.write(previous / "events-source.json", {"release_dir": str(events)})
+    before = {str(p): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+
+    def verify(path):
+        assert path == core
+        if mutation == "core":
+            raise ValueError("changed core")
+        return types.SimpleNamespace(manifest_sha256=old["core_manifest_sha256"])
+
+    monkeypatch.setattr(cycle, "verify_daily_domain_increment", verify)
+    if mutation:
+        with pytest.raises(ValueError):
+            cycle.reference_continuation(config, day, old)
+    else:
+        result = cycle.reference_continuation(config, day, old)
+        assert result == (old, market, events)
+    assert before == {str(p): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+
+
+def test_provider_uses_its_own_project_root(monkeypatch, tmp_path):
+    collector = tmp_path / "collector"
+    collector.mkdir()
+
+    def popen(command, **kwargs):
+        assert kwargs["cwd"] == collector
+        assert kwargs["env"]["PYTHONPATH"] == str(collector / "src")
+        kwargs["stdout"].write(b'{"ok": true}\n')
+        return types.SimpleNamespace(poll=lambda: 0, returncode=0)
+
+    monkeypatch.setattr(cycle.subprocess, "Popen", popen)
+    assert cycle.provider({"collector": str(collector)}, tmp_path, "probe", "reference") == {
+        "ok": True
+    }
+
+
+@pytest.mark.parametrize("eligible", [True, False])
+def test_main_keeps_two_full_attempt_gate_but_resumes_reference_once(
+    monkeypatch, tmp_path, eligible, capsys
+):
+    day = date(2026, 10, 20)
+    old = {
+        "status": "CORE_READY_5M_FAILED" if eligible else "failed",
+        "core": str(tmp_path / "old/core"),
+    }
+    cycle.write(tmp_path / "DATES.json", {"dates": {str(day): old}})
+    for index in range(2):
+        previous = tmp_path / (str(day) + f"-old-{index}")
+        previous.mkdir()
+        cycle.write(previous / "registration.json", {})
+    config = {"root": str(tmp_path), "pipeline_revision": "b" * 40}
+    monkeypatch.setattr(cycle, "load", lambda p: config)
+    monkeypatch.setattr(cycle, "resources", lambda *a, **kw: {})
+    monkeypatch.setattr(cycle, "time_gate", lambda *a: None)
+    monkeypatch.setattr(cycle, "collect", lambda *a: pytest.fail("no full recollection"))
+    monkeypatch.setattr(
+        cycle, "build_daily_domain_increment", lambda **kw: pytest.fail("no core rebuild")
+    )
+    value = {
+        "core": old["core"],
+        "core_manifest_sha256": "core",
+        "source_manifest_sha256": {"market": "market"},
+    }
+    monkeypatch.setattr(
+        cycle,
+        "reference_continuation",
+        lambda *a: (dict(value), tmp_path / "market", tmp_path / "events"),
+    )
+    monkeypatch.setattr(cycle, "finish_native", lambda *a: {"status": "continued"})
+    monkeypatch.setattr(
+        sys, "argv", ["cycle", "--config", str(tmp_path / "DATES.json"), "--day", str(day)]
+    )
+    if eligible:
+        assert cycle.main() == 0
+        assert json.loads(capsys.readouterr().out)["result"] == {"status": "continued"}
+        assert len(list(tmp_path.glob(str(day) + "-*/native-continuation.json"))) == 1
+    else:
+        with pytest.raises(ValueError, match="TWO_ATTEMPT_BUDGET"):
+            cycle.main()
+        assert not list(tmp_path.glob(str(day) + "-*/native-continuation.json"))

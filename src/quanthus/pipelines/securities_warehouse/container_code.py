@@ -24,13 +24,13 @@ def digest(path: Path) -> str:
 
 
 def bundle(repo: Path, revision: str, output: Path) -> dict[str, Any]:
-    """Export tracked source/config only, never a checkout's untracked secrets."""
+    """Export tracked source/config/project metadata only, never a checkout's untracked secrets."""
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("CONTAINER_FULL_REVISION_REQUIRED")
     if output.exists() or output.is_symlink():
         raise ValueError("CONTAINER_NEW_BUNDLE_REQUIRED")
     archive = subprocess.check_output(
-        ["git", "archive", "--format=tar", revision, "src", "config"], cwd=repo
+        ["git", "archive", "--format=tar", revision, "src", "config", "pyproject.toml"], cwd=repo
     )
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
         members = tar.getmembers()

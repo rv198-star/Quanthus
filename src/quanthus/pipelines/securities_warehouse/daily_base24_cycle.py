@@ -172,7 +172,12 @@ def provider(
     peak = 0
     with (run / (label + ".log")).open("xb") as log:
         process = subprocess.Popen(
-            command, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True
+            command,
+            cwd=runtime,
+            env=env,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
         )
         try:
             while process.poll() is None:
@@ -444,6 +449,19 @@ def assemble(
     }
     write(run / "core-receipt.json", value)
     publish(config, value)
+    return finish_native(config, run, day, value, market, events, native_root)
+
+
+def finish_native(
+    config: dict[str, Any],
+    run: Path,
+    day: date,
+    value: dict[str, Any],
+    market: Path,
+    events: Path,
+    native_root: Path | None = None,
+) -> dict[str, Any]:
+    """One native tail for both first construction and a verified core continuation."""
     if native_root is None:
         result = native(config, run, day, market, events)
         native_root = Path(result["package_path"])
@@ -459,7 +477,7 @@ def assemble(
         return value
     time_gate(day, "intake", bool(config.get("recovery_mode")))
     result = build(
-        core=core.root,
+        core=Path(value["core"]),
         native5m=native_root,
         config=Path(config["release_config"]),
         output=run / "product",
@@ -584,6 +602,58 @@ def collect(config: dict[str, Any], run: Path, day: date) -> dict[str, Any]:
     return assemble(config, run, day, Path(market["release_dir"]), Path(events["release_dir"]))
 
 
+def reference_continuation(
+    config: dict[str, Any],
+    day: date,
+    old: dict[str, Any],
+) -> tuple[dict[str, Any], Path, Path]:
+    """One bounded continuation only when reference failed before any 5m capture.
+
+    Verify immutable core and both original ODS identities before creating a run.
+    Never authorize another full daily acquisition or relax the two-attempt gate.
+    The caller holds the existing date lock across validation and continuation.
+    """
+    root = physical_path(Path(config["root"]))
+    core = physical_path(Path(old["core"]))
+    previous = core.parent
+    if (
+        previous.parent != root
+        or not previous.name.startswith(str(day) + "-")
+        or core.name != "core"
+        or old.get("market_date") != str(day)
+        or old.get("status") != "CORE_READY_5M_FAILED"
+        or old.get("base_manifest_sha256") != config["base_manifest_sha256"]
+        or old.get("config_sha256") != config["release_config_sha256"]
+        or object_at(previous / "failure.json").get("reason")
+        != "DAILY_CYCLE_PROVIDER_FAILED_reference"
+        or (previous / "daily-reference.json").exists()
+        or (previous / "capture-5m").exists()
+        or list(root.glob(str(day) + "-*/native-continuation.json"))
+    ):
+        raise ValueError("DAILY_CYCLE_REFERENCE_CONTINUATION_NOT_ELIGIBLE")
+    receipt = object_at(previous / "core-receipt.json")
+    if {k: v for k, v in receipt.items() if k != "status"} != {
+        k: v for k, v in old.items() if k != "status"
+    }:
+        raise ValueError("DAILY_CYCLE_REUSE_CORE_RECEIPT_CHANGED")
+    market, events = [
+        physical_path(Path(object_at(previous / (name + "-source.json"))["release_dir"]))
+        for name in ["market", "events"]
+    ]
+    if market.parent != events.parent or market.parent.name != str(day):
+        raise ValueError("DAILY_CYCLE_EXACT_SAME_DATE_SOURCE_ROOT_REQUIRED")
+    expected = {
+        "market_daily_core": file_sha(market / "release.json"),
+        "calendar_daily_events": file_sha(events / "release.json"),
+    }
+    if expected != old["source_manifest_sha256"]:
+        raise ValueError("DAILY_CYCLE_REUSE_SOURCE_CHANGED")
+    checked = verify_daily_domain_increment(core)
+    if checked.manifest_sha256 != old["core_manifest_sha256"]:
+        raise ValueError("DAILY_CYCLE_REUSE_CORE_CHANGED")
+    return dict(old), market, events
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
@@ -614,6 +684,7 @@ def main() -> int:
             # timer must leave it running rather than start a competing writer.
             print(json.dumps({"status": "DATE_WRITER_ALREADY_ACTIVE", "market_date": str(day)}))
             return 0
+        continuation = None
         index_path = root / "DATES.json"
         if index_path.exists() and not args.native_only:
             old = object_at(index_path).get("dates", {}).get(str(day), {})
@@ -631,10 +702,14 @@ def main() -> int:
                     raise ValueError("DAILY_CYCLE_CLOSED_SOURCE_CHANGED")
                 print(json.dumps({"status": "VERIFIED_CLOSED_SOURCE_REUSE", "entry": old}))
                 return 0
+            if old.get("status") == "CORE_READY_5M_FAILED":
+                continuation = reference_continuation(config, day, old)
+                if any([args.market, args.events, args.native]):
+                    raise ValueError("DAILY_CYCLE_CONTINUATION_EXACT_INPUTS_ALREADY_FROZEN")
         if not args.native_only:
             time_gate(day, "delivery", args.recovery)
         previous_attempts = list(root.glob(str(day) + "-*/registration.json"))
-        if not args.native_only and len(previous_attempts) >= 2:
+        if not args.native_only and continuation is None and len(previous_attempts) >= 2:
             raise ValueError("DAILY_CYCLE_TWO_ATTEMPT_BUDGET_EXHAUSTED_REQUIRES_DISPOSITION")
         resources(root)
         run.mkdir(mode=0o700)
@@ -649,6 +724,30 @@ def main() -> int:
             },
         )
         try:
+            if continuation is not None:
+                value, market, events = continuation
+                disjoint_output(run, [market, events, Path(value["core"])])
+                write(
+                    run / "native-continuation.json",
+                    {
+                        "kind": "p10-reference-failure-continuation-v1",
+                        "original_core": value["core"],
+                        "core_manifest_sha256": value["core_manifest_sha256"],
+                        "source_manifest_sha256": value["source_manifest_sha256"],
+                        "original_pipeline_revision": value.get("pipeline_revision"),
+                        "continuation_pipeline_revision": config["pipeline_revision"],
+                        "market_date": str(day),
+                        "max_native_attempts": 1,
+                        "full_daily_reacquisition": False,
+                    },
+                )
+                value.update(
+                    status="CORE_READY_5M_PENDING", pipeline_revision=config["pipeline_revision"]
+                )
+                write(run / "core-receipt.json", value)
+                result = finish_native(config, run, day, value, market, events)
+                print(json.dumps({"run": str(run), "result": result}, sort_keys=True))
+                return 0
             if args.native_only:
                 result = native(
                     config, run, day, physical_path(args.market), physical_path(args.events)

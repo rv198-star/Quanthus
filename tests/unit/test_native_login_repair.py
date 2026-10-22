@@ -1,7 +1,7 @@
 import json
 import sys
 import types
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -198,7 +198,7 @@ def test_login_only_continuation_reuses_exact_closure_without_an_extra_hour(monk
     monkeypatch.setattr(
         cycle, "verify_daily_domain_increment", lambda p: SimpleNamespace(manifest_sha256="core")
     )
-    assert cycle.capture_continuation(config, now.date(), old) == (
+    assert cycle.capture_continuation(config, date(2026, 10, 22), old) == (
         old,
         *sources,
         previous / "capture-5m",
@@ -210,4 +210,4 @@ def test_login_only_continuation_reuses_exact_closure_without_an_extra_hour(monk
     (tmp_path / "2026-10-22-repair").mkdir()
     (tmp_path / "2026-10-22-repair/native-login-repair.json").write_text("{}")
     with pytest.raises(ValueError):
-        cycle.capture_continuation(config, now.date(), old)
+        cycle.capture_continuation(config, date(2026, 10, 22), old)

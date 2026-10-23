@@ -114,6 +114,52 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**R2 missing-bar/action separation, 2026-10-23 (latest):** v7 completed full
+semantic verification for both independent preparations and started the first
+retrospective variant, then both executions stopped with
+`RETRO_HELD_ACTION_UNQUALIFIED`; zero of four variants completed. The exact retained
+August DWD confirms no bar/state for the held listing on 2026-08-03. Absence is not
+proof of suspension, delisting, or an observed price. The runtime incorrectly used
+missing session rows as its corporate-action evidence gate.
+
+The additive `retrospective-comparison.v3.json` carries the existing P10 retained
+implemented-action inventory claim separately from bar availability. It embeds exact
+original manifest/plan/exception bodies; 405 exception securities remain blocked.
+The coverage derivation adds no acquisition and no historical-PIT claim. Missing
+prices remain missing and cannot authorize any fill; only existing frozen accounting
+may carry the prior mark, applying a qualified action if one exists. Source inputs,
+8,016 candidates and the 4,326-entry common mask remain unchanged. Tests cover unknown
+and out-of-scope actions, independent action evidence without bars, complete four-way
+synthetic execution and offline source/universe binding (51 focused tests passed).
+
+v8 preparation/re-admission and actual execution are the current next steps; old
+failed v7 workspaces remain evidence, not running processes or completed results.
+Evidence root is the existing `p3-launch-convergence-20261023T085009Z-04bcbe9` job.
+`docs-impact: none` for governing design: this corrects an implementation violation
+of existing missing-data/no-forced-sale and independently governed action semantics;
+no frozen research, P2 matching, strict B/D or P6 policy is relaxed.
+
+
+**R2 prerequisite recovery, 2026-10-23 (historical v5 checkpoint):** both independent preparations
+completed 2,455,533 ports, 2,162,018 feature rows and 8,016 candidates, of which
+4,326 pass the common entry mask. The full candidate scan exposed the legitimate
+300114 → 302132 dated listing transition. Commit `0faa3de` scans contiguous listing/
+company identities separately while retaining the 22-session gate; cross-identity
+windows never qualify. Its 33 focused tests passed. Failed v3 attempts remain intact.
+The v5 continuation physically reuses each independently built port/feature artifact;
+exact hashes and AST checks prove unchanged upstream producer semantics. Recovery
+proof is `sha256:ae1464d8a03d9f5f7b7baee44103b753cb9b9ac8f4a14aadc981b7f449ec2294`.
+Primary prepared manifest is
+`sha256:29a6c62c1710808ecb2944411ca85433070f5bb099d25b84f3ff02c65faca39f`;
+independent prepared manifest is
+`sha256:bc068ca573bec1710a3c178414a39a156385dcd4673fcc76531fb2df31df4efa`.
+Their complete member entries are equal; incidental timing/resource receipts differ.
+Full semantic admission verification is running from `prepared-primary-v5` and
+`scratch/r2-independent-v5/prepared` under the existing job root. Real comparisons
+remain **0/4** until exact receipts are registered and the R2 runtime actually starts.
+Original strict B/D and P6 boundaries remain unchanged. Do not restart raw conversion.
+
+
 
 **P10-authorized support integration, 2026-10-23 (current):** the Owner explicitly
 approved “授权按 P10 职责修复，再启动 P3”. Continue this existing job, not the old

@@ -355,14 +355,19 @@ def test_recover_finished_stages_without_rebuilding_or_changing_failed_attempt(
     monkeypatch.setattr(prep.features, "write_history", stop)
     plan = native._json(recovered / "plan.json")
     result = prep._finish_preparation(
-        ROOT, recovered, plan=plan, rows=len(DAYS),
+        ROOT,
+        recovered,
+        plan=plan,
+        rows=len(DAYS),
         stages=[{"stage": "shared_prerequisite", "disposition": "verified_reuse"}],
-        resource_snapshot={}, guard=lambda: None,
+        resource_snapshot={},
+        guard=lambda: None,
     )
     prep.verify(ROOT, recovered, manifest_sha256=result["manifest_sha256"])
-    assert native._json(recovered / "manifest.json")["files"] == native._json(
-        normal / "prepared/manifest.json"
-    )["files"]
+    assert (
+        native._json(recovered / "manifest.json")["files"]
+        == native._json(normal / "prepared/manifest.json")["files"]
+    )
     assert before == {p.name: native._sha(p) for p in source.iterdir() if p.is_file()}
     assert not (source / "PREPARATION_COMPLETE.json").exists()
 
@@ -381,3 +386,42 @@ def test_candidate_payload_reader_is_bounded_separately_from_small_metadata(tmp_
     path.write_text('{"candidates":[],"candidates":[]}')
     with pytest.raises(native.InputError, match="DUPLICATE_JSON_KEY"):
         prep.load_candidates(path)
+
+
+def test_v3_action_coverage_is_sealed_and_verified_against_port_universe(tmp_path):
+    from quanthus.expert_strategy import p3_base24_native as n
+    from quanthus.expert_strategy import p3_retrospective_preparation as p
+    from tests.unit.test_p3_retrospective_bridge import INFO, ROOT, SOURCE
+    from tests.unit.test_p3_retrospective_features import DAYS, ports
+    from tests.unit.test_p10_action_coverage import fixture
+
+    coverage, args = fixture()
+    coverage["security_ids"] = ["security-native"]
+    coverage_file = tmp_path / "coverage.json"
+    p._write(coverage_file, coverage)
+    action_file = tmp_path / "actions.json"
+    action_file.write_text("[]\n")
+    assert n._sha(action_file) == args["actions_sha256"]
+    output = tmp_path / "v3"
+    result = p.materialize(
+        ROOT,
+        output,
+        ports=ports(),
+        trading_dates=DAYS,
+        source_manifest_sha256=SOURCE,
+        information_cutoff=INFO,
+        support_manifest_sha256=args["support_sha256"],
+        input_manifest_sha256=SOURCE,
+        industry_manifest_sha256=SOURCE,
+        source_roots=(tmp_path / "source",),
+        scope=SCOPE,
+        synthetic=True,
+        normalized_actions=action_file,
+        action_coverage=coverage_file,
+        purpose_version=3,
+    )
+    assert p.verify(ROOT, output, manifest_sha256=result["manifest_sha256"]) == result
+    assert n._sha(output / "action-coverage.json") == n._sha(coverage_file)
+    plan = n._json(output / "plan.json")
+    with pytest.raises(ValueError, match="ACTION_COVERAGE_SCOPE"):
+        p.load_action_coverage(output, plan, securities=["unexpected-security"])

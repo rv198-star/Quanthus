@@ -172,14 +172,36 @@ def load_actions(path: Path, cutoff: datetime) -> list[dict[str, Any]]:
     return output
 
 
+def load_action_coverage(
+    root: Path,
+    plan: Mapping[str, Any],
+    *,
+    securities: Iterable[str] | None = None,
+) -> dict[str, Any]:
+    from quanthus.pipelines.securities_warehouse.p10_action_coverage import validate
+
+    path = root / "action-coverage.json"
+    if native._sha(path) != plan.get("action_coverage_sha256"):
+        raise native.InputError("RETRO_ACTION_COVERAGE_IDENTITY")
+    return validate(
+        native._json(path),
+        support_sha256=plan["support_manifest_sha256"],
+        actions_sha256=plan["normalized_actions_sha256"],
+        information_cutoff=datetime.fromisoformat(plan["information_cutoff"]),
+        securities=securities,
+    )
+
+
 def members(plan: Mapping[str, Any]) -> set[str]:
-    return MEMBERS | (
-        {"normalized-actions.json"} if plan.get("normalized_actions_sha256") else set()
+    return (
+        MEMBERS
+        | ({"normalized-actions.json"} if plan.get("normalized_actions_sha256") else set())
+        | ({"action-coverage.json"} if plan.get("action_coverage_sha256") else set())
     )
 
 
 def _purpose_file(repository: Path, version: int) -> Path:
-    if type(version) is not int or version not in (1, 2):
+    if type(version) is not int or version not in (1, 2, 3):
         raise native.InputError("RETRO_PURPOSE_VERSION")
     return repository / f"config/research/p3-strat-003/retrospective-comparison.v{version}.json"
 
@@ -348,6 +370,7 @@ def materialize(
     synthetic: bool = False,
     normalized_actions: Path | None = None,
     purpose_version: int = 1,
+    action_coverage: Path | None = None,
 ) -> dict[str, Any]:
     """Materialize result-blind prerequisites, not source/support admission.
 
@@ -406,15 +429,39 @@ def materialize(
         support_manifest_sha256,
     ):
         raise native.InputError("RETRO_PURPOSE_SUPPORT_BINDING")
-    if not synthetic and purpose_version == 2 and (
-        purpose.get("support_manifest_sha256") != support_manifest_sha256
-        or purpose.get("industry_manifest_sha256") != industry_manifest_sha256
-        or action_sha is None
-        or purpose.get("normalized_actions_sha256") != action_sha
+    if (
+        not synthetic
+        and purpose_version >= 2
+        and (
+            purpose.get("support_manifest_sha256") != support_manifest_sha256
+            or purpose.get("industry_manifest_sha256") != industry_manifest_sha256
+            or action_sha is None
+            or purpose.get("normalized_actions_sha256") != action_sha
+        )
     ):
         raise native.InputError("RETRO_PURPOSE_P10_CLOSURE")
-    wall_budget = 7200 if purpose_version == 2 else 600
-    write_budget = 4 * 1024**3 if purpose_version == 2 else 1024**3
+    coverage_sha = None
+    if action_coverage is not None:
+        from quanthus.pipelines.securities_warehouse.p10_action_coverage import validate
+
+        action_coverage = native.physical(action_coverage)
+        native._isolate(action_coverage, output, output)
+        if purpose_version != 3 or action_sha is None:
+            raise native.InputError("RETRO_ACTION_COVERAGE_REQUIRES_V3_ACTIONS")
+        validate(
+            native._json(action_coverage),
+            support_sha256=support_manifest_sha256,
+            actions_sha256=action_sha,
+            information_cutoff=information_cutoff,
+        )
+        coverage_sha = native._sha(action_coverage)
+    if purpose_version == 3 and (
+        coverage_sha is None
+        or (not synthetic and purpose.get("action_coverage_sha256") != coverage_sha)
+    ):
+        raise native.InputError("RETRO_PURPOSE_ACTION_COVERAGE")
+    wall_budget = 7200 if purpose_version >= 2 else 600
+    write_budget = 4 * 1024**3 if purpose_version >= 2 else 1024**3
     space, fs = shutil.disk_usage(output.parent), os.statvfs(output.parent)
     plan = {
         "schema_version": VERSION,
@@ -450,6 +497,8 @@ def materialize(
         "original_B_accepted": False,
         "D_activated": False,
     }
+    if coverage_sha is not None:
+        plan["action_coverage_sha256"] = coverage_sha
     start = time.monotonic()
     resource_snapshot = {
         "observed_at": datetime.now(timezone.utc).isoformat(),
@@ -477,7 +526,11 @@ def materialize(
         shutil.copyfile(normalized_actions, output / "normalized-actions.json")
         if native._sha(output / "normalized-actions.json") != action_sha:
             raise native.InputError("RETRO_ACTION_INPUT_CHANGED")
+    if action_coverage is not None:
+        shutil.copyfile(action_coverage, output / "action-coverage.json")
+        load_action_coverage(output, plan)
     rows = 0
+    security_ids: set[str] = set()
     with (
         (output / "ports.jsonl.gz").open("xb") as stored,
         gzip.GzipFile(
@@ -491,6 +544,7 @@ def materialize(
             for p in _checked(ports, plan):
                 journal.write(json.dumps(p, default=_typed, sort_keys=True) + "\n")
                 rows += 1
+                security_ids.add(p.security_id)
                 if rows % 8192 == 0:
                     guard()
                 if p.business_date <= scope[1]:
@@ -504,6 +558,8 @@ def materialize(
         )
     if not rows:
         raise native.InputError("RETRO_PREPARATION_EMPTY_INPUT")
+    if coverage_sha is not None:
+        load_action_coverage(output, plan, securities=security_ids)
     stages = [
         {
             "stage": "shared_ports_and_history_TMP",
@@ -543,8 +599,13 @@ def materialize(
         }
     )
     return _finish_preparation(
-        repository, output, plan=plan, rows=rows, stages=stages,
-        resource_snapshot=resource_snapshot, guard=guard,
+        repository,
+        output,
+        plan=plan,
+        rows=rows,
+        stages=stages,
+        resource_snapshot=resource_snapshot,
+        guard=guard,
     )
 
 
@@ -744,10 +805,17 @@ def verify_integrity(
         )
     ):
         raise native.InputError("RETRO_PREPARATION_PLAN_BINDING")
-    if plan.get("synthetic") is False and plan.get("purpose_version") == 2 and any(
-        plan.get(key) is None or plan.get(key) != purpose.get(key)
-        for key in ("support_manifest_sha256", "industry_manifest_sha256",
-                    "normalized_actions_sha256")
+    if (
+        plan.get("synthetic") is False
+        and plan.get("purpose_version", 1) >= 2
+        and any(
+            plan.get(key) is None or plan.get(key) != purpose.get(key)
+            for key in (
+                "support_manifest_sha256",
+                "industry_manifest_sha256",
+                "normalized_actions_sha256",
+            )
+        )
     ):
         raise native.InputError("RETRO_PURPOSE_P10_CLOSURE")
     if plan.get("normalized_actions_sha256"):
@@ -756,6 +824,12 @@ def verify_integrity(
         load_actions(
             root / "normalized-actions.json", datetime.fromisoformat(plan["information_cutoff"])
         )
+    if plan.get("purpose_version") == 3:
+        if plan.get("synthetic") is False and plan.get("action_coverage_sha256") != purpose.get(
+            "action_coverage_sha256"
+        ):
+            raise native.InputError("RETRO_PURPOSE_ACTION_COVERAGE")
+        load_action_coverage(root, plan)
     load_candidates(root / "candidates.json")
     days = tuple(map(date.fromisoformat, plan["trading_dates"]))
     if not isinstance(plan.get("scope"), list) or len(plan["scope"]) != 3:
@@ -816,9 +890,16 @@ def verify(repository: Path, root: Path, *, manifest_sha256: str) -> dict[str, A
         raise native.InputError("RETRO_PREPARATION_VARIANT_SEMANTICS")
     import pyarrow.parquet as pq
 
+    port_rows = 0
+    security_ids = set()
+    for port in _ports(root):
+        port_rows += 1
+        security_ids.add(port.security_id)
+    if plan.get("action_coverage_sha256"):
+        load_action_coverage(root, plan, securities=security_ids)
     result = {
         "status": "RESULT_BLIND_SHARED_PREPARATION_COMPLETE",
-        "port_rows": sum(1 for _ in _ports(root)),
+        "port_rows": port_rows,
         "feature_rows": pq.ParquetFile(root / "features.parquet").metadata.num_rows,
         "candidates": len(candidates["candidates"]),
         "eligible_candidates": sum(m["eligible"] for m in masks),

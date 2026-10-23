@@ -12,7 +12,7 @@ import resource
 import shutil
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
@@ -205,7 +205,7 @@ class RetrospectiveFrame:
         return self.source.block_reason(security)
 
     def actions(self, security: str, prior_mark_price: Decimal) -> tuple[Any, ...]:
-        if self.source.block_reason(security) is not None:
+        if self.source.action_block_reason(security) is not None:
             raise native.InputError("RETRO_HELD_ACTION_UNQUALIFIED")
         return self.source.actions(security, prior_mark_price)
 
@@ -243,6 +243,9 @@ class _SessionIndex:
 class _DaySource:
     index: _SessionIndex
     empty: MarketSession
+    action_security_ids: frozenset[str] = frozenset()
+    action_scope: tuple[date, date] | None = None
+    actions_by_key: Mapping[tuple[str, date], dict[str, Any]] = field(default_factory=dict)
 
     def session(self, security: str) -> MarketSession:
         row = self.index.get(self.empty.session_date, security)
@@ -256,9 +259,27 @@ class _DaySource:
             "RETRO_ACTION_OR_SESSION_UNQUALIFIED" if row is None or row["blocked_action"] else None
         )
 
+    def action_block_reason(self, security: str) -> str | None:
+        row = self.index.get(self.empty.session_date, security)
+        if row is not None:
+            return "RETRO_ACTION_UNQUALIFIED" if row["blocked_action"] else None
+        if (
+            security in self.action_security_ids
+            and self.action_scope is not None
+            and self.action_scope[0] <= self.empty.session_date <= self.action_scope[1]
+        ):
+            return None
+        return "RETRO_ACTION_COVERAGE_UNAVAILABLE"
+
     def actions(self, security: str, prior_mark_price: Decimal) -> tuple[CorporateActionStep, ...]:
         row = self.index.get(self.empty.session_date, security)
-        raw = row.get("action") if row else None
+        if self.action_block_reason(security) is not None:
+            raise native.InputError("RETRO_HELD_ACTION_UNQUALIFIED")
+        raw = (
+            row.get("action")
+            if row
+            else self.actions_by_key.get((security, self.empty.session_date))
+        )
         if raw is None:
             return ()
         action = RetrospectiveCorporateAction(
@@ -285,7 +306,9 @@ class _DaySource:
 
 
 def _verify_registered_preparation(
-    repository: Path, prepared: Path, manifest_sha256: str,
+    repository: Path,
+    prepared: Path,
+    manifest_sha256: str,
     admission: Mapping[str, Any],
 ) -> None:
     """Reuse only an exact registered full-semantic receipt, with fresh byte checks.
@@ -303,11 +326,10 @@ def _verify_registered_preparation(
         or admission.get("preparation_sha256") != manifest_sha256
     ):
         raise native.InputError("RETRO_REGISTERED_VERIFICATION_REQUIRED")
-    _, manifest, _ = prep.verify_integrity(
-        repository, prepared, manifest_sha256=manifest_sha256
-    )
+    _, manifest, _ = prep.verify_integrity(repository, prepared, manifest_sha256=manifest_sha256)
     if admission.get("preparation_verification") != {
-        **manifest["result"], "manifest_sha256": manifest_sha256
+        **manifest["result"],
+        "manifest_sha256": manifest_sha256,
     }:
         raise native.InputError("RETRO_REGISTERED_VERIFICATION_RESULT")
 
@@ -599,6 +621,28 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
         index = _SessionIndex(self.workspace / "sessions.parquet")
         self.stack.callback(index.close)
         days = tuple(map(date.fromisoformat, self.r2_plan["trading_dates"]))
+        action_security_ids: frozenset[str] = frozenset()
+        action_scope = None
+        action_map = {}
+        if self.r2_plan.get("action_coverage_sha256"):
+            coverage = prep.load_action_coverage(self.prepared, self.r2_plan)
+            action_security_ids = frozenset(coverage["security_ids"]) - frozenset(
+                coverage["unqualified_security_ids"]
+            )
+            action_scope = (
+                date.fromisoformat(coverage["business_from"]),
+                date.fromisoformat(coverage["business_through"]),
+            )
+            action_map = {
+                (a["security_id"], a["effective_date"]): {
+                    "economic_event_id": a["economic_event_id"],
+                    "known_at": a["known_at"].isoformat(),
+                    "cash": str(a["cash_dividend_per_share"]),
+                    "shares": str(a["bonus_share_ratio"]),
+                    "support_manifest_sha256": self.r2_plan["support_manifest_sha256"],
+                }
+                for a in prep.load_actions(self.prepared / "normalized-actions.json", self.info)
+            }
         self.frames: Any = []
         for day, following in zip(days, days[1:], strict=False):
             if not self.decision_start <= day <= self.decision_end:
@@ -624,7 +668,7 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
                     ),
                     self.clocks[day][1],
                     following,
-                    _DaySource(index, empty),
+                    _DaySource(index, empty, action_security_ids, action_scope, action_map),
                 )
             )
         with duckdb.connect(":memory:") as c:

@@ -377,9 +377,10 @@ def test_independent_builds_share_semantic_snapshot_not_timing_receipt(tmp_path)
         ]
     with runtime(b) as second:
         assert second.preparation_sha != receipt  # elapsed time/resource receipts differ
-        assert json.loads((b / "prepared/variants.json").read_text())[0][
-            "shared_prerequisite_digest"
-        ] == shared
+        assert (
+            json.loads((b / "prepared/variants.json").read_text())[0]["shared_prerequisite_digest"]
+            == shared
+        )
         assert second.snapshot_id == identity
         assert second._code_version() == code_identity
 
@@ -394,9 +395,12 @@ def test_session_index_does_not_execute_warmup_or_first_decision_day(tmp_path):
     from tests.unit.test_p3_base24_bridge import support
     from tests.unit.test_p3_retrospective_bridge import observation
 
-    days = tuple(map(date.fromisoformat, [
-        "2024-12-30", "2024-12-31", "2025-01-02", "2025-01-03", "2025-01-06"
-    ]))
+    days = tuple(
+        map(
+            date.fromisoformat,
+            ["2024-12-30", "2024-12-31", "2025-01-02", "2025-01-03", "2025-01-06"],
+        )
+    )
     prepared, output = tmp_path / "prepared", tmp_path / "index"
     prepared.mkdir()
     output.mkdir()
@@ -406,9 +410,12 @@ def test_session_index_does_not_execute_warmup_or_first_decision_day(tmp_path):
             if day < date(2025, 1, 1):
                 row["r2_observation_role"] = "WARMUP"
             p = bridge.decision_port(
-                row, information_cutoff=INFO, source_manifest_sha256=SOURCE,
+                row,
+                information_cutoff=INFO,
+                source_manifest_sha256=SOURCE,
                 support=replace(support(row), execution_known_at=INFO),
-                static_industry_id="static-L1", warmup_dates=days[:2],
+                static_industry_id="static-L1",
+                warmup_dates=days[:2],
             )
             assert p.selected is not None
             f.write(json.dumps(p, default=prep._typed) + "\n")
@@ -458,3 +465,82 @@ def test_registered_semantic_receipt_reuses_proof_but_rechecks_every_member(tmp_
     (prepared / "features.parquet").write_bytes(b"damaged")
     with pytest.raises(ValueError):
         replay._verify_registered_preparation(ROOT, prepared, result["manifest_sha256"], receipt)
+
+
+@pytest.mark.parametrize("mode", ["no_action", "action", "uncovered", "out_of_scope"])
+def test_missing_bar_uses_independent_action_evidence_without_manufacturing_fill(tmp_path, mode):
+    from types import SimpleNamespace
+
+    with runtime(tmp_path) as r:
+        frame = r.frames[1]
+        day = frame.execution_date
+        known = mode != "uncovered"
+        actions = {}
+        if mode == "action":
+            actions[("security-native", day)] = {
+                "economic_event_id": "synthetic-cash-event",
+                "known_at": INFO.isoformat(),
+                "cash": "1.0000000000",
+                "shares": "0",
+                "support_manifest_sha256": SOURCE,
+            }
+        source = replace(
+            frame.source,
+            index=SimpleNamespace(get=lambda *_: None),
+            action_security_ids=frozenset({"security-native"} if known else set()),
+            action_scope=(DAYS[0], DAYS[0] if mode == "out_of_scope" else DAYS[-1]),
+            actions_by_key=actions,
+        )
+        frame = replace(frame, source=source)
+        session = frame.session("security-native")
+        assert session.open_price is None and session.close_price is None
+        assert session.open_execution_state == replay.OpenExecutionState.MISSING_EVIDENCE
+        assert frame.block_reason("security-native") is not None
+        if mode in ("uncovered", "out_of_scope"):
+            with pytest.raises(ValueError, match="HELD_ACTION_UNQUALIFIED"):
+                frame.actions("security-native", Decimal("100"))
+        elif mode == "no_action":
+            assert frame.actions("security-native", Decimal("100")) == ()
+        else:
+            (step,) = frame.actions("security-native", Decimal("100"))
+            assert step.post_action_mark_price == Decimal("99.00")
+            assert step.action.known_at == INFO
+        with pytest.raises(ValueError, match="HELD_ACTION_UNQUALIFIED"):
+            frame.actions("outside-frozen-universe", Decimal("100"))
+
+
+def test_independent_coverage_never_overrides_existing_unqualified_action(tmp_path):
+    with runtime(tmp_path, observations=ports(unknown_action=63)) as r:
+        frame = r.frames[1]
+        frame = replace(
+            frame,
+            source=replace(
+                frame.source,
+                action_security_ids=frozenset({"security-native"}),
+                action_scope=(DAYS[0], DAYS[-1]),
+            ),
+        )
+        with pytest.raises(ValueError, match="HELD_ACTION_UNQUALIFIED"):
+            frame.actions("security-native", Decimal("100"))
+
+
+def test_held_missing_bar_continues_four_variants_under_existing_mark_policy(tmp_path):
+    from types import SimpleNamespace
+
+    with runtime(tmp_path) as r:
+        frame = r.frames[1]
+        r.frames[1] = replace(
+            frame,
+            source=replace(
+                frame.source,
+                index=SimpleNamespace(get=lambda *_: None),
+                action_security_ids=frozenset({"security-native"}),
+                action_scope=(DAYS[0], DAYS[-1]),
+            ),
+        )
+        report = r.execute_all()
+        assert tuple(report["variants"]) == ("B", "T", "R", "TR")
+        assert r.frames[1].session("security-native").close_price is None
+        assert r.frames[1].session("security-native").open_price is None
+        assert r.frames[1].block_reason("security-native") is not None
+    assert (tmp_path / "runtime/COMPLETE.json").exists()

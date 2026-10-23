@@ -114,15 +114,41 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**Fixed component experiment step 2 active, 2026-10-24 Asia/Shanghai (latest):**
+**Fixed component experiment step 2 completed, 2026-10-24 Asia/Shanghai (latest):**
 the Owner authorized step 2 after completing step 1. The frozen five-cell design
 and separate admission registry are `risk-components.v1.json` and
 `risk-components-execution.v1.json` under the same research config directory.
 The governing [formal topology](../design/lld/04-experts-aggregator/expert-strategy-layer/first-formal-topology.md#fixed-component-diagnosis-2026-10-24)
-defines the exact effects and claim limits. Implementation and synthetic admission,
-guard, anchor and cold-process contracts are being completed before new real results.
+defines the exact effects and claim limits. All five cells completed in both the
+primary and independent cold processes. Ten replay digests were recomputed, all
+business outputs and recorded decisions matched under exact identity mappings,
+72 original input files remained unchanged, and a separate cash-flow implementation
+reconciled 320 position cycles and 2,080 portfolio closes. The cold process denied
+native old-source reads and network access. Each role reused only its own independently
+constructed prerequisite and verified checkpoint, not the other role's materialization.
 Step 1 remains complete; step 3 remains NOT_STARTED. This is a separate retrospective
 component diagnosis and never replaces the original frozen B/T/R/TR request.
+
+The fixed ordered return difference TR−T is −13.840258 percentage points:
+TC−T = −6.855502, TE−TC = −9.886442, and TR−TE = +2.901686. Held management
+under original entry instead gives TH−T = −12.694886 points. These conditional
+effects cannot assign fixed responsibility to a component or select a successor
+strategy. The five-cell return/drawdown comparison and six descriptive intervals
+are in `recovery-attempt-01/evidence/component-analysis.safe.json` under
+`/srv/agentdock/.codex/p3-risk-components-step2-20261023T205243Z-a88b88d/`;
+acceptance is `component-acceptance.safe.json` beside it. The actual information
+cutoff remains 2026-10-23T11:21:45.250143+00:00 and the window is already exposed.
+Separate arithmetic and read-only independent review passed; intervals are not
+multiple-comparison adjusted and do not establish confirmatory or historical-PIT value.
+
+The first attempt stopped on the retained ledger snapshot-identity anchor before
+any new cell ran. Its evidence remains intact. The precise old/new identity mapping
+and own-role checkpoint recovery were reviewed and registered before restarting;
+no policy, threshold, economic field or analysis rule changed. Final focused tests
+passed 144 cases, with changed-file lint/type/format checks passing. `make check`
+reported 3,795 passed, 28 failed and 20 skipped; the 28 failure identities exactly
+match the prior environment baseline. Separate `make planning-check` passed.
+The repository remains non-green; no strict B/D, P6 or production gate changed.
 
 **Corrected risk diagnosis step 1 completed, 2026-10-24 Asia/Shanghai (prior):**
 the Owner requested stepwise continuation: (1) diagnose existing corrected outputs,

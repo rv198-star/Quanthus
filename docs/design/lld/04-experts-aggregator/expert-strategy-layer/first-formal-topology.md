@@ -184,8 +184,12 @@ strict B/D acceptance, P6 mutation or production admission. Sealed v1 results re
 
 ### Fixed component diagnosis, 2026-10-24
 
-Design status: approved by the Owner's step-2 continuation. Delivery gate: open;
-real execution requires the separate exact admission registry.
+Design status: approved by the Owner's step-2 continuation. Delivery gate: accepted
+for this bounded retrospective component diagnosis only; exact primary/cold
+execution is recorded in the separate admission registry. Evidence:
+`/srv/agentdock/.codex/p3-risk-components-step2-20261023T205243Z-a88b88d/recovery-attempt-01/evidence/component-acceptance.safe.json`
+and `component-analysis.safe.json` beside it. The [current recovery checkpoint](../../../../work-items/p3-strat-003.md#current-recovery-checkpoint)
+records checks, the identity-only recovery and the unchanged strategy gates.
 
 `config/research/p3-strat-003/risk-components.v1.json` freezes five retrospective
 cells: T (original Trend entry), TC (20% entry cap only), TE (entry filter plus cap),

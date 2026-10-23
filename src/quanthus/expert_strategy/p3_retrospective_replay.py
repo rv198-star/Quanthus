@@ -492,7 +492,11 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
         self.candidate_input = self.candidate_input_manifest = None
         start, end, execution = map(date.fromisoformat, self.r2_plan["scope"])
         self.info = datetime.fromisoformat(self.r2_plan["information_cutoff"])
-        self.snapshot_id = prep.PURPOSE + "/" + manifest_sha256.split(":")[1]
+        # Resource/elapsed-time receipts differ across independent builds.
+        # Events bind the verified semantic prerequisite, not those incidental bytes.
+        variants = json.loads((self.prepared / "variants.json").read_bytes())
+        semantic_identity = variants[0]["shared_prerequisite_digest"]
+        self.snapshot_id = prep.PURPOSE + "/" + semantic_identity.split(":")[1]
         self.clocks = _index(prepared, workspace, self.r2_plan, self.snapshot_id, self._guard)
         try:
             FormalP2ReplayRuntime.__init__(
@@ -703,7 +707,7 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
         )
 
     def _code_version(self) -> str:
-        return VERSION + ":" + self.preparation_sha
+        return VERSION + ":" + digest_value(self.r2_plan["code_config_members"])
 
     def _population_manifest_fields(self) -> dict[str, Any]:
         return {

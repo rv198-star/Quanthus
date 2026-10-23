@@ -362,3 +362,23 @@ def test_normalized_action_file_checks_true_time_and_duplicate_event(tmp_path):
     file.write_text(json.dumps([a, a]))
     with pytest.raises(ValueError, match="IDENTITY_OR_TIME"):
         prep.load_actions(file, INFO)
+
+
+def test_independent_builds_share_semantic_snapshot_not_timing_receipt(tmp_path):
+    a, b = tmp_path / "first", tmp_path / "independent"
+    a.mkdir()
+    b.mkdir()
+    with runtime(a) as first:
+        identity = first.snapshot_id
+        code_identity = first._code_version()
+        receipt = first.preparation_sha
+        shared = json.loads((a / "prepared/variants.json").read_text())[0][
+            "shared_prerequisite_digest"
+        ]
+    with runtime(b) as second:
+        assert second.preparation_sha != receipt  # elapsed time/resource receipts differ
+        assert json.loads((b / "prepared/variants.json").read_text())[0][
+            "shared_prerequisite_digest"
+        ] == shared
+        assert second.snapshot_id == identity
+        assert second._code_version() == code_identity

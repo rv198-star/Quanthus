@@ -284,6 +284,34 @@ class _DaySource:
         )
 
 
+def _verify_registered_preparation(
+    repository: Path, prepared: Path, manifest_sha256: str,
+    admission: Mapping[str, Any],
+) -> None:
+    """Reuse only an exact registered full-semantic receipt, with fresh byte checks.
+
+    This is a job-local admission handoff, not an unchecked cache or caller flag.
+    The original full cold verify remains the receipt producer. Any changed member,
+    code/config closure, receipt or result census rejects before execution starts.
+    """
+    activation = native._json(
+        repository / "config/research/p3-strat-003/retrospective-execution.v1.json"
+    )
+    if (
+        digest_value(dict(admission)) not in activation["admitted_consumer_receipt_sha256"]
+        or admission.get("purpose_id") != prep.PURPOSE
+        or admission.get("preparation_sha256") != manifest_sha256
+    ):
+        raise native.InputError("RETRO_REGISTERED_VERIFICATION_REQUIRED")
+    _, manifest, _ = prep.verify_integrity(
+        repository, prepared, manifest_sha256=manifest_sha256
+    )
+    if admission.get("preparation_verification") != {
+        **manifest["result"], "manifest_sha256": manifest_sha256
+    }:
+        raise native.InputError("RETRO_REGISTERED_VERIFICATION_RESULT")
+
+
 def _index(
     prepared: Path, output: Path, plan: Mapping[str, Any], identity: str, guard: Callable[[], None]
 ) -> dict[date, tuple[datetime, datetime]]:
@@ -306,6 +334,7 @@ def _index(
     clocks: dict[date, tuple[datetime, datetime]] = {}
     days = tuple(map(date.fromisoformat, plan["trading_dates"]))
     positions = {d: i for i, d in enumerate(days)}
+    decision_start, decision_end = map(date.fromisoformat, plan["scope"][:2])
     batch = []
     unsorted = output / "sessions-unsorted.parquet"
     with pq.ParquetWriter(unsorted, schema, compression="zstd") as writer:
@@ -317,7 +346,9 @@ def _index(
             if clocks.setdefault(port.business_date, clock) != clock:
                 raise native.InputError("RETRO_SESSION_CLOCK_CONFLICT")
             i = positions[port.business_date]
-            if i == 0:
+            # Warmup is feature history, never an executable decision. Keep
+            # its clocks, but only index T+1 sessions for the frozen decisions.
+            if i == 0 or not decision_start <= days[i - 1] <= decision_end:
                 continue
             snap = SnapshotRef(
                 port.business_date, port.information_cutoff, port.source_manifest_sha256, identity
@@ -461,7 +492,12 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
             ):
                 raise native.InputError("RETRO_REAL_SOURCE_ADMISSION_NOT_CLOSED")
         self.consumer_admission_digest = digest_value(dict(consumer_admission))
-        prep.verify(repository, self.prepared, manifest_sha256=manifest_sha256)
+        if self.synthetic:
+            prep.verify(repository, self.prepared, manifest_sha256=manifest_sha256)
+        else:
+            _verify_registered_preparation(
+                repository, self.prepared, manifest_sha256, consumer_admission
+            )
         industry_path = native.physical(industry.path)
         if native._sha(industry_path) != self.r2_plan["industry_manifest_sha256"]:
             raise native.InputError("RETRO_INDUSTRY_MANIFEST_BINDING")

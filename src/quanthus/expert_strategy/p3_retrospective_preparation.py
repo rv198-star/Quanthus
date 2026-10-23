@@ -687,8 +687,10 @@ def _finish_preparation(
     return {**result, "manifest_sha256": native._sha(output / "manifest.json")}
 
 
-def verify(repository: Path, root: Path, *, manifest_sha256: str) -> dict[str, Any]:
-    """Cold verification uses only this package and ordinary current code/config."""
+def verify_integrity(
+    repository: Path, root: Path, *, manifest_sha256: str
+) -> tuple[Path, dict[str, Any], dict[str, Any]]:
+    """Recheck every physical byte and binding before reusing an admitted proof."""
     root = native.physical(root)
     if (
         not native._SHA.fullmatch(manifest_sha256)
@@ -754,12 +756,21 @@ def verify(repository: Path, root: Path, *, manifest_sha256: str) -> dict[str, A
         load_actions(
             root / "normalized-actions.json", datetime.fromisoformat(plan["information_cutoff"])
         )
-    stored_candidates = load_candidates(root / "candidates.json")
+    load_candidates(root / "candidates.json")
     days = tuple(map(date.fromisoformat, plan["trading_dates"]))
     if not isinstance(plan.get("scope"), list) or len(plan["scope"]) != 3:
         raise native.InputError("RETRO_PREPARATION_SCOPE")
     start, end, tail = map(date.fromisoformat, plan["scope"])
     _scope(days, (start, end, tail), plan["synthetic"])
+    return root, manifest, plan
+
+
+def verify(repository: Path, root: Path, *, manifest_sha256: str) -> dict[str, Any]:
+    """Full cold semantic recomputation, before any consumer admission."""
+    root, manifest, plan = verify_integrity(repository, root, manifest_sha256=manifest_sha256)
+    member_set = members(plan)
+    days = tuple(map(date.fromisoformat, plan["trading_dates"]))
+    stored_candidates = load_candidates(root / "candidates.json")
     candidates = features.candidate_observations(
         _checked(_ports(root), plan),
         trading_dates=days,

@@ -382,3 +382,79 @@ def test_independent_builds_share_semantic_snapshot_not_timing_receipt(tmp_path)
         ] == shared
         assert second.snapshot_id == identity
         assert second._code_version() == code_identity
+
+
+def test_session_index_does_not_execute_warmup_or_first_decision_day(tmp_path):
+    import gzip
+    from datetime import date
+
+    import pyarrow.parquet as pq
+
+    from quanthus.expert_strategy import p3_retrospective_bridge as bridge
+    from tests.unit.test_p3_base24_bridge import support
+    from tests.unit.test_p3_retrospective_bridge import observation
+
+    days = tuple(map(date.fromisoformat, [
+        "2024-12-30", "2024-12-31", "2025-01-02", "2025-01-03", "2025-01-06"
+    ]))
+    prepared, output = tmp_path / "prepared", tmp_path / "index"
+    prepared.mkdir()
+    output.mkdir()
+    with gzip.open(prepared / "ports.jsonl.gz", "wt") as f:
+        for day in days:
+            row = observation(day)
+            if day < date(2025, 1, 1):
+                row["r2_observation_role"] = "WARMUP"
+            p = bridge.decision_port(
+                row, information_cutoff=INFO, source_manifest_sha256=SOURCE,
+                support=replace(support(row), execution_known_at=INFO),
+                static_industry_id="static-L1", warmup_dates=days[:2],
+            )
+            assert p.selected is not None
+            f.write(json.dumps(p, default=prep._typed) + "\n")
+    plan = {
+        "trading_dates": [d.isoformat() for d in days],
+        "scope": [d.isoformat() for d in days[2:]],
+        "information_cutoff": INFO.isoformat(),
+        "source_manifest_sha256": SOURCE,
+        "support_manifest_sha256": SOURCE,
+    }
+    clocks = replay._index(prepared, output, plan, "r2-warmup-test", lambda: None)
+    assert set(clocks) == set(days)
+    assert pq.read_table(output / "sessions.parquet")["market_date"].to_pylist() == list(days[3:])
+
+
+def test_registered_semantic_receipt_reuses_proof_but_rechecks_every_member(tmp_path, monkeypatch):
+    result = build(tmp_path)
+    prepared = tmp_path / "prepared"
+    verified = prep.verify(ROOT, prepared, manifest_sha256=result["manifest_sha256"])
+    receipt = {
+        "purpose_id": prep.PURPOSE,
+        "preparation_sha256": result["manifest_sha256"],
+        "preparation_verification": verified,
+    }
+    registered = [replay.digest_value(receipt)]
+    original_json = replay.native._json
+
+    def configuration(path):
+        if path.name == "retrospective-execution.v1.json":
+            value = original_json(path)
+            return {**value, "admitted_consumer_receipt_sha256": registered}
+        return original_json(path)
+
+    monkeypatch.setattr(replay.native, "_json", configuration)
+
+    def no_repeat(*args, **kwargs):
+        raise AssertionError("full semantic verification must not repeat after exact admission")
+
+    monkeypatch.setattr(prep, "verify", no_repeat)
+    replay._verify_registered_preparation(ROOT, prepared, result["manifest_sha256"], receipt)
+    forged = {**receipt, "preparation_verification": {**verified, "eligible_candidates": 999}}
+    with pytest.raises(ValueError, match="REGISTERED_VERIFICATION_REQUIRED"):
+        replay._verify_registered_preparation(ROOT, prepared, result["manifest_sha256"], forged)
+    registered.append(replay.digest_value(forged))
+    with pytest.raises(ValueError, match="REGISTERED_VERIFICATION_RESULT"):
+        replay._verify_registered_preparation(ROOT, prepared, result["manifest_sha256"], forged)
+    (prepared / "features.parquet").write_bytes(b"damaged")
+    with pytest.raises(ValueError):
+        replay._verify_registered_preparation(ROOT, prepared, result["manifest_sha256"], receipt)

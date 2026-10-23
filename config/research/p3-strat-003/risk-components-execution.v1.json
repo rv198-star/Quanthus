@@ -7,7 +7,9 @@
   "state": "EXECUTION_REQUIRES_REGISTERED_PURPOSE_SPECIFIC_ADMISSION",
   "admitted_consumer_receipt_sha256": [
     "sha256:574474210eab591e3a08141c2a2e2105ff776181e36ed8a0cb5eef21e076617a",
-    "sha256:43feb60294c9da4f3be80dc62dd4ceed0a28cbeb9e41b8b0d91558e6b3506b18"
+    "sha256:43feb60294c9da4f3be80dc62dd4ceed0a28cbeb9e41b8b0d91558e6b3506b18",
+    "sha256:5240ed37fe4b7a662223ccb2c4b78cfa5f3db5d90681dfd1f037de34b79e7c03",
+    "sha256:b851975be688cffa1578c029bfc0a31250aa301170615287d45b22b7fb42e401"
   ],
   "owner_authorization": "2026-10-24: start step2 fixed component experiment, then report three-step progress",
   "original_request_replaced": false,

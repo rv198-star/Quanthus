@@ -97,20 +97,26 @@ def candidate_observations(
             for p in selected
             if p.selected is not None and p.selected.candidate is not None
         )
-        found, blocked, n = _scan_security_series(
-            tuple(series),
-            ordered_dates=trading_dates,
-            date_index=index,
-            history_sessions=22,
-            snapshot_id=snapshot,
-            snapshot_manifest_digest=source_manifest_sha256,
-            card=card,
-            source_policy=policy,
-            information_cutoff=information_cutoff,
-        )
-        raw.extend(found)
-        reasons.update(blocked)
-        evaluated += n
+        # A security can change its dated listing identity (for example a board
+        # transfer). Preserve the frozen one-identity/22-session rule per contiguous
+        # segment; never rewrite old codes or merge a returning identity over a gap.
+        for _, segment in groupby(
+            series, lambda row: (row.listing_id, row.listing_code, row.company_id)
+        ):
+            found, blocked, n = _scan_security_series(
+                tuple(segment),
+                ordered_dates=trading_dates,
+                date_index=index,
+                history_sessions=22,
+                snapshot_id=snapshot,
+                snapshot_manifest_digest=source_manifest_sha256,
+                card=card,
+                source_policy=policy,
+                information_cutoff=information_cutoff,
+            )
+            raw.extend(found)
+            reasons.update(blocked)
+            evaluated += n
     retained, raw_count, isolated_count, gaps = _retain_raw_candidates(
         raw,
         reasons=reasons,

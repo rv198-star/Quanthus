@@ -17,7 +17,7 @@ import shutil
 import sys
 import time
 from collections import deque
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import fields, is_dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -442,7 +442,6 @@ def materialize(
     guard()
     output.mkdir(parents=True)
     _write(output / "plan.json", plan)
-    member_set = members(plan)
     if normalized_actions is not None:
         shutil.copyfile(normalized_actions, output / "normalized-actions.json")
         if native._sha(output / "normalized-actions.json") != action_sha:
@@ -512,6 +511,43 @@ def materialize(
             "elapsed_seconds": round(time.monotonic() - prior, 6),
         }
     )
+    return _finish_preparation(
+        repository, output, plan=plan, rows=rows, stages=stages,
+        resource_snapshot=resource_snapshot, guard=guard,
+    )
+
+
+def _finish_preparation(
+    repository: Path,
+    output: Path,
+    *,
+    plan: Mapping[str, Any],
+    rows: int,
+    stages: list[dict[str, Any]],
+    resource_snapshot: Mapping[str, Any],
+    guard: Callable[[], None],
+) -> dict[str, Any]:
+    """Finish an owned, verified prerequisite stage without rebuilding it.
+
+    A recovery caller must bind exact prerequisite bytes and unchanged producer
+    semantics before physically copying them into a new isolated output. The full
+    ordinary verifier and consumer admission still govern the resulting package.
+    """
+    import pyarrow.parquet as pq
+
+    if native._json(output / "plan.json") != plan:
+        raise native.InputError("RETRO_RECOVERY_PLAN_CHANGED")
+    if plan["code_config_members"] != _preparation_closure(repository):
+        raise native.InputError("RETRO_PREPARATION_CODE_CONFIG_CHANGED")
+    trading_dates = tuple(map(date.fromisoformat, plan["trading_dates"]))
+    start, end, tail = map(date.fromisoformat, plan["scope"])
+    scope = (start, end, tail)
+    _scope(trading_dates, scope, plan["synthetic"])
+    information_cutoff = datetime.fromisoformat(plan["information_cutoff"])
+    source_manifest_sha256 = plan["source_manifest_sha256"]
+    support_manifest_sha256 = plan["support_manifest_sha256"]
+    member_set = members(plan)
+    guard()
     entries = {"features.parquet": native._entry(output / "features.parquet")}
     prior = time.monotonic()
     candidates = features.candidate_observations(
@@ -585,8 +621,10 @@ def materialize(
     )
     guard()
     # Only successful consumed, owned TMP is removed; a failed job keeps evidence.
-    (output / "history-TMP.parquet").unlink()
-    spill.rmdir()
+    (output / "history-TMP.parquet").unlink(missing_ok=True)
+    spill = output / "spill-TMP"
+    if spill.exists():
+        spill.rmdir()
     result = {
         "status": "RESULT_BLIND_SHARED_PREPARATION_COMPLETE",
         "port_rows": rows,

@@ -168,3 +168,32 @@ def test_duplicate_or_out_of_order_ports_and_changed_snapshot_rejected(tmp_path)
     with pytest.raises(native.InputError, match="RETRO_HISTORY_OUTPUT_EXISTS"):
         features.write_history(values, path, information_cutoff=INFO, source_manifest_sha256=SOURCE)
     assert path.read_bytes() == b"sealed"
+
+
+@pytest.mark.parametrize("field", ["listing_id", "listing_code", "company_id"])
+def test_dated_identity_segments_do_not_abort_or_bridge_a_transition(field):
+    values = tuple(ports())
+
+    def changed_at(start):
+        output = []
+        for i, p in enumerate(values):
+            assert p.selected is not None and p.selected.candidate is not None
+            candidate = p.selected.candidate
+            if i >= start:
+                candidate = replace(candidate, **{field: "new-identity"})
+            output.append(replace(p, selected=replace(p.selected, candidate=candidate)))
+        return output
+
+    def scan(rows):
+        return features.candidate_observations(
+            rows, trading_dates=DAYS, repository=ROOT,
+            source_manifest_sha256=SOURCE, information_cutoff=INFO,
+            support_manifest_sha256=SOURCE,
+        )
+
+    # Enough same-identity history after a legitimate dated transition qualifies.
+    assert len(scan(changed_at(20))["candidates"]) == 1
+    # A signal whose 22-session window crosses the identity change stays blocked.
+    assert not scan(changed_at(50))["candidates"]
+    # A later identity change cannot erase the earlier eligible signal.
+    assert len(scan(changed_at(63))["candidates"]) == 1

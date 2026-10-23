@@ -325,3 +325,43 @@ def test_stream_encoder_is_byte_identical_to_deepcopy_reference():
         actual = json.dumps(p, default=prep._typed, sort_keys=True)
         assert actual == reference
         assert prep.decode_port(json.loads(actual)) == p
+
+
+def test_recover_finished_stages_without_rebuilding_or_changing_failed_attempt(
+    tmp_path, monkeypatch
+):
+    normal = tmp_path / "normal"
+    normal.mkdir()
+    build(normal)
+    failed = tmp_path / "failed"
+    failed.mkdir()
+    original = prep.features.candidate_observations
+
+    def stop(*args, **kwargs):
+        raise RuntimeError("candidate stage interruption")
+
+    monkeypatch.setattr(prep.features, "candidate_observations", stop)
+    with pytest.raises(RuntimeError, match="candidate stage interruption"):
+        build(failed)
+    source = failed / "prepared"
+    before = {p.name: native._sha(p) for p in source.iterdir() if p.is_file()}
+    assert not (source / "PREPARATION_COMPLETE.json").exists()
+    recovered = tmp_path / "recovered"
+    recovered.mkdir()
+    for name in ("plan.json", "ports.jsonl.gz", "features.parquet"):
+        shutil.copyfile(source / name, recovered / name)
+    monkeypatch.setattr(prep.features, "candidate_observations", original)
+    monkeypatch.setattr(prep.features, "feature_panel", stop)
+    monkeypatch.setattr(prep.features, "write_history", stop)
+    plan = native._json(recovered / "plan.json")
+    result = prep._finish_preparation(
+        ROOT, recovered, plan=plan, rows=len(DAYS),
+        stages=[{"stage": "shared_prerequisite", "disposition": "verified_reuse"}],
+        resource_snapshot={}, guard=lambda: None,
+    )
+    prep.verify(ROOT, recovered, manifest_sha256=result["manifest_sha256"])
+    assert native._json(recovered / "manifest.json")["files"] == native._json(
+        normal / "prepared/manifest.json"
+    )["files"]
+    assert before == {p.name: native._sha(p) for p in source.iterdir() if p.is_file()}
+    assert not (source / "PREPARATION_COMPLETE.json").exists()

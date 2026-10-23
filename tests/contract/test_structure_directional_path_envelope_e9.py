@@ -57,7 +57,7 @@ def test_e9_catalog_snapshot_is_deterministic_additive_only() -> None:
     # Active code-evidence SHA bindings changed with the prefix-safe P3 feature SQL.
     # The sealed E9 registration and semantic population remain unchanged.
     assert snapshot["snapshot_digest"] == (
-        "sha256:f81a453cacde6c72324d3b1947021f81418142e4e1ea6d3d02852fa89b796063"
+        "sha256:8fd06da6f201b7f8d5ceb6553e7355fd4585c11e5d386ef298c314288ed70241"
     )
     assert result["registration"]["catalog_entry_count"] == 761
     assert result["registration"]["semantic_concept_count"] == 34

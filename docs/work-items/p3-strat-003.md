@@ -114,7 +114,42 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**Accounting-v2 corrected comparison completed, 2026-10-24 Asia/Shanghai (latest):**
+**Corrected risk diagnosis step 1 completed, 2026-10-24 Asia/Shanghai (latest):**
+the Owner requested stepwise continuation: (1) diagnose existing corrected outputs,
+(2) review/register and execute a bounded component experiment if justified,
+(3) judge a successor strategy and its further validation. Only step 1 was started.
+The read-only diagnostic binds 72 retained input files and recomputes all eight
+accepted replay digests. No new replay, warehouse/source acquisition, threshold
+search or business-window change is involved. The arithmetic helpers and synthetic
+contracts are `p3_risk_attribution.py` and `test_p3_risk_attribution.py`.
+
+Actual filled-cycle wealth/fees and every portfolio close reconcile. For TR versus
+T, the observed 13.840258-percentage-point return deficit is partitioned by actual
+entry cohorts and calendar month. Forty-seven T buys rejected by TR's entry rule
+contributed +9.735456 points on the observed T path; this is **not** a causal estimate
+of what TR would earn without the veto. Only nine entries actually filled in both
+variants, while capital/timing, entry caps and holding decisions also change paths.
+The average invested-capital fractions are 9.4836% TR and 21.6221% T, with similar
+average active-unit counts (3.851 and 3.779). The unit-scoped entry caps are 20% and
+30%, respectively; TR executed 41 reductions toward the 10% unit target. Its 44
+full-exit decisions all derive from the unchanged base rules; none is an additional
+risk-extreme exit. All 5,751 held decisions reconcile to their original rules.
+An independent cash-flow implementation confirms all 321 filled cycles and 1,664
+portfolio closes. Focused checks passed 74 tests; full `make check` reported 3,757
+passed, 28 failed and 20 skipped. The 28 failure identities match the preceding
+environment baseline (27 frozen DuckDB-version checks and one BaoStock-version
+check); the repository is not green. The 759 retained code/config member hashes
+are unchanged, but the new diagnostic module is an additive closure member, so
+no retained replay receipt is reissued for the enlarged current code closure.
+
+Evidence and the three-step status are under
+`/srv/agentdock/.codex/p3-corrected-risk-attribution-20261023T201407Z-12c189f/`.
+Step 2 remains NOT_STARTED: a new versioned diagnostic design must distinguish
+entry filtering/sizing from held management, preserve base guardians, and expose
+the interaction and already-observed-window limitations before execution. The
+frozen TR-B headline decision and strict B/D/PIT/P6/production gates are unchanged.
+
+**Accounting-v2 corrected comparison completed, 2026-10-24 Asia/Shanghai (prior execution checkpoint):**
 the Owner authorized all three successor steps after the independent review of
 `01c7e06`: versioned wiring, fixed four-variant execution and independent cold reproduction.
 Implementation is `d6f04f802a01bbf46f7e2d3920075009b20df4b3`; exact primary/cold

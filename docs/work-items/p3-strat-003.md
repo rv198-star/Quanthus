@@ -114,7 +114,43 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**Bounded risk diagnosis, 2026-10-24 Asia/Shanghai (latest):** existing v8 candidate,
+**Accounting-v2 corrected comparison completed, 2026-10-24 Asia/Shanghai (latest):**
+the Owner authorized all three successor steps after the independent review of
+`01c7e06`: versioned wiring, fixed four-variant execution and independent cold reproduction.
+Implementation is `d6f04f802a01bbf46f7e2d3920075009b20df4b3`; exact primary/cold
+activation is `b0627e9f72165195ff73da839c4f350a050b779e` under
+`retrospective-execution.v2.json`. The generic accounting-v2 constructor remains
+unadmitted, and the v1 registry and sealed results are unchanged.
+
+Both actual runtimes completed B/T/R/TR with one shared session index each. The
+cold process used its own previously independently constructed prerequisite,
+fresh physical copies/hashes, explicit unchanged-producer AST proof, kernel
+filesystem restrictions and network denial. It did not reuse primary batch
+intermediates or recalculate identical features. Every business artifact, decision
+field and engine record matches under the exact one-to-one physical-receipt identity
+mapping; eight new replay digests were recomputed. All 5,751 held reviews reconcile
+cycle wealth to independently derived realized/unrealized/dividend PnL. All 38
+retained original inputs are unchanged. Every one of the 8,016 entry-policy
+decisions per variant is unchanged from v1; B/T economic results are unchanged.
+
+The fixed analysis and independent numerical reproduction are complete. R/TR
+improve after correction. The combined variant has clearer drawdown improvement,
+but its full-window return deficit versus B exceeds the predeclared drawdown-benefit
+tradeoff allowance. Thus the original conjunctive headline acceptance rule still
+does not pass. This is not proof of negligible economic effect or permanent harm,
+and the diagnostic Trend-only result does not select a replacement policy.
+Both accounting fixes were applied together; their individual economic effects
+were not separately identified. Actual information cutoff, business windows,
+data, expert thresholds, costs and statistical rules remain frozen.
+
+Runtime artifacts, exact bindings, comparison, checks and safe evidence are under
+`/srv/agentdock/.codex/p3-accounting-corrected-20261023T192255Z-01c7e06/`.
+Focused checks and two synthetic cold relocations pass. Full `make check` records
+3,736 passed / 28 failed / 20 skipped; the exact 28 environment-version failures
+match the independent-review baseline, with no new failures. No strict B/D,
+historical PIT, independent expert-target, P6 or production acceptance is implied.
+
+**Bounded risk diagnosis, 2026-10-24 Asia/Shanghai (prior diagnosis checkpoint):** existing v8 candidate,
 feature and decision evidence explains all 801 additional `TR` entry vetoes: 601
 volatility-only, 99 RSI-only and 101 both. Annualized-fraction volatility, 0..100 RSI,
 strict-above thresholds and all four entry-policy dispositions match; zero entry

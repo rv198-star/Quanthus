@@ -1,7 +1,7 @@
 """The weaker input purpose cannot silently become strict P3/P4/P2 admission."""
 
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pyarrow as pa
@@ -38,7 +38,9 @@ def test_actual_warehouse_common_equity_is_selected_without_rewriting_it(source,
     result = build(source, out, tmp_path)
     with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
         rows = [
-            row for b in view.history_batches(business_read_boundary=CLOCK) for row in b.to_pylist()
+            row
+            for b in view.history_batches(business_read_through=CLOCK.date())
+            for row in b.to_pylist()
         ]
     assert len(rows) == 1 and rows[0]["instrument_type"] == "common_equity"
 
@@ -51,7 +53,7 @@ def test_unknown_warehouse_currency_is_not_inferred_or_silently_dropped(source, 
         reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view,
         pytest.raises(native.InputError, match="ASOF_IDENTITY_UNAVAILABLE"),
     ):
-        list(view.history_batches(business_read_boundary=CLOCK))
+        list(view.history_batches(business_read_through=CLOCK.date()))
 
 
 def test_foreign_currency_common_equity_does_not_satisfy_nonempty_A_share_gate(source, tmp_path):
@@ -59,7 +61,7 @@ def test_foreign_currency_common_equity_does_not_satisfy_nonempty_A_share_gate(s
     out = tmp_path / "out"
     result = build(source, out, tmp_path)
     with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
-        report = reader.input_census(view, CLOCK)
+        report = reader.input_census(view, CLOCK.date())
     assert report["joined_rows"] == 0
     assert report["status"] == "BLOCKED_EMPTY_REQUIRED_UNIVERSE"
 
@@ -75,7 +77,7 @@ def test_absent_session_clocks_are_classified_without_inventing_times(source, tm
     out = tmp_path / "out"
     result = build(source, out, tmp_path)
     with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
-        report = reader.input_census(view, CLOCK)
+        report = reader.input_census(view, CLOCK.date())
     assert report["joined_rows"] == 1 and report["open_session_observations"] == 0
     assert report["calendar_closed_observations"] == int(opened is False)
     assert report["calendar_unavailable_observations"] == int(opened is None)
@@ -91,13 +93,15 @@ def test_two_clocks_are_preserved_and_strict_bridge_still_rejects(source, tmp_pa
     result = build(source, out, tmp_path)
     with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
         values = [
-            row for b in view.history_batches(business_read_boundary=CLOCK) for row in b.to_pylist()
+            row
+            for b in view.history_batches(business_read_through=CLOCK.date())
+            for row in b.to_pylist()
         ]
         assert len(values) == 1
         row = values[0]
         assert row["bar_knowledge_from"] == late
         assert row["close"] == Decimal("1.1000000001")
-        assert row["r2_business_read_boundary"] == CLOCK
+        assert row["r2_business_read_through"] == CLOCK.date()
         assert row["r2_information_cutoff"] > CLOCK
         assert row["r2_observation_role"] == "DECISION_HISTORY"
         assert view.prepared_manifest is None
@@ -124,7 +128,9 @@ def test_business_boundary_excludes_later_observations(source, tmp_path):
         assert (
             sum(
                 len(b)
-                for b in view.history_batches(business_read_boundary=CLOCK - timedelta(hours=1))
+                for b in view.history_batches(
+                    business_read_through=CLOCK.date() - timedelta(days=1)
+                )
             )
             == 0
         )
@@ -135,8 +141,12 @@ def test_reused_scope_is_rebuilt_for_each_explicit_business_boundary(source, tmp
     result = build(source, out, tmp_path)
     with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
         counts = [
-            sum(len(b) for b in view.history_batches(business_read_boundary=boundary))
-            for boundary in (CLOCK - timedelta(hours=1), CLOCK, CLOCK - timedelta(hours=1))
+            sum(len(b) for b in view.history_batches(business_read_through=boundary))
+            for boundary in (
+                CLOCK.date() - timedelta(days=1),
+                CLOCK.date(),
+                CLOCK.date() - timedelta(days=1),
+            )
         ]
     # A later read cannot leak observations into an earlier feature boundary.
     assert counts == [0, 1, 0]
@@ -160,9 +170,7 @@ def test_partitioned_read_covers_warmup_and_month_boundary_once_without_retiming
     with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
         rows = [
             r
-            for b in view.history_batches(
-                business_read_boundary=datetime(2025, 2, 3, 15, tzinfo=TZ)
-            )
+            for b in view.history_batches(business_read_through=date(2025, 2, 3))
             for r in b.to_pylist()
         ]
     assert [r["trade_date"].isoformat() for r in rows] == ["2024-12-31", "2025-01-02", "2025-02-03"]
@@ -176,15 +184,17 @@ def test_partitioned_read_covers_warmup_and_month_boundary_once_without_retiming
     )
 
 
-@pytest.mark.parametrize("boundary", [datetime(2025, 1, 2), datetime(2024, 1, 1, tzinfo=TZ)])
+@pytest.mark.parametrize("boundary", [datetime(2025, 1, 2), date(2024, 1, 1)])
 def test_invalid_partition_boundary_cannot_silently_become_empty(source, tmp_path, boundary):
     out = tmp_path / "out"
     result = build(source, out, tmp_path)
     with (
         reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view,
-        pytest.raises(native.InputError, match="AWARE_CUTOFF_REQUIRED|FROZEN_DECISION_WINDOW"),
+        pytest.raises(
+            native.InputError, match="RETRO_BUSINESS_DATE_REQUIRED|FROZEN_DECISION_WINDOW"
+        ),
     ):
-        list(view.history_batches(business_read_boundary=boundary))
+        list(view.history_batches(business_read_through=boundary))
 
 
 def test_unknown_clock_stays_unavailable(source, tmp_path):
@@ -192,7 +202,7 @@ def test_unknown_clock_stays_unavailable(source, tmp_path):
     out = tmp_path / "out"
     result = build(source, out, tmp_path)
     with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
-        report = reader.input_census(view, CLOCK)
+        report = reader.input_census(view, CLOCK.date())
         assert report["joined_rows"] == 0
         assert report["original_B_accepted"] is report["D_activated"] is False
 
@@ -206,7 +216,7 @@ def test_changed_metadata_fails_during_read(source, tmp_path):
         value["information_cutoff"] = "2026-11-01T00:00:00+08:00"
         p.write_text(json.dumps(value))
         with pytest.raises(native.InputError, match="RETRO_INPUT_CHANGED_DURING_READ"):
-            list(view.history_batches(business_read_boundary=CLOCK))
+            list(view.history_batches(business_read_through=CLOCK.date()))
 
 
 def test_execution_tail_cannot_be_mislabelled_as_decision_history(source, tmp_path):
@@ -214,7 +224,7 @@ def test_execution_tail_cannot_be_mislabelled_as_decision_history(source, tmp_pa
         rows[0].update(
             calendar_session_id="sz-2026-09-18",
             observation_start=datetime(2026, 9, 18, tzinfo=TZ),
-            observation_end=datetime(2026, 9, 18, 15, tzinfo=TZ),
+            observation_end=datetime(2026, 9, 19, tzinfo=TZ),
         )
 
     mutate(source, "dwd_security_bar", tail)
@@ -222,17 +232,57 @@ def test_execution_tail_cannot_be_mislabelled_as_decision_history(source, tmp_pa
     out = tmp_path / "out"
     result = build(source, out, tmp_path)
     with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
-        report = reader.input_census(view, datetime(2026, 9, 18, 15, tzinfo=TZ))
+        report = reader.input_census(view, date(2026, 9, 18))
         assert report["observation_roles"] == {"EXECUTION_ONLY": 1}
         with pytest.raises(native.InputError, match="FROZEN_DECISION_WINDOW"):
-            list(view.history_batches(business_read_boundary=datetime(2026, 9, 19, 15, tzinfo=TZ)))
+            list(view.history_batches(business_read_through=date(2026, 9, 19)))
+
+
+def test_daily_half_open_interval_is_not_a_knowledge_cutoff_or_next_day_observation(
+    source, tmp_path
+):
+    def change(rows):
+        rows[0]["observation_end"] = datetime(2025, 1, 3, tzinfo=TZ)
+        rows.append(
+            dict(
+                rows[0],
+                calendar_session_id="sz-2025-01-03",
+                observation_start=datetime(2025, 1, 3, tzinfo=TZ),
+                observation_end=datetime(2025, 1, 4, tzinfo=TZ),
+            )
+        )
+
+    mutate(source, "dwd_security_bar", change)
+    out = tmp_path / "out"
+    result = build(source, out, tmp_path)
+    with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
+        rows = [
+            r
+            for b in view.history_batches(business_read_through=CLOCK.date())
+            for r in b.to_pylist()
+        ]
+    assert len(rows) == 1 and rows[0]["trade_date"] == CLOCK.date()
+    assert rows[0]["observation_end"] == datetime(2025, 1, 3, tzinfo=TZ)
+    assert rows[0]["r2_interval_upper_bound"] == rows[0]["observation_end"]
+    assert rows[0]["bar_knowledge_from"] == CLOCK
+    assert rows[0]["r2_information_cutoff"] > rows[0]["r2_interval_upper_bound"]
+
+
+def test_full_scope_census_blocks_a_missing_required_execution_tail(source, tmp_path):
+    out = tmp_path / "out"
+    result = build(source, out, tmp_path)
+    with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
+        report = reader.input_census(view, date(2026, 9, 18))
+    assert report["joined_rows"] == 1
+    assert report["status"] == "BLOCKED_REQUIRED_EXECUTION_TAIL"
+    assert report["D_activated"] is False
 
 
 def test_reading_does_not_grant_support_or_publish_price_values(source, tmp_path):
     out = tmp_path / "out"
     result = build(source, out, tmp_path)
     with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
-        report = reader.input_census(view, CLOCK)
+        report = reader.input_census(view, CLOCK.date())
     assert report["can_buy_unknown"] == 1
     assert report["candidate_feature_execution_qualification"] == "NOT_GRANTED_BY_READING"
     assert report["strategy_or_economic_results_read"] is False

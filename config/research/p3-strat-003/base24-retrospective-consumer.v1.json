@@ -5,17 +5,21 @@
     "native_legacy_equity_type": "A_SHARE",
     "warehouse_equity_type": "common_equity",
     "required_warehouse_equity_currency": "CNY",
-    "venue_mics": ["XSHE", "XSHG"],
+    "venue_mics": [
+      "XSHE",
+      "XSHG"
+    ],
     "unknown_currency": "unavailable; never infer CNY",
     "source_fields_rewritten": false
   },
   "information_boundary": "original input source snapshot, not historical T",
-  "business_boundary": "features through historical T; September18 execution only",
+  "business_boundary": "Shanghai business date through historical T; not intraday availability; September18 execution only",
   "empty_required_universe": "BLOCKED_EMPTY_REQUIRED_UNIVERSE",
   "nontrading_observations": "retain as calendar CLOSED; never infer open/close timestamps or include in required open-session denominator",
   "unknown_calendar_or_clocks": "unavailable; not assumed closed or tradable",
   "read_partitioning": "all frozen business months in order, then native security/time order; one shared scope TMP per month; global snapshot key/version/lineage verification before partition reads",
   "grants_candidate_feature_execution_qualification": false,
   "grants_original_B_acceptance": false,
-  "grants_D_activation": false
+  "grants_D_activation": false,
+  "interval_end": "daily half-open observation may end at next midnight; bound its full interval and cap observation_start before the following business date; never use this interval bound as knowledge_cutoff or mutate source clocks"
 }

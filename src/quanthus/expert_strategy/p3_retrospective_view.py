@@ -13,7 +13,7 @@ import argparse
 import json
 import time
 from collections.abc import Iterator
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +43,8 @@ class RetrospectiveView(native.NativeView):
             plan["warmup_calendar"]["sessions"][0]["trade_date"]
         )
         self._business_month: tuple[date, date] | None = None
+        self._business_through: date | None = None
+        self.partition_metrics: list[dict[str, Any]] = []
         self.consumer_policy = native._json(
             Path(__file__).resolve().parents[3]
             / "config/research/p3-strat-003/base24-retrospective-consumer.v1.json"
@@ -103,13 +105,13 @@ class RetrospectiveView(native.NativeView):
             raise native.InputError("RETRO_INPUT_CHANGED_DURING_READ")
 
     def _at(self, cutoff: datetime, *, market_only: bool, execution_only: bool = False) -> None:
-        if not market_only:
+        if not market_only or self._business_through is None:
             raise native.InputError("RETRO_EXPLICIT_BUSINESS_READ_REQUIRED")
         self._unchanged()
         if cutoff.tzinfo is None or cutoff.utcoffset() is None:
             raise native.InputError("AWARE_CUTOFF_REQUIRED")
-        if not date(2025, 1, 1) <= cutoff.astimezone(native.TZ).date() <= date(2026, 9, 18):
-            raise native.InputError("FROZEN_DECISION_WINDOW")
+        if cutoff != self._interval_upper(self._business_through):
+            raise native.InputError("RETRO_INTERVAL_BOUNDARY")
         if cutoff > self.information_cutoff:
             raise native.InputError("RETRO_BUSINESS_AFTER_SNAPSHOT")
         # Offline verification already established that every raw row belongs to
@@ -126,7 +128,8 @@ class RetrospectiveView(native.NativeView):
                     ]
                     where = (
                         f" WHERE observation_start>=TIMESTAMPTZ {native._q(bounds[0].isoformat())}"
-                        f" AND observation_start<TIMESTAMPTZ {native._q(bounds[1].isoformat())}"
+                        f" AND observation_start<TIMESTAMPTZ "
+                        f"{native._q(min(bounds[1], cutoff).isoformat())}"
                     )
                 self.connection.execute(
                     f"CREATE OR REPLACE TEMP VIEW {table} AS SELECT * FROM raw_{table}{where}"
@@ -138,21 +141,24 @@ class RetrospectiveView(native.NativeView):
             self.connection.execute("ROLLBACK")
             raise
 
+    @staticmethod
+    def _interval_upper(day: date) -> datetime:
+        return datetime.combine(day + timedelta(days=1), datetime.min.time(), native.TZ)
+
     def history_batches(
-        self, *, business_read_boundary: datetime, batch_size: int = 8192
+        self, *, business_read_through: date, batch_size: int = 8192
     ) -> Iterator[Any]:
         """Stream original joined rows once; execution-tail rows are labelled.
 
-        Consumers must still cap each T feature at its own business boundary.
+        This is an EOD business-date reader, never an intraday availability API.
+        A daily observation can end at next midnight without belonging to that
+        next business date. The interval bound is not a knowledge cutoff.
+        Consumers must still cap each T feature at its own business date.
         The Sep18 observations are execution-only, never additional decisions.
         """
-        if business_read_boundary.tzinfo is None or business_read_boundary.utcoffset() is None:
-            raise native.InputError("AWARE_CUTOFF_REQUIRED")
-        if (
-            not date(2025, 1, 1)
-            <= business_read_boundary.astimezone(native.TZ).date()
-            <= date(2026, 9, 18)
-        ):
+        if type(business_read_through) is not date:
+            raise native.InputError("RETRO_BUSINESS_DATE_REQUIRED")
+        if not date(2025, 1, 1) <= business_read_through <= date(2026, 9, 18):
             raise native.InputError("FROZEN_DECISION_WINDOW")
 
         # Global key/version and reference validation ran once in inputs.verify.
@@ -161,21 +167,39 @@ class RetrospectiveView(native.NativeView):
         # once; this is partitioning, not shortening the frozen research window.
         # Order is deterministic: business month, then native security/time order.
         first = self.business_start.replace(day=1)
-        last = business_read_boundary.astimezone(native.TZ).date()
+        last = business_read_through
+        self._business_through = last
+        self.partition_metrics = []
         try:
             while first <= last:
                 after = date(first.year + (first.month == 12), first.month % 12 + 1, 1)
                 self._business_month = (first, after)
-                yield from self._history_month(business_read_boundary, batch_size=batch_size)
+                start = time.monotonic()
+                rows = byte_count = 0
+                for block in self._history_month(business_read_through, batch_size=batch_size):
+                    rows += len(block)
+                    byte_count += block.nbytes
+                    yield block
+                self.partition_metrics.append(
+                    {
+                        "business_month": first.isoformat(),
+                        "joined_rows": rows,
+                        "arrow_bytes": byte_count,
+                        "elapsed_seconds": round(time.monotonic() - start, 3),
+                        "market_scope_disposition": "one_shared_TMP_built_and_consumed",
+                    }
+                )
                 first = after
         finally:
             self._business_month = None
+            self._business_through = None
         self._unchanged()
 
-    def _history_month(self, business_read_boundary: datetime, *, batch_size: int) -> Iterator[Any]:
+    def _history_month(self, business_read_through: date, *, batch_size: int) -> Iterator[Any]:
         import pyarrow as pa  # type: ignore[import-untyped]
 
-        for block in super().market_batches(business_read_boundary, batch_size=batch_size):
+        upper = self._interval_upper(business_read_through)
+        for block in super().market_batches(upper, batch_size=batch_size):
             day = block.column(block.schema.get_field_index("trade_date")).to_pylist()
             roles = [
                 "WARMUP"
@@ -189,8 +213,11 @@ class RetrospectiveView(native.NativeView):
                 "r2_information_cutoff": pa.array(
                     [self.information_cutoff] * len(block), type=pa.timestamp("us", tz="UTC")
                 ),
-                "r2_business_read_boundary": pa.array(
-                    [business_read_boundary] * len(block), type=pa.timestamp("us", tz="UTC")
+                "r2_business_read_through": pa.array(
+                    [business_read_through] * len(block), type=pa.date32()
+                ),
+                "r2_interval_upper_bound": pa.array(
+                    [upper] * len(block), type=pa.timestamp("us", tz="UTC")
                 ),
                 "r2_observation_role": pa.array(roles, type=pa.string()),
                 "r2_calendar_status": pa.array(
@@ -210,7 +237,7 @@ class RetrospectiveView(native.NativeView):
             yield block
 
 
-def input_census(view: RetrospectiveView, boundary: datetime) -> dict[str, Any]:
+def input_census(view: RetrospectiveView, boundary: date) -> dict[str, Any]:
     """Safe consumer census, not candidate/B qualification or D activation."""
     from collections import Counter
 
@@ -218,7 +245,7 @@ def input_census(view: RetrospectiveView, boundary: datetime) -> dict[str, Any]:
     dates: Counter[str] = Counter()
     total = late = state_unknown = buy_unknown = sell_unknown = 0
     closed = calendar_unknown = missing_open_clocks = usable = 0
-    for block in view.history_batches(business_read_boundary=boundary):
+    for block in view.history_batches(business_read_through=boundary):
         # These columns contain identity/time/state only. Price columns stay in
         # Arrow and are never converted to Python or included in the receipt.
         fields = [
@@ -254,16 +281,21 @@ def input_census(view: RetrospectiveView, boundary: datetime) -> dict[str, Any]:
             state_unknown += row["is_tradable"] is None
             buy_unknown += row["can_buy"] is None
             sell_unknown += row["can_sell"] is None
+    status = "P3_RETROSPECTIVE_CONSUMER_READ_COMPLETED"
+    if not total:
+        status = "BLOCKED_EMPTY_REQUIRED_UNIVERSE"
+    elif boundary == date(2026, 9, 18) and not roles["EXECUTION_ONLY"]:
+        status = "BLOCKED_REQUIRED_EXECUTION_TAIL"
+    elif not usable:
+        status = "BLOCKED_NO_OPEN_SESSION_OBSERVATIONS"
     return {
-        "status": "P3_RETROSPECTIVE_CONSUMER_READ_COMPLETED"
-        if usable
-        else "BLOCKED_NO_OPEN_SESSION_OBSERVATIONS"
-        if total
-        else "BLOCKED_EMPTY_REQUIRED_UNIVERSE",
+        "status": status,
         "consumer_policy_digest": digest_value(view.consumer_policy),
         "input_manifest_sha256": view.input_manifest_sha256,
         "information_cutoff": view.information_cutoff.isoformat(),
-        "business_read_boundary": boundary.isoformat(),
+        "business_read_through": boundary.isoformat(),
+        "interval_upper_bound_not_knowledge_cutoff": view._interval_upper(boundary).isoformat(),
+        "partitions": view.partition_metrics,
         "joined_rows": total,
         "open_session_observations": usable,
         "calendar_closed_observations": closed,
@@ -286,10 +318,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--manifest-sha256", required=True)
-    parser.add_argument("--business-read-boundary", required=True)
+    parser.add_argument("--business-read-through", required=True)
     args = parser.parse_args(argv)
     with RetrospectiveView(args.root, manifest_sha256=args.manifest_sha256) as view:
-        result = input_census(view, datetime.fromisoformat(args.business_read_boundary))
+        result = input_census(view, date.fromisoformat(args.business_read_through))
     print(json.dumps(result, sort_keys=True, ensure_ascii=False, indent=2))
     return 0 if result["status"] == "P3_RETROSPECTIVE_CONSUMER_READ_COMPLETED" else 2
 

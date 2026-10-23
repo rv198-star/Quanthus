@@ -114,6 +114,17 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**Result-blind consumer continuation, 2026-10-23:** `p3_retrospective_view.py` now reads the
+sealed retrospective input through a separate two-clock interface. Canonical warehouse
+`common_equity` requires explicit CNY and SSE/SZSE scope; the original `A_SHARE` strict-reader
+default is preserved. Empty input cannot pass. Closed sessions and open sessions with missing
+clocks are distinct; source times stay unchanged. Global snapshot verification precedes bounded
+monthly reads, with one shared market-scope TMP per month. This is input-consumer engineering,
+not candidate/features/common-mask qualification, original B acceptance or D activation.
+Continue from [the actual consumer-start record](p3-base24-goal-audit-and-plan-20261022.md#17-结果盲消费端实际启动),
+preserving the failed bounded attempts and their evidence. Do not reopen the same historical
+source hunt or pass the retrospective reader into the strict bridge.
+
 **Purpose-specific continuation, 2026-10-23:** the Owner requested trying the bounded
 evidence/purpose-contract route instead of indefinitely recovering historical versions. The
 additive `base24-retrospective-purpose.v1.json` permits a result-blind, fixed-snapshot input

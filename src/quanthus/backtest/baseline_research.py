@@ -11,7 +11,7 @@ import threading
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, datetime
 from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -716,13 +716,9 @@ class BaselineFeaturePanelReport:
         if any(value is None for value in selection) and any(
             value is not None for value in selection
         ):
-            raise BaselineResearchError(
-                "feature panel security selection identity is incomplete"
-            )
+            raise BaselineResearchError("feature panel security selection identity is incomplete")
         if self.selected_security_count is not None and self.selected_security_count <= 0:
-            raise BaselineResearchError(
-                "feature panel selected security count must be positive"
-            )
+            raise BaselineResearchError("feature panel selected security count must be positive")
 
     @property
     def digest(self) -> str:
@@ -890,9 +886,7 @@ class BaselineFeaturePanel:
             raise BaselineResearchError("governed candidate scan bounds are invalid")
         if allowed_security_ids is not None and not allowed_security_ids:
             raise BaselineResearchError("governed candidate scan universe must not be empty")
-        universe_predicate = (
-            "AND security_id = ANY(?)" if allowed_security_ids is not None else ""
-        )
+        universe_predicate = "AND security_id = ANY(?)" if allowed_security_ids is not None else ""
         parameters: list[object] = [
             market_date,
             minimum_listing_sessions,
@@ -1324,8 +1318,7 @@ class BaselineFeaturePanel:
                 "source_corporate_action_exceptions",
             ):
                 columns = {
-                    str(row[0])
-                    for row in connection.execute(f"DESCRIBE {source}").fetchall()
+                    str(row[0]) for row in connection.execute(f"DESCRIBE {source}").fetchall()
                 }
                 mapped = f"{source}_mapped"
                 if "security_id" in columns:
@@ -1471,9 +1464,7 @@ def _create_feature_source_views(
                 f"CREATE VIEW raw_source_{name} AS "
                 f"SELECT * FROM {_read_parquet_expression(dataset_paths)}"
             )
-            connection.execute(
-                f"CREATE VIEW source_{name} AS SELECT * FROM raw_source_{name}"
-            )
+            connection.execute(f"CREATE VIEW source_{name} AS SELECT * FROM raw_source_{name}")
         return
 
     security_literals = ", ".join(_sql_string(item) for item in selected_security_ids)
@@ -1490,8 +1481,7 @@ def _create_feature_source_views(
     selected_stock_codes = tuple(
         str(row[0])
         for row in connection.execute(
-            "SELECT DISTINCT stock_code "
-            "FROM source_security_code_validity ORDER BY stock_code"
+            "SELECT DISTINCT stock_code FROM source_security_code_validity ORDER BY stock_code"
         ).fetchall()
     )
     if not selected_stock_codes:
@@ -1516,20 +1506,15 @@ def _create_feature_source_views(
         elif "security_code" in columns:
             predicates = [f"security_code IN ({stock_code_literals})"]
         else:
-            raise BaselineResearchError(
-                f"feature source {name} cannot apply security selection"
-            )
+            raise BaselineResearchError(f"feature source {name} cannot apply security selection")
         date_column = daily_date_columns.get(name)
         if date_column is not None:
             predicates.append(f"CAST({date_column} AS DATE) <= CAST({cutoff} AS DATE)")
         where = " AND ".join(predicates)
         connection.execute(
-            f"CREATE VIEW raw_source_{name} AS "
-            f"SELECT * FROM {expression} WHERE {where}"
+            f"CREATE VIEW raw_source_{name} AS SELECT * FROM {expression} WHERE {where}"
         )
-        connection.execute(
-            f"CREATE TEMP TABLE source_{name} AS SELECT * FROM raw_source_{name}"
-        )
+        connection.execute(f"CREATE TEMP TABLE source_{name} AS SELECT * FROM raw_source_{name}")
 
 
 def _validate_feature_sources(connection: Any) -> None:
@@ -1619,6 +1604,7 @@ def _feature_panel_query(
     *,
     output_order: str = "date-security",
     continuity_asof_each_row: bool = False,
+    retrospective_action_cutoff: datetime | None = None,
 ) -> str:
     if output_order == "date-security":
         order_by = "market_date, security_id"
@@ -1637,6 +1623,17 @@ def _feature_panel_query(
         if continuity_asof_each_row
         else "PARTITION BY security_id"
     )
+    action_visibility = "CAST(actions.known_at AS DATE) < CAST(actions.effective_date AS DATE)"
+    if retrospective_action_cutoff is not None:
+        if (
+            not continuity_asof_each_row
+            or retrospective_action_cutoff.utcoffset() is None
+            or retrospective_action_cutoff.date() <= scope_end
+        ):
+            raise BaselineResearchError("separate retrospective action cutoff required")
+        action_visibility = "actions.known_at<=TIMESTAMPTZ " + _sql_string(
+            retrospective_action_cutoff.isoformat()
+        )
     start = _sql_string(scope_start.isoformat())
     end = _sql_string(scope_end.isoformat())
     return f"""
@@ -1646,7 +1643,7 @@ def _feature_panel_query(
                    CAST(actions.cash_dividend_per_share AS DOUBLE) AS cash_dividend_per_share,
                    CAST(actions.bonus_share_ratio AS DOUBLE) AS bonus_share_ratio
             FROM source_corporate_actions_normalized_mapped actions
-            WHERE CAST(actions.known_at AS DATE) < CAST(actions.effective_date AS DATE)
+            WHERE {action_visibility}
         ),
         mapped_exceptions AS (
             SELECT exceptions.security_id,

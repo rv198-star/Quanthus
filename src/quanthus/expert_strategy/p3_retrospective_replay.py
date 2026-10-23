@@ -14,7 +14,7 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -22,6 +22,8 @@ from typing import Any
 from quanthus.backtest.baseline_research import BaselineFeaturePanelReport, _sql_string
 from quanthus.backtest.contracts import (
     BacktestRunSpec,
+    CorporateAction,
+    CorporateActionStep,
     MarketSession,
     OpenExecutionState,
     OrderSide,
@@ -93,6 +95,11 @@ class RetrospectiveSignal:
             raise native.InputError("RETRO_SIGNAL_CONTRACT")
 
 
+@dataclass(frozen=True)
+class RetrospectiveCorporateAction(CorporateAction):
+    purpose_id: str = prep.PURPOSE
+
+
 class RetrospectiveEngine(BacktestEngine):
     def __init__(self, policy: Any, *, information_cutoff: datetime, snapshot_id: str) -> None:
         super().__init__(policy)
@@ -109,6 +116,20 @@ class RetrospectiveEngine(BacktestEngine):
         ):
             raise BacktestInputError("R2 purpose/snapshot/run binding required")
         # Remaining matching, funding, tick, cost and T+1 checks stay in P2.
+
+    def _validate_action_clock(
+        self, run: BacktestRunSpec, action: CorporateAction, applied_at: datetime
+    ) -> None:
+        if (
+            type(action) is not RetrospectiveCorporateAction
+            or action.purpose_id != prep.PURPOSE
+            or action.known_at > self.information_cutoff
+            or action.snapshot_id != self.snapshot_id
+            or run.data_snapshot_id != self.snapshot_id
+            or run.official
+            or not run.code_version.startswith(VERSION + ":")
+        ):
+            raise BacktestInputError("R2 action purpose/snapshot/run binding required")
 
 
 @dataclass(frozen=True)
@@ -184,12 +205,9 @@ class RetrospectiveFrame:
         return self.source.block_reason(security)
 
     def actions(self, security: str, prior_mark_price: Decimal) -> tuple[Any, ...]:
-        # Only explicit qualified no-action support can return (). Known and
-        # unknown action boundaries block the affected held step, never fabricate
-        # a zero action or force an exit. Normalized action replay is not inferred.
         if self.source.block_reason(security) is not None:
             raise native.InputError("RETRO_HELD_ACTION_UNQUALIFIED")
-        return ()
+        return self.source.actions(security, prior_mark_price)
 
 
 class _SessionIndex:
@@ -238,6 +256,33 @@ class _DaySource:
             "RETRO_ACTION_OR_SESSION_UNQUALIFIED" if row is None or row["blocked_action"] else None
         )
 
+    def actions(self, security: str, prior_mark_price: Decimal) -> tuple[CorporateActionStep, ...]:
+        row = self.index.get(self.empty.session_date, security)
+        raw = row.get("action") if row else None
+        if raw is None:
+            return ()
+        action = RetrospectiveCorporateAction(
+            raw["economic_event_id"],
+            security,
+            self.empty.session_date,
+            datetime.fromisoformat(raw["known_at"]),
+            Decimal(raw["cash"]),
+            Decimal(raw["shares"]),
+            raw["support_manifest_sha256"],
+            self.empty.snapshot_id,
+        )
+        mark = (
+            (prior_mark_price - action.cash_dividend_per_share) / (1 + action.bonus_share_ratio)
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if mark <= 0:
+            raise native.InputError("RETRO_ACTION_NONPOSITIVE_REFERENCE")
+        applied = self.empty.open_at.replace(hour=9, minute=0, second=0, microsecond=0)
+        return (
+            CorporateActionStep(
+                action, applied, mark, self.empty.snapshot_id + ".action." + action.action_id
+            ),
+        )
+
 
 def _index(
     prepared: Path, output: Path, plan: Mapping[str, Any], identity: str, guard: Callable[[], None]
@@ -246,6 +291,15 @@ def _index(
     import pyarrow as pa  # type: ignore[import-untyped]
     import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
+    actions = {}
+    if plan.get("normalized_actions_sha256"):
+        actions = {
+            (a["security_id"], a["effective_date"]): a
+            for a in prep.load_actions(
+                prepared / "normalized-actions.json",
+                datetime.fromisoformat(plan["information_cutoff"]),
+            )
+        }
     schema = pa.schema(
         [("market_date", pa.date32()), ("security_id", pa.string()), ("payload", pa.string())]
     )
@@ -276,7 +330,22 @@ def _index(
                 trading_dates=days,
             )
             session = market_session_from_p1(evidence)
-            blocked = p.adjustment_effective is not False
+            action = actions.get((port.security_id, port.business_date))
+            blocked = p.adjustment_effective is None or (p.adjustment_effective and action is None)
+            action_value = (
+                None
+                if action is None
+                else {
+                    "economic_event_id": action["economic_event_id"],
+                    "known_at": action["known_at"].isoformat(),
+                    "cash": str(action["cash_dividend_per_share"]),
+                    "shares": str(action["bonus_share_ratio"]),
+                    "support_manifest_sha256": plan["support_manifest_sha256"],
+                }
+            )
+            # Entitlements and execution admission are separate. A qualified
+            # action does not turn an unavailable ex-date execution reference
+            # into an observed mark/fill; P2 carries its adjusted prior mark.
             if blocked:
                 session = replace(
                     session,
@@ -289,7 +358,11 @@ def _index(
                     "market_date": port.business_date,
                     "security_id": port.security_id,
                     "payload": json.dumps(
-                        {"session": _session_dict(session), "blocked_action": blocked},
+                        {
+                            "session": _session_dict(session),
+                            "blocked_action": blocked,
+                            "action": action_value,
+                        },
                         sort_keys=True,
                     ),
                 }
@@ -399,7 +472,7 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
             p: (p.stat().st_dev, p.stat().st_ino, p.stat().st_size, p.stat().st_mtime_ns)
             for p in [
                 industry_path,
-                *(self.prepared / name for name in prep.MEMBERS),
+                *(self.prepared / name for name in prep.members(self.r2_plan)),
                 self.prepared / "manifest.json",
                 self.prepared / "PREPARATION_COMPLETE.json",
             ]

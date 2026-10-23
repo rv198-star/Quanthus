@@ -79,3 +79,41 @@ fills and reconciled ledgers, equality of economic arithmetic with the strict sy
 late-clock isolation, unknown held-action rejection, output reuse refusal and two relocated
 new-process executions under kernel filesystem/network restrictions. These are engineering
 results, not any of the four real protected-window comparisons.
+
+### P10 support continuation (Owner authorization, 2026-10-23)
+
+The Owner authorized P10 to address #555/#556 using already retained sources and
+then return to P3 admission/startup. This does not qualify the original historical
+PIT experiment. P10 preserves native rows and publishes additive, true-new-knowledge
+support: declared regular-session clocks with exact official-rule receipts, dated
+status observations with member-local raw lineage, price-limit policy evidence, and
+implemented-action economic events replayed against retained raw plans. Partial
+legacy action revisions preserve their actual term lineage; they are not rewritten
+into an invented uniform revision. Unresolved action groups use the unchanged
+normalization-v3 security-level fail-closed disposition.
+
+The R2 consumer keeps the October 20 native-snapshot time beside the later support
+information time. It uses a static industry concentration projection from the exact
+retained membership snapshot, never a claim of historical industry availability.
+Unknown industries and execution evidence block affected entries in all four
+variants. Qualified corporate actions preserve their actual known-at time and use
+the existing P2 entitlement/reference arithmetic through an explicit R2 action type;
+the ordinary historical engine rejects that type. An action does not establish an
+observed price or an executable session. Unknown held actions stop the affected
+replay rather than trigger a fabricated sale.
+
+The stage graph is: once-only native join → shared P10 qualification → one immutable
+support handoff → one port journal/history TMP → one feature panel → P4 candidates
+and common mask → B/T/R/TR. The original business start is a calendar boundary,
+not a requirement that January 1 be an open session. The end, execution tail and
+60 warm-up sessions remain exact. Version 2 preparation freezes exact native,
+support, action and static-industry identities plus the new true information cutoff.
+All versions retain the original request and numerical policy digests.
+
+Real result execution additionally requires an exact consumer receipt in the
+ordinary execution registry. Preparation binds all execution-policy fields except
+the receipt list itself, because a receipt can only be issued after preparation is
+sealed; the runtime still checks the exact registered receipt digest. Independent
+reproduction has its own admission role and independently rebuilt prerequisites.
+A source READY, code test, physical cold copy, or nonempty candidate set alone is
+not original B acceptance, original D activation, production permission or P6 access.

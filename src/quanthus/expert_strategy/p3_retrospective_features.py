@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime
+from decimal import Decimal
 from itertools import groupby
 from pathlib import Path
 from typing import Any
@@ -158,6 +159,8 @@ def feature_panel(
     scope_start: date,
     scope_end: date,
     output: Path,
+    normalized_actions: Path | None = None,
+    information_cutoff: datetime | None = None,
 ) -> None:
     """One prefix-correct existing feature SQL, shared by B/T/R/TR.
 
@@ -209,14 +212,54 @@ def feature_panel(
         executable AS is_executable, NULL::DOUBLE AS upper_limit_pct,
         NULL::DOUBLE AS lower_limit_pct, upper AS upper_limit_price,
         lower AS lower_limit_price FROM input""")
-    c.execute("""CREATE VIEW source_corporate_actions_normalized_mapped AS SELECT
-        NULL::VARCHAR AS security_id,NULL::DATE AS effective_date,
-        NULL::DOUBLE AS cash_dividend_per_share,NULL::DOUBLE AS bonus_share_ratio,
-        NULL::TIMESTAMPTZ AS known_at WHERE false""")
+    if normalized_actions is None:
+        c.execute("""CREATE VIEW source_corporate_actions_normalized_mapped AS SELECT
+            NULL::VARCHAR AS security_id,NULL::DATE AS effective_date,
+            NULL::DOUBLE AS cash_dividend_per_share,NULL::DOUBLE AS bonus_share_ratio,
+            NULL::TIMESTAMPTZ AS known_at WHERE false""")
+    else:
+        from quanthus.expert_strategy.p3_retrospective_preparation import load_actions
+
+        if information_cutoff is None:
+            raise native.InputError("RETRO_ACTION_INFORMATION_CUTOFF")
+        actions = load_actions(normalized_actions, information_cutoff)
+        schema = pa.schema(
+            [
+                ("security_id", pa.string()),
+                ("effective_date", pa.date32()),
+                ("cash_dividend_per_share", pa.string()),
+                ("bonus_share_ratio", pa.string()),
+                ("known_at", pa.timestamp("us", tz="UTC")),
+            ]
+        )
+        c.register(
+            "r2_actions",
+            pa.Table.from_pylist(
+                [
+                    {
+                        k: str(v) if isinstance(v, Decimal) else v
+                        for k, v in a.items()
+                        if k in schema.names
+                    }
+                    for a in actions
+                ],
+                schema=schema,
+            ),
+        )
+        c.execute(
+            "CREATE VIEW source_corporate_actions_normalized_mapped AS SELECT * FROM r2_actions"
+        )
     c.execute("""CREATE VIEW source_corporate_action_exceptions_mapped AS SELECT
         security_id,market_date AS blocked_from,market_date AS blocked_through
-        FROM input WHERE action_unknown_or_effective""")
-    query = _feature_panel_query(scope_start, scope_end, continuity_asof_each_row=True)
+        FROM input h WHERE action_unknown_or_effective AND NOT EXISTS (
+            SELECT 1 FROM source_corporate_actions_normalized_mapped a
+            WHERE a.security_id=h.security_id AND a.effective_date=h.market_date)""")
+    query = _feature_panel_query(
+        scope_start,
+        scope_end,
+        continuity_asof_each_row=True,
+        retrospective_action_cutoff=information_cutoff if normalized_actions is not None else None,
+    )
     c.execute(f"COPY ({query}) TO {_sql_string(str(output))} (FORMAT PARQUET)")
 
 

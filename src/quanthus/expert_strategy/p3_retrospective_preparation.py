@@ -18,7 +18,7 @@ import sys
 import time
 from collections import deque
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from dataclasses import asdict
+from dataclasses import fields, is_dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from importlib.metadata import version
@@ -54,6 +54,10 @@ MEMBERS = {
 
 
 def _typed(value: Any) -> Any:
+    # JSON visits frozen dataclass fields directly; avoid millions of unnecessary
+    # deepcopy operations on immutable Decimal/date/clock objects.
+    if is_dataclass(value) and not isinstance(value, type):
+        return {field.name: getattr(value, field.name) for field in fields(value)}
     if isinstance(value, Decimal):
         return {"Decimal": str(value)}
     if isinstance(value, datetime):
@@ -75,7 +79,11 @@ def _object(value: dict[str, Any]) -> Any:
 
 def decode_port(value: Mapping[str, Any]) -> bridge.RetrospectivePort:
     """Decode the explicit port schema; never unpickle or open a source path."""
-    raw = json.loads(json.dumps(value), object_hook=_object)
+    return _decode_typed_port(json.loads(json.dumps(value), object_hook=_object))
+
+
+def _decode_typed_port(raw: dict[str, Any]) -> bridge.RetrospectivePort:
+    # The stream parser already owns this fresh dictionary; no JSON round trip.
     selected = raw.pop("selected")
     if selected is not None:
         candidate = selected.pop("candidate")
@@ -94,12 +102,66 @@ def decode_port(value: Mapping[str, Any]) -> bridge.RetrospectivePort:
 def _ports(root: Path) -> Iterator[bridge.RetrospectivePort]:
     with gzip.open(root / "ports.jsonl.gz", "rt", encoding="utf-8") as stream:
         for line in stream:
-            yield decode_port(json.loads(line))
+            yield _decode_typed_port(json.loads(line, object_hook=_object))
 
 
 def _write(path: Path, value: Any) -> None:
     with path.open("x", encoding="utf-8") as stream:
         stream.write(json.dumps(value, ensure_ascii=False, sort_keys=True, default=_typed) + "\n")
+
+
+def load_actions(path: Path, cutoff: datetime) -> list[dict[str, Any]]:
+    """Consume an exact P10 event file; qualification comes from its support seal."""
+    raw = json.loads(path.read_text(), object_hook=_object)
+    if not isinstance(raw, list):
+        raise native.InputError("RETRO_ACTION_SCHEMA")
+    keys, ids, output = set(), set(), []
+    for a in raw:
+        day = date.fromisoformat(a["effective_date"])
+        known = datetime.fromisoformat(a["known_at"])
+        cash, shares = a["cash_dividend_per_share"], a["bonus_share_ratio"]
+        key = (a["security_id"], day)
+        if (
+            a.get("contract") != "p10-retained-implemented-plan-economic-view.v1"
+            or not isinstance(a["security_id"], str)
+            or not a["security_id"]
+            or not native._SHA.fullmatch(a["economic_event_id"])
+            or key in keys
+            or a["economic_event_id"] in ids
+            or not strict._aware(known)
+            or known > cutoff
+            or any(not isinstance(v, Decimal) or not v.is_finite() or v < 0 for v in (cash, shares))
+            or (cash == 0 and shares == 0)
+            or a.get("historical_pit_granted") is not False
+        ):
+            raise native.InputError("RETRO_ACTION_IDENTITY_OR_TIME")
+        keys.add(key)
+        ids.add(a["economic_event_id"])
+        output.append({**a, "effective_date": day, "known_at": known})
+    return output
+
+
+def members(plan: Mapping[str, Any]) -> set[str]:
+    return MEMBERS | (
+        {"normalized-actions.json"} if plan.get("normalized_actions_sha256") else set()
+    )
+
+
+def _purpose_file(repository: Path, version: int) -> Path:
+    if type(version) is not int or version not in (1, 2):
+        raise native.InputError("RETRO_PURPOSE_VERSION")
+    return repository / f"config/research/p3-strat-003/retrospective-comparison.v{version}.json"
+
+
+def _preparation_closure(repository: Path) -> dict[str, str]:
+    closure = _code_closure(repository)
+    # Admission is granted only after preparation is sealed. Its append-only
+    # receipt registry cannot be included in its own prerequisite identity.
+    # Every other activation-policy field remains bound, including purpose/gates.
+    name = "config/research/p3-strat-003/retrospective-execution.v1.json"
+    policy = native._json(repository / name)
+    closure[name] = digest_value({**policy, "admitted_consumer_receipt_sha256": []})
+    return closure
 
 
 def _scope(days: Sequence[date], scope: tuple[date, date, date], synthetic: bool) -> None:
@@ -109,7 +171,8 @@ def _scope(days: Sequence[date], scope: tuple[date, date, date], synthetic: bool
         or not days
         or tuple(days) != tuple(sorted(set(days)))
         or not scope[0] <= scope[1] < scope[2] == days[-1]
-        or not all(d in days for d in scope)
+        or not all(d in days for d in scope[1:])
+        or not any(scope[0] <= d <= scope[1] for d in days)
         or (not synthetic and len([d for d in days if d < scope[0]]) != 60)
     ):
         raise native.InputError("RETRO_PREPARATION_SCOPE")
@@ -252,6 +315,8 @@ def materialize(
     source_roots: Sequence[Path],
     scope: tuple[date, date, date] = FROZEN_SCOPE,
     synthetic: bool = False,
+    normalized_actions: Path | None = None,
+    purpose_version: int = 1,
 ) -> dict[str, Any]:
     """Materialize result-blind prerequisites, not source/support admission.
 
@@ -281,7 +346,7 @@ def materialize(
     if output.exists() or output.is_symlink():
         raise native.InputError("RETRO_PREPARATION_OUTPUT_EXISTS")
     repository = repository.resolve()
-    purpose_path = repository / "config/research/p3-strat-003/retrospective-comparison.v1.json"
+    purpose_path = _purpose_file(repository, purpose_version)
     purpose = native._json(purpose_path)
     if (
         purpose.get("purpose_id") != PURPOSE
@@ -299,6 +364,26 @@ def materialize(
         )
     ):
         raise native.InputError("RETRO_PREPARATION_PURPOSE")
+    action_sha = None
+    if normalized_actions is not None:
+        normalized_actions = native.physical(normalized_actions)
+        native._isolate(normalized_actions, output, output)
+        load_actions(normalized_actions, information_cutoff)
+        action_sha = native._sha(normalized_actions)
+    if not synthetic and purpose.get("support_manifest_sha256") not in (
+        None,
+        support_manifest_sha256,
+    ):
+        raise native.InputError("RETRO_PURPOSE_SUPPORT_BINDING")
+    if not synthetic and purpose_version == 2 and (
+        purpose.get("support_manifest_sha256") != support_manifest_sha256
+        or purpose.get("industry_manifest_sha256") != industry_manifest_sha256
+        or action_sha is None
+        or purpose.get("normalized_actions_sha256") != action_sha
+    ):
+        raise native.InputError("RETRO_PURPOSE_P10_CLOSURE")
+    wall_budget = 7200 if purpose_version == 2 else 600
+    write_budget = 4 * 1024**3 if purpose_version == 2 else 1024**3
     space, fs = shutil.disk_usage(output.parent), os.statvfs(output.parent)
     plan = {
         "schema_version": VERSION,
@@ -311,7 +396,9 @@ def materialize(
         "scope": [d.isoformat() for d in scope],
         "trading_dates": [d.isoformat() for d in trading_dates],
         "synthetic": synthetic,
-        "code_config_members": _code_closure(repository),
+        "code_config_members": _preparation_closure(repository),
+        "purpose_version": purpose_version,
+        "normalized_actions_sha256": action_sha,
         "purpose_sha256": native._sha(purpose_path),
         "runtime": {
             "python": sys.version.split()[0],
@@ -319,11 +406,11 @@ def materialize(
             "pyarrow": version("pyarrow"),
         },
         "budgets": {
-            "wall_seconds": 600,
+            "wall_seconds": wall_budget,
             "duckdb_memory": "2GB",
             "duckdb_threads": 2,
             "RSS_bytes": 4 * 1024**3,
-            "write_bytes": 1024**3,
+            "write_bytes": write_budget,
             "minimum_free_bytes": 8 * 1024**3,
         },
         "journal_lifecycle": "immutable job-local TMP retained for these consumers and cold checks",
@@ -342,12 +429,12 @@ def materialize(
 
     def guard() -> None:
         if (
-            time.monotonic() - start > 600
+            time.monotonic() - start > wall_budget
             or resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024 > 4 * 1024**3
             or shutil.disk_usage(output.parent).free < 8 * 1024**3
             or (
                 output.exists()
-                and sum(p.stat().st_size for p in output.rglob("*") if p.is_file()) > 1024**3
+                and sum(p.stat().st_size for p in output.rglob("*") if p.is_file()) > write_budget
             )
         ):
             raise native.InputError("RETRO_PREPARATION_BUDGET")
@@ -355,17 +442,24 @@ def materialize(
     guard()
     output.mkdir(parents=True)
     _write(output / "plan.json", plan)
+    member_set = members(plan)
+    if normalized_actions is not None:
+        shutil.copyfile(normalized_actions, output / "normalized-actions.json")
+        if native._sha(output / "normalized-actions.json") != action_sha:
+            raise native.InputError("RETRO_ACTION_INPUT_CHANGED")
     rows = 0
     with (
         (output / "ports.jsonl.gz").open("xb") as stored,
-        gzip.GzipFile(fileobj=stored, filename="", mode="wb", mtime=0) as compressed,
+        gzip.GzipFile(
+            fileobj=stored, filename="", mode="wb", mtime=0, compresslevel=1
+        ) as compressed,
         io.TextIOWrapper(compressed, encoding="utf-8") as journal,
     ):
 
         def observed() -> Iterator[bridge.RetrospectivePort]:
             nonlocal rows
             for p in _checked(ports, plan):
-                journal.write(json.dumps(asdict(p), default=_typed, sort_keys=True) + "\n")
+                journal.write(json.dumps(p, default=_typed, sort_keys=True) + "\n")
                 rows += 1
                 if rows % 8192 == 0:
                     guard()
@@ -405,6 +499,8 @@ def materialize(
             scope_start=scope[0],
             scope_end=scope[1],
             output=output / "features.parquet",
+            normalized_actions=(output / "normalized-actions.json") if action_sha else None,
+            information_cutoff=information_cutoff if action_sha else None,
         )
     guard()
     stages.append(
@@ -460,7 +556,7 @@ def materialize(
     entries.update(
         {
             n: native._entry(output / n)
-            for n in sorted(MEMBERS - {"variants.json", "features.parquet"})
+            for n in sorted(member_set - {"variants.json", "features.parquet"})
         }
     )
     shared = digest_value({n: entries[n]["sha256"] for n in sorted(entries)})
@@ -530,7 +626,9 @@ def verify(repository: Path, root: Path, *, manifest_sha256: str) -> dict[str, A
         or native._sha(root / "manifest.json") != manifest_sha256
     ):
         raise native.InputError("RETRO_PREPARATION_EXTERNAL_MANIFEST_BINDING")
-    if native._tree(root) != MEMBERS | {"manifest.json", "PREPARATION_COMPLETE.json"}:
+    plan = native._json(root / "plan.json")
+    member_set = members(plan)
+    if native._tree(root) != member_set | {"manifest.json", "PREPARATION_COMPLETE.json"}:
         raise native.InputError("RETRO_PREPARATION_PHYSICAL_FILES")
     seal, manifest = (
         native._json(root / "PREPARATION_COMPLETE.json"),
@@ -543,15 +641,15 @@ def verify(repository: Path, root: Path, *, manifest_sha256: str) -> dict[str, A
             "result_execution_authorized": False,
         }
         or manifest.get("schema_version") != VERSION
-        or set(manifest.get("files", {})) != MEMBERS
+        or set(manifest.get("files", {})) != member_set
     ):
         raise native.InputError("RETRO_PREPARATION_MANIFEST")
-    for name in sorted(MEMBERS):
+    for name in sorted(member_set):
         native._check_member(root / name, manifest["files"][name])
     plan = native._json(root / "plan.json")
-    if plan["code_config_members"] != _code_closure(repository.resolve()):
+    if plan["code_config_members"] != _preparation_closure(repository.resolve()):
         raise native.InputError("RETRO_PREPARATION_CODE_CONFIG_CHANGED")
-    purpose_path = repository / "config/research/p3-strat-003/retrospective-comparison.v1.json"
+    purpose_path = _purpose_file(repository, plan.get("purpose_version", 1))
     purpose = native._json(purpose_path)
     if (
         plan.get("schema_version") != VERSION
@@ -575,6 +673,18 @@ def verify(repository: Path, root: Path, *, manifest_sha256: str) -> dict[str, A
         )
     ):
         raise native.InputError("RETRO_PREPARATION_PLAN_BINDING")
+    if plan.get("synthetic") is False and plan.get("purpose_version") == 2 and any(
+        plan.get(key) is None or plan.get(key) != purpose.get(key)
+        for key in ("support_manifest_sha256", "industry_manifest_sha256",
+                    "normalized_actions_sha256")
+    ):
+        raise native.InputError("RETRO_PURPOSE_P10_CLOSURE")
+    if plan.get("normalized_actions_sha256"):
+        if native._sha(root / "normalized-actions.json") != plan["normalized_actions_sha256"]:
+            raise native.InputError("RETRO_ACTION_FILE_BINDING")
+        load_actions(
+            root / "normalized-actions.json", datetime.fromisoformat(plan["information_cutoff"])
+        )
     days = tuple(map(date.fromisoformat, plan["trading_dates"]))
     if not isinstance(plan.get("scope"), list) or len(plan["scope"]) != 3:
         raise native.InputError("RETRO_PREPARATION_SCOPE")
@@ -608,7 +718,7 @@ def verify(repository: Path, root: Path, *, manifest_sha256: str) -> dict[str, A
     if masks != stored_masks:
         raise native.InputError("RETRO_PREPARATION_MASK_SEMANTICS")
     shared = digest_value(
-        {n: manifest["files"][n]["sha256"] for n in sorted(MEMBERS - {"variants.json"})}
+        {n: manifest["files"][n]["sha256"] for n in sorted(member_set - {"variants.json"})}
     )
     request = native._json(repository / "config/research/p3-strat-003/request.v1.json")
     expected = [

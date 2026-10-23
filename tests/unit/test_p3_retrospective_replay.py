@@ -279,3 +279,86 @@ with RetrospectiveRuntime(repository,root,scratch/'run',manifest_sha256=sha,
         reports.append(json.loads(completed.stdout))
         old = moved
     assert reports[0] == reports[1]
+
+
+def test_true_late_action_isolated_from_strict_engine_and_keeps_cash_quantity(tmp_path):
+    from quanthus.backtest.contracts import BacktestRunSpec, UnitState
+
+    with runtime(tmp_path) as r:
+        f = r.frames[0]
+        run = BacktestRunSpec(
+            code_version=r._code_version(),
+            parameter_hash="sha256:" + "a" * 64,
+            data_snapshot_id=r.snapshot_id,
+            feature_version="synthetic",
+            rule_version="synthetic",
+            run_id="action-test",
+            execution_policy_version=r.engine.policy.policy_version,
+            execution_profile_id=r.engine.policy.active_profile.profile_id,
+            schedule_version=r.engine.policy.active_profile.schedule_version,
+        )
+        action = replay.RetrospectiveCorporateAction(
+            "action",
+            "security-native",
+            f.snapshot.market_date,
+            INFO,
+            Decimal("0.1"),
+            Decimal("0.1"),
+            SOURCE,
+            r.snapshot_id,
+        )
+        applied = f.decision_at.replace(hour=9, minute=0)
+        with pytest.raises(BacktestInputError, match="historical-PIT"):
+            BacktestEngine(r.engine.policy)._validate_action_clock(run, action, applied)
+        r.engine._validate_action_clock(run, action, applied)
+        with pytest.raises(BacktestInputError, match="binding"):
+            r.engine._validate_action_clock(
+                run, replace(action, known_at=INFO.replace(year=2027)), applied
+            )
+        state = UnitState(
+            unit_id="u",
+            target_notional=Decimal("10000.00"),
+            cash=Decimal("9000.00"),
+            security_code="security-native",
+            settled_quantity=100,
+            position_cost=Decimal("1000.00"),
+            commission_expense=Decimal("0.00"),
+            stamp_duty_expense=Decimal("0.00"),
+            transfer_fee_expense=Decimal("0.00"),
+            realized_pnl=Decimal("0.00"),
+            dividend_income=Decimal("0.00"),
+            external_pool=Decimal("0.00"),
+            last_mark_price=Decimal("10"),
+            last_mark_snapshot_id="before",
+        )
+        result = r.engine.apply_corporate_action(
+            run=run,
+            opening_state=state,
+            action=action,
+            applied_at=applied,
+            post_action_mark_price=Decimal("9"),
+            mark_snapshot_id="after",
+        )
+        assert result.state.settled_quantity == 110
+        assert result.state.dividend_income == Decimal("10.00")
+        assert action.known_at == INFO and action.known_at > applied
+
+
+def test_normalized_action_file_checks_true_time_and_duplicate_event(tmp_path):
+    a = {
+        "contract": "p10-retained-implemented-plan-economic-view.v1",
+        "economic_event_id": "sha256:" + "a" * 64,
+        "security_id": "security-native",
+        "effective_date": DAYS[10].isoformat(),
+        "known_at": INFO.isoformat(),
+        "cash_dividend_per_share": {"Decimal": "0.1"},
+        "bonus_share_ratio": {"Decimal": "0.1"},
+        "historical_pit_granted": False,
+    }
+    file = tmp_path / "actions.json"
+    file.write_text(json.dumps([a]))
+    parsed = prep.load_actions(file, INFO)
+    assert parsed[0]["cash_dividend_per_share"] == Decimal("0.1")
+    file.write_text(json.dumps([a, a]))
+    with pytest.raises(ValueError, match="IDENTITY_OR_TIME"):
+        prep.load_actions(file, INFO)

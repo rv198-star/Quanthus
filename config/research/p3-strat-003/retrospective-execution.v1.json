@@ -2,7 +2,7 @@
   "schema_version": "quanthus.p3-retrospective-execution.v1",
   "purpose_id": "p3-base24-retrospective-comparison-v1",
   "owner_continuation": "2026-10-23: 继续推进，不到P3能正式启动前不用停下来；保留已批准回溯口径",
-  "state": "WAITING_FOR_PURPOSE_SPECIFIC_INPUT_ADMISSION",
+  "state": "EXECUTION_REQUIRES_REGISTERED_PURPOSE_SPECIFIC_ADMISSION",
   "admitted_consumer_receipt_sha256": [],
   "receipt_requirements": [
     "exact input, source, support and industry identities and true snapshot cutoff",

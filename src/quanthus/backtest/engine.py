@@ -443,8 +443,7 @@ class BacktestEngine:
             raise BacktestInputError("corporate action applied_at must be timezone-aware")
         if applied_at.astimezone(MARKET_TIMEZONE).date() != action.effective_date:
             raise BacktestInputError("corporate action must apply on its effective market date")
-        if action.known_at > applied_at:
-            raise BacktestInputError("corporate action was not known at application time")
+        self._validate_action_clock(run, action, applied_at)
         if opening_state.security_code != action.security_code:
             raise BacktestInputError("corporate action security does not match unit position")
         if post_action_mark_price != self._quantize_price(post_action_mark_price):
@@ -1200,6 +1199,14 @@ class BacktestEngine:
         if profile.schedule_version != run.schedule_version:
             raise BacktestInputError("run schedule_version does not match execution profile")
         return profile
+
+    def _validate_action_clock(
+        self, run: BacktestRunSpec, action: CorporateAction, applied_at: datetime
+    ) -> None:
+        if type(action) is not CorporateAction:
+            raise BacktestInputError("historical-PIT CorporateAction required")
+        if action.known_at > applied_at:
+            raise BacktestInputError("corporate action was not known at application time")
 
     def _validate_signal_clock(self, run: BacktestRunSpec, signal: BacktestSignal) -> None:
         """The ordinary engine admits only historical-PIT signals, including at runtime."""

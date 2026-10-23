@@ -5,7 +5,7 @@
   "evidence": {
     "market": {"path":"src/quanthus/pipelines/securities_warehouse/market_observation.py","sha256":"sha256:5b72512cd75c9ee0d2ef17f89174b6e9a044dd354be904b7f20364bbdd6a561f","locator":"_bar_query"},
     "provider": {"path":"src/quanthus/backtest/direct_dwd_provider.py","sha256":"sha256:08fb354bb3386661c20ea19f0de3afd7aadc450cc55c1a6c03cb2241fc3ad063","locator":"daily_ohlcv_none.parquet"},
-    "panel": {"path":"src/quanthus/backtest/baseline_research.py","sha256":"sha256:59168a5b92b4c3f988275d43801d5b0fecd7d6a3d629bcd28ff3327e306fdce8","locator":"_feature_panel_query"},
+    "panel": {"path":"src/quanthus/backtest/baseline_research.py","sha256":"sha256:8881c2ac3ffe83a5ef0aa2a41b8c06726ecc297daac1ce2f241bafbc4296495f","locator":"_feature_panel_query"},
     "structure": {"path":"src/quanthus/structure_v2.py","sha256":"sha256:29693a9cf81545e8e7e34db7e5f5403f5e7f782c4d845b8cc64f700390121158","locator":"build_structure_v2"},
     "admission": {"path":"src/quanthus/structure_v2_run.py","sha256":"sha256:ce4d9ea947e5009e362422073503602ef7bef8b30a9970f72eca2b919cda7734","locator":"extract_admissions"},
     "inputs": {"path":"src/quanthus/structure_v2_inputs.py","sha256":"sha256:b336e3ee48889ca7ccb9903c0d2ddf55e84e9b9fe56472cc34b7e640339e2275","locator":"admit_daily"},

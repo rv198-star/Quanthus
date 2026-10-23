@@ -115,6 +115,31 @@ continues to require the existing exact binding.
 ### Current recovery checkpoint
 
 
+**P10-authorized support integration, 2026-10-23 (current):** the Owner explicitly
+approved “授权按 P10 职责修复，再启动 P3”. Continue this existing job, not the old
+archive hunt. Runtime evidence root is
+`/srv/agentdock/.codex/p3-launch-convergence-20261023T085009Z-04bcbe9`.
+The 70 SSE/SZSE missing-clock sessions have a separate rule-derived schedule and
+passed two isolated relocated cold checks; native nulls remain. Retained status
+replay has 2,548,004 observations with independently checked Parquet-local source
+ordinals. Retained raw EM/F10 reconciliation produced 8,778 economic events;
+405 exception securities remain fail-closed under normalization-v3. The consumer
+static concentration projection covers 5,201 securities without a historical-PIT
+claim. These are support facts, not original B/D acceptance or real comparisons.
+
+The once-built native join has 2,455,533 rows. Execution qualification v6 closed all 2,455,533 rows, including 1,353,874
+qualified execution observations. The v5 census caught expired September calendar
+versions; v6 selected the exact visible calendar and reused the unaffected 2,385,414
+rows through August. Preserve old failed attempts and evidence. The additive
+handoff `sha256:d762075663f3daa8037018ea22856eb4ee3b09b4e81867f5758c10ea1f800c4f`
+passed two independent physical, kernel-isolated cold reads and corruption rejection.
+`retrospective-comparison.v2.json` freezes its true new support snapshot and all
+input identities. Next: build the shared real preparation,
+register exact purpose-specific admission, and launch B/T/R/TR. Do not call a
+preparation marker a real comparison. Existing frozen strict B/D and P6 remain
+unchanged. The execution registry remains the result-access boundary.
+
+
 **Execution convergence, 2026-10-23 (current):** Owner requested continuation through actual
 P3 startup. The separate two-clock runtime is now connected to existing B/T/R/TR/P2 arithmetic
 for qualified no-action inputs. Synthetic four-variant fills/ledgers, strict-control arithmetic

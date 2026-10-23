@@ -257,3 +257,71 @@ def test_independent_shared_builds_preserve_typed_semantic_bytes(tmp_path):
         assert (tmp_path / "1/prepared" / name).read_bytes() == (
             tmp_path / "2/prepared" / name
         ).read_bytes()
+
+
+def test_frozen_business_start_need_not_be_an_open_exchange_date():
+    from datetime import date, timedelta
+
+    from quanthus.expert_strategy.p3_base24_batch import FROZEN_SCOPE
+
+    warmup = tuple(date(2024, 12, 31) - timedelta(days=i) for i in range(59, -1, -1))
+    dates = warmup + (date(2025, 1, 2), date(2026, 9, 17), date(2026, 9, 18))
+    prep._scope(dates, FROZEN_SCOPE, False)
+    with pytest.raises(ValueError, match="SCOPE"):
+        prep._scope(dates[:-1], FROZEN_SCOPE, False)
+
+
+def test_preparation_embeds_and_verifies_late_actions_without_source_paths(tmp_path):
+    from decimal import Decimal
+
+    action = tmp_path / "source-action.json"
+    action.write_text(
+        json.dumps(
+            [
+                {
+                    "contract": "p10-retained-implemented-plan-economic-view.v1",
+                    "economic_event_id": "sha256:" + "a" * 64,
+                    "security_id": "security-native",
+                    "effective_date": DAYS[62].isoformat(),
+                    "known_at": INFO.isoformat(),
+                    "cash_dividend_per_share": {"Decimal": "0.1"},
+                    "bonus_share_ratio": {"Decimal": "0"},
+                    "historical_pit_granted": False,
+                }
+            ]
+        )
+    )
+    result = build(tmp_path, normalized_actions=action)
+    action.unlink()
+    verified = prep.verify(ROOT, tmp_path / "prepared", manifest_sha256=result["manifest_sha256"])
+    assert verified == result
+    rows = pq.read_table(tmp_path / "prepared/features.parquet").to_pylist()
+    assert rows[1]["daily_total_return"] == pytest.approx(0.001)
+    assert prep.load_actions(tmp_path / "prepared/normalized-actions.json", INFO)[0][
+        "cash_dividend_per_share"
+    ] == Decimal("0.1")
+
+
+def test_post_preparation_admission_registry_has_no_circular_identity(tmp_path):
+    repo = tmp_path / "repo"
+    target = repo / "config/research/p3-strat-003/retrospective-execution.v1.json"
+    target.parent.mkdir(parents=True)
+    original = json.loads((ROOT / target.relative_to(repo)).read_text())
+    target.write_text(json.dumps(original))
+    before = prep._preparation_closure(repo)
+    original["admitted_consumer_receipt_sha256"].append("sha256:" + "a" * 64)
+    target.write_text(json.dumps(original))
+    assert prep._preparation_closure(repo) == before
+    original["production_authorized"] = True
+    target.write_text(json.dumps(original))
+    assert prep._preparation_closure(repo) != before
+
+
+def test_stream_encoder_is_byte_identical_to_deepcopy_reference():
+    from dataclasses import asdict
+
+    for p in ports():
+        reference = json.dumps(asdict(p), default=prep._typed, sort_keys=True)
+        actual = json.dumps(p, default=prep._typed, sort_keys=True)
+        assert actual == reference
+        assert prep.decode_port(json.loads(actual)) == p

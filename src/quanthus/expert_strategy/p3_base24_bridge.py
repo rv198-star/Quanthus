@@ -282,9 +282,10 @@ def _selected_port(
     it never edits a clock to pass the strict entrypoint.
     """
     day = row["trade_date"]
+    raw_digest = row_digest(row)
     if support is not None and (
         support.source_manifest_sha256 != source_manifest_sha256
-        or support.row_sha256 != row_digest(row)
+        or support.row_sha256 != raw_digest
         or support.listing_id != row["listing_id"]
         or support.market_date != day
     ):
@@ -360,7 +361,7 @@ def _selected_port(
         {
             "version": VERSION,
             "source": source_manifest_sha256,
-            "row": row_digest(row),
+            "row": raw_digest,
             "support": None if support is None else vars(support),
             "static_industry_id": static_industry_id,
         }

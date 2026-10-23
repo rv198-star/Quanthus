@@ -7,7 +7,9 @@
     "sha256:9663bb6789f9c08ca99e7f591168f9aa8d48353d9f6aebb6f7238d517c8a24a3",
     "sha256:a56a62d43f075a4f2ea2c9a54896450435496bd6b1ccc290f6a89c8e1c71cbef",
     "sha256:f8b1a054aec98395f7c817a62f20840b3238893a871e1b4ccd295abeac6f9207",
-    "sha256:ec21372dcc645fe6b6a44adbc42ca629d4d97f78978183184edd404de2352fef"
+    "sha256:ec21372dcc645fe6b6a44adbc42ca629d4d97f78978183184edd404de2352fef",
+    "sha256:161b0d572e6d74f7f73a5205bdfc48b6c94c04ac5a1c368c5bfe38c89600c5a9",
+    "sha256:3b6e7205de74be291b9b0f0ffcfa8e53ef0624fc75f58812c09792121a2b907f"
   ],
   "receipt_requirements": [
     "exact input, source, support and industry identities and true snapshot cutoff",

@@ -114,6 +114,23 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**Owner-approved exploratory preparation, 2026-10-23:** the Owner explicitly selected
+“同意回溯口径，继续准备”. The new comparison purpose is
+`config/research/p3-strat-003/retrospective-comparison.v1.json`; it preserves the original
+strict request, business window, numeric policies and original B/D status. It authorizes
+preparation, not a real strategy/economic result run. `p3_retrospective_preparation.py`
+now materializes one typed compact journal, one prefix-correct feature panel, exact P4
+candidates, a common mask and four identically bound variant inputs from a single port
+stream. Its completion marker is deliberately not READY/admission. Source/support semantics
+are not qualified by creating a package; late clocks must not be passed off as strict
+EventRecord/StrategyReplayFrame/BacktestSignal objects.
+
+The confirmed 35-date OPEN calendar clock gap is registered with P10
+[#555](https://github.com/rv198-star/Quanthus/issues/555), linked to #485/#474 and distinct
+from the bounded P6 source work #538/#539. Do not resume an archive hunt or infer 09:30/15:00
+source clocks. See [the current preparation record](p3-base24-goal-audit-and-plan-20261022.md#19-回溯比较准备与-p10-数据缺口)
+for the exact actual compatibility evidence, checks and remaining admission boundary.
+
 **Consumer component continuation, 2026-10-23:** the separate R2 bridge now connects
 source-snapshot/business-date ports to frozen P4 numeric rules, prefix-safe shared feature SQL,
 one complete-case mask and execution-only P1/P2 adapters. The R2 candidate dictionary is not a

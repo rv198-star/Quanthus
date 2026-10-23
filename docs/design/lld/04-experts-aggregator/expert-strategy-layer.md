@@ -445,3 +445,28 @@ The MVP deliberately does not close `P5-TARGET-001`, `P6-SCORE-001`, `P6-GOV-001
 depends on its phase gate and P6 promotion still requires its own scorecard, partition, Shadow, and
 review evidence. Any later enabled forward Shadow produces input evidence only; the accepted MVP
 did not enable it.
+
+### Fixed-snapshot exploratory comparison preparation (2026-10-23)
+
+The Owner separately approved preparing the retrospective question in
+`config/research/p3-strat-003/retrospective-comparison.v1.json`. It preserves the strict
+`P3-STRAT-003` request and its unaccepted B/NOT_RUN D. The new purpose uses the declared
+information snapshot to inspect the original frozen business dates; it cannot establish that
+the inputs were historically available or support a production/P6 claim.
+
+The result-blind `p3_retrospective_preparation` consumer owns one immutable job-local typed port
+journal and one prefix-safe feature materialization. Candidate rules, the common complete-case
+mask and all four variant definitions reuse their existing numeric rules. The journal preserves
+Decimal scale and real source/business clocks; each variant binds the same full input, support,
+static-industry, ordinary-code/config and runtime identities. Neither a schema/digest nor a
+native executable flag qualifies missing listing, normalized-action or execution support.
+
+`PREPARATION_COMPLETE.json` attests only this engineering materialization, and is deliberately
+distinct from a data READY or research admission. Cold checking takes an externally bound
+manifest digest and reads only the package and ordinary code/config. The strict EventRecord,
+StrategyReplayFrame, BacktestSignal and legacy P2 entry points keep their original clock gates;
+the preparation cannot relabel its late-clock records as those types. An explicit two-clock
+simulation boundary and purpose-specific source/support admission remain prerequisites for a
+future result run. No result execution is authorized by this preparation approval. Shared
+calendar defects go to P10 #555; historical-PIT evidence remains with P10 #474. Only the affected
+step waits; independent consumer and synthetic engineering may continue.

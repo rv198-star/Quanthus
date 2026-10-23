@@ -1,0 +1,18 @@
+{
+  "schema_version": "quanthus.p3-retrospective-consumer.v1",
+  "purpose_id": "p3-base24-retrospective-input-v1",
+  "security_scope": {
+    "native_legacy_equity_type": "A_SHARE",
+    "warehouse_equity_type": "common_equity",
+    "required_warehouse_equity_currency": "CNY",
+    "venue_mics": ["XSHE", "XSHG"],
+    "unknown_currency": "unavailable; never infer CNY",
+    "source_fields_rewritten": false
+  },
+  "information_boundary": "original input source snapshot, not historical T",
+  "business_boundary": "features through historical T; September18 execution only",
+  "empty_required_universe": "BLOCKED_EMPTY_REQUIRED_UNIVERSE",
+  "grants_candidate_feature_execution_qualification": false,
+  "grants_original_B_acceptance": false,
+  "grants_D_activation": false
+}

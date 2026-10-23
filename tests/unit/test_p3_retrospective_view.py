@@ -4,12 +4,14 @@ import json
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from quanthus.expert_strategy import p3_base24_bridge as bridge
 from quanthus.expert_strategy import p3_base24_native as native
 from quanthus.expert_strategy import p3_retrospective_view as reader
-from tests.unit.test_p3_base24_native import CLOCK, TZ, mutate
+from tests.unit.test_p3_base24_native import CLOCK, TZ, mutate, seal
 from tests.unit.test_p3_retrospective_input import build
 from tests.unit.test_p3_retrospective_input import source as source_fixture
 
@@ -17,6 +19,49 @@ from tests.unit.test_p3_retrospective_input import source as source_fixture
 @pytest.fixture
 def source(tmp_path):
     return source_fixture.__wrapped__(tmp_path)
+
+
+def warehouse_security(source, currency):
+    mutate(source, "dwd_security", lambda rows: rows[0].update(instrument_type="common_equity"))
+    if currency is not None:
+        path = source / "native/dwd_security.parquet"
+        table = pq.read_table(path).append_column(
+            "instrument_currency", pa.array([currency], type=pa.string())
+        )
+        pq.write_table(table, path)
+        seal(source)
+
+
+def test_actual_warehouse_common_equity_is_selected_without_rewriting_it(source, tmp_path):
+    warehouse_security(source, "CNY")
+    out = tmp_path / "out"
+    result = build(source, out, tmp_path)
+    with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
+        rows = [
+            row for b in view.history_batches(business_read_boundary=CLOCK) for row in b.to_pylist()
+        ]
+    assert len(rows) == 1 and rows[0]["instrument_type"] == "common_equity"
+
+
+def test_unknown_warehouse_currency_is_not_inferred_or_silently_dropped(source, tmp_path):
+    warehouse_security(source, None)
+    out = tmp_path / "out"
+    result = build(source, out, tmp_path)
+    with (
+        reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view,
+        pytest.raises(native.InputError, match="ASOF_IDENTITY_UNAVAILABLE"),
+    ):
+        list(view.history_batches(business_read_boundary=CLOCK))
+
+
+def test_foreign_currency_common_equity_does_not_satisfy_nonempty_A_share_gate(source, tmp_path):
+    warehouse_security(source, "USD")
+    out = tmp_path / "out"
+    result = build(source, out, tmp_path)
+    with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
+        report = reader.input_census(view, CLOCK)
+    assert report["joined_rows"] == 0
+    assert report["status"] == "BLOCKED_EMPTY_REQUIRED_UNIVERSE"
 
 
 def test_two_clocks_are_preserved_and_strict_bridge_still_rejects(source, tmp_path):

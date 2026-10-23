@@ -17,6 +17,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from quanthus.expert_evaluation.serialization import digest_value
 from quanthus.expert_strategy import p3_base24_native as native
 from quanthus.expert_strategy import p3_retrospective_input as inputs
 
@@ -39,8 +40,33 @@ class RetrospectiveView(native.NativeView):
         self.information_cutoff = datetime.fromisoformat(
             native._json(root / "plan.json")["information_cutoff"]
         )
+        self.consumer_policy = native._json(
+            Path(__file__).resolve().parents[3]
+            / "config/research/p3-strat-003/base24-retrospective-consumer.v1.json"
+        )
+        if (
+            self.consumer_policy.get("schema_version") != "quanthus.p3-retrospective-consumer.v1"
+            or self.consumer_policy.get("purpose_id") != "p3-base24-retrospective-input-v1"
+            or self.consumer_policy.get("grants_candidate_feature_execution_qualification")
+            is not False
+            or self.consumer_policy.get("grants_original_B_acceptance") is not False
+            or self.consumer_policy.get("grants_D_activation") is not False
+            or self.consumer_policy.get("security_scope")
+            != {
+                "native_legacy_equity_type": "A_SHARE",
+                "warehouse_equity_type": "common_equity",
+                "required_warehouse_equity_currency": "CNY",
+                "venue_mics": ["XSHE", "XSHG"],
+                "unknown_currency": "unavailable; never infer CNY",
+                "source_fields_rewritten": False,
+            }
+        ):
+            raise native.InputError("RETRO_CONSUMER_POLICY")
         super().__init__(root, deadline=deadline)
         try:
+            self.currency_present = "instrument_currency" in {
+                row[0] for row in self.connection.execute("DESCRIBE raw_dwd_security").fetchall()
+            }
             self._unchanged()
         except BaseException:
             super().__exit__()
@@ -48,6 +74,13 @@ class RetrospectiveView(native.NativeView):
 
     def __enter__(self) -> RetrospectiveView:
         return self
+
+    def _equity_predicate(self, alias: str) -> str:
+        currency = f"{alias}.instrument_currency" if self.currency_present else "NULL"
+        return (
+            f"({alias}.instrument_type='A_SHARE' OR "
+            f"({alias}.instrument_type='common_equity' AND {currency}='CNY'))"
+        )
 
     def _unchanged(self) -> None:
         super()._unchanged()
@@ -148,7 +181,10 @@ def input_census(view: RetrospectiveView, boundary: datetime) -> dict[str, Any]:
             buy_unknown += row["can_buy"] is None
             sell_unknown += row["can_sell"] is None
     return {
-        "status": "P3_RETROSPECTIVE_CONSUMER_READ_COMPLETED",
+        "status": "P3_RETROSPECTIVE_CONSUMER_READ_COMPLETED"
+        if total
+        else "BLOCKED_EMPTY_REQUIRED_UNIVERSE",
+        "consumer_policy_digest": digest_value(view.consumer_policy),
         "input_manifest_sha256": view.input_manifest_sha256,
         "information_cutoff": view.information_cutoff.isoformat(),
         "business_read_boundary": boundary.isoformat(),
@@ -175,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
     with RetrospectiveView(args.root, manifest_sha256=args.manifest_sha256) as view:
         result = input_census(view, datetime.fromisoformat(args.business_read_boundary))
     print(json.dumps(result, sort_keys=True, ensure_ascii=False, indent=2))
-    return 0
+    return 0 if result["status"] == "P3_RETROSPECTIVE_CONSUMER_READ_COMPLETED" else 2
 
 
 if __name__ == "__main__":

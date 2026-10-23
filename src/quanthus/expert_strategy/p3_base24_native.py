@@ -1167,6 +1167,10 @@ class NativeView:
     def at(self, cutoff: datetime) -> None:
         self._at(cutoff, market_only=False)
 
+    def _equity_predicate(self, alias: str) -> str:
+        """Strict input vocabulary; weaker purposes supply a distinct predicate."""
+        return f"{alias}.instrument_type='A_SHARE'"
+
     def _at(self, cutoff: datetime, *, market_only: bool, execution_only: bool = False) -> None:
         self._unchanged()
         if cutoff.tzinfo is None or cutoff.utcoffset() is None:
@@ -1207,11 +1211,16 @@ class NativeView:
                 f"{alias}.{identity}=l.{identity} AND {alias}.effective_from<=b.observation_start "
                 f"AND ({alias}.effective_to IS NULL OR {alias}.effective_to>b.observation_start)"
             )
+            in_scope = (
+                self._equity_predicate(alias)
+                if table == "dwd_security"
+                else f"{alias}.{field} IN {values}"
+            )
             outside.append(
                 f"(EXISTS (SELECT 1 FROM {table} {alias} WHERE {active} "
-                f"AND {alias}.{field} NOT IN {values}) AND NOT EXISTS "
+                f"AND NOT ({in_scope})) AND NOT EXISTS "
                 f"(SELECT 1 FROM {table} {alias} WHERE {active} "
-                f"AND ({alias}.{field} IN {values} OR {alias}.{field} IS NULL)))"
+                f"AND (({in_scope}) OR {alias}.{field} IS NULL)))"
             )
         excluded = (
             f"EXISTS (SELECT 1 FROM dwd_listing l WHERE {active_listing}) AND NOT EXISTS "
@@ -1308,6 +1317,7 @@ class NativeView:
             if next_open is None or next_open[0] != cutoff.astimezone(TZ).date():
                 raise InputError("ASOF_EXACT_NEXT_SESSION_UNAVAILABLE")
         bounded = f"b.observation_end<=TIMESTAMPTZ {_q(cutoff.isoformat())}"
+        equity = self._equity_predicate("s")
         _zero(
             c,
             f"SELECT count(*) FROM p3_market_bars b WHERE {bounded} AND NOT EXISTS "
@@ -1323,7 +1333,7 @@ class NativeView:
             "JOIN dwd_security s ON s.security_id=l.security_id "
             "JOIN dwd_trading_venue v ON v.venue_id=l.venue_id "
             "WHERE l.listing_id=b.listing_id AND c.calendar_session_id=b.calendar_session_id "
-            "AND s.instrument_type='A_SHARE' AND v.mic_code IN ('XSHE','XSHG') "
+            f"AND ({equity}) AND v.mic_code IN ('XSHE','XSHG') "
             "AND l.effective_from<=b.observation_start "
             "AND (l.effective_to IS NULL OR l.effective_to>b.observation_start) "
             "AND s.effective_from<=b.observation_start "
@@ -1384,7 +1394,7 @@ class NativeView:
             LEFT JOIN p3_market_states t ON t.listing_id=b.listing_id
                 AND t.calendar_session_id=b.calendar_session_id
                 AND {state_bounded}
-            WHERE v.mic_code IN ('XSHE','XSHG') AND s.instrument_type='A_SHARE'
+            WHERE v.mic_code IN ('XSHE','XSHG') AND ({equity})
                 AND c.trade_date=CAST(b.observation_start AS DATE)
                 AND b.observation_end<=TIMESTAMPTZ {_q(cutoff.isoformat())}
             {execution_filter}

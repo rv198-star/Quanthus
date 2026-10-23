@@ -5,7 +5,10 @@
   "runtime_version": "p3-retrospective-risk-components-v1",
   "accounting_version": "formal-p2-position-accounting-2.0.0",
   "state": "EXECUTION_REQUIRES_REGISTERED_PURPOSE_SPECIFIC_ADMISSION",
-  "admitted_consumer_receipt_sha256": [],
+  "admitted_consumer_receipt_sha256": [
+    "sha256:574474210eab591e3a08141c2a2e2105ff776181e36ed8a0cb5eef21e076617a",
+    "sha256:43feb60294c9da4f3be80dc62dd4ceed0a28cbeb9e41b8b0d91558e6b3506b18"
+  ],
   "owner_authorization": "2026-10-24: start step2 fixed component experiment, then report three-step progress",
   "original_request_replaced": false,
   "original_B_accepted": false,

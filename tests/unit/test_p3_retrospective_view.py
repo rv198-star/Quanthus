@@ -10,6 +10,7 @@ import pytest
 
 from quanthus.expert_strategy import p3_base24_bridge as bridge
 from quanthus.expert_strategy import p3_base24_native as native
+from quanthus.expert_strategy import p3_retrospective_bridge as retro_bridge
 from quanthus.expert_strategy import p3_retrospective_view as reader
 from tests.unit.test_p3_base24_native import CLOCK, TZ, mutate, seal
 from tests.unit.test_p3_retrospective_input import build
@@ -43,6 +44,33 @@ def test_actual_warehouse_common_equity_is_selected_without_rewriting_it(source,
             for row in b.to_pylist()
         ]
     assert len(rows) == 1 and rows[0]["instrument_type"] == "common_equity"
+
+
+def test_canonical_currency_survives_reader_to_business_port(source, tmp_path):
+    warehouse_security(source, "CNY")
+    for table in ("dwd_security_bar", "dwd_tradability_state"):
+        mutate(source, table, lambda rows: rows[0].update(
+            observation_start=CLOCK.replace(hour=0),
+            observation_end=(CLOCK + timedelta(days=1)).replace(hour=0),
+        ))
+    out = tmp_path / "out"
+    result = build(source, out, tmp_path)
+    with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
+        rows = [
+            row
+            for b in view.history_batches(business_read_through=CLOCK.date())
+            for row in b.to_pylist()
+        ]
+        assert rows[0]["instrument_currency"] == "CNY"
+        port = retro_bridge.decision_port(
+            rows[0],
+            information_cutoff=view.information_cutoff,
+            source_manifest_sha256=result["manifest_sha256"],
+            support=None,
+            static_industry_id=None,
+        )
+    assert port.selected is not None
+    assert "EXECUTION_QUALIFICATION_UNAVAILABLE" in port.unavailable_reasons
 
 
 def test_unknown_warehouse_currency_is_not_inferred_or_silently_dropped(source, tmp_path):

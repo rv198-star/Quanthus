@@ -97,6 +97,14 @@ class RetrospectiveView(native.NativeView):
             f"({alias}.instrument_type='common_equity' AND {currency}='CNY'))"
         )
 
+    def _security_projection(self, alias: str) -> str:
+        currency = (
+            f"{alias}.instrument_currency"
+            if self.currency_present
+            else "NULL::VARCHAR AS instrument_currency"
+        )
+        return f"{super()._security_projection(alias)}, {currency}"
+
     def _unchanged(self) -> None:
         super()._unchanged()
         if self.input_fingerprints != {

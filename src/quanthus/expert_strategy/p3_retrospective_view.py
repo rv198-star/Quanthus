@@ -37,9 +37,12 @@ class RetrospectiveView(native.NativeView):
         )
         self.input_manifest_sha256 = manifest_sha256
         self.input_fingerprints = before
-        self.information_cutoff = datetime.fromisoformat(
-            native._json(root / "plan.json")["information_cutoff"]
+        plan = native._json(root / "plan.json")
+        self.information_cutoff = datetime.fromisoformat(plan["information_cutoff"])
+        self.business_start = date.fromisoformat(
+            plan["warmup_calendar"]["sessions"][0]["trade_date"]
         )
+        self._business_month: tuple[date, date] | None = None
         self.consumer_policy = native._json(
             Path(__file__).resolve().parents[3]
             / "config/research/p3-strat-003/base24-retrospective-consumer.v1.json"
@@ -115,8 +118,18 @@ class RetrospectiveView(native.NativeView):
         self.connection.execute("BEGIN TRANSACTION")
         try:
             for table in native.KEYS:
+                where = ""
+                if table == "dwd_security_bar" and self._business_month is not None:
+                    first, after = self._business_month
+                    bounds = [
+                        datetime.combine(d, datetime.min.time(), native.TZ) for d in (first, after)
+                    ]
+                    where = (
+                        f" WHERE observation_start>=TIMESTAMPTZ {native._q(bounds[0].isoformat())}"
+                        f" AND observation_start<TIMESTAMPTZ {native._q(bounds[1].isoformat())}"
+                    )
                 self.connection.execute(
-                    f"CREATE OR REPLACE TEMP VIEW {table} AS SELECT * FROM raw_{table}"
+                    f"CREATE OR REPLACE TEMP VIEW {table} AS SELECT * FROM raw_{table}{where}"
                 )
             self._market_scope(cutoff, materialize_bars=True)
             self._unchanged()
@@ -133,6 +146,33 @@ class RetrospectiveView(native.NativeView):
         Consumers must still cap each T feature at its own business boundary.
         The Sep18 observations are execution-only, never additional decisions.
         """
+        if business_read_boundary.tzinfo is None or business_read_boundary.utcoffset() is None:
+            raise native.InputError("AWARE_CUTOFF_REQUIRED")
+        if (
+            not date(2025, 1, 1)
+            <= business_read_boundary.astimezone(native.TZ).date()
+            <= date(2026, 9, 18)
+        ):
+            raise native.InputError("FROZEN_DECISION_WINDOW")
+
+        # Global key/version and reference validation ran once in inputs.verify.
+        # Each distinct month then owns one shared bounded market-scope TMP. All
+        # months, including warmup and the execution tail, are visited exactly
+        # once; this is partitioning, not shortening the frozen research window.
+        # Order is deterministic: business month, then native security/time order.
+        first = self.business_start.replace(day=1)
+        last = business_read_boundary.astimezone(native.TZ).date()
+        try:
+            while first <= last:
+                after = date(first.year + (first.month == 12), first.month % 12 + 1, 1)
+                self._business_month = (first, after)
+                yield from self._history_month(business_read_boundary, batch_size=batch_size)
+                first = after
+        finally:
+            self._business_month = None
+        self._unchanged()
+
+    def _history_month(self, business_read_boundary: datetime, *, batch_size: int) -> Iterator[Any]:
         import pyarrow as pa  # type: ignore[import-untyped]
 
         for block in super().market_batches(business_read_boundary, batch_size=batch_size):
@@ -168,7 +208,6 @@ class RetrospectiveView(native.NativeView):
                     raise native.InputError("RETRO_RESERVED_COLUMN")
                 block = block.append_column(name, array)
             yield block
-        self._unchanged()
 
 
 def input_census(view: RetrospectiveView, boundary: datetime) -> dict[str, Any]:

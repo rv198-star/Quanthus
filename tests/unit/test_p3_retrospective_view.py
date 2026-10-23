@@ -142,6 +142,51 @@ def test_reused_scope_is_rebuilt_for_each_explicit_business_boundary(source, tmp
     assert counts == [0, 1, 0]
 
 
+def test_partitioned_read_covers_warmup_and_month_boundary_once_without_retiming(source, tmp_path):
+    def add(rows):
+        for day in (datetime(2024, 12, 31, tzinfo=TZ), datetime(2025, 2, 3, tzinfo=TZ)):
+            rows.append(
+                dict(
+                    rows[0],
+                    calendar_session_id=f"sz-{day.date()}",
+                    observation_start=day,
+                    observation_end=day + timedelta(hours=15),
+                )
+            )
+
+    mutate(source, "dwd_security_bar", add)
+    out = tmp_path / "out"
+    result = build(source, out, tmp_path)
+    with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
+        rows = [
+            r
+            for b in view.history_batches(
+                business_read_boundary=datetime(2025, 2, 3, 15, tzinfo=TZ)
+            )
+            for r in b.to_pylist()
+        ]
+    assert [r["trade_date"].isoformat() for r in rows] == ["2024-12-31", "2025-01-02", "2025-02-03"]
+    assert [r["r2_observation_role"] for r in rows] == [
+        "WARMUP",
+        "DECISION_HISTORY",
+        "DECISION_HISTORY",
+    ]
+    assert all(
+        r["close"] == Decimal("1.1000000001") and r["bar_knowledge_from"] == CLOCK for r in rows
+    )
+
+
+@pytest.mark.parametrize("boundary", [datetime(2025, 1, 2), datetime(2024, 1, 1, tzinfo=TZ)])
+def test_invalid_partition_boundary_cannot_silently_become_empty(source, tmp_path, boundary):
+    out = tmp_path / "out"
+    result = build(source, out, tmp_path)
+    with (
+        reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view,
+        pytest.raises(native.InputError, match="AWARE_CUTOFF_REQUIRED|FROZEN_DECISION_WINDOW"),
+    ):
+        list(view.history_batches(business_read_boundary=boundary))
+
+
 def test_unknown_clock_stays_unavailable(source, tmp_path):
     mutate(source, "dwd_security_bar", lambda rows: rows[0].update(knowledge_from=None))
     out = tmp_path / "out"

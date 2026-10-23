@@ -114,6 +114,14 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**Consumer component continuation, 2026-10-23:** the separate R2 bridge now connects
+source-snapshot/business-date ports to frozen P4 numeric rules, prefix-safe shared feature SQL,
+one complete-case mask and execution-only P1/P2 adapters. The R2 candidate dictionary is not a
+strict EventRecord; clocks remain original. See [the component continuation](p3-base24-goal-audit-and-plan-20261022.md#18-双时间消费组件接续)
+and its current evidence before continuing. Synthetic component integration is not real input
+qualification, original B acceptance or D activation. Preserve the selected input and completed
+copy proof; do not rerun the historical source hunt.
+
 **Result-blind consumer continuation, 2026-10-23:** `p3_retrospective_view.py` now reads the
 sealed retrospective input through a separate two-clock interface. Canonical warehouse
 `common_equity` requires explicit CNY and SSE/SZSE scope; the original `A_SHARE` strict-reader

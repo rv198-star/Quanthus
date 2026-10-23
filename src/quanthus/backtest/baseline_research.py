@@ -1618,6 +1618,7 @@ def _feature_panel_query(
     scope_end: date,
     *,
     output_order: str = "date-security",
+    continuity_asof_each_row: bool = False,
 ) -> str:
     if output_order == "date-security":
         order_by = "market_date, security_id"
@@ -1625,6 +1626,17 @@ def _feature_panel_query(
         order_by = "security_id, market_date"
     else:
         raise BaselineResearchError("feature panel output order is not admitted")
+    if type(continuity_asof_each_row) is not bool:
+        raise BaselineResearchError("feature continuity mode must be boolean")
+    # A once-only all-date consumer must match the existing prefix-at-T batch:
+    # a later action/exception cannot alter an earlier entry. Legacy full-scope
+    # feature-panel callers retain their original behavior by default.
+    continuity_window = (
+        "PARTITION BY security_id ORDER BY market_date "
+        "ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
+        if continuity_asof_each_row
+        else "PARTITION BY security_id"
+    )
     start = _sql_string(scope_start.isoformat())
     end = _sql_string(scope_end.isoformat())
     return f"""
@@ -1736,7 +1748,7 @@ def _feature_panel_query(
             SELECT *, bool_or(
                        (unexplained_price_transition OR exception_active)
                        AND market_date >= DATE {start}
-                   ) OVER (PARTITION BY security_id) AS scope_continuity_excluded
+                   ) OVER ({continuity_window}) AS scope_continuity_excluded
             FROM classified_returns
         ),
         returns AS (

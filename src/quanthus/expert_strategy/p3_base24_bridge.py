@@ -256,6 +256,32 @@ def decision_port(
     for key in ("security_id", "listing_id", "listing_code", "company_id", "venue_id"):
         if not isinstance(row.get(key), str) or not row[key].strip():
             raise native.InputError("BRIDGE_IDENTITY")
+    return _selected_port(
+        row,
+        cutoff=cutoff,
+        source_manifest_sha256=source_manifest_sha256,
+        support=support,
+        static_industry_id=static_industry_id,
+        execution_only=execution_only,
+    )
+
+
+def _selected_port(
+    row: Mapping[str, Any],
+    *,
+    cutoff: datetime,
+    source_manifest_sha256: str,
+    support: DailySupport | None,
+    static_industry_id: str | None,
+    execution_only: bool,
+) -> DecisionPort:
+    """Pure field port after the caller validates its own time/scope contract.
+
+    Strict decision_port always validates historical T first. The explicitly
+    separate retrospective port validates the source snapshot and business date;
+    it never edits a clock to pass the strict entrypoint.
+    """
+    day = row["trade_date"]
     if support is not None and (
         support.source_manifest_sha256 != source_manifest_sha256
         or support.row_sha256 != row_digest(row)
@@ -445,6 +471,28 @@ def common_entry_mask(
     feature_known_at: datetime | None,
     feature_evidence_digest: str,
 ) -> SharedEntryMask:
+    """Strict historical T-close mask; retrospective input is rejected."""
+    return _common_entry_mask(
+        ports,
+        expected_dates=expected_dates,
+        card=card,
+        feature=feature,
+        feature_known_at=feature_known_at,
+        feature_evidence_digest=feature_evidence_digest,
+        information_cutoff=None,
+    )
+
+
+def _common_entry_mask(
+    ports: Sequence[DecisionPort],
+    *,
+    expected_dates: Sequence[date],
+    card: CandidateRuleCard,
+    feature: BaselineFeatureRow | None,
+    feature_known_at: datetime | None,
+    feature_evidence_digest: str,
+    information_cutoff: datetime | None,
+) -> SharedEntryMask:
     """Union of candidate + Trend + Position Risk evidence, computed once."""
     if len(ports) > 22 or len(expected_dates) != 22:
         raise native.InputError("BRIDGE_EXACT_CANDIDATE_HISTORY")
@@ -475,7 +523,11 @@ def common_entry_mask(
     reasons: list[str] = []
     candidates = [p.candidate for p in ports]
     current = ports[-1]
-    if current.bar.market_date == expected_dates[-1] and current.selected_at != current.close_at:
+    if (
+        information_cutoff is None
+        and current.bar.market_date == expected_dates[-1]
+        and current.selected_at != current.close_at
+    ):
         raise native.InputError("BRIDGE_T_CLOSE_REQUIRED")
     if any(c is None for c in candidates):
         reasons.append("CANDIDATE_EVIDENCE_UNAVAILABLE")
@@ -483,7 +535,9 @@ def common_entry_mask(
         window = tuple(c for c in candidates if c is not None)
         if len({(c.security_id, c.listing_id, c.venue_id, c.company_id) for c in window}) != 1:
             raise native.InputError("BRIDGE_MIXED_IDENTITY")
-        reason = _window_reason(window, expected_dates=expected_dates, card=card)
+        reason = _window_reason(
+            window, expected_dates=expected_dates, card=card, information_cutoff=information_cutoff
+        )
         if reason is not None:
             reasons.append(reason.value)
         industry = window[-1].static_level1_industry_id
@@ -499,7 +553,13 @@ def common_entry_mask(
             or feature.market_date != expected_dates[-1]
         ):
             raise native.InputError("BRIDGE_FEATURE_KEY")
-        cutoff = current.candidate.close_at if current.candidate else None
+        cutoff = (
+            information_cutoff
+            if information_cutoff is not None
+            else current.candidate.close_at
+            if current.candidate
+            else None
+        )
         if cutoff is None or not _visible(feature_known_at, cutoff):
             reasons.append("FEATURE_CLOCK_UNAVAILABLE")
         if not feature.feature_ready or not feature.entry_eligible:

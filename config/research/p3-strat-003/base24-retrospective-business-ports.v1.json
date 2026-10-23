@@ -1,0 +1,46 @@
+{
+  "schema_version": "quanthus.p3-retrospective-business-ports.v1",
+  "state": "RESULT_BLIND_ENGINEERING",
+  "purpose_id": "p3-base24-retrospective-input-v1",
+  "input_grade": "R2_RETROSPECTIVE_SNAPSHOT_NOT_HISTORICAL_PIT",
+  "original_request_digest": "sha256:9de79141514aa1941d276da854d734786bb2b5bb83310a1d3c7792d60c952bde",
+  "candidate_rule_digest": "sha256:b04464c838705e71331515332ceb9e796ce26698c784d4615cff00dfdcf41c50",
+  "stage_graph": [
+    {"stage": "verified_snapshot", "depends_on": [], "owner": "RetrospectiveView", "reuse": "existing immutable input; unchanged physical/cold proof may be reused with exact member hashes"},
+    {"stage": "business_ports", "depends_on": ["verified_snapshot"], "owner": "p3_retrospective_bridge.decision_port", "reuse": "keep native values, intervals and knowledge clocks; bind exact-row support separately"},
+    {"stage": "shared_history_TMP", "depends_on": ["business_ports"], "owner": "p3_retrospective_features.write_history", "reuse": "one physical TMP per Job; exact Decimal strings; unavailable observation keys retained as explicit unavailable projections"},
+    {"stage": "feature_panel", "depends_on": ["shared_history_TMP"], "owner": "p3_retrospective_features.feature_panel", "reuse": "one existing indicator SQL over the complete calendar; prefix continuity matches per-T computation; shared by all variants"},
+    {"stage": "candidate_observations", "depends_on": ["business_ports"], "owner": "p3_retrospective_features.candidate_observations", "reuse": "one ordered security series at a time; exact frozen P4 ratios, isolation and concentration; distinct R2 record"},
+    {"stage": "common_mask", "depends_on": ["business_ports", "feature_panel"], "owner": "p3_retrospective_bridge.common_entry_mask", "reuse": "same union complete-case mask for B/T/R/TR"},
+    {"stage": "execution_port", "depends_on": ["business_ports"], "owner": "p3_retrospective_bridge.execution_evidence", "reuse": "exact next-session calendar pair; execution-only P1/P2 interface; no future bar enters decision history"}
+  ],
+  "two_clocks": {
+    "information": "exact original source snapshot; never historical T close",
+    "business": "original historical session and half-open daily interval",
+    "raw_clock_or_value_rewrite": false,
+    "knowledge_interval": "original half-open interval must contain information snapshot",
+    "session_clock_missing": "unavailable; no schedule-derived source timestamp",
+    "feature_after_snapshot": "unavailable"
+  },
+  "support": {
+    "binding": ["source_manifest_sha256", "complete_typed_row_sha256", "listing_id", "market_date", "evidence_sha256"],
+    "separately_admitted_closure_required": true,
+    "dataclass_or_native_flags_grant_qualification": false,
+    "unknown_listing_age_or_action_or_execution": "unavailable; block affected entry; no zero/no-action/executable inference",
+    "effective_action_without_qualified_terms": "blocked; this no-action feature port does not qualify native action terms or replace the existing separately qualified action-accounting path",
+    "static_industry": "bound nonblank concentration mapping only; never historical PIT",
+    "frozen_factor_visibility_exceptions": "4173 retained as policy count, not newly measured or cleared"
+  },
+  "record_boundary": {
+    "R2_candidate_is_strict_EventRecord": false,
+    "strict_T_close_mask_unchanged": true,
+    "strict_EventRecord_late_clock_rejection_unchanged": true,
+    "strict_NativeJob_admission_unchanged": true
+  },
+  "resource_and_lifecycle": "Caller freezes actual scope/source/code/config/support identity, device/free-space and wall/RSS/spill/write budgets before a real Job. One shared job-local TMP; successful consumers may remove only owned TMP under the frozen retention plan; failed evidence retained. No cross-Job cache or ADM promotion.",
+  "grants_original_B_acceptance": false,
+  "grants_D_activation": false,
+  "grants_real_strategy_or_economic_result_access": false,
+  "execution_authorized": false,
+  "P6_mutation_authorized": false
+}

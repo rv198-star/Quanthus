@@ -583,6 +583,7 @@ def _window_reason(
     *,
     expected_dates: Sequence[date],
     card: CandidateRuleCard,
+    information_cutoff: datetime | None = None,
 ) -> CandidateReason | None:
     if tuple(item.session_date for item in window) != tuple(expected_dates):
         return CandidateReason.OBSERVATION_GAP
@@ -602,8 +603,13 @@ def _window_reason(
         return CandidateReason.T_NOT_TRADABLE
     if prior.adjustment_effective is not False or current.adjustment_effective is not False:
         return CandidateReason.CORPORATE_ACTION_BOUNDARY
+    # The strict event scan uses the default T close. A separately typed R2
+    # consumer may evaluate the same business rule at its original fixed source
+    # snapshot. EventRecord still forbids a late clock; no strict admission changes.
+    boundary = current.close_at if information_cutoff is None else information_cutoff
+    _require_aware(boundary, "information_cutoff")
     for item in window:
-        if item.knowledge_cutoff > current.close_at:
+        if item.knowledge_cutoff > boundary:
             return CandidateReason.KNOWLEDGE_AFTER_T_CLOSE
         prices = (item.open_price, item.high_price, item.low_price, item.close_price)
         if any(value is None for value in prices) or item.turnover is None:
@@ -769,6 +775,7 @@ def _precomputed_window_reason(
     current_index: int,
     expected_dates: Sequence[date],
     card: CandidateRuleCard,
+    information_cutoff: datetime | None = None,
 ) -> CandidateReason | None:
     window = rows[first_index : current_index + 1]
     if tuple(item.session_date for item in window) != tuple(expected_dates):
@@ -789,8 +796,10 @@ def _precomputed_window_reason(
         return CandidateReason.T_NOT_TRADABLE
     if prior.adjustment_effective is not False or current.adjustment_effective is not False:
         return CandidateReason.CORPORATE_ACTION_BOUNDARY
+    boundary = current.close_at if information_cutoff is None else information_cutoff
+    _require_aware(boundary, "information_cutoff")
     for index in range(first_index, current_index + 1):
-        if rows[index].knowledge_cutoff > current.close_at:
+        if rows[index].knowledge_cutoff > boundary:
             return CandidateReason.KNOWLEDGE_AFTER_T_CLOSE
         reason = row_reasons[index]
         if reason is not None:
@@ -898,6 +907,7 @@ def _scan_security_series(
     snapshot_manifest_digest: str,
     card: CandidateRuleCard,
     source_policy: EventScanSourcePolicy,
+    information_cutoff: datetime | None = None,
 ) -> tuple[list[_RawCandidate], Counter[str], int]:
     if not security_rows:
         return [], Counter(), 0
@@ -950,6 +960,7 @@ def _scan_security_series(
             current_index=local_index,
             expected_dates=expected_dates,
             card=card,
+            information_cutoff=information_cutoff,
         )
         if reason is not None:
             reasons[reason.value] += 1
@@ -1046,18 +1057,14 @@ def _scan_security_series(
     return raw, reasons, evaluated
 
 
-def _finalize_raw_candidates(
+def _retain_raw_candidates(
     raw: Sequence[_RawCandidate],
     *,
     reasons: Counter[str],
-    evaluated: int,
-    ordered_dates: Sequence[date],
     date_index: Mapping[date, int],
-    snapshot_id: str,
-    snapshot_manifest_digest: str,
     card: CandidateRuleCard,
-    split_policy: SplitPolicy,
-) -> CandidateScanResult:
+) -> tuple[list[_RawCandidate], int, int, Counter[tuple[str, str, str, str]]]:
+    """Pure frozen isolation/concentration selection, without a PIT record claim."""
     ordered_raw = sorted(raw, key=lambda item: (item.signal_date, item.security_id))
     isolated: list[_RawCandidate] = []
     last_accepted_index: dict[str, int] = {}
@@ -1115,6 +1122,32 @@ def _finalize_raw_candidates(
             continue
         retained.append(candidate)
 
+    return retained, len(ordered_raw), len(isolated), industry_gap_counts
+
+
+
+def _finalize_raw_candidates(
+    raw: Sequence[_RawCandidate],
+    *,
+    reasons: Counter[str],
+    evaluated: int,
+    ordered_dates: Sequence[date],
+    date_index: Mapping[date, int],
+    snapshot_id: str,
+    snapshot_manifest_digest: str,
+    card: CandidateRuleCard,
+    split_policy: SplitPolicy,
+) -> CandidateScanResult:
+    separation = max(
+        card.isolation.cooldown_sessions,
+        card.isolation.same_security_minimum_separation_sessions,
+    )
+    retained, raw_count, isolated_count, industry_gap_counts = _retain_raw_candidates(
+        raw,
+        reasons=reasons,
+        date_index=date_index,
+        card=card,
+    )
     events: list[ScannedCandidate] = []
     for candidate in retained:
         try:
@@ -1174,8 +1207,8 @@ def _finalize_raw_candidates(
 
     counters = CandidateScanCounters(
         evaluated_rows=evaluated,
-        raw_triggers=len(ordered_raw),
-        isolated_candidates=len(isolated),
+        raw_triggers=raw_count,
+        isolated_candidates=isolated_count,
         concentration_retained=len(retained),
         candidate_events=len(events),
         reason_counts=dict(reasons),

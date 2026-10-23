@@ -114,7 +114,39 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**R2 actual comparison completed, 2026-10-23 15:33 UTC (latest):** all four
+**Retrospective interpretation completed, 2026-10-24 Asia/Shanghai (latest):**
+the already admitted v8 primary/cold artifacts were read without another replay,
+source repair, collection or parameter search. Every manifest and all eight replay
+digests were recomputed against the registered receipts and completed acceptance;
+daily returns were independently reconciled to exact equity. The frozen six
+contrasts, 22-session nonoverlapping paired blocks, 2,000 resamples, request/contrast
+SHA256 seeds and one-percentage-point headline rules were applied. The combined
+`TR-B` comparison does not satisfy either supported-increment rule, nor the
+statistically supported material-harm rule. This is inconclusive retrospective
+evidence, not evidence that the economic difference is negligible. Year slices
+and the Trend-only comparison remain diagnostic, not a selected replacement policy.
+
+Analysis code is `src/quanthus/expert_strategy/p3_retrospective_analysis.py`; tests
+are `tests/unit/test_p3_retrospective_analysis.py`. The complete result, exact
+input hashes, uncertainty intervals, entry-veto overlap and reproduction script
+are outside Git under
+`/srv/agentdock/.codex/p3-results-20261023T174812Z-ba5eb65/`.
+The final 20 return dates remain in every full-window point estimate; the incomplete
+trailing block is excluded only from resampling and explicitly listed. These are
+portfolio-policy comparisons; independent settled expert-target/MAOE quality was
+not evaluated and must not be described as accepted.
+
+This completes execution, reproduction and interpretation for the separately
+Owner-authorized retrospective comparison. It does not accept the original strict
+B, activate original D, resolve #474, qualify historical availability, or change P6
+or production. 2025 result access has occurred within the admitted retrospective
+namespace and cannot be described as untouched. The single suggested successor is
+a bounded review of the existing position-risk veto/state traces; no new run,
+threshold search or strategy promotion is opened. `docs-impact: none` for governing
+design: this implements the existing fixed analysis contract and records evidence,
+without changing policy, authority or experimental windows.
+
+**R2 actual comparison completed, 2026-10-23 15:33 UTC (execution checkpoint):** all four
 Owner-authorized retrospective variants B/T/R/TR completed in both the primary
 runtime and the independently built, relocated, kernel-isolated cold runtime.
 Both process exits are zero. Exact input re-admission commit is `07067eb`; the

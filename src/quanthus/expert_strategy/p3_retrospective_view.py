@@ -118,7 +118,7 @@ class RetrospectiveView(native.NativeView):
                 self.connection.execute(
                     f"CREATE OR REPLACE TEMP VIEW {table} AS SELECT * FROM raw_{table}"
                 )
-            self._market_scope(cutoff)
+            self._market_scope(cutoff, materialize_bars=True)
             self._unchanged()
             self.connection.execute("COMMIT")
         except BaseException:

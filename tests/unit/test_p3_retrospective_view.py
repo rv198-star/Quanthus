@@ -130,6 +130,18 @@ def test_business_boundary_excludes_later_observations(source, tmp_path):
         )
 
 
+def test_reused_scope_is_rebuilt_for_each_explicit_business_boundary(source, tmp_path):
+    out = tmp_path / "out"
+    result = build(source, out, tmp_path)
+    with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
+        counts = [
+            sum(len(b) for b in view.history_batches(business_read_boundary=boundary))
+            for boundary in (CLOCK - timedelta(hours=1), CLOCK, CLOCK - timedelta(hours=1))
+        ]
+    # A later read cannot leak observations into an earlier feature boundary.
+    assert counts == [0, 1, 0]
+
+
 def test_unknown_clock_stays_unavailable(source, tmp_path):
     mutate(source, "dwd_security_bar", lambda rows: rows[0].update(knowledge_from=None))
     out = tmp_path / "out"

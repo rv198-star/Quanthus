@@ -1194,7 +1194,7 @@ class NativeView:
             self.connection.execute("ROLLBACK")
             raise
 
-    def _market_scope(self, cutoff: datetime) -> None:
+    def _market_scope(self, cutoff: datetime, *, materialize_bars: bool = False) -> None:
         c = self.connection
         active_listing = (
             "l.listing_id=b.listing_id AND l.effective_from<=b.observation_start "
@@ -1226,8 +1226,12 @@ class NativeView:
             f"EXISTS (SELECT 1 FROM dwd_listing l WHERE {active_listing}) AND NOT EXISTS "
             f"(SELECT 1 FROM dwd_listing l WHERE {active_listing} AND NOT ({' OR '.join(outside)}))"
         )
+        # Full-snapshot consumers share this once-only bounded intermediate among
+        # the identity/version checks below. Strict as-of callers retain views.
+        relation = "TABLE" if materialize_bars else "VIEW"
         c.execute(
-            "CREATE OR REPLACE TEMP VIEW p3_market_bars AS SELECT * FROM dwd_security_bar b "
+            f"CREATE OR REPLACE TEMP {relation} p3_market_bars AS "
+            "SELECT * FROM dwd_security_bar b "
             f"WHERE b.observation_end<=TIMESTAMPTZ {_q(cutoff.isoformat())} AND NOT ({excluded})"
         )
         queries = {

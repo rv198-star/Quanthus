@@ -101,6 +101,8 @@ class RetrospectiveCorporateAction(CorporateAction):
 
 
 class RetrospectiveEngine(BacktestEngine):
+    runtime_version = VERSION
+
     def __init__(self, policy: Any, *, information_cutoff: datetime, snapshot_id: str) -> None:
         super().__init__(policy)
         self.information_cutoff, self.snapshot_id = information_cutoff, snapshot_id
@@ -112,7 +114,7 @@ class RetrospectiveEngine(BacktestEngine):
             or signal.snapshot.knowledge_cutoff != self.information_cutoff
             or signal.snapshot.snapshot_id != self.snapshot_id
             or run.official
-            or not run.code_version.startswith(VERSION + ":")
+            or not run.code_version.startswith(self.runtime_version + ":")
         ):
             raise BacktestInputError("R2 purpose/snapshot/run binding required")
         # Remaining matching, funding, tick, cost and T+1 checks stay in P2.
@@ -127,7 +129,7 @@ class RetrospectiveEngine(BacktestEngine):
             or action.snapshot_id != self.snapshot_id
             or run.data_snapshot_id != self.snapshot_id
             or run.official
-            or not run.code_version.startswith(VERSION + ":")
+            or not run.code_version.startswith(self.runtime_version + ":")
         ):
             raise BacktestInputError("R2 action purpose/snapshot/run binding required")
 
@@ -310,6 +312,8 @@ def _verify_registered_preparation(
     prepared: Path,
     manifest_sha256: str,
     admission: Mapping[str, Any],
+    *,
+    activation_name: str = "retrospective-execution.v1.json",
 ) -> None:
     """Reuse only an exact registered full-semantic receipt, with fresh byte checks.
 
@@ -317,9 +321,7 @@ def _verify_registered_preparation(
     The original full cold verify remains the receipt producer. Any changed member,
     code/config closure, receipt or result census rejects before execution starts.
     """
-    activation = native._json(
-        repository / "config/research/p3-strat-003/retrospective-execution.v1.json"
-    )
+    activation = native._json(repository / "config/research/p3-strat-003" / activation_name)
     if (
         digest_value(dict(admission)) not in activation["admitted_consumer_receipt_sha256"]
         or admission.get("purpose_id") != prep.PURPOSE
@@ -468,6 +470,13 @@ class _MaskedPanel(_NativePanel):
 class RetrospectiveRuntime(P3Strat003ReplayRuntime):
     """Actual accepted allocator/experts/ledger, with explicit R2 time contracts."""
 
+    runtime_version = VERSION
+    activation_name = "retrospective-execution.v1.json"
+    engine_type = RetrospectiveEngine
+
+    def _adapter_binding(self) -> dict[str, Any]:
+        return {}
+
     def __init__(
         self,
         repository: Path,
@@ -481,6 +490,9 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
         self.prepared, self.workspace = native.physical(prepared), native.physical(workspace)
         self.preparation_sha = manifest_sha256
         self.r2_plan = native._json(self.prepared / "plan.json")
+        adapter_binding = self._adapter_binding()
+        if any(consumer_admission.get(k) != v for k, v in adapter_binding.items()):
+            raise native.InputError("RETRO_ADAPTER_ADMISSION_BINDING")
         # Real execution is possible only with an exact consumer receipt already
         # admitted in ordinary versioned configuration. A caller flag, source
         # READY, or passing synthetic tests cannot activate protected results.
@@ -490,11 +502,12 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
                 "purpose_id": prep.PURPOSE,
                 "mode": "SYNTHETIC_ONLY",
                 "preparation_sha256": manifest_sha256,
+                **adapter_binding,
             }:
                 raise native.InputError("RETRO_CONSUMER_ADMISSION_BINDING")
         else:
             activation = native._json(
-                repository / "config/research/p3-strat-003/retrospective-execution.v1.json"
+                repository / "config/research/p3-strat-003" / self.activation_name
             )
             if (
                 digest_value(dict(consumer_admission))
@@ -518,7 +531,11 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
             prep.verify(repository, self.prepared, manifest_sha256=manifest_sha256)
         else:
             _verify_registered_preparation(
-                repository, self.prepared, manifest_sha256, consumer_admission
+                repository,
+                self.prepared,
+                manifest_sha256,
+                consumer_admission,
+                activation_name=self.activation_name,
             )
         industry_path = native.physical(industry.path)
         if native._sha(industry_path) != self.r2_plan["industry_manifest_sha256"]:
@@ -566,7 +583,7 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
                 parent_event_run_digest=None,
                 provider_config=prep.PURPOSE,
             )
-            self.engine = RetrospectiveEngine(
+            self.engine = self.engine_type(
                 self.engine.policy, information_cutoff=self.info, snapshot_id=self.snapshot_id
             )
         except BaseException:
@@ -787,7 +804,7 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
         )
 
     def _code_version(self) -> str:
-        return VERSION + ":" + digest_value(self.r2_plan["code_config_members"])
+        return self.runtime_version + ":" + digest_value(self.r2_plan["code_config_members"])
 
     def _population_manifest_fields(self) -> dict[str, Any]:
         return {
@@ -798,6 +815,7 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
     def batch_input_identity(self) -> dict[str, Any]:
         return {
             "purpose_id": prep.PURPOSE,
+            **self._adapter_binding(),
             "preparation_sha256": self.preparation_sha,
             "request_digest": self.request.digest,
             "information_cutoff": self.info.isoformat(),
@@ -805,7 +823,8 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
 
     def _manifest_metadata(self, intervention_id: str | None) -> dict[str, Any]:
         return {
-            "schema_version": VERSION,
+            "schema_version": self.runtime_version,
+            **self._adapter_binding(),
             "purpose_id": prep.PURPOSE,
             "research_variant_id": self.variant_for(intervention_id),
             "information_cutoff": self.info.isoformat(),
@@ -846,6 +865,7 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
             results[variant] = evidence.replay_digest
         report = {
             "purpose_id": prep.PURPOSE,
+            **self._adapter_binding(),
             "variants": results,
             "mode": "SYNTHETIC_ONLY" if self.synthetic else "ADMITTED_RETROSPECTIVE",
             "provider_builds": 1,

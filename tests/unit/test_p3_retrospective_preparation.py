@@ -302,12 +302,17 @@ def test_preparation_embeds_and_verifies_late_actions_without_source_paths(tmp_p
     ] == Decimal("0.1")
 
 
-def test_post_preparation_admission_registry_has_no_circular_identity(tmp_path):
+@pytest.mark.parametrize("version", [1, 2])
+def test_post_preparation_admission_registry_has_no_circular_identity(tmp_path, version):
     repo = tmp_path / "repo"
-    target = repo / "config/research/p3-strat-003/retrospective-execution.v1.json"
+    target = repo / f"config/research/p3-strat-003/retrospective-execution.v{version}.json"
     target.parent.mkdir(parents=True)
-    original = json.loads((ROOT / target.relative_to(repo)).read_text())
-    target.write_text(json.dumps(original))
+    for v in (1, 2):
+        name = f"retrospective-execution.v{v}.json"
+        (target.parent / name).write_bytes(
+            (ROOT / target.parent.relative_to(repo) / name).read_bytes()
+        )
+    original = json.loads(target.read_text())
     before = prep._preparation_closure(repo)
     original["admitted_consumer_receipt_sha256"].append("sha256:" + "a" * 64)
     target.write_text(json.dumps(original))

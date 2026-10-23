@@ -211,9 +211,10 @@ def _preparation_closure(repository: Path) -> dict[str, str]:
     # Admission is granted only after preparation is sealed. Its append-only
     # receipt registry cannot be included in its own prerequisite identity.
     # Every other activation-policy field remains bound, including purpose/gates.
-    name = "config/research/p3-strat-003/retrospective-execution.v1.json"
-    policy = native._json(repository / name)
-    closure[name] = digest_value({**policy, "admitted_consumer_receipt_sha256": []})
+    for filename in ("retrospective-execution.v1.json", "retrospective-execution.v2.json"):
+        name = "config/research/p3-strat-003/" + filename
+        policy = native._json(repository / name)
+        closure[name] = digest_value({**policy, "admitted_consumer_receipt_sha256": []})
     return closure
 
 

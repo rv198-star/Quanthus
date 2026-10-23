@@ -164,6 +164,24 @@ review with the corrected hooks. Frozen v1 keeps its legacy hooks and sealed out
 bound adapter/execution admission and corrected comparison are required before economic
 attribution resumes; old results do not establish that the risk policy itself failed.
 
+### Purpose-specific corrected comparison, 2026-10-24
+
+The Owner subsequently authorized wiring, four-variant rerun, independent reproduction and
+old-versus-corrected interpretation. `p3_retrospective_accounting_v2.py` composes the reviewed
+hooks with the existing retrospective executor. Its engine accepts only the successor code
+version; the legacy engine continues to accept only v1. The generic correction constructor
+remains unadmitted. `retrospective-execution.v2.json` registers separate exact primary and cold
+receipts, binding the successor, accounting version, complete code/config closure, preparation,
+runtime, sources and actual snapshot cutoff. Receipt lists are excluded from their own closure
+hash to avoid a circular identity; all other admission-policy fields remain bound.
+
+The original inputs, business windows, four variants, costs, expert thresholds and analysis
+rules stay fixed. Each role uses its own independently constructed prerequisite; byte-identical
+unchanged prerequisite producers may be reused only after fresh hashes and explicit semantic
+rebinding proof. One session index serves all four variants per role. Cold execution uses a new
+process with original sources and network blocked. No receipt grants historical PIT availability,
+strict B/D acceptance, P6 mutation or production admission. Sealed v1 results remain unchanged.
+
 ## 10. Rollback
 
 Remove the strategy version from the admitted registry and preserve all cards, Runs, decisions,

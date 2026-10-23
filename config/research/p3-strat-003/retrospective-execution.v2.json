@@ -5,7 +5,10 @@
   "accounting_version": "formal-p2-position-accounting-2.0.0",
   "owner_continuation": "2026-10-24: TPlan 完成1-3步，然后对比解释；接入独立复审通过的修正版，固定原输入及参数，重跑四组并独立复现",
   "state": "EXECUTION_REQUIRES_REGISTERED_PURPOSE_SPECIFIC_ADMISSION",
-  "admitted_consumer_receipt_sha256": [],
+  "admitted_consumer_receipt_sha256": [
+    "sha256:85dd7895608213babc7f55ef673425606d2756c965f084a2f06d7a0fa6358982",
+    "sha256:55eab8528aeb176fd08e0b9566c7f1180fd69f31fc74f66fba5b28d13326a60c"
+  ],
   "receipt_requirements": [
     "exact successor runtime, reviewed accounting hooks and complete code/config digest",
     "exact preparation, input, source, support, industry and true knowledge cutoff",

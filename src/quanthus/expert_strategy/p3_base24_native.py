@@ -1378,7 +1378,8 @@ class NativeView:
             if execution_after is not None
             else ""
         )
-        query = f"""SELECT b.*, s.security_id, s.company_id, {self._security_projection("s")}, l.listing_code,
+        security_projection = self._security_projection("s")
+        query = f"""SELECT b.*, s.security_id, s.company_id, {security_projection}, l.listing_code,
             l.venue_id, v.mic_code, c.trade_date, c.open_at, c.close_at,
             b.knowledge_from AS bar_knowledge_from, t.knowledge_from AS state_knowledge_from,
             l.knowledge_from AS listing_knowledge_from, s.knowledge_from AS security_knowledge_from,

@@ -67,6 +67,16 @@ class RetrospectiveView(native.NativeView):
             self.currency_present = "instrument_currency" in {
                 row[0] for row in self.connection.execute("DESCRIBE raw_dwd_security").fetchall()
             }
+            self.calendar_status = {
+                session: "OPEN"
+                if opened is True
+                else "CLOSED"
+                if opened is False
+                else "UNAVAILABLE"
+                for session, opened in self.connection.execute(
+                    "SELECT calendar_session_id,is_open FROM raw_dwd_trading_calendar"
+                ).fetchall()
+            }
             self._unchanged()
         except BaseException:
             super().__exit__()
@@ -143,6 +153,15 @@ class RetrospectiveView(native.NativeView):
                     [business_read_boundary] * len(block), type=pa.timestamp("us", tz="UTC")
                 ),
                 "r2_observation_role": pa.array(roles, type=pa.string()),
+                "r2_calendar_status": pa.array(
+                    [
+                        self.calendar_status.get(s, "UNAVAILABLE")
+                        for s in block.column(
+                            block.schema.get_field_index("calendar_session_id")
+                        ).to_pylist()
+                    ],
+                    type=pa.string(),
+                ),
             }
             for name, array in fields.items():
                 if name in block.schema.names:
@@ -159,6 +178,7 @@ def input_census(view: RetrospectiveView, boundary: datetime) -> dict[str, Any]:
     roles: Counter[str] = Counter()
     dates: Counter[str] = Counter()
     total = late = state_unknown = buy_unknown = sell_unknown = 0
+    closed = calendar_unknown = missing_open_clocks = usable = 0
     for block in view.history_batches(business_read_boundary=boundary):
         # These columns contain identity/time/state only. Price columns stay in
         # Arrow and are never converted to Python or included in the receipt.
@@ -170,18 +190,35 @@ def input_census(view: RetrospectiveView, boundary: datetime) -> dict[str, Any]:
             "is_tradable",
             "can_buy",
             "can_sell",
+            "open_at",
+            "r2_calendar_status",
         ]
         rows = block.select(fields).to_pylist()
         for row in rows:
             total += 1
             dates[row["trade_date"].isoformat()] += 1
             roles[row["r2_observation_role"]] += 1
-            late += row["bar_knowledge_from"] > row["close_at"]
+            calendar = row["r2_calendar_status"]
+            closed += calendar == "CLOSED"
+            calendar_unknown += calendar == "UNAVAILABLE"
+            valid_clocks = all(
+                isinstance(row[k], datetime)
+                and row[k].tzinfo is not None
+                and row[k].utcoffset() is not None
+                for k in ("open_at", "close_at")
+            )
+            valid_clocks = valid_clocks and row["open_at"] < row["close_at"]
+            missing_open_clocks += calendar == "OPEN" and not valid_clocks
+            if calendar == "OPEN" and valid_clocks:
+                late += row["bar_knowledge_from"] > row["close_at"]
+                usable += 1
             state_unknown += row["is_tradable"] is None
             buy_unknown += row["can_buy"] is None
             sell_unknown += row["can_sell"] is None
     return {
         "status": "P3_RETROSPECTIVE_CONSUMER_READ_COMPLETED"
+        if usable
+        else "BLOCKED_NO_OPEN_SESSION_OBSERVATIONS"
         if total
         else "BLOCKED_EMPTY_REQUIRED_UNIVERSE",
         "consumer_policy_digest": digest_value(view.consumer_policy),
@@ -189,6 +226,10 @@ def input_census(view: RetrospectiveView, boundary: datetime) -> dict[str, Any]:
         "information_cutoff": view.information_cutoff.isoformat(),
         "business_read_boundary": boundary.isoformat(),
         "joined_rows": total,
+        "open_session_observations": usable,
+        "calendar_closed_observations": closed,
+        "calendar_unavailable_observations": calendar_unknown,
+        "open_session_invalid_or_missing_clocks": missing_open_clocks,
         "observation_roles": dict(sorted(roles.items())),
         "date_counts": dict(sorted(dates.items())),
         "original_bar_clocks_after_business_close": late,

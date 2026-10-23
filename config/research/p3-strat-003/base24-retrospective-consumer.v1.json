@@ -12,6 +12,8 @@
   "information_boundary": "original input source snapshot, not historical T",
   "business_boundary": "features through historical T; September18 execution only",
   "empty_required_universe": "BLOCKED_EMPTY_REQUIRED_UNIVERSE",
+  "nontrading_observations": "retain as calendar CLOSED; never infer open/close timestamps or include in required open-session denominator",
+  "unknown_calendar_or_clocks": "unavailable; not assumed closed or tradable",
   "grants_candidate_feature_execution_qualification": false,
   "grants_original_B_acceptance": false,
   "grants_D_activation": false

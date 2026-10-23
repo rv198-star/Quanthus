@@ -64,6 +64,26 @@ def test_foreign_currency_common_equity_does_not_satisfy_nonempty_A_share_gate(s
     assert report["status"] == "BLOCKED_EMPTY_REQUIRED_UNIVERSE"
 
 
+@pytest.mark.parametrize("opened", [False, True, None])
+def test_absent_session_clocks_are_classified_without_inventing_times(source, tmp_path, opened):
+    def change(rows):
+        for r in rows:
+            if r["calendar_session_id"] == "sz-2025-01-02":
+                r.update(is_open=opened, open_at=None, close_at=None)
+
+    mutate(source, "dwd_trading_calendar", change)
+    out = tmp_path / "out"
+    result = build(source, out, tmp_path)
+    with reader.RetrospectiveView(out, manifest_sha256=result["manifest_sha256"]) as view:
+        report = reader.input_census(view, CLOCK)
+    assert report["joined_rows"] == 1 and report["open_session_observations"] == 0
+    assert report["calendar_closed_observations"] == int(opened is False)
+    assert report["calendar_unavailable_observations"] == int(opened is None)
+    assert report["open_session_invalid_or_missing_clocks"] == int(opened is True)
+    assert report["status"] == "BLOCKED_NO_OPEN_SESSION_OBSERVATIONS"
+    assert report["original_B_accepted"] is report["D_activated"] is False
+
+
 def test_two_clocks_are_preserved_and_strict_bridge_still_rejects(source, tmp_path):
     late = datetime(2026, 10, 1, tzinfo=TZ)
     mutate(source, "dwd_security_bar", lambda rows: rows[0].update(knowledge_from=late))

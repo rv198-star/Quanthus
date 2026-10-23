@@ -114,6 +114,31 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+
+**Execution convergence, 2026-10-23 (current):** Owner requested continuation through actual
+P3 startup. The separate two-clock runtime is now connected to existing B/T/R/TR/P2 arithmetic
+for qualified no-action inputs. Synthetic four-variant fills/ledgers, strict-control arithmetic
+parity and two relocated isolated processes are verified; this is still **0/4 real comparisons**.
+Do not represent a synthetic COMPLETE as original B acceptance or D activation.
+
+The actual consumer-date/venue/effective-interval census now isolates 175,110 August/September
+observations with missing calendar clocks and explicit price bounds. Calendar is P10 #555;
+execution status, action composition/revision and no-action support are P10
+[#556](https://github.com/rv198-star/Quanthus/issues/556). The earlier broad key-only join had
+175,145 rows; 35 are outside the exact consumer effective-interval denominator. Preserve both
+receipts. The 8,736 same-security/ex-date action groups have different canonical term sets;
+this does not establish that every group is corrupt or economically conflicting. Four
+IMPLEMENTED transfer records lack ex_date. Published calendar metadata proves a pre-window
+120-session lower bound for 5,330 of the 5,602 retained listings; the other 272 are not all
+missing data and must be evaluated at their actual candidate dates. Do not repeat source hunting.
+
+Continue from [the execution boundary](../design/lld/04-experts-aggregator/p3-retrospective-preparation.md#separate-execution-boundary-2026-10-23-continuation)
+and `retrospective-execution.v1.json`. Its real admission registry is intentionally empty.
+Next data-dependent step is a versioned P10 effective-view/support handoff, then exact
+consumer admission and normalized-action integration where required. Preserve current
+business dates, unknowns and true snapshot time. Do not silently replace the input with the
+later, narrower P6 #538 repair or reinterpret the old strict gate as passed.
+
 **Owner-approved exploratory preparation, 2026-10-23:** the Owner explicitly selected
 “同意回溯口径，继续准备”. The new comparison purpose is
 `config/research/p3-strat-003/retrospective-comparison.v1.json`; it preserves the original

@@ -1201,6 +1201,14 @@ class BacktestEngine:
             raise BacktestInputError("run schedule_version does not match execution profile")
         return profile
 
+    def _validate_signal_clock(self, run: BacktestRunSpec, signal: BacktestSignal) -> None:
+        """The ordinary engine admits only historical-PIT signals, including at runtime."""
+        if (
+            not isinstance(signal, BacktestSignal)
+            or signal.snapshot.knowledge_cutoff > signal.decision_at
+        ):
+            raise BacktestInputError("historical-PIT BacktestSignal required")
+
     def _validate_inputs(
         self,
         run: BacktestRunSpec,
@@ -1209,6 +1217,7 @@ class BacktestEngine:
         initial_cash: Decimal,
     ) -> ExecutionProfile:
         profile = self._validate_run(run)
+        self._validate_signal_clock(run, signal)
         if signal.profile_id != profile.profile_id:
             raise BacktestInputError("signal profile_id does not match run profile")
         if run.data_snapshot_id != signal.snapshot.snapshot_id:

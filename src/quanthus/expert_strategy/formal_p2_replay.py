@@ -379,6 +379,9 @@ class FormalP2ReplayRuntime:
             "intervention": intervention_id,
         }
 
+    def _protected_partition_access(self) -> bool:
+        return False
+
     def _manifest_metadata(self, intervention_id: str | None) -> dict[str, Any]:
         del intervention_id
         return {}
@@ -519,7 +522,7 @@ class FormalP2ReplayRuntime:
             "ledger_count": sum(
                 item.event_type is EventType.LEDGER_ENTRY for item in ordered_events
             ),
-            "sealed_partition_access": False,
+            "sealed_partition_access": self._protected_partition_access(),
             "reconciled": equity[-1]["system_equity"]
             == str(_money(sum((_wealth(item.ledger) for item in runtimes.values()), Decimal("0")))),
         }
@@ -565,7 +568,7 @@ class FormalP2ReplayRuntime:
                 },
                 "metrics": {key: str(value) for key, value in sorted(metrics.items())},
                 "replay_digest": replay_digest,
-                "sealed_partition_access": False,
+                "sealed_partition_access": self._protected_partition_access(),
                 "execution_authorized": False,
                 **self._manifest_metadata(intervention_id),
             }
@@ -589,12 +592,7 @@ class FormalP2ReplayRuntime:
                 if feature is None
                 else replace(feature, security_id=item.record.identity.security_id)
             )
-            observation = evaluate_trend_stability(
-                event=item.record,
-                feature=formal_feature,
-                config=self.trend_config,
-                spec=self.trend_spec,
-            )
+            observation = self._trend_observation(item.record, formal_feature)
             context = build_formal_expert_context(
                 event=item.record,
                 feature=formal_feature,
@@ -620,6 +618,12 @@ class FormalP2ReplayRuntime:
                 )
             )
         return tuple(output)
+
+    def _trend_observation(self, event: EventRecord, feature: BaselineFeatureRow | None) -> Any:
+        """Strict default; separate-purpose runtimes retain their own clocked artifact."""
+        return evaluate_trend_stability(
+            event=event, feature=feature, config=self.trend_config, spec=self.trend_spec
+        )
 
     def _evaluate_entry_decision(
         self,

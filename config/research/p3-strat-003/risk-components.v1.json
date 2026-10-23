@@ -102,7 +102,7 @@
     "unidentified": "Filter-versus-cap interactions are not separately identified in either held regime; filtering without the 20% cap, cap-only with held risk, and reduction versus extreme-exit effects are not separately identified. No additional cells may be added after reading results."
   },
   "acceptance": {
-    "old_T_TR_anchors": "Exact equity/daily-return/final-ledger bytes and all recorded decision business fields including no-fill/no-action rows under bijective event-coordinate mapping; omit only formal decision digest containing physical/experiment identity. Complete native entry governance equality is also checked during replay. Held governance and accounting code are unchanged. Fail before new cells if either anchor differs.",
+    "old_T_TR_anchors": "Exact equity/daily-return bytes; final-ledger canonical bytes after mapping only the complete current snapshot ID to the frozen anchor snapshot ID (null preserved, unknown IDs fail). All other ledger fields and all recorded decision business fields, including no-fill/no-action rows, must match. Decisions use bijective event-coordinate mapping; only formal decision digests containing physical/experiment identity are excluded. Full native entry governance is checked during replay; held governance/accounting unchanged. Fail before new cells if either anchor differs.",
     "cold": "Own previously independently constructed prerequisites, fresh physical members and complete producer-identity proof, independent process, kernel filesystem/network isolation and exact business artifact reproduction",
     "economic_pass_required": false,
     "new_strategy_selected": false
@@ -141,5 +141,7 @@
   "anchor_decision_sha256": {
     "T": "sha256:89bcac47b5ad7746f7d0f0f7234d299c31100f8aa826a3b8183f64f471baf39d",
     "TR": "sha256:2cef07ff8ff51b6f8c8535ae2f2e5d58a0a490900b407b68e984d72c32d39167"
-  }
+  },
+  "anchor_snapshot_id": "p3-base24-retrospective-comparison-v1/28a3aede1da691a1799284bad37e2b628bc253a062c7d8001faaa0564a37aece",
+  "index_recovery": "Only exact registered own-Job checkpoint, with producer/input/role/hash binding, complete ordered row-content equality under exact snapshot ID mapping, actual retained-port clocks including the first decision day, and cumulative prior runtime budget. Preserve failed attempt; never share primary checkpoint with cold role."
 }

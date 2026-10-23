@@ -203,10 +203,22 @@ code/config closure bind fresh primary/cold admissions in
 constructed, physically reverified prerequisite, with unchanged producer semantics.
 One session index serves its five cells. T/TR run first: exact retained equity,
 daily returns, final ledgers and every recorded decision business field must match
-under a bijective physical-event identity mapping. Complete new entry governance
+under a bijective physical-event identity mapping. For final ledgers, only the
+complete current `last_mark_snapshot_id` maps to the frozen old snapshot ID;
+null stays null, unknown IDs fail, and every other field remains byte-exact after
+canonical serialization. Complete new entry governance
 is also compared to the original runner on the same inputs; the held implementation
 is unchanged. Failure stops before the three new cells. No claim is made to compare
 old governance fields that were not persisted in old decision rows.
+
+An interrupted job may reuse each role's own completed index through an exact
+registered checkpoint binding the full semantic inputs, producer proof, code,
+role, schema, row count and bytes. Only `session.snapshot_id` is rewritten;
+all ordered row content is read back and compared. Actual clocks, including the
+first decision day absent from the execution index, come from that role's exact
+retained ports. No default clocks, cross-role index reuse or new producer build
+is allowed. New output paths retain failed attempts and charge their runtime
+against the original cumulative budget.
 
 The fixed conditional effects are TC−T (cap), TE−TC (filter given cap), TH−T and
 TR−TE (held risk under two entry regimes), their interaction, and TR−T. This is an

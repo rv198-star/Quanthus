@@ -22,6 +22,7 @@ from quanthus.expert_evaluation.serialization import canonical_json_bytes, diges
 from quanthus.expert_protocols import ConstraintOutput, ConstraintScope, ExpertApplicability
 from quanthus.expert_strategy import formal_p2_accounting_v2 as accounting
 from quanthus.expert_strategy import p3_base24_native as native
+from quanthus.expert_strategy import p3_component_checkpoint as checkpoint
 from quanthus.expert_strategy import p3_retrospective_accounting_v2 as corrected
 from quanthus.expert_strategy.p3_retrospective_analysis import path_metrics
 from quanthus.expert_strategy.position_risk import EntryRiskDecision, PositionRiskPolicy
@@ -94,7 +95,28 @@ def load_request(repository: Path) -> dict[str, Any]:
         not isinstance(s, str) or not native._SHA.fullmatch(s) for s in decisions.values()
     ):
         raise native.InputError("COMPONENT_DECISION_ANCHOR_BINDING")
+    if request.get("anchor_snapshot_id") != (
+        "p3-base24-retrospective-comparison-v1/"
+        "28a3aede1da691a1799284bad37e2b628bc253a062c7d8001faaa0564a37aece"
+    ):
+        raise native.InputError("COMPONENT_ANCHOR_SNAPSHOT_BINDING")
     return request
+
+
+def ledger_anchor_digest(payload: bytes, *, current_snapshot: str, old_snapshot: str) -> str:
+    """Map only the exact declared lineage ID; preserve every business field."""
+    rows = json.loads(payload)
+    if not isinstance(rows, list):
+        raise native.InputError("COMPONENT_LEDGER_ANCHOR_SCHEMA")
+    for row in rows:
+        if not isinstance(row, dict) or "last_mark_snapshot_id" not in row:
+            raise native.InputError("COMPONENT_LEDGER_ANCHOR_SCHEMA")
+        value = row["last_mark_snapshot_id"]
+        if value is not None:
+            if value != current_snapshot:
+                raise native.InputError("COMPONENT_LEDGER_ANCHOR_SNAPSHOT")
+            row["last_mark_snapshot_id"] = old_snapshot
+    return "sha256:" + hashlib.sha256(canonical_json_bytes(rows)).hexdigest()
 
 
 def decision_anchor_digest(
@@ -202,16 +224,41 @@ class RiskComponentRuntime(corrected.CorrectedRetrospectiveRuntime):
         self.component_request = load_request(repository)
         self.component_request_digest = digest_value(self.component_request)
         self.component_runners: dict[str, ComponentEntryRunner] = {}
+        receipt = kwargs.get("consumer_admission", {})
+        self.index_checkpoint = receipt.get("session_index_checkpoint")
+        self.result_role = receipt.get("result_role", "synthetic")
         super().__init__(repository, *args, **kwargs)
 
     def _adapter_binding(self) -> dict[str, Any]:
-        return {
+        binding = {
             "runtime_version": VERSION,
             "accounting_version": accounting.VERSION,
             "code_config_digest": digest_value(self.r2_plan["code_config_members"]),
             "experiment_id": VERSION,
             "experiment_request_digest": self.component_request_digest,
         }
+        if self.index_checkpoint is not None:
+            binding["session_index_checkpoint"] = self.index_checkpoint
+        return binding
+
+    def _build_session_index(self) -> dict[date, tuple[Any, Any]]:
+        if self.index_checkpoint is None:
+            return super()._build_session_index()
+        # Charge the failed attempt against the original runtime budget.
+        elapsed = self.index_checkpoint.get("prior_runtime_seconds")
+        if type(elapsed) is not int or not 0 <= elapsed < 3600:
+            raise native.InputError("COMPONENT_CHECKPOINT_PRIOR_BUDGET")
+        self.started -= elapsed
+        self._guard()
+        return checkpoint.resume_index(
+            self.prepared,
+            self.workspace,
+            self.r2_plan,
+            self.snapshot_id,
+            self.index_checkpoint,
+            self.result_role,
+            self._guard,
+        )
 
     @staticmethod
     def token_for(variant_id: str) -> str:
@@ -282,7 +329,16 @@ class RiskComponentRuntime(corrected.CorrectedRetrospectiveRuntime):
 
     def _verify_anchor(self, target: Path, variant: str) -> None:
         for name, sha in self.component_request["anchor_artifact_sha256"][variant].items():
-            if native._sha(target / name) != sha:
+            observed = (
+                ledger_anchor_digest(
+                    (target / name).read_bytes(),
+                    current_snapshot=self.snapshot_id,
+                    old_snapshot=self.component_request["anchor_snapshot_id"],
+                )
+                if name == "final-ledgers.json"
+                else native._sha(target / name)
+            )
+            if observed != sha:
                 raise native.InputError("COMPONENT_OLD_ANCHOR_MISMATCH")
         coordinates = {
             "entry:" + e.record.event_id: e.record.identity.security_id
@@ -329,7 +385,8 @@ class RiskComponentRuntime(corrected.CorrectedRetrospectiveRuntime):
             "mode": "SYNTHETIC_ONLY" if self.synthetic else "ADMITTED_RETROSPECTIVE_COMPONENTS",
             "provider_builds": 1,
             "feature_panel_builds": 0,
-            "session_index_builds": 1,
+            "session_index_builds": 1 if self.index_checkpoint is None else 0,
+            "session_index_checkpoint_reuses": 0 if self.index_checkpoint is None else 1,
             "real_comparisons_executed": 0 if self.synthetic else len(results),
             "information_cutoff": self.info.isoformat(),
             "old_business_anchors_verified": not self.synthetic,

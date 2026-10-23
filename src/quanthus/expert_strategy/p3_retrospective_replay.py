@@ -572,7 +572,7 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
         variants = json.loads((self.prepared / "variants.json").read_bytes())
         semantic_identity = variants[0]["shared_prerequisite_digest"]
         self.snapshot_id = prep.PURPOSE + "/" + semantic_identity.split(":")[1]
-        self.clocks = _index(prepared, workspace, self.r2_plan, self.snapshot_id, self._guard)
+        self.clocks = self._build_session_index()
         try:
             FormalP2ReplayRuntime.__init__(
                 self,
@@ -590,6 +590,9 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
             if hasattr(self, "stack"):
                 self.stack.close()
             raise
+
+    def _build_session_index(self) -> dict[date, tuple[datetime, datetime]]:
+        return _index(self.prepared, self.workspace, self.r2_plan, self.snapshot_id, self._guard)
 
     def _load_event_population(self, event_root: Path) -> Any:
         masks = {

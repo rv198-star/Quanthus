@@ -2,6 +2,7 @@
 
 import ast
 import ctypes.util
+import gzip
 import json
 import os
 import shutil
@@ -15,9 +16,10 @@ from types import SimpleNamespace
 import pytest
 
 from quanthus.aggregator import GovernedAction
-from quanthus.expert_evaluation.serialization import digest_value
+from quanthus.expert_evaluation.serialization import canonical_json_bytes, digest_value
 from quanthus.expert_strategy import formal_p2_accounting_v2 as accounting
 from quanthus.expert_strategy import p3_base24_native as n
+from quanthus.expert_strategy import p3_component_checkpoint as checkpoint
 from quanthus.expert_strategy import p3_retrospective_preparation as prep
 from quanthus.expert_strategy import p3_risk_components as c
 from quanthus.expert_strategy.registry import ExpertStrategyRegistry
@@ -260,6 +262,177 @@ def test_decision_anchor_failure_stops_before_any_new_cell(tmp_path, monkeypatch
         runtime.execute_all()
     assert n._json(tmp_path / "FAILED.json")["failed_variant"] == "T"
     assert not (tmp_path / "variant.TC").exists() and not (tmp_path / "COMPLETE.json").exists()
+
+
+def test_ledger_anchor_maps_exact_id_only_and_keeps_all_values():
+    old = [
+        {"last_mark_snapshot_id": "old", "cash": "123.4500", "count": 7},
+        {"last_mark_snapshot_id": None, "cash": "0.00", "count": 0},
+    ]
+    new = [{**old[0], "last_mark_snapshot_id": "new"}, old[1]]
+    expected = digest_value(old)
+    assert (
+        c.ledger_anchor_digest(
+            canonical_json_bytes(new), current_snapshot="new", old_snapshot="old"
+        )
+        == expected
+    )
+    for key, value in [("cash", "123.4501"), ("count", 8)]:
+        changed = [{**new[0], key: value}, new[1]]
+        assert (
+            c.ledger_anchor_digest(
+                canonical_json_bytes(changed), current_snapshot="new", old_snapshot="old"
+            )
+            != expected
+        )
+    for unexpected in ["old", "unknown", "new.action.unapproved"]:
+        with pytest.raises(ValueError, match="ANCHOR_SNAPSHOT"):
+            c.ledger_anchor_digest(
+                canonical_json_bytes([{**new[0], "last_mark_snapshot_id": unexpected}]),
+                current_snapshot="new",
+                old_snapshot="old",
+            )
+
+
+def checkpoint_setup(tmp_path):
+    import pyarrow.parquet as pq
+
+    with admitted_runtime(tmp_path) as runtime:
+        snapshot = runtime.snapshot_id
+        original_clocks = runtime.clocks.copy()
+    source = tmp_path / "runtime/sessions.parquet"
+    resume = tmp_path / "resume"
+    resume.mkdir()
+    shutil.copyfile(source, resume / "session-index-checkpoint.parquet")
+    plan = n._json(tmp_path / "prepared/plan.json")
+    descriptor = {
+        "schema_version": "quanthus.p3-component-index-checkpoint.v1",
+        "source_result_role": "synthetic",
+        "index_sha256": n._sha(source),
+        "index_rows": pq.ParquetFile(source).metadata.num_rows,
+        "old_snapshot_id": snapshot,
+        "input_identity": checkpoint.input_identity(tmp_path / "prepared", plan),
+        "producer_proof_sha256": "sha256:" + "1" * 64,
+        "current_code_config_digest": digest_value(plan["code_config_members"]),
+        "prior_runtime_seconds": 1,
+    }
+    result = n._json(tmp_path / "prepared/PREPARATION_COMPLETE.json")
+    receipt = {**admission(result, plan), "session_index_checkpoint": descriptor}
+    return resume, receipt, original_clocks
+
+
+def test_checkpoint_reuses_exact_own_index_including_first_day_clocks(tmp_path, monkeypatch):
+    from quanthus.expert_strategy import p3_retrospective_replay as legacy
+
+    resume, receipt, clocks = checkpoint_setup(tmp_path)
+
+    def forbidden(*args):
+        raise AssertionError("expensive index rebuilt")
+
+    monkeypatch.setattr(legacy, "_index", forbidden)
+    with c.RiskComponentRuntime(
+        ROOT,
+        tmp_path / "prepared",
+        resume / "run",
+        manifest_sha256=receipt["preparation_sha256"],
+        industry=industry(tmp_path / "industry.json"),
+        consumer_admission=receipt,
+    ) as runtime:
+        assert runtime.clocks == clocks
+        report = runtime.execute_all()
+        assert report["session_index_builds"] == 0
+        assert report["session_index_checkpoint_reuses"] == 1
+    proof = n._json(resume / "run/index-recovery.safe.json")
+    assert proof["before_normalized_sha256"] == proof["after_normalized_sha256"]
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("index_sha256", "sha256:" + "0" * 64),
+        ("source_result_role", "primary"),
+        ("index_rows", 999999),
+        ("input_identity", "sha256:" + "0" * 64),
+        ("old_snapshot_id", "wrong"),
+        ("current_code_config_digest", "sha256:" + "0" * 64),
+        ("prior_runtime_seconds", 3600),
+    ],
+)
+def test_checkpoint_rejects_unbound_role_inputs_bytes_and_budget(tmp_path, field, value):
+    resume, receipt, _ = checkpoint_setup(tmp_path)
+    receipt["session_index_checkpoint"][field] = value
+    with pytest.raises(ValueError, match="COMPONENT_CHECKPOINT"):
+        c.RiskComponentRuntime(
+            ROOT,
+            tmp_path / "prepared",
+            resume / "run",
+            manifest_sha256=receipt["preparation_sha256"],
+            industry=industry(tmp_path / "industry.json"),
+            consumer_admission=receipt,
+        )
+    assert not (resume / "run/COMPLETE.json").exists()
+
+
+def test_checkpoint_mapping_changes_only_exact_snapshot(tmp_path):
+    import pyarrow.parquet as pq
+
+    resume, receipt, _ = checkpoint_setup(tmp_path)
+    output = resume / "mapped"
+    output.mkdir()
+    descriptor = receipt["session_index_checkpoint"]
+    replacement = prep.PURPOSE + "/" + "a" * 64
+    checkpoint.resume_index(
+        tmp_path / "prepared",
+        output,
+        n._json(tmp_path / "prepared/plan.json"),
+        replacement,
+        descriptor,
+        "synthetic",
+        lambda: None,
+    )
+    old = pq.read_table(resume / "session-index-checkpoint.parquet").to_pylist()
+    new = pq.read_table(output / "sessions.parquet").to_pylist()
+    for a, b in zip(old, new, strict=True):
+        p = json.loads(b["payload"])
+        assert p["session"]["snapshot_id"] == replacement
+        p["session"]["snapshot_id"] = descriptor["old_snapshot_id"]
+        assert json.loads(a["payload"]) == p
+        assert a["market_date"] == b["market_date"] and a["security_id"] == b["security_id"]
+
+
+@pytest.mark.parametrize("failure", ["first_day_missing", "clock_conflict"])
+def test_checkpoint_clocks_cannot_be_fabricated_or_inconsistent(tmp_path, failure):
+    first, second = "2025-01-02", "2025-01-03"
+    plan = {
+        "trading_dates": [first, second],
+        "information_cutoff": "2026-10-23T00:00:00+00:00",
+        "source_manifest_sha256": "sha256:" + "1" * 64,
+        "scope": [first, first, second],
+    }
+    rows = []
+    for security, day in [("a", first), ("a", second), ("b", first)]:
+        if failure == "first_day_missing" and day == first:
+            continue
+        rows.append(
+            {
+                "security_id": security,
+                "business_date": {"date": day},
+                "information_cutoff": {"datetime": plan["information_cutoff"]},
+                "source_manifest_sha256": plan["source_manifest_sha256"],
+                "selected": {
+                    "open_at": {"datetime": day + "T09:30:00+08:00"},
+                    "close_at": {
+                        "datetime": day
+                        + ("T14:00:00+08:00" if security == "b" else "T15:00:00+08:00")
+                    },
+                },
+            }
+        )
+    with gzip.open(tmp_path / "ports.jsonl.gz", "wt") as f:
+        for row in rows:
+            f.write(json.dumps(row) + "\n")
+    with pytest.raises(ValueError, match="COMPONENT_CHECKPOINT_CLOCK"):
+        checkpoint._port_clocks(tmp_path, plan, lambda: None)
 
 
 def series_points():

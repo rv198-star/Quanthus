@@ -526,7 +526,7 @@ class RetrospectiveRuntime(P3Strat003ReplayRuntime):
         )
         self.common_masks = masks
         events = []
-        for r in native._json(self.prepared / "candidates.json")["candidates"]:
+        for r in prep.load_candidates(self.prepared / "candidates.json")["candidates"]:
             membership = self.r2_industry.by_security_id.get(r["security_id"])
             if membership is None or membership.level1_industry_id != r["static_industry_id"]:
                 raise native.InputError("RETRO_INDUSTRY_CONFLICT")

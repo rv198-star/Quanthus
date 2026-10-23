@@ -365,3 +365,19 @@ def test_recover_finished_stages_without_rebuilding_or_changing_failed_attempt(
     )["files"]
     assert before == {p.name: native._sha(p) for p in source.iterdir() if p.is_file()}
     assert not (source / "PREPARATION_COMPLETE.json").exists()
+
+
+def test_candidate_payload_reader_is_bounded_separately_from_small_metadata(tmp_path):
+    path = tmp_path / "candidates.json"
+    value = {"schema_version": prep.features.VERSION, "candidates": []}
+    path.write_text(json.dumps(value) + " " * (4 * 1024**2))
+    with pytest.raises(native.InputError, match="METADATA_TOO_LARGE"):
+        native._json(path)
+    assert prep.load_candidates(path) == value
+    with path.open("wb") as f:
+        f.truncate(16 * 1024**2 + 1)
+    with pytest.raises(native.InputError, match="RETRO_CANDIDATE_PAYLOAD_TOO_LARGE"):
+        prep.load_candidates(path)
+    path.write_text('{"candidates":[],"candidates":[]}')
+    with pytest.raises(native.InputError, match="DUPLICATE_JSON_KEY"):
+        prep.load_candidates(path)

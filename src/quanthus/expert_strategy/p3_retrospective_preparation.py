@@ -110,6 +110,37 @@ def _write(path: Path, value: Any) -> None:
         stream.write(json.dumps(value, ensure_ascii=False, sort_keys=True, default=_typed) + "\n")
 
 
+def load_candidates(path: Path) -> dict[str, Any]:
+    """Read a bounded row payload; the ordinary 4 MiB metadata limit stays frozen.
+
+    The full frozen 8,016-candidate population occupies about 5 MiB. A separate
+    16 MiB cap accommodates this row product without relaxing manifest readers.
+    Full semantic verification and exact member hashes remain mandatory.
+    """
+    limit = 16 * 1024**2
+    with native.physical(path).open("rb") as stream:
+        payload = stream.read(limit + 1)
+    if len(payload) > limit:
+        raise native.InputError("RETRO_CANDIDATE_PAYLOAD_TOO_LARGE")
+
+    def pairs(values: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in values:
+            if key in result:
+                raise native.InputError("DUPLICATE_JSON_KEY")
+            result[key] = value
+        return result
+
+    value = json.loads(payload, object_pairs_hook=pairs)
+    if (
+        not isinstance(value, dict)
+        or value.get("schema_version") != features.VERSION
+        or not isinstance(value.get("candidates"), list)
+    ):
+        raise native.InputError("RETRO_CANDIDATE_PAYLOAD_SCHEMA")
+    return value
+
+
 def load_actions(path: Path, cutoff: datetime) -> list[dict[str, Any]]:
     """Consume an exact P10 event file; qualification comes from its support seal."""
     raw = json.loads(path.read_text(), object_hook=_object)
@@ -723,6 +754,7 @@ def verify(repository: Path, root: Path, *, manifest_sha256: str) -> dict[str, A
         load_actions(
             root / "normalized-actions.json", datetime.fromisoformat(plan["information_cutoff"])
         )
+    stored_candidates = load_candidates(root / "candidates.json")
     days = tuple(map(date.fromisoformat, plan["trading_dates"]))
     if not isinstance(plan.get("scope"), list) or len(plan["scope"]) != 3:
         raise native.InputError("RETRO_PREPARATION_SCOPE")
@@ -741,7 +773,7 @@ def verify(repository: Path, root: Path, *, manifest_sha256: str) -> dict[str, A
         for r in candidates["candidates"]
         if plan["scope"][0] <= r["signal_date"] <= plan["scope"][1]
     ]
-    if candidates != native._json(root / "candidates.json"):
+    if candidates != stored_candidates:
         raise native.InputError("RETRO_PREPARATION_CANDIDATE_SEMANTICS")
     masks = _masks(
         repository,

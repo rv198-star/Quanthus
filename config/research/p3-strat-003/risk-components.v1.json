@@ -1,0 +1,145 @@
+{
+  "schema_version": "quanthus.p3-risk-components.v1",
+  "experiment_id": "p3-retrospective-risk-components-v1",
+  "owner_authorization": "2026-10-24: 启动第二步，我已启用Astra 6 Max",
+  "purpose_id": "p3-base24-retrospective-comparison-v1",
+  "state": "FIXED_COMPONENT_DIAGNOSIS_REQUIRES_EXACT_EXECUTION_RECEIPTS",
+  "parent_commit": "a88b88dde4ec6fb37c862db11f39c171e3c39ff3",
+  "original_request_sha256": "sha256:e1234e80857e012e2d125babba15fd4d0985cd0b38402d5737db0470d6be7c3b",
+  "strategy_card_sha256": "sha256:7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664",
+  "scope": [
+    "2025-01-01",
+    "2026-09-17",
+    "2026-09-18"
+  ],
+  "information_cutoff": "2026-10-23T11:21:45.250143+00:00",
+  "retained_preparation_sha256": {
+    "primary": "sha256:53acb7c4c86f774a877631391114b18e63926f0c51e996c335bbe66eefb65347",
+    "independent_cold_reproduction": "sha256:5cd564746cc7d322a27e4ba784d9c520f11be7fb7202925d5604ec980c324feb"
+  },
+  "variants": {
+    "T": {
+      "entry_filter": false,
+      "entry_cap": false,
+      "held_risk": false
+    },
+    "TC": {
+      "entry_filter": false,
+      "entry_cap": true,
+      "held_risk": false
+    },
+    "TE": {
+      "entry_filter": true,
+      "entry_cap": true,
+      "held_risk": false
+    },
+    "TH": {
+      "entry_filter": false,
+      "entry_cap": false,
+      "held_risk": true
+    },
+    "TR": {
+      "entry_filter": true,
+      "entry_cap": true,
+      "held_risk": true
+    }
+  },
+  "execution_order": [
+    "T",
+    "TR",
+    "TC",
+    "TE",
+    "TH"
+  ],
+  "entry_cap_semantics": "TC adds the existing fixed 20% unit-scoped strategy cap while disabling the heuristic entry veto. The unchanged 30% system/base limit and all missing-data/entry guardians still apply. It does not scale realized returns after a run.",
+  "held_risk_semantics": "Keep the entire existing held policy, including one reduction toward 10% and the rare extreme exit; preserve all common base exits. No new threshold or altered trigger.",
+  "contrasts": {
+    "cap_at_no_filter_no_held": {
+      "TC": 1,
+      "T": -1
+    },
+    "filter_at_capped_no_held": {
+      "TE": 1,
+      "TC": -1
+    },
+    "held_at_original_entry": {
+      "TH": 1,
+      "T": -1
+    },
+    "held_at_full_entry": {
+      "TR": 1,
+      "TE": -1
+    },
+    "entry_held_interaction": {
+      "TR": 1,
+      "TE": -1,
+      "TH": -1,
+      "T": 1
+    },
+    "full_risk_gap": {
+      "TR": 1,
+      "T": -1
+    }
+  },
+  "analysis": {
+    "role": "DESCRIPTIVE_COMPONENT_INTERVENTION_ONLY",
+    "point_metrics": [
+      "net_total_return",
+      "maximum_drawdown",
+      "average_invested_capital",
+      "fees",
+      "turnover",
+      "filled_entries",
+      "reductions",
+      "full_exits"
+    ],
+    "paired_block_sessions": 22,
+    "resamples": 2000,
+    "interval": "Unadjusted descriptive percentile 95% for net total return and maximum drawdown only; other metrics are full-window point diagnostics. Pair all cells within each resample. Report all six contrasts; no confirmatory winner selection.",
+    "seed": "SHA256(experiment request semantic digest + ':' + contrast name)",
+    "trailing_block": "included in all full-window point estimates; excluded only from complete-block resampling",
+    "decomposition": "TR-T = (TC-T) + (TE-TC) + (TR-TE); ordered conditional interventions, not order-independent component ownership",
+    "unidentified": "Filter-versus-cap interactions are not separately identified in either held regime; filtering without the 20% cap, cap-only with held risk, and reduction versus extreme-exit effects are not separately identified. No additional cells may be added after reading results."
+  },
+  "acceptance": {
+    "old_T_TR_anchors": "Exact equity/daily-return/final-ledger bytes and all recorded decision business fields including no-fill/no-action rows under bijective event-coordinate mapping; omit only formal decision digest containing physical/experiment identity. Complete native entry governance equality is also checked during replay. Held governance and accounting code are unchanged. Fail before new cells if either anchor differs.",
+    "cold": "Own previously independently constructed prerequisites, fresh physical members and complete producer-identity proof, independent process, kernel filesystem/network isolation and exact business artifact reproduction",
+    "economic_pass_required": false,
+    "new_strategy_selected": false
+  },
+  "budget": {
+    "maximum_new_variants": 3,
+    "control_variants": 2,
+    "independent_roles": 2,
+    "session_indexes_per_role": 1,
+    "runtime_seconds_per_role": 3600,
+    "rss_bytes_per_role": 4294967296,
+    "new_job_bytes": 4294967296,
+    "minimum_free_bytes": 8589934592
+  },
+  "already_observed_window": true,
+  "parameter_search": false,
+  "original_request_replaced": false,
+  "original_B_accepted": false,
+  "original_D_activated": false,
+  "historical_availability_claim": false,
+  "P6_mutation_authorized": false,
+  "production_authorized": false,
+  "step3_started": false,
+  "anchor_artifact_sha256": {
+    "T": {
+      "equity.json": "sha256:bdb09575f4de615423c35d6228a7220d38200500a2b4ae930596f0bd2737a2b1",
+      "daily-returns.json": "sha256:08b09b42be6ed96c8a1c7182ef6f644295df239d0247d32e98e8391b86edea6a",
+      "final-ledgers.json": "sha256:2a52dbd879d4f7635cfcf6f0fbb3975a0ea6f64454f15e99db38e393e40c5ac4"
+    },
+    "TR": {
+      "equity.json": "sha256:7d40f438f599832c299e3d9dfd22e895a05f6613c1bc8decd1c9d6ac07dac85c",
+      "daily-returns.json": "sha256:202c3549240a3546b289b73bee68abdb9da46cc309e53b2f1af3e10121c03b39",
+      "final-ledgers.json": "sha256:a49ad6214d65ed6094b2a89e292c75cdb3340258f43f09e917314a2e2e1455cf"
+    }
+  },
+  "anchor_decision_sha256": {
+    "T": "sha256:89bcac47b5ad7746f7d0f0f7234d299c31100f8aa826a3b8183f64f471baf39d",
+    "TR": "sha256:2cef07ff8ff51b6f8c8535ae2f2e5d58a0a490900b407b68e984d72c32d39167"
+  }
+}

@@ -182,6 +182,43 @@ rebinding proof. One session index serves all four variants per role. Cold execu
 process with original sources and network blocked. No receipt grants historical PIT availability,
 strict B/D acceptance, P6 mutation or production admission. Sealed v1 results remain unchanged.
 
+### Fixed component diagnosis, 2026-10-24
+
+Design status: approved by the Owner's step-2 continuation. Delivery gate: open;
+real execution requires the separate exact admission registry.
+
+`config/research/p3-strat-003/risk-components.v1.json` freezes five retrospective
+cells: T (original Trend entry), TC (20% entry cap only), TE (entry filter plus cap),
+TH (original entry plus held risk), and TR (full risk). All use Trend, unchanged
+system guardians, 30% base constraints, base exits, costs and corrected P2 accounting.
+TC contributes a separately identified unit-scoped strategy constraint; it never
+changes the system/base limit. Held risk is the entire existing policy, including
+the absolute 10% reduction target and extreme exit. TH's 30%-to-10% reduction is
+intentionally not normalized to TR's 20%-to-10% reduction.
+
+The runtime is `p3_risk_components.py`; contracts are in
+`tests/unit/test_p3_risk_components.py`. The new experiment/request digest and full
+code/config closure bind fresh primary/cold admissions in
+`risk-components-execution.v1.json`. Each role reuses only its own independently
+constructed, physically reverified prerequisite, with unchanged producer semantics.
+One session index serves its five cells. T/TR run first: exact retained equity,
+daily returns, final ledgers and every recorded decision business field must match
+under a bijective physical-event identity mapping. Complete new entry governance
+is also compared to the original runner on the same inputs; the held implementation
+is unchanged. Failure stops before the three new cells. No claim is made to compare
+old governance fields that were not persisted in old decision rows.
+
+The fixed conditional effects are TC−T (cap), TE−TC (filter given cap), TH−T and
+TR−TE (held risk under two entry regimes), their interaction, and TR−T. This is an
+ordered conditional decomposition, not an order-independent allocation of value.
+Filtering-versus-cap interaction in either held regime and reduction-versus-extreme
+exit are not separately identified. No post-result cell addition or threshold search
+is admitted. All six contrasts receive descriptive paired 22-session block intervals
+for return and drawdown only; other metrics are full-window point diagnostics.
+The exposed window and actual information cutoff remain unchanged. The original
+factorial, strict B/D, production and P6 gates remain frozen; successor strategy
+selection and fresh/forward validation belong to step 3.
+
 ## 10. Rollback
 
 Remove the strategy version from the admitted registry and preserve all cards, Runs, decisions,

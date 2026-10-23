@@ -114,7 +114,17 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**Corrected risk diagnosis step 1 completed, 2026-10-24 Asia/Shanghai (latest):**
+**Fixed component experiment step 2 active, 2026-10-24 Asia/Shanghai (latest):**
+the Owner authorized step 2 after completing step 1. The frozen five-cell design
+and separate admission registry are `risk-components.v1.json` and
+`risk-components-execution.v1.json` under the same research config directory.
+The governing [formal topology](../design/lld/04-experts-aggregator/expert-strategy-layer/first-formal-topology.md#fixed-component-diagnosis-2026-10-24)
+defines the exact effects and claim limits. Implementation and synthetic admission,
+guard, anchor and cold-process contracts are being completed before new real results.
+Step 1 remains complete; step 3 remains NOT_STARTED. This is a separate retrospective
+component diagnosis and never replaces the original frozen B/T/R/TR request.
+
+**Corrected risk diagnosis step 1 completed, 2026-10-24 Asia/Shanghai (prior):**
 the Owner requested stepwise continuation: (1) diagnose existing corrected outputs,
 (2) review/register and execute a bounded component experiment if justified,
 (3) judge a successor strategy and its further validation. Only step 1 was started.

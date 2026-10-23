@@ -1,0 +1,15 @@
+{
+  "schema_version": "quanthus.p3-risk-components-execution.v1",
+  "purpose_id": "p3-base24-retrospective-comparison-v1",
+  "experiment_id": "p3-retrospective-risk-components-v1",
+  "runtime_version": "p3-retrospective-risk-components-v1",
+  "accounting_version": "formal-p2-position-accounting-2.0.0",
+  "state": "EXECUTION_REQUIRES_REGISTERED_PURPOSE_SPECIFIC_ADMISSION",
+  "admitted_consumer_receipt_sha256": [],
+  "owner_authorization": "2026-10-24: start step2 fixed component experiment, then report three-step progress",
+  "original_request_replaced": false,
+  "original_B_accepted": false,
+  "original_D_activated": false,
+  "P6_mutation_authorized": false,
+  "production_authorized": false
+}

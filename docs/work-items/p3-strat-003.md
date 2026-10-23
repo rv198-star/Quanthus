@@ -114,7 +114,38 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**R2 missing-bar/action separation, 2026-10-23 (latest):** v7 completed full
+**R2 actual comparison completed, 2026-10-23 15:33 UTC (latest):** all four
+Owner-authorized retrospective variants B/T/R/TR completed in both the primary
+runtime and the independently built, relocated, kernel-isolated cold runtime.
+Both process exits are zero. Exact input re-admission commit is `07067eb`; the
+implementation correction is `280d194`. There are 416 execution frames, 8,016
+frozen candidates and 4,326 common eligible entries. No new source collection,
+production switch or P6 mutation occurred.
+
+Full preparation verification took 1,052 seconds concurrently for both roles.
+Each runtime built its own execution index once (~759 seconds); all four variants
+then completed without the earlier held-action failure. The safe acceptance receipt
+is `evidence/r2-final-acceptance-v8.safe.json` under the existing job root, SHA256
+`a2d8b06126ca9478cc587eab7323b6c333f9c497b46086e834acf948f0f0a4fc`.
+For every variant, equity, daily returns, final ledgers and reconciliation are
+byte-identical, and every business decision field is equal after candidate event
+coordinates are aligned. Independent physical preparation manifests include distinct
+resource/timing receipts; their bound event/decision hashes therefore differ. The
+original complete traces remain intact. Explicit one-to-one event/decision identity
+mapping and engine-record multiset comparison preserve all numerical, time, sequence
+and state fields. Raw trace byte identity is not claimed.
+
+Checks: 51 focused tests, focused lint and three-module type checks pass. `make check`
+reports 3,682 passed / 28 known frozen-runtime failures / 20 skipped, with exactly
+the same failed test identities as the pre-change baseline; planning-check was run
+separately because make stops after those failures. Full-repository green is not
+claimed. Original strict B remains unaccepted, D is not activated, #474 historical
+PIT is unresolved, and 405 retained-action exception securities remain fail-closed.
+Next business step is interpretation of these already approved retrospective
+comparisons, not another source-preparation restart or production promotion.
+
+
+**R2 missing-bar/action separation, 2026-10-23 (historical v8 launch checkpoint):** v7 completed full
 semantic verification for both independent preparations and started the first
 retrospective variant, then both executions stopped with
 `RETRO_HELD_ACTION_UNQUALIFIED`; zero of four variants completed. The exact retained

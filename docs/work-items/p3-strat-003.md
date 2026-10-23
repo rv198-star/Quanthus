@@ -114,7 +114,31 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**Retrospective interpretation completed, 2026-10-24 Asia/Shanghai (latest):**
+**Bounded risk diagnosis, 2026-10-24 Asia/Shanghai (latest):** existing v8 candidate,
+feature and decision evidence explains all 801 additional `TR` entry vetoes: 601
+volatility-only, 99 RSI-only and 101 both. Annualized-fraction volatility, 0..100 RSI,
+strict-above thresholds and all four entry-policy dispositions match; zero entry
+mapping mismatches were observed. No new strategy replay or warehouse access occurred.
+
+Two held-adapter defects invalidate a policy-only interpretation of the earlier
+portfolio comparison: v1 omits partial-sale proceeds/cash dividends from its return
+input, and its strategy-reduction count survives entry into another position. Closed
+ledger diagnostics identify 6 R / 5 TR review states where v1 crosses the 8% stop and
+position-cycle wealth does not. These are input inconsistencies, not proof that all
+11 exits disappear: other frozen exit rules can still apply. Likewise 250 R / 389 TR
+recorded no-action states match the reduce condition if the stale cycle count alone
+is reset; they are repeated state observations, not a count of counterfactual trades.
+
+Additive `formal-p2-position-accounting-2.0.0` supplies synthetic-tested correction
+hooks without activating real execution or modifying old results. The original v1
+path is retained for reproduction. See the governing first-formal-topology accounting
+correction section and `tests/unit/test_p3_risk_diagnostic.py`. Safe full diagnosis,
+exact input hashes and an executable read-only census are outside Git under
+`/srv/agentdock/.codex/p3-risk-diagnostic-20261023T182737Z-7409b5a/`.
+Next: Owner's Astra review, then a separately bound correction run; no threshold
+optimization, strategy promotion, strict B/D acceptance, #474 closure or P6 change.
+
+**Retrospective interpretation completed, 2026-10-24 Asia/Shanghai (interpretation checkpoint):**
 the already admitted v8 primary/cold artifacts were read without another replay,
 source repair, collection or parameter search. Every manifest and all eight replay
 digests were recomputed against the registered receipts and completed acceptance;

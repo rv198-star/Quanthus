@@ -147,6 +147,23 @@ topology manifest, expected-change and stop-condition record, legal intervention
 resource budget, deterministic sentinel Run, and v1 compatibility report. Full multi-year economic
 effects belong to `P3-ATTR-001` and end-to-end development acceptance belongs to `P3-EXPERT-005`.
 
+### Unadmitted accounting correction, 2026-10-24
+
+The read-only `P3-STRAT-003` risk diagnosis identified v1 adapter defects in the held-return
+input and reduction-count scope. The additive `formal-p2-position-accounting-2.0.0` hooks
+measure position-cycle wealth change relative to the wealth immediately before the filled buy,
+using buy gross plus buy fees as denominator. P2 cash already includes partial-sale proceeds,
+dividends and paid fees; those flows must not be added twice. A new filled position resets its
+strategy-reduction count and transient holding state. An absent cycle baseline remains
+unavailable. Entry thresholds and expert mappings are unchanged.
+
+Code: `src/quanthus/expert_strategy/formal_p2_accounting_v2.py`; synthetic checks:
+`tests/unit/test_p3_risk_diagnostic.py`. This successor is **not admitted for real execution**;
+its constructor refuses provider access. Synthetic probes exercise the actual inherited held
+review with the corrected hooks. Frozen v1 keeps its legacy hooks and sealed outputs. A new
+bound adapter/execution admission and corrected comparison are required before economic
+attribution resumes; old results do not establish that the risk policy itself failed.
+
 ## 10. Rollback
 
 Remove the strategy version from the admitted registry and preserve all cards, Runs, decisions,

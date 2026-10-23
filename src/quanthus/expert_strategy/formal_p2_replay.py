@@ -218,6 +218,7 @@ class _UnitRuntime:
     strategy_reduction_count: int = 0
     cooldown_sessions: int = 0
     sell_schedule: _SellSchedule | None = None
+    entry_wealth: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -643,6 +644,23 @@ class FormalP2ReplayRuntime:
             intervention_id=intervention_id,
         )
 
+    def _marked_return(self, runtime: _UnitRuntime) -> Decimal | None:
+        """Preserve frozen v1 semantics; the additive v2 adapter overrides this hook."""
+        return (
+            None
+            if runtime.ledger.last_mark_price is None or runtime.entry_gross <= 0
+            else _rate(
+                (_market_value(runtime.ledger) - runtime.entry_gross - runtime.entry_fees)
+                / (runtime.entry_gross + runtime.entry_fees)
+            )
+        )
+
+    def _record_entry(self, runtime: _UnitRuntime, before: UnitState, fill: EngineEvent) -> None:
+        """Keep legacy entry bookkeeping intact for sealed v1 reproductions."""
+        runtime.entry_gross = Decimal(str(fill.payload["gross_amount"]))
+        runtime.entry_fees = Decimal(str(fill.payload["total_fees"]))
+        runtime.holding_sessions = 1
+
     def _review_positions(
         self,
         frame_index: int,
@@ -674,14 +692,7 @@ class FormalP2ReplayRuntime:
                     "formal_position_identity_missing", "held position lacks source identity"
                 )
             feature = self.panel.feature(frame.snapshot.market_date, runtime.panel_security_id)
-            marked_return = (
-                None
-                if runtime.ledger.last_mark_price is None or runtime.entry_gross <= 0
-                else _rate(
-                    (_market_value(runtime.ledger) - runtime.entry_gross - runtime.entry_fees)
-                    / (runtime.entry_gross + runtime.entry_fees)
-                )
-            )
+            marked_return = self._marked_return(runtime)
             structural = bool(
                 feature is not None
                 and feature.total_return_index is not None
@@ -1032,9 +1043,7 @@ class FormalP2ReplayRuntime:
                         runtime.formal_security_id = candidate.item.record.identity.security_id
                         runtime.opportunity_id = candidate.opportunity_id
                         runtime.source_event = candidate.item.record
-                        runtime.entry_gross = Decimal(str(fill.payload["gross_amount"]))
-                        runtime.entry_fees = Decimal(str(fill.payload["total_fees"]))
-                        runtime.holding_sessions = 1
+                        self._record_entry(runtime, before, fill)
                         transition = _transition(
                             runtime,
                             PositionTransitionKind.ENTRY_FILLED,

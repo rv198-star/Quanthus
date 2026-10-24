@@ -9,6 +9,7 @@ exact raw-candidate equality before global concentration. No new candidate searc
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import date, datetime, time
 from decimal import ROUND_HALF_UP, Decimal
 from itertools import groupby
@@ -443,8 +444,7 @@ def prepare(
         after = _raw_candidates(
             c, mapping, old["source_information_cutoff"], repository, dates=dates, added=True
         )
-        if before != after:
-            raise ValueError("ACTION_PREPARATION_FULL_RAW_CANDIDATE_REBUILD_REQUIRED")
+        raw_candidates_equal = before == after
         c.execute(
             "CREATE OR REPLACE VIEW source_corporate_actions_normalized_mapped AS "
             "SELECT security_id,effective_date,known_at,cash_dividend_per_share,bonus_share_ratio "
@@ -508,18 +508,63 @@ def prepare(
             bundle_snapshot_id=bundle.historical_bundle.snapshot.snapshot_id,
             bundle_digest=bundle.bundle_content_digest,
         )
+        population = {}
+        if not raw_candidates_equal:
+            # The complete original raw population is not present in the retained
+            # preparation. Rebuild all securities and perform the global retain
+            # exactly once; never merge only old retained + repaired candidates.
+            c.close()
+            c = duckdb.connect(
+                config={
+                    "memory_limit": "4GB",
+                    "threads": 2,
+                    "max_temp_directory_size": "6GB",
+                    "temp_directory": str(output / "spill"),
+                }
+            )
+            c.execute("SET timezone='UTC'")
+            _create_feature_source_views(
+                c,
+                {k: v for k, v in paths.items() if k in feature_names},
+                None,
+                scope_end=date(2021, 12, 31),
+            )
+            for name in ("corporate_actions_normalized", "corporate_action_exceptions"):
+                c.execute(f"CREATE VIEW source_{name}_mapped AS SELECT * FROM source_{name}")
+            _validate_feature_sources(c)
+            c.register(
+                "new_action_arrow",
+                pa.Table.from_pylist(_action_rows(facts, bundle.manifest_sha256)),
+            )
+            c.execute("CREATE TEMP TABLE new_actions AS SELECT * FROM new_action_arrow")
+            c.unregister("new_action_arrow")
+            c.execute(
+                "CREATE TEMP TABLE selected_universe_sessions AS SELECT security_id,market_date,"
+                "row_number() OVER(PARTITION BY security_id ORDER BY market_date) "
+                "AS listing_sessions FROM source_daily_universe"
+            )
+            population = _rebuild_population(
+                c,
+                mapping,
+                request["source_information_cutoff"],
+                repository,
+                dates=dates,
+                output=output,
+            )
         proof = {
             "affected_security_ids": list(selected),
-            "raw_candidates_equal_before_global_selection": True,
+            "raw_candidates_equal_before_global_selection": raw_candidates_equal,
             "affected_raw_candidate_count": len(before),
             "unchanged_feature_rows_exact_difference": delta,
-            "original_candidate_coordinates_retained": True,
+            "original_candidate_coordinates_retained": raw_candidates_equal,
+            "full_global_candidate_rebuild": not raw_candidates_equal,
             "own_prior_preparation_sha256": prior.native._sha(old_prepared / "preparation.json"),
             "own_prior_feature_sha256": prior.native._sha(old_prepared / "features.parquet"),
             "qualified_source_manifest_sha256": bundle.manifest_sha256,
         }
         result = {
             **old,
+            **population,
             "feature_report": report,
             "feature_identity": digest_value(
                 {"source": bundle.manifest_sha256, "query": query, "proof": proof}
@@ -541,7 +586,65 @@ def prepare(
 def _raw_candidates(
     c: Any, mapping: Any, cutoff: str, repository: Path, *, dates: tuple[date, ...], added: bool
 ) -> list[Any]:
-    """Exact existing raw scanner; compare before global isolation/concentration."""
+    return _scan_raw_candidates(c, mapping, cutoff, repository, dates=dates, added=added)[0]
+
+
+def _rebuild_population(
+    c: Any, mapping: Any, cutoff: str, repository: Path, *, dates: tuple[date, ...], output: Path
+) -> dict[str, Any]:
+    from quanthus.event_library.scan import CandidateScanShard
+
+    raw, reasons, evaluated, series_count, decoded = _scan_raw_candidates(
+        c, mapping, cutoff, repository, dates=dates, added=True
+    )
+    # One immutable, independently built job-local raw census per role. It is
+    # not a cross-job cache or ADM, and is bound by the preparation file hash.
+    shard = CandidateScanShard(
+        tuple(raw),
+        tuple(sorted(mapping.by_security_id)),
+        dict(reasons),
+        evaluated,
+        series_count,
+        decoded,
+        0.0,
+        0.0,
+    )
+    (output / "raw-candidate-census.json").write_text(
+        json.dumps(shard.to_dict(), sort_keys=True, separators=(",", ":")) + "\n"
+    )
+    card = h.load_candidate_rule_card(
+        repository / "config/p4-candidate-price-volume-transition.research.v1.json"
+    )
+    kept, raw_count, isolated, gaps = h._retain_raw_candidates(
+        raw, reasons=reasons, date_index={d: i for i, d in enumerate(dates)}, card=card
+    )
+    candidates = [
+        {
+            "security_id": r.security_id,
+            "signal_date": r.signal_date.isoformat(),
+            "business_close": r.signal_close.isoformat(),
+            "static_industry_id": r.industry_id,
+            "eligibility_evidence_digest": r.eligibility_evidence_digest,
+            "feature_evidence_digest": digest_value(r.feature_evidence.to_dict()),
+        }
+        for r in kept
+    ]
+    return {
+        "candidates": candidates,
+        "evaluated_rows": evaluated,
+        "raw_triggers": raw_count,
+        "isolated": isolated,
+        "retained_candidates": len(candidates),
+        "industry_gap_identities": len(gaps),
+        "reason_counts": dict(sorted(reasons.items())),
+        "raw_candidate_census_sha256": prior.native._sha(output / "raw-candidate-census.json"),
+    }
+
+
+def _scan_raw_candidates(
+    c: Any, mapping: Any, cutoff: str, repository: Path, *, dates: tuple[date, ...], added: bool
+) -> tuple[list[Any], Counter[str], int, int, int]:
+    """Exact existing raw scanner; bounded decode, one complete security at a time."""
     index = {d: i for i, d in enumerate(dates)}
     card = h.load_candidate_rule_card(
         repository / "config/p4-candidate-price-volume-transition.research.v1.json"
@@ -576,12 +679,20 @@ def _raw_candidates(
           AND(v.valid_to IS NULL OR b.date<=CAST(v.valid_to AS DATE))
         LEFT JOIN source_price_limit_execution_daily l
           ON l.security_id=b.security_id AND l.execution_date=b.date
+        WHERE b.date >= DATE '2011-01-04'
         ORDER BY b.security_id,v.valid_from,b.date"""
     )
     names = [r[0] for r in cursor.description]
-    rows = [dict(zip(names, r, strict=True)) for r in cursor.fetchall()]
+
+    def rows() -> Any:
+        while batch := cursor.fetchmany(8192):
+            for row in batch:
+                yield dict(zip(names, row, strict=True))
+
     raw = []
-    for _, group in groupby(rows, lambda r: (r["security_id"], r["stock_code"], r["valid_from"])):
+    reasons: Counter[str] = Counter()
+    evaluated = series_count = decoded = 0
+    for _, group in groupby(rows(), lambda r: (r["security_id"], r["stock_code"], r["valid_from"])):
         series = []
         for r in group:
             sid, day = r["security_id"], r["date"]
@@ -611,7 +722,7 @@ def _raw_candidates(
                     ),
                 )
             )
-        found, _, _ = h._scan_security_series(
+        found, blocked, count = h._scan_security_series(
             series,
             ordered_dates=dates,
             date_index=index,
@@ -623,4 +734,8 @@ def _raw_candidates(
             information_cutoff=datetime.fromisoformat(cutoff),
         )
         raw.extend(found)
-    return raw
+        reasons.update(blocked)
+        evaluated += count
+        series_count += 1
+        decoded += len(series)
+    return raw, reasons, evaluated, series_count, decoded

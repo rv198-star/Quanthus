@@ -85,8 +85,10 @@ stock scope, scientific threshold, strict B/D gate or P6 state is changed.
 Each role independently rebuilds affected securities. Healthy rows may be
 reused only from that role's exact independently built predecessor, with full
 row comparison and exact raw-candidate equality before global selection. A
-changed raw candidate blocks incremental reuse and requires the complete
-deterministic candidate rebuild. A source-qualified input or successful
+changed raw candidate blocks incremental reuse and invokes the complete
+deterministic raw-population rebuild before unchanged global selection. The
+full raw census is retained as a job-local intermediate, never merged only with
+previously retained events. A source-qualified input or successful
 diagnostic remains distinct from full B/T/TCH and cold/accounting acceptance.
 
 The Owner's subsequent continuation separately authorizes permanent P10 #557 to

@@ -5,7 +5,7 @@
 | Parent | [P3-STRAT-003](p3-strat-003.md) |
 | Governing design | [Expert Strategy Layer](../design/lld/04-experts-aggregator/expert-strategy-layer.md) |
 | Design status | approved, bounded Owner continuation on 2026-10-24 |
-| Delivery gate | open; exact source qualification and independent execution evidence required |
+| Delivery gate | blocked on continuous held-input qualification; no B/T/TCH comparison accepted |
 | Purpose | `p3-historical-development-robustness-v1` |
 | Request | `config/research/p3-strat-003/historical-robustness.v1.json` |
 | Code / tests | `p3_historical_robustness.py` / `test_p3_historical_robustness.py` |
@@ -62,6 +62,56 @@ and native-read probes; ordinary code and its own independent inputs remain read
 Evidence lives in the CN02 job directory named by the recovery checkpoint. A
 negative or inconclusive study is a completed scientific outcome. Any subsequent
 policy change, fresh pilot or strategy acceptance requires its own explicit gate.
+An interrupted replay with unqualified held inputs is not a completed comparison.
+
+## Execution checkpoint, 2026-10-24
+
+| Step | Actual disposition |
+| --- | --- |
+| 1. Historical input assessment | Physical contracts and seven UTC logical fingerprints passed; continuous held-use qualification failed at the key below. Assessment is complete, qualification is not granted. |
+| 2. Freeze B/T/TCH | Complete before any arm outcome: fixed ten-year window, population, costs, accounting, policies and analysis; final request SHA256 `b95a754fed855c925096e94ceb16c22bf6d93f4ca7d94280a79f4ccb22d62612`. |
+| 3. Execute, cold reproduce, interpret | Actually started, then failed closed in B. No arm completed; no new financial comparison or strategy conclusion exists. |
+
+The unchanged consumer guard stopped held security `000901` on execution date
+`2014-10-24`: its close is below the source's own declared lower price limit,
+with no same-date normalized action or active normalization exception. An
+independent ordinary-file copy reproduced the same input guard in a new process
+with original sources and network denied. This proves a use-qualification conflict,
+not that raw prices are wrong. Price basis, limit applicability, action completeness
+and the guard's applicability remain to be classified by permanent P10
+[#557](https://github.com/rv198-star/Quanthus/issues/557).
+
+The scoped independent input census contains 13,231 guarded security-date keys;
+these are neither proven bad prices nor actual held-path impact counts. Original
+normalization exceptions stay fail closed. P3 does not repair these inputs, remove
+dates or securities after encountering the guard, invent marks or force liquidation.
+The business disposition stops this affected comparison while preserving all
+verified prerequisites and the earlier completed exposed-window studies.
+
+Primary preparation retained 22,954 candidates, of which 14,037 are feature-entry
+eligible and 8,917 ineligible. Static-industry missingness excluded 23,283 of the
+46,237 post-isolation candidates (2,544 identities); this is selected development
+coverage, not full-market or fresh-holdout evidence. The cold process independently
+rebuilt a byte-identical 585,543,107-byte feature file, SHA256
+`f1fc4c1f9dd1df38d7408bcac1643dabd6b7ba2cbf6cb666bbe5d564208d3c36`.
+Its candidate preparation and replay were interrupted after the primary failure;
+partial feature/isolation evidence does not satisfy full cold reproduction.
+
+Final focused checks passed 27 tests plus targeted lint, format, limited type and
+standalone planning checks. The latest full `make check`, on the intermediate
+`4a0db947973b7ba01b365d261050281bc062d3a1` snapshot, returned 3,859 passed,
+20 skipped and the exact same 28 dependency failures as baseline `96cc300`.
+The subsequent rejected lookup optimization was reverted, and focused checks were
+rerun on final replay commit `7814131c9dab457db9d89c956a2002d9454db376`.
+There is no full-suite pass claim for that final snapshot and no global-green claim.
+
+Next: P10 classifies the exact held key and relevant input-guard families in a
+bounded source-only assessment, returning a distinct qualified revision if a repair
+is justified. P3 then freezes its exact consumer identity, reuses prerequisites only
+when the complete semantic closure matches, and reruns the unchanged B/T/TCH
+comparison and independent cold construction. Financial interpretation follows
+actual accepted replays; it is not replaced by the input diagnosis. No 66-session
+forward wait, sealed-partition access or production/P6 change is implied.
 
 `docs-impact: none` for the existing governing LLD: this bounded study consumes
 its unchanged expert, policy, guardian and P2 interfaces. Its own request and this

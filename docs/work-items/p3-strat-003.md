@@ -119,11 +119,22 @@ steps 1–3 and prefers additional existing historical evidence before waiting f
 66 new sessions. [Historical robustness](p3-historical-robustness.md) owns the new
 2012–2021 B/T/TCH purpose, exact source and request. Source physical contracts and
 all seven UTC logical fingerprints passed; the qualification wrapper's later
-report-writing error is retained separately. Input-only preparation is in progress;
-no new economic result has been read. Current job:
+report-writing error is retained separately. Primary preparation completed, and
+the independent cold feature file matches exactly. The actual B replay then failed
+closed on held `000901 / 2014-10-24` with `unexplained_price_transition`; an
+isolated new process independently reproduced the source guard. Continuous held-use
+qualification is not granted. No arm completed and no new financial comparison is
+available; TCH superiority or failure cannot be inferred. P10
+[#557](https://github.com/rv198-star/Quanthus/issues/557) owns classification and
+qualified source delivery, not P3. Preserve the window, population and all input
+guards; do not repair source, skip dates or fabricate marks. Current job:
 `/srv/agentdock/.codex/p3-historical-robustness-20261024T084154Z-96cc300`.
-This adds retrospective development evidence without changing strict B/D, P10
-data ownership, sealed 2022–2024, the old Stage A result or P6/production authority.
+The affected comparison remains blocked until an exact qualified source is
+available; partial cold evidence is not full reproduction. The frozen experiment
+and final focused checks are ready for that resumption. This changes neither strict
+B/D, P10 data ownership, sealed 2022–2024, the old Stage A result nor P6/production
+authority. Earlier source/experiment engineering is not a claim that steps 1–3
+have all passed.
 
 **Single-successor Stage A completed, 2026-10-24 (latest):** the Owner-authorized
 three steps are complete: the separate TR/TCH executor and exact admissions,

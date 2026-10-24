@@ -70,6 +70,32 @@ An interrupted replay with unqualified held inputs is not a completed comparison
 
 ### Dated-share source and consumer gap
 
+#### Owner-approved dated-share successor, 2026-10-25
+
+The Owner's continuation approves the exact proposed research-only listed-session
+availability model and one additional 7,200-second dual-process replay tranche.
+Its clock starts at the qualified frozen launch and includes preparation,
+diagnostics and retries; all prior failures, costs and absolute deadlines remain.
+Acquisition is closed. No new source request, original strict B/D admission,
+historical PIT, production or P6 authority is inherited.
+
+`historical-dated-share-successor.v1.json` binds this policy, source and code.
+Economic entitlement is recognized on the qualified ex-date; old shares remain
+tradable and new shares become simulated tradable quantity only at the official
+listing-session open. Actual account credit remains unknown. A pending exit may
+fill old shares, incur ordinary P2 costs, then carry the remainder. The lifecycle
+carry follows the audited partial fill at its post-fill ledger boundary; it does
+not pretend that a trade is a no-change carry. The old consumer's same-day guard,
+ordinary P2 engine and existing lifecycle transitions remain unchanged.
+
+Each role rebuilds the complete affected-security history and raw candidate
+census from its own full independently built predecessor. Healthy feature values,
+the byte-identical parent input and exact affected raw before-images must pass;
+the frozen global retention runs once. B is rerun under the changed complete
+input rather than assumed equivalent. Synthetic/source qualification alone does
+not complete the three-arm comparison; full dual-role accounting and interpretation
+remain required. The source-only checkpoint below is preserved historical evidence.
+
 The official-action execution at `dd4905704b907ab17505dfef53d4de3179bea111`
 independently completed B in both roles and passed physical/business/accounting
 checks. T passed 300273, then failed at frame 1,799 (`603517 / 2019-06-03`);

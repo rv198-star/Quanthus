@@ -1,0 +1,143 @@
+{
+  "scope": [
+    "2012-01-04",
+    "2021-12-30",
+    "2021-12-31"
+  ],
+  "arms": {
+    "B": {
+      "entry_cap": false,
+      "held_risk": false,
+      "trend": false
+    },
+    "T": {
+      "entry_cap": false,
+      "held_risk": false,
+      "trend": true
+    },
+    "TCH": {
+      "entry_cap": true,
+      "held_risk": true,
+      "trend": true
+    }
+  },
+  "execution_order": [
+    "B",
+    "T",
+    "TCH"
+  ],
+  "time_blocks": [
+    [
+      2012,
+      2013
+    ],
+    [
+      2014,
+      2015
+    ],
+    [
+      2016,
+      2017
+    ],
+    [
+      2018,
+      2019
+    ],
+    [
+      2020,
+      2021
+    ]
+  ],
+  "annual_diagnostics": [
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021
+  ],
+  "analysis": {
+    "bootstrap": "fixed paired nonoverlapping blocks; trailing incomplete block excluded only from resampling; descriptive intervals",
+    "contrasts": [
+      "T-B",
+      "TCH-B",
+      "TCH-T"
+    ],
+    "decision": "No automatic strategy selection. If full-window screen lacks support or block direction is unstable, retain inconclusive/negative and plan no parameter sweep or compulsory future 66-session wait.",
+    "materiality": "0.01",
+    "paired_block_sessions": 22,
+    "point_estimates": "all sessions, exact equity; calendar blocks keep path open, no forced closing",
+    "primary_contrast": "TCH-B",
+    "resamples": 2000,
+    "screen": "same reviewed one-percentage-point supported-return/drawdown/harm rules; report five two-year and ten annual blocks without selecting years"
+  },
+  "input_preparation_request_digest": "sha256:f6bbbd8a700acbf967895ce5c553f938d1e8d33db79825c51f3582319c64c86c",
+  "optional_rights_policy": "DO_NOT_SUBSCRIBE_UNIFORMLY",
+  "optional_rights_policy_sha256": "sha256:7efd45a82b14675f3546a8daad91129be8a584d5aa4ae3125940f71f5c3c909f",
+  "schema_version": "p3-historical-dated-share-successor-v1",
+  "created_at": "2026-10-24T21:47:45.698834+00:00",
+  "parent_request_sha256": "sha256:fa72a34324e52fc2b4f63ecc31380674a97c11948174799be60e709942fedf0f",
+  "source_manifest_sha256": "sha256:b4a834416d1d8496fb2f619dd91398aedd983b579a213c46f633eba234efb6a7",
+  "source_information_cutoff": "2026-10-24T18:46:14.379397+00:00",
+  "official_source_manifest_sha256": "sha256:bfffa51041149ded72bec95d970c489c2150d1dad3c898349b4697b57b8a7da8",
+  "reference_model": "existing-P2-gross-cash-bonus-theoretical-reference-v1",
+  "source_repair_scope": [
+    [
+      "300273",
+      "2012-05-31"
+    ],
+    [
+      "603517",
+      "2019-06-03"
+    ]
+  ],
+  "maximum_additional_wall_seconds": 7200,
+  "maximum_seconds_per_role": 7200,
+  "previous_failures_costs_and_deadlines_retained": true,
+  "original_deadline_UTC": "2026-10-24T16:50:56.003671+00:00",
+  "prior_preparation_sha256": "sha256:2d549d5c41baeebd3e998a4992a51741c37d5ce7fb47d8e0198dab5c147f0ab2",
+  "prior_feature_sha256": "sha256:c78e6e18b845c73a7d13f997eaec57a9676be6054fa329374659409ea3b49a25",
+  "code_config_members": {
+    "src/quanthus/backtest/engine.py": "sha256:3fd080238d85fe075f00f51da9857a226266a9f8d4a7d70928b5757fa843d72c",
+    "src/quanthus/expert_strategy/p3_dated_share_engine.py": "sha256:ee2a0c89458e3aa49366e8d4357b16455bf9f5a0a8f2b9d7f16a02748b9759fb",
+    "src/quanthus/expert_strategy/p3_dated_share_preparation.py": "sha256:119c12c39e9b008099763ce2e8ea684ef5faf41a619fb6f400e281c6a1a25042",
+    "src/quanthus/expert_strategy/p3_dated_share_successor.py": "sha256:2a0ef7976d5fe743ba1b50d9d7bdfd04ec503446d7d110208a87381c9fd9351e",
+    "src/quanthus/pipelines/securities_warehouse/p10_dated_distribution_input.py": "sha256:36f26d931998def20f6efb1ad3e95ab636685a4c0c7b7ca18f7e2bff6fecebca",
+    "src/quanthus/pipelines/securities_warehouse/p10_historical_distribution_source.py": "sha256:d2bb18732a57c70bbdc6c79948d8969043674e73ad6fea489ba78a9ef2bfbc08",
+    "src/quanthus/position_lifecycle.py": "sha256:eae78bbeea119bf3a78bd1567c784f4f38f015c388d5315c46ff030700181c86"
+  },
+  "owner_approval_sha256": "sha256:a39857e6c30ee6363eeed45885a6d01474c30673efa7186ea4cd11bae58b5897",
+  "incremental_preparation": "Each role replaces complete affected-security features and raw census from its own independently built predecessor. Full healthy values and exact affected raw before-image verified. Global frozen retention once. B rerun; no equivalence assumed.",
+  "execution_budget_includes_gate_diagnostics": true,
+  "reference_model_is_not_new_2012_exchange_rule_certification": true,
+  "historical_PIT_claim": false,
+  "production_authorized": false,
+  "P6_mutation_authorized": false,
+  "original_B_accepted": false,
+  "original_D_activated": false,
+  "parameter_search": false,
+  "source_guards_waived": false,
+  "draft_revision_reason": "Owner explicitly approved dated new-share availability for retrospective research and one additional finite replay tranche.",
+  "dated_source_manifest_sha256": "sha256:08bbaa5dfea033178763a78a60f645b767eef2b02a4bd80cc5615244a3623a1f",
+  "affected_security_ids": [
+    "603517"
+  ],
+  "share_availability_model": "SIMULATED_LISTED_SESSION_OPEN_ACTUAL_CREDIT_UNKNOWN",
+  "new_collection_authorized": false,
+  "approved_proposal_sha256": "sha256:b6188334dc596e5a5fd8823ce4985aa998db36284e739b1ca46886e71bf11ee1",
+  "prior_complete_raw_census_sha256": "sha256:8e5973b9af3fbe74812ca6c3d0752df817c863cf2b32214d43ce5273b51d0900",
+  "share_policy": {
+    "recognition": "Economic entitlement on ex-date; only old shares tradable before official listing.",
+    "unknown_actual_credit": "Keep null. Listed-session open is an explicit simulation assumption.",
+    "pending_sells": "Same desired proportion; execute available quantity at unchanged P2 costs and carry residual.",
+    "lifecycle": "A partial fill is audited first. The subsequent EXIT_CARRIED transition starts at its post-fill ledger and leaves EXITING until remainder fills.",
+    "fractional_shares": "FAIL_CLOSED",
+    "same_day_parent": "UNCHANGED",
+    "historical_PIT_claim": false,
+    "all_arms": "B/T/TCH same consumer; all rerun."
+  }
+}

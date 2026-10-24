@@ -114,7 +114,42 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**Single-successor Stage A activated, 2026-10-24 (latest):** the Owner explicitly
+**Single-successor Stage A completed, 2026-10-24 (latest):** the Owner-authorized
+three steps are complete: the separate TR/TCH executor and exact admissions,
+two-role replay with independent accounting/isolation acceptance, and the fixed
+comparison. All four raw replay digests were recomputed; both roles' six business
+artifacts agree under exact generated-ID/source-snapshot mappings. Each TR first
+reproduced its complete retained anchor before TCH. Independent cash-flow checks
+reconciled 118 position cycles and 832 portfolio closes, and 112 original input
+files remained unchanged. Cold native old-source/index/primary-TMP reads and
+network access were denied. Previously independently constructed own-role inputs
+were reused under exact provenance; features were not rebuilt or claimed new.
+
+The fixed TCH−TR net-return difference is +5.751824 percentage points and the
+maximum-drawdown difference is −0.301555 points. Net returns are −1.367046% for
+TR and +4.384778% for TCH; maximum drawdowns are 3.242351% and 2.940796%.
+The descriptive unadjusted 95% net-return interval is [−6.262400, +16.166721]
+points and crosses zero; the drawdown interval is [−2.870481, +6.156359] points.
+The predeclared resource screen passes, which can only prioritize a separately
+authorized fresh pilot. No successor strategy is accepted, and no pilot starts.
+The 416-session point estimates retain all dates; the last 20 dates are excluded
+only from incomplete-block resampling. The common mask retains 4,326 eligible and
+3,690 excluded candidates, with overlapping `ENTRY_SUPPORT_UNAVAILABLE` and
+`FEATURE_NOT_READY` reasons disclosed separately from in-replay missingness.
+
+Focused tests passed 111 cases twice; targeted lint/format/type and standalone
+planning checks passed. Full `make check` reports 3,831 passed / 20 skipped /
+28 failed, the exact same DuckDB/BaoStock frozen-dependency failures as baseline;
+there is no global-green claim. One pre-result environment recovery repaired only
+supervisor cleanup/stat races, preserving empty startup directories and evidence.
+Post-result validation fixes corrected an array loader and the TCH action-ID map
+against already frozen qualified sources; no replay, financial value, input or
+policy changed. Detailed evidence, plain logs, capacity receipts and local-only
+commit/diffs are in `/srv/agentdock/.codex/p3-risk-entry-veto-20261024T061738Z-34d19dc/`.
+The Owner will arrange Astra Max review. Strict B/D, the old five-cell experiment,
+P6, production and the 4,173 unavailable visibility semantics remain unchanged.
+
+**Single-successor Stage A activated, 2026-10-24 (prior):** the Owner explicitly
 instructed “那就开始启动，完成1-3，完成后我会再让Astra Max做复审”. This supersedes the
 proposal's then-unstarted execution status only for the exact exposed-window Stage A.
 `risk-entry-veto.v1.json`, its separate card/mapping and exact execution registry
@@ -128,7 +163,7 @@ or source collection is authorized. Current job:
 `/srv/agentdock/.codex/p3-risk-entry-veto-20261024T061738Z-34d19dc`.
 
 
-**Successor review step 3 completed, 2026-10-24 Asia/Shanghai (latest):**
+**Successor review step 3 completed, 2026-10-24 Asia/Shanghai (prior):**
 the Owner authorized Sol 6.1 Max first, with Astra only if the result is inadequate.
 The bounded decision proposes TCH (entry heuristic veto off, 20% unit cap and full
 held risk on) against TR, without selecting an accepted strategy or running new results.

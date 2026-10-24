@@ -325,7 +325,8 @@ expert or topology is retired or superseded by a new version; it is never repair
 ### Single-successor Stage A execution (2026-10-24)
 
 Design status: approved for the Owner-activated retrospective Stage A only.
-Delivery gate: open; exact task evidence belongs to the current work-item checkpoint.
+Delivery gate: accepted-conditional for bounded implementation/replay only;
+Owner Astra Max review remains pending. This is not strategy acceptance.
 The frozen proposal remains historical. The new `risk-entry-veto.v1.json` request,
 card, mapping and initially empty `risk-entry-veto-execution.v1.json` registry
 separate TR/TCH from the accepted five-cell diagnosis. The reference TR executes
@@ -353,3 +354,13 @@ close/inconclusive or at most a reason to prioritize a separately authorized fre
 pilot. No strategy is accepted or promoted. Capacity is checked before writes with
 actual device, bytes, file counts, inode reserve and retained job remnants; no
 old/source cleanup or full real-input corruption copy is part of this experiment.
+
+The three-step Stage A delivery completed with two independent TR/TCH roles and
+full accounting/identity/isolation checks. The fixed resource screen passes:
+TCH−TR net return is +5.751824 percentage points and maximum drawdown is
+−0.301555 points. Both descriptive intervals include zero, so the disposition is
+only `FRESH_PILOT_MAY_BE_PRIORITIZED_REQUIRES_SEPARATE_AUTHORITY`. No fresh pilot,
+strategy acceptance, production/P6 change or strict B/D acceptance follows.
+The current work-item checkpoint links exact evidence and the full population
+exclusions; it preserves historical findings and the original 4,173 unavailable
+semantics. This reported comparison remains an exposed-window retrospective.

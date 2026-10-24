@@ -66,6 +66,29 @@ An interrupted replay with unqualified held inputs is not a completed comparison
 
 ## Execution checkpoint, 2026-10-24
 
+### Approved official-action batch successor
+
+After T exercised `300273 / 2012-05-31`, the Owner approved the frozen
+320-key official-metadata census, at most 32 bodies for actual held blockers,
+480 requests / 128 MiB / two hours of acquisition, and a separate two-hour
+two-role execution tranche after source qualification. Previous failures,
+deadlines and costs remain evidence. Metadata coverage does not qualify terms.
+
+`historical-official-action-successor.v1.json` binds the explicit P10 source
+and `p3_historical_action_successor.py`. The qualified late observation stays
+separate from the original PIT-validated action table. It preserves actual
+2026 acquisition, unknown historical availability, the approved optional-rights
+non-subscription policy and the existing P2 gross cash/bonus model; it does not
+claim independently certified 2012 exchange-reference rules. No source bar,
+stock scope, scientific threshold, strict B/D gate or P6 state is changed.
+
+Each role independently rebuilds affected securities. Healthy rows may be
+reused only from that role's exact independently built predecessor, with full
+row comparison and exact raw-candidate equality before global selection. A
+changed raw candidate blocks incremental reuse and requires the complete
+deterministic candidate rebuild. A source-qualified input or successful
+diagnostic remains distinct from full B/T/TCH and cold/accounting acceptance.
+
 The Owner's subsequent continuation separately authorizes permanent P10 #557 to
 classify and qualify the existing input, then return to these unchanged arms and
 scientific gates. This does not mutate this original request's

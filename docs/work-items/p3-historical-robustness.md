@@ -46,9 +46,16 @@ TCH−B and TCH−T. The inherited one-percentage-point descriptive screen and p
 22-session / 2,000-resample intervals cannot automatically select a strategy.
 The trailing incomplete block is omitted only from bootstrap, never point estimates.
 
-The request fixes one active role, two DuckDB threads, 4 GiB DuckDB, 8 GiB process
-RSS, 16 GiB new job output, 6 GiB role spill, an 8 GiB free-space floor and a
-two-hour role limit. Failed attempts and source identities remain evidence.
+The observed-runtime resource revision was frozen before any arm result. It
+permits the independent primary and cold roles in parallel on the measured
+eight-CPU node, with two DuckDB threads each, 4 GiB DuckDB, 8 GiB process RSS,
+10 GiB aggregate role RSS, 16 GiB new job output, 6 GiB role spill and an
+8 GiB free-space floor. Each role has 2.5 hours and the complete Job five hours
+from its original start; previous failures count and the clock is not reset.
+The revision changes computation only, without changing samples, policies,
+financial gates or acceptance. A proposed SQL lookup materialization failed its
+predeclared 1.5x speedup gate and was reverted; its negative evidence is retained.
+Failed attempts and source identities remain evidence.
 The cold process denies original/prior sources and network using kernel controls
 and native-read probes; ordinary code and its own independent inputs remain readable.
 

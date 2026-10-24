@@ -48,18 +48,20 @@
   "budget": {
     "concurrency": {
       "duckdb_threads": 2,
-      "roles": 1
+      "roles": 2
     },
     "device": 64785,
     "duckdb_memory_bytes": 4294967296,
-    "maximum_experiment_seconds": 14400,
+    "maximum_aggregate_role_RSS_bytes": 10737418240,
+    "maximum_experiment_seconds": 18000,
     "maximum_new_job_bytes": 17179869184,
     "maximum_process_RSS_bytes": 8589934592,
-    "maximum_role_seconds": 7200,
+    "maximum_role_seconds": 9000,
     "maximum_spill_bytes_per_role": 6442450944,
     "minimum_free_bytes": 8589934592,
+    "resource_revision": "observed-two-role-parallel-v2-before-any-result",
     "retention": "preserve source copies, final outputs, failure evidence; only automatically cleaned owned successful library TMP",
-    "roles": "sequential; primary then independent cold"
+    "roles": "independent primary and cold roles in parallel"
   },
   "code_config_members": {
     "config/audits/dwd-base-v2-1-gpu-p100-execution.v1.json": "sha256:10019a3ba2067bfc81cda98d213de885fafcb54916adbfbc47920f16bddd6bf2",

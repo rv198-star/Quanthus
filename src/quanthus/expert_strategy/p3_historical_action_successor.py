@@ -656,7 +656,14 @@ def _finalize_population(
 
 
 def _scan_raw_candidates(
-    c: Any, mapping: Any, cutoff: str, repository: Path, *, dates: tuple[date, ...], added: bool
+    c: Any,
+    mapping: Any,
+    cutoff: str,
+    repository: Path,
+    *,
+    dates: tuple[date, ...],
+    added: bool,
+    security_ids: tuple[str, ...] | None = None,
 ) -> tuple[list[Any], Counter[str], int, int, int]:
     """Exact existing raw scanner; bounded decode, one complete security at a time."""
     index = {d: i for i, d in enumerate(dates)}
@@ -676,6 +683,11 @@ def _scan_raw_candidates(
         if added
         else ""
     )
+    selection = ""
+    if security_ids is not None:
+        if not security_ids or len(set(security_ids)) != len(security_ids):
+            raise ValueError("ACTION_RAW_QUERY_SECURITY_SET")
+        selection = " AND b.security_id IN (" + ",".join("?" for _ in security_ids) + ")"
     cursor = c.execute(
         """SELECT b.*,f.listing_sessions,
         EXISTS(SELECT 1 FROM source_corporate_action_exceptions_mapped e
@@ -693,8 +705,10 @@ def _scan_raw_candidates(
           AND(v.valid_to IS NULL OR b.date<=CAST(v.valid_to AS DATE))
         LEFT JOIN source_price_limit_execution_daily l
           ON l.security_id=b.security_id AND l.execution_date=b.date
-        WHERE b.date >= DATE '2011-01-04'
-        ORDER BY b.security_id,v.valid_from,b.date"""
+        WHERE b.date >= DATE '2011-01-04'"""
+        + selection
+        + " ORDER BY b.security_id,v.valid_from,b.date",
+        [] if security_ids is None else list(security_ids),
     )
     names = [r[0] for r in cursor.description]
 
@@ -778,6 +792,12 @@ def _parallel_population(
         "GROUP BY security_id ORDER BY count(*) DESC,security_id"
     ).fetchall()
     c.close()  # release the role's prerequisite connection before workers
+    import gc
+
+    import pyarrow as pa
+
+    gc.collect()
+    pa.default_memory_pool().release_unused()
     buckets: list[list[str]] = [[], []]
     sizes = [0, 0]
     for sid, count in counts:
@@ -986,14 +1006,38 @@ def _execute_raw_shard(repository: Path, path: Path) -> None:
                 for sid, value in spec["industry"].items()
             }
         )
-        raw, reasons, evaluated, series_count, decoded = _scan_raw_candidates(
-            c,
-            mapping,
-            request["source_information_cutoff"],
-            repository,
-            dates=tuple(date.fromisoformat(d) for d in spec["dates"]),
-            added=True,
-        )
+        raw = []
+        reasons: Counter[str] = Counter()
+        evaluated = series_count = decoded = 0
+        # Each block owns complete security/listing series. The same immutable
+        # source views serve all blocks; only global retention waits for shards.
+        for begin in range(0, len(ids), 128):
+            part, counts, n, series_n, rows_n = _scan_raw_candidates(
+                c,
+                mapping,
+                request["source_information_cutoff"],
+                repository,
+                dates=tuple(date.fromisoformat(d) for d in spec["dates"]),
+                added=True,
+                security_ids=ids[begin : begin + 128],
+            )
+            raw.extend(part)
+            reasons.update(counts)
+            evaluated += n
+            series_count += series_n
+            decoded += rows_n
+            print(
+                json.dumps(
+                    {
+                        "stage": "raw_block_complete",
+                        "securities_completed": min(begin + 128, len(ids)),
+                        "security_total": len(ids),
+                        "rows": decoded,
+                        "elapsed_seconds": clock.monotonic() - started,
+                    }
+                ),
+                flush=True,
+            )
         shard = CandidateScanShard(
             tuple(raw), ids, dict(reasons), evaluated, series_count, decoded, 0.0, 0.0
         )

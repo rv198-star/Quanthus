@@ -98,7 +98,7 @@
   "prior_preparation_sha256": "sha256:e15ab17698de4616ea0e11af7746f0e56c4134f8392557575fe7f5f817d2e570",
   "prior_feature_sha256": "sha256:29523b3a16dff12e722f35939063f9b0778e7216ea650668deb7e0b6711a2b5f",
   "code_config_members": {
-    "src/quanthus/expert_strategy/p3_historical_action_successor.py": "sha256:74ed2ea5c4c7d3218f79c08ef9af9baacef4b5bd314e8c4e394e25edd7e08646",
+    "src/quanthus/expert_strategy/p3_historical_action_successor.py": "sha256:7f8f28b9095c12c3fecff942e1fe02ca8b2a7182b8f02df46b2d9932610b0b31",
     "src/quanthus/pipelines/securities_warehouse/p10_historical_action_input.py": "sha256:0342122b09ed07582c9515a8526e98a4d220aba715af8935b6db6c60a11c919b",
     "src/quanthus/pipelines/securities_warehouse/p10_historical_action_source.py": "sha256:f946d2de477d665d4fcc4c796d9f4ae84134ad31528e00777ba08d7edaadf0dc",
     "src/quanthus/expert_strategy/p3_historical_bonus_successor.py": "sha256:5631f730fa0149cf9c8e075fe52908e479bc7ca7cfdef4bb0c777c95d865a20e",
@@ -116,5 +116,6 @@
   "parameter_search": false,
   "source_guards_waived": false,
   "draft_revision_reason": "Actual raw equality rejected incremental candidate reuse; implement already-required complete deterministic raw-population fallback. Failed partial attempts and same approved deadline retained.",
-  "full_population_fallback": "Two disjoint full-security raw shards per role, deterministic row-balanced allocation, same total two DuckDB threads / 4GB / 6GB spill. One unchanged global isolation/concentration pass; parent and all descendants counted against unchanged role/aggregate RSS. Cold kernel restrictions inherited across exec."
+  "full_population_fallback": "Two disjoint full-security raw shards per role, deterministic row-balanced allocation, same total two DuckDB threads / 4GB / 6GB spill. One unchanged global isolation/concentration pass; parent and all descendants counted against unchanged role/aggregate RSS. Cold kernel restrictions inherited across exec.",
+  "raw_query_bound": "At most 128 complete securities per ordered raw query; same two disjoint workers per role and one unchanged global retain. No security history/window truncation."
 }

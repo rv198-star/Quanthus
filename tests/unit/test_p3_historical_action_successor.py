@@ -224,6 +224,11 @@ def test_real_streamed_action_boundary_rebuilds_whole_raw_population(tmp_path):
         assert {r.security_id for r in before} == {"000001", "000002"}
         assert {r.security_id for r in after} == {"000002"}
         assert before != after
+        one = p._scan_raw_candidates(*args, dates=tuple(days), added=True, security_ids=("000001",))
+        two = p._scan_raw_candidates(*args, dates=tuple(days), added=True, security_ids=("000002",))
+        assert one[0] + two[0] == after
+        assert one[4] + two[4] == 640
+        assert one[3] + two[3] == 2
         result = p._rebuild_population(*args, dates=tuple(days), output=tmp_path)
         assert {r["security_id"] for r in result["candidates"]} == {"000002"}
         census = CandidateScanShard.from_dict(

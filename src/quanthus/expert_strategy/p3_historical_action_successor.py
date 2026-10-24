@@ -9,11 +9,16 @@ exact raw-candidate equality before global concentration. No new candidate searc
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
+import time as clock
 from collections import Counter
 from datetime import date, datetime, time
 from decimal import ROUND_HALF_UP, Decimal
 from itertools import groupby
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from quanthus.backtest.baseline_research import (
@@ -532,24 +537,8 @@ def prepare(
             for name in ("corporate_actions_normalized", "corporate_action_exceptions"):
                 c.execute(f"CREATE VIEW source_{name}_mapped AS SELECT * FROM source_{name}")
             _validate_feature_sources(c)
-            c.register(
-                "new_action_arrow",
-                pa.Table.from_pylist(_action_rows(facts, bundle.manifest_sha256)),
-            )
-            c.execute("CREATE TEMP TABLE new_actions AS SELECT * FROM new_action_arrow")
-            c.unregister("new_action_arrow")
-            c.execute(
-                "CREATE TEMP TABLE selected_universe_sessions AS SELECT security_id,market_date,"
-                "row_number() OVER(PARTITION BY security_id ORDER BY market_date) "
-                "AS listing_sessions FROM source_daily_universe"
-            )
-            population = _rebuild_population(
-                c,
-                mapping,
-                request["source_information_cutoff"],
-                repository,
-                dates=dates,
-                output=output,
+            population = _parallel_population(
+                c, mapping, repository, source, request, dates=dates, output=output
             )
         proof = {
             "affected_security_ids": list(selected),
@@ -592,11 +581,36 @@ def _raw_candidates(
 def _rebuild_population(
     c: Any, mapping: Any, cutoff: str, repository: Path, *, dates: tuple[date, ...], output: Path
 ) -> dict[str, Any]:
-    from quanthus.event_library.scan import CandidateScanShard
-
     raw, reasons, evaluated, series_count, decoded = _scan_raw_candidates(
         c, mapping, cutoff, repository, dates=dates, added=True
     )
+    return _finalize_population(
+        raw,
+        reasons,
+        evaluated,
+        series_count,
+        decoded,
+        mapping,
+        repository,
+        dates=dates,
+        output=output,
+    )
+
+
+def _finalize_population(
+    raw: list[Any],
+    reasons: Counter[str],
+    evaluated: int,
+    series_count: int,
+    decoded: int,
+    mapping: Any,
+    repository: Path,
+    *,
+    dates: tuple[date, ...],
+    output: Path,
+) -> dict[str, Any]:
+    from quanthus.event_library.scan import CandidateScanShard
+
     # One immutable, independently built job-local raw census per role. It is
     # not a cross-job cache or ADM, and is bound by the preparation file hash.
     shard = CandidateScanShard(
@@ -739,3 +753,271 @@ def _scan_raw_candidates(
         series_count += 1
         decoded += len(series)
     return raw, reasons, evaluated, series_count, decoded
+
+
+def _parallel_population(
+    c: Any,
+    mapping: Any,
+    repository: Path,
+    source: Path,
+    request: dict[str, Any],
+    *,
+    dates: tuple[date, ...],
+    output: Path,
+) -> dict[str, Any]:
+    """Exactly two disjoint complete-security scans; one global frozen retain.
+
+    Each role owns its two workers and source copy. Memory/spill budgets split
+    2x2GB/2x3GB, one DuckDB thread per worker, preserving 4GB/6GB/two threads
+    per role. Kernel cold isolation is inherited by subprocesses across exec.
+    """
+    from quanthus.event_library.scan import CandidateScanShard
+
+    counts = c.execute(
+        "SELECT security_id,count(*) FROM source_daily_universe "
+        "GROUP BY security_id ORDER BY count(*) DESC,security_id"
+    ).fetchall()
+    c.close()  # release the role's prerequisite connection before workers
+    buckets: list[list[str]] = [[], []]
+    sizes = [0, 0]
+    for sid, count in counts:
+        index = min(range(2), key=lambda i: (sizes[i], i))
+        buckets[index].append(sid)
+        sizes[index] += count
+    assert buckets[0] and buckets[1]
+    plan = {
+        "kind": VERSION + "/population-stage",
+        "source_manifest_sha256": request["source_manifest_sha256"],
+        "request_digest": digest_value(request),
+        "device": output.stat().st_dev,
+        "free_bytes_before": os.statvfs(output).f_bavail * os.statvfs(output).f_frsize,
+        "free_inodes_before": os.statvfs(output).f_favail,
+        "worker_count": 2,
+        "threads_per_worker": 1,
+        "DuckDB_memory_per_worker": "2GB",
+        "spill_per_worker": "3GB",
+        "assignments": [sorted(x) for x in buckets],
+        "listing_rows_per_assignment": sizes,
+        "global_retain": "one unchanged global pass after both raw shards",
+    }
+    (output / "population-stage-freeze.json").write_text(
+        json.dumps(plan, sort_keys=True, indent=2) + "\n"
+    )
+    children = []
+    started = clock.monotonic()
+    try:
+        for index, ids in enumerate(buckets):
+            folder = output / f"population-{index:02d}"
+            folder.mkdir()
+            spec = {
+                "kind": VERSION + "/raw-shard",
+                "request_digest": digest_value(request),
+                "source": str(source),
+                "source_manifest_sha256": request["source_manifest_sha256"],
+                "output": str(folder),
+                "security_ids": sorted(ids),
+                "dates": [d.isoformat() for d in dates],
+                "industry": {
+                    sid: mapping.by_security_id[sid].level1_industry_id
+                    for sid in ids
+                    if sid in mapping.by_security_id
+                },
+            }
+            path = folder / "request.json"
+            path.write_text(json.dumps(spec, sort_keys=True, indent=2) + "\n")
+            log = (folder / "execution.txt").open("x")
+            args = [sys.executable, "-m", __name__, "--raw-shard", str(repository), str(path)]
+            child = subprocess.Popen(
+                args, stdout=log, stderr=subprocess.STDOUT, env=os.environ.copy()
+            )
+            children.append((child, log, folder, sorted(ids)))
+        while any(p.poll() is None for p, _, _, _ in children):
+            if any(p.poll() not in (None, 0) for p, _, _, _ in children):
+                raise ValueError("ACTION_RAW_SHARD_FAILED")
+            clock.sleep(0.25)
+        if any(p.returncode != 0 for p, _, _, _ in children):
+            raise ValueError("ACTION_RAW_SHARD_FAILED")
+        raw = []
+        reasons: Counter[str] = Counter()
+        evaluated = series_count = decoded = 0
+        seen: set[str] = set()
+        evidence = []
+        for _, _, folder, ids in children:
+            receipt = json.loads((folder / "COMPLETE.json").read_bytes())
+            if (
+                receipt["request_digest"] != digest_value(request)
+                or receipt["source_manifest_sha256"] != request["source_manifest_sha256"]
+                or receipt["sha256"] != prior.native._sha(folder / "raw.json")
+            ):
+                raise ValueError("ACTION_RAW_SHARD_IDENTITY")
+            shard = CandidateScanShard.from_dict(json.loads((folder / "raw.json").read_bytes()))
+            if list(shard.security_ids) != ids or seen.intersection(ids):
+                raise ValueError("ACTION_RAW_SHARD_OWNERSHIP")
+            seen.update(ids)
+            raw.extend(shard.raw_candidates)
+            reasons.update(shard.reason_counts)
+            evaluated += shard.evaluated_rows
+            series_count += shard.series_count
+            decoded += shard.decoded_rows
+            evidence.append(receipt)
+        if seen != {sid for sid, _ in counts}:
+            raise ValueError("ACTION_RAW_SHARD_COVERAGE")
+        result = _finalize_population(
+            raw,
+            reasons,
+            evaluated,
+            series_count,
+            decoded,
+            SimpleNamespace(by_security_id={k: mapping.by_security_id.get(k) for k in seen}),
+            repository,
+            dates=dates,
+            output=output,
+        )
+        (output / "population-stage-result.json").write_text(
+            json.dumps(
+                {
+                    "workers": 2,
+                    "elapsed_seconds": clock.monotonic() - started,
+                    "shards": evidence,
+                    "global_retain_once": True,
+                },
+                sort_keys=True,
+                indent=2,
+            )
+            + "\n"
+        )
+        result["raw_scan_execution"] = {
+            "workers": 2,
+            "global_retain_once": True,
+            "shards": [
+                {k: r[k] for k in ("sha256", "rows", "security_count", "raw_candidates")}
+                for r in evidence
+            ],
+        }
+        return result
+    finally:
+        for child, _log, _, _ in children:
+            if child.poll() is None:
+                child.terminate()
+        for child, log, _, _ in children:
+            try:
+                child.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                child.kill()
+                child.wait()
+            log.close()
+
+
+def _execute_raw_shard(repository: Path, path: Path) -> None:
+    import duckdb
+
+    from quanthus.event_library.scan import CandidateScanShard
+
+    spec = json.loads(path.read_bytes())
+    request = load_request(repository)
+    if (
+        spec.get("kind") != VERSION + "/raw-shard"
+        or spec.get("request_digest") != digest_value(request)
+        or spec.get("source_manifest_sha256") != request["source_manifest_sha256"]
+    ):
+        raise ValueError("ACTION_RAW_SHARD_REQUEST")
+    ids = tuple(spec["security_ids"])
+    if not ids or ids != tuple(sorted(set(ids))):
+        raise ValueError("ACTION_RAW_SHARD_SECURITY_SET")
+    output = Path(spec["output"])
+    source = Path(spec["source"])
+    if (
+        output.resolve() != output.absolute()
+        or source.resolve() != source.absolute()
+        or output == source
+        or output in source.parents
+        or source in output.parents
+        or output != path.parent
+        or (output / "raw.json").exists()
+    ):
+        raise ValueError("ACTION_RAW_SHARD_OUTPUT")
+    started = clock.monotonic()
+    bundle, facts = p10.load_input(
+        source, request["source_manifest_sha256"].removeprefix("sha256:")
+    )
+    paths = {
+        d.dataset: bundle.historical_bundle.partition_paths(d.dataset)
+        for d in bundle.historical_bundle.datasets
+        if d.dataset
+        in {
+            "daily_ohlcv_none",
+            "daily_universe",
+            "price_limit_execution_daily",
+            "security_code_validity",
+            "corporate_actions_normalized",
+            "corporate_action_exceptions",
+        }
+    }
+    (output / "spill").mkdir()
+    c = duckdb.connect(
+        config={
+            "memory_limit": "2GB",
+            "threads": 1,
+            "max_temp_directory_size": "3GB",
+            "temp_directory": str(output / "spill"),
+        }
+    )
+    try:
+        c.execute("SET timezone='UTC'")
+        _create_feature_source_views(c, paths, ids, scope_end=date(2021, 12, 31))
+        for name in ("corporate_actions_normalized", "corporate_action_exceptions"):
+            c.execute(f"CREATE VIEW source_{name}_mapped AS SELECT * FROM source_{name}")
+        _validate_feature_sources(c)
+        import pyarrow as pa
+
+        c.register(
+            "new_action_arrow", pa.Table.from_pylist(_action_rows(facts, bundle.manifest_sha256))
+        )
+        c.execute("CREATE TEMP TABLE new_actions AS SELECT * FROM new_action_arrow")
+        c.unregister("new_action_arrow")
+        c.execute(
+            "CREATE TEMP TABLE selected_universe_sessions AS SELECT security_id,market_date,"
+            "row_number() OVER(PARTITION BY security_id ORDER BY market_date) "
+            "AS listing_sessions FROM source_daily_universe"
+        )
+        mapping = SimpleNamespace(
+            by_security_id={
+                sid: SimpleNamespace(level1_industry_id=value)
+                for sid, value in spec["industry"].items()
+            }
+        )
+        raw, reasons, evaluated, series_count, decoded = _scan_raw_candidates(
+            c,
+            mapping,
+            request["source_information_cutoff"],
+            repository,
+            dates=tuple(date.fromisoformat(d) for d in spec["dates"]),
+            added=True,
+        )
+        shard = CandidateScanShard(
+            tuple(raw), ids, dict(reasons), evaluated, series_count, decoded, 0.0, 0.0
+        )
+        (output / "raw.json").write_text(
+            json.dumps(shard.to_dict(), sort_keys=True, separators=(",", ":")) + "\n"
+        )
+        receipt = {
+            "status": "COMPLETE_RAW_SCAN_ONLY",
+            "request_digest": digest_value(request),
+            "source_manifest_sha256": request["source_manifest_sha256"],
+            "request_sha256": prior.native._sha(path),
+            "sha256": prior.native._sha(output / "raw.json"),
+            "security_count": len(ids),
+            "rows": decoded,
+            "raw_candidates": len(raw),
+            "elapsed_seconds": clock.monotonic() - started,
+            "production_authorized": False,
+        }
+        (output / "COMPLETE.json").write_text(json.dumps(receipt, sort_keys=True, indent=2) + "\n")
+    finally:
+        c.close()
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4 or sys.argv[1] != "--raw-shard":
+        raise SystemExit("expected --raw-shard REPOSITORY REQUEST")
+    _execute_raw_shard(Path(sys.argv[2]), Path(sys.argv[3]))

@@ -10,20 +10,22 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from quanthus.backtest.contracts import MARKET_TIMEZONE, EventType, OpenExecutionState, OrderSide
+from quanthus.backtest.engine import BacktestInputError
 from quanthus.backtest.portfolio_replay import _child_run, _state_from_snapshot
 from quanthus.expert_evaluation.serialization import digest_value
 from quanthus.expert_strategy import p3_base24_native as native
 from quanthus.expert_strategy import p3_historical_rights_successor as parent
+from quanthus.expert_strategy import p3_historical_robustness as h
 from quanthus.expert_strategy.formal_p2_replay import _SellSchedule
 
-VERSION = "p3-historical-bonus-integration-v1"
-REQUEST = "config/research/p3-strat-003/historical-bonus-integration.v1.json"
+VERSION = "p3-historical-bonus-integration-v2"
+REQUEST = "config/research/p3-strat-003/historical-bonus-integration.v2.json"
 
 
 def load_execution_request(repository: Path) -> dict[str, Any]:
@@ -36,6 +38,11 @@ def load_execution_request(repository: Path) -> dict[str, Any]:
         or request.get("code_sha256")
         != native._sha(repository / "src/quanthus/expert_strategy/p3_historical_bonus_successor.py")
         or request.get("rule") != "EXISTING_P2_PROPORTIONAL_PENDING_SELL"
+        or request.get("action_identity_rule")
+        != (
+            "SELL_EFFECTIVE_VIEW_AND_ORIGINAL_ACTION_SOURCE_"
+            "VALIDATED_SEPARATELY_WITH_UNCHANGED_CUTOFF"
+        )
         or request.get("scope") != scientific["scope"]
         or request.get("scientific_policy_changed") is not False
         or request.get("deadline_reset") is not False
@@ -47,6 +54,33 @@ def load_execution_request(repository: Path) -> dict[str, Any]:
     ):
         raise native.InputError("BONUS_EXECUTION_REQUEST")
     return request
+
+
+class HistoricalBonusEngine(h.HistoricalEngine):
+    """Bind sell effective-view and original action identities separately."""
+
+    def __init__(self, policy: Any, cutoff: datetime, snapshot: str, action_snapshot: str) -> None:
+        super().__init__(policy, cutoff, snapshot, action_snapshot)
+        self._bound_sell_run: Any = None
+
+    def run_sell_sequence(self, *, run: Any, **kwargs: Any) -> Any:
+        if self._bound_sell_run is not None:
+            raise BacktestInputError("HISTORY_NESTED_SELL_SEQUENCE")
+        self._bound_sell_run = run
+        try:
+            return super().run_sell_sequence(run=run, **kwargs)
+        finally:
+            self._bound_sell_run = None
+
+    def _validate_action_clock(self, run: Any, action: Any, applied_at: datetime) -> None:
+        if run is self._bound_sell_run:
+            if run.data_snapshot_id != self.snapshot:
+                raise BacktestInputError("HISTORY_ACTION_BINDING")
+            # The signal guard still binds the effective input to this exact
+            # sell run. The unchanged action guard separately binds the original
+            # source and actual cutoff; no action time or identity is rewritten.
+            run = replace(run, data_snapshot_id=self.action_snapshot)
+        super()._validate_action_clock(run, action, applied_at)
 
 
 class HistoricalBonusRuntime(parent.HistoricalRightsRuntime):
@@ -62,6 +96,9 @@ class HistoricalBonusRuntime(parent.HistoricalRightsRuntime):
         ):
             raise native.InputError("BONUS_EXECUTION_ADMISSION")
         super().__init__(repository, source, prepared, admission)
+        self.engine = HistoricalBonusEngine(
+            self.engine.policy, self.info, self.snapshot_id, h.ACTION_SOURCE_SNAPSHOT
+        )
 
     def _code_version(self) -> str:
         return super()._code_version() + ":" + VERSION + ":" + self.execution_digest

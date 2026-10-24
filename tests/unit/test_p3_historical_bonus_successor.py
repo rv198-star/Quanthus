@@ -28,33 +28,39 @@ from tests.unit.test_position_lifecycle import (
 from tests.unit.test_strategy_replay import POLICY_PATH, at, frame, session
 
 
-def setup_case(*, fraction="0.1", quantity=100, full_exit=True):
+def setup_case(*, fraction="0.1", quantity=100, full_exit=True, year=2026):
     engine = BacktestEngine(load_execution_policy(POLICY_PATH))
     positioned = replace(ledger(100), security_code="000001.SZ")
     empty = ledger(0)
     lifecycle = initialize_position_lifecycle(
-        ledger_state=empty, as_of=at(date(2024, 1, 1), 9), state_machine_version="1.1.0"
+        ledger_state=empty, as_of=at(date(year - 2, 1, 1), 9), state_machine_version="1.1.0"
     )
     # Reuse the legal lifecycle fixture; only its security identity changes.
-    entry = replace(transition(PositionTransitionKind.ENTRY_FILLED, 1), security_code="000001.SZ")
+    entry = replace(
+        transition(PositionTransitionKind.ENTRY_FILLED, 1),
+        security_code="000001.SZ",
+        occurred_at=at(date(year - 1, 1, 2), 9),
+    )
     lifecycle = apply_position_transition(
         lifecycle, entry, ledger_before=empty, ledger_after=positioned
     )
     if full_exit:
         request = replace(
-            transition(PositionTransitionKind.EXIT_REQUESTED, 2), security_code="000001.SZ"
+            transition(PositionTransitionKind.EXIT_REQUESTED, 2),
+            security_code="000001.SZ",
+            occurred_at=at(date(year - 1, 1, 3), 9),
         )
         lifecycle = apply_position_transition(
             lifecycle, request, ledger_before=positioned, ledger_after=positioned
         )
     unit = _UnitRuntime(positioned, lifecycle, "000001.SZ", "000001.SZ", "opportunity-01")
-    days = [date(2026, 4, 2), date(2026, 4, 3), date(2026, 4, 6)]
+    days = [date(year, 4, 2), date(year, 4, 3), date(year, 4, 6)]
     action = CorporateActionStep(
         CorporateAction(
             action_id="bonus-1",
             security_code="000001.SZ",
             effective_date=days[1],
-            known_at=at(date(2026, 4, 1), 10),
+            known_at=at(date(year, 4, 1), 10),
             cash_dividend_per_share=Decimal("0.05"),
             bonus_share_ratio=Decimal(fraction),
             source_revision="synthetic-v1",
@@ -66,7 +72,7 @@ def setup_case(*, fraction="0.1", quantity=100, full_exit=True):
     )
     frames = (
         frame(
-            date(2026, 4, 1),
+            date(year, 4, 1),
             days[0],
             session(
                 days[0], "000001.SZ", "9.50", "9.50", OpenExecutionState.SELL_BLOCKED_LIMIT_DOWN
@@ -207,6 +213,51 @@ def test_missing_execution_admission_refuses_source_open(tmp_path, monkeypatch):
     monkeypatch.setattr(s.parent.p10, "load_input", lambda *args: pytest.fail("source opened"))
     with pytest.raises(ValueError, match="BONUS_EXECUTION_ADMISSION"):
         s.HistoricalBonusRuntime(tmp_path, tmp_path, tmp_path, {})
+
+
+@pytest.mark.parametrize("wrong_action_source", [False, True])
+def test_typed_historical_sell_binds_effective_input_and_original_action_source(
+    wrong_action_source,
+):
+    from quanthus.expert_strategy import p3_historical_robustness as h
+
+    runtime, frames, unit, run = setup_case(year=2020)
+    info = frames[0].snapshot.knowledge_cutoff
+    runtime.engine = s.HistoricalBonusEngine(
+        runtime.engine.policy, info, frames[0].snapshot.snapshot_id, "action-1"
+    )
+    original = runtime._signal(None)
+    runtime._signal = lambda *args: h.HistoricalSignal(**original.__dict__)
+    run = replace(run, code_version=h.VERSION + ":synthetic")
+    if wrong_action_source:
+        action = frames[1].corporate_actions[0]
+        altered = replace(action, action=replace(action.action, snapshot_id="unqualified"))
+        frames = (frames[0], replace(frames[1], corporate_actions=(altered,)), frames[2])
+        runtime.frames = frames
+        with pytest.raises(ValueError, match="HISTORY_ACTION_BINDING"):
+            runtime._sell_schedule(0, frames[0], unit, run, 100, True, "decision")
+    else:
+        schedule = runtime._sell_schedule(0, frames[0], unit, run, 100, True, "decision")
+        for f in frames:
+            runtime._apply_sell_schedule(f, unit, [], schedule, [])
+        assert unit.ledger.settled_quantity == 0
+        assert unit.lifecycle.stage is PositionStage.CLOSED
+
+
+def test_effective_snapshot_cannot_waive_action_guard_outside_bound_sell():
+    from quanthus.expert_strategy import p3_historical_robustness as h
+
+    runtime, frames, unit, run = setup_case(year=2020)
+    engine = s.HistoricalBonusEngine(
+        runtime.engine.policy,
+        frames[0].snapshot.knowledge_cutoff,
+        frames[0].snapshot.snapshot_id,
+        "action-1",
+    )
+    step = frames[1].corporate_actions[0]
+    run = replace(run, code_version=h.VERSION + ":synthetic")
+    with pytest.raises(ValueError, match="HISTORY_ACTION_BINDING"):
+        engine._validate_action_clock(run, step.action, step.applied_at)
 
 
 @pytest.mark.parametrize(

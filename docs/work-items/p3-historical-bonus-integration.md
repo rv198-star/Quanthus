@@ -1,5 +1,8 @@
 # Historical carried-sell integration successor
 
+Engineering continuation record for [P3 historical robustness](p3-historical-robustness.md).
+This record explains implementation and evidence; the frozen requests govern scope.
+
 The qualified optional-rights input passed the former 2014-10-24 failure region.
 Both roles independently built the same feature/candidate prerequisite. The next
 real stop was `formal_sell_bonus_share_unsupported`, before completing B.
@@ -36,3 +39,15 @@ Regression coverage includes the original guard, full carried exit through a
 bonus and cash dividend, integral partial sell, fractional proportion rejection,
 missing/tampered corporate-action evidence and exact execution admission.
 Unit success alone is not three-arm comparison acceptance.
+
+
+The first real integration attempt then exposed a second adapter mismatch:
+`HISTORY_ACTION_BINDING`. Sell signals bind the new effective input snapshot,
+while normalized actions retain their original governed source snapshot. The
+original historical action guard expects an action-specific child run; a carried
+sell executes both in one P2 sequence. Version 2 binds that exact active sell run
+and validates its effective view separately from the unchanged original-action
+source/cutoff check. The binding is cleared in `finally`; it does not apply to
+other action calls. Wrong action sources remain rejected. The original v1
+request and commit remain preserved; v2 has a distinct code-bound execution
+request and retains all prior spent time and the same deadline.

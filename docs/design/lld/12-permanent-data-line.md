@@ -123,6 +123,13 @@ not open strategy/forward-email transport. See the
 entry points, qualification gaps and controlled switching. Image preparation does
 not activate deployment, complete held Weekly domains or grant consumer acceptance.
 
+Daily and recovery share a per-market-date mail lock. A complete/closed result
+matching the latest successfully notified status, reason and manifest identities
+gets a suppression receipt rather than a second email. Failure/partial transitions,
+changed products, Weekly and channel tests remain separately reportable. Existing
+events, API identities and successful receipts are preserved; an unsent notification
+is never relabelled sent. This notification rule changes no data or consumer gate.
+
 The Owner authorized existing noninteractive sudo for CN02 Docker control. A
 deployment selects `docker_access=direct|sudo-noninteractive`; only the fixed
 local Docker client is elevated. The host wrapper, leases and receipts retain the

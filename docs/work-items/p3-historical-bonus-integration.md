@@ -51,3 +51,24 @@ source/cutoff check. The binding is cleared in `finally`; it does not apply to
 other action calls. Wrong action sources remain rejected. The original v1
 request and commit remain preserved; v2 has a distinct code-bound execution
 request and retains all prior spent time and the same deadline.
+
+### Version 3: exact-key unavailable feature handling
+
+The old day-wide reader converted unrelated securities before returning the one
+requested key; an unrelated NULL close raised Decimal ConversionSyntax. The
+separately versioned facade borrows the same owner and its sole immutable table,
+filters exact date/security, preserves all valid row values and readiness rules,
+and returns unavailable only for an already ineligible NULL-close key. An eligible
+NULL, invalid positive-price contract or duplicate selected key still fails closed.
+Unavailable observations are counted; existing entry rejection and missing-evidence
+held-position behavior remain unchanged (missing evidence is not structural damage).
+The original panel owns connection/TMP cleanup; no prerequisite is rebuilt.
+
+The preregistered quality diagnostic covered all 8,260,825 feature rows: 2,027
+NULL closes, all ineligible; no other nonfinite/nonpositive close. Three fixed-date
+first-16-key samples matched the original selected-row mapping exactly. Borrowed
+point reads measured about 0.029 seconds per 16 keys, versus 0.30–0.37 seconds for
+the original day reader (one day correctly exposed its unrelated NULL error).
+The native plan did **not** show Index Scan; measured bounded lookup is the
+performance evidence, not an optimizer/index guarantee. No price was filled or
+input byte changed. All earlier attempt costs and the original deadline remain.

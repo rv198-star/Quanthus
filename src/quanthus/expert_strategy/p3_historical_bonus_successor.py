@@ -23,9 +23,10 @@ from quanthus.expert_strategy import p3_base24_native as native
 from quanthus.expert_strategy import p3_historical_rights_successor as parent
 from quanthus.expert_strategy import p3_historical_robustness as h
 from quanthus.expert_strategy.formal_p2_replay import _SellSchedule
+from quanthus.expert_strategy.p3_historical_point_panel import PointPanel
 
-VERSION = "p3-historical-bonus-integration-v2"
-REQUEST = "config/research/p3-strat-003/historical-bonus-integration.v2.json"
+VERSION = "p3-historical-bonus-integration-v3"
+REQUEST = "config/research/p3-strat-003/historical-bonus-integration.v3.json"
 
 
 def load_execution_request(repository: Path) -> dict[str, Any]:
@@ -37,6 +38,9 @@ def load_execution_request(repository: Path) -> dict[str, Any]:
         or request.get("source_manifest_sha256") != scientific["source_manifest_sha256"]
         or request.get("code_sha256")
         != native._sha(repository / "src/quanthus/expert_strategy/p3_historical_bonus_successor.py")
+        or request.get("point_panel_code_sha256")
+        != native._sha(repository / "src/quanthus/expert_strategy/p3_historical_point_panel.py")
+        or request.get("point_panel_rule") != "EXACT_KEY_UNAVAILABLE_STAYS_UNAVAILABLE"
         or request.get("rule") != "EXISTING_P2_PROPORTIONAL_PENDING_SELL"
         or request.get("action_identity_rule")
         != (
@@ -84,6 +88,14 @@ class HistoricalBonusEngine(h.HistoricalEngine):
 
 
 class HistoricalBonusRuntime(parent.HistoricalRightsRuntime):
+    def _open_data_inputs(self) -> None:
+        super()._open_data_inputs()
+        # The stack retains the original owner. Borrow its sole immutable table;
+        # no second materialization or cross-role feature sharing is introduced.
+        if not isinstance(self.panel, h.DayPanel):
+            raise native.InputError("HISTORY_POINT_OWNER_TYPE")
+        self.panel = PointPanel(self.panel)
+
     def __init__(
         self, repository: Path, source: Path, prepared: Path, admission: dict[str, Any]
     ) -> None:

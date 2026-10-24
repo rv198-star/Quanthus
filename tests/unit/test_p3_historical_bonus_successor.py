@@ -261,7 +261,17 @@ def test_effective_snapshot_cannot_waive_action_guard_outside_bound_sell():
 
 
 @pytest.mark.parametrize(
-    "field", [None, "code_sha256", "scope", "rule", "deadline_reset", "feature_sha256"]
+    "field",
+    [
+        None,
+        "code_sha256",
+        "point_panel_code_sha256",
+        "point_panel_rule",
+        "scope",
+        "rule",
+        "deadline_reset",
+        "feature_sha256",
+    ],
 )
 def test_execution_supplement_binds_unchanged_preparation_and_new_code(
     tmp_path, monkeypatch, field
@@ -275,6 +285,7 @@ def test_execution_supplement_binds_unchanged_preparation_and_new_code(
         s.REQUEST,
         s.parent.REQUEST,
         "src/quanthus/expert_strategy/p3_historical_bonus_successor.py",
+        "src/quanthus/expert_strategy/p3_historical_point_panel.py",
     ]:
         target = tmp_path / name
         target.parent.mkdir(parents=True, exist_ok=True)

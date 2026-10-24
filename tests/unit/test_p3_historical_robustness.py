@@ -88,6 +88,7 @@ def test_runtime_binds_action_original_source_separately_from_portable_envelope(
         "BoundedHistoricalReader",
         lambda _: SimpleNamespace(
             close=lambda: None,
+            materialize_point_lookups=lambda: {},
             _rows=lambda _: [
                 {
                     "source_snapshot_id": "unapproved"
@@ -151,6 +152,42 @@ def test_current_request_has_exact_ten_years_and_no_new_authority():
     position = ExpertStrategyRegistry(ROOT).card.semantic_sections["position_and_execution"]
     assert position["unit_count"] == 5
     assert Decimal(position["unit_notional"]) == Decimal("100000.00")
+
+
+def test_point_lookup_tables_preserve_exact_parent_queries_and_build_once():
+    from quanthus.backtest.historical_frames import HistoricalReplayFrameReader
+    from tests.unit.test_baseline_research import BaselineResearchTests
+
+    fixture = BaselineResearchTests()
+    fixture.setUp()
+    reader = object.__new__(h.BoundedHistoricalReader)
+    try:
+        HistoricalReplayFrameReader.__init__(reader, fixture.bundle)
+        query = HistoricalReplayFrameReader._bar_rows
+        before = {
+            "all": query(reader, fixture.dates[-1], before_or_at=True),
+            "point": query(reader, fixture.dates[-2], "SSE-600001"),
+            "history": query(reader, fixture.dates[-1], "SSE-600001", before_or_at=True, limit=22),
+        }
+        counts = reader.materialize_point_lookups()
+        after = {
+            "all": query(reader, fixture.dates[-1], before_or_at=True),
+            "point": query(reader, fixture.dates[-2], "SSE-600001"),
+            "history": query(reader, fixture.dates[-1], "SSE-600001", before_or_at=True, limit=22),
+        }
+        assert before == after and before["point"] and before["history"]
+        assert counts["replay_universe"] == len(before["all"])
+        assert reader.materialize_point_lookups() == counts
+        assert (
+            reader._scalar(
+                "SELECT count(*) FROM duckdb_tables() WHERE table_name LIKE 'historical_lookup_%'"
+            )
+            == 3
+        )
+    finally:
+        if hasattr(reader, "_connection"):
+            reader.close()
+        fixture.doCleanups()
 
 
 def synthetic_analysis_inputs():

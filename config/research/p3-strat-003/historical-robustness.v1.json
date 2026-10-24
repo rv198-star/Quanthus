@@ -524,7 +524,7 @@
     "src/quanthus/expert_strategy/p3_base24_startup.py": "sha256:6406317d0694cf6b1f3c3916408295fe737fb01650c6e00df4a45be5f8f8e72f",
     "src/quanthus/expert_strategy/p3_component_checkpoint.py": "sha256:7c43f3ce3cfd62280625f1ed5a243c7350f95ea6bb35053371718a5f76048032",
     "src/quanthus/expert_strategy/p3_daily_adapter_probe.py": "sha256:e349e67c9cd2e3bb88a0d21371aa8e1555576487475fb0a6dc3cef58d495b680",
-    "src/quanthus/expert_strategy/p3_historical_robustness.py": "sha256:7eb2aca63aeac052779fad3050666097a33820bfa27ceb5f54e2468b7956fcd9",
+    "src/quanthus/expert_strategy/p3_historical_robustness.py": "sha256:2b7c47b6cc97c92aa07b2de50a0b40a857dde158820bbf43c0c9b0bf032fc6b4",
     "src/quanthus/expert_strategy/p3_retained_audit.py": "sha256:0977e070857c146c690d30980b2dd086453d633ef9aa9b661af5b4b1a2c80fca",
     "src/quanthus/expert_strategy/p3_retained_input.py": "sha256:b39b27109da4ee19b8c48bafb0dd8c33ee39d04178a5ff5d5908b7a8d5eabbe6",
     "src/quanthus/expert_strategy/p3_retrospective_accounting_v2.py": "sha256:994a54c4581d9db96edfa16087ffab9208be4d93c35c3435ce0f78f82c1a4a32",

@@ -145,12 +145,38 @@ def read_preparation(path: Path) -> dict[str, Any]:
 
 
 class BoundedHistoricalReader(StrategyReplayADSFrameReader):
+    _lookup_counts: dict[str, int] | None = None
+
     def _create_views(self) -> None:
         connection = self._ensure_open()
         connection.execute("SET memory_limit='4GB'")
         connection.execute("SET max_temp_directory_size='6GB'")
         connection.execute("SET timezone='UTC'")
         super()._create_views()
+
+    def materialize_point_lookups(self) -> dict[str, int]:
+        """One unchanged SQL projection per role, shared by all three arms.
+
+        Preserve every column/type/row. Only the physical access path changes;
+        the reviewed parent query, exception rules and clocks remain intact.
+        The reader's existing memory/spill limits govern these job-local tables.
+        """
+        if self._lookup_counts is not None:
+            return dict(self._lookup_counts)
+        connection = self._ensure_open()
+        counts = {}
+        for view, keys in (
+            ("replay_universe", "security_id, market_date"),
+            ("replay_bars", "security_id, date"),
+            ("replay_limits", "security_id, execution_date"),
+        ):
+            table = "historical_lookup_" + view
+            connection.execute(f"CREATE TEMP TABLE {table} AS SELECT * FROM {view}")
+            connection.execute(f"CREATE UNIQUE INDEX {table}_key ON {table} ({keys})")
+            connection.execute(f"CREATE OR REPLACE VIEW {view} AS SELECT * FROM {table}")
+            counts[view] = int(connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0])
+        self._lookup_counts = counts
+        return dict(counts)
 
 
 class DayPanel(BaselineFeaturePanel):
@@ -600,6 +626,7 @@ class HistoricalRuntime(accounting.AccountingCorrectedReplayRuntime):
         self.reader = BoundedHistoricalReader(self.bundle)
         self.entry_runners: dict[str, Any] = {}
         try:
+            self.execution_lookup_counts = self.reader.materialize_point_lookups()
             FormalP2ReplayRuntime.__init__(
                 self,
                 repository,

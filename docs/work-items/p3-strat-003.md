@@ -114,6 +114,17 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**Historical robustness continuation, 2026-10-24 (latest):** the Owner requested
+steps 1–3 and prefers additional existing historical evidence before waiting for
+66 new sessions. [Historical robustness](p3-historical-robustness.md) owns the new
+2012–2021 B/T/TCH purpose, exact source and request. Source physical contracts and
+all seven UTC logical fingerprints passed; the qualification wrapper's later
+report-writing error is retained separately. Input-only preparation is in progress;
+no new economic result has been read. Current job:
+`/srv/agentdock/.codex/p3-historical-robustness-20261024T084154Z-96cc300`.
+This adds retrospective development evidence without changing strict B/D, P10
+data ownership, sealed 2022–2024, the old Stage A result or P6/production authority.
+
 **Single-successor Stage A completed, 2026-10-24 (latest):** the Owner-authorized
 three steps are complete: the separate TR/TCH executor and exact admissions,
 two-role replay with independent accounting/isolation acceptance, and the fixed

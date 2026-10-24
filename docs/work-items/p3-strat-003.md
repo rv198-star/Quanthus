@@ -114,6 +114,26 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**P10 held-input continuation, 2026-10-24 (current):** the Owner separately
+authorized P10 #557 classification/qualification before returning to the same
+historical comparison. Work continues in
+`/srv/agentdock/.codex/p3-held-source-continuation-20261024T122013Z-859e94b`.
+The exact existing ODS announcement index contains 000901's October 2014 rights
+issue notices, including the October 24 result and November 3 new-share listing
+notice. The retained factor records a change on October 24 with an explicitly
+unavailable historical publication clock; neither normalized actions nor the
+selected Base 2.4 action partition represents it. This identifies a concrete
+unmodeled optional-action dependency, not proof of bad raw quotes or its terms.
+The P10 classifier reproduces all 13,231 existing guarded keys and safe row hashes
+without changing a guard or granting admission. The possible-post-candidate bound
+is not actual held impact. Exact body lookup found no matching filenames in the
+selected ODS/retention inventories, not global absence. A bounded three-notice
+new-acquisition request is prepared; its approval is separate from existing-file
+governance. Full source terms and a versioned consumer treatment of optional rights
+are still needed. Do not convert rights to free bonus shares, infer cash flows
+from factors/returns, presume exercise, or rerun the unchanged known-failing input.
+The frozen comparison has no completed arm or new financial conclusion.
+
 **Historical robustness continuation, 2026-10-24 (latest):** the Owner requested
 steps 1–3 and prefers additional existing historical evidence before waiting for
 66 new sessions. [Historical robustness](p3-historical-robustness.md) owns the new

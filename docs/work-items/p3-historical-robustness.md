@@ -66,6 +66,41 @@ An interrupted replay with unqualified held inputs is not a completed comparison
 
 ## Execution checkpoint, 2026-10-24
 
+The Owner's subsequent continuation separately authorizes permanent P10 #557 to
+classify and qualify the existing input, then return to these unchanged arms and
+scientific gates. This does not mutate this original request's
+`source_repair_authorized=false` or silently admit a new source revision.
+
+P10's versioned `p10_historical_held_source.py` emits safe keys, flags and row
+hashes. Its real-file census exactly matches the prior 13,231-key diagnosis:
+11,207 nontrading-reference conflicts, 952 reference resets without normalized
+actions, 712 observed-price/regime conflicts, 351 active-exception conflicts,
+six source-return disagreements and three normalized-action residuals. These
+are diagnostic families, not proven bad prices, repaired data or held impacts.
+Missing joined rows, duplicate keys and unknown references cannot produce a
+complete successful census; input views and consumer guards are not rewritten.
+
+For held 000901 / 2014-10-24, the exact existing canonical announcement archive
+identifies a rights issue: issuance notice `1200289817` (2014-10-13), issuance
+result `1200323590` (2014-10-24), and new-share listing notice `1200360816`
+(2014-11-03). The raw factor has a same-date record explicitly marked
+`harvest_day_exception|no_proveable_announce`; its actual retained cutoff remains
+2026-07-24. The dividend-derived raw actions and normalized replay actions lack
+that event. Existing-title triage finds nearby rights titles for 25 of the 320
+possible-post-candidate reference-reset keys, which is only a source-recovery
+lead. Titles alone do not establish ratios, cash, credit dates or eligibility.
+
+The three official bodies were not found by exact-ID filename selection in the
+current ODS manifest or authorized retention index. A bounded supplement request
+is ready in the new job's `evidence/three-notice-supplement-request.safe.json`:
+three documents, at most 12 requests / 16 MiB / 30 minutes. New collection remains
+separate from existing-file authority. P2 currently models cash dividends and
+free bonus shares, not optional paid subscriptions. Even a recovered document
+cannot authorize pretending rights are free bonus shares, automatic subscription,
+backdated knowledge, or an unreviewed consumer policy. Preserve the frozen
+experiment; return a distinct exact qualified handoff only after these actual
+dependencies are resolved. Until then do not restart a known-failing full replay.
+
 | Step | Actual disposition |
 | --- | --- |
 | 1. Historical input assessment | Physical contracts and seven UTC logical fingerprints passed; continuous held-use qualification failed at the key below. Assessment is complete, qualification is not granted. |

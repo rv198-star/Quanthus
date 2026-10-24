@@ -71,6 +71,7 @@ ARMS = {
     "TCH": {"trend": True, "entry_cap": True, "held_risk": True},
 }
 SOURCE_SHA = "sha256:9d6af65970d496658946e8d5739a31c403c12cf70845cd7e16863e44293cd628"
+ACTION_SOURCE_SNAPSHOT = "p1-s2-s3-dwd-20260725-v1"
 # The input-only producer was frozen before the capital-count prose correction.
 # Retain its exact population/ranking namespace; the new execution request binds
 # this digest plus the full current code/config closure and physical input hashes.
@@ -87,6 +88,7 @@ def load_request(repository: Path) -> dict[str, Any]:
         or raw.get("arms") != ARMS
         or raw.get("execution_order") != list(ARMS)
         or raw.get("source_manifest_sha256") != SOURCE_SHA
+        or raw.get("action_source_snapshot_id") != ACTION_SOURCE_SNAPSHOT
         or raw.get("input_preparation_request_digest") != POPULATION_REQUEST_DIGEST
         or raw.get("source_information_cutoff") != "2026-07-29T03:19:57+00:00"
         or raw.get("time_blocks") != [[y, y + 1] for y in range(2012, 2022, 2)]
@@ -608,11 +610,16 @@ class HistoricalRuntime(accounting.AccountingCorrectedReplayRuntime):
                 provider_config=VERSION,
             )
             self.stack.callback(self.reader.close)
+            action_sources = self.reader._rows(
+                "SELECT DISTINCT source_snapshot_id FROM replay_actions ORDER BY source_snapshot_id"
+            )
+            if action_sources != [{"source_snapshot_id": ACTION_SOURCE_SNAPSHOT}]:
+                raise native.InputError("HISTORY_ACTION_SOURCE_CLOSURE")
             self.engine = HistoricalEngine(
                 self.engine.policy,
                 self.info,
                 self.snapshot_id,
-                self.bundle.historical_bundle.snapshot.snapshot_id,
+                self.historical_request["action_source_snapshot_id"],
             )
         except BaseException:
             self.reader.close()

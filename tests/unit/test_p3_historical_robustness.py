@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+from contextlib import ExitStack
 from dataclasses import replace
 from datetime import date, datetime
 from decimal import Decimal
@@ -56,6 +57,86 @@ with DayPanel(Path(sys.argv[1]), SimpleNamespace()) as panel:
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("unexpected_source", [False, True])
+def test_runtime_binds_action_original_source_separately_from_portable_envelope(
+    tmp_path, monkeypatch, unexpected_source
+):
+    prepared = tmp_path / "prepared"
+    prepared.mkdir()
+    (prepared / "features.parquet").write_bytes(b"synthetic-admission-only")
+    (prepared / "preparation.json").write_text(
+        json.dumps(
+            {
+                "request_digest": h.POPULATION_REQUEST_DIGEST,
+                "snapshot_id": h.VERSION
+                + "/"
+                + h.POPULATION_REQUEST_DIGEST.removeprefix("sha256:"),
+            }
+        )
+    )
+    bundle = SimpleNamespace(
+        source_snapshot_id="original-action-source",
+        historical_bundle=SimpleNamespace(
+            snapshot=SimpleNamespace(snapshot_id="portable-envelope")
+        ),
+    )
+    monkeypatch.setattr(h, "open_source", lambda _: bundle)
+    monkeypatch.setattr(
+        h,
+        "BoundedHistoricalReader",
+        lambda _: SimpleNamespace(
+            close=lambda: None,
+            _rows=lambda _: [
+                {
+                    "source_snapshot_id": "unapproved"
+                    if unexpected_source
+                    else h.ACTION_SOURCE_SNAPSHOT
+                }
+            ],
+        ),
+    )
+
+    def initialize(self, *args, **kwargs):
+        self.stack = ExitStack()
+        self.engine = SimpleNamespace(policy=None)
+
+    monkeypatch.setattr(h.FormalP2ReplayRuntime, "__init__", initialize)
+    request = h.load_request(ROOT)
+    admission = {
+        "request_digest": h.digest_value(request),
+        "role": "primary",
+        "source_manifest_sha256": h.SOURCE_SHA,
+        "preparation_sha256": h.native._sha(prepared / "preparation.json"),
+        "feature_sha256": h.native._sha(prepared / "features.parquet"),
+    }
+    if unexpected_source:
+        with pytest.raises(ValueError, match="HISTORY_ACTION_SOURCE_CLOSURE"):
+            h.HistoricalRuntime(ROOT, tmp_path, prepared, admission)
+        return
+    with h.HistoricalRuntime(ROOT, tmp_path, prepared, admission) as runtime:
+        assert runtime.engine.action_snapshot == h.ACTION_SOURCE_SNAPSHOT
+        run = SimpleNamespace(
+            official=False,
+            code_version=h.VERSION + ":synthetic",
+            data_snapshot_id=h.ACTION_SOURCE_SNAPSHOT,
+        )
+        action = SimpleNamespace(known_at=runtime.info, snapshot_id=h.ACTION_SOURCE_SNAPSHOT)
+        applied = datetime.fromisoformat("2012-04-10T09:00:00+08:00")
+        runtime.engine._validate_action_clock(run, action, applied)
+        for obj, field, wrong in (
+            (action, "snapshot_id", "portable-envelope"),
+            (action, "known_at", datetime.fromisoformat("2026-07-30T00:00:00+00:00")),
+            (run, "data_snapshot_id", "unknown-source"),
+            (run, "official", True),
+            (run, "code_version", "unrelated-purpose"),
+        ):
+            before = getattr(obj, field)
+            setattr(obj, field, wrong)
+            with pytest.raises(BacktestInputError, match="HISTORY_ACTION_BINDING"):
+                runtime.engine._validate_action_clock(run, action, applied)
+            setattr(obj, field, before)
 
 
 def test_current_request_has_exact_ten_years_and_no_new_authority():
@@ -140,6 +221,7 @@ def test_historical_analysis_rejects_changed_pairing_and_accounting(fault):
     [
         ("scope", ["2022-01-01", "2024-12-30", "2024-12-31"]),
         ("source_manifest_sha256", "sha256:" + "0" * 64),
+        ("action_source_snapshot_id", "portable-envelope"),
         ("input_preparation_request_digest", "sha256:" + "0" * 64),
         ("historical_PIT_claim", True),
         ("original_D_activated", True),

@@ -114,7 +114,44 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**Latest actual execution, 2026-10-24 UTC:** the qualified `000901` input and
+**Official-action batch, 2026-10-25 CST (latest):** the Owner approved the
+320-key official metadata census and one additional two-hour, two-role replay
+tranche. Execution SHA `dd4905704b907ab17505dfef53d4de3179bea111` preserved the
+original arms, scope and optional-rights policy. Each role independently rebuilt
+the complete raw candidate population after exact equality rejected incremental
+reuse. Both physical feature files and all 22,954 retained coordinates agree.
+B completed 2,430 sessions in each role; independent accounting and six business
+artifact comparisons pass, including 538 position cycles.
+
+T passed the formerly blocked `300273 / 2012-05-31`. It then stopped at frame
+1,799, `603517 / 2019-06-03`; TCH was not run. **There is no completed three-arm
+comparison, interpretation or original strict B/D acceptance.** The official
+603517 implementation notice was acquired within the approved source clock and
+now has an offline, self-contained qualified terms package, manifest
+`08bbaa5dfea033178763a78a60f645b767eef2b02a4bd80cc5615244a3623a1f`.
+It states June 3 ex/cash-payment and June 4 new-share listing. The exact share
+credit date and historical knowledge time remain unknown. This source cannot be
+silently inserted into the earlier information cutoff or same-day share model.
+The current reader correctly refuses it; a separate dated-entitlement/sellable
+quantity contract and source-bound input successor are required before replay.
+
+The acquisition tranche is closed: all 320 filtered implementation metadata pages
+were queried, 338 requests and three PDFs totaling 1,666,080 response bytes. This
+is bounded metadata coverage, not qualification of 320 actions or exhaustive
+announcement history. The execution clock remains 17:18:32.132106–19:18:32.132106
+UTC on October 24, including preparation and failed attempts. No retry or clock
+reset is implied by the newly qualified source. Preserve the failed partials and
+all previous clocks/costs. Evidence is under
+`/srv/agentdock/.codex/p3-held-source-continuation-20261024T122013Z-859e94b`:
+`action-v6-B-completed-physical-accounting-validation.safe.json`,
+`action-v6-T-former-block-passed.safe.json`,
+`603517-official-distribution-qualified.safe.json` and
+`603517-input-calendar-residual.safe.json` in `evidence/`.
+See [the scoped source and consumer gap](p3-historical-robustness.md#dated-share-source-and-consumer-gap).
+
+**Prior rights-only execution, 2026-10-24 UTC:**
+
+**Historical rights-only execution detail, 2026-10-24 UTC:** the qualified `000901` input and
 uniform non-subscription policy are implemented. Execution code
 `d245410be3665f9e29c7bf58c45c16d6239f821d` also fixes two carried-sell interfaces
 and an unrelated-NULL failure in the day-wide feature reader. It borrows one

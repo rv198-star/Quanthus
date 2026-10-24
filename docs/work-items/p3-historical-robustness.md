@@ -14,7 +14,9 @@ The Owner requested existing historical validation before committing to a new
 66-session forward wait. This is a separate retrospective study on the already
 exposed 2012–2021 development fixture. It does not reopen strict B/D, the accepted
 capability fixture, 2022–2024 partitions, production or P6. Data recovery and
-quality repair remain P10 responsibilities; no new supplier input is collected.
+quality repair remain P10 responsibilities. The original request does not authorize
+new supplier input; separately approved official-notice supplements below are
+bounded exceptions and do not rewrite that original request.
 
 The three steps are exact historical-input qualification, an outcome-blind frozen
 experiment, and execution plus independent cold reconstruction and interpretation.
@@ -65,6 +67,41 @@ policy change, fresh pilot or strategy acceptance requires its own explicit gate
 An interrupted replay with unqualified held inputs is not a completed comparison.
 
 ## Execution checkpoint, 2026-10-24
+
+### Dated-share source and consumer gap
+
+The official-action execution at `dd4905704b907ab17505dfef53d4de3179bea111`
+independently completed B in both roles and passed physical/business/accounting
+checks. T passed 300273, then failed at frame 1,799 (`603517 / 2019-06-03`);
+TCH remains not run. All partials and consumed budgets remain evidence.
+
+The separately acquired official 603517 implementation notice is now sealed under
+`p10-official-historical-per-share-distribution-source-v1`. Its literal per-share
+unit, document/metadata identity, quotation/UTF-8 offsets, original bytes and real
+2026 acquisition are verified offline. Dates stay separate: record May 31,
+ex/cash-payment June 3, new-share listing June 4; exact account credit and historical
+knowledge are unknown. Selected identity/calendar rows and the existing P2 gross
+cash/bonus residual pass for the exact key, with source rows bound by hashes. This
+is not independent certification of a 2019 exchange rule or consumer admission.
+
+`p10_historical_distribution_source.py` owns this narrow source-only contract;
+`test_p10_historical_distribution_source.py` covers fully resealed semantic and
+clock forgeries, literal units, date-column identity and the unchanged consumer
+refusal of next-day or unknown share credit. Same-day supported events remain
+accepted. The previous per-ten contract, frozen source/input/runtime/config and
+all prior source bytes stay unchanged.
+
+The engine currently represents the whole position as settled quantity and makes
+bonus shares sellable on the ex-date. Source qualification cannot waive that
+consumer mismatch. The bounded successor needs a versioned distinction between
+old tradable shares and dated new-share entitlements, treatment of partial
+pending sells, full position valuation and audit/accounting checks. It must not
+infer a credit timestamp, delay sale of old shares, change the strategy/window,
+or mutate P2/P6 production. That successor is not implemented or execution-
+authorized by this source-only package. The original two-hour execution deadline
+remains absolute; no full rerun starts on an unqualified consumer or an implicitly
+renewed clock. The public approval question must identify both this scoped
+consumer behavior and any additional finite replay budget.
 
 ### Approved official-action batch successor
 

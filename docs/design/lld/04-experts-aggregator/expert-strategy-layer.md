@@ -68,14 +68,6 @@ surface can be consumed as optional advisory context over authoritative Continuo
 that consumption exposes a concrete downstream semantic gap. Governing child:
 `expert-strategy-layer/stage-semantic-consumption.md`.
 
-The Owner's 2026-10-24 P3 continuation adds one bounded retrospective development
-study under [historical robustness](../../../work-items/p3-historical-robustness.md).
-Its separate B/T/TCH namespace consumes the exact accepted portable fixture,
-preserves the actual source-information clock, and requires independently rebuilt
-prerequisites and business-artifact reproduction. The existing PIT, guardian,
-scientific acceptance, protected-partition and production gates remain unchanged;
-this development-window robustness study cannot accept a strategy or strict B/D.
-
 ## 3. Authority and expert classes
 
 ### 3.1 Strategy experts

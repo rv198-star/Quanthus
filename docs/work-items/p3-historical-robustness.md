@@ -55,3 +55,8 @@ and native-read probes; ordinary code and its own independent inputs remain read
 Evidence lives in the CN02 job directory named by the recovery checkpoint. A
 negative or inconclusive study is a completed scientific outcome. Any subsequent
 policy change, fresh pilot or strategy acceptance requires its own explicit gate.
+
+`docs-impact: none` for the existing governing LLD: this bounded study consumes
+its unchanged expert, policy, guardian and P2 interfaces. Its own request and this
+work item own the additional execution protocol. The governing LLD remains byte
+identical because other sealed research requests bind its existing hash.

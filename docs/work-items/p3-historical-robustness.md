@@ -5,7 +5,7 @@
 | Parent | [P3-STRAT-003](p3-strat-003.md) |
 | Governing design | [Expert Strategy Layer](../design/lld/04-experts-aggregator/expert-strategy-layer.md) |
 | Design status | approved, bounded Owner continuation on 2026-10-24 |
-| Delivery gate | blocked on continuous held-input qualification; no B/T/TCH comparison accepted |
+| Delivery gate | blocked on TCH held-input qualification; B/T independently validated, full B/T/TCH comparison not accepted |
 | Purpose | `p3-historical-development-robustness-v1` |
 | Request | `config/research/p3-strat-003/historical-robustness.v1.json` |
 | Code / tests | `p3_historical_robustness.py` / `test_p3_historical_robustness.py` |
@@ -68,6 +68,75 @@ An interrupted replay with unqualified held inputs is not a completed comparison
 
 ## Execution checkpoint, 2026-10-24
 
+### Current execution checkpoint, 2026-10-25 CST
+
+The approved dated-share successor actually ran at execution commit
+`b113ddf7d62adfd7a92d17366c44df22c19bb627`, input manifest
+`b4a834416d1d8496fb2f619dd91398aedd983b579a213c46f633eba234efb6a7`.
+Its sole absolute execution window is October 24, 21:51:30.128494 through
+23:51:30.128494 UTC, including preparation, diagnostics and failed attempts.
+The source cutoff is the actual observation at 18:46:14.379397 UTC that day,
+not a historical publication claim. All earlier attempts remain immutable.
+
+| Step | Current evidence |
+| --- | --- |
+| 1. Input qualification | Exact 300273 and 603517 sources and the dated-share consumer passed; continuous held-use qualification now exposes one new TCH source gap, 000748 / 2015-05-15. |
+| 2. Freeze and implement | The original three arms, ten-year scope, capital, costs and uniform rights waiver are unchanged. The approved dated-share contract and independent prerequisites are implemented and bound. |
+| 3. Execute and validate | B and T each completed all 2,430 sessions in both independent roles. All six business artifacts per completed arm, 538 B / 338 T position cycles, daily closes and fees reconcile. TCH stopped at primary frame 812; cold TCH was interrupted. Full three-arm interpretation remains unavailable. |
+
+Both real T paths applied the exact 300273 and 603517 official actions. The
+603517 entitlement and 29 subsequent position snapshots independently reconcile;
+no unlisted new shares were sold and actual credit remains unknown. These real
+paths did not exercise a split fill; synthetic P2 stream tests separately cover
+that branch. Do not conflate synthetic branch coverage with a real split trade.
+
+Each role rebuilt 1,169 affected-security feature rows, proved 8,259,656 healthy
+rows unchanged and reused only its own independently constructed full raw census
+after exact before-image validation. One frozen global retention retained the
+same 22,954 coordinates. This is explicit own-role prerequisite reuse, not a
+fresh whole-market raw rescan or an assumed-equivalent reuse of a B result.
+The cold role's kernel filesystem and network denials, including native reads,
+remain verified. All 72 selected original input files remain byte-identical.
+
+Post-replay validation commit `c4b1edd7828fc94bfc797faadb1e96e6fc257447`
+adds typed normalization for slice-order and partial-fill references without
+altering replay code, source, strategy or the old normalizer. It rejects changed
+business values, missing/rewired references and non-bijective aliases. Sixteen
+new cases and two old graph regressions pass, including an actual synthetic
+P2 split-fill stream with opaque identifiers renamed.
+
+The new held blocker is exactly `000748 / 2015-05-15`; the other three held
+identities at that frame have no input block. The normalized replay has no
+same-date action and retains its unexplained-transition guard. Selected ODS
+`dividend_history` and `ref_corporate_actions` contain no 2015 action for 000748.
+The closed official batch has an implementation index for notice `1200978492`,
+with associated notice `1200978622`, but no qualified body for this key. This
+is a selected-inventory finding, not a claim that the source does not exist.
+No reference/entitlement may be inferred from the price transition or title.
+P10 [#559](https://github.com/rv198-star/Quanthus/issues/559) owns this exact
+source gap. The bounded source/execution proposal is
+`tch-held-action-supplement-request-v1.safe.json`; it is not an approval.
+
+Safe evidence is under
+`/srv/agentdock/.codex/p3-held-source-continuation-20261024T122013Z-859e94b/evidence/`:
+`dated-share-B-T-partial-acceptance-v1.safe.json`,
+`tch-block-local-diagnosis-v2.safe.json`,
+`tch-existing-ODS-action-lookup-v1.safe.json`,
+`dated-share-failure-v1.json` and
+`dated-share-v1-validation-final-checks.json`.
+Original source guards, 4,173 visibility exceptions, all frozen scientific gates,
+original strict B/D and P6 remain unchanged. The approved acquisition tranche is
+closed; any newly fetched official body needs bounded source authority. No new
+acquisition, replay retry or clock reset was performed after this blocker.
+
+The final code checks before this documentation-only checkpoint report
+4,023 passed / 128 baseline failures / 20 skipped, with the exact previous failure
+IDs and no new failures. Of those, 100 are the unchanged system-TMP free-space
+floor and 28 are frozen DuckDB/BaoStock version mismatches. Repository Ruff has
+217 baseline diagnostics, all in files byte-identical to the common base;
+targeted lint, format and type checks pass. This is not an all-green claim.
+Financial comparison is withheld until all frozen arms qualify and complete.
+
 ### Dated-share source and consumer gap
 
 #### Owner-approved dated-share successor, 2026-10-25
@@ -96,7 +165,8 @@ input rather than assumed equivalent. Synthetic/source qualification alone does
 not complete the three-arm comparison; full dual-role accounting and interpretation
 remain required. The source-only checkpoint below is preserved historical evidence.
 
-The official-action execution at `dd4905704b907ab17505dfef53d4de3179bea111`
+At the prior source-only checkpoint, official-action execution
+`dd4905704b907ab17505dfef53d4de3179bea111`
 independently completed B in both roles and passed physical/business/accounting
 checks. T passed 300273, then failed at frame 1,799 (`603517 / 2019-06-03`);
 TCH remains not run. All partials and consumed budgets remain evidence.
@@ -117,7 +187,7 @@ refusal of next-day or unknown share credit. Same-day supported events remain
 accepted. The previous per-ten contract, frozen source/input/runtime/config and
 all prior source bytes stay unchanged.
 
-The engine currently represents the whole position as settled quantity and makes
+At that source-only checkpoint, the old engine represented the whole position as settled quantity and made
 bonus shares sellable on the ex-date. Source qualification cannot waive that
 consumer mismatch. The bounded successor needs a versioned distinction between
 old tradable shares and dated new-share entitlements, treatment of partial

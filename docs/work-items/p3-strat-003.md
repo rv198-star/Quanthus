@@ -114,7 +114,35 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**Official-action batch, 2026-10-25 CST (latest):** the Owner approved the
+**Dated-share execution, 2026-10-25 CST (latest):** actual replay commit
+`b113ddf7d62adfd7a92d17366c44df22c19bb627`, post-validation commit
+`c4b1edd7828fc94bfc797faadb1e96e6fc257447`, input manifest
+`b4a834416d1d8496fb2f619dd91398aedd983b579a213c46f633eba234efb6a7`.
+The Owner-approved listed-session availability consumer is implemented. B and T
+each completed all 2,430 sessions in both independent roles. Their six business
+artifacts, all daily closes and fees match; independent accounting reconciles
+538 B and 338 T position cycles. Both T roles actually pass the 300273 and
+603517 source-bound actions; unknown actual account credit remains unknown.
+
+TCH then stops at primary frame 812, execution `2015-05-15`, held `000748`;
+cold TCH was interrupted and all partials are retained. The selected existing
+ODS action files lack its 2015 event. The closed official metadata batch points
+to implementation notice `1200978492` and associated `1200978622`, but no
+qualified body is present in that batch. Do not infer terms from the title or
+price change. P10 [#559](https://github.com/rv198-star/Quanthus/issues/559)
+owns that exact gap. Acquisition remains closed. The sole execution clock is
+October 24, 21:51:30.128494–23:51:30.128494 UTC; no retry or extension is implied.
+
+**The full B/T/TCH comparison is still incomplete; original strict B/D, PIT,
+P6 and production acceptance remain unchanged.** Finish this exact P10 source
+gap under separate bounded acquisition authority, then require exact input and
+own-role prerequisite equivalence before reusing any completed result. No
+parameter search, scientific-window change or partial-outcome interpretation.
+See the [current execution details](p3-historical-robustness.md#current-execution-checkpoint-2026-10-25-cst)
+and `dated-share-B-T-partial-acceptance-v1.safe.json`,
+`tch-block-local-diagnosis-v2.safe.json` in the same CN02 evidence root below.
+
+**Prior official-action batch, 2026-10-25 CST:** the Owner approved the
 320-key official metadata census and one additional two-hour, two-role replay
 tranche. Execution SHA `dd4905704b907ab17505dfef53d4de3179bea111` preserved the
 original arms, scope and optional-rights policy. Each role independently rebuilt

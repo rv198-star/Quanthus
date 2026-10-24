@@ -171,8 +171,14 @@ API mail runs inside the data task with private runtime environment injection,
 bounded retries and durable event/idempotency receipts. Success, partial, closed,
 busy and failure are distinct outcomes. Mail or backup failure cannot recollect
 data or invalidate a sealed product; an unavailable daemon leaves an unsent event.
-Retry uses the same image's transport role, independently of collection. Backup
-freezes exact upstream package identities and qualifications, separates ODS/DWD
+Retry uses the same image's transport role, independently of collection.
+Daily and recovery share a per-market-date notification lock. A complete or
+closed result matching the most recent successfully notified result's status,
+reason and manifest identities is retained with a suppression receipt instead
+of another email. Existing event/API identities and sent receipts remain unchanged.
+Failure/partial transitions, changed products, Weekly and explicit channel tests
+remain separately reportable; suppression never claims an unsent result was sent.
+Backup freezes exact upstream package identities and qualifications, separates ODS/DWD
 Drive roots, writes immutable copies and checks the exact remote set/size/hash.
 Only Base 2.4 Daily/Weekly 1d/5m selections qualify for this route. Retired 2.3
 archives are not resynchronized. Backup does not grant consumer admission or

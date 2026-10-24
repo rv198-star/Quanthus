@@ -1,0 +1,19 @@
+{
+  "schema_version": "quanthus.p3-risk-entry-veto-execution.v1",
+  "purpose_id": "p3-base24-retrospective-comparison-v1",
+  "experiment_id": "p3-risk-entry-veto-retrospective-v1",
+  "runtime_version": "p3-risk-entry-veto-retrospective-v1",
+  "accounting_version": "formal-p2-position-accounting-2.0.0",
+  "state": "EXECUTION_REQUIRES_REGISTERED_PURPOSE_SPECIFIC_ADMISSION",
+  "admitted_consumer_receipt_sha256": [
+    "sha256:5c0b79f1527749d6aef544e8aade99f0b032e37ef57e08282207dbe9ab1b7b40",
+    "sha256:30ccd77659e7afc1fbf0d536eaf9e1ece69582cb9c45c4a0bcc5a9d1a9100c69"
+  ],
+  "owner_authorization": "2026-10-24: 那就开始启动，完成1-3，完成后我会再让Astra Max做复审",
+  "original_request_replaced": false,
+  "original_B_accepted": false,
+  "original_D_activated": false,
+  "P6_mutation_authorized": false,
+  "production_authorized": false,
+  "fresh_pilot_authorized": false
+}

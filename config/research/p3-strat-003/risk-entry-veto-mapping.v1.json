@@ -1,0 +1,22 @@
+{
+  "schema_version": "quanthus.p3-risk-entry-veto-mapping.v1",
+  "policy_id": "research.p3-entry-veto-abstain-capped-held@0.1.0",
+  "variants": {
+    "TR": {
+      "entry_filter": true,
+      "entry_cap": true,
+      "held_risk": true
+    },
+    "TCH": {
+      "entry_filter": false,
+      "entry_cap": true,
+      "held_risk": true
+    }
+  },
+  "entry_cap": "0.20",
+  "held_target": "0.10",
+  "base_policy_and_held_policy": "unchanged",
+  "entry_reference": "same-context TC business decision and complete governance, only experiment token mapped",
+  "missing_RSI_volatility_guard": "required_fail_closed",
+  "accounting_version": "formal-p2-position-accounting-2.0.0"
+}

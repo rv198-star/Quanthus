@@ -215,10 +215,11 @@ def _preparation_closure(repository: Path) -> dict[str, str]:
         name = "config/research/p3-strat-003/" + filename
         policy = native._json(repository / name)
         closure[name] = digest_value({**policy, "admitted_consumer_receipt_sha256": []})
-    component_name = "config/research/p3-strat-003/risk-components-execution.v1.json"
-    if (repository / component_name).is_file():
-        policy = native._json(repository / component_name)
-        closure[component_name] = digest_value({**policy, "admitted_consumer_receipt_sha256": []})
+    for filename in ("risk-components-execution.v1.json", "risk-entry-veto-execution.v1.json"):
+        name = "config/research/p3-strat-003/" + filename
+        if (repository / name).is_file():
+            policy = native._json(repository / name)
+            closure[name] = digest_value({**policy, "admitted_consumer_receipt_sha256": []})
     return closure
 
 

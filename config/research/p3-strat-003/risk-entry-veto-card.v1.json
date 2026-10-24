@@ -1,0 +1,12 @@
+{
+  "schema_version": "quanthus.p3-risk-entry-veto-card.v1",
+  "research_id": "candidate.p4-trend-capped-held-research@0.1.0",
+  "reference_card": {
+    "path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+    "sha256": "sha256:7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664"
+  },
+  "mapping_path": "config/research/p3-strat-003/risk-entry-veto-mapping.v1.json",
+  "mode": "EXPLORATORY_RETROSPECTIVE_ONLY",
+  "registered_production_candidate": false,
+  "production_authorized": false
+}

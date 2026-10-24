@@ -320,3 +320,36 @@ sealed requests and historical acceptances retain their existing gates.
 Remove the strategy version from the admitted registry and preserve all cards, Runs, decisions,
 and adapter manifests. Candidate replay and the accepted P3 fixture remain available. A failed
 expert or topology is retired or superseded by a new version; it is never repaired in place.
+
+
+### Single-successor Stage A execution (2026-10-24)
+
+Design status: approved for the Owner-activated retrospective Stage A only.
+Delivery gate: open; exact task evidence belongs to the current work-item checkpoint.
+The frozen proposal remains historical. The new `risk-entry-veto.v1.json` request,
+card, mapping and initially empty `risk-entry-veto-execution.v1.json` registry
+separate TR/TCH from the accepted five-cell diagnosis. The reference TR executes
+and reproduces all retained business anchors before TCH starts in each role.
+TCH composes the existing fixed 20% unit entry cap with unchanged full held risk
+and accounting-v2; it abstains only from the heuristic strategy entry veto.
+A same-context pure-policy comparison to TC checks complete entry decisions and
+governance, without another portfolio replay. All system/PIT/missing-data guards,
+base exits, candidate order and common complete-case mask remain in force.
+
+The two roles each own one physical immutable preparation and one session index
+shared by their TR/TCH consumers. Previously independently built own-role inputs
+may be reused with exact accepted provenance, fresh byte hashes, producer/code/
+policy/scope/universe closure and snapshot-only index mapping verified by inverse
+whole-content digests. Cold never consumes primary TMP. Kernel filesystem and
+network denial, complete cash-flow reconciliation and exact decision identity
+mapping remain mandatory. This does not assert historical PIT or newly rebuilt
+features. Only the new registry's append-only receipt list is normalized out of
+its own code-closure hash; every other activation field remains bound.
+
+The one analysis is TCH−TR: 22-session paired blocks, 2,000 fixed-seed resamples,
+descriptive unadjusted 95% percentile intervals, full-window points retaining the
+incomplete tail. The proposal's 1-percentage-point resource screen yields either
+close/inconclusive or at most a reason to prioritize a separately authorized fresh
+pilot. No strategy is accepted or promoted. Capacity is checked before writes with
+actual device, bytes, file counts, inode reserve and retained job remnants; no
+old/source cleanup or full real-input corruption copy is part of this experiment.

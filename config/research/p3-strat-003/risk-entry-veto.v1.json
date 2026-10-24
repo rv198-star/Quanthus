@@ -1,0 +1,113 @@
+{
+  "schema_version": "quanthus.p3-risk-entry-veto.v1",
+  "experiment_id": "p3-risk-entry-veto-retrospective-v1",
+  "proposal_sha256": "sha256:c4e6debcae3f90562541d9961b81058b50db9468333408dc5de72b50323eab21",
+  "owner_authorization": "2026-10-24: 那就开始启动，完成1-3，完成后我会再让Astra Max做复审",
+  "scope": [
+    "2025-01-01",
+    "2026-09-17",
+    "2026-09-18"
+  ],
+  "information_cutoff": "2026-10-23T11:21:45.250143+00:00",
+  "already_observed_window": true,
+  "variants": {
+    "TR": {
+      "entry_filter": true,
+      "entry_cap": true,
+      "held_risk": true
+    },
+    "TCH": {
+      "entry_filter": false,
+      "entry_cap": true,
+      "held_risk": true
+    }
+  },
+  "execution_order": [
+    "TR",
+    "TCH"
+  ],
+  "roles": [
+    "primary",
+    "independent_cold_reproduction"
+  ],
+  "contrast": {
+    "TCH": 1,
+    "TR": -1
+  },
+  "card_sha256": "sha256:6858e28f8565b2b991b219c593bbb0b94d1048b00728cc0b51587976e31aeb52",
+  "mapping_sha256": "sha256:54e3c38621fb92181d4223d803c70e5d4f5c94b7fd5cabd05f2ab901be927f6d",
+  "original_request_sha256": "sha256:e1234e80857e012e2d125babba15fd4d0985cd0b38402d5737db0470d6be7c3b",
+  "strategy_card_sha256": "sha256:7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664",
+  "anchor_artifact_sha256": {
+    "TR": {
+      "equity.json": "sha256:7d40f438f599832c299e3d9dfd22e895a05f6613c1bc8decd1c9d6ac07dac85c",
+      "daily-returns.json": "sha256:202c3549240a3546b289b73bee68abdb9da46cc309e53b2f1af3e10121c03b39",
+      "final-ledgers.json": "sha256:a49ad6214d65ed6094b2a89e292c75cdb3340258f43f09e917314a2e2e1455cf"
+    }
+  },
+  "anchor_decision_sha256": {
+    "TR": "sha256:2cef07ff8ff51b6f8c8535ae2f2e5d58a0a490900b407b68e984d72c32d39167"
+  },
+  "anchor_snapshot_id": "p3-base24-retrospective-comparison-v1/28a3aede1da691a1799284bad37e2b628bc253a062c7d8001faaa0564a37aece",
+  "analysis": {
+    "primary_contrast": "TCH-TR",
+    "paired_block_sessions": 22,
+    "resamples": 2000,
+    "interval": "Descriptive unadjusted 95% percentile; fixed SHA256(new request semantic digest + ':TCH-TR') seed",
+    "trailing_dates": "Included in full-window points, excluded only from incomplete-block resampling and listed explicitly",
+    "report_all": [
+      "net_total_return",
+      "maximum_drawdown",
+      "average_invested_capital",
+      "turnover",
+      "fees",
+      "entry_decisions",
+      "filled_entries",
+      "held_decisions",
+      "filled_reductions",
+      "filled_full_exits",
+      "unfilled_orders",
+      "missing_or_unavailable",
+      "year_slices"
+    ],
+    "inference": "A registered complete-policy intervention at fixed cap/held rules; no claim of exposure-matched alpha or fixed component responsibility"
+  },
+  "business_screen": {
+    "source": "Reuse the original 1-percentage-point business scale; it is not derived from Step2 points",
+    "return_route": {
+      "minimum_net_return_delta": "0.01",
+      "maximum_drawdown_worsening": "0.01"
+    },
+    "drawdown_route": {
+      "minimum_drawdown_improvement": "0.01",
+      "maximum_net_return_deficit": "0.01"
+    },
+    "intervals_must_be_reported": true,
+    "pass_meaning": "At most prioritize an independently authorized fresh pilot; never accept a strategy from the exposed window",
+    "otherwise": "Close the successor attempt as no material justification or inconclusive; no new cells, threshold search or window change"
+  },
+  "budget": {
+    "implementation_active_agent_hours": 6,
+    "implementation_overrun_exit": "Stop with a concrete deferred design/implementation finding; no new generic platform or automatic budget increase",
+    "new_research_cells": 1,
+    "roles": 2,
+    "replays_per_role": 2,
+    "runtime_seconds_per_role_including_recovery": 3600,
+    "unseen_result_environment_recoveries_per_role": 1,
+    "post_result_rule_or_input_recoveries": 0,
+    "rss_bytes_per_role": 4294967296,
+    "new_job_logical_bytes": 4294967296,
+    "minimum_free_bytes": 8589934592,
+    "budget_is_permission": false
+  },
+  "prerequisite_reuse": "Each role reuses only its own previously independently built accepted preparation/index under fresh complete physical hashes and unchanged producer proof; no primary materialization used by cold role. Not a generic cache.",
+  "original_request_replaced": false,
+  "original_B_accepted": false,
+  "original_D_activated": false,
+  "historical_availability_claim": false,
+  "P6_mutation_authorized": false,
+  "production_authorized": false,
+  "fresh_pilot_authorized": false,
+  "parameter_search": false,
+  "source_collection_authorized": false
+}

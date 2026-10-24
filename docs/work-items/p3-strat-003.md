@@ -114,6 +114,20 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**Single-successor Stage A activated, 2026-10-24 (latest):** the Owner explicitly
+instructed “那就开始启动，完成1-3，完成后我会再让Astra Max做复审”. This supersedes the
+proposal's then-unstarted execution status only for the exact exposed-window Stage A.
+`risk-entry-veto.v1.json`, its separate card/mapping and exact execution registry
+own the new TR/TCH namespace. The sealed five-cell request/registry, strict B/D,
+P6 and production remain unchanged. Implementation, two-role replay and fixed
+analysis/delivery are the three current tasks. Each role may physically reuse only
+its own previously independently constructed preparation and session index under
+fresh complete hashes and an unchanged-producer proof; this is bounded experiment
+reuse, not a general cache or a claim of newly recomputed features. No fresh pilot
+or source collection is authorized. Current job:
+`/srv/agentdock/.codex/p3-risk-entry-veto-20261024T061738Z-34d19dc`.
+
+
 **Successor review step 3 completed, 2026-10-24 Asia/Shanghai (latest):**
 the Owner authorized Sol 6.1 Max first, with Astra only if the result is inadequate.
 The bounded decision proposes TCH (entry heuristic veto off, 20% unit cap and full

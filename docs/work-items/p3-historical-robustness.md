@@ -90,16 +90,30 @@ that event. Existing-title triage finds nearby rights titles for 25 of the 320
 possible-post-candidate reference-reset keys, which is only a source-recovery
 lead. Titles alone do not establish ratios, cash, credit dates or eligibility.
 
-The three official bodies were not found by exact-ID filename selection in the
-current ODS manifest or authorized retention index. A bounded supplement request
-is ready in the new job's `evidence/three-notice-supplement-request.safe.json`:
-three documents, at most 12 requests / 16 MiB / 30 minutes. New collection remains
-separate from existing-file authority. P2 currently models cash dividends and
-free bonus shares, not optional paid subscriptions. Even a recovered document
-cannot authorize pretending rights are free bonus shares, automatic subscription,
-backdated knowledge, or an unreviewed consumer policy. Preserve the frozen
-experiment; return a distinct exact qualified handoff only after these actual
-dependencies are resolved. Until then do not restart a known-failing full replay.
+The three official bodies were not found by the earlier exact-ID inventory lookup;
+that selected-inventory result remains historical evidence. The Owner subsequently
+approved their bounded acquisition, now complete in nine requests / 749,304 bytes.
+The official bodies prove the record/subscription/ex-right/listing dates, paid
+subscription, waiver and actual capital counts. Historical publication and account
+credit instants remain unknown. The Owner then approved uniform non-subscription
+for all three arms in a distinct retrospective successor. The additive
+`optional-rights-waive.v1.json` and `p3_optional_rights.py` record that choice without
+inventing a zero-value P2 dividend/bonus action, subscription fill or compensation.
+
+A second approved supplement acquired the historical SZSE rule and its official
+successor (two documents / 590,197 bytes; two searches and two direct document
+requests). Clauses 4.4.2/4.4.3, 3.3.13/3.3.16 and 5.2.3 establish the actual-ratio
+reference, A-share tick, final-limit rounding and ex-right baseline. P10's
+`p10_rights_issue_source.py` and `p10_rights_issue_reference.py` verify the local
+hash/quote/clock closure and derive with rational arithmetic. No unproved rounding
+of the intermediate reference is introduced. Its one-key product manifest is
+`ef3412d5f5bfb1148a3b2b524b6f2ae5ec89e05b813d79b7bbb0485c4fa748b0`;
+the unchanged observed open/high/low/close all fit the resulting bounds. Preserve
+the exact before-image identities, original source bytes and actual new cutoff
+`2026-10-24T13:13:38.139930Z`. This qualifies one derived reference, not the other
+13,230 diagnostic keys or full P3 use. A distinct exact consumer/source successor
+must bind this product and policy before any new replay; the original frozen
+request and its failure remain immutable.
 
 | Step | Actual disposition |
 | --- | --- |

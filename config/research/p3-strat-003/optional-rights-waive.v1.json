@@ -1,0 +1,18 @@
+{
+  "schema_version": "p3-retrospective-optional-rights-waive-v1",
+  "authority": "Owner explicit choice 2026-10-24: uniformly do not subscribe, retain actual ex-right dilution",
+  "scope": "Separate retrospective development successor only",
+  "arms": ["B", "T", "TCH"],
+  "decision_dates": ["2012-01-04", "2021-12-30"],
+  "execution_through": "2021-12-31",
+  "optional_paid_rights": "DO_NOT_SUBSCRIBE",
+  "subscription_cash_debit": false,
+  "subscription_share_credit": false,
+  "assumed_rights_sale": false,
+  "dilution_compensation": false,
+  "retain_actual_observed_old_share_mark": true,
+  "all_source_and_execution_guards_retained": true,
+  "strict_historical_PIT_admission": false,
+  "production_authorized": false,
+  "P6_mutation_authorized": false
+}

@@ -165,10 +165,13 @@ class DayPanel(BaselineFeaturePanel):
                 "threads": "2",
                 "max_temp_directory_size": "6GB",
                 "temp_directory": self._spill.name,
-                "TimeZone": "UTC",
             }
         )
         try:
+            # Configure the timezone after initialization: DuckDB's startup
+            # setting otherwise attempts ICU autoload without a user home in
+            # the deliberately sanitized, offline replay environment.
+            self._connection.execute("SET timezone='UTC'")
             self._connection.execute(
                 "CREATE TABLE feature_panel AS SELECT * FROM read_parquet("
                 + _sql_string(str(self.path))

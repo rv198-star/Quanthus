@@ -1,6 +1,9 @@
 """The historical experiment keeps frozen policies and truthful late clocks."""
 
 import json
+import os
+import subprocess
+import sys
 from dataclasses import replace
 from datetime import date, datetime
 from decimal import Decimal
@@ -19,6 +22,40 @@ from quanthus.expert_strategy.registry import ExpertStrategyRegistry
 from quanthus.expert_strategy.runner import FormalStrategyRunner
 from tests.unit.test_formal_expert_strategy import EVENT_ID, _context, _held_facts
 from tests.unit.test_p3_retrospective_bridge import ROOT
+
+
+def test_day_panel_initializes_utc_in_sanitized_offline_process(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    path = tmp_path / "minimal.parquet"
+    pq.write_table(
+        pa.table({"market_date": [date(2012, 1, 4)], "security_id": ["synthetic"]}), path
+    )
+    script = """
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+from quanthus.expert_strategy.p3_historical_robustness import DayPanel
+with DayPanel(Path(sys.argv[1]), SimpleNamespace()) as panel:
+    assert panel._connection.execute("SELECT current_setting('TimeZone')").fetchone() == ('UTC',)
+    assert panel._connection.execute('SELECT count(*) FROM feature_panel').fetchone() == (1,)
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script, str(path)],
+        cwd=ROOT,
+        env={
+            "PATH": os.environ["PATH"],
+            "PYTHONPATH": str(ROOT / "src"),
+            "PYTHONNOUSERSITE": "1",
+            "TZ": "UTC",
+            "TMPDIR": str(tmp_path),
+        },
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_current_request_has_exact_ten_years_and_no_new_authority():

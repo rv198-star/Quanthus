@@ -1,0 +1,184 @@
+{
+  "schema_version": "quanthus.p3-risk-successor-proposal.v1",
+  "proposal_id": "p3-risk-entry-veto-successor-proposal-v1",
+  "work_item": "P3-STRAT-003",
+  "owner_scope": "2026-10-24: complete step 3 with Sol 6.1 Max; Astra fallback only if the judgment is inadequate",
+  "state": "PROPOSAL_ONLY_NO_EXECUTION_ADMISSION",
+  "decision": "NARROW_WITH_ONE_NEW_RESEARCH_VERSION",
+  "accepted_strategy_selected": false,
+  "original_headline": "TR-B still fails the frozen supported-increment rule; retrospective execution is valid but does not establish deployable value",
+  "baseline_commit": "08bbd4464f0bff40c8e0c6cc482a132c6ef175b2",
+  "frozen_bindings": {
+    "original_request": {
+      "path": "config/research/p3-strat-003/request.v1.json",
+      "sha256": "sha256:e1234e80857e012e2d125babba15fd4d0985cd0b38402d5737db0470d6be7c3b"
+    },
+    "original_card": {
+      "path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+      "sha256": "sha256:7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664"
+    },
+    "step2_acceptance_sha256": "sha256:5aa34be080b553ce0ed5a09bf82d9084f70e1e66dfc6618ede6014577a2bebfa",
+    "step2_analysis_sha256": "sha256:2a85453e06c0e3af84ed3e70e591493c03f1224d300bc40ef0b16eaf2e004647",
+    "step2_code_config_digest": "sha256:6d39ca2a77144837b8993234a11dc710e455a977beb849557471720af7c259da",
+    "step2_request_digest": "sha256:c7cda8a782c6ee3f7074b68e963f67142d31055b1bd973428959c89313e51281",
+    "step2_export": "/srv/agentdock/AgentDock/base22-review-afe2526/p3-risk-components-step2-20261023T221208Z-08bbd44"
+  },
+  "single_successor_question": "With the existing 20% unit-scoped entry cap and full held-risk policy fixed, does removing only the strategy-level entry veto improve the complete portfolio return/drawdown tradeoff relative to TR?",
+  "proposed_candidate": {
+    "research_id": "candidate.p4-trend-capped-held-research@0.1.0",
+    "cell": "TCH",
+    "effects": {"entry_filter": false, "entry_cap": true, "held_risk": true},
+    "reference_cell": "TR",
+    "reference_effects": {"entry_filter": true, "entry_cap": true, "held_risk": true},
+    "primary_contrast": {"TCH": 1, "TR": -1},
+    "only_policy_change": "Abstain from the position-risk STRATEGY BLOCK_NEW for threshold exceedance; preserve its feature requirements and the 20% constraint",
+    "unit_entry_cap": "0.20",
+    "unit_held_reduction_target": "0.10",
+    "held_policy": "Exact existing policy, including at most one strategy reduction per new position and the conjunctive extreme exit; corrected P2 accounting-v2",
+    "registry_admitted": false,
+    "published_card": false
+  },
+  "invariants": [
+    "Identical P4 candidate generator, Trend scoring, ordering and common complete-case mask",
+    "RSI14 and volatility20 remain required even when the heuristic strategy veto abstains",
+    "Missing, invalid, ambiguous or PIT-unavailable input blocks new entries; it does not force an existing position sale",
+    "All system vetoes, tradability, funding, concentration, Decimal and source lineage remain active",
+    "The 20% unit entry constraint applies to every eligible candidate, including values beyond the old heuristic thresholds",
+    "Unchanged full held policy, base exits, corrected cash/dividend/reduction-count accounting, P2 costs and matching",
+    "T close decision and first eligible T+1 open execution; no intraday or email fill inference",
+    "Exact acquisition/publication/effective/knowledge timestamps and 4173 unavailable semantics remain unchanged"
+  ],
+  "why_this_question": [
+    "Step2 did not identify the entry filter effect with held risk active at the same 20% cap",
+    "This adds one previously unmeasured cell; it does not pick the highest-return observed cell",
+    "Keeping cap and held risk avoids combining rule removals or changing TH's 30%-to-10% intervention amplitude",
+    "Actual average exposure, cash use and timing may still differ; these are policy-path effects to report, not equal-risk alpha ownership"
+  ],
+  "not_selected": {
+    "promote_T_TC_or_TH": "Already observed diagnostics and different risk/capital paths do not qualify a winner",
+    "retune_RSI_or_volatility": "No threshold search; only a complete, explicit removal of one policy effect is proposed",
+    "repeat_five_cells": "Accepted unchanged evidence is reused; repeating it does not resolve the missing conditional contrast",
+    "add_experts_or_exposure_matching_platform": "No demonstrated beneficiary justifies a broader research/platform programme"
+  },
+  "validation_stages": {
+    "A_exposed_window_mechanism": {
+      "state": "NOT_STARTED_REQUIRES_NEW_VERSION_AND_ACTIVATION",
+      "purpose": "One bounded exploratory mechanism test and engineering proof, never fresh confirmation",
+      "decision_scope": ["2025-01-01", "2026-09-17"],
+      "execution_end": "2026-09-18",
+      "information_cutoff": "2026-10-23T11:21:45.250143+00:00",
+      "already_observed_window": true,
+      "new_cells": ["TCH"],
+      "execution_order_per_role": ["TR", "TCH"],
+      "roles": ["primary", "independent_cold_reproduction"],
+      "before_first_new_result": [
+        "Separate versioned request, policy mapping, candidate/card binding and runtime namespace; never append TCH to Step2",
+        "Exact input/producer/code/config/candidate/universe/policy/schema and 60-session warmup closure",
+        "Separate exact execution receipts for both roles and a newly recorded access decision",
+        "TR reproduces every retained business anchor before TCH starts",
+        "Synthetic negative tests for missing/PIT/system-veto/20%-cap/base-exit/held-accounting boundaries",
+        "Actual mount/device capacity and current job remnants included in a write-before budget",
+        "Freeze total/new file counts, maximum simultaneous live files and an inode safety reserve; measured available inodes must cover the worst-case new files plus that reserve before any write"
+      ],
+      "minimum_implementation": {
+        "runtime": "New p3_risk_entry_veto.py namespace composes existing FixedCapPolicy entry behavior with unchanged held/accounting-v2; the old five-cell runner remains sealed",
+        "admission": "New request/card/mapping/runtime IDs and an initially empty exact primary/cold execution registry; old receipt hashes cannot grant access",
+        "policy_anchor": "At every common input context TCH entry business fields must equal TC entry policy; this is a same-context pure policy check, not a third portfolio replay",
+        "synthetic_regressions": ["RSI/volatility threshold exceedance removes only STRATEGY BLOCK_NEW", "Missing/PIT/system veto still blocks", "20% unit cap including high-risk cases", "Held/base exits, dividend cash flows and new-position reduction counter preserved", "Wrong request/code/input/mask/role receipt denied", "Disposable corruption and native old-source/network denial"]
+      },
+      "materialization": "Each role owns one immutable prerequisite and one session index shared by its TR/TCH consumers; cold role uses its own independently constructed closure, never primary TMP",
+      "engineering_acceptance": [
+        "All decisions and complete portfolio cash/position/fee/dividend flows reconcile",
+        "Raw replay digests recomputed; exact recorded key/version/input identities match",
+        "Fresh cold process denies original-source access and network, then reproduces all business outputs under exact identity mappings",
+        "All original inputs and sealed Step2 files remain unchanged; negative corruption tests use only disposable copies"
+      ],
+      "analysis": {
+        "primary_contrast": "TCH-TR",
+        "paired_block_sessions": 22,
+        "resamples": 2000,
+        "interval": "Descriptive unadjusted 95% percentile; fixed SHA256(new request semantic digest + ':TCH-TR') seed",
+        "trailing_dates": "Included in full-window points, excluded only from incomplete-block resampling and listed explicitly",
+        "report_all": ["net_total_return", "maximum_drawdown", "average_invested_capital", "turnover", "fees", "entry_decisions", "filled_entries", "held_decisions", "filled_reductions", "filled_full_exits", "unfilled_orders", "missing_or_unavailable", "year_slices"],
+        "inference": "A registered complete-policy intervention at fixed cap/held rules; no claim of exposure-matched alpha or fixed component responsibility"
+      },
+      "business_screen": {
+        "source": "Reuse the original 1-percentage-point business scale; it is not derived from Step2 points",
+        "return_route": {"minimum_net_return_delta": "0.01", "maximum_drawdown_worsening": "0.01"},
+        "drawdown_route": {"minimum_drawdown_improvement": "0.01", "maximum_net_return_deficit": "0.01"},
+        "intervals_must_be_reported": true,
+        "pass_meaning": "At most prioritize an independently authorized fresh pilot; never accept a strategy from the exposed window",
+        "otherwise": "Close the successor attempt as no material justification or inconclusive; no new cells, threshold search or window change"
+      },
+      "budget": {
+        "implementation_active_agent_hours": 6,
+        "implementation_overrun_exit": "Stop with a concrete deferred design/implementation finding; no new generic platform or automatic budget increase",
+        "new_research_cells": 1,
+        "roles": 2,
+        "replays_per_role": 2,
+        "runtime_seconds_per_role_including_recovery": 3600,
+        "unseen_result_environment_recoveries_per_role": 1,
+        "post_result_rule_or_input_recoveries": 0,
+        "rss_bytes_per_role": 4294967296,
+        "new_job_logical_bytes": 4294967296,
+        "minimum_free_bytes": 8589934592,
+        "budget_is_permission": false
+      },
+      "stop": ["Identity, timestamp, input, mask, guardian or accounting drift", "TR anchor mismatch before TCH", "Budget exhausted", "Cold reproduction or independent cash-flow failure", "Only a changed threshold/window/additional cell could produce the desired conclusion"]
+    },
+    "B_fresh_evidence_pilot": {
+      "state": "NOT_QUALIFIED_NOT_STARTED",
+      "purpose": "Finite prospective feasibility/descriptive evidence, not a pre-approved confirmatory or production experiment",
+      "entry_gate": [
+        "Stage A yields a business reason to continue, with all negative and interval evidence retained",
+        "Owner separately activates one frozen new request/card/input/consumer version and budget before results",
+        "Exposure ledger proves no earlier results were used; later calendar dates alone do not establish freshness",
+        "Exact listing/calendar/field-level historical availability and required corporate-action/state support meet the intended consumer gate",
+        "First decision is strictly after the frozen activation time; actual dates resolved once from the authoritative calendar",
+        "Both arms share a preregistered complete-case mask, same cold-capable reader and P2 semantics; no P6 infrastructure or ledger is reused"
+      ],
+      "window_rule": "First 66 scheduled decision sessions after activation, plus the one next-open execution boundary; end date fixed once before any result access",
+      "maximum_decision_sessions": 66,
+      "maximum_22_session_blocks": 3,
+      "missing_session_rule": "Keep scheduled sessions in the denominator; block new entries and disclose missing data; never skip or extend the horizon to replace them",
+      "historical_context": "Warmup is input-only and must be qualified; historical industry/static-source limitations are disclosed and never relabeled PIT",
+      "review": "One end-of-window economic review; interim access limited to input/engine integrity without performance selection",
+      "power": "Three blocks are not claimed adequate for confirmatory power; report descriptive points and uncertainty/insufficiency",
+      "budget": {
+        "qualification_active_agent_hours": 2,
+        "qualification_calendar_day_cap": 14,
+        "qualification_expiry_exit": "DATA_UNAVAILABLE_FOR_PILOT; no implicit P10 delivery promise or automatic investigation extension",
+        "per_decision_admission_seconds": 120,
+        "final_runtime_seconds_per_role": 3600,
+        "total_worker_seconds_including_prerequisites_checks_recovery": 18000,
+        "rss_bytes_per_role": 4294967296,
+        "maximum_new_retained_bytes": 8589934592,
+        "minimum_free_bytes": 8589934592,
+        "scope": "Incremental successor consumer work, not permission to modify or start P10 acquisition or P6 jobs",
+        "capacity_proven": false
+      },
+      "budget_rule": "These are proposed ceilings, not measurements or authority. Bind per-day and final cold-run actual input/output bytes, total/new file counts, maximum simultaneous live files, inode safety reserve, runtime, disk and device before activation; available inodes must cover worst-case new files plus the frozen reserve; the cumulative cap applies even when separate stage maxima cannot all be used; no blanket migration or resource authorization",
+      "hard_exit": "At 66 sessions close as engineering-valid descriptive, data-limited or inconclusive; no automatic extension, promotion or demand for a positive result",
+      "confirmatory_followup": "Any longer confirmatory study requires its own effect/power rationale, non-exposed scope, exact data authority, cost cap and activation"
+    }
+  },
+  "current_authority": {
+    "decision_and_plan_completed_in_step3": true,
+    "new_result_bearing_execution_authorized": false,
+    "new_market_row_access_authorized": false,
+    "new_source_collection_authorized": false,
+    "original_strict_B_accepted": false,
+    "original_strict_D_activated": false,
+    "historical_PIT_qualified": false,
+    "P6_mutation_authorized": false,
+    "production_authorized": false,
+    "original_request_replaced": false,
+    "step2_registry_extended": false,
+    "github_write_authorized": false
+  },
+  "astra_fallback": {
+    "activated": false,
+    "trigger": "Unresolved evidence/semantic contradiction or an independent review rejection after one finite Sol correction within this single-question scope; at most one bounded read-only Astra review",
+    "not_a_trigger": "Negative, inconclusive or unprofitable evidence; these are valid outcomes and do not justify model shopping"
+  }
+}

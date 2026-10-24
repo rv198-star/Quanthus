@@ -114,7 +114,37 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**Fixed component experiment step 2 completed, 2026-10-24 Asia/Shanghai (latest):**
+**Successor review step 3 completed, 2026-10-24 Asia/Shanghai (latest):**
+the Owner authorized Sol 6.1 Max first, with Astra only if the result is inadequate.
+The bounded decision proposes TCH (entry heuristic veto off, 20% unit cap and full
+held risk on) against TR, without selecting an accepted strategy or running new results.
+The versioned `risk-successor-proposal.v1.json` under the research config directory
+records the exact source bindings, business screen, two finite stages and denied
+execution authority. The [governing proposal](../design/lld/04-experts-aggregator/expert-strategy-layer/first-formal-topology.md#single-successor-proposal-2026-10-24)
+owns details. Only one unmeasured conditional effect is proposed; no new cells are
+added to step 2 and no threshold is tuned. Contract checks explicitly reject using
+this proposal or TCH in the sealed five-cell runner.
+
+The existing TR−B supported-increment rule remains unmet. The higher observed T
+return does not qualify a replacement; the two held-policy contrasts have opposite
+signs and are conditional on entry rules. Stage A would be an exposed-window
+mechanism/engineering experiment in a separate namespace, not fresh confirmation.
+Stage B would be a separately activated, PIT-qualified 66-session descriptive
+feasibility pilot. No fresh interval is currently qualified; later dates alone do
+not prove freshness. This step finishes the decision/plan and does not wait for that
+future pilot, rewrite original strict B/D or mutate P6/production.
+
+Current work/evidence root:
+`/srv/agentdock/.codex/p3-successor-step3-20261024T050704Z-08bbd44/`.
+All three decision/diagnosis steps are complete. A separate Sol 6.1 Max read-only
+review passed the exact proposal; a finite clarification added file-count/inode
+headroom to both future write-before gates. No Astra fallback was needed. Neither
+future stage is admitted, and no result-bearing successor execution has started.
+The four new contract cases passed independently and the focused combined checks
+passed 58 cases. Full repository checks and their unchanged-baseline comparison
+are recorded in this job's `checks.json`; no global-green claim is made.
+
+**Fixed component experiment step 2 completed, 2026-10-24 Asia/Shanghai (prior):**
 the Owner authorized step 2 after completing step 1. The frozen five-cell design
 and separate admission registry are `risk-components.v1.json` and
 `risk-components-execution.v1.json` under the same research config directory.

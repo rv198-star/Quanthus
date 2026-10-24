@@ -235,6 +235,86 @@ The exposed window and actual information cutoff remain unchanged. The original
 factorial, strict B/D, production and P6 gates remain frozen; successor strategy
 selection and fresh/forward validation belong to step 3.
 
+### Single successor proposal, 2026-10-24
+
+Design status: draft for future execution. Delivery gate: accepted for the Owner-authorized
+step-3 decision and plan only. Independent review of the exact proposal is recorded in
+`/srv/agentdock/.codex/p3-successor-step3-20261024T050704Z-08bbd44/evidence/independent-final-review.safe.json`.
+The versioned proposal is
+`config/research/p3-strat-003/risk-successor-proposal.v1.json`; it is not an executable
+request, strategy card, registry admission or modification of the frozen five-cell design.
+
+The selected disposition is `NARROW_WITH_ONE_NEW_RESEARCH_VERSION`: propose one TCH
+cell (filter off, 20% unit cap on, full held risk on) against TR. The sole question is
+whether removing the strategy-level threshold entry veto improves the complete
+return/drawdown tradeoff when both cap and held policy stay fixed. No observed T,
+TC or TH is promoted. The original TR−B supported-increment rule still does not pass.
+
+Step 2 identifies neither this conditional filter effect nor a universal component
+responsibility. The original-entry held return difference was −12.694886 percentage
+points, while the full-entry held difference was +2.901686 points. TCH fills one
+unmeasured conditional comparison without changing the 30%-to-10% intervention
+amplitude as TH did. Actual cash use and average exposure may still change; the
+result would include those policy-path effects, not exposure-matched alpha ownership.
+
+Both arms keep the identical candidate universe/order and complete-case mask,
+including RSI/volatility availability even when their heuristic veto abstains.
+Only the risk expert's strategy `BLOCK_NEW` on threshold exceedance is removed.
+Missing/invalid/PIT-unavailable data, system vetoes, tradability, funding,
+concentration, the unconditional 20% unit entry constraint, base exits, the full
+held policy and corrected P2 accounting stay active. Held reduction still targets
+an absolute 10% of the unit, at most once per new position, with the existing extreme
+exit preserved. No thresholds, costs, target definitions or guardians are tuned.
+
+The implementation boundary is one separate request/card/mapping/runtime version
+and exact two-role admission registry. A minimal new runner may compose the existing
+cap-only entry behavior with unchanged held management. TCH's pure entry policy
+must match TC at every common input context; a third TC portfolio run is unnecessary.
+The old runner must continue rejecting a sixth cell and a successor proposal used
+as its request. These boundaries are covered by
+`tests/contract/test_p3_risk_successor_proposal.py`. No successor executor is built
+or activated in step 3.
+
+The proposal has two finite, separately activated stages:
+
+| Stage | Exact scope and acceptance | Hard bound and exit |
+| --- | --- | --- |
+| A: exposed-window mechanism | Reuse the exact 2025-01-01…2026-09-17 decisions, execution through 2026-09-18, and actual 2026-10-23T11:21:45.250143+00:00 information cutoff under a new namespace. TR must first reproduce all retained business anchors. Each of primary/cold then runs only TR/TCH, with one own immutable prerequisite/index per role; the cold process denies source/network access and independently reconciles all cash/position flows. | At most 6 active agent-hours for implementation, 3,600 cumulative execution seconds and 4 GiB RSS per role, one pre-result environment recovery per role, 4 GiB new-job logical bytes and at least 8 GiB free. All bytes include failed attempts. An actual device/write-before budget must prove these jointly feasible before execution. Failure or overrun closes with evidence, without adding cells or a generic platform. |
+| B: fresh feasibility pilot | Only after separate Owner activation, exact unexposed-result ledger and field-level PIT qualification. Freeze the first 66 scheduled decision sessions after activation and their next-open execution boundary, once from the authoritative calendar before results. | At most 66 decision sessions / three 22-session blocks and one economic end review. Missing sessions remain in the denominator and block new entries. No replacement dates, automatic extension, confirmatory claim or promotion. Actual per-day/final cold costs must be bound before activation. |
+
+Stage A retains the original one-percentage-point business scale solely as a
+resource screen: return improves by at least one point with drawdown worsening
+by at most one point, or drawdown improves by at least one point with return
+deficit at most one point. Report the full fixed TCH−TR paired 22-session,
+2,000-resample descriptive interval regardless of the point screen. Failure closes
+this proposed attempt as no material justification or inconclusive; passing can
+only prioritize a separately authorized fresh pilot. It never accepts the candidate
+on the exposed window. Year slices, costs, exposure, fills/unfilled decisions and
+all missingness remain diagnostic and fully reported.
+
+No immediately usable fresh interval has been qualified in this review. Dates after
+2026-09-18 are not automatically untouched or PIT-valid. Stage B must freeze an
+exposure ledger, actual timestamps, consumer scope and costs before its first result;
+unknown acquisition/knowledge stays unknown, the 4,173 unavailable semantics remain
+fail-closed, and the static industry snapshot cannot be relabeled historical PIT.
+If that consumer cannot meet its input gate, stop only that pilot and route shared
+quality work to P10. Stage A may still close honestly as retrospective evidence.
+Fresh-input qualification is bounded to two active agent-hours and 14 calendar days;
+expiry closes as `DATA_UNAVAILABLE_FOR_PILOT` without an implicit P10 delivery promise.
+Proposed incremental consumer ceilings are 120 seconds per decision admission,
+3,600 seconds per final role, 18,000 worker-seconds in total including prerequisites,
+checks and recovery, 4 GiB RSS per role and 8 GiB new retained bytes while preserving
+8 GiB free. These are ceilings, not measured feasible capacity; the actual device,
+input bytes and maximum simultaneous live set still need qualification. If the
+cumulative cap is reached before a stage maximum, the cumulative cap wins.
+Both stages must freeze total/new file counts, the maximum simultaneous live file
+set and an inode safety reserve; measured available inodes on the actual device
+must cover worst-case new files plus that reserve before any write. Retained job
+outputs and failed remnants count toward both bytes and inodes.
+Three blocks do not establish confirmatory power; a longer study would need a
+separate effect/power rationale, bounded budget and activation. P6, production,
+sealed requests and historical acceptances retain their existing gates.
+
 ## 10. Rollback
 
 Remove the strategy version from the admitted registry and preserve all cards, Runs, decisions,

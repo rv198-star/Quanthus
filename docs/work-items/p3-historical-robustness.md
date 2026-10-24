@@ -115,6 +115,31 @@ the exact before-image identities, original source bytes and actual new cutoff
 must bind this product and policy before any new replay; the original frozen
 request and its failure remain immutable.
 
+### Exact optional-rights successor, 2026-10-24
+
+The qualified native input now exists, manifest
+`59e3cc21e00e56c087e3a8d1f2ff1c413fad8b1eaceb3caf3c4e93d1c9f740d7`.
+A bounded native rewrite and complete second scan verified 8,260,536 limit rows:
+one allowed key changed and every original value of the other 8,260,535 rows was
+preserved. Exact rational reference columns are canonical; the explicit four-place
+compatibility projection is not used to calculate limits. The original parent,
+issuer bodies, official rules and exact product are physically included. The
+ordinary frame reader clears the selected guard and retains all other 13,230
+unexplained keys. This is not a global quality pass or a legacy ADS/CURRENT input.
+
+`historical-rights-successor.v1.json` and `p3_historical_rights_successor.py` bind the
+distinct actual source and approved uniform waiver policy to the same scientific
+window, arms, rules and analysis. The original raw-candidate namespace is retained;
+the new source/clock/snapshot and all generated evidence identities are explicit.
+There is no claim that an updated source identity reproduces the old failed
+portfolio path. Both roles must freshly construct their own complete prerequisite;
+the independent role may not read original/primary source, features or caches.
+One immutable prerequisite serves all three arms inside each role. The original
+job's failures, spent time and 13:41:54 UTC deadline remain recorded and are not
+reset. The distinct policy/source successor has its own preregistered 2.5-hour
+role / 3-hour job ceiling. No arm result or comparison is accepted merely because
+this exact input revision and its engineering checks passed.
+
 | Step | Actual disposition |
 | --- | --- |
 | 1. Historical input assessment | Physical contracts and seven UTC logical fingerprints passed; continuous held-use qualification failed at the key below. Assessment is complete, qualification is not granted. |

@@ -90,7 +90,8 @@ def _read_reference(root: Path) -> dict[str, Any]:
             raise ValueError("RIGHTS_INPUT_REFERENCE_MEMBER")
     if {p.name for p in _files(root)} != declared:
         raise ValueError("RIGHTS_INPUT_REFERENCE_SET")
-    return json.loads((root / "derived-reference.json").read_bytes())
+    result: dict[str, Any] = json.loads((root / "derived-reference.json").read_bytes())
+    return result
 
 
 def _replacements(reference: dict[str, Any]) -> tuple[Fraction, dict[str, Any]]:
@@ -112,9 +113,9 @@ def _replacements(reference: dict[str, Any]) -> tuple[Fraction, dict[str, Any]]:
 
 def verify_limits(source: Path, target: Path, reference: dict[str, Any]) -> dict[str, int]:
     """Recompute the entire permitted difference, including a fully resealed copy."""
-    import pyarrow as pa
-    import pyarrow.compute as pc
-    import pyarrow.parquet as pq
+    import pyarrow as pa  # type: ignore[import-untyped]
+    import pyarrow.compute as pc  # type: ignore[import-untyped]
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
     original, output = pq.ParquetFile(source), pq.ParquetFile(target)
     expected_schema = original.schema_arrow

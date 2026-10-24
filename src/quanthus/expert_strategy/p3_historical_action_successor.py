@@ -705,7 +705,7 @@ def _scan_raw_candidates(
           AND(v.valid_to IS NULL OR b.date<=CAST(v.valid_to AS DATE))
         LEFT JOIN source_price_limit_execution_daily l
           ON l.security_id=b.security_id AND l.execution_date=b.date
-        WHERE b.date >= DATE '2011-01-04'"""
+        WHERE b.date BETWEEN DATE '2011-01-04' AND DATE '2021-12-31'"""
         + selection
         + " ORDER BY b.security_id,v.valid_from,b.date",
         [] if security_ids is None else list(security_ids),
@@ -984,7 +984,10 @@ def _execute_raw_shard(repository: Path, path: Path) -> None:
     )
     try:
         c.execute("SET timezone='UTC'")
-        _create_feature_source_views(c, paths, ids, scope_end=date(2021, 12, 31))
+        # The selected-security helper materializes every wide source table.
+        # Keep the original immutable source as lazy views; ownership filters
+        # apply to the actual bounded raw queries and narrow listing keys.
+        _create_feature_source_views(c, paths, None, scope_end=date(2021, 12, 31))
         for name in ("corporate_actions_normalized", "corporate_action_exceptions"):
             c.execute(f"CREATE VIEW source_{name}_mapped AS SELECT * FROM source_{name}")
         _validate_feature_sources(c)
@@ -998,7 +1001,11 @@ def _execute_raw_shard(repository: Path, path: Path) -> None:
         c.execute(
             "CREATE TEMP TABLE selected_universe_sessions AS SELECT security_id,market_date,"
             "row_number() OVER(PARTITION BY security_id ORDER BY market_date) "
-            "AS listing_sessions FROM source_daily_universe"
+            "AS listing_sessions FROM source_daily_universe "
+            "WHERE market_date<=DATE '2021-12-31' AND security_id IN ("
+            + ",".join("?" for _ in ids)
+            + ")",
+            list(ids),
         )
         mapping = SimpleNamespace(
             by_security_id={

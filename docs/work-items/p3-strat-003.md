@@ -114,6 +114,40 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**Latest actual execution, 2026-10-24 UTC:** the qualified `000901` input and
+uniform non-subscription policy are implemented. Execution code
+`d245410be3665f9e29c7bf58c45c16d6239f821d` also fixes two carried-sell interfaces
+and an unrelated-NULL failure in the day-wide feature reader. It borrows one
+already materialized table through an exact-key facade; no valid feature value
+or source byte is changed. B completed all 2,430 sessions in both independent
+roles. Six complete business artifacts agree after generated-ID normalization;
+independent accounting reconciles 538 position cycles, every portfolio close,
+fees and the bonus-adjusted pending sell.
+
+T then stopped at `300273 / 2012-05-31`, frame 95, with an existing unexplained
+price transition. A bounded diagnostic reproduced the exact key. Both existing
+ODS canonical action tables and the authorized Base 2.4 native action table
+have no rows for this security. The issue is registered as
+[P10-DATA-P3-HISTORY-ACTION-002 / #558](https://github.com/rv198-star/Quanthus/issues/558).
+T is incomplete, and formal TCH was not run. **The three-arm historical
+comparison, full acceptance and interpretation are incomplete.** Retain the
+qualified B artifact; do not rerun it merely as new progress, or reuse it after
+a source-closure change without proving semantic equivalence. All failed
+attempts and costs remain recorded. No source guard, original B/D gate, sealed
+request, P6 or production state was relaxed.
+
+Current evidence is under
+`/srv/agentdock/.codex/p3-held-source-continuation-20261024T122013Z-859e94b`:
+`evidence/B-completed-physical-accounting-validation.safe.json`,
+`evidence/T-input-gate-located.safe.json`, and
+`evidence/point-v3-checks-consolidated.safe.json`.
+The 205 focused tests pass. Actual `make check`: 3,912 passed, 128 failed,
+20 skipped; the failure set is unchanged. Exactly 100 scratch-floor failures
+pass on adequate data scratch. The other 28 are existing frozen DuckDB/BaoStock
+version mismatches; there is no single all-green full run. The earlier approved
+issuer/rule acquisition tranches are closed; new external acquisition requires
+its own bounded authority. Source-gap inventory is not repaired/qualified data.
+
 **P10 held-input continuation, 2026-10-24 (current):** the Owner separately
 authorized P10 #557 classification/qualification before returning to the same
 historical comparison. Work continues in

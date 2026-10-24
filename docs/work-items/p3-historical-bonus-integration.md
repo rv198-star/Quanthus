@@ -72,3 +72,22 @@ the original day reader (one day correctly exposed its unrelated NULL error).
 The native plan did **not** show Index Scan; measured bounded lookup is the
 performance evidence, not an optimizer/index guarantee. No price was filled or
 input byte changed. All earlier attempt costs and the original deadline remain.
+
+### Actual execution and remaining data gate
+
+At code `d245410be3665f9e29c7bf58c45c16d6239f821d`, both B roles completed
+2,430 sessions. Full business-graph parity, separate cash-flow/fee/daily-wealth
+reconciliation for 538 cycles and the actual action-adjusted pending sell pass.
+This closes the exercised engineering defects, not the three-arm comparison.
+T stops at `300273 / 2012-05-31` because an existing reference reset lacks a
+normalized action. Exact existing ODS and Base 2.4 native action lookups find
+no records for that security. P10 #558 owns source qualification; T remains
+incomplete and formal TCH remains not run. Keep all guards and failed evidence.
+
+The same frozen possible-exposure inventory has 320 reference-reset keys over
+238 securities: zero exact code/date matches in the retained canonical action
+table, 107 keys with another date present, and 213 keys whose security has no
+rows there. These are potential source gaps, not 320 actual held failures and
+not proof that raw prices are wrong. One more repaired key cannot guarantee a
+complete ten-year comparison. No price-derived share/cash terms or automatic
+cohort/date exclusion is allowed.

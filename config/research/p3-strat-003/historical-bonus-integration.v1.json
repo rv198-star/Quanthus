@@ -1,0 +1,20 @@
+{
+  "schema_version": "p3-historical-bonus-integration-v1",
+  "scientific_request_sha256": "sha256:29acd75ae20bf0fd3d427a033b3975865637292cecb0d564902c41997a1b3a02",
+  "source_manifest_sha256": "sha256:59e3cc21e00e56c087e3a8d1f2ff1c413fad8b1eaceb3caf3c4e93d1c9f740d7",
+  "code_sha256": "sha256:29cc2b43d80f2cdaf6553e98c147f5ea128769a2c2fe4c08095b7a36ec2688a6",
+  "scope": [
+    "2012-01-04",
+    "2021-12-30",
+    "2021-12-31"
+  ],
+  "rule": "EXISTING_P2_PROPORTIONAL_PENDING_SELL",
+  "preparation_sha256": "sha256:e15ab17698de4616ea0e11af7746f0e56c4134f8392557575fe7f5f817d2e570",
+  "feature_sha256": "sha256:29523b3a16dff12e722f35939063f9b0778e7216ea650668deb7e0b6711a2b5f",
+  "scientific_policy_changed": false,
+  "deadline_reset": false,
+  "production_authorized": false,
+  "deadline_UTC": "2026-10-24T16:50:56.003671+00:00",
+  "reuse": "Each role reuses only its own previously independently BUILT immutable feature/candidate prerequisite. No primary-to-cold materialization sharing. Execution supplement binds code separately; sealed preparation and scientific request stay byte-identical.",
+  "authority": "Owner continuation permits engineering closure; the existing P2 engine already adjusts pending sells proportionally and rejects fractional shares/proportions. No new discretionary action, share entitlement, cost or fill policy."
+}

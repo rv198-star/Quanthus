@@ -5,10 +5,10 @@
 | Parent | [P3-STRAT-003](p3-strat-003.md) |
 | Governing design | [Expert Strategy Layer](../design/lld/04-experts-aggregator/expert-strategy-layer.md) |
 | Design status | approved, bounded Owner continuation on 2026-10-24 |
-| Delivery gate | exact TCH held-input repair qualified; complete dual-role B/T/TCH successor running, full comparison not yet accepted |
+| Delivery gate | accepted for bounded retrospective execution/reproduction and interpretation; no strategy, strict B/D, PIT, P6 or production acceptance |
 | Purpose | `p3-historical-development-robustness-v1` |
-| Request | `config/research/p3-strat-003/historical-robustness.v1.json` |
-| Code / tests | `p3_historical_robustness.py` / `test_p3_historical_robustness.py` |
+| Request | original `config/research/p3-strat-003/historical-robustness.v1.json`; executed successor `historical-restructuring-successor.v1.json` |
+| Code / tests | `p3_restructuring_successor.py` / `test_p3_restructuring_successor.py`; original analysis kernel and regressions retained |
 
 The Owner requested existing historical validation before committing to a new
 66-session forward wait. This is a separate retrospective study on the already
@@ -20,10 +20,11 @@ bounded exceptions and do not rewrite that original request.
 
 The three steps are exact historical-input qualification, an outcome-blind frozen
 experiment, and execution plus independent cold reconstruction and interpretation.
-The exact portable manifest is `9d6af65970d496658946e8d5739a31c403c12cf70845cd7e16863e44293cd628`.
-Its actual information cutoff remains 2026-07-29, with no per-decision historical
-publication proof. Its 80 normalization exception intervals remain fail closed;
-static industry is used only for concentration. These are not new PIT data or a
+The original retained seed manifest is `9d6af65970d496658946e8d5739a31c403c12cf70845cd7e16863e44293cd628`.
+That seed and its 2026-07-29 information cutoff remain immutable, with no
+per-decision historical publication proof. Its original 80-interval ledger is
+retained; the exact source-qualified successor below disposes one non-beneficial
+exception and keeps the other 79 fail closed. Static industry is used only for concentration. These are not new PIT data or a
 fresh holdout. Preserve the original 4,173 unavailable factor-visibility cases.
 
 B has neither Trend entry selection nor strategic Position Risk. T adds Trend.
@@ -36,8 +37,10 @@ One immutable prefix-correct feature/candidate prerequisite serves all three arm
 inside each role. The first producer request's exact digest is retained as the
 population/ranking namespace after correcting a prose-only capital-count error;
 the final experiment binds that digest, the complete current source/config closure
-and the physical preparation hashes. The cold role rebuilds its own prerequisite
-from an independent physical source copy and must match it exactly. Neither an
+and the physical preparation hashes. The cold role has its own independently built historical prerequisite and
+physical source copy. Each successor independently rebuilds its complete affected
+patch and global candidate retention, with exact healthy-parent identity and
+complete before-image checks; it must match the primary result exactly. Neither an
 unknown producer nor a source-clock/PIT reinterpretation is admitted.
 
 Decisions run 2012-01-04 through 2021-12-30 with last execution 2021-12-31.
@@ -48,7 +51,7 @@ TCH−B and TCH−T. The inherited one-percentage-point descriptive screen and p
 22-session / 2,000-resample intervals cannot automatically select a strategy.
 The trailing incomplete block is omitted only from bootstrap, never point estimates.
 
-The observed-runtime resource revision was frozen before any arm result. It
+The original observed-runtime resource revision was frozen before any arm result. It
 permits the independent primary and cold roles in parallel on the measured
 eight-CPU node, with two DuckDB threads each, 4 GiB DuckDB, 8 GiB process RSS,
 10 GiB aggregate role RSS, 16 GiB new job output, 6 GiB role spill and an
@@ -70,48 +73,82 @@ An interrupted replay with unqualified held inputs is not a completed comparison
 
 ### Current execution checkpoint, 2026-10-25 CST
 
-P10 #561 exact 000792 source qualification is complete under the Owner's
-separate bounded approval. Three official notices establish that the 2020
-restructuring gives no capital-increase shares to ordinary shareholders and
-requires no ex-right adjustment. The 2021-08-10 resume session has no daily
-price limit; the next session resumes the normal 10% limit. These are observed
-source facts, not a new subscription or financial-policy choice. Acquisition
-is closed after eight requests, 880,232 bytes and three PDFs, with actual
-information cutoff `2026-10-25T08:51:06.934678+00:00`. Historical availability
-and actual shareholder-credit times remain unknown.
+**Complete retrospective comparison, all three steps delivered.** Source
+qualification, frozen experiment and execution/reproduction/interpretation are
+complete for the exposed 2012–2021 fixture. All B/T/TCH arms ran independently
+in primary and cold processes: 2,430 sessions each, six complete runs. No partial
+predecessor is spliced. The original strict B/D, historical PIT, P6 and production
+gates remain unchanged; a completed study does not accept a strategy.
 
-The qualified source SHA is
-`dc69d5fb83b74d8e4f9e669182fda12fe7633dc95bddda6ebfdd5e1337430445`.
-The small explicit-parent input SHA is
-`bb02e9695716d29683e78c9c497b87286743b35f087d06509eafe43985ee2ff8`:
-one exact non-beneficial exception is removed from the new effective view,
-all other 79 exceptions are retained, and only one of 8,260,536 limit rows is
-rewritten. The original exception ledger, OHLCV, state and 002606 reference
-repair remain intact. This composite is a role-local research input, not a
-portable ADS or a production Base publication.
+P10 #561's three official notices qualify the exact 000792 restructuring as
+non-beneficial to ordinary shareholders, without inventing an effective date,
+cash or bonus entitlement. The new source manifest is
+`dc69d5fb83b74d8e4f9e669182fda12fe7633dc95bddda6ebfdd5e1337430445`,
+with actual observation cutoff `2026-10-25T08:51:06.934678+00:00`.
+Eight requests, 880,232 bytes and three PDFs close this acquisition tranche.
+Historical availability and actual shareholder-credit dates remain unknown.
 
-`p3_restructuring_preparation.py` rebuilds complete 000792 coordinates over
-each role's own immutable prior feature/raw census. It writes only a small
-feature patch, proves the complete raw before-image and retains candidates
-once globally. Runtime combines the exact own parent and patch in one owned
-in-memory panel; it never uses the primary role's newly built prerequisites.
-113 focused tests and targeted lint, formatting and types pass. The frozen
-science, all three arms, no-subscription rule and genuine source guards stay
-unchanged. New request: `historical-restructuring-successor.v1.json`.
+The role-local composite input is
+`bb02e9695716d29683e78c9c497b87286743b35f087d06509eafe43985ee2ff8`.
+It removes only the exact non-beneficial exception from the new effective view
+and changes only the 2021-08-10 resume-session row among 8,260,536 limit rows.
+The next session retains its ordinary 10% limit. Original bars, states, ledgers,
+other 79 exceptions and the prior 002606 correction remain intact. Each role
+uses its own independently built immutable parent, writes a complete 2,675-row
+000792 patch, proves its raw before-image, and performs one global retention.
+The shared retained population is 22,955 candidates. This research composite is
+not a portable ADS or production Base publication.
 
-The conditional dual-role replay and complete six-run accounting/graph
-acceptance are next, not yet complete. One two-hour execution window starts
-only at the frozen launch; the whole approval ends October 25 at
-`11:46:49.439364 UTC`. Additional writes are capped at 1.5 GiB, aggregate spill
-and artifacts at 128 MiB each, with the existing 8 GiB free-space floor.
-No prior failure, source or cost is deleted or credited back.
+Execution commit: `8b28c3fb0c63dd37967c7a8b75660ed4adc46fce`.
+Request: `historical-restructuring-successor.v1.json`, digest
+`sha256:9fe18209a83f9f6a8ab8f7a884ff0c495e96c8249e179c09d0d3660c2b8a3992`.
+The frozen science, rights non-subscription, costs, windows and guards are unchanged.
 
-The preceding #560 run completed B and T over all 2,430 sessions in both
-roles. Its separate B/T graph, accounting, original-byte and kernel cold
-checks pass (`suspended-action-B-T-partial-acceptance-v1.safe.json`). TCH
-blocked at frame 1,997 on the newly authorized 000792 source gap. Those four
-runs are partial evidence; no incomplete TCH result is spliced and no full
-comparison or strict original B/D, PIT, P6 or production acceptance is claimed.
+The completed six-run payload is 148,335,398 bytes and triggered the original
+128 MiB artifact cap. That failure remains immutable. The Owner then explicitly
+approved 160 MiB solely to admit and validate these existing outputs; there was
+no rerun, collection, file rewrite or deadline reset. The original execution
+interval remains October 25, `09:09:28.433183–11:09:28.433183 UTC`; the whole
+tranche ends `11:46:49.439364 UTC`. The unchanged frozen acceptance code passed
+at `10:12:55.249425 UTC`; analysis and independent numerical recalculation
+completed at `10:12:59.597782 UTC`.
+
+Full acceptance rehashes all six artifact sets, compares the six typed business
+graphs per arm, reconciles 538/338/309 position cycles and all 2,430 daily closes
+for B/T/TCH, and proves fees and original-source integrity. Actual 300273,
+603517 and 000748 actions, dated-share availability, 002606's original action
+and no suspension fills, and six actual held 000792 snapshots pass in both roles.
+Native-read denial and kernel network/file isolation pass. All ten annual and
+five fixed two-year blocks and 2,000 paired 22-session resamples are reported;
+independent numerical errors are below the frozen `1e-10` tolerance.
+
+The full comparison **does not establish an increment over B**. Both T and TCH
+have lower returns than B in all five fixed two-year windows. The broad,
+unadjusted descriptive intervals do not establish overall superiority or harm
+under the frozen screen. TCH versus T supports lower drawdown, but this combines
+an entry cap with held-risk management and lower average exposure; it cannot
+identify a single component's causal effect or exposure-matched alpha.
+Retain B as a research reference. The next useful work is low-cost attribution
+of the existing complete outputs, especially Trend candidate selection/timing,
+before proposing one falsifiable bounded experiment. Do not automatically tune,
+promote, or wait for 66 future sessions.
+
+113 focused tests and changed-file lint/format/types pass. Full `make check`
+records 4,112 passed, 128 failed and 20 skipped: exactly the prior 128 failure
+IDs, no new failures. Repository Ruff retains 217 diagnostics with no changed-file
+issues. No test, runtime gate or frozen policy was relaxed. The final doc-only
+handoff runs document contracts and planning separately; full-repository green
+is not claimed.
+
+Canonical evidence remains under
+`/srv/agentdock/.codex/p3-held-source-continuation-20261024T122013Z-859e94b/evidence/`:
+`restructuring-full-acceptance-v1.safe.json`,
+`restructuring-acceptance-driver-result-v2.safe.json`,
+`restructuring-cap-amendment-owner-approval-v1.safe.json`,
+`restructuring-scientific-judgment-v1.safe.json` and private
+`restructuring-analysis-v1.json`. The original capacity failure and all earlier
+partial/failed tranches remain retained, with no cleanup credit. Final read-only
+review copy and SHA256SUMS are recorded in `restructuring-final-export-v1.safe.json`.
 
 ### Previous 002606 tranche, preserved historical evidence
 

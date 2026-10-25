@@ -114,49 +114,24 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**P10 #561 non-beneficial restructuring continuation, 2026-10-25 CST:**
-P10 #561 exact 000792 source qualification is complete under the Owner's
-separate bounded approval. Three official notices establish that the 2020
-restructuring gives no capital-increase shares to ordinary shareholders and
-requires no ex-right adjustment. The 2021-08-10 resume session has no daily
-price limit; the next session resumes the normal 10% limit. These are observed
-source facts, not a new subscription or financial-policy choice. Acquisition
-is closed after eight requests, 880,232 bytes and three PDFs, with actual
-information cutoff `2026-10-25T08:51:06.934678+00:00`. Historical availability
-and actual shareholder-credit times remain unknown.
+**2012–2021 retrospective three-step study completed, 2026-10-25 CST.**
+Exact P10 #561 source qualification and the complete B/T/TCH comparison now
+pass in two independent processes, 2,430 sessions per arm. The source-qualified
+000792 non-beneficial restructuring and resume-session boundary were exercised
+in actual held replay. Six-run graph/accounting/cold acceptance and independently
+recomputed analysis completed before the original deadline. The Owner's separate
+160 MiB artifact-cap amendment admits the existing completed outputs; the prior
+128 MiB failure is retained, and no replay or source collection restarted.
 
-The qualified source SHA is
-`dc69d5fb83b74d8e4f9e669182fda12fe7633dc95bddda6ebfdd5e1337430445`.
-The small explicit-parent input SHA is
-`bb02e9695716d29683e78c9c497b87286743b35f087d06509eafe43985ee2ff8`:
-one exact non-beneficial exception is removed from the new effective view,
-all other 79 exceptions are retained, and only one of 8,260,536 limit rows is
-rewritten. The original exception ledger, OHLCV, state and 002606 reference
-repair remain intact. This composite is a role-local research input, not a
-portable ADS or a production Base publication.
+The comparison does not establish an increment over the simple B reference.
+TCH versus T supports lower drawdown, with entry-cap/held-risk/exposure
+confounding retained. This completes the retrospective study, not original strict
+B/D, historical PIT, strategy, P6 or production acceptance. Full results, exact
+source/request/code identities, checks, budgets and next-direction judgment are
+owned by [the historical robustness work item](p3-historical-robustness.md#current-execution-checkpoint-2026-10-25-cst).
+Do not rerun accepted work or interpret archival pending notes as the current status.
 
-`p3_restructuring_preparation.py` rebuilds complete 000792 coordinates over
-each role's own immutable prior feature/raw census. It writes only a small
-feature patch, proves the complete raw before-image and retains candidates
-once globally. Runtime combines the exact own parent and patch in one owned
-in-memory panel; it never uses the primary role's newly built prerequisites.
-113 focused tests and targeted lint, formatting and types pass. The frozen
-science, all three arms, no-subscription rule and genuine source guards stay
-unchanged. New request: `historical-restructuring-successor.v1.json`.
-
-The conditional dual-role replay and complete six-run accounting/graph
-acceptance are next, not yet complete. One two-hour execution window starts
-only at the frozen launch; the whole approval ends October 25 at
-`11:46:49.439364 UTC`. Additional writes are capped at 1.5 GiB, aggregate spill
-and artifacts at 128 MiB each, with the existing 8 GiB free-space floor.
-No prior failure, source or cost is deleted or credited back.
-
-The preceding #560 run completed B and T over all 2,430 sessions in both
-roles. Its separate B/T graph, accounting, original-byte and kernel cold
-checks pass (`suspended-action-B-T-partial-acceptance-v1.safe.json`). TCH
-blocked at frame 1,997 on the newly authorized 000792 source gap. Those four
-runs are partial evidence; no incomplete TCH result is spliced and no full
-comparison or strict original B/D, PIT, P6 or production acceptance is claimed.
+#### Historical continuation notes — preserved, not current status
 
 **Previous P10 #560 source and replay, preserved historical evidence:**
 

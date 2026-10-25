@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 from quanthus.structure_v2_inputs import Admission, DailyInput, InputPolicy, admit_daily, digest
 
 VERSION = "p5-qualified-native-prefix-retrospective-v1"
+WINDOW_VERSION = "p5-qualified-native-window-retrospective-v1"
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 VENUES = {
     "SSE": "venue_bec59e31eb6bb28111a10d7e6d2c689f",
@@ -37,6 +38,19 @@ class NativePrefixScope:
     qualified_source_digest: str
     action_coverage_digest: str
     qualified_actions_digest: str
+
+
+@dataclass(frozen=True)
+class NativeWindowScope(NativePrefixScope):
+    """A qualified empty-state left boundary, separate from the real listing date.
+
+    The bound evidence covers the unadjusted coordinate, complete in-scope action
+    inventory, and any unresolved cross-boundary action. It never claims that the
+    issuer's earlier history was reconstructed or that an old episode is fresh.
+    """
+
+    observation_start: date
+    left_boundary_digest: str
 
 
 @dataclass(frozen=True)
@@ -92,6 +106,40 @@ def project_native_prefix(
     calendar: Sequence[Row], bars: Sequence[Row], states: Sequence[Row],
     gaps: Sequence[Row], exceptions: Sequence[Row], actions: Sequence[NativeAction],
 ) -> tuple[Admission, ...]:
+    """Consume the original first-listing prefix without changing its contract."""
+    if isinstance(scope, NativeWindowScope):
+        raise ValueError("NATIVE_PREFIX_USE_WINDOW_ENTRYPOINT")
+    return _project_native(scope, policy, listings=listings, calendar=calendar,
+                           bars=bars, states=states, gaps=gaps, exceptions=exceptions,
+                           actions=actions)
+
+
+def project_native_window(
+    scope: NativeWindowScope, policy: InputPolicy, *, listings: Sequence[Row],
+    calendar: Sequence[Row], bars: Sequence[Row], states: Sequence[Row],
+    gaps: Sequence[Row], exceptions: Sequence[Row], actions: Sequence[NativeAction],
+) -> tuple[Admission, ...]:
+    """Start empty at a separately qualified coordinate, retaining the true IPO date.
+
+    Complete action coverage is required over the actual input/dependency range,
+    including effective events published before its left boundary. Callers verify
+    that evidence and bind it through ``left_boundary_digest`` before this call.
+    Earlier prices, cumulative factors and inherited structure are not consumed.
+    """
+    if not isinstance(scope, NativeWindowScope) or not _sha(scope.left_boundary_digest):
+        raise ValueError("NATIVE_WINDOW_BOUNDARY_QUALIFICATION")
+    return _project_native(scope, policy, listings=listings, calendar=calendar,
+                           bars=bars, states=states, gaps=gaps, exceptions=exceptions,
+                           actions=actions, observation_start=scope.observation_start,
+                           left_boundary_digest=scope.left_boundary_digest)
+
+
+def _project_native(
+    scope: NativePrefixScope, policy: InputPolicy, *, listings: Sequence[Row],
+    calendar: Sequence[Row], bars: Sequence[Row], states: Sequence[Row],
+    gaps: Sequence[Row], exceptions: Sequence[Row], actions: Sequence[NativeAction],
+    observation_start: date | None = None, left_boundary_digest: str | None = None,
+) -> tuple[Admission, ...]:
     """Keep every configured open session, including rejected/missing attempts.
 
     Inputs must already be frozen to one knowledge revision by P10. The ordinary
@@ -100,10 +148,12 @@ def project_native_prefix(
     semantics. Source clocks are carried unchanged, never compared with T as if
     this were an actual platform-as-known reconstruction.
     """
+    read_start = scope.first_listing if observation_start is None else observation_start
     if (
         scope.exchange not in VENUES or policy.security_codes != (scope.security_code,)
         or not scope.security_id or not scope.listing_id
-        or not date(2012, 1, 1) <= scope.first_listing <= scope.through <= date(2021, 12, 31)
+        or not scope.first_listing <= read_start
+        or not date(2012, 1, 1) <= read_start <= scope.through <= date(2021, 12, 31)
         or not _sha(scope.qualified_source_digest) or not _sha(scope.action_coverage_digest)
         or not _sha(scope.qualified_actions_digest)
     ):
@@ -125,7 +175,7 @@ def project_native_prefix(
         day = cal["trade_date"]
         if type(day) is not date:
             raise ValueError("NATIVE_PREFIX_CALENDAR_DATE")
-        if scope.first_listing <= day <= scope.through and cal["is_open"] is True and cal[
+        if read_start <= day <= scope.through and cal["is_open"] is True and cal[
             "session_type"
         ] == "REGULAR_DAY":
             if day in days:
@@ -139,7 +189,7 @@ def project_native_prefix(
         for row in rows:
             day = _day(row["observation_start"])
             if row["listing_id"] != scope.listing_id or not (
-                scope.first_listing <= day <= scope.through
+                read_start <= day <= scope.through
             ) or day not in days:
                 raise ValueError("NATIVE_PREFIX_OBSERVATION_SCOPE")
             cal = sessions.get(row["calendar_session_id"])
@@ -172,7 +222,7 @@ def project_native_prefix(
     if len({a.action_id for a in actions}) != len(actions):
         raise ValueError("NATIVE_PREFIX_DUPLICATE_ACTION")
     for action in actions:
-        if (not scope.first_listing <= action.ex_date <= scope.through
+        if (not read_start <= action.ex_date <= scope.through
             or not action.action_id or not action.action_type or not action.source_revision
             or not _sha(action.evidence_digest)):
             raise ValueError("NATIVE_PREFIX_ACTION_CLOSURE")
@@ -185,8 +235,15 @@ def project_native_prefix(
         bar = bar_map.get(day)
         state = state_map.get(day)
         prefix = [a.identity() for a in ordered_actions if a.ex_date <= day]
-        epoch = digest({"first_listing": scope.first_listing, "listing": scope.listing_id,
-                        "complete_action_prefix": prefix})
+        epoch_identity: dict[str, Any] = {
+            "first_listing": scope.first_listing, "listing": scope.listing_id,
+            "complete_action_prefix": prefix,
+        }
+        if observation_start is not None:
+            epoch_identity.update(version=WINDOW_VERSION, observation_start=read_start,
+                                  left_boundary_digest=left_boundary_digest,
+                                  initial_structure_state="EMPTY")
+        epoch = digest(epoch_identity)
         reason = None
         if bar is None:
             reason = "missing_daily_bar"

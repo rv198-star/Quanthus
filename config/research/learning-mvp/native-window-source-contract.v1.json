@@ -1,0 +1,46 @@
+{
+  "schema_version": "quanthus.native-window-source-contract.v1",
+  "adapter_version": "p5-qualified-native-window-retrospective-v1",
+  "purpose": "Bounded unadjusted T-only state-head input from an independently qualified empty-state left boundary",
+  "implementation_authority": "Owner six-step Learning MVP execution; this contract grants no source, reference or fit admission",
+  "admission_granted": false,
+  "scope": {
+    "market_observation_earliest": "2012-01-01",
+    "market_observation_latest": "2021-12-31",
+    "first_listing": "True effective listing date; may predate the authorized market observation interval",
+    "observation_start": "Separate, qualified start of the actual complete dependency interval",
+    "prior_market_history_or_structure_consumed": false,
+    "knowledge_view": "retrospective_T_only",
+    "historical_public_as_known": false,
+    "historical_platform_as_known": false
+  },
+  "source_qualification_before_projection": [
+    "Immutable exact source inventory, scope, schema, code and configuration identities verified by the consumer",
+    "Economic and listing identity, currency CNY, share unit and native UNADJUSTED coordinate at the left boundary",
+    "Complete venue/calendar session interval and exact bar/state dates and session identities",
+    "Complete effective action inventory within the actual read/dependency interval, including boundary-effective actions announced earlier and unresolved cross-boundary items",
+    "Actual gap, unit/listing changes, intersecting quality exceptions and source priority qualified; an empty ledger does not prove absence",
+    "Qualification evidence bound by qualified_source_digest, left_boundary_digest, action_coverage_digest and qualified_actions_digest"
+  ],
+  "projection": {
+    "initial_structure_state": "EMPTY",
+    "coordinate_identity": "Adapter version + true listing + observation_start + qualified left boundary + complete effective in-scope action prefix",
+    "action_changes": "Actually change coordinate and restart contiguous warm-up",
+    "missing_or_rejected_attempts": "Preserved; break contiguous warm-up",
+    "ordinary_control": "ACTIVE iff unchanged admit_daily admits; target lookback never filters the BASE denominator",
+    "required_contiguous_inputs": {
+      "structure_order_facts": 60,
+      "directional_path_geometry": 21,
+      "full_trend_evolution_builder": 61
+    },
+    "earlier_dependency": "If any selected feature, reference or model needs earlier input, expand the qualified range before reading it; do not infer inherited state",
+    "original_Decimal_and_clocks": "Preserved; unknown acquisition/factor visibility remains unknown/unavailable"
+  },
+  "scientific_limits": [
+    "This scope does not prove complete IPO history or recover an old normalization revision",
+    "Changing an input boundary or episode identifier does not create reference freshness",
+    "Old reference opinions require semantic input equivalence before reuse",
+    "Independent episode/window/exposure audit and four chronological roles remain required",
+    "No candidate training, probability calibration, strategy value, P6 or production qualification is established"
+  ]
+}

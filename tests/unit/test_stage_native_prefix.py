@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
@@ -11,8 +11,10 @@ from quanthus.stage_learning.native_prefix import (
     VENUES,
     NativeAction,
     NativePrefixScope,
+    NativeWindowScope,
     ordinary_control_rows,
     project_native_prefix,
+    project_native_window,
 )
 from quanthus.structure_order_facts import build_structure_order_facts
 from quanthus.structure_v2_inputs import InputPolicy, digest
@@ -166,3 +168,84 @@ def test_unqualified_scope_or_conflicting_input_fails_closed(wrong):
         tables["actions"] = [NativeAction("x", scope.first_listing, "CASH", "r1", "unknown")]
     with pytest.raises(ValueError, match="NATIVE_PREFIX"):
         project_native_prefix(scope, policy, **tables)
+
+
+def window_fixture(n=61):
+    original, policy, tables = fixture(n)
+    real_first = date(1997, 3, 25)
+    scope = NativeWindowScope(**(asdict(original) | {"first_listing": real_first}),
+                              observation_start=original.first_listing,
+                              left_boundary_digest=SHA)
+    tables["listings"][0]["effective_from"] = datetime.combine(real_first, time.min, SHANGHAI)
+    return scope, policy, tables
+
+
+def test_bounded_window_preserves_true_old_listing_and_warms_up_from_empty():
+    scope, policy, tables = window_fixture()
+    admissions = project_native_window(scope, policy, **tables)
+    assert admissions[0].row.market_date == scope.observation_start
+    assert len(admissions) == 61 and admissions[0].row.session_index == 0
+    assert scope.first_listing == date(1997, 3, 25)
+    assert admissions[0].row.high is tables["bars"][0]["high"]
+    facts = build_structure_order_facts(admissions, report_start=scope.observation_start,
+                                       report_end=scope.through)
+    assert sum(a.available for a in facts.availability) == 2
+    assert next(a.market_date for a in facts.availability if a.available) == (
+        scope.observation_start + timedelta(days=59)
+    )
+    assert len(ordinary_control_rows(admissions)) == 61
+    # Neither an old first listing nor a new window silently changes the v1 entrypoint.
+    with pytest.raises(ValueError, match="USE_WINDOW_ENTRYPOINT"):
+        project_native_prefix(scope, policy, **tables)
+    old_scope = NativePrefixScope(**{k: v for k, v in asdict(scope).items()
+                                     if k not in {"observation_start", "left_boundary_digest"}})
+    with pytest.raises(ValueError, match="NATIVE_PREFIX_SCOPE"):
+        project_native_prefix(old_scope, policy, **tables)
+
+
+@pytest.mark.parametrize("bad", ["unqualified", "before_authorized_window", "protected"])
+def test_bounded_window_requires_qualified_boundary_and_keeps_market_year_gate(bad):
+    scope, policy, tables = window_fixture()
+    if bad == "unqualified":
+        scope = replace(scope, left_boundary_digest="unavailable")
+    elif bad == "before_authorized_window":
+        scope = replace(scope, observation_start=date(2011, 12, 31))
+    else:
+        scope = replace(scope, through=date(2022, 1, 1))
+    with pytest.raises(ValueError, match="NATIVE_(PREFIX_SCOPE|WINDOW_BOUNDARY)"):
+        project_native_window(scope, policy, **tables)
+
+
+def test_bounded_window_cannot_relabel_listing_or_smuggle_earlier_prices():
+    scope, policy, tables = window_fixture()
+    tables["listings"][0]["effective_from"] = datetime.combine(
+        scope.observation_start, time.min, SHANGHAI,
+    )
+    with pytest.raises(ValueError, match="NATIVE_PREFIX_LISTING"):
+        project_native_window(scope, policy, **tables)
+    tables["listings"][0]["effective_from"] = datetime.combine(
+        scope.first_listing, time.min, SHANGHAI,
+    )
+    tables["bars"][0]["observation_start"] -= timedelta(days=1)
+    with pytest.raises(ValueError, match="NATIVE_PREFIX_OBSERVATION_SCOPE"):
+        project_native_window(scope, policy, **tables)
+
+
+def test_bounded_window_binds_initial_coordinate_and_boundary_effective_action():
+    scope, policy, tables = window_fixture()
+    before = project_native_window(scope, policy, **tables)
+    changed_scope = replace(scope, left_boundary_digest="sha256:" + "b" * 64)
+    changed = project_native_window(changed_scope, policy, **tables)
+    assert before[0].row.coordinate_ref != changed[0].row.coordinate_ref
+    action = NativeAction("boundary-cash", scope.observation_start,
+                          "CASH_DIVIDEND", "qualified-action-r1", SHA)
+    scope = replace(scope, qualified_actions_digest=digest([action.identity()]))
+    # An announcement from before the left boundary cannot cause the effective action to vanish.
+    with pytest.raises(ValueError, match="ACTION_INVENTORY"):
+        project_native_window(scope, policy, **tables)
+    tables["actions"] = [action]
+    after = project_native_window(scope, policy, **tables)
+    assert before[0].row.coordinate_ref != after[0].row.coordinate_ref
+    facts = build_structure_order_facts(after, report_start=scope.observation_start,
+                                       report_end=scope.through)
+    assert sum(a.available for a in facts.availability) == 2

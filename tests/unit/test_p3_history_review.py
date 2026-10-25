@@ -6,6 +6,7 @@ import copy
 import hashlib
 import json
 import os
+import shutil
 from collections import Counter
 from dataclasses import replace
 from decimal import ROUND_HALF_UP, Decimal
@@ -342,6 +343,83 @@ def test_fixed_control_reuses_own_inputs_but_reproduces_full_business_graph(cont
     assert result.proof["business_graph_equal"] is True
     assert result.proof["independently_rebuilt_prerequisites_this_job"] is False
     assert result.summaries["TC"]["net_pnl"] == "96"
+
+
+def test_control_archive_survives_unreachable_old_input_without_new_source_claim(control_archives):
+    controls, freeze = control_archives
+    accepted = controls.review_controls(freeze)
+    anchor = controls.archive_anchor(freeze, accepted)
+    for record in freeze["roles"].values():
+        source = Path(next(iter(record["bindings"])))
+        source.rename(source.with_suffix(".retained"))
+    result = controls.review_control_archive(freeze, anchor)
+    assert result.summaries == accepted.summaries
+    assert result.proof["business_graph_equal"] is True
+    assert result.proof["source_inputs_unchanged"] is False
+    assert result.proof["verification_mode"] == "TRUSTED_ARCHIVE_ONLY"
+
+
+def test_control_archive_can_move_without_rewriting_frozen_identity(control_archives, tmp_path):
+    controls, freeze = control_archives
+    accepted = controls.review_controls(freeze)
+    anchor = controls.archive_anchor(freeze, accepted)
+    roots = {}
+    for role, record in freeze["roles"].items():
+        old = Path(record["work"])
+        target = tmp_path / ("moved-" + role)
+        shutil.copytree(old, target)
+        old.rename(old.with_name("unreachable-" + role))
+        roots[role] = str(target)
+    assert (
+        controls.review_control_archive(freeze, anchor, roots=roots).summaries == accepted.summaries
+    )
+
+
+def test_bh_synthetic_full_business_pack_acceptance(control_archives):
+    from quanthus.expert_strategy import p3_benchmark_held as bh
+
+    controls, freeze = control_archives
+    freeze["arm"] = "BH"
+    for record in freeze["roles"].values():
+        root = Path(record["work"])
+        folder = root / "replays/variant.TC"
+        folder.rename(root / "replays/variant.BH")
+        folder = root / "replays/variant.BH"
+        manifest = json.loads((folder / "manifest.json").read_bytes())
+        manifest.update(
+            purpose=bh.VERSION,
+            execution_adapter=bh.VERSION,
+            variant_id="variant.BH",
+            variant="BH",
+            components=bh.COMPONENTS["BH"],
+        )
+        complete = json.loads((root / "replays/COMPLETE.json").read_bytes())
+        complete["variant"] = "BH"
+        complete["file_sha256"]["manifest.json"] = write_json(folder / "manifest.json", manifest)
+        write_json(root / "replays/COMPLETE.json", complete)
+    accepted = bh.review_benchmark_held(freeze)
+    assert accepted.summaries["BH"]["net_pnl"] == "96"
+    anchor = controls.archive_anchor(freeze, accepted)
+    assert bh.review_benchmark_held(freeze, anchor).summaries == accepted.summaries
+
+
+@pytest.mark.parametrize("damage", ["repack", "freeze", "anchor", "missing"])
+def test_control_archive_is_pinned_to_external_acceptance_not_self_report(control_archives, damage):
+    controls, freeze = control_archives
+    anchor = controls.archive_anchor(freeze, controls.review_controls(freeze))
+    root = Path(freeze["roles"]["primary"]["work"])
+    if damage == "repack":
+        complete = json.loads((root / "replays/COMPLETE.json").read_bytes())
+        complete["source_manifest_sha256"] = "sha256:" + "0" * 64
+        write_json(root / "replays/COMPLETE.json", complete)
+    elif damage == "freeze":
+        freeze["candidate_keys"] = 2
+    elif damage == "anchor":
+        anchor["source_inputs_unchanged_at_acceptance"] = False
+    else:
+        (root / "replays/variant.TC/equity.json").unlink()
+    with pytest.raises((ValueError, FileNotFoundError)):
+        controls.review_control_archive(freeze, anchor)
 
 
 @pytest.mark.parametrize("mutation", ["source", "component", "PIT", "extra", "input", "isolation"])

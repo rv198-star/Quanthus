@@ -114,6 +114,13 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**BH continuation activated, 2026-10-25:** the Owner approved the audited
+three-step plan. [The BH work item](p3-benchmark-held.md) owns the two small
+engineering repairs, exact source/producer reuse, one new B-entry/held-risk
+control, and the final bounded judgment. Old five-arm results remain immutable;
+no new source collection or strict B/D, protected-window, P6 or production gate
+is opened. The post-audit completion below remains the prior accepted evidence.
+
 **Post-audit three steps completed, 2026-10-25:** existing-output attribution and
 the repository verifier passed; TC and the conditionally selected TH each
 completed two independent 2,430-session replays with full acceptance. TH returns

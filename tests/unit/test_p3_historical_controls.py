@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,99 @@ import pytest
 from quanthus.expert_strategy import p3_historical_controls as c
 
 R = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture
+def role_freeze(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "safe.txt").write_text("synthetic input remains unchanged")
+    root = tmp_path / "job"
+    root.mkdir()
+    work = root / "primary"
+    work.mkdir()
+    freeze = {
+        "repository": str(R),
+        "roles": {
+            "primary": {
+                "work": str(work),
+                **{
+                    k: str(source)
+                    for k in (
+                        "source",
+                        "parent_source",
+                        "prepared",
+                        "prior_prepared",
+                        "reference_work",
+                    )
+                },
+                "admission": str(source / "safe.txt"),
+                "bindings": {},
+            }
+        },
+        "deadline_UTC": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+        "maximum_new_owned_logical_bytes": 1024,
+        "minimum_data_free_bytes": 0,
+        "job_output": str(root),
+        "same_UTC_snapshot": {"data_device": root.stat().st_dev},
+    }
+    return freeze, source, work
+
+
+@pytest.mark.parametrize(
+    "case", ["equal", "within_source", "contains_source", "symlink", "expired"]
+)
+def test_role_preflight_rejects_before_any_source_or_output_write(role_freeze, case):
+    freeze, source, work = role_freeze
+    if case == "equal":
+        freeze["roles"]["primary"]["work"] = str(source)
+    elif case == "within_source":
+        freeze["roles"]["primary"]["work"] = str(source / "nested")
+    elif case == "contains_source":
+        freeze["roles"]["primary"]["work"] = str(source.parent)
+    elif case == "symlink":
+        link = work.parent / "alias"
+        link.symlink_to(source, target_is_directory=True)
+        freeze["roles"]["primary"]["work"] = str(link)
+    else:
+        freeze["deadline_UTC"] = "2000-01-01T00:00:00+00:00"
+    before = {str(p): p.read_bytes() for p in source.rglob("*") if p.is_file()}
+    paths = set(source.rglob("*"))
+    with pytest.raises(ValueError, match="CONTROL_(PATH|DEADLINE|OUTPUT)"):
+        c.run_role(freeze, "primary")
+    assert paths == set(source.rglob("*"))
+    assert before == {str(p): p.read_bytes() for p in source.rglob("*") if p.is_file()}
+    assert not list(work.iterdir())
+
+
+def test_role_preflight_keeps_healthy_readonly_prerequisite_reuse(role_freeze):
+    freeze, source, work = role_freeze
+    (work / "temp").mkdir()
+    (work / "cache").mkdir()
+    assert c.preflight_role(freeze, "primary")["data_device"] == source.stat().st_dev
+    assert not (work / "replays").exists()
+
+
+@pytest.mark.parametrize(
+    "damage", ["temp_alias", "cross_role", "device", "space", "existing_output"]
+)
+def test_role_entry_checks_tmp_other_roles_and_frozen_capacity(role_freeze, damage):
+    freeze, source, work = role_freeze
+    if damage == "temp_alias":
+        (work / "temp").symlink_to(source, target_is_directory=True)
+    elif damage == "cross_role":
+        freeze["roles"]["independent_cold_reproduction"] = copy.deepcopy(freeze["roles"]["primary"])
+    elif damage == "device":
+        freeze["same_UTC_snapshot"]["data_device"] = -1
+    elif damage == "space":
+        freeze["maximum_new_owned_logical_bytes"] = 10**30
+    else:
+        (work / "replays").mkdir()
+    before = (source / "safe.txt").read_bytes()
+    with pytest.raises(ValueError, match="CONTROL_"):
+        c.run_role(freeze, "primary")
+    assert (source / "safe.txt").read_bytes() == before
+    assert not (work / "isolation.json").exists()
 
 
 def test_exact_parent_and_new_component_request():

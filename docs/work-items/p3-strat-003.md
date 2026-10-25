@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved |
-| Delivery gate | Business continuation only; data work transferred to P10; temporarily defer B acceptance/D results; PARTIAL_INPUT_QUALIFICATION retained; A/C/C-R1 preserved |
+| Delivery gate | accepted for the bounded retrospective research closeout; original strict B remains unqualified and D unexecuted; A/C/C-R1 preserved; [2026-10-25 audit](../acceptance/p3-strat-003-retrospective-closeout-20261025.md) |
 | Parent | post-MVP Expert Strategy Layer research increment |
 | Governing design | `../design/lld/04-experts-aggregator/expert-strategy-layer.md` |
 | Frozen request | `../../config/research/p3-strat-003/request.v1.json` |
@@ -113,6 +113,15 @@ rewrite CURRENT, or claim the old 2026-08-27 manifest was reproduced. Every othe
 continues to require the existing exact binding.
 
 ### Current recovery checkpoint
+
+**Closeout audit accepted, 2026-10-25:** fresh archive/accounting checks and
+separate arithmetic found no blocking defect in the completed retrospective
+study. Accept the current version's non-adoption/inconclusive research
+disposition and stop micro-tuning. [The closeout audit](../acceptance/p3-strat-003-retrospective-closeout-20261025.md)
+owns the original-versus-successor scope, retained check failures and issue
+closure recommendation. This does not mark the original strict B/D passed or
+close all future phase:P3 work. GitHub #317/#412 and the original strict planning
+state were inspected but not changed by this audit.
 
 **BH three-step continuation completed, 2026-10-25:** the two engineering
 repairs, full dual-role BH replay and bounded interpretation are complete.

@@ -1,0 +1,58 @@
+{
+  "schema_version": "p3-historical-fixed-controls-v1",
+  "authority": "Owner 2026-10-25: execute post-audit step1, then conditionally continue steps2/3; existing uniform non-subscription preserved",
+  "parent_request_digest": "sha256:9fe18209a83f9f6a8ab8f7a884ff0c495e96c8249e179c09d0d3660c2b8a3992",
+  "source_manifest_sha256": "sha256:bb02e9695716d29683e78c9c497b87286743b35f087d06509eafe43985ee2ff8",
+  "source_information_cutoff": "2026-10-25T08:51:06.934678+00:00",
+  "scope": [
+    "2012-01-04",
+    "2021-12-30",
+    "2021-12-31"
+  ],
+  "components": {
+    "TC": {
+      "entry_cap": true,
+      "held_risk": false
+    },
+    "TH": {
+      "entry_cap": false,
+      "held_risk": true
+    }
+  },
+  "entry_cap": "0.20",
+  "optional_rights_parent_policy_sha256": "sha256:7efd45a82b14675f3546a8daad91129be8a584d5aa4ae3125940f71f5c3c909f",
+  "optional_paid_rights": "DO_NOT_SUBSCRIBE",
+  "reuse": "OWN_ROLE_VERIFIED_IMMUTABLE_PREREQUISITE",
+  "parameter_search": false,
+  "new_source_collection": false,
+  "historical_PIT_claim": false,
+  "production_authorized": false,
+  "P6_mutation_authorized": false,
+  "source_guards_waived": false,
+  "conditional_TH": {
+    "question": "Does held-risk have standalone value without the cap, or a material interaction?",
+    "run_if": "TC does not explain at least 80% of TCH-versus-T maximum-drawdown reduction, OR TCH-versus-TC actual total-return gain is at least 0.02",
+    "otherwise": "Stop without TH; a cap-dominated small-fixture result does not justify another cell.",
+    "interpretation": "These fixed diagnostics decide research cost, not strategy thresholds or significance; no tuning.",
+    "maximum_runtime_acceptance_seconds": 5400
+  },
+  "acceptance": {
+    "sessions_per_arm": 2430,
+    "entry_coordinates": 22955,
+    "roles": [
+      "primary",
+      "independent_cold_reproduction"
+    ],
+    "checks": [
+      "complete bound source closure and own prerequisites unchanged",
+      "exact independent file sets, hashes and semantic digests",
+      "typed business graph equality and accounting",
+      "real fee/mark/dividend reconciliation and exact scope",
+      "entry eligibility equal T/TCH; declared component effects only",
+      "kernel network and native other-role source/prerequisite/output denial"
+    ],
+    "new_source_blocker": "Stop the affected cell; route to P10 without collecting or silently skipping.",
+    "success_is_experiment_completion_not_superiority": true
+  },
+  "retention": "Read-only prerequisite retention limited to this fixed-control study; exact source/config/code/scope/universe digest mismatch is fail-closed. New role output/TMP stays in a unique owned run; failures and prior attempts retained."
+}

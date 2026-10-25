@@ -114,6 +114,13 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**Post-audit continuation, 2026-10-25:** the Owner authorized existing-output
+attribution, followed by conditional fixed component controls. See
+[the post-audit work item](p3-post-audit-attribution.md) for the current scope,
+repository verification entry points and conditional TC/TH decision. The
+completed three-arm study below remains immutable; this continuation does not
+rerun it or change original strict B/D acceptance.
+
 **2012–2021 retrospective three-step study completed, 2026-10-25 CST.**
 Exact P10 #561 source qualification and the complete B/T/TCH comparison now
 pass in two independent processes, 2,430 sessions per arm. The source-qualified

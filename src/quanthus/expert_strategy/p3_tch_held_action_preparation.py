@@ -28,6 +28,15 @@ from quanthus.expert_strategy.p3_dated_share_preparation import (
 from quanthus.pipelines.securities_warehouse import p10_tch_held_action_input as p10
 
 
+def prior_raw_cutoff(raw: Any, selected: tuple[str, ...], expected: str) -> str:
+    """Use the frozen selected census clock, never its newer envelope clock."""
+    stamp = datetime.fromisoformat(expected)
+    clocks = {r.knowledge_cutoff for r in raw.raw_candidates if r.security_id in selected}
+    if stamp.utcoffset() is None or clocks != {stamp}:
+        raise ValueError("TCH_PREPARATION_RAW_CLOCK_BEFORE_IMAGE")
+    return expected
+
+
 def prepare(
     repository: Path, source: Path, old_prepared: Path, output: Path, request: dict[str, Any]
 ) -> dict[str, Any]:
@@ -132,7 +141,7 @@ def prepare(
         before = old_module._scan_raw_candidates(
             c,
             mapping,
-            old["source_information_cutoff"],
+            prior_raw_cutoff(raw, selected, request["prior_affected_raw_cutoff"]),
             repository,
             dates=dates,
             added=True,

@@ -19,8 +19,8 @@ from quanthus.pipelines.securities_warehouse import p10_rights_replay_input as r
 from quanthus.pipelines.securities_warehouse import p10_tch_held_action_input as p10
 from quanthus.pipelines.securities_warehouse.p10_rights_issue_source import load_rights_source
 
-VERSION = "p3-tch-held-action-successor-v1"
-REQUEST = "config/research/p3-strat-003/historical-tch-held-action-successor.v1.json"
+VERSION = "p3-tch-held-action-successor-v2"
+REQUEST = "config/research/p3-strat-003/historical-tch-held-action-successor.v2.json"
 MEMBERS = {
     "src/quanthus/pipelines/securities_warehouse/p10_tch_held_action_input.py",
     "src/quanthus/expert_strategy/p3_tch_held_action_preparation.py",
@@ -51,6 +51,7 @@ def load_request(repository: Path) -> dict[str, Any]:
         or set(r.get("code_config_members", {})) != MEMBERS
         or any(r.get(k) != old[k] for k in PRESERVED)
         or r.get("affected_security_ids") != ["000748"]
+        or r.get("prior_affected_raw_cutoff") != "2026-10-24T16:49:27.317489+00:00"
         or r.get("official_source_manifest_sha256") != "sha256:" + p10.OFFICIAL_SHA
         or r.get("approved_proposal_sha256")
         != "sha256:050e92871e9038cce96acde278913abcc7512ab83973fe4344160f719cf7f6a7"

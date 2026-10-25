@@ -56,3 +56,28 @@ def test_missing_admission_blocks_real_input_before_open(tmp_path, monkeypatch):
     monkeypatch.setattr(s.p10, "load_input", lambda *a: pytest.fail("source opened"))
     with pytest.raises(ValueError, match="EXACT_ADMISSION"):
         s.TCHHeldActionRuntime(tmp_path, tmp_path, tmp_path, {})
+
+
+@pytest.mark.parametrize("case", ["same", "later-envelope", "mixed", "empty", "naive"])
+def test_raw_before_image_uses_its_own_frozen_clock_not_latest_envelope(case):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    old = datetime(2026, 10, 24, 16, tzinfo=timezone.utc)
+    latest = datetime(2026, 10, 25, 5, tzinfo=timezone.utc)
+    rows = [SimpleNamespace(security_id="affected", knowledge_cutoff=old)]
+    expected = old.isoformat()
+    if case == "later-envelope":
+        expected = latest.isoformat()
+    if case == "mixed":
+        rows.append(SimpleNamespace(security_id="affected", knowledge_cutoff=latest))
+    if case == "empty":
+        rows = []
+    if case == "naive":
+        expected = "2026-10-24T16:00:00"
+    raw = SimpleNamespace(raw_candidates=rows)
+    if case == "same":
+        assert prep.prior_raw_cutoff(raw, ("affected",), expected) == expected
+    else:
+        with pytest.raises(ValueError, match="RAW_CLOCK_BEFORE_IMAGE"):
+            prep.prior_raw_cutoff(raw, ("affected",), expected)

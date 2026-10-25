@@ -5,13 +5,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import random
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from quanthus.expert_evaluation.serialization import digest_value
 from quanthus.expert_strategy import p3_historical_controls as controls
+from quanthus.expert_strategy.assessment_comparison import paired_intervals as paired_intervals
 from quanthus.expert_strategy.p3_history_attribution import attribute
 from quanthus.expert_strategy.p3_history_review import (
     ArchiveContract,
@@ -117,35 +117,6 @@ def review_benchmark_held(
     return controls._review_fixed_cell(
         freeze, version=VERSION, components=COMPONENTS, archive_anchor=trusted_anchor
     )
-
-
-def paired_intervals(left: list[float], right: list[float], seed: int) -> dict[str, Any]:
-    """Same fixed descriptive 22-session/2,000-resample method as the parent."""
-    import numpy as np
-
-    require(len(left) == len(right) and len(left) >= 44, "BH_INTERVAL_PAIRING")
-    count = len(left) // 22
-    rng = random.Random(seed)
-    indices = np.asarray([[rng.randrange(count) for _ in range(count)] for _ in range(2000)])
-    paths = []
-    for series in (left, right):
-        raw = np.asarray(series, dtype=float)
-        require(bool(np.isfinite(raw).all()) and bool((raw > -1).all()), "BH_INTERVAL_RETURNS")
-        returns = raw[: count * 22].reshape(count, 22)[indices].reshape(2000, count * 22)
-        wealth = np.concatenate([np.ones((2000, 1)), np.cumprod(1 + returns, axis=1)], axis=1)
-        paths.append(
-            {
-                "net_total_return": wealth[:, -1] - 1,
-                "maximum_drawdown": np.max(
-                    1 - wealth / np.maximum.accumulate(wealth, axis=1), axis=1
-                ),
-            }
-        )
-    return {
-        name: {"lower": str(ordered[49]), "upper": str(ordered[1949])}
-        for name in paths[0]
-        for ordered in [np.sort(paths[0][name] - paths[1][name])]
-    }
 
 
 def analyze(

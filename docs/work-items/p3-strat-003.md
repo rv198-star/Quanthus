@@ -114,7 +114,116 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**Dated-share execution, 2026-10-25 CST (latest):** actual replay commit
+**P10 #561 non-beneficial restructuring continuation, 2026-10-25 CST:**
+P10 #561 exact 000792 source qualification is complete under the Owner's
+separate bounded approval. Three official notices establish that the 2020
+restructuring gives no capital-increase shares to ordinary shareholders and
+requires no ex-right adjustment. The 2021-08-10 resume session has no daily
+price limit; the next session resumes the normal 10% limit. These are observed
+source facts, not a new subscription or financial-policy choice. Acquisition
+is closed after eight requests, 880,232 bytes and three PDFs, with actual
+information cutoff `2026-10-25T08:51:06.934678+00:00`. Historical availability
+and actual shareholder-credit times remain unknown.
+
+The qualified source SHA is
+`dc69d5fb83b74d8e4f9e669182fda12fe7633dc95bddda6ebfdd5e1337430445`.
+The small explicit-parent input SHA is
+`bb02e9695716d29683e78c9c497b87286743b35f087d06509eafe43985ee2ff8`:
+one exact non-beneficial exception is removed from the new effective view,
+all other 79 exceptions are retained, and only one of 8,260,536 limit rows is
+rewritten. The original exception ledger, OHLCV, state and 002606 reference
+repair remain intact. This composite is a role-local research input, not a
+portable ADS or a production Base publication.
+
+`p3_restructuring_preparation.py` rebuilds complete 000792 coordinates over
+each role's own immutable prior feature/raw census. It writes only a small
+feature patch, proves the complete raw before-image and retains candidates
+once globally. Runtime combines the exact own parent and patch in one owned
+in-memory panel; it never uses the primary role's newly built prerequisites.
+113 focused tests and targeted lint, formatting and types pass. The frozen
+science, all three arms, no-subscription rule and genuine source guards stay
+unchanged. New request: `historical-restructuring-successor.v1.json`.
+
+The conditional dual-role replay and complete six-run accounting/graph
+acceptance are next, not yet complete. One two-hour execution window starts
+only at the frozen launch; the whole approval ends October 25 at
+`11:46:49.439364 UTC`. Additional writes are capped at 1.5 GiB, aggregate spill
+and artifacts at 128 MiB each, with the existing 8 GiB free-space floor.
+No prior failure, source or cost is deleted or credited back.
+
+The preceding #560 run completed B and T over all 2,430 sessions in both
+roles. Its separate B/T graph, accounting, original-byte and kernel cold
+checks pass (`suspended-action-B-T-partial-acceptance-v1.safe.json`). TCH
+blocked at frame 1,997 on the newly authorized 000792 source gap. Those four
+runs are partial evidence; no incomplete TCH result is spliced and no full
+comparison or strict original B/D, PIT, P6 or production acceptance is claimed.
+
+**Previous P10 #560 source and replay, preserved historical evidence:**
+
+**P10 #560 suspension-reference continuation, 2026-10-25 CST (latest):**
+the Owner approved the exact additional source/write/replay request. Official
+implementation notice `1203482091` and suspension notice `1203496403` close the
+existing `002606 / 2017-05-12` action's terms and suspension context. The new
+source manifest is
+`cd882f100754b34e437eac2b0dfe0b1f20be283c29aac02b53475f32eb852ef3`;
+its actual observation cutoff is October 25, `07:15:39.527523 UTC`. The source
+tranche is closed after eight requests, 332,813 bytes and two PDFs.
+
+The immutable input manifest is
+`fd477875a3cd8dd452889258afc37524ffc8fff5c54dc6656ef0cbe04ead847c`.
+Exactly 142 reference rows carry the existing action from May 12 through the
+first resumed session on December 6; the other 8,260,394 reference rows,
+original OHLCV, action dates and trading states remain unchanged. There is no
+new May 15 action and no inferred historical acquisition time. The normal
+unexplained-transition guard remains active for genuine tradable jumps.
+
+The new request is `historical-suspended-action-successor.v1.json`, digest
+`sha256:7ffdf6a12ef519e551d4761edeb142ee2704d6592a51112c96c8caad39ba9242`.
+Its committed code closure is `fdad0168eaaddb74359e25e95701536cbd60d5da`.
+The launch freeze retains the actual preceding HEAD; the separate
+`002606-launch-commit-bridge-v1.safe.json` proves that every frozen module/config
+byte equals this immediate local commit, without rewriting the freeze.
+121 focused tests and targeted lint/format/types pass. Primary and independently
+isolated cold roles were launched with complete B/T/TCH from their own prerequisites;
+no previous partial result is spliced. The absolute replay deadline is October
+25, `09:40:27.692853 UTC`; the whole approved tranche ends `10:10:21.949207 UTC`.
+Full three-arm acceptance and interpretation remain pending. Recovery evidence
+is in `suspended-action-execution-freeze-v1.json` and
+`suspended-action-resources-v1.json` under the continuation job below.
+
+**Previous P10 #559 supplement and replay, preserved historical evidence:**
+the Owner-approved official `000748 / 2015-05-15` source is qualified; PDF
+`1200978492` has SHA
+`231b4adbf66ec50b1c640cb52945ee4a6d1e6b39177abb65171b0907f8e5dde2`.
+The new immutable input is
+`44bcc661577e47c8376570cdc4c8a56897afebc95c6fcdfae2adbd8adb683e5b`,
+execution code `47fd228ed8b8df3fa7b2a20f709444a9cc02f87d`, request
+`historical-tch-held-action-successor.v2.json`. The real source observation is
+October 25 at `05:26:10.920851 UTC`; no historical knowledge is inferred.
+
+B/T both complete all 2,430 sessions in both independent roles on this new
+input. Exact feature/candidate closure, all six business artifacts per arm,
+538 B / 338 T cycles, daily closes, fees, source immutability and kernel cold
+isolation pass. TCH exceeds its former 000748 failure, then encounters
+`002606 / 2017-05-15` during sell-schedule look-ahead from frame 1,253
+(decision March 6, execution March 7). Existing sources carry a May 12 action;
+May 11, May 12 and May 15 remain suspended despite positive bar observations.
+P10 [#560](https://github.com/rv198-star/Quanthus/issues/560) owns the unresolved
+source/nontrading-reference relationship. The May 15 key is outside the earlier
+320-key source scope; a separate bounded request is prepared, not executed.
+Incomplete TCH is not accepted or spliced. Full three-arm
+interpretation remains unavailable. Details and safe receipt names are in
+[the current historical checkpoint](p3-historical-robustness.md#current-execution-checkpoint-2026-10-25-cst).
+
+One absolute execution clock is October 25, `05:33:12.904433–07:33:12.904433 UTC`;
+diagnostics and failures count. The separate one-hour source tranche is closed
+after six requests, 319,071 bytes and one PDF. No clock reset or new collection
+is implied by unused requests. All earlier attempts and original strict B/D,
+historical PIT, P6 and production gates remain unchanged. Stable checks are
+92 focused passed and `make check` 4,048 passed / 128 unchanged failures /
+20 skipped; repository lint retains 217 unchanged diagnostics.
+
+**Previous dated-share execution, preserved historical evidence:** actual replay commit
 `b113ddf7d62adfd7a92d17366c44df22c19bb627`, post-validation commit
 `c4b1edd7828fc94bfc797faadb1e96e6fc257447`, input manifest
 `b4a834416d1d8496fb2f619dd91398aedd983b579a213c46f633eba234efb6a7`.

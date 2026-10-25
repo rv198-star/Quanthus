@@ -5,7 +5,7 @@
 | Parent | [P3-STRAT-003](p3-strat-003.md) |
 | Governing design | [Expert Strategy Layer](../design/lld/04-experts-aggregator/expert-strategy-layer.md) |
 | Design status | approved, bounded Owner continuation on 2026-10-24 |
-| Delivery gate | blocked on TCH held-input qualification; B/T independently validated, full B/T/TCH comparison not accepted |
+| Delivery gate | exact TCH held-input repair qualified; complete dual-role B/T/TCH successor running, full comparison not yet accepted |
 | Purpose | `p3-historical-development-robustness-v1` |
 | Request | `config/research/p3-strat-003/historical-robustness.v1.json` |
 | Code / tests | `p3_historical_robustness.py` / `test_p3_historical_robustness.py` |
@@ -69,6 +69,169 @@ An interrupted replay with unqualified held inputs is not a completed comparison
 ## Execution checkpoint, 2026-10-24
 
 ### Current execution checkpoint, 2026-10-25 CST
+
+P10 #561 exact 000792 source qualification is complete under the Owner's
+separate bounded approval. Three official notices establish that the 2020
+restructuring gives no capital-increase shares to ordinary shareholders and
+requires no ex-right adjustment. The 2021-08-10 resume session has no daily
+price limit; the next session resumes the normal 10% limit. These are observed
+source facts, not a new subscription or financial-policy choice. Acquisition
+is closed after eight requests, 880,232 bytes and three PDFs, with actual
+information cutoff `2026-10-25T08:51:06.934678+00:00`. Historical availability
+and actual shareholder-credit times remain unknown.
+
+The qualified source SHA is
+`dc69d5fb83b74d8e4f9e669182fda12fe7633dc95bddda6ebfdd5e1337430445`.
+The small explicit-parent input SHA is
+`bb02e9695716d29683e78c9c497b87286743b35f087d06509eafe43985ee2ff8`:
+one exact non-beneficial exception is removed from the new effective view,
+all other 79 exceptions are retained, and only one of 8,260,536 limit rows is
+rewritten. The original exception ledger, OHLCV, state and 002606 reference
+repair remain intact. This composite is a role-local research input, not a
+portable ADS or a production Base publication.
+
+`p3_restructuring_preparation.py` rebuilds complete 000792 coordinates over
+each role's own immutable prior feature/raw census. It writes only a small
+feature patch, proves the complete raw before-image and retains candidates
+once globally. Runtime combines the exact own parent and patch in one owned
+in-memory panel; it never uses the primary role's newly built prerequisites.
+113 focused tests and targeted lint, formatting and types pass. The frozen
+science, all three arms, no-subscription rule and genuine source guards stay
+unchanged. New request: `historical-restructuring-successor.v1.json`.
+
+The conditional dual-role replay and complete six-run accounting/graph
+acceptance are next, not yet complete. One two-hour execution window starts
+only at the frozen launch; the whole approval ends October 25 at
+`11:46:49.439364 UTC`. Additional writes are capped at 1.5 GiB, aggregate spill
+and artifacts at 128 MiB each, with the existing 8 GiB free-space floor.
+No prior failure, source or cost is deleted or credited back.
+
+The preceding #560 run completed B and T over all 2,430 sessions in both
+roles. Its separate B/T graph, accounting, original-byte and kernel cold
+checks pass (`suspended-action-B-T-partial-acceptance-v1.safe.json`). TCH
+blocked at frame 1,997 on the newly authorized 000792 source gap. Those four
+runs are partial evidence; no incomplete TCH result is spliced and no full
+comparison or strict original B/D, PIT, P6 or production acceptance is claimed.
+
+### Previous 002606 tranche, preserved historical evidence
+
+P10 #560 now has an Owner-approved source and exact reference-carry successor.
+Two official PDFs qualify the existing `002606 / 2017-05-12` action and its
+suspension context. Eight requests, 332,813 bytes and two PDFs were consumed;
+that acquisition tranche is closed. The qualified manifest is
+`cd882f100754b34e437eac2b0dfe0b1f20be283c29aac02b53475f32eb852ef3`,
+with actual source observation `2026-10-25T07:15:39.527523+00:00`.
+
+`p10_suspended_action_input.py` carries this same action's reference across
+142 dependent observations, May 12 through the first resumed session December 6.
+It preserves all original bars, trading states and the May 12 action, and proves
+8,260,394 other reference rows unchanged. The sealed input SHA is
+`fd477875a3cd8dd452889258afc37524ffc8fff5c54dc6656ef0cbe04ead847c`.
+No May 15 action, accepted-source history or historical knowledge time is invented.
+`p3_suspended_action_preparation.py` proves each role's complete prior 002606 raw
+before-image using the actual old reference, rebuilds the affected security once,
+compares healthy feature rows and performs one global retention for all arms.
+`p3_suspended_action_successor.py` preserves the reviewed strategy, execution,
+rights, availability and analysis policies. The genuine price-jump guard remains.
+
+The versioned request is `historical-suspended-action-successor.v1.json`;
+its frozen code/config closure is committed as
+`fdad0168eaaddb74359e25e95701536cbd60d5da`. The actual launch HEAD and an
+immediate commit bridge are separately retained; frozen bytes are unchanged.
+121 focused tests and targeted lint/format/types pass. Both independent roles
+were launched; their partial and failed disposition is recorded above. The single replay interval is October 25,
+`07:40:27.692853–09:40:27.692853 UTC`, including preparation, diagnostics and
+acceptance. The whole new tranche ends `10:10:21.949207 UTC`; all old clocks,
+failed attempts and costs remain retained. Resource limits are 4 GiB additional
+writes, 24 GiB total owned data, 8 GiB free floor and 256 MiB aggregate spill.
+`suspended-action-execution-freeze-v1.json`, the commit bridge and resource
+samples in the continuation job own the exact identities and same-time capacity.
+Full six-run graph/accounting acceptance and interpretation remain pending;
+original B/D, historical PIT, P6 and production gates are unchanged.
+
+### Previous 000748 tranche, preserved historical evidence
+
+The Owner approved the exact P10 #559 request with “那缺陷记录到P10的issue，
+但我们直接完成这个补数吧”. The original `000748 / 2015-05-15` source gap
+is now qualified from complete official implementation notice `1200978492`.
+The PDF SHA is
+`231b4adbf66ec50b1c640cb52945ee4a6d1e6b39177abb65171b0907f8e5dde2`,
+actually acquired October 25 at `05:26:10.920851 UTC`; its qualified source
+manifest is `14915800c10f8b2140ad63403b555e03c3620d411a9a0a5505fe265d0e1fc854`.
+Associated notice `1200978622` was independently identified as the matching
+publisher summary, not an unread correction. That later observation corroborates
+identity only; it does not move the frozen source clock or rewrite old evidence.
+
+The immutable successor input manifest is
+`44bcc661577e47c8376570cdc4c8a56897afebc95c6fcdfae2adbd8adb683e5b`.
+Only the exact action-reference key changes; the other 8,260,535 reference rows
+and original source files remain unchanged. Historical knowledge stays unknown.
+Execution code is `47fd228ed8b8df3fa7b2a20f709444a9cc02f87d`, governed by
+`historical-tch-held-action-successor.v2.json`. Its sole new execution window is
+October 25, `05:33:12.904433–07:33:12.904433 UTC`, including preparation,
+failed attempts, diagnostics and acceptance. All previous costs remain retained.
+The separate one-hour acquisition window is closed: six requests, 319,071 bytes
+and one PDF were consumed. Unused request counts do not extend that clock.
+
+| Step | Latest evidence |
+| --- | --- |
+| 1. Input qualification | 000748 official terms and exact immutable reference repair pass; the later 002606 / 2017-05-15 suspended-action/reference relationship remains unqualified under P10 #560. |
+| 2. Freeze and implement | Exact source/code/config and original science are frozen; no change to arms, dates, costs, rights waiver, share availability or the 4,173 visibility exceptions. |
+| 3. Execute and validate | New-input B and T each complete 2,430 sessions in both roles, with all six business artifacts and cashflow/fee accounting independently reconciled. TCH passes its old 000748 block but encounters a later unexplained action; full three-arm interpretation is withheld. |
+
+Each role independently rebuilds 1,470 affected-security feature rows, proves
+8,259,355 healthy rows unchanged and runs one global frozen retention yielding
+22,954 coordinates. The two physical feature digests and candidate sets match.
+Raw before-images use the verified raw member's actual acquisition clock, not a
+later preparation-envelope clock. The failed earlier clock assumption is retained;
+its correction neither infers an earlier availability nor waives equivalence.
+All 83 selected original source files remain byte-identical. Kernel-enforced
+cold filesystem/network denial, native-read probes and the legacy-provider block
+also pass. Completed B/T are reusable only under this exact full semantic closure;
+no incomplete TCH path is spliced or declared complete.
+
+Safe receipts under the continuation job's `evidence/` are
+`000748-official-action-qualified.safe.json`,
+`tch-exact-reference-before-after-v1.safe.json`,
+`tch-held-action-v2-independent-prerequisites.safe.json`,
+`tch-held-action-B-T-partial-acceptance-v1.safe.json`,
+`tch-acquisition-closed-v1.safe.json` and
+`tch-held-action-failure-v2.json`. P10 #559 remains open while its complete
+consumer continuation is unresolved. The new actual failure is exactly
+`002606 / 2017-05-15`, reached by sell-schedule look-ahead from frame 1,253
+(decision March 6, execution March 7). Existing normalized and canonical source
+rows carry a May 12 action. May 11, May 12 and May 15 execution states are all
+suspended/non-executable, while positive bar observations exist. This is not
+proof of a missing May 15 event, a bad market price, or a tradable resumed session.
+Do not shift the May 12 action or clear a guard to fit the later observation.
+
+P10 [#560](https://github.com/rv198-star/Quanthus/issues/560) owns this exact
+source/nontrading-reference closure. Its May 15 key is outside the prior frozen
+320 missing-canonical keys; that census does not cover every held look-ahead
+relationship. The new bounded request is
+`tch-new-held-next-request-v1.safe.json`, not an approval. It prioritizes existing
+sources and permits no unsupported financial/marking policy. Source acquisition
+remains closed pending the precise scope/budget decision. Local diagnosis is in
+`tch-new-held-block-v4.safe.json`,
+`tch-002606-interval-diagnostic-v1.safe.json` and
+`tch-new-held-existing-source-assessment-v1.safe.json`.
+
+One job-local qualification script mistakenly wrote the new 000748 receipt to
+the old 300273 receipt filename. The new bytes are now separately preserved as
+`000748-official-action-qualified.safe.json`; the exact old receipt was restored
+from its earlier read-only export after checking that export's SHA256SUMS.
+`tch-qualification-receipt-filename-correction-v1.safe.json` retains the error
+and both hashes. No source payload, sealed input or old read-only export changed.
+The original producer script is retained; its corrected write-once successor is
+recorded separately rather than substituted as the historical producer.
+
+Stable checks at the execution code report 92 focused tests passed; targeted
+lint/format/type checks passed. `make check` reports 4,048 passed, 128 unchanged
+baseline failures and 20 skipped. Whole-repository Ruff retains 217 diagnostics
+in unchanged files. There are no new failure IDs, but the repository is not green.
+Original strict B/D, historical PIT, production and P6 remain unaccepted/unchanged.
+
+### Previous dated-share checkpoint, preserved historical evidence
 
 The approved dated-share successor actually ran at execution commit
 `b113ddf7d62adfd7a92d17366c44df22c19bb627`, input manifest

@@ -30,6 +30,7 @@ class NoticeCensus:
         self.pages = 0
         self.complete = False
         self._total: int | None = None
+        self._physical_rows = 0
         self._notices: dict[str, dict[str, Any]] = {}
 
     @property
@@ -39,6 +40,14 @@ class NoticeCensus:
     @property
     def notices(self) -> tuple[dict[str, Any], ...]:
         return tuple(deepcopy(self._notices[k]) for k in sorted(self._notices))
+
+    @property
+    def physical_row_count(self) -> int:
+        return self._physical_rows
+
+    @property
+    def exact_duplicate_count(self) -> int:
+        return self._physical_rows-len(self._notices)
 
     def accept(self, page: int, response: Mapping[str, Any]) -> None:
         if type(page) is not int or self.complete or page != self.pages+1:
@@ -70,13 +79,17 @@ class NoticeCensus:
             if key in proposed and proposed[key] != row:
                 raise ValueError("NOTICE_CENSUS_CONFLICT")
             proposed[key] = deepcopy(row)
-        if len(proposed) > total:
-            raise ValueError("NOTICE_CENSUS_COUNT")
         if more and (not rows or len(proposed) == len(self._notices)):
             raise ValueError("NOTICE_CENSUS_NO_PROGRESS")
-        if not more and len(proposed) != total:
+        # Publisher total counts returned records, including exact duplicate
+        # records. Preserve that census separately from canonical notice keys.
+        physical_rows = self._physical_rows+len(rows)
+        if physical_rows > total:
+            raise ValueError("NOTICE_CENSUS_COUNT")
+        if not more and physical_rows != total:
             raise ValueError("NOTICE_CENSUS_TERMINAL_COUNT")
         self._notices = proposed
+        self._physical_rows = physical_rows
         self._total = total
         self.pages = page
         self.complete = not more

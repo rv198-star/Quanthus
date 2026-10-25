@@ -97,3 +97,19 @@ def test_caller_mutation_cannot_change_the_retained_inventory() -> None:
     returned, = c.notices
     returned["secNameList"].append("另一次改动")
     assert c.notices[0]["secNameList"] == ["合成名称"]
+
+
+def test_publisher_total_counts_physical_rows_and_preserves_exact_duplicates() -> None:
+    c = census()
+    c.accept(1, page([notice("a"), notice("a")], total=4))
+    c.accept(2, page([notice("b"), notice("c")], total=4, more=False))
+    assert c.complete and c.unique_count == 3
+    assert c.physical_row_count == 4 and c.exact_duplicate_count == 1
+
+
+def test_extra_physical_rows_cannot_be_hidden_by_deduplication() -> None:
+    c = census()
+    c.accept(1, page([notice("a")], total=2))
+    with pytest.raises(ValueError, match="NOTICE_CENSUS_COUNT"):
+        c.accept(2, page([notice("b"), notice("b")], total=2, more=False))
+    assert c.unique_count == 1 and c.pages == 1

@@ -114,12 +114,18 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
-**Post-audit continuation, 2026-10-25:** the Owner authorized existing-output
-attribution, followed by conditional fixed component controls. See
-[the post-audit work item](p3-post-audit-attribution.md) for the current scope,
-repository verification entry points and conditional TC/TH decision. The
-completed three-arm study below remains immutable; this continuation does not
-rerun it or change original strict B/D acceptance.
+**Post-audit three steps completed, 2026-10-25:** existing-output attribution and
+the repository verifier passed; TC and the conditionally selected TH each
+completed two independent 2,430-session replays with full acceptance. TH returns
+28.60% with 6.32% maximum drawdown, versus TCH 9.83% / 11.17% and the simple B
+reference 52.19% / 12.58%, on the same retrospective 2012–2021 sample. See
+[the post-audit work item](p3-post-audit-attribution.md) for all predefined periods,
+component interactions, source/code identity, checks and the closing judgment.
+Retain held-risk as a research candidate, stop micro-tuning this hard-entry/cap
+combination, and propose only one next BH control; BH is not activated. The
+completed three-arm study below remains immutable. This continuation does not
+rerun it or change original strict B/D, historical PIT, strategy, P6 or production
+acceptance. Older pending notes below are historical, not the current work state.
 
 **2012–2021 retrospective three-step study completed, 2026-10-25 CST.**
 Exact P10 #561 source qualification and the complete B/T/TCH comparison now

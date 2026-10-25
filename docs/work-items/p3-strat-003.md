@@ -114,6 +114,19 @@ continues to require the existing exact binding.
 
 ### Current recovery checkpoint
 
+**BH three-step continuation completed, 2026-10-25:** the two engineering
+repairs, full dual-role BH replay and bounded interpretation are complete.
+BH returns 27.51% with 8.23% maximum drawdown versus B 52.19% / 12.58% on the
+same exposed 2012–2021 fixture. Drawdown protection without Trend is observed,
+but a universal H increment and the necessity of Trend are not established.
+Do not promote either current component or continue micro-tuning it. The fixed
+low-capital control remains an unactivated proposal; current research closes
+with unresolved exposure attribution. [The BH work item](p3-benchmark-held.md)
+owns the complete accounting, all-period evidence, execution identity, checks
+and next-use boundaries. Original strict B/D, protected windows, P6 and
+production are unchanged; no source or strategy qualification follows.
+
+**Historical activation, now completed:**
 **BH continuation activated, 2026-10-25:** the Owner approved the audited
 three-step plan. [The BH work item](p3-benchmark-held.md) owns the two small
 engineering repairs, exact source/producer reuse, one new B-entry/held-risk

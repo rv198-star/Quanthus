@@ -1,0 +1,143 @@
+{
+  "scope": [
+    "2012-01-04",
+    "2021-12-30",
+    "2021-12-31"
+  ],
+  "arms": {
+    "B": {
+      "entry_cap": false,
+      "held_risk": false,
+      "trend": false
+    },
+    "T": {
+      "entry_cap": false,
+      "held_risk": false,
+      "trend": true
+    },
+    "TCH": {
+      "entry_cap": true,
+      "held_risk": true,
+      "trend": true
+    }
+  },
+  "execution_order": [
+    "B",
+    "T",
+    "TCH"
+  ],
+  "time_blocks": [
+    [
+      2012,
+      2013
+    ],
+    [
+      2014,
+      2015
+    ],
+    [
+      2016,
+      2017
+    ],
+    [
+      2018,
+      2019
+    ],
+    [
+      2020,
+      2021
+    ]
+  ],
+  "annual_diagnostics": [
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021
+  ],
+  "analysis": {
+    "bootstrap": "fixed paired nonoverlapping blocks; trailing incomplete block excluded only from resampling; descriptive intervals",
+    "contrasts": [
+      "T-B",
+      "TCH-B",
+      "TCH-T"
+    ],
+    "decision": "No automatic strategy selection. If full-window screen lacks support or block direction is unstable, retain inconclusive/negative and plan no parameter sweep or compulsory future 66-session wait.",
+    "materiality": "0.01",
+    "paired_block_sessions": 22,
+    "point_estimates": "all sessions, exact equity; calendar blocks keep path open, no forced closing",
+    "primary_contrast": "TCH-B",
+    "resamples": 2000,
+    "screen": "same reviewed one-percentage-point supported-return/drawdown/harm rules; report five two-year and ten annual blocks without selecting years"
+  },
+  "input_preparation_request_digest": "sha256:f6bbbd8a700acbf967895ce5c553f938d1e8d33db79825c51f3582319c64c86c",
+  "optional_rights_policy": "DO_NOT_SUBSCRIBE_UNIFORMLY",
+  "optional_rights_policy_sha256": "sha256:7efd45a82b14675f3546a8daad91129be8a584d5aa4ae3125940f71f5c3c909f",
+  "schema_version": "p3-tch-held-action-successor-v1",
+  "created_at": "2026-10-24T21:47:45.698834+00:00",
+  "parent_request_sha256": "sha256:0063452e606c3a2d32b7c35eab30ede4d24f317fd6f181dad88bbd768963f094",
+  "source_manifest_sha256": "sha256:44bcc661577e47c8376570cdc4c8a56897afebc95c6fcdfae2adbd8adb683e5b",
+  "source_information_cutoff": "2026-10-25T05:26:10.920851+00:00",
+  "official_source_manifest_sha256": "sha256:14915800c10f8b2140ad63403b555e03c3620d411a9a0a5505fe265d0e1fc854",
+  "reference_model": "existing-P2-gross-cash-bonus-theoretical-reference-v1",
+  "source_repair_scope": [
+    [
+      "300273",
+      "2012-05-31"
+    ],
+    [
+      "603517",
+      "2019-06-03"
+    ],
+    [
+      "000748",
+      "2015-05-15"
+    ]
+  ],
+  "maximum_additional_wall_seconds": 7200,
+  "maximum_seconds_per_role": 7200,
+  "previous_failures_costs_and_deadlines_retained": true,
+  "original_deadline_UTC": "2026-10-24T16:50:56.003671+00:00",
+  "prior_preparation_sha256": "sha256:8a5e6738534f75a00e82146c3a0b729f284297eef44d01be8cc04d6ac70c4e2c",
+  "prior_feature_sha256": "sha256:c866c206c27120c9650950ef8389c9df0984f52ea41ddfa54a02214e441dc21d",
+  "code_config_members": {
+    "src/quanthus/pipelines/securities_warehouse/p10_tch_held_action_input.py": "sha256:5986cfd6a75dfbba1eb5f267b08ba26dce08647a41dcfb1af135fed0957e555b",
+    "src/quanthus/expert_strategy/p3_tch_held_action_preparation.py": "sha256:fdef7a9b3e4f22b92763dcf650e8b03a9a0f0716c8ca7541a81cc2102d3a5e0d",
+    "src/quanthus/expert_strategy/p3_tch_held_action_successor.py": "sha256:41b1eb2716a27022405c4830fc570e5a862a38d6088d8806cbf7e47ff65a617f"
+  },
+  "owner_approval_sha256": "sha256:8a305e9669c7a1f9fbb78d4ecd2484f7e422a12ce0294f9e3978109cf237fdc7",
+  "incremental_preparation": "Each role replaces complete affected-security features and raw census from its own independently built predecessor. Full healthy values and exact affected raw before-image verified. Global frozen retention once. B rerun; no equivalence assumed.",
+  "execution_budget_includes_gate_diagnostics": true,
+  "reference_model_is_not_new_2012_exchange_rule_certification": true,
+  "historical_PIT_claim": false,
+  "production_authorized": false,
+  "P6_mutation_authorized": false,
+  "original_B_accepted": false,
+  "original_D_activated": false,
+  "parameter_search": false,
+  "source_guards_waived": false,
+  "draft_revision_reason": "Owner-approved P10 #559 exact actual-held source, science and consumer policy unchanged. All arms rerun because candidate and source closure change.",
+  "dated_source_manifest_sha256": "sha256:08bbaa5dfea033178763a78a60f645b767eef2b02a4bd80cc5615244a3623a1f",
+  "affected_security_ids": [
+    "000748"
+  ],
+  "share_availability_model": "SIMULATED_LISTED_SESSION_OPEN_ACTUAL_CREDIT_UNKNOWN",
+  "new_collection_authorized": false,
+  "approved_proposal_sha256": "sha256:050e92871e9038cce96acde278913abcc7512ab83973fe4344160f719cf7f6a7",
+  "prior_complete_raw_census_sha256": "sha256:59f3418cee9fc7881096fce4fb262542bf0e4c117a3247e374349473ecfcc7b9",
+  "share_policy": {
+    "recognition": "Economic entitlement on ex-date; only old shares tradable before official listing.",
+    "unknown_actual_credit": "Keep null. Listed-session open is an explicit simulation assumption.",
+    "pending_sells": "Same desired proportion; execute available quantity at unchanged P2 costs and carry residual.",
+    "lifecycle": "A partial fill is audited first. The subsequent EXIT_CARRIED transition starts at its post-fill ledger and leaves EXITING until remainder fills.",
+    "fractional_shares": "FAIL_CLOSED",
+    "same_day_parent": "UNCHANGED",
+    "historical_PIT_claim": false,
+    "all_arms": "B/T/TCH same consumer; all rerun."
+  }
+}

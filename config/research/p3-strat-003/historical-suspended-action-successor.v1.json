@@ -1,0 +1,166 @@
+{
+  "scope": [
+    "2012-01-04",
+    "2021-12-30",
+    "2021-12-31"
+  ],
+  "arms": {
+    "B": {
+      "entry_cap": false,
+      "held_risk": false,
+      "trend": false
+    },
+    "T": {
+      "entry_cap": false,
+      "held_risk": false,
+      "trend": true
+    },
+    "TCH": {
+      "entry_cap": true,
+      "held_risk": true,
+      "trend": true
+    }
+  },
+  "execution_order": [
+    "B",
+    "T",
+    "TCH"
+  ],
+  "time_blocks": [
+    [
+      2012,
+      2013
+    ],
+    [
+      2014,
+      2015
+    ],
+    [
+      2016,
+      2017
+    ],
+    [
+      2018,
+      2019
+    ],
+    [
+      2020,
+      2021
+    ]
+  ],
+  "annual_diagnostics": [
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021
+  ],
+  "analysis": {
+    "bootstrap": "fixed paired nonoverlapping blocks; trailing incomplete block excluded only from resampling; descriptive intervals",
+    "contrasts": [
+      "T-B",
+      "TCH-B",
+      "TCH-T"
+    ],
+    "decision": "No automatic strategy selection. If full-window screen lacks support or block direction is unstable, retain inconclusive/negative and plan no parameter sweep or compulsory future 66-session wait.",
+    "materiality": "0.01",
+    "paired_block_sessions": 22,
+    "point_estimates": "all sessions, exact equity; calendar blocks keep path open, no forced closing",
+    "primary_contrast": "TCH-B",
+    "resamples": 2000,
+    "screen": "same reviewed one-percentage-point supported-return/drawdown/harm rules; report five two-year and ten annual blocks without selecting years"
+  },
+  "input_preparation_request_digest": "sha256:f6bbbd8a700acbf967895ce5c553f938d1e8d33db79825c51f3582319c64c86c",
+  "optional_rights_policy": "DO_NOT_SUBSCRIBE_UNIFORMLY",
+  "optional_rights_policy_sha256": "sha256:7efd45a82b14675f3546a8daad91129be8a584d5aa4ae3125940f71f5c3c909f",
+  "schema_version": "p3-suspended-action-reference-successor-v1",
+  "created_at": "2026-10-25T07:26:24.527170+00:00",
+  "parent_request_sha256": "sha256:b2c7147e93f4ec838c1bacaa80c48031c8c6b20154fe03f90004927e8202d319",
+  "source_manifest_sha256": "sha256:fd477875a3cd8dd452889258afc37524ffc8fff5c54dc6656ef0cbe04ead847c",
+  "source_information_cutoff": "2026-10-25T07:15:39.527523+00:00",
+  "official_source_manifest_sha256": "sha256:cd882f100754b34e437eac2b0dfe0b1f20be283c29aac02b53475f32eb852ef3",
+  "reference_model": "existing-P2-gross-cash-bonus-theoretical-reference-v1",
+  "source_repair_scope": [
+    [
+      "300273",
+      "2012-05-31"
+    ],
+    [
+      "603517",
+      "2019-06-03"
+    ],
+    [
+      "000748",
+      "2015-05-15"
+    ],
+    [
+      "002606",
+      "2017-05-12"
+    ]
+  ],
+  "maximum_additional_wall_seconds": 7200,
+  "maximum_seconds_per_role": 7200,
+  "previous_failures_costs_and_deadlines_retained": true,
+  "original_deadline_UTC": "2026-10-24T16:50:56.003671+00:00",
+  "prior_preparation_sha256": "sha256:d94f99588c71e29f57230a50cf65045370ffcc7efa89fb8b3b594f99647deed3",
+  "prior_feature_sha256": "sha256:a06fa5b13f1660e11db0fc8ea2e180558d61b1efd1dc54562d933eb4e9560b0d",
+  "code_config_members": {
+    "src/quanthus/pipelines/securities_warehouse/p10_suspended_action_input.py": "sha256:1eef3b460e2ffb912650386635f75650dfd89e8d9066f8cada4ba84e22349ab5",
+    "src/quanthus/expert_strategy/p3_suspended_action_preparation.py": "sha256:3cc3cd3a432eb4a160f6e2e07ef66b322714fe84a41a4d2ae85d9b981dfb4f2a",
+    "src/quanthus/expert_strategy/p3_suspended_action_successor.py": "sha256:a9fbc952c946451537bb4faa4d7f572bb93f2f6a96d8bce84fbbe41fdb3a66f1"
+  },
+  "owner_approval_sha256": "sha256:579b77053fa99158040d7e80790b50a8443bf3e1f36efe29e50957ec18c1d193",
+  "incremental_preparation": "Each role proves its complete prior raw002606 before-image against actual old reference and rebuilds the complete affected ID once, retaining exact healthy features and one frozen global retention. All arms rerun under new closure.",
+  "execution_budget_includes_gate_diagnostics": true,
+  "reference_model_is_not_new_2012_exchange_rule_certification": true,
+  "historical_PIT_claim": false,
+  "production_authorized": false,
+  "P6_mutation_authorized": false,
+  "original_B_accepted": false,
+  "original_D_activated": false,
+  "parameter_search": false,
+  "source_guards_waived": false,
+  "draft_revision_reason": "Owner-approved P10 #560 source-supported reference carry across one existing action and its same suspension. No new marking, tax, availability or strategy policy.",
+  "dated_source_manifest_sha256": "sha256:08bbaa5dfea033178763a78a60f645b767eef2b02a4bd80cc5615244a3623a1f",
+  "affected_security_ids": [
+    "002606"
+  ],
+  "share_availability_model": "SIMULATED_LISTED_SESSION_OPEN_ACTUAL_CREDIT_UNKNOWN",
+  "new_collection_authorized": false,
+  "approved_proposal_sha256": "sha256:bd0f33d0bedbf1a9f4901508b190c8c866aebaa690375cf4a620fa312681305a",
+  "prior_complete_raw_census_sha256": "sha256:cf9e746dcb823a985fd8cc320498272cbdf89f6eb7b76f606596c7061ca9cede",
+  "share_policy": {
+    "recognition": "Economic entitlement on ex-date; only old shares tradable before official listing.",
+    "unknown_actual_credit": "Keep null. Listed-session open is an explicit simulation assumption.",
+    "pending_sells": "Same desired proportion; execute available quantity at unchanged P2 costs and carry residual.",
+    "lifecycle": "A partial fill is audited first. The subsequent EXIT_CARRIED transition starts at its post-fill ledger and leaves EXITING until remainder fills.",
+    "fractional_shares": "FAIL_CLOSED",
+    "same_day_parent": "UNCHANGED",
+    "historical_PIT_claim": false,
+    "all_arms": "B/T/TCH same consumer; all rerun."
+  },
+  "prior_affected_raw_cutoff": "2026-10-24T16:49:27.317489+00:00",
+  "previous_failed_request_file_sha256": "c71e54248899ed7dc9997df5a5d65fd04a019ab13a7fa9918a7612981ced23a1",
+  "execution_deadline_preserved": "2026-10-25T07:33:12.904433+00:00",
+  "reference_carry_scope": {
+    "existing_action_date": "2017-05-12",
+    "blocked_observation": "2017-05-15",
+    "first_reference_date": "2017-05-12",
+    "last_reference_date": "2017-12-06",
+    "keys": 142,
+    "allowed_key_digest": "sha256:55170cb35d255381a312a3a0a0c0d4e3a15703f59ee80ddd8f057bcf26c358a0",
+    "no_added_or_shifted_action": true,
+    "no_OHLCV_or_tradability_mutation": true
+  },
+  "previous_execution_deadline_preserved": "2026-10-25T07:33:12.904433+00:00",
+  "whole_new_tranche_deadline_UTC": "2026-10-25T10:10:21.949207+00:00",
+  "maximum_additional_write_bytes": 4294967296,
+  "maximum_entire_owned_job_bytes": 25769803776,
+  "minimum_data_free_bytes": 8589934592,
+  "maximum_aggregate_spill_bytes": 268435456
+}

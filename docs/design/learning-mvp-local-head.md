@@ -6,7 +6,7 @@
 | Delivery gate | open — experiment and consumer admission remain separate |
 | Work items | P5-STATE-003 / #543; P5-LOCAL-001 / #544 |
 | Parent context | [Historical learning](stock-stage-historical-learning.md) |
-| Conformance | `tests/unit/test_stage_local_head.py` |
+| Conformance | `tests/unit/test_stage_local_head.py`; `tests/unit/test_stage_head_comparison.py` |
 
 `quanthus.stage_learning.local_head` implements one small binary logistic head for an
 explicitly qualified retrospective request. It does not open source data, qualify a
@@ -50,3 +50,18 @@ Predictions expose a sigmoid **raw score** and a null calibrated probability. Ex
 Neither authorizes entry, forced sale, expert/veto bypass, strategy benefit or P6.
 Raw-score diagnostics, actual fit/update completion and consumer acceptance must be
 reported separately. Unknown/ambiguous references never become negative labels.
+
+`head_comparison` supplies bounded descriptive comparison on one caller-admitted
+reference set. Calibration and evaluation must be chronological and disjoint from
+consumed training/development identities; UNKNOWN consumption is retained. Repeated
+issuer/episode anchors are reported as clusters. Missing classes produce null AUC/AP.
+The reusable `order_rule_screen.stage2_predicate` is the exact frozen R0 predicate;
+its non-match remains NO_ASSERTION rather than a semantic negative reference.
+
+An explicitly requested small-sample Platt pilot may fit only its calibration role
+after the frozen class and distinct-issuer gates pass. Parameters, source/reference,
+model and code identities belong in the caller's immutable run ledger. Its output is
+exploratory and is never substituted for formal calibrated probability or P5
+qualification. An unqualified pilot does not fit at all. The production model output
+continues to abstain, subject to the existing shared P3 expert/veto path. No economic
+replay or P6 admission follows from successful comparison code or a pilot estimate.

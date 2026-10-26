@@ -67,3 +67,56 @@ exploratory and is never substituted for formal calibrated probability or P5
 qualification. An unqualified pilot does not fit at all. The production model output
 continues to abstain, subject to the existing shared P3 expert/veto path. No economic
 replay or P6 admission follows from successful comparison code or a pilot estimate.
+
+## Separate bounded Head2 correction (2026-10-26)
+
+Owner activated one bounded correction after the first candidate's audit. The
+versioned engineering policy is
+`config/research/learning-mvp/head2-revision.v2.json`; its source/reference delivery
+gate remains blocked. This extension does not amend the frozen first experiment
+or grant a new training/consumer request. Its parent research boundaries remain
+those of [historical learning](stock-stage-historical-learning.md).
+
+`head2_revision` encodes absolute directional efficiency and center displacement,
+the original width definitions, and the two existing directional-path facts.
+Original Decimal values/revisions are retained in feature identity. A seventh
+column distinguishes mathematically undefined counter-direction at zero net
+displacement from actual source unavailability. The zero-direction mask requires
+zero directional efficiency and zero range traversal; other missing inputs remain
+unavailable. All facts have the same T anchor within 2012–2021. These are derived
+retrospective features, not reconstructed historical knowledge cutoffs.
+
+Initial fit reuses the unchanged `local_head` primitives with seven named inputs,
+200 deterministic steps, learning rate0.05 and L2=0.01. The separate V2 update
+uses one fixed100-step objective: half of the original-training mean loss and half
+of the new-batch mean loss, plus L2. Group means avoid weighting by accidental
+batch size. The original scaler never refits. Trigger0.6931471805599453 is carried
+from the frozen prior request, explicitly versioned with its provenance digest.
+
+The update checkpoint has its own canonical JSON schema; it preserves the complete
+original checkpoint and hashes the exact training/update/protection rows. Resume
+checks all three sets and deterministic progress. A distinct, definite two-class
+development protection set never enters gradients. Positive and negative error
+counts must not increase and new-batch loss must not increase. A rejected update
+is retained and cannot trigger tuning or evaluation-based version selection.
+Protection is a development guard, not independent generalization evidence.
+
+The caller must separately freeze source qualification, prior-exposure exclusions,
+reference meaning, all roles/windows and code/config identities before actual
+training. Train/update/protection/evaluation have disjoint sample, issuer and
+episode identities with chronological constraints. The policy's pilot support
+counts do not establish production statistical sufficiency. The V2 primitives
+remain usable on synthetic rows without granting a real experiment.
+
+`head2_consumer.pending_assessment` preserves model/purpose identity and returns an
+abstained expert assessment for every valid raw score. It supplies no activation
+flag, probability calibration or new action mapping. Synthetic tests call the
+actual shared `compare_entry_assessments` path; system veto and action-policy
+identities remain shared. Factual missingness still requires the ordinary system
+BLOCK_NEW veto; model abstention must not force a sale. Actual consumer/P3 economic
+comparison and P6 remain separately unqualified.
+
+Conformance: `tests/unit/test_stage_head2_revision.py` and
+`tests/unit/test_stage_head2_consumer.py`, in addition to the unchanged legacy
+regressions. Immutable per-run evidence records actual source/fit/consumer status;
+successful engineering tests do not accept the state-head experiment.

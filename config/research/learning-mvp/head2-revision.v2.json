@@ -1,0 +1,63 @@
+{
+  "schema_version": "quanthus.learning-mvp.head2-revision.v2",
+  "design_status": "approved-for-bounded-engineering",
+  "delivery_gate": "blocked-source-and-reference",
+  "owner_authority": "2026-10-26 Owner activated the reviewed six-block correction plan",
+  "work_items": ["P5-STATE-003", "P5-LOCAL-001", "P3-ASSESSMENT-REUSE"],
+  "source_and_real_experiment_admission": "NOT_GRANTED_BY_THIS_CONFIG",
+  "purpose": "2012-2021 retrospective Head2 design correction; no historical-as-known claim",
+  "feature_version": "head2-features-v2",
+  "feature_names": [
+    "absolute_directional_efficiency",
+    "range_width",
+    "width_change",
+    "absolute_center_shift",
+    "range_traversal",
+    "counter_direction_excursion_share",
+    "counter_direction_undefined"
+  ],
+  "window": {"current_sessions": 20, "preceding_nonoverlapping_sessions": 20},
+  "encoding": {
+    "direction_and_center": "Decimal.copy_abs",
+    "zero_net_direction": "counter slot 0 and explicit mask 1; efficiency and traversal must both be 0",
+    "source_missing": "UNAVAILABLE; never imputed",
+    "original_decimal_and_time": "preserved in source; feature floats are derived values"
+  },
+  "optimizer": {
+    "family": "single-fixed-l2-logistic",
+    "initialization": "zero",
+    "fit_steps": 200,
+    "update_steps": 100,
+    "learning_rate": 0.05,
+    "l2": 0.01,
+    "update_loss_trigger": 0.6931471805599453,
+    "trigger_provenance_sha256": "d20e77b27dd661d4b4cb1f1b3e3393216145d72cea0466128bba17932b8fce42",
+    "original_train_weight": 0.5,
+    "new_update_weight": 0.5,
+    "scaler": "initial-train-only; unchanged during update",
+    "maximum_updates": 1
+  },
+  "roles_max": {"train": 24, "update": 8, "development_retention": 8, "evaluation": 24},
+  "minimum_pilot_support": {
+    "train_definite": 12,
+    "train_each_class": 4,
+    "retention_each_class": 2,
+    "evaluation_definite": 12,
+    "evaluation_each_class_distinct_issuers": 5,
+    "train_and_evaluation_each_time_blocks": 2
+  },
+  "retention": {
+    "gradient_use": false,
+    "positive_errors_may_increase": false,
+    "negative_errors_may_increase": false,
+    "update_batch_mean_loss_may_increase": false,
+    "rejected_update": "preserve; evaluate preselected v0; no second update or tuning"
+  },
+  "raw_diagnostic_threshold": 0.5,
+  "calibrated_probability": null,
+  "consumer_admission": "NOT_GRANTED",
+  "new_nonprobability_consumer_authorized": false,
+  "P6_activated": false,
+  "new_acquisition_authorized": false,
+  "production_authorized": false
+}

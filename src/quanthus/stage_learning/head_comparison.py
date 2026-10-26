@@ -13,11 +13,37 @@ import math
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import date
+from decimal import Decimal
 from typing import Any, cast
 
 from quanthus.stage_learning.local_head import RowUse
+from quanthus.stage_learning.order_rule_screen import PRIMARY_FIELDS, RULE_DIGEST, OrderRuleError
 from quanthus.stage_learning.p5_assessment import P5AssessmentError
 from quanthus.stage_learning.p5_contracts import require_digest
+from quanthus.structure_v2_inputs import digest
+
+
+def stage2_predicate(values: Mapping[str, Decimal], rule: Mapping[str, Any]) -> bool:
+    """Exact R0 stage2 adapter; the hash-frozen legacy implementation stays immutable.
+
+    A false predicate is NO_ASSERTION, not a semantic negative reference. The caller
+    owns source/packet/scale admission. Thresholds come from the exact frozen rule;
+    contract tests compare this four-condition adapter with legacy evaluate_case.
+    """
+    if digest(rule) != RULE_DIGEST:
+        raise OrderRuleError("rule_drift_requires_new_version")
+    if set(values) != set(PRIMARY_FIELDS) or any(
+        not isinstance(v, Decimal) or not v.is_finite() for v in values.values()
+    ):
+        raise OrderRuleError("invalid_stage2_values")
+    e = values["directional_efficiency"].copy_abs()
+    w, d = values["range_width"], values["width_change"]
+    c = values["center_shift"].copy_abs()
+    if e > 1 or not 0 <= w < 2 or d < -1 or values["center_shift"] <= -1:
+        raise OrderRuleError("formal_measurement_range_invalid")
+    two = {key: Decimal(value) for key, value in rule["rules"]["stage_2"].items()}
+    return (e <= two["efficiency20_abs_max"] and w <= two["range_width20_max"]
+            and d <= two["width_change20_max"] and c <= two["center_shift20_abs_max"])
 
 
 @dataclass(frozen=True)

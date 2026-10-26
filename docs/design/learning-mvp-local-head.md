@@ -55,8 +55,10 @@ reported separately. Unknown/ambiguous references never become negative labels.
 reference set. Calibration and evaluation must be chronological and disjoint from
 consumed training/development identities; UNKNOWN consumption is retained. Repeated
 issuer/episode anchors are reported as clusters. Missing classes produce null AUC/AP.
-The reusable `order_rule_screen.stage2_predicate` is the exact frozen R0 predicate;
+The `head_comparison.stage2_predicate` adapter uses the exact frozen R0 predicate;
 its non-match remains NO_ASSERTION rather than a semantic negative reference.
+The legacy rule module and historical code/config manifests remain byte-immutable;
+equivalence tests bind the adapter to its original packet evaluation path.
 
 An explicitly requested small-sample Platt pilot may fit only its calibration role
 after the frozen class and distinct-issuer gates pass. Parameters, source/reference,

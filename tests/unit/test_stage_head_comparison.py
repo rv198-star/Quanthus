@@ -12,13 +12,13 @@ from quanthus.stage_learning.head_comparison import (
     pilot_metrics,
     pilot_probabilities,
     raw_metrics,
+    stage2_predicate,
     validate_partition,
 )
 from quanthus.stage_learning.order_rule_screen import (
     PRIMARY_FIELDS,
     OrderRuleError,
     load_rule,
-    stage2_predicate,
 )
 from quanthus.stage_learning.p5_assessment import P5AssessmentError
 
@@ -170,3 +170,33 @@ def test_r0_rejects_nonfinite_and_non_decimal_values(value):
     values["range_width"] = value
     with pytest.raises(OrderRuleError):
         stage2_predicate(values, load_rule())
+
+
+@pytest.mark.parametrize("e,w,d,c", [
+    ("0.33", "0.18", "-0.20", "0.04"),
+    ("-0.33", "0.18", "-0.20", "-0.04"),
+    ("0.330000000000000000000000001", "0.18", "-0.20", "0.04"),
+    ("0.2", "0.180000000000000000000000001", "-0.20", "0.04"),
+    ("0.2", "0.18", "-0.199999999999999999999999999", "0.04"),
+    ("0.2", "0.18", "-0.20", "0.040000000000000000000000001"),
+    ("0.40", "0.12", "0.20", "0.00"),
+    ("0.00", "0.12", "0.00", "0.00"),
+])
+def test_adapter_equals_immutable_legacy_packet_path(e, w, d, c):
+    from quanthus.stage_learning.order_rule_screen import evaluate_case
+
+    from .test_stage_order_reference_protocol import make_evidence
+    from .test_stage_order_rule_screen import vector
+
+    case = vector(make_evidence()["cases"][0], e, w, d, c)
+    values = {k: Decimal(v["value"]) for k, v in case["primary"].items()}
+    assert stage2_predicate(values, load_rule()) == evaluate_case(case)["assertions"]["stage_2"]
+
+
+def test_historical_frozen_code_closure_remains_accepted():
+    from pathlib import Path
+
+    from quanthus.expert_strategy.p3_historical_robustness import load_request
+
+    request = load_request(Path(__file__).resolve().parents[2])
+    assert request["historical_PIT_claim"] is False

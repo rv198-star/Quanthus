@@ -54,28 +54,6 @@ def _number(measurement: Any, field: str) -> Decimal:
     return value
 
 
-def stage2_predicate(values: Mapping[str, Decimal], rule: Mapping[str, Any]) -> bool:
-    """The exact frozen R0 predicate, reusable without fabricating a legacy packet.
-
-    A false predicate is NO_ASSERTION, not a semantic negative reference. The caller
-    still owns packet/source/scale admission. No thresholds are fitted here.
-    """
-    if digest(rule) != RULE_DIGEST:
-        raise OrderRuleError("rule_drift_requires_new_version")
-    if set(values) != set(PRIMARY_FIELDS) or any(
-        not isinstance(v, Decimal) or not v.is_finite() for v in values.values()
-    ):
-        raise OrderRuleError("invalid_stage2_values")
-    e = values["directional_efficiency"].copy_abs()
-    w, d = values["range_width"], values["width_change"]
-    c = values["center_shift"].copy_abs()
-    if e > 1 or not 0 <= w < 2 or d < -1 or values["center_shift"] <= -1:
-        raise OrderRuleError("formal_measurement_range_invalid")
-    two = {key: Decimal(value) for key, value in rule["rules"]["stage_2"].items()}
-    return (e <= two["efficiency20_abs_max"] and w <= two["range_width20_max"]
-            and d <= two["width_change20_max"] and c <= two["center_shift20_abs_max"])
-
-
 def evaluate_case(case: Mapping[str, Any]) -> dict[str, Any]:
     """Evaluate one already-built packet without fetching data or modifying the packet."""
     rule = load_rule()
@@ -125,11 +103,13 @@ def evaluate_case(case: Mapping[str, Any]) -> dict[str, Any]:
     c = values["center_shift"].copy_abs()
     if e > 1 or not 0 <= w < 2 or d < -1 or values["center_shift"] <= -1:
         raise OrderRuleError("formal_measurement_range_invalid")
-    zero = {key: Decimal(value) for key, value in rule["rules"]["stage_0"].items()}
+    zero, two = ({key: Decimal(value) for key, value in rule["rules"][name].items()}
+                 for name in ("stage_0", "stage_2"))
     expansion = d >= zero["width_change20_min"]
     migration = c >= zero["center_shift20_abs_min"]
     stage_0 = e <= zero["efficiency20_abs_max"] and (expansion or migration)
-    stage_2 = stage2_predicate(values, rule)
+    stage_2 = (e <= two["efficiency20_abs_max"] and w <= two["range_width20_max"]
+               and d <= two["width_change20_max"] and c <= two["center_shift20_abs_max"])
     if stage_0 and stage_2:
         decision, reasons = "RULE_CONFLICT", ["same_scale_assertion_conflict"]
     elif stage_0:

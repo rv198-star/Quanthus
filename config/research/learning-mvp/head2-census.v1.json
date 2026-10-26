@@ -1,0 +1,20 @@
+{
+  "schema_version": "quanthus.learning-mvp.head2-census.v1",
+  "design_status": "approved-for-bounded-execution",
+  "delivery_gate": "blocked-runtime-source-reference-support",
+  "owner_authority": "2026-10-27 Asia/Shanghai Owner: 按调整后的计划执行1-3",
+  "work_items": ["P5-STATE-003", "P5-LOCAL-001", "P3-ASSESSMENT-REUSE"],
+  "protocol": "head2-fixed-census-v1",
+  "previous_v2_unchanged": true,
+  "exact_slot_counts": {"TRAIN": 20, "GUARD": 32, "UPDATE": 16, "EVALUATE": 80},
+  "inclusion": "All source-qualified definite consensus in each frozen role; no post-label selection",
+  "train": "Explicitly reused exposed development evidence; never fresh evaluation",
+  "source_unknown_or_missing": "Retained denominator; no negative label, no replacement",
+  "features_optimizer_update_retention": "Unchanged head2-features-v2 numerical policy",
+  "development_spend_gate": "One true positive and one true negative on TRAIN at0.5, otherwise stop before new source/reference",
+  "evaluation": "Candidate selection and all evaluation predictions committed before evaluation opinions",
+  "source_or_real_fit_admission": "Requires exact independently qualified runtime request and input bindings",
+  "consumer_admission": "NOT_GRANTED",
+  "P6_activated": false,
+  "production_authorized": false
+}

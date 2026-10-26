@@ -120,3 +120,42 @@ Conformance: `tests/unit/test_stage_head2_revision.py` and
 `tests/unit/test_stage_head2_consumer.py`, in addition to the unchanged legacy
 regressions. Immutable per-run evidence records actual source/fit/consumer status;
 successful engineering tests do not accept the state-head experiment.
+
+## Fixed-census successor (2026-10-27)
+
+Owner activated the audited staged successor through
+`config/research/learning-mvp/head2-census.v1.json`. Design status is
+approved-for-bounded-execution; the delivery gate remains blocked on the exact
+runtime source/reference/support evidence. This successor does not amend the
+closed64 experiment or the frozen V2 role caps. Work items remain P5-STATE-003,
+P5-LOCAL-001 and P3-ASSESSMENT-REUSE.
+
+`head2_census` binds a complete frozen148-slot cohort:20 explicitly reused
+development cases,32 protection,16 update and80 evaluation slots. Every
+source-qualified definite two-role consensus enters its assigned role; UNKNOWN,
+disagreement and unavailable slots retain their census without becoming negative
+or being replaced. Company/security/listing/episode identity exclusion and exact
+chronological blocks are validated before role admission. The numerical feature,
+optimizer, threshold, update trigger and retention policy remain V2. The separate
+protocol digest and full runtime request enter the checkpoint eligibility binding;
+V2 keeps rejecting sizes above its original limits. No source reader or collector
+is introduced by this module.
+
+One initial fit on the20 admitted development cases precedes any new source or
+reference access. At the fixed0.5 threshold it must identify at least one true
+positive and true negative to justify spending on new evidence; otherwise the
+request closes with DEVELOPMENT_NONDISCRIMINATION_STOP. This development screen
+is neither independent model quality nor a proof that the state task is impossible.
+The resulting v0 is shared downstream, rather than fitted again inside the Job.
+
+Only then are protection/update sources and references processed. A no-trigger
+update remains NOT_RUN; an actual rejected update is retained while v0 is chosen.
+Protection labels may make this fixed development choice but never enter gradients.
+The chosen candidate and predictions for every available evaluation slot must be
+committed before evaluation opinions are opened. The commitment binds request,
+code,cohort,candidate and prediction identities; the runtime dispatcher owns the
+actual file/access order, source qualification, budgets and independent rebuild.
+Hash equality by itself does not prove temporal isolation. All definite evaluation
+cases are retained, with pooled and time-block paired results. Conformance is
+`tests/unit/test_stage_head2_census.py`; real results remain separate per-run
+evidence. No probability calibration, P3 economic, P6 or production gate is opened.

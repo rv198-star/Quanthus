@@ -1,0 +1,63 @@
+{
+  "schema_version": "quanthus.learning-mvp.head2-temporal.v1",
+  "owner_authority": "2026-10-27 Asia/Shanghai: 按照1-3完成这批次处理",
+  "purpose": "Retrospective current20 orderly-range/consolidation candidate aid; prior20 context only",
+  "consumer_admission": "NOT_GRANTED",
+  "production_authorized": false,
+  "P6_activated": false,
+  "old_contracts_models_references_results": "Immutable; closed80 is design evidence only, never fitting, threshold selection or fresh evaluation",
+  "feature_contract": {
+    "base": "head2-features-v2, seven unchanged numeric columns",
+    "additional_numeric_columns": ["late_outside_earlier_range_fraction", "midrange_side_transition_fraction"],
+    "late_outside_earlier_range_fraction": "Current20 chronological rows1..20. Count last5 closes strictly outside [min(low1..15),max(high1..15)] and divide by5. Boundary equality is inside.",
+    "midrange_side_transition_fraction": "Current20 midpoint=(max(high)+min(low))/2. Remove exact zero close-minus-midpoint signs. Adjacent nonzero sign changes / max(1,nonzero_count-1). Fewer than2 nonzero signs gives0 with no-observed-transition reason. No epsilon.",
+    "arithmetic": "Decimal; deterministic local precision28 for ratios; original source times, values and provenance retained",
+    "required_window": "Exactly40 admitted sessions, one security/listing/venue and coordinate; no future, missing-price or reset interpolation",
+    "zero_net_support": "Both arms abstain ABSTAIN_UNSEEN_ZERO_NET_GEOMETRY if counter_direction_undefined was not observed in admitted TRAIN; all48 remain in coverage denominator"
+  },
+  "successor_training": {
+    "rows": 40,
+    "positive": 12,
+    "negative": 28,
+    "maximum_anchor": "2021-08-31",
+    "roles": "Prospective reuse of original20 TRAIN and20 definite qualified stage1 observations; old roles unchanged",
+    "arms": ["seven-feature matched control", "nine-feature temporal candidate"],
+    "same_rows_labels_order_masks": true,
+    "initial_fits_max": 2,
+    "steps_each": 200,
+    "learning_rate": 0.05,
+    "l2": 0.01,
+    "zero_initialization": true,
+    "scaler": "TRAIN only, separately by arm",
+    "class_reweighting": false,
+    "threshold": 0.5,
+    "threshold_feature_optimizer_search": false,
+    "incremental_update": "Not forced; no update authorized by this comparison"
+  },
+  "fresh_evaluation": {
+    "exact_slots": 48,
+    "blocks": {"2021-11": 24, "2021-12": 24},
+    "cohort": "Same2020 true-IPO SSE/SZSE native-CNY ordinary eligibility and all existing identity/alias/old-pool/global-holdout exclusions, excluding all consumed64+128 issuers",
+    "selection_hash": "sha256(canonicalJSON([head2-temporal-v1,EVALUATE,month,company_id,security_id,listing_id]))",
+    "selection": "Identity/calendar metadata only, freeze all48 before new market/reference access; no salt retry, replacement, year/window change or source-success selection",
+    "support_failure": "Stop proposal if fewer than48 eligible disjoint issuers; source failures/UNKNOWN remain denominator, never NEGATIVE",
+    "reference": "Same current20 target and blinded prior20/current20 facts; two independently launched blind roles, same packets, no model/R0/role/identity/future. Receipt before invocation. No third vote on old80.",
+    "prediction_freeze": "Both arms committed before new evaluation opinions",
+    "claim_scope": "Fresh issuers in previously observed market periods; not an independent temporal-regime or population test",
+    "continuation_gate": "In BOTH timeblocks: nine-feature FP strictly below seven-feature FP and positive recall not lower, on identical source-qualified definite supported rows; both classes must be present, identical coverage, no selective-abstention advantage. Otherwise stop this branch with tradeoff/inconclusive disposition.",
+    "report": "Full48 source/reference/support census, pooled and byblock confusion, paired errors, identical-coverage check; old20 v0 and R0 descriptive only"
+  },
+  "execution": {
+    "engineering_minutes_max": 120,
+    "contract_minutes_max": 30,
+    "implementation_minutes_max": 90,
+    "real_stage_minutes_max_if_sources_ready": 120,
+    "new_network_requests": 0,
+    "no_inherited_source_budget": true,
+    "activation": "Exact request/input/code/config/resource identities and source qualification frozen before each real stage; preflight before mkdir, persisted launch identity before invocation",
+    "missing_source": "Stop affected real comparison and prepare exact bounded P10 supplement request. Complete independent engineering; do not repair inputs in business line.",
+    "graph": "Fixed selection -> qualified source -> immutable facts TMP -> matched seven/nine fits -> frozen predictions -> blind references -> comparison -> independent reproduction",
+    "reuse": "One immutable fact TMP shared by both arms/reference; independent reproduction is an explicit separate mode",
+    "protected": "Only admitted2012-2021 retrospective inputs; no2022-2026 research, historical-as-known claim, economics or P6"
+  }
+}

@@ -39,7 +39,8 @@
       "watch_paths": [
         "src/quanthus/structure_facts*.py",
         "src/quanthus/structure_order*.py",
-        "src/quanthus/structure_trend*.py"
+        "src/quanthus/structure_trend*.py",
+        "src/quanthus/stage_learning/factor_slice.py"
       ]
     },
     {
@@ -54,7 +55,9 @@
       "focus_facet": "engineering",
       "watch_paths": [
         "src/quanthus/feature_registry.py",
-        "src/quanthus/label_registry.py"
+        "src/quanthus/label_registry.py",
+        "src/quanthus/stage_learning/factor_slice.py",
+        "config/research/factor541-*.json"
       ]
     },
     {

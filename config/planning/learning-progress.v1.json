@@ -4287,6 +4287,289 @@
         "S04",
         "EXPERT"
       ]
+    },
+    {
+      "id": "CP-541-20261027T201718460059Z",
+      "recorded_at": "2026-10-27T20:20:16.731057+00:00",
+      "actor": "Sol 6.1 Max: one-factor real research-consumer slice",
+      "work_item": "P3-FACTOR-001",
+      "outcome": "progress",
+      "summary": "固定128/2021已有合格来源，单次Facts和成交量因子接入真实队列；433→395名额，43移出/5替补；完整冷重建一致。非市场/经济价值，PIT与P6不授予。",
+      "evidence": [
+        {
+          "id": "SLICE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-consumer-20261027T200319Z-ca52277/evidence/factor541-assessment.safe.json",
+          "sha256": "08e31477f5bf04368507b793bbc3110bca12cf54b22b5bd6383f93b4e93ebb60",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "一个既有因子的真实研究队列筛选、精确算术和实际名额成本；不外推市场质量、策略或P6。"
+        },
+        {
+          "id": "COLD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-consumer-20261027T200319Z-ca52277/evidence/cold-reproduction.safe.json",
+          "sha256": "708e4309eac7eb4ee20bc95dc7c9e2ae0ac2fb2f3e9fe4c608ef0f3521205e16",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "独立文件/新进程完整Facts和队列一致，旧源隐藏/IP网络隔离；不是独立市场真值。"
+        },
+        {
+          "id": "NEGATIVE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-consumer-20261027T200319Z-ca52277/evidence/negative-and-namespace.safe.json",
+          "sha256": "55378ab3bc7dd4357b49f874c1ceb9390c8b293e46df6e00315efe45b1b8c2d1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅一次性副本损坏/缺文件失败关闭；命名空间阻断旧源及外网。"
+        },
+        {
+          "id": "AUTHORITY",
+          "kind": "authority",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-consumer-20261027T200319Z-ca52277/evidence/owner-authority.safe.json",
+          "sha256": "2beca5b820b961598c45bbc41037cba6aaa3196847b33ef17e07c3a1760086a4",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Owner只批准既有合格Facts的一个实际消费者切片，不扩大PIT/训练/生产。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "FACTS",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "固定128家2021回溯日线的一次共享Facts TMP；非整个事实库新验收",
+          "remaining": "其他数据/新用途仍须精确输入与时间绑定；无历史当时可知资格",
+          "next_action": "复用本切片语义身份，不重复建设前置",
+          "evidence": [
+            "SLICE",
+            "COLD"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "FACTS",
+          "facet": "quality",
+          "status": "accepted",
+          "scope": "19,302行限定回溯；15,570个prior20价格/成交量值独立精确算术一致，保留56非交易/3,676历史不足",
+          "remaining": "不证明市场真值、历史PIT或其他事实族质量",
+          "next_action": "按原用途复用；有新消费者才检查其必需字段",
+          "evidence": [
+            "SLICE",
+            "COLD"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "FACTS",
+          "facet": "admission",
+          "status": "research_only",
+          "scope": "本次Owner批准的既有128家/2021回溯研究队列",
+          "remaining": "历史acquisition/knowledge仍未知；未开放训练/交易/P6",
+          "next_action": "保持旧时间和冻结门槛",
+          "evidence": [
+            "SLICE",
+            "AUTHORITY"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "FACTORS",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "既有8定义统一catalog sidecar；单个liquidity.volume_ratio20到真实研究队列，保留严格Registry",
+          "remaining": "其他因子、跨状态/真实专家决策组合尚未验收；全仓检查另记",
+          "next_action": "只为实际消费需求扩展下一片，不凑满分类",
+          "evidence": [
+            "SLICE",
+            "COLD",
+            "NEGATIVE"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "FACTORS",
+          "facet": "quality",
+          "status": "accepted",
+          "scope": "选定因子公式/单位/版本/源绑定及T-only窗口精确通过；限定算术质量",
+          "remaining": "没有新的预测、市场状态或独立市场真值资格",
+          "next_action": "保留算术和用途价值分开报告",
+          "evidence": [
+            "SLICE",
+            "COLD"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "FACTORS",
+          "facet": "value",
+          "status": "accepted",
+          "scope": "固定回溯研究队列实测：433→395复核名额，少38；移出43/替补5，代价是49/585价格候选未继续",
+          "remaining": "只证明操作筛选及名额变化；人力分钟/预测/投资效果未评估",
+          "next_action": "保留可选研究筛选工具；决策用途必须另做价值验收",
+          "evidence": [
+            "SLICE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTORS",
+          "facet": "admission",
+          "status": "research_only",
+          "scope": "只允许本次回溯研究复核清单；不冒充legacy PIT FeatureFact",
+          "remaining": "未授予正式策略、训练、生产或P6；#541广义任务继续开放",
+          "next_action": "后续消费者用独立实验身份与明确目的接入",
+          "evidence": [
+            "SLICE",
+            "AUTHORITY"
+          ],
+          "supersedes": "BASELINE-20261027"
+        }
+      ],
+      "no_change_reason": "",
+      "issue_observations": [
+        {
+          "work_item": "P3-FACTOR-001",
+          "number": 541,
+          "title": "[P3-FACTOR-001] 统一因子目录与分类契约并交付首批有用途证据的因子切片",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:48Z",
+          "body_sha256": "593d18efdef49725bb3813b5c55fa8ee1251cb57303b4bcf2d972d364abc4fe0"
+        }
+      ]
+    },
+    {
+      "id": "CP-541-20261027T203512289806Z",
+      "recorded_at": "2026-10-27T20:35:41.542699+00:00",
+      "actor": "Current execution agent: bounded #541 handoff",
+      "work_item": "P3-FACTOR-001",
+      "outcome": "progress",
+      "summary": "本切片真实/冷/负测、56回归与全仓5348/20结果已记录；首轮监控器退出码限制保留，541仍开放。",
+      "evidence": [
+        {
+          "id": "CHECKS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-consumer-20261027T200319Z-ca52277/evidence/make-check.safe.json",
+          "sha256": "eb1f701e4d78247c36e0080977ca4348ff9053b4e91cfb8ff65dcd5c860e530b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "全仓pytest5348通过20跳过和阶段PASS输出；make最终wait status未捕获，不宣称远端CI或全仓lint/type绿色。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "FACTORS",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "八定义catalog sidecar与一个真实研究队列；56 focused和全仓5348/20结果、精确算术、独立冷重建及负测已记录",
+          "remaining": "全仓lint/type旧债务和远端Actions额度未解决；make观察器退出状态限制披露；其他因子/专家消费者未验收",
+          "next_action": "复用已验收的一个切片，按实际消费者需求决定扩展；不以本轮替代广义541验收",
+          "evidence": [
+            "CHECKS"
+          ],
+          "supersedes": "CP-541-20261027T201718460059Z"
+        }
+      ],
+      "no_change_reason": "",
+      "issue_observations": [
+        {
+          "work_item": "P3-FACTOR-001",
+          "number": 541,
+          "title": "[P3-FACTOR-001] 统一因子目录与分类契约并交付首批有用途证据的因子切片",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T20:35:10Z",
+          "body_sha256": "b92128e6d3de959c9a1e4b57c977027bee00bd699c7a7a955ff5f342818f9364"
+        }
+      ]
+    },
+    {
+      "id": "CP-540-20261027T202543163086Z",
+      "recorded_at": "2026-10-27T20:35:41.543065+00:00",
+      "actor": "Current execution agent: scoped #541 result to parent blueprint",
+      "work_item": "META-LEARN-001",
+      "outcome": "progress",
+      "summary": "541最小消费者切片已实际运行且复现；更新总览，广义MVP价值仍未得结论。",
+      "evidence": [
+        {
+          "id": "SLICE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-consumer-20261027T200319Z-ca52277/evidence/factor541-assessment.safe.json",
+          "sha256": "08e31477f5bf04368507b793bbc3110bca12cf54b22b5bd6383f93b4e93ebb60",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "一个既有因子的真实研究队列筛选、精确算术和实际名额成本；不外推市场质量、策略或P6。"
+        },
+        {
+          "id": "COLD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-consumer-20261027T200319Z-ca52277/evidence/cold-reproduction.safe.json",
+          "sha256": "708e4309eac7eb4ee20bc95dc7c9e2ae0ac2fb2f3e9fe4c608ef0f3521205e16",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "独立文件/新进程完整Facts和队列一致，旧源隐藏/IP网络隔离；不是独立市场真值。"
+        },
+        {
+          "id": "NEGATIVE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-consumer-20261027T200319Z-ca52277/evidence/negative-and-namespace.safe.json",
+          "sha256": "55378ab3bc7dd4357b49f874c1ceb9390c8b293e46df6e00315efe45b1b8c2d1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅一次性副本损坏/缺文件失败关闭；命名空间阻断旧源及外网。"
+        },
+        {
+          "id": "AUTHORITY",
+          "kind": "authority",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-consumer-20261027T200319Z-ca52277/evidence/owner-authority.safe.json",
+          "sha256": "2beca5b820b961598c45bbc41037cba6aaa3196847b33ef17e07c3a1760086a4",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Owner只批准既有合格Facts的一个实际消费者切片，不扩大PIT/训练/生产。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "新增一个已有因子到真实研究复核清单的完整切片；原连续Facts、状态学习工程与旧NO_GO均保留",
+          "remaining": "其他因子/专家和完整学习决策闭环仍未验收；本次没有新状态训练或整体策略比较",
+          "next_action": "复用已验收切片，仅按实际消费者缺口决定下一笔投入",
+          "evidence": [
+            "SLICE",
+            "COLD",
+            "NEGATIVE"
+          ],
+          "supersedes": "CP-540-PURPOSE-20261028-174025"
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "已观察一个研究清单的操作变化：433→395名额，移出43/替补5；不是整个MVP或投资价值通过",
+          "remaining": "没有独立预测/投资增益、实际人力分钟或完整专家决策证据；旧3/4样本和来源缺口仍未解决",
+          "next_action": "保留本切片为可选研究工具；真正决策用途需独立身份和明确增益标准，不自动重开状态或P6",
+          "evidence": [
+            "SLICE",
+            "AUTHORITY"
+          ],
+          "supersedes": "CP-540-PURPOSE-20261028-174025"
+        }
+      ],
+      "no_change_reason": "",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:53Z",
+          "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
+        }
+      ]
     }
   ]
 }

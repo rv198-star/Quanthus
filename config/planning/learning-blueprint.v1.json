@@ -68,7 +68,10 @@
       ],
       "focus_facet": "quality",
       "watch_paths": [
-        "src/quanthus/stage_learning/p5_input_census.py"
+        "src/quanthus/stage_learning/p5_input_census.py",
+        "src/quanthus/stage_learning/qualification.py",
+        "src/quanthus/stage_learning/prefix_qualification.py",
+        "src/quanthus/stage_learning/review_list.py"
       ]
     },
     {
@@ -125,7 +128,10 @@
       ],
       "focus_facet": "value",
       "watch_paths": [
-        "src/quanthus/stage_learning/head2_consumer.py"
+        "src/quanthus/stage_learning/head2_consumer.py",
+        "config/research/learning-mvp/stage34-breakout-list-use.v1.json",
+        "src/quanthus/stage_learning/review_list.py",
+        "config/research/learning-mvp/stage34-breakout-list-use.v2.json"
       ]
     },
     {
@@ -212,7 +218,10 @@
       "depends_on": [],
       "focus_facet": "quality",
       "watch_paths": [
-        "config/stage-learning/development-candidate.v1.json"
+        "config/stage-learning/development-candidate.v1.json",
+        "src/quanthus/stage_learning/qualification.py",
+        "src/quanthus/stage_learning/prefix_qualification.py",
+        "src/quanthus/stage_learning/review_list.py"
       ]
     },
     {
@@ -226,7 +235,10 @@
       ],
       "focus_facet": "quality",
       "watch_paths": [
-        "config/stage-learning/development-candidate.v1.json"
+        "config/stage-learning/development-candidate.v1.json",
+        "src/quanthus/stage_learning/qualification.py",
+        "src/quanthus/stage_learning/prefix_qualification.py",
+        "src/quanthus/stage_learning/review_list.py"
       ]
     },
     {
@@ -495,6 +507,17 @@
         "S04"
       ],
       "contribution": "固定128家2021上市前缀的限定来源资格；P10交接与P5参考、候选评价和消费者准入分开验收"
+    },
+    {
+      "id": "P10-DATA-STAGE34-ROUTE-002",
+      "issue": 571,
+      "modules": [
+        "DATA",
+        "REFERENCE",
+        "S03",
+        "S04"
+      ],
+      "contribution": "245家2021潜在身份路线的零采集现存来源资格；与旧128交接、研究参考、质量及消费者准入分开验收"
     }
   ]
 }

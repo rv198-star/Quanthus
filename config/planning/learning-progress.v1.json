@@ -3303,6 +3303,112 @@
           "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
         }
       ]
+    },
+    {
+      "id": "CP-540-ASTRA-PREFIX128-20261027",
+      "recorded_at": "2026-10-27T14:46:58.391196+00:00",
+      "actor": "Astra: audit of source/reference scope, pre-reference capacity, consumer authority",
+      "work_item": "META-LEARN-001",
+      "outcome": "progress",
+      "summary": "保留来源交付与参考不足结论；3/4为当前主线，Head2七特征备用；发现稀缺分层被占用及用途授权标志缺门槛，先修设计再决定一次验证。",
+      "evidence": [
+        {
+          "id": "ASTRA_PREFIX128_REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/AgentDock/base22-review-afe2526/stage34-astra-audit-20261027T144559Z-f0291b7/review.md",
+          "sha256": "563f0b8decb2d56ba345b296df6233ec2a45613c8b04fc4913f2932303f18c24",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本轮只读审计与下一步建议；125项独立focused通过，当前318参考不足保留；未训练、重评分、补采或授予消费者资格。"
+        },
+        {
+          "id": "PREFIX128_ALLOCATION_AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/AgentDock/base22-review-afe2526/stage34-astra-audit-20261027T144559Z-f0291b7/evidence/capacity-audit.safe.json",
+          "sha256": "3035754a66d6b98afa4b3c2dac242dec0322770c6f16e8d18e7cef64832357f7",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "同一固定128、321个episode的原分配容量诊断；199个reclaimed和18个mature被前层占用，不代表重新抽样或新参考通过。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "inconclusive",
+          "supersedes": "CP-542-PREFIX128-20261027T130854Z",
+          "scope": "318个参考仍为100/98/16；321个episode中199个reclaimed及18个mature被前层占用，零选入不等于来源无事件",
+          "remaining": "冻结分配的稀缺层饥饿及synthetic规则参考上限；75个包不足61行；去重episode非统计独立",
+          "next_action": "先做分配后容量预检、用途与参考设计；不直接扩采或按旧结果补人数",
+          "evidence": [
+            "ASTRA_PREFIX128_REVIEW",
+            "PREFIX128_ALLOCATION_AUDIT"
+          ]
+        },
+        {
+          "module": "S03",
+          "facet": "quality",
+          "status": "inconclusive",
+          "supersedes": "CP-543-PREFIX128-20261027T130854Z",
+          "scope": "冻结3/4候选仍未评分；七特征Head2未继续训练",
+          "remaining": "来源完成不代表突破试探识别或研究用途有效",
+          "next_action": "复用固定R1，先修容量与用途契约，通过后只评价一次新冻结样本",
+          "evidence": [
+            "ASTRA_PREFIX128_REVIEW",
+            "PREFIX128_ALLOCATION_AUDIT"
+          ]
+        },
+        {
+          "module": "S04",
+          "facet": "quality",
+          "status": "inconclusive",
+          "supersedes": "CP-543-PREFIX128-20261027T130854Z",
+          "scope": "明确4仍98，旧结论不变；成熟站稳有18个episode但均已分配给前层",
+          "remaining": "新IPO短历史和分层占用同时存在，尚无证据单靠延长历史能解决",
+          "next_action": "新协议先保证稀缺层分配可行，再按实际来源选择更长历史或其他合格总体",
+          "evidence": [
+            "ASTRA_PREFIX128_REVIEW",
+            "PREFIX128_ALLOCATION_AUDIT"
+          ]
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "supersedes": "BASELINE-20261027",
+          "scope": "本次消费者仍NOT_RUN；审计复现未来质量PASS会直接令consumer_test_authorized=true",
+          "remaining": "缺用途契约及授权回执检查；当前真实false路径未触发，也无生产变更",
+          "next_action": "先修独立用途准入与默认拒绝；明确一个同信息同成本研究列表比较后再授权测试",
+          "evidence": [
+            "ASTRA_PREFIX128_REVIEW",
+            "PREFIX128_ALLOCATION_AUDIT"
+          ]
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "supersedes": "CP-540-PREFIX128-20261027T130855Z",
+          "scope": "当前转向3/4可行性；Head2七特征备用，九特征拒绝；本批没有新增用途价值",
+          "remaining": "缺一个具体可用状态的用途增益；无整体百分比分母",
+          "next_action": "下一批前两步最多150分钟：修边界、容量预检、用途与新参考设计；合格后一次最多120分钟比较，失败不自动续轮",
+          "evidence": [
+            "ASTRA_PREFIX128_REVIEW",
+            "PREFIX128_ALLOCATION_AUDIT"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:53Z",
+          "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
+        }
+      ]
     }
   ]
 }

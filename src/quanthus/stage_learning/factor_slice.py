@@ -465,16 +465,20 @@ def run(*, source: Path, repo: Path, output: Path, budget_path: Path,
             raise FactorSliceError("FACTOR_EXECUTION_BUDGET")
 
     guard()
+    if utility:
+        # Load the optional executor before checking actual module origins.
+        from quanthus.stage_learning.factor_review_utility import evaluate, load_contract
     verify_execution_closure(repo, budget.get("code_and_config_members"))
     catalog = load_catalog(repo)
     utility_spec = None
     if type(utility) is not bool:
         raise FactorSliceError("FACTOR_USE_ACTIVATION_TYPE")
     if utility:
-        from quanthus.stage_learning.factor_review_utility import load_contract
         utility_spec = load_contract(repo)
         if budget.get("utility_contract_sha256") != sha_file(checked_member(repo, USE_POLICY)):
             raise FactorSliceError("FACTOR_USE_CONTRACT_NOT_FROZEN")
+        if budget.get("source_handoff_sha256") != utility_spec["scope"]["source_handoff_sha256"]:
+            raise FactorSliceError("FACTOR_USE_SOURCE_HANDOFF_NOT_FROZEN")
     output.mkdir()
 
     def save(name: str, value: Any) -> str:
@@ -526,7 +530,6 @@ def run(*, source: Path, repo: Path, output: Path, budget_path: Path,
     save("component-costs.safe.json", component_costs)
     utility_digest = None
     if utility_spec is not None:
-        from quanthus.stage_learning.factor_review_utility import evaluate
         result = stage("five_session_use_diagnostic", lambda: evaluate(
             admissions, facts, anchor_levels, baseline, candidate,
             identity=identity, spec=utility_spec), "REUSED_SHARED_FACTS_AND_ANCHORS")
@@ -585,4 +588,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # Keep one identity class when the optional executor imports this module.
+    from quanthus.stage_learning.factor_slice import main as canonical_main
+    canonical_main()

@@ -110,6 +110,8 @@ high in the next five exchange sessions. Equality is not failure. All five sessi
 present, admitted and in the same listing/price coordinate. Any action boundary, unavailable
 session or incomplete2021 tail yields unknown; no2022 data is read and unknowns retain their
 denominator. The future observations score the diagnostic only, never enter T's features.
+The diagnostic also requires the exact handoff digest named in its frozen scope before
+source access; a same-census replacement cannot silently become its input.
 
 The primary conditional-capacity control takes the first N original price/hash selections
 on each date, where N is that date's candidate count. It is a same-count diagnostic, not an

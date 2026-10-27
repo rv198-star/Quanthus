@@ -125,6 +125,53 @@ def test_actual_import_origin_must_match_declared_tree(tmp_path):
         verify_execution_closure(REPO, execution_members(REPO))
 
 
+def test_module_cli_dispatches_the_canonical_identity_owner():
+    import os
+    import subprocess
+    import sys
+
+    code = """
+import runpy, warnings
+from quanthus.stage_learning import factor_slice
+calls = []
+factor_slice.main = lambda: calls.append('canonical')
+warnings.simplefilter('ignore', RuntimeWarning)
+runpy.run_module('quanthus.stage_learning.factor_slice', run_name='__main__')
+assert calls == ['canonical']
+"""
+    result = subprocess.run([sys.executable, "-B", "-c", code], cwd=REPO,
+                            env={**os.environ, "PYTHONPATH": str(REPO / "src")},
+                            capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+
+
+def test_diagnostic_exact_handoff_is_checked_before_mkdir_or_source(tmp_path):
+    import hashlib
+
+    source, output = tmp_path / "source", tmp_path / "output"
+    source.mkdir()
+    budget = {
+        "purpose": "RETROSPECTIVE_RESEARCH_REVIEW_QUEUE_ONLY", "new_source_requests": 0,
+        "source_root": str(source), "output": str(output),
+        "source_handoff_sha256": "0" * 64,
+        "utility_contract_sha256": hashlib.sha256(
+            (REPO / "config/research/factor541-five-session-diagnostic.v1.json").read_bytes()
+        ).hexdigest(),
+        "code_and_config_members": execution_members(REPO),
+        "deadline": (datetime.now(timezone.utc) + timedelta(minutes=1)).isoformat(),
+        "maximum_seconds": 60, "rss_bytes": 4 * 1024**3,
+        "minimum_free_bytes": 0, "maximum_output_bytes": 1024,
+    }
+    path = tmp_path / "budget.json"
+    path.write_text(json.dumps(budget))
+    with patch("quanthus.stage_learning.factor_slice.read_admissions",
+               side_effect=RuntimeError("SOURCE_MUST_NOT_BE_REACHED")) as reader:
+        with pytest.raises(FactorSliceError, match="USE.*HANDOFF"):
+            run(source=source, repo=REPO, output=output, budget_path=path, utility=True)
+        reader.assert_not_called()
+    assert not output.exists()
+
+
 @pytest.mark.parametrize("closure", [[], ["config/research/factor541-volume-review.v1.json"]])
 def test_incomplete_code_closure_rejected_before_mkdir_or_source(tmp_path, closure):
     import hashlib

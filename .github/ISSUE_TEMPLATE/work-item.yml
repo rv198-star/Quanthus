@@ -37,6 +37,14 @@ body:
       description: List observable evidence required before this issue can close.
     validations:
       required: true
+  - type: textarea
+    id: blueprint_impact
+    attributes:
+      label: Blueprint impact
+      description: For learning MVP work, name module IDs and the engineering/quality/value/admission facet. For other work, state outside-scope and its governing plan.
+      placeholder: "S02 / quality: compare one fixed candidate; closing this issue will not grant production admission."
+    validations:
+      required: true
   - type: checkboxes
     id: discipline
     attributes:

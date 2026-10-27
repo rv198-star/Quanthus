@@ -84,6 +84,17 @@ compile:
 
 planning-check:
 	$(PYTHON) scripts/sync_github_planning.py >/dev/null
+	$(PYTHON) scripts/blueprint_progress.py check
+
+.PHONY: blueprint-check blueprint-render blueprint-audit
+blueprint-check:
+	$(PYTHON) scripts/blueprint_progress.py check
+
+blueprint-render:
+	$(PYTHON) scripts/blueprint_progress.py render
+
+blueprint-audit:
+	$(PYTHON) scripts/blueprint_progress.py audit --output artifacts/blueprint/issues.json
 
 check: doctor compile test planning-check
 

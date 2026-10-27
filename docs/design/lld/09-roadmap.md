@@ -87,6 +87,13 @@ optional authoring is not applicable to the first cutover and remains separately
 
 ## 4. Release mechanics
 
+The learning-system MVP adopts [blueprint-linked progress](../blueprint-progress.md): each
+tracked issue maps to stable module IDs, and meaningful outcomes append scoped evidence before
+the generated module view changes. GitHub issue lifecycle, engineering, research quality,
+purpose value and consumer admission are independent. CI detects missing reconciliation and
+edited history; it never promotes a module or rewrites a frozen gate. The first adoption is
+#540–#548, not a migration of all sealed historical phase records.
+
 Each phase has a GitHub milestone and an epic issue. Child issues carry stable ids from
 `docs/work-items/index.md`, list dependency ids, and link the governing LLD section. A gate
 changes only through configuration, tests, and evidence in one pull request.

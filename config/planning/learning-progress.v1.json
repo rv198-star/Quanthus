@@ -1,0 +1,1078 @@
+{
+  "schema_version": "quanthus.blueprint-progress.v1",
+  "records": [
+    {
+      "id": "BASELINE-20261027",
+      "recorded_at": "2026-10-27T06:06:14.474830+00:00",
+      "actor": "Codex: verified repository metadata and named sealed safe receipts",
+      "work_item": "META-LEARN-001",
+      "outcome": "baseline",
+      "summary": "Seed 12+X and shared MVP capabilities from current reviewed evidence; retain limitations and no promotion.",
+      "evidence": [
+        {
+          "id": "PORTFOLIO",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "28df28f295ebf696d67873aeb914c2403e4f2bc4",
+          "path": "config/stage-learning/stage-whole-vocabulary-portfolio-synthesis.v1.json",
+          "sha256": "d71aac7893611f62b3ebc58df81f395b5d7b7c88a1dc255840f502c3e3638fe5",
+          "claim_ceiling": "历史语义与研究处置；不接受生产状态标签。"
+        },
+        {
+          "id": "BUNDLE",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "28df28f295ebf696d67873aeb914c2403e4f2bc4",
+          "path": "docs/work-items/stage-layered-proposition-bundle.md",
+          "sha256": "b9ecf3615c9b2859abebae4d9cf189c679122af234ad52f406a898e207bbb1e9",
+          "claim_ceiling": "已接受分层表示与开发视图；不授予新消费者使用。"
+        },
+        {
+          "id": "PROJECTION",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "28df28f295ebf696d67873aeb914c2403e4f2bc4",
+          "path": "config/stage-10-11-projection-delivery.v1.json",
+          "sha256": "dc8149c452994b494c7800ca052c3ef793f5399d86b4505a229eabfe3db46e6a",
+          "claim_ceiling": "限定10/11开发投影及旧不可变证据；不证明交易收益。"
+        },
+        {
+          "id": "THREE_FOUR",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "28df28f295ebf696d67873aeb914c2403e4f2bc4",
+          "path": "docs/acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md",
+          "sha256": "ca83aec94d41e7d670adff275a41b53de56256435f1f88026289c8f0899d766d",
+          "claim_ceiling": "旧外样本在评分前样本不足；不得改称识别质量失败或未消费盲样本。"
+        },
+        {
+          "id": "UTILITY",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "28df28f295ebf696d67873aeb914c2403e4f2bc4",
+          "path": "docs/acceptance/stage-p033-consumer-utility-20260916.md",
+          "sha256": "71c35e5ba4ad04b9d50b0ea0f1d9e14235ab10d9d6758c12b84f074b2c295501",
+          "claim_ceiling": "旧解释实验对照信息不等价；归因未闭合。"
+        },
+        {
+          "id": "HEAD2_REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/AgentDock/base22-review-afe2526/head2-temporal-review-20261027T050025Z-7f4ecc9/review.md",
+          "sha256": "f273f3920a411610a05b14793f3d788c18b665fba57316744d2d9a037800d3f2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "7f4ecc9批次复审；九特征拒绝、七特征未取得消费者资格；非新独立训练。"
+        },
+        {
+          "id": "FIT_UPDATE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/p10-mvp-window-run-20261025T211421Z-65d0788/rx6800-connect-20261026T062134Z/real-fit-and-reproduction.safe.json",
+          "sha256": "7d9dd8585dc8def5b01e8f793d42d6c3f1b25aa47368ba6590336d41ecd2abe5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原有限真实拟合、局部更新和从头复现；不外推后续所有候选。"
+        },
+        {
+          "id": "P3_INTERFACE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-mvp-run-20261025T175208Z-4199786/evidence/step2-engineering-complete.safe.json",
+          "sha256": "9f47e69e8c189772f27955764c58b71406cc43219ac5de74b4c90dfd7361d301",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "最小P3接口合成等价/拒绝验收，不代表真实经济比较。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "形成有实际用途、可比较并可保留旧版的有限学习闭环",
+          "remaining": "至少一个有明确用途的状态及完整决策价值未闭合",
+          "next_action": "先完成蓝图关联机制，不启动新研究批次",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "形成有实际用途、可比较并可保留旧版的有限学习闭环",
+          "remaining": "至少一个有明确用途的状态及完整决策价值未闭合",
+          "next_action": "先完成蓝图关联机制，不启动新研究批次",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "MVP",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "至少一个有明确用途的状态及完整决策价值未闭合",
+          "next_action": "先完成蓝图关联机制，不启动新研究批次",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "DATA",
+          "facet": "admission",
+          "status": "unassessed",
+          "scope": "P10是外部常设供给依赖",
+          "remaining": "本轮未重新验收完整数仓",
+          "next_action": "按实际消费者冻结准确输入，不为本蓝图重建数仓",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTS",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "既有连续事实族",
+          "remaining": "新用途需准确输入与时间绑定",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTS",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "既有连续事实族",
+          "remaining": "新用途需准确输入与时间绑定",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTS",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "新用途需准确输入与时间绑定",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTORS",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "同一资产可跨状态/专家复用，保留单位、时点与血缘",
+          "remaining": "跨状态最小统一消费契约未全验收",
+          "next_action": "只整理下个实际消费者需要的切片",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTORS",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "同一资产可跨状态/专家复用，保留单位、时点与血缘",
+          "remaining": "跨状态最小统一消费契约未全验收",
+          "next_action": "只整理下个实际消费者需要的切片",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTORS",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "跨状态最小统一消费契约未全验收",
+          "next_action": "只整理下个实际消费者需要的切片",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "REFERENCE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "按候选冻结来源、参考、暴露、时间及预算",
+          "remaining": "新批次独立来源/参考需另冻结",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "按候选冻结来源、参考、暴露、时间及预算",
+          "remaining": "新批次独立来源/参考需另冻结",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "REFERENCE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "新批次独立来源/参考需另冻结",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "STATES",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "分层容器、共存和证据等级",
+          "remaining": "各头资格独立，容器完成不等于全12头可用",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "BUNDLE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "STATES",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "分层容器、共存和证据等级",
+          "remaining": "各头资格独立，容器完成不等于全12头可用",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "BUNDLE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "STATES",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "各头资格独立，容器完成不等于全12头可用",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "BUNDLE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "TRAIN",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "首个有限真实fit已执行",
+          "remaining": "可用候选识别质量未闭合",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "TRAIN",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "首个有限真实fit已执行",
+          "remaining": "可用候选识别质量未闭合",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "TRAIN",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "可用候选识别质量未闭合",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "UPDATE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "首个有限局部更新已执行",
+          "remaining": "更新执行不等于新版本更优",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "UPDATE",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "首个有限局部更新已执行",
+          "remaining": "更新执行不等于新版本更优",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "UPDATE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "更新执行不等于新版本更优",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "最小复用接口合成等价及拒绝回归",
+          "remaining": "新候选完整决策增益尚未证明",
+          "next_action": "复用接口，等待合格候选与精确比较用途",
+          "evidence": [
+            "P3_INTERFACE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "EXPERT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "最小复用接口合成等价及拒绝回归",
+          "remaining": "新候选完整决策增益尚未证明",
+          "next_action": "复用接口，等待合格候选与精确比较用途",
+          "evidence": [
+            "P3_INTERFACE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "新候选完整决策增益尚未证明",
+          "next_action": "复用接口，等待合格候选与精确比较用途",
+          "evidence": [
+            "P3_INTERFACE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "首个fit/update从头复现；不代表时间特征批次独立refit",
+          "remaining": "各运行独立复现要求分别记录",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "REPRO",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "首个fit/update从头复现；不代表时间特征批次独立refit",
+          "remaining": "各运行独立复现要求分别记录",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "REPRO",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "各运行独立复现要求分别记录",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "四类结论分别给出；负结果不能伪装产品可用",
+          "remaining": "完整产品MVP尚未验收",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "四类结论分别给出；负结果不能伪装产品可用",
+          "remaining": "完整产品MVP尚未验收",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "完整产品MVP尚未验收",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "P6",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "既有引擎可复用；新候选未启动",
+          "remaining": "新候选价值与用途门槛未过",
+          "next_action": "保留不启动决定",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "P6",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "既有引擎可复用；新候选未启动",
+          "remaining": "新候选价值与用途门槛未过",
+          "next_action": "保留不启动决定",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S00",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "主状态资格暂停",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S00",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "主状态资格暂停",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S00",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "主状态资格暂停",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S01",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "下降父状态12未合格",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S01",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "下降父状态12未合格",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S01",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "下降父状态12未合格",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S02",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "七特征用途与独立资格未闭合；九特征未通过",
+          "next_action": "保留七特征；九特征停止扩展，不自动启动新批次",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S02",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "七特征用途与独立资格未闭合；九特征未通过",
+          "next_action": "保留七特征；九特征停止扩展，不自动启动新批次",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S02",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "七特征用途与独立资格未闭合；九特征未通过",
+          "next_action": "保留七特征；九特征停止扩展，不自动启动新批次",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S03",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "旧外样本不足；无新独立验证",
+          "next_action": "先核对现有输入与新参考可行性，条件通过才提出新运行",
+          "evidence": [
+            "THREE_FOUR"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S03",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "旧外样本不足；无新独立验证",
+          "next_action": "先核对现有输入与新参考可行性，条件通过才提出新运行",
+          "evidence": [
+            "THREE_FOUR"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S03",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "旧外样本不足；无新独立验证",
+          "next_action": "先核对现有输入与新参考可行性，条件通过才提出新运行",
+          "evidence": [
+            "THREE_FOUR"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S04",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "同一突破过程的持续性与新独立验证",
+          "next_action": "与3联合评估，不重复消耗旧盲样本",
+          "evidence": [
+            "THREE_FOUR"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S04",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "同一突破过程的持续性与新独立验证",
+          "next_action": "与3联合评估，不重复消耗旧盲样本",
+          "evidence": [
+            "THREE_FOUR"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S04",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "同一突破过程的持续性与新独立验证",
+          "next_action": "与3联合评估，不重复消耗旧盲样本",
+          "evidence": [
+            "THREE_FOUR"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S05",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "旧候选未过，需要新的明确假设",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S05",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "旧候选未过，需要新的明确假设",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S05",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "旧候选未过，需要新的明确假设",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S06",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "与5联合候选未通过",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S06",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "与5联合候选未通过",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S06",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "与5联合候选未通过",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S07",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "原候选均有门槛未过",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S07",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "原候选均有门槛未过",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S07",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "原候选均有门槛未过",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S08",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "代表性样本覆盖与资格不足",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S08",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "代表性样本覆盖与资格不足",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S08",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "代表性样本覆盖与资格不足",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S09",
+          "facet": "quality",
+          "status": "blocked",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "缺有根据的成交活动/量价关系",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S09",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "缺有根据的成交活动/量价关系",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S09",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "缺有根据的成交活动/量价关系",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S10",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "实际用途价值未闭合",
+          "next_action": "复用已有开发投影，不重复建设",
+          "evidence": [
+            "PROJECTION",
+            "UTILITY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S10",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "实际用途价值未闭合",
+          "next_action": "复用已有开发投影，不重复建设",
+          "evidence": [
+            "PROJECTION",
+            "UTILITY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S10",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "模块台账不是执行授权",
+          "remaining": "实际用途价值未闭合",
+          "next_action": "复用已有开发投影，不重复建设",
+          "evidence": [
+            "PROJECTION",
+            "UTILITY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S11",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "实际用途价值未闭合，反弹不等于修复",
+          "next_action": "与10一并复用，不自动晋级",
+          "evidence": [
+            "PROJECTION",
+            "UTILITY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S11",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "实际用途价值未闭合，反弹不等于修复",
+          "next_action": "与10一并复用，不自动晋级",
+          "evidence": [
+            "PROJECTION",
+            "UTILITY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S11",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "模块台账不是执行授权",
+          "remaining": "实际用途价值未闭合，反弹不等于修复",
+          "next_action": "与10一并复用，不自动晋级",
+          "evidence": [
+            "PROJECTION",
+            "UTILITY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S12",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "参考不可判断率超过原门槛",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S12",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "参考不可判断率超过原门槛",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S12",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "参考不可判断率超过原门槛",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CONTROL",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "中性/弃权/冻结拒绝路径",
+          "remaining": "新消费者仍须保留这些边界",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "BUNDLE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CONTROL",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "中性/弃权/冻结拒绝路径",
+          "remaining": "新消费者仍须保留这些边界",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "BUNDLE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CONTROL",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "新消费者仍须保留这些边界",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "BUNDLE"
+          ],
+          "supersedes": null
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-25T17:15:46Z",
+          "body_sha256": "b77e7db9f35cdbed04543e1339e4af44df801659f1ff497fe7c58c0854c7fb87"
+        },
+        {
+          "work_item": "P3-FACTOR-001",
+          "number": 541,
+          "title": "[P3-FACTOR-001] 统一因子目录与分类契约并交付首批有用途证据的因子切片",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T19:32:14Z",
+          "body_sha256": "375786fde1e79512136fc0ef5ddb7ba50b0bb0b6080ca856285fa7ac245a3d4f"
+        },
+        {
+          "work_item": "P5-STATE-002",
+          "number": 542,
+          "title": "[P5-STATE-002] 冻结首轮状态学习的输入、独立参考、可训练头与预算",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-25T20:53:36Z",
+          "body_sha256": "2560c50792e1e56d65fe0901b18b027ca403fdccc656215a4fbb936fdabd2f8b"
+        },
+        {
+          "work_item": "P5-STATE-003",
+          "number": 543,
+          "title": "[P5-STATE-003] 训练并评价首个有资格的12+X分层状态模型版本",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T19:32:20Z",
+          "body_sha256": "f9345550082cd6f2ea908d9f85fe0d232b276338ac27e77c9c1236d6e00d6e1c"
+        },
+        {
+          "work_item": "P5-LOCAL-001",
+          "number": 544,
+          "title": "[P5-LOCAL-001] 完成一次单模块局部训练及新旧版本比较",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T19:32:23Z",
+          "body_sha256": "6d1efa4f8cee9159d9fa12f2b1f6a4e90fb5bc328717a091b60824a920ccef90"
+        },
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T20:24:16Z",
+          "body_sha256": "ce4c28009f1c4d92cd9f7f4aeb885e15966c144830289ef573f2f1cad5bfb079"
+        },
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T20:24:19Z",
+          "body_sha256": "54c832c50a06213bbc957a83a33c5eaaf956168b86324b98d839f66b9f7b0c04"
+        },
+        {
+          "work_item": "P3-EXPERT-008",
+          "number": 547,
+          "title": "[P3-EXPERT-008] 在基础MVP后按职责和边际贡献逐个扩展专家角色",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T19:32:32Z",
+          "body_sha256": "c886690ae24bcd33d935f8b123b89b06d9f6c25ff280a70cdad7bb44c6af2f32"
+        },
+        {
+          "work_item": "P3-DECISION-001",
+          "number": 548,
+          "title": "[P3-DECISION-001] 在基础MVP后有界改进专家组合和整体决策机制",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T19:32:35Z",
+          "body_sha256": "b87bf30a592d40925c626d91dcb15a1d770cc4f042ec3e6a7b1d69fb83160d9d"
+        }
+      ]
+    }
+  ]
+}

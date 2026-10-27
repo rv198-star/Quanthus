@@ -127,6 +127,25 @@
   result-bearing training, P3-STRAT data-authority inheritance, P6 mutation, promotion or trading.
 - Negative, partial, data-limited, compute-limited and inconclusive outcomes are all valid.
 
+## Blueprint-linked work
+
+- For learning-system work under #540–#548, read
+  `docs/work-items/learning-blueprint-progress.md` and run
+  `python3 scripts/blueprint_progress.py context --issue NUMBER` before starting.
+  Register a new work item and its module contribution before expanding this tracked scope.
+- At an accepted milestone, rejection, blocker, defer/stop, issue close or reopen, append one
+  evidence-bound checkpoint through `scripts/blueprint_progress.py record --checkpoint PATH`.
+  State the module/facet affected, exact scope, remaining gap and next action. An explicit
+  no-module-change disposition is valid; routine logs need no checkpoint.
+- Keep issue lifecycle, engineering, research quality, purpose value and consumer admission
+  separate. Issue closure and green tests never promote a state head or grant execution.
+  Preserve old checkpoints, failures and frozen research gates. TPlan tracks execution;
+  the repository ledger owns the current reported module view, not scientific authority.
+- Regenerate and check the blueprint in the same handoff. Reconcile exact live issue metadata
+  after closure/reopening; a drift is a bookkeeping gap, not a new global data/research gate.
+  Fix that gap before claiming the affected progress, while unrelated authorized work continues.
+  The governing mechanism is `docs/design/blueprint-progress.md`.
+
 ## Development
 
 - Support Python 3.10 or newer.

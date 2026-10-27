@@ -3,12 +3,12 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved for this bounded slice by Owner 2026-10-28 |
-| Delivery gate | open after [independent review](../acceptance/factor541-astra-review-20261028.md): fixed-run arithmetic retained, three reuse-boundary fixes pending and purpose value inconclusive; [original evidence](../acceptance/factor541-review-slice-20261028.md) preserved |
+| Delivery gate | accepted-conditional for the repaired bounded engineering slice; [convergence evidence](../acceptance/factor541-convergence-20261028.md) records fixed-result identity and isolated reproduction. Purpose value remains inconclusive; the volume gate is parked. [Independent review](../acceptance/factor541-astra-review-20261028.md) and [original evidence](../acceptance/factor541-review-slice-20261028.md) remain historical records |
 | Work item | P3-FACTOR-001 / #541 |
 | Parent | [Continuous Structure Facts](continuous-structure-facts-v1.md) |
 | Blueprint | [module progress](../work-items/learning-blueprint-progress.md) |
 | Contract | `config/research/factor541-volume-review.v1.json` |
-| Code / conformance | `stage_learning/factor_slice.py`; `tests/unit/test_factor_slice.py` |
+| Code / conformance | `stage_learning/factor_slice.py`, `factor_review_utility.py`; `tests/unit/test_factor_slice.py`, `test_factor_slice_boundaries.py`, `test_factor_review_utility.py` |
 
 ## Question and bounded purpose
 

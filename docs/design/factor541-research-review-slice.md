@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved for this bounded slice by Owner 2026-10-28 |
-| Delivery gate | accepted-conditional for this retrospective review slice; [evidence](../acceptance/factor541-review-slice-20261028.md) |
+| Delivery gate | open after [independent review](../acceptance/factor541-astra-review-20261028.md): fixed-run arithmetic retained, three reuse-boundary fixes pending and purpose value inconclusive; [original evidence](../acceptance/factor541-review-slice-20261028.md) preserved |
 | Work item | P3-FACTOR-001 / #541 |
 | Parent | [Continuous Structure Facts](continuous-structure-facts-v1.md) |
 | Blueprint | [module progress](../work-items/learning-blueprint-progress.md) |

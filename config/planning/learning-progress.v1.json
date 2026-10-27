@@ -4570,6 +4570,108 @@
           "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
         }
       ]
+    },
+    {
+      "id": "CP-541-20261027T211718667394Z",
+      "recorded_at": "2026-10-27T21:17:18.667394+00:00",
+      "actor": "Astra independent review of PR572 at8c4bd034ec1a022e13a44986bce33d08b01d565a",
+      "work_item": "P3-FACTOR-001",
+      "outcome": "progress",
+      "summary": "独立重算通过；发现三项复用边界P2，工程partial；清单减少不等于有效筛选，value改为inconclusive；新make直接exit0。",
+      "evidence": [
+        {
+          "id": "REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-review-20261027T204749Z-8c4bd03/evidence/review-verdict.safe.json",
+          "sha256": "a6e5125653d8d7689010e915abb555771145d27e95bb1c29a7ee4580a55a4267",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "三项合成复现与结论校准；不宣称原固定数据有错、用途有效或新增准入。"
+        },
+        {
+          "id": "RECOUNT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-review-20261027T204749Z-8c4bd03/evidence/independent-recount.safe.json",
+          "sha256": "e674ecfc0e2acf603796875e3432fef2b0b44df3f8e3f85862e32fc58529dbb7",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "限定2021原输入全量算术与队列重算；共享原native admission adapter，不是完全独立源资格。"
+        },
+        {
+          "id": "CAPACITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-review-20261027T204749Z-8c4bd03/evidence/equal-cost-capacity.safe.json",
+          "sha256": "6b1085e4d0a7e3deb6efe324b93090fd8b29a3bce271e99e2f5b86ea4387868a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "同数量395条中18处选择变化；未读未来结果，不是价值试验。"
+        },
+        {
+          "id": "CHECKS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/factor541-review-20261027T204749Z-8c4bd03/evidence/make-check.safe.json",
+          "sha256": "0894d88bdd168452a542af4cb13da15763f5611b49b29b863a346c3f1476d21b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本轮全新make check直接exit0，5348/20；不代表远端CI或全仓lint/type通过。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "FACTORS",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "原固定切片重算正确且新make直接exit0；三处合成复现的可复用入口缺口待修，PR572保持draft",
+          "remaining": "语义配置一致性、面板/定义/来源真实绑定、完整实际执行代码闭包未校验；冷重建原namespace过宽；全仓lint/type及远端CI旧限制",
+          "next_action": "先集中修三项P2并补回归；旧输入结果保持，冷重建挂载缩至所需代码/源副本/新输出",
+          "evidence": [
+            "REVIEW",
+            "CHECKS"
+          ],
+          "supersedes": "CP-541-20261027T203512289806Z"
+        },
+        {
+          "module": "FACTORS",
+          "facet": "quality",
+          "status": "accepted",
+          "scope": "仅8c4bd03固定128家2021输入/定义的19302行算术及逐日选择独立重算一致；不外推任意面板源绑定",
+          "remaining": "通用消费入口尚不能证明外来面板来源；没有独立用途、预测、市场真值或历史PIT资格",
+          "next_action": "保留固定批次数值结论，修复入口后再按新用途冻结评价",
+          "evidence": [
+            "REVIEW",
+            "RECOUNT"
+          ],
+          "supersedes": "CP-541-20261027T201718460059Z"
+        },
+        {
+          "module": "FACTORS",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "433→395/移出43/替补5及49排除真实；只说明减少条目，同成本对照395条中仅18处选择不同",
+          "remaining": "新独立研究队列未接既有专家/人工工作流；筛选有用性、实际人力省时及投资价值未测量",
+          "next_action": "建议修入口后只做一次上限3小时的同成本用途诊断；不足即停放门槛，不扩因子/来源或启动P6",
+          "evidence": [
+            "REVIEW",
+            "CAPACITY"
+          ],
+          "supersedes": "CP-541-20261027T201718460059Z"
+        }
+      ],
+      "no_change_reason": "FACTS固定批次算术再次验证，既有研究-only admission与其他模块门槛不变；本轮未运行未来结果实验。",
+      "issue_observations": [
+        {
+          "work_item": "P3-FACTOR-001",
+          "number": 541,
+          "title": "[P3-FACTOR-001] 统一因子目录与分类契约并交付首批有用途证据的因子切片",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T21:17:13Z",
+          "body_sha256": "7c8133ee8e44f6fcef3a812f2a17fddca2c884aa688794b2c9f4eda3c272cf3f"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS"
+      ]
     }
   ]
 }

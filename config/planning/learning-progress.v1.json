@@ -1459,6 +1459,372 @@
           "body_sha256": "9ee4e8c246f904167c0bfea988b0ed231e2769c3edab749b356d531a72b943a6"
         }
       ]
+    },
+    {
+      "id": "CP-540-PUB-20261027T065039744357Z",
+      "recorded_at": "2026-10-27T06:50:39.744357+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "META-LEARN-001",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:11Z",
+          "body_sha256": "6fc06c1c903ea931e259da8830769764b8cf50a52ea87850d0ddadc076afc1cd"
+        }
+      ]
+    },
+    {
+      "id": "CP-541-PUB-20261027T065039892610Z",
+      "recorded_at": "2026-10-27T06:50:39.892610+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-FACTOR-001",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P3-FACTOR-001",
+          "number": 541,
+          "title": "[P3-FACTOR-001] 统一因子目录与分类契约并交付首批有用途证据的因子切片",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:15Z",
+          "body_sha256": "2965c6258a2b934dacf71ca6fcb9593fc25b74781297dad2ccd5787d89db3c32"
+        }
+      ]
+    },
+    {
+      "id": "CP-542-PUB-20261027T065040054539Z",
+      "recorded_at": "2026-10-27T06:50:40.054539+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P5-STATE-002",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-002",
+          "number": 542,
+          "title": "[P5-STATE-002] 冻结首轮状态学习的输入、独立参考、可训练头与预算",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:20Z",
+          "body_sha256": "a18eb678c07db341559c8149f5b072ccea1826a59e70ce2f6493f9864e2e668c"
+        }
+      ]
+    },
+    {
+      "id": "CP-543-PUB-20261027T065040205332Z",
+      "recorded_at": "2026-10-27T06:50:40.205332+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P5-STATE-003",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-003",
+          "number": 543,
+          "title": "[P5-STATE-003] 训练并评价首个有资格的12+X分层状态模型版本",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:25Z",
+          "body_sha256": "bcc5a628a8d8c70e1e6cf5de54f4f2b51a8031324f895a43d5856db5bfe6a215"
+        }
+      ]
+    },
+    {
+      "id": "CP-544-PUB-20261027T065040352545Z",
+      "recorded_at": "2026-10-27T06:50:40.352545+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P5-LOCAL-001",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P5-LOCAL-001",
+          "number": 544,
+          "title": "[P5-LOCAL-001] 完成一次单模块局部训练及新旧版本比较",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:32Z",
+          "body_sha256": "1873e7359ef203bfd59371ece13389e4ec334f3c4e82d9f278d2508d64d6485b"
+        }
+      ]
+    },
+    {
+      "id": "CP-545-PUB-20261027T065040515759Z",
+      "recorded_at": "2026-10-27T06:50:40.515759+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:36Z",
+          "body_sha256": "bd63d58ec2ca9a1d41743ad8c80e1ebde5c758d43cd65f84d002661252f1a527"
+        }
+      ]
+    },
+    {
+      "id": "CP-546-PUB-20261027T065040673540Z",
+      "recorded_at": "2026-10-27T06:50:40.673540+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "META-LEARN-002",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:42Z",
+          "body_sha256": "4050b570ba9f700b003d51f03c0a7fb7555321e2ef8e959fe604d93f2468769d"
+        }
+      ]
+    },
+    {
+      "id": "CP-547-PUB-20261027T065040831532Z",
+      "recorded_at": "2026-10-27T06:50:40.831532+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-EXPERT-008",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-008",
+          "number": 547,
+          "title": "[P3-EXPERT-008] 在基础MVP后按职责和边际贡献逐个扩展专家角色",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:45Z",
+          "body_sha256": "1f24d6d8de7640097d50cf02052be14e74b65f9f8b3e178b45126dd3fbf000d7"
+        }
+      ]
+    },
+    {
+      "id": "CP-548-PUB-20261027T065040991665Z",
+      "recorded_at": "2026-10-27T06:50:40.991665+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-DECISION-001",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P3-DECISION-001",
+          "number": 548,
+          "title": "[P3-DECISION-001] 在基础MVP后有界改进专家组合和整体决策机制",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:51Z",
+          "body_sha256": "b49abf80fc87353e90ee6e0be27f77df83a021716433b17454198bbabc7b84dc"
+        }
+      ]
+    },
+    {
+      "id": "CP-2-PUB-20261027T065041141542Z",
+      "recorded_at": "2026-10-27T06:50:41.141542+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "META-TRACE-001",
+      "outcome": "blocked",
+      "summary": "本地工程验收完成，GitHub工作流发布被现有令牌权限拒绝；待Owner授权补充workflow权限。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        },
+        {
+          "id": "IMPLEMENTATION_CHECKS",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/implementation-checks.safe.json",
+          "sha256": "cbb00c8d2daf9c92fde2874728c7beb05cac2355d1cc2fcf145a04af20be9c91",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅本轮项目关联机制工程验收；5,152通过/20跳过；不接受任何研究候选或自动启用GitHub事件。"
+        },
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "27个模块节点、10个既有工单；证据记录、派生蓝图、追加历史与变更影响检查。",
+          "remaining": "现有GitHub OAuth缺少workflow权限，分支尚未发布；默认分支事件检查尚未启用。",
+          "next_action": "经Owner授权完成官方workflow权限授予，再推送现有提交并走正常审阅合并；本地CLI可继续使用。",
+          "supersedes": "CP-2-LINK-20261027T064437703759Z",
+          "evidence": [
+            "MECHANISM",
+            "IMPLEMENTATION_CHECKS",
+            "PUBLICATION"
+          ]
+        },
+        {
+          "module": "TRACE",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "本分支CLI及本地项目治理可用；不承载交易、数据或研究授权。",
+          "remaining": "现有GitHub OAuth缺少workflow权限，分支尚未发布；默认分支事件检查尚未启用。",
+          "next_action": "经Owner授权完成官方workflow权限授予，再推送现有提交并走正常审阅合并；本地CLI可继续使用。",
+          "supersedes": "CP-2-LINK-20261027T064437703759Z",
+          "evidence": [
+            "MECHANISM",
+            "IMPLEMENTATION_CHECKS",
+            "PUBLICATION"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:56Z",
+          "body_sha256": "c1be480186c3cbe4116e5f1926c81ebaf2f69cb45d96b1e6083eb0c651fc09e1"
+        }
+      ]
     }
   ]
 }

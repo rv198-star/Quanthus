@@ -44,3 +44,10 @@ therefore does not claim automatic remote monitoring is active, branch protectio
 or the main checkout already contains this mechanism. Review and merge are normal adoption steps.
 The current research Mission remains in its prior disposition; this governance work does not
 accept Head2 or start the proposed next research batches.
+
+Publication was attempted after local validation. GitHub rejected the branch push because the
+existing OAuth token has `repo`, `read:org`, and `gist`, but lacks `workflow` scope required for
+the new workflow file. No PR was created. Credentials, scopes and production settings were not
+changed. Issue links accurately describe the local delivery and pending adoption. The code and
+complete acceptance evidence remain available locally for review; remote publication requires
+an explicitly authorized workflow-scope grant, followed by the normal push/review/merge sequence.

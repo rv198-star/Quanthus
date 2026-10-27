@@ -250,7 +250,10 @@ def _take_unique_episodes(
     seed: str,
     used_episode_ids: set[str],
     distance_first: bool = False,
+    require_exact: bool = True,
 ) -> tuple[EpisodeObservation, ...]:
+    if count == 0:
+        return ()
     eligible = [item for item in rows if item.episode_id not in used_episode_ids]
     if distance_first:
 
@@ -274,7 +277,7 @@ def _take_unique_episodes(
         local_episodes.add(item.episode_id)
         if len(selected) == count:
             break
-    if len(selected) != count:
+    if require_exact and len(selected) != count:
         raise StageQualificationError(
             f"qualification stratum has {len(selected)} unique episodes; need {count}"
         )
@@ -289,8 +292,13 @@ def select_qualification_contexts(
     report_start: date,
     report_end: date,
     sampling: Mapping[str, Any],
+    target_caps: bool = False,
 ) -> tuple[ReferenceContext, ...]:
-    """Select the preregistered 640-context external sample without candidate/future evidence."""
+    """Select without candidate/future evidence; legacy runtime keeps exact quotas.
+
+    A separately authorized development successor may explicitly request v2 caps.
+    This option neither opens a partition nor relaxes semantic sufficiency.
+    """
     seed = str(sampling.get("sampling_seed") or "")
     if not seed:
         raise StageQualificationError("qualification sampling seed is missing")
@@ -299,6 +307,8 @@ def select_qualification_contexts(
         raise StageQualificationError("qualification activity observations contain duplicates")
     eligible = [item for item in episodes if report_start <= item.market_date <= report_end]
     if not eligible:
+        if target_caps:
+            return ()
         raise StageQualificationError("qualification episode population is empty")
     strata = sampling["strata"]
     started_bucket_counts = sampling.get("started_activity_buckets")
@@ -345,6 +355,7 @@ def select_qualification_contexts(
             count=int(started_bucket_counts[bucket]),
             seed=f"{seed}|started|{bucket}",
             used_episode_ids=used_episode_ids,
+            require_exact=not target_caps,
         )
         started_selected.extend(selected)
     groups.append(("qualification_started_activity", tuple(started_selected)))
@@ -360,6 +371,7 @@ def select_qualification_contexts(
             count=int(held_counts[str(hold)]),
             seed=f"{seed}|held|{hold}",
             used_episode_ids=used_episode_ids,
+            require_exact=not target_caps,
         )
         held_selected.extend(selected)
     groups.append(("qualification_early_held", tuple(held_selected)))
@@ -373,6 +385,7 @@ def select_qualification_contexts(
                 seed=f"{seed}|loss",
                 used_episode_ids=used_episode_ids,
                 distance_first=True,
+                require_exact=not target_caps,
             ),
         )
     )
@@ -384,6 +397,7 @@ def select_qualification_contexts(
                 count=int(strata["reclaimed_ambiguity"]),
                 seed=f"{seed}|reclaimed",
                 used_episode_ids=used_episode_ids,
+                require_exact=not target_caps,
             ),
         )
     )
@@ -401,6 +415,7 @@ def select_qualification_contexts(
                 count=int(strata["mature_held"]),
                 seed=f"{seed}|mature-held",
                 used_episode_ids=used_episode_ids,
+                require_exact=not target_caps,
             ),
         )
     )
@@ -415,7 +430,7 @@ def select_qualification_contexts(
             key=lambda item: (item.sampling_stratum, item.context_id),
         )
     )
-    if len(contexts) != int(sampling["total_contexts"]):
+    if not target_caps and len(contexts) != int(sampling["total_contexts"]):
         raise StageQualificationError("qualification context count differs")
     if len({item.context_id for item in contexts}) != len(contexts):
         raise StageQualificationError("qualification context identities are duplicated")

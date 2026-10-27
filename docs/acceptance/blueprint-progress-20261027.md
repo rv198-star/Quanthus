@@ -51,3 +51,16 @@ the new workflow file. No PR was created. Credentials, scopes and production set
 changed. Issue links accurately describe the local delivery and pending adoption. The code and
 complete acceptance evidence remain available locally for review; remote publication requires
 an explicitly authorized workflow-scope grant, followed by the normal push/review/merge sequence.
+
+The Owner subsequently authorized that scope and completed GitHub's official device flow.
+The retry published `codex/blueprint-progress-20261027` and opened
+[draft PR #565](https://github.com/rv198-star/Quanthus/pull/565). The earlier rejection is retained
+as history, not a current access blocker. Default-branch issue-event activation still requires
+review and merge; publishing the branch alone does not activate it.
+
+GitHub run `40463845429` (blueprint) and `40463845421` (existing CI) did not execute their
+job steps. Their check annotations report failed recent account payments or a spending limit
+requiring an increase. This is an external execution blocker, not a remote test pass or a
+diagnosed code-test failure. No billing or runner configuration was changed. The local full
+check above remains the executed evidence; remote CI must be rerun after the account issue is
+resolved, before normal adoption is declared complete.

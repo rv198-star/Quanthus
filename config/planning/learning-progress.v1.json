@@ -1825,6 +1825,383 @@
           "body_sha256": "c1be480186c3cbe4116e5f1926c81ebaf2f69cb45d96b1e6083eb0c651fc09e1"
         }
       ]
+    },
+    {
+      "id": "CP-540-LINKED-20261027T065708643688Z",
+      "recorded_at": "2026-10-27T06:57:08.643688+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "META-LEARN-001",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:54:34Z",
+          "body_sha256": "8d146458a442943184b7124f4a747fedc1837c3a66a5c8130c40a7209c2adaf7"
+        }
+      ]
+    },
+    {
+      "id": "CP-541-LINKED-20261027T065708792793Z",
+      "recorded_at": "2026-10-27T06:57:08.792793+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-FACTOR-001",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P3-FACTOR-001",
+          "number": 541,
+          "title": "[P3-FACTOR-001] 统一因子目录与分类契约并交付首批有用途证据的因子切片",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:54:38Z",
+          "body_sha256": "38490978429a788527697db5f6c2ac90d8ac5cd05d5a68b672f015f8025a36b9"
+        }
+      ]
+    },
+    {
+      "id": "CP-542-LINKED-20261027T065708946106Z",
+      "recorded_at": "2026-10-27T06:57:08.946106+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P5-STATE-002",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-002",
+          "number": 542,
+          "title": "[P5-STATE-002] 冻结首轮状态学习的输入、独立参考、可训练头与预算",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:54:45Z",
+          "body_sha256": "9d50c255d49b2a04c2e1444bedfbc3c0efea6035b2c3d33e00a7d909ce94698c"
+        }
+      ]
+    },
+    {
+      "id": "CP-543-LINKED-20261027T065709095230Z",
+      "recorded_at": "2026-10-27T06:57:09.095230+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P5-STATE-003",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-003",
+          "number": 543,
+          "title": "[P5-STATE-003] 训练并评价首个有资格的12+X分层状态模型版本",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:54:50Z",
+          "body_sha256": "5f8f983bfa011522306fda24c5f504d358d99b5be4fb413805bfdebc4fc3a231"
+        }
+      ]
+    },
+    {
+      "id": "CP-544-LINKED-20261027T065709248511Z",
+      "recorded_at": "2026-10-27T06:57:09.248511+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P5-LOCAL-001",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P5-LOCAL-001",
+          "number": 544,
+          "title": "[P5-LOCAL-001] 完成一次单模块局部训练及新旧版本比较",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:54:54Z",
+          "body_sha256": "68af05c7989f47392b24b5d181568019af590d29daa321dc4d08acc49615050c"
+        }
+      ]
+    },
+    {
+      "id": "CP-545-LINKED-20261027T065709404671Z",
+      "recorded_at": "2026-10-27T06:57:09.404671+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:54:58Z",
+          "body_sha256": "175b4d353eaa26f1fd39b7037a0b7266aa3dbae3677023b9178bc3f15c0d9f2b"
+        }
+      ]
+    },
+    {
+      "id": "CP-546-LINKED-20261027T065709568831Z",
+      "recorded_at": "2026-10-27T06:57:09.568831+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "META-LEARN-002",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:55:03Z",
+          "body_sha256": "39a51ac743386b8980592cc387836dbc5a7a548e4a86bcfaee747fcb38c550d1"
+        }
+      ]
+    },
+    {
+      "id": "CP-547-LINKED-20261027T065709730717Z",
+      "recorded_at": "2026-10-27T06:57:09.730717+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-EXPERT-008",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-008",
+          "number": 547,
+          "title": "[P3-EXPERT-008] 在基础MVP后按职责和边际贡献逐个扩展专家角色",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:55:07Z",
+          "body_sha256": "f9baf54a9b47a5807b2c00e0ce0b5747b1507c2da0585bf9e060a81d18a2bdaf"
+        }
+      ]
+    },
+    {
+      "id": "CP-548-LINKED-20261027T065709883672Z",
+      "recorded_at": "2026-10-27T06:57:09.883672+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-DECISION-001",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P3-DECISION-001",
+          "number": 548,
+          "title": "[P3-DECISION-001] 在基础MVP后有界改进专家组合和整体决策机制",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:55:13Z",
+          "body_sha256": "4a19c915cdab7357bd3cf867a910ae83403953e0d5bfdab60eaaae52d33d8b04"
+        }
+      ]
+    },
+    {
+      "id": "CP-2-LINKED-20261027T065710025269Z",
+      "recorded_at": "2026-10-27T06:57:10.025269+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "META-TRACE-001",
+      "outcome": "progress",
+      "summary": "发布权限已解决，分支与PR #565已交付；本地工程通过，远端Actions因账户付款/费用限制尚未执行，事件启用还需合并。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        },
+        {
+          "id": "IMPLEMENTATION_CHECKS",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/implementation-checks.safe.json",
+          "sha256": "cbb00c8d2daf9c92fde2874728c7beb05cac2355d1cc2fcf145a04af20be9c91",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅本轮项目关联机制工程验收；5,152通过/20跳过；不接受任何研究候选或自动启用GitHub事件。"
+        },
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        },
+        {
+          "id": "ACTIONS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/github-first-check-details.safe.json",
+          "sha256": "0b034bf4dd784254b5e98d24ab50ade0f525ae652ff9edac836d460a339091c9",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "GitHub Actions job未执行任何steps，注释说明付款或费用上限问题；不认定远端测试已运行。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "27个模块节点、10个既有工单；证据记录、派生蓝图、追加历史与变更影响检查。",
+          "remaining": "待解决GitHub Actions账户付款/费用限制后重跑远端检查，并审阅合并；默认分支Issue自动事件尚未启用。",
+          "next_action": "在PR #565完成正常审阅与远端验证后采用；此期间执行者使用已通过的本地CLI与十项Issue对账。",
+          "supersedes": "CP-2-PUB-20261027T065041141542Z",
+          "evidence": [
+            "MECHANISM",
+            "IMPLEMENTATION_CHECKS",
+            "PUBLISHED",
+            "ACTIONS"
+          ]
+        },
+        {
+          "module": "TRACE",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "本分支CLI及本地项目治理可用；不承载交易、数据或研究授权。",
+          "remaining": "待解决GitHub Actions账户付款/费用限制后重跑远端检查，并审阅合并；默认分支Issue自动事件尚未启用。",
+          "next_action": "在PR #565完成正常审阅与远端验证后采用；此期间执行者使用已通过的本地CLI与十项Issue对账。",
+          "supersedes": "CP-2-PUB-20261027T065041141542Z",
+          "evidence": [
+            "MECHANISM",
+            "IMPLEMENTATION_CHECKS",
+            "PUBLISHED",
+            "ACTIONS"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:55:17Z",
+          "body_sha256": "d6af418bc20d0211c1b38113669328d058e1894a387f4ad5ec46b7c5b392fd82"
+        }
+      ]
     }
   ]
 }

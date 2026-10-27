@@ -47,6 +47,9 @@ The milestone should reuse the accepted Direct-DWD provider, PIT decision view, 
 identity, missing-data reset semantics, and Event Worker infrastructure already proven by
 `P3-STRUCT-001` and `P3-STRUCT-002`.
 
+Consumer-owned extension: [one factor to a research review queue](factor541-research-review-slice.md)
+keeps its separate retrospective admission and does not change this v1 product gate.
+
 ## 3. Proposed fact contract
 
 The first version should publish the smallest fact set needed to explain support/resistance and one

@@ -1,0 +1,68 @@
+{
+  "schema_version": "quanthus.factor541-use-diagnostic.v1",
+  "work_item": "P3-FACTOR-001",
+  "purpose": "RETROSPECTIVE_FIVE_SESSION_REVIEW_DIAGNOSTIC_ONLY",
+  "factor_policy_digest": "sha256:2e15957487b5234d3c83b67489ccc108e06baa3f3bd1e7a51e20d05ed4cf1a52",
+  "scope": {
+    "business_year": 2021,
+    "issuers": 128,
+    "through": "2021-12-31",
+    "source_handoff_sha256": "b2242cbd4bf39a63bb1fee717aabef7d3b7dbbb86e634f29e8e21373b1b58615",
+    "previously_exposed_development_data": true,
+    "historical_knowledge": "UNKNOWN",
+    "new_source_requests": 0
+  },
+  "target": {
+    "horizon_exchange_sessions": 5,
+    "failure": "any_valid_future_close_strictly_below_T_frozen_prior20_high",
+    "equal_to_anchor": "not_failure",
+    "requires_complete_five_session_window": true,
+    "coordinate_crossing": "unknown",
+    "missing_or_nontrading_or_session_gap": "unknown",
+    "scope_end": "unknown_no_2022_read",
+    "future_observations": "evaluation_only_never_T_features"
+  },
+  "comparison": {
+    "primary": "same_day_same_N_original_price_hash_prefix_vs_volume_queue",
+    "quota_N": "candidate_used_slots_on_that_day",
+    "common_rows": "cancel_exactly_in_paired_difference",
+    "full_price_pool_retained": true,
+    "original_unequal_count_arms": "secondary_descriptive_only",
+    "human_minutes": "NOT_MEASURED",
+    "investment_value": "NOT_MEASURED"
+  },
+  "uncertainty": {
+    "unknowns": "paired_worst_and_best_case_no_drop",
+    "bootstrap": "affected_security_cluster_net_sum",
+    "resamples": 10000,
+    "seed": 5412021,
+    "interval_percentiles": [
+      2.5,
+      97.5
+    ],
+    "only_if_changed_outcomes_all_known": true,
+    "sensitivity": [
+      "leave_one_affected_security_out",
+      "leave_one_affected_date_out"
+    ],
+    "independent_sample_claim": false
+  },
+  "continuation_rule": {
+    "limited_positive_requires": [
+      "positive_paired_net_reduction",
+      "positive_worst_case_bound",
+      "bootstrap_lower_strictly_positive",
+      "all_leave_one_security_and_date_nets_strictly_positive"
+    ],
+    "otherwise": "PARK_VOLUME_GATE_INCONCLUSIVE_OR_UNFAVOURABLE",
+    "automatic_strategy_or_P6_admission": false,
+    "threshold_or_sample_tuning": false
+  },
+  "authority": {
+    "existing_2021_diagnostic_only": true,
+    "training": false,
+    "production_or_P6": false,
+    "economic_results": false,
+    "new_collection": false
+  }
+}

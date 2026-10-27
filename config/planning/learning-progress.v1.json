@@ -3810,6 +3810,92 @@
           "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
         }
       ]
+    },
+    {
+      "id": "CP-540-20261027T183922495948Z",
+      "recorded_at": "2026-10-27T18:50:55.795792+00:00",
+      "actor": "Astra: independent code/evidence audit, capacity reproduction and prospective method review",
+      "work_item": "META-LEARN-001",
+      "outcome": "deferred",
+      "summary": "工程修复与本次NO_GO获复核；用途协议需补日候选全集/计分单元，先做独立参考方法小试再投入新来源。",
+      "evidence": [
+        {
+          "id": "AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-astra-audit-20261027T182956Z-3645cca/evidence/audit-disposition.safe.json",
+          "sha256": "ae9d084f99e86da423dc514670db6708b1ac69d08cc501a7c1dd4fbc3c061626",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "代码/证据审计与下一轮设计缺口，不授予新参考、训练或使用权限。"
+        },
+        {
+          "id": "CAPACITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-astra-audit-20261027T182956Z-3645cca/evidence/capacity-reproduction.safe.json",
+          "sha256": "f16e7a5dd3871a18364c6ccb45b76ccd2dc28c2644aa0a19babbf7e31ce12987",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "独立重现321/318/3；3是未重复ID容量上限，不是独立评价资格。"
+        },
+        {
+          "id": "DAILY_UNIVERSE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-astra-audit-20261027T182956Z-3645cca/evidence/review-list-universe.safe.json",
+          "sha256": "e71dca8ecfb50ed538abb9617d3e93684ef91187c530a6333852593822c29695",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "旧318抽样覆盖132天，仅9天候选数超过5；不外推新245。"
+        },
+        {
+          "id": "NATIVE_GUARD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-astra-audit-20261027T182956Z-3645cca/evidence/native-access-audit.safe.json",
+          "sha256": "e1c1371133ffe24edef83f77592666493fa31f0c50a697c8f07d6d9d16e69283",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "新审计进程旧native根打开和网络连接为0；不是新的科学参考。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "Astra独立复现321/318/3；仅3个未重复ID上限，尚无新的独立语义参考",
+          "remaining": "参考评审/rubric/证据等级未实际小试；245只有潜在身份/日历路线",
+          "next_action": "先用12个已消费开发包检验盲审方法与成本；可行后由P10资格化新来源，原100/100/50不变",
+          "supersedes": "CP-542-PURPOSE-20261028-174025",
+          "evidence": [
+            "AUDIT",
+            "CAPACITY",
+            "NATIVE_GUARD"
+          ]
+        },
+        {
+          "module": "EXPERT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "K=5用途方向保留；审计发现日候选全集、去重/计分单元及实际名额成本尚未冻结",
+          "remaining": "抽样质量池不等于每日候选全集；旧132天仅9天名额约束生效；未执行用途比较",
+          "next_action": "先修订独立新版本的用途执行契约与合成反例，再做参考小试；前置全部通过才一次比较",
+          "supersedes": "CP-545-PURPOSE-20261028-174025",
+          "evidence": [
+            "AUDIT",
+            "DAILY_UNIVERSE"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:53Z",
+          "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
+        }
+      ]
     }
   ]
 }

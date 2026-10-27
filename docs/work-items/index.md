@@ -4,6 +4,12 @@ Stable ids are the join key between requirements, designs, code, tests, and GitH
 The GitHub issue title must begin with the id in brackets. Closing an issue requires links to
 acceptance evidence; closing an epic requires all blocking child ids to close.
 
+For the learning-system MVP (#540–#548), start at the generated
+[blueprint and module progress](learning-blueprint-progress.md). Stable module/work-item
+links and append-only outcomes follow the [progress mechanism](../design/blueprint-progress.md).
+Issue closure, engineering completion, research quality, value and admission stay separate;
+this routing does not replace existing domain gates or reopen historical work.
+
 P10-DATA-000 is the permanent standing data epic and is excluded from automatic epic closure.
 Acquisition and shared quality/governance belong to P10 under
 [`../design/lld/12-permanent-data-line.md`](../design/lld/12-permanent-data-line.md).

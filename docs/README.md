@@ -4,6 +4,11 @@ This file is the level-zero router for people and AI sessions. It names the curr
 branch and the smallest context set for common tasks; detailed rules and design stay in child
 nodes.
 
+For current learning-system work (#540–#548), use the generated
+[module blueprint and progress](work-items/learning-blueprint-progress.md) and its
+[checkpoint mechanism](design/blueprint-progress.md). The historical phase evidence below
+is not a substitute for that task-scoped current view.
+
 | Field | Value |
 | --- | --- |
 | Current phase | P6 closed under Owner historical scope; P5 optional research deferred |

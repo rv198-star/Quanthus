@@ -1,0 +1,50 @@
+name: blueprint-progress
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  issues:
+    types: [opened, edited, closed, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  ledger:
+    if: github.event_name != 'issues'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check generated view and immutable checkpoint history
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ "$BASE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            python3 scripts/blueprint_progress.py check --base-ref "$BASE_SHA"
+          else
+            python3 scripts/blueprint_progress.py check
+          fi
+
+  reconcile:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Read issue lifecycle and detect missing checkpoints
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/blueprint_progress.py audit --event "$GITHUB_EVENT_PATH" --output artifacts/blueprint/issues.json
+      - name: Retain reconciliation receipt, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blueprint-issue-reconciliation
+          path: artifacts/blueprint/issues.json
+          if-no-files-found: error

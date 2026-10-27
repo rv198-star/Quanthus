@@ -1,0 +1,2207 @@
+{
+  "schema_version": "quanthus.blueprint-progress.v1",
+  "records": [
+    {
+      "id": "BASELINE-20261027",
+      "recorded_at": "2026-10-27T06:06:14.474830+00:00",
+      "actor": "Codex: verified repository metadata and named sealed safe receipts",
+      "work_item": "META-LEARN-001",
+      "outcome": "baseline",
+      "summary": "Seed 12+X and shared MVP capabilities from current reviewed evidence; retain limitations and no promotion.",
+      "evidence": [
+        {
+          "id": "PORTFOLIO",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "28df28f295ebf696d67873aeb914c2403e4f2bc4",
+          "path": "config/stage-learning/stage-whole-vocabulary-portfolio-synthesis.v1.json",
+          "sha256": "d71aac7893611f62b3ebc58df81f395b5d7b7c88a1dc255840f502c3e3638fe5",
+          "claim_ceiling": "历史语义与研究处置；不接受生产状态标签。"
+        },
+        {
+          "id": "BUNDLE",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "28df28f295ebf696d67873aeb914c2403e4f2bc4",
+          "path": "docs/work-items/stage-layered-proposition-bundle.md",
+          "sha256": "b9ecf3615c9b2859abebae4d9cf189c679122af234ad52f406a898e207bbb1e9",
+          "claim_ceiling": "已接受分层表示与开发视图；不授予新消费者使用。"
+        },
+        {
+          "id": "PROJECTION",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "28df28f295ebf696d67873aeb914c2403e4f2bc4",
+          "path": "config/stage-10-11-projection-delivery.v1.json",
+          "sha256": "dc8149c452994b494c7800ca052c3ef793f5399d86b4505a229eabfe3db46e6a",
+          "claim_ceiling": "限定10/11开发投影及旧不可变证据；不证明交易收益。"
+        },
+        {
+          "id": "THREE_FOUR",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "28df28f295ebf696d67873aeb914c2403e4f2bc4",
+          "path": "docs/acceptance/stock-stage-learning-f-arbitration-inconclusive-20260909.md",
+          "sha256": "ca83aec94d41e7d670adff275a41b53de56256435f1f88026289c8f0899d766d",
+          "claim_ceiling": "旧外样本在评分前样本不足；不得改称识别质量失败或未消费盲样本。"
+        },
+        {
+          "id": "UTILITY",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "28df28f295ebf696d67873aeb914c2403e4f2bc4",
+          "path": "docs/acceptance/stage-p033-consumer-utility-20260916.md",
+          "sha256": "71c35e5ba4ad04b9d50b0ea0f1d9e14235ab10d9d6758c12b84f074b2c295501",
+          "claim_ceiling": "旧解释实验对照信息不等价；归因未闭合。"
+        },
+        {
+          "id": "HEAD2_REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/AgentDock/base22-review-afe2526/head2-temporal-review-20261027T050025Z-7f4ecc9/review.md",
+          "sha256": "f273f3920a411610a05b14793f3d788c18b665fba57316744d2d9a037800d3f2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "7f4ecc9批次复审；九特征拒绝、七特征未取得消费者资格；非新独立训练。"
+        },
+        {
+          "id": "FIT_UPDATE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/p10-mvp-window-run-20261025T211421Z-65d0788/rx6800-connect-20261026T062134Z/real-fit-and-reproduction.safe.json",
+          "sha256": "7d9dd8585dc8def5b01e8f793d42d6c3f1b25aa47368ba6590336d41ecd2abe5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原有限真实拟合、局部更新和从头复现；不外推后续所有候选。"
+        },
+        {
+          "id": "P3_INTERFACE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-mvp-run-20261025T175208Z-4199786/evidence/step2-engineering-complete.safe.json",
+          "sha256": "9f47e69e8c189772f27955764c58b71406cc43219ac5de74b4c90dfd7361d301",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "最小P3接口合成等价/拒绝验收，不代表真实经济比较。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "形成有实际用途、可比较并可保留旧版的有限学习闭环",
+          "remaining": "至少一个有明确用途的状态及完整决策价值未闭合",
+          "next_action": "先完成蓝图关联机制，不启动新研究批次",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "形成有实际用途、可比较并可保留旧版的有限学习闭环",
+          "remaining": "至少一个有明确用途的状态及完整决策价值未闭合",
+          "next_action": "先完成蓝图关联机制，不启动新研究批次",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "MVP",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "至少一个有明确用途的状态及完整决策价值未闭合",
+          "next_action": "先完成蓝图关联机制，不启动新研究批次",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "DATA",
+          "facet": "admission",
+          "status": "unassessed",
+          "scope": "P10是外部常设供给依赖",
+          "remaining": "本轮未重新验收完整数仓",
+          "next_action": "按实际消费者冻结准确输入，不为本蓝图重建数仓",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTS",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "既有连续事实族",
+          "remaining": "新用途需准确输入与时间绑定",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTS",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "既有连续事实族",
+          "remaining": "新用途需准确输入与时间绑定",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTS",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "新用途需准确输入与时间绑定",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTORS",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "同一资产可跨状态/专家复用，保留单位、时点与血缘",
+          "remaining": "跨状态最小统一消费契约未全验收",
+          "next_action": "只整理下个实际消费者需要的切片",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTORS",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "同一资产可跨状态/专家复用，保留单位、时点与血缘",
+          "remaining": "跨状态最小统一消费契约未全验收",
+          "next_action": "只整理下个实际消费者需要的切片",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "FACTORS",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "跨状态最小统一消费契约未全验收",
+          "next_action": "只整理下个实际消费者需要的切片",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "REFERENCE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "按候选冻结来源、参考、暴露、时间及预算",
+          "remaining": "新批次独立来源/参考需另冻结",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "按候选冻结来源、参考、暴露、时间及预算",
+          "remaining": "新批次独立来源/参考需另冻结",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "REFERENCE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "新批次独立来源/参考需另冻结",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "STATES",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "分层容器、共存和证据等级",
+          "remaining": "各头资格独立，容器完成不等于全12头可用",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "BUNDLE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "STATES",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "分层容器、共存和证据等级",
+          "remaining": "各头资格独立，容器完成不等于全12头可用",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "BUNDLE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "STATES",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "各头资格独立，容器完成不等于全12头可用",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "BUNDLE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "TRAIN",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "首个有限真实fit已执行",
+          "remaining": "可用候选识别质量未闭合",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "TRAIN",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "首个有限真实fit已执行",
+          "remaining": "可用候选识别质量未闭合",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "TRAIN",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "可用候选识别质量未闭合",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "UPDATE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "首个有限局部更新已执行",
+          "remaining": "更新执行不等于新版本更优",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "UPDATE",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "首个有限局部更新已执行",
+          "remaining": "更新执行不等于新版本更优",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "UPDATE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "更新执行不等于新版本更优",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "最小复用接口合成等价及拒绝回归",
+          "remaining": "新候选完整决策增益尚未证明",
+          "next_action": "复用接口，等待合格候选与精确比较用途",
+          "evidence": [
+            "P3_INTERFACE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "EXPERT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "最小复用接口合成等价及拒绝回归",
+          "remaining": "新候选完整决策增益尚未证明",
+          "next_action": "复用接口，等待合格候选与精确比较用途",
+          "evidence": [
+            "P3_INTERFACE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "新候选完整决策增益尚未证明",
+          "next_action": "复用接口，等待合格候选与精确比较用途",
+          "evidence": [
+            "P3_INTERFACE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "首个fit/update从头复现；不代表时间特征批次独立refit",
+          "remaining": "各运行独立复现要求分别记录",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "REPRO",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "首个fit/update从头复现；不代表时间特征批次独立refit",
+          "remaining": "各运行独立复现要求分别记录",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "REPRO",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "各运行独立复现要求分别记录",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "FIT_UPDATE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "四类结论分别给出；负结果不能伪装产品可用",
+          "remaining": "完整产品MVP尚未验收",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "四类结论分别给出；负结果不能伪装产品可用",
+          "remaining": "完整产品MVP尚未验收",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "完整产品MVP尚未验收",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "P6",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "既有引擎可复用；新候选未启动",
+          "remaining": "新候选价值与用途门槛未过",
+          "next_action": "保留不启动决定",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "P6",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "既有引擎可复用；新候选未启动",
+          "remaining": "新候选价值与用途门槛未过",
+          "next_action": "保留不启动决定",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S00",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "主状态资格暂停",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S00",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "主状态资格暂停",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S00",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "主状态资格暂停",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S01",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "下降父状态12未合格",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S01",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "下降父状态12未合格",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S01",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "下降父状态12未合格",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S02",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "七特征用途与独立资格未闭合；九特征未通过",
+          "next_action": "保留七特征；九特征停止扩展，不自动启动新批次",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S02",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "七特征用途与独立资格未闭合；九特征未通过",
+          "next_action": "保留七特征；九特征停止扩展，不自动启动新批次",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S02",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "七特征用途与独立资格未闭合；九特征未通过",
+          "next_action": "保留七特征；九特征停止扩展，不自动启动新批次",
+          "evidence": [
+            "HEAD2_REVIEW"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S03",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "旧外样本不足；无新独立验证",
+          "next_action": "先核对现有输入与新参考可行性，条件通过才提出新运行",
+          "evidence": [
+            "THREE_FOUR"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S03",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "旧外样本不足；无新独立验证",
+          "next_action": "先核对现有输入与新参考可行性，条件通过才提出新运行",
+          "evidence": [
+            "THREE_FOUR"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S03",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "旧外样本不足；无新独立验证",
+          "next_action": "先核对现有输入与新参考可行性，条件通过才提出新运行",
+          "evidence": [
+            "THREE_FOUR"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S04",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "同一突破过程的持续性与新独立验证",
+          "next_action": "与3联合评估，不重复消耗旧盲样本",
+          "evidence": [
+            "THREE_FOUR"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S04",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "同一突破过程的持续性与新独立验证",
+          "next_action": "与3联合评估，不重复消耗旧盲样本",
+          "evidence": [
+            "THREE_FOUR"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S04",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "同一突破过程的持续性与新独立验证",
+          "next_action": "与3联合评估，不重复消耗旧盲样本",
+          "evidence": [
+            "THREE_FOUR"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S05",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "旧候选未过，需要新的明确假设",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S05",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "旧候选未过，需要新的明确假设",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S05",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "旧候选未过，需要新的明确假设",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S06",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "与5联合候选未通过",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S06",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "与5联合候选未通过",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S06",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "与5联合候选未通过",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S07",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "原候选均有门槛未过",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S07",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "原候选均有门槛未过",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S07",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "原候选均有门槛未过",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S08",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "代表性样本覆盖与资格不足",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S08",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "代表性样本覆盖与资格不足",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S08",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "代表性样本覆盖与资格不足",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S09",
+          "facet": "quality",
+          "status": "blocked",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "缺有根据的成交活动/量价关系",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S09",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "缺有根据的成交活动/量价关系",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S09",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "缺有根据的成交活动/量价关系",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S10",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "实际用途价值未闭合",
+          "next_action": "复用已有开发投影，不重复建设",
+          "evidence": [
+            "PROJECTION",
+            "UTILITY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S10",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "实际用途价值未闭合",
+          "next_action": "复用已有开发投影，不重复建设",
+          "evidence": [
+            "PROJECTION",
+            "UTILITY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S10",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "模块台账不是执行授权",
+          "remaining": "实际用途价值未闭合",
+          "next_action": "复用已有开发投影，不重复建设",
+          "evidence": [
+            "PROJECTION",
+            "UTILITY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S11",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "实际用途价值未闭合，反弹不等于修复",
+          "next_action": "与10一并复用，不自动晋级",
+          "evidence": [
+            "PROJECTION",
+            "UTILITY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S11",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "实际用途价值未闭合，反弹不等于修复",
+          "next_action": "与10一并复用，不自动晋级",
+          "evidence": [
+            "PROJECTION",
+            "UTILITY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S11",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "模块台账不是执行授权",
+          "remaining": "实际用途价值未闭合，反弹不等于修复",
+          "next_action": "与10一并复用，不自动晋级",
+          "evidence": [
+            "PROJECTION",
+            "UTILITY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S12",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "本状态限定研究证据；独立于其他状态",
+          "remaining": "参考不可判断率超过原门槛",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S12",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "已有研究实现/候选；通过仅限明确交付范围",
+          "remaining": "参考不可判断率超过原门槛",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S12",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "模块台账不是执行授权",
+          "remaining": "参考不可判断率超过原门槛",
+          "next_action": "暂缓标签资格，保留事实与历史证据",
+          "evidence": [
+            "PORTFOLIO"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CONTROL",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "中性/弃权/冻结拒绝路径",
+          "remaining": "新消费者仍须保留这些边界",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "BUNDLE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CONTROL",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "中性/弃权/冻结拒绝路径",
+          "remaining": "新消费者仍须保留这些边界",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "BUNDLE"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CONTROL",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "本蓝图不替代用途准入",
+          "remaining": "新消费者仍须保留这些边界",
+          "next_action": "复用已通过资产；按实际新缺口投入",
+          "evidence": [
+            "BUNDLE"
+          ],
+          "supersedes": null
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-25T17:15:46Z",
+          "body_sha256": "b77e7db9f35cdbed04543e1339e4af44df801659f1ff497fe7c58c0854c7fb87"
+        },
+        {
+          "work_item": "P3-FACTOR-001",
+          "number": 541,
+          "title": "[P3-FACTOR-001] 统一因子目录与分类契约并交付首批有用途证据的因子切片",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T19:32:14Z",
+          "body_sha256": "375786fde1e79512136fc0ef5ddb7ba50b0bb0b6080ca856285fa7ac245a3d4f"
+        },
+        {
+          "work_item": "P5-STATE-002",
+          "number": 542,
+          "title": "[P5-STATE-002] 冻结首轮状态学习的输入、独立参考、可训练头与预算",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-25T20:53:36Z",
+          "body_sha256": "2560c50792e1e56d65fe0901b18b027ca403fdccc656215a4fbb936fdabd2f8b"
+        },
+        {
+          "work_item": "P5-STATE-003",
+          "number": 543,
+          "title": "[P5-STATE-003] 训练并评价首个有资格的12+X分层状态模型版本",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T19:32:20Z",
+          "body_sha256": "f9345550082cd6f2ea908d9f85fe0d232b276338ac27e77c9c1236d6e00d6e1c"
+        },
+        {
+          "work_item": "P5-LOCAL-001",
+          "number": 544,
+          "title": "[P5-LOCAL-001] 完成一次单模块局部训练及新旧版本比较",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T19:32:23Z",
+          "body_sha256": "6d1efa4f8cee9159d9fa12f2b1f6a4e90fb5bc328717a091b60824a920ccef90"
+        },
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T20:24:16Z",
+          "body_sha256": "ce4c28009f1c4d92cd9f7f4aeb885e15966c144830289ef573f2f1cad5bfb079"
+        },
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T20:24:19Z",
+          "body_sha256": "54c832c50a06213bbc957a83a33c5eaaf956168b86324b98d839f66b9f7b0c04"
+        },
+        {
+          "work_item": "P3-EXPERT-008",
+          "number": 547,
+          "title": "[P3-EXPERT-008] 在基础MVP后按职责和边际贡献逐个扩展专家角色",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T19:32:32Z",
+          "body_sha256": "c886690ae24bcd33d935f8b123b89b06d9f6c25ff280a70cdad7bb44c6af2f32"
+        },
+        {
+          "work_item": "P3-DECISION-001",
+          "number": 548,
+          "title": "[P3-DECISION-001] 在基础MVP后有界改进专家组合和整体决策机制",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-22T19:32:35Z",
+          "body_sha256": "b87bf30a592d40925c626d91dcb15a1d770cc4f042ec3e6a7b1d69fb83160d9d"
+        }
+      ]
+    },
+    {
+      "id": "CP-540-LINK-20261027T064436402817Z",
+      "recorded_at": "2026-10-27T06:44:36.402817+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "META-LEARN-001",
+      "outcome": "progress",
+      "summary": "蓝图关联机制已实现并关联现有工单，更新总线下一步；未增加研究成熟度。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        },
+        {
+          "id": "IMPLEMENTATION_CHECKS",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/implementation-checks.safe.json",
+          "sha256": "cbb00c8d2daf9c92fde2874728c7beb05cac2355d1cc2fcf145a04af20be9c91",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅本轮项目关联机制工程验收；5,152通过/20跳过；不接受任何研究候选或自动启用GitHub事件。"
+        },
+        {
+          "id": "HEAD2_REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/AgentDock/base22-review-afe2526/head2-temporal-review-20261027T050025Z-7f4ecc9/review.md",
+          "sha256": "f273f3920a411610a05b14793f3d788c18b665fba57316744d2d9a037800d3f2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "7f4ecc9批次复审；九特征拒绝、七特征未取得消费者资格；非新独立训练。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "形成有实际用途、可比较并可保留旧版的有限学习闭环",
+          "remaining": "至少一个有明确用途的状态及完整决策价值未闭合",
+          "next_action": "依据模块当前缺口选择下一批领域，先绑定工作项与验收边界；本次治理交付不自动启动研究。",
+          "evidence": [
+            "HEAD2_REVIEW",
+            "IMPLEMENTATION_CHECKS"
+          ],
+          "supersedes": "BASELINE-20261027"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:42:35Z",
+          "body_sha256": "8229489c359c9bae497b93206de999b150dda6e4acfd89fe84795f1b4396d398"
+        }
+      ]
+    },
+    {
+      "id": "CP-541-LINK-20261027T064436547852Z",
+      "recorded_at": "2026-10-27T06:44:36.547852+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P3-FACTOR-001",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P3-FACTOR-001",
+          "number": 541,
+          "title": "[P3-FACTOR-001] 统一因子目录与分类契约并交付首批有用途证据的因子切片",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:42:40Z",
+          "body_sha256": "dc9b94528e8cd43c9ffabb88f530e0791000edf3d3ffb1c54e0123e3ea217806"
+        }
+      ]
+    },
+    {
+      "id": "CP-542-LINK-20261027T064436701094Z",
+      "recorded_at": "2026-10-27T06:44:36.701094+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P5-STATE-002",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-002",
+          "number": 542,
+          "title": "[P5-STATE-002] 冻结首轮状态学习的输入、独立参考、可训练头与预算",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:42:46Z",
+          "body_sha256": "91c3c346198f973bb6f67a9cbb82d1778f6b9b9e4fce83c4a1d46b4747524f09"
+        }
+      ]
+    },
+    {
+      "id": "CP-543-LINK-20261027T064436846543Z",
+      "recorded_at": "2026-10-27T06:44:36.846543+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P5-STATE-003",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-003",
+          "number": 543,
+          "title": "[P5-STATE-003] 训练并评价首个有资格的12+X分层状态模型版本",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:42:50Z",
+          "body_sha256": "fe6b2742269324fee89aeab87a05897e49c7c50f4c82b62798ba777092bb65d0"
+        }
+      ]
+    },
+    {
+      "id": "CP-544-LINK-20261027T064436981255Z",
+      "recorded_at": "2026-10-27T06:44:36.981255+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P5-LOCAL-001",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P5-LOCAL-001",
+          "number": 544,
+          "title": "[P5-LOCAL-001] 完成一次单模块局部训练及新旧版本比较",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:42:57Z",
+          "body_sha256": "cd32766bc894f5df019547981031788b3205fc27d37954cd7fb57b8f50bda8a8"
+        }
+      ]
+    },
+    {
+      "id": "CP-545-LINK-20261027T064437132569Z",
+      "recorded_at": "2026-10-27T06:44:37.132569+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:43:03Z",
+          "body_sha256": "16f43a563961b0ece8fe3f0a3c4b5ebf1ab8907804b99c92dc098a81c9f02b95"
+        }
+      ]
+    },
+    {
+      "id": "CP-546-LINK-20261027T064437281857Z",
+      "recorded_at": "2026-10-27T06:44:37.281857+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "META-LEARN-002",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:43:09Z",
+          "body_sha256": "446ca1b758df8295a7eb97b135f30cc4253d8c4118279689fafcb21fe4471a60"
+        }
+      ]
+    },
+    {
+      "id": "CP-547-LINK-20261027T064437422598Z",
+      "recorded_at": "2026-10-27T06:44:37.422598+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P3-EXPERT-008",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-008",
+          "number": 547,
+          "title": "[P3-EXPERT-008] 在基础MVP后按职责和边际贡献逐个扩展专家角色",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:43:14Z",
+          "body_sha256": "a67fa7a03e04ea80b363966a274bf9681c7df10c6dd42f586decef080009265c"
+        }
+      ]
+    },
+    {
+      "id": "CP-548-LINK-20261027T064437565199Z",
+      "recorded_at": "2026-10-27T06:44:37.565199+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P3-DECISION-001",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P3-DECISION-001",
+          "number": 548,
+          "title": "[P3-DECISION-001] 在基础MVP后有界改进专家组合和整体决策机制",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:43:17Z",
+          "body_sha256": "5ffb954dee22730307cfad19d773464a98e7b6ddddf56a24c293034f9f406cca"
+        }
+      ]
+    },
+    {
+      "id": "CP-2-LINK-20261027T064437703759Z",
+      "recorded_at": "2026-10-27T06:44:37.703759+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "META-TRACE-001",
+      "outcome": "completed",
+      "summary": "完成本轮限定蓝图关联机制的本地工程验收与十项工单关联；长期追溯工单仍开放，GitHub事件待默认分支采用。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        },
+        {
+          "id": "IMPLEMENTATION_CHECKS",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/implementation-checks.safe.json",
+          "sha256": "cbb00c8d2daf9c92fde2874728c7beb05cac2355d1cc2fcf145a04af20be9c91",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅本轮项目关联机制工程验收；5,152通过/20跳过；不接受任何研究候选或自动启用GitHub事件。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "27个模块节点、10个既有工单；证据记录、派生蓝图、追加历史与变更影响检查。",
+          "remaining": "自动GitHub事件检查待本分支审阅并合入默认分支；长期项目追溯仍持续。",
+          "next_action": "审阅交付后采用；后续任务在里程碑、阻塞或关闭/重开时登记模块影响。",
+          "supersedes": null,
+          "evidence": [
+            "MECHANISM",
+            "IMPLEMENTATION_CHECKS"
+          ]
+        },
+        {
+          "module": "TRACE",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "本分支CLI及本地项目治理可用；不承载交易、数据或研究授权。",
+          "remaining": "默认分支自动事件尚未激活，分支保护规则未变。",
+          "next_action": "通过正常代码审阅合并流程启用仓库级检查，不迁移生产服务。",
+          "supersedes": null,
+          "evidence": [
+            "MECHANISM",
+            "IMPLEMENTATION_CHECKS"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:43:21Z",
+          "body_sha256": "9ee4e8c246f904167c0bfea988b0ed231e2769c3edab749b356d531a72b943a6"
+        }
+      ]
+    },
+    {
+      "id": "CP-540-PUB-20261027T065039744357Z",
+      "recorded_at": "2026-10-27T06:50:39.744357+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "META-LEARN-001",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:11Z",
+          "body_sha256": "6fc06c1c903ea931e259da8830769764b8cf50a52ea87850d0ddadc076afc1cd"
+        }
+      ]
+    },
+    {
+      "id": "CP-541-PUB-20261027T065039892610Z",
+      "recorded_at": "2026-10-27T06:50:39.892610+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-FACTOR-001",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P3-FACTOR-001",
+          "number": 541,
+          "title": "[P3-FACTOR-001] 统一因子目录与分类契约并交付首批有用途证据的因子切片",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:15Z",
+          "body_sha256": "2965c6258a2b934dacf71ca6fcb9593fc25b74781297dad2ccd5787d89db3c32"
+        }
+      ]
+    },
+    {
+      "id": "CP-542-PUB-20261027T065040054539Z",
+      "recorded_at": "2026-10-27T06:50:40.054539+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P5-STATE-002",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-002",
+          "number": 542,
+          "title": "[P5-STATE-002] 冻结首轮状态学习的输入、独立参考、可训练头与预算",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:20Z",
+          "body_sha256": "a18eb678c07db341559c8149f5b072ccea1826a59e70ce2f6493f9864e2e668c"
+        }
+      ]
+    },
+    {
+      "id": "CP-543-PUB-20261027T065040205332Z",
+      "recorded_at": "2026-10-27T06:50:40.205332+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P5-STATE-003",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-003",
+          "number": 543,
+          "title": "[P5-STATE-003] 训练并评价首个有资格的12+X分层状态模型版本",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:25Z",
+          "body_sha256": "bcc5a628a8d8c70e1e6cf5de54f4f2b51a8031324f895a43d5856db5bfe6a215"
+        }
+      ]
+    },
+    {
+      "id": "CP-544-PUB-20261027T065040352545Z",
+      "recorded_at": "2026-10-27T06:50:40.352545+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P5-LOCAL-001",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P5-LOCAL-001",
+          "number": 544,
+          "title": "[P5-LOCAL-001] 完成一次单模块局部训练及新旧版本比较",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:32Z",
+          "body_sha256": "1873e7359ef203bfd59371ece13389e4ec334f3c4e82d9f278d2508d64d6485b"
+        }
+      ]
+    },
+    {
+      "id": "CP-545-PUB-20261027T065040515759Z",
+      "recorded_at": "2026-10-27T06:50:40.515759+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:36Z",
+          "body_sha256": "bd63d58ec2ca9a1d41743ad8c80e1ebde5c758d43cd65f84d002661252f1a527"
+        }
+      ]
+    },
+    {
+      "id": "CP-546-PUB-20261027T065040673540Z",
+      "recorded_at": "2026-10-27T06:50:40.673540+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "META-LEARN-002",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:42Z",
+          "body_sha256": "4050b570ba9f700b003d51f03c0a7fb7555321e2ef8e959fe604d93f2468769d"
+        }
+      ]
+    },
+    {
+      "id": "CP-547-PUB-20261027T065040831532Z",
+      "recorded_at": "2026-10-27T06:50:40.831532+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-EXPERT-008",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-008",
+          "number": 547,
+          "title": "[P3-EXPERT-008] 在基础MVP后按职责和边际贡献逐个扩展专家角色",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:45Z",
+          "body_sha256": "1f24d6d8de7640097d50cf02052be14e74b65f9f8b3e178b45126dd3fbf000d7"
+        }
+      ]
+    },
+    {
+      "id": "CP-548-PUB-20261027T065040991665Z",
+      "recorded_at": "2026-10-27T06:50:40.991665+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-DECISION-001",
+      "outcome": "no_module_change",
+      "summary": "Issue入口改为准确本地路径，并披露GitHub发布受workflow权限阻塞。",
+      "evidence": [
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只修正交付入口；研究成果、模块成熟度与Issue状态均不变。",
+      "issue_observations": [
+        {
+          "work_item": "P3-DECISION-001",
+          "number": 548,
+          "title": "[P3-DECISION-001] 在基础MVP后有界改进专家组合和整体决策机制",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:51Z",
+          "body_sha256": "b49abf80fc87353e90ee6e0be27f77df83a021716433b17454198bbabc7b84dc"
+        }
+      ]
+    },
+    {
+      "id": "CP-2-PUB-20261027T065041141542Z",
+      "recorded_at": "2026-10-27T06:50:41.141542+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "META-TRACE-001",
+      "outcome": "blocked",
+      "summary": "本地工程验收完成，GitHub工作流发布被现有令牌权限拒绝；待Owner授权补充workflow权限。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        },
+        {
+          "id": "IMPLEMENTATION_CHECKS",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/implementation-checks.safe.json",
+          "sha256": "cbb00c8d2daf9c92fde2874728c7beb05cac2355d1cc2fcf145a04af20be9c91",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅本轮项目关联机制工程验收；5,152通过/20跳过；不接受任何研究候选或自动启用GitHub事件。"
+        },
+        {
+          "id": "PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-blocker.safe.json",
+          "sha256": "3117d6cad296588154b87eadf537974c3945f12ec92da30dcdb9f25820398949",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录GitHub因OAuth缺少workflow权限拒绝发布；不影响本地工程验收，不构成凭据变更授权。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "27个模块节点、10个既有工单；证据记录、派生蓝图、追加历史与变更影响检查。",
+          "remaining": "现有GitHub OAuth缺少workflow权限，分支尚未发布；默认分支事件检查尚未启用。",
+          "next_action": "经Owner授权完成官方workflow权限授予，再推送现有提交并走正常审阅合并；本地CLI可继续使用。",
+          "supersedes": "CP-2-LINK-20261027T064437703759Z",
+          "evidence": [
+            "MECHANISM",
+            "IMPLEMENTATION_CHECKS",
+            "PUBLICATION"
+          ]
+        },
+        {
+          "module": "TRACE",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "本分支CLI及本地项目治理可用；不承载交易、数据或研究授权。",
+          "remaining": "现有GitHub OAuth缺少workflow权限，分支尚未发布；默认分支事件检查尚未启用。",
+          "next_action": "经Owner授权完成官方workflow权限授予，再推送现有提交并走正常审阅合并；本地CLI可继续使用。",
+          "supersedes": "CP-2-LINK-20261027T064437703759Z",
+          "evidence": [
+            "MECHANISM",
+            "IMPLEMENTATION_CHECKS",
+            "PUBLICATION"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:49:56Z",
+          "body_sha256": "c1be480186c3cbe4116e5f1926c81ebaf2f69cb45d96b1e6083eb0c651fc09e1"
+        }
+      ]
+    },
+    {
+      "id": "CP-540-LINKED-20261027T065708643688Z",
+      "recorded_at": "2026-10-27T06:57:08.643688+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "META-LEARN-001",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:54:34Z",
+          "body_sha256": "8d146458a442943184b7124f4a747fedc1837c3a66a5c8130c40a7209c2adaf7"
+        }
+      ]
+    },
+    {
+      "id": "CP-541-LINKED-20261027T065708792793Z",
+      "recorded_at": "2026-10-27T06:57:08.792793+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-FACTOR-001",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P3-FACTOR-001",
+          "number": 541,
+          "title": "[P3-FACTOR-001] 统一因子目录与分类契约并交付首批有用途证据的因子切片",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:54:38Z",
+          "body_sha256": "38490978429a788527697db5f6c2ac90d8ac5cd05d5a68b672f015f8025a36b9"
+        }
+      ]
+    },
+    {
+      "id": "CP-542-LINKED-20261027T065708946106Z",
+      "recorded_at": "2026-10-27T06:57:08.946106+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P5-STATE-002",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-002",
+          "number": 542,
+          "title": "[P5-STATE-002] 冻结首轮状态学习的输入、独立参考、可训练头与预算",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:54:45Z",
+          "body_sha256": "9d50c255d49b2a04c2e1444bedfbc3c0efea6035b2c3d33e00a7d909ce94698c"
+        }
+      ]
+    },
+    {
+      "id": "CP-543-LINKED-20261027T065709095230Z",
+      "recorded_at": "2026-10-27T06:57:09.095230+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P5-STATE-003",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-003",
+          "number": 543,
+          "title": "[P5-STATE-003] 训练并评价首个有资格的12+X分层状态模型版本",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:54:50Z",
+          "body_sha256": "5f8f983bfa011522306fda24c5f504d358d99b5be4fb413805bfdebc4fc3a231"
+        }
+      ]
+    },
+    {
+      "id": "CP-544-LINKED-20261027T065709248511Z",
+      "recorded_at": "2026-10-27T06:57:09.248511+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P5-LOCAL-001",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P5-LOCAL-001",
+          "number": 544,
+          "title": "[P5-LOCAL-001] 完成一次单模块局部训练及新旧版本比较",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:54:54Z",
+          "body_sha256": "68af05c7989f47392b24b5d181568019af590d29daa321dc4d08acc49615050c"
+        }
+      ]
+    },
+    {
+      "id": "CP-545-LINKED-20261027T065709404671Z",
+      "recorded_at": "2026-10-27T06:57:09.404671+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:54:58Z",
+          "body_sha256": "175b4d353eaa26f1fd39b7037a0b7266aa3dbae3677023b9178bc3f15c0d9f2b"
+        }
+      ]
+    },
+    {
+      "id": "CP-546-LINKED-20261027T065709568831Z",
+      "recorded_at": "2026-10-27T06:57:09.568831+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "META-LEARN-002",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:55:03Z",
+          "body_sha256": "39a51ac743386b8980592cc387836dbc5a7a548e4a86bcfaee747fcb38c550d1"
+        }
+      ]
+    },
+    {
+      "id": "CP-547-LINKED-20261027T065709730717Z",
+      "recorded_at": "2026-10-27T06:57:09.730717+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-EXPERT-008",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-008",
+          "number": 547,
+          "title": "[P3-EXPERT-008] 在基础MVP后按职责和边际贡献逐个扩展专家角色",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:55:07Z",
+          "body_sha256": "f9baf54a9b47a5807b2c00e0ce0b5747b1507c2da0585bf9e060a81d18a2bdaf"
+        }
+      ]
+    },
+    {
+      "id": "CP-548-LINKED-20261027T065709883672Z",
+      "recorded_at": "2026-10-27T06:57:09.883672+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "P3-DECISION-001",
+      "outcome": "no_module_change",
+      "summary": "已发布分支及待审PR，Issue恢复为可用蓝图入口；既有研究状态不变。",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "治理代码发布不代表研究成熟度提升或生产准入。",
+      "issue_observations": [
+        {
+          "work_item": "P3-DECISION-001",
+          "number": 548,
+          "title": "[P3-DECISION-001] 在基础MVP后有界改进专家组合和整体决策机制",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:55:13Z",
+          "body_sha256": "4a19c915cdab7357bd3cf867a910ae83403953e0d5bfdab60eaaae52d33d8b04"
+        }
+      ]
+    },
+    {
+      "id": "CP-2-LINKED-20261027T065710025269Z",
+      "recorded_at": "2026-10-27T06:57:10.025269+00:00",
+      "actor": "Codex / blueprint governance handoff",
+      "work_item": "META-TRACE-001",
+      "outcome": "progress",
+      "summary": "发布权限已解决，分支与PR #565已交付；本地工程通过，远端Actions因账户付款/费用限制尚未执行，事件启用还需合并。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        },
+        {
+          "id": "IMPLEMENTATION_CHECKS",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/implementation-checks.safe.json",
+          "sha256": "cbb00c8d2daf9c92fde2874728c7beb05cac2355d1cc2fcf145a04af20be9c91",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅本轮项目关联机制工程验收；5,152通过/20跳过；不接受任何研究候选或自动启用GitHub事件。"
+        },
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/publication-resolution.safe.json",
+          "sha256": "6c69caecfd498dde1e5a8b977a08ba8ac944833f01c8f92fcfd02a9c5497082f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "经Owner授权取得workflow权限，发布分支和待审PR；未合并。"
+        },
+        {
+          "id": "ACTIONS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/github-first-check-details.safe.json",
+          "sha256": "0b034bf4dd784254b5e98d24ab50ade0f525ae652ff9edac836d460a339091c9",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "GitHub Actions job未执行任何steps，注释说明付款或费用上限问题；不认定远端测试已运行。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "27个模块节点、10个既有工单；证据记录、派生蓝图、追加历史与变更影响检查。",
+          "remaining": "待解决GitHub Actions账户付款/费用限制后重跑远端检查，并审阅合并；默认分支Issue自动事件尚未启用。",
+          "next_action": "在PR #565完成正常审阅与远端验证后采用；此期间执行者使用已通过的本地CLI与十项Issue对账。",
+          "supersedes": "CP-2-PUB-20261027T065041141542Z",
+          "evidence": [
+            "MECHANISM",
+            "IMPLEMENTATION_CHECKS",
+            "PUBLISHED",
+            "ACTIONS"
+          ]
+        },
+        {
+          "module": "TRACE",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "本分支CLI及本地项目治理可用；不承载交易、数据或研究授权。",
+          "remaining": "待解决GitHub Actions账户付款/费用限制后重跑远端检查，并审阅合并；默认分支Issue自动事件尚未启用。",
+          "next_action": "在PR #565完成正常审阅与远端验证后采用；此期间执行者使用已通过的本地CLI与十项Issue对账。",
+          "supersedes": "CP-2-PUB-20261027T065041141542Z",
+          "evidence": [
+            "MECHANISM",
+            "IMPLEMENTATION_CHECKS",
+            "PUBLISHED",
+            "ACTIONS"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:55:17Z",
+          "body_sha256": "d6af418bc20d0211c1b38113669328d058e1894a387f4ad5ec46b7c5b392fd82"
+        }
+      ]
+    }
+  ]
+}

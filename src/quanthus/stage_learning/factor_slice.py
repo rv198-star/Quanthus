@@ -9,9 +9,12 @@ import argparse
 import json
 import os
 import resource
+import statistics
+import sys
 import time
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Context, Decimal, localcontext
 from pathlib import Path
@@ -29,8 +32,10 @@ from quanthus.structure_v2 import build_structure_v2
 from quanthus.structure_v2_inputs import Admission, InputPolicy, canonical, digest, exact_sha
 
 POLICY = "config/research/factor541-volume-review.v1.json"
+USE_POLICY = "config/research/factor541-five-session-diagnostic.v1.json"
 PURPOSE = "RETROSPECTIVE_RESEARCH_REVIEW_QUEUE_ONLY"
 FACTOR = "liquidity.volume_ratio20"
+SUPPORTED_POLICY_DIGEST = "sha256:2e15957487b5234d3c83b67489ccc108e06baa3f3bd1e7a51e20d05ed4cf1a52"
 TABLES = ("dwd_listing", "dwd_trading_calendar", "dwd_security_bar",
           "dwd_tradability_state", "dwd_observation_gap", "dwd_quality_exception")
 
@@ -42,6 +47,9 @@ class FactorSliceError(ValueError):
 def load_catalog(repo: Path) -> dict[str, Any]:
     """One canonical asset per registry id/version, with cross-domain views/aliases."""
     spec = json.loads((repo / POLICY).read_text())
+    # A new window, unit, scope or missing-value policy needs a new implementation.
+    if digest(spec) != SUPPORTED_POLICY_DIGEST:
+        raise FactorSliceError("FACTOR_UNSUPPORTED_POLICY_CONTRACT")
     expected_consumer = {
         "id": "price-breakout-research-review-queue-v1",
         "price_pool": "close_strictly_above_prior20_high",
@@ -107,14 +115,26 @@ def _unique_rows(rows: Sequence[Mapping[str, Any]]) -> None:
 
 
 def project_facts(admissions: tuple[Admission, ...], *, spec_digest: str,
-                  calendar_ref: str, definition_digest: str) -> list[dict[str, Any]]:
+                  calendar_ref: str, definition_digest: str,
+                  anchors: dict[tuple[str, date], Decimal] | None = None,
+                  component_costs: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """Build each expensive prerequisite once; no candidate/reference inputs exist."""
     if any(a.row.market_date.year != 2021 for a in admissions):
         raise FactorSliceError("FACTOR_PROTECTED_OR_OUT_OF_SCOPE")
+    started = time.perf_counter()
     structure = build_structure_v2(admissions, spec_digest=spec_digest,
                                    calendar_ref=calendar_ref, lookbacks=(20,))
+    structure_seconds = time.perf_counter() - started
+    started = time.perf_counter()
     activity = {a.key: a for a in build_activity_observations(admissions, window=20)}
-    anchors = {a.revision_id: a for a in structure.anchors if a.side == "high"}
+    if component_costs is not None:
+        component_costs.extend([
+            {"component": "shared_price_structure", "elapsed_seconds": structure_seconds,
+             "rows": len(admissions), "build_count": 1},
+            {"component": "volume_activity_engine", "elapsed_seconds": time.perf_counter()-started,
+             "rows": len(admissions), "build_count": 1,
+             "claim": "isolated_engine_component_not_total_factor_incremental_cost"}])
+    high_anchors = {a.revision_id: a for a in structure.anchors if a.side == "high"}
     prior_dates = {}
     previous_dates: dict[str, date] = {}
     for a in sorted(admissions, key=lambda a: a.key):
@@ -123,9 +143,13 @@ def project_facts(admissions: tuple[Admission, ...], *, spec_digest: str,
     # Structure also measures old frozen episode targets. Only the rolling anchor
     # ending on the immediately prior input session defines this consumer's pool.
     measures = {(m.security_code, m.market_date): m for m in structure.measurements
-                if m.anchor_revision in anchors
-                and anchors[m.anchor_revision].window_end
+                if m.anchor_revision in high_anchors
+                and high_anchors[m.anchor_revision].window_end
                 == prior_dates[m.security_code, m.market_date]}
+    if anchors is not None:
+        if anchors:
+            raise FactorSliceError("FACTOR_ANCHOR_TMP_MUST_START_EMPTY")
+        anchors.update({key: m.anchor_level for key, m in measures.items()})
     rows = []
     for a in sorted(admissions, key=lambda a: a.key):
         r, volume = a.row, activity[a.key]
@@ -201,9 +225,51 @@ def audit_arithmetic(admissions: tuple[Admission, ...],
             "semantic_market_truth_or_prediction_quality": False}
 
 
-def consume_queue(facts: Sequence[Mapping[str, Any]], *, volume_gate: bool) -> dict[str, Any]:
-    """A concrete daily research queue; selection is never an entry or sell signal."""
+@dataclass(frozen=True)
+class PanelIdentity:
+    """Expected identity supplied by a trusted producer/receipt, never by a raw panel.
+
+    The producer freezes this only after native admission and exact arithmetic pass.
+    Reloading an external panel requires this identity from the trusted receipt;
+    recomputing it from that external panel would not establish source qualification.
+    """
+
+    panel_digest: str
+    definition_digest: str
+    source_members: tuple[tuple[str, str, str], ...]
+    policy_digest: str = SUPPORTED_POLICY_DIGEST
+
+
+def verify_panel(facts: Sequence[Mapping[str, Any]], identity: PanelIdentity | None) -> None:
+    """Bind all row bytes and each source key to the previously frozen identity."""
+    if not isinstance(identity, PanelIdentity):
+        raise FactorSliceError("FACTOR_PANEL_IDENTITY_REQUIRED")
     _unique_rows(facts)
+    catalog = load_catalog(Path(__file__).resolve().parents[3])
+    if (identity.policy_digest != catalog["spec_digest"]
+            or identity.definition_digest != catalog["selected_definition_digest"]
+            or not exact_sha(identity.panel_digest)
+            or digest(facts) != identity.panel_digest):
+        raise FactorSliceError("FACTOR_PANEL_IDENTITY_BINDING")
+    sources = {(s, d): member for s, d, member in identity.source_members}
+    if (len(sources) != len(identity.source_members)
+            or set(sources) != {(r["security_id"], r["market_date"]) for r in facts}
+            or any(not exact_sha(m) for m in sources.values())):
+        raise FactorSliceError("FACTOR_PANEL_SOURCE_BINDING")
+    for row in facts:
+        if (row["definition_digest"] != identity.definition_digest
+                or row["source_member_digest"] != sources[row["security_id"], row["market_date"]]
+                or not isinstance(row.get("volume_fact_revision"), str)
+                or not exact_sha(row["volume_fact_revision"])
+                or row["factor_revision"] != digest({"fact": row["volume_fact_revision"],
+                                                    "definition": identity.definition_digest})):
+            raise FactorSliceError("FACTOR_DEFINITION_OR_SOURCE_BINDING")
+
+
+def consume_queue(facts: Sequence[Mapping[str, Any]], *, volume_gate: bool,
+                  identity: PanelIdentity | None = None) -> dict[str, Any]:
+    """A concrete daily research queue; selection is never an entry or sell signal."""
+    verify_panel(facts, identity)
     if type(volume_gate) is not bool:
         raise FactorSliceError("FACTOR_GATE_TYPE")
     days: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
@@ -341,20 +407,50 @@ def read_admissions(source: Path, handoff_sha: str) -> tuple[tuple[Admission, ..
     return tuple(sorted(admissions, key=lambda a: a.key)), calendar_ref
 
 
-def run(*, source: Path, repo: Path, output: Path, budget_path: Path) -> dict[str, Any]:
+def execution_members(repo: Path) -> list[dict[str, str]]:
+    """Exact closed Python tree plus the two semantic configuration members."""
+    names = {POLICY, USE_POLICY, "config/p3-baseline-features.research.v1.json"}
+
+    def unreadable(error: OSError) -> None:
+        raise FactorSliceError("FACTOR_CODE_CLOSURE_UNREADABLE") from error
+
+    root = repo / "src/quanthus"
+    if not root.is_dir() or root.is_symlink():
+        raise FactorSliceError("FACTOR_CODE_CLOSURE_ROOT")
+    for directory, dirs, files in os.walk(root, onerror=unreadable):
+        if any((Path(directory) / d).is_symlink() for d in dirs):
+            raise FactorSliceError("FACTOR_CODE_CLOSURE_SYMLINK")
+        names.update((Path(directory) / name).relative_to(repo).as_posix()
+                     for name in files if name.endswith(".py"))
+    return [{"path": name, "sha256": sha_file(checked_member(repo, name))}
+            for name in sorted(names)]
+
+
+def verify_execution_closure(repo: Path, members: Any) -> None:
+    if (repo != Path(__file__).resolve().parents[3] or not isinstance(members, list)
+            or not members or members != execution_members(repo)):
+        raise FactorSliceError("FACTOR_CODE_CLOSURE_INCOMPLETE_OR_CHANGED")
+    declared = {repo / m["path"] for m in members}
+    # Imports from a different checkout must not be attributed to the declared tree.
+    for name, module in tuple(sys.modules.items()):
+        if name == "quanthus" or name.startswith("quanthus."):
+            origin = getattr(module, "__file__", None)
+            if origin is not None and Path(origin).resolve() not in declared:
+                raise FactorSliceError("FACTOR_CODE_CLOSURE_EXECUTED_ORIGIN")
+
+
+def run(*, source: Path, repo: Path, output: Path, budget_path: Path,
+        utility: bool = False) -> dict[str, Any]:
     """A single immutable DAG run. A separate call is an independent reproduction Job."""
     started = time.monotonic()
     budget = json.loads(budget_path.read_text())
-    if (source.resolve() != source or output.resolve() != output or output.exists()
+    if (repo.resolve() != repo or source.resolve() != source
+            or output.resolve() != output or output.exists()
             or source.is_relative_to(output) or output.is_relative_to(source)
             or repo.is_relative_to(output) or output.is_relative_to(repo)
             or str(output) != budget["output"] or str(source) != budget["source_root"]
             or budget["purpose"] != PURPOSE or budget["new_source_requests"] != 0):
         raise FactorSliceError("FACTOR_FROZEN_PATH_OR_PURPOSE")
-    for m in budget["code_and_config_members"]:
-        if sha_file(checked_member(repo, m["path"])) != m["sha256"]:
-            raise FactorSliceError("FACTOR_CODE_OR_CONFIG_CHANGED")
-    catalog = load_catalog(repo)
     stages = []
 
     def guard() -> None:
@@ -369,6 +465,16 @@ def run(*, source: Path, repo: Path, output: Path, budget_path: Path) -> dict[st
             raise FactorSliceError("FACTOR_EXECUTION_BUDGET")
 
     guard()
+    verify_execution_closure(repo, budget.get("code_and_config_members"))
+    catalog = load_catalog(repo)
+    utility_spec = None
+    if type(utility) is not bool:
+        raise FactorSliceError("FACTOR_USE_ACTIVATION_TYPE")
+    if utility:
+        from quanthus.stage_learning.factor_review_utility import load_contract
+        utility_spec = load_contract(repo)
+        if budget.get("utility_contract_sha256") != sha_file(checked_member(repo, USE_POLICY)):
+            raise FactorSliceError("FACTOR_USE_CONTRACT_NOT_FROZEN")
     output.mkdir()
 
     def save(name: str, value: Any) -> str:
@@ -392,28 +498,69 @@ def run(*, source: Path, repo: Path, output: Path, budget_path: Path) -> dict[st
 
     admissions, calendar_ref = stage("source_admission", lambda: read_admissions(
         source, budget["source_handoff_sha256"]))
+    anchor_levels: dict[tuple[str, date], Decimal] = {}
+    component_costs: list[dict[str, Any]] = []
     facts = stage("facts_and_factor", lambda: project_facts(
         admissions, spec_digest=catalog["spec_digest"], calendar_ref=calendar_ref,
-        definition_digest=catalog["selected_definition_digest"]))
+        definition_digest=catalog["selected_definition_digest"],
+        anchors=anchor_levels if utility else None, component_costs=component_costs))
     facts_digest = save("facts-factor.private.json", facts)
     oracle = stage("independent_arithmetic", lambda: audit_arithmetic(admissions, facts))
-    baseline = stage("baseline_queue", lambda: consume_queue(facts, volume_gate=False),
+    identity = PanelIdentity(facts_digest, catalog["selected_definition_digest"], tuple(
+        (a.row.security_id, a.row.market_date.isoformat(), a.row.member_digest)
+        for a in admissions))
+    identity_digest = save("panel-identity.private.json", {
+        "panel_digest": identity.panel_digest, "definition_digest": identity.definition_digest,
+        "source_members": identity.source_members, "policy_digest": identity.policy_digest})
+    baseline = stage("baseline_queue", lambda: consume_queue(
+        facts, volume_gate=False, identity=identity),
                      "REUSED_SHARED_FACTS")
-    candidate = stage("factor_queue", lambda: consume_queue(facts, volume_gate=True),
+    candidate = stage("factor_queue", lambda: consume_queue(
+        facts, volume_gate=True, identity=identity),
                       "REUSED_SHARED_FACTS")
     queue_digest = save("queues.private.json", {"baseline": baseline, "candidate": candidate})
     summary = compare_queues(baseline, candidate)
     save("catalog.safe.json", catalog)
     save("arithmetic.safe.json", oracle)
     save("screening.safe.json", summary)
+    save("component-costs.safe.json", component_costs)
+    utility_digest = None
+    if utility_spec is not None:
+        from quanthus.stage_learning.factor_review_utility import evaluate
+        result = stage("five_session_use_diagnostic", lambda: evaluate(
+            admissions, facts, anchor_levels, baseline, candidate,
+            identity=identity, spec=utility_spec), "REUSED_SHARED_FACTS_AND_ANCHORS")
+        save("utility-outcomes.private.json", result["private_rows"])
+        utility_digest = save("utility.safe.json", result["safe"])
+
+        def queue_costs() -> dict[str, Any]:
+            times: dict[bool, list[float]] = {False: [], True: []}
+            for i in range(5):
+                for gate in ((False, True) if i % 2 == 0 else (True, False)):
+                    guard()
+                    start = time.perf_counter()
+                    consume_queue(facts, volume_gate=gate, identity=identity)
+                    times[gate].append(time.perf_counter() - start)
+            differences = [b-a for a, b in zip(times[False], times[True], strict=True)]
+            return {"pairs": 5, "order": "alternating", "shared_Facts_builds": 0,
+                    "baseline_seconds": times[False], "factor_seconds": times[True],
+                    "median_factor_minus_baseline_seconds": statistics.median(differences),
+                    "scope": "queue_with_identity_checks; shared_Facts_and_factor_already_built",
+                    "total_factor_incremental_cost": "NOT_FULLY_ISOLATED",
+                    "human_minutes": None}
+
+        save("queue-costs.safe.json", stage("queue_cost_measurement", queue_costs,
+                                          "REUSED_SHARED_FACTS_10_INVOCATIONS"))
     receipt = {"schema_version": "quanthus.factor541-run.v1", "purpose": PURPOSE,
                "source_handoff_sha256": budget["source_handoff_sha256"],
                "semantic_closure_digest": digest(budget["code_and_config_members"]),
                "policy_digest": catalog["spec_digest"], "facts_factor_digest": facts_digest,
+               "panel_identity_digest": identity_digest,
+               "utility_digest": utility_digest,
                "queue_digest": queue_digest, "screening_digest": digest(summary),
                "source_rows": len(admissions), "stages": stages,
                "source_field_times": "preserved; no inferred historical knowledge_cutoff",
-               "facts_TMP_build_count": 1, "facts_TMP_consumers": 3,
+               "facts_TMP_build_count": 1, "facts_TMP_consumers": 14 if utility else 3,
                "peak_RSS_bytes": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*1024,
                "output_bytes_before_receipt": sum(p.stat().st_size for p in output.iterdir()),
                "observed_at": datetime.now(timezone.utc).isoformat(),
@@ -428,8 +575,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     for option in ("source", "repo", "output", "budget"):
         parser.add_argument("--"+option, required=True, type=Path)
+    parser.add_argument("--utility", action="store_true")
     a = parser.parse_args()
-    result = run(source=a.source, repo=a.repo, output=a.output, budget_path=a.budget)
+    result = run(source=a.source, repo=a.repo, output=a.output, budget_path=a.budget,
+                 utility=a.utility)
     print(json.dumps({"status": "COMPLETED_BOUNDED_RESEARCH_QUEUE",
                       "rows": result["source_rows"], "queue_digest": result["queue_digest"],
                       "production_or_P6_admitted": False}, sort_keys=True))

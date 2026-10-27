@@ -10,15 +10,27 @@ import pytest
 from quanthus.stage_learning.factor_slice import (
     FACTOR,
     FactorSliceError,
+    PanelIdentity,
     audit_arithmetic,
     compare_queues,
-    consume_queue,
     load_catalog,
     project_facts,
     run,
 )
-from quanthus.structure_v2_inputs import admit_daily
+from quanthus.stage_learning.factor_slice import (
+    consume_queue as consume_bound_queue,
+)
+from quanthus.structure_v2_inputs import admit_daily, digest
 from tests.unit.test_structure_v2_inputs import SHA, TZ, policy, row
+
+DEFINITION = load_catalog(Path(__file__).resolve().parents[2])["selected_definition_digest"]
+
+
+def consume_queue(rows, *, volume_gate):
+    """Synthetic producer fixture; tamper regressions retain the pre-mutation identity."""
+    identity = PanelIdentity(digest(rows), DEFINITION, tuple(
+        (r["security_id"], r["market_date"], r["source_member_digest"]) for r in rows))
+    return consume_bound_queue(rows, volume_gate=volume_gate, identity=identity)
 
 
 def values(count=23):
@@ -33,7 +45,7 @@ def values(count=23):
 
 def build(rows):
     admitted = tuple(admit_daily(r, policy()) for r in rows)
-    facts = project_facts(admitted, spec_digest=SHA, calendar_ref=SHA, definition_digest=SHA)
+    facts = project_facts(admitted, spec_digest=SHA, calendar_ref=SHA, definition_digest=DEFINITION)
     return admitted, facts
 
 
@@ -41,8 +53,9 @@ def fact(i, volume="1", margin="0.01", day="2021-06-01", admitted=True):
     return {"security_id": f"s{i}", "listing_id": f"l{i}", "market_date": day,
             "admitted": admitted, "resistance_margin20": margin, "volume_ratio20": volume,
             "historical_knowledge_cutoff": None, "source_member_digest": SHA,
-            "price_fact_revision": SHA, "factor_revision": SHA,
-            "feature_id": FACTOR, "feature_version": "1.0.0", "definition_digest": SHA}
+            "price_fact_revision": SHA, "volume_fact_revision": SHA,
+            "factor_revision": digest({"fact": SHA, "definition": DEFINITION}),
+            "feature_id": FACTOR, "feature_version": "1.0.0", "definition_digest": DEFINITION}
 
 
 def test_catalog_reuses_strict_eight_definitions_without_duplicate_alias_asset():

@@ -48,9 +48,22 @@ The catalog distinguishes numerical feature, underlying Facts and consumer decis
 numeric is not evidence of market validity. It does not create three mutually exclusive
 objective/algorithm/qualitative libraries or require every category to be populated.
 
+The implementation admits the complete semantic digest of this frozen contract. A declaration
+of another lookback, version, unit, scope or missing policy fails before output creation; it
+cannot silently reuse the20-day implementation. Before any source read, the execution budget
+must contain the exact Python-tree and semantic-config closure and match the actual imported
+module paths. An empty, omitted, duplicated or changed member fails closed.
+
 This retrospective sidecar binds the unchanged registry definition, source Fact revision and
 unknown knowledge cutoff. It is not a legacy `FeatureFact`, `PublishedSnapshot` or PIT lineage.
 Models are not dependencies; cycles or inference about model/state qualification are absent.
+
+The public queue consumer requires a `PanelIdentity` from the trusted producer/receipt. The
+producer freezes it after native admission and exact arithmetic, binding every row byte,
+canonical definition, policy and per-security/day source member. Arbitrary raw rows are not
+accepted. A reader must obtain this expected identity from its qualified receipt; recomputing
+it from an untrusted panel would not establish qualification. Individual factor revisions
+must also bind the underlying volume Fact revision and canonical definition.
 
 ## Two frozen consumer arms
 
@@ -83,3 +96,33 @@ Rebuild in an independent new process from an independently copied tiny source s
 old sources and network unreachable. Compare full Facts and queue semantic digests. Damage
 only a disposable copy and require fail-closed. Check applicable regressions, lint/type and
 `make check`; append scoped engineering, quality, value and admission outcomes to the blueprint.
+
+## Owner-approved bounded usefulness diagnostic
+
+The2026-10-28 continuation authorizes one additional retrospective diagnostic under
+`config/research/factor541-five-session-diagnostic.v1.json`, within the3-hour task budget.
+The old queue contract, factor threshold and records remain immutable. This is previously
+exposed2021 development data, not a fresh independent test or historical PIT reconstruction.
+
+The purpose is to reduce research-review entries which quickly fall back below the breakout
+reference. A quick failure means at least one valid close strictly below T's frozen prior20
+high in the next five exchange sessions. Equality is not failure. All five sessions must be
+present, admitted and in the same listing/price coordinate. Any action boundary, unavailable
+session or incomplete2021 tail yields unknown; no2022 data is read and unknowns retain their
+denominator. The future observations score the diagnostic only, never enter T's features.
+
+The primary conditional-capacity control takes the first N original price/hash selections
+on each date, where N is that date's candidate count. It is a same-count diagnostic, not an
+independently deployable quota policy. Common observations cancel in the paired difference;
+changed unknowns give worst/best-case bounds. Security-cluster bootstrap and leave-one-security/
+date sensitivity expose dependence; daily slots must not be counted as independent evidence.
+The frozen continuation rule requires a positive worst-case reduction, positive bootstrap
+lower bound and positive leave-one-security/date nets. Otherwise park the volume gate and
+retain the engineering asset. Even a limited positive diagnostic grants no strategy or P6 use.
+
+Reuse anchors from the first Structure build, the same native admissions and immutable Facts.
+Record the isolated activity-engine component and five alternating queue timing pairs; the
+latter excludes common prerequisites and does not identify total factor cost or human time.
+A separate cold Job rebuilds from independent source files with only code, its own source
+copy and new output reachable. Do not mount original outputs into its namespace. The dated
+delivery receipt owns observed outcomes and the scoped keep/park decision.

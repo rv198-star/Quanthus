@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved — Owner requested this mechanism on 2026-10-27 |
-| Delivery gate | open; code/checks do not enable default-branch workflows before merge |
+| Delivery gate | accepted-conditional for the mechanism; default-branch integration is merged, remote Actions execution remains a separately recorded limitation |
 | Work item | META-TRACE-001; first bounded adoption: META-LEARN-001 / #540 |
 | Parent | [Delivery roadmap](lld/09-roadmap.md) |
 | Module architecture | [Layered state portfolio](stock-stage-vocabulary-portfolio.md) |
@@ -134,9 +134,12 @@ read-only reconciliation on registered issue events, main updates and manual dis
 keeps failure receipts as artifacts; it has only contents/issue read permissions, no data or
 deployment credentials, no auto-promotion, no automatic issue comments and no new daemon.
 
-GitHub issue events begin using this workflow only after it is on the default branch.
-Adding the workflow does not silently enable branch-protection requirements. Until merge,
-the CLI and local checks are usable and the workflow is prepared, not remotely activated.
+GitHub issue events select this workflow only after it is on the default branch.
+Adding the workflow does not silently enable branch-protection requirements. Default-branch
+installation, an actual runner execution and a successful reconciliation are separate facts.
+When remote runners cannot start, use the same CLI locally and retain the remote failure;
+do not describe installation or a local pass as a successful Actions run. The current adoption
+receipt is linked from the `TRACE` module in the generated blueprint.
 This is one bounded addition to existing planning and TPlan, not a new general project platform.
 
 Local implementation evidence: [2026-10-27 conformance record](../acceptance/blueprint-progress-20261027.md).

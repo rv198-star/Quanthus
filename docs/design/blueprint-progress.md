@@ -30,6 +30,31 @@ The tracking catalog references prior domain contracts. It is not a replacement 
 Changing a research threshold, sample, purpose or use authorization still follows its existing
 governing contract. Optional parked states do not block independently qualified modules.
 
+## Demand-led portfolio continuation
+
+The Owner's 2026-10-27 continuation uses four bounded batches, linked through the current ledger:
+
+1. Reuse the retained Head2 seven-feature research asset, the nine-feature rejection, accepted
+   development 10/11 projections, layered representation and comparison interfaces. Rechecking
+   compatibility does not count as new scientific acceptance or justify refitting an old candidate.
+2. Assess input, exposure and independent-reference feasibility for the frozen 3/4 candidate.
+   Preserve both anchor scales and the pre-T history requirement. Source windows and reference
+   meanings are purpose-specific: a Head2 current20 reference cannot become a 3/4 reference, and
+   the consumed 2022–2024 arbitration cannot become fresh. An input proposal does not activate it.
+3. Only after the candidate's quality and use-specific gates pass, test one concrete consumer.
+   Existing 10/11 development views remain reusable at their accepted grade; representation
+   compatibility is not decision usefulness. P3 comparison and targeted P6 simulation are needed
+   only when a proposed use actually changes trading decisions and their own gates permit it.
+4. Keep other states demand-led. A parked discrete label does not remove its continuous Facts.
+   Record the missing hypothesis, reference or relation and a concrete unlock trigger before any
+   further investment; do not open a parallel campaign to qualify all historical codes.
+
+P5 owns sample design, reference meaning and consumer disposition. A bounded P10 request owns new
+shared-source qualification. Neither issue closure nor a tracking checkpoint transfers that authority.
+The first execution findings are [recorded separately](../acceptance/state-portfolio-batches-20261027.md);
+the generated ledger remains the single current gap view. Execution notes belong here or in new
+dated receipts: do not append them to an old authority document pinned by a frozen research request.
+
 ## Four independent progress facets
 
 Each module reports **engineering**, **quality**, **value**, and **admission** separately.

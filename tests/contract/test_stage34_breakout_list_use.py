@@ -52,3 +52,33 @@ def test_history_and_exposure_do_not_become_new_truth_or_permission():
     assert use['execution']['new_network_source_requests'] == 0
     assert use['execution']['steps_1_2_deadline'] == '2026-10-27T19:43:13+00:00'
     assert use['execution']['maximum_conditional_step3_seconds'] == 7200
+
+
+def test_successor_list_protocol_preserves_frozen_candidate_and_quality_gates():
+    original = load('config/research/learning-mvp/stage34-breakout-list-use.v1.json')
+    successor = load('config/research/learning-mvp/stage34-breakout-list-use.v2.json')
+    assert successor['recognition'] == original['recognition']
+    assert successor['comparison']['arms'] == original['comparison']['arms']
+    universe = successor['comparison']['opportunity_set']
+    assert universe['unit'] == ['security_id', 'market_date']
+    assert universe['both_scales_retained'] == [20, 60]
+    assert universe['full_eligible_security_dates_required'] is True
+    assert universe['not_one_date_per_episode_quality_sample'] is True
+    assert universe['unknowns_retained_in_denominator'] is True
+    assert successor['consumer']['review_slots_per_day'] == 5
+    assert successor['execution']['consumer_test_authorized'] is False
+    assert successor['execution']['production_or_P6_admitted'] is False
+
+
+def test_reference_method_pilot_does_not_refresh_old_data_or_create_authority():
+    successor = load('config/research/learning-mvp/stage34-breakout-list-use.v2.json')
+    pilot = successor['reference']['pilot']
+    assert pilot['maximum_cases'] == 12
+    assert pilot['human_expert_validated'] is False
+    assert pilot['formal_test_sample'] is False
+    assert pilot['does_not_satisfy_old100_100_50'] is True
+    assert pilot['unknown_and_disagreement_allowed'] is True
+    assert successor['reference']['independent_reference_available_by_this_contract'] is False
+    assert successor['execution']['new_network_source_requests'] == 0
+    exclusions = successor['sampling_preflight']
+    assert exclusions['exclude_all318_previously_reviewed_episode_ids_at_every_date'] is True

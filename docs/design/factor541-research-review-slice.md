@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved for this bounded slice by Owner 2026-10-28 |
-| Delivery gate | accepted-conditional for the repaired bounded engineering slice; [convergence evidence](../acceptance/factor541-convergence-20261028.md) records fixed-result identity and isolated reproduction. Purpose value remains inconclusive; the volume gate is parked. [Independent review](../acceptance/factor541-astra-review-20261028.md) and [original evidence](../acceptance/factor541-review-slice-20261028.md) remain historical records |
+| Delivery gate | accepted-conditional for the repaired bounded engineering slice; [post-fix review](../acceptance/factor541-postfix-review-20261028.md) accepts the three P2 closures and bounded arithmetic; [convergence evidence](../acceptance/factor541-convergence-20261028.md) records fixed-result identity and isolated reproduction. Purpose value remains inconclusive; the volume gate is parked. [Initial review](../acceptance/factor541-astra-review-20261028.md) and [original evidence](../acceptance/factor541-review-slice-20261028.md) remain historical records |
 | Work item | P3-FACTOR-001 / #541 |
 | Parent | [Continuous Structure Facts](continuous-structure-facts-v1.md) |
 | Blueprint | [module progress](../work-items/learning-blueprint-progress.md) |

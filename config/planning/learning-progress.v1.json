@@ -3409,6 +3409,407 @@
           "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
         }
       ]
+    },
+    {
+      "id": "CP-542-PURPOSE-20261028-174025",
+      "recorded_at": "2026-10-27T17:40:25.296047+00:00",
+      "actor": "Codex: bounded engineering and purpose feasibility; no new reference or candidate scoring",
+      "work_item": "P5-STATE-002",
+      "outcome": "progress",
+      "summary": "容量/历史/曝光预检与新研究用途已落地；真实新评价容量不够，保留限定来源和事实。",
+      "evidence": [
+        {
+          "id": "CAPACITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/capacity-preflight-final.safe.json",
+          "sha256": "ce8f8612e15bba278d4432991965417e5d386677b2662f7d92c715ef3948a37a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "固定128的分配/曝光/历史容量诊断；321个episode中318已用，剩3；不产生新参考或评分。"
+        },
+        {
+          "id": "ROUTES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/remaining-routes.safe.json",
+          "sha256": "3e7ecde0cda3aa3409e6aa4f46c44cdb76b9acabcfb400380ffcdf8b1d600390",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "373身份中剩245只有身份/日历可行性；选定交接不含其新资格，不声称原始数据全局不存在。"
+        },
+        {
+          "id": "PURPOSE_DECISION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/three-step-decision.safe.json",
+          "sha256": "f5db9e52afb1c6df0473af24d65af9fc8066bbd80fc76d3cce6584507a410dad",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "一个K=5同输入同成本研究用途已冻结；前置未过，第三步NOT_RUN；非识别失败、用途价值或P6准入。"
+        },
+        {
+          "id": "NATIVE_GUARD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/native-access-verification.safe.json",
+          "sha256": "e84e66a9e95b482d7eb8f3694813d684557eadf2fb7ca28bb3a1aad89124be51",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "OS openat/connect和Python守卫核验；最终容量进程旧native根打开与网络connect为0，非新科学独立真值。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "误授权修复、逐层占用/曝光/历史预检已实现；原128容量真实复算并在参考前停止",
+          "remaining": "工程只保证资格分离；独立语义参考和可用新样本仍缺",
+          "next_action": "复用资格化Facts与预检；另有合格来源/参考设计时才考虑新样本",
+          "supersedes": "CP-542-PREFIX128-20261027T130854Z",
+          "evidence": [
+            "CAPACITY",
+            "ROUTES",
+            "PURPOSE_DECISION",
+            "NATIVE_GUARD"
+          ]
+        },
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "原321个episode中318已被参考消费；排除后仅3，低于至少250必要量；原参考结论不变",
+          "remaining": "原规则参考不是独立语义真值；剩245只是身份/日历路线",
+          "next_action": "不重采同128或重评旧成绩；若重启，由P10精确资格化新来源，再审参考容量",
+          "supersedes": "CP-540-ASTRA-PREFIX128-20261027",
+          "evidence": [
+            "CAPACITY",
+            "ROUTES",
+            "PURPOSE_DECISION",
+            "NATIVE_GUARD"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-002",
+          "number": 542,
+          "title": "[P5-STATE-002] 冻结首轮状态学习的输入、独立参考、可训练头与预算",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:43Z",
+          "body_sha256": "bda0fe44b4f32d7d79be67ac43fc70cdfff5ace202db0388970203aa3cdd6d60"
+        }
+      ]
+    },
+    {
+      "id": "CP-543-PURPOSE-20261028-174025",
+      "recorded_at": "2026-10-27T17:40:25.438999+00:00",
+      "actor": "Codex: bounded engineering and purpose feasibility; no new reference or candidate scoring",
+      "work_item": "P5-STATE-003",
+      "outcome": "deferred",
+      "summary": "保留3/4冻结候选；本轮未再生成参考、评分、训练或参数搜索。",
+      "evidence": [
+        {
+          "id": "CAPACITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/capacity-preflight-final.safe.json",
+          "sha256": "ce8f8612e15bba278d4432991965417e5d386677b2662f7d92c715ef3948a37a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "固定128的分配/曝光/历史容量诊断；321个episode中318已用，剩3；不产生新参考或评分。"
+        },
+        {
+          "id": "ROUTES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/remaining-routes.safe.json",
+          "sha256": "3e7ecde0cda3aa3409e6aa4f46c44cdb76b9acabcfb400380ffcdf8b1d600390",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "373身份中剩245只有身份/日历可行性；选定交接不含其新资格，不声称原始数据全局不存在。"
+        },
+        {
+          "id": "PURPOSE_DECISION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/three-step-decision.safe.json",
+          "sha256": "f5db9e52afb1c6df0473af24d65af9fc8066bbd80fc76d3cce6584507a410dad",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "一个K=5同输入同成本研究用途已冻结；前置未过，第三步NOT_RUN；非识别失败、用途价值或P6准入。"
+        },
+        {
+          "id": "NATIVE_GUARD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/native-access-verification.safe.json",
+          "sha256": "e84e66a9e95b482d7eb8f3694813d684557eadf2fb7ca28bb3a1aad89124be51",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "OS openat/connect和Python守卫核验；最终容量进程旧native根打开与网络connect为0，非新科学独立真值。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "S03",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "冻结R1/R0保留，新增quality/request/use分离和候选盲容量预检；针对性回归已通过",
+          "remaining": "状态3整体仍未获新识别/用途资格",
+          "next_action": "保留可复用工程；不以绿色测试接受状态头",
+          "supersedes": "CP-542-FOUR-BATCHES-20261027",
+          "evidence": [
+            "CAPACITY",
+            "ROUTES",
+            "PURPOSE_DECISION",
+            "NATIVE_GUARD"
+          ]
+        },
+        {
+          "module": "S04",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "保留20/60尺度；逐层显示成熟/重上被占用，最低历史按实际连续观察检查",
+          "remaining": "成熟与重上场景在旧材料中存在，但没有新的合格评价总体",
+          "next_action": "容量与独立参考闭合前不评分，不把分层诊断当新样本",
+          "supersedes": "CP-542-FOUR-BATCHES-20261027",
+          "evidence": [
+            "CAPACITY",
+            "ROUTES",
+            "PURPOSE_DECISION",
+            "NATIVE_GUARD"
+          ]
+        },
+        {
+          "module": "S03",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "旧3=100参考保留；新容量仅3，候选未评分，非质量拒绝",
+          "remaining": "缺目的兼容的新参考/数量与独立语义资格",
+          "next_action": "停放本次新评分；连续Facts继续按原资格复用",
+          "supersedes": "CP-540-ASTRA-PREFIX128-20261027",
+          "evidence": [
+            "CAPACITY",
+            "ROUTES",
+            "PURPOSE_DECISION",
+            "NATIVE_GUARD"
+          ]
+        },
+        {
+          "module": "S04",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "旧4=98/模糊16和未评分结论保留；稀缺优先诊断不改变旧结果",
+          "remaining": "新未消费容量不足，且剩245未有本用途来源资格",
+          "next_action": "不事后补2个4或34个模糊案例，不降低原100/100/50门槛",
+          "supersedes": "CP-540-ASTRA-PREFIX128-20261027",
+          "evidence": [
+            "CAPACITY",
+            "ROUTES",
+            "PURPOSE_DECISION",
+            "NATIVE_GUARD"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-003",
+          "number": 543,
+          "title": "[P5-STATE-003] 训练并评价首个有资格的12+X分层状态模型版本",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:45Z",
+          "body_sha256": "07e66bd3025f361b4230833bc5530384686f7b9db0a9afa68d16a0183d2ac082"
+        }
+      ]
+    },
+    {
+      "id": "CP-545-PURPOSE-20261028-174025",
+      "recorded_at": "2026-10-27T17:40:25.586032+00:00",
+      "actor": "Codex: bounded engineering and purpose feasibility; no new reference or candidate scoring",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "deferred",
+      "summary": "K=5突破审核列表用途和公平对照已冻结；实际消费者比较按前置NOT_RUN。",
+      "evidence": [
+        {
+          "id": "CAPACITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/capacity-preflight-final.safe.json",
+          "sha256": "ce8f8612e15bba278d4432991965417e5d386677b2662f7d92c715ef3948a37a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "固定128的分配/曝光/历史容量诊断；321个episode中318已用，剩3；不产生新参考或评分。"
+        },
+        {
+          "id": "ROUTES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/remaining-routes.safe.json",
+          "sha256": "3e7ecde0cda3aa3409e6aa4f46c44cdb76b9acabcfb400380ffcdf8b1d600390",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "373身份中剩245只有身份/日历可行性；选定交接不含其新资格，不声称原始数据全局不存在。"
+        },
+        {
+          "id": "PURPOSE_DECISION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/three-step-decision.safe.json",
+          "sha256": "f5db9e52afb1c6df0473af24d65af9fc8066bbd80fc76d3cce6584507a410dad",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "一个K=5同输入同成本研究用途已冻结；前置未过，第三步NOT_RUN；非识别失败、用途价值或P6准入。"
+        },
+        {
+          "id": "NATIVE_GUARD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/native-access-verification.safe.json",
+          "sha256": "e84e66a9e95b482d7eb8f3694813d684557eadf2fb7ca28bb3a1aad89124be51",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "OS openat/connect和Python守卫核验；最终容量进程旧native根打开与网络connect为0，非新科学独立真值。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "明确每日最多5个审核名额，冻结R1/R0同Facts同成本、误报/漏报/UNKNOWN与issuer依赖统计",
+          "remaining": "无实际新消费者执行；现有专家/P3/P6代码继续复用",
+          "next_action": "保留这一个用途契约，不扩建通用平台",
+          "supersedes": "BASELINE-20261027",
+          "evidence": [
+            "CAPACITY",
+            "ROUTES",
+            "PURPOSE_DECISION",
+            "NATIVE_GUARD"
+          ]
+        },
+        {
+          "module": "EXPERT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "用途明确但本轮比较NOT_RUN，没有新增决策或收益价值证据",
+          "remaining": "3个未用episode不足，独立参考与精确用途准入不存在",
+          "next_action": "前置通过再一次比较；否则停放3/4标签，不拖累其他合格模块",
+          "supersedes": "CP-545-PREFIX128-20261027T130854Z",
+          "evidence": [
+            "CAPACITY",
+            "ROUTES",
+            "PURPOSE_DECISION",
+            "NATIVE_GUARD"
+          ]
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "质量通过不再自动开启消费者；所有分支consumer_test_authorized和production/P6保持false",
+          "remaining": "来源/参考/质量/代码配置/比较预算绑定的显式用途准入仍缺",
+          "next_action": "不启动P3经济回放或P6，不把用途设计等同获准使用",
+          "supersedes": "CP-540-ASTRA-PREFIX128-20261027",
+          "evidence": [
+            "CAPACITY",
+            "ROUTES",
+            "PURPOSE_DECISION",
+            "NATIVE_GUARD"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:49Z",
+          "body_sha256": "291e438c73c9210cbfbef550c187642ad694716cd4c9d739c4551260f8378f3c"
+        }
+      ]
+    },
+    {
+      "id": "CP-540-PURPOSE-20261028-174025",
+      "recorded_at": "2026-10-27T17:40:25.724590+00:00",
+      "actor": "Codex: bounded engineering and purpose feasibility; no new reference or candidate scoring",
+      "work_item": "META-LEARN-001",
+      "outcome": "progress",
+      "summary": "本轮1/2工程与用途可行性已完成判断；第三步按条件不运行，整体MVP未验收。",
+      "evidence": [
+        {
+          "id": "CAPACITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/capacity-preflight-final.safe.json",
+          "sha256": "ce8f8612e15bba278d4432991965417e5d386677b2662f7d92c715ef3948a37a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "固定128的分配/曝光/历史容量诊断；321个episode中318已用，剩3；不产生新参考或评分。"
+        },
+        {
+          "id": "ROUTES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/remaining-routes.safe.json",
+          "sha256": "3e7ecde0cda3aa3409e6aa4f46c44cdb76b9acabcfb400380ffcdf8b1d600390",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "373身份中剩245只有身份/日历可行性；选定交接不含其新资格，不声称原始数据全局不存在。"
+        },
+        {
+          "id": "PURPOSE_DECISION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/three-step-decision.safe.json",
+          "sha256": "f5db9e52afb1c6df0473af24d65af9fc8066bbd80fc76d3cce6584507a410dad",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "一个K=5同输入同成本研究用途已冻结；前置未过，第三步NOT_RUN；非识别失败、用途价值或P6准入。"
+        },
+        {
+          "id": "NATIVE_GUARD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/stage34-purpose-execution-20261027T171432Z-9608a85/evidence/native-access-verification.safe.json",
+          "sha256": "e84e66a9e95b482d7eb8f3694813d684557eadf2fb7ca28bb3a1aad89124be51",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "OS openat/connect和Python守卫核验；最终容量进程旧native根打开与网络connect为0，非新科学独立真值。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "前两步得到可复用修复和精确NO_GO，不再把同一稀缺样本重复跑成新进展",
+          "remaining": "至少一个状态的实际用途增益仍待证明",
+          "next_action": "本轮交付后停止旧128新评分；其他模块继续需求驱动",
+          "supersedes": "CP-540-FOUR-BATCHES-20261027",
+          "evidence": [
+            "CAPACITY",
+            "ROUTES",
+            "PURPOSE_DECISION",
+            "NATIVE_GUARD"
+          ]
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "一个具体用途已定义；无新的识别/消费者价值通过，未训练Head2或重开P6",
+          "remaining": "新3/4来源、未消费容量与独立参考未闭合；没有产品总百分比分母",
+          "next_action": "后续投入先解决合格新来源/参考可行性；不自动新增轮次或机械补数",
+          "supersedes": "CP-540-ASTRA-PREFIX128-20261027",
+          "evidence": [
+            "CAPACITY",
+            "ROUTES",
+            "PURPOSE_DECISION",
+            "NATIVE_GUARD"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:53Z",
+          "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
+        }
+      ]
     }
   ]
 }

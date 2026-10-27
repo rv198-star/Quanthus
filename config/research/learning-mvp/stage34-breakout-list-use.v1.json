@@ -1,0 +1,126 @@
+{
+  "schema_version": "quanthus.stage34-breakout-list-use.v1",
+  "request_id": "stage34-breakout-list-feasibility-20261028-v1",
+  "work_items": [
+    "META-LEARN-001",
+    "P5-STATE-002",
+    "P5-STATE-003",
+    "P3-EXPERT-007"
+  ],
+  "status": "preregistered_feasibility_not_consumer_admission",
+  "owner_authority": "Owner approved audit route steps1/2 within150minutes, and one conditional step3 within120minutes; original elapsed time and zero-new-acquisition floor retained.",
+  "purpose": "RETROSPECTIVE_RESEARCH_BREAKOUT_REVIEW_LIST",
+  "consumer": {
+    "actor": "research analyst reviewing a daily breakout follow-up list",
+    "action": "choose at most five T-close episode alerts to inspect; distinguish probe, acceptance, invalid/uncertain",
+    "review_slots_per_day": 5,
+    "cost_per_slot_units": 1,
+    "no_automatic_order_or_fill": true,
+    "missing_or_invalid_never_forces_sale": true,
+    "claim_ceiling": "Research triage only; no investor return, live analyst time saving or historical-as-known claim."
+  },
+  "comparison": {
+    "arms": [
+      "frozen_R1",
+      "frozen_R0"
+    ],
+    "shared_inputs": [
+      "same admitted T-or-earlier daily prefix",
+      "same20/60 anchor facts",
+      "same activity facts",
+      "same exact context universe and UNKNOWN denominator"
+    ],
+    "baseline": "existing frozen R0, no deliberately weakened or information-deprived baseline",
+    "ranking_before_reference": {
+      "stage_order": [
+        4,
+        3
+      ],
+      "within_stage": "SHA256(request_id,context_id), ascending",
+      "unknown": "retained in denominator and unselected; not negative"
+    },
+    "same_review_slots_and_input_cost": true,
+    "measures": [
+      "reviewed definite-positive count",
+      "definite-negative alerts",
+      "missed definite-positive count",
+      "ambiguous unique assertions",
+      "UNKNOWN count and rate",
+      "issuer and related-episode dependence"
+    ],
+    "useful_only_if": "at same cost fewer false alerts with no lost definite positives, or more definite positives with no extra false alerts; no claim if neither strictly improves",
+    "uncertainty": "paired issuer-cluster summaries; dependent episodes/scales are not independent votes",
+    "economic_or_future_settlement_result": false
+  },
+  "recognition": {
+    "candidate_config": "config/stage-learning/development-candidate.v1.json",
+    "candidate_canonical_digest": "sha256:d492d12686be5f5ac84f87ba278afd873d9999aadc5fa5dc79a6f5f5985f176c",
+    "gate_source": "config/stage-learning/qualification.v1.json#hard_gates",
+    "minimum_definite_per_stage": 100,
+    "minimum_ambiguous": 50,
+    "minimum_total_unique_episodes_necessary_not_sufficient": 250,
+    "training_or_parameter_search": false
+  },
+  "sampling_preflight": {
+    "legacy_result_and_sampler_immutable": true,
+    "old_fixed128_only_development_diagnostics": true,
+    "exclude_all318_previously_reviewed_episode_ids_at_every_date": true,
+    "source_scope": "only previously admitted2021 prefixes and already authorized identity/calendar metadata",
+    "prospective_order": [
+      "mature_held",
+      "reclaimed_ambiguity",
+      "started_activity",
+      "early_held",
+      "near_anchor_loss_negative"
+    ],
+    "caps_source": "config/stage-learning/qualification-protocol.v2.json#sampling",
+    "caps_unchanged": true,
+    "no_cross_stratum_backfill": true,
+    "history": {
+      "scales": [
+        20,
+        60
+      ],
+      "minimum_prior_contiguous_admitted_sessions": {
+        "20": 20,
+        "60": 60
+      },
+      "T_excluded_from_prior_count": true,
+      "packet_maximum_prior_sessions": 60,
+      "full60_history_claim_requires61_rows_including_T": true,
+      "gap_coordinate_or_listing_reset_restarts_count": true,
+      "missing_history_is_unavailable": true
+    },
+    "capacity_pass_never_proves_semantic_or_exposure_qualification": true,
+    "no_reference_or_prediction_before_freeze_and_capacity_pass": true
+  },
+  "reference": {
+    "old_tier": "SYNTHETIC_EXPERT_CONSENSUS",
+    "old_tier_ceiling": "deterministic rule shadow and reproducibility only; not human or new independent AI review",
+    "purpose_requires": "candidate-blind separately attributable semantic judgements on same T-only packets, independent of compared threshold rules as sole truth",
+    "independence_receipt_required": true,
+    "exposure_scope_and_reviewed_episode_exclusions_required": true,
+    "reviewer_count_or_new_process_does_not_prove_independence": true,
+    "independent_reference_available_by_this_contract": false
+  },
+  "execution": {
+    "steps_1_2_started_at": "2026-10-27T17:13:13+00:00",
+    "steps_1_2_deadline": "2026-10-27T19:43:13+00:00",
+    "maximum_conditional_step3_seconds": 7200,
+    "maximum_new_bytes": 268435456,
+    "rss_bytes": 4294967296,
+    "minimum_free_bytes": 8589934592,
+    "new_network_source_requests": 0,
+    "no_new_source_or_unqualified_market_reads": true,
+    "step3_requires": [
+      "qualified exact new input and complete hashes",
+      "unconsumed episode and post-allocation capacity",
+      "purpose-appropriate independent semantic references",
+      "original recognition gates pass",
+      "explicit code/config/source/reference/comparator-bound use admission"
+    ],
+    "when_unmet": "record exact NO_GO and NOT_RUN, preserve reusable code and qualified facts; no automatic resampling or extra round",
+    "consumer_test_authorized": false,
+    "production_or_P6_admitted": false
+  }
+}

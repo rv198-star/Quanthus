@@ -85,9 +85,18 @@ def score_if_sufficient(
     activity: Sequence[ActivityObservation], candidate: Mapping[str, Any],
     experiment: Mapping[str, Any], gates: Mapping[str, Any],
 ) -> dict[str, Any]:
+    """Assess recognition quality, never issue use-specific consumer authority.
+
+    A passing result is eligible to accompany a separate consumer request. An
+    admitted use still needs its own purpose, comparison and bound authority
+    receipt; none is an input to this quality-only function.
+    """
     sufficiency = reference_sufficiency(contexts, references, audits, gates)
     result: dict[str, Any] = {"reference_sufficiency": sufficiency,
-                             "candidate_scored": False, "consumer_test_authorized": False}
+                             "candidate_scored": False, "quality_passed": False,
+                             "consumer_request_eligible": False,
+                             "consumer_test_authorized": False,
+                             "production_or_P6_admitted": False}
     if not sufficiency["passed"]:
         return {**result, "disposition": "INCONCLUSIVE_REFERENCE_SHORTFALL_NOT_SCORED"}
     observations = build_learning_observations(contexts, structure, activity)
@@ -105,7 +114,8 @@ def score_if_sufficient(
             "r0_score": scores[1], "hard_gate": gate,
             "disposition": ("BOUNDED_DEVELOPMENT_REPLICATION_PASS" if gate["passed"]
                             else "REJECTED_RETAIN_FIXED_CANDIDATE_RESULT"),
-            "consumer_test_authorized": gate["passed"]}
+            "quality_passed": gate["passed"],
+            "consumer_request_eligible": gate["passed"]}
 
 
 def run_prefix_qualification(

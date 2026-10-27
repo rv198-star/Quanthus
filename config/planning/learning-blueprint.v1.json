@@ -68,7 +68,9 @@
       ],
       "focus_facet": "quality",
       "watch_paths": [
-        "src/quanthus/stage_learning/p5_input_census.py"
+        "src/quanthus/stage_learning/p5_input_census.py",
+        "src/quanthus/stage_learning/qualification.py",
+        "src/quanthus/stage_learning/prefix_qualification.py"
       ]
     },
     {
@@ -125,7 +127,8 @@
       ],
       "focus_facet": "value",
       "watch_paths": [
-        "src/quanthus/stage_learning/head2_consumer.py"
+        "src/quanthus/stage_learning/head2_consumer.py",
+        "config/research/learning-mvp/stage34-breakout-list-use.v1.json"
       ]
     },
     {
@@ -212,7 +215,9 @@
       "depends_on": [],
       "focus_facet": "quality",
       "watch_paths": [
-        "config/stage-learning/development-candidate.v1.json"
+        "config/stage-learning/development-candidate.v1.json",
+        "src/quanthus/stage_learning/qualification.py",
+        "src/quanthus/stage_learning/prefix_qualification.py"
       ]
     },
     {
@@ -226,7 +231,9 @@
       ],
       "focus_facet": "quality",
       "watch_paths": [
-        "config/stage-learning/development-candidate.v1.json"
+        "config/stage-learning/development-candidate.v1.json",
+        "src/quanthus/stage_learning/qualification.py",
+        "src/quanthus/stage_learning/prefix_qualification.py"
       ]
     },
     {

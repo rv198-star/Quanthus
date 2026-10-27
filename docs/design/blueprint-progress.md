@@ -116,6 +116,12 @@ PR base or push predecessor; ordinary local `check` cannot independently establi
 Concurrent writers re-read the ledger under a POSIX lock. A crash between the authoritative
 ledger rename and view rename leaves a stale view that `check` rejects; `render` safely repairs it.
 
+After adoption, main is the shared checkpoint baseline. Long-lived research branches must
+recover the latest blueprint before work and submit their scoped checkpoint against that baseline;
+they do not become parallel progress authorities. A stale `supersedes` must be reassessed, not
+silently overwritten. Unmerged research receipts may be referenced by identity without merging
+the research implementation or importing its results into an unrelated branch.
+
 Do not hand-edit generated Markdown. Do not copy the latest local uncommitted status into a
 production authority file. Catalog topology changes must explain their product impact in the PR;
 the mechanical cycle/link checks do not decide whether a dependency is substantively warranted.
@@ -132,3 +138,5 @@ GitHub issue events begin using this workflow only after it is on the default br
 Adding the workflow does not silently enable branch-protection requirements. Until merge,
 the CLI and local checks are usable and the workflow is prepared, not remotely activated.
 This is one bounded addition to existing planning and TPlan, not a new general project platform.
+
+Local implementation evidence: [2026-10-27 conformance record](../acceptance/blueprint-progress-20261027.md).

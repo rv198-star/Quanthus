@@ -1073,6 +1073,392 @@
           "body_sha256": "b87bf30a592d40925c626d91dcb15a1d770cc4f042ec3e6a7b1d69fb83160d9d"
         }
       ]
+    },
+    {
+      "id": "CP-540-LINK-20261027T064436402817Z",
+      "recorded_at": "2026-10-27T06:44:36.402817+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "META-LEARN-001",
+      "outcome": "progress",
+      "summary": "蓝图关联机制已实现并关联现有工单，更新总线下一步；未增加研究成熟度。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        },
+        {
+          "id": "IMPLEMENTATION_CHECKS",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/implementation-checks.safe.json",
+          "sha256": "cbb00c8d2daf9c92fde2874728c7beb05cac2355d1cc2fcf145a04af20be9c91",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅本轮项目关联机制工程验收；5,152通过/20跳过；不接受任何研究候选或自动启用GitHub事件。"
+        },
+        {
+          "id": "HEAD2_REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/AgentDock/base22-review-afe2526/head2-temporal-review-20261027T050025Z-7f4ecc9/review.md",
+          "sha256": "f273f3920a411610a05b14793f3d788c18b665fba57316744d2d9a037800d3f2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "7f4ecc9批次复审；九特征拒绝、七特征未取得消费者资格；非新独立训练。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "形成有实际用途、可比较并可保留旧版的有限学习闭环",
+          "remaining": "至少一个有明确用途的状态及完整决策价值未闭合",
+          "next_action": "依据模块当前缺口选择下一批领域，先绑定工作项与验收边界；本次治理交付不自动启动研究。",
+          "evidence": [
+            "HEAD2_REVIEW",
+            "IMPLEMENTATION_CHECKS"
+          ],
+          "supersedes": "BASELINE-20261027"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:42:35Z",
+          "body_sha256": "8229489c359c9bae497b93206de999b150dda6e4acfd89fe84795f1b4396d398"
+        }
+      ]
+    },
+    {
+      "id": "CP-541-LINK-20261027T064436547852Z",
+      "recorded_at": "2026-10-27T06:44:36.547852+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P3-FACTOR-001",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P3-FACTOR-001",
+          "number": 541,
+          "title": "[P3-FACTOR-001] 统一因子目录与分类契约并交付首批有用途证据的因子切片",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:42:40Z",
+          "body_sha256": "dc9b94528e8cd43c9ffabb88f530e0791000edf3d3ffb1c54e0123e3ea217806"
+        }
+      ]
+    },
+    {
+      "id": "CP-542-LINK-20261027T064436701094Z",
+      "recorded_at": "2026-10-27T06:44:36.701094+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P5-STATE-002",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-002",
+          "number": 542,
+          "title": "[P5-STATE-002] 冻结首轮状态学习的输入、独立参考、可训练头与预算",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:42:46Z",
+          "body_sha256": "91c3c346198f973bb6f67a9cbb82d1778f6b9b9e4fce83c4a1d46b4747524f09"
+        }
+      ]
+    },
+    {
+      "id": "CP-543-LINK-20261027T064436846543Z",
+      "recorded_at": "2026-10-27T06:44:36.846543+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P5-STATE-003",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-003",
+          "number": 543,
+          "title": "[P5-STATE-003] 训练并评价首个有资格的12+X分层状态模型版本",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:42:50Z",
+          "body_sha256": "fe6b2742269324fee89aeab87a05897e49c7c50f4c82b62798ba777092bb65d0"
+        }
+      ]
+    },
+    {
+      "id": "CP-544-LINK-20261027T064436981255Z",
+      "recorded_at": "2026-10-27T06:44:36.981255+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P5-LOCAL-001",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P5-LOCAL-001",
+          "number": 544,
+          "title": "[P5-LOCAL-001] 完成一次单模块局部训练及新旧版本比较",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:42:57Z",
+          "body_sha256": "cd32766bc894f5df019547981031788b3205fc27d37954cd7fb57b8f50bda8a8"
+        }
+      ]
+    },
+    {
+      "id": "CP-545-LINK-20261027T064437132569Z",
+      "recorded_at": "2026-10-27T06:44:37.132569+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:43:03Z",
+          "body_sha256": "16f43a563961b0ece8fe3f0a3c4b5ebf1ab8907804b99c92dc098a81c9f02b95"
+        }
+      ]
+    },
+    {
+      "id": "CP-546-LINK-20261027T064437281857Z",
+      "recorded_at": "2026-10-27T06:44:37.281857+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "META-LEARN-002",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:43:09Z",
+          "body_sha256": "446ca1b758df8295a7eb97b135f30cc4253d8c4118279689fafcb21fe4471a60"
+        }
+      ]
+    },
+    {
+      "id": "CP-547-LINK-20261027T064437422598Z",
+      "recorded_at": "2026-10-27T06:44:37.422598+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P3-EXPERT-008",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-008",
+          "number": 547,
+          "title": "[P3-EXPERT-008] 在基础MVP后按职责和边际贡献逐个扩展专家角色",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:43:14Z",
+          "body_sha256": "a67fa7a03e04ea80b363966a274bf9681c7df10c6dd42f586decef080009265c"
+        }
+      ]
+    },
+    {
+      "id": "CP-548-LINK-20261027T064437565199Z",
+      "recorded_at": "2026-10-27T06:44:37.565199+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "P3-DECISION-001",
+      "outcome": "no_module_change",
+      "summary": "为现有工作项补上蓝图、模块贡献与阶段收口入口，核对原始正文未被覆盖。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只补进度关联元数据；既有模块工程、研究质量、用途价值与准入结论均保留。",
+      "issue_observations": [
+        {
+          "work_item": "P3-DECISION-001",
+          "number": 548,
+          "title": "[P3-DECISION-001] 在基础MVP后有界改进专家组合和整体决策机制",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:43:17Z",
+          "body_sha256": "5ffb954dee22730307cfad19d773464a98e7b6ddddf56a24c293034f9f406cca"
+        }
+      ]
+    },
+    {
+      "id": "CP-2-LINK-20261027T064437703759Z",
+      "recorded_at": "2026-10-27T06:44:37.703759+00:00",
+      "actor": "Codex / Owner-authorized blueprint linkage",
+      "work_item": "META-TRACE-001",
+      "outcome": "completed",
+      "summary": "完成本轮限定蓝图关联机制的本地工程验收与十项工单关联；长期追溯工单仍开放，GitHub事件待默认分支采用。",
+      "evidence": [
+        {
+          "id": "MECHANISM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "e964cf9eb7d8413b4592df5d174fb647ba0ef0dc",
+          "path": "docs/design/blueprint-progress.md",
+          "sha256": "333c91a195f65ce0144cd17e32154bf881a748ba985b3344dae7d760568a8846",
+          "claim_ceiling": "关联机制设计及使用边界，不改变研究用途与执行授权。"
+        },
+        {
+          "id": "IMPLEMENTATION_CHECKS",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/blueprint-progress-20261027/implementation-checks.safe.json",
+          "sha256": "cbb00c8d2daf9c92fde2874728c7beb05cac2355d1cc2fcf145a04af20be9c91",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅本轮项目关联机制工程验收；5,152通过/20跳过；不接受任何研究候选或自动启用GitHub事件。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "27个模块节点、10个既有工单；证据记录、派生蓝图、追加历史与变更影响检查。",
+          "remaining": "自动GitHub事件检查待本分支审阅并合入默认分支；长期项目追溯仍持续。",
+          "next_action": "审阅交付后采用；后续任务在里程碑、阻塞或关闭/重开时登记模块影响。",
+          "supersedes": null,
+          "evidence": [
+            "MECHANISM",
+            "IMPLEMENTATION_CHECKS"
+          ]
+        },
+        {
+          "module": "TRACE",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "本分支CLI及本地项目治理可用；不承载交易、数据或研究授权。",
+          "remaining": "默认分支自动事件尚未激活，分支保护规则未变。",
+          "next_action": "通过正常代码审阅合并流程启用仓库级检查，不迁移生产服务。",
+          "supersedes": null,
+          "evidence": [
+            "MECHANISM",
+            "IMPLEMENTATION_CHECKS"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T06:43:21Z",
+          "body_sha256": "9ee4e8c246f904167c0bfea988b0ed231e2769c3edab749b356d531a72b943a6"
+        }
+      ]
     }
   ]
 }

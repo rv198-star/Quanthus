@@ -2202,6 +2202,745 @@
           "body_sha256": "d6af418bc20d0211c1b38113669328d058e1894a387f4ad5ec46b7c5b392fd82"
         }
       ]
+    },
+    {
+      "id": "CP-2-FOUR-BATCHES-20261027",
+      "recorded_at": "2026-10-27T07:46:40.438643+00:00",
+      "actor": "Codex Sol6.1 self-review; pinned safe metadata and prior evidence",
+      "work_item": "META-TRACE-001",
+      "outcome": "progress",
+      "summary": "合并已完成；默认分支安装与远端CI未运行分开记录",
+      "evidence": [
+        {
+          "id": "FOUR_BATCHES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/state-portfolio-batches-20261027T072049Z-1c4d007/evidence/four-batch-assessment.safe.json",
+          "sha256": "5606e7b01806fdf16f302cdc9a8c5a3aa63e5e199bc3a6b51b9de000dc5b8794",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "四批次的复用、固定范围可行性与条件处置；不是新3/4评分、研究MVP完成、消费者价值或生产准入。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "PR565自审后已合并main；本地CLI、追加记录和生成视图可用",
+          "remaining": "GitHub Actions账户billing/spending导致job零步骤，远端执行未验收",
+          "next_action": "继续用相同CLI本地审计；账户恢复后单独验收远端工作流，不改账单/分支保护",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "CP-2-LINKED-20261027T065710025269Z"
+        },
+        {
+          "module": "TRACE",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "蓝图跟踪已进默认分支；与科学/数据/生产授权分开",
+          "remaining": "自动远端巡检还没有成功运行记录",
+          "next_action": "记录真实issue变化和模块影响；不以安装、issue关闭或本地绿代替远端/研究通过",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "CP-2-LINKED-20261027T065710025269Z"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ]
+    },
+    {
+      "id": "CP-540-FOUR-BATCHES-20261027",
+      "recorded_at": "2026-10-27T07:46:40.608089+00:00",
+      "actor": "Codex Sol6.1 self-review; pinned safe metadata and prior evidence",
+      "work_item": "META-LEARN-001",
+      "outcome": "progress",
+      "summary": "完成资产复用和按需求取舍；新输入/消费者门槛明确保留",
+      "evidence": [
+        {
+          "id": "FOUR_BATCHES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/state-portfolio-batches-20261027T072049Z-1c4d007/evidence/four-batch-assessment.safe.json",
+          "sha256": "5606e7b01806fdf16f302cdc9a8c5a3aa63e5e199bc3a6b51b9de000dc5b8794",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "四批次的复用、固定范围可行性与条件处置；不是新3/4评分、研究MVP完成、消费者价值或生产准入。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "四批次复用/有限可行性/取舍已执行；不等于学习MVP完成",
+          "remaining": "新3/4输入/参考/用途及真实消费者价值仍缺",
+          "next_action": "按#542与P10#566闭合一个限定来源/参考路径；条件合格才固定候选评价",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "既有负面/无结论证据有效保留；没有新消费者价值实验",
+          "remaining": "至少一个可用状态的具体用途增益未证实",
+          "next_action": "先完成3/4可行性门槛，再选一个信息等价的研究消费者比较",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "CP-540-LINK-20261027T064436402817Z"
+        },
+        {
+          "module": "S00",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "保留中性/无序研究解释；ABSTAIN/X不是0",
+          "remaining": "没有被当前用途要求的独立中性标签资格",
+          "next_action": "只在具体消费者需要中性状态、且参考意义独立时冻结一小批；不为凑齐词汇采样",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S01",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "原下跌背景内减速/企稳研究条件",
+          "remaining": "独立意义和父背景12参考资格未闭合",
+          "next_action": "先有一个真实的下跌背景用途，再决定条件1是否需要单独参考；保留连续事实",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S02",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "七特征保留研究排序备份；九特征拒绝记录不改",
+          "remaining": "未取得新消费者资格；旧评价窗口不能重投票或重调参",
+          "next_action": "暂停九特征分支；仅在新用途/证据提出可检验变化时重开投入",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S05",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "旧5标签停放，连续趋势事实保留",
+          "remaining": "没有足够新的可证伪趋势状态假说",
+          "next_action": "实际消费者提出无法由现有连续事实解决的问题后，先冻结假说/负对照再给预算",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S06",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "旧6标签停放，过程与支撑事实保留",
+          "remaining": "回撤检验相对父背景的独立用途和参考不足",
+          "next_action": "与具体回撤消费者绑定一个过程问题；不先启动全域补标签",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S07",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "旧7标签停放，结构修复事实保留",
+          "remaining": "新重建假说及相对现有事实的增量未确定",
+          "next_action": "先提出可证伪的重建条件和用途，避免延长旧失败分支",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S08",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "高侧加速/延伸作为modifier保留",
+          "remaining": "实际消费者需求及覆盖/参考资格未闭合",
+          "next_action": "仅在需要一个上行修饰量时做有限覆盖资格；不当作peer-primary标签",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S09",
+          "facet": "quality",
+          "status": "blocked",
+          "scope": "高位量价背离修饰量仍受既有关系门槛限制",
+          "remaining": "最小活动关系和限定参考没有闭合",
+          "next_action": "消费者确需时先验证缺少的活动关系；不靠新阈值或空标签绕过",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S12",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "原下跌背景研究解释与失败证据保留",
+          "remaining": "背景参考路线no-pass，尚无新用途资格",
+          "next_action": "先确认是否有必须依赖离散下跌背景的用途；不得以条件1反推12合格",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S10",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "既有正式开发投影及development_shadow分层表示继续复用",
+          "remaining": "未得到严格历史PIT或生产专家/交易使用资格",
+          "next_action": "直接复用已有接口；新增用途必须另有资格和信息等价比较，不重做旧表示实验",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S10",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "旧P029证明显式保留结构语义；P033用途归因仍未闭合",
+          "remaining": "表示保留不能证明决策/预测/经济增益",
+          "next_action": "只在真实需求出现时做一个信息匹配消费者试验；不把合成兼容性算用途通过",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "S11",
+          "facet": "admission",
+          "status": "development_only",
+          "scope": "既有正式开发投影及development_shadow分层表示继续复用",
+          "remaining": "未得到严格历史PIT或生产专家/交易使用资格",
+          "next_action": "直接复用已有接口；新增用途必须另有资格和信息等价比较，不重做旧表示实验",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S11",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "旧P029证明显式保留结构语义；P033用途归因仍未闭合",
+          "remaining": "表示保留不能证明决策/预测/经济增益",
+          "next_action": "只在真实需求出现时做一个信息匹配消费者试验；不把合成兼容性算用途通过",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": null
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:45Z",
+          "body_sha256": "051d6d255b7c6ffafdc1999ee7789c01a766b26b4f3168ceda1d2bd911269e0b"
+        }
+      ],
+      "no_change_reason": "全部模块已复核。既有FACTS/FACTORS/训练/更新/独立复现/P6等本轮未产生新研究资格；兼容回归和issue链接更新不提升它们的成熟度。",
+      "reviewed_modules": [
+        "MVP",
+        "DATA",
+        "FACTS",
+        "FACTORS",
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "P6",
+        "S00",
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "CONTROL"
+      ]
+    },
+    {
+      "id": "CP-541-FOUR-BATCHES-20261027",
+      "recorded_at": "2026-10-27T07:46:40.759874+00:00",
+      "actor": "Codex Sol6.1 self-review; pinned safe metadata and prior evidence",
+      "work_item": "P3-FACTOR-001",
+      "outcome": "no_module_change",
+      "summary": "主分支蓝图关联已更新；本轮未新增因子资格",
+      "evidence": [
+        {
+          "id": "FOUR_BATCHES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/state-portfolio-batches-20261027T072049Z-1c4d007/evidence/four-batch-assessment.safe.json",
+          "sha256": "5606e7b01806fdf16f302cdc9a8c5a3aa63e5e199bc3a6b51b9de000dc5b8794",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "四批次的复用、固定范围可行性与条件处置；不是新3/4评分、研究MVP完成、消费者价值或生产准入。"
+        }
+      ],
+      "updates": [],
+      "issue_observations": [
+        {
+          "work_item": "P3-FACTOR-001",
+          "number": 541,
+          "title": "[P3-FACTOR-001] 统一因子目录与分类契约并交付首批有用途证据的因子切片",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:48Z",
+          "body_sha256": "593d18efdef49725bb3813b5c55fa8ee1251cb57303b4bcf2d972d364abc4fe0"
+        }
+      ],
+      "no_change_reason": "没有重算因子、打开数据或新增因子用途；只确认复用入口。",
+      "reviewed_modules": [
+        "FACTS",
+        "FACTORS"
+      ]
+    },
+    {
+      "id": "CP-542-FOUR-BATCHES-20261027",
+      "recorded_at": "2026-10-27T07:46:40.939674+00:00",
+      "actor": "Codex Sol6.1 self-review; pinned safe metadata and prior evidence",
+      "work_item": "P5-STATE-002",
+      "outcome": "blocked",
+      "summary": "输入可行性已实测；新3/4参考与用途资格未满足，不开始评分",
+      "evidence": [
+        {
+          "id": "FOUR_BATCHES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/state-portfolio-batches-20261027T072049Z-1c4d007/evidence/four-batch-assessment.safe.json",
+          "sha256": "5606e7b01806fdf16f302cdc9a8c5a3aa63e5e199bc3a6b51b9de000dc5b8794",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "四批次的复用、固定范围可行性与条件处置；不是新3/4评分、研究MVP完成、消费者价值或生产准入。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "四包1530成员、191日期窗口及22旧曝光元数据已核验；未来128家仅身份提案",
+          "remaining": "没有形成新3/4参考输入包或通过语义参考数量门槛",
+          "next_action": "P5先冻结后继用途和曝光处置，P10#566再资格化固定前缀；不默认新采集",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "blocked",
+          "scope": "本轮新3/4路径的参考/用途门槛；不重写旧实验",
+          "remaining": "Head2 current20标签不等于3/4参考；未生成新参考，旧仲裁已消费",
+          "next_action": "先取得目的兼容的输入和新参考资格，再核对100条/阶段明确参考和50条模糊审计门槛",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S03",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "冻结候选/原20和60尺度复用；只完成输入日期与曝光可行性",
+          "remaining": "160个近期窗口每窗40观察；原31含2个L5及已知开发/跨头曝光",
+          "next_action": "走固定128家来源提案的前置资格；不得补造先前结构或丢弃60尺度",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S03",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "旧外部运行在评分前样本不足，本轮没有新评分",
+          "remaining": "新目的输入、独立语义参考和数量/用途门槛未通过",
+          "next_action": "资格齐备后只运行一次冻结候选和R0；不做R2、不重开2022–2024或2025",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S03",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本轮身份/日期可行性不授予状态消费者资格",
+          "remaining": "新研究用途与真实消费者比较尚未准入",
+          "next_action": "保留条件NOT_RUN；参考和用途通过再接一个具体消费者",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S04",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "冻结候选/原20和60尺度复用；只完成输入日期与曝光可行性",
+          "remaining": "160个近期窗口每窗40观察；原31含2个L5及已知开发/跨头曝光",
+          "next_action": "走固定128家来源提案的前置资格；不得补造先前结构或丢弃60尺度",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S04",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "旧外部运行在评分前样本不足，本轮没有新评分",
+          "remaining": "新目的输入、独立语义参考和数量/用途门槛未通过",
+          "next_action": "资格齐备后只运行一次冻结候选和R0；不做R2、不重开2022–2024或2025",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S04",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本轮身份/日期可行性不授予状态消费者资格",
+          "remaining": "新研究用途与真实消费者比较尚未准入",
+          "next_action": "保留条件NOT_RUN；参考和用途通过再接一个具体消费者",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-002",
+          "number": 542,
+          "title": "[P5-STATE-002] 冻结首轮状态学习的输入、独立参考、可训练头与预算",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:52Z",
+          "body_sha256": "31c8a4f227060a5f0ca7b28924e7f41973ccdbfff205c9c0c28289e6636fbee9"
+        }
+      ]
+    },
+    {
+      "id": "CP-543-FOUR-BATCHES-20261027",
+      "recorded_at": "2026-10-27T07:46:41.126964+00:00",
+      "actor": "Codex Sol6.1 self-review; pinned safe metadata and prior evidence",
+      "work_item": "P5-STATE-003",
+      "outcome": "blocked",
+      "summary": "没有新合格输入/独立参考，本轮真实3/4评价NOT_RUN",
+      "evidence": [
+        {
+          "id": "FOUR_BATCHES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/state-portfolio-batches-20261027T072049Z-1c4d007/evidence/four-batch-assessment.safe.json",
+          "sha256": "5606e7b01806fdf16f302cdc9a8c5a3aa63e5e199bc3a6b51b9de000dc5b8794",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "四批次的复用、固定范围可行性与条件处置；不是新3/4评分、研究MVP完成、消费者价值或生产准入。"
+        }
+      ],
+      "updates": [],
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-003",
+          "number": 543,
+          "title": "[P5-STATE-003] 训练并评价首个有资格的12+X分层状态模型版本",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:55Z",
+          "body_sha256": "a7dd2e2e3e2ea524e6a4330c9c7505b6830b566489169224c330847fdf51cf9f"
+        }
+      ],
+      "no_change_reason": "保留冻结R1/R0及原语义门槛；未训练、评分或产生新的状态质量结论。",
+      "reviewed_modules": [
+        "STATES",
+        "TRAIN",
+        "CONTROL",
+        "S00",
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12"
+      ]
+    },
+    {
+      "id": "CP-544-FOUR-BATCHES-20261027",
+      "recorded_at": "2026-10-27T07:46:41.307309+00:00",
+      "actor": "Codex Sol6.1 self-review; pinned safe metadata and prior evidence",
+      "work_item": "P5-LOCAL-001",
+      "outcome": "no_module_change",
+      "summary": "原真实局部更新证据继续保留，没有重跑",
+      "evidence": [
+        {
+          "id": "FOUR_BATCHES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/state-portfolio-batches-20261027T072049Z-1c4d007/evidence/four-batch-assessment.safe.json",
+          "sha256": "5606e7b01806fdf16f302cdc9a8c5a3aa63e5e199bc3a6b51b9de000dc5b8794",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "四批次的复用、固定范围可行性与条件处置；不是新3/4评分、研究MVP完成、消费者价值或生产准入。"
+        }
+      ],
+      "updates": [],
+      "issue_observations": [
+        {
+          "work_item": "P5-LOCAL-001",
+          "number": 544,
+          "title": "[P5-LOCAL-001] 完成一次单模块局部训练及新旧版本比较",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:58Z",
+          "body_sha256": "b7392723abce95c060b11ce1b056ef0d68ca90d9e4d3ab7f12e75070273c7ca6"
+        }
+      ],
+      "no_change_reason": "本轮不改已封存更新/旧版本取舍，不把旧训练算新进度。",
+      "reviewed_modules": [
+        "UPDATE",
+        "TRAIN",
+        "S02"
+      ]
+    },
+    {
+      "id": "CP-545-FOUR-BATCHES-20261027",
+      "recorded_at": "2026-10-27T07:46:41.471178+00:00",
+      "actor": "Codex Sol6.1 self-review; pinned safe metadata and prior evidence",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "blocked",
+      "summary": "具体消费者比较未到准入；复用已有开发视图和P3接口",
+      "evidence": [
+        {
+          "id": "FOUR_BATCHES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/state-portfolio-batches-20261027T072049Z-1c4d007/evidence/four-batch-assessment.safe.json",
+          "sha256": "5606e7b01806fdf16f302cdc9a8c5a3aa63e5e199bc3a6b51b9de000dc5b8794",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "四批次的复用、固定范围可行性与条件处置；不是新3/4评分、研究MVP完成、消费者价值或生产准入。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "EXPERT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "已复核旧10/11分层表示与P033信息不等价限制；本轮38项兼容回归",
+          "remaining": "新的合格状态/参考/用途和信息匹配的真实消费者比较缺失",
+          "next_action": "等待#542/#543门槛；合格后只选一个用途；交易未变则不触发P3经济重跑/P6",
+          "evidence": [
+            "FOUR_BATCHES"
+          ],
+          "supersedes": "BASELINE-20261027"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:43:01Z",
+          "body_sha256": "f751e1e2e86406e9be42e8331e924422de5d46e17b44685253c933e9bed1efa1"
+        }
+      ]
+    },
+    {
+      "id": "CP-546-FOUR-BATCHES-20261027",
+      "recorded_at": "2026-10-27T07:46:41.645396+00:00",
+      "actor": "Codex Sol6.1 self-review; pinned safe metadata and prior evidence",
+      "work_item": "META-LEARN-002",
+      "outcome": "no_module_change",
+      "summary": "本轮没有以兼容回归替代科学独立复现或MVP收口",
+      "evidence": [
+        {
+          "id": "FOUR_BATCHES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/state-portfolio-batches-20261027T072049Z-1c4d007/evidence/four-batch-assessment.safe.json",
+          "sha256": "5606e7b01806fdf16f302cdc9a8c5a3aa63e5e199bc3a6b51b9de000dc5b8794",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "四批次的复用、固定范围可行性与条件处置；不是新3/4评分、研究MVP完成、消费者价值或生产准入。"
+        }
+      ],
+      "updates": [],
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:43:04Z",
+          "body_sha256": "52082c9849fb2bfc35df214aa15032a6a1491ffebc5cef7d4549a03190d4f515"
+        }
+      ],
+      "no_change_reason": "旧复现/收口边界保留；整体MVP未通过，不自动启动P6。",
+      "reviewed_modules": [
+        "MVP",
+        "CLOSEOUT",
+        "REPRO",
+        "P6"
+      ]
+    },
+    {
+      "id": "CP-547-FOUR-BATCHES-20261027",
+      "recorded_at": "2026-10-27T07:46:41.818581+00:00",
+      "actor": "Codex Sol6.1 self-review; pinned safe metadata and prior evidence",
+      "work_item": "P3-EXPERT-008",
+      "outcome": "deferred",
+      "summary": "新增专家仍按边际用途暂缓",
+      "evidence": [
+        {
+          "id": "FOUR_BATCHES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/state-portfolio-batches-20261027T072049Z-1c4d007/evidence/four-batch-assessment.safe.json",
+          "sha256": "5606e7b01806fdf16f302cdc9a8c5a3aa63e5e199bc3a6b51b9de000dc5b8794",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "四批次的复用、固定范围可行性与条件处置；不是新3/4评分、研究MVP完成、消费者价值或生产准入。"
+        }
+      ],
+      "updates": [],
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-008",
+          "number": 547,
+          "title": "[P3-EXPERT-008] 在基础MVP后按职责和边际贡献逐个扩展专家角色",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:43:07Z",
+          "body_sha256": "ce2f5fc52dbfe0256b2ce3779f407e5c2276856e3283c679e3acd635cb07d326"
+        }
+      ],
+      "no_change_reason": "先有一个已资格化状态和具体用途价值，不扩大专家集合。",
+      "reviewed_modules": [
+        "EXPERT"
+      ]
+    },
+    {
+      "id": "CP-548-FOUR-BATCHES-20261027",
+      "recorded_at": "2026-10-27T07:46:42.001041+00:00",
+      "actor": "Codex Sol6.1 self-review; pinned safe metadata and prior evidence",
+      "work_item": "P3-DECISION-001",
+      "outcome": "deferred",
+      "summary": "组合机制优化尚无新的合格输入/用途，不启动",
+      "evidence": [
+        {
+          "id": "FOUR_BATCHES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/state-portfolio-batches-20261027T072049Z-1c4d007/evidence/four-batch-assessment.safe.json",
+          "sha256": "5606e7b01806fdf16f302cdc9a8c5a3aa63e5e199bc3a6b51b9de000dc5b8794",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "四批次的复用、固定范围可行性与条件处置；不是新3/4评分、研究MVP完成、消费者价值或生产准入。"
+        }
+      ],
+      "updates": [],
+      "issue_observations": [
+        {
+          "work_item": "P3-DECISION-001",
+          "number": 548,
+          "title": "[P3-DECISION-001] 在基础MVP后有界改进专家组合和整体决策机制",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:43:10Z",
+          "body_sha256": "8cacaff026f50b312c58077557120d08641f08ed2967e51c7ac1e7349150bf7a"
+        }
+      ],
+      "no_change_reason": "原策略、冻结比较和生产路径不改。",
+      "reviewed_modules": [
+        "EXPERT",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-566-FOUR-BATCHES-20261027",
+      "recorded_at": "2026-10-27T07:46:42.168928+00:00",
+      "actor": "Codex Sol6.1 self-review; pinned safe metadata and prior evidence",
+      "work_item": "P10-DATA-STAGE34-PREFIX-001",
+      "outcome": "no_module_change",
+      "summary": "登记固定128家既有来源资格提案，尚未激活市场行或研究",
+      "evidence": [
+        {
+          "id": "FOUR_BATCHES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/state-portfolio-batches-20261027T072049Z-1c4d007/evidence/four-batch-assessment.safe.json",
+          "sha256": "5606e7b01806fdf16f302cdc9a8c5a3aa63e5e199bc3a6b51b9de000dc5b8794",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "四批次的复用、固定范围可行性与条件处置；不是新3/4评分、研究MVP完成、消费者价值或生产准入。"
+        }
+      ],
+      "updates": [],
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-STAGE34-PREFIX-001",
+          "number": 566,
+          "title": "[P10-DATA-STAGE34-PREFIX-001] 评估现有 Base 2.4 对状态3/4新历史前缀的限定来源资格",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:43:14Z",
+          "body_sha256": "f459d56e69c33ffa0b2565544fddc6e8a69688c5e40ed5bf40c5c485af43ab10"
+        }
+      ],
+      "no_change_reason": "P10请求登记不等于来源资格或数据修复；P5仍须冻结用途、样本曝光和参考。",
+      "reviewed_modules": [
+        "DATA",
+        "REFERENCE",
+        "S03",
+        "S04"
+      ]
     }
   ]
 }

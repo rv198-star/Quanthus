@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved — Owner requested this mechanism on 2026-10-27 |
-| Delivery gate | open; code/checks do not enable default-branch workflows before merge |
+| Delivery gate | accepted-conditional for the mechanism; default-branch integration is merged, remote Actions execution remains a separately recorded limitation |
 | Work item | META-TRACE-001; first bounded adoption: META-LEARN-001 / #540 |
 | Parent | [Delivery roadmap](lld/09-roadmap.md) |
 | Module architecture | [Layered state portfolio](stock-stage-vocabulary-portfolio.md) |
@@ -29,6 +29,31 @@ It does not retrospectively rewrite every historical issue or launch the propose
 The tracking catalog references prior domain contracts. It is not a replacement for them.
 Changing a research threshold, sample, purpose or use authorization still follows its existing
 governing contract. Optional parked states do not block independently qualified modules.
+
+## Demand-led portfolio continuation
+
+The Owner's 2026-10-27 continuation uses four bounded batches, linked through the current ledger:
+
+1. Reuse the retained Head2 seven-feature research asset, the nine-feature rejection, accepted
+   development 10/11 projections, layered representation and comparison interfaces. Rechecking
+   compatibility does not count as new scientific acceptance or justify refitting an old candidate.
+2. Assess input, exposure and independent-reference feasibility for the frozen 3/4 candidate.
+   Preserve both anchor scales and the pre-T history requirement. Source windows and reference
+   meanings are purpose-specific: a Head2 current20 reference cannot become a 3/4 reference, and
+   the consumed 2022–2024 arbitration cannot become fresh. An input proposal does not activate it.
+3. Only after the candidate's quality and use-specific gates pass, test one concrete consumer.
+   Existing 10/11 development views remain reusable at their accepted grade; representation
+   compatibility is not decision usefulness. P3 comparison and targeted P6 simulation are needed
+   only when a proposed use actually changes trading decisions and their own gates permit it.
+4. Keep other states demand-led. A parked discrete label does not remove its continuous Facts.
+   Record the missing hypothesis, reference or relation and a concrete unlock trigger before any
+   further investment; do not open a parallel campaign to qualify all historical codes.
+
+P5 owns sample design, reference meaning and consumer disposition. A bounded P10 request owns new
+shared-source qualification. Neither issue closure nor a tracking checkpoint transfers that authority.
+The first execution findings are [recorded separately](../acceptance/state-portfolio-batches-20261027.md);
+the generated ledger remains the single current gap view. Execution notes belong here or in new
+dated receipts: do not append them to an old authority document pinned by a frozen research request.
 
 ## Four independent progress facets
 
@@ -134,9 +159,12 @@ read-only reconciliation on registered issue events, main updates and manual dis
 keeps failure receipts as artifacts; it has only contents/issue read permissions, no data or
 deployment credentials, no auto-promotion, no automatic issue comments and no new daemon.
 
-GitHub issue events begin using this workflow only after it is on the default branch.
-Adding the workflow does not silently enable branch-protection requirements. Until merge,
-the CLI and local checks are usable and the workflow is prepared, not remotely activated.
+GitHub issue events select this workflow only after it is on the default branch.
+Adding the workflow does not silently enable branch-protection requirements. Default-branch
+installation, an actual runner execution and a successful reconciliation are separate facts.
+When remote runners cannot start, use the same CLI locally and retain the remote failure;
+do not describe installation or a local pass as a successful Actions run. The current adoption
+receipt is linked from the `TRACE` module in the generated blueprint.
 This is one bounded addition to existing planning and TPlan, not a new general project platform.
 
 Local implementation evidence: [2026-10-27 conformance record](../acceptance/blueprint-progress-20261027.md).

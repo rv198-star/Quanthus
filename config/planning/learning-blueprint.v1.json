@@ -484,6 +484,17 @@
         "TRACE"
       ],
       "contribution": "维护项目可追溯机制；本轮接入学习MVP，既有长期任务继续保留"
+    },
+    {
+      "id": "P10-DATA-STAGE34-PREFIX-001",
+      "issue": 566,
+      "modules": [
+        "DATA",
+        "REFERENCE",
+        "S03",
+        "S04"
+      ],
+      "contribution": "状态3/4后继历史前缀的限定来源资格请求；提案不激活新样本、参考、训练或外样本验收"
     }
   ]
 }

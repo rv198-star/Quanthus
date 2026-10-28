@@ -233,7 +233,7 @@ def isolation(cold: Path, ledger: dict[str, Any]) -> dict[str, Any]:
         Path(feature_probe),
         job / "private/facts87.json",
         job / "private/checkpoint.json",
-        job / "private/capital-primary/C0/equity.json",
+        job / "private/predictions87.json",
     ]
     allowed = [
         cold,
@@ -328,9 +328,20 @@ def facts(cold: Path) -> dict[str, Any]:
             return self.connection.execute(query, mapped)
 
     duckdb.connect = Connection
-    result = producer.qualify(role)
+    if (role / "evidence/qualification.safe.json").exists():
+        # Resume after a transport-only failure: the independently constructed
+        # immutable Facts must already equal the sealed primary digests.
+        for name in ("facts87.json", "training20.json"):
+            if sha(role / "private" / name) != ledger["expected"][name]:
+                raise ValueError("ENTRY_COLD_PARTIAL_FACTS_CHANGED")
+        if sha(role / "reference/packet.json") != ledger["expected_packet_sha256"]:
+            raise ValueError("ENTRY_COLD_PARTIAL_PACKET_CHANGED")
+        result = read(role / "evidence/qualification.safe.json")
+    else:
+        result = producer.qualify(role)
     fit_path = Path(ledger["code"]["successor"]) / "scripts/entry_march_fit.py"
     fit = load("entry_march_fit", fit_path)
+    fit.file_sha = lambda path: sha(physical(path))
     fit.gate(role)
     fit.fit(role)
     comparisons = {
@@ -355,8 +366,11 @@ def facts(cold: Path) -> dict[str, Any]:
     return receipt
 
 
-def capital(cold: Path) -> dict[str, Any]:
-    ledger = read(cold / "copy-ledger.frozen.json")
+def capital(cold: Path, attempt: int = 1) -> dict[str, Any]:
+    ledger = read(
+        cold
+        / ("copy-ledger.frozen.json" if attempt == 1 else f"copy-ledger-v{attempt}.frozen.json")
+    )
     verify(ledger["code_pins"])
     if not all(read(cold / "facts-fit.safe.json")["byte_equal"].values()):
         raise ValueError("ENTRY_COLD_FACTS_FIT_REQUIRED")
@@ -378,7 +392,7 @@ def capital(cold: Path) -> dict[str, Any]:
         "entry_march_adapter", successor / "src/quanthus/expert_strategy/entry_march_capital.py"
     )
     runtime = adapter.runtime_type(RestructuringRuntime)
-    root = cold / "capital"
+    root = cold / ("capital" if attempt == 1 else f"capital-v{attempt}")
     root.mkdir()
     results = {}
     started = time.monotonic()
@@ -411,17 +425,93 @@ def capital(cold: Path) -> dict[str, Any]:
         "elapsed_seconds": time.monotonic() - started,
         "peak_RSS_bytes": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024,
     }
-    write(cold / "capital.safe.json", receipt)
+    write(cold / f"capital-attempt{attempt}.safe.json", receipt)
     return receipt
+
+
+def refresh(job: Path, attempt: int) -> dict[str, Any]:
+    """Retain the proven source copy, append a new code/stage identity only."""
+    guard(job)
+    cold = job / "private/cold-role"
+    prior = read(cold / "copy-ledger.frozen.json")
+    stage = read(job / "private" / f"capital-stage-v{attempt}.frozen.json")
+    verify(stage["pins"])
+    verify(stage["old_code_pins"])
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    write(
+        job / "private" / f"cold-code-refresh-v{attempt}.frozen.json",
+        {
+            "kind": "entry-march-cold-code-refresh-v1",
+            "UTC": datetime.now(timezone.utc).isoformat(),
+            "prior_ledger_sha256": sha(cold / "copy-ledger.frozen.json"),
+            "new_stage_sha256": sha(job / "private" / f"capital-stage-v{attempt}.frozen.json"),
+            "code_revision": revision,
+            "maximum_new_bytes": 40 * 2**20,
+            "existing_job_bytes": size(job),
+            "remaining_source_copies": 0,
+            "available_bytes": shutil.disk_usage(job).free,
+            "device": job.stat().st_dev,
+            "available_inodes": os.statvfs(job).f_favail,
+            "source_identity_reused": "Exact copy ledger; full loader validation retained",
+        },
+    )
+    output = cold / "code" / f"successor-v{attempt}"
+    output.mkdir()
+    archive = cold / f"successor-v{attempt}.tar"
+    with archive.open("xb") as stream:
+        subprocess.run(
+            [
+                "git",
+                "archive",
+                revision,
+                "src",
+                "config",
+                "scripts",
+                "pyproject.toml",
+                "tests/fixtures",
+            ],
+            cwd=ROOT,
+            stdout=stream,
+            check=True,
+        )
+    with tarfile.open(archive) as handle:
+        for item in handle.getmembers():
+            if (
+                item.issym()
+                or item.islnk()
+                or Path(item.name).is_absolute()
+                or ".." in Path(item.name).parts
+            ):
+                raise ValueError("ENTRY_COLD_CODE_ARCHIVE")
+        handle.extractall(output)
+    archive.unlink()
+    ledger = {
+        **prior,
+        "code": {**prior["code"], "successor": str(output)},
+        "capital_stage": stage,
+        "code_pins": {
+            **prior["code_pins"],
+            **{str(p): pin(p) for p in sorted(output.rglob("*")) if p.is_file()},
+        },
+    }
+    write(cold / f"copy-ledger-v{attempt}.frozen.json", ledger)
+    return {
+        "ledger_sha256": sha(cold / f"copy-ledger-v{attempt}.frozen.json"),
+        "source_copy_reused": True,
+        "new_code_revision": revision,
+    }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("prepare", "facts", "capital"))
+    parser.add_argument("command", choices=("prepare", "facts", "capital", "refresh"))
     parser.add_argument("--job", type=Path, required=True)
+    parser.add_argument("--attempt", type=int, default=1)
     args = parser.parse_args()
     if args.command == "prepare":
         result = prepare(args.job)
+    elif args.command == "refresh":
+        result = refresh(args.job, args.attempt)
     else:
         cold = args.job / "private/cold-role"
         ledger = read(cold / "copy-ledger.frozen.json")
@@ -430,7 +520,7 @@ def main() -> None:
             signal.SIGALRM, lambda *_: (_ for _ in ()).throw(TimeoutError("ENTRY_COLD_DEADLINE"))
         )
         signal.alarm(max(1, int((deadline - datetime.now(timezone.utc)).total_seconds())))
-        result = facts(cold) if args.command == "facts" else capital(cold)
+        result = facts(cold) if args.command == "facts" else capital(cold, args.attempt)
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
 
 

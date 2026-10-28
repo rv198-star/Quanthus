@@ -88,7 +88,17 @@ def verify(pins: dict[str, Any]) -> None:
             raise ValueError("ENTRY_CAPITAL_INPUT_CHANGED:" + name)
 
 
-def freeze(job: Path, inventory: Path, old_repository: Path) -> dict[str, Any]:
+def stage_path(job: Path, attempt: int) -> Path:
+    if attempt < 1 or attempt > 3:
+        raise ValueError("ENTRY_CAPITAL_ATTEMPT")
+    return (
+        job
+        / "private"
+        / ("capital-stage" + ("" if attempt == 1 else f"-v{attempt}") + ".frozen.json")
+    )
+
+
+def freeze(job: Path, inventory: Path, old_repository: Path, attempt: int = 1) -> dict[str, Any]:
     guard(job)
     old = read(inventory)
     baseline = read(old["baseline_freeze"])
@@ -133,10 +143,13 @@ def freeze(job: Path, inventory: Path, old_repository: Path) -> dict[str, Any]:
         "adapter": str(ROOT / ADAPTER),
         "contract": str(ROOT / CONTRACT),
         "arms": ["C0", "C1", "C2"],
-        "primary_output": str(job / "private/capital-primary"),
+        "attempt": attempt,
+        "primary_output": str(
+            job / "private" / ("capital-primary" if attempt == 1 else f"capital-primary-v{attempt}")
+        ),
         "cold_output": str(job / "private/capital-independent"),
         "preexisting_job_bytes": size(job),
-        "planned_maximum_additional_bytes": 2300000000,
+        "planned_maximum_additional_bytes": 2300000000 if attempt == 1 else 100 * 2**20,
         "simultaneously_live": [
             "existing shared Facts/ref/fit",
             "three primary arms",
@@ -164,17 +177,17 @@ def freeze(job: Path, inventory: Path, old_repository: Path) -> dict[str, Any]:
         > result["stops"]["maximum_data_job_logical_bytes"]
     ):
         raise ValueError("ENTRY_CAPITAL_WRITE_BUDGET")
-    write(job / "private/capital-stage.frozen.json", result)
+    write(stage_path(job, attempt), result)
     return {
-        "frozen_sha256": sha(job / "private/capital-stage.frozen.json"),
+        "frozen_sha256": sha(stage_path(job, attempt)),
         "runtime_members": len(old["runtime_pins"]),
-        "planned_new_bytes": 2300000000,
+        "planned_new_bytes": result["planned_maximum_additional_bytes"],
     }
 
 
-def run(job: Path) -> dict[str, Any]:
+def run(job: Path, attempt: int = 1) -> dict[str, Any]:
     guard(job)
-    frozen = read(job / "private/capital-stage.frozen.json")
+    frozen = read(stage_path(job, attempt))
     verify(frozen["pins"])
     verify(frozen["old_code_pins"])
     diagnostic = read(job / "evidence/fit-diagnostic.safe.json")
@@ -195,7 +208,7 @@ def run(job: Path) -> dict[str, Any]:
                 guard(job)
             except Exception as error:
                 write(
-                    job / "evidence/capital-watch-failure.safe.json",
+                    job / "evidence" / f"capital-watch-attempt{attempt}-failure.safe.json",
                     {"reason": str(error), "UTC": datetime.now(timezone.utc).isoformat()},
                 )
                 os._exit(75)
@@ -256,7 +269,7 @@ def run(job: Path) -> dict[str, Any]:
                 "UTC": datetime.now(timezone.utc).isoformat(),
             }
         )
-        write(job / "evidence/capital-primary.safe.json", result)
+        write(job / "evidence" / f"capital-primary-attempt{attempt}.safe.json", result)
         return result
     finally:
         stop.set()
@@ -268,11 +281,12 @@ def main() -> None:
     parser.add_argument("--job", type=Path, required=True)
     parser.add_argument("--inventory", type=Path)
     parser.add_argument("--old-repository", type=Path)
+    parser.add_argument("--attempt", type=int, default=1)
     args = parser.parse_args()
     value = (
-        freeze(args.job, args.inventory, args.old_repository)
+        freeze(args.job, args.inventory, args.old_repository, args.attempt)
         if args.command == "freeze"
-        else run(args.job)
+        else run(args.job, args.attempt)
     )
     print(json.dumps(value, ensure_ascii=False, sort_keys=True))
 

@@ -21,6 +21,59 @@ VERSION = "entry-march-capital-v1"
 ARMS = ("C0", "C1", "C2")
 
 
+def scoped_panel_type(parent: type) -> type:
+    """Project exact parent+patch values before materializing a bounded SQL table."""
+
+    class ScopedPanel(parent):  # type: ignore[misc,valid-type]
+        def __init__(
+            self,
+            path: Path,
+            report: Any,
+            *,
+            patch: Path,
+            selected: tuple[str, ...],
+            start: date,
+            end: date,
+        ) -> None:
+            import tempfile
+
+            import duckdb
+
+            if not selected or len(set(selected)) != len(selected) or start > end:
+                raise ValueError("ENTRY_CAPITAL_PANEL_SCOPE")
+            self.path, self.report = path.resolve(), report
+            self._spill = tempfile.TemporaryDirectory(prefix="entry-march-panel-")
+            self._connection = duckdb.connect(
+                config={
+                    "memory_limit": "512MB",
+                    "threads": 1,
+                    "max_temp_directory_size": "64MB",
+                    "temp_directory": self._spill.name,
+                    "autoinstall_known_extensions": False,
+                    "autoload_known_extensions": False,
+                }
+            )
+            try:
+                self._connection.execute("SET timezone='UTC'")
+                self._connection.execute(
+                    "CREATE TABLE feature_panel AS SELECT * FROM ("
+                    "SELECT * FROM read_parquet(?) WHERE security_id<>'000792' "
+                    "UNION ALL SELECT * FROM read_parquet(?)) "
+                    "WHERE security_id IN (" + ",".join("?" for _ in selected) + ") "
+                    "AND market_date BETWEEN ? AND ?",
+                    [str(self.path), str(patch), *selected, start, end],
+                )
+                self._connection.execute(
+                    "CREATE UNIQUE INDEX feature_panel_key "
+                    "ON feature_panel (market_date,security_id)"
+                )
+            except BaseException:
+                self.close()
+                raise
+
+    return ScopedPanel
+
+
 def filtered_decision(
     decision: Any, *, arm: str, prediction: dict[str, Any], request_digest: str
 ) -> Any:
@@ -94,6 +147,53 @@ def runtime_type(parent: type) -> type:
                 or self.frames[-1].execution_date != self.execution_end
             ):
                 raise ValueError("ENTRY_CAPITAL_SCOPED_CALENDAR")
+
+        def _open_data_inputs(self) -> None:
+            # Retained parent __init__ dispatches here after source/preparation
+            # admission. Reuse immutable features, not its all-history SQL copy.
+            import pyarrow.parquet as pq
+
+            from quanthus.backtest.baseline_research import BaselineFeaturePanelReport
+            from quanthus.contracts import SnapshotRef
+            from quanthus.expert_strategy import p3_historical_robustness as h
+            from quanthus.expert_strategy.p3_restructuring_preparation import validate_feature_patch
+
+            self.data_snapshot_id = self.snapshot_id
+            self.data_content_digest = self.prerequisite_digest
+            self.data_manifest_sha256 = self.effective_source_sha
+            self.frames = [
+                h.HistoricalFrame(
+                    SnapshotRef(day, self.info, self.effective_source_sha, self.snapshot_id),
+                    h.datetime.combine(day, h.time(15), tzinfo=h.MARKET_TIMEZONE),
+                    following,
+                    h._HistoricalFrameSource(self.reader, following),
+                )
+                for day, following in self.reader._date_pairs(date(2021, 4, 2), date(2021, 12, 30))
+            ]
+            report = BaselineFeaturePanelReport(
+                **{
+                    **self.preparation["feature_report"],
+                    "scope_start": date.fromisoformat(
+                        self.preparation["feature_report"]["scope_start"]
+                    ),
+                    "scope_end": date.fromisoformat(
+                        self.preparation["feature_report"]["scope_end"]
+                    ),
+                }
+            )
+            original = self.prepared / "features.parquet"
+            validate_feature_patch(original, pq.read_table(self.feature_patch), ("000792",))
+            selected = tuple(sorted({e.panel_security_id for e in self.events}))
+            self.panel = self.stack.enter_context(
+                scoped_panel_type(h.DayPanel)(
+                    original,
+                    report,
+                    patch=self.feature_patch,
+                    selected=selected,
+                    start=date(2021, 4, 2),
+                    end=date(2021, 12, 30),
+                )
+            )
 
         def _load_event_population(self, event_root: Path) -> Any:
             events, mapping = super()._load_event_population(event_root)

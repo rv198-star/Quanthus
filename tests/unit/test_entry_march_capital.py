@@ -145,3 +145,55 @@ def test_changed_baseline_is_rejected_before_allocation():
             prediction={"c0_allowed": False, "c1_allowed": False, "c2_allowed": False},
             request_digest="new",
         )
+
+
+def test_scoped_native_panel_equals_exact_parent_patch_projection(tmp_path):
+    import duckdb
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from quanthus.expert_strategy.entry_march_capital import scoped_panel_type
+
+    rows = [
+        {"security_id": code, "market_date": date(2021, month, 2), "value": number}
+        for number, code in enumerate(("000001", "000792", "999999"))
+        for month in (3, 4, 5)
+    ]
+    original, patch = tmp_path / "original.parquet", tmp_path / "patch.parquet"
+    pq.write_table(pa.Table.from_pylist(rows), original)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [{**r, "value": r["value"] + 100} for r in rows if r["security_id"] == "000792"]
+        ),
+        patch,
+    )
+
+    class Parent:
+        def close(self):
+            self._connection.close()
+            self._spill.cleanup()
+
+    panel = scoped_panel_type(Parent)(
+        original,
+        None,
+        patch=patch,
+        selected=("000001", "000792"),
+        start=date(2021, 4, 1),
+        end=date(2021, 5, 31),
+    )
+    try:
+        actual = panel._connection.execute(
+            "SELECT * FROM feature_panel ORDER BY security_id,market_date"
+        ).fetchall()
+        with duckdb.connect() as connection:
+            expected = connection.execute(
+                "SELECT * FROM (SELECT * FROM read_parquet(?) WHERE security_id<>'000792' "
+                "UNION ALL SELECT * FROM read_parquet(?)) "
+                "WHERE security_id IN ('000001','000792') AND market_date BETWEEN '2021-04-01' "
+                "AND '2021-05-31' ORDER BY security_id,market_date",
+                [str(original), str(patch)],
+            ).fetchall()
+        assert actual == expected and len(actual) == 4
+        assert all(row[0] != "999999" and row[1] >= date(2021, 4, 1) for row in actual)
+    finally:
+        panel.close()

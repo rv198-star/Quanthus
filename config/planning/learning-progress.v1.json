@@ -5153,6 +5153,177 @@
       "reviewed_modules": [
         "EXPERT"
       ]
+    },
+    {
+      "id": "CP-545-20261028T094548750254Z",
+      "recorded_at": "2026-10-28T09:59:13.385398+00:00",
+      "actor": "Codex execution and self-review",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "progress",
+      "summary": "完成固定B全8393持仓检查的实际结构输入和经原聚合器的影子动作比较；16次提议中15次原规则已强制退出，仅1开仓段改变动作，按冻结规则停放本候选。",
+      "evidence": [
+        {
+          "id": "INPUTS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/expert545-held-structure-20261028T085018Z-0e07ed8/inputs.final.frozen.json",
+          "sha256": "1561894ab8e89ff75c6dcd8997d30a8f05c15154580afc3b2b6f70eb48e7bc3c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "固定8393/343/538、11个直接源完整哈希、原生坐标/日历/时钟和代码配置；仅回溯用途"
+        },
+        {
+          "id": "FACTS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/expert545-held-structure-20261028T085018Z-0e07ed8/evidence/qualified-facts-full-census.safe.json",
+          "sha256": "3511065bcb1ef399998f2d4d2bc699d23e69ec59683d5cfd6b4a36de843a9a98",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "343个一次合格物化文件，8380唯一证券日供8393持仓上下文复用；不接受整个Facts库或历史PIT"
+        },
+        {
+          "id": "TRACE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/expert545-held-structure-20261028T085018Z-0e07ed8/trace/receipt.safe.json",
+          "sha256": "68011e4e1dd49efd2619097ecc64ede33865e2c80ce82d8c72e39436877f29c2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅一次原B工程trace，3个旧产物逐字节一致；不是新科学结果"
+        },
+        {
+          "id": "COMPARE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/expert545-held-structure-20261028T085018Z-0e07ed8/evidence/decision-comparison.safe.json",
+          "sha256": "27f9c01b57922e683702bcb99260fc860777fe4877ed6572325b5bc4f81ae255",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原B固定状态上的16提议/1动作差异；不是完整资本路径或价值提升"
+        },
+        {
+          "id": "REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/expert545-held-structure-20261028T085018Z-0e07ed8/evidence/comparison-self-review.safe.json",
+          "sha256": "3d22e57466a2a85b01fab314544e5426d3363808055124da159ac9742f59322b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "全8393复核和OS读取/网络核对，按冻结单开仓段停止规则停放；无新经济回测"
+        },
+        {
+          "id": "AUTHORITY",
+          "kind": "authority",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/expert545-held-structure-20261028T085018Z-0e07ed8/scope.frozen.json",
+          "sha256": "64d280e1ccb9dd3b71ac9a5b75ab8246efca77e6352a5cbca286799e21522bfc",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Owner采用本次三步离线方案；不授予生产/P6/保护分区或新经济实验"
+        }
+      ],
+      "updates": [
+        {
+          "module": "FACTS",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "新范围：原B的343家/8380唯一日键一次支撑Facts TMP，服务8393检查；既有128家资产不变",
+          "remaining": "新数据/用途仍需完整身份；本批非通用ADM或全Facts库验收",
+          "next_action": "保留本次输入/算法/时钟身份供精确研究复用；不重算相同前置",
+          "evidence": [
+            "FACTS",
+            "INPUTS"
+          ],
+          "supersedes": "CP-541-20261027T201718460059Z"
+        },
+        {
+          "module": "FACTS",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "仅本批原生未复权坐标、行动重置、日历和未知保留；既有128家资格按原范围保留",
+          "remaining": "provider acquisition和DWD known-from不可用；没有市场真值/历史PIT/独立标签新验收",
+          "next_action": "不倒填时钟或放宽4173例外；跨用途另验",
+          "evidence": [
+            "FACTS",
+            "INPUTS"
+          ],
+          "supersedes": "CP-541-20261027T201718460059Z"
+        },
+        {
+          "module": "FACTS",
+          "facet": "admission",
+          "status": "research_only",
+          "scope": "Owner采用的2011-2021暖启动/2012-2021实际持仓回溯影子用途",
+          "remaining": "训练、历史当时可知、生产、P6和保护年份均未授权",
+          "next_action": "按精确范围保存，新增用途另定契约",
+          "evidence": [
+            "AUTHORITY",
+            "INPUTS"
+          ],
+          "supersedes": "CP-541-20261027T201718460059Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "限定本批：完整8393上下文/原B决策摘要匹配；两个等信息结构表示经原聚合器比较零不一致",
+          "remaining": "当前主分支仍缺旧trace生产者集成；不代表完整#545策略价值验收",
+          "next_action": "保留最小切片，统一资产与代码集成作为独立交付工作",
+          "evidence": [
+            "TRACE",
+            "COMPARE",
+            "REVIEW"
+          ],
+          "supersedes": "CP-545-20261028T073018020654Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "已闭合本次实际持仓输入与单一政策桥接；没有独立预测质量或历史PIT声明",
+          "remaining": "5364可用/3029不可用检查保留；不是独立holdout或全部状态质量验收",
+          "next_action": "保留未知不额外卖出、基础安全退出优先的结论",
+          "evidence": [
+            "INPUTS",
+            "FACTS",
+            "REVIEW"
+          ],
+          "supersedes": "CP-545-20261028T073018020654Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "固定B影子：16提议中15个原已full_exit，仅1日/1证券/1开仓段no_action转reduce；未执行新资本回测",
+          "remaining": "只有一个差异开仓段，不足以支持下一轮经济试验；不等于所有结构信号无效",
+          "next_action": "按冻结停止规则停放本20-session/10%可选减仓政策；不调参扩样或启P6",
+          "evidence": [
+            "COMPARE",
+            "REVIEW"
+          ],
+          "supersedes": "CP-545-20261028T073018020654Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "research_only",
+          "scope": "仅本次离线逐点影子决策；原B状态不随假想成交演进",
+          "remaining": "完整资本路径、独立价值、生产及P6资格仍未具备；#545保持open",
+          "next_action": "保留原组合，优先按#546归并首轮学习资产与四类结论；新假设另冻",
+          "evidence": [
+            "AUTHORITY",
+            "COMPARE",
+            "REVIEW"
+          ],
+          "supersedes": "CP-545-20261028T073018020654Z"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:49Z",
+          "body_sha256": "291e438c73c9210cbfbef550c187642ad694716cd4c9d739c4551260f8378f3c"
+        }
+      ]
     }
   ]
 }

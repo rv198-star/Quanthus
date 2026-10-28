@@ -134,7 +134,10 @@
         "src/quanthus/stage_learning/head2_consumer.py",
         "config/research/learning-mvp/stage34-breakout-list-use.v1.json",
         "src/quanthus/stage_learning/review_list.py",
-        "config/research/learning-mvp/stage34-breakout-list-use.v2.json"
+        "config/research/learning-mvp/stage34-breakout-list-use.v2.json",
+        "src/quanthus/expert_strategy/held_structure_preflight.py",
+        "scripts/expert545_preflight.py",
+        "config/research/expert545-held-preflight.v1.json"
       ]
     },
     {

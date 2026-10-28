@@ -366,12 +366,15 @@ def facts(cold: Path) -> dict[str, Any]:
     return receipt
 
 
-def capital(cold: Path, attempt: int = 1) -> dict[str, Any]:
+def capital(cold: Path, attempt: int = 1, run_number: int = 1) -> dict[str, Any]:
     ledger = read(
         cold
         / ("copy-ledger.frozen.json" if attempt == 1 else f"copy-ledger-v{attempt}.frozen.json")
     )
     verify(ledger["code_pins"])
+    if (cold / "metadata-supplement.frozen.json").exists():
+        supplement = read(cold / "metadata-supplement.frozen.json")
+        verify({supplement["copy"]: supplement["expected"]})
     if not all(read(cold / "facts-fit.safe.json")["byte_equal"].values()):
         raise ValueError("ENTRY_COLD_FACTS_FIT_REQUIRED")
     proof = isolation(cold, ledger)
@@ -392,7 +395,8 @@ def capital(cold: Path, attempt: int = 1) -> dict[str, Any]:
         "entry_march_adapter", successor / "src/quanthus/expert_strategy/entry_march_capital.py"
     )
     runtime = adapter.runtime_type(RestructuringRuntime)
-    root = cold / ("capital" if attempt == 1 else f"capital-v{attempt}")
+    suffix = "" if run_number == 1 else f"-run{run_number}"
+    root = cold / (("capital" if attempt == 1 else f"capital-v{attempt}") + suffix)
     root.mkdir()
     results = {}
     started = time.monotonic()
@@ -425,7 +429,7 @@ def capital(cold: Path, attempt: int = 1) -> dict[str, Any]:
         "elapsed_seconds": time.monotonic() - started,
         "peak_RSS_bytes": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024,
     }
-    write(cold / f"capital-attempt{attempt}.safe.json", receipt)
+    write(cold / f"capital-attempt{attempt}{suffix}.safe.json", receipt)
     return receipt
 
 
@@ -507,6 +511,7 @@ def main() -> None:
     parser.add_argument("command", choices=("prepare", "facts", "capital", "refresh"))
     parser.add_argument("--job", type=Path, required=True)
     parser.add_argument("--attempt", type=int, default=1)
+    parser.add_argument("--run-number", type=int, default=1)
     args = parser.parse_args()
     if args.command == "prepare":
         result = prepare(args.job)
@@ -520,7 +525,9 @@ def main() -> None:
             signal.SIGALRM, lambda *_: (_ for _ in ()).throw(TimeoutError("ENTRY_COLD_DEADLINE"))
         )
         signal.alarm(max(1, int((deadline - datetime.now(timezone.utc)).total_seconds())))
-        result = facts(cold) if args.command == "facts" else capital(cold, args.attempt)
+        result = (
+            facts(cold) if args.command == "facts" else capital(cold, args.attempt, args.run_number)
+        )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
 
 

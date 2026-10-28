@@ -5324,6 +5324,317 @@
           "body_sha256": "291e438c73c9210cbfbef550c187642ad694716cd4c9d739c4551260f8378f3c"
         }
       ]
+    },
+    {
+      "id": "CP-546-20261028T112246237569Z",
+      "recorded_at": "2026-10-28T11:23:53.893496+00:00",
+      "actor": "Codex: bounded asset acceptance; exact old independent evidence and fresh pinned-reader checks",
+      "work_item": "META-LEARN-002",
+      "outcome": "progress",
+      "summary": "#546本次资产总验收交付：首轮fit/update旧独立复现与6模型保留可读通过，七特征保留、九特征拒绝、3/4及两项用途停放；产品MVP仍未达成，集成与远端CI分别披露，546保持开放。",
+      "evidence": [
+        {
+          "id": "VERDICT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning546-closeout-20261028T110945Z-8a1565c/evidence/four-facet-verdict.safe.json",
+          "sha256": "708723ae95158066855cb0d4c3443b5e402ea86ae4837b600987a74e02e3c1d7",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本轮四类资产结论；不是产品MVP通过、准入或新训练。"
+        },
+        {
+          "id": "READER",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning546-closeout-20261028T110945Z-8a1565c/evidence/retention-reader.safe.json",
+          "sha256": "941f09eece4b7d6f32a613024d1746a17771f36e1756f6eb02f54188333cdc98",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "6封存模型按11文件固定旧代码在新进程可读且不变；18个内存负测，不是从头refit。"
+        },
+        {
+          "id": "REPRO",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning546-closeout-20261028T110945Z-8a1565c/evidence/existing-independent-reproduction.safe.json",
+          "sha256": "e5db63d30fe1e7322c3ddd0e87882e532bf9cbea7e967d274986017d88d2f629",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "重核首轮fit/update原两进程各3产物；新refit为0，不外推7/9特征。"
+        },
+        {
+          "id": "INVENTORY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning546-closeout-20261028T110945Z-8a1565c/evidence/receipt-inventory.frozen.json",
+          "sha256": "a7abb3deaf45fb9e629200868abb5640960410f5bf21ce560ec4076e27ba3329",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "12份既有安全回执的精确身份匹配；不重新接受其底层市场来源。"
+        },
+        {
+          "id": "INTEGRATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning546-closeout-20261028T110945Z-8a1565c/evidence/integration-gap.safe.json",
+          "sha256": "69176eca147188b77fea30c7f6f170a8635461b3179c8f1f1f6150e064fcc517",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "固定main与堆叠PR元数据和路径缺口；不建立主分支交付或合并授权。"
+        },
+        {
+          "id": "OS_READS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning546-closeout-20261028T110945Z-8a1565c/evidence/reader-os-open-audit.safe.json",
+          "sha256": "be7b0166df871f746c3f22b7bed5793850af87eb5905bbde17513314e1001ad8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "实际成功文件打开和Internet connect观察；启动nscd Unix失败单列，不是内核沙箱。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "首轮真实fit/update原独立重建和本次6模型固定版本读取/保留通过；连续Facts与两项负结果资产保留",
+          "remaining": "Head2原代码/设计尚未合入main；完整有用学习决策链未接受",
+          "next_action": "做一次有界版本化资产集成审查，先列准确旧读者/设计及兼容测试，不盲合堆叠PR",
+          "evidence": [
+            "READER",
+            "REPRO",
+            "INTEGRATION"
+          ],
+          "supersedes": "CP-540-20261027T202543163086Z"
+        },
+        {
+          "module": "MVP",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "七特征保留研究资产，九特征固定候选拒绝；无新独立合格可用状态头",
+          "remaining": "3/4来源、参考和样本容量未过；现有10/11开发资格不等于学习头通过",
+          "next_action": "先形成具体未满足的消费决策、独立参考与增量成本/价值标准，再决定是否另开有界候选；不自动重训、补采或P6",
+          "evidence": [
+            "VERDICT",
+            "INVENTORY"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "量能同名额差异弱且脆弱；持仓结构只改变1个开仓段，两项当前映射停放",
+          "remaining": "未取得足以推进采用/P6的学习候选决策价值；没有新经济回放",
+          "next_action": "先形成具体未满足的消费决策、独立参考与增量成本/价值标准，再决定是否另开有界候选；不自动重训、补采或P6",
+          "evidence": [
+            "VERDICT",
+            "INVENTORY"
+          ],
+          "supersedes": "CP-540-20261027T223010393960Z"
+        },
+        {
+          "module": "MVP",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本轮只验收资产和四类结论，不授予消费者/历史PIT/Shadow/P6/P7/生产资格",
+          "remaining": "产品学习MVP仍未达成，#546保持开放",
+          "next_action": "保留现行旧版和冻结门槛；后续按具体用途单独准入",
+          "evidence": [
+            "VERDICT"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "本次有界资产总验收：清点、固定旧读者实测、保留链和四类结论可追溯；非整个产品MVP接受",
+          "remaining": "原#546产品门槛仍开放；代码集成与远端CI未完成",
+          "next_action": "复用本次总清单和保留验证，不重复扫描旧数仓或重训已完成候选",
+          "evidence": [
+            "INVENTORY",
+            "READER",
+            "REPRO",
+            "INTEGRATION",
+            "OS_READS"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "总验收不把拟合完成、较佳对照或AI参考一致性提升为识别质量",
+          "remaining": "本轮没有新可采用状态头",
+          "next_action": "先形成具体未满足的消费决策、独立参考与增量成本/价值标准，再决定是否另开有界候选；不自动重训、补采或P6",
+          "evidence": [
+            "VERDICT"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "按冻结停止条件保留九特征拒绝及量能/持仓映射停放，负结果可交付",
+          "remaining": "整体价值证据未达到产品采用条件",
+          "next_action": "先形成具体未满足的消费决策、独立参考与增量成本/价值标准，再决定是否另开有界候选；不自动重训、补采或P6",
+          "evidence": [
+            "VERDICT"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "资产验收完成与产品/生产准入独立；546不关闭",
+          "remaining": "原产品MVP、P6新候选与生产门槛未过",
+          "next_action": "保持不启动新P6、训练或采集",
+          "evidence": [
+            "VERDICT"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "首轮fit/update两进程各3产物及原请求重新核对；6模型新进程读回和身份保留通过",
+          "remaining": "后续7/9时间特征无独立refit；本轮不以加载代替重建",
+          "next_action": "按精确版本复用首轮独立证据；新增运行逐项绑定自己的复现合同",
+          "evidence": [
+            "REPRO",
+            "READER",
+            "OS_READS"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "REPRO",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "复现的是有限回溯raw-score工程行为，不接受市场识别或概率",
+          "remaining": "独立市场/用途参考与模型采用门槛分开",
+          "next_action": "保留六训练/九开发的有限分母，不外推后续实验",
+          "evidence": [
+            "REPRO",
+            "VERDICT"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "REPRO",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "通过版本读取和已有独立构建不授予新使用权限",
+          "remaining": "主分支尚未集成旧读者且产品资格不成立",
+          "next_action": "先按固定版本保留，不启动消费者或P6",
+          "evidence": [
+            "READER",
+            "INTEGRATION",
+            "VERDICT"
+          ],
+          "supersedes": "BASELINE-20261027"
+        }
+      ],
+      "no_change_reason": "既有P6能力和封存收口不改变；新候选无价值/准入证据，不启动。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:43:04Z",
+          "body_sha256": "52082c9849fb2bfc35df214aa15032a6a1491ffebc5cef7d4549a03190d4f515"
+        }
+      ],
+      "reviewed_modules": [
+        "P6"
+      ]
+    },
+    {
+      "id": "CP-546-20261028T113650567370Z",
+      "recorded_at": "2026-10-28T11:37:37.553979+00:00",
+      "actor": "Codex: final bounded acceptance, repository checks and exact remote-source availability",
+      "work_item": "META-LEARN-002",
+      "outcome": "progress",
+      "summary": "#546本次三段资产验收与make check完成：5448/20，旧读者171，契约26，文档蓝图33；216既有lint保留。补记旧Head2/规划SHA本地可恢复但GitHub未解析，保护本地历史，原产品MVP仍不通过且546不关闭。",
+      "evidence": [
+        {
+          "id": "FINAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning546-closeout-20261028T110945Z-8a1565c/evidence/acceptance.final.safe.json",
+          "sha256": "ab02a3cd6427194ee5f6d47434af877e2bf5b2f8515de68019c797aaedce0e33",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本批验收与检查完成；产品MVP仍未达成，546保持开放。"
+        },
+        {
+          "id": "CHECKS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning546-closeout-20261028T110945Z-8a1565c/checks.json",
+          "sha256": "e7a90d6e8e92b5126247fff1dd42a1617823d436c190860fe9741d557facbd9c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本机实际命令结果；make5448/20，lint216既有失败，未运行/跳过分开，不接受真实训练或生产。"
+        },
+        {
+          "id": "LOCAL_ONLY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning546-closeout-20261028T110945Z-8a1565c/evidence/git-source-availability.safe.json",
+          "sha256": "d6a4ae23255c265de0a09733db1e31b9f8033e4e71dd4c53ff7db3603b3cfb47",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "两旧SHA本地存在而GitHub API未解析；不证明全局不存在，不代表已交付。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "本次资产总验收和固定读者实测通过；完整学习决策工程仍partial",
+          "remaining": "旧Head2/规划SHA本地可恢复但GitHub未解析、main未集成；完整有用状态/决策仍未接受",
+          "next_action": "保护原Git对象/工作树；下一笔优先最小版本化资产集成审查，不盲推或盲合旧历史",
+          "evidence": [
+            "FINAL",
+            "CHECKS",
+            "LOCAL_ONLY"
+          ],
+          "supersedes": "CP-546-20261028T112246237569Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "本次有界总验收三段完成，make check5448/20及171旧读者/26冻结/33文档蓝图通过；216既有lint与远端CI限制保留",
+          "remaining": "原546产品MVP仍未达成；独立资格/价值及代码正式交付未完成",
+          "next_action": "按本次总验收保留可复用与拒绝资产，维持产品未通过；不再重跑本轮训练或可选政策",
+          "evidence": [
+            "FINAL",
+            "CHECKS",
+            "LOCAL_ONLY"
+          ],
+          "supersedes": "CP-546-20261028T112246237569Z"
+        }
+      ],
+      "no_change_reason": "最终工程验证不新增识别质量、价值或准入；P6和各停放候选保持原处置，未新训练/采集/回放。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:43:04Z",
+          "body_sha256": "52082c9849fb2bfc35df214aa15032a6a1491ffebc5cef7d4549a03190d4f515"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "CLOSEOUT",
+        "REPRO",
+        "P6"
+      ]
     }
   ]
 }

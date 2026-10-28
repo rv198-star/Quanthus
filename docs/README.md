@@ -9,6 +9,11 @@ For current learning-system work (#540–#548), use the generated
 [checkpoint mechanism](design/blueprint-progress.md). The historical phase evidence below
 is not a substitute for that task-scoped current view.
 
+First-round learning asset acceptance (#546) is recorded in the
+[2026-10-28 bounded audit](acceptance/learning546-first-round-assets-20261028.md).
+It separates reproducible engineering and old-version retention from the still
+unmet product learning MVP and its use-specific gates.
+
 | Field | Value |
 | --- | --- |
 | Current phase | P6 closed under Owner historical scope; P5 optional research deferred |

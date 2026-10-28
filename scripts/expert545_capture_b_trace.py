@@ -11,10 +11,12 @@ import argparse
 import gzip
 import hashlib
 import json
+import os
 import resource
 import shutil
 import socket
 import subprocess
+import sys
 import time
 from dataclasses import asdict
 from datetime import date, datetime
@@ -44,6 +46,72 @@ def encode(value: Any) -> Any:
     raise TypeError(type(value).__name__)
 
 
+def launch_identity(repository: Path, freeze: Path) -> dict[str, Any]:
+    """Snapshot launcher and the producer's whole Python/config import closure.
+
+    This CLI runs with the old producer on PYTHONPATH, so it deliberately uses
+    stdlib only until the launch record is sealed. No current-package import is
+    inserted into that producer's namespace.
+    """
+    pins = {}
+
+    def scan_error(error: OSError) -> None:
+        raise error
+
+    for directory in (repository / "src/quanthus", repository / "config"):
+        if directory.resolve(strict=True) != directory:
+            raise ValueError("TRACE_CODE_SYMLINK")
+        for parent, dirs, files in os.walk(directory, onerror=scan_error, followlinks=False):
+            dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+            if any((Path(parent) / d).is_symlink() for d in dirs):
+                raise ValueError("TRACE_CODE_SYMLINK")
+            for name in sorted(files):
+                path = Path(parent) / name
+                if directory.name != "config" and path.suffix != ".py":
+                    continue
+                if path.resolve(strict=True) != path or not path.is_file():
+                    raise ValueError("TRACE_CODE_SYMLINK")
+                pins[path.relative_to(repository).as_posix()] = sha(path)
+    for path in repository.iterdir():
+        if path.is_file() and (
+            path.name in {"pyproject.toml", "uv.lock", "poetry.lock"}
+            or path.name.startswith("requirements")
+            and path.suffix == ".txt"
+        ):
+            pins[path.name] = sha(path)
+    return {
+        "kind": "expert545-capture-launch-v1",
+        "observed_at": datetime.now().astimezone().isoformat(),
+        "producer_revision": PRODUCER,
+        "producer_root": str(repository),
+        "producer_code_config_sha256": pins,
+        "launcher": str(Path(__file__).resolve()),
+        "launcher_sha256": sha(Path(__file__)),
+        "source_freeze_sha256": sha(freeze),
+        "source_freeze": str(freeze),
+        "python": sys.version,
+        "executable": sys.executable,
+        "historical_capture_backfill": False,
+    }
+
+
+def verify_launch(identity: dict[str, Any], repository: Path) -> None:
+    current = launch_identity(repository, Path(identity["source_freeze"]))
+    for key in ("producer_code_config_sha256", "launcher_sha256", "source_freeze_sha256"):
+        if current[key] != identity[key]:
+            raise ValueError("TRACE_LAUNCH_CHANGED:" + key)
+    for name, module in tuple(sys.modules.items()):
+        if name != "quanthus" and not name.startswith("quanthus."):
+            continue
+        origin = getattr(module, "__file__", None)
+        path = Path(origin).resolve() if origin is not None else None
+        if path is None or not path.is_relative_to(repository / "src"):
+            raise ValueError("TRACE_IMPORTED_CODE_ORIGIN:" + name)
+        key = path.relative_to(repository).as_posix()
+        if identity["producer_code_config_sha256"].get(key) != sha(path):
+            raise ValueError("TRACE_IMPORTED_CODE_ORIGIN:" + name)
+
+
 def capture(freeze: Path, output: Path) -> dict[str, Any]:
     start = time.monotonic()
     frozen = json.loads(freeze.read_bytes())
@@ -53,8 +121,16 @@ def capture(freeze: Path, output: Path) -> dict[str, Any]:
     ).strip()
     if actual != PRODUCER or output.exists() or output.is_symlink():
         raise ValueError("TRACE_PRODUCER_OR_OUTPUT")
+    dirty = subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=all", "--", "src", "config"],
+        cwd=repository,
+        text=True,
+    )
+    if dirty.strip():
+        raise ValueError("TRACE_PRODUCER_CODE_DIRTY")
     if shutil.disk_usage(output.parent).free < 8 * 1024**3 + 512 * 1024**2:
         raise ValueError("TRACE_FREE_SPACE")
+    launch = launch_identity(repository, freeze)
     record = frozen["roles"]["primary"]
     for name, identity in record["bindings"].items():
         path = Path(name)
@@ -70,6 +146,12 @@ def capture(freeze: Path, output: Path) -> dict[str, Any]:
         ),
         flush=True,
     )
+    # Seal before importing or invoking any producer. Old captures are not amended.
+    verify_launch(launch, repository)
+    output.mkdir()
+    launch_path = output / "launch.frozen.json"
+    with launch_path.open("x", encoding="utf-8") as handle:
+        handle.write(json.dumps(launch, indent=2, sort_keys=True) + "\n")
     # No network source fallback may be introduced by the instrumented run.
     connect = socket.socket.connect
 
@@ -79,12 +161,26 @@ def capture(freeze: Path, output: Path) -> dict[str, Any]:
         return connect(sock, address)
 
     socket.socket.connect = no_network  # type: ignore[method-assign]
+    try:
+        return _capture_runtime(repository, record, output, launch, start, freeze)
+    finally:
+        socket.socket.connect = connect  # type: ignore[method-assign]
+
+
+def _capture_runtime(
+    repository: Path,
+    record: dict[str, Any],
+    output: Path,
+    launch: dict[str, Any],
+    start: float,
+    freeze: Path,
+) -> dict[str, Any]:
     from quanthus.expert_strategy.p3_restructuring_successor import RestructuringRuntime
 
     from quanthus.expert_strategy.formal_p2_replay import FormalP2ReplayRuntime
     from quanthus.expert_strategy.runner import FormalStrategyRunner
 
-    output.mkdir()
+    verify_launch(launch, repository)
     current: dict[str, Any] = {}
     reviews = FormalP2ReplayRuntime._review_positions
     evaluate = FormalStrategyRunner.evaluate_held
@@ -163,10 +259,12 @@ def capture(freeze: Path, output: Path) -> dict[str, Any]:
         finally:
             FormalP2ReplayRuntime._review_positions = reviews  # type: ignore[method-assign]
             FormalStrategyRunner.evaluate_held = evaluate  # type: ignore[method-assign]
+    verify_launch(launch, repository)
     result = {
         "kind": "expert545-unchanged-B-trace-v1",
         "producer_revision": PRODUCER,
         "source_freeze_sha256": sha(freeze),
+        "capture_launch_sha256": sha(output / "launch.frozen.json"),
         "rows": trace_count,
         "comparisons": comparisons,
         "trace_sha256": sha(output / "held-contexts.private.jsonl.gz"),

@@ -21,6 +21,14 @@ from typing import Any
 from quanthus.expert_protocols import RequiredAction
 from quanthus.expert_strategy import ExpertStrategyRegistry, FormalStrategyRunner
 from quanthus.expert_strategy.held_structure_inputs import historical_daily_inputs
+from quanthus.expert_strategy.held_structure_integrity import (
+    HELD_POPULATION,
+    INPUT_KIND,
+    execution_pins,
+    verified_held,
+    verify_execution,
+    verify_selected_sources,
+)
 from quanthus.expert_strategy.held_structure_shadow import (
     SupportDecisionInput,
     evaluate_shadow,
@@ -110,22 +118,7 @@ def freeze(job: Path, archive_freeze: Path, held_file: Path, footprint: Path) ->
             or "sha256:" + sha(Path(p)) != identity["sha256"]
         ):
             raise ValueError("HELD_SELECTED_SOURCE_CHANGED")
-    code_pins = {
-        str(p.relative_to(ROOT)): sha(p)
-        for p in (
-            CONFIG,
-            ROOT / "src/quanthus/expert_strategy/held_structure_inputs.py",
-            ROOT / "src/quanthus/expert_strategy/held_structure_shadow.py",
-            ROOT / "src/quanthus/structure_v2.py",
-            ROOT / "src/quanthus/structure_v2_inputs.py",
-            ROOT / "src/quanthus/structure_support_facts.py",
-            ROOT / "src/quanthus/stage_projection.py",
-            ROOT / "config/stage-10-11-projection.v1.json",
-            ROOT / "config/expert-strategies/p4-trend-risk.v1.0.1.json",
-            ROOT / "src/quanthus/expert_strategy/runner.py",
-            Path(__file__),
-        )
-    }
+    code_pins = execution_pins(ROOT)
     ranges: dict[str, dict[str, Any]] = {}
     for r in held:
         code = r["security_code"]
@@ -143,7 +136,7 @@ def freeze(job: Path, archive_freeze: Path, held_file: Path, footprint: Path) ->
         if code in ranges:
             ranges[code]["raw_rows_upper_bound"] = count
     value = {
-        "kind": "expert545-held-structure-inputs-v1",
+        "kind": INPUT_KIND,
         "archive_freeze": str(archive_freeze),
         "archive_freeze_sha256": sha(archive_freeze),
         "source_manifest_sha256": (
@@ -170,6 +163,15 @@ def freeze(job: Path, archive_freeze: Path, held_file: Path, footprint: Path) ->
             "free_inodes": __import__("os").statvfs(job).f_favail,
         },
     }
+    proof_path = job / "trace/receipt.safe.json"
+    launch_path = job / "trace/launch.frozen.json"
+    proof = json.loads(proof_path.read_bytes())
+    if proof.get("capture_launch_sha256") != sha(launch_path):
+        raise ValueError("HELD_CAPTURE_LAUNCH_REQUIRED")
+    value["trace_proof_sha256"] = sha(proof_path)
+    value["capture_launch_sha256"] = sha(launch_path)
+    verify_execution(ROOT, value)
+    verified_held(value, population=HELD_POPULATION)
     write_json(job / "inputs.final.frozen.json", value)
     return {
         "held_rows": 8393,
@@ -282,13 +284,12 @@ def build(job: Path) -> dict[str, Any]:
     _guard(job)
     start = time.monotonic()
     frozen = json.loads((job / "inputs.final.frozen.json").read_bytes())
-    for name, expected in frozen["code_config_sha256"].items():
-        if sha(ROOT / name) != expected:
-            raise ValueError("HELD_FROZEN_CODE_CHANGED:" + name)
+    verify_execution(ROOT, frozen)
+    held = verified_held(frozen, population=HELD_POPULATION)
+    verify_selected_sources(frozen)
     output = job / "facts"
     output.mkdir()
     selected = frozen["selected"]
-    held = json.loads(Path(frozen["held_file"]).read_bytes())["rows"]["B"]
     codes = sorted({r["security_code"] for r in held})
     identities = pq.read_table(
         selected["security_code_validity"], filters=[("stock_code", "in", codes)]
@@ -467,6 +468,8 @@ def compare(job: Path) -> dict[str, Any]:
     _guard(job)
     start = time.monotonic()
     frozen = json.loads((job / "inputs.final.frozen.json").read_bytes())
+    verify_execution(ROOT, frozen)
+    held = verified_held(frozen, population=HELD_POPULATION)
     materialized = json.loads((job / "evidence/facts-materialization.safe.json").read_bytes())
     if materialized["input_freeze_sha256"] != sha(job / "inputs.final.frozen.json"):
         raise ValueError("HELD_FACT_INPUT_IDENTITY")
@@ -491,7 +494,6 @@ def compare(job: Path) -> dict[str, Any]:
             if (support_row.security_code, support_row.market_date) in inputs:
                 raise ValueError("HELD_FACT_DUPLICATE")
             inputs[support_row.security_code, support_row.market_date] = support_row
-    held = json.loads(Path(frozen["held_file"]).read_bytes())["rows"]["B"]
     identities = {(r["market_date"], r["unit_id"]): r for r in held}
     registry = ExpertStrategyRegistry(ROOT)
     runner = FormalStrategyRunner(registry.card, registry.topology_manifest.digest)
@@ -501,11 +503,16 @@ def compare(job: Path) -> dict[str, Any]:
     all_rows = []
     seen = set()
     trace = Path(frozen["trace"])
-    proof = json.loads((job / "trace/receipt.safe.json").read_bytes())
+    proof_path = job / "trace/receipt.safe.json"
+    proof = json.loads(proof_path.read_bytes())
     if (
-        proof["rows"] != 8393
+        sha(proof_path) != frozen["trace_proof_sha256"]
+        or sha(job / "trace/launch.frozen.json") != frozen["capture_launch_sha256"]
+        or proof.get("capture_launch_sha256") != frozen["capture_launch_sha256"]
+        or set(proof["comparisons"]) != {"decisions.json", "engine-events.json", "manifest.json"}
+        or any(v["equal"] is not True for v in proof["comparisons"].values())
+        or proof["rows"] != HELD_POPULATION[0]
         or proof["source_freeze_sha256"] != frozen["archive_freeze_sha256"]
-        or not all(v["equal"] for v in proof["comparisons"].values())
         or sha(trace) != proof["trace_sha256"]
     ):
         raise ValueError("HELD_TRACE_CHANGED")
@@ -522,6 +529,8 @@ def compare(job: Path) -> dict[str, Any]:
                 identity["quantity"],
             ):
                 raise ValueError("HELD_CONTEXT_SECURITY_OR_QUANTITY")
+            if "entry_key" in raw and raw["entry_key"] != identity["entry_key"]:
+                raise ValueError("HELD_CONTEXT_ENTRY_EPISODE")
             day = date.fromisoformat(raw["market_date"])
             support = inputs[raw["security_code"], day]
             context = restore_context(raw["context"])
@@ -578,7 +587,7 @@ def compare(job: Path) -> dict[str, Any]:
                 changed.append(
                     {k: row[k] for k in ("security_code", "entry_key", "market_date", "unit_id")}
                 )
-    if seen != set(identities) or counts["held_rows"] != 8393:
+    if seen != set(identities) or counts["held_rows"] != HELD_POPULATION[0]:
         raise ValueError("HELD_FULL_DENOMINATOR_NOT_RETAINED")
     with gzip.open(job / "decision-shadow.private.json.gz", "xb") as handle:
         handle.write(canonical(all_rows))
@@ -587,7 +596,9 @@ def compare(job: Path) -> dict[str, Any]:
         "kind": "expert545-fixed-B-shadow-safe-v1",
         "counts": dict(counts),
         "reasons": dict(reasons),
-        "full_denominator": {"held_reviews": 8393, "issuers": 343, "entry_episodes": 538},
+        "full_denominator": dict(
+            zip(("held_reviews", "issuers", "entry_episodes"), HELD_POPULATION, strict=True)
+        ),
         "changed_distinct_issuers": len({r["security_code"] for r in changed}),
         "changed_distinct_entry_episodes": len(episodes),
         "changed_unique_dates": len({r["market_date"] for r in changed}),

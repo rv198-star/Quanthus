@@ -108,7 +108,7 @@ class SupportDecisionInput:
     stage11_active: bool
     confirmation_ref: str | None
     lineage_digest: str
-    process_count: int = 1
+    process_count: int = 0
     unavailable_process_count: int = 0
     process_revisions: tuple[str, ...] = ()
 

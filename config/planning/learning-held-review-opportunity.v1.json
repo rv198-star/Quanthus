@@ -1,0 +1,112 @@
+{
+  "schema_version": "quanthus.learning-consumer-opportunity.v1",
+  "id": "held-after-close-review-opportunity-20261028-v1",
+  "work_items": [
+    "META-LEARN-001",
+    "P3-EXPERT-007",
+    "META-LEARN-002"
+  ],
+  "design_status": "approved_for_feasibility_decision_only",
+  "delivery_gate": "blocked_for_new_result_experiment",
+  "decision": "PARK_PROPOSED_HELD_PRIORITY_QUEUE_NO_ESTABLISHED_UNMET_NEED",
+  "decision_scope": "only this proposed new queue/training branch; existing accepted research and data operations continue",
+  "code_inspected_at": "b57b28e738c837bfa53e90aa466c90c9f6a21ac9",
+  "actual_consumer": {
+    "call": "FormalP2ReplayRuntime._review_positions -> FormalStrategyRunner.evaluate_held -> aggregate_governance",
+    "evidence_of_use": "original unchanged-B trace contains8393 actual held reviews; existing proof only, not a fresh evaluation",
+    "existing_selection": "all eligible held units in sorted unit_id order; active TRIAL/DYNAMIC without pending sell",
+    "existing_decision": "full exit / reduce / no_action, under original base and position-risk safeguards",
+    "existing_output": [
+      "date/unit/event identity",
+      "action and reason codes",
+      "governance and decision digests",
+      "risk veto and evidence refs",
+      "reduction target where applicable"
+    ],
+    "visibility": "code and original safe receipt verified; no assertion that a new live production workflow was inspected",
+    "report_consumer": "candidate-detail read-only expert evidence displays topology, reasons, disagreement cases and source digests; its approval rail reviews run evidence, not daily held-position priorities"
+  },
+  "proposed_use": {
+    "name": "offline after-close held-position review priority",
+    "possible_beneficiary": "research analyst inspecting held-risk evidence",
+    "beneficiary_workload_observed": false,
+    "held_priority_queue_observed_in_inspected_code": false,
+    "changed_decision": "which evidence an analyst examines first; no change to trade decisions",
+    "control": "existing B decision/reasons and all-position review",
+    "candidate": "continuous support Facts and explicit uncertainty as optional explanation",
+    "head2": "EXCLUDED_PURPOSE_MISMATCH_ORDERLY_CONSOLIDATION_IS_NOT_RISK_OR_DAMAGE",
+    "new_human_minutes_saved": null,
+    "new_incremental_benefit": null
+  },
+  "denominator_and_timing": {
+    "required_future_population": "all eligible held reviews in a separately frozen task, including missing and uncertain evidence",
+    "old_population": {
+      "reviews": 8393,
+      "securities": 343,
+      "entry_episodes": 538
+    },
+    "old_population_use": "feasibility diagnosis only; already consumed, never relabeled as a fresh holdout",
+    "historical_PIT_claim": false,
+    "real_knowledge_time": "provider acquisition and DWD known-from remain unavailable",
+    "after_close": "an observation coordinate, not a repaired knowledge clock or execution permission"
+  },
+  "eligibility": {
+    "status": "NOT_ELIGIBLE",
+    "unmet_decision_or_workload_need_established": false,
+    "fixed_human_review_capacity_per_day": null,
+    "acceptable_error_budget": null,
+    "independent_purpose_reference": null,
+    "independent_reference_capacity_verified": false,
+    "measured_time_or_material_benefit_threshold": null,
+    "reason_codes": [
+      "NO_OBSERVED_HELD_PRIORITY_WORKFLOW_OR_CAPACITY",
+      "NO_FRESH_PURPOSE_COMPATIBLE_REFERENCE",
+      "EXISTING_POINTWISE_DELTA_TOO_CONCENTRATED_TO_JUSTIFY_CAPITAL_REPLAY",
+      "HEAD2_PURPOSE_MISMATCH"
+    ],
+    "interpretation": "absence of a qualified next experiment, not proof that all continuous structure or all future consumers have zero value"
+  },
+  "existing_feasibility_evidence": {
+    "safe_receipt_sha256": "27f9c01b57922e683702bcb99260fc860777fe4877ed6572325b5bc4f81ae255",
+    "scope": "old fixed shadow mapping only; not a new outcome experiment",
+    "proposals": 16,
+    "already_covered_by_baseline_full_exit": 15,
+    "changed_entry_episodes": 1,
+    "safety": "missing evidence adds no sale; original base exits retain precedence",
+    "claim_ceiling": "diagnoses concentration in one frozen mapping, not a universal value estimate or equivalence test"
+  },
+  "unlock_branches": [
+    {
+      "when": "an actual owner/consumer records a specific missed decision or costly review backlog",
+      "next": "freeze exact purpose, full denominator, fixed capacity, acceptable errors, independent reference, exposure and cost before scoring; existing qualified Facts/simple control first"
+    },
+    {
+      "when": "the question is orderly consolidation for an existing entry-candidate follow-up workflow",
+      "next": "separate purpose/request and exposure assessment; seven-feature Head2 is only a possible candidate, not a risk-score substitute"
+    },
+    {
+      "when": "no material beneficiary or independent measure is established",
+      "next": "retain explanation and model assets; do not train, collect, tune or open P6 just to continue the campaign"
+    }
+  ],
+  "authority": {
+    "new_acquisition": false,
+    "new_real_training_or_update": false,
+    "new_model_scoring_experiment": false,
+    "new_economic_replay": false,
+    "protected_partition_access": false,
+    "consumer_admission": false,
+    "P6_or_production": false,
+    "new_service_or_manual_workflow": false
+  },
+  "inspected_source_sha256": {
+    "src/quanthus/expert_strategy/formal_p2_replay.py": "fdb9839ecb4a35a7a2fe4ecb12f5976c3ddb0167ce24e837ebf2156bd3862e46",
+    "src/quanthus/expert_strategy/runner.py": "96d00567ec4b0008e753aed1874136337a108d2c36a684d897117fc4d124d69b",
+    "src/quanthus/expert_strategy/position_risk.py": "521925258416e48f8bda585b16253dea81224d29bea50a5336febc2b06c53b56",
+    "src/quanthus/expert_evaluation/product_view.py": "80a07642582612c333282c1a23a744c21b1c77e3787652d6f7d1c1bf2e89b735",
+    "src/quanthus/platform/product_query.py": "855e74c12e5d24a0c1c83bf1f9319254457ff49630cf4a772741ea3e5873a52d",
+    "product-web/src/views/CandidateDetail.vue": "1ee7597829faecb46941560ca0c051b9d75ec43b20f4e3bd90a69072edf3415b",
+    "src/quanthus/stage_learning/factor_slice.py": "43ba70b07a8ff0b0118534f0d6e152ef4a1bce03b42edb6a9015676581480e35",
+    "src/quanthus/stage_learning/head2_consumer.py": "ea7f29ad0b094232936aa2f4c2ecb3724f33ef7176a9cee6557dee25a8e15d7e"
+  }
+}

@@ -68,7 +68,8 @@ def guard(job: Path) -> None:
         raise ValueError("ENTRY_CONFIRMATION_DISK_FLOOR")
     if resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024 > b["RSS_bytes"]:
         raise ValueError("ENTRY_CONFIRMATION_RSS")
-    if sum(p.stat().st_size for p in job.rglob("*") if p.is_file()) > b["system_new_bytes"]:
+    accounting = Path(b.get("accounting_root", job))
+    if sum(p.stat().st_size for p in accounting.rglob("*") if p.is_file()) > b["system_new_bytes"]:
         raise ValueError("ENTRY_CONFIRMATION_WRITE_BUDGET")
 
 
@@ -186,8 +187,8 @@ def run(job: Path) -> dict[str, Any]:
         if row["stock_code"] in scopes:
             raise ValueError("ENTRY_CONFIRMATION_DUPLICATE_VALIDITY")
         scopes[row["stock_code"]] = ListingScope(
-            row["exchange"], date.fromisoformat(row["valid_from"]),
-            date.fromisoformat(row["valid_to"]) if row.get("valid_to") else None,
+            row["exchange"], date.fromisoformat(str(row["valid_from"])),
+            date.fromisoformat(str(row["valid_to"])) if row.get("valid_to") else None,
         )
     rows = qualify_population(
         original, model_last_observation=last_training, identities=identities,

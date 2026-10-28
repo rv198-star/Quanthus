@@ -19,7 +19,7 @@ from dataclasses import asdict
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quanthus.event_library.rule_card import load_candidate_rule_card
 from quanthus.expert_strategy.held_structure_inputs import historical_daily_inputs
@@ -112,7 +112,7 @@ def freeze(job: Path, spec_path: Path) -> dict[str, Any]:
 
 def qualify(job: Path) -> dict[str, Any]:
     import duckdb
-    import pyarrow.parquet as pq
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
     started = time.monotonic()
     guard(job)
@@ -333,7 +333,11 @@ def qualify(job: Path) -> dict[str, Any]:
                             "facts": {**primary, **path},
                             "normalized_HLC40": [
                                 [
-                                    float((v / base * Decimal(100)).quantize(Decimal("0.0001")))
+                                    float(
+                                        (cast(Decimal, v) / base * Decimal(100)).quantize(
+                                            Decimal("0.0001")
+                                        )
+                                    )
                                     for v in (a.row.high, a.row.low, a.row.close)
                                 ]
                                 for a in current

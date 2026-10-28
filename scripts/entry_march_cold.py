@@ -212,7 +212,7 @@ def isolation(cold: Path, ledger: dict[str, Any]) -> dict[str, Any]:
     function = next(
         n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "isolate_role"
     )
-    namespace = {
+    namespace: dict[str, Any] = {
         "ctypes": ctypes,
         "os": os,
         "errno": errno,
@@ -246,7 +246,10 @@ def isolation(cold: Path, ledger: dict[str, Any]) -> dict[str, Any]:
         Path("/proc"),
         Path("/sys"),
     ]
-    return namespace["isolate_role"](allowed, forbidden)
+    result = namespace["isolate_role"](allowed, forbidden)
+    if not isinstance(result, dict):
+        raise ValueError("ENTRY_COLD_ISOLATION_RECEIPT")
+    return result
 
 
 def cold_guard(cold: Path, ledger: dict[str, Any]) -> None:
@@ -302,7 +305,7 @@ def facts(cold: Path) -> dict[str, Any]:
     producer.file_sha = lambda path: sha(physical(path))
     producer.guard = lambda _: cold_guard(cold, ledger)
     import duckdb
-    import pyarrow.parquet as pq
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
     native_read = pq.read_table
     pq.read_table = lambda path, *a, **k: native_read(physical(path), *a, **k)
@@ -327,7 +330,7 @@ def facts(cold: Path) -> dict[str, Any]:
             )
             return self.connection.execute(query, mapped)
 
-    duckdb.connect = Connection
+    duckdb.connect = Connection  # type: ignore[assignment]
     if (role / "evidence/qualification.safe.json").exists():
         # Resume after a transport-only failure: the independently constructed
         # immutable Facts must already equal the sealed primary digests.
@@ -378,7 +381,9 @@ def capital(cold: Path, attempt: int = 1, run_number: int = 1) -> dict[str, Any]
     if not all(read(cold / "facts-fit.safe.json")["byte_equal"].values()):
         raise ValueError("ENTRY_COLD_FACTS_FIT_REQUIRED")
     proof = isolation(cold, ledger)
-    from quanthus.expert_strategy.p3_restructuring_successor import RestructuringRuntime
+    RestructuringRuntime = importlib.import_module(
+        "quanthus.expert_strategy.p3_restructuring_successor"
+    ).RestructuringRuntime
 
     stage = ledger["capital_stage"]
     source_root = Path(

@@ -214,7 +214,9 @@ def run(job: Path, attempt: int = 1) -> dict[str, Any]:
                 os._exit(75)
 
     threading.Thread(target=watch, daemon=True).start()
-    from quanthus.expert_strategy.p3_restructuring_successor import RestructuringRuntime
+    RestructuringRuntime = importlib.import_module(
+        "quanthus.expert_strategy.p3_restructuring_successor"
+    ).RestructuringRuntime
 
     adapter_spec = importlib.util.spec_from_file_location("entry_march_adapter", frozen["adapter"])
     assert adapter_spec is not None and adapter_spec.loader is not None

@@ -7,6 +7,91 @@ from decimal import Decimal
 from typing import Any
 
 
+def cash_change(row: dict[str, Any]) -> Decimal:
+    return sum(
+        (
+            Decimal(p["amount"])
+            for p in row["postings"]
+            if p["account"] == "external_pool/cash"
+            or (
+                p["account"].startswith("unit/")
+                and p["account"].count("/") == 2
+                and p["account"].endswith("/cash")
+            )
+        ),
+        Decimal(0),
+    )
+
+
+def entry_date_contributions(
+    events: list[dict[str, Any]],
+    ledgers: list[dict[str, Any]],
+    *,
+    initial: Decimal,
+    ending: Decimal,
+) -> dict[str, Decimal]:
+    """Trace actual cash/mark wealth to the original buy decision's date cluster."""
+    signals = {
+        e["payload"]["signal_id"]: e["payload"]
+        for e in events
+        if e["event_type"] == "signal_accepted"
+    }
+    orders = {
+        e["payload"]["order_id"]: e["payload"] for e in events if e["event_type"] == "order_created"
+    }
+    fills = {e["payload"]["fill_id"]: e["payload"] for e in events if e["event_type"] == "fill"}
+    ledger_events = [e for e in events if e["event_type"] == "ledger_entry"]
+
+    def order_for(row: dict[str, Any]) -> dict[str, Any] | None:
+        return (
+            orders[fills[row["reference_id"]]["order_id"]]
+            if row["reference_type"] == "fill"
+            else None
+        )
+
+    def key(event: dict[str, Any]) -> tuple[str, int]:
+        order = order_for(event["payload"])
+        return event["event_time"], 2 if order and order["side"] == "buy" else 1
+
+    owned: dict[str, dict[str, Any]] = {}
+    result: dict[str, Decimal] = defaultdict(Decimal)
+    for event in sorted(ledger_events, key=key):
+        row = event["payload"]
+        change = cash_change(row)
+        if row["reference_type"] == "unit_close_settlement":
+            if change:
+                raise ValueError("ENTRY_DATE_SETTLEMENT_NOT_NEUTRAL")
+            continue
+        order = order_for(row)
+        unit = row["unit_id"]
+        if order and order["side"] == "buy":
+            if unit in owned:
+                raise ValueError("ENTRY_DATE_OVERLAPPING_UNIT")
+            owned[unit] = {
+                "code": row["security_code"],
+                "quantity": 0,
+                "date": signals[order["signal_id"]]["decision_at"][:10],
+            }
+        if unit not in owned or owned[unit]["code"] != row["security_code"]:
+            raise ValueError("ENTRY_DATE_MISSING_POSITION_ORIGIN")
+        owner = owned[unit]
+        result[owner["date"]] += change
+        owner["quantity"] += row["quantity_delta"]
+        if owner["quantity"] < 0:
+            raise ValueError("ENTRY_DATE_NEGATIVE_QUANTITY")
+        if owner["quantity"] == 0:
+            del owned[unit]
+    for row in ledgers:
+        if row["settled_quantity"]:
+            owner = owned[row["unit_id"]]
+            if owner["quantity"] != row["settled_quantity"]:
+                raise ValueError("ENTRY_DATE_FINAL_QUANTITY")
+            result[owner["date"]] += Decimal(str(row["last_mark_price"])) * row["settled_quantity"]
+    if sum(result.values(), Decimal(0)) != ending - initial:
+        raise ValueError("ENTRY_DATE_WEALTH_NOT_RECONCILED")
+    return dict(result)
+
+
 def issuer_contributions(
     events: list[dict[str, Any]],
     ledgers: list[dict[str, Any]],
@@ -20,14 +105,7 @@ def issuer_contributions(
         if event["event_type"] != "ledger_entry":
             continue
         row = event["payload"]
-        change = sum(
-            (
-                Decimal(p["amount"])
-                for p in row["postings"]
-                if p["account"] in {"cash", "external_pool"}
-            ),
-            Decimal(0),
-        )
+        change = cash_change(row)
         if change:
             if not row.get("security_code"):
                 raise ValueError("ENTRY_ATTRIBUTION_MISSING_ISSUER")
@@ -60,12 +138,20 @@ def metrics(equity: list[dict[str, Any]], events: list[dict[str, Any]]) -> dict[
         "fees": str(sum((Decimal(r["total_fees"]) for r in fills), Decimal(0))),
         "turnover": float(sum((Decimal(r["gross_amount"]) for r in fills), Decimal(0)) / values[0]),
         "sessions": len(values) - 1,
+        "average_idle_capital_ratio": 1
+        - float(
+            sum((Decimal(r["invested_capital_ratio"]) for r in equity[1:]), Decimal(0))
+            / Decimal(len(equity) - 1)
+        ),
+        "time_in_market": sum(Decimal(r["market_value"]) > 0 for r in equity[1:])
+        / (len(equity) - 1),
     }
 
 
 def compare(
     arms: dict[str, dict[str, Any]],
     *,
+    company_by_code: dict[str, str],
     replicates: int = 10000,
     seed: int = 20210331,
     block: int = 5,
@@ -77,7 +163,7 @@ def compare(
     dates = [r["market_date"] for r in arms["C0"]["equity"]]
     if len(set(dates)) != len(dates) or dates != sorted(dates):
         raise ValueError("ENTRY_CAPITAL_DATE_KEYS")
-    values, increments, contributions, observed = {}, {}, {}, {}
+    values, increments, contributions, observed, by_entry_date = {}, {}, {}, {}, {}
     for arm, payload in arms.items():
         if dates != [r["market_date"] for r in payload["equity"]]:
             raise ValueError("ENTRY_CAPITAL_UNPAIRED_SESSIONS")
@@ -104,7 +190,14 @@ def compare(
             raise ValueError("ENTRY_CAPITAL_FINAL_LEDGER_MISMATCH")
         values[arm] = vector
         increments[arm] = [b - a for a, b in zip(vector, vector[1:], strict=False)]
-        contributions[arm] = issuer_contributions(
+        by_code = issuer_contributions(
+            payload["events"], payload["ledgers"], initial=vector[0], ending=vector[-1]
+        )
+        grouped: dict[str, Decimal] = defaultdict(Decimal)
+        for code, value in by_code.items():
+            grouped[company_by_code[code]] += value
+        contributions[arm] = dict(grouped)
+        by_entry_date[arm] = entry_date_contributions(
             payload["events"], payload["ledgers"], initial=vector[0], ending=vector[-1]
         )
         observed[arm] = metrics(payload["equity"], payload["events"])
@@ -134,6 +227,12 @@ def compare(
         worst_without_issuer = min((total - d for d in issuer_deltas), default=total)
         session_deltas = [a - b for a, b in zip(increments["C2"], increments[control], strict=True)]
         worst_without_session = min((total - d for d in session_deltas), default=total)
+        entry_dates = sorted(set(by_entry_date["C2"]) | set(by_entry_date[control]))
+        entry_deltas = [
+            by_entry_date["C2"].get(d, Decimal(0)) - by_entry_date[control].get(d, Decimal(0))
+            for d in entry_dates
+        ]
+        worst_without_entry = min((total - d for d in entry_deltas), default=total)
         pairs[control] = {
             "net_return_delta": float(total / Decimal(500000)),
             "paired_95_interval": [float(low), float(high)],
@@ -146,14 +245,21 @@ def compare(
                 worst_without_issuer / Decimal(500000)
             ),
             "worst_leave_one_equity_session_delta": float(worst_without_session / Decimal(500000)),
+            "entry_date_clusters": len(entry_dates),
+            "worst_leave_one_entry_date_contribution_delta": float(
+                worst_without_entry / Decimal(500000)
+            ),
             "advantage_survives_each_issuer_and_session_removal": (
                 worst_without_issuer > 0 and worst_without_session > 0
+            ),
+            "advantage_survives_each_issuer_and_entry_date_removal": (
+                worst_without_issuer > 0 and worst_without_entry > 0
             ),
         }
     passed = all(
         r["net_return_delta"] > 0
         and r["drawdown_not_worse"]
-        and r["advantage_survives_each_issuer_and_session_removal"]
+        and r["advantage_survives_each_issuer_and_entry_date_removal"]
         and r["interval_strictly_positive"]
         for r in pairs.values()
     )

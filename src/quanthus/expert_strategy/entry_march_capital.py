@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime, time
 from decimal import Decimal
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,7 @@ ARMS = ("C0", "C1", "C2")
 def scoped_panel_type(parent: type) -> type:
     """Project exact parent+patch values before materializing a bounded SQL table."""
 
-    class ScopedPanel(parent):  # type: ignore[misc,valid-type]
+    class ScopedPanel(parent):  # type: ignore[misc]
         def __init__(
             self,
             path: Path,
@@ -108,7 +109,9 @@ def filtered_decision(
 def runtime_type(parent: type) -> type:
     """Compose without editing/import-substituting the old frozen producer."""
 
-    class MarchRuntime(parent):  # type: ignore[misc,valid-type]
+    class MarchRuntime(parent):  # type: ignore[misc]
+        frames: Any
+
         def __init__(
             self,
             *args: Any,
@@ -151,12 +154,16 @@ def runtime_type(parent: type) -> type:
         def _open_data_inputs(self) -> None:
             # Retained parent __init__ dispatches here after source/preparation
             # admission. Reuse immutable features, not its all-history SQL copy.
-            import pyarrow.parquet as pq
+            import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
             from quanthus.backtest.baseline_research import BaselineFeaturePanelReport
+            from quanthus.backtest.contracts import MARKET_TIMEZONE
             from quanthus.contracts import SnapshotRef
-            from quanthus.expert_strategy import p3_historical_robustness as h
-            from quanthus.expert_strategy.p3_restructuring_preparation import validate_feature_patch
+
+            h = import_module("quanthus.expert_strategy.p3_historical_robustness")
+            validate_feature_patch = import_module(
+                "quanthus.expert_strategy.p3_restructuring_preparation"
+            ).validate_feature_patch
 
             self.data_snapshot_id = self.snapshot_id
             self.data_content_digest = self.prerequisite_digest
@@ -164,7 +171,7 @@ def runtime_type(parent: type) -> type:
             self.frames = [
                 h.HistoricalFrame(
                     SnapshotRef(day, self.info, self.effective_source_sha, self.snapshot_id),
-                    h.datetime.combine(day, h.time(15), tzinfo=h.MARKET_TIMEZONE),
+                    datetime.combine(day, time(15), tzinfo=MARKET_TIMEZONE),
                     following,
                     h._HistoricalFrameSource(self.reader, following),
                 )
@@ -245,7 +252,7 @@ def runtime_type(parent: type) -> type:
             return None
 
         def _code_version(self) -> str:
-            return super()._code_version() + ":" + VERSION + ":" + self.successor_digest
+            return str(super()._code_version()) + ":" + VERSION + ":" + self.successor_digest
 
         def _parameter_payload(self, intervention_id: str | None) -> dict[str, Any]:
             return {

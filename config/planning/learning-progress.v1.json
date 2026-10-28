@@ -6718,6 +6718,151 @@
           "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
         }
       ]
+    },
+    {
+      "id": "CP-540-20261028T184413752182Z",
+      "recorded_at": "2026-10-28T18:44:13.752182+00:00",
+      "actor": "Codex: independent fixed-B recount and pre-outcome inventory/cutoff review",
+      "work_item": "META-LEARN-001",
+      "outcome": "progress",
+      "summary": "复审确认原固定B流为0；975记录=973公司，增加既有持仓研究排除后，2021-03-31训练前缀与87机会具备有界预审基础；新参考、拟合和资金比较未启动",
+      "evidence": [
+        {
+          "id": "ZERO",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-inventory-review-20261028T182251Z-a725623/evidence/independent-zero-review.safe.json",
+          "sha256": "0f62d02b88bbe39bd3e0995469556a0b49d6e13cb54796d9dbfa486f18d3f0a4",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "独立重算固定B的零结论；不代表历史数据全局耗尽"
+        },
+        {
+          "id": "POOL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-inventory-review-20261028T182251Z-a725623/evidence/inventory-metadata.safe.json",
+          "sha256": "b109f0832afc9b97af69a66a14709e9f510e46023779d1985d1d6f7c23db7455",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "975身份记录及训练截止可行性网格；非已接受样本"
+        },
+        {
+          "id": "EXPOSURE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-inventory-review-20261028T182251Z-a725623/evidence/cross-purpose-exposure.safe.json",
+          "sha256": "9f9071fe770d32cb42a8eede13464e9db1751a76d2e73d69d904f54ad90e5d9a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "另34家公司曾用于持仓结构研究；保守排除的预先敏感性"
+        },
+        {
+          "id": "READY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-inventory-review-20261028T182251Z-a725623/evidence/source-readiness.safe.json",
+          "sha256": "2919e4071c15032d3bcabf37184c0c33223c2300f4d67eb04652a0c038f5c241",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "现有数据有效性布尔检查；非独立参考或资金结果"
+        },
+        {
+          "id": "FILES",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-inventory-review-20261028T182251Z-a725623/evidence/runtime-training-closure.safe.json",
+          "sha256": "a9db11c9038d9e7a4580e502b41c2d5ce0817b6417ecbc1b476f29716dae90b9",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "124运行来源成员及719训练来源成员哈希完整；未执行新训练或回放"
+        },
+        {
+          "id": "PLAN",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-inventory-review-20261028T182251Z-a725623/evidence/successor-proposal.safe.json",
+          "sha256": "74c60607837be2a6d07c1e7e454b4eed5747e72a589cf183c68ac84cad7de492",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "TRAIN20/EVAL87草案身份已登记，非运行授权或研究准入"
+        },
+        {
+          "id": "SHIFT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-inventory-review-20261028T182251Z-a725623/evidence/cohort-shift.safe.json",
+          "sha256": "d23672fa5c023b12d607f3d9222068f10483d29493d0259e10a1e58912355396",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "训练IPO2020与评价1993–2019存在群体差异；不能宣称全市场代表性"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "975记录/973公司重建；扣除另34个旧持仓研究公司后，拟议3月底截止留下87机会/66公司",
+          "remaining": "84个来源初筛通过，尚缺完整Facts/mask及盲参考资格；IPO训练与成熟公司评价分布不同",
+          "next_action": "按草案先资格化全部87并保留未知；支持不足不换样本，不启动资金比较",
+          "evidence": [
+            "ZERO",
+            "POOL",
+            "EXPOSURE",
+            "READY",
+            "PLAN",
+            "SHIFT"
+          ],
+          "supersedes": "CP-540-20261028T174749880217Z"
+        },
+        {
+          "module": "S02",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "现有40行模型保留；已确认20行/4正16负的3月底训练前缀及原包字节可复用",
+          "remaining": "新的早期模型尚未训练，现模型不能回填训练截止；独立识别质量尚未证实",
+          "next_action": "新请求获批且参考支持通过后才固定20行重训一次并封存预测",
+          "evidence": [
+            "FILES",
+            "PLAN",
+            "SHIFT"
+          ],
+          "supersedes": "CP-540-20261028T174749880217Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "原资金比较未运行结论保留；识别出可以进入资格阶段的新受限机会集合",
+          "remaining": "完整三组资金路径、独立复现和用途价值仍未完成；非原全市场B曲线复现",
+          "next_action": "资格通过才按固定新日期/公司范围运行B、B+R0、B+早期Head2完整账本",
+          "evidence": [
+            "ZERO",
+            "PLAN",
+            "FILES"
+          ],
+          "supersedes": "CP-540-20261028T174749880217Z"
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "本轮完成可执行性审查并给出3步及非自动备选路线",
+          "remaining": "产品价值及正式使用准入未建立，库存与文件完整性不能替代实验结果",
+          "next_action": "先执行一个3–5小时有界的新版本提案；未满足条件即准确收口",
+          "evidence": [
+            "PLAN",
+            "SHIFT"
+          ],
+          "supersedes": "CP-540-20261028T174749880217Z"
+        }
+      ],
+      "no_change_reason": "",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:53Z",
+          "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
+        }
+      ]
     }
   ]
 }

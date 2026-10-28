@@ -326,3 +326,105 @@ or protected-history opening follows from this finding. The12 old terminal calen
 coordinates close with2021-12-31 context, without claiming execution-price closure.
 Further actual entry-use research needs a reviewed new candidate/cohort design;
 rerunning the used790 is at most separately labeled development evidence.
+
+### Reviewed successor proposal: qualify the inventory before choosing the run
+
+| Field | Value |
+| --- | --- |
+| Design status | draft — reviewed proposal, not a new frozen experiment |
+| Delivery gate | blocked on new reference/use-specific qualification and successor activation |
+| Evidence | [Independent inventory and training-cutoff review](../acceptance/learning-entry-inventory-astra-review-20261029.md) |
+| Objective | One bounded retrospective company-held-out test of B + consolidation screening, followed by complete capital paths if qualified |
+
+The975 metadata records correspond to973 companies. After conservatively excluding
+the34 companies also used in #545's held-structure study,941 records/939 companies
+remain. The review has already checked their old B opportunities, historical key
+coverage, numerical validity flags, source-file identities and existing training
+prefix. Do not start again by selecting an arbitrary number from that inventory.
+
+**Recommended branch:** train a new seven-feature generation0 checkpoint using
+the exact20 previously qualified training rows through2021-03-31, with the
+existing200-step optimizer, training-only scaler and threshold0.5. This is the
+earliest reviewed cutoff meeting the unchanged12-definite/four-per-class/two-block
+pilot floor; it has4 positives and16 negatives. Keep the old40-row checkpoint
+unchanged. No update, calibration, threshold, feature or sample search is proposed.
+
+Use every original B opportunity after that cutoff in the conservatively eligible
+company set:87 events/66 companies, including the three known action-boundary
+unavailables.84 pass the current source screen;47 of those were B trial-entry
+decisions, across37 companies. These are opportunities, not promised fills or
+independent labels. Exact proposed TRAIN20 and EVAL87 manifests are frozen as
+**proposals**, with hashes in the review; their purpose/execution activation remains
+absent. Do not drop unavailable events or select only B winners/filled positions.
+
+All20 training issuers are2020 listings; evaluation issuers are1993–2019 listings.
+The stronger exclusion also removes old B-held companies. Keep this cohort shift
+and selection limitation in the report; the pilot is a scoped test of transfer,
+not a representative or historically available full-market strategy. The less strict
+111-event Head2-only exposure census is disclosed as sensitivity, not silently mixed
+into the87-event primary set if the primary fails.
+
+| Block | Concrete work and output | Gate / stop rule | Planning allowance |
+| --- | --- | --- | --- |
+|1. Finish qualification and freeze one successor|Verify the two exact identity manifests; preserve all company aliases and exposure exclusions. Build one immutable87-window T−1 Facts TMP from the existing source closure. Check train-only mask support, complete input/code/config identities, next-open execution semantics and the six remaining normalized action rows. Prepare anonymized current20/preceding20 reference packets. Obtain two separately committed, candidate-blind references; preserve disagreement/UNKNOWN. Freeze the new purpose, dates, universe, initial capital, controls, metric/error policy, resources and all input identities before any scoring/outcomes.|No new acquisition. Preserve original evaluation support floor:12 definite references, at least5 distinct issuers per class, and at least two time blocks. Reveal support/disposition receipts before label values; inadequate support ends this branch without refitting, replacing issuers or relaxing criteria. An unseen mask remains unavailable. Source gaps are NOT_CHECKED or exact deficiencies, never fabricated labels.|45–90min; implementation skeleton may proceed while reference work runs, but no new scoring or outcomes before admission.|
+|2. One fit and complete C0/C1/C2 capital paths|Fit only TRAIN20; commit checkpoint, scaler, complete use ledger and all87 predictions before opening evaluation opinions. C0 is original B policy on this new fixed universe; C1 adds unchanged R0; C2 adds the new raw score>=0.5. Apply both filters before allocation. Reuse the exact accepted parent-feature + affected-patch lane; no10-year feature rebuild. Compute each arm's complete cash, allocation, holdings, actions, exits, fees and daily equity independently.|Use the same five100,000 capital units, sizing, lot/fee/execution/exit/guardian policies. Start each arm from the same empty portfolio in April2021; retain calendar/execution and terminal valuation through2021-12-31. All87 remain in the denominator; C1/C2 unknown blocks their new entry only. Never substitute old B fills, held quantities or pointwise hypothetical wealth. Zero or single-issuer/date incremental differences triggers the existing futility stop before economic interpretation.|60–120min, including the small versioned adapter and synthetic state-divergence/ledger cases; actual replay is a bounded subset, not a new market-wide study.|
+|3. Independently reproduce and decide the use ceiling|New process and independently copied exact inputs; independently rebuild this job's Facts, deterministic fit and each portfolio. Preserve old source/cache/network isolation evidence and compare decisions, fills, daily cash/equity and final ledger identities. Review reference errors separately from capital outcomes. Record results and blueprint once.|Report the full denominator and common-known diagnostics separately. Net capital, drawdown, idle capital, turnover, fees, coverage and issuer/date concentration are required. Report paired time-block uncertainty; an interval crossing zero is inconclusive, not a pass. No direct production/P6 promotion. A failed or inconclusive result parks this entry filter; do not launch a rescue cohort automatically.|45–90min, including checks and handoff.|
+
+Before block2, the new request must explicitly freeze the value decision: retain a
+proposal for further use only when C2 beats **both** C0 and C1 after the same fees,
+does not worsen drawdown, and its incremental benefit is not confined to one issuer
+or decision-date cluster. Use a preregistered paired time-block uncertainty procedure;
+do not import the old ten-year1pp hurdle into this short pilot. Report clustered
+issuer sensitivity without treating events or overlapping windows as independent
+observations. Do not tune the block choice after seeing outcomes. These are proposed
+continuation criteria, not retroactive amendments of prior acceptance thresholds.
+Even a favorable pilot supports only this scoped research-use proposal: limited
+support, repeated market periods and unknown historical knowledge times prevent
+unrestricted live screening admission. A state-quality failure cannot be renamed a
+successful Head2 recognizer because one return happened to improve.
+
+The engine review found that B's original entry pass-through uses an empty-position
+context and source/feature guardians; it is not itself a realized fill. The downstream
+allocator and held engine are stateful. The successor must use the actual
+`RestructuringRuntime`/accepted composed feature lane, then a small versioned consumer
+adapter. Do not invoke the abstract historical runtime expecting a nonexistent child
+`features.parquet`, or silently edit its hardcoded source/window contract. Synthetic
+tests must make one arm reject a candidate and prove later holdings, available cash,
+orders and exits diverge correctly while all ledgers reconcile.
+
+The review verified124 runtime members and719 training-package members. Files and
+qualified training material exist; fresh reference support and use semantics remain
+the uncertainty. Start with a fresh physical job root on the data disk, one shared
+primary Facts TMP and one rotating independent input/output copy. A proposed ceiling
+is3GiB new data-disk writes,64MiB system writes,2GiB RSS and8GiB free per written
+device; freeze actual paths, copied member bytes, stage peak and final deadline before
+starting. The1.72GB runtime member closure is already measured. Avoid full market
+duplication and repeated hashes inside each immutable stage. The current system
+disk cannot host unrestricted full-suite TMP; declare an executable test-TMP location
+and measured check budget before restarting a full test suite. Never lower the free
+space floor or delete source/old evidence to finish a check.
+
+The total planning range is approximately3–5hours after activation, primarily for
+reference/adaptation/review. It is not a promise that the sample will qualify or a
+request to run all time if a gate fails. One failed qualification ends this request;
+record the exact failure and avoid repeated selection, collection or cutoff rescue.
+
+**Alternatives, not automatic fallbacks:**
+
+-2020-12-31 offers117 events/114 source passes/64 B trial entries, but existing
+  training has only3 positives. Do not lower the four-positive floor or label cases
+  until a fourth positive appears. A fixed new training-reference batch would need
+  its own design and authority; it is not the cheapest next action.
+-2021-06-30 provides28 training rows/9 positives, but only40 events/38 source passes/
+  24 B trial entries. It buys training support by materially shrinking evaluation;
+  do not use it as an after-results retry of the March model.
+-2019-12-31 provides314 events/290 source passes/144 B trial entries across2020–2021,
+  but none of the current qualified training rows predates that cutoff. It needs a
+  newly fixed early training/reference cohort with company-disjoint roles and a new
+  budget. Reserve it for an explicit broader-study decision, not an assumed free reuse.
+
+The successor is retrospective company-held-out research, not a model historically
+available in March2021: feature design and source acquisition occurred later. A
+March training cutoff controls observations used by the fit; it does not backdate
+design knowledge, recover historical PIT, or authorize2022–2026 access. Keep current
+MVP/value/admission inconclusive until this exact new request actually supplies evidence.

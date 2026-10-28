@@ -33,6 +33,10 @@ The subsequent [entry confirmation qualification](acceptance/learning-entry-conf
 recounts the complete fixed B stream after the Owner's conditional authorization:
 no unconsumed independent opportunity remains. The capital comparison did not run
 and screening admission remains ungranted; this is not global historical-data absence.
+The [inventory and cutoff review](acceptance/learning-entry-inventory-astra-review-20261029.md)
+independently confirms that result and checks the remaining975 records. Its
+[concrete successor proposal](work-items/learning-next-route-20261028.md#reviewed-successor-proposal-qualify-the-inventory-before-choosing-the-run)
+separates an earlier qualified training prefix from the still-required independent reference and capital comparison.
 
 | Field | Value |
 | --- | --- |

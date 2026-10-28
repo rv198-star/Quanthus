@@ -11,6 +11,10 @@ is not a substitute for that task-scoped current view.
 
 First-round learning asset acceptance (#546) is recorded in the
 [2026-10-28 bounded audit](acceptance/learning546-first-round-assets-20261028.md).
+The subsequent [independent #545/#546 review](acceptance/learning545-546-independent-review-20261028.md)
+records the comparison-entry defects and retained conclusions. Its
+[conditional next route](work-items/learning-next-route-20261028.md) is a proposal,
+not new research or consumer authority.
 It separates reproducible engineering and old-version retention from the still
 unmet product learning MVP and its use-specific gates.
 

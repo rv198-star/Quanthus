@@ -247,7 +247,9 @@ def quality(job: Path) -> dict[str, Any]:
         "prediction_commitment_precedes_opinion_opening": True,
         "consumer_admission": "NOT_GRANTED",
         "UTC": datetime.now(timezone.utc).isoformat(),
-        "recognition_ceiling": "Descriptive fixed-batch comparison; not admission or independent market truth",
+        "recognition_ceiling": (
+            "Descriptive fixed-batch comparison; not admission or independent market truth"
+        ),
     }
     write(job / "evidence/recognition.safe.json", receipt)
     return receipt

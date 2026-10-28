@@ -5007,6 +5007,99 @@
           "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
         }
       ]
+    },
+    {
+      "id": "CP-545-20261028T073018020654Z",
+      "recorded_at": "2026-10-28T07:34:45.697532+00:00",
+      "actor": "Codex Sol 6.1 Max: bounded #545 offline archive and code inspection",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "blocked",
+      "summary": "#545预检收口：25930次持仓身份全部核清，现有#541样本交集为零且不是支撑演化Facts；停止本批比较，不推断无效、不扩大样本。",
+      "evidence": [
+        {
+          "id": "ADMISSION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/expert545-preflight-20261028T070134Z-bd9543a/evidence/consumer-input-admission.safe.json",
+          "sha256": "b028f1af83b9903d2a2dff5ff4b0009c22903483d80ae165614b9d378e515039",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "精确已选来源兼容性/用途矩阵；不代表全局来源缺失或新实验准入。"
+        },
+        {
+          "id": "FOOTPRINT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/expert545-preflight-20261028T070134Z-bd9543a/analysis-final/decision-footprint.safe.json",
+          "sha256": "a5ca6ba9f65d782821bc33875405033af23101e63095f45999f39c8cf2303e88",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "全25930持仓元数据分母和路径差异；不代表完整状态配对、独立样本数或经济价值。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "新增离线持仓身份/路径分母预检和回归；本批25930持仓身份全解析，当前策略与阈值未变",
+          "remaining": "完整专家实际比较仍未运行；此预检不是新状态模型/策略接入",
+          "next_action": "保留可复验预检资产；当前样本不追加实验",
+          "evidence": [
+            "ADMISSION",
+            "FOOTPRINT"
+          ],
+          "supersedes": "CP-540-20261027T192528495073Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "quality",
+          "status": "blocked",
+          "scope": "限定当前#545输入兼容性：#541的19302日键与三组持仓交集均为零；突破/量能字段不替代支撑演化Facts",
+          "remaining": "缺精确兼容的持仓决策/支撑Facts、价格日历知识用途桥接和独立评价标准",
+          "next_action": "只在精确输入及比较契约合格后重新审查；不在本批换样本或补采",
+          "evidence": [
+            "ADMISSION",
+            "FOOTPRINT"
+          ],
+          "supersedes": null
+        },
+        {
+          "module": "EXPERT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "本批最小比较NOT_RUN；不能把零兼容样本写成结构风控零效果",
+          "remaining": "未冻结新映射和同Facts控制，无法归因或测增量价值",
+          "next_action": "停放当前候选；兼容证据与独立准则到位才另定有界比较",
+          "evidence": [
+            "ADMISSION",
+            "FOOTPRINT"
+          ],
+          "supersedes": "CP-540-20261027T223010393960Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "只完成已授权离线预检；10/11旧开发资格、#541研究队列用途及P3严格门槛均未提升",
+          "remaining": "完整状态/用途/输入/代码配置绑定的比较准入未具备",
+          "next_action": "保持交易、生产和P6关闭；#545保持open",
+          "evidence": [
+            "ADMISSION",
+            "FOOTPRINT"
+          ],
+          "supersedes": "CP-545-PURPOSE-20261028-174025"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:49Z",
+          "body_sha256": "291e438c73c9210cbfbef550c187642ad694716cd4c9d739c4551260f8378f3c"
+        }
+      ]
     }
   ]
 }

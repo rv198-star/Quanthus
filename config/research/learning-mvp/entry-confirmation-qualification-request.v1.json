@@ -1,0 +1,65 @@
+{
+  "schema_version": "quanthus.entry-confirmation-qualification-request.v1",
+  "design_status": "draft",
+  "delivery_gate": "blocked",
+  "status": "QUALIFICATION_REQUEST_ONLY_EXPERIMENT_NOT_ACTIVATED",
+  "parent_request": "config/research/learning-mvp/entry-consolidation-diagnostic.v1.json",
+  "work_items": [540, 542, 545, 546],
+  "decision": "Keep the seven-feature candidate for one independent qualification; dispersed development differences are sufficient only to avoid the predeclared futility stop",
+  "candidate": {
+    "checkpoint_sha256": "2f6760f7b0c8597d062ab115ee6ffb8082b9154c1059c31dc8926095e28be663",
+    "feature_count": 7,
+    "anchor": "Forty actual venue sessions ending T-1",
+    "raw_threshold": 0.5,
+    "R0_semantic_digest": "sha256:74d257c75e57b0fa9d09fd183496ee63a3d9cbed21492c36acecc4f7e71bf7f0",
+    "controls": ["Exact original B", "B AND unchanged R0", "B AND retained seven-feature raw score >=0.5"],
+    "new_fit_update_calibration_or_threshold_search": false
+  },
+  "development_evidence": {
+    "code_revision": "09037518e3d65bdd6af93c9dec3f3b91993ed11a",
+    "input_identity": "sha256:5ab3d8d7cf1852bf4e34fe2523f6deed85e28d5cc1386c1457da7b916de646d0",
+    "frozen_input_sha256": "0f0d97c8f235ba4de3c8db8ccb7ccddf5b0e4e02808375c984f2505ce43c7f43",
+    "facts_and_decisions_sha256": "3bead4a00ab8be10806df2c018090c80f1b0f1df911c7f025f76b0d224cc2f3b",
+    "opportunities": 790,
+    "common_known": 760,
+    "unknown": 30,
+    "known_C1_C2_differences": 221,
+    "difference_issuers": 208,
+    "difference_dates": 75,
+    "after_largest_issuer_removed": 219,
+    "after_largest_date_removed": 211,
+    "claim_ceiling": "Reused development decision differences only; neither a fresh evaluation nor economic or recognition quality"
+  },
+  "qualification_before_execution": {
+    "new_exact_confirmation_cohort_and_untouched_roles": "NOT_CHECKED",
+    "old_evaluation_global_company_alias_exclusions": "REQUIRED",
+    "current790_development_opportunities_must_not_be_renamed_fresh": true,
+    "later_anchors_after_model_observations_and_within2012_2021": "REQUIRED",
+    "new_cohort_authoritative_member_action_and_time_closure": "NOT_CHECKED",
+    "candidate_blind_purpose_compatible_independent_state_reference": "NOT_CHECKED",
+    "finite_support_material_error_cost_and_value_criteria_frozen_before_outcomes": "REQUIRED",
+    "whole_capital_replay_source_and_complete_execution_policy_identity": "NOT_CHECKED",
+    "T_plus_one_open_calendar_and_execution_prices_for_each_terminal_entry": "REQUIRED",
+    "fresh_current_source_cohort_absence_proven": false
+  },
+  "comparison_requirements": [
+    "Identical information, universe, original capital, sizing, allocation, exit, fee and execution policies; preserve every original guardian",
+    "Report full population and common known subset; unknown blocks candidate entries and never forces a sale",
+    "Report net whole-capital return, drawdown, time invested, turnover, fees, coverage and issuer/date concentration; greater entry count alone is not value",
+    "Distinguish state recognition from decision value, and independent reproduction from fresh empirical confirmation",
+    "If only reused development outcomes can qualify, record that ceiling and obtain the required design review; do not silently relabel them independent"
+  ],
+  "authority": {
+    "execution_authorized": false,
+    "new_network_requests": 0,
+    "new_training_or_update": false,
+    "reference_collection_authorized": false,
+    "economic_replay_authorized_by_this_file": false,
+    "protected2022_2026_access": false,
+    "P6_or_production": false,
+    "consumer_admission": "NOT_GRANTED",
+    "maximum_execution_seconds": 0
+  },
+  "budget_note": "The parent route proposes2-4h for a qualified next batch; no final measured budget or execution activation is supplied here. Exact source/role/capacity gaps must be resolved first.",
+  "minimal_next_action": "Qualify one exact independent comparison using known authorized inventory; if it cannot qualify, stop that branch with exact evidence. Register P10 only for an actually demonstrated shared-source deficit."
+}

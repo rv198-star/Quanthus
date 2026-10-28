@@ -143,7 +143,12 @@
         "src/quanthus/expert_strategy/held_structure_integrity.py",
         "scripts/expert545_held_structure.py",
         "scripts/expert545_capture_b_trace.py",
-        "config/research/expert545-held-structure.v1.json"
+        "config/research/expert545-held-structure.v1.json",
+        "src/quanthus/stage_learning/entry_baseline.py",
+        "src/quanthus/stage_learning/entry_consolidation.py",
+        "scripts/entry_consolidation_diagnostic.py",
+        "config/research/learning-mvp/entry-consolidation-diagnostic.v1.json",
+        "config/research/learning-mvp/entry-confirmation-qualification-request.v1.json"
       ]
     },
     {
@@ -218,7 +223,8 @@
         "src/quanthus/stage_learning/head2_facts.py",
         "src/quanthus/stage_learning/head2_temporal.py",
         "src/quanthus/stage_learning/head2_census.py",
-        "config/research/learning-mvp/head2-*.json"
+        "config/research/learning-mvp/head2-*.json",
+        "src/quanthus/stage_learning/head_comparison.py"
       ]
     },
     {

@@ -191,8 +191,8 @@ access, threshold or production authority is granted by this proposal.
 
 | Field | Value |
 | --- | --- |
-| Design status | draft — concrete recommendation delivered in the requested audit; not a change to the old frozen experiment |
-| Delivery gate | blocked for a new real comparison until its exact request, existing-input scope and budget qualify |
+| Design status | approved for A–C by Owner continuation on 2026-10-29; D/E remain conditional and unactivated |
+| Delivery gate | A–C completed within the bounded request; independent confirmation remains blocked pending exact qualification |
 | Parent and evidence | This conditional route; [steps1–4 review](../acceptance/learning1-4-astra-review-20261029.md) |
 | Execution | Sol 6.1 Max for bounded implementation and execution; another Astra review is needed only for conflicting scientific evidence or adoption, not routine preparation |
 
@@ -248,7 +248,7 @@ keep `pending_assessment` and all existing live activation gates unchanged.
 | D. Qualify and run the surviving comparison | Freeze a new exact source/exposure/split ledger and later evaluation anchors within authorized 2012–2021 history. Use the old reference protocol only for the same consolidation meaning, blinded to candidate scores and future returns. Freeze finite sample/support/error/value criteria before opening new reference or outcome data. Independently evaluate state recognition and complete capital-path value; reuse one immutable in-Job panel for the three paths | Additional 2–4 hours only after a measured budget and qualification. First inspect existing exact inventory; a genuine shared-source deficit becomes one minimal P10 request, not a speculative source hunt. No collection authority is implied |
 | E. Candidate update and adoption | Only a qualified, promising learned candidate with a specific error established on training/development data justifies one seven-feature fit/update and required independent reproduction. Preserve old version/scaler/parent. Use an untouched, separately reserved final evaluation for an updated candidate | Conditional, at most one additional 3-hour batch after resource measurement. If D's evaluation motivates a change, it is consumed and cannot evaluate that update afresh. No new P6 unless qualified complete-path value warrants its separate scenario |
 
-Blocks A–C have a combined **2 hours 45 minutes maximum**, including a safe final
+Blocks A–C have an approved combined **2 hours 45 minutes maximum**, including a safe final
 receipt. They need not spend the whole allowance. Reserve at most 128 MiB new
 system-disk files and 1 GiB new data-disk files, use one worker and a 2 GiB RSS stop
 threshold; freeze the actual mounted-device/free-space snapshot and preserve the
@@ -285,11 +285,22 @@ explicit; do not train a model just to satisfy a checklist.
 
 ### What changes now and what does not
 
-The audit resolves the pending scientific direction review with the above bounded
-proposal. It does not execute A–E or grant new market/holdout access, collection,
-consumer authority or production changes. The old human-queue card and step4
+The audit resolved the pending scientific direction review with the above bounded
+proposal. The subsequent Owner request activated A–C only, under the separately
+frozen diagnostic and exact existing development inputs. It grants no holdout
+opening, collection, consumer authority or production changes. The old human-queue card and step4
 negative receipt remain immutable historical evidence. The blueprint records the
 new next action while keeping quality/value/admission unaccepted. Old 48/80
 evaluation, nine-feature rejection, 10/11 reduction stop and 3/4 disposition are
 not reopened. If A–C fail their inexpensive feasibility test, close this particular
 entry hypothesis and retain the assets; do not automatically launch another head.
+
+### A–C completion
+
+The [executed three-step receipt](../acceptance/learning-entry-diagnostic-20261029.md)
+records790 frozen opportunities,760 known inputs and221 C1/C2 differences across208
+issuers/75 dates. Both predeclared futility checks pass. These are reused development
+differences, predominantly a more permissive model filter, not quality or economic
+acceptance. The next [independent qualification request](../../config/research/learning-mvp/entry-confirmation-qualification-request.v1.json)
+pins the candidate and remaining exact gates; it does not activate D/E. No threshold,
+feature, fit, protected-year access, production or P6 change occurred.

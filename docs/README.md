@@ -12,7 +12,9 @@ is not a substitute for that task-scoped current view.
 First-round learning asset acceptance (#546) is recorded in the
 [2026-10-28 bounded audit](acceptance/learning546-first-round-assets-20261028.md).
 The subsequent [independent #545/#546 review](acceptance/learning545-546-independent-review-20261028.md)
-records the comparison-entry defects and retained conclusions. Its
+records the comparison-entry defects and retained conclusions. The
+[first-tranche delivery](acceptance/learning-first-tranche-20261028.md) repairs those
+entries, preserves the minimum assets and records the proposed-use pause. The
 [conditional next route](work-items/learning-next-route-20261028.md) is a proposal,
 not new research or consumer authority.
 The Owner approved its first three steps on2026-10-28; the

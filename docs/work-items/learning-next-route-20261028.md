@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Design status | draft — proposed to the Owner for the next execution batch |
+| Design status | approved for steps1–3 by Owner2026-10-28; steps4–7 remain conditional proposals |
 | Delivery gate | blocked for new result-bearing research until its exact request qualifies |
 | Work items | #540 coordination; #545 consumer impact; #546 retention/integration; #542–544 conditional learning |
 | Governing parents | [blueprint mechanism](../design/blueprint-progress.md), [layered portfolio](../design/stock-stage-vocabulary-portfolio.md), original immutable MVP contract at `e79eeb0...` |
@@ -14,6 +14,14 @@ This plan grants no training, acquisition, partition, merge or production author
 It does not redefine the original learning MVP as a report-only product. Estimates
 are bounded agent/script wall time, not required human workdays or a promise of
 positive findings. Scope and budget must be frozen before each result-bearing batch.
+
+The first-batch [integration contract](learning-asset-integration-20261028.md)
+and [consumer opportunity card](../../config/planning/learning-held-review-opportunity.v1.json)
+record the implementation boundary and the actual step3 eligibility decision.
+The proposed held-priority queue is parked: an existing all-position research
+review consumer is verified, but neither an unmet priority-workflow need nor a
+fresh compatible value reference has been established. This is the planned negative
+branch, not acceptance of the learning product or a claim that all future uses lack value.
 
 ## Objective and reason for the route
 

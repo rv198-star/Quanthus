@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved — Owner's2026-10-28 instruction covers steps1–3 of the [conditional route](learning-next-route-20261028.md) |
-| Delivery gate | blocked until the dated handoff records focused checks, clean-checkout smoke and Git delivery; no consumer admission |
+| Delivery gate | accepted-conditional for the bounded entry repairs, clean reader and Git handoff in the [dated delivery](../acceptance/learning-first-tranche-20261028.md); no consumer admission |
 | Work items | #545 comparison integrity; #543 unchanged training scope; #546 retention; #540 consumer opportunity |
 | Governing parent | [Blueprint mechanism](../design/blueprint-progress.md); [original immutable MVP](learning-system-mvp.md) |
 | Batch boundary | Four hours total; no new acquisition, real fit/update, market replay or production/P6 changes |

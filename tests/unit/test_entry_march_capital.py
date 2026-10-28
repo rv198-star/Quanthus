@@ -197,3 +197,28 @@ def test_scoped_native_panel_equals_exact_parent_patch_projection(tmp_path):
         assert all(row[0] != "999999" and row[1] >= date(2021, 4, 1) for row in actual)
     finally:
         panel.close()
+
+
+@pytest.mark.parametrize("error_type", [FileNotFoundError, PermissionError])
+def test_job_budget_scan_handles_removed_tmp_but_not_unreadable_tree(
+    monkeypatch, tmp_path, error_type
+):
+    import importlib.util
+    import os
+
+    path = find_project_root() / "scripts/entry_march_capital.py"
+    spec = importlib.util.spec_from_file_location("entry_march_capital_budget_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    (tmp_path / "kept").write_bytes(b"abc")
+
+    def walk(root, *, onerror):
+        onerror(error_type("disposable synthetic directory race"))
+        yield str(root), [], ["kept"]
+
+    monkeypatch.setattr(os, "walk", walk)
+    if error_type is FileNotFoundError:
+        assert module.size(tmp_path) == 3
+    else:
+        with pytest.raises(PermissionError):
+            module.size(tmp_path)

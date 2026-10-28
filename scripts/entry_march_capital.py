@@ -46,8 +46,12 @@ def sha(path: Path | str) -> str:
 
 
 def size(root: Path) -> int:
+    def scan_error(error: OSError) -> None:
+        if not isinstance(error, FileNotFoundError):
+            raise error
+
     total = 0
-    for current, _, names in os.walk(root, onerror=lambda error: (_ for _ in ()).throw(error)):
+    for current, _, names in os.walk(root, onerror=scan_error):
         for name in names:
             try:
                 total += (Path(current) / name).stat().st_size

@@ -15,6 +15,12 @@ The subsequent [independent #545/#546 review](acceptance/learning545-546-indepen
 records the comparison-entry defects and retained conclusions. Its
 [conditional next route](work-items/learning-next-route-20261028.md) is a proposal,
 not new research or consumer authority.
+The Owner approved its first three steps on2026-10-28; the
+[minimum integration contract](work-items/learning-asset-integration-20261028.md)
+defines that bounded engineering scope. The [original MVP specification](work-items/learning-system-mvp.md)
+and `config/planning/learning-system-mvp.v1.json` are restored byte-for-byte from
+`e79eeb027917de4f6a48abf563569b55f3e7c91b`; their preparation statuses are historical,
+while the generated blueprint owns current progress. This does not activate later experiments.
 It separates reproducible engineering and old-version retention from the still
 unmet product learning MVP and its use-specific gates.
 

@@ -140,6 +140,7 @@
         "scripts/expert545_preflight.py",
         "config/research/expert545-held-preflight.v1.json",
         "src/quanthus/expert_strategy/held_structure_shadow.py",
+        "src/quanthus/expert_strategy/held_structure_integrity.py",
         "scripts/expert545_held_structure.py",
         "scripts/expert545_capture_b_trace.py",
         "config/research/expert545-held-structure.v1.json"

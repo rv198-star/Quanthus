@@ -5906,6 +5906,89 @@
         "CLOSEOUT",
         "REPRO"
       ]
+    },
+    {
+      "id": "CP-545-20261028T135845879778Z",
+      "recorded_at": "2026-10-28T13:58:45.879778+00:00",
+      "actor": "Codex / Sol 6.1",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "progress",
+      "summary": "修复held/完整执行闭包入口、真实源构建前复核、未来capture启动身份与新placeholder计数；合成验证，不重跑或重写旧8393条证据",
+      "evidence": [
+        {
+          "id": "ENTRY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-first-tranche-20261028T134000Z-82c4d34/evidence/step1-integrity.safe.json",
+          "sha256": "63bc36d365e37d167e9b4d312225149ab8a4881eb4940850bcc349d4f2c5bb8c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "20项新入口回归及原30项持仓测试；capture只测合成编排；不宣称旧缺失启动身份恢复或真实重放通过"
+        }
+      ],
+      "updates": [
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "本轮v2可复用入口和启动身份工程；新源/持仓/代码漂移拒绝、无process计数0，原实际逐点比较仍仅为旧证据",
+          "remaining": "旧v1缺完整闭包/启动记录，不复用为新资格；本轮无真实capture或经济回放，识别质量/价值/生产准入未提升",
+          "next_action": "仅在具体用途与资格成立时新建v2研究运行；当前减少仓位映射继续停放",
+          "evidence": [
+            "ENTRY"
+          ],
+          "supersedes": "CP-545-20261028T120442014951Z"
+        }
+      ],
+      "no_change_reason": "未改变旧Facts实体或时钟资格；仅修新materialization的可选计数，原3887项异常和旧结果保留",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:49Z",
+          "body_sha256": "291e438c73c9210cbfbef550c187642ad694716cd4c9d739c4551260f8378f3c"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS"
+      ]
+    },
+    {
+      "id": "CP-543-20261028T135846214766Z",
+      "recorded_at": "2026-10-28T13:58:46.214766+00:00",
+      "actor": "Codex / Sol 6.1",
+      "work_item": "P5-STATE-003",
+      "outcome": "progress",
+      "summary": "按原哈希恢复最小local_head源与安全弃权接口；只运行合成契约，无真实训练/评价",
+      "evidence": [
+        {
+          "id": "ASSETS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-first-tranche-20261028T134000Z-82c4d34/evidence/minimum-integration-inventory.safe.json",
+          "sha256": "6a2008c80095f2c9245327a38f02d0e6cd53509c4e0b0f111481d58929b81b4a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只确认选定原模块/契约身份与范围；最终Git发布和冷读取另有回执"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "local_head为原实现原字节迁入；没有新增fit/update、样本或质量证据，TRAIN各facet原结论保持",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-003",
+          "number": 543,
+          "title": "[P5-STATE-003] 训练并评价首个有资格的12+X分层状态模型版本",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:45Z",
+          "body_sha256": "07e66bd3025f361b4230833bc5530384686f7b9db0a9afa68d16a0183d2ac082"
+        }
+      ],
+      "reviewed_modules": [
+        "TRAIN"
+      ]
     }
   ]
 }

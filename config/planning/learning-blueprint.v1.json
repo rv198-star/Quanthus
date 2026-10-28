@@ -75,7 +75,8 @@
         "src/quanthus/stage_learning/p5_input_census.py",
         "src/quanthus/stage_learning/qualification.py",
         "src/quanthus/stage_learning/prefix_qualification.py",
-        "src/quanthus/stage_learning/review_list.py"
+        "src/quanthus/stage_learning/review_list.py",
+        "src/quanthus/stage_learning/entry_qualification.py"
       ]
     },
     {
@@ -148,7 +149,9 @@
         "src/quanthus/stage_learning/entry_consolidation.py",
         "scripts/entry_consolidation_diagnostic.py",
         "config/research/learning-mvp/entry-consolidation-diagnostic.v1.json",
-        "config/research/learning-mvp/entry-confirmation-qualification-request.v1.json"
+        "config/research/learning-mvp/entry-confirmation-qualification-request.v1.json",
+        "scripts/entry_confirmation_qualification.py",
+        "config/research/learning-mvp/entry-confirmation-activation.v1.json"
       ]
     },
     {

@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Design status | approved for steps1–3 by Owner2026-10-28; steps4–7 remain conditional proposals |
+| Design status | approved — Owner continued steps4–7 conditionally on 2026-10-28; material purpose/reference redesign still needs the specified review |
 | Delivery gate | blocked for new result-bearing research until its exact request qualifies |
 | Work items | #540 coordination; #545 consumer impact; #546 retention/integration; #542–544 conditional learning |
 | Governing parents | [blueprint mechanism](../design/blueprint-progress.md), [layered portfolio](../design/stock-stage-vocabulary-portfolio.md), original immutable MVP contract at `e79eeb0...` |
@@ -22,6 +22,15 @@ The proposed held-priority queue is parked: an existing all-position research
 review consumer is verified, but neither an unmet priority-workflow need nor a
 fresh compatible value reference has been established. This is the planned negative
 branch, not acceptance of the learning product or a claim that all future uses lack value.
+
+That finding concerns the **proposed human queue only**. It is not an additional
+prerequisite for the original algorithmic learning MVP. The Owner's continuation
+therefore first checked actual entry/held consumers and remaining identity capacity;
+the [step4 assessment](../acceptance/learning-route4-7-20261028.md) and
+[machine-readable disposition](../../config/planning/learning-route4-7-qualification.20261028.json)
+record the result. Step4's assessment is complete, its experiment gate has **not**
+passed, steps5–6 have not run, and step7 grants no new admission. These are not four
+completed product steps.
 
 ## Objective and reason for the route
 
@@ -140,3 +149,39 @@ At each acceptance, rejection, block or stop, append one evidence-bound blueprin
 checkpoint: exact version, relevant module/facet, remaining gap, next executable
 action. Do not reopen completed negative experiments, repeat full-history scans
 without changed inputs, or use a completed Mission/PR as a product acceptance flag.
+
+## Current decision for the next qualified request
+
+The verified original consumer is algorithmic: `FormalStrategyRunner.evaluate_entry`
+and its P4 pass-through control feed the existing expert/veto/constraint path;
+`evaluate_held` handles positions. `pending_assessment` deliberately gives Head2 no
+action authority. The 3/4 and #541 research queues do not supply a purpose-compatible
+Head2 reference or an observed human capacity limit.
+
+The next scientific review should decide **whether current20 orderly consolidation
+has a plausible, testable role at the algorithmic entry decision**. This is the
+preferred question over inventing a human queue or treating Head2 as a risk score.
+It is a proposal, not an approved score-to-action rule. Astra should review:
+
+1. A concrete entry decision change and its hypothesis, against the existing B
+   control and one simple continuous-Facts alternative, with all hard guardians
+   preserved. Define the action mapping and cost/error criteria before reading new
+   outcomes; do not select a threshold from old comparisons.
+2. Separate independent **state-quality** reference from **decision-value** evidence.
+   A blind consolidation assessment can evaluate state recognition; it does not
+   prove profitable entry selection. A subsequent action-changing use needs its
+   own complete P3 capital comparison before any targeted P6 proposal.
+3. Choose a defensible evaluation cohort before scoring. The old Head2 exclusion
+   rules leave at most 13 issuers in the inspected pool, the same issuers in both
+   months. They cannot reproduce the old 48-distinct-issuer evaluation, and they
+   have no new source/action or reference qualification. A smaller pilot would
+   answer a narrower question and needs a new design; a broader cohort inside
+   authorized history needs explicit exposure qualification. This census is not
+   evidence that no other historical cohort exists.
+
+If that review cannot state a useful decision, independent reference and finite
+qualification path, park this learning campaign and preserve the existing assets.
+Do not commission source work or refit a model merely to keep the pipeline active.
+If it can, freeze one new request and its exact input closure/split, then resume
+steps4→5→6 only as their conditions pass. No new data acquisition, protected-year
+access, threshold or production authority is granted by this proposal.

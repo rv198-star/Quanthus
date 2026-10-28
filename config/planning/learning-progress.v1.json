@@ -6129,6 +6129,162 @@
       "reviewed_modules": [
         "EXPERT"
       ]
+    },
+    {
+      "id": "CP-542-20261028T151444381249Z",
+      "recorded_at": "2026-10-28T15:14:44.381249+00:00",
+      "actor": "Codex / Sol 6.1",
+      "work_item": "P5-STATE-002",
+      "outcome": "blocked",
+      "summary": "真实重算旧Head2样本/暴露/日历容量：剩余至多13发行人，同一批覆盖11/12月；新来源和用途参考仍未资格化",
+      "evidence": [
+        {
+          "id": "QUAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-route4-7-20261028T144800Z-66be543/evidence/route4-7-qualification.safe.json",
+          "sha256": "a8136b01101ec6d7426197fd6467f50e73d4aa41a9a4189b5620839e73dec5f1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "第4步身份/用途资格评估，不是新模型/消费者资格"
+        },
+        {
+          "id": "CAPACITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-route4-7-20261028T144800Z-66be543/evidence/identity-capacity.safe.json",
+          "sha256": "9f6a9010767e66844c5fac038162fcb802522eceb48129bb71a65e10dd7b5d7e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原排除规则下13发行人上限，仅身份/日历，非全历史可用池"
+        },
+        {
+          "id": "PORT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-route4-7-20261028T144800Z-66be543/evidence/consumer-port-review.safe.json",
+          "sha256": "4ef58b3948b0792ffa732128925d42a67ee52b0bc30b6aa82955108f362b3d2e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原算法消费者静态端口/语义检查，非决策价值实验"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "已消费64+128+48共240发行人无交叉；原规则余13仅身份/日历容量，新来源/参考0；既有3/4参考未通过的结论保留",
+          "remaining": "缺新用途独立参考、来源/action闭包和精确split；13不能复现旧48独立发行人；不宣称全局无其他历史池",
+          "next_action": "先经Astra审定算法入场用途/参考，再选新请求；不把规则silver、旧评价或同发行人多月变成独立真值",
+          "evidence": [
+            "QUAL",
+            "CAPACITY"
+          ],
+          "supersedes": "CP-540-20261027T192528495073Z"
+        }
+      ],
+      "no_change_reason": "元数据检查不修复P10来源；七特征未准入/九特征拒绝和既有3/4来源阻塞不变",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-002",
+          "number": 542,
+          "title": "[P5-STATE-002] 冻结首轮状态学习的输入、独立参考、可训练头与预算",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:43Z",
+          "body_sha256": "bda0fe44b4f32d7d79be67ac43fc70cdfff5ace202db0388970203aa3cdd6d60"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA",
+        "S02",
+        "S03",
+        "S04"
+      ]
+    },
+    {
+      "id": "CP-540-20261028T151445844542Z",
+      "recorded_at": "2026-10-28T15:14:45.844542+00:00",
+      "actor": "Codex / Sol 6.1",
+      "work_item": "META-LEARN-001",
+      "outcome": "blocked",
+      "summary": "纠正人工持仓队列不应成为原算法MVP前置；第4步门槛未过，5/6未运行，7无新准入，按计划交Astra作实质用途/参考审定",
+      "evidence": [
+        {
+          "id": "QUAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-route4-7-20261028T144800Z-66be543/evidence/route4-7-qualification.safe.json",
+          "sha256": "a8136b01101ec6d7426197fd6467f50e73d4aa41a9a4189b5620839e73dec5f1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "第4步身份/用途资格评估，不是新模型/消费者资格"
+        },
+        {
+          "id": "CAPACITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-route4-7-20261028T144800Z-66be543/evidence/identity-capacity.safe.json",
+          "sha256": "9f6a9010767e66844c5fac038162fcb802522eceb48129bb71a65e10dd7b5d7e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原排除规则下13发行人上限，仅身份/日历，非全历史可用池"
+        },
+        {
+          "id": "PORT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-route4-7-20261028T144800Z-66be543/evidence/consumer-port-review.safe.json",
+          "sha256": "4ef58b3948b0792ffa732128925d42a67ee52b0bc30b6aa82955108f362b3d2e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原算法消费者静态端口/语义检查，非决策价值实验"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "完成真实身份/日历/已知暴露容量审计及现有算法消费者端口核查；原修复和干净读者保留",
+          "remaining": "步骤4实验未资格化，5/6未运行，7未准入；本轮不是学习MVP收敛",
+          "next_action": "按当前路线审定算法入场用途、独立状态参考和完整决策价值方法，再冻结一份新请求",
+          "evidence": [
+            "QUAL",
+            "CAPACITY",
+            "PORT"
+          ],
+          "supersedes": "CP-540-20261028T140729717813Z"
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "新增人工排序队列仍停放，但其需求缺失不否定原算法价值；真实算法消费者存在，Head2当前20日语义与持仓风险不匹配",
+          "remaining": "尚无新独立用途比较；不靠旧48/80或#541研究队列重标fresh、改阈值或重跑九特征补结论",
+          "next_action": "Astra审定有无可证伪入场用途；无则停放学习活动，有则只做一次合格同成本比较",
+          "evidence": [
+            "QUAL",
+            "PORT"
+          ],
+          "supersedes": "CP-540-20261028T140729717813Z"
+        }
+      ],
+      "no_change_reason": "本批未读新价格/标签/预测或训练，原候选/消费者/P3/P6/生产资格均不升级",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:53Z",
+          "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
+        }
+      ],
+      "reviewed_modules": [
+        "EXPERT",
+        "S02",
+        "TRAIN",
+        "UPDATE",
+        "CLOSEOUT",
+        "P6"
+      ]
     }
   ]
 }

@@ -6567,6 +6567,157 @@
         "P6",
         "CLOSEOUT"
       ]
+    },
+    {
+      "id": "CP-540-20261028T174749880217Z",
+      "recorded_at": "2026-10-28T17:47:49.880217+00:00",
+      "actor": "Codex: complete fixed-B metadata qualification and separate consumption-set audit",
+      "work_item": "META-LEARN-001",
+      "outcome": "blocked",
+      "summary": "独立样本资格核验完成但固定B流无剩余样本：22955=22041+116+8+790；完整资金比较未启动，实际筛选准入仍未授予",
+      "evidence": [
+        {
+          "id": "QUAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-confirmation-20261028T173600Z-5ff45e0/attempt-v2/evidence/qualification.safe.json",
+          "sha256": "2323e64cd52966b16793af5dcc0b932da6e868c8ded231f041f2c38feb858dff",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "完整固定B流独立样本为0；非全局历史数据不存在，非模型/价值失败"
+        },
+        {
+          "id": "AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-confirmation-20261028T173600Z-5ff45e0/attempt-v2/evidence/separate-set-audit.safe.json",
+          "sha256": "c434b608ad94986d7cb012a8adf62c9b4d26b78acf0d5ef6224c39b98baa567c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "实际790消费记录及完整排除集合的计算复核，非新独立科学参考"
+        },
+        {
+          "id": "CHECK",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-confirmation-20261028T173600Z-5ff45e0/checks.json",
+          "sha256": "665001ed7c07f8a6f1ee758c1e7e4e77b15067de37a024f6e5de124d69c97370",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "39针对性通过；全仓输出5568/20，make外层监控退出码未捕获，其他组件补验0；216既有lint"
+        },
+        {
+          "id": "ACTIVATION",
+          "kind": "authority",
+          "location": "git",
+          "revision": "869914380f233f1e792040a9a444f2d98b882e90",
+          "path": "config/research/learning-mvp/entry-confirmation-activation.v1.json",
+          "sha256": "393049d666d395178b0f68302a3206096bfb3ad26b1f55451f9c399245c024d3",
+          "claim_ceiling": "Owner仅授权先资格化，全部门槛通过才比较；不授予实际使用、训练、采集或受保护年份"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "固定22955个B机会全量资格重算；训练后914个中790已消费、116旧暴露、8锚点时序不符",
+          "remaining": "0个未消费独立B机会；975条未命中已知暴露的身份记录仅是库存，非新参考或入场资格",
+          "next_action": "当前固定流停止；新历史走步方案先独立审定样本/训练截止，不补采或复用790冒充独立",
+          "evidence": [
+            "QUAL",
+            "AUDIT"
+          ],
+          "supersedes": "CP-540-20261028T171000785103Z"
+        },
+        {
+          "module": "S02",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "保留七特征固定候选；本轮无新独立识别质量或资金效果评价",
+          "remaining": "空的固定B确认集不能证明准确或无效；原参考/质量边界保留",
+          "next_action": "以研究资产保留；新的实际入场用途需要独立非空样本和匹配参考",
+          "evidence": [
+            "QUAL"
+          ],
+          "supersedes": "CP-540-FOUR-BATCHES-20261027"
+        },
+        {
+          "module": "S02",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本轮资格失败，不新增实际入场/执行使用资格",
+          "remaining": "独立参考、完整资金路径及适用价值未验收",
+          "next_action": "不接生产或P6，不为正结果调阈值",
+          "evidence": [
+            "QUAL",
+            "ACTIVATION"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "独立资金比较NOT_RUN；此前790开发机会差异不升级为经济效果",
+          "remaining": "固定机会流耗尽；完整C0/C1/C2资金路径未比较",
+          "next_action": "新候选/样本设计经科学审阅后才另行考虑完整比较",
+          "evidence": [
+            "QUAL",
+            "AUDIT"
+          ],
+          "supersedes": "CP-540-20261028T171000785103Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "资格检查完成，实际筛选准入仍NOT_GRANTED",
+          "remaining": "样本、参考和完整资金效果门槛未通过",
+          "next_action": "仅复用限定工程/研究资产；不授予真实决策或P6接入",
+          "evidence": [
+            "QUAL",
+            "ACTIVATION"
+          ],
+          "supersedes": "CP-545-20261028T094548750254Z"
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "本轮定量闭合一个可行性问题：既有固定B流没有未消费确认机会",
+          "remaining": "学习MVP用途价值仍未建立，不能按代码/issue或核验完成推算接受",
+          "next_action": "停止重复旧机会；需要时先审定一个有独立样本支持的新历史设计",
+          "evidence": [
+            "QUAL",
+            "AUDIT"
+          ],
+          "supersedes": "CP-540-20261028T171000785103Z"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "新资格边界39项针对性用例、元数据整体重算及实际消费集合交叉复核；详见本轮实际仓库检查",
+          "remaining": "这是计算复核，非外部科学复审或独立资金确认；仓库216项既有lint问题保留",
+          "next_action": "保留固定证据/失败尝试；新科学设计另行资格化",
+          "evidence": [
+            "QUAL",
+            "AUDIT",
+            "CHECK"
+          ],
+          "supersedes": "CP-540-20261028T171000785103Z"
+        }
+      ],
+      "no_change_reason": "",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:53Z",
+          "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
+        }
+      ]
     }
   ]
 }

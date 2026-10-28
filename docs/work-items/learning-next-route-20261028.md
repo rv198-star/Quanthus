@@ -304,3 +304,25 @@ differences, predominantly a more permissive model filter, not quality or econom
 acceptance. The next [independent qualification request](../../config/research/learning-mvp/entry-confirmation-qualification-request.v1.json)
 pins the candidate and remaining exact gates; it does not activate D/E. No threshold,
 feature, fit, protected-year access, production or P6 change occurred.
+
+### D qualification disposition,2026-10-29
+
+The Owner next authorized independent qualification followed by a full capital-path
+comparison **only after its gates pass**, and a use-admission verdict. This later
+authority is recorded in the new [activation](../../config/research/learning-mvp/entry-confirmation-activation.v1.json);
+it does not rewrite the earlier inactive qualification request or activate E.
+
+The [executed qualification](../acceptance/learning-entry-confirmation-20261029.md)
+accounts for all22,955 original B events:22,041 before the model time boundary,
+116 previously excluded issuer aliases,8 T−1 anchors at/before that boundary and
+790 already consumed development opportunities. **Zero unconsumed independent B
+opportunities remain in this fixed stream.** The other975 metadata inventory
+identities are not qualified fresh entry samples. This is a scoped sample-capacity
+finding, not a claim that all historical data or all new purposes are exhausted.
+
+The dependent capital comparison is NOT_RUN and admission stays NOT_GRANTED.
+No source hunt, new collection, score/threshold change, reference/outcome inspection
+or protected-history opening follows from this finding. The12 old terminal calendar
+coordinates close with2021-12-31 context, without claiming execution-price closure.
+Further actual entry-use research needs a reviewed new candidate/cohort design;
+rerunning the used790 is at most separately labeled development evidence.

@@ -29,6 +29,10 @@ The [steps1–4 review](acceptance/learning1-4-astra-review-20261029.md) indepen
 checks the retained boundary/reader and the scoped identity count, and supplies a
 bounded algorithmic-entry development proposal in that same route. It does not
 authorize a new experiment or turn old evaluation into fresh evidence.
+The subsequent [entry confirmation qualification](acceptance/learning-entry-confirmation-20261029.md)
+recounts the complete fixed B stream after the Owner's conditional authorization:
+no unconsumed independent opportunity remains. The capital comparison did not run
+and screening admission remains ungranted; this is not global historical-data absence.
 
 | Field | Value |
 | --- | --- |

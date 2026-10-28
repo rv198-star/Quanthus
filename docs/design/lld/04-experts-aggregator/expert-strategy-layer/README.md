@@ -71,7 +71,8 @@ predecessors are accepted and its own human decision gate has a recorded, digest
 | `P3-EXPERT-004` | Read-only candidate-detail evidence projection | `candidate-detail-evidence.md` | accepted; `docs/acceptance/p3-expert-candidate-detail-evidence-20260823.md` |
 | `P3-EXPERT-005` | Development acceptance and forward-Shadow disposition | `mvp-shadow-handoff.md` | accepted; inconclusive decision and Shadow disabled |
 | `P3-EXPERT-006` | Post-MVP Stage10/11 expert-consumption discovery sidecar | `stage-semantic-consumption.md` | accepted/closed; `SUFFICIENT_FOR_BOUNDED_CONSUMPTION_NO_STAGE_REOPEN`, zero action authority |
-| `P3-EXPERT-007` | Held-position input and decision-denominator preflight | [held-structure-preflight.md](held-structure-preflight.md) | bounded offline engineering accepted; qualified real comparison remains blocked |
+| `P3-EXPERT-007` | Held-position input and decision-denominator preflight | [held-structure-preflight.md](held-structure-preflight.md) | bounded preflight accepted; incompatible-fixture result preserved at its original scope |
+| `P3-EXPERT-007` continuation | Actual-held-path structure and pointwise decision comparison | [held-structure-shadow.md](held-structure-shadow.md) | pointwise comparison complete; single-episode policy parked; full strategy value and production unaccepted |
 
 ## 5. Human authority
 

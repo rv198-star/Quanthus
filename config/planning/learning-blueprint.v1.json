@@ -40,7 +40,8 @@
         "src/quanthus/structure_facts*.py",
         "src/quanthus/structure_order*.py",
         "src/quanthus/structure_trend*.py",
-        "src/quanthus/stage_learning/factor_slice.py"
+        "src/quanthus/stage_learning/factor_slice.py",
+        "src/quanthus/expert_strategy/held_structure_inputs.py"
       ]
     },
     {
@@ -137,7 +138,11 @@
         "config/research/learning-mvp/stage34-breakout-list-use.v2.json",
         "src/quanthus/expert_strategy/held_structure_preflight.py",
         "scripts/expert545_preflight.py",
-        "config/research/expert545-held-preflight.v1.json"
+        "config/research/expert545-held-preflight.v1.json",
+        "src/quanthus/expert_strategy/held_structure_shadow.py",
+        "scripts/expert545_held_structure.py",
+        "scripts/expert545_capture_b_trace.py",
+        "config/research/expert545-held-structure.v1.json"
       ]
     },
     {
@@ -463,9 +468,10 @@
       "id": "P3-EXPERT-007",
       "issue": 545,
       "modules": [
+        "FACTS",
         "EXPERT"
       ],
-      "contribution": "合格状态接入专家后验证完整决策影响"
+      "contribution": "在实际持仓范围生成受限连续Facts并经原专家安全链验证完整决策差异；不自动取得策略价值或生产准入"
     },
     {
       "id": "META-LEARN-002",

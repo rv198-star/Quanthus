@@ -5100,6 +5100,59 @@
           "body_sha256": "291e438c73c9210cbfbef550c187642ad694716cd4c9d739c4551260f8378f3c"
         }
       ]
+    },
+    {
+      "id": "CP-545-20261028T082858780621Z",
+      "recorded_at": "2026-10-28T08:40:27.013419+00:00",
+      "actor": "Astra review",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "no_module_change",
+      "summary": "复审PR573：独立按成交/持仓事件重建全部25930条身份并复现零交集；接受限定预检NOT_RUN，完整比较与使用资格不提升。",
+      "evidence": [
+        {
+          "id": "REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/expert545-review-20261028T082051Z-f26f550/evidence/review-verdict.safe.json",
+          "sha256": "8c0cf43fb3a000e44ddb2a24eae363fd48d5fb307071ad2911c3ddc073d383f2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "限定本批预检和NO_GO的独立审查；不是整体#545或新专家通过。"
+        },
+        {
+          "id": "RECOUNT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/expert545-review-20261028T082051Z-f26f550/evidence/independent-recount.safe.json",
+          "sha256": "26a9ca413146d0b5a95db30f4c176f1cddf2a247841085b9fa98a5e78ebbb7c4",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "独立从成交及持仓事件还原固定25930条身份；不推导经济价值或独立样本数。"
+        },
+        {
+          "id": "PLAN",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/expert545-review-20261028T082051Z-f26f550/next-plan.md",
+          "sha256": "715517b2778ce233f5456da4363dd87eec7f837411b53d046ca82178063664b7",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "消费者实际分母上的三小时提案；本文件无执行或新政策授权。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "复审确认原限定结论，未运行新候选、经济实验、训练或P6；工程partial、当前输入quality blocked、value inconclusive和admission not_granted保持原范围。后续三步为待采用提案。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:49Z",
+          "body_sha256": "291e438c73c9210cbfbef550c187642ad694716cd4c9d739c4551260f8378f3c"
+        }
+      ],
+      "reviewed_modules": [
+        "EXPERT"
+      ]
     }
   ]
 }

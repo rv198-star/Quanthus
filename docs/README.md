@@ -25,6 +25,10 @@ and `config/planning/learning-system-mvp.v1.json` are restored byte-for-byte fro
 while the generated blueprint owns current progress. This does not activate later experiments.
 It separates reproducible engineering and old-version retention from the still
 unmet product learning MVP and its use-specific gates.
+The [steps1–4 review](acceptance/learning1-4-astra-review-20261029.md) independently
+checks the retained boundary/reader and the scoped identity count, and supplies a
+bounded algorithmic-entry development proposal in that same route. It does not
+authorize a new experiment or turn old evaluation into fresh evidence.
 
 | Field | Value |
 | --- | --- |

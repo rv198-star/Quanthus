@@ -7,6 +7,7 @@
 | Work items | #540 coordination; #545 consumer impact; #546 retention/integration; #542–544 conditional learning |
 | Governing parents | [blueprint mechanism](../design/blueprint-progress.md), [layered portfolio](../design/stock-stage-vocabulary-portfolio.md), original immutable MVP contract at `e79eeb0...` |
 | Audit basis | [independent two-round review](../acceptance/learning545-546-independent-review-20261028.md) |
+| Latest review | [Steps1–4 review](../acceptance/learning1-4-astra-review-20261029.md); the proposed amendment at the end replaces another open-ended purpose-review task |
 | Current state | [one generated progress/gap view](learning-blueprint-progress.md) |
 | Execution default | Sol 6.1 Max, following the Owner's standing preference; Astra for consequential research-design or adoption review |
 
@@ -185,3 +186,110 @@ Do not commission source work or refit a model merely to keep the pipeline activ
 If it can, freeze one new request and its exact input closure/split, then resume
 steps4→5→6 only as their conditions pass. No new data acquisition, protected-year
 access, threshold or production authority is granted by this proposal.
+
+## Astra-reviewed proposed amendment, 2026-10-29
+
+| Field | Value |
+| --- | --- |
+| Design status | draft — concrete recommendation delivered in the requested audit; not a change to the old frozen experiment |
+| Delivery gate | blocked for a new real comparison until its exact request, existing-input scope and budget qualify |
+| Parent and evidence | This conditional route; [steps1–4 review](../acceptance/learning1-4-astra-review-20261029.md) |
+| Execution | Sol 6.1 Max for bounded implementation and execution; another Astra review is needed only for conflicting scientific evidence or adoption, not routine preparation |
+
+The selected next question is: **among the existing B/P4 entry opportunities, does
+orderly consolidation immediately before the signal add useful selection information
+beyond a simple frozen rule?** It is not a held-risk or human-ranking experiment.
+The mechanism is plausible enough for a small development diagnostic, not established
+enough to justify training, fresh annotation or a full replay as the first action.
+
+### Concrete comparison, frozen before any outcome inspection
+
+- **Decision coordinate:** an existing entry event on T. Compute the unchanged
+  prior20/current20 feature contract over the 40 sessions ending **T−1**, so the
+  breakout on T does not redefine the consolidation being assessed. This changes
+  the consumer anchor in a new request, not the old model target or old results.
+  All assessments occur after T close; an admitted simulated fill is no earlier
+  than T+1 open. The retained checkpoint's last training observation must precede
+  every scored anchor. Source knowledge gaps stay explicitly retrospective.
+- **C0:** the exact existing B/P4 control, including its actual position-risk
+  setting, capacity, allocation, exit, cost and execution policies, pinned by SHA.
+  Do not choose a favorable control variant after observing differences.
+- **C1:** C0 plus one research entry filter using the unchanged R0 Stage2 predicate
+  from `order-rule-screen.v1.json` and its exact `stage2_predicate` adapter:
+  absolute efficiency ≤0.33, width ≤0.18, width change ≤−0.20 and absolute center
+  shift ≤0.04. These are existing control parameters, not newly optimized values.
+  False means no positive assertion; it is not an independent negative state label.
+- **C2:** the same filter position using the frozen seven-feature checkpoint and
+  its existing raw diagnostic threshold 0.5. No nine-feature retry, new features,
+  calibration or fitting. The score is not a probability of a winning trade.
+- **Action meaning:** the experimental filter only withholds an otherwise eligible
+  new entry; it cannot create an entry rejected by B or any hard guardian, force a
+  sale, change position sizing or suppress an original risk exit. Missing required
+  candidate inputs block that candidate's new entry and raise its reason; unknown
+  cases remain in the complete opportunity denominator. C0's own missingness
+  behavior stays unchanged. No live policy is changed by this proposal.
+- **Fairness:** same opportunity universe, timing, source closure, code, capital
+  and fees. Report both the complete population and common known-input subset;
+  never drop unknowns or force equal trade counts to make results look comparable.
+  A filter leaves cash uninvested, which the later whole-capital comparison must
+  account for. A five-slot report queue supplies none of these capital assumptions.
+
+The native rule and model are **research controls** at this point. Their inclusion
+does not establish state truth or consumer admission. A synthetic adapter must
+keep `pending_assessment` and all existing live activation gates unchanged.
+
+### Ordered execution and stop rules
+
+| Block | Exact work and deliverable | Ceiling / branching rule |
+| --- | --- | --- |
+| A. Complete the small input bridge | Bring only the unchanged seven-feature/R0 dependency closure from retained code into the task branch; bind exact code/config/checkpoint/scaler/source identities. Synthetic tests cover T−1, model-training cutoff, unknown input, original guardian precedence and no new sale. Freeze the purpose card and reuse/disposition ledger before real use | 45 minutes; no whole old-branch merge or general learning platform. Missing an exact code dependency is an engineering gap, not a P10 source issue |
+| B. Development decision-difference census | Use already qualified and explicitly designated development inputs only. Begin with the original B/P4 opportunity metadata, exclude all applicable sealed evaluation/holdout roles, and require complete 40-session/source/action scope and post-training anchors. Record every inclusion/exclusion before scoring. Materialize shared Facts once; compute C0/C1/C2 applicability, entry-decision differences, issuer/date/episode concentration and actual compute cost. Do not inspect future returns in this block | 90 minutes; zero new collection, fit, update, labels or economic replay. This is reused development evidence, never fresh confirmation. If sources or usable decisions are absent, report the exact gap; do not hunt archives or replace samples |
+| C. Choose the smallest justified continuation | If C2 makes no additional decision difference from C1, stop the learned branch. If all its differences disappear when the largest issuer or largest decision-date cluster is removed, stop for concentration. Otherwise freeze a single independent confirmation request. A useful C1-only hypothesis can continue separately without claiming learning-MVP acceptance | 30 minutes; the concentration test is a low-cost futility rule, not a statistical-power or profitability test. No threshold/horizon rescue after seeing differences |
+| D. Qualify and run the surviving comparison | Freeze a new exact source/exposure/split ledger and later evaluation anchors within authorized 2012–2021 history. Use the old reference protocol only for the same consolidation meaning, blinded to candidate scores and future returns. Freeze finite sample/support/error/value criteria before opening new reference or outcome data. Independently evaluate state recognition and complete capital-path value; reuse one immutable in-Job panel for the three paths | Additional 2–4 hours only after a measured budget and qualification. First inspect existing exact inventory; a genuine shared-source deficit becomes one minimal P10 request, not a speculative source hunt. No collection authority is implied |
+| E. Candidate update and adoption | Only a qualified, promising learned candidate with a specific error established on training/development data justifies one seven-feature fit/update and required independent reproduction. Preserve old version/scaler/parent. Use an untouched, separately reserved final evaluation for an updated candidate | Conditional, at most one additional 3-hour batch after resource measurement. If D's evaluation motivates a change, it is consumed and cannot evaluate that update afresh. No new P6 unless qualified complete-path value warrants its separate scenario |
+
+Blocks A–C have a combined **2 hours 45 minutes maximum**, including a safe final
+receipt. They need not spend the whole allowance. Reserve at most 128 MiB new
+system-disk files and 1 GiB new data-disk files, use one worker and a 2 GiB RSS stop
+threshold; freeze the actual mounted-device/free-space snapshot and preserve the
+8 GiB floor on each written device before launch. If the measured fixed inputs do
+not fit, stop that block and report a specific budget adjustment; do not start a
+full-history scan. These are proposed next-job ceilings, not claims that a real
+new batch has been measured or run. No more asset preservation passes are needed
+when their exact input identities are unchanged.
+
+### Reference and value are separate decisions
+
+Block B needs no new independent state label to determine whether two frozen
+functions produce different proposed entries. It does need qualified inputs and
+explicit research-use scope. This does not bypass the independent-reference
+requirement for declaring a state head correct or admitting its real decision use.
+
+For D, sample size follows the **new** question and measured available support.
+The former 48-issuer design is not a universal requirement; 13 remaining old-pool
+issuers are not universal capacity. The existing 1,453 identity records are only
+an inventory, not a fresh cohort. Audit issuer/alias exposure and timing across
+all applicable previous selections before selecting anything. Retain sealed
+evaluation roles; do not turn them into development data by changing a name.
+If only a small pilot can qualify, predeclare its limited claim and uncertainty,
+or stop. Do not shrink an old frozen evaluation or invent a powered test.
+
+The later capital comparison must report net whole-capital return, drawdown,
+turnover/fees, time invested, coverage and issuer/date concentration, and show
+the effect of removing the largest contributing issuer. Any materiality tolerance
+must be fixed from the applicable contract or declared cost/risk objective before
+opening those outcomes. A tiny development improvement, fewer trades or a higher
+state-label agreement alone cannot justify adoption. If simple Facts suffice,
+retain that limited product evidence and leave the learning MVP's unmet gates
+explicit; do not train a model just to satisfy a checklist.
+
+### What changes now and what does not
+
+The audit resolves the pending scientific direction review with the above bounded
+proposal. It does not execute A–E or grant new market/holdout access, collection,
+consumer authority or production changes. The old human-queue card and step4
+negative receipt remain immutable historical evidence. The blueprint records the
+new next action while keeping quality/value/admission unaccepted. Old 48/80
+evaluation, nine-feature rejection, 10/11 reduction stop and 3/4 disposition are
+not reopened. If A–C fail their inexpensive feasibility test, close this particular
+entry hypothesis and retain the assets; do not automatically launch another head.

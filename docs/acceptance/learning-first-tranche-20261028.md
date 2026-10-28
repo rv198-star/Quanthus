@@ -98,3 +98,17 @@ previous216errors remain a baseline limitation; a focused pass must not be repor
 as whole-repository green. This dated evidence does not grant quality/value/admission
 facets from engineering alone. The generated blueprint is updated with scoped
 checkpoints; #540/#545/#546 are not closed as completed products.
+
+Final local checks at `0f61d94f37cb4291b2992634b039380a73cdfe90` on
+Python 3.10.12: `make check` exited 0 with 5,529 passed, 20 skipped and 8 warnings
+in 685.16s of pytest time (690.72s command wall time; maximum RSS 560,588 KiB).
+This includes doctor, compilation, tests and planning checks. The 111 focused
+tests, nine changed-file Ruff checks and four production-module mypy checks
+also pass. Whole-repository `make lint` exits 2 with the same 216 baseline errors;
+it is not reported as green. No new real capture, fit/update, independent refit,
+market/economic comparison, P6 execution or production deployment was performed.
+
+The delivery is [draft PR576](https://github.com/rv198-star/Quanthus/pull/576)
+on `codex/learning-first-tranche-20261028`, based on the unmerged #575 branch.
+This final paragraph records existing check results only; it changes no code,
+configuration, frozen opportunity or blueprint verdict.

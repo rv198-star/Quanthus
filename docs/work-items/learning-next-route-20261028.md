@@ -16,6 +16,22 @@ It does not redefine the original learning MVP as a report-only product. Estimat
 are bounded agent/script wall time, not required human workdays or a promise of
 positive findings. Scope and budget must be frozen before each result-bearing batch.
 
+## Current recovery checkpoint — March successor completed
+
+The Owner separately approved the fixed 2021-03-31 TRAIN20 / EVAL87 successor on
+2026-10-29. Its [three-step execution and negative conclusion](../acceptance/learning-entry-march-confirmation-20261029.md)
+supersede the unexecuted status of the reviewed successor proposal below, without
+changing that proposal or any older frozen request retroactively. All 87 cases
+were retained, the blind-reference support gate passed, one early model was fitted,
+and three complete capital paths plus independent reproduction finished.
+
+**Park this Head2 entry-filter candidate:** it trails original B after fees and
+has worse drawdown than both controls. Usage remains `NOT_GRANTED`; the learning
+MVP remains unaccepted. Retain the engineering assets, not an automatic next cutoff
+or P6 activation. Current gaps and scoped module verdicts are recorded through the
+[blueprint ledger](learning-blueprint-progress.md). Historical proposals below are
+context, not outstanding instructions to repeat the completed comparison.
+
 The first-batch [integration contract](learning-asset-integration-20261028.md)
 and [consumer opportunity card](../../config/planning/learning-held-review-opportunity.v1.json)
 record the implementation boundary and the actual step3 eligibility decision.

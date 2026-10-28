@@ -37,6 +37,11 @@ The [inventory and cutoff review](acceptance/learning-entry-inventory-astra-revi
 independently confirms that result and checks the remaining975 records. Its
 [concrete successor proposal](work-items/learning-next-route-20261028.md#reviewed-successor-proposal-qualify-the-inventory-before-choosing-the-run)
 separates an earlier qualified training prefix from the still-required independent reference and capital comparison.
+The Owner subsequently approved that March-cutoff successor. Its
+[completed three-step experiment](acceptance/learning-entry-march-confirmation-20261029.md)
+passes qualification and independent reproduction but rejects the Head2 entry filter
+on actual capital value. The current blueprint records completed engineering separately
+from research-only quality and ungranted consumer admission.
 
 | Field | Value |
 | --- | --- |

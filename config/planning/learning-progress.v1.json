@@ -6863,6 +6863,259 @@
           "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
         }
       ]
+    },
+    {
+      "id": "CP-540-20261028T202135817023Z",
+      "recorded_at": "2026-10-28T20:21:35.817023+00:00",
+      "actor": "Codex / Sol 6.1 Max: approved March-cutoff batch execution and scoped closeout",
+      "work_item": "META-LEARN-001",
+      "outcome": "rejected",
+      "summary": "固定87机会资格与盲参考通过；20行3月底模型完成一次拟合；三组完整资金路径及独立复现完成，新Head2低于原B且回撤更大，本入场用途拒绝；MVP未接受、不启动P6",
+      "evidence": [
+        {
+          "id": "QUAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/entry-march-confirmation-20261028T191129Z-8aee69a/evidence/qualification.safe.json",
+          "sha256": "20fc610c2c9dc0cdca26160b036118621dfe21db052805d0ed3a52b039cfaf09",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "87全量Facts资格；4不可用保留，非历史PIT资格"
+        },
+        {
+          "id": "REF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/entry-march-confirmation-20261028T191129Z-8aee69a/evidence/reference-support.safe.json",
+          "sha256": "1bdbd4da1910163b7073173054f68b638c2ff3e2560174ec0ea043c50597145b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "两份候选盲AI操作性参考；58明确共识，不是独立市场真值"
+        },
+        {
+          "id": "FIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/entry-march-confirmation-20261028T191129Z-8aee69a/evidence/prediction-commitment.safe.json",
+          "sha256": "71e6da2e0145439ae559c2e1e38731c1d8929f0f3cff4af4a0541cc29c0e0324",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "固定20行一次新fit与87预测先封存；非使用资格"
+        },
+        {
+          "id": "QUALITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/entry-march-confirmation-20261028T191129Z-8aee69a/evidence/recognition.safe.json",
+          "sha256": "b857780f9533ab21419bd393ace1f23ea8c7095694219e84110cf25c109ef2dc",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "58共识的描述性识别比较，敏感度提高且特异度下降"
+        },
+        {
+          "id": "CAP",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/entry-march-confirmation-20261028T191129Z-8aee69a/evidence/capital-comparison-v2.safe.json",
+          "sha256": "a922ce86fa86303e07eebd1dc2a98060fbf83696c0e3a4f08e61e11fbb1e58bf",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "新范围真实资金账本比较，非原全市场B复现；bootstrap仅描述性"
+        },
+        {
+          "id": "COLD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/entry-march-confirmation-20261028T191129Z-8aee69a/evidence/independent-capital-comparison.safe.json",
+          "sha256": "59a8b790faa8bf4f80a9f33882e8265b885e9d97ee066b83db8f3b7a533d0788",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "独立物理输入、新进程原源/网络拒绝，21资金文件一致；非重建十年原始feature lane或外部科学审查"
+        },
+        {
+          "id": "SOURCE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/entry-march-confirmation-20261028T191129Z-8aee69a/evidence/source-postcheck.safe.json",
+          "sha256": "945a73335183db829779e3e370841c16b6a753aa57f8314a7752b5a764f2e711",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "已选895成员哈希未变；不宣称全数仓验收"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "87机会/66公司均保留；83输入可用，58明确盲共识（23正35负），25未知4不可用",
+          "remaining": "两AI参考非市场真值；四正训练最小pilot，训练IPO与成熟公司评价分布不同",
+          "next_action": "保留已消费参考及不确定性；不重新投票、改样本或当作新holdout",
+          "evidence": [
+            "QUAL",
+            "REF"
+          ],
+          "supersedes": "CP-540-20261028T184413752182Z"
+        },
+        {
+          "module": "S02",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "新TRAIN20截止2021-03-31，七特征一次fit；完整预测与状态资金接线已复现",
+          "remaining": "本限定实验工程完成，不代表全12头或生产已完成",
+          "next_action": "复用固定Facts/fit/reader/adapter，不重复建设或修改旧40行模型",
+          "evidence": [
+            "FIT",
+            "COLD"
+          ],
+          "supersedes": "CP-540-20261028T171000785103Z"
+        },
+        {
+          "module": "S02",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "58共识上BA82.86%对R0 71.80%；召回100%对52.17%，特异度65.71%对91.43%",
+          "remaining": "多检出同时增加误报，不支配R0；参考有限且群体差异仍在",
+          "next_action": "保留研究级结果；不得由识别指标授予交易资格",
+          "evidence": [
+            "QUALITY",
+            "REF"
+          ],
+          "supersedes": "CP-540-20261028T184413752182Z"
+        },
+        {
+          "module": "S02",
+          "facet": "value",
+          "status": "rejected",
+          "scope": "本Head2入场过滤器C2净收益0.385698%，低于C0 1.145054%；回撤高于两对照",
+          "remaining": "固定用途价值门槛失败；不是所有Head2未来用途均无效",
+          "next_action": "停放本候选，不调0.5、不改截止或样本补救",
+          "evidence": [
+            "CAP"
+          ],
+          "supersedes": "CP-540-20261028T171000785103Z"
+        },
+        {
+          "module": "S02",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "87机会限定回溯研究完成；本候选未获实际筛选/执行准入",
+          "remaining": "净收益、回撤及集中性不能支持使用",
+          "next_action": "保留原消费者和旧版本，不接生产或P6",
+          "evidence": [
+            "CAP",
+            "COLD"
+          ],
+          "supersedes": "CP-540-20261028T174749880217Z"
+        },
+        {
+          "module": "TRAIN",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "固定20行七特征generation0，train-only scaler；独立重训checkpoint及87预测字节一致",
+          "remaining": "仅证明本fit工程可复现，不证明候选有价值或局部update已通过",
+          "next_action": "保留训练接口与旧checkpoint；无新fit/update启动",
+          "evidence": [
+            "FIT",
+            "COLD"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "三组新现金账本完成，原引擎各自分配/持仓/费用/退出，183会话；21文件冷复现一致",
+          "remaining": "仅66公司/2021范围；非全市场旧B曲线，未重建十年feature lane",
+          "next_action": "复用限定资金路径接口及证据，不把逐点差异冒充收益",
+          "evidence": [
+            "CAP",
+            "COLD"
+          ],
+          "supersedes": "CP-540-20261028T171000785103Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "value",
+          "status": "rejected",
+          "scope": "本入场候选未胜原B；相对R0收益改善在去最大公司/入场日期贡献后消失",
+          "remaining": "最大回撤更差；贡献剔除只是归因，不是资金重分配模拟",
+          "next_action": "按固定失败分支收口，不以样本后调参救回",
+          "evidence": [
+            "CAP"
+          ],
+          "supersedes": "CP-540-20261028T184413752182Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "限定研究资金比较已完成，未授予新增执行权限",
+          "remaining": "用途价值失败，历史PIT和生产资格未建立",
+          "next_action": "保持现有安全链/生产/P6不变",
+          "evidence": [
+            "CAP"
+          ],
+          "supersedes": "CP-540-20261028T174749880217Z"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "独立实体来源、新进程重建Facts/训练/预测及三组资金，21文件字节一致且inode独立",
+          "remaining": "独立复现不是外部科学复审；全仓既有216 lint债务保留",
+          "next_action": "封存成功和失败尝试；来源哈希未变，不重复跑同批",
+          "evidence": [
+            "COLD",
+            "SOURCE"
+          ],
+          "supersedes": "CP-540-20261028T174749880217Z"
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "已完成批准三步：资格、一次新fit与完整资金比较、独立复现；本用途负结论成立",
+          "remaining": "整体学习MVP的可靠增量价值仍未取得；不能以实验完成算产品通过",
+          "next_action": "停放本入场过滤器；后续消费者/假说另行论证，不自动开新样本",
+          "evidence": [
+            "REF",
+            "CAP",
+            "COLD"
+          ],
+          "supersedes": "CP-540-20261028T184413752182Z"
+        },
+        {
+          "module": "MVP",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "本批工程闭环完成，学习资产保留，产品及交易准入仍未授予",
+          "remaining": "缺合格实际消费者增量；#540/#546仍开放",
+          "next_action": "不启动针对本候选的P6；继续保留独立四维度状态",
+          "evidence": [
+            "CAP",
+            "COLD"
+          ],
+          "supersedes": "CP-546-20261028T112246237569Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "三步研究可收口；负用途证据与完整复现已归档",
+          "remaining": "首轮学习MVP价值验收未通过，任务收口不能关闭产品门槛",
+          "next_action": "以本负证据更新总验收，不自动关闭#546或扩大研究",
+          "evidence": [
+            "CAP",
+            "COLD"
+          ],
+          "supersedes": "CP-546-20261028T120440890371Z"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:53Z",
+          "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
+        }
+      ]
     }
   ]
 }

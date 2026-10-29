@@ -1,0 +1,69 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "HISTORICAL-DECISION-REVIEW-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "historical-decision-review-delivery",
+  "work_item": "META-LEARN-001",
+  "modules": [
+    "FACTS",
+    "EXPERT",
+    "REPRO"
+  ],
+  "question": "能否从已消费的准确历史轨迹直接交付原因和来源可追溯的复盘输出？",
+  "consumer": "Owner及现有研究调用方的历史决策查阅；不参与交易决定",
+  "scope": "只读固定2012–2021已消费derived选择；不采集、重训、重评分、经济回放或部署",
+  "deliverable": "准确事件查询CLI、JSON与离线HTML；不伪造正式candidate包",
+  "decision_if_pass": "交付研究查阅能力；只更新相应工程事实，不提升模型采用资格",
+  "decision_if_fail": "交付具体缺口及独立小修复；不追源、不自动开新实验",
+  "acceptance": [
+    "R1身份保留，原abstain/缺值语义不变",
+    "全8393键与538事件对齐，12预定类别案例逐字段核对",
+    "真实输出、独立进程复现、破坏拒绝、本地检查及蓝图更新"
+  ],
+  "stop_conditions": [
+    "45分钟内无法建立准确输入和用途则停止对应消费步骤",
+    "2小时没有真实案例贯通则只保留最小CLI方向，不以合成示例冒充交付",
+    "6小时或128MiB写入/RSS1GiB/8GiB可用空间门槛触发则停止该批次"
+  ],
+  "memory_sha256": "f1669ca067ff083cc5db106968491b92b0566d6e55ab0667c989c00a59a30f19",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "保留该结论和原用途等级；本批只消费已封存历史决定解释原因，不生成新模型或比较。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "保留该结论和原用途等级；本批只消费已封存历史决定解释原因，不生成新模型或比较。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "保留该结论和原用途等级；本批只消费已封存历史决定解释原因，不生成新模型或比较。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "保留该结论和原用途等级；本批只消费已封存历史决定解释原因，不生成新模型或比较。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "本批真实复盘交付已经完成；本文件保留已完成非授权提案，不据此重复执行或提升科学/交易资格。"
+    }
+  ],
+  "cumulative_cost_review": "既有研究消耗与负结论完整保留；本批是新增有限交付投入，不重置旧曝光或未知成本。",
+  "runtime_authority_boundary": "本文件仅规划，不是运行授权；执行需要当前任务授权和TPlan预算，真实输入还须原有用途准入。",
+  "budget": {
+    "wall_seconds": 21600,
+    "max_new_bytes": 134217728,
+    "network_requests": 0,
+    "accounting_owner": "current TPlan mission; source network budget zero, authorized GitHub code operations separate"
+  },
+  "execution_disposition": "COMPLETED_RETROSPECTIVE_REVIEW_DELIVERY; no successor activated",
+  "execution_record": "docs/acceptance/historical-decision-review-20261029.md",
+  "proposal_role": "Retained non-authorizing completed proposal; exact original request stays frozen in the job."
+}

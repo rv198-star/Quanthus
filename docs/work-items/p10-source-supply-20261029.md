@@ -36,6 +36,18 @@ nine-request tranche has one observation-purpose pass, five rejected request/
 purpose definitions and three explicit holds. See the current integration section
 for the complete dated ledger and test/operational receipts.
 
+The current candidate watch is running locally on CN02 as
+`quanthus-p10-supplement-watch`, pinned Quanthus source
+`d335c1a3d3ad2197340f0ef4c66f0bced657070c`, with its only writable bind at
+`/srv/quanthus-source-watch/qualification-d335c1a3d3ad`. Its first fifteen requests
+all pass their observation purposes, with explicit archive/identity/clock limits.
+The seven-day period ends **2026-11-06 01:39:23 Asia/Shanghai**; next scheduled
+cycle is **2026-10-31 01:39:23 Asia/Shanghai**. Do not relaunch an identical daily
+canary or extend the persisted period. Inspect `watch.json`, `candidates.json` and
+immutable `runs/*/manifest.json`, then continue source-specific issues. Stopping
+and restarting this new watch was verified without a second fetch or changed
+manifest/deadline. Business and historical PIT admission remain false.
+
 | Work item | Scope | Evidence/remaining gate |
 | --- | --- | --- |
 | [#582](https://github.com/rv198-star/Quanthus/issues/582) | Runtime lineage and upstream baseline | Daily chain established; upstream reference updated; no production upgrade claimed |
@@ -398,6 +410,69 @@ and recent consecutive evidence. Stopping or selectively disabling the supplemen
 is the rollback. Frozen research/business consumers keep their existing gates.
 The P10 epic and this source-supply issue group remain open for actual outstanding
 qualification and consumer-specific decisions.
+
+## First integrated observation and operational rollback — 2026-10-30
+
+[Quanthus PR #590](https://github.com/rv198-star/Quanthus/pull/590) carries the
+integration. The source-watch image consumes the already published exact source
+`d335c1a3d3ad2197340f0ef4c66f0bced657070c`; GitHub and local Git tree identities
+were checked before exporting tracked source/config only. The offline build uses
+Python 3.10.22 and the hash-locked runtime wheels. Its image identity is
+`sha256:ca5f2f0c4e4c5a8bc1c31712375b1d36847d2e03b19d3f010b59ad825a9a9c96`.
+All bundle files and installed astock modules are verified during the build.
+Local full checks use Python 3.10.12. Python 3.12 is unavailable locally; hosted
+jobs did not start because of the account billing/spend limit, as confirmed by
+actual check annotations. This is a hosted-CI availability limit, not an executed
+hosted test. Local acceptance follows the root AGENTS Owner rule of 2026-10-29.
+
+The network-disabled container check marks all fifteen capabilities explicitly
+unavailable with `SOURCE_DISABLED_ROLLBACK`; both initial build and same-job reuse
+make **zero network requests**, retaining an identical immutable manifest.
+The live watch then makes exactly fifteen requests in **20.779104 seconds**, with
+**46,693 raw-response bytes and 568 normalized rows/curve points**. All fifteen
+pass their named observation purpose. These counts describe one bounded sample.
+All times below are **2026-10-30, Asia/Shanghai**.
+
+| Capability | Verified at | Rows | Quality/use ceiling |
+| --- | --- | --- | --- |
+| `chinabond:treasury.curve` | 01:39:25 | 505 | Observed-purpose pass |
+| `chinamoney:lpr.history` | 01:39:27 | 12 | Observed-purpose pass |
+| `cnbc:news.rss` | 01:39:28 | 30 | Observed-purpose pass |
+| `cninfo:disclosure.index` | 01:39:30 | 2 | Observed-purpose pass |
+| `eastmoney:fund.nav` | 01:39:31 | 2 | Pass; fund identity is request-bound, no response echo |
+| `eastmoney:macro.cpi` | 01:39:32 | 2 | Observed-purpose pass |
+| `eastmoney:macro.gdp` | 01:39:33 | 2 | Observed-purpose pass |
+| `eastmoney:macro.m2` | 01:39:35 | 2 | Observed-purpose pass |
+| `eastmoney:macro.pmi` | 01:39:36 | 2 | Observed-purpose pass |
+| `eastmoney:macro.ppi` | 01:39:38 | 2 | Observed-purpose pass |
+| `eastmoney:quote.snapshot` | 01:39:39 | 1 | Pass for quote diagnostic; source clock unavailable |
+| `sina:news.roll.2510` | 01:39:40 | 2 | Pass for archive metadata; excluded from current-policy coverage |
+| `sina:news.roll.2516` | 01:39:42 | 2 | Observed-purpose pass |
+| `sina:quote.snapshot` | 01:39:43 | 1 | Observed-purpose pass |
+| `tencent:quote.snapshot` | 01:39:44 | 1 | Observed-purpose pass |
+
+Eastmoney quote has recovered for this new dated observation; its earlier
+transport failure remains in the original ledger. All three quote adapters report
+the same normalized price unit and security identity; this sample's last prices
+agree. Their clocks differ and Eastmoney's remains unknown, so this comparison
+selects no provider priority or automatic business fallback. Sina 2510's retained
+old item is still archive-only. First-observed acquisition time remains the
+knowledge floor for every source.
+
+After publication, stopping the new watch container leaves its manifest intact.
+Restart resumes the original next-at/end-at times, produces no second Job or
+source request, and keeps its sole writable observation bind. The finite end is
+**2026-11-06 01:39:23 Asia/Shanghai**. Three distinct successful dates and recent
+three consecutive successful dates permit review then; a first sample is not
+completion of that period or business acceptance.
+
+Operational receipts outside Git are `watch-image-receipt.json`,
+`watch-rollback-receipt.json`, `watch-launch-receipt.json` and
+`watch-first-cycle-receipt.json` under the current evaluation root. The live
+`candidates.json` SHA256 at this checkpoint is
+`6a3935f75224f8725b7c02c9d71dbde814e988c4bb44f5bdde7b2ec2e2888a29`; its first immutable manifest SHA256 is
+`1eb98a14ec6bba9e5f2c0c8a13bd64c910a84c900166653d7b0f8b70865817f5`.
+Run-stage metrics and all raw/normalized response hashes are retained there.
 
 ## Earlier verification checkpoint — retained history
 

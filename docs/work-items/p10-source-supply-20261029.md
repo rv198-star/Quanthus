@@ -22,7 +22,7 @@ site-identity result must never be reported as a working financial data feed.
 
 Owner subsequently selected a public, relatively independent astock fork while
 Quanthus remains private. [P10-DATA-SUPPLY-005 / #587](https://github.com/rv198-star/Quanthus/issues/587)
-tracks the [source-subproject boundary](../design/astock-subproject.md) and eighteen
+tracks the [source-subproject boundary](../design/astock-subproject.md) and nineteen
 source-library request contracts in [rv198-star/astock](https://github.com/rv198-star/astock).
 The original reference checkout and its hashes below remain historical evidence;
 repository creation does not upgrade the deployed collector.
@@ -663,3 +663,31 @@ expanding samples. Do not endlessly retry identical unavailable endpoints. A
 failed optional source does not block independently qualified daily products.
 The current source inventory, candidate ledger and issue group provide recovery;
 they do not close the full functional-qualification work package.
+
+## Named futures and remaining bounded replacements — 2026-10-30
+
+Owner continued #581/#583/#584/#587 with valid futures contracts, unit/time proof
+and bounded online qualification. No seven-day wait is a predecessor. Evidence
+root: `/srv/agentdock/evaluations/p10-futures-20261030/`; original failures,
+frozen plans and raw hashes remain outside Git.
+
+| Capability | Actual verification (Asia/Shanghai) | Disposition and quality |
+| --- | --- | --- |
+| Sina DCE:V2701 price snapshot | 2026-10-30 05:08:26 | PASS for vendor contract-price diagnostics: one row/241 bytes, native CNY/tonne, 5 tonnes/lot separately; native date/time labels uncombined; no real-time or trade-day admission |
+| Eastmoney HK00700 exact-security replacement | 2026-10-30 05:11:15 | HOLD_LOCAL_TRANSPORT_FAILURE; public page and currency/clock field definitions found, but actual snapshot request failed locally; no vendor-outage claim |
+| Eastmoney US AAPL exact-security replacement | 2026-10-30 05:11:16 | HOLD_LOCAL_TRANSPORT_FAILURE; same bounded treatment, no login/retry/fallback |
+| Jin10 attr76 latest first page | 2026-10-30 05:11:16 | REJECT_CURRENT_PURPOSE_STALE_VINTAGE: 20 rows/830 bytes, explicit USD100 million units; latest label 2025-09-07 has null actual and latest non-null actual is 2025-08-07 |
+
+The four original unbounded wrappers retain their previous exclusion reasons;
+these new single-security/one-page requests do not erase that history. Sina's
+unbounded daily-history wrapper remains excluded without a repeated request.
+DCE-host spec/guide references timed out; a DCE-authored PDF on a member's site
+provides units but does not independently confirm today's listing. The passed
+sample is explicitly vendor-listed and unexpired, with a conservative stop before
+its delivery month, under the [v3 contract](../design/astock-subproject.md).
+
+This tranche made four functional requests: one diagnostic pass, two local
+transport holds and one current-purpose rejection. Website/script discovery is
+counted separately and is not functional qualification. Full census functionality
+remains open; an accessible stale series does not become a useful archive product
+without a named consumer.

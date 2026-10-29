@@ -93,3 +93,18 @@ keeps failed fixtures. Test selection and the existing 8 GiB free-space gate sta
 unchanged. Retain the complete check log and command receipt outside TMP; use a
 separate qualification environment for the 0.1.2 wheel. This does not change the
 P10 data cleaner's mounts, schedule or evidence retention.
+
+### Named PVC futures diagnostic tranche
+
+Policy `config/pipelines/p10-supplement-sources.v3.json` selects only Sina V2701
+with astock `0.1.3`. Build with `P10_POLICY` set to that file and stage
+`requirements-v3.lock` as `requirements.lock`; use a separate environment, image
+and empty evidence root. Do not upgrade either existing watch in place.
+
+The request is capped at 4096 bytes/20 seconds and a single dated contract.
+Price is CNY/tonne; contract size is separate. Native date/time labels are never
+joined or converted to a trading day. Volume, open interest and tick-size units
+are excluded. The conservative scope stops before 2027-01-01 in Shanghai; expiry
+blocks new requests and same-day cache reuse. The snapshot remains audit evidence.
+A seven-day watch is finite and does not grant real-time, historical PIT or
+business admission, or delay continued qualification of remaining sources.

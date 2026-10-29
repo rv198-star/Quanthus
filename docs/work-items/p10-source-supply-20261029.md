@@ -22,21 +22,22 @@ site-identity result must never be reported as a working financial data feed.
 
 Owner subsequently selected a public, relatively independent astock fork while
 Quanthus remains private. [P10-DATA-SUPPLY-005 / #587](https://github.com/rv198-star/Quanthus/issues/587)
-tracks the [source-subproject boundary](../design/astock-subproject.md) and fifteen
+tracks the [source-subproject boundary](../design/astock-subproject.md) and eighteen
 source-library request contracts in [rv198-star/astock](https://github.com/rv198-star/astock).
 The original reference checkout and its hashes below remain historical evidence;
 repository creation does not upgrade the deployed collector.
 
 Owner's further 2026-10-30 instruction continues actual P10 integration, unit/time/
 rollback contracts, dated quality candidates and finite observation, through the
-existing issues. Current source library `0.1.1` adds the verified fund-NAV request;
+existing issues. The original fifteen-capability runtime uses source library `0.1.1`
+with the verified fund-NAV request;
 the original `0.1.0` observations below remain historical evidence. The exact
-Quanthus adapter, policy and watch boundary are in the child design. The new
-nine-request tranche has one observation-purpose pass, five rejected request/
-purpose definitions and three explicit holds. See the current integration section
+Quanthus adapter, policy and watch boundary are in the child design. The earlier
+nine-request tranche recorded one observation-purpose pass, five rejected request/
+purpose definitions and three holds; the later three-hold continuation is below. See the current integration section
 for the complete dated ledger and test/operational receipts.
 
-The current candidate watch is running locally on CN02 as
+The original fifteen-capability candidate watch is running locally on CN02 as
 `quanthus-p10-supplement-watch`, pinned Quanthus source
 `d335c1a3d3ad2197340f0ef4c66f0bced657070c`, with its only writable bind at
 `/srv/quanthus-source-watch/qualification-d335c1a3d3ad`. Its first fifteen requests
@@ -54,7 +55,7 @@ manifest/deadline. Business and historical PIT admission remain false.
 | [#583](https://github.com/rv198-star/Quanthus/issues/583) | Census, contracts and disposition ledger | Frozen declaration census; incomplete API definitions still need functional contracts |
 | [#584](https://github.com/rv198-star/Quanthus/issues/584) | Structured data, announcements and regulatory APIs | Bounded samples; capability-specific results and limitations retained |
 | [#585](https://github.com/rv198-star/Quanthus/issues/585) | Media, RSS and institution sites | Site identity and RSS tested separately; unavailable/network-limited entries stay explicit |
-| [#587](https://github.com/rv198-star/Quanthus/issues/587) | Independent astock fork and bounded absorption | 15 contracts, pinned P10 observation adapter, unit/time/rollback contracts and finite watch |
+| [#587](https://github.com/rv198-star/Quanthus/issues/587) | Independent astock fork and bounded absorption | 18 contracts, two pinned P10 observation policies and independent finite watches |
 
 The Owner then continued the three access/unit holds independently of that watch.
 [astock PR#3](https://github.com/rv198-star/astock/pull/3) adds three corrected
@@ -64,6 +65,13 @@ in `config/pipelines/p10-supplement-sources.v2.json` qualifies archival stock
 announcements, one ETF's vendor trading flows and the anonymous guest-bond subset.
 Their02:01 observations and unsupported purposes are in the three-hold section.
 The original fifteen-source running watch above is not replaced or restarted.
+The three-capability container `quanthus-p10-holds-watch` now runs source
+`f2247db5d35e60ced2e849cadb38d68cbf6298da` in the separate root
+`/srv/quanthus-source-watch/holds-f2247db5d35e`. Its first three observations at
+02:34:36–02:34:39 pass their limited purposes. Its next cycle is
+**2026-10-31 02:34:34 Asia/Shanghai**, and its nonrenewable end is
+**2026-11-06 02:34:34 Asia/Shanghai**. The original watch still ends at01:39:23.
+Both periods are observation requirements; other source qualification proceeds.
 
 ## Why daily collection works without the upstream checkout
 
@@ -537,10 +545,75 @@ installation outside the checkout passes all51 maintained tests. The new P10
 unit/time/subset contracts plus existing supplement tests pass37 cases; local
 Ruff and strict mypy pass for the changed production modules.
 
+### Installed-container integration and recovery
+
+[Quanthus PR#591](https://github.com/rv198-star/Quanthus/pull/591) publishes the exact
+new adapter source `f2247db5d35e60ced2e849cadb38d68cbf6298da`. GitHub's Git tree was
+verified before making the tracked-only source bundle. Offline construction uses
+the pinned base image, fixed0.1.2 wheel and five hash-locked transport wheels;
+the build verifies the bundle and every library module before completing. Image
+`sha256:f1b0b77f5966b7c77e244e774fb716b8ed35d3611a8bcf62f27772cd7f5eeba5`
+is53,765,863 bytes. The new watch runs as998:998 with a read-only rootfs, dropped
+capabilities, bounded resources/logs and one writable qualification root. Its
+source, policy and package differ from the original watch, which stays fixed.
+
+A separate three-call cold-integration plan was frozen before launch (SHA256
+`529772226ae33d5ee963664cceca15859859ea5af47882a43b3cc68632424077`).
+The actual first cycle has3 requests,33 normalized rows and40,473 raw bytes in
+5.077963 seconds. Raw/parsed/normalized prerequisites are built once per source
+and shared by the quality and ledger consumers; timings/rows/bytes/BUILD are in
+the immutable manifest. Latest actual acquisition times are all2026-10-30 Shanghai:
+
+| Capability | Installed-container verified at | Rows/quality |
+| --- | --- | --- |
+| Eastmoney archive announcement index |02:34:36.897653|2; correct600519, notice-age76days, archive-only and release-clock flags retained |
+| Eastmoney ETF trading-flow diagnostic |02:34:38.261492|1; correctsh510300, CNY/ratio mapping, vendor epoch clock separate from knowledge |
+| Jisilu anonymous partial reference |02:34:39.960405|30;29C-qualified reference units and1E-metadata-only, unknown actual quote clock |
+
+All rows retain complete-response acquisition as `knowledge_from`; reading even
+one microsecond before that acquisition fails `SOURCE_NOT_KNOWN_AT_CUTOFF`.
+Stopping and restarting the new container keeps the manifest, next-at, end-at and
+one Job unchanged; no second request occurs. The original fifteen-capability
+container/image/root, manifest, candidate ledger and schedule were compared before
+and after and remain identical. The new first manifest SHA256 is
+`e758c716b08ee7f34a5043e14b1f8a5fbf4aeb6d3f3a47314f3e9b950cfbca2d`;
+the candidate-ledger SHA256 is
+`8a900374dd259b7fb99eb25cd112d8ecb22ca876cdbf866ad515ac467b79403d`.
+
+With network disabled, the actual image's all-disabled first Job and same-Job
+reuse both make zero requests and explicitly report `SOURCE_DISABLED_ROLLBACK`.
+A second offline test copies the published first live snapshot into an isolated
+scratch root, then disables all three. Past-good references remain auditable,
+but current reads fail `SOURCE_CURRENT_OBSERVATION_UNAVAILABLE`, every candidate
+isHOLD, and no old good value is silently reused. The real live root is unchanged.
+Restart/reuse never renews either watch period or pads distinct successful dates.
+
+Complete local `make check` on the exact source passes **5759 tests /20 skips**,
+including planning/blueprint/exploration checks, in634.60 pytest seconds. The host
+usesPython3.10.12; optional research/runtime tests remain skipped as logged. Hosted
+jobs did not start because of account billing/spending limits; actual annotations
+are retained. Local acceptance uses the Owner2026-10-29 AGENTS instruction without
+workflow/protection/account changes or forged hosted status. Later documentation
+reuses the byte-identical executable/config/test closure and reruns its affected
+checks. Only completed synthetic pytest531 TMP was removed after process exit,
+recovering603,193,344 filesystem bytes; full logs and receipts remain outsideTMP.
+
+The remaining five pinned AKShare calls now have an explicit budget disposition.
+`futures_zh_daily_sina` has no date/count request bound; the FX-reserve helper loops
+back through history; HK/US spot wrappers paginate the whole market. These four
+original call contracts are rejected for this latest-only sample budget, with no
+claim that their vendors are unavailable. `futures_zh_spot` remains held until one
+current listed contract, exchange, units and useful P10 purpose are fixed. This is
+static source evidence with zero financial requests, not five additional online
+passes. The pinned upstream SHA and exact code lines are in the separate receipt.
+
 Evidence outside Git: `/srv/agentdock/evaluations/p10-holds-20261030/` retains
 `discovery-plan.json`, `script-plan.json`, `functional-plan.json`, the two unit
 plans, each raw response/metadata, `candidate-ledger.json`, independent build and
-test logs. The original673-request census and all prior ledgers are unchanged.
+test logs. The added `watch-*-receipt.json` files record the image, zero-network
+rollback, launch, first live cycle and disable-after-good test; `quanthus-verification-receipt.json`
+binds complete local checks to source/log hashes. The original673-request census
+and all prior ledgers are unchanged.
 #583/#584/#585/#587 continue to own remaining functional coverage and later review.
 
 ## Earlier verification checkpoint — retained history

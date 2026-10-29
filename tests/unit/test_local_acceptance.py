@@ -399,3 +399,27 @@ def test_tmp_retention_never_chmods_hardlinked_file(tmp_path: Path) -> None:
     assert original.read_bytes() == b"synthetic-kept-source"
     assert original.stat().st_mode & 0o777 == 0o400
     assert not owned.exists()
+
+
+@pytest.mark.parametrize("error", [FileNotFoundError("retired TMP"), PermissionError("denied")])
+def test_allocation_sampling_only_tolerates_retired_tmp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: OSError
+) -> None:
+    def raced(*args: Any, **kwargs: Any) -> Any:
+        kwargs["onerror"](error)
+        return []
+
+    monkeypatch.setattr(os, "walk", raced)
+    if isinstance(error, FileNotFoundError):
+        assert local.allocated(tmp_path) == 0
+    else:
+        with pytest.raises(PermissionError):
+            local.allocated(tmp_path)
+
+
+def test_allocation_includes_directory_blocks(tmp_path: Path) -> None:
+    for index in range(32):
+        (tmp_path / f"directory-{index}").mkdir()
+    (tmp_path / "ordinary-file").write_bytes(b"synthetic")
+    expected = sum(p.lstat().st_blocks * 512 for p in [tmp_path, *tmp_path.rglob("*")])
+    assert local.allocated(tmp_path) == expected

@@ -238,12 +238,15 @@ def environment(root: Path, job: Path) -> dict[str, str]:
 
 def allocated(root: Path) -> int:
     def failed(error: OSError) -> None:
-        raise error
+        if not isinstance(error, FileNotFoundError):
+            raise error
 
     if not root.exists():
         return 0  # Optional test TMP is created by pytest after make starts.
     total = 0
     for directory, _, names in os.walk(root, onerror=failed):
+        with contextlib.suppress(FileNotFoundError):
+            total += Path(directory).lstat().st_blocks * 512
         for name in names:
             with contextlib.suppress(FileNotFoundError):
                 total += (Path(directory) / name).lstat().st_blocks * 512

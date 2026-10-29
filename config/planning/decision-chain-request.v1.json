@@ -27,37 +27,42 @@
     "首条完整链60分钟仍不成立则停止扩建",
     "4小时整体截止，写入前容量门槛和8GiB余量有效"
   ],
-  "memory_sha256": "c28f8d667142c375fca77367b9d249e73a318c58ded6d05dfbde796c250e56ec",
+  "memory_sha256": "cbc331f034daa3be315acfde50c245e2a41a6d340346baa281057bc90ba814c0",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
       "relation": "respect",
-      "rationale": "保留该范围结论、原费用和曝光；本批已收口，仅刷新非授权提案记忆，不启动后继研究。"
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
     },
     {
       "conclusion_id": "CON-HELD-NEED-20261029",
       "relation": "respect",
-      "rationale": "保留该范围结论、原费用和曝光；本批已收口，仅刷新非授权提案记忆，不启动后继研究。"
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
     },
     {
       "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
       "relation": "respect",
-      "rationale": "保留该范围结论、原费用和曝光；本批已收口，仅刷新非授权提案记忆，不启动后继研究。"
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
     },
     {
       "conclusion_id": "CON-DECISION-SELECTION-20261029",
       "relation": "respect",
-      "rationale": "保留该范围结论、原费用和曝光；本批已收口，仅刷新非授权提案记忆，不启动后继研究。"
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
     },
     {
       "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
       "relation": "respect",
-      "rationale": "保留该范围结论、原费用和曝光；本批已收口，仅刷新非授权提案记忆，不启动后继研究。"
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
     },
     {
       "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
       "relation": "respect",
-      "rationale": "保留该范围结论、原费用和曝光；本批已收口，仅刷新非授权提案记忆，不启动后继研究。"
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
     }
   ],
   "cumulative_cost_review": "本批单独记录时间、产物及检查；原Head2、量能、持仓影子等失败和未知成本不清零。",

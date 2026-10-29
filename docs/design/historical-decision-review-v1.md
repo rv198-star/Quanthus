@@ -118,3 +118,46 @@ This companion preserves 22,955 entry decisions, 8,393 held decisions, 17,062 en
 2026 retrospective cutoff remain; all execution is original simulation. Counterfactuals,
 live execution, historical PIT and adoption of any learned model remain unqualified.
 Neither this delivery nor PR merge starts a new comparison or P6.
+
+## Entry funnel and optional allocation observation
+
+`ENTRY-ALLOCATION-DELIVERY-001` / #540/#545 reuses the authenticated B package once
+to produce a Chinese offline funnel and identity-bearing JSON through
+`expert_strategy.entry_funnel` / `scripts/learning_entry_funnel.py`. The full
+22,955-opportunity denominator has 14,062 trial-entry actions, 543 buy orders,
+538 filled entries and 5 unfilled entries. Of the trial-entry actions, 13,519
+have no observed order. The selected manifest members contain no original
+allocation result; their reasons remain `NOT_RECORDED`, not inferred capacity
+rejections. Strategy abstentions (8,893) and original buy-status reasons are
+shown separately. Sell/held statuses never become entry-rejection reasons.
+The report binds the trusted package/contract/member identities and original
+scope, and includes exact decision/event row locators. It exposes no prices
+or performance statistics and runs no allocator or replay.
+
+For a future separately authorized replay, `FormalP2ReplayRuntime.run_variant`
+accepts the keyword-only `allocation_audit=True` (default false). Immediately
+after the existing allocator call, it serializes that same result once,
+including its exact ordering, priorities, disposition, capacity/reason and
+reservation references. Explicit opportunity, entry and formal-decision keys
+connect every candidate, including those not requesting allocation. The
+pre-execution available-unit/active-lifecycle identities, Shanghai business
+date, original decision/snapshot cutoff and actual UTC observation time are
+retained; observation time is not provider acquisition or historical knowledge.
+
+The additive `entry-allocation-audit.json` has schema
+`quanthus.entry-allocation-audit.v1`, its own digest, and complete hashes of
+the seven original replay files. Its identity includes the actual run/data/
+feature/strategy/topology/industry, execution policy, population and source
+metadata, scope, and repository code/config hashes. It is an operational
+sidecar: observations may have different timestamps/digests between runs.
+It is appended after the original replay digest and manifest are computed;
+original decisions, events, equity, returns, ledgers, reconciliation and
+manifest stay byte-identical with audit on or off. No allocation rule, legacy
+flag, economic identity or activation gate is changed. Default callers receive
+exactly the old file set; audit-enabled callers must retain the separate
+sidecar under their owning job's budget and may not graft it onto old archives.
+
+Tests: `test_entry_allocation_audit.py` and `test_entry_funnel.py`. Independent
+immutable-base behavior/cost and isolated reader evidence are recorded in
+[this delivery acceptance](../acceptance/entry-allocation-delivery-20261030.md).
+This is not an approval to rerun historical trading to fill missing reasons.

@@ -236,3 +236,32 @@ Output is an exclusive new file outside all protected package/source/selection d
 Original simulation is explicit; lack of an order is not an invented rejection. The final
 unit ledger is run-level context. Unknown fields and alternative actions remain unknown.
 No polling task, network collection, replay, trading signal or production change is installed.
+
+## Read the exact original B entry funnel
+
+Use the same authenticated `CHAIN_PACKAGE` and trusted `CHAIN_DIGEST`; do not
+rebuild #588 or rerun trading. Both output parents must already exist. Each
+invocation verifies/loads the package once and shares that prerequisite for
+the JSON and Chinese offline HTML views:
+
+```bash
+PYTHONPATH=src python3 -B scripts/learning_entry_funnel.py \
+  --package "$CHAIN_PACKAGE" --manifest-sha256 "$CHAIN_DIGEST" \
+  --json "$NEW_FUNNEL_JSON" --html "$NEW_FUNNEL_HTML"
+```
+
+Outputs are exclusive new files outside package/source roots. The JSON carries
+the package, contract, member and purpose identities. The HTML gives the complete
+opportunity/action/order/fill denominator and exact original row examples, with
+no prices, outcome ranking or performance claims. Missing allocation reasons
+stay unknown; `allocated=true` is consideration, not a reservation. The retained
+[delivery receipt](../acceptance/entry-allocation-delivery-20261030.md) identifies
+the real report and its safe checks.
+
+Only a future independently authorized caller may opt in to
+`runtime.run_variant(intervention_id, output_root, allocation_audit=True)`.
+This returns the old seven files unchanged plus `entry-allocation-audit.json`.
+Persist that sidecar with the owning job; its operational timestamp/digest and
+legacy-file hashes are separate from the old replay identity. The default is
+off, and this guide neither constructs a real runtime nor authorizes a replay,
+new experiment, production service or P6 activation.

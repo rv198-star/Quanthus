@@ -399,6 +399,77 @@
         "CP-540-20261029T154357968158Z"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "recorded_at": "2026-10-29T16:52:34.415776+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved 1–3",
+      "work_item": "META-LEARN-001",
+      "question_id": "ENTRY-ALLOCATION-DELIVERY-001",
+      "family": "entry-allocation-observability",
+      "modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "能否交付准确原B漏斗，并保存现成分配结果而不改变交易？",
+      "consumer": "Owner和已有只读研究复核方",
+      "scope": "原B2012–2021已消费记录/实际2026回溯观察截止；新audit仅合成，无新经济路径。",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "工程观测与查阅；13519旧原因未知不是策略负结果，非投资价值/历史PIT/生产P6准入。",
+      "decision_effect": "交付中文漏斗/可选sidecar；停止历史原因恢复，不重开新比较或改变阈值/分配规则。",
+      "reopen_conditions": [
+        "准确原事件支持具体未满足消费决定及允许替代动作。",
+        "未来另有合格运行授权时选择audit，不补造旧记录。"
+      ],
+      "retained_assets": [
+        "中文离线漏斗、来源身份JSON和原行定位。",
+        "原提交/开关七文件等同、一次分配/序列化及合成成本证据。",
+        "旧输入不变、独立统计、隔离冷读；旧失败/费用/曝光不清零。"
+      ],
+      "evidence": [
+        {
+          "id": "FUNNEL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/evidence/funnel-delivery.safe.json",
+          "sha256": "b18a548a9663fabfb7fd286dd23904b98ef263b43cd14ae9a0712245bc7fa5c3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原B完整漏斗与独立连接；不是策略增益"
+        },
+        {
+          "id": "AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/evidence/synthetic-behavior-cost.safe.json",
+          "sha256": "43285972cf1ab658eb57f2ac6d8d9ec913d3c54763eb735e4408f2bfd7117013",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原提交/开关audit七文件相等，仅合成"
+        },
+        {
+          "id": "COLD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/evidence/cold-funnel.safe.json",
+          "sha256": "be4ae770c5ed9e405922c66303229dd6b979c3d4e431222a46df1c83bae91f2d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "隔离新进程无旧源/网络；旧包构建证明复用"
+        }
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "脚本/RSS/字节有实测；完整AI token/计费不能归因，不填零。保留初次preflight、fixture错误及Git超时，旧费用/曝光不清零。",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/logs/proposal-preflight.txt",
+        "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/logs/focused-audit-initial.txt"
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T164848737757Z"
+      ],
+      "supersedes": null
     }
   ]
 }

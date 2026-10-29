@@ -27,32 +27,42 @@
     "2小时没有真实案例贯通则只保留最小CLI方向，不以合成示例冒充交付",
     "6小时或128MiB写入/RSS1GiB/8GiB可用空间门槛触发则停止该批次"
   ],
-  "memory_sha256": "f1669ca067ff083cc5db106968491b92b0566d6e55ab0667c989c00a59a30f19",
+  "memory_sha256": "cbc331f034daa3be315acfde50c245e2a41a6d340346baa281057bc90ba814c0",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
       "relation": "respect",
-      "rationale": "保留该结论和原用途等级；本批只消费已封存历史决定解释原因，不生成新模型或比较。"
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
     },
     {
       "conclusion_id": "CON-HELD-NEED-20261029",
       "relation": "respect",
-      "rationale": "保留该结论和原用途等级；本批只消费已封存历史决定解释原因，不生成新模型或比较。"
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
     },
     {
       "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
       "relation": "respect",
-      "rationale": "保留该结论和原用途等级；本批只消费已封存历史决定解释原因，不生成新模型或比较。"
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
     },
     {
       "conclusion_id": "CON-DECISION-SELECTION-20261029",
       "relation": "respect",
-      "rationale": "保留该结论和原用途等级；本批只消费已封存历史决定解释原因，不生成新模型或比较。"
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
     },
     {
       "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
       "relation": "respect",
-      "rationale": "本批真实复盘交付已经完成；本文件保留已完成非授权提案，不据此重复执行或提升科学/交易资格。"
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
     }
   ],
   "cumulative_cost_review": "既有研究消耗与负结论完整保留；本批是新增有限交付投入，不重置旧曝光或未知成本。",

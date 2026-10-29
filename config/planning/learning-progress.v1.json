@@ -8268,6 +8268,190 @@
       "reviewed_modules": [
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-540-20261029T164848737757Z",
+      "recorded_at": "2026-10-29T16:48:48.737757+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved 3h entry-allocation batch",
+      "work_item": "META-LEARN-001",
+      "outcome": "progress",
+      "summary": "准确原B漏斗和可选现成allocation记录；原提交/开关原文件相等，13519旧原因保持未知，无新科学比较。",
+      "evidence": [
+        {
+          "id": "FUNNEL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/evidence/funnel-delivery.safe.json",
+          "sha256": "b18a548a9663fabfb7fd286dd23904b98ef263b43cd14ae9a0712245bc7fa5c3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原B完整漏斗与独立连接；不是策略增益"
+        },
+        {
+          "id": "AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/evidence/synthetic-behavior-cost.safe.json",
+          "sha256": "43285972cf1ab658eb57f2ac6d8d9ec913d3c54763eb735e4408f2bfd7117013",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原提交/开关audit七文件相等，仅合成"
+        },
+        {
+          "id": "COLD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/evidence/cold-funnel.safe.json",
+          "sha256": "be4ae770c5ed9e405922c66303229dd6b979c3d4e431222a46df1c83bae91f2d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "隔离新进程无旧源/网络；旧包构建证明复用"
+        }
+      ],
+      "updates": [
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "22955原机会→14062入场动作→543委托→538成交可读追溯；可选sidecar直接保存现成分配结果。",
+          "remaining": "13519旧无委托动作的分配原因未记录，不能恢复；无新策略价值或生产/P6准入。",
+          "next_action": "使用准确漏斗及原事件；未来另有授权运行才可选保留sidecar，不重跑旧B造原因。",
+          "evidence": [
+            "FUNNEL",
+            "AUDIT",
+            "COLD"
+          ],
+          "supersedes": "CP-540-20261029T154357968158Z"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "原提交/关闭/开启audit的七份合成原文件相等；真实漏斗对上独立事件连接，隔离新进程可读。",
+          "remaining": "未重跑真实完整交易，未测完整历史sidecar成本；不构成历史PIT资格。",
+          "next_action": "复用原包构建与新reader证据；仅为具体新需求增加有界验收。",
+          "evidence": [
+            "FUNNEL",
+            "AUDIT",
+            "COLD"
+          ],
+          "supersedes": "CP-540-20261029T154357968158Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "本批历史边界、最小接口、真实漏斗和合成行为/成本证据收敛；本地全仓检查独立报告。",
+          "remaining": "完整学习MVP用途增益未证明，旧原因未知及停放保持；PR待审。",
+          "next_action": "完成本批检查/PR交付；没有明确可改变决定的需求就停放新比较。",
+          "evidence": [
+            "FUNNEL",
+            "AUDIT",
+            "COLD"
+          ],
+          "supersedes": "CP-540-20261029T154357968158Z"
+        }
+      ],
+      "no_change_reason": "只更新工程覆盖；TRACE机制、研究价值/质量/准入、Head2/3/4停放与P6不变。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:53Z",
+          "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
+        }
+      ],
+      "reviewed_modules": []
+    },
+    {
+      "id": "CP-2-20261029T165235477677Z",
+      "recorded_at": "2026-10-29T16:52:35.477677+00:00",
+      "actor": "Codex / Sol 6.1; scoped no-change review",
+      "work_item": "META-TRACE-001",
+      "outcome": "progress",
+      "summary": "本批EXPERT/REPRO/CLOSEOUT工程交付刷新当前结论与蓝图，TRACE机制没有变化。",
+      "evidence": [
+        {
+          "id": "FUNNEL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/evidence/funnel-delivery.safe.json",
+          "sha256": "b18a548a9663fabfb7fd286dd23904b98ef263b43cd14ae9a0712245bc7fa5c3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原B完整漏斗与独立连接；不是策略增益"
+        },
+        {
+          "id": "AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/evidence/synthetic-behavior-cost.safe.json",
+          "sha256": "43285972cf1ab658eb57f2ac6d8d9ec913d3c54763eb735e4408f2bfd7117013",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原提交/开关audit七文件相等，仅合成"
+        },
+        {
+          "id": "COLD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/evidence/cold-funnel.safe.json",
+          "sha256": "be4ae770c5ed9e405922c66303229dd6b979c3d4e431222a46df1c83bae91f2d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "隔离新进程无旧源/网络；旧包构建证明复用"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只按现有append-only脚本登记工程产出和停放结论；不改变TRACE机制、阈值、CI、研究或生产权限。",
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-540-20261029T175149428512Z",
+      "recorded_at": "2026-10-29T17:51:49.428512+00:00",
+      "actor": "Codex review",
+      "work_item": "META-LEARN-001",
+      "outcome": "no_module_change",
+      "summary": "PR589复审核对原B完整入场漏斗、旧版/审计关闭/开启行为等价和隔离读取；无阻断发现。保留已交付工程级别与所有研究/用途/准入结论。",
+      "evidence": [
+        {
+          "id": "pr589-review",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-review-20261029T174254Z/evidence/review-findings.safe.json",
+          "sha256": "dc7e62003bb190e769f72cf96d0db5b86d630338fd91ba55021f86d7adfed79d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "精确a5f9565版本的本地静态、合成、原包只读及隔离读取复核；最终仓库检查、提交与普通合并身份另存交接。不自动升级蓝图维度。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "这是原限定工程交付的复核，不增加模型质量、投资价值或P6/生产资格；13,519条旧分配原因未知，不启动新的历史追索、比较或训练。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:53Z",
+          "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
+        }
+      ],
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ]
     }
   ]
 }

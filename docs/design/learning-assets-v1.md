@@ -25,6 +25,7 @@ P6 or production acceptance.
 | Consumed-path diagnosis | `expert_strategy.held_decision_census` | Validate the complete existing denominator and count recorded decisions. No new model, score, market read or economic replay. Unobserved alternatives stay NOT_OBSERVED. |
 | Historical decision lookup | `expert_strategy.decision_review` | [Exact-archive read-only projection](historical-decision-review-v1.md), event-key queries and offline JSON/HTML. Actual retrospective time and parked conclusions remain unchanged. |
 | Original B decision-chain lookup | `expert_strategy.decision_chain` | Exact original entry/signal/order/fill/held/exit reference queries, run-level ledger context and offline HTML; [same governed companion boundary](historical-decision-review-v1.md#original-b-decision-chain-companion), no new replay or invented allocation reason. |
+| Entry funnel and allocation observation | `expert_strategy.entry_funnel`, optional `formal_p2_replay` sidecar | Read the exact original B funnel with missing allocation reasons explicit; future authorized runs can export their already-computed allocator result without changing legacy files. [Contract](historical-decision-review-v1.md#entry-funnel-and-optional-allocation-observation). |
 
 Use `scripts/learning_held_decision_census.py --help` for the narrow offline census
 entry. It requires an exact external selection SHA256 and a fresh output file.

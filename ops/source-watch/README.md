@@ -125,3 +125,13 @@ discrepancy remains visible in every applicable normalized observation.
 
 Priority is A shares first. HK/US source requests require new access or contract
 evidence and remain low priority; do not add unchanged failed requests to v4.
+
+The installed local v4 watch is `quanthus-p10-a-share-watch`, source
+`2a630b0ed3df81ee80089d7767c0100b037a1d1c`, root
+`/srv/quanthus-source-watch/a-share-2a630b0ed3df`. Its finite window ends
+2026-11-06 06:15:57 Asia/Shanghai; restart preserves that deadline and does not
+repeat the current Job. The actual first cycle used two requests and returned
+four rows. Offline rollback after success rejected current reads while retaining
+prior evidence. Exact image/manifest identities, timing and the distinct-day
+limit are recorded in the supply work item above. This reference-qualification
+watch is separate from production collection and from the three earlier watches.

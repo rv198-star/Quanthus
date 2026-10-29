@@ -312,3 +312,12 @@ Returned counts and vendor total/pages stay visible. Any invalid/empty current
 result isolates that capability; a previous good run is audit evidence rather
 than an implicit fallback. A separate finite watch may check access/contract
 stability using v4 while existing v1/v2/v3 runtimes and deadlines remain pinned.
+
+The published 0.1.4 wheel, local installed-library replay and separate installed
+container have passed their bounded checks. Both capabilities are now P10
+reference candidates with an explicit access-observation window through
+2026-11-06 06:15:57 Asia/Shanghai. This does not expand the frozen sample dates.
+The [supply work item](../work-items/p10-source-supply-20261029.md) records exact
+library/image/code identities, validation times, rollback checks and local full
+acceptance results. The full functional census and purpose-specific consumer
+admission stay open in existing issues.

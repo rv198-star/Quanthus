@@ -771,7 +771,7 @@ remain immutable.
 ### Futures evidence review
 
 Two new official DCE routes were attempted once each: the HTTPS contract-info
-POST restricted to product `v`, and its current contract-info page. Both timed
+POST restricted to product `v`, and its declared contract-info page. Both timed
 out on CN02 at **05:47:53 / 05:48:05 Asia/Shanghai**. Official V2701 listing/start/
 last-trade metadata therefore remains unverified. This is a local access result,
 not a claim that the exchange or the named contract is unavailable.
@@ -813,3 +813,65 @@ at actual complete acquisition. The source's latest native session and the actua
 validation clock are separate ledger fields. A longer access watch does not
 qualify more sessions or repair discrepancies. astock `0.1.4` and P10 policy v4
 absorb both functions independently of the three existing watches.
+
+### A-share installed-runtime and local acceptance receipt
+
+Published [astock PR #5](https://github.com/rv198-star/astock/pull/5) and
+[sources-v0.1.4](https://github.com/rv198-star/astock/releases/tag/sources-v0.1.4)
+use source `c33a7b7b0e110735283331e0356318679750afb5`. Two wheel builds and the
+downloaded release agree on SHA256
+`2880d1e261bcbc50a35296aefab7cd66ce2a4f3a7a85de2ed53835c542583ffe`.
+This adds two bounded contracts, not two independent vendors or a completed
+functional census. Consumer changes are in
+[Quanthus PR #594](https://github.com/rv198-star/Quanthus/pull/594).
+
+The separate local CN02 container `quanthus-p10-a-share-watch` consumes published
+Quanthus source `2a630b0ed3df81ee80089d7767c0100b037a1d1c`, image
+`sha256:9ee9b8f11823ae241521f7eb5ce2fc00260bd4d189074a7788675bf42170711a`,
+and only writable bind `/srv/quanthus-source-watch/a-share-2a630b0ed3df`.
+Its first cold cycle completed at **2026-10-30 06:16:00 Asia/Shanghai**:
+two requests, four rows, 3953 raw bytes and 3.171887 seconds. Actual complete
+acquisition was **06:15:59.283353** for margin and **06:16:00.521474** for
+block trades. The same source-session limits, partial-page counts and reported
+amount discrepancy remain visible. Manifest SHA256:
+`158bc616af1ae804092c1c379a15ce97dec23eea346c700390a80807245792b0`;
+candidate-ledger SHA256:
+`1f90918964ac610966c56ced3c4f59d6ffba1d8b9ad8718effd503fd8be6e5e6`.
+
+The next cycle is **2026-10-31 06:15:57 Asia/Shanghai**; the nonrenewable
+period ends **2026-11-06 06:15:57 Asia/Shanghai**. There is one distinct
+successful access-observation day. Fixed-date reaccess does not qualify later
+native sessions or latest-session coverage. Actual stop/restart preserved the
+deadline and manifest with zero extra requests. Offline disable-after-good kept
+old evidence for audit and rejected current reads; a cutoff one microsecond
+before actual acquisition was rejected. All three prior watches retained their
+images, start times, manifests, ledgers and deadlines. This is qualification
+infrastructure only; business, historical PIT and production admission remain
+unchanged. Remaining sources continue without waiting for this period to end.
+
+Local `make check` on runtime source `2a630b0ed3df81ee80089d7767c0100b037a1d1c`
+passed **5791 tests, with 20 skipped and 8 warnings**, in 621.31 pytest seconds;
+doctor, compile and planning checks passed. Focused P10 tests passed 57; the new
+v4 installed-library contract tests passed 10. astock library tests passed 70,
+retained compatibility tests passed 257 with 4 opt-in live skips, and installed
+wheel checks passed 70. Ruff and changed-module strict mypy passed. Host Python
+is 3.10.12 and the pinned container is 3.10.22; Python 3.12 was unavailable locally.
+The full-check skips retain optional model/database/artifact prerequisites and
+include no new A-share tests. Hosted CI did not start because of account billing;
+its annotations are evidence of unavailability, not executed tests. Full log SHA256:
+`d5dac7a82547b455938199f983adcd21431937ee5ae09d19f48bdff99e8b69ce`.
+
+This final documentation follow-up reuses that full check only with byte-identical
+executable/config/test closure, plus affected documentation/planning checks.
+The closure includes 1806 tracked non-documentation files; original manifest SHA256:
+`404f5eaa53d6ad1e1989a886080077d041c5ef70029edb1161f526490a20488d`.
+Complete checks, integrated candidate dispositions, raw responses and rollback
+receipts stay outside Git under the evidence root above.
+
+Scoped disk cleanup removed verified completed software-image TMP copies only
+(154043055 logical bytes, 154107904 measured free-byte increase), plus this
+completed image-build context after its source/image/bundle identity was retained
+(15575423 logical bytes, 17702912 measured free-byte increase). No shared prune,
+market-data deletion or production change was made. The existing cleaner's
+03:30 run described above has a different owned root; it does not own these
+software TMP copies. Operations tracking remains in #537.

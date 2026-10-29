@@ -22,10 +22,18 @@ site-identity result must never be reported as a working financial data feed.
 
 Owner subsequently selected a public, relatively independent astock fork while
 Quanthus remains private. [P10-DATA-SUPPLY-005 / #587](https://github.com/rv198-star/Quanthus/issues/587)
-tracks the [source-subproject boundary](../design/astock-subproject.md) and first
-two source-library adapters in [rv198-star/astock](https://github.com/rv198-star/astock).
+tracks the [source-subproject boundary](../design/astock-subproject.md) and fourteen
+source-library request contracts in [rv198-star/astock](https://github.com/rv198-star/astock).
 The original reference checkout and its hashes below remain historical evidence;
 repository creation does not upgrade the deployed collector.
+
+On 2026-10-30, Owner continued absorption, environment construction and disk/cleaner
+inspection. The library candidate is `0eeedec0b0f22df78f4e738db2765b5219ca0ab6`;
+all 14 original samples replay successfully, and a separate 14-request canary has
+13 successes and one transport hold. Library/full-upstream/package checks now pass.
+The container cleaner is operating as designed; six superseded local build images
+and this task's completed synthetic test scratch were reclaimed. Full Quanthus
+checks now pass; see the current verification and housekeeping sections below.
 
 | Work item | Scope | Evidence/remaining gate |
 | --- | --- | --- |
@@ -33,7 +41,7 @@ repository creation does not upgrade the deployed collector.
 | [#583](https://github.com/rv198-star/Quanthus/issues/583) | Census, contracts and disposition ledger | Frozen declaration census; incomplete API definitions still need functional contracts |
 | [#584](https://github.com/rv198-star/Quanthus/issues/584) | Structured data, announcements and regulatory APIs | Bounded samples; capability-specific results and limitations retained |
 | [#585](https://github.com/rv198-star/Quanthus/issues/585) | Media, RSS and institution sites | Site identity and RSS tested separately; unavailable/network-limited entries stay explicit |
-| [#587](https://github.com/rv198-star/Quanthus/issues/587) | Independent astock fork and bounded absorption | Public source library; first ChinaMoney LPR and CNBC RSS adapters; consumer integration remains separate |
+| [#587](https://github.com/rv198-star/Quanthus/issues/587) | Independent astock fork and bounded absorption | 14 contracts, isolated build and package verification; consumer integration remains separate |
 
 ## Why daily collection works without the upstream checkout
 
@@ -101,7 +109,7 @@ capability overlap, not byte-identical ancestry or independent corroboration.
 | CNINFO disclosures | Existing `lane_runner` announcement collector | Supplementary HTTPS index sample tested separately; no silent transport or time-schema change |
 | News, macro and other upstream layers | Not established as current daily inputs | New candidate purposes require their own source and consumer contracts |
 
-No image, deployed code pointer, timer, production environment, existing Base or
+No active image, deployed code pointer, timer, production environment, existing Base or
 warehouse data was changed. Recovery shares the container release; the runbook
 describes initial Weekly financial wiring and explicit held domains, not full
 Weekly acceptance. A complete latest reference checkout alone cannot upgrade any
@@ -204,7 +212,90 @@ The runtime lineage receipt is
 SHA256 `656756cc71f396e3e389bc554e650c4618be82fb5f897ee9e9c45dec03301d13`.
 These are retained local evidence, not raw data committed to Git or an ADM product.
 
-## Verification and next gate
+## Current source-library verification — 2026-10-30
+
+The public library independently implements 14 request contracts in `src/astock`;
+no delivered scraper source code is copied. [astock PR #1](https://github.com/rv198-star/astock/pull/1)
+merged as `8ce0c5c844d88b56ff7092e2575757c463e698d3`; candidate prerelease
+[sources-v0.1.0](https://github.com/rv198-star/astock/releases/tag/sources-v0.1.0)
+pins the exact tested source commit and distributes the wheel/source/checksums.
+All original candidate bodies replay
+with exact body hashes and equivalent method/URL/form-or-JSON fields. A separate
+canary froze 14 requests, no retries, verified TLS, no proxy inheritance and a
+256 KiB response cap. Its current dispositions are:
+
+| Capability | Original replay | New canary | Candidate use ceiling |
+| --- | --- | --- | --- |
+| ChinaMoney LPR | 12 rows | 12 rows, pass | Effective-date rate observation; no inferred publication clock |
+| CNBC RSS | 30 items | 30 items, pass | Publisher feed discovery |
+| ChinaBond treasury curve | 505 points | 505 points, pass | Exact curve identity/source date; native units pending consumer mapping |
+| CNINFO index | 2 rows | 2 rows, pass | Raw index, exact source milliseconds; no document bodies or historical admission |
+| Eastmoney CPI/PPI/PMI/GDP/M2 | 2 rows each | 2 rows each, pass | Current-vintage named native numeric fields; no inferred release clocks |
+| Sina 2516 | 2 items | 2 items, pass | Publisher news metadata; no official-policy authority |
+| Sina 2510 | 2 items | 2 items, pass for archive metadata | Latest observed creation time is 2025-05-26 UTC; exclude current-policy coverage |
+| Tencent quote | 1 snapshot | 1 snapshot, pass | Single-security native quote diagnostic |
+| Sina quote | 1 snapshot | 1 snapshot, pass | Single-security native quote diagnostic |
+| Eastmoney quote | 1 snapshot | `REQUEST_FAILED`, hold | Prior schema evidence retained; current availability not granted |
+
+These are 13 current purpose-limited sample candidates and one transport hold,
+not whole-vendor, numerical-consumer, historical-PIT or production admission.
+The earlier 673-request census/dispositions remain immutable; this canary is an
+additional dated observation rather than a new independent-source denominator.
+
+Environment/build evidence is outside Git at
+`/srv/agentdock/evaluations/astock-20261030/`:
+
+- `build-dependency-manifest.json`: 13 PyPI wheel hashes/versions; bootstrap pip
+  23.0.1 comes from the existing pinned Python image
+  `sha256:db6ee5170ebce0f4d165af242e8e77addc08bd9ffc37e8b1815752cf027aa4f8`.
+  A partial official pip download was not executed. No shared runtime was modified.
+- `library-replay.json`, `live/plan.json`, `live/observations.jsonl`, retained bodies
+  and `candidate-ledger.v1.json`: per-contract status and evidence. The canary ledger
+  SHA256 is `7a1f10541ea6b9fd6630ace338e0e20fd4b0b70994a12b616be8dc1188ce20c7`.
+- `wheel-verification.json`: two fixed-epoch builds produce wheel SHA256
+  `b1896aabced17fcb1761121f9a1fce8a40073495185d2a9ea90a79e3398df646`.
+  A fresh install outside the checkout runs all **30 maintained tests** successfully.
+  Full original-plus-library suite: **221 tests, four opt-in live skips, no errors**;
+  legacy pandas is reused read-only, openpyxl is installed in the isolated overlay.
+- Mission logs retain commands/results. Ruff passes for all maintained source/tests.
+  Quanthus full `make check`: **5,699 passed, 20 skipped**, 605.11 seconds; doctor,
+  compile and planning/blueprint/exploration checks pass. The previous free-space
+  failure is resolved without changing its 8 GiB floor. The documentation-only
+  follow-up retains all 1,711 executable/config/test closure files byte-identically;
+  79 affected documentation/P10 contract tests and planning checks also pass.
+
+## CN02 disk and cleaner audit — 2026-10-30
+
+The running `quanthus-data-cleanup-1` uses the active pinned pipeline image, has
+exactly one bind at `/srv/quanthus-base22-data/tmp/p10` and no network. Five retained
+sweep logs cover Shanghai 03:30 on October 25–29; October 26–29 removed **nine**
+eligible directories. `.p10-cleaner.json` records the October 29 slot. Four failed
+jobs are correctly retained. The entire TMP root is only **104 KiB**. Historical
+logs have directory counts but no byte counters, so historical reclaimed bytes
+cannot be reconstructed from them. The scheduler is effective within its declared
+72-hour successful-TMP scope; it does not manage images, test scratch or evidence.
+
+The filesystem had 8,351,113,216 free bytes before this cleanup. Six old P10 local
+build images were unreferenced by all containers and current deployment configs;
+normal non-force image removal reclaimed **927,772,672 bytes**. Current and recent
+rollback images, all containers/volumes, P6, source trees and formal data were kept.
+After full tests, this task's own completed `/tmp/pytest-of-agentdock/pytest-519`
+synthetic scratch was removed with its test log retained. The receipts are
+`disk-cleanup-plan.json`, `disk-cleanup-receipt.json` and
+`test-scratch-cleanup-receipt.json` in the evaluation directory. Read-only synthetic
+publication fixtures required restoring owner-write on their own test directories
+before final removal; production paths were not involved. Final observed free
+space is 9,201,885,184 bytes (about 8.6 GiB); the test environment and audit evidence
+remain retained.
+
+Other retained `.codex` work/evidence consumes about **23 GiB**, including prepared
+research inputs. It was not age-deleted or relabelled disposable. Further recovery
+there requires an exact lifecycle/dependency disposition through P10, not widening
+the current cleaner mounts or deleting old research evidence by name. Findings are
+routed to the existing container lifecycle issue #537, without opening a duplicate
+cleaner-defect issue or changing the running schedule.
+
+## Earlier verification checkpoint — retained history
 
 The upstream full offline suite ran 191 tests with four live tests skipped; it
 reported 14 errors from missing `openpyxl` in the inspected runtime. It must not be

@@ -22,18 +22,19 @@ site-identity result must never be reported as a working financial data feed.
 
 Owner subsequently selected a public, relatively independent astock fork while
 Quanthus remains private. [P10-DATA-SUPPLY-005 / #587](https://github.com/rv198-star/Quanthus/issues/587)
-tracks the [source-subproject boundary](../design/astock-subproject.md) and fourteen
+tracks the [source-subproject boundary](../design/astock-subproject.md) and fifteen
 source-library request contracts in [rv198-star/astock](https://github.com/rv198-star/astock).
 The original reference checkout and its hashes below remain historical evidence;
 repository creation does not upgrade the deployed collector.
 
-On 2026-10-30, Owner continued absorption, environment construction and disk/cleaner
-inspection. The library candidate is `0eeedec0b0f22df78f4e738db2765b5219ca0ab6`;
-all 14 original samples replay successfully, and a separate 14-request canary has
-13 successes and one transport hold. Library/full-upstream/package checks now pass.
-The container cleaner is operating as designed; six superseded local build images
-and this task's completed synthetic test scratch were reclaimed. Full Quanthus
-checks now pass; see the current verification and housekeeping sections below.
+Owner's further 2026-10-30 instruction continues actual P10 integration, unit/time/
+rollback contracts, dated quality candidates and finite observation, through the
+existing issues. Current source library `0.1.1` adds the verified fund-NAV request;
+the original `0.1.0` observations below remain historical evidence. The exact
+Quanthus adapter, policy and watch boundary are in the child design. The new
+nine-request tranche has one observation-purpose pass, five rejected request/
+purpose definitions and three explicit holds. See the current integration section
+for the complete dated ledger and test/operational receipts.
 
 | Work item | Scope | Evidence/remaining gate |
 | --- | --- | --- |
@@ -41,7 +42,7 @@ checks now pass; see the current verification and housekeeping sections below.
 | [#583](https://github.com/rv198-star/Quanthus/issues/583) | Census, contracts and disposition ledger | Frozen declaration census; incomplete API definitions still need functional contracts |
 | [#584](https://github.com/rv198-star/Quanthus/issues/584) | Structured data, announcements and regulatory APIs | Bounded samples; capability-specific results and limitations retained |
 | [#585](https://github.com/rv198-star/Quanthus/issues/585) | Media, RSS and institution sites | Site identity and RSS tested separately; unavailable/network-limited entries stay explicit |
-| [#587](https://github.com/rv198-star/Quanthus/issues/587) | Independent astock fork and bounded absorption | 14 contracts, isolated build and package verification; consumer integration remains separate |
+| [#587](https://github.com/rv198-star/Quanthus/issues/587) | Independent astock fork and bounded absorption | 15 contracts, pinned P10 observation adapter, unit/time/rollback contracts and finite watch |
 
 ## Why daily collection works without the upstream checkout
 
@@ -294,6 +295,109 @@ there requires an exact lifecycle/dependency disposition through P10, not wideni
 the current cleaner mounts or deleting old research evidence by name. Findings are
 routed to the existing container lifecycle issue #537, without opening a duplicate
 cleaner-defect issue or changing the running schedule.
+
+## P10 integration and next source tranche — 2026-10-30
+
+The current consumer is P10's own supplementary observation and supplier
+qualification, governed by the [source-subproject design](../design/astock-subproject.md).
+`p10_source_contracts.py` and `p10_supplement.py` integrate fifteen separately
+identified capabilities through the fixed optional `supplement-sources` dependency.
+The versioned policy and per-field primary evidence are in
+[`p10-supplement-sources.v1.json`](../../config/pipelines/p10-supplement-sources.v1.json).
+The separate finite-watch image/runbook is in [`ops/source-watch`](../../ops/source-watch/README.md).
+
+The added NAV adapter was independently implemented and merged in
+[astock PR #2](https://github.com/rv198-star/astock/pull/2).
+Exact tested source `8360132de1255a68e42df8a1aa142f1335bd68e7` and merge
+`34f1c8492705c7a22b4bee8a05b73b33c505e3fd` have the same tree.
+[sources-v0.1.1](https://github.com/rv198-star/astock/releases/tag/sources-v0.1.1)
+distributes the reproducible wheel, source archive and checksums. Wheel SHA256:
+`49b04b404016fa5432acb12a1bbfdd5a2a4268adbd3a4e44a1f16adc53b1eebf`.
+The maintained synthetic suite passes 37 tests; the full retained upstream plus
+library runs 228 tests with four opt-in live skips. An initial legacy-environment
+attempt lacked pandas; the successful run uses the isolated environment plus the
+existing read-only test dependency closure. Quanthus's 28 targeted contracts cover
+units, periods, clocks, optional failure/disable, prior snapshot preservation,
+cutoff/hash checks, daily reuse and finite watch non-renewal.
+
+Quanthus full `make check` passes: **5,750 passed, 20 skipped**, 618.66 seconds;
+doctor, compilation and planning/blueprint/exploration checks pass. The first
+attempt had two subprocess import failures because the fresh test environment
+had not installed Quanthus. After an isolated editable install, those two cases
+pass independently and the complete check passes. No production logic or test
+gate was changed to repair that environment. Both full-check logs are retained.
+Ruff and strict mypy pass for the new production modules; 79 affected document/P10
+contracts pass separately.
+
+The fixed source request was replayed from the retained NAV response without
+another financial request. The source's actual `SGZT`/`SHZT` fields are validated;
+the delivered wrapper uses different names and would lose these statuses. Fund
+manager metadata confirms RMB for this exact fund. Unit NAV and accumulated NAV
+retain different bases; a valuation date supplies no release time. The source
+response does not normally echo the fund code, so identity is explicitly
+request-bound rather than claimed independently proven.
+
+The next manifest froze nine functional requests, each bounded to two rows/one
+security where applicable, with TLS verification, 256 KiB ceiling, 20-second
+outer deadline, no retry or automatic fallback. Original manifest and responses
+remain immutable. All times below are **2026-10-30, Asia/Shanghai (UTC+08:00)**;
+the machine ledger retains exact UTC and Shanghai timestamps and body SHA256.
+
+| Request / package function | Verified at | Disposition | Quality and reopening condition |
+| --- | --- | --- | --- |
+| Eastmoney fund NAV / `get_fund_nav` | 00:54:31 | PASS, P10 observation | Two valuation rows; NAV currency/units and status fields checked; absorbed into astock/P10 and finite watch |
+| Eastmoney margin / `get_margin_trading` | 00:54:32 | REJECT this request | HTTP 200 with source business error 9501, null result; corrected vendor-supported request needed |
+| Eastmoney block trades / `get_block_trades` | 00:54:32 | REJECT this request | Same explicit business error; no rows or unit claim; corrected contract needed |
+| Eastmoney billboard seats / `get_dragon_tiger_seats` | 00:54:32 | REJECT this request | Same business error; a quote fallback cannot establish seats |
+| Eastmoney executive holdings / `get_shareholder_changes` | 00:54:33 | REJECT this request | Same business error; corrected request and actual field definitions needed |
+| Eastmoney announcement / `EastMoneyReportAPI.search_reports` | 00:54:34 | HOLD access | HTTP 200, zero bytes; not an explicit empty list; changed/documented public access needed |
+| Eastmoney ETF flow / `get_etf_fund_flow` | 00:54:34 | HOLD units/basis | Two structured rows and source epoch seconds; per-field monetary/flow basis unproven, declared evidence page `/etf/` is 404 |
+| Eastmoney northbound / `get_northbound_flow` | 00:54:35 | REJECT this purpose contract | Four source fields versus eight assumed by wrapper, ambiguous market aliases; do not admit zeros as current flow |
+| Jisilu convertible list / `get_convertible_bonds` | 00:54:36 | HOLD access | HTTP 200, zero bytes; controlled public-session diagnostic at 01:12 found bootstrap `/cbnew/` HTTP 404 and stopped |
+
+These rejects apply to the observed request/purpose, not to every service of a
+vendor. Access holds remain unknown rather than permanently dead. The Jisilu
+diagnostic adds one homepage request, performs no second POST, login, TLS downgrade
+or challenge bypass. ETF schema success is retained, with numerical admission held
+until primary unit and definition evidence exists. No identical failed request
+is repeatedly retried. The source declaration census is not rebased by this tranche.
+The four shorthand function labels in the frozen manifest have explicit origin
+errata in the disposition ledger; request/body evidence is unchanged.
+
+An additional **static contract screen**, separate from financial online results,
+checked all thirteen `structured_market_data.py` AKShare routes against primary
+upstream source `akfamily/akshare@a14a7830c5b9a763230fcfb8ab0b3c9107716dc7`.
+Three named functions are not exported; three no-argument macro functions conflict
+with the package's `start_year` defaults. The package's fallback drops those
+arguments or switches backend, so it cannot prove the requested window. Two routes
+reuse already covered Eastmoney macro backends. Five remaining signatures require
+an explicit bounded source request/universe before runtime qualification; no
+whole-market or unrestricted history call was made. The reference modules and
+per-route dispositions are in `akshare-reference/contract-triage.json`. These
+thirteen rows count as no financial online passes and introduce no new dependency
+to the observation runtime.
+
+Current artifacts are outside Git at
+`/srv/agentdock/evaluations/p10-admission-20261030/`:
+
+- `normalization-replay.v2.json`: all fifteen retained observations through the
+  current pinned adapter, standardized units/time and quality; fourteen usable
+  for their limited purpose and the retained Eastmoney quote transport hold.
+- `remaining/plan.json`, individual response metadata/bodies and
+  `remaining/candidate-ledger.json`: all nine dated dispositions and primary-unit
+  evidence, plus `jisilu-session.json` for the sole controlled diagnostic.
+- `astock-dist-a/` and `astock-dist-b/`: identical wheel builds;
+  `astock-check-v2.log`, `astock-check-upstream-v3.log` and Git publication receipt.
+- `journal-before.json` and `journal-cleanup-receipt.json`: removal of ten archived
+  2024 OS journal files under a 365-day retention bound, 234,881,024 bytes. All
+  2026 Quanthus/container logs, formal data, volumes and rollback images remain.
+
+The finite watch persists a seven-day budget and daily checkpoints. Candidates
+remain observations while it runs; earliest review requires enough distinct-day
+and recent consecutive evidence. Stopping or selectively disabling the supplement
+is the rollback. Frozen research/business consumers keep their existing gates.
+The P10 epic and this source-supply issue group remain open for actual outstanding
+qualification and consumer-specific decisions.
 
 ## Earlier verification checkpoint — retained history
 

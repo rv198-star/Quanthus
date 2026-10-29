@@ -1,0 +1,376 @@
+{
+  "budget": {
+    "max_response_bytes": 262144,
+    "no_retry": true,
+    "no_vendor_fallback": true,
+    "source_wall_seconds": 20
+  },
+  "consumer": "P10 source qualification and supplemental observation",
+  "fund_universe": [
+    "000001"
+  ],
+  "issues": [
+    581,
+    583,
+    584,
+    585,
+    587
+  ],
+  "kind": "p10-supplement-policy-v1",
+  "library": {
+    "module_sha256": {
+      "__init__.py": "143c8d1aeebaffd45065d337fa1829a53f9d10ce89a79ae2947351932e3bd1c0",
+      "_parsing.py": "a0a558f03be73846cb1a7c6934cf8152c4556cb6f8646782cfbf6a4d9b864565",
+      "bonds.py": "0801a88dd753c4c28ff5cb3011771b8498a2164566ed318231b43a18a2a69fc8",
+      "contracts.py": "13b1d8054d53d851a249e3a43f59f21776086075a862b6b3af3ad84fe592376d",
+      "disclosures.py": "8ee04e210099795a457fdea99e67fe97dc697bffbf460a82490e7588b00d0ba0",
+      "funds.py": "440d9f92bbca2810d5fdf91fbe96a857c1fe424d246a00cd968a414993b7a050",
+      "lpr.py": "9bd05f285376fe0e7a4073bfbdcfde53b0cc08a38243f8fffbf9356783051264",
+      "macro.py": "223f7393286c93a8e45cf01ce0d3a90ba2291a5538a5aa38f0743b7467d59abf",
+      "news.py": "67b4dbdabee3ed7eac80cc006c45cb0821f4f146548619184f67c41fc1abe51a",
+      "quotes.py": "29ec0f41a69a017ec1b7abc37e0f787ef3a29fe47aa5b16dffcb53198b744862",
+      "rss.py": "dcf353035e468f11367617ef85b4437beddfe6736198de2fde3656e2f5f00355",
+      "transport.py": "3bc4929a066856c9cabe553a87b075e080bee0c66de64a7d19371e00dc38eb02"
+    },
+    "repository": "https://github.com/rv198-star/astock",
+    "revision": "8360132de1255a68e42df8a1aa142f1335bd68e7",
+    "version": "0.1.1",
+    "wheel_sha256": "49b04b404016fa5432acb12a1bbfdd5a2a4268adbd3a4e44a1f16adc53b1eebf",
+    "wheel_url": "https://github.com/rv198-star/astock/releases/download/sources-v0.1.1/astock_sources-0.1.1-py3-none-any.whl"
+  },
+  "lifecycle": {
+    "business_admission": false,
+    "observations": "ADM_P10_QUALIFICATION_EVIDENCE",
+    "retention": "KEEP_IMMUTABLE_UNTIL_P10_DISPOSITION",
+    "staging": "TMP"
+  },
+  "owner": "P10",
+  "policy_version": "2026-10-30.1",
+  "quality": {
+    "future_clock_seconds": 300
+  },
+  "runtime_dependencies": {
+    "certifi": {
+      "filename": "certifi-2026.7.22-py3-none-any.whl",
+      "version": "2026.7.22",
+      "wheel_sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775"
+    },
+    "charset-normalizer": {
+      "filename": "charset_normalizer-3.5.2-py3-none-any.whl",
+      "version": "3.5.2",
+      "wheel_sha256": "b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685"
+    },
+    "idna": {
+      "filename": "idna-3.20-py3-none-any.whl",
+      "version": "3.20",
+      "wheel_sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"
+    },
+    "requests": {
+      "filename": "requests-2.34.2-py3-none-any.whl",
+      "version": "2.34.2",
+      "wheel_sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0"
+    },
+    "urllib3": {
+      "filename": "urllib3-2.8.0-py3-none-any.whl",
+      "version": "2.8.0",
+      "wheel_sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3"
+    }
+  },
+  "schema": "p10-supplement-observation-v1",
+  "security_universe": [
+    "sh600519"
+  ],
+  "sources": [
+    {
+      "fields": {
+        "maturity": {
+          "basis": "SOURCE_REMAINING_MATURITY",
+          "multiplier": "1",
+          "native_unit": "YEAR",
+          "unit": "YEAR"
+        },
+        "yield": {
+          "basis": "CHINABOND_TREASURY_MATURITY_YIELD",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "ANNUAL_YIELD_RATIO"
+        }
+      },
+      "key": "chinabond:treasury.curve",
+      "kind": "curve",
+      "purpose": "treasury_curve_observation"
+    },
+    {
+      "fields": {
+        "rate": {
+          "basis": "PUBLISHED_LPR_TENOR",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "ANNUAL_RATE_RATIO"
+        }
+      },
+      "key": "chinamoney:lpr.history",
+      "kind": "lpr",
+      "purpose": "rate_observation"
+    },
+    {
+      "fields": {},
+      "key": "cnbc:news.rss",
+      "kind": "rss",
+      "max_latest_age_seconds": 172800,
+      "purpose": "current_news_metadata"
+    },
+    {
+      "fields": {},
+      "key": "cninfo:disclosure.index",
+      "kind": "disclosure",
+      "purpose": "disclosure_index_metadata"
+    },
+    {
+      "fields": {
+        "accumulated_nav": {
+          "basis": "VENDOR_ACCUMULATED_NAV_NOT_TOTAL_RETURN_INDEX",
+          "multiplier": "1",
+          "native_unit": "CNY_PER_FUND_UNIT",
+          "unit": "CNY_PER_FUND_UNIT"
+        },
+        "daily_change": {
+          "basis": "VENDOR_DAILY_NAV_CHANGE",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "RATIO"
+        },
+        "nav": {
+          "basis": "SOURCE_UNIT_NAV",
+          "multiplier": "1",
+          "native_unit": "CNY_PER_FUND_UNIT",
+          "unit": "CNY_PER_FUND_UNIT"
+        }
+      },
+      "key": "eastmoney:fund.nav",
+      "kind": "fund",
+      "purpose": "single_fund_nav_observation"
+    },
+    {
+      "fields": {
+        "NATIONAL_BASE": {
+          "basis": "VENDOR_REPORTED_INDEX_BASE_UNSPECIFIED",
+          "multiplier": "1",
+          "native_unit": "INDEX_POINT",
+          "unit": "INDEX_POINT"
+        },
+        "NATIONAL_SAME": {
+          "basis": "VENDOR_REPORTED_CHANGE",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "RATIO"
+        },
+        "NATIONAL_SEQUENTIAL": {
+          "basis": "VENDOR_REPORTED_CHANGE",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "RATIO"
+        }
+      },
+      "key": "eastmoney:macro.cpi",
+      "kind": "macro",
+      "purpose": "current_vintage_macro"
+    },
+    {
+      "fields": {
+        "DOMESTICL_PRODUCT_BASE": {
+          "basis": "CURRENT_VINTAGE_SOURCE_TOTAL",
+          "multiplier": "100000000",
+          "native_unit": "CNY_100_MILLION",
+          "unit": "CNY"
+        },
+        "SUM_SAME": {
+          "basis": "VENDOR_REPORTED_CHANGE",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "RATIO"
+        }
+      },
+      "key": "eastmoney:macro.gdp",
+      "kind": "macro",
+      "purpose": "current_vintage_macro"
+    },
+    {
+      "fields": {
+        "BASIC_CURRENCY": {
+          "basis": "CURRENT_VINTAGE_SOURCE_TOTAL",
+          "multiplier": "100000000",
+          "native_unit": "CNY_100_MILLION",
+          "unit": "CNY"
+        },
+        "BASIC_CURRENCY_SAME": {
+          "basis": "VENDOR_REPORTED_CHANGE",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "RATIO"
+        }
+      },
+      "key": "eastmoney:macro.m2",
+      "kind": "macro",
+      "purpose": "current_vintage_macro"
+    },
+    {
+      "fields": {
+        "MAKE_INDEX": {
+          "basis": "VENDOR_REPORTED_INDEX_BASE_UNSPECIFIED",
+          "multiplier": "1",
+          "native_unit": "INDEX_POINT",
+          "unit": "INDEX_POINT"
+        },
+        "NMAKE_INDEX": {
+          "basis": "VENDOR_REPORTED_INDEX_BASE_UNSPECIFIED",
+          "multiplier": "1",
+          "native_unit": "INDEX_POINT",
+          "unit": "INDEX_POINT"
+        }
+      },
+      "key": "eastmoney:macro.pmi",
+      "kind": "macro",
+      "purpose": "current_vintage_macro"
+    },
+    {
+      "fields": {
+        "BASE": {
+          "basis": "VENDOR_REPORTED_INDEX_BASE_UNSPECIFIED",
+          "multiplier": "1",
+          "native_unit": "INDEX_POINT",
+          "unit": "INDEX_POINT"
+        },
+        "BASE_ACCUMULATE": {
+          "basis": "VENDOR_REPORTED_INDEX_BASE_UNSPECIFIED",
+          "multiplier": "1",
+          "native_unit": "INDEX_POINT",
+          "unit": "INDEX_POINT"
+        },
+        "BASE_SAME": {
+          "basis": "VENDOR_REPORTED_CHANGE",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "RATIO"
+        }
+      },
+      "key": "eastmoney:macro.ppi",
+      "kind": "macro",
+      "purpose": "current_vintage_macro"
+    },
+    {
+      "fields": {
+        "price": {
+          "basis": "SOURCE_SNAPSHOT_NO_ADJUSTMENT_INFERENCE",
+          "multiplier": "1",
+          "native_unit": "CNY_PER_SHARE",
+          "unit": "CNY_PER_SHARE"
+        }
+      },
+      "key": "eastmoney:quote.snapshot",
+      "kind": "quote",
+      "purpose": "single_security_quote_diagnostic"
+    },
+    {
+      "fields": {},
+      "key": "sina:news.roll.2510",
+      "kind": "news",
+      "purpose": "archive_news_metadata"
+    },
+    {
+      "fields": {},
+      "key": "sina:news.roll.2516",
+      "kind": "news",
+      "max_latest_age_seconds": 172800,
+      "purpose": "current_news_metadata"
+    },
+    {
+      "fields": {
+        "price": {
+          "basis": "SOURCE_SNAPSHOT_NO_ADJUSTMENT_INFERENCE",
+          "multiplier": "1",
+          "native_unit": "CNY_PER_SHARE",
+          "unit": "CNY_PER_SHARE"
+        }
+      },
+      "key": "sina:quote.snapshot",
+      "kind": "quote",
+      "purpose": "single_security_quote_diagnostic"
+    },
+    {
+      "fields": {
+        "price": {
+          "basis": "SOURCE_SNAPSHOT_NO_ADJUSTMENT_INFERENCE",
+          "multiplier": "1",
+          "native_unit": "CNY_PER_SHARE",
+          "unit": "CNY_PER_SHARE"
+        }
+      },
+      "key": "tencent:quote.snapshot",
+      "kind": "quote",
+      "purpose": "single_security_quote_diagnostic"
+    }
+  ],
+  "unit_evidence": [
+    {
+      "sha256": "e38fa8f47c56c384901e9f61292aba32e1c9cb8af875fb11ef488414e286cf61",
+      "source": "eastmoney:macro.gdp",
+      "url": "https://data.eastmoney.com/newstatic/js/cjsj/cn/gdp.js"
+    },
+    {
+      "sha256": "92ff113d8800924dab4e75444b922c11bd28833385704c136d6c88bada4a05d0",
+      "source": "eastmoney:macro.m2",
+      "url": "https://data.eastmoney.com/newstatic/js/cjsj/cn/hbgyl.js"
+    },
+    {
+      "sha256": "d9b284d8e20927f180039e2bfc52b9776b5b1b4dd3aec5527a524aff52dbb35c",
+      "source": "eastmoney:macro.pmi",
+      "url": "https://data.eastmoney.com/newstatic/js/cjsj/cn/pmi.js"
+    },
+    {
+      "sha256": "51f0ad248516c025787c2169932715c5771a92ee61275d9c3f4d1ff35e1eeb17",
+      "source": "eastmoney:macro.cpi",
+      "url": "https://data.eastmoney.com/newstatic/js/cjsj/cn/cpi.js"
+    },
+    {
+      "sha256": "d1326d2730e9e306afe30d5c13c5f13c473f1d5919f112978ab7d5680d1d7cca",
+      "source": "eastmoney:macro.ppi",
+      "url": "https://data.eastmoney.com/newstatic/js/cjsj/cn/ppi.js"
+    },
+    {
+      "sha256": "39fdb845aef397c96e1fac63f8a9b361a4cd30432691deb0edc585f47908d1b5",
+      "source": "chinabond:treasury.curve",
+      "url": "https://yield.chinabond.com.cn/cbweb-mn/yield_main?locale=zh_CN"
+    },
+    {
+      "basis": "PAGE_HEADINGS_PERCENT_TENOR; effective date is not publication time",
+      "source": "chinamoney:lpr.history",
+      "url": "https://www.chinamoney.com.cn/chinese/bklpr/"
+    },
+    {
+      "basis": "3.3.10 and 3.3.11; fixed Shanghai A-share scope only; no volume units admitted",
+      "source": "quote.snapshot",
+      "url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml"
+    },
+    {
+      "basis": "Unit/accumulated NAV and percentage; actual SGZT/SHZT fields",
+      "sha256": "15336ed7a5f4ddcb4d948591898f4bc48af5272f46b652582a250f0d773738bf",
+      "source": "eastmoney:fund.nav",
+      "url": "https://fundf10.eastmoney.com/jjjz_000001.html"
+    },
+    {
+      "basis": "GBK; fund 000001; trading currency RMB; fixed-fund scope only",
+      "sha256": "d17f72a2a788a34dd7bf854c249607ca8b2fb62ebb1fd7c0826d8f2936af3137",
+      "source": "eastmoney:fund.nav",
+      "url": "https://www.chinaamc.com/fund/000001/index.shtml"
+    }
+  ],
+  "watch": {
+    "automatic_business_admission": false,
+    "days": 7,
+    "expiry_action": "STOP_AND_REVIEW",
+    "interval_seconds": 86400,
+    "min_consecutive_success_days": 3,
+    "min_distinct_success_days": 3
+  }
+}

@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 
 from quanthus import local_acceptance as local
+from quanthus import local_acceptance_pytest as telemetry
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -383,3 +384,18 @@ def test_assume_unchanged_cannot_hide_source_edit(repository: Path) -> None:
     assert not local.git(repository, "status", "--porcelain")
     with pytest.raises(local.AcceptanceError, match="DIRTY_TRACKED_CONTENT"):
         local.repository_identity(repository)
+
+
+def test_tmp_retention_never_chmods_hardlinked_file(tmp_path: Path) -> None:
+    original = tmp_path / "original"
+    original.write_bytes(b"synthetic-kept-source")
+    original.chmod(0o400)
+    owned = tmp_path / "owned"
+    nested = owned / "nested"
+    nested.mkdir(parents=True)
+    (nested / "linked").hardlink_to(original)
+    nested.chmod(0o500)
+    telemetry.remove_owned(owned)
+    assert original.read_bytes() == b"synthetic-kept-source"
+    assert original.stat().st_mode & 0o777 == 0o400
+    assert not owned.exists()

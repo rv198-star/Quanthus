@@ -40,10 +40,10 @@ def remove_owned(path: Path) -> None:
         if target != path and path not in target.parents:
             raise ValueError("TMP_OUTSIDE_OWNED_ROOT")
         for item in (target.parent, target):
-            if (item == path or path in item.parents) and not item.is_symlink():
+            if (item == path or path in item.parents) and not item.is_symlink() and item.is_dir():
                 if item.stat().st_uid != os.geteuid():
                     raise ValueError("TMP_OWNER_CHANGED")
-                item.chmod(item.stat().st_mode | (0o700 if item.is_dir() else 0o600))
+                item.chmod(item.stat().st_mode | 0o700)
         function(name)
 
     shutil.rmtree(path, onerror=writable)

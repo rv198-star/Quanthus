@@ -318,6 +318,87 @@
         "CP-540-20261029T134116537370Z"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-RECORDED-B-CHAIN-20261029",
+      "recorded_at": "2026-10-29T15:43:57.968158+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved original B decision-chain delivery",
+      "work_item": "META-LEARN-001",
+      "question_id": "RECORDED-B-DECISION-CHAIN-001",
+      "family": "recorded-decision-chain-delivery",
+      "modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "能否用原B准确记录交付从入场决定到原模拟成交、持仓和退出的可追溯查阅链？",
+      "consumer": "Owner及已有研究调用者的历史审查，不参与交易或新研究比较",
+      "scope": "原B2012–2021精确记录及#580原持仓投影；22955入场/8393持仓/17062事件。",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "只读工程查阅和原字段/连接证明；不是策略/预测增益、历史PIT、反事实或交易资格。",
+      "decision_effect": "交付原模拟完整记录链和7类案例；分配考虑不等于订单、缺失理由未知；无新可改变决定的科学用途证据，不自动重开比较或P6。",
+      "reopen_conditions": [
+        "具体调用者提出准确事件和原字段支持的未满足决定或可重复工程缺陷。",
+        "新增研究另须用途、资格和有限预算；全部旧失败、曝光和成本保留。"
+      ],
+      "retained_assets": [
+        "准确B适配、冻结契约、查询/离线HTML和合成回归。",
+        "原B/#580字节相等、独立引用核对、两次隔离冷读和负测收据。",
+        "原停放/拒绝/未知成本保留；本地原环境失败和复验分别保留。"
+      ],
+      "evidence": [
+        {
+          "id": "CHAIN_FIELDS",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/independent-fields.safe.json",
+          "sha256": "bb7ad5105bb6708a5e142a3763581de71fa4539117f1de973321f6aa8c148b44",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原B11文件逐字相等、完整入场/持仓/引擎分母及独立引用和行动单元核对；不做经济计算"
+        },
+        {
+          "id": "CHAIN_COLD",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/cold-acceptance.safe.json",
+          "sha256": "03cb08eda1786953bc38f328f0913048d481af9d281c6093afe3efa95de9ddb0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "一份独立实体副本两位置/两新进程、空文件系统与网络命名空间、native旧源打开/网络连接0和损坏/缺失拒绝"
+        },
+        {
+          "id": "CHAIN_VIEW",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/query-delivery.safe.json",
+          "sha256": "b4db69c640da046cb117a11e581f4cf23b2a05ff74086668f03bc15631d65974",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "准确只读包及7类实际案例，未知和原模拟身份保留；不是新策略"
+        },
+        {
+          "id": "CHAIN_CHECK",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/post-test-code-closure.safe.json",
+          "sha256": "29b34aa101579ddcab4ba6b21e25089a97f7534fc9c861cbbbddc3657af71aae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "1479文件与本地全仓/环境复验完全同字节；不是GitHub CI通过"
+        }
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "本job激活墙钟和脚本/RSS/字节在交接实测；模型token/计费不可完整归因，不填零。插件载入失败、一次完整make和15项环境复验均保留，不重跑科学实验。",
+      "attempt_refs": [
+        "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/initial-plugin-import-make-check.safe.json",
+        "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/make-check.safe.json",
+        "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/environment-recheck.safe.json"
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T154357968158Z"
+      ],
+      "supersedes": null
     }
   ]
 }

@@ -196,3 +196,43 @@ The original `trial` position state, actual 2026 retrospective cutoff and unavai
 reasons are retained. An old shadow proposal is separately identified and remains parked.
 No learned-model use was observed in this retained trace; model admission, entry/allocation/
 fill alternatives and historical PIT qualification are not inferred from these cards.
+
+## Trace an original B entry through its recorded exit
+
+Use the decision-chain companion after #580 when the question includes entry, order,
+fill, original rejection/delay, or final unit ledger context. It accepts only the exact
+versioned B selection; it is not a general replay or arbitrary data loader. The retained
+[acceptance record](../acceptance/recorded-b-decision-chain-20261029.md) gives the package,
+trusted digest and local example paths. Preserve its owning-job access/retention policy.
+
+Build once only under an active budget, with a new output and physical parent:
+
+```bash
+PYTHONPATH=src python3 -B scripts/learning_decision_chain.py build \
+  --selection "$CHAIN_SELECTION" --output "$CHAIN_PACKAGE"
+```
+
+Use the returned trusted `CHAIN_DIGEST`. Queries and verification need only this package
+and ordinary code; original B, Facts, #580 sources, caches and source networks are unnecessary.
+Routine consumers should load/verify once and reuse the returned immutable index for their
+queries within the process, rather than rebuild it per question. Each CLI invocation does a
+fresh complete read/semantic verification for safety; it does not claim indexed low-latency
+service performance.
+
+```bash
+PYTHONPATH=src python3 -B scripts/learning_decision_chain.py verify \
+  --package "$CHAIN_PACKAGE" --manifest-sha256 "$CHAIN_DIGEST"
+PYTHONPATH=src python3 -B scripts/learning_decision_chain.py query \
+  --package "$CHAIN_PACKAGE" --manifest-sha256 "$CHAIN_DIGEST" \
+  --security 000011 --date 2012-01-05 --limit 3
+PYTHONPATH=src python3 -B scripts/learning_decision_chain.py query \
+  --package "$CHAIN_PACKAGE" --manifest-sha256 "$CHAIN_DIGEST" \
+  --episode "$ORIGINAL_ENTRY_KEY" --limit 1 --format html --output "$CHAIN_VIEW"
+```
+
+Dates match original entry decisions, held reviews or engine-event business dates. Use
+`--unit`/`--episode` for unambiguous identity; inspect `matched`/`returned`/`truncated`.
+Output is an exclusive new file outside all protected package/source/selection directories.
+Original simulation is explicit; lack of an order is not an invented rejection. The final
+unit ledger is run-level context. Unknown fields and alternative actions remain unknown.
+No polling task, network collection, replay, trading signal or production change is installed.

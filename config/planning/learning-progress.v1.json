@@ -8128,6 +8128,146 @@
       "reviewed_modules": [
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-540-20261029T154357968158Z",
+      "recorded_at": "2026-10-29T15:43:57.968158+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved original B decision-chain delivery",
+      "work_item": "META-LEARN-001",
+      "outcome": "completed",
+      "summary": "PR580普通合并；原B入场—原模拟订单/成交—持仓—退出只读链、独立核验和7类案例交付；不重开停放研究。",
+      "evidence": [
+        {
+          "id": "CHAIN_FIELDS",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/independent-fields.safe.json",
+          "sha256": "bb7ad5105bb6708a5e142a3763581de71fa4539117f1de973321f6aa8c148b44",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原B11文件逐字相等、完整入场/持仓/引擎分母及独立引用和行动单元核对；不做经济计算"
+        },
+        {
+          "id": "CHAIN_COLD",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/cold-acceptance.safe.json",
+          "sha256": "03cb08eda1786953bc38f328f0913048d481af9d281c6093afe3efa95de9ddb0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "一份独立实体副本两位置/两新进程、空文件系统与网络命名空间、native旧源打开/网络连接0和损坏/缺失拒绝"
+        },
+        {
+          "id": "CHAIN_VIEW",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/query-delivery.safe.json",
+          "sha256": "b4db69c640da046cb117a11e581f4cf23b2a05ff74086668f03bc15631d65974",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "准确只读包及7类实际案例，未知和原模拟身份保留；不是新策略"
+        },
+        {
+          "id": "CHAIN_CHECK",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/post-test-code-closure.safe.json",
+          "sha256": "29b34aa101579ddcab4ba6b21e25089a97f7534fc9c861cbbbddc3657af71aae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "1479文件与本地全仓/环境复验完全同字节；不是GitHub CI通过"
+        }
+      ],
+      "updates": [
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "原B22955入场、8393持仓和17062事件由精确摘要/显式引用接通；538买入、535退出、3期末持有、5未成交订单可查询；PR580已进入主线。",
+          "remaining": "未记录的分配/拒绝原因不补造；新链待审，不构成模型增益、历史PIT或生产/P6准入。",
+          "next_action": "使用7类实际链；只有出现具体可改变决定且证据合格的用途缺口才另立任务。",
+          "evidence": [
+            "CHAIN_FIELDS",
+            "CHAIN_COLD",
+            "CHAIN_VIEW",
+            "CHAIN_CHECK"
+          ],
+          "supersedes": "CP-540-20261029T134116537370Z"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "原始11文件逐字相等、独立全键/引用核对；独立实体副本两处新进程离线冷读、无旧源/网络和损坏失败关闭。",
+          "remaining": "是工程/字段验证，不是新策略或训练科学复现；make原15项noexec失败和15项复验通过保留；全仓216项旧lint仍在。",
+          "next_action": "按准确输入/代码/契约身份复用；新科学研究仍需自身独立构建和用途准入。",
+          "evidence": [
+            "CHAIN_FIELDS",
+            "CHAIN_COLD",
+            "CHAIN_VIEW",
+            "CHAIN_CHECK"
+          ],
+          "supersedes": "CP-540-20261029T134116537370Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "批准1–3收口：既有工具主线交付、真实完整记录链、分类案例、适用检查与蓝图结论关联齐备。",
+          "remaining": "本批补工程可查阅性；整体12+X用途、Head2/量能/持仓影子等停放结论不变。",
+          "next_action": "结束本批；先用已交付链定位实际问题，不自动启动采集、训练、比较或P6。",
+          "evidence": [
+            "CHAIN_FIELDS",
+            "CHAIN_COLD",
+            "CHAIN_VIEW",
+            "CHAIN_CHECK"
+          ],
+          "supersedes": "CP-540-20261029T134116537370Z"
+        }
+      ],
+      "no_change_reason": "",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:53Z",
+          "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
+        }
+      ]
+    },
+    {
+      "id": "CP-2-CHAIN-READONLY-20261029T154501633474Z",
+      "recorded_at": "2026-10-29T15:45:01.633474+00:00",
+      "actor": "Codex / Sol 6.1",
+      "work_item": "META-TRACE-001",
+      "outcome": "completed",
+      "summary": "记录真实决策链交付结论、模块watch路径与保留提案记忆；未修改追溯工具行为。",
+      "evidence": [
+        {
+          "id": "TRACE_BIND",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/post-test-code-closure.safe.json",
+          "sha256": "29b34aa101579ddcab4ba6b21e25089a97f7534fc9c861cbbbddc3657af71aae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只记录真实本批来源和检查身份；追溯工具代码和资格无变化"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只追加本批事实、扩展EXPERT跟踪路径并刷新非授权提案记忆；TRACE代码、算法、状态与准入能力无变化。",
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
     }
   ]
 }

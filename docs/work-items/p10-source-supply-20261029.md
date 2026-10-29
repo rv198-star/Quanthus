@@ -22,7 +22,7 @@ site-identity result must never be reported as a working financial data feed.
 
 Owner subsequently selected a public, relatively independent astock fork while
 Quanthus remains private. [P10-DATA-SUPPLY-005 / #587](https://github.com/rv198-star/Quanthus/issues/587)
-tracks the [source-subproject boundary](../design/astock-subproject.md) and nineteen
+tracks the [source-subproject boundary](../design/astock-subproject.md) and twenty-one
 source-library request contracts in [rv198-star/astock](https://github.com/rv198-star/astock).
 The original reference checkout and its hashes below remain historical evidence;
 repository creation does not upgrade the deployed collector.
@@ -61,7 +61,7 @@ manifest/deadline. Business and historical PIT admission remain false.
 | [#583](https://github.com/rv198-star/Quanthus/issues/583) | Census, contracts and disposition ledger | Frozen declaration census; incomplete API definitions still need functional contracts |
 | [#584](https://github.com/rv198-star/Quanthus/issues/584) | Structured data, announcements and regulatory APIs | Bounded samples; capability-specific results and limitations retained |
 | [#585](https://github.com/rv198-star/Quanthus/issues/585) | Media, RSS and institution sites | Site identity and RSS tested separately; unavailable/network-limited entries stay explicit |
-| [#587](https://github.com/rv198-star/Quanthus/issues/587) | Independent astock fork and bounded absorption | 18 contracts, two pinned P10 observation policies and independent finite watches |
+| [#587](https://github.com/rv198-star/Quanthus/issues/587) | Independent astock fork and bounded absorption | 21 contracts; v1/v2/v3 watches preserved and a separate bounded A-share v4 policy |
 
 The Owner then continued the three access/unit holds independently of that watch.
 [astock PR#3](https://github.com/rv198-star/astock/pull/3) adds three corrected
@@ -78,6 +78,16 @@ The three-capability container `quanthus-p10-holds-watch` now runs source
 **2026-10-31 02:34:34 Asia/Shanghai**, and its nonrenewable end is
 **2026-11-06 02:34:34 Asia/Shanghai**. The original watch still ends at01:39:23.
 Both periods are observation requirements; other source qualification proceeds.
+
+Owner's latest continuation makes **A shares the highest priority**. Hong Kong/US
+work is low priority and requires new access or request-contract evidence before
+another bounded probe; unchanged failures are not replayed. The next two A-share
+functions use astock `0.1.4` and the separate v4 policy: one security's financing/
+stock-lending window and a two-row block-trade disclosure sample. Dates are frozen
+qualification samples, not a latest-session/full-market feed. See the final section
+for source-native units, partial coverage and the retained amount discrepancy.
+The existing fifteen/three/futures watches and their deadlines remain unchanged.
+Seven-day observation is not a predecessor for another bounded source tranche.
 
 ## Why daily collection works without the upstream checkout
 
@@ -748,3 +758,58 @@ source `e626c85ee7bdd43f9b66468d2b3349a95d37477e`.
 Consumer change: [Quanthus PR #592](https://github.com/rv198-star/Quanthus/pull/592).
 Existing issues and the standing epic remain open; candidate observation never
 automatically grants business or historical PIT admission.
+
+## 2026-10-30 continuation: A shares first, futures evidence bounded
+
+This continuation uses existing #581/#583/#584/#587. A shares are the highest
+source priority. HK/US remains low priority with **zero** new requests: no new
+access or request-contract evidence supports retrying the prior transport holds.
+Evidence is retained under
+`/srv/agentdock/evaluations/p10-cn-priority-20261030/`; prior roots and raw responses
+remain immutable.
+
+### Futures evidence review
+
+Two new official DCE routes were attempted once each: the HTTPS contract-info
+POST restricted to product `v`, and its current contract-info page. Both timed
+out on CN02 at **05:47:53 / 05:48:05 Asia/Shanghai**. Official V2701 listing/start/
+last-trade metadata therefore remains unverified. This is a local access result,
+not a claim that the exchange or the named contract is unavailable.
+
+The [CFA explanation](https://www.cfachina.org/inv/wqbh/rxwd/202302/t20230208_36029.html),
+fully acquired at **05:48:05**, supplies general exchange single-sided counting
+from 2020 and lots in its example. A DCE-authored
+[night/day auction Q&A reproduced by a member](https://www.bhfcc.com/customer-center-ques-details.html?id=8944)
+links the 2023-05-25 night to the 2023-05-26 trading day. That text is browser
+discovery evidence; CN02's full-body request timed out. A separate 2025 rules
+reproduction hit the response cap and is explicitly incomplete. Neither partial
+reference establishes Sina's native date role, vendor quantity scale/counting
+or the 2026 holiday/session mapping.
+
+Sina V2701 keeps its existing price-only contract. Official current listing,
+night-session date binding and vendor volume/open-interest units/counting remain
+open; no clocks are combined, quantities normalized or expiry extended. Reference
+discovery stops at the finite budget; the work moves to A shares without another
+identical futures quote or failed DCE request.
+
+### New A-share functional samples
+
+| Capability | Actual validation, Asia/Shanghai | Counts and disposition | Qualified units/time limits |
+| --- | --- | --- | --- |
+| Eastmoney SH600519 financing/stock lending | 2026-10-30 05:50:51.793109 | 2 rows, vendor total 3/pages 2 within 2026-10-26..29; bounded-reference candidate | Source sessions 10-28/27; CNY and shares, exact decimals/signed net flows; no claim of 10-29 coverage or historical publication |
+| Eastmoney A-share block trades | 2026-10-30 05:50:52.067566 | 2 rows from vendor total 68/pages 34 for 2026-10-29; partial bounded-reference candidate | CNY/share, shares, CNY and already-fractional premium; one CNY 50 price-times-shares discrepancy retained; no inferred execution/complete census |
+
+Both actual HTTP 200 JSON envelopes pass scope/security/venue/schema/count checks.
+The independent parsers require the exact request and headers, first-page bounds,
+finite source-native numbers and declared session scope. Source-reported errors,
+empty/invalid/partial transport and missing fields never become successful zero
+or a second provider. `RZRQYECZ` is excluded from numeric admission: the delivered
+skill's `balance_change` label is unsupported. Unknown extra fields, including
+future-horizon returns, are not admitted into metrics.
+
+The policy fixes these dates and purposes; another session/universe is a new
+reviewed scope. All publication/source-clock values are null and knowledge begins
+at actual complete acquisition. The source's latest native session and the actual
+validation clock are separate ledger fields. A longer access watch does not
+qualify more sessions or repair discrepancies. astock `0.1.4` and P10 policy v4
+absorb both functions independently of the three existing watches.

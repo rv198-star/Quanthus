@@ -268,3 +268,47 @@ checks passed without additional HTTP or stale substitution; it neither pads
 existing qualification days nor blocks continued screening of other sources.
 See the [supply work item](../work-items/p10-source-supply-20261029.md) for exact
 image/source, first-cycle evidence, period and local checks.
+
+## Bounded A-share references — source library 0.1.4
+
+Owner's current source priority is A shares first; HK/US is low priority and is
+retested only after new access or request-contract evidence. This tranche adds
+`eastmoney:margin.single_security.bounded` and
+`eastmoney:block_trades.a_share.bounded`, bringing the independent library to
+21 request contracts, not 21 independent vendors. It uses the separate
+[`p10-supplement-sources.v4.json`](../../config/pipelines/p10-supplement-sources.v4.json),
+`supplement-sources-v4` extra and
+[`requirements-v4.lock`](../../ops/source-watch/requirements-v4.lock).
+
+The first request freezes SH600519, 2026-10-26 through 2026-10-29 and page 1/size 2.
+The second freezes A-share block-trade disclosures dated 2026-10-29, page 1/size 2.
+These are fixed-session vendor-reference qualification samples. Repeated access
+observations do not establish additional native-session coverage, latest-session
+freshness, all-market completeness, historical publication or a portfolio fill.
+Raw/parse/normalize remains one immutable job-local chain reused by quality and
+candidate reporting; source code, request, policy and dependency identities remain
+in the run closure. No new business consumer is enabled.
+
+The [publisher margin script](https://data.eastmoney.com/newstatic/js/rzrq/stock.js)
+binds financing/stock-lending monetary fields to yuan and lending quantities to
+shares. Preserve exact decimals, signed net flows and valid zero. Do not divide
+amounts into rounded hundred-million-yuan display values. `RZRQYECZ` is retained
+as unqualified metadata, never the original skill's claimed daily balance change.
+
+The [block-trade table](https://data.eastmoney.com/dzjy/dzjy_mrmx.html) and its
+[formatter](https://data.eastmoney.com/newstatic/js/common/emdataview.js) prove
+API shares/yuan are scaled by 10^-4 only for webpage display. Native premium is
+already fractional; the webpage multiplies it by 100 for display percent. P10
+therefore uses multiplier 1 for shares, yuan, yuan/share and premium fraction.
+One sampled reported amount differs from price times shares by CNY 50; the native
+amount is preserved and `BLOCK_TRADE_REPORTED_AMOUNT_DIFFERS_FROM_PRICE_TIMES_SHARES`
+is explicit. No rounding explanation or repaired amount is invented. This remains
+a vendor-reference candidate; an exact reconciliation consumer still needs its
+own evidence and admission.
+
+Every native session label stays separate from actual acquisition. Publication
+and source clocks remain null; knowledge starts only at complete acquisition.
+Returned counts and vendor total/pages stay visible. Any invalid/empty current
+result isolates that capability; a previous good run is audit evidence rather
+than an implicit fallback. A separate finite watch may check access/contract
+stability using v4 while existing v1/v2/v3 runtimes and deadlines remain pinned.

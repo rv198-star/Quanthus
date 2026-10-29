@@ -108,3 +108,20 @@ are excluded. The conservative scope stops before 2027-01-01 in Shanghai; expiry
 blocks new requests and same-day cache reuse. The snapshot remains audit evidence.
 A seven-day watch is finite and does not grant real-time, historical PIT or
 business admission, or delay continued qualification of remaining sources.
+
+## A-share v4 qualification window
+
+`config/pipelines/p10-supplement-sources.v4.json` selects two astock `0.1.4`
+contracts: one SH600519 margin window and one A-share block-trade date, each
+page 1/size 2. Use `P10_POLICY` for that file and stage `requirements-v4.lock`
+as `requirements.lock`. Use a new image, empty writable root and container;
+the existing v1/v2/v3 watches keep their versions and persisted deadlines.
+
+The policy is explicitly a fixed-session vendor-reference sample. Distinct
+success days mean access-observation days, not newly covered native sessions.
+A seven-day watch never upgrades freshness, full-market coverage, exact amount
+reconciliation, historical PIT or business admission. The block-trade amount
+discrepancy remains visible in every applicable normalized observation.
+
+Priority is A shares first. HK/US source requests require new access or contract
+evidence and remain low priority; do not add unchanged failed requests to v4.

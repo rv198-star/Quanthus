@@ -151,7 +151,10 @@
         "config/research/learning-mvp/entry-consolidation-diagnostic.v1.json",
         "config/research/learning-mvp/entry-confirmation-qualification-request.v1.json",
         "scripts/entry_confirmation_qualification.py",
-        "config/research/learning-mvp/entry-confirmation-activation.v1.json"
+        "config/research/learning-mvp/entry-confirmation-activation.v1.json",
+        "src/quanthus/expert_strategy/decision_review.py",
+        "scripts/learning_decision_review.py",
+        "config/research/decision-review-delivery.v1.json"
       ]
     },
     {

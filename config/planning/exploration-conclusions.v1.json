@@ -237,6 +237,87 @@
           "claim_ceiling": "已消费安全统计及原报告上的任务选择；不证明全局不存在其他决策缺口。"
         }
       ]
+    },
+    {
+      "id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "recorded_at": "2026-10-29T13:43:26.298616+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved three-step delivery",
+      "work_item": "META-LEARN-001",
+      "question_id": "HISTORICAL-DECISION-REVIEW-001",
+      "family": "historical-decision-review-delivery",
+      "modules": [
+        "FACTS",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "能否从准确已消费轨迹交付可直接查阅、可追溯的历史决定解释？",
+      "consumer": "Owner和已有研究调用方；只读回溯查阅",
+      "scope": "固定351成员的2012–2021轨迹；8393审查/538事件/343证券；原2026-10-25实际观察截止保持。",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "真实工程查阅能力与精确追溯已验证；不是新科学样本、投资增益、历史PIT、模型或交易准入。",
+      "decision_effect": "交付CLI/JSON/离线HTML及待审工程变更。没有确认一个新决策缺陷，不自动重开Head2、量能或阈值比较。",
+      "reopen_conditions": [
+        "现有调用者提出一个被准确事件和原字段支撑的未满足决定或具体查阅缺陷。",
+        "新增研究另需有限问题/资格/用途/预算，不以本工具可运行替代准入。"
+      ],
+      "retained_assets": [
+        "准确投影代码、冻结输入契约、模型/用途身份回归、使用说明。",
+        "独立构建、全键普查、12类原字段核验、无源/无网络冷读及损坏拒绝证据。",
+        "既有科学停放结论、所有原失败、曝光和未知成本保持。"
+      ],
+      "evidence": [
+        {
+          "id": "FIELDS",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-review-delivery-20261029T130059Z/evidence/independent-fields.safe.json",
+          "sha256": "8444ea65b55f6f6eb14bd7654a5c1b949503fdcd0edce7b9f8b808e7b2d953db",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "全8393键及12类原字段独立读取核验；不是全量新科学验证"
+        },
+        {
+          "id": "COLD",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-review-delivery-20261029T130059Z/evidence/cold-acceptance.safe.json",
+          "sha256": "b45c0f129429c13ba24290cd0359eaf6c85e2296903775665dca30e4d2cf8a1a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "无源目录的隔离冷读和损坏/缺文件失败关闭；原模型用途等级不变"
+        },
+        {
+          "id": "BUILD",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-review-delivery-20261029T130059Z/evidence/independent-build.safe.json",
+          "sha256": "a2edfee2405605b9f90a8ae438c6165e41327d761c4455bdf0bbfa8886fe7dc8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "两份真实投影独立构建、文件字节一致及不同inode；没有重训模型"
+        },
+        {
+          "id": "VIEW",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-review-delivery-20261029T130059Z/evidence/review-deliverable.safe.json",
+          "sha256": "7a782593b3ad6e66ff6feda107c5ab303d497da775747ba1ac681bc1776fe753",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "准确封存镜像和12类离线复盘视图可使用；不推断投资效用"
+        }
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "本job脚本墙钟、输出字节和RSS逐项记录；包含AI与暂停在内的完整人工/模型成本未统一汇总，不填零。原研究累计成本和曝光仍保留；原型及正式独立构建分别记账。",
+      "attempt_refs": [
+        "cn02:/srv/quanthus-base22-data/jobs/decision-review-delivery-20261029T130059Z/logs/build-primary-final.txt",
+        "cn02:/srv/quanthus-base22-data/jobs/decision-review-delivery-20261029T130059Z/logs/independent-build.txt"
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T134116537370Z"
+      ],
+      "supersedes": null
     }
   ]
 }

@@ -19,6 +19,10 @@ The executed [consumer delivery and decision selection](work-items/learning-cons
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its
 acceptance and the current no-new-comparison disposition.
 
+For read-only lookup of already-recorded held decisions, use the
+[historical review contract](design/historical-decision-review-v1.md) and its
+[real-archive acceptance](acceptance/historical-decision-review-20261029.md).
+
 | Field | Value |
 | --- | --- |
 | Current phase | P6 closed under Owner historical scope; P5 optional research deferred |

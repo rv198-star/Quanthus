@@ -26,7 +26,7 @@
     "60分钟内无法确认消费者与具体未满足接口就不继续开发。",
     "出现新数据、训练、阈值、P6/生产或超预算要求时只停止对应步骤。"
   ],
-  "memory_sha256": "a3f284f81679a72e3af0ba437591335bc61fea2f36698268356c36a0074b7bb0",
+  "memory_sha256": "f1669ca067ff083cc5db106968491b92b0566d6e55ab0667c989c00a59a30f19",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -47,6 +47,11 @@
       "conclusion_id": "CON-DECISION-SELECTION-20261029",
       "relation": "respect",
       "rationale": "没有成立的新决策问题；第三步不运行，无后继候选自动激活。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "本批真实复盘交付已经完成；本文件保留已完成非授权提案，不据此重复执行或提升科学/交易资格。"
     }
   ],
   "cumulative_cost_review": "既有Head2和持仓尝试全部保留，旧总成本未知而非零；新批次独立记账，不伪装新方向抹去原投入。",

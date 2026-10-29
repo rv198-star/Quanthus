@@ -110,7 +110,9 @@ print(json.dumps({
     "topology_digest": registry.topology_manifest.digest,
     "decisions": {"ready_entry": ready.to_dict(), "missing_entry": missing.to_dict(),
                   "missing_held": held.to_dict()},
-    "pending_head2": {"admission": pending.consumer_admission,
+    "pending_head2": {"model_digest": pending.model_digest,
+                      "purpose_digest": pending.purpose_digest,
+                      "admission": pending.consumer_admission,
                       "reason": pending.assessment.reason_code,
                       "applicability": pending.assessment.applicability.value,
                       "calibrated_probability": pending.calibrated_probability,
@@ -150,3 +152,47 @@ to display the same conclusion.
 `scripts/learning_held_decision_census.py --help` documents the existing narrow authenticated
 census CLI for a separately justified rerun. An exact selection SHA and fresh output are required.
 The completed result is a research diagnostic, not a new ranking, reference set or live policy.
+
+## Review an already-recorded historical decision
+
+The [historical review contract](../design/historical-decision-review-v1.md) adds a
+read-only CLI for the exact previously-consumed #545 archive. This path joins recorded
+decisions and facts; it does not call the runner in the synthetic example above.
+The package and local 12-category example views are located in the
+[acceptance record](../acceptance/historical-decision-review-20261029.md).
+
+Build once from the exact selection into a new, source-isolated directory. `SELECTION`
+is the authorized external selection path; `PACKAGE` must have an existing physical
+parent. Do not substitute a different archive or reuse an expired execution budget.
+
+```bash
+PYTHONPATH=src python3 -B scripts/learning_decision_review.py build \
+  --selection "$SELECTION" --output "$PACKAGE"
+```
+
+Keep the returned manifest SHA256 in the caller's trusted receipt. Reading thereafter
+needs only the package and ordinary code; source paths stored in the manifest are
+not followed. Set `DIGEST` to that exact trusted digest, rather than accepting a
+replacement digest supplied by an untrusted package.
+
+```bash
+PYTHONPATH=src python3 -B scripts/learning_decision_review.py verify \
+  --package "$PACKAGE" --manifest-sha256 "$DIGEST"
+PYTHONPATH=src python3 -B scripts/learning_decision_review.py query \
+  --package "$PACKAGE" --manifest-sha256 "$DIGEST" \
+  --security 000011 --date 2012-01-05 --limit 12
+PYTHONPATH=src python3 -B scripts/learning_decision_review.py query \
+  --package "$PACKAGE" --manifest-sha256 "$DIGEST" \
+  --reason insufficient_history --limit 12 --format html --output "$VIEW"
+```
+
+`VIEW` is a new external file; the CLI does not overwrite files or add files inside
+the package/source directories. `--unit` and `--episode` disambiguate multiple
+capital units or entry events. Inspect `matched`, `returned` and `truncated` rather
+than treating the display limit as the full denominator. `--format json` returns the
+recorded values and source locators; HTML expands those same values without remote assets.
+
+The original `trial` position state, actual 2026 retrospective cutoff and unavailable
+reasons are retained. An old shadow proposal is separately identified and remains parked.
+No learned-model use was observed in this retained trace; model admission, entry/allocation/
+fill alternatives and historical PIT qualification are not inferred from these cards.

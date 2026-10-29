@@ -1,0 +1,38 @@
+{
+  "schema_version": "quanthus.expert545-held-preflight.v1",
+  "work_item": "P3-EXPERT-007",
+  "purpose": "OFFLINE_RETROSPECTIVE_INPUT_AND_DECISION_CENSUS_ONLY",
+  "consumer": "PositionRiskPolicy.evaluate_held",
+  "decision_start": "2012-01-04",
+  "decision_end": "2021-12-30",
+  "decision_time_asia_shanghai": "15:00:00",
+  "archive_producer_revision": "4199786e5a0a0fdde55ed84271b3ed703f0aa3fc",
+  "policy_config": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+  "current_consumer_inputs": [
+    "risk.realized_volatility20",
+    "price.rsi14",
+    "holding_sessions",
+    "marked_return",
+    "prior_strategy_reduction_count"
+  ],
+  "structural_candidate_required_facts": [
+    "unreclaimed_age_sessions",
+    "signed_distance_to_support",
+    "post_break_rebound"
+  ],
+  "candidate_definition": "config/stage-10-11-projection.v1.json",
+  "existing_factor_fixture_contract": "config/research/factor541-volume-review.v1.json",
+  "maximum_selected_file_bytes": 33554432,
+  "maximum_selected_total_bytes": 134217728,
+  "maximum_output_bytes": 67108864,
+  "minimum_free_bytes": 8589934592,
+  "price_basis_bridge_qualified": false,
+  "independent_usefulness_reference_qualified": false,
+  "candidate_policy_mapping_frozen": false,
+  "comparison_execution_implemented": false,
+  "new_acquisition_authorized": false,
+  "threshold_tuning_authorized": false,
+  "training_authorized": false,
+  "historical_PIT_claim": false,
+  "production_or_P6_authorized": false
+}

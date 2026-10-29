@@ -39,7 +39,9 @@
       "watch_paths": [
         "src/quanthus/structure_facts*.py",
         "src/quanthus/structure_order*.py",
-        "src/quanthus/structure_trend*.py"
+        "src/quanthus/structure_trend*.py",
+        "src/quanthus/stage_learning/factor_slice.py",
+        "src/quanthus/expert_strategy/held_structure_inputs.py"
       ]
     },
     {
@@ -54,7 +56,9 @@
       "focus_facet": "engineering",
       "watch_paths": [
         "src/quanthus/feature_registry.py",
-        "src/quanthus/label_registry.py"
+        "src/quanthus/label_registry.py",
+        "src/quanthus/stage_learning/factor_slice.py",
+        "config/research/factor541-*.json"
       ]
     },
     {
@@ -68,7 +72,11 @@
       ],
       "focus_facet": "quality",
       "watch_paths": [
-        "src/quanthus/stage_learning/p5_input_census.py"
+        "src/quanthus/stage_learning/p5_input_census.py",
+        "src/quanthus/stage_learning/qualification.py",
+        "src/quanthus/stage_learning/prefix_qualification.py",
+        "src/quanthus/stage_learning/review_list.py",
+        "src/quanthus/stage_learning/entry_qualification.py"
       ]
     },
     {
@@ -125,7 +133,25 @@
       ],
       "focus_facet": "value",
       "watch_paths": [
-        "src/quanthus/stage_learning/head2_consumer.py"
+        "src/quanthus/stage_learning/head2_consumer.py",
+        "config/research/learning-mvp/stage34-breakout-list-use.v1.json",
+        "src/quanthus/stage_learning/review_list.py",
+        "config/research/learning-mvp/stage34-breakout-list-use.v2.json",
+        "src/quanthus/expert_strategy/held_structure_preflight.py",
+        "scripts/expert545_preflight.py",
+        "config/research/expert545-held-preflight.v1.json",
+        "src/quanthus/expert_strategy/held_structure_shadow.py",
+        "src/quanthus/expert_strategy/held_structure_integrity.py",
+        "scripts/expert545_held_structure.py",
+        "scripts/expert545_capture_b_trace.py",
+        "config/research/expert545-held-structure.v1.json",
+        "src/quanthus/stage_learning/entry_baseline.py",
+        "src/quanthus/stage_learning/entry_consolidation.py",
+        "scripts/entry_consolidation_diagnostic.py",
+        "config/research/learning-mvp/entry-consolidation-diagnostic.v1.json",
+        "config/research/learning-mvp/entry-confirmation-qualification-request.v1.json",
+        "scripts/entry_confirmation_qualification.py",
+        "config/research/learning-mvp/entry-confirmation-activation.v1.json"
       ]
     },
     {
@@ -200,7 +226,8 @@
         "src/quanthus/stage_learning/head2_facts.py",
         "src/quanthus/stage_learning/head2_temporal.py",
         "src/quanthus/stage_learning/head2_census.py",
-        "config/research/learning-mvp/head2-*.json"
+        "config/research/learning-mvp/head2-*.json",
+        "src/quanthus/stage_learning/head_comparison.py"
       ]
     },
     {
@@ -212,7 +239,10 @@
       "depends_on": [],
       "focus_facet": "quality",
       "watch_paths": [
-        "config/stage-learning/development-candidate.v1.json"
+        "config/stage-learning/development-candidate.v1.json",
+        "src/quanthus/stage_learning/qualification.py",
+        "src/quanthus/stage_learning/prefix_qualification.py",
+        "src/quanthus/stage_learning/review_list.py"
       ]
     },
     {
@@ -226,7 +256,10 @@
       ],
       "focus_facet": "quality",
       "watch_paths": [
-        "config/stage-learning/development-candidate.v1.json"
+        "config/stage-learning/development-candidate.v1.json",
+        "src/quanthus/stage_learning/qualification.py",
+        "src/quanthus/stage_learning/prefix_qualification.py",
+        "src/quanthus/stage_learning/review_list.py"
       ]
     },
     {
@@ -445,9 +478,10 @@
       "id": "P3-EXPERT-007",
       "issue": 545,
       "modules": [
+        "FACTS",
         "EXPERT"
       ],
-      "contribution": "合格状态接入专家后验证完整决策影响"
+      "contribution": "在实际持仓范围生成受限连续Facts并经原专家安全链验证完整决策差异；不自动取得策略价值或生产准入"
     },
     {
       "id": "META-LEARN-002",
@@ -495,6 +529,17 @@
         "S04"
       ],
       "contribution": "固定128家2021上市前缀的限定来源资格；P10交接与P5参考、候选评价和消费者准入分开验收"
+    },
+    {
+      "id": "P10-DATA-STAGE34-ROUTE-002",
+      "issue": 571,
+      "modules": [
+        "DATA",
+        "REFERENCE",
+        "S03",
+        "S04"
+      ],
+      "contribution": "245家2021潜在身份路线的零采集现存来源资格；与旧128交接、研究参考、质量及消费者准入分开验收"
     }
   ]
 }

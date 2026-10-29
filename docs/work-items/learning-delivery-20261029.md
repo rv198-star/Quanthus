@@ -8,6 +8,7 @@
 | Plan | [After March review](learning-after-march-review-20261029.md) |
 | API boundary | [Reusable assets v1](../design/learning-assets-v1.md) |
 | Acceptance | [Batch evidence](../acceptance/learning-delivery-20261029.md) |
+| Publication | [PR #577](https://github.com/rv198-star/Quanthus/pull/577), ready for review; main not merged, GitHub account CI blocked before execution |
 
 ## Current recovery checkpoint
 

@@ -7552,6 +7552,99 @@
           "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
         }
       ]
+    },
+    {
+      "id": "CP-546-20261029T084345282246Z",
+      "recorded_at": "2026-10-29T08:43:45.282246+00:00",
+      "actor": "Codex / Sol 6.1: final publication reconciliation, metadata only",
+      "work_item": "META-LEARN-002",
+      "outcome": "completed",
+      "summary": "记录PR577实际发布与GitHub账户CI阻塞；本批交付完成，main未合并，学习产品准入不变",
+      "evidence": [
+        {
+          "id": "PUBLISHED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-delivery-20261029T074601Z-bd474bf/evidence/remote-publication.safe.json",
+          "sha256": "65d0468f00b01356eac91c4f491c30b402ef86d969f78ef8d8bf8ca714296a17",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "代码提交bf0a928及两个独立历史Git ref已逐一核实；不是main已合并"
+        },
+        {
+          "id": "PR",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-delivery-20261029T074601Z-bd474bf/evidence/pull-request.safe.json",
+          "sha256": "eeebd58652bd384fadb302bd28263bbec7e9691e634479d5a4a8196c0f97adf1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "PR577已创建为非草稿，基线main，准确代码head bf0a928；不是通过CI"
+        },
+        {
+          "id": "CI",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-delivery-20261029T074601Z-bd474bf/evidence/ci-diagnosis.safe.json",
+          "sha256": "f3f5018424becbce7e9173eb1aa6d810c63c678cbbd7fdebe23b97ffad9b6a44",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actions三组job均0步骤，账户付款/额度拒绝启动；不是新代码断言失败或CI通过"
+        },
+        {
+          "id": "CHECKS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/learning-delivery-20261029T074601Z-bd474bf/evidence/final-engineering-checks.safe.json",
+          "sha256": "049b7ddfa36e48bc02d0b1ca5fb0843e52e1be49bf96f679469a8a02914b99d0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本地完整检查5652通过20跳过；全仓193既有lint非绿"
+        }
+      ],
+      "updates": [
+        {
+          "module": "CLOSEOUT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "本批1-3已发布PR577：bf0a928的最小main目标资产、模型读回、六子项对账和完整诊断交付",
+          "remaining": "main尚未合并；GitHub CI因账户付款/额度未启动，现有本地检查独立记录",
+          "next_action": "先恢复账户CI并审阅合并交付PR；不继续Head2试验或调阈值",
+          "evidence": [
+            "PUBLISHED",
+            "PR",
+            "CI",
+            "CHECKS"
+          ],
+          "supersedes": "CP-540-20261029T083255376941Z"
+        },
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "共享学习资产已形成可审阅的主线目标交付PR577；原草稿栈未盲合并",
+          "remaining": "整体MVP同一资格链与产品采用仍未完成；主线合并等待外部CI条件",
+          "next_action": "保留已交付资产；有具体未满足业务决策需求才提出下一次有界资格化",
+          "evidence": [
+            "PUBLISHED",
+            "PR",
+            "CHECKS"
+          ],
+          "supersedes": "CP-540-20261029T083255376941Z"
+        }
+      ],
+      "reviewed_modules": [
+        "REPRO",
+        "P6"
+      ],
+      "no_change_reason": "代码和原独立复现身份未变；没有新训练/资金回放，P6与生产未启用。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "state": "open",
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "updated_at": "2026-10-27T07:43:04Z",
+          "state_reason": null,
+          "body_sha256": "52082c9849fb2bfc35df214aa15032a6a1491ffebc5cef7d4549a03190d4f515"
+        }
+      ]
     }
   ]
 }

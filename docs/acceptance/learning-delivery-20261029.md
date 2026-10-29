@@ -8,6 +8,7 @@
 | Earlier feature-contract archive | `7f4ecc9ad9d0569b68b27cfac5a8081aae4e5a63` on `codex/learning-feature-contract-archive-20261029T074601Z` |
 | Control/evidence | `cn02:/srv/agentdock/.codex/learning-delivery-20261029T074601Z-bd474bf` |
 | Current route | [Delivery work item](../work-items/learning-delivery-20261029.md) |
+| Publication | [PR #577](https://github.com/rv198-star/Quanthus/pull/577), code commit `bf0a928f39c675226e5b98ec23045ddcc8c3264e`; main not merged |
 
 The batch began at 2026-10-29 07:42:40 UTC, with a hard 11:42:40 UTC deadline.
 System/data device capacity, a 1 GiB new data-job write budget, 16 MiB control/TMP
@@ -101,3 +102,11 @@ The blueprint is append-only: the 48 records already on remote main remain an
 unchanged prefix; the 37 prior research records are imported as history, not new
 progress. The new delivery/diagnosis checkpoint records this batch's actual work
 without promoting research-quality or consumer-admission facets.
+
+GitHub Actions reported failure before starting any job step. The exact
+annotations cite recent account payment failure or a spending limit; ledger,
+Python and Web jobs did not execute. This external CI condition is separate from
+the passed local checks and is recorded in the final publication checkpoint.
+No workflow, account limit or protected-branch policy was bypassed. A final
+metadata-only commit records this publication state; tested production bytes
+remain those of `bf0a928f39c675226e5b98ec23045ddcc8c3264e`.

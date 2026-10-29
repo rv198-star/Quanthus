@@ -20,12 +20,20 @@ Git. The first screening pass and a separate API tranche retain raw response has
 Functional coverage beyond the named samples remains work under #584/#585; an HTML
 site-identity result must never be reported as a working financial data feed.
 
+Owner subsequently selected a public, relatively independent astock fork while
+Quanthus remains private. [P10-DATA-SUPPLY-005 / #587](https://github.com/rv198-star/Quanthus/issues/587)
+tracks the [source-subproject boundary](../design/astock-subproject.md) and first
+two source-library adapters in [rv198-star/astock](https://github.com/rv198-star/astock).
+The original reference checkout and its hashes below remain historical evidence;
+repository creation does not upgrade the deployed collector.
+
 | Work item | Scope | Evidence/remaining gate |
 | --- | --- | --- |
 | [#582](https://github.com/rv198-star/Quanthus/issues/582) | Runtime lineage and upstream baseline | Daily chain established; upstream reference updated; no production upgrade claimed |
 | [#583](https://github.com/rv198-star/Quanthus/issues/583) | Census, contracts and disposition ledger | Frozen declaration census; incomplete API definitions still need functional contracts |
 | [#584](https://github.com/rv198-star/Quanthus/issues/584) | Structured data, announcements and regulatory APIs | Bounded samples; capability-specific results and limitations retained |
 | [#585](https://github.com/rv198-star/Quanthus/issues/585) | Media, RSS and institution sites | Site identity and RSS tested separately; unavailable/network-limited entries stay explicit |
+| [#587](https://github.com/rv198-star/Quanthus/issues/587) | Independent astock fork and bounded absorption | Public source library; first ChinaMoney LPR and CNBC RSS adapters; consumer integration remains separate |
 
 ## Why daily collection works without the upstream checkout
 

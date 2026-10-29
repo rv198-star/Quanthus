@@ -54,6 +54,7 @@ the P6 critical path.
 | P10-DATA-SUPPLY-002 | Freeze source contracts and candidate/rejection ledgers | P10-DATA-SUPPLY-001 | [#583](https://github.com/rv198-star/Quanthus/issues/583); ready; unresolved definitions remain explicit |
 | P10-DATA-SUPPLY-003 | Qualify financial, disclosure and regulatory APIs | P10-DATA-SUPPLY-002 | blocked full functional closure; [#584](https://github.com/rv198-star/Quanthus/issues/584); named bounded samples retained |
 | P10-DATA-SUPPLY-004 | Qualify media, RSS and institution discovery | P10-DATA-SUPPLY-002 | blocked full functional closure; [#585](https://github.com/rv198-star/Quanthus/issues/585); named bounded samples retained |
+| P10-DATA-SUPPLY-005 | Maintain independent astock fork and source absorption | P10-DATA-SUPPLY-000 | [#587](https://github.com/rv198-star/Quanthus/issues/587); [public subproject](../design/astock-subproject.md); ready for bounded source-library engineering; no production migration |
 
 The bounded [P6 main integration](p6-main-integration.md) separates the required
 P10 source interfaces, P6 consumer and #538 regression into dependent PRs. Its

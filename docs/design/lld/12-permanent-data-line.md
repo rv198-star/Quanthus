@@ -209,6 +209,7 @@ independent cold construction remain governed.
 | P10-DATA-SUPPLY-002 | Freeze the source census, functional contracts and candidate/rejection ledger | P10-DATA-SUPPLY-001 | [#583](https://github.com/rv198-star/Quanthus/issues/583); bounded requests, evidence hashes and explicit unresolved contracts |
 | P10-DATA-SUPPLY-003 | Qualify structured financial, disclosure and regulatory APIs online | P10-DATA-SUPPLY-002 | [#584](https://github.com/rv198-star/Quanthus/issues/584); source-identity/schema/time evidence per purpose; no historical PIT inference |
 | P10-DATA-SUPPLY-004 | Qualify media, RSS and institution discovery sources online | P10-DATA-SUPPLY-002 | [#585](https://github.com/rv198-star/Quanthus/issues/585); retain functional/discovery distinction and finite unresolved dispositions |
+| P10-DATA-SUPPLY-005 | Maintain an independent public astock fork and absorb bounded source capabilities | P10-DATA-SUPPLY-000; Owner clarification 2026-10-29 | [#587](https://github.com/rv198-star/Quanthus/issues/587); [subproject boundary](../astock-subproject.md); public source library does not activate a Quanthus dependency or production migration |
 
 Governed assets: `config/data-ownership.v1.json`, `scripts/sync_github_planning.py`,
 `scripts/sync_p10_data_issues.py`, `tests/contract/test_p10_data_ownership.py`, root `AGENTS.md`

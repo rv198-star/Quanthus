@@ -7645,6 +7645,153 @@
           "body_sha256": "52082c9849fb2bfc35df214aa15032a6a1491ffebc5cef7d4549a03190d4f515"
         }
       ]
+    },
+    {
+      "id": "CP-2-20261029T090421847561Z",
+      "recorded_at": "2026-10-29T09:04:21.847561+00:00",
+      "actor": "Codex: Owner-directed local acceptance default",
+      "work_item": "META-TRACE-001",
+      "outcome": "progress",
+      "summary": "GitHub CI默认不可用；同一CLI本地验收为默认路径，不再等待费用恢复或变更保护规则",
+      "evidence": [
+        {
+          "id": "LOCAL_REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/local-ci-default-20261029T090122Z-9a7e40b/evidence/self-review.safe.json",
+          "sha256": "8a6c9d5bb8be1dbeeb4ef3582e48cd7f31e837080752236b2728ce58fd9b0b83",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "执行者自审、本地工程验收及Owner默认CI不可用决定；不是独立审计或产品准入"
+        },
+        {
+          "id": "CLOSURE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/local-ci-default-20261029T090122Z-9a7e40b/evidence/exact-closure-reuse.safe.json",
+          "sha256": "fc1844ba355e10b5025f9a292fa5575651c37e29ac9954484ebde4892591b68f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "1779个代码/配置/测试/依赖/workflow文件与已完整测试提交逐字节相同；复用不是新全量运行"
+        },
+        {
+          "id": "REGRESSION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/local-ci-default-20261029T090122Z-9a7e40b/evidence/blueprint-tests.safe.json",
+          "sha256": "b197e94808388ad157fec1a656675d3034ae1db033f63e4796b32935de64726e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本轮28项蓝图回归通过，不追加为新的全仓独立覆盖"
+        }
+      ],
+      "updates": [
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "已合并的蓝图CLI机制沿用；按Owner新指令默认本地验收，远端CI不作新增等待条件",
+          "remaining": "远端Actions未执行且默认不可用；这不是本地机制或研究资格的新阻塞",
+          "next_action": "每轮本地检查准确PR基点、追加历史和受影响issue；保存结果，不等账户恢复",
+          "evidence": [
+            "LOCAL_REVIEW",
+            "CLOSURE",
+            "REGRESSION"
+          ],
+          "supersedes": "CP-2-FOUR-BATCHES-20261027"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ]
+    },
+    {
+      "id": "CP-546-LOCAL-CI-20261029T090519818494Z",
+      "recorded_at": "2026-10-29T09:05:19.818476+00:00",
+      "actor": "Codex: local acceptance and ordinary delivery self-review",
+      "work_item": "META-LEARN-002",
+      "outcome": "progress",
+      "summary": "PR577工程交付通过本地自审；取消等待GitHub付费CI的下一步，保持Head2停放和MVP未准入",
+      "evidence": [
+        {
+          "id": "LOCAL_REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/local-ci-default-20261029T090122Z-9a7e40b/evidence/self-review.safe.json",
+          "sha256": "8a6c9d5bb8be1dbeeb4ef3582e48cd7f31e837080752236b2728ce58fd9b0b83",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "执行者自审、本地工程验收及Owner默认CI不可用决定；不是独立审计或产品准入"
+        },
+        {
+          "id": "CLOSURE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/local-ci-default-20261029T090122Z-9a7e40b/evidence/exact-closure-reuse.safe.json",
+          "sha256": "fc1844ba355e10b5025f9a292fa5575651c37e29ac9954484ebde4892591b68f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "1779个代码/配置/测试/依赖/workflow文件与已完整测试提交逐字节相同；复用不是新全量运行"
+        },
+        {
+          "id": "REGRESSION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/local-ci-default-20261029T090122Z-9a7e40b/evidence/blueprint-tests.safe.json",
+          "sha256": "b197e94808388ad157fec1a656675d3034ae1db033f63e4796b32935de64726e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本轮28项蓝图回归通过，不追加为新的全仓独立覆盖"
+        }
+      ],
+      "updates": [
+        {
+          "module": "CLOSEOUT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "PR577的最小主线目标资产、六模型读回与完整持仓诊断已完成本地验收和执行者自审",
+          "remaining": "无新增本地工程阻塞；GitHub CI默认不可用；普通合并的实际SHA由交付收据记录",
+          "next_action": "按既有授权普通合并并记录身份；不重开学习试验，不调整研究或生产门槛",
+          "evidence": [
+            "LOCAL_REVIEW",
+            "CLOSURE",
+            "REGRESSION"
+          ],
+          "supersedes": "CP-546-20261029T084345282246Z"
+        },
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "既有可复用资产已通过主线目标本地交付验收；PR577作为正常GitHub分发载体",
+          "remaining": "整体MVP同一资格链与产品采用仍未完成；不再以恢复GitHub CI费用作为工程下一步",
+          "next_action": "复用已交付资产；只有具体未满足业务决策才提出新的有界资格化，不自动转Head3/4或P6",
+          "evidence": [
+            "LOCAL_REVIEW",
+            "CLOSURE",
+            "REGRESSION"
+          ],
+          "supersedes": "CP-546-20261029T084345282246Z"
+        }
+      ],
+      "no_change_reason": "代码和研究数据没有变化；不重训、不补采、不调阈值，P6和消费者准入保持不变。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:43:04Z",
+          "body_sha256": "52082c9849fb2bfc35df214aa15032a6a1491ffebc5cef7d4549a03190d4f515"
+        }
+      ],
+      "reviewed_modules": [
+        "REPRO",
+        "P6"
+      ]
     }
   ]
 }

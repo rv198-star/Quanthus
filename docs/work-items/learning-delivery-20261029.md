@@ -8,7 +8,7 @@
 | Plan | [After March review](learning-after-march-review-20261029.md) |
 | API boundary | [Reusable assets v1](../design/learning-assets-v1.md) |
 | Acceptance | [Batch evidence](../acceptance/learning-delivery-20261029.md) |
-| Publication | [PR #577](https://github.com/rv198-star/Quanthus/pull/577), ready for review; main not merged, GitHub account CI blocked before execution |
+| Publication | [PR #577](https://github.com/rv198-star/Quanthus/pull/577); local acceptance is authoritative for this engineering review, hosted CI is unavailable; actual merge identity is recorded in the follow-up receipt |
 
 ## Current recovery checkpoint
 
@@ -16,6 +16,11 @@ Head2 new experiments are parked. This batch delivers existing assets, then
 diagnoses recorded algorithm decisions. It does not gather sources, alter
 thresholds, change samples, retrain/update real models, run another economic
 comparison or activate P6/production. March87 are consumed development evidence.
+
+The Owner's 2026-10-29 follow-up treats GitHub CI as unavailable by default.
+Use the [local acceptance rule](../../AGENTS.md#local-acceptance-default--owner-2026-10-29)
+and [follow-up review](../acceptance/local-ci-default-20261029.md); do not wait for
+account recovery. The earlier CI-blocked receipt remains historical evidence.
 
 The integration target is actual remote main
 `a332e79f3f548f6c0ea558092f745b584045de80`, not the stale local main checkout.

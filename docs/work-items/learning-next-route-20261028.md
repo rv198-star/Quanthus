@@ -16,7 +16,17 @@ It does not redefine the original learning MVP as a report-only product. Estimat
 are bounded agent/script wall time, not required human workdays or a promise of
 positive findings. Scope and budget must be frozen before each result-bearing batch.
 
-## Current recovery checkpoint — March successor completed
+## Current recovery checkpoint — March successor reviewed
+
+The [2026-10-29 Astra review](../acceptance/learning-march-astra-review-20261029.md)
+independently confirms the negative capital conclusion and records one reusable-fit
+input-binding P2. The actual qualified training rows and cold artifacts match; the
+finding does not invalidate this experiment. Head2 new-trial investment is parked.
+The [next bounded recommendation](learning-after-march-review-20261029.md) prioritizes
+repair/durable delivery and one actual algorithmic decision-gap diagnosis, with a
+four-hour proposed first tranche. It does not reopen the earlier human-priority queue
+or authorize another research run. Positive P&L is not a new engineering-MVP gate;
+the old four-feature update and new seven-feature experiment remain distinct lineages.
 
 The Owner separately approved the fixed 2021-03-31 TRAIN20 / EVAL87 successor on
 2026-10-29. Its [three-step execution and negative conclusion](../acceptance/learning-entry-march-confirmation-20261029.md)

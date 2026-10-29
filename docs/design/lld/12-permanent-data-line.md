@@ -204,6 +204,11 @@ independent cold construction remain governed.
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03; P1 historical foundation retained | Ownership/routing contracts and verified live issue migration; bounded repairs/handoffs need separate evidence and standing epic remains open |
 | P10-DATA-OPS-016 | Integrate acquisition through ODS/DWD, notification, backup and housekeeping in one pipeline image | P10-DATA-000; Owner source-integration instruction 2026-10-23 | [#537](https://github.com/rv198-star/Quanthus/issues/537); [integration](../../work-items/p10-container-main-integration.md); source checks do not accept full Weekly or activate a release |
+| P10-DATA-SUPPLY-000 | Update the a-stock-data reference and qualify supplementary skill sources | P10-DATA-000; Owner instruction 2026-10-29 | [#581](https://github.com/rv198-star/Quanthus/issues/581); [bounded work package](../../work-items/p10-source-supply-20261029.md); candidate disposition does not admit a consumer or upgrade production |
+| P10-DATA-SUPPLY-001 | Establish CN02 collector lineage and update the upstream reference baseline | P10-DATA-SUPPLY-000 | [#582](https://github.com/rv198-star/Quanthus/issues/582); exact runtime/reference identities and applicable-change mapping |
+| P10-DATA-SUPPLY-002 | Freeze the source census, functional contracts and candidate/rejection ledger | P10-DATA-SUPPLY-001 | [#583](https://github.com/rv198-star/Quanthus/issues/583); bounded requests, evidence hashes and explicit unresolved contracts |
+| P10-DATA-SUPPLY-003 | Qualify structured financial, disclosure and regulatory APIs online | P10-DATA-SUPPLY-002 | [#584](https://github.com/rv198-star/Quanthus/issues/584); source-identity/schema/time evidence per purpose; no historical PIT inference |
+| P10-DATA-SUPPLY-004 | Qualify media, RSS and institution discovery sources online | P10-DATA-SUPPLY-002 | [#585](https://github.com/rv198-star/Quanthus/issues/585); retain functional/discovery distinction and finite unresolved dispositions |
 
 Governed assets: `config/data-ownership.v1.json`, `scripts/sync_github_planning.py`,
 `scripts/sync_p10_data_issues.py`, `tests/contract/test_p10_data_ownership.py`, root `AGENTS.md`

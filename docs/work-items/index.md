@@ -49,6 +49,12 @@ the P6 critical path.
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03 | open epic |
 | P10-DATA-OPS-016 | Integrate the CN02 acquisition/container operational stack | P10-DATA-000 | [#537](https://github.com/rv198-star/Quanthus/issues/537); [source integration](p10-container-main-integration.md); release activation and full Weekly acceptance remain separate |
+| P10-DATA-SUPPLY-000 | Update the upstream reference and qualify supplementary sources | P10-DATA-000 | [#581](https://github.com/rv198-star/Quanthus/issues/581); [runtime lineage and bounded screening](p10-source-supply-20261029.md); #582–#585 track capability-specific remaining gates |
+| P10-DATA-SUPPLY-001 | Establish CN02 lineage and the updated upstream baseline | P10-DATA-SUPPLY-000 | [#582](https://github.com/rv198-star/Quanthus/issues/582); ready; bounded evidence in the supply work item |
+| P10-DATA-SUPPLY-002 | Freeze source contracts and candidate/rejection ledgers | P10-DATA-SUPPLY-001 | [#583](https://github.com/rv198-star/Quanthus/issues/583); ready; unresolved definitions remain explicit |
+| P10-DATA-SUPPLY-003 | Qualify financial, disclosure and regulatory APIs | P10-DATA-SUPPLY-002 | blocked full functional closure; [#584](https://github.com/rv198-star/Quanthus/issues/584); named bounded samples retained |
+| P10-DATA-SUPPLY-004 | Qualify media, RSS and institution discovery | P10-DATA-SUPPLY-002 | blocked full functional closure; [#585](https://github.com/rv198-star/Quanthus/issues/585); named bounded samples retained |
+| P10-DATA-SUPPLY-005 | Maintain independent astock fork and source absorption | P10-DATA-SUPPLY-000 | [#587](https://github.com/rv198-star/Quanthus/issues/587); [public subproject](../design/astock-subproject.md); ready for bounded source-library engineering; no production migration |
 
 The bounded [P6 main integration](p6-main-integration.md) separates the required
 P10 source interfaces, P6 consumer and #538 regression into dependent PRs. Its

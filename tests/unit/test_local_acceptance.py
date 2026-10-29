@@ -371,3 +371,15 @@ def test_invalid_manifest_member_refused(repository: Path, tmp_path: Path) -> No
         stream.write("a" * 64 + "  ../not-in-receipt\n")
     with pytest.raises(local.AcceptanceError, match="INVALID_CHECKSUM_MEMBER"):
         local.verify(repository, job)
+
+
+def test_assume_unchanged_cannot_hide_source_edit(repository: Path) -> None:
+    subprocess.run(
+        ["git", "update-index", "--assume-unchanged", "src/quanthus/__init__.py"],
+        cwd=repository,
+        check=True,
+    )
+    (repository / "src/quanthus/__init__.py").write_text("# hidden edit\n")
+    assert not local.git(repository, "status", "--porcelain")
+    with pytest.raises(local.AcceptanceError, match="DIRTY_TRACKED_CONTENT"):
+        local.repository_identity(repository)

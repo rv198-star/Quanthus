@@ -67,7 +67,21 @@ def read_json(path: Path) -> dict[str, Any]:
 
 
 def git(root: Path, *args: str) -> bytes:
-    return subprocess.check_output(["git", "-C", str(root), *args], stderr=subprocess.PIPE)
+    binary = str(shutil.which("git", path=os.defpath))
+    return subprocess.check_output([binary, "-C", str(root), *args], stderr=subprocess.PIPE)
+
+
+def committed_digest(path: Path, blob: str) -> str:
+    """Check content even when Git's assume-unchanged/skip-worktree flags hide edits."""
+    require(len(blob) == 40, "UNSUPPORTED_GIT_OBJECT_FORMAT")
+    content = hashlib.sha256()
+    git_blob = hashlib.sha1(b"blob " + str(path.stat().st_size).encode() + b"\0")
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            content.update(block)
+            git_blob.update(block)
+    require(git_blob.hexdigest() == blob, "DIRTY_TRACKED_CONTENT")
+    return content.hexdigest()
 
 
 def physical(path: Path) -> Path:
@@ -152,12 +166,14 @@ def repository_identity(root: Path) -> dict[str, Any]:
     files = {}
     for member in filter(None, members):
         metadata, raw = member.split(b"\t", 1)
-        mode, _, stage = metadata.decode().split()
+        mode, blob, stage = metadata.decode().split()
         require(mode in {"100644", "100755"} and stage == "0", "UNSUPPORTED_GIT_MEMBER")
         name = raw.decode()
         path = root / name
         require(path.resolve() == path and path.is_file(), "LINKED_OR_MISSING_GIT_MEMBER")
-        files[name] = {"sha256": digest(path), "executable": bool(path.stat().st_mode & 0o111)}
+        executable = bool(path.stat().st_mode & 0o111)
+        require(executable == (mode == "100755"), "DIRTY_TRACKED_MODE")
+        files[name] = {"sha256": committed_digest(path, blob), "executable": executable}
     for area in ("src", "tests", "config", "scripts"):
         for path in walked_files(root / area):
             require(str(path.relative_to(root)) in files, "UNTRACKED_SEMANTIC_INPUT")

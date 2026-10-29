@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved — Owner requested engineering adoption on 2026-10-29 |
-| Delivery gate | open until the local conformance and integration receipt |
+| Delivery gate | accepted-conditional for the offline mechanism; [local evidence](../acceptance/exploration-governance-20261029.md); no recurring executor |
 | Parent | [LLD 09 roadmap](lld/09-roadmap.md) |
 | Work item | META-TRACE-001 / #2; learning portfolio coordination remains #540 |
 | Code | `src/quanthus/exploration_governance.py`, `scripts/exploration_governance.py` |

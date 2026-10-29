@@ -1,0 +1,79 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "ENTRY-ALLOCATION-DELIVERY-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "entry-allocation-observability",
+  "work_item": "META-LEARN-001",
+  "modules": [
+    "EXPERT",
+    "REPRO",
+    "CLOSEOUT"
+  ],
+  "question": "能否从原B精确交付入场漏斗，并直接记录现有分配结果而不改变决策/委托/账本？",
+  "consumer": "Owner和只读研究复核调用方",
+  "scope": "准确原B2012–2021已消费记录；新增审计接口仅合成验证，无新经济回放/训练/生产/P6",
+  "deliverable": "准确漏斗的独立离线JSON/中文HTML和可选版本化allocation sidecar",
+  "decision_if_pass": "交付工程观测能力；旧分配未知保持NOT_RECORDED；研究继续停放",
+  "decision_if_fail": "保留明确失败和未知边界，停止受影响部分，不猜历史原因",
+  "acceptance": [
+    "完整分母与manifest声明成员资格",
+    "同一已计算allocation结果一次导出，原动作/事件/账本字节一致",
+    "合成回归/成本/本地完整检查、可读交付和蓝图"
+  ],
+  "stop_conditions": [
+    "第1步45分钟/整体3小时到限停止",
+    "8GiB系统空闲余量/192MiB job/128MiB成功测试TMP峰值/1GiB应用RSS",
+    "不补采、不训练、不改策略阈值或资金规则，不重跑真实经济路径"
+  ],
+  "memory_sha256": "cbc331f034daa3be315acfde50c245e2a41a6d340346baa281057bc90ba814c0",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    }
+  ],
+  "cumulative_cost_review": "旧失败/费用/曝光不重置；本批脚本与墙钟实测，模型token及不可归因费用未知不填零",
+  "runtime_authority_boundary": "Owner批准Astra PR588审计后的1–3步，上限3小时；本提案不授予研究/生产权限。精确authority在本job冻结。",
+  "budget": {
+    "wall_seconds": 10800,
+    "max_new_bytes": 4194304,
+    "network_requests": 0,
+    "accounting_owner": "产品4MiB、全job192MiB及测试TMP128MiB上限；GitHub普通代码操作另计"
+  },
+  "execution_disposition": "COMPLETED_ENTRY_FUNNEL_AND_SYNTHETIC_OPTIONAL_AUDIT; no research activated",
+  "execution_record": "docs/acceptance/entry-allocation-delivery-20261030.md",
+  "proposal_role": "Non-authorizing retained proposal; executed v2 request/authority frozen in job; initial preflight failure retained."
+}

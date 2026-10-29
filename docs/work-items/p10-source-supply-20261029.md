@@ -37,6 +37,12 @@ nine-request tranche recorded one observation-purpose pass, five rejected reques
 purpose definitions and three holds; the later three-hold continuation is below. See the current integration section
 for the complete dated ledger and test/operational receipts.
 
+The latest tranche adds only Sina's named PVC futures contract `DCE:V2701` through
+astock `0.1.3` and a separate v3 policy/watch. Price units pass for vendor
+contract-price diagnostics; the date/time labels remain independent and trading-day,
+real-time, tick-size and quantity admission remain open. See the final futures
+section below for the actual first-cycle receipt and remaining-route dispositions.
+
 The original fifteen-capability candidate watch is running locally on CN02 as
 `quanthus-p10-supplement-watch`, pinned Quanthus source
 `d335c1a3d3ad2197340f0ef4c66f0bced657070c`, with its only writable bind at
@@ -691,3 +697,54 @@ transport holds and one current-purpose rejection. Website/script discovery is
 counted separately and is not functional qualification. Full census functionality
 remains open; an accessible stale series does not become a useful archive product
 without a named consumer.
+
+### Futures installed-runtime receipt
+
+The standalone `quanthus-p10-futures-watch` runs locally on CN02 with published
+source `3ed3fe4ba40549244e634c428caaecc5fc52e97b`, image
+`sha256:b08a193c9a2b743731b65428a6c32f40c27c0a82c337d0e0b284d9ba8d5d607b`,
+and its sole writable bind `/srv/quanthus-source-watch/futures-3ed3fe4ba405`. First cold integration completed at
+**2026-10-30 05:20:26 Asia/Shanghai**, with one request, one row and 241 bytes
+in 1.9112 seconds. The manifest SHA256 is
+`bd6f57d62f3aaa81e52e490d012cea9a85ead30f0a16ad2682352ac285c12df1`; the candidate ledger SHA256 is
+`fd9f3c08f0195d8526b5c9dbef4f3e3b3d57560b95ff36a07f1f1b563089cc89`.
+
+The persisted next cycle is **2026-10-31 05:20:25 Asia/Shanghai**; the observation
+period ends **2026-11-06 05:20:25 Asia/Shanghai**. Only one distinct successful
+date exists. First functional and installed-container samples do not pad days.
+Actual stop/restart preserved the manifest and deadline without another HTTP
+request. Offline disable-after-success kept the prior-good reference but made
+current data unavailable; exact-cutoff reading one microsecond before acquisition
+was rejected. Both earlier watches retain the same images, start times, manifest
+hashes, ledgers and persisted deadlines.
+
+The existing production TMP cleaner's **2026-10-30 03:30 Asia/Shanghai** slot ran:
+two eligible successful directories removed, four failed jobs retained. It
+records no deleted-byte count; no byte saving is inferred. The completed local
+image-build context was classified TMP and removed after its Git/image identity
+and bundle manifest were retained. No shared prune or production mutation was
+performed. See existing operations issue #537.
+
+Local full validation on exact executable/config/test source
+`3ed3fe4ba40549244e634c428caaecc5fc52e97b`: **5781 passed, 20 skipped**, 8 warnings,
+641.66 seconds; doctor/compile/planning checks passed. Focused unit/time/expiry/
+rollback tests 47 passed; installed-library futures tests 10 passed. Source-library
+checks 58 passed, retained suite 245 passed plus 4 opt-in live skips; installed wheel
+checks 58 passed. The two wheel builds and downloaded release agree on SHA256
+`b6d6cd358164d0ea3bde7d98020c54b8001800ca4aea7c9538fa539f6925d1b4`.
+Source archives have identical file contents but different metadata timestamps;
+only wheel byte reproducibility is claimed.
+
+The final documentation-only handoff preserves all 1803 tested non-documentation
+files byte-for-byte and reruns documentation/planning checks. Local pytest uses
+successful-TMP teardown cleanup; the test selection and 8 GiB floor are unchanged.
+Hosted CI did not start because of account billing (annotations retained), so no
+hosted pass is claimed. Full log SHA256:
+`d9f86fab2ff531ead767f9674e801142b3019b976cbae361a6fec6406806f85b`.
+
+Published library: [astock PR #4](https://github.com/rv198-star/astock/pull/4),
+[sources-v0.1.3](https://github.com/rv198-star/astock/releases/tag/sources-v0.1.3),
+source `e626c85ee7bdd43f9b66468d2b3349a95d37477e`.
+Consumer change: [Quanthus PR #592](https://github.com/rv198-star/Quanthus/pull/592).
+Existing issues and the standing epic remain open; candidate observation never
+automatically grants business or historical PIT admission.

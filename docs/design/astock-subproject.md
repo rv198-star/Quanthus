@@ -262,6 +262,9 @@ substituted into a failed current observation.
 [`test_p10_source_futures.py`](../../tests/unit/test_p10_source_futures.py) covers
 exact units, wrong contracts, independent night labels, conservative expiry and
 same-day cache/HTTP isolation. The shared rollback/PIT tests continue to apply.
-The new finite watch, when launched from published source, has its own empty
-store and nonrenewable period; it neither pads existing qualification days nor
-blocks continued screening of other sources.
+The new finite watch runs from published source in its own initially empty
+store with a nonrenewable period. Its actual stop/restart and disable-after-good
+checks passed without additional HTTP or stale substitution; it neither pads
+existing qualification days nor blocks continued screening of other sources.
+See the [supply work item](../work-items/p10-source-supply-20261029.md) for exact
+image/source, first-cycle evidence, period and local checks.

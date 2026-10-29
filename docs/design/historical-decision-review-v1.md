@@ -121,6 +121,10 @@ Neither this delivery nor PR merge starts a new comparison or P6.
 
 ## Entry funnel and optional allocation observation
 
+The [delivery receipt](../acceptance/entry-allocation-delivery-20261030.md) and
+[PR #589 review](../acceptance/entry-allocation-review-20261030.md) record this
+bounded engineering acceptance separately from consumer qualification.
+
 `ENTRY-ALLOCATION-DELIVERY-001` / #540/#545 reuses the authenticated B package once
 to produce a Chinese offline funnel and identity-bearing JSON through
 `expert_strategy.entry_funnel` / `scripts/learning_entry_funnel.py`. The full

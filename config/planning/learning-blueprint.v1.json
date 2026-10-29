@@ -372,7 +372,11 @@
       "focus_facet": "engineering",
       "watch_paths": [
         "src/quanthus/blueprint_progress.py",
-        "scripts/blueprint_progress.py"
+        "scripts/blueprint_progress.py",
+        "src/quanthus/exploration_governance.py",
+        "scripts/exploration_governance.py",
+        "config/planning/exploration-conclusions.v1.json",
+        "config/planning/next-delivery-request.v1.json"
       ]
     }
   ],

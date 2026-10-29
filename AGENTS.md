@@ -146,6 +146,33 @@
   Fix that gap before claiming the affected progress, while unrelated authorized work continues.
   The governing mechanism is `docs/design/blueprint-progress.md`.
 
+## Exploration-driven delivery — Owner 2026-10-29
+
+- For prospective research, exploratory changes, or delivery of research assets, read
+  `docs/design/exploration-governance.md` and the current blueprint before selecting work.
+  The direction layer selects questions and adopts useful assets; TPlan executes bounded work.
+  Do not start a new general agent platform or perpetual experiment service by implication.
+- Query `python3 scripts/exploration_governance.py context --family FAMILY --module MODULE`.
+  Before execution, prepare a versioned proposal and run `preflight --request PATH`; explain
+  applicability of every current related conclusion, the consumer, decision branches, finite
+  budget and stop conditions. A check pass is not data, training, P6 or production authority.
+- Preserve scoped negative, inconclusive, blocked and invalid outcomes separately. Append the
+  conclusion, evidence, actual decision, retained assets, cumulative-cost review and reopening
+  condition to `config/planning/exploration-conclusions.v1.json`; link a blueprint checkpoint.
+  Never turn a source/reference failure into a negative market label or task closure into adoption.
+- Parked directions require a material new question/condition with evidence before reopening.
+  New issues, samples, features, agents or retries do not reset a direction's cost or sample
+  exposure. Unknown historical cost stays unknown. Reusable engineering can be delivered even
+  when the candidate failed its value gate; keep its use grade explicit.
+- Prefer justified usable delivery and necessary repair over another low-value trial. No fixed
+  70/30 quota is adopted. No eligible worthwhile task is a valid wait/stop state; do not generate
+  work to consume a budget. Review within existing authority without routine Owner reapproval.
+- Use proportional evidence for the declared decision, preserving hard safety/PIT/frozen gates.
+  Shared-data defects stay with P10. No collection or policy changes follow from a proposed loop.
+- Run `make exploration-check` and an append-only check against the exact PR base, plus normal
+  local checks. Record only affected blueprint facets. Existing sealed requests remain immutable;
+  this policy does not require retroactive migration of every historical experiment.
+
 ## Development
 
 - Support Python 3.10 or newer.

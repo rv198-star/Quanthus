@@ -30,6 +30,12 @@ The tracking catalog references prior domain contracts. It is not a replacement 
 Changing a research threshold, sample, purpose or use authorization still follows its existing
 governing contract. Optional parked states do not block independently qualified modules.
 
+Prospective research and research-asset delivery also follow
+[exploration governance](exploration-governance.md). Its append-only conclusion records explain
+why a direction is selected, parked or reopened and reference this ledger's scoped checkpoints.
+It is not a second module-progress authority. Proposals must review current related conclusions;
+neither proposal preflight nor a positive recorded result activates a consumer.
+
 ## Demand-led portfolio continuation
 
 The Owner's 2026-10-27 continuation uses four bounded batches, linked through the current ledger:

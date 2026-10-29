@@ -14,6 +14,13 @@
 - Run manifest or fixture ids:
 - Data partitions accessed:
 
+## Exploration and decision impact (or not applicable)
+
+- Consumer/question, prior conclusion IDs and applicability:
+- New conclusion/decision, retained asset and blueprint checkpoint:
+- Scope, cumulative-cost review, stop/reopening conditions:
+- Exact-base exploration history check and proposal preflight (if applicable):
+
 ## Checklist
 
 - [ ] `make check` passes

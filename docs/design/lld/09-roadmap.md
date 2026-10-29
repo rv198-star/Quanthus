@@ -87,6 +87,14 @@ optional authoring is not applicable to the first cutover and remains separately
 
 ## 4. Release mechanics
 
+Prospective exploratory work follows [exploration-driven delivery](../exploration-governance.md):
+review prior scoped conclusions before allocating another bounded task; retain negative,
+inconclusive and unevaluated outcomes with their decisions; extract independently qualified
+assets into actual consumers. TPlan owns execution, the conclusion ledger owns recorded
+reasoning and disposition, and the blueprint owns current module status. Mechanical checks
+never decide scientific truth or grant domain authority. This is a thin governance addition,
+not a new research runtime or a requirement to complete every optional state head.
+
 The learning-system MVP adopts [blueprint-linked progress](../blueprint-progress.md): each
 tracked issue maps to stable module IDs, and meaningful outcomes append scoped evidence before
 the generated module view changes. GitHub issue lifecycle, engineering, research quality,

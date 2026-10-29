@@ -1,0 +1,147 @@
+{
+  "schema_version": "quanthus.exploration-memory.v1",
+  "grants_authority": false,
+  "records": [
+    {
+      "id": "CON-HEAD2-MARCH-20261029",
+      "recorded_at": "2026-10-29T11:03:04.933411+00:00",
+      "actor": "Codex; Owner-approved engineering mechanism",
+      "question_id": "CON-HEAD2-MARCH-20261029-QUESTION",
+      "family": "head2-entry-filter",
+      "work_item": "META-LEARN-001",
+      "modules": [
+        "S02",
+        "EXPERT"
+      ],
+      "question": "March 截止的 Head2 入场候选是否通过固定用途采用门槛？",
+      "consumer": "Quanthus research task selection and existing expert consumers",
+      "scope": "TRAIN20 / EVAL87，2021-03-31训练截止，原固定基准和用途；回溯研究。",
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "reject_candidate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "只拒绝此候选的此用途；不证明所有Head2或12+X无效；不授予P6/生产资格。",
+      "decision_effect": "停放此入场过滤方向的新fit、特征追加和截止调整；交付独立合格组件，不自动转向3/4。",
+      "reopen_conditions": [
+        "出现有独立证据支持的不同消费者问题。",
+        "对应范围的来源、参考和评价资格以及新任务预算明确；旧曝光不清零。"
+      ],
+      "retained_assets": [
+        "复用已支持的读取器、编码器、Facts和比较接口。",
+        "历史March拟合驱动P2仍开放，排除在支持接口外。"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "历史尝试消耗仍见原收据；本次未重建总量，不把未知计为零。下一批预算与原成本分开。",
+      "attempt_refs": [],
+      "evidence": [
+        {
+          "id": "MARCH",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "075a02885be6656abcc9cb1de15b20c2fda34657",
+          "path": "docs/acceptance/learning-march-astra-review-20261029.md",
+          "sha256": "9fec4bea6792095b4408852432e023df64b5e489c67379b999defd96e19670d0",
+          "claim_ceiling": "只拒绝此候选的此用途；不证明所有Head2或12+X无效；不授予P6/生产资格。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261028T202135817023Z",
+        "CP-540-20261029T083255376941Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "id": "CON-HELD-NEED-20261029",
+      "recorded_at": "2026-10-29T11:03:04.936783+00:00",
+      "actor": "Codex; Owner-approved engineering mechanism",
+      "question_id": "CON-HELD-NEED-20261029-QUESTION",
+      "family": "held-structure-action-mapping",
+      "work_item": "P3-EXPERT-007",
+      "modules": [
+        "EXPERT"
+      ],
+      "question": "完整既有持仓轨迹是否支持追加结构决策试验？",
+      "consumer": "Quanthus research task selection and existing expert consumers",
+      "scope": "538 episodes / 8393 reviews；既有回溯轨迹；16个旧建议15个被安全退出覆盖，1个改变动作。",
+      "execution_status": "completed",
+      "verdict": "inconclusive",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "不是新的经济效果实验，也未观测所有入场/资金分配替代方案；不外推需求不存在。",
+      "decision_effect": "当前没有成立的可重复未满足需求；不新开结构阈值试验；先接入已合格资产。",
+      "reopen_conditions": [
+        "有具体未满足消费者需求及可检验的增量决定。"
+      ],
+      "retained_assets": [
+        "完整trace核对、专家/veto接口可按原等级复用。"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "历史尝试消耗仍见原收据；本次未重建总量，不把未知计为零。下一批预算与原成本分开。",
+      "attempt_refs": [],
+      "evidence": [
+        {
+          "id": "HELD",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "075a02885be6656abcc9cb1de15b20c2fda34657",
+          "path": "docs/work-items/learning-delivery-20261029.md",
+          "sha256": "bb71626138c331faad2b12736613da09c8e22e6c0c991f40c2689dfe0c080f75",
+          "claim_ceiling": "不是新的经济效果实验，也未观测所有入场/资金分配替代方案；不外推需求不存在。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T083255376941Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "id": "CON-STAGE34-SOURCE-20261029",
+      "recorded_at": "2026-10-29T11:03:04.940326+00:00",
+      "actor": "Codex; Owner-approved engineering mechanism",
+      "question_id": "CON-STAGE34-SOURCE-20261029-QUESTION",
+      "family": "stage34-purpose-qualified-reference",
+      "work_item": "P5-STATE-002",
+      "modules": [
+        "S03",
+        "S04"
+      ],
+      "question": "245身份的现有路线是否具备3/4评价所需来源和独立参考？",
+      "consumer": "Quanthus research task selection and existing expert consumers",
+      "scope": "只检查已选定现存inventory；身份数量不等于合格参考容量。",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "仅所查来源路线未合格；不证明全局无来源或3/4无用。",
+      "decision_effect": "停放当前来源路线下的训练和评分；不记录为状态3/4无效；独立合格业务继续。",
+      "reopen_conditions": [
+        "准确的目的兼容行动来源闭包和独立参考准入材料齐备。",
+        "明确实际用途与有限预算；补采仍由P10及相应授权负责。"
+      ],
+      "retained_assets": [
+        "保留既有来源评估和表示工程；不将未评分当作负标签。"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "历史尝试消耗仍见原收据；本次未重建总量，不把未知计为零。下一批预算与原成本分开。",
+      "attempt_refs": [],
+      "evidence": [
+        {
+          "id": "STAGE34",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "075a02885be6656abcc9cb1de15b20c2fda34657",
+          "path": "docs/acceptance/stage34-reference-route-20261028.md",
+          "sha256": "766e6f54dc0b150f2ca16814188320c2afebc87063de14805b91829126ebc5f3",
+          "claim_ceiling": "仅所查来源路线未合格；不证明全局无来源或3/4无用。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261027T192528495073Z"
+      ],
+      "supersedes": null
+    }
+  ]
+}

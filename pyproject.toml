@@ -13,6 +13,9 @@ authors = [{ name = "Quanthus maintainers" }]
 dependencies = []
 
 [project.optional-dependencies]
+supplement-sources = [
+  "astock-sources @ https://github.com/rv198-star/astock/releases/download/sources-v0.1.1/astock_sources-0.1.1-py3-none-any.whl#sha256=49b04b404016fa5432acb12a1bbfdd5a2a4268adbd3a4e44a1f16adc53b1eebf",
+]
 platform = [
   "cryptography>=45,<46",
   "gunicorn>=26,<27",
@@ -66,6 +69,7 @@ quanthus-minute-tdx = "quanthus.providers.minute_tdx:main"
 quanthus-ods-snapshot = "quanthus.providers.ods_snapshot:main"
 quanthus-calendar-refresh = "quanthus.providers.trading_calendar:main"
 quanthus-p5-cpu-probe = "quanthus.stage_learning.p5_compute_probe:main"
+quanthus-p10-supplement = "quanthus.p10_supplement:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

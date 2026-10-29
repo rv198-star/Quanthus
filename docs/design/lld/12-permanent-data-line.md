@@ -228,6 +228,21 @@ Dedicated CN01/Hermes daily-core services and OCI core-only mirroring are allowe
 after their baseline, physical-source, contract and runtime verification.
 
 
+## Supplementary-source observation — P10-DATA-SUPPLY-002/003/004/005
+
+Owner's 2026-10-30 continuation authorizes bounded qualified-source integration for
+P10's own source selection and observation. The
+[independent astock subproject](../astock-subproject.md) owns the child contracts:
+fixed public source release, field units/time/basis, immutable raw and normalized
+audit products, exact-snapshot reads, source-specific failure isolation and rollback,
+and a finite seven-day watch. The executable policy is
+[`p10-supplement-sources.v1.json`](../../../config/pipelines/p10-supplement-sources.v1.json);
+code/tests and current evidence are linked by that child and the
+[supply work item](../../work-items/p10-source-supply-20261029.md).
+This standing-line consumer can progress without changing a business line's frozen
+inputs. Candidate review remains purpose-specific; a homepage, transport success,
+elapsed probation or issue closure cannot establish financial/PIT acceptance.
+
 ## Bounded dated-status evidence — P10-DATA-P6-BASE24-EXEC-001
 
 Issue #538's additive `securities_warehouse/base24_status_evidence.py` publishes

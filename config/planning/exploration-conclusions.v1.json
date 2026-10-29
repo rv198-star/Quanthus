@@ -470,6 +470,61 @@
         "CP-540-20261029T164848737757Z"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "recorded_at": "2026-10-29T21:09:39.133468+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved conditional 1–3",
+      "question_id": "ENTRY-ALLOCATION-CONSUMER-001",
+      "family": "entry-allocation-consumer-adoption",
+      "work_item": "META-LEARN-001",
+      "modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "目前是否有实际、近期且已获准合格的调用任务需要新增allocation audit接入？",
+      "consumer": "具名FormalP2ReplayBackend/P3Strat003ReplayRuntime维护者与Owner",
+      "scope": "列明代码入口、当前任务/激活记录、#540/#545/#546及有界open issue/PR快照；无行情/标签/经济结果读取。",
+      "claim_ceiling": "仅本轮当前接入条件未成立；不等于未来无需求、工程能力无用或策略价值负结果。",
+      "decision_effect": "按第一步条件收口；第2/3步NOT_RUN_CONDITION_NOT_MET，不增接线/日志、不为补旧审计重放；PR589能力按原级保留。",
+      "cost_review": "需求检查514.246秒；完整检查及交接另记实际receipt。模型token、完整费用与历史费用未知不填零，保留初次提案/工具失败和旧研究投入。",
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "reopen_conditions": [
+        "具名近期任务及负责调用方确需一个未满足的分配审计决定。",
+        "绑定精确输入/用途/窗口/配置及有限运行预算，按现有门槛取得执行资格。",
+        "仅对新运行显式选择audit；旧缺失原因保持NOT_RECORDED，不自动回放或追补。"
+      ],
+      "retained_assets": [
+        "PR589已交付的默认关闭allocation_audit与旧七文件行为证据；不重写旧封存产物。",
+        "具名调用入口和有界需求评估，避免以可能的未来复用为由持续制造接线工作。",
+        "旧漏斗/费用/曝光/负结果和Head2、P6停放状态。"
+      ],
+      "evidence": [
+        {
+          "id": "CALLER-ASSESSMENT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-consumer-20261029T210011Z/evidence/caller-assessment.safe.json",
+          "sha256": "7099680e577d15a4bbb3c71c703424e50c74d3f56e093def0c0d8b0dca02c3df",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅所列调用入口及当前任务的有界需求检查，不是全局无需求或策略价值负结果。"
+        }
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/.codex/entry-allocation-consumer-20261029T210011Z/logs/proposal-preflight.txt",
+        "cn02:/srv/agentdock/.codex/entry-allocation-consumer-20261029T210011Z/logs/proposal-preflight-v2.txt"
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T164848737757Z",
+        "CP-540-20261029T210855864308Z"
+      ],
+      "supersedes": null
     }
   ]
 }

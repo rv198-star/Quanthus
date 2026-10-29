@@ -80,3 +80,16 @@ trading, not fund subscriptions/redemptions. Jisilu is an anonymous subset cappe
 at30 rows; C-type convertible prices have per100-face units, and E-type exchangeables
 remain metadata-only. The source's context date and optional time text are never
 combined into a quote timestamp. Keep these restrictions in every review.
+
+On storage-constrained CN02, validate with pytest's successful-fixture cleanup:
+
+```sh
+PYTEST_ADDOPTS='-o tmp_path_retention_policy=failed -o tmp_path_retention_count=1' \
+  make check PYTHON=/path/to/isolated-check-venv/bin/python
+```
+
+With pytest 8.4.2 this reclaims successful synthetic fixture TMP after teardown and
+keeps failed fixtures. Test selection and the existing 8 GiB free-space gate stay
+unchanged. Retain the complete check log and command receipt outside TMP; use a
+separate qualification environment for the 0.1.2 wheel. This does not change the
+P10 data cleaner's mounts, schedule or evidence retention.

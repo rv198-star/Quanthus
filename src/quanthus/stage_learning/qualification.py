@@ -13,7 +13,7 @@ import hashlib
 import json
 import re
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -437,6 +437,134 @@ def select_qualification_contexts(
     if len({item.episode_id for item in contexts}) != len(contexts):
         raise StageQualificationError("qualification sample reuses an episode")
     return contexts
+
+
+def qualification_capacity_preflight(
+    episodes: Sequence[EpisodeObservation],
+    activity: Sequence[ActivityObservation],
+    *,
+    report_start: date,
+    report_end: date,
+    sampling: Mapping[str, Any],
+    minimum_unique_episodes: int,
+    excluded_episode_ids: Sequence[str] = (),
+    selection_order: Sequence[str] | None = None,
+    prior_history_sessions: Mapping[tuple[str, date], int] | None = None,
+    minimum_prior_sessions_by_scale: Mapping[int, int] | None = None,
+) -> dict[str, Any]:
+    """Diagnose a prospective allocation before references or predictions.
+
+    Reuse the frozen selector for each stratum, with the other quotas set to
+    zero. A different order is a capacity probe only: this function does not
+    return a new sample or alter the legacy sampler. Prior exposure excludes
+    the whole episode, not just its previously selected date. A numerical pass
+    is only a necessary condition, never semantic or exposure qualification.
+    Optional history counts exclude T and must come from the admitted contiguous
+    coordinate prefix, not elapsed dates or concatenated windows. Missing counts
+    fail closed; the caller freezes and binds their source identity separately.
+    """
+    if (not isinstance(minimum_unique_episodes, int)
+            or isinstance(minimum_unique_episodes, bool) or minimum_unique_episodes < 1):
+        raise StageQualificationError("qualification capacity minimum must be a positive integer")
+    predicates: dict[str, Callable[[EpisodeObservation], bool]] = {
+        "started_activity": lambda e: e.observation == "started",
+        "early_held": lambda e: (e.observation == "held" and e.phase == "active"
+                                 and e.hold_count in (1, 2, 3)),
+        "near_anchor_loss_negative": lambda e: e.observation in {"lost", "below"},
+        "reclaimed_ambiguity": lambda e: e.observation == "reclaimed",
+        "mature_held": lambda e: (e.observation == "held" and e.phase == "active"
+                                  and e.hold_count >= 40),
+    }
+    order = tuple(predicates) if selection_order is None else tuple(selection_order)
+    if (isinstance(selection_order, str) or len(order) != len(predicates)
+            or set(order) != set(predicates)):
+        raise StageQualificationError(
+            "qualification allocation order must contain each stratum once"
+        )
+    if report_start > report_end:
+        raise StageQualificationError("qualification capacity date range is reversed")
+    eligible = [e for e in episodes if report_start <= e.market_date <= report_end]
+    history_missing = history_ineligible = 0
+    if (prior_history_sessions is None) != (minimum_prior_sessions_by_scale is None):
+        raise StageQualificationError("qualification history counts and policy must be paired")
+    if minimum_prior_sessions_by_scale is not None:
+        if (not minimum_prior_sessions_by_scale
+                or any(type(k) is not int or k < 1 or type(v) is not int or v < k
+                       for k, v in minimum_prior_sessions_by_scale.items())
+                or prior_history_sessions is None
+                or any(type(v) is not int or v < 0 for v in prior_history_sessions.values())
+                or any(e.scale not in minimum_prior_sessions_by_scale for e in eligible)):
+            raise StageQualificationError("qualification history policy or counts are invalid")
+        full_history = []
+        for episode in eligible:
+            count = prior_history_sessions.get((episode.security_code, episode.market_date))
+            if count is None:
+                history_missing += 1
+            elif count < minimum_prior_sessions_by_scale[episode.scale]:
+                history_ineligible += 1
+            else:
+                full_history.append(episode)
+        eligible = full_history
+    all_ids = {e.episode_id for e in eligible}
+    excluded = set(excluded_episode_ids)
+    remaining = [e for e in eligible if e.episode_id not in excluded]
+    used: set[str] = set()
+    allocation = []
+    for name in order:
+        predicate = predicates[name]
+        original_ids = {e.episode_id for e in eligible if predicate(e)}
+        ids = original_ids - excluded
+        local_sampling = {
+            **sampling,
+            "strata": {k: v if k == name else 0 for k, v in sampling["strata"].items()},
+            "started_activity_buckets": {
+                k: v if name == "started_activity" else 0
+                for k, v in sampling["started_activity_buckets"].items()
+            },
+            "early_held_per_hold_count": {
+                k: v if name == "early_held" else 0
+                for k, v in sampling["early_held_per_hold_count"].items()
+            },
+        }
+        contexts = select_qualification_contexts(
+            [e for e in remaining if e.episode_id not in used], activity,
+            report_start=report_start, report_end=report_end,
+            sampling=local_sampling, target_caps=True,
+        )
+        chosen = {c.episode_id for c in contexts}
+        if (not chosen <= ids - used
+                or any(c.sampling_stratum != "qualification_" + name for c in contexts)):
+            raise StageQualificationError("qualification capacity stratum disagrees with selector")
+        allocation.append({
+            "stratum": name, "target_cap": int(sampling["strata"][name]),
+            "eligible_unique_episodes": len(original_ids),
+            "excluded_exposed_episodes": len(original_ids & excluded),
+            "occupied_by_earlier_strata": len(ids & used),
+            "available_after_prior_strata": len(ids - used), "selected": len(chosen),
+        })
+        used.update(chosen)
+    reasons = []
+    if len(all_ids - excluded) < minimum_unique_episodes:
+        reasons.append("UNCONSUMED_EPISODE_CAPACITY_BELOW_MINIMUM")
+    if len(used) < minimum_unique_episodes:
+        reasons.append("ALLOCATED_EPISODE_CAPACITY_BELOW_MINIMUM")
+    return {
+        "schema_version": "quanthus.stage-qualification-capacity.v1",
+        "eligible_observations": len(eligible), "eligible_unique_episodes": len(all_ids),
+        "excluded_unique_episodes": len(all_ids & excluded),
+        "unconsumed_unique_episodes": len(all_ids - excluded),
+        "selected_unique_episodes": len(used), "allocation": allocation,
+        "minimum_unique_episodes": minimum_unique_episodes,
+        "history_minimum_checked": minimum_prior_sessions_by_scale is not None,
+        "required_prior_sessions_by_scale": {
+            str(k): v for k, v in (minimum_prior_sessions_by_scale or {}).items()
+        },
+        "history_missing_observations": history_missing,
+        "history_ineligible_observations": history_ineligible,
+        "capacity_passed": not reasons, "reason_codes": reasons,
+        "semantic_sufficiency_proven": False, "new_sample_published": False,
+        "consumer_test_authorized": False,
+    }
 
 
 def _trial(candidate: Mapping[str, Any]) -> R1Parameters:

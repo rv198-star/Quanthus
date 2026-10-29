@@ -1,0 +1,69 @@
+{
+  "schema_version": "quanthus.factor-review-slice.v1",
+  "work_item": "P3-FACTOR-001",
+  "purpose": "RETROSPECTIVE_RESEARCH_REVIEW_QUEUE_ONLY",
+  "registry": {
+    "path": "config/p3-baseline-features.research.v1.json",
+    "sha256": "f336c21b4724b1e0c0a52faca7ab3a725831437d6aea9a945ee52ba0f884fbd9"
+  },
+  "factor": {
+    "feature_id": "liquidity.volume_ratio20",
+    "version": "1.0.0",
+    "unit": "ratio",
+    "implementation_concept": "stage.activity.volume-ratio20",
+    "formation": ["qualified_unadjusted_daily_volume", "prior20_mean_excluding_T", "current_over_mean"],
+    "domains": ["liquidity", "structure_activity"],
+    "output_kind": "continuous_feature",
+    "evidence_grade": "EXACT_ARITHMETIC_RETROSPECTIVE_ONLY",
+    "missing": "explicit_unknown_abstain_not_zero",
+    "revision": "new_semantic_input_or_definition_changes_identity"
+  },
+  "facts": {
+    "structure": "quanthus.structure_v2.build_structure_v2",
+    "activity": "quanthus.stage_learning.core.build_activity_observations",
+    "lookback": 20,
+    "prior_window_excludes_T": true,
+    "reuse": "one_immutable_job_local_TMP_shared_by_both_arms",
+    "coordinate_or_gap": "reset_and_rewarm"
+  },
+  "consumer": {
+    "id": "price-breakout-research-review-queue-v1",
+    "price_pool": "close_strictly_above_prior20_high",
+    "baseline": "price_pool_without_volume_gate",
+    "candidate": "price_pool_with_volume_ratio_gte_1",
+    "volume_minimum": "1",
+    "slots_per_day": 5,
+    "ranking": "ascending_sha256(seed,market_date,security_id)",
+    "seed": "factor541-volume-review-v1",
+    "unknown_factor": "abstain_from_candidate_retain_in_denominator",
+    "filler_rows": false,
+    "positions_or_orders": false
+  },
+  "scope": {
+    "source_grade": "QUALIFIED_RETROSPECTIVE_COORDINATE_ONLY",
+    "business_year": 2021,
+    "issuers": 128,
+    "through": "2021-12-31",
+    "existing_development_reuse": true,
+    "historical_as_known": false,
+    "knowledge_cutoff": null,
+    "provider_acquisition": "UNAVAILABLE_RETAINED"
+  },
+  "comparison": {
+    "freeze_before_factor_values": true,
+    "same_source_full_daily_denominator": true,
+    "same_ranking_and_maximum_slots": true,
+    "report_actual_used_and_unused_slots": true,
+    "report_selected_replacement_and_coverage_loss": true,
+    "human_minutes_per_slot": null,
+    "economic_or_prediction_value": "NOT_ASSESSED",
+    "no_threshold_or_sample_tuning": true
+  },
+  "authority": {
+    "legacy_feature_fact_or_PIT_admission": false,
+    "formal_state_reference": false,
+    "training": false,
+    "production_or_P6": false,
+    "new_source_acquisition": false
+  }
+}

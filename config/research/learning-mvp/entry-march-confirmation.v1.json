@@ -1,0 +1,74 @@
+{
+  "schema_version": "quanthus.entry-march-confirmation.v1",
+  "design_status": "approved",
+  "delivery_gate": "blocked",
+  "owner_authority": "Owner2026-10-29 approved TRAIN20 through2021-03-31, fixed87 qualification and blinded reference, conditional refit and complete capital comparison/reproduction, <=5h; no acquisition or threshold tuning",
+  "work_items": [540, 542, 545, 546],
+  "parent": "docs/work-items/learning-next-route-20261028.md",
+  "purpose": "RETROSPECTIVE_COMPANY_HELD_OUT_ENTRY_CONFIRMATION",
+  "training": {
+    "identity_sha256": "5b18e075167e23c3c286666a2d25abae9d7d15e4bb58c0bc79cce12e659c10f6",
+    "cutoff": "2021-03-31",
+    "rows": 20,
+    "positive": 4,
+    "negative": 16,
+    "features": 7,
+    "fit_steps": 200,
+    "learning_rate": 0.05,
+    "l2": 0.01,
+    "scaler": "train-only",
+    "initialization": "zero",
+    "generation": 0,
+    "update_or_calibration": false
+  },
+  "evaluation": {
+    "identity_sha256": "6858a54dca8251b0efa0d26cd63e5dafcc09ed5174c5acc3e9eebc72c45000d3",
+    "opportunities": 87,
+    "companies": 66,
+    "first_signal": "2021-04-02",
+    "last_signal": "2021-08-31",
+    "terminal_session": "2021-12-31",
+    "window": "exact40 actual venue sessions ending T-1; current20 decision, preceding20 context",
+    "unavailable": "Retain all87; block affected new entry only; never negative or forced sale",
+    "unsupported_mask": "Unavailable when not represented in TRAIN20"
+  },
+  "reference": {
+    "readers": 2,
+    "rubric": "head2-blind-observed-order-reference-rubric-v3",
+    "candidate_blind": true,
+    "minimum_definite": 12,
+    "minimum_distinct_companies_per_class": 5,
+    "minimum_time_blocks": 2,
+    "time_block": "signal calendar month",
+    "consensus": "Same definite opinion only; any disagreement or UNKNOWN stays UNKNOWN; no third vote",
+    "commitment": "Both complete opinion arrays committed before fit; support-only receipt before fit; full opinions opened only after checkpoint and all87 predictions are committed",
+    "ceiling": "Two AI operational references, not independently established market truth"
+  },
+  "capital": {
+    "controls": ["C0 original B on this scoped universe", "C1 C0 plus unchanged R0", "C2 C0 plus new raw score>=0.5"],
+    "raw_threshold": 0.5,
+    "initial_units": 5,
+    "unit_notional": 100000,
+    "initial_state": "Independent empty cash portfolios; no inherited old B fills",
+    "execution": "Unchanged accepted parent-feature plus affected-patch RestructuringRuntime; T+1 open, own allocation/cash/holdings/fees/actions/exits per arm",
+    "rights": "DO_NOT_SUBSCRIBE; preserve actual ex-right loss",
+    "futility": "Stop before economic interpretation when no known C1-C2 changes, or changes confined to one company or one signal date",
+    "value_gate": "C2 beats BOTH C0 and C1 net fees, no worse drawdown, benefit not confined to one company/date; state quality reported separately",
+    "uncertainty": {
+      "method": "paired nonoverlapping5-session block bootstrap of daily equity increments, common sessions/arms",
+      "replicates": 10000,
+      "seed": 20210331,
+      "interval": "two-sided95% percentile; interval crossing0 is inconclusive",
+      "issuer_sensitivity": "Report leave-one-issuer-out contribution concentration; no sample/threshold reselection"
+    }
+  },
+  "authority": {
+    "new_source_requests": 0,
+    "protected2022_2026_access": false,
+    "source_repair_or_archive_hunt": false,
+    "deployment_or_P6": false,
+    "consumer_admission": "NOT_GRANTED",
+    "historical_PIT_claim": false,
+    "failed_qualification": "Close fixed batch; no cutoff, class, sample or threshold rescue"
+  }
+}

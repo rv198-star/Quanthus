@@ -1,0 +1,16 @@
+{
+  "schema_version": "quanthus.entry-consolidation-development.v1",
+  "owner_authority": "Owner invoked TPlan to execute approved audit steps A-C on 2026-10-29 Asia/Shanghai",
+  "purpose": "REUSED_DEVELOPMENT_ENTRY_DECISION_DIFFERENCE_ONLY",
+  "work_items": [540, 542, 545, 546],
+  "scope": {"business_start": "2012-01-01", "business_through": "2021-12-30", "anchor": "40 actual venue sessions ending T-1", "training_observations_strictly_before_anchor": true},
+  "baseline": {"retained_arm": "B", "trend": false, "entry_cap": false, "held_risk": false, "preserve_original_decision_and_guardians": true, "new_execution_or_capital_replay": false},
+  "controls": {"C0": "Exact original B entry decision", "C1": "C0 AND unchanged R0 consolidation predicate", "C2": "C0 AND retained seven-feature raw score >= 0.5", "R0_file": "config/stage-learning/order-rule-screen.v1.json", "R0_semantic_digest": "sha256:74d257c75e57b0fa9d09fd183496ee63a3d9cbed21492c36acecc4f7e71bf7f0", "checkpoint_sha256": "2f6760f7b0c8597d062ab115ee6ffb8082b9154c1059c31dc8926095e28be663", "threshold": 0.5, "calibrated_probability": false, "parameter_search": false},
+  "exposure": {"preserved_global_identities": "EXCLUDE", "legacy_evaluation_pools": "EXCLUDE", "recent_Head2_selected_issuers_all_roles": "CONSERVATIVELY_EXCLUDE", "original31": "CONSERVATIVELY_EXCLUDE", "company_and_all_code_alias_closure": true, "older_known_development_reuse": "PERMITTED_AND_DISCLOSED", "fresh_or_out_of_sample_claim": false},
+  "unknown": "Blocks C1/C2 new entry; remains in full denominator; never counted as a known C1-C2 delta or forced sale",
+  "stop_rules": {"zero_known_C1_C2_difference": "STOP", "all_differences_removed_by_largest_issuer": "STOP", "all_differences_removed_by_largest_date": "STOP", "otherwise": "PROPOSE_INDEPENDENT_QUALIFICATION_ONLY"},
+  "authority": {"new_network_requests": 0, "training": false, "updates": false, "new_reference_or_labels": false, "future_returns": false, "economic_replay": false, "protected2022_2026_market_or_result_access": false, "historical_PIT_claim": false, "consumer_admission": "NOT_GRANTED", "production": false, "P6_mutation": false},
+  "budget": {"combined_seconds": 9900, "bridge_seconds": 2700, "census_seconds": 5400, "disposition_seconds": 1800, "new_system_bytes": 134217728, "new_data_bytes": 1073741824, "RSS_bytes": 2147483648, "minimum_free_bytes_per_written_device": 8589934592, "workers": 1},
+  "shared_prerequisite": {"facts": "One immutable job-local per-opportunity Facts materialization shared by C1/C2", "lifecycle": "TMP", "cache_or_ADM": false},
+  "non_claims": ["Different entries do not prove recognition quality or economic value", "R0 false is no assertion, not a state label", "T+1 open is only the earliest calendar coordinate; no fill is inferred", "Completion does not accept learning MVP or open conditional steps D/E"]
+}

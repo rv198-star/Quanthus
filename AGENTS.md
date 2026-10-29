@@ -154,6 +154,29 @@
 - Prefer deterministic ordering and explicit reason codes over implicit behavior.
 - Run `make check` before a handoff.
 
+### Local acceptance default — Owner 2026-10-29
+
+- Treat GitHub-hosted CI as unavailable by default. Use local acceptance to continue
+  authorized engineering and PR review; do not wait for account payment, buy runner
+  capacity, repeatedly rerun billing-blocked jobs, or describe them as executed tests.
+  GitHub remains the code-distribution and PR history channel.
+- Run applicable focused regressions, lint/type checks and `make check` locally.
+  For blueprint work also check immutable history against the exact PR base and
+  reconcile affected live issue metadata. Run Web checks when the change affects Web;
+  explicitly report unavailable runtime versions, optional dependencies and skipped checks.
+- Bind evidence to the exact tested code/config/test closure, runtime, commands,
+  results, logs and SHA256. A documentation/ledger-only follow-up may reuse an existing
+  complete `make check` result after proving that its executable/config/test closure
+  is byte-identical; rerun affected planning/documentation checks and record the reuse.
+  Changed dependencies, test selection or semantic inputs invalidate that reuse.
+  This does not replace a required independent construction or cold acceptance.
+- Separate local pass, existing baseline failures, not-run checks and remote CI status.
+  Review actual failures on their merits; unavailable CI is neither a code pass nor a
+  new research/data gate. Retain scientific, PIT, consumer, production and merge authority.
+- Use ordinary authorized PR/merge operations only. Do not forge hosted-CI success,
+  use admin bypass, change branch protection/workflows/account settings, or start a
+  self-hosted runner merely to replace unavailable hosted CI.
+
 ## Batch data construction
 
 - Design warehouse, feature, replay, attribution, and other data-heavy batches as an explicit

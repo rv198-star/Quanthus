@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved — Owner requested this mechanism on 2026-10-27 |
-| Delivery gate | accepted-conditional for the mechanism; default-branch integration is merged, remote Actions execution remains a separately recorded limitation |
+| Delivery gate | accepted-conditional for the mechanism; default-branch integration is merged, local checks are the default acceptance route under the Owner's 2026-10-29 instruction |
 | Work item | META-TRACE-001; first bounded adoption: META-LEARN-001 / #540 |
 | Parent | [Delivery roadmap](lld/09-roadmap.md) |
 | Module architecture | [Layered state portfolio](stock-stage-vocabulary-portfolio.md) |
@@ -162,9 +162,15 @@ deployment credentials, no auto-promotion, no automatic issue comments and no ne
 GitHub issue events select this workflow only after it is on the default branch.
 Adding the workflow does not silently enable branch-protection requirements. Default-branch
 installation, an actual runner execution and a successful reconciliation are separate facts.
-When remote runners cannot start, use the same CLI locally and retain the remote failure;
-do not describe installation or a local pass as a successful Actions run. The current adoption
-receipt is linked from the `TRACE` module in the generated blueprint.
+Under the Owner's 2026-10-29 instruction, GitHub-hosted CI is assumed unavailable.
+Use the same CLI locally as the default acceptance route, including the exact-base
+append-only check and affected issue reconciliation. Follow the evidence/reuse rules
+in [`AGENTS.md`](../../AGENTS.md#local-acceptance-default--owner-2026-10-29).
+Retain remote failures without waiting for account payment or treating them as a new
+module/research gate. Existing workflow definitions remain unchanged; runner execution,
+local acceptance and merge authority are separate facts. Do not describe installation
+or a local pass as a successful Actions run. The current adoption receipt is linked
+from the `TRACE` module in the generated blueprint.
 This is one bounded addition to existing planning and TPlan, not a new general project platform.
 
 Local implementation evidence: [2026-10-27 conformance record](../acceptance/blueprint-progress-20261027.md).

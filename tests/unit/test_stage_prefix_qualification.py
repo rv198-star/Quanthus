@@ -83,6 +83,9 @@ def test_reference_shortfall_never_constructs_or_predicts_candidate(monkeypatch)
     assert result["disposition"] == "INCONCLUSIVE_REFERENCE_SHORTFALL_NOT_SCORED"
     assert result["candidate_scored"] is False
     assert result["consumer_test_authorized"] is False
+    assert result["quality_passed"] is False
+    assert result["consumer_request_eligible"] is False
+    assert result["production_or_P6_admitted"] is False
 
 
 def test_empty_reference_is_retained_as_inconclusive():
@@ -113,3 +116,28 @@ def test_sufficient_synthetic_reference_runs_only_frozen_candidate_and_r0(monkey
     assert result["candidate_scored"] is True
     assert result["disposition"] == "BOUNDED_DEVELOPMENT_REPLICATION_PASS"
     assert len(seen) == 6 and len(set(seen)) == 2
+    assert result["quality_passed"] is True
+    assert result["consumer_request_eligible"] is True
+    # A quality assessment has no use contract or admission receipt. Even the
+    # positive path cannot grant research consumption, production, or P6.
+    assert result["consumer_test_authorized"] is False
+    assert result["production_or_P6_admitted"] is False
+
+
+def test_quality_rejection_cannot_become_use_request_eligibility(monkeypatch):
+    contexts, references, gates = corpus()
+    root = Path(__file__).resolve().parents[2]
+    full = json.loads((root / "config/stage-learning/qualification.v1.json").read_text())
+    candidate = json.loads((root / full["candidate_config"]).read_text())
+    experiment = json.loads((root / full["experiment_config"]).read_text())
+    observations = tuple(SimpleNamespace(context_id=c.context_id) for c in contexts)
+    monkeypatch.setattr(module, "build_learning_observations", lambda *args: observations)
+    monkeypatch.setattr(module, "predict_stage", lambda *args: None)
+    monkeypatch.setattr(module, "_hard_gate", lambda *args, **kwargs: {"passed": False})
+    result = module.score_if_sufficient(contexts, references, [], None, (), candidate,
+                                        experiment, gates)
+    assert result["candidate_scored"] is True
+    assert result["quality_passed"] is False
+    assert result["consumer_request_eligible"] is False
+    assert result["consumer_test_authorized"] is False
+    assert result["production_or_P6_admitted"] is False

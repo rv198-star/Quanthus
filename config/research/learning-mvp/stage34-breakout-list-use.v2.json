@@ -1,0 +1,188 @@
+{
+  "schema_version": "quanthus.stage34-breakout-list-use.v2",
+  "request_id": "stage34-reference-method-and-existing-route-20261028-v2",
+  "work_items": [
+    "META-LEARN-001",
+    "P5-STATE-002",
+    "P5-STATE-003",
+    "P3-EXPERT-007"
+  ],
+  "status": "approved_bounded_method_pilot_and_conditional_existing_source_qualification",
+  "owner_authority": "Owner2026-10-28: steps1/2<=150minutes; one conditional step3<=120minutes; old scientific gates immutable.",
+  "purpose": "RETROSPECTIVE_RESEARCH_BREAKOUT_REVIEW_LIST",
+  "consumer": {
+    "actor": "research analyst reviewing a daily breakout follow-up list",
+    "action": "review at most5 security/date units; retain every20/60 context assertion inside one unit",
+    "review_slots_per_day": 5,
+    "cost_per_slot_units": 1,
+    "no_automatic_order_or_fill": true,
+    "missing_or_invalid_never_forces_sale": true,
+    "claim_ceiling": "Research triage only; no investor return, live analyst time saving or historical-as-known claim."
+  },
+  "comparison": {
+    "arms": [
+      "frozen_R1",
+      "frozen_R0"
+    ],
+    "shared_inputs": [
+      "same admitted T-or-earlier daily prefix",
+      "same20/60 anchor facts",
+      "same activity facts",
+      "same exact context universe and UNKNOWN denominator"
+    ],
+    "baseline": "existing frozen R0, no deliberately weakened or information-deprived baseline",
+    "ranking_before_reference": {
+      "stage_order": [
+        4,
+        3
+      ],
+      "within_stage": "SHA256([request_id,market_date,security_id]), ascending",
+      "multiple_scales": "rank unit by greatest asserted stage, retain all assertions and UNKNOWN",
+      "unknown": "in denominator; no nomination by UNKNOWN alone"
+    },
+    "same_review_slots_and_input_cost": "same maximum slots and identical Facts; report actual cost; same-cost benefit requires equal actual use",
+    "measures": [
+      "reviewed definite-positive count",
+      "definite-negative alerts",
+      "missed definite-positive count",
+      "ambiguous unique assertions",
+      "UNKNOWN count and rate",
+      "issuer and related-episode dependence"
+    ],
+    "useful_only_if": "at same cost fewer false alerts with no lost definite positives, or more definite positives with no extra false alerts; no claim if neither strictly improves",
+    "uncertainty": "paired issuer-cluster summaries; dependent episodes/scales are not independent votes",
+    "economic_or_future_settlement_result": false,
+    "opportunity_set": {
+      "freeze_before_references_and_predictions": true,
+      "unit": [
+        "security_id",
+        "market_date"
+      ],
+      "context_identity_required": true,
+      "both_scales_retained": [
+        20,
+        60
+      ],
+      "full_eligible_security_dates_required": true,
+      "unknowns_retained_in_denominator": true,
+      "not_one_date_per_episode_quality_sample": true,
+      "cross_scale_independence_claim": false,
+      "missing_or_extra_prediction_is_error": true,
+      "overlapping_episodes": "one security/date unit retaining all distinct context assertions"
+    },
+    "measure_definitions": {
+      "recognition": "original context/episode quality gates unchanged; no pilot scoring",
+      "selected_positive_units": "selected security/date with at least one matched definite3/4; also report every error in that unit",
+      "wrong_stage_assertions": "asserted3 against definite4, or4 against definite3, at same context/scale",
+      "negative_alert_assertions": "asserted3/4 against definite empty support",
+      "ambiguous_unique_assertions": "one asserted stage against support[3,4]",
+      "missed_positive_units": "unit has definite3/4 reference but no selected matching assertion; UNKNOWN is not negative",
+      "cost": "one per selected security/date; report used/unused slots and actual cost; no fillers",
+      "benefit": "original positive/false-alert dominance at equal actual cost; unequal use gives an inconclusive same-cost claim",
+      "review_worthiness": "separate reviewer judgement; never inferred solely from state correctness"
+    }
+  },
+  "recognition": {
+    "candidate_config": "config/stage-learning/development-candidate.v1.json",
+    "candidate_canonical_digest": "sha256:d492d12686be5f5ac84f87ba278afd873d9999aadc5fa5dc79a6f5f5985f176c",
+    "gate_source": "config/stage-learning/qualification.v1.json#hard_gates",
+    "minimum_definite_per_stage": 100,
+    "minimum_ambiguous": 50,
+    "minimum_total_unique_episodes_necessary_not_sufficient": 250,
+    "training_or_parameter_search": false
+  },
+  "sampling_preflight": {
+    "legacy_result_and_sampler_immutable": true,
+    "old_fixed128_only_development_diagnostics": true,
+    "exclude_all318_previously_reviewed_episode_ids_at_every_date": true,
+    "source_scope": "only previously admitted2021 prefixes and already authorized identity/calendar metadata",
+    "prospective_order": [
+      "mature_held",
+      "reclaimed_ambiguity",
+      "started_activity",
+      "early_held",
+      "near_anchor_loss_negative"
+    ],
+    "caps_source": "config/stage-learning/qualification-protocol.v2.json#sampling",
+    "caps_unchanged": true,
+    "no_cross_stratum_backfill": true,
+    "history": {
+      "scales": [
+        20,
+        60
+      ],
+      "minimum_prior_contiguous_admitted_sessions": {
+        "20": 20,
+        "60": 60
+      },
+      "T_excluded_from_prior_count": true,
+      "packet_maximum_prior_sessions": 60,
+      "full60_history_claim_requires61_rows_including_T": true,
+      "gap_coordinate_or_listing_reset_restarts_count": true,
+      "missing_history_is_unavailable": true
+    },
+    "capacity_pass_never_proves_semantic_or_exposure_qualification": true,
+    "no_reference_or_prediction_before_freeze_and_capacity_pass": true
+  },
+  "reference": {
+    "old_tier": "SYNTHETIC_EXPERT_CONSENSUS",
+    "old_tier_ceiling": "deterministic rule shadow and reproducibility only; not human or new independent AI review",
+    "purpose_requires": "candidate-blind separately attributable semantic judgements on same T-only packets, independent of compared threshold rules as sole truth",
+    "independence_receipt_required": true,
+    "exposure_scope_and_reviewed_episode_exclusions_required": true,
+    "reviewer_count_or_new_process_does_not_prove_independence": true,
+    "independent_reference_available_by_this_contract": false,
+    "semantic_rubric": {
+      "stage3": "A visible attempt to leave an earlier upper price region, with insufficient evidence yet for sustained acceptance. Explain the earlier region and observations supporting the attempt.",
+      "stage4": "Earlier escape followed by sustained acceptance outside that earlier region through T. Explain repeated observations and counterevidence; ordinary uptrend alone is insufficient.",
+      "negative": "Visible evidence clearly supports neither condition, including a failed/reversed attempt. Cite actual observations.",
+      "ambiguous": "Both3 and4 interpretations remain supportable; preserve[3,4].",
+      "unjudgeable": "Insufficient history/coordinate reliability, or no defensible earlier region at the requested scale. Missing evidence is not negative.",
+      "review_worthiness": "Separately yes/no/unknown: does this packet warrant one human research review slot? Give reason without future outcomes."
+    },
+    "pilot": {
+      "maximum_cases": 12,
+      "source": "already-consumed2021 development packets only",
+      "selection": "hash order: scale20/60 x visible61/shorter-history;scale20:4full+2short;scale60:6full (no short packets exist); distinct issuer and episode",
+      "blinding": "opaque caseID,T-only normalized raw OHLCV and completeness; no candidate anchor,phase,holdcount,labels,tags,stratum,prediction",
+      "reviewers": 2,
+      "context_isolation": "two fresh Sol6.1 Max contexts without prior transcript or compared thresholds",
+      "evidence_tier": "MODEL_ASSISTED_RESEARCH_REFERENCE_METHOD_PILOT",
+      "human_expert_validated": false,
+      "formal_test_sample": false,
+      "outputs": [
+        "definite3",
+        "definite4",
+        "definite_negative",
+        "ambiguous_set[3,4]",
+        "unjudgeable"
+      ],
+      "citations": "exact offset/field/value, support and counterevidence",
+      "resolution": "agreement kept at model-assisted grade; unresolved disagreements UNKNOWN unless a factual source correction resolves them; votes never create truth",
+      "method_acceptance": "bound isolated inputs/calls; citations checked; semantic rationale inspected for circular rule shadow; within budget; no invented semantic agreement threshold",
+      "unknown_and_disagreement_allowed": true,
+      "does_not_satisfy_old100_100_50": true
+    }
+  },
+  "execution": {
+    "steps_1_2_started_at": "2026-10-27T18:55:18+00:00",
+    "steps_1_2_deadline": "2026-10-27T21:25:18+00:00",
+    "maximum_conditional_step3_seconds": 7200,
+    "maximum_new_bytes": 268435456,
+    "rss_bytes": 4294967296,
+    "minimum_free_bytes": 8589934592,
+    "new_network_source_requests": 0,
+    "no_new_source_or_unqualified_market_reads": true,
+    "step3_requires": [
+      "qualified exact new input and complete hashes",
+      "unconsumed episode and post-allocation capacity",
+      "purpose-appropriate independent semantic references",
+      "original recognition gates pass",
+      "explicit code/config/source/reference/comparator-bound use admission"
+    ],
+    "when_unmet": "record exact NO_GO and NOT_RUN, preserve reusable code and qualified facts; no automatic resampling or extra round",
+    "consumer_test_authorized": false,
+    "production_or_P6_admitted": false
+  },
+  "supersedes_use_protocol": "config/research/learning-mvp/stage34-breakout-list-use.v1.json"
+}

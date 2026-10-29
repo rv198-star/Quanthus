@@ -7792,6 +7792,60 @@
         "REPRO",
         "P6"
       ]
+    },
+    {
+      "id": "CP-2-EXPLORATION-20261029T113141Z",
+      "recorded_at": "2026-10-29T11:31:41.879148+00:00",
+      "actor": "Codex",
+      "work_item": "META-TRACE-001",
+      "outcome": "completed",
+      "summary": "将探索结论、后续选择和重开条件落实为工程规则、离线检查及下一阶段计划；没有新研究/生产激活。",
+      "evidence": [
+        {
+          "id": "RULES",
+          "location": "git",
+          "kind": "assessment",
+          "revision": "56e5b700054fb721e2de473efeab851b1826e496",
+          "path": "docs/design/exploration-governance.md",
+          "sha256": "1de30e5ebdb73ee6e737cfa6873815453ee462ff2bf79e64b256cf60c019bab2",
+          "claim_ceiling": "离线工程机制与设计边界；代码和规则不授予研究、数据或生产资格。"
+        },
+        {
+          "id": "CHECKS",
+          "location": "external_receipt",
+          "kind": "acceptance",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/engineering-exploration-20261029/evidence/engineering-acceptance.json",
+          "sha256": "8d93c5a60eaa7ca61f6917ca56f2b2ea7dcffedd2e7d8c3e0357c7353ec526b8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "92项focused，5683项唯一Python通过及20跳过；noexec恢复和193项旧lint单列。不是新科学验收。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "当前工程要求、3条历史结论、只读context/preflight/check和追加历史约束通过本地验收；主线发布身份另存最终交接。",
+          "remaining": "尚无持续执行服务；语义适用性、实际资源扣账和准入仍由Agent/TPlan/领域合同负责；既有全仓lint保留。",
+          "next_action": "按新规则先确认一个已有资产的实际消费者，必要时最小接入；不自动重开Head2或3/4。",
+          "evidence": [
+            "RULES",
+            "CHECKS"
+          ],
+          "supersedes": "CP-2-20261029T090421847561Z"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ]
     }
   ]
 }

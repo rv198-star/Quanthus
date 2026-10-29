@@ -9,6 +9,12 @@ For current learning-system work (#540–#548), use the generated
 [checkpoint mechanism](design/blueprint-progress.md). The historical phase evidence below
 is not a substitute for that task-scoped current view.
 
+For new exploration or delivery of research assets, also use the approved
+[exploration engineering requirements](design/exploration-governance.md),
+[retained conclusions and decisions](work-items/exploration-decisions.md), and
+[next delivery plan](work-items/exploration-next-20261029.md).
+These link past results to selection; they do not activate new research or production.
+
 | Field | Value |
 | --- | --- |
 | Current phase | P6 closed under Owner historical scope; P5 optional research deferred |

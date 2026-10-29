@@ -10,6 +10,11 @@ links and append-only outcomes follow the [progress mechanism](../design/bluepri
 Issue closure, engineering completion, research quality, value and admission stay separate;
 this routing does not replace existing domain gates or reopen historical work.
 
+`META-TRACE-001` / #2 also owns the approved
+[exploration engineering requirements](../design/exploration-governance.md).
+Use [retained conclusions](exploration-decisions.md) before selecting new research or asset
+delivery. The [next plan](exploration-next-20261029.md) is proposed work, not an activation.
+
 P10-DATA-000 is the permanent standing data epic and is excluded from automatic epic closure.
 Acquisition and shared quality/governance belong to P10 under
 [`../design/lld/12-permanent-data-line.md`](../design/lld/12-permanent-data-line.md).

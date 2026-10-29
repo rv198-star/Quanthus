@@ -1,0 +1,50 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "NEXT-ASSET-CONSUMER-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "learning-asset-consumer-delivery",
+  "work_item": "META-LEARN-001",
+  "modules": [
+    "FACTS",
+    "EXPERT",
+    "REPRO"
+  ],
+  "question": "已有主线资产能否通过一个现存真实消费者入口提供可解释、可复用的研究输出？",
+  "consumer": "已有研究调用方与查看候选决定的研究人员；首先核对现有入口，不能假定需要新UI。",
+  "scope": "首先只查既有接口/合同/测试和已准入收据；不重跑旧实验、不读取新行情、不重训、不部署。",
+  "deliverable": "确认一个实际消费者与输入/输出合同；若入口已具备则交付使用方式和缺口结论，确缺最小接线才开发并验收。",
+  "decision_if_pass": "把已有合格资产交给该消费者；记录工程使用范围，不提升模型经济价值或生产资格。",
+  "decision_if_fail": "明确缺少的消费者或接口；无真实使用需要则停止，转需求选择，不新建通用平台。",
+  "acceptance": [
+    "一个具名现有消费者与可重放的最小调用合同。",
+    "已合格结果的可读输出能追溯输入、版本、拒绝/未知原因；可用与不可用不混淆。",
+    "现有入口已经满足时直接复用，不重复实现；原6模型读取验收不算新进度。"
+  ],
+  "stop_conditions": [
+    "60分钟内无法确认消费者与具体未满足接口就不继续开发。",
+    "出现新数据、训练、阈值、P6/生产或超预算要求时只停止对应步骤。"
+  ],
+  "memory_sha256": "29cbe37062eae75e1e17978d2652a13285550ee33a94ff533c36799f3fd2a978",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "维持原科学停放结论，只交付已合格的工程资产，不重开该试验。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "维持原科学停放结论，只交付已合格的工程资产，不重开该试验。"
+    }
+  ],
+  "cumulative_cost_review": "既有Head2和持仓尝试全部保留，旧总成本未知而非零；新批次独立记账，不伪装新方向抹去原投入。",
+  "runtime_authority_boundary": "本文件仅规划，不是运行授权；执行需要当前任务授权和TPlan预算，真实输入还须原有用途准入。",
+  "budget": {
+    "wall_seconds": 14400,
+    "max_new_bytes": 268435456,
+    "network_requests": 0,
+    "accounting_owner": "TPlan batch and family-linked attempt receipts; this validator does not execute or debit budgets"
+  }
+}

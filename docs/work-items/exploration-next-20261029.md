@@ -2,12 +2,19 @@
 
 | Field | Value |
 | --- | --- |
-| Design status | approved for planning; proposed batches are not execution activation |
-| Delivery gate | open for the proposed consumer slice; research/production gates unchanged |
+| Design status | approved; the Owner-activated batch is recorded in the execution disposition below |
+| Delivery gate | bounded consumer delivery completed; conditional comparison not run; research/production gates retain their own requirements |
 | Parent | [Exploration requirements](../design/exploration-governance.md), [blueprint](learning-blueprint-progress.md) |
 | Coordination | META-LEARN-001 / #540; existing #546 assets and #545 consumer boundary |
-| First request | `config/planning/next-delivery-request.v1.json` |
+| First request | `config/planning/next-delivery-request.v1.json`; retained proposal example with a completed-execution link, not an active successor |
 | Prior decisions | [Scoped conclusions](exploration-decisions.md) |
+
+## Execution disposition
+
+The Owner subsequently activated steps 1–3. The [executed delivery and selection](learning-consumer-cycle-20261029.md)
+provides a runnable existing-consumer guide, reuses the completed diagnoses and records NO_GO
+for a new comparison. Step 3's condition is not met, so no new comparison is run. The original
+estimates below remain planning estimates, not claimed effort spent. No successor is activated.
 
 ## Current position
 

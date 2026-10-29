@@ -15,6 +15,10 @@ For new exploration or delivery of research assets, also use the approved
 [next delivery plan](work-items/exploration-next-20261029.md).
 These link past results to selection; they do not activate new research or production.
 
+The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
+links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its
+acceptance and the current no-new-comparison disposition.
+
 | Field | Value |
 | --- | --- |
 | Current phase | P6 closed under Owner historical scope; P5 optional research deferred |

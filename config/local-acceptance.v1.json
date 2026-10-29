@@ -1,0 +1,15 @@
+{
+  "schema_version": "quanthus.local-acceptance-profile.v1",
+  "id": "local-make-check-v1",
+  "target": "check",
+  "plugin": "quanthus.local_acceptance_pytest",
+  "reuse": "same_commit_tree_files_runtime_profile_and_logs",
+  "scope": "Local engineering make check; optional integrations remain explicit skips. Not independent reconstruction, cold acceptance, scientific or production admission.",
+  "limits": {
+    "wall_seconds": 1800,
+    "rss_bytes": 1073741824,
+    "job_and_worktree_bytes": 201326592,
+    "pytest_tmp_bytes": 100663296,
+    "minimum_free_bytes": 8589934592
+  }
+}

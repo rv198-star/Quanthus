@@ -382,7 +382,10 @@
         "src/quanthus/exploration_governance.py",
         "scripts/exploration_governance.py",
         "config/planning/exploration-conclusions.v1.json",
-        "config/planning/next-delivery-request.v1.json"
+        "config/planning/next-delivery-request.v1.json",
+        "src/quanthus/local_acceptance.py",
+        "src/quanthus/local_acceptance_pytest.py",
+        "config/local-acceptance.v1.json"
       ]
     }
   ],
@@ -550,6 +553,14 @@
         "S04"
       ],
       "contribution": "245家2021潜在身份路线的零采集现存来源资格；与旧128交接、研究参考、质量及消费者准入分开验收"
+    },
+    {
+      "id": "META-GATE-001",
+      "issue": 3,
+      "modules": [
+        "TRACE"
+      ],
+      "contribution": "本地make check统一入口、完整身份回执和保守复用；只服务当前工程交付，不提升研究/用途准入"
     }
   ]
 }

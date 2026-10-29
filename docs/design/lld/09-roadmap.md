@@ -87,6 +87,11 @@ optional authoring is not applicable to the first cutover and remains separately
 
 ## 4. Release mechanics
 
+The [local engineering acceptance contract](../local-acceptance-v1.md) and its
+[run/verify commands](../../operations/local-acceptance.md) provide a versioned receipt around
+the existing `make check` for META-GATE-001. Same-input local reuse is explicitly labeled;
+independent reconstruction, domain gates and ordinary merge authority remain separate.
+
 Prospective exploratory work follows [exploration-driven delivery](../exploration-governance.md):
 review prior scoped conclusions before allocating another bounded task; retain negative,
 inconclusive and unevaluated outcomes with their decisions; extract independently qualified

@@ -15,7 +15,7 @@ make local-acceptance PYTHON=/absolute/venv/bin/python \
 
 The parent must exist and the job must be new, absolute, physically separate from the checkout
 and runtime. The profile reserves 8 GiB filesystem free space plus the unspent portion of
-its 192 MiB combined job/worktree budget (existing checkout allocation is already on disk).
+its 160 MiB combined job/worktree budget (existing checkout allocation is already on disk).
 The default check time limit is 30 minutes. If this
 profile does not fit the task, review a new versioned profile rather than disabling its checks.
 

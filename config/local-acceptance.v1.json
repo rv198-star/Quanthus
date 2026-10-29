@@ -8,7 +8,7 @@
   "limits": {
     "wall_seconds": 1800,
     "rss_bytes": 1073741824,
-    "job_and_worktree_bytes": 201326592,
+    "job_and_worktree_bytes": 167772160,
     "pytest_tmp_bytes": 100663296,
     "minimum_free_bytes": 8589934592
   }

@@ -8568,6 +8568,41 @@
       "reviewed_modules": [
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-3-20261029T224147155570Z",
+      "recorded_at": "2026-10-29T22:41:47.155570+00:00",
+      "actor": "Codex / Sol 6.1; same Owner-approved local engineering batch",
+      "work_item": "META-GATE-001",
+      "outcome": "no_module_change",
+      "summary": "首次完整工程检查因临时目录回收竞态记为INCOMPLETE并保留；容量采样仅容忍ENOENT，权限/来源扫描仍关闭失败，回归通过后重新完整验收。",
+      "evidence": [
+        {
+          "id": "RACE-REPAIR",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/local-acceptance-20261029T221354Z/evidence/sampling-race-repair.safe.json",
+          "sha256": "ad106995e723e605f14a8bece98aa9075044b9b82d7502542e29dc5c68951463",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只证明采样竞态修复及针对性合成回归；首次真实工程运行不完整，须新job完整验收。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "工程采样问题修复与有限预算收口，不把第一次失败清零或计成通过；科学/数据/生产和模块等级不变。",
+      "issue_observations": [
+        {
+          "work_item": "META-GATE-001",
+          "number": 3,
+          "title": "[META-GATE-001] Automate release gate reporting",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-08-19T15:46:34Z",
+          "body_sha256": "caa1eb55e38b5e171007abeb30c9f0d05978e646001dac03fc386f473744e06e"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
     }
   ]
 }

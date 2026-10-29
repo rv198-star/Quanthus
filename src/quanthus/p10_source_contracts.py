@@ -83,8 +83,22 @@ def library_contracts(config: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
     actual = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in root.glob("*.py")}
     if actual != config["library"]["module_sha256"]:
         raise ValueError("SOURCE_LIBRARY_CONTENT_MISMATCH")
+    declared = {x["key"] for x in config["sources"]}
+    supported = {r.provider + ":" + r.capability for r in astock.capabilities()}
+    selection = config.get("capability_selection", "ALL_SUPPORTED")
+    if selection == "ALL_SUPPORTED":
+        if declared != supported:
+            raise ValueError("SOURCE_CAPABILITY_SET_MISMATCH")
+    elif selection == "EXACT_DECLARED_SUBSET":
+        if not declared or not declared <= supported:
+            raise ValueError("SOURCE_CAPABILITY_SET_MISMATCH")
+    else:
+        raise ValueError("SOURCE_CAPABILITY_SELECTION_INVALID")
     contracts = {}
     for request in astock.capabilities():
+        key = request.provider + ":" + request.capability
+        if key not in declared:
+            continue
         capability = request.capability
         parser: Any
         if capability.startswith("macro."):
@@ -93,6 +107,13 @@ def library_contracts(config: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
         elif capability.startswith("news.roll."):
             channel = int(capability.split(".")[2])
             parser = partial(news.parse, channel=channel)
+        elif capability in {"announcement.index", "etf.trading_flow.snapshot", "convertible.list"}:
+            module = {
+                "announcement.index": "announcements",
+                "etf.trading_flow.snapshot": "etf_flow",
+                "convertible.list": "convertibles",
+            }[capability]
+            parser = importlib.import_module("astock." + module).parse
         else:
             parser = {
                 "lpr.history": lpr.parse,
@@ -102,8 +123,8 @@ def library_contracts(config: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
                 "quote.snapshot": quotes.parse,
                 "fund.nav": funds.parse,
             }[capability]
-        contracts[request.provider + ":" + capability] = (request, parser)
-    if set(contracts) != {x["key"] for x in config["sources"]}:
+        contracts[key] = (request, parser)
+    if set(contracts) != declared:
         raise ValueError("SOURCE_CAPABILITY_SET_MISMATCH")
     return contracts
 
@@ -148,6 +169,7 @@ def normalize(result: Any, spec: dict[str, Any], config: dict[str, Any]) -> dict
     rows: list[dict[str, Any]] = []
     clocks: list[datetime] = []
     dates: list[date] = []
+    notice_dates: list[date] = []
     status = result.status.value
     if status == "SUCCESS":
         for item in result.records:
@@ -246,6 +268,83 @@ def normalize(result: Any, spec: dict[str, Any], config: dict[str, Any]) -> dict
                     source_display_date=clock.astimezone(SHANGHAI).date().isoformat(),
                     attachment_path=item.attachment_path,
                 )
+            elif kind == "announcement":
+                if item.security_code not in config["announcement_security_codes"]:
+                    raise ValueError("SOURCE_ANNOUNCEMENT_SECURITY_SCOPE_MISMATCH")
+                flags.update(
+                    {
+                        "ARCHIVE_ONLY_NOT_CURRENT_DISCLOSURE_COVERAGE",
+                        "DISCLOSURE_RELEASE_CLOCK_UNPROVEN",
+                    }
+                )
+                notice_dates.append(item.notice_date)
+                row.update(
+                    record_key=item.announcement_id,
+                    security_code=item.security_code,
+                    title=item.title,
+                    notice_date=item.notice_date.isoformat(),
+                    date_basis="VENDOR_NOTICE_LABEL_NOT_PUBLICATION_OR_KNOWLEDGE_DATE",
+                    source_display_time_text=item.display_time_text,
+                    source_production_time_text=item.production_time_text,
+                )
+            elif kind == "etf_trading_flow":
+                if item.security not in config["etf_universe"]:
+                    raise ValueError("SOURCE_ETF_SCOPE_MISMATCH")
+                flags.add("VENDOR_CLASSIFICATION_NOT_SUBSCRIPTION_FLOW")
+                row.update(
+                    record_key=item.security,
+                    security=item.security,
+                    source_name=item.name,
+                    source_timestamp_seconds=item.source_timestamp_seconds,
+                    source_clock=datetime.fromtimestamp(
+                        item.source_timestamp_seconds, tz=timezone.utc
+                    ).isoformat(),
+                    source_clock_kind="VENDOR_EPOCH_SECONDS_NOT_PROVEN_PUBLICATION",
+                    metrics={
+                        k: metric(v, spec["fields"][k])
+                        for k, v in (*item.amounts_native, *item.percentages_native)
+                    },
+                    flow_basis="VENDOR_CLASSIFIED_SECONDARY_TRADING_NOT_CREATION_REDEMPTION",
+                )
+            elif kind == "guest_bond":
+                if item.bond_type not in {"C", "E"}:
+                    raise ValueError("SOURCE_UNSUPPORTED_BOND_TYPE")
+                flags.update(
+                    {
+                        "ANONYMOUS_PARTIAL_LIST_NO_COMPLETENESS",
+                        "SOURCE_REFERENCE_QUOTE_CLOCK_UNPROVEN",
+                    }
+                )
+                prices = {
+                    "price": item.price_native,
+                    "conversion_price": item.conversion_price_native,
+                    "stock_price": item.stock_price_native,
+                }
+                row.update(
+                    record_key=item.bond_code,
+                    bond_code=item.bond_code,
+                    source_name=item.name,
+                    bond_type=item.bond_type,
+                    stock_code=item.stock_code,
+                    source_context_date=item.source_context_date.isoformat(),
+                    source_last_time_text=item.last_time_text,
+                    listing_date=item.listing_date.isoformat() if item.listing_date else None,
+                    listing_state="NOT_INFERRED",
+                    quote_date=None,
+                    coverage_basis="ANONYMOUS_SOURCE_SUBSET_NOT_FULL_UNIVERSE",
+                    source_guest_prompt=item.guest_prompt,
+                    price_basis="VENDOR_REFERENCE_PRICE_NOT_VERIFIED_TRADE",
+                    metrics={},
+                )
+                # The response mixes C (convertible) and E (exchangeable) bonds.
+                # The attached unit evidence qualifies C reference prices only.
+                if item.bond_type == "C":
+                    row["metrics"] = {k: metric(v, spec["fields"][k]) for k, v in prices.items()}
+                    row["unit_admission"] = "VERIFIED_CONVERTIBLE_REFERENCE_UNITS"
+                else:
+                    flags.add("EXCHANGEABLE_ROW_METADATA_ONLY")
+                    row["unit_admission"] = "METADATA_ONLY_UNQUALIFIED_EXCHANGEABLE"
+                    row["unqualified_source_values"] = {k: str(v) for k, v in prices.items()}
             elif kind in {"rss", "news"}:
                 row.update(record_key=item.native_id or item.url, title=item.title, url=item.url)
                 stamp = item.published_at if kind == "rss" else item.source_created_at
@@ -301,11 +400,23 @@ def normalize(result: Any, spec: dict[str, Any], config: dict[str, Any]) -> dict
         "quality_ok": quality_ok,
         "quality_flags": sorted(flags),
         "purpose": spec["purpose"],
-        "unit_contract": "VERIFIED_PER_FIELD" if spec.get("fields") else "METADATA_NO_NUMERIC_UNIT",
+        "unit_contract": (
+            "VERIFIED_CONVERTIBLE_FIELDS_EXCHANGEABLE_METADATA_ONLY"
+            if "EXCHANGEABLE_ROW_METADATA_ONLY" in flags
+            else "VERIFIED_PER_FIELD"
+            if spec.get("fields")
+            else "METADATA_NO_NUMERIC_UNIT"
+        ),
         "source_latest_clock": latest.isoformat() if latest else None,
         "source_latest_age_seconds": age,
         "source_latest_date": latest_date.isoformat() if latest_date else None,
         "source_latest_date_age_days": date_age,
+        "source_latest_notice_date": max(notice_dates).isoformat() if notice_dates else None,
+        "source_latest_notice_age_days": (
+            (acquired.astimezone(SHANGHAI).date() - max(notice_dates)).days
+            if notice_dates
+            else None
+        ),
         "source_row_count": len(result.records),
         "records": rows,
         "fallback_action": "NONE" if quality_ok else "ISOLATE_OPTIONAL_SOURCE",

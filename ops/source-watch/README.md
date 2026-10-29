@@ -56,3 +56,40 @@ data does not imply a sale. There are no production credentials in this image.
 
 The current source inventory and online dispositions live in
 [`p10-source-supply-20261029.md`](../../docs/work-items/p10-source-supply-20261029.md).
+## Additional three-capability qualification
+
+The original fifteen-source watch remains pinned to its original image, library,
+policy, root and deadline. For the additional announcement, single-ETF trading-flow
+and anonymous guest-bond contracts use a separate runtime with astock0.1.2,
+`requirements-v2.lock` and `config/pipelines/p10-supplement-sources.v2.json`.
+Use the versioned Dockerfile with build argument
+`P10_POLICY=config/pipelines/p10-supplement-sources.v2.json`; stage the v2 lock as
+the build context's `requirements.lock`. The normal bundle and published-revision
+verification still apply. Do not install both optional source extras together.
+
+Give this watch its own empty absolute bind and invoke `watch --root /work --policy
+config/pipelines/p10-supplement-sources.v2.json --revision FULL_PUBLISHED_REVISION`.
+Keep the same non-root/read-only/resource/log bounds described below. Its explicit
+three-key subset must not request the existing fifteen providers again. First cold
+container qualification is a separately frozen integration check, not an identical
+failed-request retry and not a second successful day. Persist start/end/next times;
+restart must not renew the period or re-fetch the current Job.
+
+Announcement coverage is archival only. ETF flows are vendor-classified secondary
+trading, not fund subscriptions/redemptions. Jisilu is an anonymous subset capped
+at30 rows; C-type convertible prices have per100-face units, and E-type exchangeables
+remain metadata-only. The source's context date and optional time text are never
+combined into a quote timestamp. Keep these restrictions in every review.
+
+On storage-constrained CN02, validate with pytest's successful-fixture cleanup:
+
+```sh
+PYTEST_ADDOPTS='-o tmp_path_retention_policy=failed -o tmp_path_retention_count=1' \
+  make check PYTHON=/path/to/isolated-check-venv/bin/python
+```
+
+With pytest 8.4.2 this reclaims successful synthetic fixture TMP after teardown and
+keeps failed fixtures. Test selection and the existing 8 GiB free-space gate stay
+unchanged. Retain the complete check log and command receipt outside TMP; use a
+separate qualification environment for the 0.1.2 wheel. This does not change the
+P10 data cleaner's mounts, schedule or evidence retention.

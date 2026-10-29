@@ -22,21 +22,22 @@ site-identity result must never be reported as a working financial data feed.
 
 Owner subsequently selected a public, relatively independent astock fork while
 Quanthus remains private. [P10-DATA-SUPPLY-005 / #587](https://github.com/rv198-star/Quanthus/issues/587)
-tracks the [source-subproject boundary](../design/astock-subproject.md) and fifteen
+tracks the [source-subproject boundary](../design/astock-subproject.md) and eighteen
 source-library request contracts in [rv198-star/astock](https://github.com/rv198-star/astock).
 The original reference checkout and its hashes below remain historical evidence;
 repository creation does not upgrade the deployed collector.
 
 Owner's further 2026-10-30 instruction continues actual P10 integration, unit/time/
 rollback contracts, dated quality candidates and finite observation, through the
-existing issues. Current source library `0.1.1` adds the verified fund-NAV request;
+existing issues. The original fifteen-capability runtime uses source library `0.1.1`
+with the verified fund-NAV request;
 the original `0.1.0` observations below remain historical evidence. The exact
-Quanthus adapter, policy and watch boundary are in the child design. The new
-nine-request tranche has one observation-purpose pass, five rejected request/
-purpose definitions and three explicit holds. See the current integration section
+Quanthus adapter, policy and watch boundary are in the child design. The earlier
+nine-request tranche recorded one observation-purpose pass, five rejected request/
+purpose definitions and three holds; the later three-hold continuation is below. See the current integration section
 for the complete dated ledger and test/operational receipts.
 
-The current candidate watch is running locally on CN02 as
+The original fifteen-capability candidate watch is running locally on CN02 as
 `quanthus-p10-supplement-watch`, pinned Quanthus source
 `d335c1a3d3ad2197340f0ef4c66f0bced657070c`, with its only writable bind at
 `/srv/quanthus-source-watch/qualification-d335c1a3d3ad`. Its first fifteen requests
@@ -54,7 +55,23 @@ manifest/deadline. Business and historical PIT admission remain false.
 | [#583](https://github.com/rv198-star/Quanthus/issues/583) | Census, contracts and disposition ledger | Frozen declaration census; incomplete API definitions still need functional contracts |
 | [#584](https://github.com/rv198-star/Quanthus/issues/584) | Structured data, announcements and regulatory APIs | Bounded samples; capability-specific results and limitations retained |
 | [#585](https://github.com/rv198-star/Quanthus/issues/585) | Media, RSS and institution sites | Site identity and RSS tested separately; unavailable/network-limited entries stay explicit |
-| [#587](https://github.com/rv198-star/Quanthus/issues/587) | Independent astock fork and bounded absorption | 15 contracts, pinned P10 observation adapter, unit/time/rollback contracts and finite watch |
+| [#587](https://github.com/rv198-star/Quanthus/issues/587) | Independent astock fork and bounded absorption | 18 contracts, two pinned P10 observation policies and independent finite watches |
+
+The Owner then continued the three access/unit holds independently of that watch.
+[astock PR#3](https://github.com/rv198-star/astock/pull/3) adds three corrected
+contracts in source-library 0.1.2, tested source
+`3814b20ccb121f44e8bcdc73ba4c1ec4981176e2`. A separate explicit three-key policy
+in `config/pipelines/p10-supplement-sources.v2.json` qualifies archival stock
+announcements, one ETF's vendor trading flows and the anonymous guest-bond subset.
+Their 02:01 observations and unsupported purposes are in the three-hold section.
+The original fifteen-source running watch above is not replaced or restarted.
+The three-capability container `quanthus-p10-holds-watch` now runs source
+`f2247db5d35e60ced2e849cadb38d68cbf6298da` in the separate root
+`/srv/quanthus-source-watch/holds-f2247db5d35e`. Its first three observations at
+02:34:36–02:34:39 pass their limited purposes. Its next cycle is
+**2026-10-31 02:34:34 Asia/Shanghai**, and its nonrenewable end is
+**2026-11-06 02:34:34 Asia/Shanghai**. The original watch still ends at01:39:23.
+Both periods are observation requirements; other source qualification proceeds.
 
 ## Why daily collection works without the upstream checkout
 
@@ -473,6 +490,153 @@ Operational receipts outside Git are `watch-image-receipt.json`,
 `6a3935f75224f8725b7c02c9d71dbde814e988c4bb44f5bdde7b2ec2e2888a29`; its first immutable manifest SHA256 is
 `1eb98a14ec6bba9e5f2c0c8a13bd64c910a84c900166653d7b0f8b70865817f5`.
 Run-stage metrics and all raw/normalized response hashes are retained there.
+
+## Three access/unit holds — continued 2026-10-30
+
+Owner explicitly continued qualification without waiting for the original watch.
+Current publisher pages and their declared scripts establish corrected public paths;
+all initial failures remain immutable. Five discovery pages, six declared scripts,
+four primary unit/rule documents and three corrected functional calls were bounded
+and frozen before access. Each call has a 20-second outer budget and byte ceiling,
+with no auth, retry, provider substitution or automatic redirect following.
+
+The source library 0.1.2 independently implements these three contracts. The new
+policy `config/pipelines/p10-supplement-sources.v2.json` explicitly selects them
+without requesting the original fifteen capabilities. See the governing child
+[additional qualification design](../design/astock-subproject.md#additional-access-and-unit-qualification--2026-10-30).
+The `supplement-sources-v2` extra and `requirements-v2.lock` use a separate runtime;
+the existing 0.1.1 image/root/policy/deadline stay fixed.
+
+All times below are **2026-10-30, Asia/Shanghai**.
+
+| Corrected capability | Verified at | Result | Remaining purpose limit |
+| --- | --- | --- | --- |
+| Eastmoney announcement index, `/api/security/ann`, stock 600519/page1/size2 | 02:01:29| Two correct-security records; archive metadata admitted | Latest notice label 2026-08-15 (76 days old); current-disclosure completeness and historical release clocks unproven |
+| Eastmoney ETF 510300, one exact `secids` via `ulist.np/get` | 02:01:30| One identified ETF; signed CNY trading-flow buckets and vendor percentages admitted for diagnostics | Secondary-market order classification, not creations/redemptions or verified investor positions; original unqualified f20 omitted |
+| Jisilu current anonymous `/webapi/cb/list/` | 02:01:30| 30 anonymous records;29 C convertibles with qualified reference units,1 E exchangeable metadata-only | Login required for full list;4 missing row time texts and3 missing listing dates; no full-universe or actual-trade claim |
+
+The original announcement path `/security/announcement` and old Jisilu POST/
+bootstrap definitions remain failed historical contracts; a working new route
+never rewrites them as passes. Unsupported current-disclosure/full-anonymous-list/
+ETF-subscription-flow interpretations stay explicitly unavailable. Reopening needs
+new purpose-specific recency, access/coverage or creation/redemption evidence,
+not a repeat of an unchanged failed request.
+
+Primary pages and field bindings resolve ETF money as CNY and percent values as
+native percentages; normalization maps percentages to ratios once. Official SSE/
+SZSE article 6 gives convertible quotation per 100 face; issuer disclosure confirms
+conversion-price denomination CNY/share. This verifies denomination, not each
+current conversion price. All unit sources have exact URLs/times/body hashes in
+the policy. Exchangeable numerics are kept outside that convertible unit admission.
+
+Notice-date labels and native `display_time`/`eiTime` text never backdate knowledge.
+Jisilu's `info.date` is not joined to its row's time-only `last_time`: the context
+can already show the next calendar day at midnight. Missing listing dates remain
+unknown, and reference prices do not establish a trade or fill. ETF epoch seconds
+stay a separate vendor claim. Knowledge begins at complete-response acquisition.
+
+The new adapters pass 51 maintained synthetic tests. The retained upstream plus
+library runs 242 cases: 238 pass and 4 opt-in live cases skip. An initial full-upstream
+attempt lacked openpyxl; the successful run reuses the existing isolated read-only
+spreadsheet dependency closure. Shared environments were not changed. Two pinned
+wheel builds are byte-identical, SHA256
+`5311abc0c2ecfd89be787c4fda4ba7edd03f9079ab9954ce026cf9b80a86f64d`;
+installation outside the checkout passes all 51 maintained tests. The new P10
+unit/time/subset contracts plus existing supplement tests pass 37 cases; local
+Ruff and strict mypy pass for the changed production modules.
+
+### Installed-container integration and recovery
+
+[Quanthus PR#591](https://github.com/rv198-star/Quanthus/pull/591) publishes the exact
+new adapter source `f2247db5d35e60ced2e849cadb38d68cbf6298da`. GitHub's Git tree was
+verified before making the tracked-only source bundle. Offline construction uses
+the pinned base image, fixed 0.1.2 wheel and five hash-locked transport wheels;
+the build verifies the bundle and every library module before completing. Image
+`sha256:f1b0b77f5966b7c77e244e774fb716b8ed35d3611a8bcf62f27772cd7f5eeba5`
+reports53,765,863 bytes in image-inspect Size (not unique disk usage). The new watch runs as 998:998 with a read-only rootfs, dropped
+capabilities, bounded resources/logs and one writable qualification root. Its
+source, policy and package differ from the original watch, which stays fixed.
+
+A separate three-call cold-integration plan was frozen before launch (SHA256
+`529772226ae33d5ee963664cceca15859859ea5af47882a43b3cc68632424077`).
+The actual first cycle has 3 requests, 33 normalized rows and 40,473 raw bytes in
+5.077963 seconds. Raw/parsed/normalized prerequisites are built once per source
+and shared by the quality and ledger consumers; timings/rows/bytes/BUILD are in
+the immutable manifest. Latest actual acquisition times are all 2026-10-30 Shanghai:
+
+| Capability | Installed-container verified at | Rows/quality |
+| --- | --- | --- |
+| Eastmoney archive announcement index | 02:34:36.897653| 2; correct 600519, notice-age 76 days, archive-only and release-clock flags retained |
+| Eastmoney ETF trading-flow diagnostic | 02:34:38.261492| 1; correct sh510300, CNY/ratio mapping, vendor epoch clock separate from knowledge |
+| Jisilu anonymous partial reference | 02:34:39.960405| 30; 29 C-qualified reference units and 1 E-metadata-only, unknown actual quote clock |
+
+All rows retain complete-response acquisition as `knowledge_from`; reading even
+one microsecond before that acquisition fails `SOURCE_NOT_KNOWN_AT_CUTOFF`.
+Stopping and restarting the new container keeps the manifest, next-at, end-at and
+one Job unchanged; no second request occurs. The original fifteen-capability
+container/image/root, manifest, candidate ledger and schedule were compared before
+and after and remain identical. The new first manifest SHA256 is
+`e758c716b08ee7f34a5043e14b1f8a5fbf4aeb6d3f3a47314f3e9b950cfbca2d`;
+the candidate-ledger SHA256 is
+`8a900374dd259b7fb99eb25cd112d8ecb22ca876cdbf866ad515ac467b79403d`.
+
+With network disabled, the actual image's all-disabled first Job and same-Job
+reuse both make zero requests and explicitly report `SOURCE_DISABLED_ROLLBACK`.
+A second offline test copies the published first live snapshot into an isolated
+scratch root, then disables all three. Past-good references remain auditable,
+but current reads fail `SOURCE_CURRENT_OBSERVATION_UNAVAILABLE`, every candidate
+isHOLD, and no old good value is silently reused. The real live root is unchanged.
+Restart/reuse never renews either watch period or pads distinct successful dates.
+
+Complete local `make check` on the exact source passes **5759 tests / 20 skips**,
+including planning/blueprint/exploration checks, in 634.60 pytest seconds. The host
+uses Python 3.10.12; optional research/runtime tests remain skipped as logged. Hosted
+jobs did not start because of account billing/spending limits; actual annotations
+are retained. Local acceptance uses the Owner 2026-10-29 AGENTS instruction without
+workflow/protection/account changes or forged hosted status. Later documentation
+reuses the byte-identical executable/config/test closure and reruns its affected
+checks. Only completed synthetic pytest 531 TMP was removed after process exit,
+recovering 603,193,344 filesystem bytes; full logs and receipts remain outsideTMP.
+
+Main advanced during this work, so the branch also integrates exact main
+`d6c01cde9941ec3f30a3806a198e18f39090758e`. Complete local checks on integrated
+source `cfadba190d0c0ed3b96826e2f657f9717202ad11` pass **5771 tests / 20 skips**
+in 615.19 pytest seconds, with doctor/compile/planning checks also passing. The
+1,800 non-documentation source/config/test files are bound in
+`integrated-tested-closure.json`. P10 runtime files, selected policy, library and
+request identities remain identical to the independently running f2247 image.
+
+The first integrated attempt had 5770 passes and one environmental failure,
+`FREE_SPACE_FLOOR_REACHED`: default pytest retention accumulated 577 MiB of successful
+synthetic TMP before the existing 8 GiB gate. Its log is retained. Only that exited
+synthetic scratch was removed; the corrected full run uses pytest 8.4.2 options
+`-o tmp_path_retention_policy=failed -o tmp_path_retention_count=1`, reclaiming
+successful fixture TMP after teardown and retaining failures. Test selection,
+source/config/test bytes and the 8 GiB threshold are unchanged. Observed late-run
+scratch was about 16 MiB with about 8.38 GiB free; after completion, free space is
+9,016,180,736 bytes. The explicit command and full log/closure hashes are retained
+in `integrated-retry-command.json` and `integrated-verification-receipt.json`;
+the operator command is also in the source-watch README. This check generated
+zero additional financial source requests. Further documentation changes reuse
+this exact 1,800-file closure and rerun documentation/planning checks.
+
+The remaining five pinned AKShare calls now have an explicit budget disposition.
+`futures_zh_daily_sina` has no date/count request bound; the FX-reserve helper loops
+back through history; HK/US spot wrappers paginate the whole market. These four
+original call contracts are rejected for this latest-only sample budget, with no
+claim that their vendors are unavailable. `futures_zh_spot` remains held until one
+current listed contract, exchange, units and useful P10 purpose are fixed. This is
+static source evidence with zero financial requests, not five additional online
+passes. The pinned upstream SHA and exact code lines are in the separate receipt.
+
+Evidence outside Git: `/srv/agentdock/evaluations/p10-holds-20261030/` retains
+`discovery-plan.json`, `script-plan.json`, `functional-plan.json`, the two unit
+plans, each raw response/metadata, `candidate-ledger.json`, independent build and
+test logs. The added `watch-*-receipt.json` files record the image, zero-network
+rollback, launch, first live cycle and disable-after-good test; `quanthus-verification-receipt.json`
+binds complete local checks to source/log hashes. The original 673-request census
+and all prior ledgers are unchanged.
+#583/#584/#585/#587 continue to own remaining functional coverage and later review.
 
 ## Earlier verification checkpoint — retained history
 

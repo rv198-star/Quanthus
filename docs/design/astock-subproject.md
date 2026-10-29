@@ -184,3 +184,43 @@ Source qualification under #583–#585 continues for the remaining function cont
 Its dated outcomes and current execution evidence are in the linked supply work
 item. Consumers needing warehouse substitution or historical PIT retain their own
 admission gates.
+
+## Additional access and unit qualification — 2026-10-30
+
+Owner explicitly continued the remaining sources without waiting for the first
+seven-day watch. Three corrected contracts use a separate astock `0.1.2` runtime
+and [`p10-supplement-sources.v2.json`](../../config/pipelines/p10-supplement-sources.v2.json).
+The original fifteen-source policy, installed library and running watch remain
+fixed. The new optional `supplement-sources-v2` extra belongs in a separate
+environment: the two exact source-library versions must not be installed together.
+
+The new policy explicitly selects three declared capabilities from the verified
+library registry. Unknown or empty selections fail closed; a policy without that
+explicit subset mode still requires the complete supported capability set. This
+allows a new tranche to operate independently without re-requesting the original
+fifteen capabilities or inheriting their observation days.
+
+| Corrected contract | Purpose and units | Explicit limit |
+| --- | --- | --- |
+| Eastmoney `/api/security/ann`, stock600519, two records | Archival announcement-index metadata; notice-date label and native display/production time text | No current-disclosure completeness or historical publication claim; no PDF acquisition |
+| Eastmoney single ETF510300 trading-flow snapshot | Signed CNY amounts; vendor-reported percentages mapped once to ratios | Vendor secondary-market order classification, not creations/redemptions or verified investor positions |
+| Jisilu current anonymous `/webapi/cb/list/` | Partial bond metadata and C-type convertible reference prices: CNY per100 face; conversion/underlying prices CNY/share | At most30 anonymous rows, no full-universe claim or login; E-type exchangeables retain metadata and unqualified native values only |
+
+The public publisher pages and their declared scripts establish corrected paths,
+field-to-label bindings and monetary display scales. SSE/SZSE primary rules and an
+issuer disclosure establish convertible and conversion-price denominations. Their
+exact URLs, acquisition times and retained body digests are attached to the policy.
+No source script code or financial payload is copied into either repository.
+
+Notice dates can label a later business day and never backdate knowledge. Jisilu's
+context date is not joined to its optional time-only row clock; such a join can
+manufacture a future quote around midnight. Missing listing dates remain unknown.
+Reference prices confer no transaction, listing/suspension state or fill. ETF epoch
+seconds stay a separate vendor claim; all knowledge intervals start at actual
+complete acquisition. Each candidate retains verification time, archive/guest/type
+limits, exact units, raw identity and the prior failed request's history.
+
+The three-source watch uses its own empty store and persisted seven-day budget.
+Stopping or disabling it is the rollback. Its daily evidence cannot pad the original
+watch or automatically promote any business consumer. The same immutable snapshot,
+finite request, missing-data isolation and PIT contracts above apply.

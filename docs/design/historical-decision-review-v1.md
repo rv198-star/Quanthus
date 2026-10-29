@@ -74,3 +74,47 @@ Model/purpose identities in the separate calling example are preserved while pen
 remain ABSTAIN/NOT_GRANTED. This engineering delivery changes no model-quality, investment-value,
 P6 or trading admission. Operation is described in the
 [consumer guide](../operations/learning-assets-consumer.md#review-an-already-recorded-historical-decision).
+
+## Original B decision-chain companion
+
+The Owner-approved `RECORDED-B-DECISION-CHAIN-001` delivery adds a separate reader for
+original B entries, original simulated order/intent/status/fill events, held reviews,
+corporate actions, exits and recorded ledger context. It does not expand the held-only
+reader's claims. Implementation: `src/quanthus/expert_strategy/decision_chain.py` and
+`scripts/learning_decision_chain.py`; exact contract:
+`config/research/decision-chain-delivery.v1.json`; synthetic regressions:
+`tests/unit/test_decision_chain.py`. Its own acceptance is recorded in
+[the decision-chain record](../acceptance/recorded-b-decision-chain-20261029.md).
+
+The stage graph is `exact B selection + sealed held projection -> authenticate original
+trace/body hashes -> build one immutable chain index -> read-only JSON/offline HTML`.
+It reuses #580; it does not rematerialize Facts or execute a policy, model or backtest.
+The self-contained job-local research package copies original member bytes into independent
+files, includes the original manifests/receipt, exact contract, index and complete file
+hashes; READY is last. Its trust root is a caller-supplied manifest SHA256. Cold validation
+rechecks retained provenance and independently recomputes the index from local records,
+without dereferencing archival paths. An arbitrary replacement trusted digest does not
+confer scientific qualification.
+
+The key is the original entry decision key; original coordinates supply security/date.
+A signal joins by exact formal decision digest, Shanghai decision date, unit and side,
+with a security check. Order/intent/fill/status/ledger/action references use their explicit
+ids. Local engine sequence numbers never group the globally exported events. Snapshots
+and settlement context join only a unique actual filled unit interval through its exit
+session. Initial empty snapshots remain visible in the package census, not falsely
+assigned to a position. Multiple units remain separate.
+
+`allocated=true` means the producer considered the opportunity; it does not establish a
+reservation or order. Held decision rows were recorded before execution with `filled=false`;
+actual exits come from explicit original fill events, not that flag. Unrecorded allocation
+or rejection reasons remain unknown; original status reasons are retained. End-of-run unit
+ledgers are labelled separately and are not per-episode performance. Day-only decisions
+remain day-only; HTML groups by Shanghai date and sorts only timed engine events by instant.
+Decimal strings, original time strings, nulls, unknown structure and parked shadow records
+are unchanged. No missing value creates an exit.
+
+This companion preserves 22,955 entry decisions, 8,393 held decisions, 17,062 engine events,
+538 filled entries and 535 filled exits. The exact original 2012–2021 scope and actual
+2026 retrospective cutoff remain; all execution is original simulation. Counterfactuals,
+live execution, historical PIT and adoption of any learned model remain unqualified.
+Neither this delivery nor PR merge starts a new comparison or P6.

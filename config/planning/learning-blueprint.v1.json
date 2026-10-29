@@ -154,7 +154,10 @@
         "config/research/learning-mvp/entry-confirmation-activation.v1.json",
         "src/quanthus/expert_strategy/decision_review.py",
         "scripts/learning_decision_review.py",
-        "config/research/decision-review-delivery.v1.json"
+        "config/research/decision-review-delivery.v1.json",
+        "src/quanthus/expert_strategy/decision_chain.py",
+        "scripts/learning_decision_chain.py",
+        "config/research/decision-chain-delivery.v1.json"
       ]
     },
     {

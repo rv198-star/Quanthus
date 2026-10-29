@@ -56,6 +56,15 @@ manifest/deadline. Business and historical PIT admission remain false.
 | [#585](https://github.com/rv198-star/Quanthus/issues/585) | Media, RSS and institution sites | Site identity and RSS tested separately; unavailable/network-limited entries stay explicit |
 | [#587](https://github.com/rv198-star/Quanthus/issues/587) | Independent astock fork and bounded absorption | 15 contracts, pinned P10 observation adapter, unit/time/rollback contracts and finite watch |
 
+The Owner then continued the three access/unit holds independently of that watch.
+[astock PR#3](https://github.com/rv198-star/astock/pull/3) adds three corrected
+contracts in source-library0.1.2, tested source
+`3814b20ccb121f44e8bcdc73ba4c1ec4981176e2`. A separate explicit three-key policy
+in `config/pipelines/p10-supplement-sources.v2.json` qualifies archival stock
+announcements, one ETF's vendor trading flows and the anonymous guest-bond subset.
+Their02:01 observations and unsupported purposes are in the three-hold section.
+The original fifteen-source running watch above is not replaced or restarted.
+
 ## Why daily collection works without the upstream checkout
 
 On `quanthus-cn02`, the actual daily path is:
@@ -473,6 +482,66 @@ Operational receipts outside Git are `watch-image-receipt.json`,
 `6a3935f75224f8725b7c02c9d71dbde814e988c4bb44f5bdde7b2ec2e2888a29`; its first immutable manifest SHA256 is
 `1eb98a14ec6bba9e5f2c0c8a13bd64c910a84c900166653d7b0f8b70865817f5`.
 Run-stage metrics and all raw/normalized response hashes are retained there.
+
+## Three access/unit holds — continued 2026-10-30
+
+Owner explicitly continued qualification without waiting for the original watch.
+Current publisher pages and their declared scripts establish corrected public paths;
+all initial failures remain immutable. Five discovery pages, six declared scripts,
+four primary unit/rule documents and three corrected functional calls were bounded
+and frozen before access. Each call has a20-second outer budget and byte ceiling,
+with no auth, retry, provider substitution or automatic redirect following.
+
+The source library0.1.2 independently implements these three contracts. The new
+policy `config/pipelines/p10-supplement-sources.v2.json` explicitly selects them
+without requesting the original fifteen capabilities. See the governing child
+[additional qualification design](../design/astock-subproject.md#additional-access-and-unit-qualification--2026-10-30).
+The `supplement-sources-v2` extra and `requirements-v2.lock` use a separate runtime;
+the existing0.1.1 image/root/policy/deadline stay fixed.
+
+All times below are **2026-10-30, Asia/Shanghai**.
+
+| Corrected capability | Verified at | Result | Remaining purpose limit |
+| --- | --- | --- | --- |
+| Eastmoney announcement index, `/api/security/ann`, stock600519/page1/size2 |02:01:29| Two correct-security records; archive metadata admitted | Latest notice label2026-08-15 (76days old); current-disclosure completeness and historical release clocks unproven |
+| Eastmoney ETF510300, one exact `secids` via `ulist.np/get` |02:01:30| One identified ETF; signed CNY trading-flow buckets and vendor percentages admitted for diagnostics | Secondary-market order classification, not creations/redemptions or verified investor positions; original unqualified f20 omitted |
+| Jisilu current anonymous `/webapi/cb/list/` |02:01:30|30 anonymous records;29 Cconvertibles with qualified reference units,1 Eexchangeable metadata-only | Login required for full list;4 missing row time texts and3 missing listing dates; no full-universe or actual-trade claim |
+
+The original announcement path `/security/announcement` and old Jisilu POST/
+bootstrap definitions remain failed historical contracts; a working new route
+never rewrites them as passes. Unsupported current-disclosure/full-anonymous-list/
+ETF-subscription-flow interpretations stay explicitly unavailable. Reopening needs
+new purpose-specific recency, access/coverage or creation/redemption evidence,
+not a repeat of an unchanged failed request.
+
+Primary pages and field bindings resolve ETF money as CNY and percent values as
+native percentages; normalization maps percentages to ratios once. Official SSE/
+SZSE article6 gives convertible quotation per100 face; issuer disclosure confirms
+conversion-price denomination CNY/share. This verifies denomination, not each
+current conversion price. All unit sources have exact URLs/times/body hashes in
+the policy. Exchangeable numerics are kept outside that convertible unit admission.
+
+Notice-date labels and native `display_time`/`eiTime` text never backdate knowledge.
+Jisilu's `info.date` is not joined to its row's time-only `last_time`: the context
+can already show the next calendar day at midnight. Missing listing dates remain
+unknown, and reference prices do not establish a trade or fill. ETF epoch seconds
+stay a separate vendor claim. Knowledge begins at complete-response acquisition.
+
+The new adapters pass51 maintained synthetic tests. The retained upstream plus
+library runs242 cases:238 pass and4 opt-in live cases skip. An initial full-upstream
+attempt lacked openpyxl; the successful run reuses the existing isolated read-only
+spreadsheet dependency closure. Shared environments were not changed. Two pinned
+wheel builds are byte-identical, SHA256
+`5311abc0c2ecfd89be787c4fda4ba7edd03f9079ab9954ce026cf9b80a86f64d`;
+installation outside the checkout passes all51 maintained tests. The new P10
+unit/time/subset contracts plus existing supplement tests pass37 cases; local
+Ruff and strict mypy pass for the changed production modules.
+
+Evidence outside Git: `/srv/agentdock/evaluations/p10-holds-20261030/` retains
+`discovery-plan.json`, `script-plan.json`, `functional-plan.json`, the two unit
+plans, each raw response/metadata, `candidate-ledger.json`, independent build and
+test logs. The original673-request census and all prior ledgers are unchanged.
+#583/#584/#585/#587 continue to own remaining functional coverage and later review.
 
 ## Earlier verification checkpoint — retained history
 

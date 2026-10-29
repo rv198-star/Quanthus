@@ -231,19 +231,23 @@ def _ledger(root: Path, config: dict[str, Any], at: datetime) -> dict[str, Any]:
                 "review_due_at": due.isoformat() if due else None,
                 "last_verified_at": latest["verified_at"] if latest else None,
                 "last_quality": {
-                    k: latest[k]
-                    for k in (
-                        "status",
-                        "reason",
-                        "quality_ok",
-                        "quality_flags",
-                        "source_row_count",
-                        "source_latest_clock",
-                        "source_latest_age_seconds",
-                        "source_latest_date",
-                        "source_latest_date_age_days",
-                        "unit_contract",
-                    )
+                    "source_latest_notice_date": latest.get("source_latest_notice_date"),
+                    "source_latest_notice_age_days": latest.get("source_latest_notice_age_days"),
+                    **{
+                        k: latest[k]
+                        for k in (
+                            "status",
+                            "reason",
+                            "quality_ok",
+                            "quality_flags",
+                            "source_row_count",
+                            "source_latest_clock",
+                            "source_latest_age_seconds",
+                            "source_latest_date",
+                            "source_latest_date_age_days",
+                            "unit_contract",
+                        )
+                    },
                 }
                 if latest
                 else None,
@@ -307,6 +311,8 @@ def cycle(
         "universe": {
             "securities": config["security_universe"],
             "funds": config.get("fund_universe", []),
+            "etfs": config.get("etf_universe", []),
+            "source_selection": config.get("universe_selection", {}),
         },
         "day": started.date().isoformat(),
         "requests": {k: r.identity for k, (r, _) in contracts.items()},

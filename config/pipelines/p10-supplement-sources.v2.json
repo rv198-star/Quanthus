@@ -1,0 +1,252 @@
+{
+  "announcement_security_codes": [
+    "600519"
+  ],
+  "budget": {
+    "max_response_bytes": 262144,
+    "no_retry": true,
+    "no_vendor_fallback": true,
+    "source_wall_seconds": 20
+  },
+  "capability_selection": "EXACT_DECLARED_SUBSET",
+  "consumer": "P10 source qualification and supplemental observation",
+  "etf_universe": [
+    "sh510300"
+  ],
+  "fund_universe": [],
+  "issues": [
+    581,
+    583,
+    584,
+    585,
+    587
+  ],
+  "kind": "p10-supplement-policy-v1",
+  "library": {
+    "module_sha256": {
+      "__init__.py": "d05fcfc5f7e40109d0f32dbffe5a052c8e7ec89f83b6acae02a604dc9ede9a2b",
+      "_parsing.py": "a0a558f03be73846cb1a7c6934cf8152c4556cb6f8646782cfbf6a4d9b864565",
+      "announcements.py": "1c47909f115b9d27e2d3e8309bd7dc2d4112299e860bd9f0fc0ab81af30e2aa0",
+      "bonds.py": "0801a88dd753c4c28ff5cb3011771b8498a2164566ed318231b43a18a2a69fc8",
+      "contracts.py": "13b1d8054d53d851a249e3a43f59f21776086075a862b6b3af3ad84fe592376d",
+      "convertibles.py": "b7bfe58b202cd7ab6d072e345b6130fecebf27e743529775cb86bb4a0e16ac8b",
+      "disclosures.py": "8ee04e210099795a457fdea99e67fe97dc697bffbf460a82490e7588b00d0ba0",
+      "etf_flow.py": "93a757a84c237b31bd2306982e6ea16d356c1c1bb35353e8cb5d3aa17c4ade2f",
+      "funds.py": "440d9f92bbca2810d5fdf91fbe96a857c1fe424d246a00cd968a414993b7a050",
+      "lpr.py": "9bd05f285376fe0e7a4073bfbdcfde53b0cc08a38243f8fffbf9356783051264",
+      "macro.py": "223f7393286c93a8e45cf01ce0d3a90ba2291a5538a5aa38f0743b7467d59abf",
+      "news.py": "67b4dbdabee3ed7eac80cc006c45cb0821f4f146548619184f67c41fc1abe51a",
+      "quotes.py": "29ec0f41a69a017ec1b7abc37e0f787ef3a29fe47aa5b16dffcb53198b744862",
+      "rss.py": "dcf353035e468f11367617ef85b4437beddfe6736198de2fde3656e2f5f00355",
+      "transport.py": "3bc4929a066856c9cabe553a87b075e080bee0c66de64a7d19371e00dc38eb02"
+    },
+    "repository": "https://github.com/rv198-star/astock",
+    "revision": "3814b20ccb121f44e8bcdc73ba4c1ec4981176e2",
+    "version": "0.1.2",
+    "wheel_sha256": "5311abc0c2ecfd89be787c4fda4ba7edd03f9079ab9954ce026cf9b80a86f64d",
+    "wheel_url": "https://github.com/rv198-star/astock/releases/download/sources-v0.1.2/astock_sources-0.1.2-py3-none-any.whl"
+  },
+  "lifecycle": {
+    "business_admission": false,
+    "observations": "ADM_P10_QUALIFICATION_EVIDENCE",
+    "retention": "KEEP_IMMUTABLE_UNTIL_P10_DISPOSITION",
+    "staging": "TMP"
+  },
+  "owner": "P10",
+  "policy_version": "2026-10-30.holds.1",
+  "quality": {
+    "future_clock_seconds": 300
+  },
+  "runtime_dependencies": {
+    "certifi": {
+      "filename": "certifi-2026.7.22-py3-none-any.whl",
+      "version": "2026.7.22",
+      "wheel_sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775"
+    },
+    "charset-normalizer": {
+      "filename": "charset_normalizer-3.5.2-py3-none-any.whl",
+      "version": "3.5.2",
+      "wheel_sha256": "b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685"
+    },
+    "idna": {
+      "filename": "idna-3.20-py3-none-any.whl",
+      "version": "3.20",
+      "wheel_sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"
+    },
+    "requests": {
+      "filename": "requests-2.34.2-py3-none-any.whl",
+      "version": "2.34.2",
+      "wheel_sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0"
+    },
+    "urllib3": {
+      "filename": "urllib3-2.8.0-py3-none-any.whl",
+      "version": "2.8.0",
+      "wheel_sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3"
+    }
+  },
+  "schema": "p10-supplement-observation-v1",
+  "security_universe": [],
+  "sources": [
+    {
+      "fields": {},
+      "key": "eastmoney:announcement.index",
+      "kind": "announcement",
+      "purpose": "archive_announcement_index_metadata"
+    },
+    {
+      "fields": {
+        "f184": {
+          "basis": "VENDOR_REPORTED_NET_FLOW_PERCENT",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "RATIO"
+        },
+        "f62": {
+          "basis": "VENDOR_CLASSIFIED_SECONDARY_TRADING_NET_FLOW",
+          "multiplier": "1",
+          "native_unit": "CNY",
+          "unit": "CNY"
+        },
+        "f66": {
+          "basis": "VENDOR_CLASSIFIED_SECONDARY_TRADING_NET_FLOW",
+          "multiplier": "1",
+          "native_unit": "CNY",
+          "unit": "CNY"
+        },
+        "f69": {
+          "basis": "VENDOR_REPORTED_NET_FLOW_PERCENT",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "RATIO"
+        },
+        "f72": {
+          "basis": "VENDOR_CLASSIFIED_SECONDARY_TRADING_NET_FLOW",
+          "multiplier": "1",
+          "native_unit": "CNY",
+          "unit": "CNY"
+        },
+        "f75": {
+          "basis": "VENDOR_REPORTED_NET_FLOW_PERCENT",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "RATIO"
+        },
+        "f78": {
+          "basis": "VENDOR_CLASSIFIED_SECONDARY_TRADING_NET_FLOW",
+          "multiplier": "1",
+          "native_unit": "CNY",
+          "unit": "CNY"
+        },
+        "f81": {
+          "basis": "VENDOR_REPORTED_NET_FLOW_PERCENT",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "RATIO"
+        },
+        "f84": {
+          "basis": "VENDOR_CLASSIFIED_SECONDARY_TRADING_NET_FLOW",
+          "multiplier": "1",
+          "native_unit": "CNY",
+          "unit": "CNY"
+        },
+        "f87": {
+          "basis": "VENDOR_REPORTED_NET_FLOW_PERCENT",
+          "multiplier": "0.01",
+          "native_unit": "PERCENT",
+          "unit": "RATIO"
+        }
+      },
+      "key": "eastmoney:etf.trading_flow.snapshot",
+      "kind": "etf_trading_flow",
+      "purpose": "single_etf_vendor_trading_flow_diagnostic"
+    },
+    {
+      "fields": {
+        "conversion_price": {
+          "basis": "VENDOR_CONVERSION_PRICE_FOR_TYPE_C_ONLY",
+          "multiplier": "1",
+          "native_unit": "CNY_PER_SHARE",
+          "unit": "CNY_PER_SHARE"
+        },
+        "price": {
+          "basis": "VENDOR_CONVERTIBLE_REFERENCE_NOT_VERIFIED_TRADE",
+          "multiplier": "1",
+          "native_unit": "CNY_PER_100_CNY_FACE",
+          "unit": "CNY_PER_100_CNY_FACE"
+        },
+        "stock_price": {
+          "basis": "VENDOR_UNDERLYING_REFERENCE_NOT_VERIFIED_TRADE",
+          "multiplier": "1",
+          "native_unit": "CNY_PER_SHARE",
+          "unit": "CNY_PER_SHARE"
+        }
+      },
+      "key": "jisilu:convertible.list",
+      "kind": "guest_bond",
+      "purpose": "anonymous_partial_bond_reference_diagnostic"
+    }
+  ],
+  "unit_evidence": [
+    {
+      "body_sha256": "6e902d38f1539fcfd46150adaf3e56c19cbf7ff7d4ef2099121d773e3df18409",
+      "role": "Field-to-label binding for f62/f66/f72/f78/f84 and percentage fields",
+      "url": "https://data.eastmoney.com/zjlx/510300.html",
+      "verified_at": "2026-10-29T17:58:51.073967+00:00"
+    },
+    {
+      "body_sha256": "a10418e3080502fd6ca570922168fcbabeadaf1f0eb1194b05b0dcc54cd2e9e3",
+      "role": "Primary field bindings, raw CNY axes and display-only scaling",
+      "url": "https://data.eastmoney.com/newstatic/js/zjlx/stock.js",
+      "verified_at": "2026-10-29T17:59:51.908197+00:00"
+    },
+    {
+      "body_sha256": "85634f2984191ef52d3b716b3bd29ad0724b5b245150575dcab28db9a637435b",
+      "role": "Article6 convertible quotation per100 face",
+      "url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/bond/trading/currency/c/c_20250606_10781040.shtml",
+      "verified_at": "2026-10-29T18:05:20.564299+00:00"
+    },
+    {
+      "body_sha256": "f6ace7794ec6471905cd150048115eda3b1b7e5bc34c56dec223a568128fd183",
+      "role": "Article6 convertible quotation per100 face",
+      "url": "https://docs.static.szse.cn/www/lawrules/rule/bond/W020250327514604502531.pdf",
+      "verified_at": "2026-10-29T18:05:21.110146+00:00"
+    },
+    {
+      "body_sha256": "22bf121986c5f90dc4bfdff7426ff488f020b5003b9512adc8db56245c6d2c57",
+      "role": "Guest reference-price names and separate convertible/exchangeable types",
+      "url": "https://www.jisilu.cn/web/js/data_cb.f004489a.js",
+      "verified_at": "2026-10-29T17:59:53.149045+00:00"
+    },
+    {
+      "body_sha256": "464c53655542fd64f9d149db1c2ae3ccaf71ac23c6c26680ab57b95f5fb0850f",
+      "role": "Current public API route, not legacy POST",
+      "url": "https://www.jisilu.cn/web/js/data_cb~data_cb_custom~data_cb_layout.46004509.js",
+      "verified_at": "2026-10-29T17:59:53.567917+00:00"
+    },
+    {
+      "body_sha256": "d82d396cda489247898e66af340cff1ab647a6230ab943bbd70234ae54b63630",
+      "role": "Exact primary article6 convertible denomination per100 face",
+      "url": "https://www.sse.com.cn/lawandrules/sselawsrules2025/bond/trading/currency/c/10781040/files/0cd49df084af4d6c913313fa4d3df3ad.docx",
+      "verified_at": "2026-10-29T18:13:38.716044+00:00"
+    },
+    {
+      "body_sha256": "e0988de32e410417b93c127b655c38bc793f874e693e1e705ef703536194f677",
+      "role": "Issuer example establishes CNY/share denomination only; not an individual current conversion price",
+      "url": "https://disc.static.szse.cn/download/disc/disk03/finalpage/2025-12-17/dc3c40f0-544f-48f3-8b2f-de64e97e8f98.PDF",
+      "verified_at": "2026-10-29T18:13:39.119166+00:00"
+    }
+  ],
+  "universe_selection": {
+    "announcement": "FIXED_SECURITY_600519_PAGE1_SIZE2",
+    "etf": "FIXED_SH510300_SINGLE_SECURITY",
+    "jisilu": "ANONYMOUS_SOURCE_SUBSET_AT_MOST30_NOT_FULL_UNIVERSE"
+  },
+  "watch": {
+    "automatic_business_admission": false,
+    "days": 7,
+    "expiry_action": "STOP_AND_REVIEW",
+    "interval_seconds": 86400,
+    "min_consecutive_success_days": 3,
+    "min_distinct_success_days": 3
+  }
+}

@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved — Owner approved the bounded implementation on 2026-10-30 |
-| Delivery gate | open; actual run/reuse evidence belongs to the task handoff |
+| Delivery gate | local engineering accepted with explicit skips; actual run/reuse evidence is linked in the blueprint ledger and task handoff |
 | Parent | [Delivery roadmap](lld/09-roadmap.md#4-release-mechanics) |
 | Work item | META-GATE-001 / #3; META-TRACE-001 / #2 for blueprint bookkeeping |
 | Contract/config | `config/local-acceptance.v1.json` |

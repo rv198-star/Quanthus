@@ -224,3 +224,47 @@ The three-source watch uses its own empty store and persisted seven-day budget.
 Stopping or disabling it is the rollback. Its daily evidence cannot pad the original
 watch or automatically promote any business consumer. The same immutable snapshot,
 finite request, missing-data isolation and PIT contracts above apply.
+
+## Named futures contract qualification — 2026-10-30
+
+The next tranche uses independently versioned astock `0.1.3` and
+[`p10-supplement-sources.v3.json`](../../config/pipelines/p10-supplement-sources.v3.json),
+with the separate `supplement-sources-v3` extra and hash-locked
+[`requirements-v3.lock`](../../ops/source-watch/requirements-v3.lock). Existing
+fifteen- and three-capability policies/watches stay pinned. The new policy selects
+only Sina's named `DCE:V2701` PVC futures contract, one request, one row and at most
+4096 response bytes within the existing 20-second outer budget.
+
+The publisher's current contract page lists V2701 and its delivery month is still
+in the future. Its own JavaScript maps latest/open/high/low to raw fields 8/2/3/4
+after accounting for a prepended presentation symbol. A DCE-authored contract
+file and the publisher page agree on CNY/tonne and 5 tonnes/lot. The latter is
+contract size, never a price multiplier. Official DCE-host reference requests
+timed out; independent current exchange listing is unverified. Conflicting tick
+sizes, volume/open-interest quantities and bid/offer sizes remain unqualified.
+This is a vendor contract-price diagnostic, not a physical spot or executable price.
+
+The source emits a date label and six-digit time. They remain separate because
+the date's calendar-versus-trading-day role is unproven, especially around night
+sessions. No next-day, weekend or holiday inference is permitted. Source clock,
+calendar quote date, trading day and publication time remain null; knowledge starts
+at complete acquisition. Real-time freshness and historical PIT are not admitted.
+
+A frozen contract scope binds code, venue, product, delivery month, evidence floor
+and conservative stop-before time. It stops before the delivery month starts
+(`2027-01-01 00:00 Asia/Shanghai`), without guessing the exchange's final trading
+day. There is no automatic roll. Expired, premature or malformed scopes issue no
+HTTP request. Scope status joins the immutable job identity so a same-UTC-day
+expiry cannot reuse a formerly good job; the current ledger changes to
+`HOLD_CONTRACT_SCOPE`. Prior evidence remains readable for audit, never silently
+substituted into a failed current observation.
+
+[`test_p10_source_futures.py`](../../tests/unit/test_p10_source_futures.py) covers
+exact units, wrong contracts, independent night labels, conservative expiry and
+same-day cache/HTTP isolation. The shared rollback/PIT tests continue to apply.
+The new finite watch runs from published source in its own initially empty
+store with a nonrenewable period. Its actual stop/restart and disable-after-good
+checks passed without additional HTTP or stale substitution; it neither pads
+existing qualification days nor blocks continued screening of other sources.
+See the [supply work item](../work-items/p10-source-supply-20261029.md) for exact
+image/source, first-cycle evidence, period and local checks.

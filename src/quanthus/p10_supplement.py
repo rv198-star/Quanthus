@@ -29,6 +29,7 @@ from quanthus.p10_source_contracts import (
     library_contracts,
     normalize,
     policy,
+    source_scope_failure,
 )
 
 
@@ -222,11 +223,15 @@ def _ledger(root: Path, config: dict[str, Any], at: datetime) -> dict[str, Any]:
                     )
                     else "HOLD_REVIEW_DUE"
                 )
+        scope_failure = source_scope_failure(spec, at)
+        if scope_failure:
+            status = "HOLD_CONTRACT_SCOPE"
         rows.append(
             {
                 "key": spec["key"],
                 "purpose": spec["purpose"],
                 "status": status,
+                "current_scope_failure": scope_failure,
                 "first_verified_at": first.isoformat() if first else None,
                 "review_due_at": due.isoformat() if due else None,
                 "last_verified_at": latest["verified_at"] if latest else None,
@@ -317,6 +322,11 @@ def cycle(
         "day": started.date().isoformat(),
         "requests": {k: r.identity for k, (r, _) in contracts.items()},
         "disabled": sorted(set(disabled)),
+        "request_scope_status": {
+            spec["key"]: source_scope_failure(spec, started)
+            for spec in config["sources"]
+            if spec["kind"] == "futures_contract_price"
+        },
     }
     job_id = started.strftime("%Y%m%d") + "-" + digest(closure)
     _initialize(root)
@@ -355,6 +365,8 @@ def cycle(
                 raw_type = importlib.import_module("astock.contracts").RawObservation
                 if key in disabled:
                     raw = raw_type(request, clock(), b"", None, False, "SOURCE_DISABLED_ROLLBACK")
+                elif failure := source_scope_failure(spec, clock()):
+                    raw = raw_type(request, clock(), b"", None, False, failure)
                 else:
                     raw = fetcher(request, config["budget"])
                     network_requests += 1

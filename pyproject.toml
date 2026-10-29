@@ -19,6 +19,9 @@ supplement-sources = [
 supplement-sources-v2 = [
   "astock-sources @ https://github.com/rv198-star/astock/releases/download/sources-v0.1.2/astock_sources-0.1.2-py3-none-any.whl#sha256=5311abc0c2ecfd89be787c4fda4ba7edd03f9079ab9954ce026cf9b80a86f64d",
 ]
+supplement-sources-v3 = [
+  "astock-sources @ https://github.com/rv198-star/astock/releases/download/sources-v0.1.3/astock_sources-0.1.3-py3-none-any.whl#sha256=b6d6cd358164d0ea3bde7d98020c54b8001800ca4aea7c9538fa539f6925d1b4",
+]
 platform = [
   "cryptography>=45,<46",
   "gunicorn>=26,<27",

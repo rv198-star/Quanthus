@@ -114,6 +114,11 @@ def library_contracts(config: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
                 "convertible.list": "convertibles",
             }[capability]
             parser = importlib.import_module("astock." + module).parse
+        elif capability == "futures.price.snapshot":
+            futures_module = importlib.import_module("astock.futures")
+            spec = next(x for x in config["sources"] if x["key"] == key)
+            request = futures_module.request(spec["contract_scope"]["contract"])
+            parser = partial(futures_module.parse, contract=spec["contract_scope"]["contract"])
         else:
             parser = {
                 "lpr.history": lpr.parse,
@@ -127,6 +132,36 @@ def library_contracts(config: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
     if set(contracts) != declared:
         raise ValueError("SOURCE_CAPABILITY_SET_MISMATCH")
     return contracts
+
+
+def source_scope_failure(spec: dict[str, Any], at: datetime) -> str | None:
+    """A dated futures sample cannot roll or outlive its conservative contract bound."""
+    if spec["kind"] != "futures_contract_price":
+        return None
+    try:
+        scope = spec["contract_scope"]
+        contract = scope["contract"]
+        if (
+            not isinstance(contract, str)
+            or re.fullmatch(r"V[0-9]{2}(?:0[1-9]|1[0-2])", contract) is None
+            or scope["venue"] != "DCE"
+            or scope["product"] != "PVC"
+            or scope["delivery_month"] != "20" + contract[1:3] + "-" + contract[3:]
+        ):
+            raise ValueError("INVALID_CONTRACT_SCOPE")
+        start, stop = instant(scope["not_before"]), instant(scope["stop_before"])
+        delivery_start = datetime.fromisoformat(scope["delivery_month"] + "-01").replace(
+            tzinfo=SHANGHAI
+        )
+        if not start < stop <= delivery_start:
+            raise ValueError("INVALID_CONSERVATIVE_CONTRACT_BOUND")
+        if at < start:
+            return "FUTURES_QUALIFICATION_NOT_YET_VALID"
+        if at >= stop:
+            return "FUTURES_CONTRACT_QUALIFICATION_EXPIRED"
+    except (ValueError, KeyError, TypeError):
+        return "FUTURES_CONTRACT_SCOPE_INVALID"
+    return None
 
 
 def period(series: str, text: str, marker: str) -> tuple[str, str]:
@@ -305,6 +340,47 @@ def normalize(result: Any, spec: dict[str, Any], config: dict[str, Any]) -> dict
                         for k, v in (*item.amounts_native, *item.percentages_native)
                     },
                     flow_basis="VENDOR_CLASSIFIED_SECONDARY_TRADING_NOT_CREATION_REDEMPTION",
+                )
+            elif kind == "futures_contract_price":
+                scope = spec["contract_scope"]
+                failure = source_scope_failure(spec, acquired)
+                if failure:
+                    raise ValueError(failure)
+                if (item.contract, item.venue, item.delivery_month) != (
+                    scope["contract"],
+                    scope["venue"],
+                    scope["delivery_month"],
+                ):
+                    raise ValueError("SOURCE_FUTURES_CONTRACT_MISMATCH")
+                flags.update(
+                    {
+                        "FUTURES_DATE_LABEL_ROLE_UNPROVEN",
+                        "FUTURES_VOLUME_AND_OPEN_INTEREST_UNITS_UNQUALIFIED",
+                        "FUTURES_TICK_SIZE_REFERENCE_CONFLICT",
+                        "VENDOR_SNAPSHOT_NO_REALTIME_FRESHNESS_ADMISSION",
+                        "EXCHANGE_LISTING_REFERENCE_UNAVAILABLE",
+                    }
+                )
+                row.update(
+                    record_key=item.venue + ":" + item.contract,
+                    contract=item.contract,
+                    venue=item.venue,
+                    source_name=item.name,
+                    delivery_month=item.delivery_month,
+                    contract_qualification_stop_before=scope["stop_before"],
+                    contract_size=spec["contract_size"],
+                    price_basis="VENDOR_FUTURES_CONTRACT_SNAPSHOT_NOT_PHYSICAL_SPOT_OR_FILL",
+                    source_date_label=item.source_date_label.isoformat(),
+                    source_time_text=item.source_time_text,
+                    source_clock_kind="INDEPENDENT_NATIVE_LABELS_NOT_COMBINED",
+                    trading_day=None,
+                    quote_calendar_date=None,
+                    real_time_admission=False,
+                    unqualified_source_fields={str(k): v for k, v in item.unqualified_fields},
+                    metrics={
+                        k: metric(getattr(item, k + "_native"), spec["fields"]["price"])
+                        for k in ("last", "open", "high", "low")
+                    },
                 )
             elif kind == "guest_bond":
                 if item.bond_type not in {"C", "E"}:

@@ -28,6 +28,10 @@ Use `scripts/learning_held_decision_census.py --help` for the narrow offline cen
 entry. It requires an exact external selection SHA256 and a fresh output file.
 The data-bearing selection and execution budget are not checked into Git.
 
+The [existing-consumer calling guide](../operations/learning-assets-consumer.md) provides a
+validated synthetic invocation of the supported expert/aggregator APIs, reason-bearing JSON,
+and the required input contract. It introduces no additional runner or model-use admission.
+
 ## Archive-only experiments
 
 The immutable archive is Git ref

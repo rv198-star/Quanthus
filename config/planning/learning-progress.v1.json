@@ -7846,6 +7846,128 @@
           "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
         }
       ]
+    },
+    {
+      "id": "CP-540-20261029T121833583946Z",
+      "recorded_at": "2026-10-29T12:18:33.583946+00:00",
+      "actor": "Codex / Sol 6.1",
+      "work_item": "META-LEARN-001",
+      "outcome": "completed",
+      "summary": "交付并运行现有专家/聚合器调用指南；复用既有诊断筛选需求，无成立的新比较问题，按条件分支收口。",
+      "evidence": [
+        {
+          "id": "CALL",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/learning-consumer-cycle-20261029T120743Z/evidence/consumer-example.json",
+          "sha256": "89b971765c4228245f642fe5d2e82f26f27fe8dfc8caccb999cdcbe05a151b87",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "现有正式消费API的合成调用与未知/弃权/否决保持；不是生产或科学验收。"
+        },
+        {
+          "id": "SELECT",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/learning-consumer-cycle-20261029T120743Z/evidence/decision-selection.json",
+          "sha256": "80b9cc2fd2743d9f0f464083b5f7210a85dc12f628153e120dad532158564c6b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "已消费安全统计及原报告上的任务选择；不证明全局不存在其他决策缺口。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "现有FormalStrategyRunner与聚合器已有功能保持；新增可运行调用指南在独立Python进程通过，包含完整原因/版本身份和安全行为。",
+          "remaining": "本轮只关闭调用说明缺口，没有新增模型的采用资格或真实消费者生产接入。",
+          "next_action": "复用已交付调用方法；具体新调用方先固定已准入输入，确有功能缺口再最小开发。",
+          "evidence": [
+            "CALL"
+          ],
+          "supersedes": "CP-540-20261029T083255376941Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "本轮已有资产调用交付和有限需求筛选完成；第三步按未满足条件不运行比较。",
+          "remaining": "完整12+X产品价值与同资格链学习采用未因本轮提高；已有全仓lint问题保留。",
+          "next_action": "无新候选即收口；正常项目工作按自身合同继续，不自动开新模型或P6。",
+          "evidence": [
+            "CALL",
+            "SELECT"
+          ],
+          "supersedes": "CP-546-LOCAL-CI-20261029T090519818494Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "复用已知持仓/入场诊断及后续March失败结论，未确立一个新的实质可处理决策问题。",
+          "remaining": "选择范围只覆盖三类已知需求；入场/资金等未观测部分不是全局无缺口的证据。",
+          "next_action": "停放新比较；出现具体消费者未满足决定、允许替代动作和合格证据后再提有界任务。",
+          "evidence": [
+            "SELECT"
+          ],
+          "supersedes": "CP-540-20261029T083255376941Z"
+        }
+      ],
+      "no_change_reason": "不新增Facts、模型、独立构建或市场比较；原研究质量、状态路线与P6准入保持原范围。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T13:06:53Z",
+          "body_sha256": "32e64546842d01d8a0b43a02604185e5e9d0a7ea357c7cb24bcf3b0967115a13"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "REPRO",
+        "S02",
+        "S03",
+        "S04",
+        "P6"
+      ]
+    },
+    {
+      "id": "CP-2-20261029T122153353807Z",
+      "recorded_at": "2026-10-29T12:21:53.353807+00:00",
+      "actor": "Codex / Sol 6.1",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "本轮仅使用既有探索记录机制追加交付/停放结论和提案执行链接；机制源码与科学准入无变化。",
+      "evidence": [
+        {
+          "id": "FOCUSED",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/learning-consumer-cycle-20261029T120743Z/evidence/focused.json",
+          "sha256": "efb3c11623cc68ecb2e9f7eddb0e5851fdef146be6dd540f91ccac3aeec101ed",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本轮134项消费者/账本/文档针对性回归；非全量新跑或科学验收。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "结论账本和非授权提案元数据已更新并通过134项focused及planning；记录机制本身没有新增能力或变更语义。首次exact-base检查要求显式TRACE无变化说明，原失败保留。",
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
     }
   ]
 }

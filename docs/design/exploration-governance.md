@@ -91,6 +91,11 @@ suppliers, schedule tasks or deduct resources. TPlan still owns live cumulative 
 runtime guards. The metadata check cannot prevent an unrelated command being run outside this
 process; contributor rules and domain admission enforce that boundary.
 
+After that example has executed, its `execution_record` and `execution_disposition` link the
+completed batch while its proposal shape remains non-authorizing. It is no longer an active
+next task. Preserve the original request identity in Git/job evidence; completion does not
+create a successor. TPlan and the explicit Owner/domain authority own actual execution state.
+
 ## Selection, budgets and evidence proportionality
 
 Select among actual consumer delivery, necessary repair and bounded exploration. Consider

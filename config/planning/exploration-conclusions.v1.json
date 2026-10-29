@@ -142,6 +142,101 @@
         "CP-540-20261027T192528495073Z"
       ],
       "supersedes": null
+    },
+    {
+      "recorded_at": "2026-10-29T12:20:02.539271+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved bounded steps1-3",
+      "work_item": "META-LEARN-001",
+      "execution_status": "completed",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "本轮实际脚本耗时和资源见job收据；包括准备/交接的完整AI成本未汇总，不填零；旧研究成本与曝光完整保留。",
+      "attempt_refs": [],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T121833583946Z"
+      ],
+      "supersedes": null,
+      "id": "CON-CONSUMER-DELIVERY-20261029",
+      "question_id": "NEXT-ASSET-CONSUMER-001",
+      "family": "learning-asset-consumer-delivery",
+      "modules": [
+        "EXPERT",
+        "CLOSEOUT"
+      ],
+      "question": "已有资产能否通过现有专家消费者形成可运行且解释拒绝/未知原因的调用交付？",
+      "consumer": "FormalStrategyRunner / existing aggregator research caller",
+      "scope": "当前普通代码及冻结registry；合成输入四类行为与完整输出身份，未接入新的真实市场或模型用途。",
+      "verdict": "supported",
+      "disposition": "park",
+      "claim_ceiling": "支持调用说明和接口工程交付；不提升模型质量、经济价值、历史PIT、P6或生产准入。",
+      "decision_effect": "采用现有指南交付，不新造runner或adapter；该说明需求关闭，进一步扩建停放。",
+      "reopen_conditions": [
+        "具名实际调用方发现指南无法覆盖的可复现接口缺口。"
+      ],
+      "retained_assets": [
+        "现有正式策略消费者/聚合器API。",
+        "已执行验证的调用指南及JSON原因、政策/拓扑/证据身份。"
+      ],
+      "evidence": [
+        {
+          "id": "CALL",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/learning-consumer-cycle-20261029T120743Z/evidence/consumer-example.json",
+          "sha256": "89b971765c4228245f642fe5d2e82f26f27fe8dfc8caccb999cdcbe05a151b87",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "现有正式消费API的合成调用与未知/弃权/否决保持；不是生产或科学验收。"
+        }
+      ]
+    },
+    {
+      "recorded_at": "2026-10-29T12:20:02.539271+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved bounded steps1-3",
+      "work_item": "META-LEARN-001",
+      "execution_status": "completed",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "本轮实际脚本耗时和资源见job收据；包括准备/交接的完整AI成本未汇总，不填零；旧研究成本与曝光完整保留。",
+      "attempt_refs": [],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T121833583946Z"
+      ],
+      "supersedes": null,
+      "id": "CON-DECISION-SELECTION-20261029",
+      "question_id": "NEXT-DECISION-NEED-001",
+      "family": "existing-decision-gap-selection",
+      "modules": [
+        "EXPERT",
+        "CLOSEOUT"
+      ],
+      "question": "已有持仓和入场证据是否支持一个新的有价值最小比较？",
+      "consumer": "Learning work selection for existing algorithmic decisions",
+      "scope": "三类已知需求；已消费8393持仓复核、原790入场诊断和后续March固定用途失败结论；不是全项目需求穷举。",
+      "verdict": "inconclusive",
+      "disposition": "park",
+      "claim_ceiling": "没有在当前证据确立新实质缺口；未观测不等于没有，全项目学习价值未被否定。",
+      "decision_effect": "NO_GO新比较；第三步NOT_RUN_CONDITION_NOT_MET；保留交付资产，后续无具体需求则停止探索。",
+      "reopen_conditions": [
+        "具体观察到的未满足消费者决定及允许替代动作。",
+        "用途兼容输入/参考及有限成本明确；保留原曝光、失败和费用，不调整阈值或补采。"
+      ],
+      "retained_assets": [
+        "原持仓普查、入场诊断和March结论按身份复用。",
+        "本轮安全需求筛选矩阵及不运行第三步的理由。"
+      ],
+      "evidence": [
+        {
+          "id": "SELECT",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/learning-consumer-cycle-20261029T120743Z/evidence/decision-selection.json",
+          "sha256": "80b9cc2fd2743d9f0f464083b5f7210a85dc12f628153e120dad532158564c6b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "已消费安全统计及原报告上的任务选择；不证明全局不存在其他决策缺口。"
+        }
+      ]
     }
   ]
 }

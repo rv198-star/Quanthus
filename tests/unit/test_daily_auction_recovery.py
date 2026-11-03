@@ -378,7 +378,8 @@ def test_held_continuation_validates_frozen_core_and_sources(tmp_path, monkeypat
         auto.held_continuation(config, day, old)
 
 
-def test_daily_quality_resume_never_recollects_full_day(tmp_path, monkeypatch):
+@pytest.mark.parametrize("fail_tail", [False, True])
+def test_daily_quality_resume_never_recollects_full_day(tmp_path, monkeypatch, fail_tail):
     import sys
 
     root = tmp_path / "runtime"
@@ -409,13 +410,24 @@ def test_daily_quality_resume_never_recollects_full_day(tmp_path, monkeypatch):
 
     def finish(config, run, day, value, market, events, *, native_root):
         calls.append((run, dict(value), native_root))
+        if fail_tail:
+            raise OSError("tail copy failed")
         return {"status": "CORE_READY_5M_HELD_SOURCE_QUALITY"}
 
     monkeypatch.setattr(cycle, "finish_native", finish)
     monkeypatch.setattr(
         sys, "argv", ["cycle", "--config", str(path), "--day", "2026-11-03", "--recovery"]
     )
-    assert cycle.main() == 0
+    monkeypatch.setattr(cycle, "alert", lambda *a: None)
+    monkeypatch.setattr(
+        cycle, "publish", lambda *a: pytest.fail("must preserve indexed predecessor")
+    )
+    if fail_tail:
+        with pytest.raises(OSError, match="tail copy failed"):
+            cycle.main()
+        assert json.loads((root / "DATES.json").read_text())["dates"]["2026-11-03"] == old
+    else:
+        assert cycle.main() == 0
     assert len(calls) == 1
     run, value, native_root = calls[0]
     assert native_root == source

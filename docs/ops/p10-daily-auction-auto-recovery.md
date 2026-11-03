@@ -21,3 +21,5 @@ Additionally replay a real archived held package with archived HTTP responses in
 ## Review decisions
 
 Independent review prompted separate network/local deadlines, candidate quarantine, fail-held hook handling, late status and receipt binding, frozen-input quality continuation, amount notional validation, capacity checks, durable writes and exact HTTP origin verification. The assertion that a full package must always exceed 90 seconds was not treated as measured evidence; a full-universe acceptance replay supplies the timing evidence. Historical source unavailability remains an explicit limit, not a reason to infer an auction from a daily total.
+
+If the late quality continuation fails after native recovery (including product construction, verification or alert/publication failure), the original indexed HELD entry remains unchanged. Its private failure record and one-use continuation marker are retained; this consumes the bounded retry and requires explicit disposition rather than recollection or downgrading the predecessor to FAILED. The input snapshot HELD label is a recovery precondition label, not a claim that a PENDING run was already published.

@@ -1077,7 +1077,10 @@ def main() -> int:
                 },
             )
             alert(config, run, day, type(exc).__name__ + ": " + str(exc))
-            if (run / "core-receipt.json").exists():
+            # A quality continuation failure retains the original indexed HELD
+            # disposition. Its private failure and consumed retry marker remain
+            # available for explicit disposition; never downgrade the predecessor.
+            if (run / "core-receipt.json").exists() and auction_resume is None:
                 partial = object_at(run / "core-receipt.json")
                 partial["status"] = "CORE_READY_5M_FAILED"
                 publish(config, partial)

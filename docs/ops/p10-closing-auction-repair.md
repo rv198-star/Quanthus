@@ -10,4 +10,4 @@ Replay verifies both archived source streams, former R3 identities, content hash
 
 Run native source verification and full Daily build/verify before publishing a new attempt. The old attempt remains intact. Pin the accepted processing commit in the source manifest and run receipt.
 
-For a code-only runtime refresh, build a tracked source bundle with container_code.bundle from a GitHub-fetched commit, then use ops/data/Dockerfile.code-refresh with an existing immutable BASE_IMAGE digest and the same PIPELINE_REVISION. It changes no dependencies or collector code. verify_bundle rejects obsolete/extra/missing members. Preserve the prior deployment JSON and image for rollback; do not edit an existing release.
+For a code-only runtime refresh, build a tracked source bundle with container_code.bundle from a GitHub-fetched commit, then use ops/data/Dockerfile.code-refresh with an existing immutable RUNTIME_IMAGE digest and the same PIPELINE_REVISION. It changes no dependencies or collector code. verify_bundle rejects obsolete/extra/missing members. Preserve the prior deployment JSON and image for rollback; do not edit an existing release.

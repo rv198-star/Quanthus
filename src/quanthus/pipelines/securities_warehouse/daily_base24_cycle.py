@@ -512,12 +512,49 @@ def finish_native(
     native_manifest = object_at(native_root / "manifest.json")
     value["native_source"] = str(native_root)
     value["native_manifest_sha256"] = file_sha(native_root / "manifest.json")
+    if config.get("recovery_mode"):
+        value["delivery_timing"] = "LATE_RECOVERY_NOT_ON_TIME_SUCCESS"
+    if native_manifest.get("research_ready") is not True:
+        recovered = None
+        try:
+            from .daily_auction_recovery import recover
+
+            recovered = recover(
+                run,
+                value,
+                revision=config["pipeline_revision"],
+                recovery_mode=bool(config.get("recovery_mode")),
+            )
+            recovery_log = run / "closing-auction-recovery.json"
+            recovery_report = object_at(recovery_log)
+            value["auction_recovery"] = {
+                "report": str(recovery_log),
+                "report_sha256": file_sha(recovery_log),
+                **recovery_report,
+            }
+            if recovered is not None and (
+                recovery_report.get("status") != "RECOVERED"
+                or recovery_report.get("candidate_verified") is not True
+            ):
+                raise ValueError("AUCTION_RECOVERY_NOT_COLD_VERIFIED")
+        except Exception as exc:
+            recovered = None
+            value["auction_recovery"] = {
+                "status": "HELD",
+                "reason": type(exc).__name__ + ":" + str(exc)[:240],
+            }
+        if recovered is not None:
+            native_root = recovered
+            native_manifest = object_at(native_root / "manifest.json")
+            value["native_source"] = str(native_root)
+            value["native_manifest_sha256"] = file_sha(native_root / "manifest.json")
     if native_manifest.get("research_ready") is not True:
         # Preserve the original strict R3 classification and core availability.
         value["status"] = "CORE_READY_5M_HELD_SOURCE_QUALITY"
         write(run / "receipt.json", value)
         publish(config, value)
-        alert(config, run, day, "SOURCE_NATIVE5M_QUALITY_HELD_CORE_REMAINS_AVAILABLE")
+        reason = value.get("auction_recovery", {}).get("reason", "NOT_ELIGIBLE")
+        alert(config, run, day, "SOURCE_NATIVE5M_QUALITY_HELD_CORE_REMAINS_AVAILABLE:" + reason)
         return value
     time_gate(day, "intake", bool(config.get("recovery_mode")))
     result = build(
@@ -850,6 +887,7 @@ def main() -> int:
             return 0
         continuation = None
         capture_resume = None
+        auction_resume = None
         index_path = root / "DATES.json"
         if index_path.exists() and not args.native_only:
             old = object_at(index_path).get("dates", {}).get(str(day), {})
@@ -867,6 +905,12 @@ def main() -> int:
                     raise ValueError("DAILY_CYCLE_CLOSED_SOURCE_CHANGED")
                 print(json.dumps({"status": "VERIFIED_CLOSED_SOURCE_REUSE", "entry": old}))
                 return 0
+            if old.get("status") == "CORE_READY_5M_HELD_SOURCE_QUALITY":
+                if any([args.market, args.events, args.native]):
+                    raise ValueError("AUCTION_HELD_EXACT_INPUTS_ALREADY_FROZEN")
+                from .daily_auction_recovery import held_continuation
+
+                auction_resume = held_continuation(config, day, old)
             if old.get("status") == "CORE_READY_5M_FAILED":
                 if args.recovery:
                     # A capture-budget failure can reuse source bytes. Reference
@@ -915,6 +959,29 @@ def main() -> int:
             },
         )
         try:
+            if auction_resume is not None:
+                value, market, events, source, captures = auction_resume
+                disjoint_output(run, [market, events, source, captures, Path(value["core"])])
+                write(
+                    run / "auction-quality-continuation.json",
+                    {
+                        "market_date": str(day),
+                        "original_core": value["core"],
+                        "original_source": str(source),
+                        "original_capture_root": str(captures),
+                        "full_daily_reacquisition": False,
+                    },
+                )
+                value.update(
+                    status="CORE_READY_5M_PENDING",
+                    pipeline_revision=config["pipeline_revision"],
+                    auction_original_capture_root=str(captures),
+                    delivery_timing="LATE_RECOVERY_NOT_ON_TIME_SUCCESS",
+                )
+                write(run / "core-receipt.json", value)
+                result = finish_native(config, run, day, value, market, events, native_root=source)
+                print(json.dumps({"run": str(run), "result": result}, sort_keys=True))
+                return 0
             if capture_resume is not None:
                 value, market, events, seed = capture_resume
                 policy = (

@@ -163,19 +163,17 @@ def test_incomplete_base_grid_is_not_filled():
         replay(dump(e), "600061", DAY)
 
 
-def test_builder_then_full_cold_replay(tmp_path):
+def held_auction_fixture(tmp_path):
     import gzip
 
     import pyarrow as pa
     import pyarrow.parquet as pq
 
     from quanthus.pipelines.securities_warehouse.base22 import canonical, file_sha
-    from quanthus.pipelines.securities_warehouse.closing_auction_repair import build
     from quanthus.pipelines.securities_warehouse.native5m_daily_source import (
         KIND,
         _digest,
         minute_schema,
-        verify_native5m_source,
     )
 
     attempt = tmp_path / "attempt"
@@ -204,6 +202,7 @@ def test_builder_then_full_cold_replay(tmp_path):
         "market_date": DAY,
         "quality_grade": "R3",
         "quality_reason": "missing_or_wrong_terminal_close",
+        "missing_actual_minutes": [],
         "raw_sha256": sha(original),
         "reference_ods_manifest_sha256": market_sha,
     }
@@ -247,6 +246,16 @@ def test_builder_then_full_cold_replay(tmp_path):
         (evidence / name).write_bytes(base64.b64decode(entry["raw_base64"]))
         index["files"][name] = {k: v for k, v in entry.items() if k != "raw_base64"}
     (evidence / "CAPTURE.json").write_bytes(canonical(index))
+    return attempt, evidence, source, receipt
+
+
+def test_builder_then_full_cold_replay(tmp_path):
+    from quanthus.pipelines.securities_warehouse.base22 import file_sha
+    from quanthus.pipelines.securities_warehouse.closing_auction_repair import build
+    from quanthus.pipelines.securities_warehouse.native5m_daily_source import verify_native5m_source
+
+    attempt, evidence, source, receipt = held_auction_fixture(tmp_path)
+    market_sha, events_sha = "sha256:" + "a" * 64, "sha256:" + "b" * 64
     output = tmp_path / "repaired"
     result = build(attempt, evidence, output, "c" * 40)
     checked = verify_native5m_source(

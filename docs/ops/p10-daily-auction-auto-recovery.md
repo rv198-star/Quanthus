@@ -1,0 +1,23 @@
+# Daily observed-auction automatic recovery
+
+Daily invokes `daily_auction_recovery.recover` only for a source-held native package. The versioned policy is `config/pipelines/base24-auction-auto-recovery.v1.json`, included in the verified immutable code bundle. There is no runtime environment switch to weaken price, share-volume, grid or source-evidence gates.
+
+Eligibility is deliberately narrow: 1–8 SSE main-board/KCB held securities, 48 source bars already present, and only the established volume/terminal-close R3 reasons. Other active securities must be R0; suspension statuses are preserved. Rebind-derived predecessors, missing minutes and unsupported boards remain held.
+
+One attempt per run captures at most 24 public Tencent requests: date/page count, final detail page, plus KCB exact-share cumulative 14:59/15:00 observations. Only the observed closing auction is added to the terminal bar. No daily residual inference, post-close trades, adjusted prices or gate relaxation. Supplier-reported auction amount must also be within CNY 1 of exact shares × auction price; this is a conservative eligibility check, not a claim of exchange-exact amount precision.
+
+Network work has a hard 90-second ceiling, 6 seconds per request, 512 KiB per response and 4 MiB total. Local package construction and full cold validation have a separate hard 300-second ceiling. Both respect the current day's 20:45 Asia/Shanghai sealed-input deadline outside explicit late recovery. The 8 GiB free floor and an additional package-copy reserve apply before network requests. HTTP origin changes/redirects and non-200 status are refused. Capture bytes and receipt clocks/hashes are persisted; no credentials are involved.
+
+The original held source and run are preserved. A private new source is returned only after the existing full native verifier accepts it against the frozen core's exact daily values and selected source-manifest identities. The normal Daily builder/verifier then runs its existing gates again. Failed candidates lose READY and gain UNVERIFIED; an orphan stage is recorded and not retried. Every outcome is recorded in `closing-auction-recovery.json`, whose SHA256 and policy/predecessor bindings enter the Daily receipt. Import/hook failures keep the original source quality-held.
+
+The 21:15 recovery route reuses a quality-held run's frozen core, exact source releases and archived 5m captures. It does not recollect the entire day. One such continuation per date is allowed; the existing two-attempt date budget still applies. Recovery-mode outcomes carry `LATE_RECOVERY_NOT_ON_TIME_SUCCESS`, including successful recovery, so they cannot be reported as on-time SLA success. The current Tencent endpoints supply the latest market day; historical days whose evidence is no longer served remain held. Historical scanning is read-only and does not invoke business jobs or append delivery events.
+
+## Verification and deployment
+
+Run the seven affected Daily/source/rebind/precision unit modules. Cases cover recovery through the actual Daily hook, late recovery reuse, full cold source binding, amount units, unsupported gaps, stale dates, post-close trades, transport redirects/status/bytes, resources, absolute timeouts, orphan quarantine and repeated-call refusal.
+
+Additionally replay a real archived held package with archived HTTP responses inside the pinned runtime, using an isolated build directory and no business index/event/mail access. Label this as archived-response replay; it does not establish future live recovery success. Separately probe the production HTTP transport. Deploy only a GitHub-fetched tracked commit through `container_code.bundle`, the existing `Dockerfile.code-refresh` contract and the existing immutable runtime image. Verify bundle inventory, UID, policy hash and deployment configuration. Keep the prior deployment JSON, runtime configs, release symlink and image digest for direct rollback. Do not run `daily --day` as an operational probe.
+
+## Review decisions
+
+Independent review prompted separate network/local deadlines, candidate quarantine, fail-held hook handling, late status and receipt binding, frozen-input quality continuation, amount notional validation, capacity checks, durable writes and exact HTTP origin verification. The assertion that a full package must always exceed 90 seconds was not treated as measured evidence; a full-universe acceptance replay supplies the timing evidence. Historical source unavailability remains an explicit limit, not a reason to infer an auction from a daily total.

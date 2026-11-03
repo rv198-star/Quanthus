@@ -27,6 +27,16 @@ CONTRACT = "p10-cn02-native5m-source-rebinding-v1"
 
 def qualify(raw: bytes | None, code: str, day: str, daily: dict[str, Any]) -> tuple[Any, Any]:
     """Same native-5m grid, cent-close and exact-share gates as the pinned source."""
+    if raw:
+        try:
+            representation = json.loads(raw)
+        except (ValueError, TypeError):
+            representation = {}
+        if (
+            isinstance(representation, dict)
+            and representation.get("provider") == "baostock+tencent-observed-closing-auction-5m"
+        ):
+            raise ValueError("NATIVE_REBIND_COMPOUND_SOURCE_REQUIRES_AUCTION_REPLAY")
     result = dict(
         stock_code=code,
         market_date=day,

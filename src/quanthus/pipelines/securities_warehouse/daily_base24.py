@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 from .base22 import canonical, file_sha
 from .base22_sources import _tree, disjoint_output, physical_path
 from .base24_image import KIND as BASE_KIND
+from .closing_auction_source import PROVIDER as AUCTION_PROVIDER
 from .daily_core_domain import _TABLE_KEYS, verify_daily_domain_increment
 from .native5m_daily_source import verify_native5m_source
 from .native_base24_reader import require_daily_core_governance
@@ -107,7 +108,7 @@ def _rows(native: Path, daily: Mapping[str, Mapping[str, Any]]) -> Iterator[dict
     }
     manifest = _json(native / "manifest.json")
     sealed = datetime.fromisoformat(manifest["sealed_at"])
-    revision = "baostock-native-5m@" + file_sha(native / "manifest.json")[7:19]
+    manifest_suffix = file_sha(native / "manifest.json")[7:19]
     for batch in pq.ParquetFile(native / "minute-real-observed.parquet").iter_batches(
         batch_size=8192, use_threads=False
     ):
@@ -120,10 +121,15 @@ def _rows(native: Path, daily: Mapping[str, Mapping[str, Any]]) -> Iterator[dict
                 .replace(tzinfo=ZoneInfo("Asia/Shanghai"))
                 .astimezone(timezone.utc)
             )
+            source_name = (
+                AUCTION_PROVIDER
+                if statuses[code].get("source_composition") == AUCTION_PROVIDER
+                else "baostock-native-5m"
+            )
             yield {
-                "record_source": "baostock-native-5m",
+                "record_source": source_name,
                 "source_record_id": f"{code}.json.gz#code={code}&ts={row['source_ts']}",
-                "source_revision": revision,
+                "source_revision": source_name + "@" + manifest_suffix,
                 "source_artifact_sha256": row["raw_sha256"],
                 "knowledge_from": max(sealed, observed_bound, parent["knowledge_from"]),
                 "knowledge_to": None,

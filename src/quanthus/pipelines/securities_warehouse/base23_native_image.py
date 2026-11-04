@@ -47,6 +47,7 @@ class NativeImageProfile:
     assess_delivery: Callable[..., dict[str, Any]]
     validate_table: Callable[[str, list[Path]], None] | None = None
     manifest_fields: tuple[tuple[str, Any], ...] = ()
+    scan_factory: Callable[..., GlobalScan] | None = None
 
 
 BASE23_PROFILE = NativeImageProfile(
@@ -568,7 +569,8 @@ def audit_native_image(
     if (root / "manifest.json").exists():
         declared |= {"manifest.json", "READY"}
     summaries = {}
-    with scan_type(budget, read_only_roots=[root]) as scan:
+    factory = profile.scan_factory or scan_type
+    with factory(budget, read_only_roots=[root]) as scan:
         for table in sorted(ss):
             budget.begin_stage("whole-table-" + table)
             entry = record["layout"][table]

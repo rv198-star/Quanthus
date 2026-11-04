@@ -7,6 +7,7 @@ import shutil
 from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import duckdb
 import pyarrow as pa
@@ -40,6 +41,7 @@ from quanthus.pipelines.securities_warehouse.base_build_period import (
     compare_tables,
     expected_days,
     prepare_period,
+    qualified_calendar_union,
 )
 from quanthus.pipelines.securities_warehouse.base_build_profile import delivery_contract
 from quanthus.pipelines.securities_warehouse.daily_core_domain import (
@@ -252,6 +254,7 @@ def fixture(tmp_path, original):
             "trade_date": date(2026, 10, 1) + timedelta(days=n),
             "exchange": venue,
             "is_open": int(n == 7),
+            "session": "day",
             "built_at": "2026-10-08T10:00:00+00:00",
             "source": "fixture",
         }
@@ -712,5 +715,54 @@ def test_offline_gate_uses_current_namespace_even_when_host_sysfs_is_visible(tmp
 
     monkeypatch.setattr(entry.socket, "if_nameindex", lambda: [(1, "lo")])
     monkeypatch.setattr(entry.os, "listdir", lambda path: ["lo", "eth0", "host-bridge"])
-    entry._preflight_paths({}, tmp_path / "not-created", Limits(free_floor_bytes=1,
-                           allocated_bytes=1), 1)
+    entry._preflight_paths(
+        {}, tmp_path / "not-created", Limits(free_floor_bytes=1, allocated_bytes=1), 1
+    )
+
+
+def calendars(tmp_path, *, conflict=False, missing_observed=False):
+    sources = []
+    for number in (1, 2):
+        rows = []
+        for day in (1, 2):
+            for venue in ("SSE", "SZSE"):
+                if day != number and not (number == 2 and conflict):
+                    # This is a cached placeholder and must not become evidence.
+                    known, source, opened = None, "unknown", 0
+                else:
+                    known, source, opened = "2026-10-03T10:00:00+00:00", "observed", 1
+                if conflict and number == 2 and day == 1:
+                    opened = 0
+                if missing_observed and day == 2:
+                    known, source = None, "unknown"
+                rows.append(
+                    {
+                        "exchange": venue,
+                        "trade_date": date(2026, 10, day),
+                        "is_open": opened,
+                        "session": "day",
+                        "built_at": known,
+                        "source": source,
+                    }
+                )
+        p = tmp_path / f"calendar-{number}.parquet"
+        pq.write_table(pa.Table.from_pylist(rows), p)
+        sources.append((p, SimpleNamespace(sha256=file_sha(p))))
+    return sources
+
+
+def test_partial_observed_calendars_combine_without_promoting_unknown_cached_cells(tmp_path):
+    sources = calendars(tmp_path)
+    days, selected, receipt = qualified_calendar_union(sources, "2026-09-30", "2026-10-02")
+    assert days == ["2026-10-01", "2026-10-02"]
+    assert selected["2026-10-01"][0] == sources[0][0]
+    assert selected["2026-10-02"][0] == sources[1][0]
+    assert receipt["unknown_cached_cells_ignored"] == 4
+    assert receipt["trusted_cells"] == 4
+
+
+@pytest.mark.parametrize("damage", ["missing_observed", "conflict"])
+def test_calendar_union_rejects_missing_evidence_or_conflicting_known_cells(tmp_path, damage):
+    sources = calendars(tmp_path, **{damage: True})
+    with pytest.raises(BoundedError, match="CALENDAR_DATE_MISSING|CALENDAR_CONFLICT"):
+        qualified_calendar_union(sources, "2026-09-30", "2026-10-02")

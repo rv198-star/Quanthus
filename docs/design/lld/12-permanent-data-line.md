@@ -116,6 +116,12 @@ the original release/artifact identities without inventing omitted source READY 
 job graph owns this one TMP prerequisite and its verified recovery. `base_build` currently exposes
 only input freezing and period preparation; full paired orchestration and A/B/C remain open.
 
+Calendar admission combines all frozen parent-bound raw calendars. Missing dates in one artifact
+are not missing input when other selected artifacts supply the observed cells; unknown cached
+rows cannot supply evidence. Known overlaps must agree. Projection binds one deterministic original
+artifact per day, preserving its actual clock and identity rather than attributing a merged file
+to a single source.
+
 The [Daily price-basis candidate](01-data-foundation/daily-price-basis.md) prepares #473 through
 the existing versioned Daily builder. Its explicit candidate kind cannot enter default CURRENT,
 mirroring or P6 admission; historical replacement and each consumer's acceptance remain separate.

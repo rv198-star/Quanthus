@@ -11,7 +11,7 @@ import importlib
 import json
 import re
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -141,6 +141,78 @@ def expected_days(calendar: Path, after: str, through: str) -> list[str]:
             result.append(day.isoformat())
         day += timedelta(days=1)
     return result
+
+
+def qualified_calendar_union(
+    sources: list[tuple[Path, Any]],
+    after: str,
+    through: str,
+) -> tuple[list[str], dict[str, tuple[Path, Any]], dict[str, Any]]:
+    """Use observed cells only; unknown cached cells cannot fill a source gap.
+
+    A deterministic original artifact is selected per day for projection so no
+    merged calendar is falsely attributed to one release. All known overlapping
+    values must agree. Earliest real observation wins; historical clocks stay.
+    """
+    pq = importlib.import_module("pyarrow.parquet")
+    first, last = date.fromisoformat(after) + timedelta(days=1), date.fromisoformat(through)
+    cells, choices = {}, {}
+    ignored = 0
+    for path, artifact in sorted(sources, key=lambda s: (s[1].sha256, str(s[0]))):
+        if file_sha(path) != artifact.sha256:
+            raise BoundedError("BUILD_PERIOD_CALENDAR_ARTIFACT_CHANGED")
+        by_day: dict[date, dict[str, Any]] = {}
+        for batch in pq.ParquetFile(path).iter_batches(batch_size=8192):
+            for row in batch.to_pylist():
+                day = row["trade_date"]
+                venue = row["exchange"]
+                if venue not in {"SSE", "SZSE", "BSE"} or not first <= day <= last:
+                    continue
+                known = row.get("built_at")
+                if row.get("source") in {None, "", "unknown"} or known is None:
+                    ignored += 1
+                    continue
+                if isinstance(known, str):
+                    known = datetime.fromisoformat(known)
+                if known.tzinfo is None or known.utcoffset() is None:
+                    raise BoundedError("BUILD_PERIOD_CALENDAR_KNOWLEDGE_TIME_INVALID")
+                if row.get("session") != "day" or row["is_open"] not in (0, 1):
+                    raise BoundedError("BUILD_PERIOD_CALENDAR_OPEN_INVALID")
+                value = int(row["is_open"]), row["session"]
+                key = venue, day
+                if key in cells and cells[key] != value:
+                    raise BoundedError("BUILD_PERIOD_CALENDAR_CONFLICT")
+                cells[key] = value
+                if venue in by_day.setdefault(day, {}):
+                    raise BoundedError("BUILD_PERIOD_CALENDAR_SOURCE_CELL_DUPLICATE")
+                by_day[day][venue] = known
+        for day, venues in by_day.items():
+            if not {"SSE", "SZSE"} <= venues.keys():
+                continue
+            order = max(venues.values()), artifact.sha256
+            if day not in choices or order < choices[day][0]:
+                choices[day] = order, path, artifact
+    days, selected = [], {}
+    day = first
+    while day <= last:
+        if day not in choices or any((v, day) not in cells for v in ("SSE", "SZSE")):
+            raise BoundedError("BUILD_PERIOD_CALENDAR_DATE_MISSING")
+        if cells["SSE", day] != cells["SZSE", day]:
+            raise BoundedError("BUILD_PERIOD_ASYMMETRIC_CALENDAR_REQUIRES_ADAPTER")
+        if cells["SSE", day][0]:
+            days.append(day.isoformat())
+        selected[day.isoformat()] = choices[day][1:]
+        day += timedelta(days=1)
+    return (
+        days,
+        selected,
+        {
+            "trusted_cells": len(cells),
+            "unknown_cached_cells_ignored": ignored,
+            "source_artifact_sha256": sorted({a.sha256 for _, a in sources}),
+            "day_projection_sources": {d: a.sha256 for d, (_, a) in selected.items()},
+        },
+    )
 
 
 def source_universe(
@@ -317,31 +389,42 @@ def prepare_period(
         or parent_daily.get("market_date") != parent_core.get("market_date")
     ):
         raise BoundedError("BUILD_PERIOD_CALENDAR_PARENT_CHAIN_CHANGED")
-    days = expected_days(calendar_path, binding["predecessor_through"], binding["through_date"])
-    if days != selection["expected_days"]:
-        raise BoundedError("BUILD_PERIOD_CALENDAR_SELECTION_DIFFERS")
-    if (
-        expected_days(
-            selected_calendar_path,
-            binding["predecessor_through"],
-            binding["through_date"],
-        )
-        != days
-    ):
-        raise BoundedError("BUILD_PERIOD_SELECTED_CALENDAR_DIFFERS_FROM_SOURCE")
     packages = sorted(
         (r for r in selection["packages"] if r["role"] == "daily"),
         key=lambda r: r["day"],
     )
+    selected_by_package = {}
+    calendar_sources = [(calendar_path, calendar_artifact)]
+    for package in packages:
+        core = load(Path(roots[package["id"]]) / "members/core/manifest.json")
+        selected = {}
+        for lane, expected in core["selected_releases"].items():
+            matches = release_index.get(expected["manifest_sha256"], [])
+            if len(matches) != 1:
+                raise BoundedError("BUILD_PERIOD_SELECTED_SOURCE_NOT_UNIQUE")
+            selected[lane] = selected_release(
+                source_root, matches[0], expected, day=package["day"], frozen_members=source_members
+            )
+        if set(selected) != {"market_daily_core", "calendar_daily_events"}:
+            raise BoundedError("BUILD_PERIOD_DAILY_LANE_SET_CHANGED")
+        selected_by_package[package["id"]] = selected
+        calendar_sources.append(_artifact(selected, "market_daily_core", "trading_calendar"))
+    days, calendar_by_day, calendar_union = qualified_calendar_union(
+        calendar_sources, binding["predecessor_through"], binding["through_date"]
+    )
+    if days != selection["expected_days"]:
+        raise BoundedError("BUILD_PERIOD_CALENDAR_SELECTION_DIFFERS")
+    if (
+        expected_days(
+            selected_calendar_path, binding["predecessor_through"], binding["through_date"]
+        )
+        != days
+    ):
+        raise BoundedError("BUILD_PERIOD_SELECTED_CALENDAR_DIFFERS_FROM_SOURCE")
     if days[-1] < binding["through_date"] and [r["day"] for r in closed_days] != [
         binding["through_date"]
     ]:
         raise BoundedError("BUILD_PERIOD_CUTOFF_CLOSED_DAY_SOURCE_REQUIRED")
-    for package in packages:
-        core = load(Path(roots[package["id"]]) / "members/core/manifest.json")
-        for expected in core["selected_releases"].values():
-            if len(release_index.get(expected["manifest_sha256"], [])) != 1:
-                raise BoundedError("BUILD_PERIOD_SELECTED_SOURCE_NOT_UNIQUE")
     base = next(r for r in selection["packages"] if r["role"] == "dwd")
     if base["manifest_sha256"] != binding["predecessor_manifest_sha256"]:
         raise BoundedError("BUILD_PERIOD_PREDECESSOR_IDENTITY_CHANGED")
@@ -389,20 +472,7 @@ def prepare_period(
         core = load(root / "members/core/manifest.json")
         if core["covered_after_date"] != after or core["base"] != dict(parent.binding):
             raise BoundedError("BUILD_PERIOD_DAILY_CHAIN_OR_BASE_CHANGED")
-        selected = {}
-        for lane, expected in core["selected_releases"].items():
-            matches = release_index.get(expected["manifest_sha256"], [])
-            if len(matches) != 1:
-                raise BoundedError("BUILD_PERIOD_SELECTED_SOURCE_NOT_UNIQUE")
-            selected[lane] = selected_release(
-                source_root,
-                matches[0],
-                expected,
-                day=day,
-                frozen_members=source_members,
-            )
-        if set(selected) != {"market_daily_core", "calendar_daily_events"}:
-            raise BoundedError("BUILD_PERIOD_DAILY_LANE_SET_CHANGED")
+        selected = selected_by_package[package["id"]]
         source_quality(selected, day)
         universe, master_rows = source_universe(selected, day)
         if core["acquisition_universe"] != universe:
@@ -571,11 +641,12 @@ def prepare_period(
                 _views(connection, parents, {})
                 path = _project_trading_calendar(
                     connection,
-                    path=calendar_path,
-                    artifact=calendar_artifact,
+                    path=calendar_by_day[day.isoformat()][0],
+                    artifact=calendar_by_day[day.isoformat()][1],
                     work=output / "closed-calendar" / day.isoformat(),
                     market_date=day,
-                    record_filename=calendar_artifact.relative_path.name,
+                    record_filename=calendar_by_day[day.isoformat()][1].relative_path.name,
+                    require_observed=True,
                 )
                 if (
                     connection.execute(
@@ -610,6 +681,7 @@ def prepare_period(
         "kind": "p10-standard-base-period-admission-v1",
         "binding": binding,
         "calendar_sha256": file_sha(calendar_path),
+        "calendar_source_union": calendar_union,
         "daily": admissions,
         "delta_identity": delta["identity"],
         "delta_relative_path": "delta",

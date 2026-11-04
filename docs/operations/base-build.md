@@ -107,12 +107,16 @@ space/inode reserves, fixed code, contract and selection scope. It hashes the co
 closure once per invocation, including a stage reuse, and shares that verified prerequisite.
 No job field can disable semantic or quality checks.
 
-`prepare-period` independently derives expected trading days from a parent-bound raw calendar
-and security-day populations from each delivered source universe/security master. A retained
+`prepare-period` independently derives expected trading days from all parent-bound raw calendar
+artifacts in the selected Daily releases and explicit supplement. Sources may cover partial dates;
+the union must cover every required exchange/day and all observed overlapping values must agree.
+Rows with unknown source or missing `built_at` are inert cached evidence and cannot fill gaps.
+For each day the earliest complete observed original artifact is selected deterministically;
+its source identity and actual knowledge clock remain intact, including closed-day projection.
+Security-day populations come from each delivered source universe/security master. A retained
 derived calendar member must agree for the selected period; it is not authoritative input for
-the reconstruction. The optional reference supplement binds source release, parent core and
-parent Daily metadata; later market observations are not read. Original observed calendar clocks
-are retained when projecting intervening closed days.
+reconstruction. Supplements bind source release, parent core and parent Daily metadata; later
+market observations are not read.
 
 The source adapter locates each sealed Daily's exact selected release hash inside the frozen
 evidence inventory, validates the original release contract and every artifact, and replays all

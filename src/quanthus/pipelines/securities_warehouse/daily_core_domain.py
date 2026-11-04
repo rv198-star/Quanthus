@@ -507,11 +507,12 @@ def _project_announcements(
 
 def _project_trading_calendar(
     connection: Any, *, path: Path, artifact: Any, work: Path, market_date: date,
-    record_filename: str | None = None,
+    record_filename: str | None = None, require_observed: bool = False,
 ) -> Path:
     """Project one observed calendar day, preserving source knowledge and clock."""
     trading_calendar_path, trading_calendar_artifact = path, artifact
     record_filename = record_filename or path.name
+    observed = " AND o.built_at IS NOT NULL AND o.source NOT IN ('','unknown')" if require_observed else ""
     calendar_session_id = _stable_id_sql(
         "calendar_session", "v.venue_id", "CAST(o.trade_date AS VARCHAR)", _sql("day")
     )
@@ -537,7 +538,7 @@ def _project_trading_calendar(
         FROM read_parquet({_sql(str(trading_calendar_path))}) o JOIN base_venue v
           ON v.mic_code=CASE o.exchange WHEN 'SSE' THEN 'XSHG'
              WHEN 'SZSE' THEN 'XSHE' WHEN 'BSE' THEN 'BJSE' END
-        WHERE o.trade_date={_sql(market_date.isoformat())}::DATE""",
+            WHERE o.trade_date={_sql(market_date.isoformat())}::DATE{observed}""",
         calendar_output,
     )
     return calendar_output

@@ -44,6 +44,20 @@ Calendar semantics and expected universe remain explicit downstream gates. Evide
 a manufactured product READY. Every successful freeze still reports
 `FROZEN_BYTES_ONLY_SEMANTIC_GATES_PENDING`; it never qualifies or seals a Base.
 
+For cloud transfer, archive each evidence root from its complete frozen `content.files`,
+preserving those exact relative names. A supplementary source archive is sufficient only when
+it also carries every frozen parent manifest, binding and selected reference member. In the
+one-time Base 2.4 migration the calendar evidence root contains six members; the older three-file
+calendar-source archive alone cannot restore it. Do not reconstruct missing metadata from node
+paths or infer that matching source bytes imply a complete delivery.
+
+Reuse `quanthus.p10_gdrive_backup.pack` with the frozen root and complete member map
+(`bytes=size_bytes`, bare-hex `sha256`). It verifies source bytes while packing and rejects a
+member-set mismatch. Keep the archive inventory, SHA256 and cloud verification receipts outside
+the input root. Recover exact names with `base_build_recovery.recover_path_stream`, then require
+the restored root to match the original frozen inventory. A missing member requires a new
+immutable complete archive; it does not authorize changes to the frozen input identity.
+
 ## Recovery and retries
 
 `base_build_recovery` restores only requested SHA-selected regular blobs from the retained content

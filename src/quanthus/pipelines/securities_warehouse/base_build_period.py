@@ -46,6 +46,7 @@ class VerifiedInputs:
     frozen: dict[str, Any]
     roots: dict[str, str]
     verified_identity: str
+    predecessor_members: dict[str, Path] | None = None
 
     @classmethod
     def verify(cls, frozen: dict[str, Any], roots: dict[str, str]) -> VerifiedInputs:
@@ -445,6 +446,7 @@ def prepare_period(
         independent_files=True,
         default_intervals=("1d", "5m"),
         one_minute_disposition=ONE_MINUTE_DISPOSITION,
+        relocated_members=inputs.predecessor_members,
     )
     parents = {table: parent.files(table) for table in PARENTS}
     pq, pa = (
@@ -677,9 +679,16 @@ def prepare_period(
         output=output / "delta",
         budget=budget,
     )
+    source_configuration = {
+        "source_evidence_id": source_evidence_id,
+        "closed_days": closed_days,
+        "calendar_reference": calendar_reference,
+    }
+    _save(output / "CONFIG.json", source_configuration)
     result = {
         "kind": "p10-standard-base-period-admission-v1",
         "binding": binding,
+        "source_configuration_identity": identity(source_configuration),
         "calendar_sha256": file_sha(calendar_path),
         "calendar_source_union": calendar_union,
         "daily": admissions,

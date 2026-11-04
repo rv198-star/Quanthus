@@ -36,7 +36,7 @@ def seal_header(root, manifest):
     (root / "READY").write_text(file_sha(root / "manifest.json") + "\n")
 
 
-def source_inputs(tmp_path, source_closure):
+def source_inputs(tmp_path, source_closure, *, include_empty=False):
     """ODS closure test only; mock DWD/Daily headers do not grant paired A/B."""
     ods = tmp_path / "base-ods"
     plan = _freeze(source_closure)
@@ -57,12 +57,27 @@ def source_inputs(tmp_path, source_closure):
                         "path": p.relative_to(dwd).as_posix(),
                         "sha256": file_sha(p),
                         "size_bytes": p.stat().st_size,
+                        "rows": 1,
                     }
                 ]
             }
         },
         "evidence": {},
     }
+    if include_empty:
+        empty = dwd / "payload/empty-table/empty/original.parquet"
+        empty.parent.mkdir(parents=True)
+        pq.write_table(pa.table({"unchanged_schema": pa.array([], type=pa.int64())}), empty)
+        record["layout"]["empty-table"] = {
+            "files": [
+                {
+                    "path": empty.relative_to(dwd).as_posix(),
+                    "rows": 0,
+                    "sha256": file_sha(empty),
+                    "size_bytes": empty.stat().st_size,
+                }
+            ]
+        }
     save(dwd / "MATERIALIZATION.json", record)
     seal_header(
         dwd,
@@ -137,6 +152,12 @@ def source_inputs(tmp_path, source_closure):
     }
     period = tmp_path / "period"
     period.mkdir()
+    source_configuration = {
+        "source_evidence_id": "synthetic-unit-no-source-replay",
+        "closed_days": [],
+        "calendar_reference": {},
+    }
+    save(period / "CONFIG.json", source_configuration)
     scope = {
         "contract": LEDGER_CONTRACT,
         "venue": "SSE",
@@ -162,6 +183,7 @@ def source_inputs(tmp_path, source_closure):
     )
     admission = {
         "binding": binding,
+        "source_configuration_identity": identity(source_configuration),
         "ledger_sha256": file_sha(period / "security-days.parquet"),
         "new_windows": 1,
         "new_window_contract": LEDGER_CONTRACT,
@@ -374,3 +396,31 @@ def test_rehashed_new_held_cannot_be_claimed_as_inherited_inside_ods(
     ):
         audit_ods(output, budget)
     assert not (output / "READY").exists()
+
+
+def test_original_empty_dwd_bytes_survive_when_successor_can_drop_the_placeholder(
+    tmp_path,
+    source_closure,
+    monkeypatch,
+):
+    inputs, period, windows, c = source_inputs(tmp_path, source_closure, include_empty=True)
+    original = Path(inputs.roots["dwd"]) / "payload/empty-table/empty/original.parquet"
+    expected = original.read_bytes()
+    with Budget(
+        tmp_path / "ods-job",
+        [Path(p) for p in inputs.roots.values()] + [period, windows],
+        Limits(free_floor_bytes=1),
+    ) as budget:
+        output = budget.root / "ODS"
+        materialize_ods(
+            inputs=inputs, period=period, windows=windows, contract=c, output=output, budget=budget
+        )
+    assert (
+        output / "members/dwd/payload/empty-table/empty/original.parquet"
+    ).read_bytes() == expected
+    assert not (output / "members/dwd/payload/controlled-test.parquet").exists()
+    for path in inputs.roots.values():
+        shutil.rmtree(path)
+    readonly(monkeypatch, [output])
+    with Budget(tmp_path / "audit-job", [output], Limits(free_floor_bytes=1)) as budget:
+        audit_ods(output, budget, expected_input_identity=inputs.verified_identity)

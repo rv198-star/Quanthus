@@ -19,7 +19,7 @@ from tests.test_base_build_ods import save, source_inputs
 from tests.unit.test_base24_ods_image import source_closure as source_closure
 
 
-def pair_fixture(tmp_path, source_closure):
+def pair_fixture(tmp_path, source_closure, *, audit_coherent=False):
     """Real materializers, synthetic rows; not full workflow A or paired audit B."""
     dwd_area = tmp_path / "dwd-inputs"
     dwd_area.mkdir()
@@ -33,6 +33,23 @@ def pair_fixture(tmp_path, source_closure):
             "evidence_paths": [retained.relative_to(predecessor).as_posix()],
         }
     ]
+    additional_evidence = []
+    if audit_coherent:
+        from tests.unit.test_base24_image import base24_limitations
+
+        limitations[0].update(
+            tables=["dwd_security_bar"],
+            scope_kind="fields",
+            scope=["synthetic-field"],
+            blocked_uses=["cross_provider_exact_price"],
+            risk="synthetic unavailable field",
+            repair_cost="fixture-only",
+        )
+        frequency = base24_limitations()
+        limitations += frequency
+        frequency_evidence = predecessor / frequency[0]["evidence_paths"][0]
+        save(frequency_evidence, {"synthetic_restrictions_only": frequency})
+        additional_evidence.append(frequency_evidence)
     save(predecessor / "evidence/limitations.json", limitations)
     record = json.loads((predecessor / "MATERIALIZATION.json").read_bytes())
     record["evidence"] = {
@@ -41,6 +58,7 @@ def pair_fixture(tmp_path, source_closure):
             retained,
             predecessor / "evidence/limitations.json",
             predecessor / "evidence/input-plan.json",
+            *additional_evidence,
         )
     }
     save(predecessor / "MATERIALIZATION.json", record)
@@ -67,6 +85,51 @@ def pair_fixture(tmp_path, source_closure):
     descriptor["binding"] = binding
     descriptor["identity"] = identity({k: v for k, v in descriptor.items() if k != "identity"})
     save(delta / "DELTA.json", descriptor)
+    if audit_coherent:
+        from datetime import datetime, timezone
+
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        from quanthus.pipelines.securities_warehouse.base23_native_image import image_schemas
+        from quanthus.pipelines.securities_warehouse.base_build_delta import build_delta
+        from tests.unit.test_base22_independent_image import _row
+
+        tables = {
+            t: [delta / r["path"] for r in descriptor["files"] if r["table"] == t]
+            for t in descriptor["tables"]
+        }
+        schemas = image_schemas(old.model, old.extension)
+        seed = tmp_path / "coherent-period-inputs"
+        seed.mkdir()
+        bar = pq.ParquetFile(tables["dwd_security_bar"][0]).read().to_pylist()[0]
+        listing_path = predecessor / record["layout"]["dwd_listing"]["files"][0]["path"]
+        bar["listing_id"] = pq.ParquetFile(listing_path).read().to_pylist()[0]["listing_id"]
+        pq.write_table(
+            pa.Table.from_pylist([bar], schema=schemas["dwd_security_bar"]), seed / "bar.parquet"
+        )
+        tables["dwd_security_bar"] = [seed / "bar.parquet"]
+        calendar = _row(
+            schemas["dwd_trading_calendar"], datetime(2026, 10, 30, tzinfo=timezone.utc)
+        )
+        calendar["calendar_session_id"] = bar["calendar_session_id"]
+        pq.write_table(
+            pa.Table.from_pylist([calendar], schema=schemas["dwd_trading_calendar"]),
+            seed / "calendar.parquet",
+        )
+        tables["dwd_trading_calendar"] = [seed / "calendar.parquet"]
+        with Budget(
+            tmp_path / "coherent-delta-job", [predecessor, delta, seed], limits()
+        ) as budget:
+            delta = budget.root / "delta"
+            descriptor = build_delta(
+                tables=tables,
+                rules=rules,
+                schemas=schemas,
+                binding=binding,
+                output=delta,
+                budget=budget,
+            )
     shutil.copytree(delta, period / "delta")
     admission = json.loads((period / "ADMISSION.json").read_bytes())
     admission.update(binding=binding, delta_identity=descriptor["identity"])

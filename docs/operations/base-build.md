@@ -92,7 +92,7 @@ generic input envelope.
 
 ## Source admission and period command
 
-The common entry point currently implements `freeze`, `prepare-period` and `materialize`:
+The common entry point currently implements `freeze`, `prepare-period`, `materialize` and `audit`:
 
 ```sh
 PYTHONTZPATH='' PYTHONPATH=src python -m quanthus.pipelines.securities_warehouse.base_build \
@@ -135,6 +135,8 @@ No precision or instant conversion is inferred from a nullable header.
 
 The result is one job-local period TMP shared by later composition: seven Daily families, five
 optional identity extensions, a source-derived security-day ledger and ADMISSION/DELTA receipts.
+Its `CONFIG.json` retains only input-relative source/reference selection, bound into ADMISSION;
+archived products can replay it without looking up original host paths.
 The stage graph preserves failed attempts and verifies all output bytes before reuse. This command
 does not complete inherited-window reconciliation, paired materialize/audit/seal or A/B/C, and
 does not produce formal Base READY. Those later actions remain under implementation.
@@ -159,7 +161,10 @@ historical prices or dispose of historical quality contradictions.
 
 The ODS materializer retains every frozen ODS/Daily/evidence member with independent unchanged
 bytes, plus the complete source inventory, contract, period and windows. It retains predecessor
-DWD control/evidence members; predecessor DWD payload bytes belong to the paired DWD materializer.
+DWD control/evidence members and exact empty DWD placeholders; nonempty predecessor DWD payload
+bytes belong to the paired DWD materializer. Empty original bytes must survive even when a
+nonempty new period legitimately removes their placeholder from the successor DWD. Keeping the
+original empty files avoids synthesizing a replacement Parquet during later source verification.
 The archive reserves its full member-copy space before copying, rejects source growth or mutation,
 and records its original provenance without introducing a runtime dependency on archived paths.
 The readonly ODS auditor can operate after all original sources have been removed. It verifies
@@ -175,8 +180,55 @@ the exact ODS materialization, period and window identities. Stage receipts reco
 rows by table, source bytes/member counts and observed resource peaks. Completed stages are TMP;
 neither layer receives a new manifest or READY. Do not edit their successful stage outputs to add
 publication metadata: the stage inventory is immutable. Paired readonly audit, guarded publication
-and continuous-version full workflow A remain required separate work. Synthetic 33-table/graph
+and continuous-version full workflow A remain required separate gates. Synthetic 33-table/graph
 recovery tests establish these materialization primitives only, not A/B/C or a formal Base.
+
+## Readonly paired audit and archived-source replay
+
+Use `audit --job audit-job.json --contract delivery-contract.json` with the separate fixed schema
+in `config/pipelines/base-build-audit-job.example.v1.json`. Select the same clean pinned revision
+as materialization. Both products must be kernel readonly, the namespace must have only loopback,
+and every declared original input root must be absent or unreadable. The caller must isolate
+production acquisition/recovery/cache directories as well. The actual namespace/runtime boundary
+is a separate qualification; mocked mount flags in unit tests do not establish it.
+
+Audit TMP belongs in a separate disjoint work root, which can use the system disk while products
+remain on the data disk. Admit actual free space, inodes and the complete audit write reserve
+before starting. An existing audit root is preserved and rejected. Failed attempts keep a bound
+FAILURE receipt, exact code/input/policy/job identities, actual time and stable reason; use a new
+attempt directory after a failure. No job switch can disable source denial or quality gates.
+
+`base_build_audit` runs the ODS owning archive audit and the standard native whole-image scan for
+all 33 DWD tables, including global keys, versions, references, exact types/precision, lineage,
+partitions and cutoff rules. It then independently proves that every inherited nonempty file and
+every admitted period file is selected, with the original per-table update/inherit disposition.
+A DWD that coherently drops an old nonempty file can pass its own self-consistent native scan;
+the paired original closure must reject it. Original limitation values remain identical. The
+native writer may serialize the successor registry differently; its raw original bytes remain
+unchanged in ODS and predecessor-control, and every referenced evidence file is byte-identical.
+
+The audit maps each original predecessor DWD file to its verified local paired copy or retained
+empty file, then replays the entire period from archived Daily/source/reference bytes. Only the
+seven original parent reference tables need an explicit relocated reader; original sealed
+metadata, selected-member set, independent files, hashes and partition counts still apply. The
+ordinary reader retains its original physical-directory contract. No reconstructed full-size
+predecessor cache or original source directory is needed. The freshly audited byte closure is an
+in-process prerequisite, never a persisted cache receipt. Recomputed source ADMISSION, every
+typed delta identity and every source/config/ledger binding must equal the original result.
+
+Physical fingerprint guards can reject observed changes early. Matching metadata is not a byte
+audit and cannot authorize reusing an old audit: timestamp granularity can hide very fast in-place
+writes. Actual layer hashes and source replay remain mandatory. A later publication transaction
+must preserve exclusive ownership and run a fresh readonly audit on recovery, rather than trust a
+stale guard. Publication is still under implementation; successful stage directories are immutable.
+
+The `audit` action deliberately returns
+`PAIRED_SOURCE_AND_STRUCTURE_PASS_HISTORICAL_GATE_PENDING`, `publication_eligible=false` and
+`formal_READY=false`. Historical diagnostic disposition, guarded paired publication, standard
+Daily/reference publishing and two consecutive complete versions A remain open. A synthetic
+fixture now runs actual 33-table materialization, removes all original inputs and period TMP,
+and fully replays source admission from the paired archive. That test still uses mocked mount
+flags and is not runtime A, full-data B or independent-node C.
 
 ## Locked offline runtime
 
@@ -228,4 +280,7 @@ Focused tests: `tests/test_base_build_inputs.py`, `tests/test_base_build_freeze.
 Paired primitives: `tests/test_base_build_windows.py`, `tests/test_base_build_ods.py` and
 `tests/test_base_build_pair.py`, including source removal, scope relabelling, resource admission,
 full 33-table materialization and interrupted-DWD recovery with verified shared-stage reuse.
+`tests/test_base_build_audit.py` covers paired whole-image/source replay, coherent inherited-file
+omission, unchanged original limitation values, exact relocated references, readable-source
+rejection and bound failure preservation. Legacy Base 2.3/2.4 reader tests remain required.
 Full handoff verification remains `make check`.

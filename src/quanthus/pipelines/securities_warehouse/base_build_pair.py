@@ -81,6 +81,7 @@ def materialize_dwd(
         predecessor, "MATERIALIZATION.json"
     )
     evidence["evidence/build/ADMISSION.json"] = member(period, "ADMISSION.json")
+    evidence["evidence/build/CONFIG.json"] = member(period, "CONFIG.json")
     evidence["evidence/build/ODS-MATERIALIZATION.json"] = member(ods, "MATERIALIZATION.json")
     for name in ("PLAN.json", "CHECKPOINT.json", "WINDOWS.parquet"):
         evidence["evidence/build/windows/" + name] = member(windows, name)

@@ -1,8 +1,9 @@
 """Standard Base build entry point for implemented input/period stages.
 
 Unsealed paired materialization shares the admitted period and window closure.
-Audit/seal stages remain under implementation. No action here writes a formal
-Base READY or activates consumers.
+Readonly paired audit replays archived sources. Historical disposition and
+publication remain under implementation. No action here writes formal Base
+READY or activates consumers.
 """
 
 from __future__ import annotations
@@ -18,9 +19,11 @@ from typing import Any
 
 from .base22_bounded import BoundedError, Budget, Limits
 from .base23_native_image import image_schemas
+from .base_build_audit import audit_pair
 from .base_build_environment import check_environment
 from .base_build_freeze import freeze
 from .base_build_inputs import canonical, identity, member
+from .base_build_ods import save
 from .base_build_pair import materialization_stages
 from .base_build_period import VerifiedInputs, load, prepare_period
 from .base_build_profile import validate_contract
@@ -42,6 +45,107 @@ JOB_KEYS = {
     "closed_days",
     "limits",
 }
+AUDIT_JOB = "p10-standard-base-pair-audit-job-v1"
+AUDIT_KEYS = {
+    "contract",
+    "builder_revision",
+    "ods",
+    "dwd",
+    "work_root",
+    "frozen_input_identity",
+    "environment_lock",
+    "wheelhouse",
+    "limits",
+    "denied_input_roots",
+}
+
+
+def validate_audit_job(job: dict[str, Any]) -> None:
+    if (
+        set(job) != AUDIT_KEYS
+        or job.get("contract") != AUDIT_JOB
+        or not re.fullmatch(r"[0-9a-f]{40}", str(job.get("builder_revision")))
+        or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(job.get("frozen_input_identity")))
+    ):
+        raise BoundedError("BUILD_AUDIT_JOB_SCHEMA_OR_IDENTITY_INVALID")
+    for key in ("ods", "dwd", "work_root", "environment_lock", "wheelhouse"):
+        if not isinstance(job[key], str) or not Path(job[key]).is_absolute():
+            raise BoundedError("BUILD_AUDIT_JOB_ABSOLUTE_PATH_REQUIRED")
+    denied = job["denied_input_roots"]
+    if (
+        not isinstance(denied, list)
+        or not denied
+        or any(not isinstance(p, str) or not Path(p).is_absolute() for p in denied)
+        or len(set(denied)) != len(denied)
+    ):
+        raise BoundedError("BUILD_AUDIT_SOURCE_DENIAL_DECLARATION_REQUIRED")
+    Limits(**job["limits"])
+
+
+def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
+    validate_audit_job(job)
+    validate_contract(contract)
+    _require_pinned_code(job["builder_revision"])
+    environment = check_environment(
+        lock=Path(job["environment_lock"]), wheelhouse=Path(job["wheelhouse"])
+    )
+    products = {k: job[k] for k in ("ods", "dwd")}
+    limits = Limits(**job["limits"])
+    _preflight_paths(products, Path(job["work_root"]), limits, 0)
+    for raw in job["denied_input_roots"]:
+        path = Path(raw)
+        if path.exists() and os.access(path, os.R_OK):
+            raise BoundedError("BUILD_AUDIT_ORIGINAL_SOURCE_STILL_READABLE")
+    sources = [Path(p) for p in products.values()]
+    owned = False
+    try:
+        with Budget(Path(job["work_root"]), sources, limits) as budget:
+            owned = True
+            receipt = audit_pair(
+                ods=Path(job["ods"]),
+                dwd=Path(job["dwd"]),
+                contract=contract,
+                expected_input_identity=job["frozen_input_identity"],
+                budget=budget,
+            )
+            if receipt["binding"]["code_revision"] != job["builder_revision"]:
+                raise BoundedError("BUILD_AUDIT_CODE_BINDING_CHANGED")
+            save(budget.root / "AUDIT.json", receipt)
+    except BaseException as exc:
+        if owned:
+            from datetime import datetime, timezone
+
+            reason = str(exc)
+            reason = (
+                reason if re.fullmatch(r"[A-Z][A-Z0-9_]{0,159}", reason) else type(exc).__name__
+            )
+            save(
+                Path(job["work_root"]) / "FAILURE.json",
+                {
+                    "contract": AUDIT_JOB,
+                    "job_identity": identity(job),
+                    "frozen_input_identity": job["frozen_input_identity"],
+                    "code_revision": job["builder_revision"],
+                    "policy_identity": identity(contract),
+                    "failed_at": datetime.now(timezone.utc).isoformat(),
+                    "exception_type": type(exc).__name__,
+                    "reason_code": reason,
+                    "status": "FAILED_PRESERVED",
+                    "formal_READY": False,
+                },
+            )
+        raise
+    return {
+        "stage": "audit",
+        "status": "PAIRED_SOURCE_AND_STRUCTURE_PASS_HISTORICAL_GATE_PENDING",
+        "audit_identity": receipt["identity"],
+        "output": str(budget.root / "AUDIT.json"),
+        "environment_identity": environment["lock_sha256"],
+        "resources": dict(budget.peak),
+        "formal_READY": False,
+        "publication_eligible": False,
+        "full_A_B_C": False,
+    }
 
 
 def validate_job(job: dict[str, Any]) -> None:
@@ -115,6 +219,8 @@ def _preflight_paths(roots: dict[str, str], work_root: Path, limits: Limits, day
 
 
 def run(*, action: str, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
+    if action == "audit":
+        return run_audit(job=job, contract=contract)
     validate_job(job)
     validate_contract(contract)
     _require_pinned_code(job["builder_revision"])
@@ -259,7 +365,7 @@ def run(*, action: str, job: dict[str, Any], contract: dict[str, Any]) -> dict[s
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("freeze", "prepare-period", "materialize"))
+    parser.add_argument("action", choices=("freeze", "prepare-period", "materialize", "audit"))
     parser.add_argument("--job", required=True, type=Path)
     parser.add_argument("--contract", required=True, type=Path)
     args = parser.parse_args()

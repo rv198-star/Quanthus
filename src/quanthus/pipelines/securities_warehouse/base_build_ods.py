@@ -71,7 +71,29 @@ def copy_member(
     temporary.rename(destination)
 
 
-def selected_members(frozen: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def dwd_controls(frozen: dict[str, Any], roots: dict[str, str]) -> dict[str, dict[str, Any]]:
+    """Read only the frozen original DWD descriptor to retain empty placeholders.
+
+    A later nonempty period removes an old empty partition from the new DWD.
+    Its original bytes must still survive in ODS for full predecessor closure.
+    """
+    result = {}
+    for package in frozen["content"]["selection"]["packages"]:
+        if package["role"] != "dwd":
+            continue
+        sid = package["id"]
+        path = member(Path(roots[sid]), "MATERIALIZATION.json")
+        rows = frozen["content"]["packages"][sid]["content"]["files"]
+        expected = next(r for r in rows if r["path"] == "MATERIALIZATION.json")
+        if file_sha(path) != expected["sha256"]:
+            raise BoundedError("BUILD_ODS_PREDECESSOR_DWD_DESCRIPTOR_CHANGED")
+        result[sid] = load(path)
+    return result
+
+
+def selected_members(
+    frozen: dict[str, Any], dwd_metadata: dict[str, dict[str, Any]]
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Projection from the original frozen closure; no filesystem discovery."""
     content = frozen["content"]
     if frozen.get("identity") != identity(content):
@@ -83,6 +105,22 @@ def selected_members(frozen: dict[str, Any]) -> tuple[list[dict[str, Any]], dict
         if frozen_package.get("identity") != identity(source_content):
             raise BoundedError("BUILD_ODS_FROZEN_PACKAGE_IDENTITY_CHANGED")
         metadata_only = roles.get(sid) == "dwd"
+        empty_members = set()
+        if metadata_only:
+            declared = {r["path"]: r for r in source_content["files"]}
+            for entry in dwd_metadata[sid]["layout"].values():
+                for item in entry["files"]:
+                    if type(item.get("rows")) is not int or item["rows"] < 0:
+                        raise BoundedError("BUILD_ODS_DWD_ROW_CENSUS_REQUIRED")
+                    if item["rows"] == 0:
+                        row = declared.get(item["path"], {})
+                        if (
+                            not item["path"].startswith("payload/")
+                            or row.get("sha256") != item["sha256"]
+                            or row.get("size_bytes") != item["size_bytes"]
+                        ):
+                            raise BoundedError("BUILD_ODS_DWD_EMPTY_MEMBER_NOT_FROZEN")
+                        empty_members.add(item["path"])
         prefix = "members/" + sid
         member(Path("/offline-ods"), prefix)
         sources[sid] = {
@@ -92,10 +130,15 @@ def selected_members(frozen: dict[str, Any]) -> tuple[list[dict[str, Any]], dict
             "manifest_sha256": source_content.get("manifest_sha256"),
             "metadata_only": metadata_only,
             "excluded_payload_owner": "PAIRED_DWD" if metadata_only else None,
+            "retained_empty_DWD_payload": sorted(empty_members),
         }
         for row in source_content["files"]:
             member(Path("/offline-source"), row["path"])
-            if metadata_only and row["path"].startswith("payload/"):
+            if (
+                metadata_only
+                and row["path"].startswith("payload/")
+                and row["path"] not in empty_members
+            ):
                 continue
             files.append(
                 {
@@ -156,6 +199,10 @@ def materialize_ods(
         raise BoundedError("BUILD_ODS_INPUT_OR_CONTRACT_SCOPE_CHANGED")
     admission = load(member(period, "ADMISSION.json"))
     _admission_scope(admission, frozen, contract)
+    if admission.get("source_configuration_identity") != identity(
+        load(member(period, "CONFIG.json"))
+    ):
+        raise BoundedError("BUILD_ODS_PERIOD_CONFIGURATION_CHANGED")
     window_receipt = audit_windows(windows, budget)
     if admission.get("binding", {}).get("frozen_input_identity") != frozen["identity"]:
         raise BoundedError("BUILD_ODS_PERIOD_BINDING_CHANGED")
@@ -169,7 +216,7 @@ def materialize_ods(
     if output.exists():
         raise BoundedError("BUILD_ODS_OUTPUT_EXISTS_PRESERVED")
     output.mkdir()
-    files, sources = selected_members(frozen)
+    files, sources = selected_members(frozen, dwd_controls(frozen, inputs.roots))
     # Budget's monitor keeps checking disk/RSS while the copy is blocked. Its
     # full directory census must not run once per small archive member (O(n^2)).
     # Foreground checkpoints retain immediate background errors and perform an
@@ -196,6 +243,7 @@ def materialize_ods(
         copy_member(source, member(output, row["path"]), row, check)
     extras = {
         "evidence/period/ADMISSION.json": member(period, "ADMISSION.json"),
+        "evidence/period/CONFIG.json": member(period, "CONFIG.json"),
         "evidence/period/security-days.parquet": member(period, "security-days.parquet"),
     }
     extras.update(
@@ -266,7 +314,10 @@ def audit_ods(
         or record["through_date"] != contract["business_through"]
     ):
         raise BoundedError("BUILD_ODS_MATERIALIZATION_IDENTITY_CHANGED")
-    required, sources = selected_members(frozen)
+    archived_roots = {
+        sid: str(member(root, "members/" + sid)) for sid in frozen["content"]["packages"]
+    }
+    required, sources = selected_members(frozen, dwd_controls(frozen, archived_roots))
     declared = {r["path"]: r for r in record["files"]}
     if len(declared) != len(record["files"]) or sources != record["sources"]:
         raise BoundedError("BUILD_ODS_MEMBER_OR_SOURCE_SET_CHANGED")
@@ -275,6 +326,7 @@ def audit_ods(
             raise BoundedError("BUILD_ODS_FROZEN_MEMBER_CLOSURE_CHANGED")
     extra_paths = {
         "evidence/period/ADMISSION.json",
+        "evidence/period/CONFIG.json",
         "evidence/period/security-days.parquet",
         "evidence/windows/PLAN.json",
         "evidence/windows/CHECKPOINT.json",
@@ -324,6 +376,10 @@ def audit_ods(
     )
     admission = load(member(root, "evidence/period/ADMISSION.json"))
     _admission_scope(admission, frozen, contract)
+    if admission.get("source_configuration_identity") != identity(
+        load(member(root, "evidence/period/CONFIG.json"))
+    ):
+        raise BoundedError("BUILD_ODS_PERIOD_CONFIGURATION_CHANGED")
     ledger = member(root, "evidence/period/security-days.parquet")
     if (
         record["period_admission_identity"] != admission.get("identity")

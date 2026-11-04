@@ -157,7 +157,7 @@ def write_source(root, *, day, lane, frames, universe):
     }
 
 
-def fixture(tmp_path, original):
+def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
     """Period-only integration fixture; its seven-parent Base is not full A/B."""
     schemas = image_schemas(
         json.loads((CONFIG / "dwd-domain-model.v1.json").read_text()),
@@ -230,11 +230,13 @@ def fixture(tmp_path, original):
             "consumer_admission": "NOT_GRANTED",
         },
     )
+    if base_factory is not None:
+        base = base_factory(base, schemas)
     cfg = json.loads((CONFIG / "base24-daily-governance.v1.json").read_text())
     cfg["layers"]["dwd"].update(
         manifest_sha256=file_sha(base / "manifest.json"),
         materialization_sha256=file_sha(base / "MATERIALIZATION.json"),
-        content_digest="sha256:" + "e" * 64,
+        content_digest=json.loads((base / "manifest.json").read_bytes())["content_digest"],
         package_id="synthetic-parent",
     )
     config = tmp_path / "config.json"
@@ -437,6 +439,8 @@ def fixture(tmp_path, original):
             "content": {"through_date": "2026-09-30", "files": []},
         },
     )
+    if ods_factory is not None:
+        ods = ods_factory()
     reference = tmp_path / "calendar"
     reference.mkdir()
     for source, name in (

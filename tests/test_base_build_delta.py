@@ -61,6 +61,12 @@ def test_input_order_does_not_change_retained_value_or_lineage():
     assert normalize([first, second]) == normalize([second, first])
 
 
+def test_duplicate_version_from_same_source_revision_is_not_silently_dropped():
+    first = row(8)
+    with pytest.raises(BoundedError, match="SAME_SOURCE_DUPLICATE"):
+        normalize([first, dict(first)])
+
+
 def test_same_instant_disagreement_fails_instead_of_arbitrary_source_priority():
     with pytest.raises(BoundedError, match="SAME_INSTANT_BUSINESS_CONFLICT"):
         normalize([row(8), row(8, title="conflicting", source="other")])

@@ -98,7 +98,14 @@ The [Base input operations runbook](../../operations/base-build.md) owns selecti
 explicit source/reference supplements and verified recovery retries. Inventory or frozen-byte
 receipts are input integrity evidence only; they do not establish semantic admission, a completed
 Builder, paired Base acceptance or consumer activation. Original source representation, historical
-quality restrictions and actual knowledge clocks remain unchanged.
+quality restrictions and actual knowledge clocks remain unchanged. Internal engine stages use an
+explicit job DAG: shared source/period prerequisites feed layer materialization, followed by
+paired audit and seal. A stage's reusable identity binds the complete input/code/environment/policy
+closure and dependency stage/output identities; failed attempts are preserved and only fully
+verified matching outputs may be reused. The standard 33-table composition keeps explicit
+append/inherit coverage dispositions and retains all native global checks. The versioned offline
+runtime lock and installed-wheel verification belong to build preflight, not data qualification.
+These primitives do not establish a completed orchestrator or A/B/C acceptance.
 
 The [Daily price-basis candidate](01-data-foundation/daily-price-basis.md) prepares #473 through
 the existing versioned Daily builder. Its explicit candidate kind cannot enter default CURRENT,

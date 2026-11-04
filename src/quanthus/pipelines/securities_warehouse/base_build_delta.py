@@ -59,6 +59,11 @@ def normalize_versions(connection: Any, source: str, schema: Any,
         # A closed/reopened temporal interval needs an explicit version adapter;
         # deduplicating it as a fresh observation would erase an availability gap.
         raise BoundedError("BUILD_DELTA_CLOSED_KNOWLEDGE_VERSION_REQUIRES_ADAPTER")
+    if connection.execute(
+        f"SELECT 1 FROM incoming GROUP BY {keys},record_source,source_revision "
+        "HAVING count(*)>1 LIMIT 1",
+    ).fetchone() is not None:
+        raise BoundedError("BUILD_DELTA_SAME_SOURCE_DUPLICATE")
     duplicate = connection.execute(
         f"SELECT 1 FROM incoming GROUP BY {keys} HAVING count(DISTINCT __value)>1 LIMIT 1",
     ).fetchone()

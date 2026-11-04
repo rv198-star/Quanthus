@@ -3,7 +3,8 @@
 Parent: [Permanent P10 data line](../design/lld/12-permanent-data-line.md).
 Work item: `P10-DATA-BASE25-001`, [#596](https://github.com/rv198-star/Quanthus/issues/596).
 
-This runbook covers implemented input inventory, selection freezing and selected-byte recovery.
+This runbook covers implemented input inventory, selection freezing, selected-byte recovery and
+internal composition/recovery/environment primitives.
 It does not declare a complete materialize/audit/seal orchestrator, a Base 2.5 acceptance or a
 production consumer switch. The full build consumes the previous paired Base, selected Daily
 deliveries and their explicitly selected source/reference evidence. Original products stay read-only.
@@ -61,6 +62,59 @@ dispositions. A receipt for another request fails. Receipt publication is atomic
 overwrites an existing receipt. It is a recovery receipt, not product READY or data qualification.
 Use the outer build lock to serialize writers to a recovery/output root.
 
+## Engine stage recovery and composition
+
+`base_build_stages.StageRunner` executes an explicitly supplied dependency graph under one
+nonblocking job lock. Shared prerequisites run once. A stage identity binds frozen inputs, code,
+environment, policy, scope, its configuration and both identities of each dependency (stage and
+output). Every reuse checks the complete output file inventory and runs the stage verifier.
+Configuration changes propagate to descendants even if upstream output bytes remain identical.
+Unrelated branches may retain verified results. The concrete builder must supply semantic stage
+verifiers; a runner success alone never grants input admission or quality acceptance.
+
+Each attempt has a separate directory, START and either SUCCESS or FAILURE receipt. Unreceipted
+partials, corrupt outputs and prior failed attempts are preserved; recovery builds a new attempt.
+The runner never invents a receipt to adopt an existing image and never writes product READY.
+Metrics record elapsed time, files, bytes, result counters and build/reuse disposition. Outputs
+inside the job are TMP until the separate product audit/seal contract succeeds.
+
+`base_build_composition` creates the shared native engine's 33-table selection from a pinned
+predecessor and a typed period delta. The seven declared Daily families append admitted period
+rows; the other 26 retain original rows and coverage. Empty placeholders are retained only when
+the whole table is empty. Original lineage and values remain unchanged. This structural plan does
+not replace independent expected-universe admission, global key/time/reference checks, inherited
+held reconciliation or paired ODS/DWD quality audit. The standard seal wrapper checks the exact
+stored contract, version, code and plan, and enumerates all physical members for the next build's
+generic input envelope.
+
+## Locked offline runtime
+
+`ops/data/base-build-environment.v1.json` and `ops/data/base-build-runtime.lock` declare the current
+Linux x86_64 CPython 3.10 environment (Python >=3.10.12, glibc >=2.28), exact DuckDB 1.5.6,
+PyArrow 23.0.1 and tzdata 2026.5 binary wheels. Prepare the three named wheels with the recorded
+sizes/SHA256 before disconnecting; other interpreter/architecture combinations are not admitted.
+No source build or unpinned dependency resolution is part of the build.
+
+Create a dedicated venv with Python 3.10 on a filesystem that permits native library execution
+(for example `/opt/quanthus/venvs` on CN02). The CN02 data disk is mounted `noexec`; keep wheels,
+inputs, output and TMP there, but not installed `.so` libraries. Then install:
+
+```sh
+"$BASE_BUILD_VENV/bin/python" -m pip install --no-index \
+  --find-links "$BASE_BUILD_WHEELHOUSE" --only-binary=:all: --require-hashes \
+  -r ops/data/base-build-runtime.lock
+```
+
+Launch the pinned GitHub code with `PYTHONTZPATH=''` so `zoneinfo` uses locked tzdata rather than
+the host database. `base_build_environment.check_environment` verifies platform, lock identity,
+wheel bytes and every installed wheel payload against its pinned RECORD. A fresh isolated child
+must load DuckDB/PyArrow and round-trip an exact Decimal and Shanghai instant; this detects
+`noexec`, ABI and missing runtime dependency failures before data stages. Installed version
+strings alone are insufficient. The restore-only external `zstd` decoder must be >=1.4.8; its
+observed version is recorded and every decoded selected member is independently hash-checked.
+The environment receipt explicitly grants no data acceptance. A clean environment smoke check
+is separate from A's two-period workflow and B/C's full-data acceptance.
+
 ## Failure repair and accumulation
 
 Keep the failed attempt, exact input/code/config/environment identities, reason and affected
@@ -76,5 +130,8 @@ turn failures green. Normal regression tests do not replace full paired data aud
 GitHub/GDrive reconstruction. A fix is reusable only when the same entry point automatically applies
 it or its admission gate catches the condition on the next Build.
 
-Focused tests: `tests/test_base_build_inputs.py`, `tests/test_base_build_freeze.py` and
-`tests/test_base_build_recovery.py`. Full handoff verification remains `make check`.
+Focused tests: `tests/test_base_build_inputs.py`, `tests/test_base_build_freeze.py`,
+`tests/test_base_build_recovery.py`, `tests/test_base_build_profile.py`,
+`tests/test_base_build_delta.py`, `tests/test_base_build_composition.py`,
+`tests/test_base_build_stages.py` and `tests/test_base_build_environment.py`.
+Full handoff verification remains `make check`.

@@ -19,7 +19,7 @@ from .base22 import file_sha
 from .base22_bounded import BoundedError, Budget, identifier
 from .base22_sources import physical_path
 from .base_build_inputs import canonical, identity, member
-from .base_build_profile import UPDATED_TABLES
+from .base_build_profile import REFERENCE_TABLES, UPDATED_TABLES
 
 LINEAGE = frozenset({"record_source", "source_record_id", "source_revision",
                      "source_artifact_sha256", "knowledge_from", "knowledge_to"})
@@ -172,7 +172,7 @@ def build_delta(*, tables: dict[str, list[Path]], rules: dict[str, Any],
                 schemas: dict[str, Any], binding: dict[str, Any], output: Path,
                 budget: Budget) -> dict[str, Any]:
     """Materialize one immutable period intermediate shared by all consumers."""
-    if set(tables) != UPDATED_TABLES:
+    if set(tables) not in (UPDATED_TABLES, UPDATED_TABLES | REFERENCE_TABLES):
         raise BoundedError("BUILD_DELTA_EXACT_TABLE_SET_REQUIRED")
     output = budget.destination(output)
     if output.exists():
@@ -187,11 +187,20 @@ def build_delta(*, tables: dict[str, list[Path]], rules: dict[str, Any],
             paths = [physical_path(p) for p in tables[table]]
             schema = schemas[table]
             for path in paths:
-                if not pq.ParquetFile(path).schema_arrow.equals(schema, check_metadata=False):
+                observed_schema = pq.ParquetFile(path).schema_arrow
+                if (observed_schema.names != schema.names or any(
+                    left.type != right.type for left, right in zip(observed_schema, schema,
+                                                                   strict=True)
+                )):
                     raise BoundedError("BUILD_DELTA_SOURCE_SCHEMA_CHANGED")
             rule = rules["tables"][table]
             source = relation(paths)
-            if table in TEMPORAL:
+            required = [identifier(f.name) + " IS NULL" for f in schema if not f.nullable]
+            if required and connection.execute(
+                "SELECT 1 FROM " + source + " WHERE " + " OR ".join(required) + " LIMIT 1",
+            ).fetchone() is not None:
+                raise BoundedError("BUILD_DELTA_REQUIRED_VALUE_NULL")
+            if table in TEMPORAL | REFERENCE_TABLES:
                 metrics[table] = normalize_versions(connection, source, schema,
                                                      rule["business_key"], rule["version_key"])
             else:
@@ -203,7 +212,8 @@ def build_delta(*, tables: dict[str, list[Path]], rules: dict[str, Any],
             # The period must never rewrite an earlier business observation.
             cutoff = rule.get("cutoff_field")
             if cutoff is None:
-                candidates = [n for n in ("observation_start", "effective_at", "trade_date")
+                candidates = [n for n in ("observation_start", "effective_at", "effective_from",
+                                          "trade_date")
                               if n in schema.names]
                 cutoff = candidates[0]
             field = schema.field(cutoff)
@@ -220,8 +230,9 @@ def build_delta(*, tables: dict[str, list[Path]], rules: dict[str, Any],
                 raise BoundedError("BUILD_DELTA_BUSINESS_DATE_OUTSIDE_INTERVAL")
             expressions = partition_expressions(rule, schema)
             selects = ",".join(expr for _, expr in expressions)
-            parts = connection.execute("SELECT DISTINCT " + selects
-                                       + " FROM normalized ORDER BY ALL").fetchall()
+            parts = (connection.execute("SELECT DISTINCT " + selects
+                                        + " FROM normalized ORDER BY ALL").fetchall()
+                     if expressions else [()] if metrics[table]["output_rows"] else [])
             if not parts:
                 parts = [None]
             observed = 0
@@ -229,12 +240,12 @@ def build_delta(*, tables: dict[str, list[Path]], rules: dict[str, Any],
                 part = "empty" if values is None else "/".join(
                     key + "=" + str(value)
                     for (key, _), value in zip(expressions, values, strict=True)
-                )
+                ) or "all"
                 condition = "false" if values is None else " AND ".join(
                     expr + " IS NOT DISTINCT FROM "
                     + (literal(value) if isinstance(value, str) else str(value))
                     for (_, expr), value in zip(expressions, values, strict=True)
-                )
+                ) or "true"
                 order = ",".join(identifier(k) for k in rule["version_key"])
                 query = f"SELECT * FROM normalized WHERE {condition} ORDER BY {order}"
                 relative = "tables/" + table + "/" + part + "/part-000000.parquet"

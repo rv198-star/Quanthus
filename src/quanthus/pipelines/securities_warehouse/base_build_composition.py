@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .base22 import digest
-from .base22_bounded import BoundedError, Budget
+from .base22_bounded import BoundedError, Budget, identifier
 from .base23_native_image import (
     audit_native_image,
     seal_native_image,
@@ -30,7 +30,7 @@ from .base_build_inputs import (
     inventory,
     member,
 )
-from .base_build_profile import UPDATED_TABLES, profile, validate_contract
+from .base_build_profile import REFERENCE_TABLES, UPDATED_TABLES, profile, validate_contract
 
 
 def _object(path: Path) -> dict[str, Any]:
@@ -107,13 +107,14 @@ def build_composition_plan(*, predecessor: Path, delta: Path, rules: dict[str, A
                                                    if k != "identity"})
             or period.get("binding") != binding or period.get("READY") is not False
             or period.get("lifecycle") != "TMP"
-            or set(period.get("tables", {})) != UPDATED_TABLES):
+            or set(period.get("tables", {})) not in (UPDATED_TABLES,
+                                                       UPDATED_TABLES | REFERENCE_TABLES)):
         raise BoundedError("BUILD_COMPOSITION_PERIOD_IDENTITY_CHANGED")
-    period_files: dict[str, list[dict[str, Any]]] = {table: [] for table in UPDATED_TABLES}
+    period_files: dict[str, list[dict[str, Any]]] = {table: [] for table in period["tables"]}
     seen = set()
     pq = importlib.import_module("pyarrow.parquet")
     for item in period["files"]:
-        if item.get("table") not in UPDATED_TABLES or item["path"] in seen:
+        if item.get("table") not in period_files or item["path"] in seen:
             raise BoundedError("BUILD_COMPOSITION_PERIOD_FILE_SET_CHANGED")
         seen.add(item["path"])
         path = member(delta, item["path"])
@@ -151,7 +152,18 @@ def build_composition_plan(*, predecessor: Path, delta: Path, rules: dict[str, A
         if dict(counts) != previous["expected_partition_rows"]:
             raise BoundedError("BUILD_COMPOSITION_PREDECESSOR_CENSUS_CHANGED")
         added = period_files.get(table, [])
-        if table in UPDATED_TABLES and (not added or sum(i["rows"] for i in added)
+        if table in REFERENCE_TABLES and any(i["rows"] for i in added):
+            with _connection(budget) as connection:
+                old = relation([member(predecessor, i["path"]) for i in inherited])
+                new = relation([member(delta, i["path"]) for i in added])
+                keys = [k for k in rules["tables"][table]["business_key"]
+                        if k != "effective_from"]
+                overlap = " AND ".join("a." + identifier(k) + " IS NOT DISTINCT FROM b."
+                                       + identifier(k) for k in keys)
+                if connection.execute("SELECT 1 FROM " + new + " a JOIN " + old
+                                      + " b ON " + overlap + " LIMIT 1").fetchone() is not None:
+                    raise BoundedError("BUILD_COMPOSITION_IDENTITY_EXTENSION_OVERLAPS_PREDECESSOR")
+        if table in period_files and (not added or sum(i["rows"] for i in added)
                                         != period["tables"][table]["output_rows"]):
             raise BoundedError("BUILD_COMPOSITION_PERIOD_CENSUS_CHANGED")
         candidates = [dict(item, source_id="predecessor") for item in inherited]
@@ -180,7 +192,9 @@ def build_composition_plan(*, predecessor: Path, delta: Path, rules: dict[str, A
             "lineage_by_source": by_source,
         }
         plan["table_dispositions"][table] = {
-            "action": "APPEND_ADMITTED_PERIOD" if table in UPDATED_TABLES else "INHERIT",
+            "action": ("APPEND_ADMITTED_PERIOD" if table in UPDATED_TABLES else
+                       "APPEND_SOURCE_REPLAYED_IDENTITY_EXTENSION"
+                       if table in period_files else "INHERIT"),
             "predecessor_rows": sum(i["rows"] for i in inherited),
             "period_rows": sum(i["rows"] for i in added),
             "predecessor_through": binding["predecessor_through"],

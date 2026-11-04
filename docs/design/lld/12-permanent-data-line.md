@@ -107,6 +107,15 @@ append/inherit coverage dispositions and retains all native global checks. The v
 runtime lock and installed-wheel verification belong to build preflight, not data qualification.
 These primitives do not establish a completed orchestrator or A/B/C acceptance.
 
+The implemented period stage derives its calendar/security-day denominator from frozen independent
+reference sources, replays all seven Daily projections with the shared Daily converter and separately
+replays native 5m originals. Five identity extension families are admitted only for source-replayed
+new identities; other table coverage is inherited without an inferred refresh. Closed-day calendar
+and event projections preserve actual source clocks. Parent-pinned evidence adapters must verify
+the original release/artifact identities without inventing omitted source READY markers. The same
+job graph owns this one TMP prerequisite and its verified recovery. `base_build` currently exposes
+only input freezing and period preparation; full paired orchestration and A/B/C remain open.
+
 The [Daily price-basis candidate](01-data-foundation/daily-price-basis.md) prepares #473 through
 the existing versioned Daily builder. Its explicit candidate kind cannot enter default CURRENT,
 mirroring or P6 admission; historical replacement and each consumer's acceptance remain separate.

@@ -80,12 +80,60 @@ inside the job are TMP until the separate product audit/seal contract succeeds.
 
 `base_build_composition` creates the shared native engine's 33-table selection from a pinned
 predecessor and a typed period delta. The seven declared Daily families append admitted period
-rows; the other 26 retain original rows and coverage. Empty placeholders are retained only when
+rows. Five explicit identity extension tables may append source-replayed new identities from
+the Daily reference members; changing an effective date does not authorize reusing a predecessor
+identity. Their earliest identical real knowledge clock is retained, and conflicts fail. The
+other 21 tables retain original rows and coverage. Empty placeholders are retained only when
 the whole table is empty. Original lineage and values remain unchanged. This structural plan does
 not replace independent expected-universe admission, global key/time/reference checks, inherited
 held reconciliation or paired ODS/DWD quality audit. The standard seal wrapper checks the exact
 stored contract, version, code and plan, and enumerates all physical members for the next build's
 generic input envelope.
+
+## Source admission and period command
+
+The common entry point currently implements `freeze` and `prepare-period`:
+
+```sh
+PYTHONTZPATH='' PYTHONPATH=src python -m quanthus.pipelines.securities_warehouse.base_build \
+  prepare-period --job /data/controls/build-job.json --contract /data/controls/delivery-contract.json
+```
+
+Use the versioned job schema in `config/pipelines/base-build-job.example.v1.json`, replacing its
+zero revision with the exact clean GitHub checkout. Input roots must be kernel readonly in the
+build namespace; keep the work root separate and writable by the actual runtime user. Run the
+data stages with networking disabled. The preflight checks the locked environment, physical
+space/inode reserves, fixed code, contract and selection scope. It hashes the complete input
+closure once per invocation, including a stage reuse, and shares that verified prerequisite.
+No job field can disable semantic or quality checks.
+
+`prepare-period` independently derives expected trading days from a parent-bound raw calendar
+and security-day populations from each delivered source universe/security master. A retained
+derived calendar member must agree for the selected period; it is not authoritative input for
+the reconstruction. The optional reference supplement binds source release, parent core and
+parent Daily metadata; later market observations are not read. Original observed calendar clocks
+are retained when projecting intervening closed days.
+
+The source adapter locates each sealed Daily's exact selected release hash inside the frozen
+evidence inventory, validates the original release contract and every artifact, and replays all
+seven source projections with the Daily converter. Full typed values and multiplicities are
+compared, including valuations and events. Native 5m strings are separately replayed by the
+existing exact source verifier. A self-consistent repack is insufficient. Historical source
+READY markers omitted by an explicitly parent-pinned evidence archive are not invented.
+
+The five reference extensions are reconstructed from the same frozen universe/master and checked
+against the delivered reference members. All other nonempty source artifacts require their
+existing explicit disposition or a handler. A closed month end requires its selected event
+release; the shared announcement converter retains actual publish/acquisition clocks and source
+identity. Zero new quality held and normal 48-slot native days remain hard gates. Nullable legacy
+Parquet headers may be adapted only when physical types match and every required value is present.
+No precision or instant conversion is inferred from a nullable header.
+
+The result is one job-local period TMP shared by later composition: seven Daily families, five
+optional identity extensions, a source-derived security-day ledger and ADMISSION/DELTA receipts.
+The stage graph preserves failed attempts and verifies all output bytes before reuse. This command
+does not complete inherited-window reconciliation, paired materialize/audit/seal or A/B/C, and
+does not produce formal Base READY. Those later actions remain under implementation.
 
 ## Locked offline runtime
 

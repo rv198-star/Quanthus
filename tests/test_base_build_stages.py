@@ -159,3 +159,14 @@ def test_unreceipted_output_after_abrupt_death_is_not_adopted(tmp_path):
     assert not result["source-admission"]["reused"]
     assert result["source-admission"]["path"].parent.name == "attempt-000002"
     assert (output / "value.txt").read_text() == "source-admission"
+
+
+def test_failure_receipt_keeps_a_stable_reason_for_the_next_recovery(tmp_path):
+    def fail(output, dependencies):
+        raise BoundedError("BUILD_PERIOD_SOURCE_REPLAY_DIFFERS")
+
+    stage = Stage("period", (), fail, lambda output, result: None)
+    with pytest.raises(BoundedError, match="SOURCE_REPLAY_DIFFERS"):
+        StageRunner(root=tmp_path / "job", sources=[], binding=binding(), stages=[stage]).execute()
+    failure = json.loads((tmp_path / "job/stages/period/attempt-000001/FAILURE.json").read_text())
+    assert failure["reason_code"] == "BUILD_PERIOD_SOURCE_REPLAY_DIFFERS"

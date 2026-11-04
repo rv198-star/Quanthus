@@ -38,6 +38,11 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _reason(exc: BaseException) -> str:
+    value = str(exc)
+    return value if re.fullmatch(r"[A-Z][A-Z0-9_]{0,159}", value) else type(exc).__name__
+
+
 def _save_new(path: Path, value: Any) -> None:
     """Publish a receipt only after its full bytes reach the filesystem."""
     temporary = path.with_name("." + path.name + ".partial")
@@ -167,7 +172,8 @@ class StageRunner:
                 # Preserve the receipt and bytes. A fresh attempt is required;
                 # a bad completed stage never permits skipping its verification.
                 self._event({"stage": stage.name, "attempt": attempt.name,
-                             "status": "REUSE_REJECTED", "exception_type": type(exc).__name__})
+                             "status": "REUSE_REJECTED", "exception_type": type(exc).__name__,
+                             "reason_code": _reason(exc)})
         return None
 
     def execute(self) -> dict[str, dict[str, Any]]:
@@ -228,6 +234,7 @@ class StageRunner:
                         _save_new(attempt / "FAILURE.json", {"kind": KIND, "stage": name,
                                   "stage_identity": key, "failed_at": _now(),
                                   "exception_type": type(exc).__name__,
+                                  "reason_code": _reason(exc),
                                   "status": "FAILED_PRESERVED"})
                     raise
             return completed

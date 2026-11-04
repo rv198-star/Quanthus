@@ -35,6 +35,10 @@ UPDATED_TABLES = frozenset({
     "dwd_disclosure", "dwd_disclosure_subject", "dwd_index_bar", "dwd_security_bar",
     "dwd_security_valuation", "dwd_tradability_state", "dwd_trading_calendar",
 })
+REFERENCE_TABLES = frozenset({
+    "dwd_listed_company", "dwd_company_identifier", "dwd_security",
+    "dwd_security_identifier", "dwd_listing",
+})
 
 
 class StandardGlobalScan(UniqueBusinessKeyScan):
@@ -69,6 +73,8 @@ def delivery_contract(legacy: dict[str, Any], *, version: str, through: str,
                                   "per-table update/inherit and limitations remain explicit.")
     result["table_policy"] = {
         "daily_updated_tables": sorted(UPDATED_TABLES),
+        "reference_extension_tables": sorted(REFERENCE_TABLES),
+        "reference_extension_rule": "SOURCE_REPLAYED_NEW_IDENTITIES_ONLY_NO_PREDECESSOR_REWRITE",
         "other_tables": "INHERIT_ORIGINAL_ROWS_AND_COVERAGE_NO_REFRESH_INFERRED",
         "unhandled_nonempty_artifacts": "REJECT_UNLESS_EXPLICIT_EXISTING_ODS_ONLY_DISPOSITION",
         "closed_day_events": "REQUIRED_THROUGH_TARGET_CUTOFF",
@@ -109,6 +115,8 @@ def validate_contract(contract: dict[str, Any]) -> None:
     validate_legacy(_legacy_view(contract))
     expected = {
         "daily_updated_tables": sorted(UPDATED_TABLES),
+        "reference_extension_tables": sorted(REFERENCE_TABLES),
+        "reference_extension_rule": "SOURCE_REPLAYED_NEW_IDENTITIES_ONLY_NO_PREDECESSOR_REWRITE",
         "other_tables": "INHERIT_ORIGINAL_ROWS_AND_COVERAGE_NO_REFRESH_INFERRED",
         "unhandled_nonempty_artifacts": "REJECT_UNLESS_EXPLICIT_EXISTING_ODS_ONLY_DISPOSITION",
         "closed_day_events": "REQUIRED_THROUGH_TARGET_CUTOFF",

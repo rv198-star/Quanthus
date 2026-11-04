@@ -14,12 +14,14 @@ import re
 import shutil
 import subprocess
 import tarfile
+import tempfile
 from pathlib import Path
 from typing import Any, BinaryIO
 
-from .base_build_inputs import BuildInputError, canonical, file_sha, identity, member
+from .base_build_inputs import BuildInputError, _object, canonical, file_sha, identity, member
 
 REQUEST = "p10-base-selected-regular-recovery-v1"
+RECEIPT = "RECOVERY.safe.json"
 
 
 def _sha(value: str) -> str:
@@ -38,6 +40,8 @@ def validate_request(request: dict[str, Any]) -> None:
                 or type(row["size_bytes"]) is not int or row["size_bytes"] < 0):
             raise BuildInputError("BUILD_RECOVERY_MEMBER_SCHEMA")
         member(Path("/unmounted-recovery-root"), row["path"])
+        if row["path"] == RECEIPT or row["path"].startswith(RECEIPT + "/"):
+            raise BuildInputError("BUILD_RECOVERY_RESERVED_TARGET")
         _sha(row["sha256"])
         if row["path"] in paths:
             raise BuildInputError("BUILD_RECOVERY_DUPLICATE_TARGET")
@@ -134,6 +138,106 @@ def recover_stream(stream: BinaryIO, request: dict[str, Any], output: Path, *,
             "disposition": disposition, "READY": False}
 
 
+def recover_path_stream(stream: BinaryIO, request: dict[str, Any],
+                        output: Path) -> dict[str, Any]:
+    """Restore hash-selected relative members from a conventional tar stream.
+
+    This supports ordinary Base/Daily preparation archives without converting
+    them into a second content store. Unselected archive names are never used
+    as filesystem paths. Every selected member must occur exactly once.
+    """
+    validate_request(request)
+    output = member(output.parent.absolute(), output.name)
+    output.mkdir(exist_ok=True)
+    selected = {row["path"]: row for row in request["members"]}
+    disposition = {}
+    for name, row in selected.items():
+        path = member(output, name)
+        if path.exists():
+            if path.stat().st_size != row["size_bytes"] or file_sha(path) != row["sha256"]:
+                raise BuildInputError("BUILD_RECOVERY_EXISTING_TARGET_CONFLICT")
+            disposition[name] = "VERIFIED_REUSED"
+    seen = set()
+    with tarfile.open(fileobj=stream, mode="r|") as archive:
+        for entry in archive:
+            row = selected.get(entry.name)
+            if row is None:
+                continue
+            if not entry.isfile() or entry.name in seen:
+                raise BuildInputError("BUILD_RECOVERY_SELECTED_MEMBER_INVALID")
+            if entry.size != row["size_bytes"]:
+                raise BuildInputError("BUILD_RECOVERY_MEMBER_SIZE")
+            if entry.name not in disposition:
+                source = archive.extractfile(entry)
+                if source is None:
+                    raise BuildInputError("BUILD_RECOVERY_MEMBER_UNREADABLE")
+                with source:
+                    _put(output, row, source)
+                disposition[entry.name] = "VERIFIED_ARCHIVED_MEMBER"
+            seen.add(entry.name)
+    if seen != set(selected):
+        raise BuildInputError("BUILD_RECOVERY_SELECTED_MEMBER_MISSING")
+    for name, row in selected.items():
+        path = member(output, name)
+        if path.stat().st_size != row["size_bytes"] or file_sha(path) != row["sha256"]:
+            raise BuildInputError("BUILD_RECOVERY_FINAL_MEMBER_IDENTITY")
+    return {"contract": REQUEST, "status": "SELECTED_BYTES_RECOVERED_NOT_DATA_ACCEPTANCE",
+            "archive_format": "relative-path-v1", "request_identity": identity(request),
+            "members": request["members"], "disposition": disposition, "READY": False}
+
+
+def publish_receipt(output: Path, result: dict[str, Any]) -> dict[str, Any]:
+    """Keep the original successful attempt after a fully verified CLI retry.
+
+    Only the per-attempt reuse disposition may differ. The caller must finish
+    payload verification and archive decoding before entering this function.
+    Atomic no-overwrite publication prevents an interrupted write from leaving
+    a partial receipt that a later retry might mistake for success.
+    """
+    receipt = member(output, RECEIPT)
+
+    def existing() -> dict[str, Any]:
+        prior = _object(receipt)
+        stable = {key: value for key, value in result.items() if key != "disposition"}
+        dispositions = prior.get("disposition")
+        allowed = {"VERIFIED_REUSED", "VERIFIED_RETAINED_COPY", "VERIFIED_ARCHIVED_BLOB",
+                   "VERIFIED_ARCHIVED_BLOB_COPY", "VERIFIED_ARCHIVED_MEMBER"}
+        if (set(prior) != set(result)
+                or any(prior.get(key) != value for key, value in stable.items())
+                or not isinstance(dispositions, dict)
+                or set(dispositions) != set(result["disposition"])
+                or any(not isinstance(value, str) or value not in allowed
+                       for value in dispositions.values())):
+            raise BuildInputError("BUILD_RECOVERY_RECEIPT_CONFLICT")
+        return prior
+
+    if receipt.exists():
+        return existing()
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=output, prefix=".recovery-receipt-",
+                                         delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(canonical(result) + b"\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temporary, receipt)
+        except FileExistsError:
+            return existing()
+        temporary.unlink()
+        temporary = None
+        descriptor = os.open(output, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        return result
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--request", type=Path, required=True)
@@ -141,6 +245,8 @@ def main() -> None:
     parser.add_argument("--archive-sha256", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--kept", type=Path)
+    parser.add_argument("--archive-format", choices=["content-addressed", "relative-path"],
+                        default="content-addressed")
     args = parser.parse_args()
     request = json.loads(args.request.read_bytes())
     validate_request(request)
@@ -152,24 +258,35 @@ def main() -> None:
         sources.append(args.kept.resolve())
     if any(source == target or target in source.parents for source in sources):
         raise BuildInputError("BUILD_RECOVERY_OUTPUT_OVERLAP")
-    required = sum(row["size_bytes"] for row in request["members"])
+    required = sum(row["size_bytes"] for row in request["members"]
+                   if not member(target, row["path"]).exists())
     if shutil.disk_usage(args.output.parent).free < required + 8 * 1024 ** 3:
         raise BuildInputError("BUILD_RECOVERY_CAPACITY")
     kept = json.loads(args.kept.read_bytes()) if args.kept else {}
+    if args.archive_format == "relative-path" and kept:
+        raise BuildInputError("BUILD_RECOVERY_KEPT_FORMAT_UNSUPPORTED")
     # The retained archive declares a 256 MiB zstd window. Bound decoder memory
     # explicitly; the CLI default (128 MiB) cannot decode this existing format.
     with subprocess.Popen(["zstd", "--memory=256MB", "-d", "-c", str(args.archive)],
                           stdout=subprocess.PIPE) as decoder:
-        if decoder.stdout is None:
-            raise BuildInputError("BUILD_RECOVERY_DECODER")
-        result = recover_stream(decoder.stdout, request, args.output, kept=kept)
-        # Drain the stream so zstd can validate the container and finish normally.
-        for _ in iter(lambda: decoder.stdout.read(1024 * 1024), b""):
-            pass
-        if decoder.wait() != 0:
-            raise BuildInputError("BUILD_RECOVERY_ARCHIVE_DECODE")
-    with (args.output / "RECOVERY.safe.json").open("x") as receipt:
-        receipt.write(canonical(result).decode("ascii") + "\n")
+        try:
+            if decoder.stdout is None:
+                raise BuildInputError("BUILD_RECOVERY_DECODER")
+            result = (recover_path_stream(decoder.stdout, request, args.output)
+                      if args.archive_format == "relative-path"
+                      else recover_stream(decoder.stdout, request, args.output, kept=kept))
+            # Drain the stream so zstd validates the complete compressed container.
+            for _ in iter(lambda: decoder.stdout.read(1024 * 1024), b""):
+                pass
+            if decoder.wait() != 0:
+                raise BuildInputError("BUILD_RECOVERY_ARCHIVE_DECODE")
+        except BaseException:
+            # A failed member stops reading. Waiting on a decoder whose stdout
+            # pipe is full would otherwise deadlock the failed build attempt.
+            decoder.kill()
+            decoder.wait()
+            raise
+    result = publish_receipt(args.output, result)
     print(result["status"], len(result["members"]))
 
 

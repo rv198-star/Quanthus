@@ -18,6 +18,14 @@ SUPPORTED_KINDS = {
     "quanthus_ods_base24_bundle",
     "dwd_base24_native_1d5m_purpose_qualified_candidate_v1",
     "cn02_base24_daily_1d_native5m_v1",
+    "quanthus_ods_base_bundle_v1",
+    "quanthus_dwd_base_bundle_v1",
+    "quanthus_daily_1d5m_v1",
+}
+GENERIC_KINDS = {
+    "ods": "quanthus_ods_base_bundle_v1",
+    "dwd": "quanthus_dwd_base_bundle_v1",
+    "daily": "quanthus_daily_1d5m_v1",
 }
 
 
@@ -98,7 +106,7 @@ def _declarations(root: Path, manifest: dict[str, Any]) -> list[dict[str, Any]]:
     kind = manifest.get("kind")
     if kind not in SUPPORTED_KINDS:
         raise BuildInputError("BUILD_INPUT_UNSUPPORTED_KIND")
-    if kind == "quanthus_ods_base24_bundle":
+    if kind in {"quanthus_ods_base24_bundle", *GENERIC_KINDS.values()}:
         return manifest["content"]["files"]
     if kind == "cn02_base24_daily_1d_native5m_v1":
         return manifest["files"]
@@ -182,3 +190,49 @@ def verify_inventory(root: Path, frozen: dict[str, Any], *, workers: int = 4) ->
     if actual["content"] != content or actual["identity"] != frozen["identity"]:
         raise BuildInputError("BUILD_INPUT_FROZEN_CONTENT")
     return actual
+
+
+def inventory_evidence(root: Path, records: list[dict[str, Any]], *,
+                       workers: int = 4) -> dict[str, Any]:
+    """Freeze explicitly selected evidence bytes without inventing a product READY.
+
+    The caller pins declarations in the selection. Parent relationships, use
+    limits and calendar semantics remain separate admission/audit requirements.
+    """
+    root = _physical(root)
+    if not root.is_dir() or type(workers) is not int or not 1 <= workers <= 8:
+        raise BuildInputError("BUILD_INPUT_ROOT_OR_WORKERS")
+    if not isinstance(records, list) or not records:
+        raise BuildInputError("BUILD_EVIDENCE_MEMBERS_REQUIRED")
+    declared = {}
+    for row in records:
+        if (not isinstance(row, dict) or set(row) != {"path", "sha256", "size_bytes"}
+                or type(row["size_bytes"]) is not int or row["size_bytes"] < 0
+                or not isinstance(row["sha256"], str)
+                or len(row["sha256"]) != 71 or not row["sha256"].startswith("sha256:")
+                or any(c not in "0123456789abcdef" for c in row["sha256"][7:])):
+            raise BuildInputError("BUILD_EVIDENCE_DECLARATION_INVALID")
+        member(root, row["path"])
+        if row["path"] in declared:
+            raise BuildInputError("BUILD_EVIDENCE_DUPLICATE_MEMBER")
+        declared[row["path"]] = row
+    if _tree(root) != set(declared):
+        raise BuildInputError("BUILD_EVIDENCE_MEMBER_SET")
+    before = {name: _fingerprint(member(root, name)) for name in sorted(declared)}
+
+    def check(name: str) -> dict[str, Any]:
+        path = member(root, name)
+        actual = {"path": name, "size_bytes": path.stat().st_size, "sha256": file_sha(path)}
+        if actual != declared[name]:
+            raise BuildInputError("BUILD_EVIDENCE_MEMBER_IDENTITY")
+        return actual
+
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="base-evidence") as pool:
+        files = list(pool.map(check, sorted(declared)))
+    if (_tree(root) != set(declared)
+            or any(_fingerprint(member(root, name)) != fp for name, fp in before.items())):
+        raise BuildInputError("BUILD_EVIDENCE_CHANGED_DURING_INVENTORY")
+    content = {"kind": "p10-base-evidence-input-v1", "files": files}
+    return {"status": "FULL_EVIDENCE_INTEGRITY_PASS_NOT_DATA_ACCEPTANCE",
+            "content": content, "identity": identity(content), "file_count": len(files),
+            "bytes": sum(row["size_bytes"] for row in files)}

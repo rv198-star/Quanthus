@@ -14,19 +14,35 @@ from pathlib import Path
 from typing import Any
 
 from .base_build_inputs import (
+    GENERIC_KINDS,
     BuildInputError,
     canonical,
     identity,
     inventory,
+    inventory_evidence,
 )
 
 CONTRACT = "p10-base-build-input-selection-v1"
 FROZEN = "p10-base-build-frozen-inputs-v1"
+CONTRACT_V2 = "p10-base-build-input-selection-v2"
+FROZEN_V2 = "p10-base-build-frozen-inputs-v2"
 KINDS = {
     "ods": "quanthus_ods_base24_bundle",
     "dwd": "dwd_base24_native_1d5m_purpose_qualified_candidate_v1",
     "daily": "cn02_base24_daily_1d_native5m_v1",
 }
+EVIDENCE_PURPOSES = {"calendar_reference", "daily_source_evidence", "historical_quality"}
+
+
+def _version(value: Any) -> tuple[int, ...]:
+    if not isinstance(value, str) or not re.fullmatch(r"\d+\.\d+(?:\.\d+)?", value):
+        raise BuildInputError("BUILD_SELECTION_VERSION")
+    parts = [int(x) for x in value.split(".")]
+    return tuple(parts + [0] * (3 - len(parts)))
+
+
+def _frozen_contract(selection: dict[str, Any]) -> str:
+    return FROZEN_V2 if selection["contract"] == CONTRACT_V2 else FROZEN
 
 
 def load(path: Path) -> dict[str, Any]:
@@ -37,10 +53,15 @@ def load(path: Path) -> dict[str, Any]:
 
 
 def validate_selection(value: dict[str, Any]) -> None:
-    if (set(value) != {"contract", "through_date", "predecessor_through", "expected_days",
-                       "expected_days_evidence", "packages"}
-            or value["contract"] != CONTRACT):
+    keys = {"contract", "through_date", "predecessor_through", "expected_days",
+            "expected_days_evidence", "packages"}
+    v2 = value.get("contract") == CONTRACT_V2
+    if v2:
+        keys |= {"predecessor_version", "target_version", "evidence"}
+    if set(value) != keys or value.get("contract") not in {CONTRACT, CONTRACT_V2}:
         raise BuildInputError("BUILD_SELECTION_SCHEMA")
+    if v2 and _version(value["target_version"]) <= _version(value["predecessor_version"]):
+        raise BuildInputError("BUILD_SELECTION_VERSION_ORDER")
     start = date.fromisoformat(value["predecessor_through"])
     end = date.fromisoformat(value["through_date"])
     days = value["expected_days"]
@@ -70,6 +91,30 @@ def validate_selection(value: dict[str, Any]) -> None:
                 raise BuildInputError("BUILD_SELECTION_BASE_DAY")
     if sorted(bases) != ["dwd", "ods"] or sorted(daily) != days:
         raise BuildInputError("BUILD_SELECTION_DAY_OR_BASE_SET")
+    if v2:
+        if not isinstance(value["evidence"], list):
+            raise BuildInputError("BUILD_SELECTION_EVIDENCE_SCHEMA")
+        parent_identities = {row["manifest_sha256"] for row in packages}
+        for entry in value["evidence"]:
+            if (not isinstance(entry, dict)
+                    or set(entry) != {"id", "purpose", "parent_manifests", "files"}
+                    or not isinstance(entry["id"], str)
+                    or not re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", entry["id"])
+                    or entry["id"] in ids or entry["purpose"] not in EVIDENCE_PURPOSES
+                    or not isinstance(entry["parent_manifests"], list)
+                    or not entry["parent_manifests"]
+                    or not isinstance(entry["files"], list) or not entry["files"]):
+                raise BuildInputError("BUILD_SELECTION_EVIDENCE_SCHEMA")
+            ids.add(entry["id"])
+            # External parent metadata must itself be retained and hash-selected.
+            available = parent_identities | {
+                row.get("sha256") for row in entry["files"] if isinstance(row, dict)
+            }
+            for parent in entry["parent_manifests"]:
+                if (not isinstance(parent, str)
+                        or not re.fullmatch(r"sha256:[0-9a-f]{64}", parent)
+                        or parent not in available):
+                    raise BuildInputError("BUILD_SELECTION_EVIDENCE_PARENT_NOT_RETAINED")
     evidence = value["expected_days_evidence"]
     if (not isinstance(evidence, dict)
             or set(evidence) != {"package_id", "path", "sha256"}
@@ -82,6 +127,9 @@ def freeze(selection: dict[str, Any], roots: dict[str, str], *, workers: int = 4
            ) -> dict[str, Any]:
     validate_selection(selection)
     ids = {row["id"] for row in selection["packages"]}
+    v2 = selection["contract"] == CONTRACT_V2
+    if v2:
+        ids |= {row["id"] for row in selection["evidence"]}
     if set(roots) != ids:
         raise BuildInputError("BUILD_SELECTION_ROOT_BINDINGS")
     results = {}
@@ -89,17 +137,35 @@ def freeze(selection: dict[str, Any], roots: dict[str, str], *, workers: int = 4
         root = Path(roots[row["id"]])
         result = inventory(root, row["manifest_sha256"], workers=workers)
         manifest = load(root / "manifest.json")
-        if result["content"]["package_kind"] != KINDS[row["role"]]:
+        kind = result["content"]["package_kind"]
+        allowed = {KINDS[row["role"]]}
+        if v2:
+            allowed.add(GENERIC_KINDS[row["role"]])
+        if kind not in allowed:
+            raise BuildInputError("BUILD_SELECTION_ROLE_KIND")
+        generic = kind in GENERIC_KINDS.values()
+        metadata = manifest["content"] if generic else manifest
+        if generic and metadata.get("role") != row["role"]:
             raise BuildInputError("BUILD_SELECTION_ROLE_KIND")
         if row["role"] == "daily":
-            if manifest.get("market_date") != row["day"]:
+            if metadata.get("market_date") != row["day"]:
                 raise BuildInputError("BUILD_SELECTION_DAILY_DATE")
         else:
-            through = (manifest.get("business_through") if row["role"] == "dwd"
+            through = (metadata.get("through_date") if generic else
+                       manifest.get("business_through") if row["role"] == "dwd"
                        else manifest.get("content", {}).get("through_date"))
             if through != selection["predecessor_through"]:
                 raise BuildInputError("BUILD_SELECTION_PREDECESSOR_DATE")
+            if v2:
+                actual_version = metadata.get("base_version") if generic else "2.4"
+                if actual_version != selection["predecessor_version"]:
+                    raise BuildInputError("BUILD_SELECTION_PREDECESSOR_VERSION")
         results[row["id"]] = result
+    if v2:
+        for row in selection["evidence"]:
+            results[row["id"]] = inventory_evidence(
+                Path(roots[row["id"]]), row["files"], workers=workers,
+            )
     evidence = selection["expected_days_evidence"]
     files = results[evidence["package_id"]]["content"]["files"]
     if not any(f["path"] == evidence["path"] and f["sha256"] == evidence["sha256"]
@@ -107,7 +173,8 @@ def freeze(selection: dict[str, Any], roots: dict[str, str], *, workers: int = 4
         raise BuildInputError("BUILD_SELECTION_CALENDAR_NOT_IN_CLOSURE")
     # Calendar semantic coverage and native/data quality belong to the next audit
     # stage. Byte inventory deliberately cannot imply those gates passed.
-    content = {"contract": FROZEN, "selection": selection, "packages": results}
+    content = {"contract": _frozen_contract(selection), "selection": selection,
+               "packages": results}
     return {"content": content, "identity": identity(content),
             "status": "FROZEN_BYTES_ONLY_SEMANTIC_GATES_PENDING"}
 
@@ -115,9 +182,12 @@ def freeze(selection: dict[str, Any], roots: dict[str, str], *, workers: int = 4
 def cold_verify(frozen: dict[str, Any], roots: dict[str, str], *, workers: int = 4
                 ) -> dict[str, Any]:
     content = frozen.get("content", {})
-    if frozen.get("identity") != identity(content) or content.get("contract") != FROZEN:
+    if (frozen.get("identity") != identity(content)
+            or content.get("contract") not in {FROZEN, FROZEN_V2}):
         raise BuildInputError("BUILD_FROZEN_IDENTITY")
     validate_selection(content["selection"])
+    if content["contract"] != _frozen_contract(content["selection"]):
+        raise BuildInputError("BUILD_FROZEN_IDENTITY")
     if set(roots) != set(content["packages"]):
         raise BuildInputError("BUILD_SELECTION_ROOT_BINDINGS")
     # freeze performs one full physical/hash pass per package. Its complete

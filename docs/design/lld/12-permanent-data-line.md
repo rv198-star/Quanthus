@@ -93,6 +93,13 @@ P10 may deliver qualified supply, a bounded rejection or a formal unavailable di
 Consumers decide business treatment and their own acceptance; closing the source issue never
 automatically accepts research or activates training/production.
 
+`P10-DATA-BASE25-001` / #596 standardizes the paired Base plus Daily build input closure.
+The [Base input operations runbook](../../operations/base-build.md) owns selection freezing,
+explicit source/reference supplements and verified recovery retries. Inventory or frozen-byte
+receipts are input integrity evidence only; they do not establish semantic admission, a completed
+Builder, paired Base acceptance or consumer activation. Original source representation, historical
+quality restrictions and actual knowledge clocks remain unchanged.
+
 The [Daily price-basis candidate](01-data-foundation/daily-price-basis.md) prepares #473 through
 the existing versioned Daily builder. Its explicit candidate kind cannot enter default CURRENT,
 mirroring or P6 admission; historical replacement and each consumer's acceptance remain separate.

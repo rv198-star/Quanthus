@@ -21,6 +21,7 @@ from .base_build_inputs import _fingerprint, _tree, canonical, file_sha, identit
 from .base_build_ods import audit_ods
 from .base_build_period import PARENTS, VerifiedInputs, load, prepare_period
 from .base_build_profile import REFERENCE_TABLES, UPDATED_TABLES
+from .base_build_quality import evaluate_historical
 
 CONTRACT = "p10-standard-base-pair-audit-v1"
 
@@ -261,6 +262,16 @@ def audit_pair(
         source_replay_bytes=sum(
             p.stat().st_size for p in (budget.root / "source-replay").rglob("*") if p.is_file()
         ),
+    )
+    historical = evaluate_historical(ods, dwd, budget)
+    result.update(
+        historical_gate=historical,
+        historical_disposition=(
+            "PASS_NO_APPLICABLE_REGISTERED_CASE"
+            if historical["publication_eligible"]
+            else "PENDING_REGISTERED_CASE_DISPOSITION"
+        ),
+        publication_eligible=historical["publication_eligible"],
     )
     result["identity"] = identity({k: v for k, v in result.items() if k != "identity"})
     return result

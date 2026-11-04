@@ -14,6 +14,7 @@ import os
 import re
 import socket
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,12 +23,13 @@ from .base23_native_image import image_schemas
 from .base_build_audit import audit_pair
 from .base_build_environment import check_environment
 from .base_build_freeze import freeze
-from .base_build_inputs import canonical, identity, member
+from .base_build_inputs import canonical, file_sha, identity, member
 from .base_build_ods import save
 from .base_build_pair import materialization_stages
 from .base_build_period import VerifiedInputs, load, prepare_period
 from .base_build_profile import validate_contract
-from .base_build_stages import Stage, StageRunner
+from .base_build_resources import job_capacity, remaining_stage_limits
+from .base_build_stages import Stage, StageRunner, _save_new
 
 REPOSITORY = Path(__file__).resolve().parents[4]
 JOB = "p10-standard-base-build-job-v1"
@@ -98,6 +100,7 @@ def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any
             raise BoundedError("BUILD_AUDIT_ORIGINAL_SOURCE_STILL_READABLE")
     sources = [Path(p) for p in products.values()]
     owned = False
+    started_at = datetime.now(timezone.utc).isoformat()
     try:
         with Budget(Path(job["work_root"]), sources, limits) as budget:
             owned = True
@@ -110,11 +113,25 @@ def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any
             )
             if receipt["binding"]["code_revision"] != job["builder_revision"]:
                 raise BoundedError("BUILD_AUDIT_CODE_BINDING_CHANGED")
-            save(budget.root / "AUDIT.json", receipt)
+            _save_new(budget.root / "AUDIT.json", receipt)
+            completion = {
+                "contract": "p10-standard-base-audit-execution-v1",
+                "job_identity": identity(job),
+                "work_root": job["work_root"],
+                "code_revision": job["builder_revision"],
+                "policy_identity": identity(contract),
+                "environment_identity": environment["lock_sha256"],
+                "audit_identity": receipt["identity"],
+                "audit_sha256": file_sha(budget.root / "AUDIT.json"),
+                "started_at": started_at,
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "publication_eligible": receipt["publication_eligible"],
+                "formal_READY": False,
+            }
+            completion["identity"] = identity(completion)
+            _save_new(budget.root / "COMPLETION.json", completion)
     except BaseException as exc:
         if owned:
-            from datetime import datetime, timezone
-
             reason = str(exc)
             reason = (
                 reason if re.fullmatch(r"[A-Z][A-Z0-9_]{0,159}", reason) else type(exc).__name__
@@ -137,13 +154,19 @@ def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any
         raise
     return {
         "stage": "audit",
-        "status": "PAIRED_SOURCE_AND_STRUCTURE_PASS_HISTORICAL_GATE_PENDING",
+        "status": (
+            "PAIRED_SOURCE_STRUCTURE_AND_REGISTERED_QUALITY_GATES_PASS"
+            if receipt["publication_eligible"]
+            else "PAIRED_SOURCE_AND_STRUCTURE_PASS_HISTORICAL_GATE_PENDING"
+        ),
         "audit_identity": receipt["identity"],
         "output": str(budget.root / "AUDIT.json"),
+        "completion": str(budget.root / "COMPLETION.json"),
+        "execution_identity": completion["identity"],
         "environment_identity": environment["lock_sha256"],
         "resources": dict(budget.peak),
         "formal_READY": False,
-        "publication_eligible": False,
+        "publication_eligible": receipt["publication_eligible"],
         "full_A_B_C": False,
     }
 
@@ -190,17 +213,22 @@ def validate_job(job: dict[str, Any]) -> None:
 
 
 def _require_pinned_code(revision: str) -> None:
-    head = subprocess.check_output(
-        ["git", "-C", str(REPOSITORY), "rev-parse", "HEAD"], text=True
-    ).strip()
-    dirty = subprocess.check_output(
-        ["git", "-C", str(REPOSITORY), "status", "--porcelain"], text=True
-    )
+    git = [
+        "git",
+        "--no-optional-locks",
+        "-c",
+        "safe.directory=" + str(REPOSITORY),
+        "-C",
+        str(REPOSITORY),
+    ]
+    head = subprocess.check_output([*git, "rev-parse", "HEAD"], text=True).strip()
+    dirty = subprocess.check_output([*git, "status", "--porcelain"], text=True)
     if head != revision or dirty:
         raise BoundedError("BUILD_CLEAN_PINNED_GITHUB_WORKTREE_REQUIRED")
 
 
 def _preflight_paths(roots: dict[str, str], work_root: Path, limits: Limits, days: int) -> None:
+    usage = job_capacity(work_root, [Path(p) for p in roots.values()], limits)
     if {name for _, name in socket.if_nameindex()} != {"lo"}:
         raise BoundedError("BUILD_ISOLATED_OFFLINE_NETWORK_REQUIRED")
     for source in roots.values():
@@ -212,7 +240,7 @@ def _preflight_paths(roots: dict[str, str], work_root: Path, limits: Limits, day
     fs = os.statvfs(ancestor)
     if not os.access(ancestor, os.W_OK | os.X_OK):
         raise BoundedError("BUILD_RUNTIME_USER_CANNOT_WRITE_WORK_ROOT")
-    if fs.f_bavail * fs.f_frsize < limits.allocated_bytes + limits.free_floor_bytes:
+    if fs.f_bavail * fs.f_frsize < usage["remaining_allocated_bytes"] + limits.free_floor_bytes:
         raise BoundedError("BUILD_WORK_SPACE_RESERVE_INSUFFICIENT")
     if fs.f_favail < 4000 + days * 500:
         raise BoundedError("BUILD_WORK_INODE_RESERVE_INSUFFICIENT")
@@ -282,7 +310,9 @@ def run(*, action: str, job: dict[str, Any], contract: dict[str, Any]) -> dict[s
     }
 
     def build(output: Path, dependencies: dict[str, Path]) -> dict[str, Any]:
-        with Budget(output, sources, limits) as budget:
+        with Budget(
+            output, sources, remaining_stage_limits(Path(job["work_root"]), sources, limits)
+        ) as budget:
             result = prepare_period(
                 inputs=inputs,
                 binding=binding,
@@ -296,6 +326,7 @@ def run(*, action: str, job: dict[str, Any], contract: dict[str, Any]) -> dict[s
             "admission_identity": result["identity"],
             "delta_identity": result["delta_identity"],
             "security_days": result["new_windows"],
+            "resources": dict(budget.peak),
         }
 
     def verify(output: Path, result: dict[str, Any]) -> None:
@@ -318,12 +349,18 @@ def run(*, action: str, job: dict[str, Any], contract: dict[str, Any]) -> dict[s
     if action == "materialize":
         stages.extend(
             materialization_stages(
-                inputs=inputs, binding=binding, contract=contract, config_root=config, limits=limits
+                inputs=inputs,
+                binding=binding,
+                contract=contract,
+                config_root=config,
+                limits=limits,
+                job_root=Path(job["work_root"]),
             )
         )
     runner = StageRunner(
         root=Path(job["work_root"]),
         sources=sources,
+        limits=limits,
         binding={
             "input_identity": inputs.verified_identity,
             "code_revision": job["builder_revision"],
@@ -357,6 +394,7 @@ def run(*, action: str, job: dict[str, Any], contract: dict[str, Any]) -> dict[s
         "stage_identity": completed["receipt"]["stage_identity"],
         "output_identity": completed["receipt"]["output_identity"],
         "result": completed["receipt"]["content"]["result"],
+        "retained_job_resources": job_capacity(Path(job["work_root"]), sources, limits),
         "formal_READY": False,
         "kernel_readonly_inputs": True,
         "network_interfaces": sorted(name for _, name in socket.if_nameindex()),

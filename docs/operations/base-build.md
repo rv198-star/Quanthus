@@ -222,13 +222,40 @@ writes. Actual layer hashes and source replay remain mandatory. A later publicat
 must preserve exclusive ownership and run a fresh readonly audit on recovery, rather than trust a
 stale guard. Publication is still under implementation; successful stage directories are immutable.
 
-The `audit` action deliberately returns
-`PAIRED_SOURCE_AND_STRUCTURE_PASS_HISTORICAL_GATE_PENDING`, `publication_eligible=false` and
-`formal_READY=false`. Historical diagnostic disposition, guarded paired publication, standard
-Daily/reference publishing and two consecutive complete versions A remain open. A synthetic
-fixture now runs actual 33-table materialization, removes all original inputs and period TMP,
-and fully replays source admission from the paired archive. That test still uses mocked mount
-flags and is not runtime A, full-data B or independent-node C.
+The audit evaluates the four exact registered historical cases using
+`config/pipelines/base-build-historical-gates.v1.json`. Source registration, inherited registration
+or matching listing/venue/date observations keep a case pending. Omitting an observation cannot
+hide a registered diagnostic. The current policy provides no repair or override and adds no held
+window. Only absence of both observations and registration proves nonapplicability. The real
+Base 2.5 inputs register all four cases, so they remain ineligible for publication. A complete
+synthetic fixture can pass the absence rule. `formal_READY` always remains false for this action.
+
+Each successful audit has a separate `COMPLETION.json` execution envelope binding the exact job,
+unique work root, code/policy/environment, actual start/end times and AUDIT bytes. Existing roots
+are rejected; a saved AUDIT file is not authority for a new publication invocation.
+
+Internal `base_build_publication` primitives preserve successful stage inventories by recording a
+no-overwrite ownership intent and moving each layer into the job's `published` directory on the
+same filesystem. The original SUCCESS bytes remain intact. A consumed job cannot restart the
+materialization graph. Only owned incomplete marker bytes can be archived during recovery;
+unknown or altered markers stop recovery and remain available for diagnosis. Manifests are
+published before READY using no-overwrite links, with interrupted links resolved before strict
+single-inode hashing. Every incomplete recovery still requires a fresh isolated whole-pair audit;
+the metadata primitives do not authorize publication by themselves. Fresh full byte readback,
+mutual pair binding, complete native scan and historical eligibility are required at the marker
+boundary. Native legacy sealing retains its existing contract.
+
+Resource admission includes all retained failed attempts, controls and outputs in the same job.
+Preflight reserves only the remaining allocated allowance plus the free-space floor; it does not
+demand the original whole allowance again after a partial successful run. Each subsequent stage
+receives the remaining total allowance, with room for immutable control receipts, and StageRunner
+checks the total before recording success. Audit TMP retains its own disjoint budget.
+
+The privileged controller, actual readonly protection/namespace qualification, governed historical
+dispositions, standard Daily/reference publishing and two consecutive complete versions A remain
+open. The synthetic fixture materializes all 33 tables, removes original inputs and period TMP,
+replays all sources, prepares paired metadata and re-audits the sealed pair. Mocked mount flags
+in that test do not establish runtime A, full-data B or independent-node C.
 
 ## Locked offline runtime
 

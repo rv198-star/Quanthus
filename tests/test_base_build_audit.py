@@ -288,9 +288,59 @@ def test_full_pair_replays_all_period_sources_from_archived_inputs_after_origina
     assert receipt["source_replay"] == "PASS_ALL_PERIOD_SOURCES_AND_TYPED_DELTA"
     assert receipt["replay_identity"] == receipt["ODS"]["period_admission_identity"]
     assert len(receipt["closure"]["table_counts"]) == 33
-    assert receipt["publication_eligible"] is False
-    assert receipt["historical_disposition"] == "PENDING"
+    assert receipt["publication_eligible"] is True
+    assert receipt["historical_disposition"] == "PASS_NO_APPLICABLE_REGISTERED_CASE"
     assert not (ods / "READY").exists() and not (dwd / "READY").exists()
+
+    # Actual complete source audit -> paired metadata -> complete sealed audit.
+    # Unit-only mocked mount flags remain distinct from runtime A/B/C.
+    from quanthus.pipelines.securities_warehouse.base_build_publication import (
+        pair_documents,
+        prepare_markers,
+        verify_pair_seal,
+        write_markers,
+    )
+
+    control = tmp_path / "publication"
+    control.mkdir()
+    documents = pair_documents(
+        ods=ods, dwd=dwd, receipt=receipt, contract=c, revision=args["binding"]["code_revision"]
+    )
+    prepared = prepare_markers(control, documents, attempt="attempt-000001")
+    write_markers(control, {"ods": ods, "dwd": dwd}, prepared, attempt="attempt-000001")
+    with Budget(tmp_path / "sealed-pair-audit", [ods, dwd], limits()) as budget:
+        fresh = audit_pair(
+            ods=ods,
+            dwd=dwd,
+            contract=c,
+            expected_input_identity=inputs.verified_identity,
+            budget=budget,
+        )
+    verify_pair_seal(ods, dwd, fresh)
+
+    from quanthus.pipelines.securities_warehouse.base_build_publication import (
+        verify_pair_registration,
+    )
+
+    # Rehashing outer markers cannot legitimize a false scan or changed proof.
+    for layer, field in ((ods, "content"), (dwd, "scan_identity"), (dwd, "summaries")):
+        before = (layer / "manifest.json").read_bytes()
+        ready = (layer / "READY").read_bytes()
+        damaged = json.loads(before)
+        if field == "content":
+            damaged[field]["audit_identity"] = "sha256:" + "0" * 64
+            damaged["content_digest"] = digest(damaged["content"])
+        else:
+            damaged[field] = {} if field == "summaries" else "sha256:" + "0" * 64
+            damaged["content_digest"] = digest(
+                {k: v for k, v in damaged.items() if k != "content_digest"}
+            )
+        save(layer / "manifest.json", damaged)
+        (layer / "READY").write_text(file_sha(layer / "manifest.json") + "\n")
+        with pytest.raises(BoundedError, match="BUILD_PUBLICATION_MANIFEST_PROOF_CHANGED"):
+            verify_pair_registration(ods, dwd)
+        (layer / "manifest.json").write_bytes(before)
+        (layer / "READY").write_bytes(ready)
 
 
 @pytest.mark.parametrize(
@@ -376,3 +426,33 @@ def test_audit_worker_preserves_bound_failure_and_does_not_overwrite_a_prior_att
         entry.run(action="audit", job=job, contract=c)
     assert path.read_bytes() == original
     assert not (tmp_path / "worker/AUDIT.json").exists()
+
+
+def test_audit_execution_envelope_binds_actual_attempt_and_cannot_reuse_a_saved_success(
+    tmp_path, monkeypatch
+):
+    from datetime import datetime
+
+    from quanthus.pipelines.securities_warehouse.base_build_inputs import identity
+
+    entry, job, c = audit_worker_job(tmp_path, monkeypatch)
+    receipt = {"binding": {"code_revision": job["builder_revision"]}, "publication_eligible": False}
+    receipt["identity"] = identity(receipt)
+    monkeypatch.setattr(entry, "audit_pair", lambda **kwargs: receipt)
+    result = entry.run(action="audit", job=job, contract=c)
+    path = tmp_path / "worker/COMPLETION.json"
+    value = json.loads(path.read_bytes())
+    before = path.read_bytes()
+    assert value["job_identity"] == identity(job)
+    assert value["policy_identity"] == identity(c)
+    assert value["work_root"] == job["work_root"]
+    assert value["audit_sha256"] == file_sha(tmp_path / "worker/AUDIT.json")
+    assert value["audit_identity"] == receipt["identity"]
+    assert datetime.fromisoformat(value["started_at"]) <= datetime.fromisoformat(
+        value["finished_at"]
+    )
+    assert value["formal_READY"] is False and value["publication_eligible"] is False
+    assert result["execution_identity"] == value["identity"]
+    with pytest.raises(FileExistsError):
+        entry.run(action="audit", job=job, contract=c)
+    assert path.read_bytes() == before

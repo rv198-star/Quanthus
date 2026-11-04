@@ -12,6 +12,7 @@ from .base_build_inputs import file_sha, identity, member
 from .base_build_ods import materialize_ods
 from .base_build_period import VerifiedInputs, load
 from .base_build_profile import profile
+from .base_build_resources import remaining_stage_limits
 from .base_build_stages import Stage
 from .base_build_windows import audit_windows, build_windows
 
@@ -119,13 +120,17 @@ def materialization_stages(
     contract: dict[str, Any],
     config_root: Path,
     limits: Limits,
+    job_root: Path | None = None,
 ) -> list[Stage]:
     """The period is a single graph predecessor for both layer consumers."""
     sources = [Path(p) for p in inputs.roots.values()]
 
+    def stage_limits() -> Limits:
+        return remaining_stage_limits(job_root, sources, limits) if job_root is not None else limits
+
     def windows_build(output: Path, dependencies: dict[str, Path]) -> dict[str, Any]:
         period = member(dependencies["period"], "period")
-        with Budget(output, sources + [period], limits) as budget:
+        with Budget(output, sources + [period], stage_limits()) as budget:
             receipt = build_windows(
                 predecessor=predecessor_root(inputs, "ods"),
                 period=period,
@@ -152,7 +157,7 @@ def materialization_stages(
             member(dependencies["period"], "period"),
             member(dependencies["windows"], "windows"),
         )
-        with Budget(output, sources + [period, windows], limits) as budget:
+        with Budget(output, sources + [period, windows], stage_limits()) as budget:
             record = materialize_ods(
                 inputs=inputs,
                 period=period,
@@ -176,7 +181,7 @@ def materialization_stages(
             member(dependencies["windows"], "windows"),
         )
         ods = member(dependencies["ods"], "ODS")
-        with Budget(output, sources + [period, windows, ods], limits) as budget:
+        with Budget(output, sources + [period, windows, ods], stage_limits()) as budget:
             record = materialize_dwd(
                 predecessor=predecessor_root(inputs, "dwd"),
                 period=period,

@@ -58,6 +58,16 @@ the input root. Recover exact names with `base_build_recovery.recover_path_strea
 the restored root to match the original frozen inventory. A missing member requires a new
 immutable complete archive; it does not authorize changes to the frozen input identity.
 
+Network timeouts retain incomplete cloud archives and their failed receipts. Use
+`base_build_cloud_download` with the fixed cloud file id/SHA256, SSH host and staging directory
+to resume one failed transfer. It accepts a short-lived GDrive token as stdin JSON
+(`access_token`), keeps it on the client, requires an acknowledged HTTP byte range, locks the
+remote target and hashes the entire retained prefix plus new bytes. Only complete size, cloud
+MD5 and pinned SHA256 agreement permits atomic publication. Failed attempts and partials remain;
+an active or unknown partial is rejected. Use `--proxy` only for the existing client proxy.
+Transfer success is byte evidence and never input or Base acceptance. Process failed objects
+sequentially and keep their original failure records when consolidating download status.
+
 ## Recovery and retries
 
 `base_build_recovery` restores only requested SHA-selected regular blobs from the retained content

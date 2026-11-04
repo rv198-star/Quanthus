@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
+import shutil
+import subprocess
 import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from quanthus.pipelines.securities_warehouse import base_build_recovery as recovery
 from quanthus.pipelines.securities_warehouse.base_build_inputs import BuildInputError
@@ -106,6 +110,31 @@ class SelectedRecoveryTest(unittest.TestCase):
         with self.assertRaisesRegex(BuildInputError, "KEPT_SOURCE_CHANGED"):
             recovery.recover_stream(io.BytesIO(), self.request, self.root,
                                     kept={self.sha: str(source)})
+
+    @unittest.skipUnless(shutil.which("zstd"), "zstd CLI required")
+    def test_cli_restores_existing_long_window_archive(self):
+        archive = Path(self.tmp.name) / "selected.tar.zst"
+        raw = self.archive().read()
+        compressed = subprocess.check_output(
+            ["zstd", "--long=28", "-c"], input=raw,
+        )
+        archive.write_bytes(compressed)
+        request = Path(self.tmp.name) / "request.json"
+        request.write_text(json.dumps(self.request))
+        archive_sha = "sha256:" + hashlib.sha256(compressed).hexdigest()
+        argv = ["recover", "--request", str(request), "--archive", str(archive),
+                "--archive-sha256", archive_sha, "--output", str(self.root)]
+        # This test qualifies decoding, not the host's disposable /tmp capacity.
+        usage = shutil.disk_usage(Path(self.tmp.name))._replace(free=16 * 1024 ** 3)
+        with (
+            patch("sys.argv", argv),
+            patch.object(recovery.shutil, "disk_usage", return_value=usage),
+        ):
+            recovery.main()
+        receipt = json.loads((self.root / "RECOVERY.safe.json").read_bytes())
+        self.assertEqual(receipt["members"], self.request["members"])
+        self.assertEqual((self.root / self.row["path"]).read_bytes(), self.data)
+        self.assertFalse(receipt["READY"])
 
     def test_target_traversal_rejected(self):
         request = {"contract": recovery.REQUEST, "members": [{**self.row, "path": "../escape"}]}

@@ -156,8 +156,10 @@ def main() -> None:
     if shutil.disk_usage(args.output.parent).free < required + 8 * 1024 ** 3:
         raise BuildInputError("BUILD_RECOVERY_CAPACITY")
     kept = json.loads(args.kept.read_bytes()) if args.kept else {}
-    with subprocess.Popen(["zstd", "-d", "-c", str(args.archive)],
-                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as decoder:
+    # The retained archive declares a 256 MiB zstd window. Bound decoder memory
+    # explicitly; the CLI default (128 MiB) cannot decode this existing format.
+    with subprocess.Popen(["zstd", "--memory=256MB", "-d", "-c", str(args.archive)],
+                          stdout=subprocess.PIPE) as decoder:
         if decoder.stdout is None:
             raise BuildInputError("BUILD_RECOVERY_DECODER")
         result = recover_stream(decoder.stdout, request, args.output, kept=kept)

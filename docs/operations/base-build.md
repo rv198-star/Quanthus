@@ -3,10 +3,11 @@
 Parent: [Permanent P10 data line](../design/lld/12-permanent-data-line.md).
 Work item: `P10-DATA-BASE25-001`, [#596](https://github.com/rv198-star/Quanthus/issues/596).
 
-This runbook covers implemented input inventory, selection freezing, selected-byte recovery and
-unsealed paired materialization and internal composition/recovery/environment primitives.
-It does not declare a complete materialize/audit/seal orchestrator, a Base 2.5 acceptance or a
-production consumer switch. The full build consumes the previous paired Base, selected Daily
+This runbook covers input inventory, selection freezing, selected-byte recovery, paired
+materialization/source audit and the guarded offline build controller. Controller namespace
+qualification, standard Daily publishing and continuous-version acceptance are distinct from
+engineering tests. It does not declare Base 2.5 acceptance or a production consumer switch.
+The full build consumes the previous paired Base, selected Daily
 deliveries and their explicitly selected source/reference evidence. Original products stay read-only.
 
 ## Input selection and relocation
@@ -92,7 +93,7 @@ generic input envelope.
 
 ## Source admission and period command
 
-The common entry point currently implements `freeze`, `prepare-period`, `materialize` and `audit`:
+The common entry point implements `freeze`, `prepare-period`, `materialize`, `audit` and `build`:
 
 ```sh
 PYTHONTZPATH='' PYTHONPATH=src python -m quanthus.pipelines.securities_warehouse.base_build \
@@ -251,11 +252,60 @@ demand the original whole allowance again after a partial successful run. Each s
 receives the remaining total allowance, with room for immutable control receipts, and StageRunner
 checks the total before recording success. Audit TMP retains its own disjoint budget.
 
-The privileged controller, actual readonly protection/namespace qualification, governed historical
-dispositions, standard Daily/reference publishing and two consecutive complete versions A remain
-open. The synthetic fixture materializes all 33 tables, removes original inputs and period TMP,
+Actual readonly protection/namespace qualification, governed historical dispositions, standard
+Daily/reference publishing and two consecutive complete versions A remain open. The synthetic
+fixture materializes all 33 tables, removes original inputs and period TMP,
 replays all sources, prepares paired metadata and re-audits the sealed pair. Mocked mount flags
 in that test do not establish runtime A, full-data B or independent-node C.
+
+## Offline paired build controller
+
+Use `build --job ... --contract ... --execution ...` with the fixed execution schema in
+`config/pipelines/base-build-execution.example.v1.json`. It requires root inside an offline network
+namespace, a real unprivileged runtime account, a clean pinned checkout, a new or already-owned Job
+root, a disjoint persistent audit parent and the node's declared production/cache paths. Qualified
+paths exclude whitespace and systemd path-list/specifier characters; the runtime Python may be
+the normal terminal venv symlink. For example, from the pinned code directory:
+
+```sh
+sudo -n unshare --net env PYTHONPATH=/code/src:/code PYTHONTZPATH= PYTHONDONTWRITEBYTECODE=1 \
+  /opt/quanthus/venvs/base-build-py310-20261104/bin/python \
+  -m quanthus.pipelines.securities_warehouse.base_build build \
+  --job /data/controls/job.json --contract /data/controls/contract.json \
+  --execution /data/controls/execution.json
+```
+
+The controller holds its own lock, checks retained worker units before starting another phase,
+and runs the existing materialization graph as the runtime user. systemd supplies `PrivateNetwork`,
+`ProtectSystem=strict`, readonly inputs/code/runtime, a narrow writable Job, explicit production
+denial, no capabilities and declared memory/CPU/wall limits. It records actual worker units,
+start/exit times, logs and failures. A disconnected or killed controller does not authorize a
+duplicate worker; re-entry stops while a previously recorded unit is still active or unreadable.
+
+After successful materialization it records the ownership intent, moves layer roots once and
+root-protects generated products and Job ancestors. Previous stage receipts remain byte-identical;
+rejected linked input inodes in failed attempts are never chmod/chown targets. Host protection
+uses root ownership and readonly modes. Audit workers independently require actual kernel readonly
+product mounts. Original inputs, all old stage TMP/failed attempts, prior audit replay TMP and
+declared production/cache paths are inaccessible to the audit worker. `PrivateTmp` explicitly binds
+the current host scratch directory back in, so receipts survive the service exit. Audit-parent
+retention and per-audit remaining allowances are both checked.
+
+Every publication invocation launches a new audit and checks its exit plus completion envelope
+against the exact current job, unique scratch, hashes and actual invocation time. The root
+controller remains offline while performing complete product-byte readback and metadata commit.
+An incomplete marker transaction is archived and re-audited; a complete pair receives a fresh
+sealed source audit. `PAIR-READY.json` is written only after that final audit and binds both
+manifest hashes and the mutual registration. A completed re-entry leaves its original bytes
+unchanged and performs another fresh audit. It does not re-run the consumed materialization graph.
+
+Registered historical findings return `PAIRED_BUILT_AUDITED_HISTORICAL_GATE_PENDING` with no
+layer/parent READY. No execution option can grant a disposition. A successfully sealed pair still
+reports `full_A_B_C=false` and `consumer_admission=NOT_GRANTED`; the seven-task acceptance and
+production handoff are separate. Controller protocol tests simulate workers/ownership and do not
+establish actual namespace isolation. `tests/base_build_controller_fixture.py` prepares only
+synthetic predecessors/inputs for a later real locked-runtime namespace qualification; its
+generation mocks are undone before the runtime build and seed TMP is declared inaccessible.
 
 ## Locked offline runtime
 

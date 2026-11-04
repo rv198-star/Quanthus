@@ -1,9 +1,9 @@
-"""Standard Base build entry point for implemented input/period stages.
+"""Standard paired Base input, build, source audit and guarded publication.
 
 Unsealed paired materialization shares the admitted period and window closure.
-Readonly paired audit replays archived sources. Historical disposition and
-publication remain under implementation. No action here writes formal Base
-READY or activates consumers.
+Readonly paired audit replays archived sources. The offline root build controller
+owns protected publication and recovery. Registered historical gates remain
+mandatory. Independent A/B/C acceptance and consumer activation stay separate.
 """
 
 from __future__ import annotations
@@ -246,7 +246,21 @@ def _preflight_paths(roots: dict[str, str], work_root: Path, limits: Limits, day
         raise BoundedError("BUILD_WORK_INODE_RESERVE_INSUFFICIENT")
 
 
-def run(*, action: str, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
+def run(
+    *,
+    action: str,
+    job: dict[str, Any],
+    contract: dict[str, Any],
+    execution: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if action == "build":
+        from .base_build_controller import execute
+
+        if execution is None:
+            raise BoundedError("BUILD_EXECUTION_CONTRACT_REQUIRED")
+        return execute(job=job, contract=contract, execution=execution)
+    if execution is not None:
+        raise BoundedError("BUILD_EXECUTION_ONLY_FOR_BUILD_ACTION")
     if action == "audit":
         return run_audit(job=job, contract=contract)
     validate_job(job)
@@ -403,11 +417,23 @@ def run(*, action: str, job: dict[str, Any], contract: dict[str, Any]) -> dict[s
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("freeze", "prepare-period", "materialize", "audit"))
+    parser.add_argument(
+        "action", choices=("freeze", "prepare-period", "materialize", "audit", "build")
+    )
     parser.add_argument("--job", required=True, type=Path)
     parser.add_argument("--contract", required=True, type=Path)
+    parser.add_argument("--execution", type=Path)
     args = parser.parse_args()
-    print(json.dumps(run(action=args.action, job=load(args.job), contract=load(args.contract))))
+    print(
+        json.dumps(
+            run(
+                action=args.action,
+                job=load(args.job),
+                contract=load(args.contract),
+                execution=load(args.execution) if args.execution else None,
+            )
+        )
+    )
 
 
 if __name__ == "__main__":

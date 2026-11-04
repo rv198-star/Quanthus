@@ -105,7 +105,18 @@ closure and dependency stage/output identities; failed attempts are preserved an
 verified matching outputs may be reused. The standard 33-table composition keeps explicit
 append/inherit coverage dispositions and retains all native global checks. The versioned offline
 runtime lock and installed-wheel verification belong to build preflight, not data qualification.
-These primitives do not establish a completed orchestrator or A/B/C acceptance.
+The common `build` controller owns the offline graph, protection of generated products,
+fresh source audit and guarded paired publication. Successful producer inventories stay immutable:
+an explicit ownership transfer moves their layer roots into the Job's published namespace before
+metadata is added. Each incomplete recovery requires a new source audit; completed pairs are also
+re-audited on reuse. An atomic parent completion binds both layer seals. Root ownership is limited
+to generated Job products/evidence; original inputs, production collection/delivery and consumer
+pointers are outside its write authority. A configured unprivileged runtime performs transformations
+and audits with readonly inputs, denied original/cache paths and no network. The implementation
+and contracts live in `base_build_controller.py`, `base_build_publication.py` and
+`config/pipelines/base-build-execution.example.v1.json`. Controller engineering tests and a sealed
+pair do not establish continuous-version A, whole-real-data B, independent-node C or consumer
+activation; those acceptance boundaries remain explicit.
 
 The implemented period stage derives its calendar/security-day denominator from frozen independent
 reference sources, replays all seven Daily projections with the shared Daily converter and separately

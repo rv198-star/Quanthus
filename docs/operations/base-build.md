@@ -4,7 +4,7 @@ Parent: [Permanent P10 data line](../design/lld/12-permanent-data-line.md).
 Work item: `P10-DATA-BASE25-001`, [#596](https://github.com/rv198-star/Quanthus/issues/596).
 
 This runbook covers implemented input inventory, selection freezing, selected-byte recovery and
-internal composition/recovery/environment primitives.
+unsealed paired materialization and internal composition/recovery/environment primitives.
 It does not declare a complete materialize/audit/seal orchestrator, a Base 2.5 acceptance or a
 production consumer switch. The full build consumes the previous paired Base, selected Daily
 deliveries and their explicitly selected source/reference evidence. Original products stay read-only.
@@ -92,7 +92,7 @@ generic input envelope.
 
 ## Source admission and period command
 
-The common entry point currently implements `freeze` and `prepare-period`:
+The common entry point currently implements `freeze`, `prepare-period` and `materialize`:
 
 ```sh
 PYTHONTZPATH='' PYTHONPATH=src python -m quanthus.pipelines.securities_warehouse.base_build \
@@ -138,6 +138,45 @@ optional identity extensions, a source-derived security-day ledger and ADMISSION
 The stage graph preserves failed attempts and verifies all output bytes before reuse. This command
 does not complete inherited-window reconciliation, paired materialize/audit/seal or A/B/C, and
 does not produce formal Base READY. Those later actions remain under implementation.
+
+## Unsealed paired materialization
+
+Use the same job and contract with the `materialize` action. Its graph is
+`period -> windows -> ODS -> DWD`; both layers consume that one verified period and window
+closure. Stage identities include code, so a period built with a different revision is not an
+implicit cache hit. A failed DWD attempt preserves its evidence; retry verifies and reuses the
+matching period/windows/ODS stages before constructing a new DWD attempt.
+
+The window stage reads the predecessor's actual legacy plan, acquisition CHECKPOINT and original
+terminal receipts, or the successor's standard `evidence/windows` representation. Historical
+failure attempts are retained separately from final terminal states. Held coordinates include
+their original contract and scope identity and must remain exactly equal. New Daily security-day
+windows use their own contract; they do not invent legacy supplier partitions. Duplicate IDs,
+overlapping intervals, missing/extra/both terminal states, changed plan bindings and new held
+windows fail closed. Empty terminal directories may be absent in file-inventory archives; final
+exact membership and counts still apply. This window stage does not independently replay all
+historical prices or dispose of historical quality contradictions.
+
+The ODS materializer retains every frozen ODS/Daily/evidence member with independent unchanged
+bytes, plus the complete source inventory, contract, period and windows. It retains predecessor
+DWD control/evidence members; predecessor DWD payload bytes belong to the paired DWD materializer.
+The archive reserves its full member-copy space before copying, rejects source growth or mutation,
+and records its original provenance without introducing a runtime dependency on archived paths.
+The readonly ODS auditor can operate after all original sources have been removed. It verifies
+the exact archive namespace and frozen closure, the owning predecessor auditor, scope/period/window
+bindings and every other member. Relabelling a valid frozen period as a later version fails even
+when the changed outer metadata hashes agree. It also reconstructs the entire window closure from
+the embedded predecessor and period, so a self-consistent new held cannot be relabelled as inherited.
+This is an ODS archive audit, not paired audit B.
+
+The DWD materializer consumes the shared 33-table composition through the existing native engine,
+preserves the inherited limitation list and every referenced original evidence byte, and binds
+the exact ODS materialization, period and window identities. Stage receipts record table counts,
+rows by table, source bytes/member counts and observed resource peaks. Completed stages are TMP;
+neither layer receives a new manifest or READY. Do not edit their successful stage outputs to add
+publication metadata: the stage inventory is immutable. Paired readonly audit, guarded publication
+and continuous-version full workflow A remain required separate work. Synthetic 33-table/graph
+recovery tests establish these materialization primitives only, not A/B/C or a formal Base.
 
 ## Locked offline runtime
 
@@ -186,4 +225,7 @@ Focused tests: `tests/test_base_build_inputs.py`, `tests/test_base_build_freeze.
 `tests/test_base_build_recovery.py`, `tests/test_base_build_profile.py`,
 `tests/test_base_build_delta.py`, `tests/test_base_build_composition.py`,
 `tests/test_base_build_stages.py` and `tests/test_base_build_environment.py`.
+Paired primitives: `tests/test_base_build_windows.py`, `tests/test_base_build_ods.py` and
+`tests/test_base_build_pair.py`, including source removal, scope relabelling, resource admission,
+full 33-table materialization and interrupted-DWD recovery with verified shared-stage reuse.
 Full handoff verification remains `make check`.

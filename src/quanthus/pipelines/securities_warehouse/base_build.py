@@ -1,7 +1,8 @@
 """Standard Base build entry point for implemented input/period stages.
 
-The paired image materialize/audit/seal stages remain under implementation.
-No implemented action here writes a formal Base READY or activates consumers.
+Unsealed paired materialization shares the admitted period and window closure.
+Audit/seal stages remain under implementation. No action here writes a formal
+Base READY or activates consumers.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from .base23_native_image import image_schemas
 from .base_build_environment import check_environment
 from .base_build_freeze import freeze
 from .base_build_inputs import canonical, identity, member
+from .base_build_pair import materialization_stages
 from .base_build_period import VerifiedInputs, load, prepare_period
 from .base_build_profile import validate_contract
 from .base_build_stages import Stage, StageRunner
@@ -146,7 +148,7 @@ def run(*, action: str, job: dict[str, Any], contract: dict[str, Any]) -> dict[s
             "identity": actual["identity"],
             "formal_READY": False,
         }
-    if action != "prepare-period":
+    if action not in {"prepare-period", "materialize"}:
         raise BoundedError("BUILD_ACTION_NOT_IMPLEMENTED")
     # Full input verification runs exactly once in this invocation, including a
     # verified stage reuse. The resulting object is shared with the period stage.
@@ -206,6 +208,13 @@ def run(*, action: str, job: dict[str, Any], contract: dict[str, Any]) -> dict[s
         ):
             raise BoundedError("BUILD_PERIOD_STAGE_RECEIPT_CHANGED")
 
+    stages = [Stage("period", (), build, verify, configuration=stage_configuration)]
+    if action == "materialize":
+        stages.extend(
+            materialization_stages(
+                inputs=inputs, binding=binding, contract=contract, config_root=config, limits=limits
+            )
+        )
     runner = StageRunner(
         root=Path(job["work_root"]),
         sources=sources,
@@ -218,12 +227,25 @@ def run(*, action: str, job: dict[str, Any], contract: dict[str, Any]) -> dict[s
                 k: binding[k] for k in ("predecessor_through", "through_date", "target_version")
             },
         },
-        stages=[Stage("period", (), build, verify, configuration=stage_configuration)],
+        stages=stages,
     )
-    completed = runner.execute()["period"]
+    all_completed = runner.execute()
+    completed = all_completed["period"]
     return {
         "stage": action,
-        "status": "SOURCE_ADMISSION_AND_PERIOD_TMP_VERIFIED",
+        "status": (
+            "PAIRED_UNSEALED_MATERIALIZATIONS_COMPLETE_AUDIT_SEAL_PENDING"
+            if action == "materialize"
+            else "SOURCE_ADMISSION_AND_PERIOD_TMP_VERIFIED"
+        ),
+        "stages": {
+            name: {
+                "output": str(r["path"]),
+                "reused": r["reused"],
+                "output_identity": r["receipt"]["output_identity"],
+            }
+            for name, r in all_completed.items()
+        },
         "output": str(completed["path"]),
         "reused": completed["reused"],
         "stage_identity": completed["receipt"]["stage_identity"],
@@ -237,7 +259,7 @@ def run(*, action: str, job: dict[str, Any], contract: dict[str, Any]) -> dict[s
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("freeze", "prepare-period"))
+    parser.add_argument("action", choices=("freeze", "prepare-period", "materialize"))
     parser.add_argument("--job", required=True, type=Path)
     parser.add_argument("--contract", required=True, type=Path)
     args = parser.parse_args()

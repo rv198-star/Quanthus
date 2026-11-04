@@ -157,7 +157,17 @@ def write_source(root, *, day, lane, frames, universe):
     }
 
 
-def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
+def fixture(
+    tmp_path,
+    original,
+    *,
+    base_factory=None,
+    ods_factory=None,
+    market_day="2026-10-08",
+    closed_day="2026-10-09",
+    assemble_inputs=True,
+    extra_events=None,
+):
     """Period-only integration fixture; its seven-parent Base is not full A/B."""
     schemas = image_schemas(
         json.loads((CONFIG / "dwd-domain-model.v1.json").read_text()),
@@ -232,41 +242,57 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
     )
     if base_factory is not None:
         base = base_factory(base, schemas)
-    cfg = json.loads((CONFIG / "base24-daily-governance.v1.json").read_text())
-    cfg["layers"]["dwd"].update(
-        manifest_sha256=file_sha(base / "manifest.json"),
-        materialization_sha256=file_sha(base / "MATERIALIZATION.json"),
-        content_digest=json.loads((base / "manifest.json").read_bytes())["content_digest"],
-        package_id="synthetic-parent",
-    )
+    metadata = json.loads((base / "manifest.json").read_bytes())
+    if metadata["kind"] == "quanthus_dwd_base_bundle_v1":
+        from quanthus.pipelines.securities_warehouse.native_base_standard_reader import (
+            governance_config,
+        )
+
+        cfg = governance_config(base, build_id="synthetic-standard-daily")
+        record = json.loads((base / "MATERIALIZATION.json").read_bytes())
+        parent_paths = {
+            t: [base / r["path"] for r in record["layout"][t]["files"]] for t in PARENTS
+        }
+    else:
+        cfg = json.loads((CONFIG / "base24-daily-governance.v1.json").read_text())
+        cfg["layers"]["dwd"].update(
+            manifest_sha256=file_sha(base / "manifest.json"),
+            materialization_sha256=file_sha(base / "MATERIALIZATION.json"),
+            content_digest=json.loads((base / "manifest.json").read_bytes())["content_digest"],
+            package_id="synthetic-parent",
+        )
+    base_through = cfg["through_date"]
     config = tmp_path / "config.json"
     save(config, cfg)
     universe = {
-        "market_date": "2026-10-08",
+        "market_date": market_day,
         "historical_pit_authorized": False,
         "policy_id": "p10-acquisition-prevention-v1",
         "population": 2,
         "scope": "SSE_SZSE_A_SHARE_00_30_60_68",
         "codes": ["000001", "000002"],
         "company_org_ids": {},
-        "warehouse_observed_at": "2026-10-08T10:00:00+00:00",
+        "warehouse_observed_at": market_day + "T10:00:00+00:00",
     }
     calendar = [
         {
-            "trade_date": date(2026, 10, 1) + timedelta(days=n),
+            "trade_date": date.fromisoformat(base_through) + timedelta(days=n + 1),
             "exchange": venue,
-            "is_open": int(n == 7),
+            "is_open": int(
+                date.fromisoformat(base_through) + timedelta(days=n + 1)
+                == date.fromisoformat(market_day)
+            ),
             "session": "day",
-            "built_at": "2026-10-08T10:00:00+00:00",
+            "built_at": market_day + "T10:00:00+00:00",
             "source": "fixture",
         }
-        for n in range(9)
+        for n in range((date.fromisoformat(closed_day) - date.fromisoformat(base_through)).days)
         for venue in ("SSE", "SZSE")
     ]
     common = {
-        "date": "2026-10-08",
-        "market_date": "2026-10-08",
-        "acquired_at": "2026-10-08T10:00:00+00:00",
+        "date": market_day,
+        "market_date": market_day,
+        "acquired_at": market_day + "T10:00:00+00:00",
     }
     price = {
         **common,
@@ -278,10 +304,10 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
         "amount": "9600",
     }
     source_root = tmp_path / "sources"
-    market_path = source_root / "2026-10-08/market"
+    market_path = source_root / market_day / "market"
     market = write_source(
         market_path,
-        day="2026-10-08",
+        day=market_day,
         lane="market_daily_core",
         universe=universe,
         frames={
@@ -309,7 +335,7 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
                 {
                     "stock_code": "00000" + str(n),
                     "exchange": "SZSE",
-                    "target_date": "2026-10-08",
+                    "target_date": market_day,
                     "list_date": "2010-01-01",
                     "delist_date": None,
                 }
@@ -336,12 +362,13 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
                         "title": "original-title",
                         "url": "https://example.invalid/document",
                         "acquired_at": day + "T10:00:00+00:00",
-                    }
+                    },
+                    *(extra_events if day == market_day and extra_events else []),
                 ]
             },
         )
 
-    events, closed = event("2026-10-08"), event("2026-10-09")
+    events, closed = event(market_day), event(closed_day)
     selected = {"market_daily_core": market, "calendar_daily_events": events}
     core = tmp_path / "core"
     core.mkdir()
@@ -352,8 +379,8 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
             connection,
             selected=selected,
             work=core,
-            market_date=date(2026, 10, 8),
-            covered_after=date(2026, 9, 30),
+            market_date=date.fromisoformat(market_day),
+            covered_after=date.fromisoformat(base_through),
             catalog_digest="sha256:" + "9" * 64,
             bar_sources=[(path, artifact, "1d", "INTERVAL 0 SECOND")],
             check_identity=True,
@@ -361,8 +388,8 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
     assert held == 0
     parent_binding = {k: v for k, v in cfg["layers"]["dwd"].items() if k != "format"}
     parent_binding.update(
-        kind=KIND,
-        business_through="2026-09-30",
+        kind=metadata["kind"],
+        business_through=base_through,
         governance_use="governance_baseline",
         source_consumer_admission="NOT_GRANTED",
     )
@@ -370,13 +397,13 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
         lane: {k: value[k] for k in ("release_id", "manifest_sha256")}
         for lane, value in selected.items()
     }
-    save(core / "audit.json", {"result": "accepted", "market_date": "2026-10-08"})
+    save(core / "audit.json", {"result": "accepted", "market_date": market_day})
     save(core / "source-universe.json", universe)
     body = {
         "schema_version": 2,
         "kind": "cn01_daily_core_dwd_increment",
         "package_id": "synthetic-core",
-        "market_date": "2026-10-08",
+        "market_date": market_day,
         "covered_after_date": "2026-09-30",
         "product_scope": "daily-core-v1",
         "quality_policy": "p10-business-value-warehouse-quality.v1",
@@ -423,7 +450,7 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
     for row in statuses:
         row["reference_ods_manifest_sha256"] = market["manifest_sha256"]
     (native / "quality-status.jsonl").write_text("".join(json.dumps(r) + "\n" for r in statuses))
-    seal_native(native)
+    seal_native(native, market_day)
     manifest = json.loads((native / "manifest.json").read_text())
     manifest["source_ods_manifest_sha256"] = market["manifest_sha256"]
     sealed_header(native, manifest)
@@ -431,6 +458,16 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
     daily_base24.build(
         core=core, native5m=native, config=config, output=daily, code_revision="a" * 40
     )
+    if not assemble_inputs:
+        return {
+            "base": base,
+            "projection": daily,
+            "config": config,
+            "source_root": source_root,
+            "market": market_path,
+            "events": source_root / market_day / "events",
+            "closed_events": source_root / closed_day / "events",
+        }
     ods = tmp_path / "ods"
     sealed_header(
         ods,
@@ -463,8 +500,8 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
         "predecessor_version": "2.4",
         "target_version": "2.5",
         "predecessor_through": "2026-09-30",
-        "through_date": "2026-10-09",
-        "expected_days": ["2026-10-08"],
+        "through_date": closed_day,
+        "expected_days": [market_day],
         "packages": [
             {
                 "id": key,
@@ -475,7 +512,7 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
             for key, role, day in (
                 ("base-dwd", "dwd", None),
                 ("base-ods", "ods", None),
-                ("daily", "daily", "2026-10-08"),
+                ("daily", "daily", market_day),
             )
         ],
         "expected_days_evidence": {
@@ -511,7 +548,7 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
         json.loads((CONFIG / "base24-delivery.v1.json").read_text()),
         version="2.5",
         predecessor_version="2.4",
-        through="2026-10-09",
+        through=closed_day,
     )
     binding = {
         "predecessor_manifest_sha256": file_sha(base / "manifest.json"),
@@ -519,7 +556,7 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
         "code_revision": "c" * 40,
         "policy_identity": identity(c),
         "predecessor_through": "2026-09-30",
-        "through_date": "2026-10-09",
+        "through_date": closed_day,
         "target_version": "2.5",
     }
     return {
@@ -539,8 +576,8 @@ def fixture(tmp_path, original, *, base_factory=None, ods_factory=None):
         "closed_days": [
             {
                 "evidence_id": "sources",
-                "day": "2026-10-09",
-                "release_path": "2026-10-09/events/release.json",
+                "day": closed_day,
+                "release_path": closed_day + "/events/release.json",
                 "release_id": closed["release_id"],
                 "manifest_sha256": closed["manifest_sha256"],
             }

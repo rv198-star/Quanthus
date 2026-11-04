@@ -124,8 +124,27 @@ replays native 5m originals. Five identity extension families are admitted only 
 new identities; other table coverage is inherited without an inferred refresh. Closed-day calendar
 and event projections preserve actual source clocks. Parent-pinned evidence adapters must verify
 the original release/artifact identities without inventing omitted source READY markers. The same
-job graph owns this one TMP prerequisite and its verified recovery. `base_build` currently exposes
-only input freezing and period preparation; full paired orchestration and A/B/C remain open.
+job graph owns this one TMP prerequisite and its verified recovery. `base_build` exposes freezing,
+period preparation, paired materialization, source audit and the offline `build` controller.
+A/B/C acceptance remains separate from availability of these commands.
+
+The opt-in `p10-standard-calendar-day-delivery-v1` contract makes each ordinary Daily delivery
+self-contained: the original market/core/native projection, raw source releases, observed
+calendar/universe/master and source-replayed identity extensions travel together. Closed days
+carry original events and an observed market reference, without manufactured bars. The next Job
+derives its selection from the preceding pair and one delivery per calendar day; it does not
+require an external reference-preparation directory. Repeated event observations may select the
+earliest actual knowledge row only when all business facts and subject sets agree. Changed facts
+require an explicit governed revision. All original observations remain in ODS. The same Daily
+converters and source replay serve publishing, building and cold audit.
+
+A sealed generic Base can explicitly seed subsequent Daily governance through
+`native_base_standard_reader.py`. Its proof names native/source bootstrap identities and grants
+no research/trading or independent A/B/C acceptance. Legacy parent contracts and production
+defaults retain their existing gates. `standard_daily.py` and `base_build_standard_daily.py`
+provide the publisher and Job preparation operations; `tests/test_standard_daily.py` exercises
+successive full 33-table pairs and source removal. Runtime two-version acceptance uses the same
+public controller, not test mount simulation.
 
 Calendar admission combines all frozen parent-bound raw calendars. Missing dates in one artifact
 are not missing input when other selected artifacts supply the observed cells; unknown cached

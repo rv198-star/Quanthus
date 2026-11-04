@@ -8,7 +8,11 @@ import pytest
 
 from quanthus.pipelines.securities_warehouse.base22 import digest
 from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError, Budget
-from quanthus.pipelines.securities_warehouse.base_build_audit import audit_structure, physical_guard
+from quanthus.pipelines.securities_warehouse.base_build_audit import (
+    audit_pair,
+    audit_structure,
+    physical_guard,
+)
 from quanthus.pipelines.securities_warehouse.base_build_composition import audit_standard_image
 from quanthus.pipelines.securities_warehouse.base_build_inputs import file_sha
 from tests.test_base_build_composition import limits
@@ -205,86 +209,10 @@ def test_full_pair_replays_all_period_sources_from_archived_inputs_after_origina
     original,
     monkeypatch,
 ):
-    from pathlib import Path
+    from tests.base_build_full_fixture import source_pair
 
-    from quanthus.pipelines.securities_warehouse.base_build_audit import audit_pair
-    from quanthus.pipelines.securities_warehouse.base_build_ods import materialize_ods
-    from quanthus.pipelines.securities_warehouse.base_build_pair import materialize_dwd
-    from quanthus.pipelines.securities_warehouse.base_build_period import prepare_period
-    from quanthus.pipelines.securities_warehouse.base_build_profile import delivery_contract
-    from quanthus.pipelines.securities_warehouse.base_build_windows import build_windows
-    from tests.base_build_full_fixture import native_predecessor, ods_predecessor
-    from tests.test_base_build_period import fixture as period_fixture
-
-    args = period_fixture(
-        tmp_path,
-        original,
-        base_factory=lambda root, schemas: native_predecessor(root, schemas, monkeypatch),
-        ods_factory=lambda: ods_predecessor(tmp_path, source_closure),
-    )
-    inputs = args["inputs"]
-    roots = [Path(p) for p in inputs.roots.values()]
-    c = delivery_contract(
-        json.loads(Path("config/pipelines/base24-delivery.v1.json").read_bytes()),
-        version="2.5",
-        predecessor_version="2.4",
-        through="2026-10-09",
-    )
-    prior_ods = next(
-        Path(inputs.roots[r["id"]])
-        for r in inputs.frozen["content"]["selection"]["packages"]
-        if r["role"] == "ods"
-    )
-    prior_dwd = next(
-        Path(inputs.roots[r["id"]])
-        for r in inputs.frozen["content"]["selection"]["packages"]
-        if r["role"] == "dwd"
-    )
-    with Budget(tmp_path / "materialize-job", roots, limits()) as budget:
-        period = budget.root / "period"
-        prepare_period(**args, output=period, budget=budget)
-        windows = budget.root / "windows"
-        build_windows(
-            predecessor=prior_ods,
-            period=period,
-            binding=args["binding"],
-            output=windows,
-            budget=budget,
-        )
-        ods = budget.root / "ODS"
-        materialize_ods(
-            inputs=inputs, period=period, windows=windows, contract=c, output=ods, budget=budget
-        )
-        dwd = budget.root / "DWD"
-        materialize_dwd(
-            predecessor=prior_dwd,
-            period=period,
-            windows=windows,
-            ods=ods,
-            binding=args["binding"],
-            contract=c,
-            rules=args["rules"],
-            model=json.loads(Path("config/pipelines/dwd-domain-model.v1.json").read_bytes()),
-            extension=json.loads(
-                Path("config/pipelines/dwd-domain-model.v1.1-extension.json").read_bytes()
-            ),
-            config_root=Path("config/pipelines"),
-            output=dwd,
-            budget=budget,
-        )
-    for root in roots:
-        shutil.rmtree(root)
-    shutil.rmtree(period)
-    shutil.rmtree(windows)
-    readonly(monkeypatch, [ods, dwd])
-    with Budget(tmp_path / "full-pair-audit", [ods, dwd], limits()) as budget:
-        receipt = audit_pair(
-            ods=ods,
-            dwd=dwd,
-            contract=c,
-            expected_input_identity=inputs.verified_identity,
-            budget=budget,
-        )
+    ods, dwd, receipt, c, inputs = source_pair(tmp_path, source_closure, original, monkeypatch)
+    args = {"binding": receipt["binding"]}
     assert receipt["source_replay"] == "PASS_ALL_PERIOD_SOURCES_AND_TYPED_DELTA"
     assert receipt["replay_identity"] == receipt["ODS"]["period_admission_identity"]
     assert len(receipt["closure"]["table_counts"]) == 33

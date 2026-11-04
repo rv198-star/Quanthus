@@ -307,6 +307,60 @@ establish actual namespace isolation. `tests/base_build_controller_fixture.py` p
 synthetic predecessors/inputs for a later real locked-runtime namespace qualification; its
 generation mocks are undone before the runtime build and seed TMP is declared inaccessible.
 
+## Ordinary Daily to next Base
+
+Use the opt-in contract `config/pipelines/standard-daily-delivery.v1.json`. For an already sealed
+standard parent, export its exact governance binding with `standard_daily parent-config --base
+/data/base/DWD --build-id daily-next --output /data/config/next-parent.json`. The modules below
+are under `quanthus.pipelines.securities_warehouse`; run them with `python -m` from pinned code.
+This prepares isolated governance only and does not change scheduled production or consumers.
+
+After the existing Daily core/native projection completes, publish its complete sources:
+
+```sh
+python -m quanthus.pipelines.securities_warehouse.standard_daily publish \
+  --base /data/base/DWD --config /data/config/next-parent.json \
+  --projection /data/day/projection --market-source /data/day/market \
+  --events /data/day/events --code-revision "$BASE_BUILD_REVISION" \
+  --work-root /data/tmp/day-publish --output /data/daily/2026-11-02
+```
+
+On a closed day omit `--projection` and use `--reference-source /data/observed-market` instead of
+`--market-source`. Retain a complete observed market release as the calendar/master reference;
+its original date and knowledge times remain unchanged. The publisher verifies original seven-table
+and native-5m projection/source equality, includes raw source releases and reference closure, and
+atomically seals the delivery. Existing matching deliveries receive fresh replay on re-entry;
+unknown or changed output is rejected. Failed staging stays in its unique work root. `--limits`
+accepts the existing `Limits` JSON. Archive the entire resulting directory to GDrive with the
+ordinary complete-member backup and cloud verification; a DWD-only projection is insufficient.
+
+Deliver one package per calendar day after the Base cutoff, including closed days. Market event
+windows may overlap closed-day observations; only exactly unchanged business facts and subject
+sets can be coalesced, using the earliest actual observation. Conflicts stop the affected build
+and retain all originals. No new quality-held is permitted. The generic parent adapter grants
+Daily governance bootstrap only; independent acceptance remains separate.
+
+Prepare the next existing Job directly from the pair and delivered days:
+
+```sh
+python -m quanthus.pipelines.securities_warehouse.base_build_standard_daily \
+  --ods /data/base/ODS --dwd /data/base/DWD \
+  --daily /data/daily/2026-11-01 --daily /data/daily/2026-11-02 \
+  --target-version 2.6 --through-date 2026-11-02 \
+  --code-revision "$BASE_BUILD_REVISION" \
+  --environment-lock /workspace/ops/data/base-build-environment.v1.json \
+  --wheelhouse /data/runtime/wheelhouse --limits /data/controls/build-limits.json \
+  --output /data/controls/next --work-root /data/build/base26
+```
+
+The preparation writes selection, relocated roots, a full input freeze, contract and Job, without
+source hunting or a separately prepared reference archive. Existing controls are preserved.
+Use the `build` command above with that Job/contract and the existing execution configuration.
+Its period replay is shared by both layers; later source audit replays the archived deliveries.
+Keep the one-time legacy Base2.4 migration supplements for Base2.5, but subsequent ordinary builds
+use these self-contained deliveries. `tests/test_standard_daily.py` reuses the complete pair
+fixture for two versions; existing missing/corrupt/duplicate/recovery regressions remain applicable.
+
 ## Locked offline runtime
 
 `ops/data/base-build-environment.v1.json` and `ops/data/base-build-runtime.lock` declare the current

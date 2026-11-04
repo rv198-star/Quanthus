@@ -151,8 +151,77 @@ def main() -> None:
     for option in ("revision", "runtime-python", "runtime-user", "wheelhouse"):
         parser.add_argument("--" + option, required=True)
     parser.add_argument("--protected", action="append", required=True)
+    parser.add_argument("--predecessor-controls", type=Path)
     args = vars(parser.parse_args())
-    print(json.dumps(prepare(**args)))
+    previous = args.pop("predecessor_controls")
+    print(json.dumps(prepare_next(previous=previous, **args) if previous else prepare(**args)))
+
+
+def prepare_next(*, previous: Path, **args) -> dict[str, str]:
+    """Prepare the next Job using the first controller's actual sealed pair."""
+    from quanthus.pipelines.securities_warehouse.base_build_freeze import freeze
+    from tests.base_build_full_fixture import standard_next_inputs
+
+    root, job_root, audit_parent = (args[k] for k in ("root", "job_root", "audit_parent"))
+    revision = args["revision"]
+    prior_job = json.loads((previous / "job.json").read_bytes())
+    prior_execution = json.loads((previous / "execution.json").read_bytes())
+    pair = Path(prior_job["work_root"]) / "published"
+    assert (pair.parent / "PAIR-READY.json").is_file()
+    root.mkdir(parents=True, exist_ok=False)
+    selection, roots, configuration = standard_next_inputs(
+        root, pair / "ODS", pair / "DWD", revision
+    )
+    controls = root / "controls"
+    controls.mkdir()
+    frozen = freeze(selection, roots)
+    for name, value in (("selection", selection), ("roots", roots), ("frozen", frozen)):
+        save(controls / (name + ".json"), value)
+    job = dict(prior_job)
+    job.update(
+        builder_revision=revision,
+        work_root=str(job_root),
+        selection=str(controls / "selection.json"),
+        roots=str(controls / "roots.json"),
+        frozen=str(controls / "frozen.json"),
+        **configuration,
+    )
+    execution = dict(prior_execution)
+    execution.update(
+        audit_parent=str(audit_parent),
+        protected_paths=sorted(
+            set(
+                [
+                    *args["protected"],
+                    *(
+                        str(p)
+                        for p in seed_only_paths(root, [Path(p) for p in roots.values()], controls)
+                    ),
+                ]
+            )
+        ),
+    )
+    contract = delivery_contract(
+        json.loads(Path("config/pipelines/base24-delivery.v1.json").read_bytes()),
+        version="2.6",
+        predecessor_version="2.5",
+        through="2026-10-13",
+    )
+    for name, value in (("job", job), ("execution", execution), ("contract", contract)):
+        save(controls / (name + ".json"), value)
+    save(
+        controls / "SYNTHETIC-QUALIFICATION.json",
+        {
+            "synthetic": True,
+            "real_base25_data": False,
+            "full_A_B_C": False,
+            "generation_code_revision": revision,
+            "predecessor": str(pair),
+            "mocking": "NONE_SECOND_VERSION",
+            "inputs": "SEALED_FIRST_PAIR_AND_SELF_CONTAINED_CALENDAR_DAY_DELIVERIES",
+        },
+    )
+    return {name: str(controls / (name + ".json")) for name in ("job", "contract", "execution")}
 
 
 if __name__ == "__main__":

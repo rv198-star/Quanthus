@@ -319,6 +319,13 @@ def _verify_base(
 ) -> tuple[dict[str, Any] | NativeBase23, dict[str, Any]]:
     manifest = _object(base_root / "manifest.json")
     config = _object(release_config)
+    if manifest.get("kind") == "quanthus_dwd_base_bundle_v1":
+        from .native_base_standard_reader import read_native_parent_references as read_standard
+
+        try:
+            return read_standard(base_root, config), config
+        except (NativeBase23Error, ValueError) as exc:
+            raise DailyDomainBuildError(str(exc)) from exc
     if manifest.get("kind") == NATIVE_BASE24_KIND:
         try:
             require_daily_core_governance(config)
@@ -429,8 +436,14 @@ def _reuse_base24_output(output: Path, identity: Mapping[str, Any]) -> DailyDoma
 
 
 def _project_announcements(
-    connection: Any, *, path: Path, artifact: Any, work: Path,
-    after: date, through: date, check_identity: bool,
+    connection: Any,
+    *,
+    path: Path,
+    artifact: Any,
+    work: Path,
+    after: date,
+    through: date,
+    check_identity: bool,
 ) -> tuple[Path, Path, int]:
     """One source-preserving converter shared by Daily and Base closed days.
 
@@ -506,13 +519,21 @@ def _project_announcements(
 
 
 def _project_trading_calendar(
-    connection: Any, *, path: Path, artifact: Any, work: Path, market_date: date,
-    record_filename: str | None = None, require_observed: bool = False,
+    connection: Any,
+    *,
+    path: Path,
+    artifact: Any,
+    work: Path,
+    market_date: date,
+    record_filename: str | None = None,
+    require_observed: bool = False,
 ) -> Path:
     """Project one observed calendar day, preserving source knowledge and clock."""
     trading_calendar_path, trading_calendar_artifact = path, artifact
     record_filename = record_filename or path.name
-    observed = " AND o.built_at IS NOT NULL AND o.source NOT IN ('','unknown')" if require_observed else ""
+    observed = (
+        " AND o.built_at IS NOT NULL AND o.source NOT IN ('','unknown')" if require_observed else ""
+    )
     calendar_session_id = _stable_id_sql(
         "calendar_session", "v.venue_id", "CAST(o.trade_date AS VARCHAR)", _sql("day")
     )
@@ -545,21 +566,38 @@ def _project_trading_calendar(
 
 
 def _project_daily_tables(
-    connection: Any, *, selected: Mapping[str, Any], work: Path,
-    market_date: date, covered_after: date, catalog_digest: str,
-    bar_sources: list[tuple[Path, Any, str, str]], check_identity: bool,
+    connection: Any,
+    *,
+    selected: Mapping[str, Any],
+    work: Path,
+    market_date: date,
+    covered_after: date,
+    catalog_digest: str,
+    bar_sources: list[tuple[Path, Any, str, str]],
+    check_identity: bool,
 ) -> tuple[dict[str, Path], int]:
     """Shared exact source projection; callers own qualification and comparison."""
-    valuation_path, valuation_artifact = _artifact(selected, "market_daily_core", "valuation_daily_delta")
+    valuation_path, valuation_artifact = _artifact(
+        selected, "market_daily_core", "valuation_daily_delta"
+    )
     index_path, index_artifact = _artifact(selected, "market_daily_core", "index_daily_delta")
-    status_path, status_artifact = _artifact(selected, "market_daily_core", "daily_status_observation_delta")
-    trading_calendar_path, trading_calendar_artifact = _artifact(selected, "market_daily_core", "trading_calendar")
-    announcements_path, announcements_artifact = _artifact(selected, "calendar_daily_events", "announcements_delta")
+    status_path, status_artifact = _artifact(
+        selected, "market_daily_core", "daily_status_observation_delta"
+    )
+    trading_calendar_path, trading_calendar_artifact = _artifact(
+        selected, "market_daily_core", "trading_calendar"
+    )
+    announcements_path, announcements_artifact = _artifact(
+        selected, "calendar_daily_events", "announcements_delta"
+    )
     catalog = {"catalog_digest": catalog_digest}
     universe_artifact = check_identity
     calendar_output = _project_trading_calendar(
-        connection, path=trading_calendar_path, artifact=trading_calendar_artifact,
-        work=work, market_date=market_date,
+        connection,
+        path=trading_calendar_path,
+        artifact=trading_calendar_artifact,
+        work=work,
+        market_date=market_date,
     )
     connection.execute(
         f"CREATE VIEW daily_calendar AS SELECT * FROM read_parquet({_sql(str(calendar_output))})"
@@ -665,8 +703,13 @@ def _project_daily_tables(
     )
 
     disclosure_output, subject_output, held_disclosure_count = _project_announcements(
-        connection, path=announcements_path, artifact=announcements_artifact, work=work,
-        after=covered_after, through=market_date, check_identity=bool(universe_artifact),
+        connection,
+        path=announcements_path,
+        artifact=announcements_artifact,
+        work=work,
+        after=covered_after,
+        through=market_date,
+        check_identity=bool(universe_artifact),
     )
 
     outputs = {
@@ -694,7 +737,10 @@ def build_daily_domain_increment(
     """Build and audit one Base-seeded daily DWD package without mutating Base."""
 
     requested_config = _object(release_config)
-    is_base24 = requested_config.get("layers", {}).get("dwd", {}).get("format") == "native_base24"
+    is_base24 = requested_config.get("layers", {}).get("dwd", {}).get("format") in {
+        "native_base24",
+        "native_standard_base",
+    }
     if is_base24:
         try:
             output = disjoint_output(output, [base_root, release_root, catalog_root])
@@ -710,7 +756,10 @@ def build_daily_domain_increment(
         if output == source_root or output.is_relative_to(source_root):
             raise DailyDomainBuildError(f"daily output must be outside the {label} root")
     if output.exists() and not is_base24:
-        if _object(output / "manifest.json").get("base", {}).get("kind") == NATIVE_BASE24_KIND:
+        if _object(output / "manifest.json").get("base", {}).get("kind") in {
+            NATIVE_BASE24_KIND,
+            "quanthus_dwd_base_bundle_v1",
+        }:
             raise DailyDomainBuildError("Base 2.4 Daily requires its explicit governance config")
         return verify_daily_domain_increment(output)
     catalog, selected = _read_catalog(catalog_root.resolve(), release_root)
@@ -855,9 +904,14 @@ def build_daily_domain_increment(
         connection.execute(f"CREATE VIEW base_venue AS SELECT * FROM {_path_relation(venue_files)}")
 
         outputs, held_disclosure_count = _project_daily_tables(
-            connection, selected=selected, work=work, market_date=market_date,
-            covered_after=covered_after, catalog_digest=catalog["catalog_digest"],
-            bar_sources=bar_sources, check_identity=bool(universe_artifact),
+            connection,
+            selected=selected,
+            work=work,
+            market_date=market_date,
+            covered_after=covered_after,
+            catalog_digest=catalog["catalog_digest"],
+            bar_sources=bar_sources,
+            check_identity=bool(universe_artifact),
         )
         row_counts: dict[str, int] = {}
         audit_tables = []
@@ -1121,7 +1175,7 @@ def verify_daily_domain_increment(root: Path) -> DailyDomainResult:
         raise DailyDomainBuildError("daily DWD READY is unreadable") from exc
     if ready != manifest_sha:
         raise DailyDomainBuildError("daily DWD manifest or READY differs")
-    if manifest.get("base", {}).get("kind") == NATIVE_BASE24_KIND:
+    if manifest.get("base", {}).get("kind") in {NATIVE_BASE24_KIND, "quanthus_dwd_base_bundle_v1"}:
         identity = manifest.get("job_identity")
         if (
             manifest.get("kind") != "cn01_daily_core_dwd_increment"

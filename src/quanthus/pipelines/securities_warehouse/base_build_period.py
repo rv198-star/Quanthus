@@ -340,6 +340,20 @@ def prepare_period(
         or binding["target_version"] != selection["target_version"]
     ):
         raise BoundedError("BUILD_PERIOD_SCOPE_BINDING_CHANGED")
+    from .base_build_standard_daily import MODE
+    from .base_build_standard_daily import prepare as prepare_standard
+
+    if source_evidence_id == MODE:
+        return prepare_standard(
+            inputs=inputs,
+            binding=binding,
+            rules=rules,
+            schemas=schemas,
+            output=output,
+            budget=budget,
+            closed_days=closed_days,
+            calendar_reference=calendar_reference,
+        )
     output = budget.destination(output)
     if output.exists():
         raise BoundedError("BUILD_PERIOD_OUTPUT_EXISTS_PRESERVED")

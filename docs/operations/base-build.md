@@ -279,7 +279,12 @@ The controller holds its own lock, checks retained worker units before starting 
 and runs the existing materialization graph as the runtime user. systemd supplies `PrivateNetwork`,
 `ProtectSystem=strict`, readonly inputs/code/runtime, a narrow writable Job, explicit production
 denial, no capabilities and declared memory/CPU/wall limits. It records actual worker units,
-start/exit times, logs and failures. A disconnected or killed controller does not authorize a
+start/exit times, logs and failures.
+If a selected frozen Base is inside a denied production parent, the materialization namespace
+masks that parent with an empty readonly filesystem and binds back only the declared readonly
+inputs. Other production siblings, including newly created ones, remain hidden. Audit still
+denies all original inputs. No host mount or source ownership is changed.
+A disconnected or killed controller does not authorize a
 duplicate worker; re-entry stops while a previously recorded unit is still active or unreadable.
 
 After successful materialization it records the ownership intent, moves layer roots once and

@@ -254,8 +254,9 @@ def test_interrupted_marker_link_recovers_before_strict_transfer_census(tmp_path
     assert list((Path(job["work_root"]) / "publication-writes").rglob("archived-final-markers"))
 
 
+@pytest.mark.parametrize("nested_input", [False, True])
 def test_service_namespace_keeps_scratch_visible_under_private_tmp_and_denies_derived_inputs(
-    tmp_path,
+    tmp_path, nested_input,
 ):
     execution = json.loads(
         Path("config/pipelines/base-build-execution.example.v1.json").read_bytes()
@@ -270,14 +271,19 @@ def test_service_namespace_keeps_scratch_visible_under_private_tmp_and_denies_de
         job_path=Path("/controls/job.json"),
         contract_path=Path("/controls/contract.json"),
         readonly=[Path("/data/products/ODS"), Path("/data/products/DWD")],
-        denied=[Path("/data/original"), Path("/data/work/stages")],
+        denied=[Path("/data") if nested_input else Path("/data/original"),
+                Path("/data/work/stages")],
         writable=Path("/var/tmp/job-audit"),
         unit="unit",
     )
     assert "PrivateNetwork=yes" in args and "ProtectSystem=strict" in args
     assert "PrivateTmp=yes" in args and "BindPaths=/var/tmp/job-audit:/var/tmp/job-audit" in args
     assert "ReadWritePaths=/var/tmp/job-audit" in args and "CapabilityBoundingSet=" in args
-    assert "InaccessiblePaths=-/data/original -/data/work/stages" in args
+    if nested_input:
+        assert "TemporaryFileSystem=/data:ro" in args
+        assert not any(a.startswith("InaccessiblePaths=") for a in args)
+    else:
+        assert "InaccessiblePaths=-/data/original -/data/work/stages" in args
     assert any(a.startswith("BindReadOnlyPaths=") and "/data/products/ODS" in a for a in args)
     assert "User=agentdock" in args
 

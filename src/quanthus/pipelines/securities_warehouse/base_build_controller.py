@@ -309,8 +309,24 @@ def service_arguments(
             )
         ),
     ]
-    if denied:
-        properties.append("InaccessiblePaths=" + " ".join("-" + str(p) for p in denied))
+    # A frozen Base may live inside a production jobs parent. An inaccessible
+    # parent also hides its explicitly bound child. Mask that parent with an
+    # empty readonly filesystem instead; the existing readonly bind list then
+    # exposes only the selected inputs. New production siblings stay hidden too.
+    masks, inaccessible = [], []
+    for path in denied:
+        if any(path == source or source in path.parents for source in readonly):
+            raise BoundedError("BUILD_EXECUTION_INPUT_DENIAL_CONFLICT")
+        if any(path in source.parents for source in readonly):
+            masks.append(path)
+        else:
+            inaccessible.append(path)
+    masks = [p for p in masks if not any(q in p.parents for q in masks)]
+    if masks:
+        properties.append("TemporaryFileSystem=" + " ".join(str(p) + ":ro" for p in masks))
+    inaccessible = [p for p in inaccessible if not any(q in p.parents for q in masks)]
+    if inaccessible:
+        properties.append("InaccessiblePaths=" + " ".join("-" + str(p) for p in inaccessible))
     arguments = ["systemd-run", "--quiet", "--wait", "--pipe", "--collect", "--unit=" + unit]
     for value in properties:
         arguments.extend(["-p", value])

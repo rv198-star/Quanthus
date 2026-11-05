@@ -96,7 +96,12 @@ def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any
     _preflight_paths(products, Path(job["work_root"]), limits, 0)
     for raw in job["denied_input_roots"]:
         path = Path(raw)
-        if path.exists() and os.access(path, os.R_OK):
+        try:
+            readable = path.exists() and os.access(path, os.R_OK)
+        except PermissionError:
+            # InaccessiblePaths may deny traversal of an original source's parent.
+            readable = False
+        if readable:
             raise BoundedError("BUILD_AUDIT_ORIGINAL_SOURCE_STILL_READABLE")
     sources = [Path(p) for p in products.values()]
     owned = False

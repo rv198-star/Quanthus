@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import json
 import os
 import shutil
@@ -330,6 +331,40 @@ def test_audit_worker_rejects_readable_original_source_before_any_product_scan(
     with pytest.raises(BoundedError, match="BUILD_AUDIT_ORIGINAL_SOURCE_STILL_READABLE"):
         entry.run(action="audit", job=job, contract=c)
     assert not (tmp_path / "worker").exists()
+
+
+@pytest.mark.parametrize("error_number", [errno.EACCES, errno.EPERM, errno.EIO])
+def test_audit_worker_handles_original_source_stat_errors_without_weakening_denial(
+    tmp_path, monkeypatch, error_number
+):
+    from pathlib import Path
+
+    entry, job, c = audit_worker_job(tmp_path, monkeypatch)
+    original = tmp_path / "inaccessible-parent/prior-base"
+    job["denied_input_roots"] = [str(original)]
+    exists = Path.exists
+    error = OSError(error_number, "original source stat failed", str(original))
+
+    def source_exists(path):
+        if path == original:
+            raise error
+        return exists(path)
+
+    def reached_product_audit(**kwargs):
+        raise BoundedError("SYNTHETIC_PRODUCT_AUDIT_REACHED")
+
+    monkeypatch.setattr(Path, "exists", source_exists)
+    monkeypatch.setattr(entry, "audit_pair", reached_product_audit)
+    if isinstance(error, PermissionError):
+        with pytest.raises(BoundedError, match="SYNTHETIC_PRODUCT_AUDIT_REACHED"):
+            entry.run(action="audit", job=job, contract=c)
+        failure = json.loads((tmp_path / "worker/FAILURE.json").read_bytes())
+        assert failure["reason_code"] == "SYNTHETIC_PRODUCT_AUDIT_REACHED"
+    else:
+        with pytest.raises(OSError) as failure:
+            entry.run(action="audit", job=job, contract=c)
+        assert failure.value is error
+        assert not (tmp_path / "worker").exists()
 
 
 def test_audit_worker_preserves_bound_failure_and_does_not_overwrite_a_prior_attempt(

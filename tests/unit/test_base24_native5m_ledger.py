@@ -51,15 +51,27 @@ def test_partial_or_invalid_observation_stays_in_denominator_as_r3():
     assert classify(row_count=0, distinct_buckets=0)["rating"] == "R3"
 
 
-def test_empty_day_requires_hashed_clocked_same_day_status_evidence():
-    result = classify(
+def test_empty_day_requires_hashed_clocked_same_day_status_and_daily_corroboration():
+    status_only = classify(
         row_count=0,
         distinct_buckets=0,
         status_evidence=(evidence(tradestatus="0"),),
     )
-    assert result["disposition"] == "JUSTIFIED_NO_DATA"
-    assert result["rating"] is None
-    assert result["reason"] == "daily_status_not_tradable"
+    # Base 2.5: Baostock reported tradestatus=0 on 688065/2023-06-15 while the
+    # frozen daily row carried volume 353426 and amount 19589785.99. A status
+    # flag without daily corroboration must fail closed.
+    assert status_only["disposition"] == "UNRESOLVED"
+    assert status_only["rating"] == "R3"
+    assert status_only["reason"] == "status_without_daily_corroboration"
+    corroborated = classify(
+        row_count=0,
+        distinct_buckets=0,
+        status_evidence=(evidence(tradestatus="0"),),
+        daily_evidence=(evidence(volume="0", amount="0.00"),),
+    )
+    assert corroborated["disposition"] == "JUSTIFIED_NO_DATA"
+    assert corroborated["rating"] is None
+    assert corroborated["reason"] == "daily_status_not_tradable"
     bad = evidence(tradestatus="0", acquired_at=None)
     with pytest.raises(Native5mLedgerError, match="EVIDENCE_IDENTITY"):
         classify(row_count=0, distinct_buckets=0, status_evidence=(bad,))

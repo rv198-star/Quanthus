@@ -1,0 +1,99 @@
+{
+  "contract": "p10-base-build-historical-corrections-v1",
+  "effective_at": "2026-11-06T00:00:00+00:00",
+  "authority": "outputs/evidence/BASE25-OWNER-DAILY-REVISION-DECISION.json (mainline mission)",
+  "evidence_root": {
+    "package_id": "historical-corrections-evidence",
+    "required": true
+  },
+  "corrections": [
+    {
+      "id": "CORR-BASE25-002336-20200617",
+      "venue": "SZSE",
+      "stock_code": "002336",
+      "market_date": "2020-06-17",
+      "table": "dwd_security_bar",
+      "interval_size": "1d",
+      "price_basis": "UNADJUSTED",
+      "set": {
+        "volume": "0",
+        "turnover": "0"
+      },
+      "reason": "SUSPENDED_NO_TRADING_FROZEN_VALUE_IS_PRIOR_DAY_RESIDUE",
+      "evidence": [
+        {
+          "id": "szse-002336-20200617",
+          "sha256": "9e2f9f3eb44675cbbf539f0104b554a62bb12993f7e722557b7cf92ac284a92b"
+        },
+        {
+          "id": "szse-002336-20200616",
+          "sha256": "6d8cf2e4cda1cb427bacde69ac4662b6491a8d4dd4179c384dcf95a840c2638a"
+        },
+        {
+          "id": "tushare-002336-daily-20200617",
+          "sha256": "e6cce7f872790cb2bf34a6120cf356d4379b2d8894ae81b7ca16ad89d92055fd"
+        },
+        {
+          "id": "case-verdicts",
+          "sha256": "c2a6130509dbfd1d02e9a97a704cbe0473c20952d747da783cc604a574d961e3"
+        },
+        {
+          "id": "daily-revision-candidates",
+          "sha256": "6ff5e8daa42a85e829db940cc9cddf0b2e2fba5679248d2bf65fce13d9f19395"
+        }
+      ]
+    },
+    {
+      "id": "CORR-BASE25-002500-20200617",
+      "venue": "SZSE",
+      "stock_code": "002500",
+      "market_date": "2020-06-17",
+      "table": "dwd_security_bar",
+      "interval_size": "1d",
+      "price_basis": "UNADJUSTED",
+      "set": {
+        "volume": "0",
+        "turnover": "0"
+      },
+      "reason": "SUSPENDED_NO_TRADING_FROZEN_VALUE_IS_PRIOR_DAY_RESIDUE",
+      "evidence": [
+        {
+          "id": "szse-002500-20200617",
+          "sha256": "b2ce5afcf7760186a2292a82b1c59d1273fb4f4de8d428bc1a762d313adf32b7"
+        },
+        {
+          "id": "szse-002500-20200616",
+          "sha256": "ba7020c2b73a1895fd5d8dcc5ce935720665859f3c87a4cb618aa99f8e564adb"
+        },
+        {
+          "id": "tushare-002500-daily-20200617",
+          "sha256": "8d6fa5428316cfce8bff1a945e83e9b53ac108e24b0719f074dc83a987dd8428"
+        },
+        {
+          "id": "case-verdicts",
+          "sha256": "c2a6130509dbfd1d02e9a97a704cbe0473c20952d747da783cc604a574d961e3"
+        },
+        {
+          "id": "daily-revision-candidates",
+          "sha256": "6ff5e8daa42a85e829db940cc9cddf0b2e2fba5679248d2bf65fce13d9f19395"
+        }
+      ]
+    }
+  ],
+  "declarations": [
+    {
+      "id": "DECL-BASE25-302132-20250217-MINUTE-LOT-GRANULARITY",
+      "venue": "SZSE",
+      "stock_code": "302132",
+      "market_date": "2025-02-17",
+      "statement": "minute volume is lot-granular; the +49 difference is a minute-granularity artifact, not a daily error",
+      "data_change": false,
+      "evidence": [
+        {
+          "id": "case-verdicts",
+          "sha256": "c2a6130509dbfd1d02e9a97a704cbe0473c20952d747da783cc604a574d961e3"
+        }
+      ]
+    }
+  ]
+}

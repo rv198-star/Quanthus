@@ -17,7 +17,7 @@ from urllib import error, parse, request
 
 API = "https://www.googleapis.com/drive/v3/files"
 FIELDS = "id,name,size,md5Checksum,sha256Checksum"
-CHUNK = 64 * 1024 * 1024
+CHUNK = 8 * 1024 * 1024
 
 
 def private_save(path: Path, value: dict) -> None:

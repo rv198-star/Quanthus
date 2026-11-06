@@ -210,7 +210,11 @@ def build_delta(*, tables: dict[str, list[Path]], rules: dict[str, Any],
                 metrics[table] = {"input_rows": count, "output_rows": count,
                                   "identical_repeats": 0}
             # The period must never rewrite an earlier business observation.
-            cutoff = rule.get("cutoff_field")
+            # An identity extension may add an earlier knowledge version of an
+            # inherited fact, so the period reference clock is the capture
+            # instant this build observed, never a rewritten business date.
+            cutoff = ("knowledge_from" if table in REFERENCE_TABLES
+                      else rule.get("cutoff_field"))
             if cutoff is None:
                 candidates = [n for n in ("observation_start", "effective_at", "effective_from",
                                           "trade_date")

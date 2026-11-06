@@ -19,6 +19,7 @@ from quanthus.pipelines.contracts import OdsRelease
 
 from .base22_bounded import BoundedError, Budget
 from .base23_identity_overlay import build_overlay
+from .base23_identity_refresh import build_refresh
 from .base24_delivery import ONE_MINUTE_DISPOSITION
 from .base_build_delta import _connection, build_delta, relation
 from .base_build_freeze import cold_verify
@@ -509,9 +510,27 @@ def prepare_period(
         }
         if set(actual_references) != set(overlay):
             raise BoundedError("BUILD_PERIOD_REFERENCE_EXTENSION_SET_CHANGED")
+        # The reference extension admits only identities effective inside the
+        # build interval, so an inherited identity keeps its predecessor clock.
+        # Record the earlier observation this release actually captured as an
+        # additional version; it never rewrites the predecessor and never
+        # enters the projection views used to replay the Daily payload.
+        refresh = build_refresh(
+            master=master,
+            observed_at=datetime.fromisoformat(str(universe["warehouse_observed_at"])),
+            parents=parents,
+            business_keys={
+                table: rules["tables"][table]["business_key"] for table in REFERENCE_TABLES
+            },
+            output=work / "identity-refresh",
+            source_sha256=artifact.sha256,
+            source_revision="security_master@" + str(artifact.source_revision),
+        )
         with _connection(budget) as connection:
             for table, path in overlay.items():
                 compare_tables([path], [actual_references[table]], connection)
+                tables[table].append(path)
+            for table, path in refresh.items():
                 tables[table].append(path)
             _views(connection, parents, overlay)
             path, artifact = _artifact(selected, "market_daily_core", "daily_ohlcv_none_delta")
@@ -578,6 +597,10 @@ def prepare_period(
                 "held_disclosures": held,
             }
         )
+        admissions[-1]["identity_refresh"] = {
+            table: {"rows": pq.ParquetFile(path).metadata.num_rows, "sha256": file_sha(path)}
+            for table, path in sorted(refresh.items())
+        }
         after, last_overlay = day, overlay
         print(
             json.dumps(

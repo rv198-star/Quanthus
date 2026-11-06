@@ -299,12 +299,23 @@ def _copy(connection: Any, query: str, output: Path) -> None:
 
 
 def _lineage(path: Path, artifact: Any, alias: str) -> str:
+    """Bind the release artifact clock, never the per-row response arrival time.
+
+    One daily artifact is admitted, replayed and compared as a whole, so its
+    availability instant is the artifact's fixed `knowledge_cutoff`. A
+    per-row `acquired_at` would let one row of an acquisition batch appear
+    known before the same batch's own parent rows, which is not an admissible
+    availability ordering.
+    """
+    cutoff = artifact.knowledge_cutoff
+    if cutoff.tzinfo is None or cutoff.utcoffset() is None:
+        raise DailyDomainBuildError("daily artifact knowledge cutoff lacks a timezone")
     return f"""
       {_sql(str(artifact.source_revision).split("@")[0])}::VARCHAR AS record_source,
       {alias}.source_record_id,
       {_sql(artifact.source_revision)}::VARCHAR AS source_revision,
       {_sql(artifact.sha256)}::VARCHAR AS source_artifact_sha256,
-      CAST({alias}.acquired_at AS TIMESTAMPTZ) AS knowledge_from,
+      CAST({_sql(cutoff.isoformat())} AS TIMESTAMPTZ) AS knowledge_from,
       NULL::TIMESTAMPTZ AS knowledge_to
     """
 

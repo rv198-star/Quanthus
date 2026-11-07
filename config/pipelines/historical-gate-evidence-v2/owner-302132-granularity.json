@@ -1,0 +1,10 @@
+{
+  "kind": "base251-owner-302132-minute-granularity-decision-v1",
+  "recorded_at": "2026-11-06T08:04:45Z",
+  "decision": "AUTHORIZE_CONTRACT_DECLARATION_MINUTE_LOT_GRANULARITY",
+  "scope": "SZSE-300114-20250217-volume-coverage (source code 302132)",
+  "owner_reply": "授权契约声明：分钟量为整手粒度，+49 属分钟粒度产物",
+  "data_changed": false,
+  "held_added": 0,
+  "consumer_switch_authorized": false
+}

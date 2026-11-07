@@ -1,0 +1,23 @@
+{
+  "recorded_at": "2026-11-06T08:04:45.346616+00:00",
+  "decision": "AUTHORIZE_VERSIONED_DAILY_REVISION_AND_TARGETED_REBUILD",
+  "scope": [
+    "002336/2020-06-17 volume 1118342 -> 0, amount 0, tradestatus 0",
+    "002500/2020-06-17 volume 38945309 -> 0, amount 0, tradestatus 0"
+  ],
+  "owner_reply": "授权：版本化落盘修订 + 重建受影响分区",
+  "not_authorized": [
+    "688065 source admission (awaiting simplified question)",
+    "consumer switch",
+    "B seal"
+  ],
+  "notes": "rebuild limited to affected partitions; no full Job without space check",
+  "decision_2": "AUTHORIZE_CONTRACT_DECLARATION_MINUTE_LOT_GRANULARITY",
+  "owner_reply_302132": "授权契约声明：分钟量为整手粒度，+49 属分钟粒度产物",
+  "decision_3": "CONTINUE_EVIDENCE_FOR_688065_RELAY_QUALIFICATION",
+  "owner_reply_688065": "继续补证据（推荐）：让补采线再多找几个可核对的日子，证明这家供应商的 5 分钟数据靠得住，再决定用不用",
+  "followup_sent_to": "01a1aa4b-029e-7471-8af9-75d5f9513013",
+  "followup_sent_at": "2026-11-05T21:20:03.873121+00:00",
+  "path_decision": "PATH_A_REPAIR_PREDECESSOR_BASE24_PARTITION_AND_RESEAL",
+  "owner_reply_path": "选A吧"
+}

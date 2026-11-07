@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+"""Re-bind a reviewed Base build Job to a new builder revision (issue #600 P1.2).
+
+Copies an existing reviewed control set and changes only the builder revision, the
+work root, the environment lock, the audit parent and the protected paths. Then it
+re-runs the repository validators, the locked-environment check and the capacity
+pre-check, and refuses to touch an existing target, an active build writer or a
+held build lock.
+"""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+import pathlib
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+
+BASE = pathlib.Path("/srv/quanthus-base22-data/build/base25-20261031")
+LOCK = BASE / "controls/BUILD.lock"
+
+
+def sha256(path: pathlib.Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load(path: pathlib.Path) -> dict:
+    return json.loads(path.read_text())
+
+
+def save_new(path: pathlib.Path, value: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x") as stream:
+        json.dump(value, stream, ensure_ascii=False, indent=2, sort_keys=True)
+        stream.write("\n")
+
+
+def shell(command: str) -> str:
+    done = subprocess.run(["bash", "-lc", command], capture_output=True, text=True)
+    return (done.stdout + done.stderr).strip()
+
+
+def free_bytes(path: pathlib.Path) -> int:
+    ancestor = path
+    while not ancestor.exists():
+        ancestor = ancestor.parent
+    stat = os.statvfs(ancestor)
+    return stat.f_bavail * stat.f_frsize
+
+
+def overlap(left: pathlib.Path, right: pathlib.Path) -> bool:
+    return left == right or left in right.parents or right in left.parents
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--from-controls", required=True, type=pathlib.Path)
+    parser.add_argument("--to-controls", required=True, type=pathlib.Path)
+    parser.add_argument("--repository", required=True, type=pathlib.Path)
+    parser.add_argument("--revision", required=True)
+    parser.add_argument("--work-root", required=True, type=pathlib.Path)
+    parser.add_argument("--audit-parent", required=True, type=pathlib.Path)
+    parser.add_argument("--base", default=BASE, type=pathlib.Path)
+    options = parser.parse_args()
+
+    if os.geteuid() != 0:
+        raise SystemExit("run as root so the control set keeps root ownership")
+    active = shell(
+        "systemctl list-units --all --no-legend --no-pager "
+        "| grep -E 'quanthus-base-build-|quanthus-base251-' || true"
+    )
+    if active:
+        raise SystemExit(f"a build unit is present:\n{active}")
+    repository = options.repository.resolve()
+    sys.path.insert(0, str(repository / "src"))
+    from quanthus.pipelines.securities_warehouse import base_build as entry
+    from quanthus.pipelines.securities_warehouse import base_build_controller as ctl
+    from quanthus.pipelines.securities_warehouse.base_build_environment import (
+        check_environment,
+    )
+
+    if not re.fullmatch(r"[0-9a-f]{40}", options.revision):
+        raise SystemExit("revision must be a full commit SHA")
+    head = shell(f"git -C {repository} rev-parse HEAD")
+    dirty = shell(f"git -C {repository} status --porcelain")
+    if head != options.revision or dirty:
+        raise SystemExit(f"clean pinned worktree required, head={head} dirty={dirty[:200]}")
+    if not options.from_controls.is_dir():
+        raise SystemExit(f"missing source controls {options.from_controls}")
+    if options.to_controls.exists():
+        raise SystemExit(f"target controls already exist {options.to_controls}")
+    if options.work_root.exists() or options.audit_parent.exists():
+        raise SystemExit("target work root or audit parent already exists")
+
+    with LOCK.open("a+") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise SystemExit("global BUILD.lock is held by another writer")
+
+        job = load(options.from_controls / "job.json")
+        contract = load(options.from_controls / "contract.json")
+        execution = load(options.from_controls / "execution.json")
+        source_hashes = {
+            name: sha256(options.from_controls / name)
+            for name in ("job.json", "contract.json", "execution.json")
+        }
+
+        new_job = {
+            **job,
+            "builder_revision": options.revision,
+            "work_root": str(options.work_root),
+            "environment_lock": str(repository / "ops/data/base-build-environment.v1.json"),
+        }
+
+        candidates = set(execution["protected_paths"])
+        # The wheelhouse under runtime/ and the control set itself stay readable: the
+        # worker binds the wheelhouse read-only, and the controller reads its own job
+        # from controls, so denying either would conflict with those bindings.
+        for name in ("inputs", "outputs", "jobs"):
+            candidates.add(str(options.base / name))
+        work_dir = options.base / "work"
+        if work_dir.is_dir():
+            candidates.update(str(path) for path in work_dir.iterdir() if path.is_dir())
+        protected = []
+        for raw in sorted(candidates):
+            path = pathlib.Path(raw)
+            if not path.exists():
+                continue
+            if overlap(path, options.work_root) or overlap(path, options.audit_parent):
+                continue
+            if any(os.path.islink(part) for part in [*path.parents, path]):
+                continue
+            protected.append(str(path))
+        new_execution = {
+            **execution,
+            "audit_parent": str(options.audit_parent),
+            "protected_paths": sorted(set(protected)),
+        }
+
+        entry.validate_job(new_job)
+        entry.validate_contract(contract)
+        ctl.validate_execution(new_execution)
+        environment = check_environment(
+            lock=pathlib.Path(new_job["environment_lock"]),
+            wheelhouse=pathlib.Path(new_job["wheelhouse"]),
+        )
+        frozen = load(pathlib.Path(new_job["frozen"]))
+        roots = load(pathlib.Path(new_job["roots"]))
+        selection = load(pathlib.Path(new_job["selection"]))
+        for key in ("selection", "frozen", "roots"):
+            if new_job[key] != job[key]:
+                raise SystemExit(f"shared input path changed for {key}")
+
+        job_need = new_job["limits"]["allocated_bytes"] + new_job["limits"]["free_floor_bytes"]
+        audit_need = (
+            new_execution["audit_limits"]["allocated_bytes"]
+            + new_execution["audit_limits"]["free_floor_bytes"]
+        )
+        job_free = free_bytes(options.base)
+        audit_free = free_bytes(options.audit_parent)
+        if job_free < job_need:
+            raise SystemExit(f"work filesystem free {job_free} < job requirement {job_need}")
+        if audit_free < audit_need:
+            raise SystemExit(f"audit filesystem free {audit_free} < audit requirement {audit_need}")
+
+        options.to_controls.mkdir(parents=True, exist_ok=False)
+        save_new(options.to_controls / "job.json", new_job)
+        save_new(options.to_controls / "contract.json", contract)
+        save_new(options.to_controls / "execution.json", new_execution)
+        preparation = {
+            "kind": "base-build-job-rebind-preparation-v1",
+            "at": datetime.now(timezone.utc).isoformat(),
+            "source_controls": str(options.from_controls),
+            "source_hashes": source_hashes,
+            "repository": str(repository),
+            "repository_revision": options.revision,
+            "target_version": selection["target_version"],
+            "predecessor_version": selection["predecessor_version"],
+            "through_date": selection["through_date"],
+            "expected_days": len(selection["expected_days"]),
+            "shared_inputs": {key: new_job[key] for key in ("selection", "frozen", "roots")},
+            "frozen_input_identity": frozen["identity"],
+            "roots": sorted(roots),
+            "environment_identity": environment["lock_sha256"],
+            "wheelhouse": new_job["wheelhouse"],
+            "work_root": new_job["work_root"],
+            "audit_parent": new_execution["audit_parent"],
+            "limits": new_job["limits"],
+            "audit_limits": new_execution["audit_limits"],
+            "service_limits": new_execution["service_limits"],
+            "protected_paths": new_execution["protected_paths"],
+            "capacity": {
+                "job_free_bytes": job_free,
+                "job_required_bytes": job_need,
+                "audit_free_bytes": audit_free,
+                "audit_required_bytes": audit_need,
+            },
+            "written_hashes": {
+                name: sha256(options.to_controls / name)
+                for name in ("job.json", "contract.json", "execution.json")
+            },
+        }
+        save_new(options.to_controls / "PREPARATION.json", preparation)
+        subprocess.run(["chown", "-R", "agentdock:agentdock", str(options.to_controls)], check=False)
+        subprocess.run(["chmod", "-R", "a-w", str(options.to_controls)], check=False)
+        print(json.dumps(preparation, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+

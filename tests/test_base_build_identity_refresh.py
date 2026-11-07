@@ -70,26 +70,38 @@ def test_refresh_mints_one_earlier_version_of_the_identical_fact(tmp_path):
     row = pq.ParquetFile(result["dwd_listing"]).read().to_pylist()[0]
     original = _listing_row(observed + timedelta(hours=11))
     assert row["knowledge_from"] == observed
-    assert row["knowledge_to"] is None
+    assert row["knowledge_to"] == original["knowledge_from"]
     assert row["record_source"] == "ref_security_master"
     assert row["source_artifact_sha256"] == "sha256:" + "b" * 64
-    for name in ("listing_id", "security_id", "venue_id", "listing_code", "board_code",
-                 "effective_from", "effective_to", "lot_size", "listing_currency"):
+    for name in (
+        "listing_id",
+        "security_id",
+        "venue_id",
+        "listing_code",
+        "board_code",
+        "effective_from",
+        "effective_to",
+        "lot_size",
+        "listing_currency",
+    ):
         assert row[name] == original[name]
 
 
 def test_refresh_skips_identities_the_warehouse_already_knew_earlier(tmp_path):
     observed = datetime(2026, 10, 13, 19, 13, 15, tzinfo=timezone.utc)
     parents, master = _fixture(tmp_path, observed - timedelta(days=1))
-    assert build_refresh(
-        master=master,
-        observed_at=observed,
-        parents=parents,
-        business_keys=BUSINESS_KEYS,
-        output=tmp_path / "refresh",
-        source_sha256="sha256:" + "b" * 64,
-        source_revision="security_master@market-daily-provider-20261013-v4",
-    ) == {}
+    assert (
+        build_refresh(
+            master=master,
+            observed_at=observed,
+            parents=parents,
+            business_keys=BUSINESS_KEYS,
+            output=tmp_path / "refresh",
+            source_sha256="sha256:" + "b" * 64,
+            source_revision="security_master@market-daily-provider-20261013-v4",
+        )
+        == {}
+    )
 
 
 def test_lineage_binds_the_release_artifact_clock_not_the_row_arrival_time():
@@ -103,4 +115,3 @@ def test_lineage_binds_the_release_artifact_clock_not_the_row_arrival_time():
     assert cutoff.isoformat() in sql
     assert "acquired_at" not in sql
     assert "o.source_record_id" in sql
-

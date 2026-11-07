@@ -39,15 +39,22 @@ LINEAGE = frozenset(
 )
 
 
-def _current_versions(
-    rows: list[dict[str, Any]], business_key: Sequence[str]
+def _next_versions(
+    rows: list[dict[str, Any]], business_key: Sequence[str], observed_at: datetime
 ) -> list[dict[str, Any]]:
-    """Keep one row per business key: the latest source version per key."""
+    """Keep the earliest inherited version strictly after the observed clock.
+
+    The new earlier version must close at the next inherited version's
+    knowledge_from. Selecting the latest row would leave a NULL end on the new
+    version and create an overlapping knowledge interval.
+    """
     selected: dict[tuple, dict[str, Any]] = {}
     for row in rows:
         key = tuple(row[name] for name in business_key)
+        if row["knowledge_from"] <= observed_at:
+            continue
         held = selected.get(key)
-        if held is None or row["knowledge_from"] > held["knowledge_from"]:
+        if held is None or row["knowledge_from"] < held["knowledge_from"]:
             selected[key] = row
     return [selected[key] for key in sorted(selected, key=lambda item: tuple(str(v) for v in item))]
 
@@ -114,11 +121,9 @@ def build_refresh(
     for table in TABLES:
         business_key = list(business_keys[table])
         minted = []
-        for row in _current_versions(
-            [row for row in rows[table] if scope[table](row)], business_key
+        for row in _next_versions(
+            [row for row in rows[table] if scope[table](row)], business_key, observed_at
         ):
-            if row["knowledge_from"] <= observed_at:
-                continue
             refreshed = dict(row)
             refreshed.update(
                 record_source="ref_security_master",
@@ -130,7 +135,7 @@ def build_refresh(
                 source_revision=source_revision,
                 source_artifact_sha256=source_sha256,
                 knowledge_from=observed_at,
-                knowledge_to=None,
+                knowledge_to=row["knowledge_from"],
             )
             minted.append(refreshed)
         if not minted:
@@ -140,4 +145,3 @@ def build_refresh(
         pq.write_table(pa.Table.from_pylist(minted, schema=schemas[table]), path)
         result[table] = path
     return result
-

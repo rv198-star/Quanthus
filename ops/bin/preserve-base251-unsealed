@@ -41,6 +41,8 @@ LOCK = CONTROLS / "BUILD.lock"
 ROLES = ("ODS", "DWD")
 STAGES = ("period", "windows", "ods", "dwd")
 ARCHIVE_FILE_LIMIT = 64 * 1024 * 1024
+SAMPLE_FILES = 256
+SAMPLE_FILE_LIMIT = 32 * 1024 * 1024
 OWNER = "agentdock:agentdock"
 
 
@@ -74,24 +76,46 @@ def shell(command: str) -> str:
     return (done.stdout + done.stderr).strip()
 
 
+def declared_members(record: dict) -> dict[str, tuple[int, str]]:
+    """Both published layers declare their payload, with two different schemas."""
+    declared: dict[str, tuple[int, str]] = {}
+    rows: list[dict] = []
+    layout = record.get("layout")
+    if isinstance(layout, dict):
+        for entry in layout.values():
+            rows.extend(entry.get("files", []))
+    flat = record.get("files")
+    if isinstance(flat, list):
+        rows.extend(flat)
+    if not rows:
+        raise SystemExit("materialization declares no members")
+    for row in rows:
+        key = str(row["path"])
+        value = (int(row["size_bytes"]), str(row["sha256"]))
+        if declared.get(key, value) != value:
+            raise SystemExit(f"conflicting declaration for {key}")
+        declared[key] = value
+    return declared
+
+
+def is_payload(key: str) -> bool:
+    return key.startswith("payload/") or key.startswith("members/")
+
+
 def baseline(role: str) -> dict:
     """Declared determinism baseline for one published layer, checked on disk."""
     root = WORK / "published" / role
     record = json.loads((root / "MATERIALIZATION.json").read_text())
-    declared: dict[str, tuple[int, str]] = {}
-    for layout in record["layout"].values():
-        for row in layout["files"]:
-            key = row["path"]
-            if key in declared:
-                raise SystemExit(f"{role}: duplicate declared member {key}")
-            declared[key] = (row["size_bytes"], row["sha256"])
+    declared = declared_members(record)
     on_disk = {p.relative_to(root).as_posix(): p for p in files_under(root)}
     missing = sorted(set(declared) - set(on_disk))
     if missing:
         raise SystemExit(f"{role}: {len(missing)} declared members missing, e.g. {missing[:3]}")
     extra = sorted(set(on_disk) - set(declared))
-    if len(extra) > 64:
-        raise SystemExit(f"{role}: unexpected extra members {len(extra)}, e.g. {extra[:3]}")
+    stray = [key for key in extra if is_payload(key)]
+    if stray:
+        raise SystemExit(f"{role}: undeclared payload members {len(stray)}, e.g. {stray[:3]}")
+    undeclared = {key: sha256(on_disk[key]) for key in extra}
     wrong = [
         key
         for key, (size, _) in declared.items()
@@ -99,15 +123,29 @@ def baseline(role: str) -> dict:
     ]
     if wrong:
         raise SystemExit(f"{role}: {len(wrong)} members differ in size, e.g. {wrong[:3]}")
+    keys = sorted(declared)
+    sample_keys = [key for key in keys[:SAMPLE_FILES] + keys[-SAMPLE_FILES:]
+                   if declared[key][0] <= SAMPLE_FILE_LIMIT]
+    sample_bytes = sum(declared[key][0] for key in sample_keys)
+    sample_bad = [
+        key for key in sample_keys
+        if sha256(on_disk[key]) != declared[key][1]
+    ]
+    if sample_bad:
+        raise SystemExit(f"{role}: sampled members drifted, e.g. {sample_bad[:3]}")
     return {
         "role": role,
         "root": str(root),
         "declared_members": len(declared),
         "declared_bytes": sum(size for size, _ in declared.values()),
-        "metadata_members": extra,
+        "metadata_members": {key: on_disk[key].stat().st_size for key in extra},
+        "metadata_bitmap": undeclared,
+        "sampled_members": len(sample_keys),
+        "sampled_bytes": sample_bytes,
         "materialization_sha256": sha256(root / "MATERIALIZATION.json"),
+        "materialization_identity": record.get("identity"),
         "source_descriptors": record.get("source_descriptors"),
-        "layout_tables": sorted(record["layout"]),
+        "sources": sorted(record.get("sources", {})),
         "members": {key: {"size_bytes": size, "sha256": digest}
                     for key, (size, digest) in sorted(declared.items())},
     }
@@ -172,8 +210,12 @@ def main() -> None:
         for name in ("START.json", "SUCCESS.json"):
             members.append(W / "stages" / stage / "attempt-000001" / name)
     for role in ROLES:
-        members.append(W / "published" / role / "MATERIALIZATION.json")
-        members.append(W / "published" / role / "contract")
+        layer = W / "published" / role
+        for path in files_under(layer):
+            if path.stat().st_size <= ARCHIVE_FILE_LIMIT and not is_payload(
+                path.relative_to(layer).as_posix()
+            ):
+                members.append(path)
     members.append(SEAL)
     for name in ("job", "contract", "execution", "PREPARATION", "roots", "selection"):
         members.append(INPUTS / (name + ".json"))

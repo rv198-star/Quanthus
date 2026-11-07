@@ -118,6 +118,22 @@ def main() -> int:
             "environment_lock": str(repository / "ops/data/base-build-environment.v1.json"),
         }
 
+        frozen = load(pathlib.Path(new_job["frozen"]))
+        roots = load(pathlib.Path(new_job["roots"]))
+        selection = load(pathlib.Path(new_job["selection"]))
+        # The controller refuses to deny a path that is, or sits inside, a bound
+        # read-only input (BUILD_EXECUTION_INPUT_DENIAL_CONFLICT). Every selected
+        # root plus the code, interpreter tree, wheelhouse and environment lock is
+        # such an input, so a protected path must not equal or descend from one.
+        blockers = [pathlib.Path(raw) for raw in roots.values()]
+        blockers.append(repository)
+        blockers.append(pathlib.Path(new_job["wheelhouse"]))
+        blockers.append(pathlib.Path(new_job["environment_lock"]))
+        blockers.append(pathlib.Path(execution["runtime_python"]).parent.parent)
+
+        def denies_a_bound_input(path: pathlib.Path) -> bool:
+            return any(path == blocker or blocker in path.parents for blocker in blockers)
+
         candidates = set(execution["protected_paths"])
         # The wheelhouse under runtime/ and the control set itself stay readable: the
         # worker binds the wheelhouse read-only, and the controller reads its own job
@@ -127,7 +143,7 @@ def main() -> int:
         work_dir = options.base / "work"
         if work_dir.is_dir():
             candidates.update(str(path) for path in work_dir.iterdir() if path.is_dir())
-        protected = []
+        protected, dropped = [], []
         for raw in sorted(candidates):
             path = pathlib.Path(raw)
             if not path.exists():
@@ -135,6 +151,9 @@ def main() -> int:
             if overlap(path, options.work_root) or overlap(path, options.audit_parent):
                 continue
             if any(os.path.islink(part) for part in [*path.parents, path]):
+                continue
+            if denies_a_bound_input(path):
+                dropped.append({"path": str(path), "reason": "bound_readonly_input"})
                 continue
             protected.append(str(path))
         new_execution = {
@@ -150,9 +169,12 @@ def main() -> int:
             lock=pathlib.Path(new_job["environment_lock"]),
             wheelhouse=pathlib.Path(new_job["wheelhouse"]),
         )
-        frozen = load(pathlib.Path(new_job["frozen"]))
-        roots = load(pathlib.Path(new_job["roots"]))
-        selection = load(pathlib.Path(new_job["selection"]))
+        still_conflicting = [
+            raw for raw in new_execution["protected_paths"]
+            if denies_a_bound_input(pathlib.Path(raw))
+        ]
+        if still_conflicting:
+            raise SystemExit(f"protected path still denies a bound input: {still_conflicting}")
         for key in ("selection", "frozen", "roots"):
             if new_job[key] != job[key]:
                 raise SystemExit(f"shared input path changed for {key}")
@@ -195,6 +217,7 @@ def main() -> int:
             "audit_limits": new_execution["audit_limits"],
             "service_limits": new_execution["service_limits"],
             "protected_paths": new_execution["protected_paths"],
+            "dropped_protected_candidates": dropped,
             "capacity": {
                 "job_free_bytes": job_free,
                 "job_required_bytes": job_need,

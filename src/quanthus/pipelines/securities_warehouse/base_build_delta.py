@@ -38,7 +38,8 @@ def relation(paths: list[Path]) -> str:
 
 
 def normalize_versions(connection: Any, source: str, schema: Any,
-                       business_key: list[str], version_key: list[str]) -> dict[str, int]:
+                       business_key: list[str], version_key: list[str], *,
+                       allow_closed_identity: bool = False) -> dict[str, int]:
     """Retain first identical knowledge; conflicting facts require a separate repair.
 
     Typed struct equality decides value equality, never a hash collision or
@@ -52,13 +53,19 @@ def normalize_versions(connection: Any, source: str, schema: Any,
     ) + ")"
     connection.execute(f"CREATE OR REPLACE TEMP VIEW incoming AS SELECT *,{packed} __value "
                        f"FROM {source}")
-    if connection.execute(
+    closed = connection.execute(
         "SELECT 1 FROM incoming WHERE knowledge_to IS NOT NULL LIMIT 1",
-    ).fetchone() is not None:
+    ).fetchone() is not None
+    if closed and not allow_closed_identity:
         # This adapter consumes the current append-only Daily representation.
         # A closed/reopened temporal interval needs an explicit version adapter;
         # deduplicating it as a fresh observation would erase an availability gap.
         raise BoundedError("BUILD_DELTA_CLOSED_KNOWLEDGE_VERSION_REQUIRES_ADAPTER")
+    if allow_closed_identity and connection.execute(
+        "SELECT 1 FROM incoming WHERE knowledge_to IS NOT NULL "
+        "AND knowledge_to<=knowledge_from LIMIT 1",
+    ).fetchone() is not None:
+        raise BoundedError("BUILD_DELTA_INVALID_CLOSED_KNOWLEDGE_INTERVAL")
     if connection.execute(
         f"SELECT 1 FROM incoming GROUP BY {keys},record_source,source_revision "
         "HAVING count(*)>1 LIMIT 1",
@@ -83,12 +90,14 @@ def normalize_versions(connection: Any, source: str, schema: Any,
     )
     connection.execute(
         f"CREATE OR REPLACE TEMP VIEW ordered_versions AS SELECT *,"
-        f"lag(__value) OVER w __prior_value,row_number() OVER w __n FROM versions "
+        f"lag(__value) OVER w __prior_value,lag(knowledge_to) OVER w __prior_end,"
+        f"row_number() OVER w __n FROM versions "
         f"WINDOW w AS (PARTITION BY {bk} ORDER BY knowledge_from)",
     )
+    reopen_rule = " OR __prior_end IS NOT NULL" if allow_closed_identity else ""
     connection.execute(
         "CREATE OR REPLACE TEMP VIEW changed_versions AS SELECT * FROM ordered_versions "
-        "WHERE __n=1 OR __value IS DISTINCT FROM __prior_value",
+        "WHERE __n=1 OR __value IS DISTINCT FROM __prior_value" + reopen_rule,
     )
     connection.execute(
         f"CREATE OR REPLACE TEMP VIEW bounded_versions AS SELECT *,"
@@ -202,7 +211,9 @@ def build_delta(*, tables: dict[str, list[Path]], rules: dict[str, Any],
                 raise BoundedError("BUILD_DELTA_REQUIRED_VALUE_NULL")
             if table in TEMPORAL | REFERENCE_TABLES:
                 metrics[table] = normalize_versions(connection, source, schema,
-                                                     rule["business_key"], rule["version_key"])
+                                                     rule["business_key"], rule["version_key"],
+                                                     allow_closed_identity=(
+                                                         table in REFERENCE_TABLES))
             else:
                 connection.execute("CREATE OR REPLACE TEMP VIEW normalized AS SELECT * FROM "
                                    + source)

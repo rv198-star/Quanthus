@@ -19,6 +19,7 @@ import fcntl
 import hashlib
 import json
 import os
+import argparse
 import shutil
 import subprocess
 import tarfile
@@ -153,6 +154,13 @@ def baseline(role: str) -> dict:
 
 def main() -> None:
     started = time.monotonic()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="run every check, build and read back the archive, then delete nothing",
+    )
+    options = parser.parse_args()
     if os.geteuid() != 0:
         raise SystemExit("run as root (sudo -n)")
     if OUT.exists() or ARCHIVE.exists():
@@ -197,20 +205,21 @@ def main() -> None:
             continue
         if not Path(path).exists():
             raise SystemExit(f"audited control file vanished: {path}")
-        audited[path] = {"declared": declared_hash, "actual": sha256(Path(path)),
-                         "unchanged": sha256(Path(path)) == declared_hash}
+        actual = sha256(Path(path))
+        audited[path] = {"declared": declared_hash, "actual": actual,
+                         "unchanged": actual == declared_hash}
     if not all(row["unchanged"] for row in audited.values()):
         raise SystemExit("an audited control/materialization hash changed; review before cleanup")
 
     members: list[Path] = []
     for name in ("CONTROLLER.json", "PUBLICATION.json", "events.jsonl"):
-        members.append(W / name)
-    members.append(W / "controller")
+        members.append(WORK / name)
+    members.append(WORK / "controller")
     for stage in STAGES:
         for name in ("START.json", "SUCCESS.json"):
-            members.append(W / "stages" / stage / "attempt-000001" / name)
+            members.append(WORK / "stages" / stage / "attempt-000001" / name)
     for role in ROLES:
-        layer = W / "published" / role
+        layer = WORK / "published" / role
         for path in files_under(layer):
             if path.stat().st_size <= ARCHIVE_FILE_LIMIT and not is_payload(
                 path.relative_to(layer).as_posix()
@@ -312,19 +321,25 @@ def main() -> None:
     if before_tmp < audit_required:
         raise SystemExit(f"/var/tmp free {before_tmp} < audit requirement {audit_required}")
 
-    removed = []
-    for target in targets:
-        shutil.rmtree(target)
-        removed.append(str(target))
-    after_data = free_bytes(BASE)
-    after_tmp = free_bytes(Path("/var/tmp"))
-    if after_data < required:
-        raise SystemExit(
-            f"post-cleanup free {after_data} is below the job requirement {required}"
-        )
+    planned = [str(target) for target in targets]
+    removed: list[str] = []
+    if options.dry_run:
+        after_data = before_data
+        after_tmp = before_tmp
+    else:
+        for target in targets:
+            shutil.rmtree(target)
+            removed.append(str(target))
+        after_data = free_bytes(BASE)
+        after_tmp = free_bytes(Path("/var/tmp"))
+        if after_data < required:
+            raise SystemExit(
+                f"post-cleanup free {after_data} is below the job requirement {required}"
+            )
 
     receipt = {
         "kind": "base251-bf7cc61e-preservation-and-reclamation-v1",
+        "dry_run": bool(options.dry_run),
         "reviewed_revision_of": "work/base251_p11_preserve.py (issue #600 P1.0/P1.1)",
         "at": now(),
         "elapsed_seconds": round(time.monotonic() - started, 1),
@@ -344,6 +359,7 @@ def main() -> None:
         "tmp_free_bytes_before": before_tmp,
         "tmp_free_bytes_after": after_tmp,
         "removed": removed,
+        "planned_removals": planned,
         "kept": [
             str(WORK / name) for name in sorted(p.name for p in WORK.iterdir())
         ],
@@ -355,6 +371,13 @@ def main() -> None:
     for path in (OUT, ARCHIVE, Path(receipt["inventory"])):
         subprocess.run(["chown", "-R", OWNER, str(path)], check=False)
     print(json.dumps(receipt, sort_keys=True, indent=2))
+    if options.dry_run:
+        for path in (ARCHIVE, OUT):
+            if path.is_dir():
+                shutil.rmtree(path)
+            elif path.exists():
+                path.unlink()
+        print("DRY_RUN_ONLY: archive and receipt removed, no data deleted")
 
 
 if __name__ == "__main__":

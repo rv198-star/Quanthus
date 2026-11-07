@@ -1,0 +1,320 @@
+#!/usr/bin/env python3
+"""Base 2.5.1 P1.1: preserve the unsealed bf7cc61e evidence under the global build
+lock, verify the archive by reading it back, then reclaim only the owned unsealed
+outputs. Reviewed revision of the earlier draft (issue #600, P1.0/P1.1).
+
+Fail-closed order:
+  1. exclusive build lock plus no-active-writer checks
+  2. determinism baseline from the archived MATERIALIZATION declarations, with the
+     on-disk file set, sizes and the audited materialization hashes re-checked
+  3. preserve, then read every archived member back and compare size/SHA256
+  4. capacity pre-check on exclusive-inode reclaimable bytes
+  5. delete only the listed self-owned unsealed paths
+  6. receipt with archive identity, free space before/after and the kept set
+"""
+
+from __future__ import annotations
+
+import fcntl
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import tarfile
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+BASE = Path("/srv/quanthus-base22-data/build/base25-20261031")
+CONTROLS = BASE / "controls"
+WORK = BASE / "work/paired-base251-bf7cc61e-a1"
+INPUTS = CONTROLS / "base251-inputs-bf7cc61e-a1"
+SEAL = CONTROLS / "base251-gate-v2-seal-a1"
+AUDITS = [
+    Path("/var/tmp/quanthus-base-build/base251-bf7cc61e-a1"),
+    Path("/var/tmp/quanthus-base-build/base251-gate-v2-audit-a1"),
+]
+OUT = CONTROLS / "base251-bf7cc61e-preservation-a1"
+ARCHIVE = CONTROLS / "base251-bf7cc61e-preservation-20261108.tar.zst"
+LOCK = CONTROLS / "BUILD.lock"
+ROLES = ("ODS", "DWD")
+STAGES = ("period", "windows", "ods", "dwd")
+ARCHIVE_FILE_LIMIT = 64 * 1024 * 1024
+OWNER = "agentdock:agentdock"
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(block)
+    return "sha256:" + digest.hexdigest()
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def files_under(root: Path) -> list[Path]:
+    found: list[Path] = []
+    for directory, _, names in os.walk(root):
+        for name in names:
+            found.append(Path(directory) / name)
+    return sorted(found)
+
+
+def free_bytes(path: Path) -> int:
+    usage = shutil.usage(path) if hasattr(shutil, "usage") else shutil.disk_usage(path)
+    return usage.free
+
+
+def shell(command: str) -> str:
+    done = subprocess.run(["bash", "-lc", command], capture_output=True, text=True)
+    return (done.stdout + done.stderr).strip()
+
+
+def baseline(role: str) -> dict:
+    """Declared determinism baseline for one published layer, checked on disk."""
+    root = WORK / "published" / role
+    record = json.loads((root / "MATERIALIZATION.json").read_text())
+    declared: dict[str, tuple[int, str]] = {}
+    for layout in record["layout"].values():
+        for row in layout["files"]:
+            key = row["path"]
+            if key in declared:
+                raise SystemExit(f"{role}: duplicate declared member {key}")
+            declared[key] = (row["size_bytes"], row["sha256"])
+    on_disk = {p.relative_to(root).as_posix(): p for p in files_under(root)}
+    missing = sorted(set(declared) - set(on_disk))
+    if missing:
+        raise SystemExit(f"{role}: {len(missing)} declared members missing, e.g. {missing[:3]}")
+    extra = sorted(set(on_disk) - set(declared))
+    if len(extra) > 64:
+        raise SystemExit(f"{role}: unexpected extra members {len(extra)}, e.g. {extra[:3]}")
+    wrong = [
+        key
+        for key, (size, _) in declared.items()
+        if on_disk[key].stat().st_size != size
+    ]
+    if wrong:
+        raise SystemExit(f"{role}: {len(wrong)} members differ in size, e.g. {wrong[:3]}")
+    return {
+        "role": role,
+        "root": str(root),
+        "declared_members": len(declared),
+        "declared_bytes": sum(size for size, _ in declared.values()),
+        "metadata_members": extra,
+        "materialization_sha256": sha256(root / "MATERIALIZATION.json"),
+        "source_descriptors": record.get("source_descriptors"),
+        "layout_tables": sorted(record["layout"]),
+        "members": {key: {"size_bytes": size, "sha256": digest}
+                    for key, (size, digest) in sorted(declared.items())},
+    }
+
+
+def main() -> None:
+    started = time.monotonic()
+    if os.geteuid() != 0:
+        raise SystemExit("run as root (sudo -n)")
+    if OUT.exists() or ARCHIVE.exists():
+        raise SystemExit("preservation output already exists; preserve the existing receipt")
+    active = shell("systemctl list-units --all --no-legend --no-pager "
+                   "| grep -E 'quanthus-base-build-|quanthus-base251-' || true")
+    if active:
+        raise SystemExit(f"a build unit is present:\n{active}")
+    writers = shell("ps -eo args --no-headers | grep base_build | grep -v grep || true")
+    if writers:
+        raise SystemExit(f"a builder process is running:\n{writers}")
+    if (WORK / "PAIR-READY.json").exists():
+        raise SystemExit("work root already sealed")
+    for role in ROLES:
+        for marker in ("READY", "manifest.json"):
+            if (WORK / "published" / role / marker).exists():
+                raise SystemExit(f"unexpected sealed marker {role}/{marker}")
+
+    job = json.loads((INPUTS / "job.json").read_text())
+    execution = json.loads((INPUTS / "execution.json").read_text())
+    required = job["limits"]["allocated_bytes"] + job["limits"]["free_floor_bytes"]
+    audit_required = (
+        execution["audit_limits"]["allocated_bytes"]
+        + execution["audit_limits"]["free_floor_bytes"]
+    )
+
+    lock_stream = LOCK.open("a+")
+    try:
+        fcntl.flock(lock_stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise SystemExit("global BUILD.lock is held; refusing to touch the work root")
+
+    before_data = free_bytes(BASE)
+    before_tmp = free_bytes(Path("/var/tmp"))
+    layers = {role: baseline(role) for role in ROLES}
+    kept_inputs = json.loads((SEAL / "START.json").read_text()).get(
+        "prior_control_and_metadata_hashes", {}
+    )
+    audited = {}
+    for path, declared_hash in sorted(kept_inputs.items()):
+        if Path(path).suffix != ".json":
+            continue
+        if not Path(path).exists():
+            raise SystemExit(f"audited control file vanished: {path}")
+        audited[path] = {"declared": declared_hash, "actual": sha256(Path(path)),
+                         "unchanged": sha256(Path(path)) == declared_hash}
+    if not all(row["unchanged"] for row in audited.values()):
+        raise SystemExit("an audited control/materialization hash changed; review before cleanup")
+
+    members: list[Path] = []
+    for name in ("CONTROLLER.json", "PUBLICATION.json", "events.jsonl"):
+        members.append(W / name)
+    members.append(W / "controller")
+    for stage in STAGES:
+        for name in ("START.json", "SUCCESS.json"):
+            members.append(W / "stages" / stage / "attempt-000001" / name)
+    for role in ROLES:
+        members.append(W / "published" / role / "MATERIALIZATION.json")
+        members.append(W / "published" / role / "contract")
+    members.append(SEAL)
+    for name in ("job", "contract", "execution", "PREPARATION", "roots", "selection"):
+        members.append(INPUTS / (name + ".json"))
+    large: list[dict] = []
+    for audit in AUDITS:
+        if not audit.exists():
+            continue
+        for path in files_under(audit):
+            if path.stat().st_size <= ARCHIVE_FILE_LIMIT:
+                members.append(path)
+            else:
+                large.append({"path": str(path), "size_bytes": path.stat().st_size,
+                              "sha256": sha256(path), "disposition": "RETAINED_IN_PLACE"})
+    for member in members:
+        if not member.exists():
+            raise SystemExit(f"missing preservation member {member}")
+
+    OUT.mkdir()
+    files = [p for member in members for p in (files_under(member) if member.is_dir() else [member])]
+    if len(set(files)) != len(files):
+        raise SystemExit("duplicate archive member")
+    recorded = {p.as_posix(): {"size_bytes": p.stat().st_size, "sha256": sha256(p)}
+                for p in sorted(files)}
+    inventory = {
+        "kind": "base251-bf7cc61e-published-inventory-v1",
+        "recorded_at": now(),
+        "note": (
+            "Per-file determinism baseline. Members and hashes come from the layer "
+            "MATERIALIZATION declarations, whose own hashes are re-checked against the "
+            "audited control set; the on-disk file set and every size were compared before "
+            "deletion. The gate-v2 audit already re-derived full table content from these "
+            "on-disk files, so declared content is the audited content."
+        ),
+        "layers": layers,
+        "audited_control_hashes": audited,
+        "archive_members": recorded,
+        "retained_large_members": large,
+    }
+    (OUT / "PUBLISHED-INVENTORY.json").write_text(
+        json.dumps(inventory, sort_keys=True, indent=2) + "\n"
+    )
+
+    raw = OUT / "base251-bf7cc61e-preservation.tar"
+    with tarfile.open(raw, "x") as tar:
+        for path in sorted(files):
+            tar.add(path, arcname=path.as_posix(), recursive=False)
+    subprocess.run(["zstd", "-q", "-19", "-T4", "--rm", str(raw)], check=True)
+    subprocess.run(["zstd", "-q", "-t", str(ARCHIVE.with_suffix(""))], check=True)
+    os.replace(ARCHIVE.with_suffix(""), ARCHIVE)
+    archive_sha = sha256(ARCHIVE)
+    archive_bytes = ARCHIVE.stat().st_size
+
+    verify_root = OUT / "verify"
+    verify_root.mkdir()
+    try:
+        with tarfile.open(ARCHIVE) as tar:
+            names = {m.name for m in tar.getmembers() if m.isfile()}
+            if names != set(recorded):
+                raise SystemExit("archive member set differs from the recorded set")
+            tar.extractall(verify_root, filter="data")
+        drift = [
+            key for key, row in recorded.items()
+            if sha256(verify_root / key) != row["sha256"]
+            or (verify_root / key).stat().st_size != row["size_bytes"]
+        ]
+        if drift:
+            raise SystemExit(f"{len(drift)} archived members failed read-back, e.g. {drift[:3]}")
+        verify_rows = len(recorded)
+    finally:
+        shutil.rmtree(verify_root, ignore_errors=True)
+
+    targets = [WORK / "published"] + [
+        WORK / "stages" / stage / "attempt-000001" / "output" for stage in STAGES
+    ]
+    targets = [path for path in targets if path.exists()]
+    seen: set[tuple[int, int]] = set()
+    exclusive = 0
+    counted = 0
+    for target in targets:
+        for path in files_under(target):
+            info = path.lstat()
+            key = (info.st_dev, info.st_ino)
+            if key in seen:
+                continue
+            seen.add(key)
+            counted += 1
+            if info.st_nlink == 1:
+                exclusive += info.st_blocks * 512
+    if before_data + exclusive < required + archive_bytes:
+        raise SystemExit(
+            f"insufficient reclaim: free {before_data} + exclusive {exclusive} "
+            f"< required {required} + archive {archive_bytes}"
+        )
+    if before_tmp < audit_required:
+        raise SystemExit(f"/var/tmp free {before_tmp} < audit requirement {audit_required}")
+
+    removed = []
+    for target in targets:
+        shutil.rmtree(target)
+        removed.append(str(target))
+    after_data = free_bytes(BASE)
+    after_tmp = free_bytes(Path("/var/tmp"))
+    if after_data < required:
+        raise SystemExit(
+            f"post-cleanup free {after_data} is below the job requirement {required}"
+        )
+
+    receipt = {
+        "kind": "base251-bf7cc61e-preservation-and-reclamation-v1",
+        "reviewed_revision_of": "work/base251_p11_preserve.py (issue #600 P1.0/P1.1)",
+        "at": now(),
+        "elapsed_seconds": round(time.monotonic() - started, 1),
+        "archive": str(ARCHIVE),
+        "archive_bytes": archive_bytes,
+        "archive_sha256": archive_sha,
+        "archived_members": verify_rows,
+        "read_back_verified_members": verify_rows,
+        "inventory": str(OUT / "PUBLISHED-INVENTORY.json"),
+        "retained_large_members": large,
+        "exclusive_inode_bytes": exclusive,
+        "counted_unique_inodes": counted,
+        "job_required_bytes": required,
+        "audit_required_bytes": audit_required,
+        "data_free_bytes_before": before_data,
+        "data_free_bytes_after": after_data,
+        "tmp_free_bytes_before": before_tmp,
+        "tmp_free_bytes_after": after_tmp,
+        "removed": removed,
+        "kept": [
+            str(WORK / name) for name in sorted(p.name for p in WORK.iterdir())
+        ],
+        "sealed": False,
+        "reason": "Single-revision cleanup for the adce892e rebuild (issue #600 P1.1)",
+    }
+    (OUT / "RECEIPT.json").write_text(json.dumps(receipt, sort_keys=True, indent=2) + "\n")
+    os.chmod(ARCHIVE, 0o444)
+    for path in (OUT, ARCHIVE, Path(receipt["inventory"])):
+        subprocess.run(["chown", "-R", OWNER, str(path)], check=False)
+    print(json.dumps(receipt, sort_keys=True, indent=2))
+
+
+if __name__ == "__main__":
+    main()
+

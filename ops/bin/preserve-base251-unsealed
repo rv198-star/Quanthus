@@ -272,8 +272,9 @@ def main() -> None:
         for path in sorted(files):
             tar.add(path, arcname=path.as_posix(), recursive=False)
     subprocess.run(["zstd", "-q", "-19", "-T4", "--rm", str(raw)], check=True)
-    subprocess.run(["zstd", "-q", "-t", str(ARCHIVE.with_suffix(""))], check=True)
-    os.replace(ARCHIVE.with_suffix(""), ARCHIVE)
+    produced = Path(str(raw) + ".zst")
+    subprocess.run(["zstd", "-q", "-t", str(produced)], check=True)
+    os.replace(produced, ARCHIVE)
     archive_sha = sha256(ARCHIVE)
     archive_bytes = ARCHIVE.stat().st_size
 

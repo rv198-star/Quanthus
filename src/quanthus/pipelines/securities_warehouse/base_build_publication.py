@@ -25,6 +25,7 @@ from .base_build_stages import KIND as STAGE_KIND
 from .base_build_stages import _save_new
 
 CONTRACT = "p10-standard-base-paired-publication-v1"
+DUAL_REVISION_CONTRACT = "p10-standard-base-paired-publication-v2"
 
 
 def portable_audit_identity(receipt: dict[str, Any]) -> str:
@@ -85,7 +86,10 @@ def verify_publication_bytes(
     return {"files": len(files), "bytes": sum(r["size_bytes"] for r in files)}
 
 
-def _require_audit(receipt: dict[str, Any], contract: dict[str, Any], revision: str) -> None:
+def _require_audit(
+    receipt: dict[str, Any], contract: dict[str, Any], revision: str,
+    *, materialization_revision: str | None = None,
+) -> None:
     validate_contract(contract)
     binding = receipt.get("binding", {})
     historical = receipt.get("historical_gate", {})
@@ -93,7 +97,7 @@ def _require_audit(receipt: dict[str, Any], contract: dict[str, Any], revision: 
         receipt.get("contract") != "p10-standard-base-pair-audit-v1"
         or receipt.get("identity")
         != identity({k: v for k, v in receipt.items() if k != "identity"})
-        or binding.get("code_revision") != revision
+        or binding.get("code_revision") != (materialization_revision or revision)
         or binding.get("policy_identity") != identity(contract)
         or binding.get("target_version") != contract["base_version"]
         or binding.get("through_date") != contract["business_through"]
@@ -121,25 +125,28 @@ def _require_audit(receipt: dict[str, Any], contract: dict[str, Any], revision: 
     if receipt["ODS"].get("input_identity") != receipt["input_identity"]:
         raise BoundedError("BUILD_PUBLICATION_INPUT_BINDING_CHANGED")
     cases = inherited_cases({"pairing": {"historical_gate": historical}})
-    if any(c["scope_registered"] for c in cases.values()) or historical.get(
+    if any(
+        c["scope_registered"] and c["status"] == "PENDING_GOVERNED_DISPOSITION"
+        for c in cases.values()
+    ) or historical.get(
         "policy_sha256"
     ) != file_sha(POLICY):
         raise BoundedError("BUILD_PUBLICATION_HISTORICAL_REGISTRATION_UNRESOLVED")
 
 
-def pair_documents(
-    *, ods: Path, dwd: Path, receipt: dict[str, Any], contract: dict[str, Any], revision: str
-) -> dict[str, dict[str, Any]]:
-    """Internal controller operation after a fresh worker, not a public seal bypass."""
-    _require_audit(receipt, contract, revision)
-    for role, root in (("ods", ods), ("dwd", dwd)):
-        if (root / "manifest.json").exists() or (root / "READY").exists():
-            raise BoundedError("BUILD_PUBLICATION_EXISTING_MARKERS_REQUIRE_RECOVERY")
-        verify_publication_bytes(root, role, receipt[role.upper()]["materialization_sha256"])
+def pair_gate(
+    receipt: dict[str, Any], *, revision: str, materialization_revision: str | None = None
+) -> dict[str, Any]:
+    """Publication gate shared by both revisions of the pairing contract."""
+    materialization_revision = materialization_revision or revision
+    if receipt["binding"]["code_revision"] != materialization_revision:
+        raise BoundedError("BUILD_PUBLICATION_MATERIALIZATION_REVISION_CHANGED")
     gate = {
-        "contract": CONTRACT,
+        "contract": DUAL_REVISION_CONTRACT if revision != materialization_revision else CONTRACT,
         "input_identity": receipt["input_identity"],
         "binding": receipt["binding"],
+        **({"audit_revision": revision, "materialization_revision": materialization_revision}
+           if revision != materialization_revision else {}),
         "audit_content_identity": portable_audit_identity(receipt),
         "materializations": {
             role: receipt[role.upper()]["materialization_sha256"] for role in ("ods", "dwd")
@@ -150,6 +157,46 @@ def pair_documents(
         "consumer_admission": "NOT_GRANTED",
     }
     gate["identity"] = identity(gate)
+    return gate
+
+
+def require_gate_revisions(gate: dict[str, Any], manifest_revision: Any) -> str:
+    """Single and dual gates each pin the audit and materialization revisions."""
+    materialization_revision = gate["binding"]["code_revision"]
+    if gate.get("contract") == DUAL_REVISION_CONTRACT:
+        if (
+            gate.get("audit_revision") != manifest_revision
+            or gate.get("materialization_revision") != materialization_revision
+            or manifest_revision == materialization_revision
+        ):
+            raise BoundedError("BUILD_PUBLICATION_DUAL_REVISION_BINDING_CHANGED")
+    elif (
+        manifest_revision != materialization_revision
+        or "audit_revision" in gate
+        or "materialization_revision" in gate
+    ):
+        raise BoundedError("BUILD_PUBLICATION_SINGLE_REVISION_BINDING_CHANGED")
+    return materialization_revision
+
+
+def pair_documents(
+    *, ods: Path, dwd: Path, receipt: dict[str, Any], contract: dict[str, Any],
+    revision: str, materialization_revision: str | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Internal controller operation after a fresh worker, not a public seal bypass."""
+    _require_audit(
+        receipt, contract, revision, materialization_revision=materialization_revision
+    )
+    materialization_revision = materialization_revision or revision
+    if receipt["binding"]["code_revision"] != materialization_revision:
+        raise BoundedError("BUILD_PUBLICATION_MATERIALIZATION_REVISION_CHANGED")
+    for role, root in (("ods", ods), ("dwd", dwd)):
+        if (root / "manifest.json").exists() or (root / "READY").exists():
+            raise BoundedError("BUILD_PUBLICATION_EXISTING_MARKERS_REQUIRE_RECOVERY")
+        verify_publication_bytes(root, role, receipt[role.upper()]["materialization_sha256"])
+    gate = pair_gate(
+        receipt, revision=revision, materialization_revision=materialization_revision
+    )
     ods_content = {
         "role": "ods",
         "base_version": contract["base_version"],
@@ -192,7 +239,7 @@ def verify_pair_registration(ods: Path, dwd: Path) -> dict[str, Any]:
     }
     gate = manifests["ods"].get("pairing", {})
     if (
-        gate.get("contract") != CONTRACT
+        gate.get("contract") not in {CONTRACT, DUAL_REVISION_CONTRACT}
         or gate.get("identity") != identity({k: v for k, v in gate.items() if k != "identity"})
         or gate != manifests["dwd"].get("pairing")
         or gate.get("quality_held_added") != 0
@@ -201,7 +248,12 @@ def verify_pair_registration(ods: Path, dwd: Path) -> dict[str, Any]:
         raise BoundedError("BUILD_PUBLICATION_PAIR_REGISTRATION_CHANGED")
     contract = load(member(dwd, "contract/base-build-delivery.v1.json"))
     shared_proof = manifests["ods"].get("paired_audit", {})
-    _require_audit(shared_proof, contract, manifests["ods"].get("code_revision"))
+    audit_revision = manifests["ods"].get("code_revision")
+    materialization_revision = require_gate_revisions(gate, audit_revision)
+    _require_audit(
+        shared_proof, contract, audit_revision,
+        materialization_revision=materialization_revision,
+    )
     if (
         gate.get("binding") != shared_proof["binding"]
         or gate.get("input_identity") != shared_proof["input_identity"]
@@ -223,7 +275,7 @@ def verify_pair_registration(ods: Path, dwd: Path) -> dict[str, Any]:
             or proof.get("identity")
             != identity({k: v for k, v in proof.items() if k != "identity"})
             or proof != shared_proof
-            or manifest.get("code_revision") != gate["binding"]["code_revision"]
+            or manifest.get("code_revision") != audit_revision
             or content.get("files") != product_inventory(root, role)
             or gate["materializations"][role] != proof[role.upper()]["materialization_sha256"]
             or portable_audit_identity(proof) != gate["audit_content_identity"]
@@ -254,7 +306,8 @@ def verify_pair_seal(ods: Path, dwd: Path, fresh_audit: dict[str, Any]) -> None:
     _require_audit(
         fresh_audit,
         load(member(dwd, "contract/base-build-delivery.v1.json")),
-        gate["binding"]["code_revision"],
+        gate.get("audit_revision", gate["binding"]["code_revision"]),
+        materialization_revision=gate["binding"]["code_revision"],
     )
     if (
         portable_audit_identity(fresh_audit) != gate["audit_content_identity"]

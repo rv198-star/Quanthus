@@ -267,7 +267,7 @@ def audit_pair(
     result.update(
         historical_gate=historical,
         historical_disposition=(
-            "PASS_NO_APPLICABLE_REGISTERED_CASE"
+            historical["historical_disposition"]
             if historical["publication_eligible"]
             else "PENDING_REGISTERED_CASE_DISPOSITION"
         ),

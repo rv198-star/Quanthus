@@ -420,6 +420,22 @@ def audit_completion(
     job: dict[str, Any], contract: dict[str, Any], environment_identity: str, started_at: str
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     root = safe_path(job["work_root"])
+    materialization_revision = job.get("materialization_revision", job["builder_revision"])
+    if not re.fullmatch(r"[0-9a-f]{40}", str(materialization_revision)):
+        raise BoundedError("BUILD_CONTROLLER_MATERIALIZATION_REVISION_INVALID")
+    materialized = root / "PUBLICATION.json"
+    resume = "materialization_revision" in job
+    if resume:
+        # A re-audit names the revision that produced these bytes. The product
+        # must already be materialized and must not carry any seal marker.
+        if not materialized.exists():
+            raise BoundedError("BUILD_CONTROLLER_MATERIALIZATION_NOT_FOUND")
+        for role in ("ODS", "DWD"):
+            for marker in ("manifest.json", "READY"):
+                if (root / "published" / role / marker).exists():
+                    raise BoundedError("BUILD_CONTROLLER_MARKER_REQUIRES_RECOVERY")
+        if (root / "PAIR-READY.json").exists():
+            raise BoundedError("BUILD_CONTROLLER_PAIR_ALREADY_COMPLETE")
     completion = load(member(root, "COMPLETION.json"))
     audit_path = member(root, "AUDIT.json")
     receipt = load(audit_path)
@@ -436,6 +452,8 @@ def audit_completion(
         or completion.get("job_identity") != identity(job)
         or completion.get("work_root") != job["work_root"]
         or completion.get("code_revision") != job["builder_revision"]
+        or completion.get("materialization_revision", job["builder_revision"])
+        != job.get("materialization_revision", job["builder_revision"])
         or completion.get("policy_identity") != identity(contract)
         or completion.get("environment_identity") != environment_identity
         or completion.get("audit_sha256") != file_sha(audit_path)
@@ -480,6 +498,8 @@ def _audit(
     audit_job = {
         "contract": AUDIT_JOB,
         "builder_revision": job["builder_revision"],
+        **({"materialization_revision": job["materialization_revision"]}
+           if "materialization_revision" in job else {}),
         "ods": str(products["ods"]),
         "dwd": str(products["dwd"]),
         "work_root": str(scratch / "output"),
@@ -580,6 +600,10 @@ def execute(
         safe_path(job["wheelhouse"]),
         safe_path(job["environment_lock"]),
     ]
+    # A re-audit of an already materialized pair names the revision that owns
+    # those bytes; it is an input identity, never a write target.
+    if "materialization_revision" in job:
+        readonly.append(safe_path(job["work_root"]))
     protected = [safe_path(p) for p in execution["protected_paths"]]
     disjoint_output(root, [*sources, *readonly, *protected])
     disjoint_output(safe_path(execution["audit_parent"]), [root, *sources, *readonly, *protected])
@@ -615,7 +639,11 @@ def execute(
             attempt / "START.json", {**owner_record, "owner_identity": owner, "started_at": now()}
         )
         try:
-            if not (root / "PUBLICATION.json").exists():
+            if resume:
+                # Re-audit path: the materialization and its transfer intent are
+                # already owned; never invoke the materialize worker again.
+                intent = begin_transfer(root, {}, owner_identity=owner)
+            elif not (root / "PUBLICATION.json").exists():
                 controller_capacity(
                     root, sources, limits, len(load(safe_path(job["selection"]))["expected_days"])
                 )
@@ -692,6 +720,9 @@ def execute(
                         receipt=receipt,
                         contract=contract,
                         revision=job["builder_revision"],
+                        materialization_revision=job.get(
+                            "materialization_revision", job["builder_revision"]
+                        ),
                     )
                     writes = root / "publication-writes"
                     numbers = [int(p.name[8:]) for p in writes.iterdir()] if writes.exists() else []

@@ -49,9 +49,7 @@ def portable_audit_identity(receipt: dict[str, Any]) -> str:
 def product_inventory(root: Path, role: str) -> list[dict[str, Any]]:
     record = load(member(root, "MATERIALIZATION.json"))
     if role == "ods":
-        files = [
-            {k: r[k] for k in ("path", "sha256", "size_bytes")} for r in record["files"]
-        ]
+        files = [{k: r[k] for k in ("path", "sha256", "size_bytes")} for r in record["files"]]
     elif role == "dwd":
         files = [
             {k: r[k] for k in ("path", "sha256", "size_bytes")}
@@ -115,13 +113,10 @@ def _require_audit(
         or binding.get("through_date") != contract["business_through"]
         or binding.get("frozen_input_identity") != receipt.get("input_identity")
         or receipt.get("source_replay") != "PASS_ALL_PERIOD_SOURCES_AND_TYPED_DELTA"
-        or receipt.get("replay_identity")
-        != receipt.get("ODS", {}).get("period_admission_identity")
+        or receipt.get("replay_identity") != receipt.get("ODS", {}).get("period_admission_identity")
         or receipt.get("ODS", {}).get("quality_held_added") != 0
-        or receipt.get("DWD", {}).get("assessment", {}).get("build_eligible")
-        is not True
-        or receipt.get("DWD", {}).get("global_keys_versions_references_lineage")
-        != "PASS"
+        or receipt.get("DWD", {}).get("assessment", {}).get("build_eligible") is not True
+        or receipt.get("DWD", {}).get("global_keys_versions_references_lineage") != "PASS"
         or len(receipt.get("closure", {}).get("table_counts", {})) != 33
         or receipt.get("publication_eligible") is not True
         or historical.get("publication_eligible") is not True
@@ -135,9 +130,7 @@ def _require_audit(
         layer = receipt.get(role, {})
         if layer.get("identity") != hash_function(
             {k: v for k, v in layer.items() if k != "identity"}
-        ) or not re.fullmatch(
-            r"sha256:[0-9a-f]{64}", str(layer.get("materialization_sha256"))
-        ):
+        ) or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(layer.get("materialization_sha256"))):
             raise BoundedError("BUILD_PUBLICATION_LAYER_AUDIT_CHANGED")
     if receipt["ODS"].get("input_identity") != receipt["input_identity"]:
         raise BoundedError("BUILD_PUBLICATION_INPUT_BINDING_CHANGED")
@@ -160,9 +153,7 @@ def pair_gate(
     if receipt["binding"]["code_revision"] != materialization_revision:
         raise BoundedError("BUILD_PUBLICATION_MATERIALIZATION_REVISION_CHANGED")
     gate = {
-        "contract": DUAL_REVISION_CONTRACT
-        if revision != materialization_revision
-        else CONTRACT,
+        "contract": DUAL_REVISION_CONTRACT if revision != materialization_revision else CONTRACT,
         "input_identity": receipt["input_identity"],
         "binding": receipt["binding"],
         **(
@@ -175,8 +166,7 @@ def pair_gate(
         ),
         "audit_content_identity": portable_audit_identity(receipt),
         "materializations": {
-            role: receipt[role.upper()]["materialization_sha256"]
-            for role in ("ods", "dwd")
+            role: receipt[role.upper()]["materialization_sha256"] for role in ("ods", "dwd")
         },
         "historical_gate": receipt["historical_gate"],
         "source_replay_identity": receipt["replay_identity"],
@@ -216,21 +206,15 @@ def pair_documents(
     materialization_revision: str | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Internal controller operation after a fresh worker, not a public seal bypass."""
-    _require_audit(
-        receipt, contract, revision, materialization_revision=materialization_revision
-    )
+    _require_audit(receipt, contract, revision, materialization_revision=materialization_revision)
     materialization_revision = materialization_revision or revision
     if receipt["binding"]["code_revision"] != materialization_revision:
         raise BoundedError("BUILD_PUBLICATION_MATERIALIZATION_REVISION_CHANGED")
     for role, root in (("ods", ods), ("dwd", dwd)):
         if (root / "manifest.json").exists() or (root / "READY").exists():
             raise BoundedError("BUILD_PUBLICATION_EXISTING_MARKERS_REQUIRE_RECOVERY")
-        verify_publication_bytes(
-            root, role, receipt[role.upper()]["materialization_sha256"]
-        )
-    gate = pair_gate(
-        receipt, revision=revision, materialization_revision=materialization_revision
-    )
+        verify_publication_bytes(root, role, receipt[role.upper()]["materialization_sha256"])
+    gate = pair_gate(receipt, revision=revision, materialization_revision=materialization_revision)
     ods_content = {
         "role": "ods",
         "base_version": contract["base_version"],
@@ -264,9 +248,7 @@ def pair_documents(
             ("paired_audit", receipt),
         ),
     )
-    dwd_manifest = native_manifest(
-        dwd, receipt["DWD"], code_revision=revision, profile=p
-    )
+    dwd_manifest = native_manifest(dwd, receipt["DWD"], code_revision=revision, profile=p)
     return {"ods": ods_manifest, "dwd": dwd_manifest}
 
 
@@ -276,14 +258,12 @@ def verify_pair_registration(ods: Path, dwd: Path) -> dict[str, Any]:
     This is registration/byte authority only, not another source or quality scan.
     """
     manifests = {
-        role: load(member(root, "manifest.json"))
-        for role, root in (("ods", ods), ("dwd", dwd))
+        role: load(member(root, "manifest.json")) for role, root in (("ods", ods), ("dwd", dwd))
     }
     gate = manifests["ods"].get("pairing", {})
     if (
         gate.get("contract") not in {CONTRACT, DUAL_REVISION_CONTRACT}
-        or gate.get("identity")
-        != identity({k: v for k, v in gate.items() if k != "identity"})
+        or gate.get("identity") != identity({k: v for k, v in gate.items() if k != "identity"})
         or gate != manifests["dwd"].get("pairing")
         or gate.get("quality_held_added") != 0
         or gate.get("consumer_admission") != "NOT_GRANTED"
@@ -315,17 +295,14 @@ def verify_pair_registration(ods: Path, dwd: Path) -> dict[str, Any]:
             or content.get("role") != role
             or content.get("base_version") != gate["binding"]["target_version"]
             or content.get("through_date") != gate["binding"]["through_date"]
-            or file_sha(member(root, "MATERIALIZATION.json"))
-            != gate["materializations"][role]
-            or member(root, "READY").read_text().strip()
-            != file_sha(root / "manifest.json")
+            or file_sha(member(root, "MATERIALIZATION.json")) != gate["materializations"][role]
+            or member(root, "READY").read_text().strip() != file_sha(root / "manifest.json")
             or proof.get("identity")
             != identity({k: v for k, v in proof.items() if k != "identity"})
             or proof != shared_proof
             or manifest.get("code_revision") != audit_revision
             or content.get("files") != product_inventory(root, role)
-            or gate["materializations"][role]
-            != proof[role.upper()]["materialization_sha256"]
+            or gate["materializations"][role] != proof[role.upper()]["materialization_sha256"]
             or portable_audit_identity(proof) != gate["audit_content_identity"]
         ):
             raise BoundedError("BUILD_PUBLICATION_LAYER_REGISTRATION_CHANGED")
@@ -339,8 +316,7 @@ def verify_pair_registration(ods: Path, dwd: Path) -> dict[str, Any]:
             valid = (
                 manifest.get("content_digest")
                 == digest({k: v for k, v in manifest.items() if k != "content_digest"})
-                and manifest.get("materialization_sha256")
-                == native["materialization_sha256"]
+                and manifest.get("materialization_sha256") == native["materialization_sha256"]
                 and manifest.get("scan_identity") == native["identity"]
                 and manifest.get("summaries") == native["summaries"]
                 and manifest.get("assessment") == native["assessment"]
@@ -406,9 +382,7 @@ def producer_record(output: Path, role: str) -> dict[str, Any]:
     }
 
 
-def begin_transfer(
-    work: Path, outputs: dict[str, Path], *, owner_identity: str
-) -> dict[str, Any]:
+def begin_transfer(work: Path, outputs: dict[str, Path], *, owner_identity: str) -> dict[str, Any]:
     path = work / "PUBLICATION.json"
     if path.exists():
         intent = load(path)
@@ -439,9 +413,9 @@ def begin_transfer(
 
 
 def resume_transfer(work: Path, intent: dict[str, Any]) -> dict[str, Path]:
-    if load(member(work, "PUBLICATION.json")) != intent or intent.get(
-        "identity"
-    ) != identity({k: v for k, v in intent.items() if k != "identity"}):
+    if load(member(work, "PUBLICATION.json")) != intent or intent.get("identity") != identity(
+        {k: v for k, v in intent.items() if k != "identity"}
+    ):
         raise BoundedError("BUILD_PUBLICATION_TRANSFER_INTENT_CHANGED")
     published = work / "published"
     if intent["target"] != str(published):
@@ -462,18 +436,13 @@ def resume_transfer(work: Path, intent: dict[str, Any]) -> dict[str, Path]:
             raise BoundedError("BUILD_PUBLICATION_PRODUCER_RECEIPT_CHANGED")
         current = source if source.exists() else target
         # Even an interrupted transfer retains the exact original producer bytes.
-        if _tree(current) - {"manifest.json", "READY"} != {
-            r["path"] for r in producer["files"]
-        }:
+        if _tree(current) - {"manifest.json", "READY"} != {r["path"] for r in producer["files"]}:
             raise BoundedError("BUILD_PUBLICATION_TRANSFER_NAMESPACE_CHANGED")
         for row in producer["files"]:
             path = member(current, row["path"])
             if path.stat().st_size != row["size_bytes"]:
                 raise BoundedError("BUILD_PUBLICATION_TRANSFER_SIZE_CHANGED")
-        if (
-            file_sha(current / "MATERIALIZATION.json")
-            != producer["materialization_sha256"]
-        ):
+        if file_sha(current / "MATERIALIZATION.json") != producer["materialization_sha256"]:
             raise BoundedError("BUILD_PUBLICATION_TRANSFER_MATERIALIZATION_CHANGED")
         if current == source:
             if source.stat().st_dev != published.stat().st_dev:
@@ -499,8 +468,7 @@ def _prepared(value: dict[str, Any]) -> None:
     if (
         set(value) != {"contract", "documents", "manifest_hashes", "identity"}
         or value.get("contract") != CONTRACT
-        or value.get("identity")
-        != identity({k: v for k, v in value.items() if k != "identity"})
+        or value.get("identity") != identity({k: v for k, v in value.items() if k != "identity"})
         or set(value["documents"]) != {"ods", "dwd"}
         or value["manifest_hashes"]
         != {
@@ -511,9 +479,7 @@ def _prepared(value: dict[str, Any]) -> None:
         raise BoundedError("BUILD_PUBLICATION_PREPARED_MARKERS_CHANGED")
 
 
-def prepare_markers(
-    work: Path, documents: dict[str, Any], *, attempt: str
-) -> dict[str, Any]:
+def prepare_markers(work: Path, documents: dict[str, Any], *, attempt: str) -> dict[str, Any]:
     if not re.fullmatch(r"attempt-[0-9]{6}", attempt) or set(documents) != {
         "ods",
         "dwd",
@@ -570,9 +536,7 @@ def recover_owned_markers(work: Path, products: dict[str, Path]) -> bool:
     writes = work / "publication-writes"
     if not writes.exists():
         if any(
-            (root / n).exists()
-            for root in products.values()
-            for n in ("manifest.json", "READY")
+            (root / n).exists() for root in products.values() for n in ("manifest.json", "READY")
         ):
             raise BoundedError("BUILD_PUBLICATION_UNKNOWN_MARKERS_PRESERVED")
         return False
@@ -612,28 +576,20 @@ def recover_owned_markers(work: Path, products: dict[str, Path]) -> bool:
                         wanted = (
                             control_bytes(prepared["documents"][role])
                             if name == "manifest.json"
-                            else (prepared["manifest_hashes"][role] + "\n").encode(
-                                "ascii"
-                            )
+                            else (prepared["manifest_hashes"][role] + "\n").encode("ascii")
                         )
                         if writing.read_bytes() != wanted:
-                            raise BoundedError(
-                                "BUILD_PUBLICATION_ALTERED_MARKER_PRESERVED"
-                            )
+                            raise BoundedError("BUILD_PUBLICATION_ALTERED_MARKER_PRESERVED")
                         writing.unlink()
                     else:
                         if archive.exists():
-                            raise BoundedError(
-                                "BUILD_PUBLICATION_ARCHIVE_CONFLICT_PRESERVED"
-                            )
+                            raise BoundedError("BUILD_PUBLICATION_ARCHIVE_CONFLICT_PRESERVED")
                         # Atomic rename retains even a partial write without a
                         # second interrupted-copy state or linked archive.
                         os.rename(writing, archive)
                     _sync_directory(directory)
     present = any(
-        (root / n).exists()
-        for root in products.values()
-        for n in ("manifest.json", "READY")
+        (root / n).exists() for root in products.values() for n in ("manifest.json", "READY")
     )
     if expected is None:
         if present:
@@ -650,9 +606,7 @@ def recover_owned_markers(work: Path, products: dict[str, Path]) -> bool:
             if final.exists() and final.read_bytes() != wanted:
                 raise BoundedError("BUILD_PUBLICATION_ALTERED_MARKER_PRESERVED")
     complete = all(
-        (root / n).exists()
-        for root in products.values()
-        for n in ("manifest.json", "READY")
+        (root / n).exists() for root in products.values() for n in ("manifest.json", "READY")
     )
     if complete:
         return True

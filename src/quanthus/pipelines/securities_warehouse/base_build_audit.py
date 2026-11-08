@@ -77,25 +77,20 @@ def _closure(
         plan.get("build_binding") != binding
         or admission.get("binding") != binding
         or binding["frozen_input_identity"] != frozen["identity"]
-        or file_sha(prior_root / "manifest.json")
-        != binding["predecessor_manifest_sha256"]
+        or file_sha(prior_root / "manifest.json") != binding["predecessor_manifest_sha256"]
         or prior_manifest.get("materialization_sha256")
         != file_sha(prior_root / "MATERIALIZATION.json")
         or prior_record.get("plan_digest") != digest(prior_plan)
         or plan["sources"]["predecessor"]["descriptor_sha256"]
         != file_sha(prior_root / "MATERIALIZATION.json")
-        or period.get("identity")
-        != identity({k: v for k, v in period.items() if k != "identity"})
+        or period.get("identity") != identity({k: v for k, v in period.items() if k != "identity"})
         or period.get("identity") != admission.get("delta_identity")
         or period.get("binding") != binding
-        or set(period["tables"])
-        not in (UPDATED_TABLES, UPDATED_TABLES | REFERENCE_TABLES)
+        or set(period["tables"]) not in (UPDATED_TABLES, UPDATED_TABLES | REFERENCE_TABLES)
         or set(current["layout"]) != set(prior_record["layout"])
     ):
         raise BoundedError("BUILD_PAIR_AUDIT_SOURCE_OR_SCOPE_BINDING_CHANGED")
-    _same_file(
-        dwd / "evidence/sources/predecessor.json", prior_root / "MATERIALIZATION.json"
-    )
+    _same_file(dwd / "evidence/sources/predecessor.json", prior_root / "MATERIALIZATION.json")
     for name in ("manifest.json", "MATERIALIZATION.json", *prior_record["evidence"]):
         _same_file(dwd / ("evidence/predecessor-control/" + name), prior_root / name)
     # The successor registry is serialized by the native writer. Its values
@@ -108,12 +103,8 @@ def _closure(
     for name in ("ADMISSION.json", "CONFIG.json"):
         _same_file(dwd / ("evidence/build/" + name), ods / ("evidence/period/" + name))
     for name in ("PLAN.json", "CHECKPOINT.json", "WINDOWS.parquet"):
-        _same_file(
-            dwd / ("evidence/build/windows/" + name), ods / ("evidence/windows/" + name)
-        )
-    _same_file(
-        dwd / "evidence/build/ODS-MATERIALIZATION.json", ods / "MATERIALIZATION.json"
-    )
+        _same_file(dwd / ("evidence/build/windows/" + name), ods / ("evidence/windows/" + name))
+    _same_file(dwd / "evidence/build/ODS-MATERIALIZATION.json", ods / "MATERIALIZATION.json")
     period_files = {t: [] for t in period["tables"]}
     for row in period["files"]:
         if row["table"] not in period_files:
@@ -125,17 +116,14 @@ def _closure(
     for table, original in sorted(prior_record["layout"].items()):
         budget.check()
         expected_old = [
-            dict({k: r[k] for k in fields}, source_id="predecessor")
-            for r in original["files"]
+            dict({k: r[k] for k in fields}, source_id="predecessor") for r in original["files"]
         ]
         added = [dict(r, source_id="period") for r in period_files.get(table, [])]
         candidates = expected_old + added
         positive = [r for r in candidates if r["rows"] > 0]
         expected = positive or [candidates[0]]
         if plan["tables"][table]["files"] != expected:
-            raise BoundedError(
-                "BUILD_PAIR_AUDIT_INHERIT_OR_PERIOD_MEMBER_CLOSURE_CHANGED"
-            )
+            raise BoundedError("BUILD_PAIR_AUDIT_INHERIT_OR_PERIOD_MEMBER_CLOSURE_CHANGED")
         expected_disposition = {
             "action": "APPEND_ADMITTED_PERIOD"
             if table in UPDATED_TABLES
@@ -170,9 +158,7 @@ def _closure(
             "output_rows": sum(r["rows"] for r in expected),
         }
     frozen_files = frozen["content"]["packages"][prior_id]["content"]["files"]
-    originals = {
-        r["path"]: r for t in prior_record["layout"].values() for r in t["files"]
-    }
+    originals = {r["path"]: r for t in prior_record["layout"].values() for r in t["files"]}
     if set(mapped) != set(originals):
         raise BoundedError("BUILD_PAIR_AUDIT_PREDECESSOR_PAYLOAD_OWNERSHIP_CHANGED")
     for row in frozen_files:
@@ -187,14 +173,10 @@ def _closure(
                 raise BoundedError("BUILD_PAIR_AUDIT_ORIGINAL_PAYLOAD_NOT_FROZEN")
         elif not member(prior_root, relative).is_file():
             raise BoundedError("BUILD_PAIR_AUDIT_ORIGINAL_CONTROL_NOT_ARCHIVED")
-    if set(originals) != {
-        r["path"] for r in frozen_files if r["path"].startswith("payload/")
-    }:
+    if set(originals) != {r["path"] for r in frozen_files if r["path"].startswith("payload/")}:
         raise BoundedError("BUILD_PAIR_AUDIT_PREDECESSOR_PAYLOAD_INVENTORY_CHANGED")
     references = {
-        r["path"]: mapped[r["path"]]
-        for t in PARENTS
-        for r in prior_record["layout"][t]["files"]
+        r["path"]: mapped[r["path"]] for t in PARENTS for r in prior_record["layout"][t]["files"]
     }
     return references, {
         "predecessor_id": prior_id,
@@ -214,14 +196,10 @@ def _audit_structure(
 ) -> tuple[dict[str, Any], dict[str, Path]]:
     """Full layer scans and paired closure; source replay remains explicit below."""
     before = {"ods": physical_guard(ods), "dwd": physical_guard(dwd)}
-    ods_receipt = audit_ods(
-        ods, budget, expected_input_identity=expected_input_identity
-    )
+    ods_receipt = audit_ods(ods, budget, expected_input_identity=expected_input_identity)
     dwd_receipt = audit_standard_image(dwd, budget, contract)
     admission = load(member(ods, "evidence/period/ADMISSION.json"))
-    references, closure = _closure(
-        ods=ods, dwd=dwd, binding=admission["binding"], budget=budget
-    )
+    references, closure = _closure(ods=ods, dwd=dwd, binding=admission["binding"], budget=budget)
     after = {"ods": physical_guard(ods), "dwd": physical_guard(dwd)}
     if before != after:
         raise BoundedError("BUILD_PAIR_AUDIT_PRODUCTS_CHANGED_DURING_SCAN")
@@ -278,9 +256,7 @@ def audit_pair(
     )
     frozen = load(member(ods, "evidence/frozen-inputs.json"))
     archive = load(member(ods, "MATERIALIZATION.json"))
-    roots = {
-        sid: str(member(ods, r["prefix"])) for sid, r in archive["sources"].items()
-    }
+    roots = {sid: str(member(ods, r["prefix"])) for sid, r in archive["sources"].items()}
     # These are fresh full byte audits above, not a persisted receipt/cache hit.
     # Every original DWD byte is either in ODS or the pinned native DWD copy.
     inputs = VerifiedInputs(frozen, roots, expected_input_identity, references)
@@ -308,17 +284,13 @@ def audit_pair(
     original = load(member(ods, "evidence/period/ADMISSION.json"))
     if replay != original:
         raise BoundedError("BUILD_PAIR_AUDIT_SOURCE_REPLAY_DIFFERS")
-    if {"ods": physical_guard(ods), "dwd": physical_guard(dwd)} != result[
-        "physical_guard"
-    ]:
+    if {"ods": physical_guard(ods), "dwd": physical_guard(dwd)} != result["physical_guard"]:
         raise BoundedError("BUILD_PAIR_AUDIT_PRODUCTS_CHANGED_DURING_REPLAY")
     result.update(
         source_replay="PASS_ALL_PERIOD_SOURCES_AND_TYPED_DELTA",
         replay_identity=replay["identity"],
         source_replay_bytes=sum(
-            p.stat().st_size
-            for p in (budget.root / "source-replay").rglob("*")
-            if p.is_file()
+            p.stat().st_size for p in (budget.root / "source-replay").rglob("*") if p.is_file()
         ),
     )
     historical = evaluate_historical(ods, dwd, budget)

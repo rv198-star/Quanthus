@@ -64,17 +64,13 @@ AUDIT_MATERIALIZATION_REVISION = "materialization_revision"
 
 
 def validate_audit_job(job: dict[str, Any]) -> None:
-    materialization_revision = job.get(
-        AUDIT_MATERIALIZATION_REVISION, job.get("builder_revision")
-    )
+    materialization_revision = job.get(AUDIT_MATERIALIZATION_REVISION, job.get("builder_revision"))
     if (
         set(job) not in (AUDIT_KEYS, AUDIT_KEYS | {AUDIT_MATERIALIZATION_REVISION})
         or job.get("contract") != AUDIT_JOB
         or not re.fullmatch(r"[0-9a-f]{40}", str(job.get("builder_revision")))
         or not re.fullmatch(r"[0-9a-f]{40}", str(materialization_revision))
-        or not re.fullmatch(
-            r"sha256:[0-9a-f]{64}", str(job.get("frozen_input_identity"))
-        )
+        or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(job.get("frozen_input_identity")))
     ):
         raise BoundedError("BUILD_AUDIT_JOB_SCHEMA_OR_IDENTITY_INVALID")
     for key in ("ods", "dwd", "work_root", "environment_lock", "wheelhouse"):
@@ -153,9 +149,7 @@ def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any
         if owned:
             reason = str(exc)
             reason = (
-                reason
-                if re.fullmatch(r"[A-Z][A-Z0-9_]{0,159}", reason)
-                else type(exc).__name__
+                reason if re.fullmatch(r"[A-Z][A-Z0-9_]{0,159}", reason) else type(exc).__name__
             )
             save(
                 Path(job["work_root"]) / "FAILURE.json",
@@ -165,11 +159,7 @@ def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any
                     "frozen_input_identity": job["frozen_input_identity"],
                     "code_revision": job["builder_revision"],
                     **(
-                        {
-                            "materialization_revision": job[
-                                AUDIT_MATERIALIZATION_REVISION
-                            ]
-                        }
+                        {"materialization_revision": job[AUDIT_MATERIALIZATION_REVISION]}
                         if AUDIT_MATERIALIZATION_REVISION in job
                         else {}
                     ),
@@ -257,9 +247,7 @@ def _require_pinned_code(revision: str) -> None:
         raise BoundedError("BUILD_CLEAN_PINNED_GITHUB_WORKTREE_REQUIRED")
 
 
-def _preflight_paths(
-    roots: dict[str, str], work_root: Path, limits: Limits, days: int
-) -> None:
+def _preflight_paths(roots: dict[str, str], work_root: Path, limits: Limits, days: int) -> None:
     usage = job_capacity(work_root, [Path(p) for p in roots.values()], limits)
     if {name for _, name in socket.if_nameindex()} != {"lo"}:
         raise BoundedError("BUILD_ISOLATED_OFFLINE_NETWORK_REQUIRED")
@@ -272,10 +260,7 @@ def _preflight_paths(
     fs = os.statvfs(ancestor)
     if not os.access(ancestor, os.W_OK | os.X_OK):
         raise BoundedError("BUILD_RUNTIME_USER_CANNOT_WRITE_WORK_ROOT")
-    if (
-        fs.f_bavail * fs.f_frsize
-        < usage["remaining_allocated_bytes"] + limits.free_floor_bytes
-    ):
+    if fs.f_bavail * fs.f_frsize < usage["remaining_allocated_bytes"] + limits.free_floor_bytes:
         raise BoundedError("BUILD_WORK_SPACE_RESERVE_INSUFFICIENT")
     if fs.f_favail < 4000 + days * 500:
         raise BoundedError("BUILD_WORK_INODE_RESERVE_INSUFFICIENT")
@@ -313,9 +298,7 @@ def run(
         raise BoundedError("BUILD_JOB_SELECTION_CONTRACT_SCOPE_DIFFERS")
     limits = Limits(**job["limits"])
     sources = [Path(p) for p in roots.values()]
-    _preflight_paths(
-        roots, Path(job["work_root"]), limits, len(selection["expected_days"])
-    )
+    _preflight_paths(roots, Path(job["work_root"]), limits, len(selection["expected_days"]))
     frozen_path = Path(job["frozen"])
     if action == "freeze":
         actual = freeze(selection, roots)
@@ -420,8 +403,7 @@ def run(
             "environment_identity": environment["lock_sha256"],
             "policy_identity": identity(contract),
             "scope": {
-                k: binding[k]
-                for k in ("predecessor_through", "through_date", "target_version")
+                k: binding[k] for k in ("predecessor_through", "through_date", "target_version")
             },
         },
         stages=stages,

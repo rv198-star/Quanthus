@@ -147,9 +147,7 @@ def control_record(path: Path, value: dict[str, Any]) -> None:
 def controller_lock(root: Path) -> Iterator[None]:
     root = _physical(root)
     root.mkdir(parents=True, exist_ok=True)
-    fd = os.open(
-        root / "CONTROLLER.lock", os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600
-    )
+    fd = os.open(root / "CONTROLLER.lock", os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     try:
         if not stat.S_ISREG(os.fstat(fd).st_mode):
             raise BoundedError("BUILD_CONTROLLER_LOCK_NOT_REGULAR")
@@ -179,9 +177,7 @@ def _no_active_workers(controls: Path) -> None:
             text=True,
             check=False,
         )
-        state = dict(
-            line.split("=", 1) for line in result.stdout.splitlines() if "=" in line
-        )
+        state = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
         if state.get("ActiveState") in {
             "active",
             "activating",
@@ -205,10 +201,7 @@ def controller_capacity(
     while not ancestor.exists():
         ancestor = ancestor.parent
     fs = os.statvfs(ancestor)
-    if (
-        fs.f_bavail * fs.f_frsize
-        < usage["remaining_allocated_bytes"] + limits.free_floor_bytes
-    ):
+    if fs.f_bavail * fs.f_frsize < usage["remaining_allocated_bytes"] + limits.free_floor_bytes:
         raise BoundedError("BUILD_WORK_SPACE_RESERVE_INSUFFICIENT")
     if fs.f_favail < 4000 + days * 500:
         raise BoundedError("BUILD_WORK_INODE_RESERVE_INSUFFICIENT")
@@ -341,14 +334,10 @@ def service_arguments(
             inaccessible.append(path)
     masks = [p for p in masks if not any(q in p.parents for q in masks)]
     if masks:
-        properties.append(
-            "TemporaryFileSystem=" + " ".join(str(p) + ":ro" for p in masks)
-        )
+        properties.append("TemporaryFileSystem=" + " ".join(str(p) + ":ro" for p in masks))
     inaccessible = [p for p in inaccessible if not any(q in p.parents for q in masks)]
     if inaccessible:
-        properties.append(
-            "InaccessiblePaths=" + " ".join("-" + str(p) for p in inaccessible)
-        )
+        properties.append("InaccessiblePaths=" + " ".join("-" + str(p) for p in inaccessible))
     arguments = [
         "systemd-run",
         "--quiet",
@@ -423,9 +412,7 @@ def run_service(
     )
     clock = time.monotonic()
     with (parent / "worker.log").open("xb") as stream:
-        result = subprocess.run(
-            arguments, stdout=stream, stderr=subprocess.STDOUT, check=False
-        )
+        result = subprocess.run(arguments, stdout=stream, stderr=subprocess.STDOUT, check=False)
     control_record(
         parent / "EXIT.json",
         {
@@ -460,12 +447,7 @@ def audit_completion(
     try:
         start = datetime.fromisoformat(completion["started_at"])
         end = datetime.fromisoformat(completion["finished_at"])
-        clocks = (
-            datetime.fromisoformat(started_at)
-            <= start
-            <= end
-            <= datetime.now(timezone.utc)
-        )
+        clocks = datetime.fromisoformat(started_at) <= start <= end <= datetime.now(timezone.utc)
     except (KeyError, TypeError, ValueError):
         clocks = False
     if (
@@ -484,8 +466,7 @@ def audit_completion(
         or receipt.get("identity")
         != identity({k: v for k, v in receipt.items() if k != "identity"})
         or receipt.get("input_identity") != job["frozen_input_identity"]
-        or completion.get("publication_eligible")
-        is not receipt.get("publication_eligible")
+        or completion.get("publication_eligible") is not receipt.get("publication_eligible")
         or not clocks
         or (root / "FAILURE.json").exists()
     ):
@@ -515,9 +496,7 @@ def _audit(
     parent.mkdir(parents=True, exist_ok=True)
     # Prior audit replay/spill is retained failure evidence, never a readable
     # shortcut for this fresh source audit.
-    denied = sorted(
-        set([*denied, *(member(parent, p.name) for p in parent.iterdir())]), key=str
-    )
+    denied = sorted(set([*denied, *(member(parent, p.name) for p in parent.iterdir())]), key=str)
     scratch = member(parent, "audit-" + token)
     scratch.mkdir()
     os.chown(scratch, user.pw_uid, user.pw_gid)
@@ -550,9 +529,7 @@ def _audit(
         writable=scratch,
         token=token,
     )
-    receipt, completion = audit_completion(
-        audit_job, contract, environment_identity, started
-    )
+    receipt, completion = audit_completion(audit_job, contract, environment_identity, started)
     if result.get("execution_identity") != completion["identity"]:
         raise BoundedError("BUILD_CONTROLLER_CURRENT_AUDIT_COMPLETION_REQUIRED")
     protect_tree(scratch, strict=True)
@@ -572,9 +549,7 @@ def _pair_completion(
         "owner_identity": owner,
         "pair_registration_identity": gate["identity"],
         "audit_content_identity": portable_audit_identity(receipt),
-        "manifest_hashes": {
-            r: file_sha(p / "manifest.json") for r, p in products.items()
-        },
+        "manifest_hashes": {r: file_sha(p / "manifest.json") for r, p in products.items()},
         "materializations": gate["materializations"],
         "consumer_admission": "NOT_GRANTED",
     }
@@ -625,9 +600,7 @@ def execute(
     if user.pw_uid == 0:
         raise BoundedError("BUILD_CONTROLLER_UNPRIVILEGED_WORKER_REQUIRED")
     root = safe_path(job["work_root"])
-    materialization_revision = job.get(
-        "materialization_revision", job["builder_revision"]
-    )
+    materialization_revision = job.get("materialization_revision", job["builder_revision"])
     if not re.fullmatch(r"[0-9a-f]{40}", str(materialization_revision)):
         raise BoundedError("BUILD_CONTROLLER_MATERIALIZATION_REVISION_INVALID")
     resume = "materialization_revision" in job
@@ -656,9 +629,7 @@ def execute(
         readonly.append(safe_path(job["work_root"]))
     protected = [safe_path(p) for p in execution["protected_paths"]]
     disjoint_output(root, [*sources, *readonly, *protected])
-    disjoint_output(
-        safe_path(execution["audit_parent"]), [root, *sources, *readonly, *protected]
-    )
+    disjoint_output(safe_path(execution["audit_parent"]), [root, *sources, *readonly, *protected])
     for denied in derive_denied(job, execution):
         disjoint_output(denied, readonly)
     limits = Limits(**job["limits"])
@@ -720,8 +691,7 @@ def execute(
                 if set(result.get("stages", {})) != {"period", "windows", "ods", "dwd"}:
                     raise BoundedError("BUILD_CONTROLLER_COMPLETE_GRAPH_REQUIRED")
                 outputs = {
-                    role: safe_path(result["stages"][role]["output"])
-                    for role in ("ods", "dwd")
+                    role: safe_path(result["stages"][role]["output"]) for role in ("ods", "dwd")
                 }
                 # Recover a killed intent write before starting a new transfer.
                 partial = root / ".PUBLICATION.json.partial"
@@ -734,12 +704,8 @@ def execute(
                 intent = begin_transfer(root, {}, owner_identity=owner)
                 partial = root / ".PUBLICATION.json.partial"
                 if partial.exists():
-                    if not os.path.samefile(
-                        member(root, partial.name), root / "PUBLICATION.json"
-                    ):
-                        raise BoundedError(
-                            "BUILD_CONTROLLER_TRANSFER_INTENT_CONFLICT_PRESERVED"
-                        )
+                    if not os.path.samefile(member(root, partial.name), root / "PUBLICATION.json"):
+                        raise BoundedError("BUILD_CONTROLLER_TRANSFER_INTENT_CONFLICT_PRESERVED")
                     partial.unlink()
                     _sync(root)
             # Resolve a killed no-overwrite marker link before the strict file
@@ -791,11 +757,7 @@ def execute(
                         ),
                     )
                     writes = root / "publication-writes"
-                    numbers = (
-                        [int(p.name[8:]) for p in writes.iterdir()]
-                        if writes.exists()
-                        else []
-                    )
+                    numbers = [int(p.name[8:]) for p in writes.iterdir()] if writes.exists() else []
                     number = 1 + max(numbers, default=0)
                     name = f"attempt-{number:06d}"
                     prepared = prepare_markers(root, documents, attempt=name)

@@ -116,14 +116,30 @@ def test_governed_registered_cases_no_longer_block_publication():
     _require_audit(receipt(), contract(), AUDIT, materialization_revision=MATERIALIZED)
 
 
+def forged_pending_case():
+    """Governed receipt whose gate claims PASS while one case is still pending."""
+    value = receipt()
+    gate = value["historical_gate"]
+    gate["cases"][1]["status"] = "PENDING_GOVERNED_DISPOSITION"
+    gate["identity"] = identity({k: v for k, v in gate.items() if k != "identity"})
+    value["identity"] = identity({k: v for k, v in value.items() if k != "identity"})
+    return value
+
+
 def test_pending_registered_case_still_blocks_publication():
     with pytest.raises(BoundedError, match="HISTORICAL_REGISTRATION_UNRESOLVED"):
         _require_audit(
-            receipt(pending="SZSE-002336-20200617-tradability"),
+            forged_pending_case(),
             contract(),
             AUDIT,
             materialization_revision=MATERIALIZED,
         )
+
+
+def test_pending_gate_verdict_is_rejected_before_the_case_scan():
+    value = receipt(pending="SZSE-002336-20200617-tradability")
+    with pytest.raises(BoundedError, match="FULL_SOURCE_AND_QUALITY_AUDIT_REQUIRED"):
+        _require_audit(value, contract(), AUDIT, materialization_revision=MATERIALIZED)
 
 
 def test_policy_hash_mismatch_still_blocks_publication():

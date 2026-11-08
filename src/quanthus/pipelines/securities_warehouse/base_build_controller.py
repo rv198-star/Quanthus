@@ -420,22 +420,6 @@ def audit_completion(
     job: dict[str, Any], contract: dict[str, Any], environment_identity: str, started_at: str
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     root = safe_path(job["work_root"])
-    materialization_revision = job.get("materialization_revision", job["builder_revision"])
-    if not re.fullmatch(r"[0-9a-f]{40}", str(materialization_revision)):
-        raise BoundedError("BUILD_CONTROLLER_MATERIALIZATION_REVISION_INVALID")
-    materialized = root / "PUBLICATION.json"
-    resume = "materialization_revision" in job
-    if resume:
-        # A re-audit names the revision that produced these bytes. The product
-        # must already be materialized and must not carry any seal marker.
-        if not materialized.exists():
-            raise BoundedError("BUILD_CONTROLLER_MATERIALIZATION_NOT_FOUND")
-        for role in ("ODS", "DWD"):
-            for marker in ("manifest.json", "READY"):
-                if (root / "published" / role / marker).exists():
-                    raise BoundedError("BUILD_CONTROLLER_MARKER_REQUIRES_RECOVERY")
-        if (root / "PAIR-READY.json").exists():
-            raise BoundedError("BUILD_CONTROLLER_PAIR_ALREADY_COMPLETE")
     completion = load(member(root, "COMPLETION.json"))
     audit_path = member(root, "AUDIT.json")
     receipt = load(audit_path)
@@ -592,6 +576,21 @@ def execute(
     if user.pw_uid == 0:
         raise BoundedError("BUILD_CONTROLLER_UNPRIVILEGED_WORKER_REQUIRED")
     root = safe_path(job["work_root"])
+    materialization_revision = job.get("materialization_revision", job["builder_revision"])
+    if not re.fullmatch(r"[0-9a-f]{40}", str(materialization_revision)):
+        raise BoundedError("BUILD_CONTROLLER_MATERIALIZATION_REVISION_INVALID")
+    resume = "materialization_revision" in job
+    if resume:
+        # A re-audit names the revision that produced these bytes. The product
+        # must already be materialized and must not carry any seal marker.
+        if not (root / "PUBLICATION.json").exists():
+            raise BoundedError("BUILD_CONTROLLER_MATERIALIZATION_NOT_FOUND")
+        for role in ("ODS", "DWD"):
+            for marker in ("manifest.json", "READY"):
+                if (root / "published" / role / marker).exists():
+                    raise BoundedError("BUILD_CONTROLLER_MARKER_REQUIRES_RECOVERY")
+        if (root / "PAIR-READY.json").exists():
+            raise BoundedError("BUILD_CONTROLLER_PAIR_ALREADY_COMPLETE")
     roots = load(safe_path(job["roots"]))
     sources = [safe_path(p) for p in roots.values()]
     readonly = [

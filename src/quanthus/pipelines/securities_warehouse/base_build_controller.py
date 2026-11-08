@@ -650,7 +650,22 @@ def execute(
         controls = member(root, "controller")
         controls.mkdir(exist_ok=True)
         _no_active_workers(controls)
-        control_record(root / "CONTROLLER.json", owner_record)
+        if resume:
+            # The materialization owner record is immutable; a re-audit appends its
+            # own ownership record instead of rewriting the producer's.
+            control_record(
+                root / "CONTROLLER-REAUDIT.json",
+                {
+                    "contract": "p10-standard-base-controller-reaudit-v1",
+                    "owner_identity": owner,
+                    "job_identity": identity(job),
+                    "audit_revision": job["builder_revision"],
+                    "materialization_revision": materialization_revision,
+                    "environment_identity": environment["lock_sha256"],
+                },
+            )
+        else:
+            control_record(root / "CONTROLLER.json", owner_record)
         token = uuid.uuid4().hex
         attempt = controls / ("run-" + token)
         attempt.mkdir()

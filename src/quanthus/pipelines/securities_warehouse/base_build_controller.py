@@ -623,10 +623,6 @@ def execute(
         safe_path(job["wheelhouse"]),
         safe_path(job["environment_lock"]),
     ]
-    # A re-audit of an already materialized pair names the revision that owns
-    # those bytes; it is an input identity, never a write target.
-    if "materialization_revision" in job:
-        readonly.append(safe_path(job["work_root"]))
     protected = [safe_path(p) for p in execution["protected_paths"]]
     disjoint_output(root, [*sources, *readonly, *protected])
     disjoint_output(safe_path(execution["audit_parent"]), [root, *sources, *readonly, *protected])

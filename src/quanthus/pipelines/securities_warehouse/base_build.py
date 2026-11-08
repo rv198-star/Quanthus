@@ -47,6 +47,7 @@ JOB_KEYS = {
     "closed_days",
     "limits",
 }
+JOB_REAUDIT_KEYS = JOB_KEYS | {"materialization_revision"}
 AUDIT_JOB = "p10-standard-base-pair-audit-job-v1"
 AUDIT_KEYS = {
     "contract",
@@ -193,9 +194,13 @@ def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any
 
 def validate_job(job: dict[str, Any]) -> None:
     if (
-        set(job) != JOB_KEYS
+        set(job) not in (JOB_KEYS, JOB_REAUDIT_KEYS)
         or job["contract"] != JOB
         or not re.fullmatch(r"[0-9a-f]{40}", str(job["builder_revision"]))
+        or (
+            "materialization_revision" in job
+            and not re.fullmatch(r"[0-9a-f]{40}", str(job["materialization_revision"]))
+        )
     ):
         raise BoundedError("BUILD_JOB_SCHEMA_OR_REVISION_INVALID")
     for key in (

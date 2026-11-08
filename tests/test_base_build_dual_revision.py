@@ -10,6 +10,7 @@ import pytest
 from quanthus.pipelines.securities_warehouse.base22 import digest
 from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError
 from quanthus.pipelines.securities_warehouse.base_build import validate_audit_job
+from quanthus.pipelines.securities_warehouse.base_build import validate_job as validate_build_job
 from quanthus.pipelines.securities_warehouse.base_build_inputs import file_sha, identity
 from quanthus.pipelines.securities_warehouse.base_build_profile import delivery_contract
 from quanthus.pipelines.securities_warehouse.base_build_publication import (
@@ -204,3 +205,11 @@ def test_audit_job_accepts_only_a_full_optional_materialization_revision():
         validate_audit_job({**job, "materialization_revision": "not-a-sha"})
     with pytest.raises(BoundedError, match="AUDIT_JOB_SCHEMA_OR_IDENTITY_INVALID"):
         validate_audit_job({**job, "extra": 1})
+
+
+def test_build_job_accepts_a_materialization_revision_only_for_reaudit():
+    job = json.loads(Path("config/pipelines/base-build-job.example.v1.json").read_bytes())
+    validate_build_job(job)
+    validate_build_job({**job, "materialization_revision": MATERIALIZED})
+    with pytest.raises(BoundedError, match="BUILD_JOB_SCHEMA_OR_REVISION_INVALID"):
+        validate_build_job({**job, "materialization_revision": "short"})

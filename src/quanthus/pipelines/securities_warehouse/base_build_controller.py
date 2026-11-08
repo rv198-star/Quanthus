@@ -31,6 +31,7 @@ from .base_build_period import load
 from .base_build_publication import (
     begin_transfer,
     pair_documents,
+    materialization_intent,
     portable_audit_identity,
     prepare_markers,
     recover_owned_markers,
@@ -677,7 +678,7 @@ def execute(
             if resume:
                 # Re-audit path: the materialization and its transfer intent are
                 # already owned; never invoke the materialize worker again.
-                intent = begin_transfer(root, {}, owner_identity=owner)
+                intent = materialization_intent(root)
             elif not (root / "PUBLICATION.json").exists():
                 controller_capacity(
                     root,

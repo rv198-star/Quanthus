@@ -412,6 +412,21 @@ def begin_transfer(work: Path, outputs: dict[str, Path], *, owner_identity: str)
     return intent
 
 
+def materialization_intent(work: Path) -> dict[str, Any]:
+    """Read the immutable producer transfer intent for a re-audit.
+
+    The owner identity belongs to the materializing job and must not be rewritten
+    by a later audit revision; only the intent's own contract and identity are
+    re-verified here. Every byte it names is still re-checked by resume_transfer.
+    """
+    intent = load(member(work, "PUBLICATION.json"))
+    if intent.get("contract") != CONTRACT or intent.get("identity") != identity(
+        {k: v for k, v in intent.items() if k != "identity"}
+    ):
+        raise BoundedError("BUILD_PUBLICATION_MATERIALIZATION_INTENT_CHANGED")
+    return intent
+
+
 def resume_transfer(work: Path, intent: dict[str, Any]) -> dict[str, Path]:
     if load(member(work, "PUBLICATION.json")) != intent or intent.get("identity") != identity(
         {k: v for k, v in intent.items() if k != "identity"}

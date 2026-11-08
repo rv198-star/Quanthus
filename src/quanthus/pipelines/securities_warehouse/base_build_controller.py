@@ -653,9 +653,10 @@ def execute(
         _no_active_workers(controls)
         if resume:
             # The materialization owner record is immutable; a re-audit appends its
-            # own ownership record instead of rewriting the producer's.
+            # own ownership record instead of rewriting the producer's. One file per
+            # owner identity keeps earlier re-audit attempts as immutable evidence.
             control_record(
-                root / "CONTROLLER-REAUDIT.json",
+                controls / ("reaudit-" + owner.removeprefix("sha256:")[:16] + ".json"),
                 {
                     "contract": "p10-standard-base-controller-reaudit-v1",
                     "owner_identity": owner,

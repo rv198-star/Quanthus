@@ -51,7 +51,9 @@ def historical(*, pending: str | None = None, policy_sha: str | None = None):
                 "market_date": day,
                 "observations_present": True,
                 "scope_registered": True,
-                "status": "PENDING_GOVERNED_DISPOSITION" if cid == pending else GOVERNED[cid],
+                "status": "PENDING_GOVERNED_DISPOSITION"
+                if cid == pending
+                else GOVERNED[cid],
                 "facts_or_grades_changed": False,
                 "held_added": 0,
             }
@@ -162,7 +164,9 @@ def test_pair_gate_records_both_revisions_only_when_they_differ():
     assert dual["contract"] == DUAL_REVISION_CONTRACT
     assert dual["audit_revision"] == AUDIT
     assert dual["materialization_revision"] == MATERIALIZED
-    assert dual["identity"] == identity({k: v for k, v in dual.items() if k != "identity"})
+    assert dual["identity"] == identity(
+        {k: v for k, v in dual.items() if k != "identity"}
+    )
     single = pair_gate(receipt(), revision=MATERIALIZED)
     assert single["contract"] == CONTRACT
     assert "audit_revision" not in single and "materialization_revision" not in single
@@ -175,9 +179,13 @@ def test_gate_revision_binding_rejects_mismatched_and_degenerate_pairs():
     assert require_gate_revisions(dual, AUDIT) == MATERIALIZED
     with pytest.raises(BoundedError, match="DUAL_REVISION_BINDING_CHANGED"):
         require_gate_revisions(dual, MATERIALIZED)
-    degenerate = pair_gate(receipt(), revision=AUDIT, materialization_revision=MATERIALIZED)
+    degenerate = pair_gate(
+        receipt(), revision=AUDIT, materialization_revision=MATERIALIZED
+    )
     degenerate["audit_revision"] = MATERIALIZED
-    degenerate["identity"] = identity({k: v for k, v in degenerate.items() if k != "identity"})
+    degenerate["identity"] = identity(
+        {k: v for k, v in degenerate.items() if k != "identity"}
+    )
     with pytest.raises(BoundedError, match="DUAL_REVISION_BINDING_CHANGED"):
         require_gate_revisions(degenerate, MATERIALIZED)
     single = pair_gate(receipt(), revision=MATERIALIZED)
@@ -204,4 +212,3 @@ def test_audit_job_accepts_only_a_full_optional_materialization_revision():
         validate_audit_job({**job, "materialization_revision": "not-a-sha"})
     with pytest.raises(BoundedError, match="AUDIT_JOB_SCHEMA_OR_IDENTITY_INVALID"):
         validate_audit_job({**job, "extra": 1})
-

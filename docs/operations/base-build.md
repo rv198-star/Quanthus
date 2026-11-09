@@ -10,6 +10,9 @@ engineering tests. It does not declare Base 2.5 acceptance or a production consu
 The full build consumes the previous paired Base, selected Daily
 deliveries and their explicitly selected source/reference evidence. Original products stay read-only.
 
+The scheduled Daily rollover procedure is in
+[Standard Daily and Base rollover](standard-daily-base-rollover.md).
+
 ## Input selection and relocation
 
 Run `python -m quanthus.pipelines.securities_warehouse.base_build_freeze freeze` with

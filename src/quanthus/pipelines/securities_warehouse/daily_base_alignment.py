@@ -124,9 +124,32 @@ def prepare(base: Path, runtime: Path, through: date | None, revision: str) -> d
                 for d, e in dates.items()
                 if d < ds and e.get("status") == "QUALIFIED_1D_NATIVE5M"
             ]
-            if not candidates:
-                raise ValueError("DAILY_ALIGNMENT_CLOSED_REFERENCE_MISSING:" + ds)
-            reference = lanes(runtime, max(candidates, key=lambda x: x[0])[1])
+            if old.get("standard_delivery"):
+                delivered = physical_path(Path(old["standard_delivery"]))
+                if (
+                    file_sha(delivered / "manifest.json")
+                    != old["standard_delivery_manifest_sha256"]
+                ):
+                    raise ValueError("DAILY_ALIGNMENT_INDEXED_DELIVERY_CHANGED")
+                closed_body = inspect_delivery(delivered)
+                selected = closed_body["sources"]["calendar_reference"]
+                reference_path = delivered / selected["path"]
+                if (
+                    closed_body["market_date"] != ds
+                    or file_sha(reference_path) != selected["manifest_sha256"]
+                ):
+                    raise ValueError("DAILY_ALIGNMENT_CLOSED_REFERENCE_CHANGED")
+                reference = {"sources": {"market_daily_core": str(reference_path.parent)}}
+            elif candidates:
+                reference = lanes(runtime, max(candidates, key=lambda x: x[0])[1])
+            else:
+                ready = runtime / "RUNTIME-READY.json"
+                retained = load(ready).get("calendar_reference") if ready.exists() else None
+                if not retained or (
+                    file_sha(Path(retained["path"]) / "release.json") != retained["manifest_sha256"]
+                ):
+                    raise ValueError("DAILY_ALIGNMENT_CLOSED_REFERENCE_MISSING:" + ds)
+                reference = {"sources": {"market_daily_core": retained["path"]}}
             sources = {
                 "calendar_reference": reference["sources"]["market_daily_core"],
                 "calendar_daily_events": str(events),
@@ -157,7 +180,28 @@ def prepare(base: Path, runtime: Path, through: date | None, revision: str) -> d
             raise ValueError("DAILY_ALIGNMENT_UNQUALIFIED_DATE:" + ds + ":" + old["status"])
         entries.append(row)
         day += timedelta(days=1)
+    market_entries = [
+        (ds, e)
+        for ds, e in dates.items()
+        if ds <= str(through) and e.get("status") == "QUALIFIED_1D_NATIVE5M"
+    ]
+    if market_entries:
+        reference = lanes(runtime, max(market_entries, key=lambda x: x[0])[1])
+        reference_path = Path(reference["sources"]["market_daily_core"])
+        calendar_reference = {
+            "path": str(reference_path),
+            "manifest_sha256": file_sha(reference_path / "release.json"),
+        }
+    else:
+        ready = runtime / "RUNTIME-READY.json"
+        calendar_reference = load(ready)["calendar_reference"] if ready.exists() else None
+        if not calendar_reference or (
+            file_sha(Path(calendar_reference["path"]) / "release.json")
+            != calendar_reference["manifest_sha256"]
+        ):
+            raise ValueError("DAILY_ALIGNMENT_CALENDAR_REFERENCE_REQUIRED")
     request = {
+        "calendar_reference": calendar_reference,
         "base_root": str(base),
         "source_runtime": str(runtime),
         "source_index_sha256": file_sha(index_path),

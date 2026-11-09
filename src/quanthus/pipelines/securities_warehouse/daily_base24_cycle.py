@@ -648,10 +648,10 @@ def collect(config: dict[str, Any], run: Path, day: date) -> dict[str, Any]:
             "consumer_admission": "NOT_GRANTED",
             "execution_authorized": False,
         }
-        write(run / "receipt.json", result)
         from .standard_daily_live import finish as finish_standard_delivery
 
         finish_standard_delivery(config, run, day, result, events=Path(events["release_dir"]))
+        write(run / "receipt.json", result)
         publish(config, result)
         return result
     market = provider(

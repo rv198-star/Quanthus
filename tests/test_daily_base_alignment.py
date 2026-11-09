@@ -38,3 +38,64 @@ def test_rebase_audit_refuses_changed_business_values(tmp_path: Path):
     write(new, close=11)
     with pytest.raises(ValueError, match="BUSINESS_VALUES_CHANGED"):
         compare_bars(old, new)
+
+
+def test_closed_only_runtime_can_align_again_without_market_index(tmp_path, monkeypatch):
+    import json
+    from datetime import date
+
+    from quanthus.pipelines.securities_warehouse import daily_base_alignment as align
+    from quanthus.pipelines.securities_warehouse import observed_daily_calendar as calendar
+    from quanthus.pipelines.securities_warehouse.base_build_inputs import file_sha
+
+    base, runtime = tmp_path / "base", tmp_path / "runtime"
+    base.mkdir()
+    runtime.mkdir()
+    (base / "manifest.json").write_text("{}")
+    delivered = runtime / "deliveries/2026-11-07"
+    reference = delivered / "sources/calendar_reference"
+    events = delivered / "sources/calendar_daily_events"
+    for source in [reference, events]:
+        source.mkdir(parents=True)
+        (source / "release.json").write_text("{}")
+    (delivered / "manifest.json").write_text("{}")
+    captured = runtime / "2026-11-07-aligned/calendar"
+    captured.mkdir(parents=True)
+    (captured / "calendar.json").write_text("{}")
+    entry = {
+        "status": "AUTHORITATIVE_CLOSED_EVENT_SOURCE_READY",
+        "event_source": str(events),
+        "event_manifest_sha256": file_sha(events / "release.json"),
+        "calendar_sha256": file_sha(captured / "calendar.json"),
+        "standard_delivery": str(delivered),
+        "standard_delivery_manifest_sha256": file_sha(delivered / "manifest.json"),
+    }
+    (runtime / "DATES.json").write_text(json.dumps({"dates": {"2026-11-07": entry}}))
+    retained = {"path": str(reference), "manifest_sha256": file_sha(reference / "release.json")}
+    (runtime / "RUNTIME-READY.json").write_text(json.dumps({"calendar_reference": retained}))
+    monkeypatch.setattr(
+        align,
+        "governance_config",
+        lambda *a, **kw: {
+            "through_date": "2026-11-06",
+            "layers": {"dwd": {"manifest_sha256": "new-base"}},
+        },
+    )
+    monkeypatch.setattr(align, "read_native_parent_references", lambda *a, **kw: None)
+    monkeypatch.setattr(calendar, "validate", lambda *a, **kw: None)
+    monkeypatch.setattr(
+        align,
+        "inspect_delivery",
+        lambda *a, **kw: {
+            "market_date": "2026-11-07",
+            "sources": {
+                "calendar_reference": {
+                    "path": "sources/calendar_reference/release.json",
+                    "manifest_sha256": retained["manifest_sha256"],
+                }
+            },
+        },
+    )
+    plan = align.prepare(base, runtime, date(2026, 11, 7), "a" * 40)
+    assert plan["entries"][0]["sources"]["calendar_reference"] == str(reference)
+    assert plan["calendar_reference"] == retained

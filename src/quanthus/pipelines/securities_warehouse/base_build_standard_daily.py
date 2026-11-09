@@ -340,6 +340,8 @@ def select(
     for root in sorted(daily_roots):
         body = inspect(root)
         day = body["market_date"]
+        if not after < day <= through_date:
+            continue
         sid = "delivery-" + day
         if sid in roots:
             raise BoundedError("BUILD_STANDARD_DELIVERY_DAY_DUPLICATE")

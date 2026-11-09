@@ -35,6 +35,11 @@ def test_market_and_closed_delivery_replay_only_self_contained_sources(
             "market_daily_core" if kind == "market" else "calendar_reference": roots["sources"]
             / "2026-10-08/market",
         }
+        observed = None
+        if kind == "closed":
+            from tests.test_observed_daily_calendar import observation
+
+            observed = observation(tmp_path / "observed-calendar")
         with Budget(tmp_path / (kind + "-publisher"), list(roots.values()), limits()) as budget:
             body = publish(
                 projection=roots["daily"] if kind == "market" else None,
@@ -44,6 +49,7 @@ def test_market_and_closed_delivery_replay_only_self_contained_sources(
                 output=output,
                 code_revision="a" * 40,
                 budget=budget,
+                calendar_observation=observed,
             )
         assert body["day_kind"] == kind
         deliveries[kind] = output

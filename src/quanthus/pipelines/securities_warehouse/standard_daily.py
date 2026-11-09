@@ -115,7 +115,7 @@ def inspect(root: Path, *, sealed: bool = True) -> dict[str, Any]:
                 raise BoundedError("DAILY_DELIVERY_MEMBER_CHANGED")
     body = load(member(root, "DELIVERY.json"))
     if (
-        set(body)
+        (set(body) - {"calendar_observation"})
         != {
             "contract",
             "day_kind",
@@ -133,6 +133,8 @@ def inspect(root: Path, *, sealed: bool = True) -> dict[str, Any]:
         or body.get("policy_sha256") != file_sha(POLICY)
         or file_sha(member(root, "contract.json")) != file_sha(POLICY)
         or body.get("day_kind") not in {"market", "closed"}
+        or "calendar_observation" in body
+        and body.get("day_kind") != "closed"
         or body["market_date"] != content.get("market_date")
         or body["day_kind"] != content.get("day_kind")
         or date.fromisoformat(body["market_date"]).isoformat() != body["market_date"]
@@ -293,6 +295,12 @@ def _replay(
             )
             if held:
                 raise BoundedError("DAILY_DELIVERY_NEW_CLOSED_QUALITY_HELD")
+            if body.get("calendar_observation"):
+                from .observed_daily_calendar import project as project_calendar
+
+                calendar = project_calendar(
+                    root, body["calendar_observation"], output, day.isoformat()
+                )
             cal = _project_trading_calendar(
                 connection,
                 path=calendar[0],
@@ -350,6 +358,7 @@ def publish(
     output: Path,
     code_revision: str,
     budget: Budget,
+    calendar_observation: Path | None = None,
 ) -> dict[str, Any]:
     from .daily_core_domain import _verify_base
 
@@ -380,8 +389,22 @@ def publish(
         "projection": file_sha(projection / "manifest.json") if projection else None,
         "sources": {k: file_sha(p / "release.json") for k, p in sources.items()},
     }
+    if calendar_observation is not None:
+        from .observed_daily_calendar import validate as validate_calendar
+
+        if projection is not None:
+            raise BoundedError("DAILY_DELIVERY_MARKET_CALENDAR_OVERRIDE_FORBIDDEN")
+        validate_calendar(calendar_observation.parent, day=day)
+        request["calendar_observation"] = file_sha(calendar_observation)
     output = disjoint_output(
-        output, [base_root, config, *sources.values(), *([projection] if projection else [])]
+        output,
+        [
+            base_root,
+            config,
+            *sources.values(),
+            *([projection] if projection else []),
+            *([calendar_observation.parent] if calendar_observation else []),
+        ],
     )
     if output.exists():
         body = inspect(output)
@@ -427,6 +450,21 @@ def publish(
             "code_revision": code_revision,
             "policy_sha256": file_sha(POLICY),
         }
+        if calendar_observation is not None:
+            from .observed_daily_calendar import CONTRACT as CALENDAR_CONTRACT
+
+            original = load(calendar_observation)
+            for name in ["calendar.json", *original["original_files"]]:
+                copy_file(
+                    member(calendar_observation.parent, name),
+                    member(stage, "calendar-observation/" + name),
+                    budget,
+                )
+            body["calendar_observation"] = {
+                "contract": CALENDAR_CONTRACT,
+                "path": "calendar-observation/calendar.json",
+                "sha256": file_sha(calendar_observation),
+            }
         replay = _replay(stage, body, parent, budget, budget.root / "publish-replay")
         for table, paths in replay.tables.items():
             body["table_paths"][table] = []

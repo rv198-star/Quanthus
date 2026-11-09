@@ -137,6 +137,20 @@ def prepare(base: Path, runtime: Path, through: date | None, revision: str) -> d
                     k: file_sha(Path(v) / "release.json") for k, v in sources.items()
                 },
             }
+            observations = sorted(
+                {
+                    p
+                    for p in runtime.glob(ds + "-*/calendar/calendar.json")
+                    if file_sha(p) == old["calendar_sha256"]
+                }
+            )
+            if not observations:
+                raise ValueError("DAILY_ALIGNMENT_INDEXED_CALENDAR_MISSING:" + ds)
+            from .observed_daily_calendar import validate as validate_calendar
+
+            validate_calendar(observations[0].parent, day=ds)
+            row["calendar_observation"] = str(observations[0])
+            row["calendar_observation_sha256"] = old["calendar_sha256"]
         else:
             raise ValueError("DAILY_ALIGNMENT_UNQUALIFIED_DATE:" + ds + ":" + old["status"])
         entries.append(row)
@@ -309,6 +323,9 @@ def execute(plan: dict[str, Any], output: Path) -> dict[str, Any]:
                     output=delivery,
                     code_revision=plan["code_revision"],
                     budget=budget,
+                    calendar_observation=Path(row["calendar_observation"])
+                    if row.get("calendar_observation")
+                    else None,
                 )
                 verify_delivery(
                     delivery, parent=parent, budget=budget, output=budget.root / "acceptance-replay"

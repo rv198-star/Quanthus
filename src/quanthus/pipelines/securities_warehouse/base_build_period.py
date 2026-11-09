@@ -305,7 +305,15 @@ def compare_tables(expected: list[Path], observed: list[Path], connection: Any) 
         raise BoundedError("BUILD_PERIOD_SOURCE_REPLAY_DIFFERS")
 
 
-def _views(connection: Any, parents: dict[str, list[Path]], overlay: dict[str, Path]) -> None:
+def _views(
+    connection: Any,
+    parents: dict[str, list[Path]],
+    overlay: dict[str, Path],
+    *,
+    knowledge_cutoff: Any = None,
+) -> None:
+    from .daily_reference_views import reference_relation
+
     for view, table in (
         ("base_listing", "dwd_listing"),
         ("base_security", "dwd_security"),
@@ -314,7 +322,10 @@ def _views(connection: Any, parents: dict[str, list[Path]], overlay: dict[str, P
     ):
         paths = parents[table] + ([overlay[table]] if table in overlay else [])
         connection.execute(
-            "CREATE OR REPLACE TEMP VIEW " + view + " AS SELECT * FROM " + relation(paths)
+            "CREATE OR REPLACE TEMP VIEW "
+            + view
+            + " AS SELECT * FROM "
+            + reference_relation(paths, knowledge_cutoff)
         )
 
 

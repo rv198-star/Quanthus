@@ -213,3 +213,67 @@ def test_build_job_accepts_a_materialization_revision_only_for_reaudit():
     validate_build_job({**job, "materialization_revision": MATERIALIZED})
     with pytest.raises(BoundedError, match="BUILD_JOB_SCHEMA_OR_REVISION_INVALID"):
         validate_build_job({**job, "materialization_revision": "short"})
+
+
+def standard_reader_root(tmp_path):
+    from quanthus.pipelines.securities_warehouse.base_build_publication import (
+        portable_audit_identity,
+    )
+
+    root = tmp_path / "base"
+    (root / "contract").mkdir(parents=True)
+    (root / "contract/base-build-delivery.v1.json").write_text(json.dumps(contract()))
+    (root / "MATERIALIZATION.json").write_text("{}")
+    proof = receipt()
+    dwd = proof["DWD"]
+    dwd["materialization_sha256"] = file_sha(root / "MATERIALIZATION.json")
+    dwd["identity"] = digest({k: v for k, v in dwd.items() if k != "identity"})
+    proof["identity"] = identity({k: v for k, v in proof.items() if k != "identity"})
+    gate = pair_gate(proof, revision=AUDIT, materialization_revision=MATERIALIZED)
+    body = {
+        "kind": "quanthus_dwd_base_bundle_v1",
+        "version": contract()["base_version"],
+        "business_through": contract()["business_through"],
+        "code_revision": AUDIT,
+        "content": {
+            "role": "dwd",
+            "base_version": contract()["base_version"],
+            "through_date": contract()["business_through"],
+        },
+        "consumer_admission": "NOT_GRANTED",
+        "paired_audit": proof,
+        "pairing": gate,
+        "scan_identity": dwd["identity"],
+        "materialization_sha256": dwd["materialization_sha256"],
+    }
+    assert gate["audit_content_identity"] == portable_audit_identity(proof)
+    body["content_digest"] = digest(body)
+    (root / "manifest.json").write_text(json.dumps(body))
+    (root / "READY").write_text(file_sha(root / "manifest.json"))
+    return root
+
+
+def test_standard_daily_governance_accepts_verified_dual_revision_base(tmp_path):
+    from quanthus.pipelines.securities_warehouse.native_base_standard_reader import (
+        governance_config,
+    )
+
+    root = standard_reader_root(tmp_path)
+    cfg = governance_config(root, build_id="dual-revision-daily")
+    assert cfg["layers"]["dwd"]["manifest_sha256"] == file_sha(root / "manifest.json")
+    assert cfg["consumer_admission"] == "NOT_GRANTED"
+    assert cfg["execution_authorized"] is False
+
+
+def test_standard_daily_governance_rejects_forged_revision_pair(tmp_path):
+    from quanthus.pipelines.securities_warehouse.native_base_standard_reader import (
+        governance_config,
+    )
+
+    root = standard_reader_root(tmp_path)
+    body = json.loads((root / "manifest.json").read_bytes())
+    body["pairing"]["materialization_revision"] = AUDIT
+    (root / "manifest.json").write_text(json.dumps(body))
+    (root / "READY").write_text(file_sha(root / "manifest.json"))
+    with pytest.raises(BoundedError, match="DUAL_REVISION_BINDING_CHANGED"):
+        governance_config(root, build_id="forged-daily")

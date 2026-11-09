@@ -36,6 +36,7 @@ from .daily_core_domain import (
     _project_announcements,
     _project_daily_tables,
     _project_trading_calendar,
+    daily_parent_cutoff,
 )
 from .native_base23_reader import NativeBase23
 
@@ -211,7 +212,12 @@ def _replay(
     )
     calendar = _artifact({"market_daily_core": market}, "market_daily_core", "trading_calendar")
     with _connection(budget) as connection:
-        _views(connection, parents, overlay)
+        _views(
+            connection,
+            parents,
+            overlay,
+            knowledge_cutoff=daily_parent_cutoff(selected),
+        )
         grades = {}
         if body["day_kind"] == "market":
             projection = member(root, "projection")

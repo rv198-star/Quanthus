@@ -56,11 +56,13 @@ def lanes(runtime: Path, entry: dict[str, Any]) -> dict[str, Any]:
     if file_sha(core / "manifest.json") != entry["core_manifest_sha256"]:
         raise ValueError("DAILY_ALIGNMENT_INDEXED_CORE_CHANGED")
     m = load(core / "manifest.json")
-    catalog = core.parent / "catalog"
+    catalog = physical_path(Path(entry.get("source_catalog", str(core.parent / "catalog"))))
     verified = verify_daily_ods_catalog(catalog)
     if verified.root != catalog or file_sha(catalog / "catalog.json") != m["catalog_sha256"]:
         raise ValueError("DAILY_ALIGNMENT_CATALOG_CHANGED")
-    releases = runtime / "collector-home/shadow/releases"
+    releases = physical_path(
+        Path(entry.get("source_release_root", str(runtime / "collector-home/shadow/releases")))
+    )
     chosen = {}
     for row in load(catalog / "catalog.json")["lanes"]:
         lane = row["lane"]

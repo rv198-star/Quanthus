@@ -415,21 +415,51 @@ def publish(
     stage = budget.destination(budget.root / "delivery-staging")
     stage.mkdir()
     try:
-        copy_file(config, stage / "config.json", budget)
-        copy_file(POLICY, stage / "contract.json", budget)
+        from .daily_copy_budget import CopyReservation
+
+        targets = {
+            stage / "config.json": config.stat().st_size,
+            stage / "contract.json": POLICY.stat().st_size,
+        }
+        if projection:
+            targets.update(
+                {
+                    stage / "projection" / name: member(projection, name).stat().st_size
+                    for name in sorted(_tree(projection))
+                }
+            )
+        for role, source in sources.items():
+            for name in [
+                "release.json",
+                *(a.relative_path.as_posix() for a in releases[role].artifacts),
+            ]:
+                targets[stage / "sources" / role / name] = member(source, name).stat().st_size
+            if (source / "READY").exists():
+                targets[stage / "sources" / role / "READY"] = (source / "READY").stat().st_size
+        if calendar_observation is not None:
+            observed = load(calendar_observation)
+            for name in ["calendar.json", *observed["original_files"]]:
+                targets[stage / "calendar-observation" / name] = (
+                    member(calendar_observation.parent, name).stat().st_size
+                )
+        copy_budget = CopyReservation(budget, targets)
+        copy_file(config, stage / "config.json", copy_budget)
+        copy_file(POLICY, stage / "contract.json", copy_budget)
         if projection:
             for path in sorted(_tree(projection)):
-                copy_file(member(projection, path), member(stage, "projection/" + path), budget)
+                copy_file(
+                    member(projection, path), member(stage, "projection/" + path), copy_budget
+                )
         records = {}
         for role, source in sources.items():
             release = releases[role]
             prefix = "sources/" + role
             for name in ["release.json", *(a.relative_path.as_posix() for a in release.artifacts)]:
-                copy_file(member(source, name), member(stage, prefix + "/" + name), budget)
+                copy_file(member(source, name), member(stage, prefix + "/" + name), copy_budget)
             if (source / "READY").exists():
                 if (source / "READY").read_text().strip() != file_sha(source / "release.json"):
                     raise BoundedError("DAILY_DELIVERY_ORIGINAL_SOURCE_READY_CHANGED")
-                copy_file(source / "READY", stage / prefix / "READY", budget)
+                copy_file(source / "READY", stage / prefix / "READY", copy_budget)
             records[role] = {
                 "path": prefix + "/release.json",
                 "release_id": release.release_id,
@@ -458,14 +488,22 @@ def publish(
                 copy_file(
                     member(calendar_observation.parent, name),
                     member(stage, "calendar-observation/" + name),
-                    budget,
+                    copy_budget,
                 )
             body["calendar_observation"] = {
                 "contract": CALENDAR_CONTRACT,
                 "path": "calendar-observation/calendar.json",
                 "sha256": file_sha(calendar_observation),
             }
+        copy_budget.finish()
         replay = _replay(stage, body, parent, budget, budget.root / "publish-replay")
+        if calendar_observation is not None:
+            calendar_path = "calendar-observation/observed-calendar.parquet"
+            copy_file(replay.calendar[0], member(stage, calendar_path), budget)
+            body["calendar_observation"]["projection_path"] = calendar_path
+            body["calendar_observation"]["projection_sha256"] = file_sha(
+                member(stage, calendar_path)
+            )
         for table, paths in replay.tables.items():
             body["table_paths"][table] = []
             for index, path in enumerate(paths):

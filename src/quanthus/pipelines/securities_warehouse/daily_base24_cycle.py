@@ -575,6 +575,9 @@ def finish_native(
         row_counts=checked["row_counts"],
         completed_at=datetime.now(timezone.utc).isoformat(),
     )
+    from .standard_daily_live import finish as finish_standard_delivery
+
+    finish_standard_delivery(config, run, day, value, market=market, events=events)
     write(run / "receipt.json", value)
     publish(config, value)
     write(run / "READY", {"receipt_sha256": file_sha(run / "receipt.json")})
@@ -646,6 +649,9 @@ def collect(config: dict[str, Any], run: Path, day: date) -> dict[str, Any]:
             "execution_authorized": False,
         }
         write(run / "receipt.json", result)
+        from .standard_daily_live import finish as finish_standard_delivery
+
+        finish_standard_delivery(config, run, day, result, events=Path(events["release_dir"]))
         publish(config, result)
         return result
     market = provider(

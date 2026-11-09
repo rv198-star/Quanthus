@@ -56,7 +56,7 @@ def validate(root: Path, *, day: str) -> tuple[dict[str, Any], datetime]:
     return body, observed.astimezone(timezone.utc)
 
 
-def project(root: Path, proof: dict[str, Any], output: Path, day: str):
+def project(root: Path, proof: dict[str, Any], output: Path | None, day: str):
     import pyarrow as pa
     import pyarrow.parquet as pq
 
@@ -66,7 +66,11 @@ def project(root: Path, proof: dict[str, Any], output: Path, day: str):
     if file_sha(calendar) != proof["sha256"]:
         raise ValueError("DAILY_OBSERVED_CALENDAR_BINDING_CHANGED")
     body, observed = validate(calendar.parent, day=day)
-    path = output / "observed-calendar.parquet"
+    path = (
+        member(root, proof["projection_path"])
+        if proof.get("projection_path")
+        else output / "observed-calendar.parquet"
+    )
     schema = pa.schema(
         [
             ("exchange", pa.string()),
@@ -88,11 +92,18 @@ def project(root: Path, proof: dict[str, Any], output: Path, day: str):
         }
         for exchange in ("SSE", "SZSE")
     ]
-    pq.write_table(pa.Table.from_pylist(rows, schema=schema), path)
+    expected_table = pa.Table.from_pylist(rows, schema=schema)
+    if proof.get("projection_path"):
+        if file_sha(path) != proof["projection_sha256"] or not pq.ParquetFile(path).read().equals(
+            expected_table
+        ):
+            raise ValueError("DAILY_OBSERVED_CALENDAR_TYPED_PROJECTION_CHANGED")
+    else:
+        pq.write_table(expected_table, path)
     artifact = SimpleNamespace(
         source_revision="cn02-observed-calendar@" + proof["sha256"][7:],
-        sha256=proof["sha256"],
-        relative_path=Path("calendar.json"),
+        sha256=file_sha(path),
+        relative_path=Path("observed-calendar.parquet"),
         knowledge_cutoff=observed,
     )
     return path, artifact

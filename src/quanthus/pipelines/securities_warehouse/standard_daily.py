@@ -17,6 +17,7 @@ from typing import Any
 
 from quanthus.pipelines.contracts import OdsRelease
 
+from .base22 import file_sha as source_file_sha
 from .base22_bounded import BoundedError, Budget, Limits, Member, independent_copy
 from .base22_sources import disjoint_output
 from .base23_identity_overlay import build_overlay
@@ -60,7 +61,11 @@ def save(path: Path, value: dict[str, Any]) -> None:
 
 
 def copy_file(source: Path, target: Path, budget: Budget) -> None:
-    independent_copy(Member(source, file_sha(source), source.stat().st_size, 0), target, budget)
+    # Legacy ODS can have archive hardlinks. Copy bytes independently; the copy
+    # primitive verifies source fingerprints and the destination SHA/nlink.
+    independent_copy(
+        Member(source, source_file_sha(source), source.stat().st_size, 0), target, budget
+    )
 
 
 def _sources(root: Path, body: dict[str, Any]) -> dict[str, Any]:

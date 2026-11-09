@@ -293,6 +293,7 @@ def execute(plan: dict[str, Any], output: Path) -> dict[str, Any]:
                 verify_daily_domain_increment(core.root)
                 advance_daily_current(package=core.root, pointer=pointer)
                 projection = output / "projections" / day
+                projection.parent.mkdir(parents=True, exist_ok=True)
                 build_projection(
                     core=core.root,
                     native5m=native,

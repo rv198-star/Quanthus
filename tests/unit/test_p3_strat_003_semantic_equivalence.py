@@ -114,9 +114,49 @@ def _package(
     return package, manifest_sha
 
 
-def test_probe_config_is_frozen_and_result_blind(tmp_path, monkeypatch) -> None:
+def test_probe_config_is_frozen_and_result_blind() -> None:
+    config = probe._load_config(CONFIG)
+
+    assert config.boundary.market_date == date(2026, 8, 27)
+    assert tuple(item.sentinel_id for item in config.sentinels) == (
+        "pre_builder_change_overlap",
+        "post_builder_change_overlap",
+    )
+    assert config.raw["runtime_implementation"] == {
+        "daily_domain": {
+            "path": "src/quanthus/pipelines/securities_warehouse/daily_domain.py",
+            "file_sha256": _sha(
+                ROOT / "src/quanthus/pipelines/securities_warehouse/daily_domain.py"
+            ),
+        },
+        "daily_ods_catalog": {
+            "path": "src/quanthus/pipelines/securities_warehouse/daily_ods_catalog.py",
+            "file_sha256": _sha(
+                ROOT / "src/quanthus/pipelines/securities_warehouse/daily_ods_catalog.py"
+            ),
+        },
+    }
+    boundary = config.raw["missing_boundary"]
+    assert boundary["source_identity_rule"] == "selected_cn01_release_self_verified"
+    assert boundary["cross_source_physical_sha256_required"] is False
+    assert boundary["required_ods_artifact"] == {
+        "lane": "calendar_daily_events",
+        "name": "financial_disclosures_delta",
+        "row_count": 0,
+    }
+    assert config.raw["boundaries"] == {
+        "strategy_or_economic_results": False,
+        "target_outcome_labels": False,
+        "candidate_scoring": False,
+        "mutate_daily_current": False,
+        "mutate_p6": False,
+        "job_local_output_only": True,
+    }
+
+
+def test_frozen_probe_rejects_new_runtime_without_repinning(tmp_path, monkeypatch):
     raw = json.loads(CONFIG.read_text())
-    legacy = ROOT / "tests/fixtures/p10/daily_domain.3382b63.py.txt"
+    candidate = ROOT / "src/quanthus/pipelines/securities_warehouse/daily_price_basis_domain.py"
     bindings = [
         raw["request"],
         raw["source_runtime"],
@@ -127,56 +167,12 @@ def test_probe_config_is_frozen_and_result_blind(tmp_path, monkeypatch) -> None:
         target = tmp_path / binding["path"]
         target.parent.mkdir(parents=True, exist_ok=True)
         source = (
-            legacy
+            candidate
             if binding is raw["runtime_implementation"]["daily_domain"]
-            else (ROOT / binding["path"])
+            else ROOT / binding["path"]
         )
         shutil.copyfile(source, target)
     monkeypatch.setattr(probe, "find_project_root", lambda _: tmp_path)
-    config = probe._load_config(CONFIG)
-    assert config.boundary.market_date == date(2026, 8, 27)
-    assert tuple(item.sentinel_id for item in config.sentinels) == (
-        "pre_builder_change_overlap",
-        "post_builder_change_overlap",
-    )
-    assert config.raw == raw
-    assert raw["missing_boundary"]["market_date"] == "2026-08-27"
-    assert tuple(item["sentinel_id"] for item in raw["sentinels"]) == (
-        "pre_builder_change_overlap",
-        "post_builder_change_overlap",
-    )
-    assert raw["runtime_implementation"] == {
-        "daily_domain": {
-            "path": "src/quanthus/pipelines/securities_warehouse/daily_domain.py",
-            "file_sha256": _sha(legacy),
-        },
-        "daily_ods_catalog": {
-            "path": "src/quanthus/pipelines/securities_warehouse/daily_ods_catalog.py",
-            "file_sha256": _sha(
-                ROOT / "src/quanthus/pipelines/securities_warehouse/daily_ods_catalog.py"
-            ),
-        },
-    }
-    boundary = raw["missing_boundary"]
-    assert boundary["source_identity_rule"] == "selected_cn01_release_self_verified"
-    assert boundary["cross_source_physical_sha256_required"] is False
-    assert boundary["required_ods_artifact"] == {
-        "lane": "calendar_daily_events",
-        "name": "financial_disclosures_delta",
-        "row_count": 0,
-    }
-    assert raw["boundaries"] == {
-        "strategy_or_economic_results": False,
-        "target_outcome_labels": False,
-        "candidate_scoring": False,
-        "mutate_daily_current": False,
-        "mutate_p6": False,
-        "job_local_output_only": True,
-    }
-
-
-def test_frozen_probe_rejects_new_runtime_without_repinning():
-    # P10's new opt-in producer cannot reactivate the completed historical attempt.
     with pytest.raises(ExpertEvaluationError, match="daily_domain implementation bytes differ"):
         probe._load_config(CONFIG)
     assert _sha(CONFIG) == (

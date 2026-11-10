@@ -15,7 +15,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from quanthus.pipelines.securities_warehouse import daily_price_basis as basis
-from quanthus.pipelines.securities_warehouse.daily_domain import (
+from quanthus.pipelines.securities_warehouse.daily_price_basis_domain import (
     DailyDomainBuildError,
     advance_daily_current,
     build_daily_domain_increment,

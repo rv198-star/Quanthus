@@ -171,7 +171,7 @@ def recover_session(workspace: Path, base251: Path) -> dict[str, Any]:
     if login.error_code != "0":
         raise ValueError("BAOSTOCK_RECOVERY_LOGIN_FAILED")
     started = time.monotonic()
-    receipts = []
+    receipts: list[dict[str, Any]] = []
     try:
         for task in plan["tasks"]:
             for method in ["daily", "factor"]:

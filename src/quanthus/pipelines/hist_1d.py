@@ -106,8 +106,13 @@ def extract_members(archive: tarfile.TarFile, members: list[list[Any]], root: Pa
             continue
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         temporary = path.with_name(path.name + ".partial")
-        if temporary.exists() or temporary.is_symlink():
-            raise ValueError("UNRECONCILED_RECOVERY_PARTIAL")
+        if temporary.is_symlink():
+            raise ValueError("UNSAFE_RECOVERY_PARTIAL")
+        if temporary.exists():
+            if temporary.stat().st_size == size and file_sha256(temporary) == digest:
+                os.replace(temporary, path)
+                continue
+            temporary.unlink()
         source = archive.extractfile(info)
         if source is None:
             raise ValueError("UNREADABLE_ARCHIVE_MEMBER")
@@ -157,6 +162,17 @@ def download_archive(part: dict[str, Any], root: Path, token: str, proxy: str | 
     partial = path.with_suffix(path.suffix + ".partial")
     if partial.is_symlink():
         raise ValueError("UNSAFE_ARCHIVE_PARTIAL")
+    if partial.exists():
+        partial_size = partial.stat().st_size
+        if partial_size > part["archive_bytes"]:
+            raise ValueError("SOURCE_ARCHIVE_PARTIAL_TOO_LARGE")
+        if partial_size == part["archive_bytes"]:
+            if file_sha256(partial) != part["sha256"]:
+                raise ValueError("SOURCE_ARCHIVE_HASH_MISMATCH")
+            os.replace(partial, path)
+            return path
+        if partial_size == 0:
+            partial.unlink()
     started = time.monotonic()
     for attempt in range(3):
         offset = partial.stat().st_size if partial.exists() else 0

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from quanthus.pipelines import hist_1d
 from quanthus.pipelines.hist_1d import extract_members, recovery_selection, safe_destination
 
 
@@ -92,3 +93,38 @@ def test_missing_member_rejected(tmp_path: Path) -> None:
         pytest.raises(ValueError, match="ARCHIVE_MEMBERS_MISSING"),
     ):
         extract_members(archive, [[_member(2019), 1, "a"]], tmp_path)
+
+
+@pytest.mark.parametrize("partial", [b"raw", b"raw parquet"])
+def test_member_partial_is_verified_or_reextracted(tmp_path: Path, partial: bytes) -> None:
+    name, raw = _member(2019), b"raw parquet"
+    path = tmp_path / name
+    path.parent.mkdir(parents=True)
+    path.with_name(path.name + ".partial").write_bytes(partial)
+    with tarfile.open(fileobj=_tar(name, raw), mode="r|") as archive:
+        extract_members(archive, [[name, len(raw), hashlib.sha256(raw).hexdigest()]], tmp_path)
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.parametrize("offset", [0, 3, 11])
+def test_archive_partial_empty_range_and_complete(tmp_path: Path, monkeypatch, offset: int) -> None:
+    raw = b"raw archive"
+    part = {
+        "name": "a.tar.zst",
+        "archive_bytes": len(raw),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "file_id": "fake",
+    }
+    (tmp_path / "a.tar.zst.partial").write_bytes(raw[:offset])
+
+    class Response(io.BytesIO):
+        status = 206 if offset else 200
+
+    class Opener:
+        def open(self, req, timeout):
+            assert offset < len(raw), "complete partial must avoid network"
+            assert req.get_header("Range") == (f"bytes={offset}-" if offset else None)
+            return Response(raw[offset:])
+
+    monkeypatch.setattr(hist_1d, "_opener", lambda proxy: Opener())
+    assert hist_1d.download_archive(part, tmp_path, "not-a-real-token", None).read_bytes() == raw

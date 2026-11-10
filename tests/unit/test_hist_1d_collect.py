@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from quanthus.pipelines.hist_1d_collect import capture
+from quanthus.pipelines.hist_1d_collect import capture, select_tasks
 
 
 def test_capture_preserves_lexical_values_and_reuses_verified_bytes(tmp_path: Path) -> None:
@@ -49,3 +49,13 @@ def test_capture_preserves_lexical_values_and_reuses_verified_bytes(tmp_path: Pa
     path.write_bytes(b"corrupt")
     with pytest.raises(ValueError, match="CAPTURE_CHECKPOINT_IDENTITY_MISMATCH"):
         capture(source, task, "daily", path, "fixed-plan")
+
+
+def test_shards_are_disjoint_and_cover_exact_frozen_prefix() -> None:
+    tasks = [{"id": i} for i in range(20)]
+    selected = [select_tasks(tasks, 17, shard, 4) for shard in range(4)]
+    assert sorted(t["id"] for group in selected for t in group) == list(range(17))
+    with pytest.raises(ValueError, match="COLLECTION_LIMIT_OUT_OF_SCOPE"):
+        select_tasks(tasks, 21, 0, 4)
+    with pytest.raises(ValueError, match="COLLECTION_LIMIT_OUT_OF_SCOPE"):
+        select_tasks(tasks, 17, 0, 5)

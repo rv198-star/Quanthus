@@ -147,10 +147,21 @@ def capture(
     return receipt
 
 
-def collect(workspace: Path, base251: Path, limit: int) -> dict[str, Any]:
-    plan = make_plan(workspace, base251)
-    if limit < 1 or limit > len(plan["tasks"]):
+def select_tasks(
+    tasks: list[dict[str, Any]], limit: int, shard: int, shards: int
+) -> list[dict[str, Any]]:
+    if limit < 1 or limit > len(tasks) or not 1 <= shards <= 4 or not 0 <= shard < shards:
         raise ValueError("COLLECTION_LIMIT_OUT_OF_SCOPE")
+    return tasks[:limit][shard::shards]
+
+
+def collect(
+    workspace: Path, base251: Path, limit: int, shard: int = 0, shards: int = 1
+) -> dict[str, Any]:
+    plan = make_plan(workspace, base251)
+    tasks = select_tasks(plan["tasks"], limit, shard, shards)
+    if len(plan["tasks"]) * 2 > plan["max_logical_queries"]:
+        raise ValueError("COLLECTION_QUERY_BUDGET_EXCEEDED")
     digest = file_sha256(workspace / "COLLECTION-PLAN.json")
     bs = importlib.import_module("baostock")
     socket.setdefaulttimeout(20)
@@ -162,7 +173,7 @@ def collect(workspace: Path, base251: Path, limit: int) -> dict[str, Any]:
     failures = 0
     queries = 0
     try:
-        for index, task in enumerate(plan["tasks"][:limit]):
+        for index, task in enumerate(tasks):
             if time.monotonic() - started > plan["max_wall_seconds"]:
                 raise ValueError("COLLECTION_WALL_BUDGET_EXCEEDED")
             for method in ["daily", "factor"]:
@@ -174,15 +185,16 @@ def collect(workspace: Path, base251: Path, limit: int) -> dict[str, Any]:
                 if not receipt["reused"]:
                     queries += 1
                     failures += receipt["error_code"] != "0"
-                    time.sleep(1 / plan["queries_per_second"])
-                if failures >= plan["failure_stop_count"]:
+                    time.sleep(shards / plan["queries_per_second"])
+                if failures >= max(1, plan["failure_stop_count"] // shards):
                     raise ValueError("COLLECTION_FAILURE_BUDGET_EXCEEDED")
-            if (index + 1) % 10 == 0 or index + 1 == limit:
+            if (index + 1) % 10 == 0 or index + 1 == len(tasks):
                 print(
                     json.dumps(
                         {
                             "completed": index + 1,
-                            "target": limit,
+                            "target": len(tasks),
+                            "shard": shard,
                             "new_queries": queries,
                             "elapsed_s": round(time.monotonic() - started, 3),
                         }
@@ -194,7 +206,9 @@ def collect(workspace: Path, base251: Path, limit: int) -> dict[str, Any]:
     summary = {
         "plan_sha256": digest,
         "target_securities": len(plan["tasks"]),
-        "completed_securities": limit,
+        "completed_securities": len(tasks),
+        "shard": shard,
+        "shards": shards,
         "new_queries": queries,
         "failures": failures,
         "rows": sum(r["rows"] for r in receipts),
@@ -202,7 +216,11 @@ def collect(workspace: Path, base251: Path, limit: int) -> dict[str, Any]:
         "elapsed_seconds": round(time.monotonic() - started, 3),
         "receipts": receipts,
     }
-    target = workspace / f"COLLECTION-{limit}.json"
+    target = workspace / (
+        f"COLLECTION-{limit}.json"
+        if shards == 1
+        else f"COLLECTION-{limit}-shard{shard}-of{shards}.json"
+    )
     target.write_text(json.dumps(summary, indent=2) + "\n")
     return {k: v for k, v in summary.items() if k != "receipts"}
 
@@ -212,12 +230,20 @@ def main() -> int:
     parser.add_argument("--workspace", required=True, type=Path)
     parser.add_argument("--base251", required=True, type=Path)
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--shard-index", type=int, default=0)
+    parser.add_argument("--shard-count", type=int, default=1)
     args = parser.parse_args()
     plan = make_plan(args.workspace, args.base251)
     if args.limit is None:
         print(json.dumps({"planned_securities": len(plan["tasks"])}))
     else:
-        print(json.dumps(collect(args.workspace, args.base251, args.limit)))
+        print(
+            json.dumps(
+                collect(
+                    args.workspace, args.base251, args.limit, args.shard_index, args.shard_count
+                )
+            )
+        )
     return 0
 
 

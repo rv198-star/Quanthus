@@ -113,7 +113,8 @@ def audit(
         bind("supp_lifecycle", hist_root / "payload/dwd_listing_status_interval")
         connection.execute("""CREATE TEMP VIEW lifecycle AS SELECT * FROM base_lifecycle
             UNION ALL SELECT * FROM supp_lifecycle
-            WHERE record_source='baostock.query_history_k_data_plus' AND status_type='SUSPENSION'""")
+            WHERE record_source='baostock.query_history_k_data_plus'
+            AND status_type='SUSPENSION'""")
     bind("calendar", base251 / "payload/dwd_trading_calendar")
     connection.execute("""CREATE TABLE old_daily AS SELECT listing_id,calendar_session_id,
         observation_start,interval_size,price_basis,currency,open,high,low,close,volume,turnover,

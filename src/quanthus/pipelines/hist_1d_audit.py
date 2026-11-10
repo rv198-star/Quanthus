@@ -61,7 +61,9 @@ def _export(connection: Any, sql: str, path: Path) -> None:
     connection.execute(f"COPY ({sql}) TO '{escaped}' (FORMAT PARQUET, COMPRESSION ZSTD)")
 
 
-def audit(workspace: Path, base251: Path, output: Path) -> dict[str, Any]:
+def audit(
+    workspace: Path, base251: Path, output: Path, hist_root: Path | None = None
+) -> dict[str, Any]:
     if file_sha256(base251 / "manifest.json") != BASE251_MANIFEST:
         raise ValueError("BASE251_REFERENCE_IDENTITY_MISMATCH")
     receipt = json.loads((workspace / "RECOVERY-RECEIPT.json").read_bytes())
@@ -93,10 +95,25 @@ def audit(workspace: Path, base251: Path, output: Path) -> dict[str, Any]:
             raise ValueError("AUDIT_TABLE_UNAVAILABLE:" + name)
         connection.read_parquet([str(p) for p in files], hive_partitioning=False).create_view(name)
 
-    bind("old_raw", source / "DWD/payload/dwd_security_bar")
+    if hist_root is None:
+        bind("old_raw", source / "DWD/payload/dwd_security_bar")
+    else:
+        bind("hist_bars", hist_root / "payload/dwd_security_bar")
+        bind("archive_overlap", source / "DWD/payload/dwd_security_bar", {2020, 2021})
+        connection.execute(
+            "CREATE TEMP VIEW old_raw AS SELECT * FROM hist_bars "
+            "UNION ALL SELECT * FROM archive_overlap"
+        )
     bind("new_raw", base251 / "payload/dwd_security_bar/interval_size=1d", {2020, 2021})
     bind("listing_raw", base251 / "payload/dwd_listing")
-    bind("lifecycle", base251 / "payload/dwd_listing_status_interval")
+    if hist_root is None:
+        bind("lifecycle", base251 / "payload/dwd_listing_status_interval")
+    else:
+        bind("base_lifecycle", base251 / "payload/dwd_listing_status_interval")
+        bind("supp_lifecycle", hist_root / "payload/dwd_listing_status_interval")
+        connection.execute("""CREATE TEMP VIEW lifecycle AS SELECT * FROM base_lifecycle
+            UNION ALL SELECT * FROM supp_lifecycle
+            WHERE record_source='baostock.query_history_k_data_plus' AND status_type='SUSPENSION'""")
     bind("calendar", base251 / "payload/dwd_trading_calendar")
     connection.execute("""CREATE TABLE old_daily AS SELECT listing_id,calendar_session_id,
         observation_start,interval_size,price_basis,currency,open,high,low,close,volume,turnover,
@@ -190,6 +207,15 @@ def audit(workspace: Path, base251: Path, output: Path) -> dict[str, Any]:
         output / "source-universe-differences.parquet",
     )
     summary["elapsed_seconds"] = round(time.monotonic() - started, 3)
+    if hist_root is not None:
+        bind("product_status", hist_root / "payload/dwd_security_status_interval")
+        summary["historical_status"] = _rows(
+            connection,
+            """SELECT status_type,status_value,
+            reason_code,count(*) AS intervals,count(DISTINCT security_id) AS securities
+            FROM product_status WHERE effective_from<TIMESTAMPTZ '2011-01-01 00:00:00+08'
+            GROUP BY ALL ORDER BY ALL""",
+        )
     summary["ledgers"] = [
         {"path": p.name, "bytes": p.stat().st_size, "sha256": file_sha256(p)}
         for p in sorted(output.glob("*.parquet"))
@@ -205,8 +231,12 @@ def main() -> int:
     parser.add_argument("--workspace", required=True, type=Path)
     parser.add_argument("--base251", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--hist-root", type=Path)
     args = parser.parse_args()
-    print(json.dumps(audit(args.workspace, args.base251, args.output), default=str), flush=True)
+    print(
+        json.dumps(audit(args.workspace, args.base251, args.output, args.hist_root), default=str),
+        flush=True,
+    )
     return 0
 
 

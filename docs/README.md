@@ -15,6 +15,8 @@ Permanent data ownership: P10 owns acquisition and shared quality/governance und
 bypass, temporary ignore or acceptance of a known limitation; they do not recover or repair
 data. Historical evidence and existing safety/research/production gates remain unchanged.
 
+Layer construction standard: [design/p10-dws-adm-standard.md](design/p10-dws-adm-standard.md).
+
 ## Current branch
 
 - P1 is accepted with the versioned C1 fail-closed condition.

@@ -10,6 +10,7 @@
 | Ownership policy | `../../../config/data-ownership.v1.json` |
 | Parent | `../hld.md` |
 | Physical data contracts | `01-data-foundation.md` and its children |
+| DWS/ADM construction standard | ../p10-dws-adm-standard.md |
 
 ## 1. Purpose and ownership
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import shutil
 import time
 from pathlib import Path
 from typing import Any
@@ -74,8 +75,13 @@ def audit(workspace: Path, base251: Path, output: Path) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
     duckdb = importlib.import_module("duckdb")
-    connection = duckdb.connect(config={"threads": 2, "memory_limit": "2GB"})
+    scratch = output / "scratch"
+    scratch.mkdir()
+    connection = duckdb.connect(
+        str(scratch / "audit.duckdb"), config={"threads": 2, "memory_limit": "2GB"}
+    )
     connection.execute("SET TimeZone='Asia/Shanghai'")
+    connection.execute("SET preserve_insertion_order=false")
 
     def bind(name: str, table_root: Path, years: set[int] | None = None) -> None:
         files = sorted(table_root.rglob("*.parquet"))
@@ -92,16 +98,17 @@ def audit(workspace: Path, base251: Path, output: Path) -> dict[str, Any]:
     bind("listing_raw", base251 / "payload/dwd_listing")
     bind("lifecycle", base251 / "payload/dwd_listing_status_interval")
     bind("calendar", base251 / "payload/dwd_trading_calendar")
-    connection.execute("""CREATE TEMP TABLE old_daily AS SELECT *,
+    connection.execute("""CREATE TABLE old_daily AS SELECT listing_id,calendar_session_id,
+        observation_start,interval_size,price_basis,currency,open,high,low,close,volume,turnover,
         CAST(observation_start AS DATE) AS trade_date FROM old_raw
         WHERE knowledge_to IS NULL AND interval_size='1d' AND price_basis='UNADJUSTED'""")
     connection.execute("""CREATE TEMP VIEW new_daily AS SELECT * FROM new_raw
         WHERE knowledge_to IS NULL AND interval_size='1d' AND price_basis='UNADJUSTED'""")
-    connection.execute("""CREATE TEMP TABLE listings AS SELECT DISTINCT
+    connection.execute("""CREATE TABLE listings AS SELECT DISTINCT
         listing_id,security_id,venue_id,listing_code,board_code
         FROM listing_raw WHERE knowledge_to IS NULL AND listing_currency='CNY'
         AND board_code IN ('SSE_main','SZ_main','ChiNext','CHINEXT','STAR')""")
-    connection.execute("""CREATE TEMP TABLE expected AS SELECT DISTINCT
+    connection.execute("""CREATE TABLE expected AS SELECT DISTINCT
         l.listing_id,l.security_id,l.listing_code,l.board_code,c.trade_date,c.open_at
         FROM listings l JOIN lifecycle s ON s.listing_id=l.listing_id
         JOIN calendar c ON c.venue_id=l.venue_id
@@ -110,11 +117,11 @@ def audit(workspace: Path, base251: Path, output: Path) -> dict[str, Any]:
         AND c.is_open AND c.session_type='REGULAR_DAY'
         AND c.trade_date BETWEEN DATE '1990-12-19' AND DATE '2019-12-31'
         AND s.effective_from<=c.open_at AND (s.effective_to IS NULL OR c.open_at<s.effective_to)""")
-    connection.execute("""CREATE TEMP TABLE bar_presence AS SELECT listing_id,trade_date,
+    connection.execute("""CREATE TABLE bar_presence AS SELECT listing_id,trade_date,
         count(*) AS rows,count(*) FILTER (WHERE volume=0) AS zero_rows
         FROM old_daily GROUP BY ALL""")
-    connection.execute("CREATE TEMP TABLE coverage AS " + coverage_query())
-    connection.execute("CREATE TEMP TABLE overlap_differences AS " + overlap_query())
+    connection.execute("CREATE TABLE coverage AS " + coverage_query())
+    connection.execute("CREATE TABLE overlap_differences AS " + overlap_query())
     summary: dict[str, Any] = {
         "status": "AUDIT_COMPLETED",
         "base251_manifest_sha256": BASE251_MANIFEST,
@@ -189,6 +196,7 @@ def audit(workspace: Path, base251: Path, output: Path) -> dict[str, Any]:
     ]
     (output / "AUDIT.json").write_text(json.dumps(summary, indent=2, default=str) + "\n")
     connection.close()
+    shutil.rmtree(scratch)
     return summary
 
 

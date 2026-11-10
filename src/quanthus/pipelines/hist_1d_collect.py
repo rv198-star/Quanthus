@@ -84,7 +84,12 @@ def make_plan(workspace: Path, base251: Path) -> dict[str, Any]:
 
 
 def capture(
-    bs: Any, task: dict[str, Any], method: str, path: Path, plan_digest: str
+    bs: Any,
+    task: dict[str, Any],
+    method: str,
+    path: Path,
+    plan_digest: str,
+    supersedes: str | None = None,
 ) -> dict[str, Any]:
     sidecar = path.with_suffix(path.suffix + ".receipt.json")
     if path.exists() or sidecar.exists():
@@ -128,6 +133,8 @@ def capture(
         "fields": response.fields,
         "rows": rows,
     }
+    if supersedes is not None:
+        payload["supersedes_failed_capture_sha256"] = supersedes
     raw = (json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n").encode()
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with path.open("xb") as stream, gzip.GzipFile(fileobj=stream, mode="wb", mtime=0) as zipped:
@@ -153,6 +160,50 @@ def select_tasks(
     if limit < 1 or limit > len(tasks) or not 1 <= shards <= 4 or not 0 <= shard < shards:
         raise ValueError("COLLECTION_LIMIT_OUT_OF_SCOPE")
     return tasks[:limit][shard::shards]
+
+
+def recover_session(workspace: Path, base251: Path) -> dict[str, Any]:
+    plan = make_plan(workspace, base251)
+    digest = file_sha256(workspace / "COLLECTION-PLAN.json")
+    bs = importlib.import_module("baostock")
+    socket.setdefaulttimeout(20)
+    login = bs.login()
+    if login.error_code != "0":
+        raise ValueError("BAOSTOCK_RECOVERY_LOGIN_FAILED")
+    started = time.monotonic()
+    receipts = []
+    try:
+        for task in plan["tasks"]:
+            for method in ["daily", "factor"]:
+                path = workspace / "raw/baostock" / task["listing_id"] / (method + ".json.gz")
+                sidecar = path.with_suffix(path.suffix + ".receipt.json")
+                supersedes = None
+                if sidecar.exists():
+                    prior = json.loads(sidecar.read_bytes())
+                    if file_sha256(path) != prior["sha256"] or prior["plan_sha256"] != digest:
+                        raise ValueError("RECOVERY_CHECKPOINT_CHANGED")
+                    if prior["error_code"] != "10001001":
+                        continue
+                    supersedes = prior["sha256"]
+                    path = path.with_name(method + ".session-recovery-1.json.gz")
+                if len(receipts) >= 200 or time.monotonic() - started > 600:
+                    raise ValueError("SESSION_RECOVERY_BUDGET_EXCEEDED")
+                record = capture(bs, task, method, path, digest, supersedes)
+                receipts.append(record)
+                if record["error_code"] != "0":
+                    raise ValueError("SESSION_RECOVERY_SOURCE_FAILED")
+                if not record["reused"]:
+                    time.sleep(1 / plan["queries_per_second"])
+    finally:
+        bs.logout()
+    summary = {
+        "new_queries": sum(not r["reused"] for r in receipts),
+        "resolved_captures": len(receipts),
+        "elapsed_seconds": round(time.monotonic() - started, 3),
+        "receipts": receipts,
+    }
+    (workspace / "SESSION-RECOVERY.json").write_text(json.dumps(summary, indent=2) + "\n")
+    return {k: v for k, v in summary.items() if k != "receipts"}
 
 
 def collect(
@@ -232,9 +283,12 @@ def main() -> int:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--shard-count", type=int, default=1)
+    parser.add_argument("--recover-session", action="store_true")
     args = parser.parse_args()
     plan = make_plan(args.workspace, args.base251)
-    if args.limit is None:
+    if args.recover_session:
+        print(json.dumps(recover_session(args.workspace, args.base251)))
+    elif args.limit is None:
         print(json.dumps({"planned_securities": len(plan["tasks"])}))
     else:
         print(

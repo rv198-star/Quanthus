@@ -1,11 +1,22 @@
 from __future__ import annotations
 
+import gzip
+import hashlib
+import json
+import zipfile
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
-from quanthus.pipelines.hist_1d_materialize import daily_records, factor_records, subtype
+from quanthus.pipelines.hist_1d_materialize import (
+    capture_payload,
+    daily_records,
+    factor_records,
+    official_names,
+    subtype,
+)
 
 
 def test_status_subtypes_require_official_name_and_preserve_binary_unknown() -> None:
@@ -92,3 +103,56 @@ def test_native_factor_uses_lexical_native_column_and_separate_knowledge_clock()
     assert rows[0]["factor_value"] == Decimal("5680.849855")
     assert rows[0]["adjustment_direction"] == "PROVIDER_NATIVE"
     assert rows[0]["effective_from"].isoformat() == "2010-07-11T16:00:00+00:00"
+
+
+def test_official_xlsx_accepts_inline_headers(tmp_path: Path) -> None:
+    cells = ["变更日期", "证券代码", "证券简称", "变更前简称", "变更后简称"]
+    data = ["2005-01-04", "000001", "样本", "样本", "*ST样本"]
+    xml = '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
+    for values in [cells, data]:
+        xml += (
+            "<row>"
+            + "".join('<c t="inlineStr"><is><t>' + v + "</t></is></c>" for v in values)
+            + "</row>"
+        )
+    xml += "</sheetData></worksheet>"
+    path = tmp_path / "names.xlsx"
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr(
+            "xl/sharedStrings.xml",
+            '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>',
+        )
+        z.writestr("xl/worksheets/sheet1.xml", xml)
+    assert official_names(path) == {"000001": [(date(2005, 1, 4), "*ST样本")]}
+
+
+def test_session_recovery_preserves_failed_bytes_and_resolves_new_lineage(tmp_path: Path) -> None:
+    root = tmp_path / "raw/baostock/l"
+    root.mkdir(parents=True)
+    old = root / "daily.json.gz"
+    old.write_bytes(gzip.compress(json.dumps({"error_code": "10001001", "rows": []}).encode()))
+    old_sha = hashlib.sha256(old.read_bytes()).hexdigest()
+    before = old.read_bytes()
+    old.with_suffix(".gz.receipt.json").write_text(
+        json.dumps({"plan_sha256": "plan", "sha256": old_sha, "error_code": "10001001"})
+    )
+    new = root / "daily.session-recovery-1.json.gz"
+    new.write_bytes(
+        gzip.compress(
+            json.dumps(
+                {
+                    "error_code": "0",
+                    "rows": [["value"]],
+                    "supersedes_failed_capture_sha256": old_sha,
+                }
+            ).encode()
+        )
+    )
+    new_sha = hashlib.sha256(new.read_bytes()).hexdigest()
+    new.with_suffix(".gz.receipt.json").write_text(
+        json.dumps({"plan_sha256": "plan", "sha256": new_sha, "error_code": "0"})
+    )
+    payload, digest = capture_payload(old, "plan")
+    assert payload["rows"] == [["value"]] and digest == "sha256:" + new_sha
+    assert payload["_capture_relative_path"].endswith("daily.session-recovery-1.json.gz")
+    assert old.read_bytes() == before

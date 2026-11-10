@@ -61,7 +61,11 @@ def official_names(path: Path) -> dict[str, list[tuple[date, str]]]:
         values = []
         for cell in row.findall("x:c", ns):
             value_node = cell.find("x:v", ns)
-            value = value_node.text if value_node is not None else ""
+            value = (
+                value_node.text
+                if value_node is not None
+                else "".join(t.text or "" for t in cell.findall(".//x:t", ns))
+            )
             if cell.get("t") == "s" and value:
                 value = strings[int(value)]
             values.append(value or "")
@@ -103,7 +107,24 @@ def capture_payload(path: Path, plan_sha: str) -> tuple[dict[str, Any], str]:
     receipt = json.loads(path.with_suffix(path.suffix + ".receipt.json").read_bytes())
     if receipt["plan_sha256"] != plan_sha or file_sha256(path) != receipt["sha256"]:
         raise ValueError("RAW_CAPTURE_CHANGED")
+    if receipt["error_code"] == "10001001":
+        recovery = path.with_name(path.name.replace(".json.gz", ".session-recovery-1.json.gz"))
+        if recovery.is_file():
+            new_receipt = json.loads(
+                recovery.with_suffix(recovery.suffix + ".receipt.json").read_bytes()
+            )
+            if (
+                new_receipt["plan_sha256"] != plan_sha
+                or file_sha256(recovery) != new_receipt["sha256"]
+                or new_receipt["error_code"] != "0"
+            ):
+                raise ValueError("SESSION_RECOVERY_CAPTURE_INVALID")
+            new_payload = json.loads(gzip.decompress(recovery.read_bytes()))
+            if new_payload.get("supersedes_failed_capture_sha256") != receipt["sha256"]:
+                raise ValueError("SESSION_RECOVERY_LINEAGE_INVALID")
+            path, receipt = recovery, new_receipt
     payload: dict[str, Any] = json.loads(gzip.decompress(path.read_bytes()))
+    payload["_capture_relative_path"] = "/".join(path.parts[path.parts.index("raw") :])
     return payload, "sha256:" + receipt["sha256"]
 
 
@@ -113,7 +134,9 @@ def common(
     return {
         "record_source": "baostock."
         + ("query_history_k_data_plus" if method == "daily" else "query_adjust_factor"),
-        "source_record_id": f"raw/baostock/{task['listing_id']}/{method}.json.gz",
+        "source_record_id": payload.get(
+            "_capture_relative_path", f"raw/baostock/{task['listing_id']}/{method}.json.gz"
+        ),
         "source_revision": "hist1d-baostock-v1@" + digest.removeprefix("sha256:")[:16],
         "source_artifact_sha256": digest,
         "knowledge_from": datetime.fromisoformat(payload["acquisition_completed_at"]),
@@ -382,11 +405,14 @@ def materialize(
     names_path = workspace / "raw/source-probes/szse-short-name-changes.xlsx"
     names = official_names(names_path)
     names_sha = file_sha256(names_path) if names_path.exists() else None
-    names_acquired = (
-        datetime.fromtimestamp(names_path.stat().st_mtime, timezone.utc)
-        if names_path.exists()
-        else None
-    )
+    names_acquired = None
+    if names_path.exists():
+        name_receipt = json.loads(
+            (workspace / "raw/source-probes/SZSE-ACQUISITION.json").read_bytes()
+        )
+        if name_receipt["sha256"] != names_sha:
+            raise ValueError("SZSE_NAME_ACQUISITION_IDENTITY_CHANGED")
+        names_acquired = datetime.fromisoformat(name_receipt["knowledge_verified_at"])
     plan = json.loads((workspace / "COLLECTION-PLAN.json").read_bytes())
     plan_sha = file_sha256(workspace / "COLLECTION-PLAN.json")
     selected = plan["tasks"] if limit is None else plan["tasks"][:limit]

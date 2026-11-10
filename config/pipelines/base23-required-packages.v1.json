@@ -1,0 +1,43 @@
+{
+  "contract_id": "p10-base23-required-daily-and-share-units-v1",
+  "owner": "P10",
+  "business_start": "2026-08-01",
+  "business_through": "2026-09-30",
+  "timezone": "Asia/Shanghai",
+  "purpose": "scoped_daily_source_qualification_and_proven_share_unit_revisions",
+  "daily_qualification": {
+    "universe": "exact pinned selected listings, not the full market",
+    "calendar": "complete pinned SSE/SZSE/BSE annual notices; date-only authority",
+    "required": ["listing_identity_and_knowledge_window", "calendar_date_and_venue", "every_selected_listing_on_every_declared_open_date"],
+    "prior_suspension_conflict": "CONFLICT_BLOCKS_NEW_ENTRY",
+    "provider_flag_rewrite": false,
+    "inferred_resume_date": false,
+    "force_sale": false,
+    "legal_lifecycle_or_consumer_admission": false
+  },
+  "share_unit_revision": {
+    "original_entity": "exact corporate_actions action_id and immutable original member",
+    "source_unit": "explicit per_ten_shares contract, complete original raw and complete locally replayed corroborating literal source",
+    "target_unit": "per_share",
+    "operation": "exact share ratio divide by ten, only if before equals raw and corroborated target agrees",
+    "cash_change": false,
+    "donor_event_identity_adoption": false,
+    "unproved_source_priority": false,
+    "historical_atoms": "retain old values and close only their existing open knowledge versions",
+    "knowledge_from": "actual new governance observation",
+    "schema_rounding": "reject if the exact result cannot be serialized",
+    "unknown_or_conflicting_terms": "per-key hold, no invented value or cross-provider alias"
+  },
+  "integration": {
+    "domain_product_is_complete_Base23": false,
+    "old_seals_and_sources": "immutable",
+    "whole_successor_required": "bound local replay, native 33-table/global scan, two full physical cold relocations and disposable faults",
+    "write_gate": "fresh execution and independent-acceptance capacity budget"
+  },
+  "permanent_protections": {
+    "visibility_unavailable": 4173,
+    "tail_conflicts": "KEEP_OLD_THREE_KEYS_PENDING_AUTHORITY",
+    "frozen_consumer_policy_changed": false,
+    "historical_PIT_or_original_normalization_recovered": false
+  }
+}

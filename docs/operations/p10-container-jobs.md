@@ -39,6 +39,17 @@ in a troubleshooting footer. The durable JSON event, delivery idempotency key an
 existing send receipts are unchanged; a format update never resends old events.
 This is presentation only (`docs-impact: none` for governing data/PIT gates).
 
+Daily and recovery notifications share a market-date lock. Before sending another
+complete/closed notice, the sender checks that date's durable Daily/recovery events
+and actual successful send receipts. If the latest notified result has the same
+status, reason (ignoring the late-recovery prefix) and manifest identities, the
+new event is retained with `suppressed_unchanged` and no API request is made. The
+outbox retry uses the same rule. Existing sent receipts and per-event API keys are
+preserved, including across an upgrade. A prior failure/partial notice or changed
+manifest still allows the new recovery notice. Weekly and explicitly labelled
+acceptance tests are independent. Do not disable the recovery timer to hide duplicate
+mail, delete historical events, or relabel an unsent notification as sent.
+
 Daily/recovery retain the existing host timer clock; no second in-container data
 cron is enabled. Only housekeeping has the small internal clock described below.
 

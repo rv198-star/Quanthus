@@ -1,0 +1,157 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pytest
+
+from quanthus.pipelines.securities_warehouse.base22 import digest, file_sha
+from quanthus.pipelines.securities_warehouse.base22_bounded import (
+    BoundedError,
+    Budget,
+    Limits,
+    Member,
+)
+from quanthus.pipelines.securities_warehouse.base23_merge import (
+    SCOPES,
+    close_sparse_batch,
+    prior_closure,
+    rewrite_knowledge_file,
+    scope_outputs,
+)
+
+T0 = datetime(2026, 8, 31, 19, 59, 59, 123456, tzinfo=timezone.utc)
+T1 = datetime(2026, 10, 9, 9, 35, 17, 876543, tzinfo=timezone.utc)
+
+
+def table():
+    return pa.table({"average_holding_exact": pa.array([
+        Decimal("1234567890123456789012345678.1234567890123"),
+        None, Decimal("0.0000000000000"),
+    ], type=pa.decimal256(41, 13)),
+        "knowledge_from": pa.array([T0]*3, type=pa.timestamp("us", tz="UTC")),
+        "knowledge_to": pa.array([None]*3, type=pa.timestamp("us", tz="UTC")),
+        "original": pa.array(["zero/null/exact", None, "晚到"]),
+    })
+
+
+def test_sparse_closure_preserves_decimal256_null_zero_clock_and_all_other_atoms():
+    before = table()
+    after = close_sparse_batch(before, row_offset=10, closures=[(10, T1), (12, T1)])
+    assert before.column("knowledge_to").to_pylist() == [None]*3
+    assert after.column("knowledge_to").to_pylist() == [T1, None, T1]
+    for name in ("average_holding_exact", "original", "knowledge_from"):
+        assert before.column(name).equals(after.column(name))
+    assert close_sparse_batch(before, row_offset=10, closures=[]).equals(before)
+
+
+@pytest.mark.parametrize("closures", [[(10, T1), (10, T1)], [(12, T1), (10, T1)],
+                                      [(9, T1)], [(13, T1)], [(10, T0)]])
+def test_sparse_invalid_positions_and_nonnew_time_fail(closures):
+    with pytest.raises(BoundedError):
+        close_sparse_batch(table(), row_offset=10, closures=closures)
+
+
+def test_existing_closed_interval_is_immutable():
+    assert prior_closure(T0, None, T1) == T1
+    old_end = T0+timedelta(seconds=1)
+    assert prior_closure(T0, old_end, T1) == old_end
+    with pytest.raises(BoundedError, match="CLOSED_HISTORY_INTERVAL_CONFLICT"):
+        prior_closure(T0, T1+timedelta(seconds=1), T1)
+    with pytest.raises(BoundedError, match="NOT_STRICTLY_NEW"):
+        prior_closure(T1, None, T0)
+    t = table().set_column(2, "knowledge_to", pa.array([T1, None, None],
+                         type=pa.timestamp("us", tz="UTC")))
+    with pytest.raises(BoundedError, match="CLOSED_HISTORY_ROW_TARGETED"):
+        close_sparse_batch(t, row_offset=0, closures=[(0, T1)])
+
+
+def scope():
+    outputs = {t: {"path": f"payload/{t}/all/part.parquet", "partition": "all",
+                   "semantic_scan": {"rows": 3}} for t in
+               ("dwd_security_valuation", "dwd_index_bar")}
+    body = {"contract_id": "p10-base23-retained-daily-measures-v1", "READY": False,
+            "complete_Base23": False, "consumer_admission": "NOT_GRANTED",
+            "days": [{"date": "2026-09-01", "outputs": outputs}],
+            "physical_members": {i["path"]: {"sha256": "sha256:"+"a"*64,
+                                             "size_bytes": 100} for i in outputs.values()}}
+    body["identity"] = digest(body)
+    return body
+
+
+def test_explicit_existing_daily_layout_and_exact_physical_members():
+    body = scope()
+    out = scope_outputs(body)
+    assert set(out) == {"dwd_security_valuation", "dwd_index_bar"}
+    assert out["dwd_index_bar"][0]["rows"] == 3
+
+
+@pytest.mark.parametrize("damage", ["member", "table", "purpose", "count", "path"])
+def test_repacked_unqualified_or_conflicting_scope_refused(damage):
+    body = scope()
+    out = body["days"][0]["outputs"]
+    if damage == "member":
+        body["physical_members"] = {}
+    elif damage == "table":
+        del out["dwd_index_bar"]
+    elif damage == "purpose":
+        body["consumer_admission"] = "GRANTED"
+    elif damage == "count":
+        out["dwd_index_bar"]["rows"] = 0
+    else:
+        out["dwd_index_bar"]["path"] = "payload/dwd_index_bar/../other.parquet"
+    body["identity"] = digest({k: v for k, v in body.items() if k != "identity"})
+    with pytest.raises(BoundedError):
+        scope_outputs(body)
+
+
+def test_reviewed_industry_flat_union_includes_unchanged_exact_parent_set():
+    body = scope()
+    body["contract_id"] = "p10-base23-retained-dated-static-industry-v1"
+    del body["days"]
+    body["outputs"] = {t: {"path": f"payload/{t}/all/part-000000.parquet",
+                            "semantic_scan": {"rows": 3}} for t in SCOPES[body["contract_id"]]}
+    body["physical_members"] = {i["path"]: {"sha256": "sha256:"+"a"*64, "size_bytes": 100}
+                                for i in body["outputs"].values()}
+    body["identity"] = digest({k: v for k, v in body.items() if k != "identity"})
+    outputs = scope_outputs(body)
+    assert set(outputs) == SCOPES[body["contract_id"]]
+    assert {i["partition"] for v in outputs.values() for i in v} == {"all"}
+
+
+def test_real_parquet_sparse_rewrite_keeps_independent_source_and_precision(tmp_path):
+    source = tmp_path / "source.parquet"
+    original = table()
+    pq.write_table(original, source)
+    before = source.read_bytes()
+    member = Member(source, file_sha(source), source.stat().st_size, 3)
+    with Budget(tmp_path / "job", [source], Limits(
+        batch_rows=2, free_floor_bytes=1, allocated_bytes=16*1024**2, temp_bytes=8*1024**2,
+    )) as budget:
+        output = budget.root / "closed.parquet"
+        receipt = rewrite_knowledge_file(member, output, schema=original.schema,
+                                        closures=[(0, T1), (2, T1)], budget=budget)
+        expected = close_sparse_batch(original, row_offset=0, closures=[(0, T1), (2, T1)])
+        assert pq.ParquetFile(output).read().equals(expected)
+        assert source.read_bytes() == before
+        assert output.stat().st_ino != source.stat().st_ino
+        assert receipt["closed_open_knowledge_versions"] == 2
+        with pytest.raises(BoundedError, match="OUTPUT_ALREADY_EXISTS"):
+            rewrite_knowledge_file(member, output, schema=original.schema,
+                                   closures=[(0, T1)], budget=budget)
+
+
+def test_bad_sparse_target_rejected_before_file_creation(tmp_path):
+    source = tmp_path / "source.parquet"
+    pq.write_table(table(), source)
+    before = source.read_bytes()
+    member = Member(source, file_sha(source), source.stat().st_size, 3)
+    with Budget(tmp_path / "job", [source], Limits(free_floor_bytes=1)) as budget:
+        output = budget.root / "bad.parquet"
+        with pytest.raises(BoundedError, match="FILE_CLOSURE_CENSUS_INVALID"):
+            rewrite_knowledge_file(member, output, schema=table().schema,
+                                   closures=[(3, T1)], budget=budget)
+        assert not output.exists()
+        assert source.read_bytes() == before

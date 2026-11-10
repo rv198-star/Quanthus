@@ -100,6 +100,69 @@ Record and compare on both nodes:
 Any mismatch blocks publication. Do not repair a copied package in place; repeat transfer into a
 new hidden staging child after diagnosing the source.
 
+## Base 2.3 warehouse input
+
+Use a checkout containing the reviewed monthly source adapter. Obtain code through
+GitHub; copying the package does not deploy its reader. Keep the exact sealed ODS
+bytes and the original paired identity. This procedure reads the restored package
+and writes only a new isolated audit/plan directory, never CURRENT or a service.
+
+For a locally restored 2.3 image, supply its physical root as `ODS_BASE23`, an
+existing isolated writable parent as `ODS_AUDIT_PARENT`, a unique job name as
+`ODS_INPUT_JOB`, and an actual timezone-qualified observation time as
+`ODS_OBSERVATION_CUTOFF`. The latter must cover the preserved original artifact
+cutoffs; September 30 is a business cutoff, not the observation cutoff.
+
+```bash
+ops/bin/verify-ods-base \
+  --bundle "$ODS_BASE23" \
+  --monthly-consumer-contract config/pipelines/ods-base23-warehouse-input.v1.json \
+  --model config/pipelines/dwd-domain-model.v1.json \
+  --knowledge-cutoff "$ODS_OBSERVATION_CUTOFF" \
+  --monthly-audit-root "$ODS_AUDIT_PARENT/$ODS_INPUT_JOB-verify"
+```
+
+This always performs full native verification; `--deep` is not required. The
+image and model hashes must match the pinned successor contract, all original
+manifests and native members must close, and scratch must be new and physically
+disjoint. Register at least the existing 4 GiB RSS bound, 8 GiB free-space floor,
+256 MiB scratch allocation and 30-minute per-stage time limit before running.
+The 256 MiB bound is for audit scratch bytes, not application memory. Any failure
+leaves evidence and never falls back to an old source. Two original physical-copy
+receipts remain bound to the unchanged seal; a source-read receipt does not replace
+target-node recovery or claim a new two-copy construction.
+
+To prepare model-mapped raw inputs instead, invoke one whole admission and emit
+the immutable source ledger in the same job:
+
+```bash
+ops/bin/plan-dwd-dws-run \
+  --ods-package "$ODS_BASE23" \
+  --model config/pipelines/dwd-domain-model.v1.json \
+  --mode monthly_base \
+  --monthly-consumer-contract config/pipelines/ods-base23-warehouse-input.v1.json \
+  --monthly-audit-root "$ODS_AUDIT_PARENT/$ODS_INPUT_JOB-audit" \
+  --output "$ODS_AUDIT_PARENT/$ODS_INPUT_JOB-plan" \
+  --run-id "$ODS_INPUT_JOB" \
+  --through-date 2026-09-30 \
+  --knowledge-cutoff "$ODS_OBSERVATION_CUTOFF" \
+  --code-revision "$(git rev-parse HEAD)" \
+  --runtime-id cn01-monthly-ods-input-v1
+```
+
+Do not run both commands merely to repeat the same expensive prerequisite inside
+one job. The planning command already performs the native source admission. Its
+ledger preserves distinct original revisions, source hashes, physical paths and
+clocks, while its purpose is raw reconstruction only. The native member resolver
+also rechecks individual files when used after admission.
+
+Successful output admits `WAREHOUSE_RAW_RECONSTRUCTION`, with the seven minute
+gaps still disclosed. It grants no execution, research/PIT or complete-minute
+qualification. An unchanged July DWD executor will not accept the new monthly
+plan. Production DWD Base compatibility, October increment continuation, paired
+switch/rollback and any service deployment need their own existing gates; do not
+mix ODS 2.1 and DWD 2.3 or alter the seal to bypass them.
+
 ## July Valuation Gap Repair
 
 The retained valuation history ends on 2026-07-18. Acquire the open-session gap through July 30

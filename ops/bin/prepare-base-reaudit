@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""Prepare a re-audit control set for an already materialized Base pair (issue #600)."""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+import pathlib
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+
+
+def sha(path: pathlib.Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load(path: pathlib.Path) -> dict:
+    return json.loads(path.read_text())
+
+
+def save_new(path: pathlib.Path, value: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x") as stream:
+        json.dump(value, stream, ensure_ascii=False, indent=2, sort_keys=True)
+        stream.write("\n")
+
+
+def free_bytes(path: pathlib.Path) -> int:
+    ancestor = path
+    while not ancestor.exists():
+        ancestor = ancestor.parent
+    stat = os.statvfs(ancestor)
+    return stat.f_bavail * stat.f_frsize
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--from-controls", required=True, type=pathlib.Path)
+    parser.add_argument("--to-controls", required=True, type=pathlib.Path)
+    parser.add_argument("--repository", required=True, type=pathlib.Path)
+    parser.add_argument("--materialization-revision", required=True)
+    parser.add_argument("--audit-parent", required=True, type=pathlib.Path)
+    options = parser.parse_args()
+    if os.geteuid() != 0:
+        raise SystemExit("run as root")
+    repository = options.repository.resolve()
+    sys.path.insert(0, str(repository / "src"))
+    from quanthus.pipelines.securities_warehouse import base_build as entry
+    from quanthus.pipelines.securities_warehouse import base_build_controller as ctl
+    from quanthus.pipelines.securities_warehouse.base_build_environment import (
+        check_environment,
+    )
+
+    head = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"],
+                          capture_output=True, text=True, check=True).stdout.strip()
+    dirty = subprocess.run(["git", "-C", str(repository), "status", "--porcelain"],
+                           capture_output=True, text=True, check=True).stdout.strip()
+    if dirty:
+        raise SystemExit(f"repository not clean: {dirty[:200]}")
+    if not re.fullmatch(r"[0-9a-f]{40}", head):
+        raise SystemExit("bad head")
+    if options.to_controls.exists():
+        raise SystemExit("target controls exist")
+    job = load(options.from_controls / "job.json")
+    contract = load(options.from_controls / "contract.json")
+    execution = load(options.from_controls / "execution.json")
+    root = pathlib.Path(job["work_root"])
+    if not (root / "PUBLICATION.json").exists():
+        raise SystemExit("materialization intent missing")
+    for role in ("ODS", "DWD"):
+        for marker in ("manifest.json", "READY"):
+            if (root / "published" / role / marker).exists():
+                raise SystemExit("seal markers already present")
+    if (root / "PAIR-READY.json").exists():
+        raise SystemExit("pair already complete")
+
+    new_job = {
+        **job,
+        "builder_revision": head,
+        "materialization_revision": options.materialization_revision,
+        "environment_lock": str(repository / "ops/data/base-build-environment.v1.json"),
+    }
+    new_execution = {**execution, "audit_parent": str(options.audit_parent)}
+    entry.validate_job(new_job)
+    entry.validate_contract(contract)
+    ctl.validate_execution(new_execution)
+    environment = check_environment(
+        lock=pathlib.Path(new_job["environment_lock"]),
+        wheelhouse=pathlib.Path(new_job["wheelhouse"]),
+    )
+    audit_need = (
+        new_execution["audit_limits"]["allocated_bytes"]
+        + new_execution["audit_limits"]["free_floor_bytes"]
+    )
+    audit_free = free_bytes(options.audit_parent)
+    if audit_free < audit_need:
+        raise SystemExit(f"audit free {audit_free} < {audit_need}")
+    lock = pathlib.Path("/srv/quanthus-base22-data/build/base25-20261031/controls/BUILD.lock")
+    with lock.open("a+") as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        options.to_controls.mkdir(parents=True, exist_ok=False)
+        save_new(options.to_controls / "job.json", new_job)
+        save_new(options.to_controls / "contract.json", contract)
+        save_new(options.to_controls / "execution.json", new_execution)
+        record = {
+            "kind": "base-reaudit-preparation-v1",
+            "at": datetime.now(timezone.utc).isoformat(),
+            "source_controls": str(options.from_controls),
+            "repository": str(repository),
+            "audit_revision": head,
+            "materialization_revision": options.materialization_revision,
+            "work_root": str(root),
+            "audit_parent": str(options.audit_parent),
+            "frozen_input_identity": load(pathlib.Path(new_job["frozen"]))["identity"],
+            "environment_identity": environment["lock_sha256"],
+            "audit_free_bytes": audit_free,
+            "audit_required_bytes": audit_need,
+            "written_hashes": {
+                name: sha(options.to_controls / name)
+                for name in ("job.json", "contract.json", "execution.json")
+            },
+        }
+        save_new(options.to_controls / "PREPARATION.json", record)
+        subprocess.run(["chown", "-R", "agentdock:agentdock", str(options.to_controls)], check=False)
+        subprocess.run(["chmod", "-R", "a-w", str(options.to_controls)], check=False)
+        print(json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+

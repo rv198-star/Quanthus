@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "contract_id": "p10-base22-canonical-action-raw-successor-v1",
+  "purpose": "P10_ISOLATED_HISTORICAL_ACTION_REPAIR",
+  "through_business_date": "2026-08-31",
+  "business_timezone": "Asia/Shanghai",
+  "lifecycle": "TMP",
+  "source_roles": {
+    "original_authority_bound": "exact retained implementation raw response and original per-row authority reference",
+    "factor_only_with_F10": "full retained F10 response/receipt and exact original dated identity; shared conflicting totals remain unqualified",
+    "factor_only_without_F10": "complete selected original raw/factor/prior-price closure under the frozen numerical rules, retrospective knowledge only"
+  },
+  "priority": "No conflicting-source priority is granted. Every known conflicting key and prelisting identity is held with evidence; only raw-closed uncontested identities receive new versions.",
+  "tables": {
+    "dwd_corporate_action": {
+      "business_cutoff_field": "effective_at",
+      "business_key": ["corporate_action_id", "effective_at"],
+      "version_key": ["knowledge_from"],
+      "stable_identity": "original canonical entity; exact source_row_key and dated company/security required",
+      "revision": "genuinely new knowledge version; preserve every original version; only selected open knowledge_to closes"
+    },
+    "dwd_corporate_action_term": {
+      "business_cutoff_field": "effective_at",
+      "business_key": ["corporate_action_id", "corporate_action_term_id", "effective_at"],
+      "version_key": ["knowledge_from"],
+      "revision": "only exactly supplied raw terms; original zero/null/absent observations remain archived, never impute omitted donor terms"
+    }
+  },
+  "knowledge": "actual new governance observation, strictly after source and old knowledge; provider/publication UNKNOWN remains UNKNOWN; preserve raw date-only and original clocks; no historical PIT inference",
+  "shared_dependency": "One immutable qualified source/history dependency per job; all projections consume it once, never the final August31 mirror.",
+  "materialization_order": [
+    "freeze exact sources and qualified-receipt identities, physical files and budget",
+    "verify and independently own required raw/typed source closure",
+    "recompute complete eligibility and explicitly held key set",
+    "rewrite only affected history partitions; copy unchanged independent files",
+    "merge existing qualified uncontested additions without changing their clocks",
+    "validate every before/new atom and complete global key/source/parent closure",
+    "independent source-hidden native cold replay twice and disposable faults"
+  ],
+  "original_normalization_manifest_restored": false,
+  "legacy_CURRENT_or_P6_input": false,
+  "consumer_admission": "NOT_GRANTED",
+  "partial_qualification_is_complete_Base22": false
+}

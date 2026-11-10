@@ -110,11 +110,14 @@ def _read_native_tables(
     independent_files: bool = False,
     default_intervals: tuple[str, ...] | None = None,
     one_minute_disposition: str | None = None,
+    relocated_members: Mapping[str, Path] | None = None,
 ) -> NativeBase23:
     """Shared physical reader; public entry points retain exact version contracts."""
     if not tables or len(tables) != len(set(tables)):
         raise NativeBase23Error("native consumer table closure is invalid")
     kind, version, purpose, physical_format = profile
+    if relocated_members is not None and not independent_files:
+        raise NativeBase23Error("relocated native members require independent verification")
     control_fingerprints = {}
     if independent_files:
         from .base22_sources import SourceAssessmentError, _fingerprint, _read_json, physical_path
@@ -188,6 +191,12 @@ def _read_native_tables(
     layout = materialization.get("layout")
     if not isinstance(layout, dict):
         raise NativeBase23Error("native table layout is absent")
+    if relocated_members is not None:
+        selected_paths = {r["path"] for t in tables for r in layout.get(t, {}).get("files", [])}
+        if set(relocated_members) != selected_paths or len(
+            set(map(str, relocated_members.values()))
+        ) != len(relocated_members):
+            raise NativeBase23Error("relocated native member inventory differs")
     paths: dict[str, tuple[Path, ...]] = {}
     seen: set[str] = set()
     for table in tables:
@@ -205,7 +214,18 @@ def _read_native_tables(
                 raise NativeBase23Error("native member path must be a string")
             if independent_files and PurePosixPath(relative).as_posix() != relative:
                 raise NativeBase23Error("native member path is not canonical")
-            path = _member(root, relative)
+            if relocated_members is None:
+                path = _member(root, relative)
+            else:
+                rel = PurePosixPath(relative)
+                if rel.is_absolute() or ".." in rel.parts or rel.as_posix() != relative:
+                    raise NativeBase23Error("unsafe relocated native member path")
+                try:
+                    path = physical_path(Path(relocated_members[relative]))
+                except SourceAssessmentError as exc:
+                    raise NativeBase23Error("relocated native member contains a symlink") from exc
+                if not path.is_file():
+                    raise NativeBase23Error("relocated native member is missing")
             if independent_files and path.stat().st_nlink != 1:
                 raise NativeBase23Error("native parent requires an independent file")
             before = _fingerprint(path) if independent_files else None
@@ -229,7 +249,12 @@ def _read_native_tables(
         if {key: value.get("rows") for key, value in summaries.items()} != dict(rows):
             raise NativeBase23Error(f"native sealed partition counts differ: {table}")
         physical = set()
-        if independent_files:
+        if relocated_members is not None:
+            # The exact original selected inventory was checked above. Paths
+            # can live in different read-only paired-product partitions; each
+            # still has its original size/hash/row/partition declaration.
+            physical = set(table_paths)
+        elif independent_files:
             from .base22_sources import SourceAssessmentError, _tree
 
             directory = root / "payload" / table

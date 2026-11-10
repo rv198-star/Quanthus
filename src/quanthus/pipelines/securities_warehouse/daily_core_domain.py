@@ -207,11 +207,13 @@ def _artifact(selected: Mapping[str, Any], lane: str, name: str) -> tuple[Path, 
 
 
 def _audit_non_output_daily_artifacts(
-    selected: Mapping[str, Any], *, parquet: Any
+    selected: Mapping[str, Any], *, parquet: Any, closed_day: bool = False
 ) -> list[dict[str, Any]]:
     """Account for recognized ODS-only inputs and fail closed on deferred non-empty inputs."""
 
     audited: list[dict[str, Any]] = []
+    if closed_day and set(selected) != {"calendar_daily_events"}:
+        raise DailyDomainBuildError("closed-day source scope differs")
     scoped_exclusions = {}
     for lane, value in selected.items():
         quality = value["artifacts"].get("acquisition_quality")
@@ -263,6 +265,8 @@ def _audit_non_output_daily_artifacts(
         )
 
     for lane, name in _DEFERRED_DAILY_ARTIFACTS:
+        if closed_day and lane != "calendar_daily_events":
+            continue
         if (lane, name) in scoped_exclusions:
             continue
         path, _artifact_contract = _artifact(selected, lane, name)
@@ -295,14 +299,39 @@ def _copy(connection: Any, query: str, output: Path) -> None:
 
 
 def _lineage(path: Path, artifact: Any, alias: str) -> str:
+    """Bind the release artifact clock, never the per-row response arrival time.
+
+    One daily artifact is admitted, replayed and compared as a whole, so its
+    availability instant is the artifact's fixed `knowledge_cutoff`. A
+    per-row `acquired_at` would let one row of an acquisition batch appear
+    known before the same batch's own parent rows, which is not an admissible
+    availability ordering.
+    """
+    cutoff = artifact.knowledge_cutoff
+    if cutoff.tzinfo is None or cutoff.utcoffset() is None:
+        raise DailyDomainBuildError("daily artifact knowledge cutoff lacks a timezone")
     return f"""
       {_sql(str(artifact.source_revision).split("@")[0])}::VARCHAR AS record_source,
       {alias}.source_record_id,
       {_sql(artifact.source_revision)}::VARCHAR AS source_revision,
       {_sql(artifact.sha256)}::VARCHAR AS source_artifact_sha256,
-      CAST({alias}.acquired_at AS TIMESTAMPTZ) AS knowledge_from,
+      CAST({_sql(cutoff.isoformat())} AS TIMESTAMPTZ) AS knowledge_from,
       NULL::TIMESTAMPTZ AS knowledge_to
     """
+
+
+def daily_parent_cutoff(selected: Mapping[str, Any]):
+    """Use the earliest real cutoff of projected artifacts for shared parent references."""
+    names = (
+        ("market_daily_core", "daily_ohlcv_none_delta"),
+        ("market_daily_core", "valuation_daily_delta"),
+        ("market_daily_core", "index_daily_delta"),
+        ("market_daily_core", "daily_status_observation_delta"),
+        ("calendar_daily_events", "announcements_delta"),
+    )
+    if "market_daily_core" not in selected and "calendar_reference" in selected:
+        selected = {**selected, "market_daily_core": selected["calendar_reference"]}
+    return min(_artifact(selected, lane, name)[1].knowledge_cutoff for lane, name in names)
 
 
 def _path_relation(paths: Sequence[Path]) -> str:
@@ -315,6 +344,13 @@ def _verify_base(
 ) -> tuple[dict[str, Any] | NativeBase23, dict[str, Any]]:
     manifest = _object(base_root / "manifest.json")
     config = _object(release_config)
+    if manifest.get("kind") == "quanthus_dwd_base_bundle_v1":
+        from .native_base_standard_reader import read_native_parent_references as read_standard
+
+        try:
+            return read_standard(base_root, config), config
+        except (NativeBase23Error, ValueError) as exc:
+            raise DailyDomainBuildError(str(exc)) from exc
     if manifest.get("kind") == NATIVE_BASE24_KIND:
         try:
             require_daily_core_governance(config)
@@ -424,6 +460,295 @@ def _reuse_base24_output(output: Path, identity: Mapping[str, Any]) -> DailyDoma
     return result
 
 
+def _project_announcements(
+    connection: Any,
+    *,
+    path: Path,
+    artifact: Any,
+    work: Path,
+    after: date,
+    through: date,
+    check_identity: bool,
+) -> tuple[Path, Path, int]:
+    """One source-preserving converter shared by Daily and Base closed days.
+
+    Caller supplies already qualified source and parent views. The converter
+    retains publish/acquisition clocks, stable ids and unavailable evidence.
+    """
+    pq = importlib.import_module("pyarrow.parquet")
+    announcements_path, announcements_artifact = path, artifact
+    covered_after, market_date = after, through
+    universe_artifact = check_identity
+    disclosure_id = _stable_id_sql("disclosure", _sql("announcement_archive"), "o.ann_id")
+    subject_id = _stable_id_sql(
+        "disclosure_subject", disclosure_id, _sql("SECURITY"), "l.security_id"
+    )
+    ann_source = f"""SELECT *, concat({_sql(announcements_path.name)},'#ann_id=',ann_id) source_record_id
+    FROM read_parquet({_sql(str(announcements_path))})
+    WHERE CAST(announce_date AS DATE)>{_sql(covered_after.isoformat())}::DATE
+      AND CAST(announce_date AS DATE)<={_sql(market_date.isoformat())}::DATE"""
+    effective = "CAST(o.publish_time AS TIMESTAMP) AT TIME ZONE 'Asia/Shanghai'"
+    held_disclosure_count = 0
+    if universe_artifact:
+        identity_clause = """EXISTS (SELECT 1 FROM base_listing l JOIN base_security s ON s.security_id=l.security_id
+            WHERE o.stock_code=l.listing_code
+            AND CAST(o.announce_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+            AND (l.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))
+            AND CAST(o.announce_date AS DATE)>=CAST(s.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+            AND (s.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(s.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE)))"""
+        held_path = work / "quality/disclosure-unavailable.parquet"
+        _copy(
+            connection,
+            f"SELECT o.*, 'LISTING_NOT_EFFECTIVE_OR_IDENTITY_UNAVAILABLE'::VARCHAR reason_code FROM ({ann_source}) o WHERE NOT {identity_clause}",
+            held_path,
+        )
+        held_disclosure_count = pq.ParquetFile(held_path).metadata.num_rows
+        ann_source = f"SELECT o.* FROM ({ann_source}) o WHERE {identity_clause}"
+    disclosure_output = (
+        work
+        / f"payload/disclosure_company_event/dwd_disclosure/market_date={market_date}/part-00000.parquet"
+    )
+    _copy(
+        connection,
+        f"""SELECT {_lineage(announcements_path, announcements_artifact, "o")},
+        {effective} AS effective_at, {effective} AS announced_at,
+        {disclosure_id} AS disclosure_id, s.company_id AS company_id,
+        'announcement'::VARCHAR AS disclosure_type,
+        o.ann_id AS source_document_id, o.title AS title,
+        o.url AS document_uri, 'zh-CN'::VARCHAR AS "language"
+        FROM ({ann_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
+        AND CAST(o.announce_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+        AND (l.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))
+        JOIN base_security s ON s.security_id=l.security_id
+        AND CAST(o.announce_date AS DATE)>=CAST(s.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+        AND (s.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(s.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))""",
+        disclosure_output,
+    )
+    subject_output = (
+        work
+        / f"payload/disclosure_company_event/dwd_disclosure_subject/market_date={market_date}/part-00000.parquet"
+    )
+    _copy(
+        connection,
+        f"""SELECT {_lineage(announcements_path, announcements_artifact, "o")},
+        {effective} effective_at, {effective} announced_at, {subject_id} disclosure_subject_id,
+        {disclosure_id} disclosure_id, 'SECURITY'::VARCHAR subject_type, l.security_id,
+        NULL::VARCHAR corporate_action_id, NULL::VARCHAR financial_report_id
+        FROM ({ann_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
+        AND CAST(o.announce_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+        AND (l.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))""",
+        subject_output,
+    )
+
+    return disclosure_output, subject_output, held_disclosure_count
+
+
+def _project_trading_calendar(
+    connection: Any,
+    *,
+    path: Path,
+    artifact: Any,
+    work: Path,
+    market_date: date,
+    record_filename: str | None = None,
+    require_observed: bool = False,
+) -> Path:
+    """Project one observed calendar day, preserving source knowledge and clock."""
+    trading_calendar_path, trading_calendar_artifact = path, artifact
+    record_filename = record_filename or path.name
+    observed = (
+        " AND o.built_at IS NOT NULL AND o.source NOT IN ('','unknown')" if require_observed else ""
+    )
+    calendar_session_id = _stable_id_sql(
+        "calendar_session", "v.venue_id", "CAST(o.trade_date AS VARCHAR)", _sql("day")
+    )
+    calendar_output = (
+        work
+        / f"payload/tradability_state/dwd_trading_calendar/market_date={market_date}/part-00000.parquet"
+    )
+    _copy(
+        connection,
+        f"""SELECT o.source::VARCHAR AS record_source,
+        concat({_sql(record_filename)},'#exchange=',o.exchange,
+               '&trade_date=',CAST(o.trade_date AS VARCHAR),'&session=day') AS source_record_id,
+        {_sql(trading_calendar_artifact.source_revision)}::VARCHAR AS source_revision,
+        {_sql(trading_calendar_artifact.sha256)}::VARCHAR AS source_artifact_sha256,
+        CAST(o.built_at AS TIMESTAMPTZ) AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to,
+        o.trade_date::TIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS observation_start,
+        (o.trade_date::TIMESTAMP AT TIME ZONE 'Asia/Shanghai')+INTERVAL 1 DAY AS observation_end,
+        {calendar_session_id} AS calendar_session_id, v.venue_id, o.trade_date,
+        'day'::VARCHAR AS session_type, CAST(o.is_open AS BOOLEAN) AS is_open,
+        CASE WHEN o.is_open=1 THEN (o.trade_date+TIME '09:30:00') AT TIME ZONE 'Asia/Shanghai' END AS open_at,
+        CASE WHEN o.is_open=1 THEN (o.trade_date+TIME '15:00:00') AT TIME ZONE 'Asia/Shanghai' END AS close_at,
+        CASE WHEN o.is_open=1 THEN NULL ELSE 'SCHEDULED_CLOSED' END::VARCHAR AS calendar_reason
+        FROM read_parquet({_sql(str(trading_calendar_path))}) o JOIN base_venue v
+          ON v.mic_code=CASE o.exchange WHEN 'SSE' THEN 'XSHG'
+             WHEN 'SZSE' THEN 'XSHE' WHEN 'BSE' THEN 'BJSE' END
+            WHERE o.trade_date={_sql(market_date.isoformat())}::DATE{observed}""",
+        calendar_output,
+    )
+    return calendar_output
+
+
+def _project_daily_tables(
+    connection: Any,
+    *,
+    selected: Mapping[str, Any],
+    work: Path,
+    market_date: date,
+    covered_after: date,
+    catalog_digest: str,
+    bar_sources: list[tuple[Path, Any, str, str]],
+    check_identity: bool,
+) -> tuple[dict[str, Path], int]:
+    """Shared exact source projection; callers own qualification and comparison."""
+    valuation_path, valuation_artifact = _artifact(
+        selected, "market_daily_core", "valuation_daily_delta"
+    )
+    index_path, index_artifact = _artifact(selected, "market_daily_core", "index_daily_delta")
+    status_path, status_artifact = _artifact(
+        selected, "market_daily_core", "daily_status_observation_delta"
+    )
+    trading_calendar_path, trading_calendar_artifact = _artifact(
+        selected, "market_daily_core", "trading_calendar"
+    )
+    announcements_path, announcements_artifact = _artifact(
+        selected, "calendar_daily_events", "announcements_delta"
+    )
+    catalog = {"catalog_digest": catalog_digest}
+    universe_artifact = check_identity
+    calendar_output = _project_trading_calendar(
+        connection,
+        path=trading_calendar_path,
+        artifact=trading_calendar_artifact,
+        work=work,
+        market_date=market_date,
+    )
+    connection.execute(
+        f"CREATE VIEW daily_calendar AS SELECT * FROM read_parquet({_sql(str(calendar_output))})"
+    )
+
+    bar_parts = []
+    for path, artifact, interval, subtract in bar_sources:
+        if interval == "1d":
+            raw_start = "CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai'"
+            raw_end = f"({raw_start}) + INTERVAL 1 DAY"
+            source = f"SELECT *, concat({_sql(str(path.name))},'#code=',stock_code,'&date=',date) source_record_id FROM read_parquet({_sql(str(path))})"
+        else:
+            label = "CAST(o.ts AS TIMESTAMP) AT TIME ZONE 'Asia/Shanghai'"
+            raw_start = f"({label}) - {subtract}"
+            raw_end = label
+            source = f"SELECT *, concat({_sql(str(path.name))},'#code=',stock_code,'&ts=',ts) source_record_id FROM read_parquet({_sql(str(path))})"
+        bar_parts.append(
+            f"""SELECT {_lineage(path, artifact, "o")},
+            {raw_start} AS observation_start, {raw_end} AS observation_end,
+            l.listing_id, c.calendar_session_id, {_sql(interval)}::VARCHAR interval_size,
+            'none'::VARCHAR price_basis, l.listing_currency AS currency,
+            CAST(o.open AS DECIMAL(38,10)) AS "open",
+            CAST(o.high AS DECIMAL(38,10)) AS "high",
+            CAST(o.low AS DECIMAL(38,10)) AS "low",
+            CAST(o.close AS DECIMAL(38,10)) AS "close",
+            CAST(o.volume AS DECIMAL(38,10)) AS volume,
+            CAST(o.amount AS DECIMAL(38,10)) AS turnover,
+            NULL::BIGINT AS trade_count
+            FROM ({source}) o JOIN base_listing l ON o.stock_code=l.listing_code
+            AND CAST(o.market_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
+            AND (l.effective_to IS NULL OR CAST(o.market_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))
+            JOIN daily_calendar c ON c.venue_id=l.venue_id AND c.trade_date=CAST(o.market_date AS DATE)
+            AND c.session_type='day'"""
+        )
+    bar_output = (
+        work
+        / f"payload/security_market_observation/dwd_security_bar/market_date={market_date}/part-00000.parquet"
+    )
+    _copy(connection, " UNION ALL ".join(bar_parts), bar_output)
+
+    valuation_source = f"""SELECT *, concat({_sql(valuation_path.name)},'#code=',stock_code,'&date=',date) source_record_id
+    FROM read_parquet({_sql(str(valuation_path))})"""
+    valuation_output = (
+        work
+        / f"payload/security_market_observation/dwd_security_valuation/market_date={market_date}/part-00000.parquet"
+    )
+    _copy(
+        connection,
+        f"""SELECT {_lineage(valuation_path, valuation_artifact, "o")},
+        CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai' observation_start,
+        (CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai')+INTERVAL 1 DAY observation_end,
+        l.security_id, l.listing_id, u.measure_type,
+        CAST(u.measure_value AS DECIMAL(38,10)) measure_value,
+        NULL::VARCHAR currency, 'provider_reported'::VARCHAR methodology,
+        'ttm_or_reported'::VARCHAR fiscal_basis
+        FROM ({valuation_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
+        CROSS JOIN LATERAL (VALUES ('pe_ttm',o.pe_ttm),('pb',o.pb),('ps_ttm',o.ps_ttm),('pcf_ttm',o.pcf_ttm)) u(measure_type,measure_value)""",
+        valuation_output,
+    )
+
+    index_source = f"""SELECT *, concat({_sql(index_path.name)},'#index=',index_code,'&date=',date) source_record_id
+    FROM read_parquet({_sql(str(index_path))})"""
+    index_output = (
+        work
+        / f"payload/security_market_observation/dwd_index_bar/market_date={market_date}/part-00000.parquet"
+    )
+    _copy(
+        connection,
+        f"""SELECT {_lineage(index_path, index_artifact, "o")},
+        CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai' observation_start,
+        (CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai')+INTERVAL 1 DAY observation_end,
+        i.index_id, NULL::VARCHAR calendar_session_id, '1d'::VARCHAR interval_size,
+        i.base_currency currency, CAST(o.open AS DECIMAL(38,10)) AS "open",
+        CAST(o.high AS DECIMAL(38,10)) AS "high",
+        CAST(o.low AS DECIMAL(38,10)) AS "low",
+        CAST(o.close AS DECIMAL(38,10)) AS "close",
+        CAST(o.volume AS DECIMAL(38,10)) AS volume,
+        CAST(o.amount AS DECIMAL(38,10)) AS turnover
+        FROM ({index_source}) o JOIN base_market_index i ON o.index_code=i.index_code""",
+        index_output,
+    )
+
+    status_source = f"""SELECT *, concat({_sql(status_path.name)},'#code=',stock_code,'&date=',date) source_record_id
+    FROM read_parquet({_sql(str(status_path))})"""
+    status_output = (
+        work
+        / f"payload/tradability_state/dwd_tradability_state/market_date={market_date}/part-00000.parquet"
+    )
+    _copy(
+        connection,
+        f"""SELECT {_lineage(status_path, status_artifact, "o")},
+        c.observation_start, c.observation_end, l.listing_id, c.calendar_session_id,
+        o.tradestatus='1' is_tradable,
+        {ST_BUY_SQL} can_buy,
+        o.tradestatus='1' can_sell,
+        {ST_REASON_SQL}::VARCHAR reason_code,
+        NULL::DECIMAL(38,10) upper_price, NULL::DECIMAL(38,10) lower_price,
+        {_sql(catalog["catalog_digest"])}::VARCHAR input_revision_digest
+        FROM ({status_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
+        JOIN daily_calendar c ON c.venue_id=l.venue_id AND c.trade_date=CAST(o.market_date AS DATE)
+        AND c.session_type='day'""",
+        status_output,
+    )
+
+    disclosure_output, subject_output, held_disclosure_count = _project_announcements(
+        connection,
+        path=announcements_path,
+        artifact=announcements_artifact,
+        work=work,
+        after=covered_after,
+        through=market_date,
+        check_identity=bool(universe_artifact),
+    )
+
+    outputs = {
+        "dwd_trading_calendar": calendar_output,
+        "dwd_security_bar": bar_output,
+        "dwd_security_valuation": valuation_output,
+        "dwd_index_bar": index_output,
+        "dwd_tradability_state": status_output,
+        "dwd_disclosure": disclosure_output,
+        "dwd_disclosure_subject": subject_output,
+    }
+    return outputs, held_disclosure_count
+
+
 def build_daily_domain_increment(
     *,
     catalog_root: Path,
@@ -437,7 +762,10 @@ def build_daily_domain_increment(
     """Build and audit one Base-seeded daily DWD package without mutating Base."""
 
     requested_config = _object(release_config)
-    is_base24 = requested_config.get("layers", {}).get("dwd", {}).get("format") == "native_base24"
+    is_base24 = requested_config.get("layers", {}).get("dwd", {}).get("format") in {
+        "native_base24",
+        "native_standard_base",
+    }
     if is_base24:
         try:
             output = disjoint_output(output, [base_root, release_root, catalog_root])
@@ -453,7 +781,10 @@ def build_daily_domain_increment(
         if output == source_root or output.is_relative_to(source_root):
             raise DailyDomainBuildError(f"daily output must be outside the {label} root")
     if output.exists() and not is_base24:
-        if _object(output / "manifest.json").get("base", {}).get("kind") == NATIVE_BASE24_KIND:
+        if _object(output / "manifest.json").get("base", {}).get("kind") in {
+            NATIVE_BASE24_KIND,
+            "quanthus_dwd_base_bundle_v1",
+        }:
             raise DailyDomainBuildError("Base 2.4 Daily requires its explicit governance config")
         return verify_daily_domain_increment(output)
     catalog, selected = _read_catalog(catalog_root.resolve(), release_root)
@@ -583,221 +914,34 @@ def build_daily_domain_increment(
             if "dwd_listing" in overlay:
                 listing_files = [*listing_files, overlay["dwd_listing"]]
                 security_files = [*security_files, overlay["dwd_security"]]
-        connection.execute(
-            f"CREATE VIEW base_listing AS SELECT * FROM {_path_relation(listing_files)}"
-        )
-        connection.execute(
-            f"CREATE VIEW base_security AS SELECT * FROM {_path_relation(security_files)}"
-        )
-        connection.execute(
-            f"CREATE VIEW base_calendar AS SELECT * FROM {_path_relation(calendar_files)}"
-        )
-        connection.execute(
-            f"CREATE VIEW base_market_index AS SELECT * FROM {_path_relation(market_index_files)}"
-        )
-        connection.execute(f"CREATE VIEW base_venue AS SELECT * FROM {_path_relation(venue_files)}")
+        from .daily_reference_views import reference_relation
 
-        calendar_session_id = _stable_id_sql(
-            "calendar_session", "v.venue_id", "CAST(o.trade_date AS VARCHAR)", _sql("day")
+        cutoff = (
+            daily_parent_cutoff(selected)
+            if config.get("layers", {}).get("dwd", {}).get("format") == "native_standard_base"
+            else None
         )
-        calendar_output = (
-            work
-            / f"payload/tradability_state/dwd_trading_calendar/market_date={market_date}/part-00000.parquet"
-        )
-        _copy(
-            connection,
-            f"""SELECT o.source::VARCHAR AS record_source,
-            concat({_sql(trading_calendar_path.name)},'#exchange=',o.exchange,
-                   '&trade_date=',CAST(o.trade_date AS VARCHAR),'&session=day') AS source_record_id,
-            {_sql(trading_calendar_artifact.source_revision)}::VARCHAR AS source_revision,
-            {_sql(trading_calendar_artifact.sha256)}::VARCHAR AS source_artifact_sha256,
-            CAST(o.built_at AS TIMESTAMPTZ) AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to,
-            o.trade_date::TIMESTAMP AT TIME ZONE 'Asia/Shanghai' AS observation_start,
-            (o.trade_date::TIMESTAMP AT TIME ZONE 'Asia/Shanghai')+INTERVAL 1 DAY AS observation_end,
-            {calendar_session_id} AS calendar_session_id, v.venue_id, o.trade_date,
-            'day'::VARCHAR AS session_type, CAST(o.is_open AS BOOLEAN) AS is_open,
-            CASE WHEN o.is_open=1 THEN (o.trade_date+TIME '09:30:00') AT TIME ZONE 'Asia/Shanghai' END AS open_at,
-            CASE WHEN o.is_open=1 THEN (o.trade_date+TIME '15:00:00') AT TIME ZONE 'Asia/Shanghai' END AS close_at,
-            CASE WHEN o.is_open=1 THEN NULL ELSE 'SCHEDULED_CLOSED' END::VARCHAR AS calendar_reason
-            FROM read_parquet({_sql(str(trading_calendar_path))}) o JOIN base_venue v
-              ON v.mic_code=CASE o.exchange WHEN 'SSE' THEN 'XSHG'
-                 WHEN 'SZSE' THEN 'XSHE' WHEN 'BSE' THEN 'BJSE' END
-            WHERE o.trade_date={_sql(market_date.isoformat())}::DATE""",
-            calendar_output,
-        )
-        connection.execute(
-            f"CREATE VIEW daily_calendar AS SELECT * FROM read_parquet({_sql(str(calendar_output))})"
-        )
-
-        bar_parts = []
-        for path, artifact, interval, subtract in bar_sources:
-            if interval == "1d":
-                raw_start = "CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai'"
-                raw_end = f"({raw_start}) + INTERVAL 1 DAY"
-                source = f"SELECT *, concat({_sql(str(path.name))},'#code=',stock_code,'&date=',date) source_record_id FROM read_parquet({_sql(str(path))})"
-            else:
-                label = "CAST(o.ts AS TIMESTAMP) AT TIME ZONE 'Asia/Shanghai'"
-                raw_start = f"({label}) - {subtract}"
-                raw_end = label
-                source = f"SELECT *, concat({_sql(str(path.name))},'#code=',stock_code,'&ts=',ts) source_record_id FROM read_parquet({_sql(str(path))})"
-            bar_parts.append(
-                f"""SELECT {_lineage(path, artifact, "o")},
-                {raw_start} AS observation_start, {raw_end} AS observation_end,
-                l.listing_id, c.calendar_session_id, {_sql(interval)}::VARCHAR interval_size,
-                'none'::VARCHAR price_basis, l.listing_currency AS currency,
-                CAST(o.open AS DECIMAL(38,10)) AS "open",
-                CAST(o.high AS DECIMAL(38,10)) AS "high",
-                CAST(o.low AS DECIMAL(38,10)) AS "low",
-                CAST(o.close AS DECIMAL(38,10)) AS "close",
-                CAST(o.volume AS DECIMAL(38,10)) AS volume,
-                CAST(o.amount AS DECIMAL(38,10)) AS turnover,
-                NULL::BIGINT AS trade_count
-                FROM ({source}) o JOIN base_listing l ON o.stock_code=l.listing_code
-                AND CAST(o.market_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
-                AND (l.effective_to IS NULL OR CAST(o.market_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))
-                JOIN daily_calendar c ON c.venue_id=l.venue_id AND c.trade_date=CAST(o.market_date AS DATE)
-                AND c.session_type='day'"""
+        for view, paths in (
+            ("base_listing", listing_files),
+            ("base_security", security_files),
+            ("base_calendar", calendar_files),
+            ("base_market_index", market_index_files),
+            ("base_venue", venue_files),
+        ):
+            connection.execute(
+                f"CREATE VIEW {view} AS SELECT * FROM {reference_relation(paths, cutoff)}"
             )
-        bar_output = (
-            work
-            / f"payload/security_market_observation/dwd_security_bar/market_date={market_date}/part-00000.parquet"
-        )
-        _copy(connection, " UNION ALL ".join(bar_parts), bar_output)
 
-        valuation_source = f"""SELECT *, concat({_sql(valuation_path.name)},'#code=',stock_code,'&date=',date) source_record_id
-        FROM read_parquet({_sql(str(valuation_path))})"""
-        valuation_output = (
-            work
-            / f"payload/security_market_observation/dwd_security_valuation/market_date={market_date}/part-00000.parquet"
-        )
-        _copy(
+        outputs, held_disclosure_count = _project_daily_tables(
             connection,
-            f"""SELECT {_lineage(valuation_path, valuation_artifact, "o")},
-            CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai' observation_start,
-            (CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai')+INTERVAL 1 DAY observation_end,
-            l.security_id, l.listing_id, u.measure_type,
-            CAST(u.measure_value AS DECIMAL(38,10)) measure_value,
-            NULL::VARCHAR currency, 'provider_reported'::VARCHAR methodology,
-            'ttm_or_reported'::VARCHAR fiscal_basis
-            FROM ({valuation_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
-            CROSS JOIN LATERAL (VALUES ('pe_ttm',o.pe_ttm),('pb',o.pb),('ps_ttm',o.ps_ttm),('pcf_ttm',o.pcf_ttm)) u(measure_type,measure_value)""",
-            valuation_output,
+            selected=selected,
+            work=work,
+            market_date=market_date,
+            covered_after=covered_after,
+            catalog_digest=catalog["catalog_digest"],
+            bar_sources=bar_sources,
+            check_identity=bool(universe_artifact),
         )
-
-        index_source = f"""SELECT *, concat({_sql(index_path.name)},'#index=',index_code,'&date=',date) source_record_id
-        FROM read_parquet({_sql(str(index_path))})"""
-        index_output = (
-            work
-            / f"payload/security_market_observation/dwd_index_bar/market_date={market_date}/part-00000.parquet"
-        )
-        _copy(
-            connection,
-            f"""SELECT {_lineage(index_path, index_artifact, "o")},
-            CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai' observation_start,
-            (CAST(o.date AS DATE)::TIMESTAMP AT TIME ZONE 'Asia/Shanghai')+INTERVAL 1 DAY observation_end,
-            i.index_id, NULL::VARCHAR calendar_session_id, '1d'::VARCHAR interval_size,
-            i.base_currency currency, CAST(o.open AS DECIMAL(38,10)) AS "open",
-            CAST(o.high AS DECIMAL(38,10)) AS "high",
-            CAST(o.low AS DECIMAL(38,10)) AS "low",
-            CAST(o.close AS DECIMAL(38,10)) AS "close",
-            CAST(o.volume AS DECIMAL(38,10)) AS volume,
-            CAST(o.amount AS DECIMAL(38,10)) AS turnover
-            FROM ({index_source}) o JOIN base_market_index i ON o.index_code=i.index_code""",
-            index_output,
-        )
-
-        status_source = f"""SELECT *, concat({_sql(status_path.name)},'#code=',stock_code,'&date=',date) source_record_id
-        FROM read_parquet({_sql(str(status_path))})"""
-        status_output = (
-            work
-            / f"payload/tradability_state/dwd_tradability_state/market_date={market_date}/part-00000.parquet"
-        )
-        _copy(
-            connection,
-            f"""SELECT {_lineage(status_path, status_artifact, "o")},
-            c.observation_start, c.observation_end, l.listing_id, c.calendar_session_id,
-            o.tradestatus='1' is_tradable,
-            {ST_BUY_SQL} can_buy,
-            o.tradestatus='1' can_sell,
-            {ST_REASON_SQL}::VARCHAR reason_code,
-            NULL::DECIMAL(38,10) upper_price, NULL::DECIMAL(38,10) lower_price,
-            {_sql(catalog["catalog_digest"])}::VARCHAR input_revision_digest
-            FROM ({status_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
-            JOIN daily_calendar c ON c.venue_id=l.venue_id AND c.trade_date=CAST(o.market_date AS DATE)
-            AND c.session_type='day'""",
-            status_output,
-        )
-
-        disclosure_id = _stable_id_sql("disclosure", _sql("announcement_archive"), "o.ann_id")
-        subject_id = _stable_id_sql(
-            "disclosure_subject", disclosure_id, _sql("SECURITY"), "l.security_id"
-        )
-        ann_source = f"""SELECT *, concat({_sql(announcements_path.name)},'#ann_id=',ann_id) source_record_id
-        FROM read_parquet({_sql(str(announcements_path))})
-        WHERE CAST(announce_date AS DATE)>{_sql(covered_after.isoformat())}::DATE
-          AND CAST(announce_date AS DATE)<={_sql(market_date.isoformat())}::DATE"""
-        effective = "CAST(o.publish_time AS TIMESTAMP) AT TIME ZONE 'Asia/Shanghai'"
-        held_disclosure_count = 0
-        if universe_artifact:
-            identity_clause = """EXISTS (SELECT 1 FROM base_listing l JOIN base_security s ON s.security_id=l.security_id
-                WHERE o.stock_code=l.listing_code
-                AND CAST(o.announce_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
-                AND (l.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))
-                AND CAST(o.announce_date AS DATE)>=CAST(s.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
-                AND (s.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(s.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE)))"""
-            held_path = work / "quality/disclosure-unavailable.parquet"
-            _copy(
-                connection,
-                f"SELECT o.*, 'LISTING_NOT_EFFECTIVE_OR_IDENTITY_UNAVAILABLE'::VARCHAR reason_code FROM ({ann_source}) o WHERE NOT {identity_clause}",
-                held_path,
-            )
-            held_disclosure_count = pq.ParquetFile(held_path).metadata.num_rows
-            ann_source = f"SELECT o.* FROM ({ann_source}) o WHERE {identity_clause}"
-        disclosure_output = (
-            work
-            / f"payload/disclosure_company_event/dwd_disclosure/market_date={market_date}/part-00000.parquet"
-        )
-        _copy(
-            connection,
-            f"""SELECT {_lineage(announcements_path, announcements_artifact, "o")},
-            {effective} AS effective_at, {effective} AS announced_at,
-            {disclosure_id} AS disclosure_id, s.company_id AS company_id,
-            'announcement'::VARCHAR AS disclosure_type,
-            o.ann_id AS source_document_id, o.title AS title,
-            o.url AS document_uri, 'zh-CN'::VARCHAR AS "language"
-            FROM ({ann_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
-            AND CAST(o.announce_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
-            AND (l.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))
-            JOIN base_security s ON s.security_id=l.security_id
-            AND CAST(o.announce_date AS DATE)>=CAST(s.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
-            AND (s.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(s.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))""",
-            disclosure_output,
-        )
-        subject_output = (
-            work
-            / f"payload/disclosure_company_event/dwd_disclosure_subject/market_date={market_date}/part-00000.parquet"
-        )
-        _copy(
-            connection,
-            f"""SELECT {_lineage(announcements_path, announcements_artifact, "o")},
-            {effective} effective_at, {effective} announced_at, {subject_id} disclosure_subject_id,
-            {disclosure_id} disclosure_id, 'SECURITY'::VARCHAR subject_type, l.security_id,
-            NULL::VARCHAR corporate_action_id, NULL::VARCHAR financial_report_id
-            FROM ({ann_source}) o JOIN base_listing l ON o.stock_code=l.listing_code
-            AND CAST(o.announce_date AS DATE)>=CAST(l.effective_from AT TIME ZONE 'Asia/Shanghai' AS DATE)
-            AND (l.effective_to IS NULL OR CAST(o.announce_date AS DATE)<CAST(l.effective_to AT TIME ZONE 'Asia/Shanghai' AS DATE))""",
-            subject_output,
-        )
-
-        outputs = {
-            "dwd_trading_calendar": calendar_output,
-            "dwd_security_bar": bar_output,
-            "dwd_security_valuation": valuation_output,
-            "dwd_index_bar": index_output,
-            "dwd_tradability_state": status_output,
-            "dwd_disclosure": disclosure_output,
-            "dwd_disclosure_subject": subject_output,
-        }
         row_counts: dict[str, int] = {}
         audit_tables = []
         for table, path in outputs.items():
@@ -1060,7 +1204,7 @@ def verify_daily_domain_increment(root: Path) -> DailyDomainResult:
         raise DailyDomainBuildError("daily DWD READY is unreadable") from exc
     if ready != manifest_sha:
         raise DailyDomainBuildError("daily DWD manifest or READY differs")
-    if manifest.get("base", {}).get("kind") == NATIVE_BASE24_KIND:
+    if manifest.get("base", {}).get("kind") in {NATIVE_BASE24_KIND, "quanthus_dwd_base_bundle_v1"}:
         identity = manifest.get("job_identity")
         if (
             manifest.get("kind") != "cn01_daily_core_dwd_increment"

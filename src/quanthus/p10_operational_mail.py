@@ -133,6 +133,48 @@ def render_event(value: dict[str, Any]) -> tuple[str, str]:
     return subject, "\n".join(lines)
 
 
+def _event_key(value: dict[str, Any]) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+def _previous_notification(
+    event: Path, state: Path, value: dict[str, Any]
+) -> tuple[dict[str, Any], str] | None:
+    """Use only same-day durable job events and their existing successful mail receipts."""
+    sent = []
+    for role in ("daily", "recovery"):
+        for peer in event.parent.glob(f"{role}-{value['market_date']}-*.json"):
+            if peer == event:
+                continue
+            if peer.is_symlink() or peer.stat().st_size > 8192:
+                raise ValueError("P10_MAIL_SMALL_PHYSICAL_EVENT_REQUIRED")
+            prior = json.loads(peer.read_bytes())
+            validate(prior)
+            if (
+                prior["market_date"] != value["market_date"]
+                or prior["role"] != role
+                or peer.name != prior["run_id"] + ".json"
+            ):
+                raise ValueError("P10_MAIL_PEER_IDENTITY_DIFFERS")
+            key = _event_key(prior)
+            receipt = state / (key + ".json")
+            if receipt.is_symlink():
+                raise ValueError("P10_MAIL_PHYSICAL_RECEIPT_REQUIRED")
+            if receipt.exists():
+                record = json.loads(receipt.read_bytes())
+                if record.get("event_sha256") != key:
+                    raise ValueError("P10_MAIL_RECEIPT_IDENTITY_DIFFERS")
+                if record.get("status") == "sent" and not prior["reason"].startswith("ACCEPTANCE_"):
+                    sent.append((prior, key))
+    return max(
+        sent,
+        key=lambda pair: (datetime.fromisoformat(pair[0]["observed_at"]), pair[1]),
+        default=None,
+    )
+
+
 def deliver(event: Path, state: Path, secret: Path, *, attempts: int = 2) -> str:
     """API idempotency plus a durable local receipt, independent of Docker."""
     if event.is_symlink() or event.stat().st_size > 8192:
@@ -141,16 +183,46 @@ def deliver(event: Path, state: Path, secret: Path, *, attempts: int = 2) -> str
     validate(value)
     if attempts not in {1, 2}:
         raise ValueError("P10_MAIL_BOUNDED_ATTEMPTS_REQUIRED")
-    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
-    key = hashlib.sha256(encoded).hexdigest()
+    key = _event_key(value)
     if state.resolve() != state.absolute():
         raise ValueError("P10_MAIL_PHYSICAL_STATE_REQUIRED")
     state.mkdir(parents=True, exist_ok=True)
-    with (state / (key + ".lock")).open("a") as lock:
+    # Daily and its recovery check share one lock, including failed/partial events.
+    # The original per-event API key and successful receipts remain immutable.
+    scope = "daily-" + value["market_date"] if value["role"] in {"daily", "recovery"} else key
+    with (state / (scope + ".lock")).open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         receipt = state / (key + ".json")
-        if receipt.exists() and json.loads(receipt.read_bytes()).get("status") == "sent":
-            return "already_sent"
+        if receipt.exists():
+            status = json.loads(receipt.read_bytes()).get("status")
+            if status == "sent":
+                return "already_sent"
+            if status == "suppressed_unchanged":
+                return "unchanged_result_already_sent"
+        if (
+            value["role"] in {"daily", "recovery"}
+            and value["status"] in {"complete", "closed"}
+            and value["manifests"]
+            and not value["reason"].startswith("ACCEPTANCE_")
+        ):
+            previous = _previous_notification(event, state, value)
+            if previous is not None:
+                prior, previous_key = previous
+                if (
+                    prior["status"] == value["status"]
+                    and sorted(prior["manifests"]) == sorted(value["manifests"])
+                    and prior["reason"].removeprefix("LATE_RECOVERY_")
+                    == value["reason"].removeprefix("LATE_RECOVERY_")
+                ):
+                    atomic(
+                        receipt,
+                        {
+                            "status": "suppressed_unchanged",
+                            "event_sha256": key,
+                            "duplicate_of_event_sha256": previous_key,
+                        },
+                    )
+                    return "unchanged_result_already_sent"
         # Runtime injection only: never bake a key into image ENV/ARG/layers.
         # Legacy file input remains readable for earlier independent send receipts.
         if "QUANTHUS_RESEND_API_KEY" in os.environ:

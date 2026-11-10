@@ -1,0 +1,24 @@
+{
+  "kind": "base24r1-actual-partition-independent-comparison-v1",
+  "verified_at": "2026-11-06T10:58:49.779802+00:00",
+  "original_manifest_sha256": "sha256:04345d9cfb7d99dae9e65b11bd28591095156e48378b5b44245fc3d36a944b3a",
+  "original_partition_sha256": "sha256:6661f13c9bee6c3206af98ec3a1e4762ddf4d4627bb37fce709072f44405b9a9",
+  "corrected_partition_sha256": "sha256:8fe3c4019f4db474610bbd4c9b57e27d7ae74a0ed17aaf10e17da7b33e35780f",
+  "rows": 77270,
+  "hits": {
+    "002336": 1,
+    "002500": 1
+  },
+  "before": {
+    "002336": {
+      "volume": "1118342.0000000000",
+      "turnover": "0E-10"
+    },
+    "002500": {
+      "volume": "38945309.0000000000",
+      "turnover": "0E-10"
+    }
+  },
+  "only_authorized_values_differ": true,
+  "schema_row_order_all_other_values_and_lineage_preserved": true
+}

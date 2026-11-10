@@ -1,0 +1,59 @@
+{
+  "contract_id": "p10-base231-official-all-issued-share-adjustment-v1",
+  "business_through": "2026-09-30",
+  "timezone": "Asia/Shanghai",
+  "basis": "ALL_ISSUED_PRE_EVENT_SHARES",
+  "source_priority": "For these exact named coordinates only, the original official implementation final reference-price formula or explicit non-differentiated total-issued-share implementation base governs the new current-knowledge coefficient observation.",
+  "qualified_purpose": "current-knowledge governed adjustment-coefficient observation",
+  "separate_purpose": "eligible-holder pretax distribution",
+  "preserve_old_observations_and_knowledge": true,
+  "missing_or_unknown_components_not_zero": true,
+  "original_publication_or_acquisition_not_fabricated": true,
+  "price_factor_execution_admission": "NOT_GRANTED",
+  "historical_PIT_admission": "NOT_GRANTED",
+  "current_5_2026_effect_conflicts": "new authoritative basis observation; do not rewrite prior source records or mark remaining historical conflicts resolved",
+  "scopes": [
+    {
+      "code": "688115",
+      "venue": "SSE",
+      "ex_date": "2026-07-15",
+      "announcement_id": "1225412942",
+      "full_official_body_sha256": "sha256:c946e06f221802dda4810ed69e68f1ec298ff59dc0e62edfbaf1efaaaebae539"
+    },
+    {
+      "code": "003018",
+      "venue": "SZSE",
+      "ex_date": "2026-07-15",
+      "announcement_id": "1225416175",
+      "full_official_body_sha256": "sha256:f82cb20fa5a2058ccb1d2474bc09867312c2e98d59be226513888d945ac7bd13"
+    },
+    {
+      "code": "301266",
+      "venue": "SZSE",
+      "ex_date": "2026-05-22",
+      "announcement_id": "1225306973",
+      "full_official_body_sha256": "sha256:1d60be4e7019d0c105801f5658f428e3f5151bdfe1f733b318db7a48ca203843"
+    },
+    {
+      "code": "001211",
+      "venue": "SZSE",
+      "ex_date": "2026-06-04",
+      "announcement_id": "1225332732",
+      "full_official_body_sha256": "sha256:9c8d5f8921d0c34d16b8d1e27785d7eb28ba6bdd9fe465ad6cf120eea43b362e"
+    },
+    {
+      "code": "002831",
+      "venue": "SZSE",
+      "ex_date": "2026-06-04",
+      "announcement_id": "1225335706",
+      "full_official_body_sha256": "sha256:ae29cedfb8dd555a2c0f624a05fe0d91484b67d29fc5ba1118dfca79a52f5922"
+    },
+    {
+      "code": "601390",
+      "venue": "SSE",
+      "ex_date": "2026-07-31",
+      "announcement_id": "1225439154",
+      "full_official_body_sha256": "sha256:f92cccf77e3abefa38c608126b882b6831bbac85287a0b3cf9ae60243e5a7d52"
+    }
+  ]
+}

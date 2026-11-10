@@ -67,17 +67,17 @@ def storage_census(root: Path) -> dict[str, int]:
         raise BoundedError("RESOURCE_SCAN_FAILED") from error
 
     for directory, dirs, names in os.walk(root, onerror=scan_failed, followlinks=False):
+        directories = set(dirs)
         for name in [*dirs, *names]:
-            path = Path(directory) / name
-            if path.is_symlink():
-                raise BoundedError("RESOURCE_SYMLINK_FORBIDDEN")
-            if name in dirs:
-                continue
             try:
-                info = path.stat()
+                info = os.lstat(os.path.join(directory, name))
             except FileNotFoundError:
                 # A job-owned spill file may disappear while its writer runs.
                 # Source inventory uses the stricter, fail-closed _tree instead.
+                continue
+            if stat.S_ISLNK(info.st_mode):
+                raise BoundedError("RESOURCE_SYMLINK_FORBIDDEN")
+            if name in directories:
                 continue
             if not stat.S_ISREG(info.st_mode):
                 raise BoundedError("RESOURCE_SPECIAL_FILE_FORBIDDEN")

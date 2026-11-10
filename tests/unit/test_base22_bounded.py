@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import errno
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -56,6 +57,33 @@ def records(keys=(1, 2)):
             "source_record_id": ["r"] * len(keys),
         }
     )
+
+
+@pytest.mark.parametrize("kind", ["directory-symlink", "dangling-symlink", "fifo"])
+def test_budget_census_rejects_nonregular_members_inside_nested_job(tmp_path, kind):
+    budget = b.Budget(tmp_path / "job", [], limits())
+    nested = budget.root / "nested"
+    nested.mkdir(parents=True)
+    if kind == "fifo":
+        os.mkfifo(nested / "wire")
+        reason = "RESOURCE_SPECIAL_FILE_FORBIDDEN"
+    else:
+        target = tmp_path / "elsewhere"
+        if kind == "directory-symlink":
+            target.mkdir()
+        (nested / "link").symlink_to(target, target_is_directory=target.is_dir())
+        reason = "RESOURCE_SYMLINK_FORBIDDEN"
+    with pytest.raises(b.BoundedError, match=reason):
+        budget.check()
+
+
+def test_budget_census_counts_nested_partial_spill_bytes(tmp_path):
+    budget = b.Budget(tmp_path / "job", [], limits(allocated_bytes=4096))
+    nested = budget.root / "temp" / "sort"
+    nested.mkdir(parents=True)
+    (nested / "part.parquet.partial").write_bytes(b"x" * 8192)
+    with pytest.raises(b.BoundedError, match="ALLOCATED_WRITE_BUDGET_EXCEEDED"):
+        budget.check()
 
 
 def test_stage_clock_reset_preserves_peaks_and_rejects_an_expired_stage(tmp_path, monkeypatch):

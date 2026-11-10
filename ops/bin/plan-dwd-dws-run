@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from contextlib import ExitStack
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
@@ -14,6 +15,8 @@ from quanthus.pipelines.securities_warehouse import (  # noqa: E402
     WarehousePlanningError,
     build_input_plan,
 )
+from quanthus.pipelines.securities_warehouse.base22_bounded import BoundedError
+from quanthus.pipelines.securities_warehouse.base22_sources import SourceAssessmentError
 
 
 def main() -> int:
@@ -23,7 +26,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
         "--mode",
-        choices=("base", "daily", "weekly", "correction", "backfill"),
+        choices=("base", "daily", "weekly", "correction", "backfill", "monthly_base"),
         required=True,
     )
     parser.add_argument("--run-id", required=True)
@@ -32,6 +35,8 @@ def main() -> int:
     parser.add_argument("--runtime-id", required=True)
     parser.add_argument("--market-date")
     parser.add_argument("--through-date")
+    parser.add_argument("--monthly-consumer-contract", type=Path)
+    parser.add_argument("--monthly-audit-root", type=Path)
     parser.add_argument(
         "--input-identity-override",
         type=Path,
@@ -43,22 +48,52 @@ def main() -> int:
         help="existing filesystem root reserved for DWD/DWS candidate and spill capacity",
     )
     args = parser.parse_args()
+    if args.mode == "monthly_base":
+        if args.monthly_consumer_contract is None or args.monthly_audit_root is None:
+            parser.error(
+                "monthly_base requires --monthly-consumer-contract and --monthly-audit-root"
+            )
+    elif args.monthly_consumer_contract is not None or args.monthly_audit_root is not None:
+        parser.error("monthly options require explicit --mode monthly_base")
     try:
-        result = build_input_plan(
-            ods_package=args.ods_package,
-            model_path=args.model,
-            output=args.output,
-            mode=args.mode,
-            run_id=args.run_id,
-            knowledge_cutoff=args.knowledge_cutoff,
-            code_revision=args.code_revision,
-            runtime_id=args.runtime_id,
-            market_date=args.market_date,
-            through_date=args.through_date,
-            capacity_root=args.capacity_root,
-            input_identity_override=args.input_identity_override,
-        )
-    except (WarehousePlanningError, FileExistsError, OSError) as exc:
+        with ExitStack() as stack:
+            budget = None
+            if args.mode == "monthly_base":
+                from quanthus.pipelines.securities_warehouse.base22_bounded import Budget, Limits
+                from quanthus.pipelines.securities_warehouse.base22_sources import disjoint_output
+
+                # Check all write locations before the monitor can create scratch.
+                sources = [args.ods_package, args.monthly_consumer_contract, args.model]
+                audit_root = disjoint_output(args.monthly_audit_root, sources)
+                disjoint_output(args.output, [*sources, audit_root])
+                budget = stack.enter_context(
+                    Budget(
+                        audit_root,
+                        sources,
+                        Limits(
+                            allocated_bytes=256 * 1024**2,
+                            temp_bytes=128 * 1024**2,
+                            free_floor_bytes=8 * 1024**3,
+                        ),
+                    )
+                )
+            result = build_input_plan(
+                ods_package=args.ods_package,
+                model_path=args.model,
+                output=args.output,
+                mode=args.mode,
+                run_id=args.run_id,
+                knowledge_cutoff=args.knowledge_cutoff,
+                code_revision=args.code_revision,
+                runtime_id=args.runtime_id,
+                market_date=args.market_date,
+                through_date=args.through_date,
+                capacity_root=args.capacity_root,
+                input_identity_override=args.input_identity_override,
+                monthly_consumer_contract=args.monthly_consumer_contract,
+                monthly_budget=budget,
+            )
+    except (WarehousePlanningError, BoundedError, SourceAssessmentError, OSError) as exc:
         print(f"DWD/DWS input planning failed: {exc}", file=sys.stderr)
         return 2
     print(

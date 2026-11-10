@@ -144,6 +144,28 @@ evidence starts with the first accepted DWD release after activation.
 
 ## 3. Data platform and storage design
 
+The 2026-11-11 integration checkpoint retains CN02 Daily/Recovery at pipeline revision `76b242de1752d5dfd448f32a3ccbec2e9087071a` and the existing release image. Base 2.5.1 is sealed with materialization `adce892e` and audit `19e2926a`; [#600](https://github.com/rv198-star/Quanthus/issues/600) records the receipts and [#601](https://github.com/rv198-star/Quanthus/issues/601) retains the deferred independent-node reconstruction. This source integration changes no deployed entry or consumer admission.
+
+The following placement paragraph preserves the 2026-10-20 migration design. The later CN02-only ownership in the linked work item governs current responsibility; earlier distributed topology descriptions below remain historical.
+
+The Owner's 2026-10-20 target placement consolidates the entire Quanthus project on
+CN02, replacing CN01's acquisition/build role and OCI's application/platform role.
+The target Daily path uses daily and supplier-native 5m on T after close; T+1 is
+recovery/revision only. Required OCI functions and referenced state are selected
+for migration; obsolete services and historical image inventories are not copied
+wholesale. Data readiness on T does not change the T+1-open execution profile.
+The current migration sequence preserves selected OCI data first; application and
+system rebuilds are deferred until development needs them. Data preservation does
+not establish application restoration or node cutover.
+Base 2.4 is its data foundation, not proof of that whole-project migration. The
+[CN02 migration work item](../work-items/cn02-project-migration.md) owns the exact
+deployment inventory, database/artifact and secret continuity, resource/architecture
+qualification, isolated acceptance, single-writer cutover and rollback preparation.
+This target does not claim that services, endpoints or current data writers have
+already moved. Until the separately confirmed cutover, installed roles and all
+frozen data, research and activation gates remain effective. P10 and business-line
+ownership do not change with node placement.
+
 The current file-first analytical architecture is distributed across CN01, Hermes, and OCI and is
 governed by ADR 0007:
 

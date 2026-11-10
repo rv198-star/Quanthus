@@ -1,0 +1,13 @@
+# Code-only hotfix: use the verified immutable production runtime, not a new dependency resolution.
+ARG RUNTIME_IMAGE
+FROM ${RUNTIME_IMAGE}
+ARG PIPELINE_REVISION
+ARG DATA_UID=998
+ARG DATA_GID=998
+USER 0
+LABEL org.opencontainers.image.revision="${PIPELINE_REVISION}"
+# Existing files are deliberately not deleted. Exact inventory verification rejects stale extras.
+COPY pipeline /opt/pipeline
+RUN python -c "from pathlib import Path; from quanthus.pipelines.securities_warehouse.container_code import verify_bundle; from quanthus.pipelines.securities_warehouse.daily_base24_provider import COLLECTOR; verify_bundle(Path('/opt/pipeline'), '${PIPELINE_REVISION}'); verify_bundle(Path('/opt/collector'), COLLECTOR)" \
+    && chmod -R a-w /opt/pipeline
+USER ${DATA_UID}:${DATA_GID}

@@ -1,0 +1,24 @@
+{
+  "contract_id": "p10-base22-raw-equivalent-financial-precision-union-v2",
+  "purpose": "P10 isolated financial history TMP; not Base22 or consumer admission",
+  "tables": ["dwd_financial_report", "dwd_financial_fact"],
+  "affected_years": [2024, 2025, 2026],
+  "business_cutoff": "2026-08-31",
+  "business_timezone": "Asia/Shanghai",
+  "prerequisites": [
+    "complete original July ODS raw members with original manifest identity",
+    "complete qualified current raw/typed captures and actual two cold receipts",
+    "immutable dated parent company/security/identifier closure",
+    "exact selected member hashes, schemas, row counts and version keys"
+  ],
+  "equal_version_rule": "Same provider/revision, exact complete report body, same qualified parent availability floor, and all typed non-provenance/non-publication/non-end atoms equal. Preserve native version; retain complete incoming capture in local evidence. This grants no conflicting value priority.",
+  "knowledge_from": "Keep the existing model max(original provider observation, dated company identity availability). Actual acquisition clocks remain separate in original raw evidence; a common parent floor never makes two acquisitions identical.",
+  "publication_precision": "Only an original raw date-only token and its exact legacy derived Shanghai end-of-day bound authorize published_at=NULL. Retain the raw date token, complete body, old bound and actual repair observation in local evidence. Genuine timestamp instants remain unchanged.",
+  "knowledge_to": "Close only at the exact next kept same-business-key knowledge clock when earlier than the original end; preserve finite gaps.",
+  "proof": "Cold rederive the shared bridge once from all local original/current raw members and pinned dated parent mapping, then compare every retained typed atom in each year. Verify global keys, intervals, all report/fact parents, schema and physical partition set separately.",
+  "representation": "Original typed captures and raw evidence are independent entity files. Sort only keys, clocks and row ordinals; stream typed Parquet. No full-history JSON/SQLite, source links, external fallback or READY.",
+  "historical_PIT_admission": false,
+  "consumer_admission": "NOT_GRANTED",
+  "legacy_union_v1_equal_clock_rejection_preserved": true,
+  "complete_Base22": false
+}

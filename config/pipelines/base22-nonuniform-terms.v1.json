@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "contract_id": "p10-base22-native-literal-nonuniform-terms-v1",
+  "scope": "candidate_intermediate_only",
+  "base_contract_sha256": "sha256:a57938ee94a91510133cbfbe78373c32c38673a5a3780dd759d250d8ddefe97c",
+  "table": "dwd_corporate_action_term",
+  "physical_schema": "unchanged_pinned_v1_1",
+  "priority_id": "implemented_issuer_literal_population_claims_replace_ambiguous_scalar-v1",
+  "term_type_prefix": "SOURCE_DECLARED_NONUNIFORM_",
+  "per_one_declared_cash": "amount_per_share_original_literal_CNY; tax_unavailable_label_never_means_gross",
+  "per_source_denominator_cash": "currency_CNY_ratio_numerator_literal_money_ratio_denominator_literal_share_count_amount_per_share_NULL",
+  "per_source_denominator_transfer": "currency_NULL_ratio_numerator_literal_share_count_ratio_denominator_literal_share_count",
+  "printed_scope_recap": "separate_source_summary_not_extra_additive_component_or_inferred_total",
+  "population_meaning": "original_source_population_witness_no_actual_membership_inference",
+  "unknown_tax_basis": "retain_source_not_explicitly_declared_no_generic_gross_cash_qualification",
+  "revision_rule": "close_complete_exact_native_action_and_term_group_open_real_governance_version_preserve_old_atoms",
+  "virtual_average_FX_compensation_entitlement_calculation": "forbidden",
+  "consumer_admission": "NOT_GRANTED",
+  "full_image_integration": "SEPARATE_GATE"
+}

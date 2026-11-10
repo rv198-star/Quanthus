@@ -1,0 +1,19 @@
+{
+  "schema_version": 2,
+  "contract_id": "p10-base22-holder-exact-v2",
+  "purpose": "isolated_governance_holder_observations",
+  "parent_contract_sha256": "sha256:a57938ee94a91510133cbfbe78373c32c38673a5a3780dd759d250d8ddefe97c",
+  "approved_draft_sha256": "sha256:a9329f73c81e6ba34fbf287ca5a5922faef1d5605e53429d613b074c89a41059",
+  "table": "dwd_shareholder_count_observation",
+  "field": {"name": "average_holding_exact", "precision": 38, "scale": 11, "nullable": true},
+  "old_field": {"name": "average_holding", "precision": 38, "scale": 10, "nullable": true},
+  "raw_field": "raw_average_holding",
+  "column_rule": "exact_when_representable_else_null_with_per_row_evidence",
+  "unsupported_both_columns": "fail_closed",
+  "maximum_scope_rows": 32768,
+  "through_date": "2026-08-31",
+  "business_timezone": "Asia/Shanghai",
+  "sealed_legacy_data": "unchanged",
+  "source_admission": "NOT_GRANTED_BY_SCHEMA",
+  "consumer_admission": "NOT_GRANTED"
+}

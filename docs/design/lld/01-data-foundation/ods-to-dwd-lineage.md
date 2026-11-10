@@ -249,6 +249,31 @@ ODS `weekly-corrections` 在周六 08:00 运行。`cn01-dwd-weekly-input` 仅能
 并把规范化 v3 公司行动封装到 correction 的 replay 面。它验证了不可变 correction 的最小
 合同，但不代表上述自动周更 transform、调度和发布已启用。
 
+### 7.1 规范化 revision 证据保全（P10 / #471）
+
+新建 correction 使用 manifest schema v2，并在原 `payload/replay/` 下保留完整的
+normalization revision：两个既有 Parquet、原 `manifest.json`、`audit_report.json`、
+`exception_changes.json` 和 `CHECKSUMS.sha256`。六个成员按原字节复制，不重新序列化
+源 manifest；全部纳入 correction 文件清单、大小、SHA-256 和版本化 content digest。
+源 manifest 的精确 SHA 仍由 `normalization_revision.manifest_sha256` 绑定；v2 另以
+`checksum_ledger_sha256` 绑定校验清单原字节，并对六个成员的复制前后 SHA 逐项核对。
+
+构建图为“验证源 revision → 生成 overlay 并复制一次 replay 成员/元数据 → 验证 staging
+闭包与 overlay → 原子发布”。`READY` 仅在未公开的 staging 中写入；任何验证失败均清理
+staging，不能先发布再返回验证错误。复验绑定 revision/kind/schema、实际 scope、policy、
+source/report/exception lineage、成员 checksum 与行数，且各层 `execution_authorized=false`；
+缺失、漂移、重复 checksum/JSON key、非规范路径或 symlink 均 fail closed。常规 v2 校验也
+校验完整 revision；`deep` 另验证 overlay。原始 scope 不从文件名推断，消费者仍须验证
+自己的冻结窗口、PIT 和分区门禁。
+
+该闭包保全 normalization revision 的证据，不表示其全部上游 raw sources 已一并复制。
+旧 schema v1 保持不可变兼容读取，结果明确为 `legacy_manifest_unretained`，不能获得
+v2 的 `verified_normalization_revision_closure` 资格。历史 correction-001 和引用的原
+normalization manifest SHA 不得改写或伪造；本预防性修复不恢复缺失原文、不关闭 #471，
+也不接受 P5 B 或启用生产。实现为 `src/quanthus/pipelines/securities_warehouse/dwd_correction.py`
+及 `src/quanthus/corporate_action_revision.py`；合成回归为
+`tests/unit/test_dwd_correction_source_closure.py`，生产/历史数据验收仍需独立证据。
+
 ## 8. 外键和回放主链
 
 ```mermaid

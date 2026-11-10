@@ -22,7 +22,7 @@ def encoded(value):
     return canonical(value) + b"\n"
 
 
-def seal(root):
+def seal(root, day="2026-10-08"):
     entries = []
     for p in sorted(root.rglob("*")):
         if p.is_file() and p.name not in {"manifest.json", "READY"}:
@@ -37,7 +37,7 @@ def seal(root):
         "kind": source.KIND,
         "schema_version": 1,
         "policy_id": "p10-trading-day-complete-daily-v1",
-        "market_date": "2026-10-08",
+        "market_date": day,
         "interval": "5m",
         "execution_authorized": False,
         "code_revision": "e" * 40,
@@ -48,7 +48,7 @@ def seal(root):
             "reference_digest"
         ],
         "source_ods_manifest_sha256": "sha256:" + "a" * 64,
-        "sealed_at": "2026-10-09T00:00:00+00:00",
+        "sealed_at": (datetime.fromisoformat(day) + timedelta(days=1)).isoformat() + "+00:00",
         "files": entries,
         "content_digest": digest(encoded(entries)),
     }
@@ -59,18 +59,22 @@ def seal(root):
 
 
 @pytest.fixture
-def original(tmp_path):
+def original(tmp_path, day="2026-10-08"):
     root = tmp_path / "native"
     root.mkdir()
     (root / "ods/raw").mkdir(parents=True)
     labels = []
     for hour, minute in [(9, 35), (13, 5)]:
         labels += [
-            (datetime(2026, 10, 8, hour, minute) + timedelta(minutes=5 * i)) for i in range(24)
+            (
+                datetime.fromisoformat(day).replace(hour=hour, minute=minute)
+                + timedelta(minutes=5 * i)
+            )
+            for i in range(24)
         ]
     rows = [
         [
-            "2026-10-08",
+            day,
             x.strftime("%Y%m%d%H%M%S") + "000",
             "sz.000001",
             "2.0000000001",
@@ -88,7 +92,7 @@ def original(tmp_path):
             "frequency": "5",
             "adjustflag": "3",
             "code": "sz.000001",
-            "market_date": "2026-10-08",
+            "market_date": day,
             "fields": source.FIELDS.split(","),
             "rows": rows,
         }
@@ -97,18 +101,18 @@ def original(tmp_path):
     statuses = [
         {
             "stock_code": "000001",
-            "market_date": "2026-10-08",
+            "market_date": day,
             "quality_grade": "R0",
             "quality_reason": "native_48_exact_daily",
             "raw_sha256": digest(raw),
-            "source_acquired_at_or_after": "2026-10-08T18:00:00+08:00",
+            "source_acquired_at_or_after": day + "T18:00:00+08:00",
             "reference_ods_manifest_sha256": "sha256:" + "a" * 64,
             "formally_ingested": True,
             "default_research_admitted": True,
         },
         {
             "stock_code": "000002",
-            "market_date": "2026-10-08",
+            "market_date": day,
             "quality_grade": "SUSPENDED",
             "quality_reason": "sealed_daily_suspension_price_unavailable",
             "raw_sha256": None,
@@ -134,7 +138,7 @@ def original(tmp_path):
     ref = {
         "kind": "p10_complete_daily_job_reference_v3",
         "policy_id": "p10-trading-day-complete-daily-v1",
-        "market_date": "2026-10-08",
+        "market_date": day,
         "population": 2,
         "source_ods_manifest_sha256": "sha256:" + "a" * 64,
         "event_ods_manifest_sha256": "sha256:" + "b" * 64,
@@ -158,7 +162,7 @@ def original(tmp_path):
         values.append(
             {
                 "stock_code": "000001",
-                "market_date": "2026-10-08",
+                "market_date": day,
                 "source_ts": x.isoformat(),
                 "exchange_session_phase": "continuous",
                 **{k: Decimal("2.0000000001") for k in ["open", "high", "low", "close"]},
@@ -175,7 +179,7 @@ def original(tmp_path):
         pa.Table.from_pylist(values, schema=source.minute_schema()),
         root / "minute-real-observed.parquet",
     )
-    sha = seal(root)
+    sha = seal(root, day)
     inputs = {
         "market_daily_core": "sha256:" + "a" * 64,
         "calendar_daily_events": "sha256:" + "b" * 64,

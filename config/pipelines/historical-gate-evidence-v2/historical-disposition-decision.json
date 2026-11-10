@@ -1,0 +1,62 @@
+{
+  "recorded_at": "2026-11-06T06:40:00+08:00",
+  "scope": "MAINLINE_DISPOSITION_DECISION_FOR_FOUR_HISTORICAL_CASES",
+  "backfill_line_final_state": "EVIDENCE_CONVERGED, 0/4 DISPOSITIONS COMPLETE",
+  "backfill_package": {
+    "checksums": "23/23 OK",
+    "tar_sha256": "fe726bdadf4b1e5224a793d1fd6a85fa03aa89be496f78fe0eeb0869476ba530",
+    "tar_bytes": 142267,
+    "gdrive": "11 files uploaded with readback SHA match"
+  },
+  "cases": {
+    "002336/2020-06-17": {
+      "fact": "NO_TRADING_SUSPENDED",
+      "evidence": "SZSE official 0.00 wan-shares / 0.00 wan-CNY; Eastmoney and Tencent rows absent; Tushare relay daily row absent and 5m 0 buckets coverage=complete; Tushare 2020-06-16 volume 11,183.42 lots = 1,118,342 shares equals the frozen 2020-06-17 value digit-for-digit",
+      "decision": "APPLY_AUTHORIZED_VERSIONED_CORRECTION",
+      "correction": {"volume": "1118342 -> 0", "amount": "0 -> 0", "tradestatus": "0"},
+      "ledger": "JUSTIFIED_NO_DATA stands",
+      "rebuild": "targeted 2020-06 dwd_security_bar partition only",
+      "owner_authorization": "outputs/evidence/BASE25-OWNER-DAILY-REVISION-DECISION.json"
+    },
+    "002500/2020-06-17": {
+      "fact": "NO_TRADING_SUSPENDED",
+      "evidence": "SZSE official 0.00 / 0.00; Eastmoney and Tencent rows absent; Tushare 2020-06-16 volume 389,453.09 lots = 38,945,309 shares equals the frozen 2020-06-17 value digit-for-digit",
+      "decision": "APPLY_AUTHORIZED_VERSIONED_CORRECTION",
+      "correction": {"volume": "38945309 -> 0", "amount": "0 -> 0", "tradestatus": "0"},
+      "ledger": "JUSTIFIED_NO_DATA stands",
+      "rebuild": "targeted 2020-06 dwd_security_bar partition only",
+      "owner_authorization": "outputs/evidence/BASE25-OWNER-DAILY-REVISION-DECISION.json"
+    },
+    "688065/2023-06-15": {
+      "fact": "TRADED",
+      "evidence": "Baostock OHLCV + Eastmoney + Tencent + Tushare relay all confirm trading; old JUSTIFIED_NO_DATA/daily_status_not_tradable justification is false",
+      "supplementary_5m": "48 buckets obtained and internally consistent with paired daily (353,426 shares / 19,589,786 CNY)",
+      "qualification": "REJECTED_AS_WHOLE_SOURCE: 40 security-day study; relay daily agrees with frozen 5m sum on 36/38 days, but relay 5m cross-agrees on only 13/38; label convention splits 20/18 with no board/day rule; opening-bucket deviations explain 0/38 days; target day 2023-06-15 has no overlap day",
+      "decision": "KEEP_PENDING_DO_NOT_ADOPT_SUPPLEMENT",
+      "ledger_note": "old justification is invalid; true state is minute data missing despite trading (UNRESOLVED/R3 in nature), but the current gate contract only permits PENDING and any formal re-grade is a versioned contract change",
+      "further_relay_collection": "STOP - marginal return low; only new external authoritative evidence can change the verdict",
+      "paths_forward": [
+        "external authoritative evidence: exchange or licensed Level-1/2 native 5m, supplier authority statement, or a frozen minute source extended to 2023-06-15",
+        "explicit Owner decision to accept a permanent historical limitation for this single coordinate (gate change, not taken)"
+      ]
+    },
+    "302132/2025-02-17": {
+      "fact": "TRADED",
+      "evidence": "frozen daily 17,537,251 shares confirmed by Tushare relay 175,372.51 lots; frozen 48-bucket 5m sum 17,537,300 (+49) and every bucket is a multiple of 100; relay 5m itself is +131,195 vs its own daily",
+      "decision": "APPLY_AUTHORIZED_CONTRACT_DECLARATION",
+      "declaration": "minute volume is lot-granular; the +49 difference is a minute-granularity artifact, not a daily error",
+      "data_change": "none",
+      "owner_authorization": "outputs/evidence/BASE25-OWNER-DAILY-REVISION-DECISION.json"
+    }
+  },
+  "backfill_line": "CLOSE - evidence converged; further data acquisition has low marginal return",
+  "four_cases_status": "0/4 ADMITTED",
+  "B_seal_authorized": false,
+  "consumer_switch": false,
+  "next_mainline_actions": [
+    "implement versioned historical-corrections contract and knowledge-version overlay for 002336/002500",
+    "add regression, fix on GitHub, targeted 2020-06 partition rebuild, re-audit",
+    "implement 302132 minute-lot-granularity contract declaration",
+    "keep 688065 PENDING and wait for external authoritative evidence or an explicit Owner limitation decision"
+  ]
+}

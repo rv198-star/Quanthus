@@ -9707,6 +9707,43 @@
         "TRACE"
       ],
       "no_change_reason": "Index and view maintenance only; prior TRACE mechanism and maturity retained."
+    },
+    {
+      "id": "CP-628-20261111T195818439642Z",
+      "recorded_at": "2026-11-11T19:58:18.439642+00:00",
+      "actor": "Codex A final checks and publication closeout",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "outcome": "no_module_change",
+      "summary": "A8955 checks and26-file private HF/CN02 readback complete;628 remains open and BCD not run.",
+      "evidence": [
+        {
+          "id": "A-PUBLISH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/retained/publish-readback.json",
+          "sha256": "e003f956b9e2d8ecb896b5846dc489130598058e825fc58847e3cb81f8377201",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Qualification-only26-file immutable HF readback and CN02 verification; capital BCD not run."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Final issue metadata, checks and evidence lifecycle only; scoped A engineering recorded in preceding checkpoint, previous signal quality/value retained.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-CAPITAL-001",
+          "number": 628,
+          "title": "[P3-RESEARCH-CAPITAL-001] 资格通过后完成固定动量候选的最小资金回放",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-11T19:58:08Z",
+          "body_sha256": "523a8b1ecb737e0a98d772673af18936306d65d42d6781e36d989b23bf8080b5"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
     }
   ]
 }

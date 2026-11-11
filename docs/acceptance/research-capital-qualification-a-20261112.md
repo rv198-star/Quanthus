@@ -49,4 +49,12 @@ CN02最终专项18通过，含真实DuckDB合成完整census与时区边界。�
 最终代码在CN02专项18通过（1.09秒）；修改范围Ruff通过。两份新增生产模块严格类型检查（follow-imports=silent）通过。
 首次展开依赖的类型检查另报告272条未改动依赖/缺stub诊断；本线新增的6条类型收窄诊断已修正，完整原始日志保留。
 旧代码上的完整检查中途停止，最终代码重新完整检查，分别记账；没有重做源census或关系补核。
-受影响blueprint/exploration元数据、精确PR base的追加历史检查均已通过。最终完整检查与发布回读事实在交付时追加。
+受影响blueprint/exploration元数据、精确PR base的追加历史检查均已通过。最终代码完整`make check`通过：8,955 passed / 35 skipped / 62 warnings，pytest790.02秒、整条make794.88秒；可选sklearn/torch等跳过在原始日志逐项保留。HF/CN02固定回读另有交付收据。
+
+## 固定发布与交付
+
+最终代码完整检查8,955通过/35跳过/62warnings（pytest790.02秒）。资格包一次原子发布至私有HF `rv192/quanthus-research-r1@011f8e929bbbca7076cb9377612441e93bf20e06`，目录`runs/RESEARCH-CAPITAL-QUAL-001/RESEARCH-CAPITAL-QUAL-001-T1/A1`。26文件/2,037,141B从固定提交逐文件回读一致；manifest SHA256 `dae7fd7d003c9886044fa769a7a67717078f69ffabe5ae006ac75d2707462d07`。
+
+CN02长期根`/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/retained/qualification-package`逐文件hash核对，收据为上一级`publish-readback.json`。资格包使用qualification-only schema，保留源census、关系、检查和失败记录。源码交付[PR #630](https://github.com/rv198-star/Quanthus/pull/630)，叠加于#629；最终代码2288文件闭包与文档/计划跟进逐字节一致，受影响计划检查重跑。
+
+A段资格调查与原型交付，完整资本资格BLOCKED，#628及R4保持OPEN，B/C/D未运行。留存责任人为CN02研究维护者；资格包及未解P10键长期保留，临时源/缓存2026-12-12起复核清理，审阅或消费者恢复需要时延长。

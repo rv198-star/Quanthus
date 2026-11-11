@@ -23,3 +23,11 @@
 A授权上限60分钟主动工作。启动错误、质量发现年份守卫修正、旧R1/R2返工和已消费2020–2021窗口全部保留；完整主动工时、Token和账单持续为unknown_not_zero，不推算原总线余款。
 
 代码与检查的准确身份、HF固定包和CN02留存入口见[资格与自审报告](../acceptance/research-capital-qualification-a-20261112.md)。代码走叠加PR，main集成保持原专线。
+
+## 固定发布与交付
+
+最终代码完整检查8,955通过/35跳过/62warnings（pytest790.02秒）。资格包一次原子发布至私有HF `rv192/quanthus-research-r1@011f8e929bbbca7076cb9377612441e93bf20e06`，目录`runs/RESEARCH-CAPITAL-QUAL-001/RESEARCH-CAPITAL-QUAL-001-T1/A1`。26文件/2,037,141B从固定提交逐文件回读一致；manifest SHA256 `dae7fd7d003c9886044fa769a7a67717078f69ffabe5ae006ac75d2707462d07`。
+
+CN02长期根`/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/retained/qualification-package`逐文件hash核对，收据为上一级`publish-readback.json`。资格包使用qualification-only schema，保留源census、关系、检查和失败记录。源码交付[PR #630](https://github.com/rv198-star/Quanthus/pull/630)，叠加于#629；最终代码2288文件闭包与文档/计划跟进逐字节一致，受影响计划检查重跑。
+
+A段资格调查与原型交付，完整资本资格BLOCKED，#628及R4保持OPEN，B/C/D未运行。留存责任人为CN02研究维护者；资格包及未解P10键长期保留，临时源/缓存2026-12-12起复核清理，审阅或消费者恢复需要时延长。

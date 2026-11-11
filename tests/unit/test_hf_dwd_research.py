@@ -813,7 +813,7 @@ def test_r2_closed_band_edges(synthetic, r2_request):
         c.close()
 
 
-def test_r2_pairing_weights_and_disjoint_reason_accounting(r2_request):
+def test_r2_pairing_weights_and_disjoint_reason_accounting(r2_request, tmp_path, monkeypatch):
     from quanthus.hf_dwd_research_sql import momentum_markout
 
     c = duckdb.connect()
@@ -857,6 +857,25 @@ def test_r2_pairing_weights_and_disjoint_reason_accounting(r2_request):
     assert sum(x["count"] for x in result["label_ledger"]) == len(rows)
     reasons = {x["reason"] for x in result["label_ledger"]}
     assert reasons == {"pass", "missing_or_invalid_next_close", "nonfinite_response"}
+    monkeypatch.syspath_prepend(str(ROOT / "scripts"))
+    from research_r2_independent_audit import evaluate
+
+    frame = (
+        c.execute("SELECT * FROM labelled ORDER BY trade_date,venue_id")
+        .df()
+        .rename(
+            columns={
+                "trade_date": "day",
+                "next_open": "next_op",
+                "next_close": "next_px",
+                "next_open_reason": "reason",
+            }
+        )
+    )
+    frame["momentum20"] = frame.selected.map({True: 0.05, False: 0.0})
+    assert evaluate(r2_request, frame, {"metrics": result}, tmp_path, 0) == 0
+    result["paired_cells"][0]["candidate_count"] += 1
+    assert evaluate(r2_request, frame, {"metrics": result}, tmp_path, 0) == 2
     c.close()
 
 

@@ -8656,6 +8656,30 @@
           "body_sha256": "caa1eb55e38b5e171007abeb30c9f0d05978e646001dac03fc386f473744e06e"
         }
       ]
+    },
+    {
+      "id": "CP-3-PR595-REVIEW-20261111",
+      "recorded_at": "2026-11-11T14:47:19.617717+00:00",
+      "actor": "Codex; Owner authorized PR595 review, repair and merge",
+      "work_item": "META-GATE-001",
+      "outcome": "no_module_change",
+      "summary": "在当前main复审本地验收工具，修复editable安装元数据误拒绝和teardown skip重复计数；原版两项失败、修订后44项回归通过，完整命令验收另行记录。",
+      "evidence": [
+        {
+          "id": "REVIEW-REGRESSION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/historical-pr595-pr599-20261111/PR595-FOCUSED.json",
+          "sha256": "d58a280b5b6048abf043197b019489c6a77e7c0bc80eb6f668d26104277ab9ba",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本地验收工具的聚焦工程回归和格式检查；完整当前main运行待执行。"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "交付同一限定工程工具的兼容性与结果计数修复；保留既有TRACE模块等级。"
     }
   ]
 }

@@ -79,7 +79,7 @@ def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
         "schema_version": "quanthus.local-pytest-result.v1",
         "exit_status": int(exitstatus),
         "collected": session.testscollected,
-        "passed": len(_passed - _failed - _errors),
+        "passed": len(_passed - _failed - _errors - set(_skipped)),
         "failed": len(_failed),
         "errors": len(_errors),
         "skipped": len(_skipped),

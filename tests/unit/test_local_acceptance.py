@@ -58,7 +58,7 @@ def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         root / "src/quanthus/local_acceptance_pytest.py",
     )
     (root / "Makefile").write_text("check:\n\t$(PYTHON) -m pytest -q\n")
-    (root / ".gitignore").write_text("__pycache__/\n.pytest_cache/\n*.ignored\n")
+    (root / ".gitignore").write_text("__pycache__/\n.pytest_cache/\n*.ignored\n*.egg-info/\n")
     (root / "tests/test_sample.py").write_text(
         "import pytest\n"
         "def test_pass(tmp_path):\n"
@@ -124,7 +124,17 @@ def test_missing_or_corrupt_member_is_rejected(
 
 @pytest.mark.parametrize(
     "change",
-    ["source", "config", "test", "dependency", "commit", "runtime", "selection", "ignored_source"],
+    [
+        "source",
+        "config",
+        "test",
+        "dependency",
+        "commit",
+        "runtime",
+        "selection",
+        "ignored_source",
+        "editable_metadata",
+    ],
 )
 def test_semantic_or_commit_changes_reject_reuse(
     repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str
@@ -158,9 +168,11 @@ def test_semantic_or_commit_changes_reject_reuse(
             "dependency": "requirements.lock",
             "selection": "pytest.ini",
             "ignored_source": "src/extra.ignored",
+            "editable_metadata": "src/quanthus.egg-info/PKG-INFO",
         }
+        (repository / paths[change]).parent.mkdir(parents=True, exist_ok=True)
         (repository / paths[change]).write_text("# changed\n")
-        if change != "ignored_source":
+        if change not in {"ignored_source", "editable_metadata"}:
             commit(repository)
     with pytest.raises(local.AcceptanceError):
         local.verify(repository, job)
@@ -423,3 +435,63 @@ def test_allocation_includes_directory_blocks(tmp_path: Path) -> None:
     (tmp_path / "ordinary-file").write_bytes(b"synthetic")
     expected = sum(p.lstat().st_blocks * 512 for p in [tmp_path, *tmp_path.rglob("*")])
     assert local.allocated(tmp_path) == expected
+
+
+def test_editable_install_metadata_is_bound(repository: Path) -> None:
+    metadata = repository / "src/quanthus.egg-info"
+    metadata.mkdir()
+    names = {
+        "src/quanthus.egg-info/" + name
+        for name in (
+            "PKG-INFO",
+            "SOURCES.txt",
+            "dependency_links.txt",
+            "entry_points.txt",
+            "requires.txt",
+            "top_level.txt",
+        )
+    }
+    for name in names:
+        (repository / name).write_text("synthetic installation metadata\n")
+    before = local.repository_identity(repository)
+    assert set(before["editable_metadata"]) == names
+    assert not local.git(repository, "status", "--porcelain")
+    (metadata / "PKG-INFO").write_text("changed metadata\n")
+    assert local.repository_identity(repository) != before
+
+
+@pytest.mark.parametrize("kind", ["unknown", "linked"])
+def test_editable_metadata_rejects_unknown_or_linked_files(repository: Path, kind: str) -> None:
+    metadata = repository / "src/quanthus.egg-info"
+    metadata.mkdir()
+    if kind == "unknown":
+        (metadata / "untracked.py").write_text("raise RuntimeError('unexpected code')\n")
+        reason = "UNTRACKED_SEMANTIC_INPUT"
+    else:
+        (metadata / "PKG-INFO").symlink_to(repository / "src/quanthus/__init__.py")
+        reason = "LINKED_INSTALL_METADATA"
+    with pytest.raises(local.AcceptanceError, match=reason):
+        local.repository_identity(repository)
+
+
+def test_teardown_skip_is_not_counted_as_a_fully_passed_test(
+    repository: Path, tmp_path: Path
+) -> None:
+    (repository / "tests/test_sample.py").write_text(
+        "import pytest\n"
+        "@pytest.fixture\n"
+        "def late_skip():\n"
+        "    yield\n"
+        "    pytest.skip('teardown dependency unavailable')\n"
+        "def test_skipped(late_skip, tmp_path):\n"
+        "    (tmp_path / 'retained').write_text('synthetic')\n"
+        "def test_pass(): pass\n"
+    )
+    commit(repository)
+    job = tmp_path / "teardown-skipped"
+    result = local.run(repository, job)
+    assert result["status"] == "PASS_WITH_SKIPS"
+    assert result["tests"]["passed"] == 1
+    assert result["tests"]["skipped"] == 1
+    assert result["tests"]["collected"] == 2
+    assert list((job / "tmp/pytest").rglob("retained"))

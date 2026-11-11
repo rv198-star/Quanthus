@@ -30,6 +30,17 @@ SCHEMA = "quanthus.local-acceptance-receipt.v1"
 PLUGIN = "quanthus.local_acceptance_pytest"
 FILES = ("inputs.json", "checks.log", "pytest.json", "receipt.json")
 CACHE_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+EDITABLE_METADATA = {
+    "src/quanthus.egg-info/" + name
+    for name in (
+        "PKG-INFO",
+        "SOURCES.txt",
+        "dependency_links.txt",
+        "entry_points.txt",
+        "requires.txt",
+        "top_level.txt",
+    )
+}
 
 
 class AcceptanceError(ValueError):
@@ -174,14 +185,24 @@ def repository_identity(root: Path) -> dict[str, Any]:
         executable = bool(path.stat().st_mode & 0o111)
         require(executable == (mode == "100755"), "DIRTY_TRACKED_MODE")
         files[name] = {"sha256": committed_digest(path, blob), "executable": executable}
+    editable_metadata = {}
     for area in ("src", "tests", "config", "scripts"):
         for path in walked_files(root / area):
-            require(str(path.relative_to(root)) in files, "UNTRACKED_SEMANTIC_INPUT")
+            name = str(path.relative_to(root))
+            if name in files:
+                continue
+            require(name in EDITABLE_METADATA, "UNTRACKED_SEMANTIC_INPUT")
+            require(path.resolve() == path and path.is_file(), "LINKED_INSTALL_METADATA")
+            editable_metadata[name] = {
+                "sha256": digest(path),
+                "mode": stat.S_IMODE(path.stat().st_mode),
+            }
     return {
         "root": str(root),
         "commit": git(root, "rev-parse", "HEAD").decode().strip(),
         "tree": git(root, "rev-parse", "HEAD^{tree}").decode().strip(),
         "files": files,
+        "editable_metadata": editable_metadata,
     }
 
 

@@ -21,12 +21,14 @@ def main() -> int:
         paths = hub.HfApi(token=False).list_repo_files(
             args.repo, repo_type="dataset", revision=args.revision
         )
+        prefix = (
+            "payload/dwd_security_bar/interval_size=1d/"
+            "observation_start_year=2005/"
+        )
         filename = next(
             path
             for path in sorted(paths)
-            if path.startswith(
-                "payload/dwd_security_bar/interval_size=1d/observation_start_year=2005/"
-            )
+            if path.startswith(prefix)
             and path.endswith(".parquet")
         )
     path = hub.hf_hub_download(

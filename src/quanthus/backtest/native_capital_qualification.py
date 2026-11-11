@@ -51,6 +51,8 @@ def member_table(name: str) -> str | None:
     if Path(name).is_absolute() or ".." in parts or not name.endswith(".parquet"):
         raise ValueError("unsafe native member")
     for part in parts:
+        if part.startswith("detected_at_year=") and parts[1] == "dwd_quality_exception":
+            continue
         if "_year=" in part:
             year = part.rsplit("=", 1)[1]
             allowed = (

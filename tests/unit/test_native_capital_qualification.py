@@ -122,3 +122,10 @@ def test_bounded_census_preserves_source_clock_and_directions(tmp_path):
     assert all(x["rows"] == 1 for x in result["tables"].values())
     assert result["tables"]["dwd_corporate_action"]["source_knowledge_after_business_date"] == 1
     assert result["relations"]["directional_states"] == [[True, False, True, 1]]
+
+
+def test_quality_discovery_year_is_not_market_business_time():
+    assert (
+        member_table("payload/dwd_quality_exception/detected_at_year=2026/a.parquet")
+        == "dwd_quality_exception"
+    )

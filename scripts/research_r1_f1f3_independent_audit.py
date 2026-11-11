@@ -370,7 +370,7 @@ def fault_probes(q, members, identity, seed, out):
 def candidate_days(q, out):
     import duckdb
 
-    from quanthus.hf_dwd_research_sql import SSE, TABLES, calculate
+    from quanthus.hf_dwd_research_sql import SSE, SZSE, TABLES, calculate
 
     results = []
     for left, right in ((0, 3), (2, 3), (3, 2), (3, 3), (4, 4)):
@@ -394,9 +394,10 @@ def candidate_days(q, out):
         db = duckdb.connect()
         db.execute(f"""
         CREATE TABLE dwd_trading_calendar AS
-        SELECT 's'||cast(d AS DATE) calendar_session_id, '{SSE}' venue_id,
+        SELECT venue_id||cast(d AS DATE) calendar_session_id, venue_id,
         cast(d AS DATE) trade_date,true is_open,NULL::TIMESTAMP knowledge_to
         FROM generate_series(DATE '2019-01-01',DATE '2021-01-08',INTERVAL 1 DAY) t(d)
+        CROSS JOIN (VALUES ('{SSE}'),('{SZSE}')) v(venue_id)
         WHERE dayofweek(d) BETWEEN 1 AND 5;
         CREATE TABLE dwd_listing AS SELECT 'L' listing_id,'S' security_id,'{SSE}' venue_id,
         DATE '2010-01-01' effective_from,NULL::DATE effective_to,NULL::TIMESTAMP knowledge_to;
@@ -407,7 +408,8 @@ def candidate_days(q, out):
           AND day(trade_date)-28 < {left} THEN 0.001
         WHEN trade_date BETWEEN DATE '2021-01-04' AND DATE '2021-01-07'
           AND day(trade_date)-4 < {right} THEN 0.001 ELSE 0.05 END)) OVER(ORDER BY trade_date)) px
-        FROM dwd_trading_calendar WHERE trade_date >= DATE '2020-01-02';
+        FROM dwd_trading_calendar WHERE trade_date >= DATE '2020-01-02'
+        AND venue_id='{SSE}';
         CREATE TABLE dwd_security_bar AS SELECT 'L' listing_id,calendar_session_id,
         trade_date observation_start,px AS "open",px AS "close",2e8 turnover,'1d' interval_size,
         'UNADJUSTED' price_basis,NULL::TIMESTAMP knowledge_to FROM prices;

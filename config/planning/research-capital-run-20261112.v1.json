@@ -81,5 +81,7 @@
     "max_new_bytes": 536870912,
     "network_requests": 200,
     "accounting_owner": "TPlan RESEARCH-CAPITAL-001; prior A/R1/R2 exposure/cost retained"
-  }
+  },
+  "execution_record": "docs/acceptance/research-capital-replay-20261112.md",
+  "execution_disposition": "GUARDED_CONSUMER_DELIVERED_COMPARISON_BLOCKED_AT_P10_KEY; original preflight identity and attempted evidence preserved"
 }

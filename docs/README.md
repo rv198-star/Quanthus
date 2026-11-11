@@ -35,7 +35,12 @@ It records the second resource decision and the scope of the next costed-replay 
 
 For the next capital comparison, see the [native seam and staged plan](design/research-capital-replay-plan-v1.md)
 and its [code/metadata review](acceptance/research-capital-seam-20261112.md).
-Successor #628 has delivered A input qualification and a thin prototype; full capital consumption is held for the P10 economic-event view. See the [A value brief](work-items/research-capital-qualification-a-value-brief.md). B/C/D remain unfunded.
+Successor #628 now delivers the guarded native capital consumer and an independently reconciled
+source-held run. Start with the [capital value brief](work-items/research-capital-replay-value-brief.md)
+and [execution/self-audit evidence](acceptance/research-capital-replay-20261112.md).
+The complete economic comparison awaits the encountered P10 action view; #628 remains open.
+The earlier [A qualification brief](work-items/research-capital-qualification-a-value-brief.md)
+is preserved as the prior stage snapshot.
 
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its

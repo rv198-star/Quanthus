@@ -1156,6 +1156,66 @@
         "CP-628-20261111T194217114480Z"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-CAPITAL-REPLAY-20261112",
+      "recorded_at": "2026-11-11T21:51:12.998523+00:00",
+      "actor": "Codex post-execution author audit; independent algorithm cold reference",
+      "question_id": "RESEARCH-CAPITAL-001-ECONOMIC-COMPARISON",
+      "family": "raw-momentum20-capital-replay",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "Does the fixed R2 momentum candidate clear its preregistered P2 capital-use gate?",
+      "consumer": "Research allocator and guarded native P2 capital consumer",
+      "scope": "2020-2021 consumed development window, fixed R2 band and disjoint control, fixed T sizing and minimum legal holding; original P10 source guards retained.",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Guarded consumer delivered and all committed receipts reconcile to an independently built Decimal referee. Candidate actual held action source conflict blocks full economic comparison; author self-review and algorithmic independence are recorded separately.",
+      "decision_effect": "Deliver bounded engineering; prioritize P10 existing556 exact on-path economic-event use mapping before further financial evaluation. Keep Worker deployment and additional strategy trials parked.",
+      "reopen_conditions": [
+        "Versioned P10 qualified composition/replacement/unknown use mapping for601186/2021-08-04, bound to exact source and genuine new knowledge clock.",
+        "New consumer input admission/recovery request with cumulative attempts/cost and finite new computation authority; original formal and both reference attempts preserved."
+      ],
+      "retained_assets": [
+        "src/quanthus/backtest/native_capital_replay.py",
+        "src/quanthus/backtest/capital_clock.py",
+        "scripts/research_capital_replay.py",
+        "scripts/research_capital_independent.py",
+        "config/research/research-capital/request.v1.json",
+        "config/research/research-capital/independent-recovery.v1.json",
+        "docs/work-items/research-capital-replay-value-brief.md",
+        "docs/acceptance/research-capital-replay-20261112.md"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Original remaining4h active envelope retained, no reset. Formal92.452s + failed independent73.953s + targeted recovery77.213s; source new download0B, peakRSS about3.41GB. Publication78files712321B full readback132.16s. A/R1/R2 failed attempts, reviews and2020-2021 exposure cumulative; complete active/token/billing costs unknown_not_zero.",
+      "attempt_refs": [
+        "git:10cf1d4b0d5c465afbbc667e363ff8f872a56149",
+        "git:aa0dbb8a47fcc83b12306d1ef2c164371cbae07f",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-replay-20261112/formal-a1",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-replay-20261112/independent-a1",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-replay-20261112/independent-a2",
+        "hf:rv192/quanthus-research-r1@0c049aa223232abf04d56261d170ad618443f3f0/runs/RESEARCH-CAPITAL-001/RESEARCH-CAPITAL-001-T1/A1"
+      ],
+      "evidence": [
+        {
+          "id": "CAPITAL-PUBLISH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-replay-20261112/retained/publish-readback.json",
+          "sha256": "3be70ed3743db6e8d3b1146662779411dab2bd58478614326127b7f67dad76f1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "78-file fixed private HF/CN02 package, exact producer and independent cold identities; all completed financial receipts agree, comparison source-held; author self-review, no second-agent audit."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-628-20261111T215015198548Z"
+      ],
+      "supersedes": null
     }
   ]
 }

@@ -9744,6 +9744,79 @@
         "REPRO",
         "CLOSEOUT"
       ]
+    },
+    {
+      "id": "CP-628-20261111T215015198548Z",
+      "recorded_at": "2026-11-11T21:50:15.198548+00:00",
+      "actor": "Codex post-execution author audit and independent-algorithm reconciliation",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "outcome": "blocked",
+      "summary": "B guarded native capital consumer delivered; formal and corrected cold reference reconcile exact on-path source hold; complete economic comparison parked at P10 #556.",
+      "evidence": [
+        {
+          "id": "CAPITAL-PUBLISH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-replay-20261112/retained/publish-readback.json",
+          "sha256": "3be70ed3743db6e8d3b1146662779411dab2bd58478614326127b7f67dad76f1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "78-file fixed private HF/CN02 package, exact producer and independent cold identities; all completed financial receipts agree, comparison source-held; author self-review, no second-agent audit."
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Native126-member capital consumer, explicit source/simulation clock and side-specific P2 path implemented; one formal and one corrected independent cold construction reconcile T nominal choices and all committed cash-cent/fill/order receipts; control full window completes.",
+          "remaining": "Full candidate comparison held at601186/2021-08-04 multi-record economic event; new versioned P10 use mapping, bounded recovery request, independent role review and main integration remain.",
+          "next_action": "P10 existing556 first resolves the actually encountered economic key from qualified retained evidence; retain original attempts/parameters/exposure and separately freeze necessary recovery.",
+          "evidence": [
+            "CAPITAL-PUBLISH"
+          ],
+          "supersedes": "CP-628-20261111T194217114480Z"
+        }
+      ],
+      "no_change_reason": "Prior R2 signal quality and CLOSEOUT value decisions retained. Source hold does not create a negative market label or economic adoption; no new FACTORS/CLOSEOUT facet update.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-CAPITAL-001",
+          "number": 628,
+          "title": "[P3-RESEARCH-CAPITAL-001] 资格通过后完成固定动量候选的最小资金回放",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-11T21:49:27Z",
+          "body_sha256": "843030fefb0f8d51cd8ffc15bc220e1538544b8d33c644e2065df5b848977111"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-2-CAPITAL-REPLAY-INDEX-20261112",
+      "recorded_at": "2026-11-11T21:51:36.532411+00:00",
+      "actor": "Codex capital replay closeout",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "Refresh retired next proposal index after guarded capital consumer and source-held comparison; TRACE mechanism unchanged.",
+      "evidence": [
+        {
+          "id": "CAPITAL-PUBLISH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-replay-20261112/retained/publish-readback.json",
+          "sha256": "3be70ed3743db6e8d3b1146662779411dab2bd58478614326127b7f67dad76f1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "78-file fixed private HF/CN02 package, exact producer and independent cold identities; all completed financial receipts agree, comparison source-held; author self-review, no second-agent audit."
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "Conclusion/index maintenance only. Current main META-GATE-001 no-change TRACE observations reviewed via exact GitHub API snapshot; preserve both histories in the designated integration line. No TRACE mechanism or maturity upgrade."
     }
   ]
 }

@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved for Owner continuation under the versioned guarded contract |
-| Delivery gate | blocked — native input/clock/action qualification and successor tranche allocation |
+| Delivery gate | accepted-conditional for the guarded consumer; complete economic comparison blocked on the encountered P10 action key; [execution evidence](../acceptance/research-capital-replay-20261112.md) |
 | Parent | [Exploration governance](exploration-governance.md) |
 | Seam work item | P3-RESEARCH-REPLAY-001 / #627; bus #608 |
 | Successor | P3-RESEARCH-CAPITAL-001 / [#628](https://github.com/rv198-star/Quanthus/issues/628); milestone 18 |
@@ -12,7 +12,7 @@
 | Reused core | `src/quanthus/backtest/strategy_replay.py`, `engine.py`, `policy.py` |
 | Source inspection | `src/quanthus/backtest/direct_dwd_provider.py`, `base24_semantic_projection.py`, `historical_frames.py`, `baseline_research.py` |
 
-## 1. 本段得到的决定
+## 1. 历史：接缝段得到的决定
 
 R2 已形成一个明确候选：原20日未复权动量[2%,12%]对次日盘中响应的增量6.4101bp。
 本次获批的是最多30分钟的代码/元数据接缝与预登记。已核对代码及固定HF manifest，
@@ -198,3 +198,10 @@ DAG为固定源逐成员核验→一次共享T特征和原生执行事实TMP→�
 正式比较和独立冷建各一次；资源守卫、停止、回传和最终审计按新请求封顶。
 
 无ex_date的已实施行动不以effective_at占位日期（包括周末）定位：该证券在本固定窗内关闭新入场并阻断持仓消费。现金分红沿P2既有ex_date入账；payment_date应收款与股息税时序不进入本次固定来源条件回放。
+
+## 10. 本次执行后的恢复入口
+
+受控消费者和独立算法核对已交付；具体运行及最终检查见[执行后自审报告](../acceptance/research-capital-replay-20261112.md)。
+候选2021-08-04于601186的三条分红记录受阻，完整收益差保持待评价。原正式运行和参照失败/恢复保留。
+P10 #556先交付该经济键的版本化用途解释；研究恢复再绑定合格用途版本、重新冻结请求及次数，继续累计旧成本。
+不因一次source hold要求全市场全部质量债清零。代码main集成保持原专线，Worker暂不新增部署。

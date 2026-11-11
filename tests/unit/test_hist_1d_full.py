@@ -78,6 +78,29 @@ def test_conflicting_reference_values_fail_instead_of_picking_parent(connection)
         merge_reference(connection, "status", "status_id")
 
 
+def test_unknown_source_interval_may_extend_hist_narrowed_regime(connection):
+    _status(connection)
+    connection.execute("UPDATE h_status SET status_value='UNKNOWN' WHERE status_id='inherited'")
+    connection.execute("UPDATE b_status SET status_value='UNKNOWN',effective_from='1999-01-01'")
+    for prefix in ("h", "b"):
+        connection.execute(
+            f"CREATE VIEW {prefix}_dwd_security_status_interval AS SELECT * FROM {prefix}_status"
+        )
+    result = connection.execute(
+        merge_reference(connection, "dwd_security_status_interval", "status_id")
+    ).fetchall()
+    inherited = next(row for row in result if row[0] == "inherited")
+    assert inherited[2].year == 1999
+    assert inherited[4] == "UNKNOWN"
+
+
+def test_known_status_cannot_gain_an_earlier_unqualified_interval(connection):
+    _status(connection)
+    connection.execute("UPDATE b_status SET effective_from='1999-01-01'")
+    with pytest.raises(ValueError, match="REFERENCE_PARENT_CONFLICT"):
+        merge_reference(connection, "status", "status_id")
+
+
 @pytest.mark.parametrize("relative", ["hist/output", "base/output", "hist", "."])
 def test_output_may_not_modify_parent_or_ancestor(tmp_path, relative):
     hist, base = tmp_path / "hist", tmp_path / "base"

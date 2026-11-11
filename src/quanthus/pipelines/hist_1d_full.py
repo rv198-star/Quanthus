@@ -40,11 +40,18 @@ def bind(connection: Any, name: str, directory: Path) -> list[Path]:
 def merge_reference(connection: Any, table: str, key: str) -> str:
     """Base retains its full intervals; Hist contributes only additional observations."""
     columns = [row[0] for row in connection.execute("DESCRIBE h_" + table).fetchall()]
-    compare = [name for name in columns if name not in {"effective_to"}]
+    compare = [name for name in columns if name not in {"effective_from", "effective_to"}]
     changed = " OR ".join(f'h."{name}" IS DISTINCT FROM b."{name}"' for name in compare)
+    unknown_extension = (
+        "h.status_value='UNKNOWN'" if table == "dwd_security_status_interval" else "false"
+    )
     n = connection.execute(
         f"SELECT count(*) FROM h_{table} h JOIN b_{table} b "
-        f"USING({key},knowledge_from) WHERE {changed}"
+        f"USING({key},knowledge_from) WHERE ({changed}) "
+        "OR h.effective_from<b.effective_from "
+        "OR (b.effective_to IS NOT NULL AND "
+        "(h.effective_to IS NULL OR h.effective_to>b.effective_to)) "
+        f"OR (h.effective_from<>b.effective_from AND NOT ({unknown_extension}))"
     ).fetchone()[0]
     if n:
         raise ValueError("REFERENCE_PARENT_CONFLICT:" + table)

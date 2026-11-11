@@ -93,12 +93,119 @@ def hf_private(candidate: Path, secret: Path, receipt: Path, repo: str) -> None:
     print(json.dumps(result), flush=True)
 
 
-def drive_backup(packs: Path, helper: Path, parent: str, receipt: Path) -> None:
+def hf_public(root: Path, secret: Path, receipt: Path, repo: str, expected_parent: str) -> None:
+    verified = verify_manifest(root)
+    manifest = json.loads((root / "manifest.json").read_bytes())
+    ready = json.loads((root / "READY").read_bytes())
+    if (
+        manifest["status"] != "READY"
+        or ready["status"] != "READY"
+        or ready["acceptance_sha256"] != file_sha256(root / "ACCEPTANCE.json")
+        or ready["contract_sha256"] != file_sha256(root / "contract.json")
+    ):
+        raise ValueError("RELEASE_READY_BINDINGS_INVALID")
+    settings = {}
+    for line in secret.read_text().splitlines():
+        parts = shlex.split(line)
+        if parts and "=" in parts[-1]:
+            key, value = parts[-1].split("=", 1)
+            settings[key] = value
+    api = importlib.import_module("huggingface_hub").HfApi(token=settings["HF_TOKEN"])
+    commit = api.upload_folder(
+        repo_id=repo,
+        repo_type="dataset",
+        folder_path=str(root),
+        parent_commit=expected_parent,
+        commit_message="Publish Hist-1D v1 with accepted binary ST scope",
+    )
+    api.update_repo_settings(repo, repo_type="dataset", private=False)
+    if api.repo_info(repo, repo_type="dataset", revision=commit.oid).private:
+        raise RuntimeError("PUBLIC_VISIBILITY_VERIFICATION_FAILED")
+    result = {
+        "status": "PUBLIC_READY_RELEASE",
+        "repo": repo,
+        "revision": commit.oid,
+        "local_verification": verified,
+        "acceptance_profile": ready["profile"],
+    }
+    save(receipt, result)
+    print(json.dumps(result), flush=True)
+
+
+def release_delta(
+    root: Path, previous: Path, workspace: Path, output: Path, prior_backup: Path, publication: Path
+) -> None:
+    verified = verify_manifest(root)
+    prior = verify_manifest(previous)
+    old = {
+        x["path"]: x["sha256"]
+        for x in json.loads((previous / "manifest.json").read_bytes())["members"]
+    }
+    current = json.loads((root / "manifest.json").read_bytes())
+    changed = [x["path"] for x in current["members"] if old.get(x["path"]) != x["sha256"]]
+    changed.append("manifest.json")
+    backup = json.loads(prior_backup.read_bytes())
+    if backup["status"] != "ALL_OBJECTS_FULL_READBACK_PASSED":
+        raise ValueError("PREDECESSOR_BACKUP_NOT_VERIFIED")
+    output.mkdir(parents=True, exist_ok=False)
+    with tarfile.open(output / "HIST1D-RELEASE-OVERLAY.tar.gz", "w:gz", compresslevel=1) as archive:
+        for name in sorted(changed):
+            archive.add(root / name, arcname=name, recursive=False)
+    sources = [p for p in (workspace / "raw/baostock-status").rglob("*") if p.is_file()]
+    sources.extend(p for p in workspace.glob("BINARY-STATUS-*.json") if p.is_file())
+    if any(p.is_symlink() for p in sources):
+        raise ValueError("STATUS_RAW_SYMLINK")
+    save(output / "RAW-MEMBERS.json", {"members": [member(workspace, p) for p in sorted(sources)]})
+    with tarfile.open(
+        output / "HIST1D-BINARY-STATUS-RAW.tar.gz", "w:gz", compresslevel=1
+    ) as archive:
+        for source in sorted(sources):
+            archive.add(source, arcname=source.relative_to(workspace), recursive=False)
+    save(
+        output / "PREDECESSOR-BACKUP.json",
+        {"candidate_manifest": prior, "backup": backup, "release_manifest": verified},
+    )
+    save(output / "PUBLICATION-RECEIPT.json", json.loads(publication.read_bytes()))
+    (output / "RESTORE.md").write_text("""# Restore Hist-1D v1
+
+1. Verify and extract hist-1d-candidate.tar from PREDECESSOR-BACKUP.json.
+2. Verify and extract HIST1D-RELEASE-OVERLAY.tar.gz into its hist-1d-candidate folder.
+3. Run python -m quanthus.pipelines.hist_1d_release --verify RESTORED_FOLDER.
+4. Restore prior raw-supplement and HIST1D-BINARY-STATUS-RAW.tar.gz separately;
+   validate original/new raw member SHA256 manifests. Raw paths are workspace-relative.
+
+The immutable predecessor and this overlay form the complete release snapshot.
+PUBLICATION-RECEIPT.json binds its public dataset revision and anonymous readback.
+""")
+    objects = [member(output, p) for p in sorted(output.iterdir()) if p.name != "RAW-MEMBERS.json"]
+    save(
+        output / "BACKUP-MANIFEST.json",
+        {"status": "RELEASE_WITH_VERIFIED_PREDECESSOR", "release": verified, "objects": objects},
+    )
+    print(
+        json.dumps(
+            {
+                "release": verified,
+                "changed_members": len(changed),
+                "new_backup_bytes": sum(x["bytes"] for x in objects),
+            }
+        ),
+        flush=True,
+    )
+
+
+def drive_backup(
+    packs: Path,
+    helper: Path,
+    parent: str,
+    receipt: Path,
+    folder_name: str = "quanthus-hist-1d-candidate-20261111-a1",
+) -> None:
     # Import generic methods only. The legacy helper's Base-specific main is never invoked.
     namespace = runpy.run_path(str(helper), run_name="hist1d_drive_helper")
     drive = namespace["Drive"]()
     drive_error = namespace["DriveFailure"]
-    folder = drive.folder(parent, "quanthus-hist-1d-candidate-20261111-a1")
+    folder = drive.folder(parent, folder_name)
     manifest = json.loads((packs / "BACKUP-MANIFEST.json").read_bytes())
     paths = [packs / row["path"] for row in manifest["objects"]]
     paths.extend([packs / "RAW-MEMBERS.json", packs / "BACKUP-MANIFEST.json"])
@@ -124,7 +231,7 @@ def drive_backup(packs: Path, helper: Path, parent: str, receipt: Path) -> None:
                                 body=block,
                                 headers={
                                     "Content-Length": str(len(block)),
-                                        "Content-Range": f"bytes {position}-{last_byte}/{size}",
+                                    "Content-Range": f"bytes {position}-{last_byte}/{size}",
                                 },
                                 timeout=180,
                             ) as response:
@@ -179,7 +286,9 @@ def drive_backup(packs: Path, helper: Path, parent: str, receipt: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["pack", "hf-private", "drive-backup"])
+    parser.add_argument(
+        "action", choices=["pack", "hf-private", "hf-public", "release-delta", "drive-backup"]
+    )
     parser.add_argument("--candidate", type=Path)
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--packs", type=Path)
@@ -188,14 +297,32 @@ def main() -> int:
     parser.add_argument("--repo", default="rv192/quanthus-hist-1d")
     parser.add_argument("--drive-helper", type=Path)
     parser.add_argument("--drive-parent")
+    parser.add_argument("--drive-folder", default="quanthus-hist-1d-candidate-20261111-a1")
+    parser.add_argument("--previous-candidate", type=Path)
+    parser.add_argument("--prior-backup", type=Path)
+    parser.add_argument("--publication-receipt", type=Path)
+    parser.add_argument("--expected-parent")
     args = parser.parse_args()
     os.umask(0o077)
     if args.action == "pack":
         pack(args.candidate, args.workspace, args.packs)
     elif args.action == "hf-private":
         hf_private(args.candidate, args.hf_secret, args.receipt, args.repo)
+    elif args.action == "hf-public":
+        hf_public(args.candidate, args.hf_secret, args.receipt, args.repo, args.expected_parent)
+    elif args.action == "release-delta":
+        release_delta(
+            args.candidate,
+            args.previous_candidate,
+            args.workspace,
+            args.packs,
+            args.prior_backup,
+            args.publication_receipt,
+        )
     else:
-        drive_backup(args.packs, args.drive_helper, args.drive_parent, args.receipt)
+        drive_backup(
+            args.packs, args.drive_helper, args.drive_parent, args.receipt, args.drive_folder
+        )
     return 0
 
 

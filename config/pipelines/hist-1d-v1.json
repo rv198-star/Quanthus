@@ -4,6 +4,24 @@
   "issue": 602,
   "owner": "P10",
   "purpose": "A-share cycle research",
+  "contract_revision": "hist-1d-v1-owner-binary-st-20261111",
+  "acceptance": {
+    "profile": "hist1d-cycle-research-binary-st-v1",
+    "authority": "explicit_owner_feedback",
+    "decided_on": "2026-11-11",
+    "owner_instruction": "本次以二元 ST 为必需；ST/*ST 等细分缺口登记为后续补充",
+    "binary_st_required": true,
+    "research_binary_missing_max": 0,
+    "research_binary_conflicts_max": 0,
+    "binary_resolution": {
+      "PROVIDER_DAILY_STATE": {"NORMAL": 0, "ST": 1},
+      "SPECIAL_TREATMENT": {"NORMAL": 0, "ST": 1, "DELISTING_RISK": 1}
+    },
+    "deferred": ["ST/*ST/delisting-risk subtype completion"],
+    "deferred_issue": "https://github.com/rv198-star/Quanthus/issues/606",
+    "deferred_ledger": "evidence/ST-SUBTYPE-DEFERRED.parquet",
+    "unknown_resolution": "UNKNOWN stays unknown; only explicit source classes map to binary."
+  },
   "publication": {
     "independent_dataset": "rv192/quanthus-hist-1d",
     "base_mutation": false
@@ -86,6 +104,10 @@
     "session_recovery_seconds_max": 600,
     "factor_completion_queries_max": 145,
     "factor_completion_seconds_max": 600,
+    "binary_status_completion_queries_max": 4500,
+    "binary_status_completion_workers_max": 4,
+    "binary_status_completion_worker_seconds_max": 2400,
+    "binary_status_completion_queries_per_second_max": 5,
     "failed_capture_bytes_preserved": true
   },
   "optional": [

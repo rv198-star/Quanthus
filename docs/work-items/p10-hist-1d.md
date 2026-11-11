@@ -3,6 +3,26 @@
 Issue: [#602](https://github.com/rv198-star/Quanthus/issues/602). Parent: permanent P10 #478.
 Contract: `config/pipelines/hist-1d-v1.json`.
 
+## Owner acceptance scope — 2026-11-11
+
+The Owner explicitly selected `hist1d-cycle-research-binary-st-v1`: binary ST is
+required for this cycle-research delivery; ST/*ST/delisting-risk subtype gaps are
+tracked as follow-up [#606](https://github.com/rv198-star/Quanthus/issues/606).
+Unknown subtype observations retain their reason codes and source lineage.
+
+The final binary-coverage check found inherited 2011–2019 gaps even after mapping
+explicit NORMAL/ST/DELISTING_RISK classes: 5,463,062 listing/sessions across 3,610
+securities. The Base 2.3 and 2.5.1 status files are byte-identical. Bounded completion
+therefore uses the already-qualified BaoStock endpoint with only `date,code,isST`,
+then fills the frozen missing intervals in a separate release. Existing bar/factor
+members are reused. The final READY gate requires complete, nonconflicting binary
+coverage of the research-tier listing/session denominator.
+
+`hist_1d_finalize` binds the Owner profile, preserves the subtype debt ledger and
+seals the full member manifest. The publication helper uploads a fixed revision,
+publishes the dataset, and supports a small release overlay over the previously
+verified candidate backup, including the additional raw status captures.
+
 ## Objective and scope
 
 Publish Quanthus Hist-1D v1 for cycle research: SSE/SZSE A-share ordinary-equity daily bars
@@ -14,7 +34,7 @@ The product uses source lexical Decimal values, UTC timestamps and the DWD schem
 Retrospective observations use their recorded acquisition clock. Its use grade is
 “周期研究级，非历史 PIT 认证”. The existing sealed Base and production Daily remain separate.
 
-## Current recovery checkpoint — 2026-11-11
+## Pre-publication candidate checkpoint — 2026-11-11
 
 CN02 workspace: `/srv/quanthus-base22-data/work/hist-1d-602-20261111`.
 Versioned implementation: `quanthus.pipelines.hist_1d`, `hist_1d_collect`,
@@ -69,12 +89,10 @@ history is separately graded.
 In 2005–2010, 215 distinct securities retain an UNKNOWN subtype: 186 unresolved and
 29 official-name/provider-class disagreements. Binary provider observations are kept.
 
-The existing relay's historical `namechange` endpoint is at its daily quota. Bounded
-official SSE probes found a historical-announcement candidate, while 2001 test windows
-returned no records. The Owner has been asked whether binary ST is sufficient for this
-cycle-research delivery or whether full subtype coverage remains a P1 completion gate.
-Until resolved, product readiness remains candidate-level. P2 valuation and additional
-index work is optional and deferred.
+The relay's historical `namechange` endpoint reached its daily quota. Bounded official
+SSE probes and their limitations remain recorded. The Owner's binary-ST scope above
+supersedes the prior subtype readiness hold. P2 valuation and additional index work
+remain optional and deferred.
 
 ## Recovery and verification commands
 

@@ -14,7 +14,7 @@ duckdb = pytest.importorskip("duckdb")
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def synthetic_source(tmp_path):
+def synthetic_source(tmp_path, extra_calendar_venue=False):
     db = duckdb.connect()
     db.execute("SET TimeZone='Asia/Shanghai'")
     common = "knowledge_from TIMESTAMPTZ,knowledge_to TIMESTAMPTZ"
@@ -82,6 +82,13 @@ def synthetic_source(tmp_path):
             for d in days
         ],
     )
+    if extra_calendar_venue:
+        db.execute(
+            "INSERT INTO dwd_trading_calendar VALUES('OTHER-2020','other-venue',"
+            "'2020-03-02',true,'2020-03-02T09:30:00+08:00',"
+            "'2020-03-02T15:00:00+08:00',?,NULL)",
+            [known],
+        )
     for listing, security, venue, code in [
         ("L1", "S1", SSE, "000001"),
         ("L2", "S2", SZSE, "000002"),
@@ -169,7 +176,7 @@ def test_independent_decimal_referee_matches_full_synthetic_P2(tmp_path, monkeyp
     monkeypatch.syspath_prepend(str(ROOT / "scripts"))
     from research_capital_independent import IndependentFacts, independent_decision, referee
 
-    members = synthetic_source(tmp_path)
+    members = synthetic_source(tmp_path, extra_calendar_venue=True)
     q = json.loads((ROOT / "config/research/research-capital/request.v1.json").read_text())
     module().formal(q, members, {"git": "synthetic-only"}, tmp_path)
     result = json.loads((tmp_path / "result.json").read_text())

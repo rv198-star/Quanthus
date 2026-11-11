@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import collections
 import json
+import subprocess
 import time
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
@@ -130,11 +131,15 @@ class IndependentFacts:
                 self.exceptions[
                     key["stock_code"], e["affected_effective_at"].astimezone(ZONE).date()
                 ].append(e["quality_exception_id"])
+        venues = read(ROOT / q["r2_request"]["path"])["analysis"]["required_venues"]
+        assert len(venues) == 2
         calendars = query(
             self.db,
-            "SELECT venue_id,list(CAST(trade_date AS DATE) ORDER BY trade_date) AS calendar_days "
-            "FROM dwd_trading_calendar WHERE is_open AND trade_date BETWEEN "
-            "DATE '2020-03-02' AND DATE '2021-12-31' GROUP BY venue_id",
+            "SELECT venue_id,list(CAST(trade_date AS DATE) ORDER BY trade_date) "
+            "AS calendar_days FROM dwd_trading_calendar WHERE is_open "
+            "AND venue_id IN (?,?) AND trade_date BETWEEN DATE '2020-03-02' "
+            "AND DATE '2021-12-31' GROUP BY venue_id",
+            venues,
         )
         assert (
             len(calendars) == 2 and calendars[0]["calendar_days"] == calendars[1]["calendar_days"]
@@ -527,10 +532,22 @@ def independent_decision(arms):
 def independent(q, members, identity, job, author_job):
     began = time.monotonic()
     author = read(author_job / "result.json")
-    assert (
-        author["identity"]["request_digest"] == digest(q)
-        and author["identity"]["git"] == identity["git"]
-    )
+    assert author["identity"]["request_digest"] == digest(q)
+    if author["identity"]["git"] != identity["git"]:
+        recovery = read(ROOT / "config/research/research-capital/independent-recovery.v1.json")
+        assert recovery["request_digest"] == digest(q)
+        assert recovery["producer_git"] == author["identity"]["git"]
+        assert recovery["producer_result_digest"] == author["digest"]
+        assert job.name == recovery["allowed_job_name"]
+        failed = read(author_job.parent / recovery["failed_job_name"] / "guardian.json")
+        assert failed["exit_code"] != 0 and failed["identity"]["request_digest"] == digest(q)
+        changed = subprocess.check_output(
+            ["git", "diff", "--name-only", recovery["producer_git"], identity["git"]],
+            cwd=ROOT,
+            text=True,
+        ).splitlines()
+        assert set(changed) <= set(recovery["allowed_changed_paths"])
+
     assert author["digest"] == digest({k: v for k, v in author.items() if k != "digest"})
     verify_members(job / "source", q, members)
     for item in members:

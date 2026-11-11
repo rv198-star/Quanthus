@@ -1,0 +1,37 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-BATCH-VALUE-HANDOFF-20261112",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "research-batch-value-handoff",
+  "work_item": "META-TRACE-001",
+  "modules": [
+    "TRACE"
+  ],
+  "question": "Can the project owner tell what R1 changed and what decision follows from an ordinary batch handoff?",
+  "consumer": "Project owner reading the conversation and parent research issue",
+  "scope": "Documentation and parent-issue reporting only; reinterpret no scientific result, run no market computation, preserve current branch/acceptance states",
+  "deliverable": "One concise R1 value brief, existing handoff contract clarified, generic reusable template and corrected parent issue summary",
+  "decision_if_pass": "Use the value-first handoff format for subsequent bounded batches and stop this communication repair",
+  "decision_if_fail": "Correct the missing factual link in the brief; do not extend research or build reporting infrastructure",
+  "acceptance": [
+    "Ordinary reply explains project delta, actual decision, investment judgment and next gap",
+    "Brief and parent issue agree with accepted R1 evidence and live lifecycle",
+    "Executable/config/test closure unchanged; documentation/planning and append-only checks pass"
+  ],
+  "stop_conditions": [
+    "One bounded documentation pass; no new research, source changes, worker expansion or main merge",
+    "Stop on evidence conflict and retain an explicit gap rather than invent a benefit"
+  ],
+  "memory_sha256": "bed3a759cba548fe671a9e0fe9f1ac361af8d9b96d4738a5876259bcf8872aed",
+  "prior_reviews": [],
+  "cumulative_cost_review": "All earlier R1 work and failures remain cumulative. This reporting repair is bounded to 30 minutes active work with reuse of exact prior complete acceptance; no new market trial. Full historical effort/token/billing unknown_not_zero.",
+  "runtime_authority_boundary": "Owner reports a concrete communication gap and asks for a future project communication mechanism; make the existing R1 outcome understandable and repair its delivery metadata only.",
+  "budget": {
+    "wall_seconds": 1800,
+    "max_new_bytes": 1048576,
+    "network_requests": 30,
+    "accounting_owner": "META-TRACE-001 documentation-only follow-up, prior costs preserved"
+  }
+}

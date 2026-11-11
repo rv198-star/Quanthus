@@ -15,6 +15,9 @@ For new exploration or delivery of research assets, also use the approved
 [next delivery plan](work-items/exploration-next-20261029.md).
 These link past results to selection; they do not activate new research or production.
 
+For the HF-DWD R1 batch, see the [independent audit](acceptance/research-r1-independent-audit-612-20261111.md)
+and the proposed [model task allocation standard](operations/research-model-task-standard-v1.md).
+
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its
 acceptance and the current no-new-comparison disposition.

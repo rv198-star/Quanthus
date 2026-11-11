@@ -1,0 +1,59 @@
+name: Epic
+description: 组织一组独立任务的共同目标与总验收
+type: Epic
+title: "[WORK-ID] "
+labels: ["status:triage"]
+body:
+  - type: input
+    id: work_id
+    attributes:
+      label: Work-item ID
+      placeholder: META-GITHUB-001
+    validations:
+      required: true
+  - type: input
+    id: design
+    attributes:
+      label: Governing design / policy
+      description: Link the approved design or maintenance policy; include parent/dependency IDs in scope.
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: 目标 / 问题
+      description: 要改变什么；Bug 请写期望与实际行为。
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 范围与边界
+      description: 本任务负责什么，关联什么父任务或依赖。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 完成条件与证据
+      description: 写可复核的完成条件；Epic 写总验收和子 Issue 索引。
+    validations:
+      required: true
+  - type: textarea
+    id: blueprint_impact
+    attributes:
+      label: Blueprint impact
+      description: Learning work names module/facet and checkpoint; other work states outside-scope and its governing plan.
+    validations:
+      required: true
+  - type: checkboxes
+    id: discipline
+    attributes:
+      label: Engineering discipline
+      options:
+        - label: Point-in-time and versioning impact is declared, including not-applicable where appropriate.
+          required: true
+        - label: Tests and stable evidence paths are identified.
+          required: true
+        - label: Arbitration/blind data access is declared, including no access for maintenance.
+          required: true

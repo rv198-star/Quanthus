@@ -177,6 +177,15 @@
   local checks. Record only affected blueprint facets. Existing sealed requests remain immutable;
   this policy does not require retroactive migration of every historical experiment.
 
+## GitHub work lifecycle
+
+- Follow `CONTRIBUTING.md` for Issue types, sub-issues, multi-PR delivery,
+  ordinary merge commits and required worktree/branch closeout.
+- Preserve planning field ownership: normal synchronization fills metadata gaps;
+  reviewed document-driven replacement uses the explicit metadata-refresh option.
+- Closeout includes ignored evidence, unpushed commits, dependent PRs and active
+  processes. Record retained references and their release conditions in the task.
+
 ## Development
 
 - Support Python 3.10 or newer.

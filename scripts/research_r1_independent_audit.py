@@ -70,7 +70,7 @@ def main():
     tables = {}
     for name in ['dwd_security_bar', 'dwd_trading_calendar', 'dwd_tradability_state', 'dwd_listing', 'dwd_security']:
         paths = [str(out / 'source/DWD' / p) for p in expected if p.startswith('payload/'+name+'/')]
-        con.execute(f'CREATE VIEW {name} AS SELECT * FROM read_parquet(?, hive_partitioning=true)', [paths])
+        con.read_parquet(paths, hive_partitioning=True).create_view(name)
         tables[name] = con.execute(f'DESCRIBE {name}').fetchall()
     # Only row assembly uses SQL; feature windows and T+1 labels are independently computed in pandas.
     panel = con.execute("""

@@ -502,7 +502,7 @@ def verified_stage_success(
     )
     resources, attempts = read(job / "resources.json"), read(job / "attempts.json")
     require(isinstance(resources, dict) and isinstance(attempts, list), "Guardian record shape")
-    entry = resources.get(phase)
+    entry: dict[str, Any] = resources.get(phase)
     require(isinstance(entry, dict), "Guardian completion missing: " + phase)
     require(
         entry.get("schema") == "quanthus.research-stage-completion.v1"

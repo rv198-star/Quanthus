@@ -616,10 +616,13 @@ def test_guardian_terminal_record_controls_written_child_outputs(
             "run.json": run["digest"],
         }
         worker.build_package(specimen, [], identity, tmp_path)
+        worker.screen(specimen, [], identity, tmp_path)
     else:
         assert terminal["failure"] == ("stage_wall_exceeded" if outcome == "timeout" else None)
         with pytest.raises(worker.GuardError):
             worker.build_package(specimen, [], identity, tmp_path)
+        with pytest.raises(worker.GuardError):
+            worker.screen(specimen, [], identity, tmp_path)
 
 
 @pytest.mark.parametrize("interrupted_name", ["package", "package.staging"])

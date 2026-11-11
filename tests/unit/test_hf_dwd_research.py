@@ -861,7 +861,7 @@ def test_r2_pairing_weights_and_disjoint_reason_accounting(r2_request):
 
 
 @pytest.mark.parametrize(
-    ("value", "branch"), [(0.001, "advance"), (0.0, "below_minimum"), (0.0005, "uncertain")]
+    ("value", "branch"), [(0.001, "advance"), (0.0, "below_minimum"), (0.0005, "advance")]
 )
 def test_r2_frozen_routing_branches(r2_request, value, branch):
     from quanthus.hf_dwd_research_sql import markout_decision
@@ -886,6 +886,9 @@ def test_r2_frozen_routing_branches(r2_request, value, branch):
     result = markout_decision(daily, groups, analysis)
     assert result["decision_branch"] == branch
     assert result["interval95"] == pytest.approx([value, value])
+    for row in daily:
+        row["increment"] = -0.001 if row["date"].startswith("2020") else 0.002
+    assert markout_decision(daily, groups, analysis)["decision_branch"] == "uncertain"
     groups["control"]["top10_listing_share"] = 0.21
     result = markout_decision(daily, groups, analysis)
     assert result["decision_branch"] == "insufficient"

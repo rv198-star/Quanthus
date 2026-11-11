@@ -46,7 +46,7 @@
     "listing_age_rule": "calendar open sessions since listing effective_from; start clipped to 2019 for older listings, guaranteed >=120 before first decision",
     "next_open_rule": "next open calendar_session joined by venue; valid listing/security [from,to), positive finite open, tradable and can_buy true, positive finite upper limit, open < upper-0.005",
     "unknown_rule": "missing/invalid required input blocks admission; disjoint ordered reason ledger",
-    "control": "same decision dates and listing universe; positive finite close and current tradability; no candidate filters"
+    "control": "baseline AND finite momentum20 outside original closed band"
   },
   "decision": {
     "consumer": "Next research allocator deciding whether this fixed raw-momentum band deserves a costed-replay tranche",

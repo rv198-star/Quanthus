@@ -216,7 +216,7 @@ def build(hist: Path, base: Path, output: Path) -> dict[str, Any]:
         },
     )
     write_manifest(output, provenance)
-    return verify_manifest(output)
+    return dict(verify_manifest(output))
 
 
 def main() -> int:

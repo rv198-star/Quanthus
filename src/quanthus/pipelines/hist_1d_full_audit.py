@@ -311,7 +311,7 @@ PROVENANCE.json 记录构建代码与两个父版本；manifest.json 登记全�
     manifest = write_manifest(root, provenance)
     manifest["status"] = "READY"
     save(root / "manifest.json", manifest)
-    return verify_manifest(root)
+    return dict(verify_manifest(root))
 
 
 def main() -> int:

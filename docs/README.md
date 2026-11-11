@@ -22,6 +22,8 @@ input closure, bounded execution and per-stage self-audit. See its
 [repair delivery and reviewer handoff](acceptance/research-r1-repair-20261111.md).
 The [v2 independent acceptance](acceptance/research-r1-v2-independent-audit-612-20261111.md)
 accepts the recorded A2 result and specifies three bounded Worker repairs before reuse.
+The [F1–F3 repair self-audit](acceptance/research-r1-f1f3-self-audit-20261111.md)
+records the corrected stage gates, package recovery and A4 delivery for independent reacceptance.
 
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its

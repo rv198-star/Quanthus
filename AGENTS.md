@@ -176,6 +176,9 @@
 - Run `make exploration-check` and an append-only check against the exact PR base, plus normal
   local checks. Record only affected blueprint facets. Existing sealed requests remain immutable;
   this policy does not require retroactive migration of every historical experiment.
+- At batch handoff, follow the value-brief contract in `docs/design/exploration-governance.md`.
+  Explain the actual project change, decision, cost/value judgment and next step before process
+  status or test counts; refresh the parent issue's current brief and affected task checkboxes.
 
 ## Development
 

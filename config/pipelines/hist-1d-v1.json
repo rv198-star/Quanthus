@@ -1,0 +1,113 @@
+{
+  "schema_version": "quanthus.hist-1d.v1",
+  "product": "Quanthus Hist-1D v1",
+  "issue": 602,
+  "owner": "P10",
+  "purpose": "A-share cycle research",
+  "publication": {
+    "independent_dataset": "rv192/quanthus-hist-1d",
+    "base_mutation": false
+  },
+  "scope": {
+    "venues": [
+      "SSE",
+      "SZSE"
+    ],
+    "security_type": "A-share ordinary equity, including delisted listings",
+    "start": "1990-12-19",
+    "end": "2019-12-31",
+    "research_grade_start": "2005-01-01",
+    "overlap_start": "2020-01-02",
+    "overlap_end": "2021-12-31",
+    "overlap_published": false,
+    "universe": "Base 2.5.1 dwd_listing joined to dwd_listing_status_interval; source differences retained separately"
+  },
+  "sources": {
+    "base23_manifest_sha256": "6991d0c9440d4117c3dfdd3375e2267d0e43174203fc834751c9476cd7598206",
+    "base23_archive_index_sha256": "50f984a671aed2a5f04206b19fb77a8eea14d223f83d701d0fe782d88444c72c",
+    "base251_repository": "rv192/quanthus-base25-sealed",
+    "base251_revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "base251_dwd_manifest_sha256": "8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "priority": [
+      "hash-verified Base 2.3 recovery",
+      "separately qualified bounded supplement"
+    ],
+    "conflicts": "Priority controls investigation order; retain differences and evidence-backed dispositions.",
+    "astock": "Issue 587 grants no blanket historical daily/factor/status admission.",
+    "baostock_isST": "Binary ST class only; ST/*ST/delisting-risk subtypes require separate evidence."
+  },
+  "values": {
+    "price_basis": "UNADJUSTED",
+    "price_type": "DECIMAL(38,10)",
+    "factor_type": "DECIMAL(38,18)",
+    "volume_unit": "share",
+    "turnover_unit": "CNY",
+    "conversion": "Native strings to Decimal; source lots/monetary scale converted once under source-specific evidence.",
+    "missing": "Null remains missing. No invented bars, forward-filled OHLC, zero-volume substitutions or inferred suspensions."
+  },
+  "time": {
+    "business_timezone": "Asia/Shanghai",
+    "timestamp_storage": "UTC",
+    "knowledge_from": "Retain source-proven knowledge times and their lineage; new retrospective observations without publication proof use first complete acquisition time.",
+    "observation_time": "Trading date and close define the observation interval, separately from knowledge availability.",
+    "use_grade": "周期研究级，非历史 PIT 认证"
+  },
+  "coverage": {
+    "denominator": "Venue open sessions intersect each listing's effective listed interval and publication window; preserve code-reuse identities.",
+    "outcomes": [
+      "observed_bar",
+      "evidenced_suspension",
+      "evidenced_no_trade",
+      "missing",
+      "identity_difference"
+    ],
+    "research_grade": "Every unexplained missing listing/session is zero or individually evidenced and dispositioned.",
+    "reference_grade": "Publish year/board coverage and machine-readable gaps.",
+    "status_before_regime": "Use exchange-supported regime-effective evidence; otherwise UNKNOWN.",
+    "factor_seam": "Bind method, direction and normalization anchor; explain factor changes through corporate actions and adjusted-price/return continuity."
+  },
+  "storage": {
+    "bars": "payload/dwd_security_bar/interval_size=1d/observation_start_year=YYYY/observation_start_month=M",
+    "reference_tables": "Follow each Base 2.5.1 table schema and effective-coordinate partitioning.",
+    "raw": "Retain source bytes, acquisition receipts and SHA256 outside Git.",
+    "manifest": "All published member paths, byte sizes and SHA256; READY follows completed acceptance."
+  },
+  "budgets": {
+    "recovery_download_bytes_max": 3000000000,
+    "recovery_workers": 2,
+    "recovery_workspace_bytes_max": 16000000000,
+    "supplement_canary_requests_max": 12,
+    "supplement_canary_seconds_max": 600,
+    "stop_condition": "A failed supplement qualification is recorded per capability; do not repeat the same request without a new evidence hypothesis.",
+    "collection_workers_max": 4,
+    "collection_logical_queries_max": 6000,
+    "collection_global_queries_per_second_max": 5,
+    "session_recovery_queries_max": 200,
+    "session_recovery_seconds_max": 600,
+    "factor_completion_queries_max": 145,
+    "factor_completion_seconds_max": 600,
+    "failed_capture_bytes_preserved": true
+  },
+  "optional": [
+    "pre-2011 valuation/share capital",
+    "additional index daily bars"
+  ],
+  "excluded": [
+    "minute bars",
+    "financial statements",
+    "announcements",
+    "historical industry classification"
+  ],
+  "materialization": {
+    "bars": "Preserve existing archive business keys and lexical values; supplement missing keys only. New provider tradestatus=0 produces suspension intervals without invented bars. Existing source zero-volume bars remain identifiable.",
+    "factor_method": "PROVIDER_ADJUST_FACTOR",
+    "factor_direction": "PROVIDER_NATIVE",
+    "factor_field": "BaoStock adjustFactor; same native cumulative basis as sealed Base 2.5.1.",
+    "factor_conflicts": "Exact overlap differences are retained and reviewed before acceptance.",
+    "factor_source_identity": "A code-based capture is eligible only within its source listing's frozen LISTING_LIFECYCLE interval. Preserve out-of-lifetime predecessor responses in an exclusion ledger. Native bases may reset at a successor listing boundary; do not silently stitch cross-reorganization returns.",
+    "provider_binary_state": "PROVIDER_DAILY_STATE: NORMAL / ST / UNKNOWN.",
+    "subtype": "SPECIAL_TREATMENT: official SZSE historical name corroborated by provider isST=1 distinguishes ST and DELISTING_RISK. Unresolved class retains UNKNOWN.",
+    "official_name_clock": "SHA-bound SZSE-ACQUISITION.json knowledge_verified_at, fixed once; never filesystem mtime.",
+    "scope": "Market bars end 2019-12-31; identity/reference snapshots bind the sealed Base 2.5.1 revision."
+  }
+}

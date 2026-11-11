@@ -28,10 +28,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--original', type=Path, required=True)
     parser.add_argument('--audit', type=Path, required=True)
+    parser.add_argument('--resume-verified-copy', action='store_true')
     args = parser.parse_args()
     start = time.monotonic()
     out = args.audit.resolve()
-    out.mkdir(parents=True, exist_ok=False)
+    out.mkdir(parents=True, exist_ok=args.resume_verified_copy)
     req = json.loads((Path(__file__).resolve().parents[1] / 'config/research/research-r1-audit/request.v1.json').read_text())
     manifest_path = args.original / 'source/DWD/manifest.json'
     assert sha(manifest_path) == req['source_manifest_sha256']
@@ -50,14 +51,15 @@ def main():
         dst = out / 'source/DWD' / name
         dst.parent.mkdir(parents=True, exist_ok=True)
         assert sha(src) == entry['sha256'].removeprefix('sha256:')
-        shutil.copyfile(src, dst)
+        if not args.resume_verified_copy:
+            shutil.copyfile(src, dst)
         assert sha(dst) == entry['sha256'].removeprefix('sha256:')
         assert dst.stat().st_size == entry['size_bytes']
         copied += dst.stat().st_size
     assert copied == 187888538
     shutil.copyfile(manifest_path, out / 'source/DWD/manifest.json')
     originals = out / 'original-receipts'
-    originals.mkdir()
+    originals.mkdir(exist_ok=args.resume_verified_copy)
     for name in ['result.json', 'request.json', 'fetch-receipt.json', 'run-receipt.json', 'publish-receipt.json', 'package-manifest.json']:
         shutil.copyfile(args.original / name, originals / name)
     save(out / 'input-verification.json', {'manifest_sha256': sha(manifest_path), 'members': len(expected), 'bytes': copied, 'isolated_copy': True, 'copy_seconds': time.monotonic()-start})
@@ -75,7 +77,7 @@ def main():
     # Only row assembly uses SQL; feature windows and T+1 labels are independently computed in pandas.
     panel = con.execute("""
     SELECT l.listing_id, l.venue_id, CAST(l.effective_from AS DATE) listed,
-      CAST(c.trade_date AS DATE) day, c.calendar_session_id,
+      CAST(c.trade_date AS DATE) AS day, c.calendar_session_id,
       CAST(b.open AS DOUBLE) op, CAST(b.close AS DOUBLE) px,
       CAST(b.turnover AS DOUBLE) amount, CAST(t.upper_price AS DOUBLE) upper,
       t.is_tradable tradable, t.can_buy buy

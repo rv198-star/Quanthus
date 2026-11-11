@@ -124,6 +124,20 @@ def structural_audit(product: Path, base: Path) -> dict[str, Any]:
         AND effective_from<TIMESTAMPTZ '2011-01-01 00:00:00+08'
         AND (effective_to IS NULL OR effective_to>TIMESTAMPTZ '2005-01-01 00:00:00+08')
         GROUP BY reason_code ORDER BY reason_code""")
+    factor_gaps = query("""WITH f AS (SELECT security_id,min(effective_from) first_factor
+        FROM dwd_adjustment_factor GROUP BY 1)
+        SELECT l.listing_code,f.first_factor,count(*) bar_rows,min(b.observation_start) first_bar,
+        max(b.observation_start) last_bar FROM dwd_security_bar b
+        JOIN dwd_listing l USING(listing_id)
+        LEFT JOIN f USING(security_id) WHERE f.first_factor IS NULL
+        OR b.observation_start<f.first_factor GROUP BY ALL ORDER BY l.listing_code""")
+    clock = query("""SELECT count(*) mismatched_bar_session_clocks
+        FROM dwd_security_bar b JOIN dwd_trading_calendar c USING(calendar_session_id)
+        WHERE b.observation_start IS DISTINCT FROM c.open_at
+        OR b.observation_end IS DISTINCT FROM c.close_at""")
+    tradability = query("""SELECT count(*) legacy_missing_reasons_with_hist_bar
+        FROM dwd_tradability_state t JOIN dwd_security_bar b
+        USING(listing_id,calendar_session_id) WHERE t.reason_code='TRADABLE_OBSERVATION_MISSING'""")
     connection.close()
     return {
         "schema_members": "ALL_MATCH_SEALED_DWD",
@@ -132,6 +146,9 @@ def structural_audit(product: Path, base: Path) -> dict[str, Any]:
         "factor_initial_coverage": first_factor,
         "factor_2011_seam": seam,
         "research_ST_subtype_holds": research_holds,
+        "factor_initial_gaps": factor_gaps,
+        "bar_calendar_clocks": clock,
+        "base_tradability_reconciliation": tradability,
     }
 
 
@@ -152,6 +169,9 @@ def stage(workspace: Path, product: Path, audit: Path, base: Path, output: Path)
         "SESSION-RECOVERY.json",
     ]:
         shutil.copyfile(workspace / name, output / "evidence" / name)
+    for name in ["FACTOR-COMPLETION-PLAN.json", "FACTOR-COMPLETION.json"]:
+        if (workspace / name).is_file():
+            shutil.copyfile(workspace / name, output / "evidence" / name)
     for name in [
         "SZSE-ACQUISITION.json",
         "INDEPENDENT-PRICE-SOURCE.json",
@@ -174,6 +194,11 @@ def stage(workspace: Path, product: Path, audit: Path, base: Path, output: Path)
         "materialization_code_revision": "2cbd992f042c79fa2793baf71c42320dbedcb747",
         "base251_revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
     }
+    materialization = json.loads((product / "MATERIALIZATION.json").read_bytes())
+    if "factor_completion" in materialization:
+        provenance["completion_code_revision"] = (
+            materialization["factor_completion"]["code_revision"]
+        )
     save(output / "PROVENANCE.json", provenance)
     bars = structure["table_rows"]["dwd_security_bar"]
     parquet = sorted((output / "payload").rglob("*.parquet"))
@@ -205,6 +230,9 @@ def stage(workspace: Path, product: Path, audit: Path, base: Path, output: Path)
         "overlap_scope": "Audit-only; bars are published through 2019-12-31.",
         "factor_interval_audit": structure["factor_intervals"],
         "factor_initial_coverage": structure["factor_initial_coverage"],
+        "factor_initial_gaps": structure["factor_initial_gaps"],
+        "bar_calendar_clocks": structure["bar_calendar_clocks"],
+        "base_tradability_reconciliation": structure["base_tradability_reconciliation"],
         "research_ST_subtype_holds": structure["research_ST_subtype_holds"],
     }
     save(output / "QUALITY.json", quality)
@@ -232,6 +260,12 @@ tags: [finance, a-shares, historical, daily]
 二元 ST 在 PROVIDER_DAILY_STATE；经深交所官方历史简称佐证的 ST/*ST
 在 SPECIAL_TREATMENT，其余细分保留 UNKNOWN 及原因，见 QUALITY.json。
 复用的公司行动记录保持已封存参考版本；新原生因子的事件日期及数值可回溯原始响应。
+沿用的 tradability_state 是 Base 2.5.1 固定快照；其中旧缺行情原因与本次已补行情
+的相交数登记在 QUALITY.json，当前行情覆盖以 coverage 台账为准。
+旧归档日级午夜坐标按其 calendar_session_id 映射到开收盘，规则
+hist1d-session-clock-v1，值与源字节保留，逐条变更见 legacy-clock-normalization 台账。
+000005 在 1990-12-19 至 1991-01-14 的 18 条参考级行情早于首条原生因子；
+这些日期的复权查询保留无适用因子状态。
 P2 估值/股本及新增指数留待后续。
 
 周期研究级，非历史 PIT 认证。业务时间按 Asia/Shanghai，时间戳 UTC。

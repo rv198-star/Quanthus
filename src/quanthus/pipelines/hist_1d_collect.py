@@ -111,7 +111,11 @@ def capture(
         }
         response = bs.query_history_k_data_plus(**args)
     else:
-        args = {"code": task["code"], "start_date": "1990-12-19", "end_date": "2011-01-31"}
+        args = {
+            "code": task["code"],
+            "start_date": task.get("factor_start_date", "1990-12-19"),
+            "end_date": task.get("factor_end_date", "2011-01-31"),
+        }
         response = bs.query_adjust_factor(**args)
     rows = []
     while response.error_code == "0" and response.next():

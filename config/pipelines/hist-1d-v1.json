@@ -84,6 +84,8 @@
     "collection_global_queries_per_second_max": 5,
     "session_recovery_queries_max": 200,
     "session_recovery_seconds_max": 600,
+    "factor_completion_queries_max": 145,
+    "factor_completion_seconds_max": 600,
     "failed_capture_bytes_preserved": true
   },
   "optional": [

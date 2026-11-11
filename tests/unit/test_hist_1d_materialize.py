@@ -103,6 +103,12 @@ def test_native_factor_uses_lexical_native_column_and_separate_knowledge_clock()
     assert rows[0]["factor_value"] == Decimal("5680.849855")
     assert rows[0]["adjustment_direction"] == "PROVIDER_NATIVE"
     assert rows[0]["effective_from"].isoformat() == "2010-07-11T16:00:00+00:00"
+    payload["rows"][0][1] = "2012-07-12"
+    task = {"listing_id": "l", "security_id": "s", "code": "sh.600601"}
+    with pytest.raises(ValueError, match="FACTOR_SOURCE_DATE_INVALID"):
+        factor_records(payload, "sha256:" + "a" * 64, task)
+    task["factor_end_date"] = "2019-12-31"
+    assert len(factor_records(payload, "sha256:" + "a" * 64, task)) == 1
 
 
 def test_official_xlsx_accepts_inline_headers(tmp_path: Path) -> None:

@@ -331,7 +331,9 @@ def factor_records(
         if row["code"] != task["code"]:
             raise ValueError("FACTOR_SOURCE_IDENTITY_INVALID")
         day = date.fromisoformat(row["dividOperateDate"])
-        if not date(1990, 12, 19) <= day <= date(2011, 1, 31):
+        factor_start = date.fromisoformat(task.get("factor_start_date", "1990-12-19"))
+        factor_end = date.fromisoformat(task.get("factor_end_date", "2011-01-31"))
+        if not factor_start <= day <= factor_end:
             raise ValueError("FACTOR_SOURCE_DATE_INVALID")
         value = decimal_value(row["adjustFactor"], positive=True)
         result.append(
@@ -520,8 +522,10 @@ def materialize(
     write_table("dwd_listing", "SELECT * FROM universe")
     for table in [
         "dwd_security",
-        "dwd_venue",
+        "dwd_listed_company",
+        "dwd_trading_venue",
         "dwd_trading_calendar",
+        "dwd_tradability_state",
         "dwd_price_limit_regime",
         "dwd_corporate_action",
         "dwd_corporate_action_term",
@@ -535,13 +539,21 @@ def materialize(
         for field in ["listing_id", "security_id", "venue_id"]:
             if field in fields:
                 where.append(f"{field} IN (SELECT {field} FROM universe)")
-        if table not in ["dwd_security", "dwd_venue"]:
+        if "company_id" in fields:
+            where.append(
+                "company_id IN (SELECT company_id FROM ref_dwd_security "
+                "WHERE security_id IN (SELECT security_id FROM universe))"
+            )
+        if table not in ["dwd_security", "dwd_trading_venue", "dwd_listed_company"]:
             if "effective_from" in fields:
                 where.append("effective_from<TIMESTAMPTZ '2020-01-01 00:00:00+08'")
             if "effective_at" in fields:
                 where.append("effective_at<TIMESTAMPTZ '2020-01-01 00:00:00+08'")
             if "trade_date" in fields:
                 where.append("trade_date BETWEEN DATE '1990-12-19' AND DATE '2019-12-31'")
+            if "observation_start" in fields:
+                where.append("observation_start>=TIMESTAMPTZ '1990-12-19 00:00:00+08'")
+                where.append("observation_start<TIMESTAMPTZ '2020-01-01 00:00:00+08'")
         if table == "dwd_corporate_action_term":
             where.append(
                 "corporate_action_id IN (SELECT corporate_action_id FROM eligible_actions)"

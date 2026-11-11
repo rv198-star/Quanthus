@@ -20,6 +20,22 @@ from quanthus.pipelines.hist_1d_materialize import capture_payload, factor_recor
 from quanthus.pipelines.hist_1d_release import save
 
 
+def canonicalize_factors(connection: Any) -> Any:
+    conflicts = connection.execute("""SELECT security_id,effective_from
+        FROM factor_candidates GROUP BY security_id,effective_from,
+        adjustment_method,adjustment_direction HAVING count(DISTINCT factor_value)>1""").fetchall()
+    if conflicts:
+        raise ValueError("FACTOR_EVENT_VALUE_CONFLICT")
+    return connection.execute("""WITH unique_events AS (
+        SELECT * FROM factor_candidates QUALIFY row_number() OVER (
+        PARTITION BY security_id,effective_from,adjustment_method,adjustment_direction
+        ORDER BY knowledge_from,source_artifact_sha256,source_record_id)=1)
+        SELECT * REPLACE (lead(effective_from) OVER (
+        PARTITION BY security_id,adjustment_method,adjustment_direction ORDER BY effective_from)
+        AS effective_to) FROM unique_events ORDER BY security_id,effective_from
+        """).fetch_arrow_table()
+
+
 def complete(workspace: Path, product: Path, base: Path, output: Path) -> dict[str, Any]:
     if file_sha256(base / "manifest.json") != BASE251_MANIFEST:
         raise ValueError("BASE251_REFERENCE_IDENTITY_MISMATCH")
@@ -112,12 +128,13 @@ def complete(workspace: Path, product: Path, base: Path, output: Path) -> dict[s
     original = sorted((product / "payload/dwd_adjustment_factor").rglob("*.parquet"))
     schema = pq.ParquetFile(original[0]).schema_arrow
     c.register("new_factors", pa.Table.from_pylist(factors, schema=schema))
-    final = c.execute("""WITH all_factors AS (
-        SELECT * FROM dwd_adjustment_factor UNION ALL SELECT * FROM new_factors)
-        SELECT * REPLACE (lead(effective_from) OVER (
-        PARTITION BY security_id,adjustment_method,adjustment_direction ORDER BY effective_from)
-        AS effective_to) FROM all_factors ORDER BY security_id,effective_from
-        """).fetch_arrow_table()
+    c.execute("""CREATE TEMP VIEW factor_candidates AS
+        SELECT * FROM dwd_adjustment_factor UNION ALL SELECT * FROM new_factors""")
+    duplicates = c.execute("""SELECT * FROM factor_candidates QUALIFY count(*) OVER (
+        PARTITION BY security_id,effective_from,adjustment_method,adjustment_direction)>1
+        ORDER BY security_id,effective_from,knowledge_from""").fetch_arrow_table()
+    pq.write_table(duplicates, output / "evidence/factor-equivalent-source-observations.parquet")
+    final = canonicalize_factors(c)
     target = output / "payload/dwd_adjustment_factor/all/part-000000.parquet"
     target.parent.mkdir(parents=True)
     pq.write_table(final.cast(schema), target, compression="zstd")
@@ -172,12 +189,15 @@ def complete(workspace: Path, product: Path, base: Path, output: Path) -> dict[s
             normalized.cast(pq.ParquetFile(old).schema_arrow), temporary, compression="zstd"
         )
         os.replace(temporary, destination)
-    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True,
+                                      cwd=Path(__file__).resolve().parents[3]).strip()
     summary = {
         "status": "FACTOR_COMPLETION_CANDIDATE",
         "securities": len(missing),
         "accepted_captures": len(receipts),
         "factor_rows_added": len(factors),
+        "equivalent_factor_observations": duplicates.num_rows,
+        "canonical_factor_rows": final.num_rows,
         "empty_factor_histories": empty,
         "bar_clock_normalization": {
             "rule": "hist1d-session-clock-v1",

@@ -525,6 +525,161 @@
         "CP-540-20261029T210855864308Z"
       ],
       "supersedes": null
+    },
+    {
+      "recorded_at": "2026-11-11T09:26:42.468137+00:00",
+      "actor": "Codex / Astra; independent #612 audit",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "consumer": "R1审阅、研究任务下达者与Worker维护者",
+      "scope": "固定 d23386bf 与HF A1；2020-2021已消费闭包的独立审计",
+      "consumer_admission": "not_granted_by_this_record",
+      "cost_review": "原主动工时自报1.7h、Owner约2h；fetch187.067s/compute10.399s；独立复算66.763s。原失败/等待及模型账单未知非零。审计完整本地检查与网络恢复另见固定回执。",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/reproduction-attempt1-parse-failure.log",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/reproduction.log"
+      ],
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-612-20261111T092552053641Z"
+      ],
+      "supersedes": null,
+      "id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "question_id": "R1-ORIGINAL-PROXY-REPRODUCTION",
+      "family": "tradability-execution-screen-reproduction",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "原始闭包、HF包和原实现统计是否可核验复现？",
+      "claim_ceiling": "固定原代理统计及字节完整性；保留重复键、公式和时间语义缺陷。",
+      "decision_effect": "保留原HF A1与独立复算作为审计查询资产；通用Worker交付待整改。",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "reopen_conditions": [
+        "源/代码/config改变或发现原摘要/对拍差异时重新核对受影响闭包。"
+      ],
+      "retained_assets": [
+        "固定55成员输入清单与哈希",
+        "HF五文件完整回读",
+        "独立pandas复算与分年分所对拍"
+      ]
+    },
+    {
+      "recorded_at": "2026-11-11T09:26:42.468137+00:00",
+      "actor": "Codex / Astra; independent #612 audit",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "consumer": "R1审阅、研究任务下达者与Worker维护者",
+      "scope": "固定 d23386bf 与HF A1；2020-2021已消费闭包的独立审计",
+      "consumer_admission": "not_granted_by_this_record",
+      "cost_review": "原主动工时自报1.7h、Owner约2h；fetch187.067s/compute10.399s；独立复算66.763s。原失败/等待及模型账单未知非零。审计完整本地检查与网络恢复另见固定回执。",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/reproduction-attempt1-parse-failure.log",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/reproduction.log"
+      ],
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-612-20261111T092552053641Z"
+      ],
+      "supersedes": null,
+      "id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "question_id": "RESEARCH-R1-HF-001",
+      "family": "tradability-execution-screen",
+      "modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ],
+      "question": "该批结果能否支持实际可成交率及后续日线理想成交假设？",
+      "claim_ceiling": "原评价因有效期连接/波动率/上市年龄语义缺陷为invalid；策略用途保持未评价。",
+      "decision_effect": "冻结采用并重开#609/#611；原执行约束继续；下一笔先修消费者语义与合同，#613/#614仍按条件触发。",
+      "execution_status": "invalid",
+      "verdict": "not_evaluated",
+      "disposition": "investigate",
+      "reopen_conditions": [
+        "新版本合同明确指标/分母/最小样本/效应阈值、时间连接和warmup，完成自审与独立反例后再运行。"
+      ],
+      "retained_assets": [
+        "原结果、失败和已消费曝光",
+        "四个security代码沿革连接遗漏诊断；归消费者修复",
+        "模型E0-E3任务分级文档"
+      ]
+    },
+    {
+      "recorded_at": "2026-11-11T09:26:42.468137+00:00",
+      "actor": "Codex / Astra; independent #612 audit",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "consumer": "R1审阅、研究任务下达者与Worker维护者",
+      "scope": "固定 d23386bf 与HF A1；2020-2021已消费闭包的独立审计",
+      "consumer_admission": "not_granted_by_this_record",
+      "cost_review": "原主动工时自报1.7h、Owner约2h；fetch187.067s/compute10.399s；独立复算66.763s。原失败/等待及模型账单未知非零。审计完整本地检查与网络恢复另见固定回执。",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/reproduction-attempt1-parse-failure.log",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/reproduction.log"
+      ],
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-612-20261111T092552053641Z"
+      ],
+      "supersedes": null,
+      "id": "CON-R1-WORKER-CONTRACT-20261111",
+      "question_id": "P3-RESEARCH-HF-001-CONFORMANCE",
+      "family": "hf-dwd-worker-contract",
+      "modules": [
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "首版执行包是否满足#610单节点复用合同？",
+      "claim_ceiling": "限定d23386bf合同审计；成功路径可用原型与通用执行验收分别处置。",
+      "decision_effect": "重开#610，PR617待整改；Deepseek可按精确测试合同实现E1修复，独立验收后交付。",
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "investigate",
+      "reopen_conditions": [
+        "身份/白名单/缺失/资源/不可变发布/环境/TTL合同补齐并通过相称负测；代码与运行闭包绑定。"
+      ],
+      "retained_assets": [
+        "固定HF取数与分阶段原型",
+        "无网络合成篡改、缺开盘价和重复发布反例",
+        "原完整检查5814通过/29跳过"
+      ]
     }
   ]
 }

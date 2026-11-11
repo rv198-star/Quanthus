@@ -8524,6 +8524,216 @@
       "reviewed_modules": [
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-612-20261111T092552053641Z",
+      "recorded_at": "2026-11-11T09:25:52.053641+00:00",
+      "actor": "Codex / Astra; Owner-requested independent audit #612",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "outcome": "progress",
+      "summary": "R1原统计与HF包独立复核通过；评价语义与Worker合同未通过，原三项重开，保留工程证据与模型任务边界。",
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "FACTS",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "R1 Base2.5.1 2020-2021描述代理；原33409/33392可复现，security有效期连接、波动率和上市年龄有语义缺陷",
+          "remaining": "原批次实际可成交率/策略假设采用冻结；旧Facts资产保留原范围",
+          "next_action": "新请求明确语义并对拍，修消费者时间连接；不修源数据",
+          "evidence": [
+            "AUDIT612"
+          ],
+          "supersedes": "CP-545-20261028T094548750254Z"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "R1源闭包和HF结果字节完整、独立复算一致；通用执行包合同未通过",
+          "remaining": "缺开盘价、身份绑定、不可变发布及资源守卫；旧reader资产仍按原范围使用",
+          "next_action": "先修#610精确缺口并负测，再复用Worker",
+          "evidence": [
+            "AUDIT612"
+          ],
+          "supersedes": "CP-540-20261029T164848737757Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "本批采用未通过；撤回理想成交推广，当前轻任务暂不扩Worker",
+          "remaining": "事前阈值、最小样本与完整累计成本缺项；信号/执行投入选择待有效合同",
+          "next_action": "Sol/Astra主责#609语义；Deepseek只接E0/E1；#613/#614保持条件触发",
+          "evidence": [
+            "AUDIT612"
+          ],
+          "supersedes": "CP-540-20261029T121833583946Z"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-REVIEW-001",
+          "number": 612,
+          "title": "[META-RESEARCH-REVIEW-001] 独立审阅首个结果并完成采用、入账与长期证据留存",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-11T06:31:33Z",
+          "body_sha256": "745742bf6942eabf9909a1a92a66a283d4598dc6a74adab6aabbdbe20aa00342"
+        }
+      ]
+    },
+    {
+      "id": "CP-2-20261111T092740125507Z",
+      "recorded_at": "2026-11-11T09:27:40.125507+00:00",
+      "actor": "Codex / Astra; #612 audit",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "R1审计只追加有证据的记录与工作项索引，TRACE校验器及权限无变化。",
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本条仅对账任务生命周期/记账机制，保持既有科学、工程与资格结论的适用范围。",
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-609-20261111T092741147614Z",
+      "recorded_at": "2026-11-11T09:27:41.147614+00:00",
+      "actor": "Codex / Astra; #612 audit",
+      "work_item": "META-RESEARCH-SELECT-001",
+      "outcome": "no_module_change",
+      "summary": "独立审计后重开#609，确认当前issue元数据；模块判断已由#612专属checkpoint记录。",
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本条仅对账任务生命周期/记账机制，保持既有科学、工程与资格结论的适用范围。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-SELECT-001",
+          "number": 609,
+          "title": "[META-RESEARCH-SELECT-001] 选择首个高ROI问题并冻结用途、输入与有限预算",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T09:22:29Z",
+          "body_sha256": "bceaaa2c218260c96e8140bdfd57a40df991e291280ec99e8ac8002d0597f197"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-610-20261111T092742138299Z",
+      "recorded_at": "2026-11-11T09:27:42.138299+00:00",
+      "actor": "Codex / Astra; #612 audit",
+      "work_item": "P3-RESEARCH-HF-001",
+      "outcome": "no_module_change",
+      "summary": "独立审计后重开#610，确认当前issue元数据；模块判断已由#612专属checkpoint记录。",
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本条仅对账任务生命周期/记账机制，保持既有科学、工程与资格结论的适用范围。",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-HF-001",
+          "number": 610,
+          "title": "[P3-RESEARCH-HF-001] 为首个研究任务打通最小HF读取、限额运行与结果回传",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T09:22:36Z",
+          "body_sha256": "2303682c50f33c3ad4d0c8922add2da032626f73ac8529a431504ca110133a32"
+        }
+      ],
+      "reviewed_modules": [
+        "REPRO"
+      ]
+    },
+    {
+      "id": "CP-611-20261111T092743517402Z",
+      "recorded_at": "2026-11-11T09:27:43.517402+00:00",
+      "actor": "Codex / Astra; #612 audit",
+      "work_item": "P3-RESEARCH-PILOT-001",
+      "outcome": "no_module_change",
+      "summary": "独立审计后重开#611，确认当前issue元数据；模块判断已由#612专属checkpoint记录。",
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本条仅对账任务生命周期/记账机制，保持既有科学、工程与资格结论的适用范围。",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-PILOT-001",
+          "number": 611,
+          "title": "[P3-RESEARCH-PILOT-001] 完成首个有界比较、HF结果包与下一笔投入判断",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T09:22:42Z",
+          "body_sha256": "c4ac6a6827f84ac9784e53e47231bb3dedccb4f31429809bd17c1a57901562a1"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ]
     }
   ]
 }

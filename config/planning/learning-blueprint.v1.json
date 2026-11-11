@@ -560,6 +560,32 @@
         "CLOSEOUT"
       ],
       "contribution": "独立审阅 #609-611 的统计语义、工程交付与投入判断；记录缺陷、长期证据和模型分工，限定本批次成熟度。"
+    },
+    {
+      "id": "META-RESEARCH-SELECT-001",
+      "issue": 609,
+      "modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ],
+      "contribution": "重审事前问题合同、指标语义、阈值和准入；保留原曝光"
+    },
+    {
+      "id": "P3-RESEARCH-HF-001",
+      "issue": 610,
+      "modules": [
+        "REPRO"
+      ],
+      "contribution": "修复并验收固定HF输入、资源边界与不可变结果包"
+    },
+    {
+      "id": "P3-RESEARCH-PILOT-001",
+      "issue": 611,
+      "modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ],
+      "contribution": "按有效设计复算与解释；保留原始代理统计及失败记录"
     }
   ]
 }

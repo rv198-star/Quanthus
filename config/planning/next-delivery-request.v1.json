@@ -26,7 +26,7 @@
     "60分钟内无法确认消费者与具体未满足接口就不继续开发。",
     "出现新数据、训练、阈值、P6/生产或超预算要求时只停止对应步骤。"
   ],
-  "memory_sha256": "295327bb6c1dad75c6f16bb92b040bd2a8211f4efdac08c7e3113b4efdf3ea6a",
+  "memory_sha256": "f86dc16908f5e0cbdeb4818f0ce3721e2b882740ab4d3ecc8e4a550e187396c7",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -67,6 +67,21 @@
       "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
       "relation": "respect",
       "rationale": "本轮当前接入条件未成立；保留可复用能力和未来具名需求的重开条件，不将旧提案激活。"
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "保留R1审计的限定复算、未通过合同与冻结采用；本已执行提案例只刷新记忆索引，不启动修复或新研究。"
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "保留R1审计的限定复算、未通过合同与冻结采用；本已执行提案例只刷新记忆索引，不启动修复或新研究。"
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-CONTRACT-20261111",
+      "relation": "respect",
+      "rationale": "保留R1审计的限定复算、未通过合同与冻结采用；本已执行提案例只刷新记忆索引，不启动修复或新研究。"
     }
   ],
   "cumulative_cost_review": "既有Head2和持仓尝试全部保留，旧总成本未知而非零；新批次独立记账，不伪装新方向抹去原投入。",

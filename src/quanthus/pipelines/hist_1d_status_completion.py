@@ -359,6 +359,17 @@ def build(workspace: Path, candidate: Path, output: Path) -> dict[str, Any]:
         "binary_census": after,
         "candidate_manifest_sha256": INPUT_MANIFEST,
     }
+    collections = [
+        json.loads(p.read_bytes()) for p in workspace.glob("BINARY-STATUS-COLLECTION-*.json")
+    ]
+    receipt["capture_code_revisions"] = sorted(
+        {r["code_revision"] for r in collections if r["plan_sha256"] == digest}
+    )
+    materialization = json.loads((output / "MATERIALIZATION.json").read_bytes())
+    materialization["binary_status_completion"] = {
+        k: v for k, v in receipt.items() if k != "captures"
+    }
+    save(output / "MATERIALIZATION.json", materialization)
     save(workspace / "BINARY-STATUS-COMPLETION.json", receipt)
     save(output / "evidence/BINARY-STATUS-COMPLETION.json", receipt)
     shutil.copyfile(

@@ -58,6 +58,24 @@ def runs(indices: list[int]) -> list[list[int]]:
     return result
 
 
+def take_query_slot(workspace: Path, queries_per_second: int) -> None:
+    """Serialize dispatch times across shards, without serializing network reads."""
+    fcntl = importlib.import_module("fcntl")
+    path = workspace / "BINARY-STATUS-RATE-LIMIT"
+    with path.open("a+") as stream:
+        fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+        stream.seek(0)
+        raw = stream.read().strip()
+        now = time.monotonic()
+        due = float(raw) if raw else now
+        time.sleep(max(0, min(due - now, 1 / queries_per_second)))
+        stream.seek(0)
+        stream.truncate()
+        stream.write(str(time.monotonic() + 1 / queries_per_second))
+        stream.flush()
+        fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+
 def census(root: Path) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, list[Any]]]:
     pq = importlib.import_module("pyarrow.parquet")
 
@@ -194,14 +212,14 @@ def collect(
         if time.monotonic() - started > plan["max_worker_seconds"]:
             raise ValueError("STATUS_COMPLETION_WALL_BUDGET")
         path = workspace / "raw/baostock-status" / task["listing_id"] / "daily.json.gz"
+        if not path.exists():
+            take_query_slot(workspace, plan["queries_per_second"])
         receipt = capture(bs, task, "daily", path, digest, daily_fields=FIELDS)
         receipts.append(receipt)
         if receipt["error_code"] != "0" or not receipt["rows"]:
             failures += 1
         if failures >= max(1, plan["failure_stop_count"] // shards):
             raise ValueError("STATUS_COMPLETION_FAILURE_BUDGET")
-        if not receipt["reused"]:
-            time.sleep(shards / plan["queries_per_second"])
         if (index + 1) % 25 == 0 or index + 1 == len(tasks):
             print(
                 json.dumps(

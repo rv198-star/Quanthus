@@ -3687,6 +3687,9 @@ def _run_minute_collector(
             if not isinstance(entry, dict) or entry.get("status") != "done":
                 invalid.append(code)
                 continue
+            if bar_size == "1m" and entry.get("inferred_zero_volume_minutes"):
+                invalid.append(code)
+                continue
             try:
                 rows_file = int(entry.get("rows_file", -1))
             except (TypeError, ValueError):

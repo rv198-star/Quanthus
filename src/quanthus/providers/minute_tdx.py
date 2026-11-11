@@ -316,6 +316,11 @@ def _tencent_one_minute_bars(
                     daily_close=daily["close"],
                     market_date=market_date,
                 )
+                # The research normalizer may describe a no-trade hypothesis,
+                # but exact daily volume does not prove which minute was empty.
+                # Formal source admission must never publish synthetic OHLC.
+                if detail.get("inferred_zero_volume_minutes"):
+                    raise ValueError("Tencent source grid contains unobserved minutes")
                 frame = pd.DataFrame(rows)
             # Pandas otherwise serializes an all-None column as Parquet null
             # type, not the governed nullable float64 amount field.

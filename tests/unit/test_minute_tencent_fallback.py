@@ -86,6 +86,35 @@ class TencentMinuteFallbackTests(unittest.TestCase):
                 opener=lambda *_args, **_kwargs: _Response(_payload("2026-09-22")),
             )
 
+    def test_missing_minute_cannot_be_inferred_even_when_daily_total_matches(self):
+        payload = json.loads(_payload("2026-09-23"))
+        payload["data"]["sz000001"]["m1"].pop(12)
+        raw = json.dumps(payload).encode()
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(RuntimeError, "unobserved minutes"):
+                _tencent_one_minute_bars(
+                    "000001", "2026-09-23",
+                    {"volume": 24000, "close": 10, "tradestatus": "1"},
+                    Path(temporary), opener=lambda *_args, **_kwargs: _Response(raw),
+                )
+            self.assertEqual(
+                gzip.decompress((Path(temporary) / "000001.json.gz").read_bytes()), raw
+            )
+
+    def test_explicit_source_zero_volume_minute_is_not_inference(self):
+        payload = json.loads(_payload("2026-09-23"))
+        payload["data"]["sz000001"]["m1"][12][5] = "0"
+        raw = json.dumps(payload).encode()
+        with tempfile.TemporaryDirectory() as temporary:
+            frame, meta = _tencent_one_minute_bars(
+                "000001", "2026-09-23",
+                {"volume": 24000, "close": 10, "tradestatus": "1"},
+                Path(temporary), opener=lambda *_args, **_kwargs: _Response(raw),
+            )
+            self.assertEqual(len(frame), 240)
+            self.assertEqual(meta["inferred_zero_volume_minutes"], [])
+            self.assertEqual((frame["volume"] == 0).sum(), 1)
+
     def test_daily_volume_mismatch_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             with self.assertRaisesRegex(RuntimeError, "volume mismatch"):

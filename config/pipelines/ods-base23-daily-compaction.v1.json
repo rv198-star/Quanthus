@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "contract_id": "p10-ods-base23-daily-governance-compaction-v1",
+  "stage": "ACTIVE_VERSIONED_CONTRACT",
+  "version": "2.3",
+  "business_through": "2026-09-30",
+  "business_timezone": "Asia/Shanghai",
+  "purpose": "CURRENT_DAILY_GOVERNANCE_RECONSTRUCTION_SEED",
+  "historical_seed": {
+    "manifest_sha256": "sha256:7f74a7655f3f86982b4e662f55b12aff4fa2f28ee23cf9b5db530f9f2aa0955b",
+    "member_retention": "every exact original member, independently copied; immutable original manifest retained inside image"
+  },
+  "calendar_authority": {
+    "scope_sha256": "sha256:69042053793b1a105be877d05e6b18d73e0ff8e5f894d86f9856e50e7d96adb1",
+    "open_dates": [
+      "2026-08-03",
+      "2026-08-04",
+      "2026-08-05",
+      "2026-08-06",
+      "2026-08-07",
+      "2026-08-10",
+      "2026-08-11",
+      "2026-08-12",
+      "2026-08-13",
+      "2026-08-14",
+      "2026-08-17",
+      "2026-08-18",
+      "2026-08-19",
+      "2026-08-20",
+      "2026-08-21",
+      "2026-08-24",
+      "2026-08-25",
+      "2026-08-26",
+      "2026-08-27",
+      "2026-08-28",
+      "2026-08-31",
+      "2026-09-01",
+      "2026-09-02",
+      "2026-09-03",
+      "2026-09-04",
+      "2026-09-07",
+      "2026-09-08",
+      "2026-09-09",
+      "2026-09-10",
+      "2026-09-11",
+      "2026-09-14",
+      "2026-09-15",
+      "2026-09-16",
+      "2026-09-17",
+      "2026-09-18",
+      "2026-09-21",
+      "2026-09-22",
+      "2026-09-23",
+      "2026-09-24",
+      "2026-09-28",
+      "2026-09-29",
+      "2026-09-30"
+    ]
+  },
+  "required_daily_roles": [
+    "core",
+    "events"
+  ],
+  "required_artifacts": {
+    "core": [
+      "daily_ohlcv_none_delta",
+      "daily_status_observation_delta",
+      "valuation_daily_delta",
+      "security_master",
+      "stock_list",
+      "trading_calendar",
+      "index_daily_delta",
+      "adjustment_evidence_delta"
+    ],
+    "events": [
+      "announcements_delta",
+      "suspensions_delta",
+      "corporate_actions_delta",
+      "dividends_delta",
+      "factor_evidence_delta",
+      "financial_disclosures_delta"
+    ]
+  },
+  "release_retention": "retain each admitted immutable raw revision independently; no numerical merge or provider priority invented",
+  "weekly": "retain all selected verified complete original releases; no new financial/shareholder use qualification inferred",
+  "intraday": {
+    "role": "retained raw/source-evidence only; intraday qualification is outside required current daily purpose",
+    "availability_gaps": [
+      {
+        "business_date": "2026-09-24",
+        "role": "intraday_1m",
+        "reason": "NO_PHYSICALLY_VERIFIED_ORIGINAL_REQUIRED_MEMBER_IN_SELECTED_LOCAL_INVENTORY"
+      },
+      {
+        "business_date": "2026-09-28",
+        "role": "intraday_1m",
+        "reason": "NO_PHYSICALLY_VERIFIED_ORIGINAL_REQUIRED_MEMBER_IN_SELECTED_LOCAL_INVENTORY"
+      },
+      {
+        "business_date": "2026-09-28",
+        "role": "intraday_5m",
+        "reason": "NO_PHYSICALLY_VERIFIED_ORIGINAL_REQUIRED_MEMBER_IN_SELECTED_LOCAL_INVENTORY"
+      },
+      {
+        "business_date": "2026-09-29",
+        "role": "intraday_1m",
+        "reason": "NO_PHYSICALLY_VERIFIED_ORIGINAL_REQUIRED_MEMBER_IN_SELECTED_LOCAL_INVENTORY"
+      },
+      {
+        "business_date": "2026-09-29",
+        "role": "intraday_5m",
+        "reason": "NO_PHYSICALLY_VERIFIED_ORIGINAL_REQUIRED_MEMBER_IN_SELECTED_LOCAL_INVENTORY"
+      },
+      {
+        "business_date": "2026-09-30",
+        "role": "intraday_1m",
+        "reason": "NO_PHYSICALLY_VERIFIED_ORIGINAL_REQUIRED_MEMBER_IN_SELECTED_LOCAL_INVENTORY"
+      },
+      {
+        "business_date": "2026-09-30",
+        "role": "intraday_5m",
+        "reason": "NO_PHYSICALLY_VERIFIED_ORIGINAL_REQUIRED_MEMBER_IN_SELECTED_LOCAL_INVENTORY"
+      }
+    ],
+    "absence_scope": "not found in selected local inventory and queried exact existing CN01/Hermes release paths; not a global non-existence claim",
+    "uses_blocked": [
+      "intraday execution",
+      "complete August/September minute reconstruction",
+      "minute precision qualified analysis"
+    ]
+  },
+  "nontrading_events": "retain weekend/holiday observations and true acquisition, allow late observations for earlier business dates",
+  "time_rules": {
+    "no_acquisition_or_knowledge_inference": true,
+    "preserve_unknown": true,
+    "build_time": "actual UTC separate from business cutoff",
+    "future_reference_or_interval_end": "retain original governed reference/interval values; do not truncate to cutoff",
+    "September_cutoff": "no October business observation release admitted"
+  },
+  "scope_boundaries": [
+    "4173 visibility unavailable retained",
+    "no P3/P5/P6 admission or policy relaxation",
+    "no research or economic-results access",
+    "ODS retains original raw bytes, does not masquerade curated DWD as raw",
+    "complete package integrity is not unconditional downstream data qualification"
+  ],
+  "physical_contract": {
+    "symlinks": false,
+    "source_hardlinks": false,
+    "external_runtime_source_reads": false,
+    "exact_file_set": true,
+    "original_manifest_member_closure": true,
+    "hashes": "full SHA256 for every physical member; manifest/content/READY binding",
+    "checks": "native schema/footer census and SQLite integrity; preserve originally qualified unchanged source semantics by exact bytes",
+    "cold_acceptance": "two physical ownership copies, two new-process source/network-denied scans; disposable missing/corrupt negative tests; READY last"
+  },
+  "publication": "immutable source seed under explicit successor contract; legacy CURRENT/config is not silently rewritten",
+  "original_current_policy": "July policy remains frozen. This successor current-daily-purpose contract does not establish complete-intraday qualification.",
+  "runtime_binding": "The immutable job contract adds exact source admission records and the tracked policy SHA256 after fresh complete physical assessment; no inferred source or revision is admitted."
+}

@@ -1,0 +1,24 @@
+{
+  "contract": "p10-standard-base-execution-v1",
+  "runtime_user": "agentdock",
+  "runtime_python": "/opt/quanthus/venvs/base-build-py310-20261104/bin/python",
+  "audit_parent": "/var/tmp/quanthus-base-build/audit-for-this-job",
+  "protected_paths": [
+    "/data/production/daily",
+    "/data/production/recovery",
+    "/data/production/delivery",
+    "/data/unqualified-candidate-cache"
+  ],
+  "audit_limits": {
+    "allocated_bytes": 25769803776,
+    "temp_bytes": 17179869184,
+    "free_floor_bytes": 17179869184,
+    "rss_bytes": 4294967296,
+    "wall_seconds": 14400
+  },
+  "service_limits": {
+    "memory_max_bytes": 5368709120,
+    "cpu_quota_percent": 200,
+    "wall_seconds": 28800
+  }
+}

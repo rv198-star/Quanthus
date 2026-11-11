@@ -1,0 +1,19 @@
+{
+  "contract_id": "p10-base231-official-event-reference-price-ratio-v1",
+  "business_through": "2026-09-30",
+  "timezone": "Asia/Shanghai",
+  "official_scope_contract": "base231-official-adjustment-bases.v1.json",
+  "method": "OFFICIAL_EVENT_REFERENCE_PRICE_RATIO_V1",
+  "direction": "EVENT_PRE_TO_POST_REFERENCE_MULTIPLIER",
+  "formula": "(unadjusted_previous_session_close - official_all_issued_cash) / ((1 + official_combined_share_increment) * unadjusted_previous_session_close)",
+  "input_scope": "same security/listing venue, unique latest available unadjusted CNY daily close on the preceding open regular daily calendar session",
+  "precision": 96,
+  "output_decimal": "decimal128(38,18)",
+  "rounding": "ROUND_HALF_EVEN",
+  "unknown_components": "A literal final denominator, or exact official before/after issued totals in a non-differentiated implementation, establishes its combined coefficient without assigning zero to unknown components. Otherwise all components must be explicit.",
+  "source_priority": "Only the exact official coordinates in the parent scope contract govern this new observation; preserve all previous source observations and knowledge.",
+  "lifecycle": "TMP until integrated and independently accepted",
+  "cumulative_qfq_hfq_admission": "NOT_GRANTED",
+  "historical_PIT_admission": "NOT_GRANTED",
+  "consumer_admission": "NOT_GRANTED"
+}

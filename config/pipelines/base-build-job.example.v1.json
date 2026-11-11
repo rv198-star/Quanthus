@@ -1,0 +1,27 @@
+{
+  "contract": "p10-standard-base-build-job-v1",
+  "builder_revision": "0000000000000000000000000000000000000000",
+  "selection": "/data/controls/selection.json",
+  "frozen": "/data/controls/input-frozen.json",
+  "roots": "/data/controls/roots.json",
+  "work_root": "/data/build/standard-base-job",
+  "environment_lock": "/workspace/ops/data/base-build-environment.v1.json",
+  "wheelhouse": "/data/runtime/wheelhouse",
+  "source_evidence_id": "daily-sources",
+  "calendar_reference": {
+    "evidence_id": "calendar-reference",
+    "path": "reference-source.parquet",
+    "parent_release": "source-release.json",
+    "parent_core": "parent-core-manifest.json",
+    "parent_daily": "parent-daily-manifest.json",
+    "artifact_name": "trading_calendar"
+  },
+  "closed_days": [],
+  "limits": {
+    "allocated_bytes": 8589934592,
+    "temp_bytes": 4294967296,
+    "free_floor_bytes": 21474836480,
+    "rss_bytes": 4294967296,
+    "wall_seconds": 7200
+  }
+}

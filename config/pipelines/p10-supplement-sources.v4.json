@@ -1,0 +1,269 @@
+{
+  "announcement_security_codes": [],
+  "budget": {
+    "max_response_bytes": 16384,
+    "no_retry": true,
+    "no_vendor_fallback": true,
+    "source_wall_seconds": 20
+  },
+  "capability_selection": "EXACT_DECLARED_SUBSET",
+  "consumer": "P10 bounded A-share supplier qualification; fixed sessions and partial pages, not latest-session/full-market admission",
+  "etf_universe": [],
+  "fund_universe": [],
+  "issues": [
+    581,
+    583,
+    584,
+    587
+  ],
+  "kind": "p10-supplement-policy-v1",
+  "library": {
+    "module_sha256": {
+      "__init__.py": "ebd5526b827be62b0668106205d8f93723f34679e9697750c1ad19e1053a7e68",
+      "_parsing.py": "a0a558f03be73846cb1a7c6934cf8152c4556cb6f8646782cfbf6a4d9b864565",
+      "a_shares.py": "0384d5da8ae04a63157331cf1dada7a50b3e5c1971b152b44d29e95b3ff375b1",
+      "announcements.py": "1c47909f115b9d27e2d3e8309bd7dc2d4112299e860bd9f0fc0ab81af30e2aa0",
+      "bonds.py": "0801a88dd753c4c28ff5cb3011771b8498a2164566ed318231b43a18a2a69fc8",
+      "contracts.py": "13b1d8054d53d851a249e3a43f59f21776086075a862b6b3af3ad84fe592376d",
+      "convertibles.py": "b7bfe58b202cd7ab6d072e345b6130fecebf27e743529775cb86bb4a0e16ac8b",
+      "disclosures.py": "8ee04e210099795a457fdea99e67fe97dc697bffbf460a82490e7588b00d0ba0",
+      "etf_flow.py": "93a757a84c237b31bd2306982e6ea16d356c1c1bb35353e8cb5d3aa17c4ade2f",
+      "funds.py": "440d9f92bbca2810d5fdf91fbe96a857c1fe424d246a00cd968a414993b7a050",
+      "futures.py": "fa8804cc292da2fd51c3c7434cd2cda012207081cd2de586be5d2b6ccfb19647",
+      "lpr.py": "9bd05f285376fe0e7a4073bfbdcfde53b0cc08a38243f8fffbf9356783051264",
+      "macro.py": "223f7393286c93a8e45cf01ce0d3a90ba2291a5538a5aa38f0743b7467d59abf",
+      "news.py": "67b4dbdabee3ed7eac80cc006c45cb0821f4f146548619184f67c41fc1abe51a",
+      "quotes.py": "29ec0f41a69a017ec1b7abc37e0f787ef3a29fe47aa5b16dffcb53198b744862",
+      "rss.py": "dcf353035e468f11367617ef85b4437beddfe6736198de2fde3656e2f5f00355",
+      "transport.py": "3bc4929a066856c9cabe553a87b075e080bee0c66de64a7d19371e00dc38eb02"
+    },
+    "repository": "https://github.com/rv198-star/astock",
+    "revision": "c33a7b7b0e110735283331e0356318679750afb5",
+    "version": "0.1.4",
+    "wheel_sha256": "2880d1e261bcbc50a35296aefab7cd66ce2a4f3a7a85de2ed53835c542583ffe",
+    "wheel_url": "https://github.com/rv198-star/astock/releases/download/sources-v0.1.4/astock_sources-0.1.4-py3-none-any.whl"
+  },
+  "lifecycle": {
+    "business_admission": false,
+    "observations": "ADM_P10_QUALIFICATION_EVIDENCE",
+    "retention": "KEEP_IMMUTABLE_UNTIL_P10_DISPOSITION",
+    "staging": "TMP"
+  },
+  "owner": "P10",
+  "policy_version": "2026-10-30.a-share.1",
+  "quality": {
+    "future_clock_seconds": 300
+  },
+  "runtime_dependencies": {
+    "certifi": {
+      "filename": "certifi-2026.7.22-py3-none-any.whl",
+      "version": "2026.7.22",
+      "wheel_sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775"
+    },
+    "charset-normalizer": {
+      "filename": "charset_normalizer-3.5.2-py3-none-any.whl",
+      "version": "3.5.2",
+      "wheel_sha256": "b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685"
+    },
+    "idna": {
+      "filename": "idna-3.20-py3-none-any.whl",
+      "version": "3.20",
+      "wheel_sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"
+    },
+    "requests": {
+      "filename": "requests-2.34.2-py3-none-any.whl",
+      "version": "2.34.2",
+      "wheel_sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0"
+    },
+    "urllib3": {
+      "filename": "urllib3-2.8.0-py3-none-any.whl",
+      "version": "2.8.0",
+      "wheel_sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3"
+    }
+  },
+  "schema": "p10-supplement-observation-v1",
+  "security_universe": [],
+  "source_priority": {
+    "a_shares": "HIGHEST",
+    "hk_us": "LOW_NEW_EVIDENCE_ONLY"
+  },
+  "sources": [
+    {
+      "excluded_fields": [
+        "RZRQYECZ_as_daily_balance_change",
+        "historical_publication_at",
+        "latest_session_coverage",
+        "future_horizon_return_fields"
+      ],
+      "fields": {
+        "RQCHL": {
+          "basis": "VENDOR_STOCK_LENDING_BALANCE_OR_FLOW",
+          "multiplier": "1",
+          "native_unit": "SHARES",
+          "unit": "SHARES"
+        },
+        "RQJMG": {
+          "basis": "VENDOR_STOCK_LENDING_BALANCE_OR_FLOW",
+          "multiplier": "1",
+          "native_unit": "SHARES",
+          "unit": "SHARES"
+        },
+        "RQMCL": {
+          "basis": "VENDOR_STOCK_LENDING_BALANCE_OR_FLOW",
+          "multiplier": "1",
+          "native_unit": "SHARES",
+          "unit": "SHARES"
+        },
+        "RQYE": {
+          "basis": "VENDOR_FINANCING_OR_STOCK_LENDING_BALANCE_OR_FLOW",
+          "multiplier": "1",
+          "native_unit": "CNY",
+          "unit": "CNY"
+        },
+        "RQYL": {
+          "basis": "VENDOR_STOCK_LENDING_BALANCE_OR_FLOW",
+          "multiplier": "1",
+          "native_unit": "SHARES",
+          "unit": "SHARES"
+        },
+        "RZCHE": {
+          "basis": "VENDOR_FINANCING_OR_STOCK_LENDING_BALANCE_OR_FLOW",
+          "multiplier": "1",
+          "native_unit": "CNY",
+          "unit": "CNY"
+        },
+        "RZJME": {
+          "basis": "VENDOR_FINANCING_OR_STOCK_LENDING_BALANCE_OR_FLOW",
+          "multiplier": "1",
+          "native_unit": "CNY",
+          "unit": "CNY"
+        },
+        "RZMRE": {
+          "basis": "VENDOR_FINANCING_OR_STOCK_LENDING_BALANCE_OR_FLOW",
+          "multiplier": "1",
+          "native_unit": "CNY",
+          "unit": "CNY"
+        },
+        "RZRQYE": {
+          "basis": "VENDOR_FINANCING_OR_STOCK_LENDING_BALANCE_OR_FLOW",
+          "multiplier": "1",
+          "native_unit": "CNY",
+          "unit": "CNY"
+        },
+        "RZYE": {
+          "basis": "VENDOR_FINANCING_OR_STOCK_LENDING_BALANCE_OR_FLOW",
+          "multiplier": "1",
+          "native_unit": "CNY",
+          "unit": "CNY"
+        }
+      },
+      "key": "eastmoney:margin.single_security.bounded",
+      "kind": "a_share_margin",
+      "purpose": "fixed_session_vendor_margin_reference",
+      "reference_evidence": [
+        {
+          "sha256": "b2db3affc0270f4a8586ac36e06ff8e8dacd14148fbc392a8ca59022721b0af2",
+          "url": "https://data.eastmoney.com/rzrq/stock/600519.html",
+          "verified_at": "2026-10-29T21:48:07.554382+00:00"
+        },
+        {
+          "sha256": "7aa323e364c47d05e607302b17e0581043bfa8dca6b2391dcf9373ad0cb611c4",
+          "url": "https://data.eastmoney.com/newstatic/js/rzrq/stock.js",
+          "verified_at": "2026-10-29T21:48:39.954643+00:00"
+        },
+        {
+          "sha256": "8d366b520805b60b15fc3fd1d581be49afe405ac6cf41bb254bd3a1aa6de52be",
+          "url": "https://data.eastmoney.com/newstatic/js/common/emdataview.js",
+          "verified_at": "2026-10-29T21:48:40.203757+00:00"
+        }
+      ],
+      "sample_scope": {
+        "end": "2026-10-29",
+        "limit": 2,
+        "security": "sh600519",
+        "security_code": "600519",
+        "start": "2026-10-26"
+      }
+    },
+    {
+      "excluded_fields": [
+        "complete_market_coverage",
+        "exchange_trade_id",
+        "portfolio_fill",
+        "source_amount_reconstruction",
+        "publication_at",
+        "future_horizon_return_fields"
+      ],
+      "fields": {
+        "CLOSE_PRICE": {
+          "basis": "VENDOR_BLOCK_TRADE_OR_CLOSE_REFERENCE",
+          "multiplier": "1",
+          "native_unit": "CNY_PER_SHARE",
+          "unit": "CNY_PER_SHARE"
+        },
+        "DEAL_AMT": {
+          "basis": "VENDOR_BLOCK_TRADE_REPORTED_AMOUNT_NOT_RECONSTRUCTED",
+          "multiplier": "1",
+          "native_unit": "CNY",
+          "unit": "CNY"
+        },
+        "DEAL_PRICE": {
+          "basis": "VENDOR_BLOCK_TRADE_OR_CLOSE_REFERENCE",
+          "multiplier": "1",
+          "native_unit": "CNY_PER_SHARE",
+          "unit": "CNY_PER_SHARE"
+        },
+        "DEAL_VOLUME": {
+          "basis": "VENDOR_BLOCK_TRADE_REPORTED_VOLUME",
+          "multiplier": "1",
+          "native_unit": "SHARES",
+          "unit": "SHARES"
+        },
+        "PREMIUM_RATIO": {
+          "basis": "VENDOR_PREMIUM_RATIO_ALREADY_FRACTIONAL_NOT_DISPLAY_PERCENT",
+          "multiplier": "1",
+          "native_unit": "FRACTION",
+          "unit": "FRACTION"
+        }
+      },
+      "key": "eastmoney:block_trades.a_share.bounded",
+      "kind": "a_share_block_trade",
+      "purpose": "fixed_session_vendor_block_trade_reference",
+      "reference_evidence": [
+        {
+          "sha256": "6c920fb913d485427c3cc2fd4c53447b41c1f1be6a0c127c499311689e613e3f",
+          "url": "https://data.eastmoney.com/dzjy/dzjy_mrmx.html",
+          "verified_at": "2026-10-29T21:48:07.212464+00:00"
+        },
+        {
+          "sha256": "6162969d957e963328942fe3153a572ff9db4bd001bf7057d94f3ed0e715704d",
+          "url": "https://data.eastmoney.com/newstatic/js/dzjy/mrmx.js",
+          "verified_at": "2026-10-29T21:48:39.649487+00:00"
+        },
+        {
+          "sha256": "8d366b520805b60b15fc3fd1d581be49afe405ac6cf41bb254bd3a1aa6de52be",
+          "url": "https://data.eastmoney.com/newstatic/js/common/emdataview.js",
+          "verified_at": "2026-10-29T21:48:40.203757+00:00"
+        }
+      ],
+      "sample_scope": {
+        "asset_class": "CN_A_SHARE",
+        "limit": 2,
+        "trade_date": "2026-10-29"
+      }
+    }
+  ],
+  "universe_selection": {
+    "block_trades": "FIXED_20261029_A_SHARE_DISCLOSURES_FIRST_TWO_NO_PAGINATION",
+    "margin": "FIXED_SINGLE_SH600519_20261026_THROUGH_20261029_FIRST_TWO",
+    "observation_period_counts": "ACCESS_DAYS_NOT_NEW_SESSION_COVERAGE"
+  },
+  "watch": {
+    "automatic_business_admission": false,
+    "days": 7,
+    "expiry_action": "STOP_AND_REVIEW",
+    "interval_seconds": 86400,
+    "min_consecutive_success_days": 3,
+    "min_distinct_success_days": 3
+  }
+}

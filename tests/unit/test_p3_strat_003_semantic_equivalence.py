@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from datetime import date
 from pathlib import Path
 
@@ -151,6 +152,32 @@ def test_probe_config_is_frozen_and_result_blind() -> None:
         "mutate_p6": False,
         "job_local_output_only": True,
     }
+
+
+def test_frozen_probe_rejects_new_runtime_without_repinning(tmp_path, monkeypatch):
+    raw = json.loads(CONFIG.read_text())
+    candidate = ROOT / "src/quanthus/pipelines/securities_warehouse/daily_price_basis_domain.py"
+    bindings = [
+        raw["request"],
+        raw["source_runtime"],
+        raw["legacy_transport_contract"],
+        *raw["runtime_implementation"].values(),
+    ]
+    for binding in bindings:
+        target = tmp_path / binding["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source = (
+            candidate
+            if binding is raw["runtime_implementation"]["daily_domain"]
+            else ROOT / binding["path"]
+        )
+        shutil.copyfile(source, target)
+    monkeypatch.setattr(probe, "find_project_root", lambda _: tmp_path)
+    with pytest.raises(ExpertEvaluationError, match="daily_domain implementation bytes differ"):
+        probe._load_config(CONFIG)
+    assert _sha(CONFIG) == (
+        "sha256:3dc2a1c1a8b54b84f35fdcb7d8e3e1845c13f0e37ad81aec2c3747bf856dbf64"
+    )
 
 
 def test_consumer_identity_ignores_audit_only_manifest_drift(tmp_path: Path) -> None:

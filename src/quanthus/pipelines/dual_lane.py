@@ -2999,6 +2999,63 @@ def record_accepted_ods_copy(
     return receipt_path
 
 
+def _accepted_ods_copy_receipts(
+    *, root: Path, recovery_root: Path
+) -> list[tuple[dict[str, Any], str]]:
+    """Check the existing immutable index before trusting recovery-copy claims."""
+    current = root
+    for part in recovery_root.relative_to(root).parts:
+        current = current / part
+        if current.is_symlink():
+            raise DualLaneError("accepted ODS recovery evidence forbids symbolic links")
+
+    def evidence_files(directory: Path) -> set[Path]:
+        if directory.is_symlink():
+            raise DualLaneError("accepted ODS recovery evidence forbids symbolic links")
+        if not directory.exists():
+            return set()
+        try:
+            entries = tuple(directory.iterdir())
+        except OSError as exc:
+            raise DualLaneError("cannot read accepted ODS recovery index evidence") from exc
+        paths: set[Path] = set()
+        for path in entries:
+            if path.is_symlink():
+                raise DualLaneError("accepted ODS recovery evidence forbids symbolic links")
+            if path.suffix == ".json":
+                if not path.is_file():
+                    raise DualLaneError("accepted ODS recovery index evidence is not a file")
+                paths.add(path)
+        return paths
+
+    copy_paths = evidence_files(recovery_root / "copies")
+    index_paths = evidence_files(recovery_root / "copy-index")
+    expected_indexes: set[Path] = set()
+    receipts: list[tuple[dict[str, Any], str]] = []
+    for path in sorted(copy_paths):
+        receipt, digest = _load_object_with_digest(path)
+        index_path = recovery_root / "copy-index" / f"{digest.removeprefix('sha256:')}.json"
+        if index_path not in index_paths:
+            raise DualLaneError("accepted ODS recovery receipt is missing its checksum index")
+        index, _ = _load_object_with_digest(index_path)
+        if (
+            type(index.get("schema_version")) is not int
+            or index.get("schema_version") != 1
+            or index.get("kind") != "accepted_ods_copy_index_entry"
+            or index.get("copy_id") != receipt.get("copy_id")
+            or receipt.get("copy_id") != path.stem
+            or index.get("receipt_path") != path.relative_to(root).as_posix()
+            or index.get("receipt_sha256") != digest
+            or index.get("reason_code") != "accepted_ods_copy_indexed"
+        ):
+            raise DualLaneError("accepted ODS recovery copy index differs from its receipt")
+        expected_indexes.add(index_path)
+        receipts.append((receipt, digest))
+    if index_paths != expected_indexes:
+        raise DualLaneError("accepted ODS recovery copy index has missing or extra receipts")
+    return receipts
+
+
 def assess_accepted_ods_recovery(
     *,
     root: Path,
@@ -3012,25 +3069,22 @@ def assess_accepted_ods_recovery(
     now = _trusted_now(clock)
     receipts: list[dict[str, Any]] = []
     receipt_digests: list[str] = []
-    copies_root = recovery_root / "copies"
-    if copies_root.exists():
-        for path in sorted(copies_root.glob("*.json")):
-            receipt, digest = _load_object_with_digest(path)
-            retention_until = _parse_aware_datetime(
-                receipt.get("retention_until"), field="retention_until"
-            )
-            if (
-                receipt.get("schema_version") != 1
-                or receipt.get("kind") != "accepted_ods_recovery_copy"
-                or receipt.get("market_date") != candidate.market_date.isoformat()
-                or receipt.get("ods_manifest_sha256") != candidate.ods_manifest_sha256
-                or receipt.get("candidate_manifest_sha256") != candidate.manifest_sha256
-                or receipt.get("deletion_authorized") is not False
-                or retention_until <= now
-            ):
-                raise DualLaneError("accepted ODS recovery receipt is invalid or expired")
-            receipts.append(receipt)
-            receipt_digests.append(digest)
+    for receipt, digest in _accepted_ods_copy_receipts(root=root, recovery_root=recovery_root):
+        retention_until = _parse_aware_datetime(
+            receipt.get("retention_until"), field="retention_until"
+        )
+        if (
+            receipt.get("schema_version") != 1
+            or receipt.get("kind") != "accepted_ods_recovery_copy"
+            or receipt.get("market_date") != candidate.market_date.isoformat()
+            or receipt.get("ods_manifest_sha256") != candidate.ods_manifest_sha256
+            or receipt.get("candidate_manifest_sha256") != candidate.manifest_sha256
+            or receipt.get("deletion_authorized") is not False
+            or retention_until <= now
+        ):
+            raise DualLaneError("accepted ODS recovery receipt is invalid or expired")
+        receipts.append(receipt)
+        receipt_digests.append(digest)
     failure_domains = tuple(
         sorted({_required_string(receipt, "failure_domain") for receipt in receipts})
     )

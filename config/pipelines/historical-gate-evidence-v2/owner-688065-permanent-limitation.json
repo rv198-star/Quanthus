@@ -1,0 +1,18 @@
+{
+  "kind": "base251-owner-688065-permanent-limitation-decision-v1",
+  "recorded_at": "2026-11-07T12:06:55Z",
+  "decision": "ACCEPT_PERMANENT_HISTORICAL_LIMITATION",
+  "scope": "SSE-688065-20230615-tradability",
+  "owner_reply": "我无法提供更多数据源了，很明显我只能接受了",
+  "interpretation": "Owner accepts the unresolved permanent historical limitation for this coordinate because no additional authoritative source will be supplied.",
+  "limitations": [
+    "historical_pit unavailable for this coordinate",
+    "cross_provider_exact_price unavailable for this coordinate",
+    "complete_market_coverage unavailable for this coordinate",
+    "native 5m remains unavailable"
+  ],
+  "data_or_grade_changed": false,
+  "held_added": 0,
+  "consumer_switch_authorized": false,
+  "source_collection_restarted": false
+}

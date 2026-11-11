@@ -1,0 +1,16 @@
+{
+  "contract_id": "p10-base231-new-current-complete-statement-observations-v1",
+  "business_through": "2026-09-30",
+  "business_timezone": "Asia/Shanghai",
+  "purpose": "New current-knowledge statements from complete genuine envelopes for specifically selected remediation issuers",
+  "capture_date": "Actual acquisition date in Asia/Shanghai, never relabelled as September",
+  "currency_authority": "Explicit original report rCurrency; no inference for old F10 monetary literals",
+  "publication": "Preserve explicit original timestamp; calendar-date-only publication remains unknown as an instant, literal retained in local raw evidence",
+  "original_literals": "Preserve complete raw JSON bytes, Decimal tokens, zeros, nulls, unavailable precision and update/publication fields",
+  "concept_merge": "Only exact equal concept business fields at the locked native version key may share one output; deterministic minimum source-row digest chooses the representative and all contributing source identities stay in evidence",
+  "old_native_history": "Retain unchanged; new knowledge versions only, no old value replacement or provider precedence inference",
+  "historical_PIT_qualified": false,
+  "old_weekly_snapshot_restored": false,
+  "consumer_admission": "NOT_GRANTED",
+  "complete_Base": false
+}

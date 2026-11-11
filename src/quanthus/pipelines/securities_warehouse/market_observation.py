@@ -95,6 +95,7 @@ _SOURCE_IDENTITIES = {
     "index_daily_delta",
     "index_daily_metadata",
 }
+_OPTIONAL_SOURCE_IDENTITIES = {"base24_native5m_exact"}
 _LINEAGE_FIELDS = (
     "record_source",
     "source_record_id",
@@ -299,11 +300,14 @@ def _source_records(ledger: Mapping[str, Any]) -> list[Mapping[str, Any]]:
             and set(targets).intersection(_OWNED_TABLES)
         ):
             identity = raw.get("mapping_identity")
-            if identity not in _SOURCE_IDENTITIES:
+            if identity not in _SOURCE_IDENTITIES | _OPTIONAL_SOURCE_IDENTITIES:
                 raise MarketObservationBuildError(f"unexpected modeled source: {identity}")
             records.append(raw)
     identities = {record.get("mapping_identity") for record in records}
-    if identities != _SOURCE_IDENTITIES:
+    if (
+        not identities >= _SOURCE_IDENTITIES
+        or identities - _SOURCE_IDENTITIES - _OPTIONAL_SOURCE_IDENTITIES
+    ):
         raise MarketObservationBuildError("Issue #58 source identity inventory is incomplete")
     return sorted(records, key=lambda item: _text(item, "path"))
 
@@ -480,6 +484,7 @@ def _bar_query(
         "minute_5m_formal_archive",
         "minute_5m_hotfix",
         "intraday_bars",
+        "base24_native5m_exact",
     }
     if minute_interval == "1m":
         minute_identities -= {"minute_5m_formal_archive", "minute_5m_hotfix"}
@@ -493,6 +498,7 @@ def _bar_query(
              THEN '1m'
            WHEN r.mapping_identity IN ('minute_5m_formal_archive','minute_5m_hotfix')
              THEN '5m'
+           WHEN r.mapping_identity='base24_native5m_exact' THEN '5m'
            ELSE b.bar_size END"""
     minute_predicates = []
     code_predicate = _code_filter("b.stock_code", stock_codes)
@@ -591,6 +597,8 @@ WITH daily_raw AS (
 ), minute_raw AS (
   SELECT b.*, r.relative_path, r.dataset_id, r.mapping_identity, r.source_sha256,
          CAST(CAST(b.ts AS VARCHAR) AS TIMESTAMP) AS interval_label,
+         try_cast(json_extract_string(to_json(b),'$.acquired_at') AS TIMESTAMPTZ)
+           AS source_acquired_at,
          {normalized_interval} AS normalized_interval
   FROM {minute} b JOIN source_registry r ON b.filename=r.absolute_path{minute_where}
 ), source_rows AS (
@@ -598,6 +606,7 @@ WITH daily_raw AS (
          timezone('Asia/Shanghai', CAST(trade_date AS TIMESTAMP)) AS local_day_start,
          NULL::TIMESTAMPTZ AS minute_end,
          NULL::TIMESTAMP AS source_label,
+         NULL::TIMESTAMPTZ AS source_acquired_at,
          '1d' AS interval_size,
          open, high, low, close, volume, amount,
          dataset_id AS record_source, source_priority,
@@ -611,11 +620,13 @@ WITH daily_raw AS (
              THEN interval_label - INTERVAL 90 MINUTE
            ELSE interval_label END) AS minute_end,
          interval_label AS source_label,
+         source_acquired_at,
          normalized_interval, open, high, low, close, volume, amount,
          dataset_id,
          CASE mapping_identity
            WHEN 'minute_1m_research_archive' THEN 30
            WHEN 'minute_5m_formal_archive' THEN 30
+           WHEN 'base24_native5m_exact' THEN 40
            WHEN 'intraday_bars' THEN 20 ELSE 10 END,
          relative_path, mapping_identity, source_sha256
   FROM minute_raw
@@ -630,7 +641,12 @@ SELECT record_source,
        mapping_identity || '@' ||
          substr(replace(source_sha256,'sha256:',''),1,16) AS source_revision,
        source_sha256 AS source_artifact_sha256,
-       TIMESTAMPTZ {_sql_literal(cutoff)} AS knowledge_from, NULL::TIMESTAMPTZ AS knowledge_to,
+       CASE WHEN mapping_identity='base24_native5m_exact'
+              THEN CASE WHEN source_acquired_at IS NULL
+                     THEN error('BASE24_NATIVE5M_ACQUIRED_AT_MISSING')
+                     ELSE source_acquired_at END
+            ELSE TIMESTAMPTZ {_sql_literal(cutoff)} END AS knowledge_from,
+       NULL::TIMESTAMPTZ AS knowledge_to,
        observation_start, observation_end, listing_id, calendar_session_id, interval_size,
        'UNADJUSTED' AS price_basis, 'CNY' AS currency,
        CAST(open AS DECIMAL(38,10)) AS open, CAST(high AS DECIMAL(38,10)) AS high,

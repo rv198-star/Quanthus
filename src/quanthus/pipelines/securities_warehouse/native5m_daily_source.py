@@ -52,6 +52,10 @@ def m5_grid(day: str) -> list[str]:
 
 def native_m5(raw: bytes, code: str, day: str) -> dict[str, dict[str, Decimal]]:
     value = json.loads(raw)
+    if value.get("provider") == "baostock+tencent-observed-closing-auction-5m":
+        from .closing_auction_source import replay
+
+        return replay(raw, code, day)
     vendor_code = ("sh." if code.startswith("6") else "sz.") + code
     if (
         value.get("provider") != PROVIDER
@@ -256,6 +260,11 @@ def verify_native5m_source(
         from .daily_base24_native_rebind import verify_binding
 
         verify_binding(root, ref, statuses)
+    from .closing_auction_source import phase as source_phase
+    from .closing_auction_source import verify_revision
+
+    verify_revision(root, manifest, statuses)
+
     pq = importlib.import_module("pyarrow.parquet")
     pf = pq.ParquetFile(root / "minute-real-observed.parquet")
     if pf.schema_arrow != minute_schema():
@@ -283,6 +292,12 @@ def verify_native5m_source(
 
                 if "sha256:" + hashlib.sha256(raw).hexdigest() != status.get("raw_sha256"):
                     raise ValueError("NATIVE5M_ORIGINAL_HASH_DIFFERS")
+                if source_phase(
+                    raw, day.replace("-", "") + "1500"
+                ) != "continuous" and code not in manifest.get("closing_auction_revision", {}).get(
+                    "codes", []
+                ):
+                    raise ValueError("AUCTION_UNDECLARED_COMPOUND_SOURCE")
                 remaining = native_m5(raw, code, day)
                 grid = m5_grid(day)
                 if grid[-1] not in remaining or remaining[grid[-1]]["close"].quantize(
@@ -309,7 +324,7 @@ def verify_native5m_source(
                 or row["raw_sha256"] != statuses[code]["raw_sha256"]
                 or row["original_source_observed"] is not True
                 or row["default_research_admitted"] is not True
-                or row["exchange_session_phase"] != "continuous"
+                or row["exchange_session_phase"] != source_phase(raw, stamp)
                 or any(
                     row[name] != original[name]
                     for name in ("open", "high", "low", "close", "volume_shares", "amount")

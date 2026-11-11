@@ -234,3 +234,66 @@ def test_native_parent_reader_cannot_enable_legacy_minute_product(native):
             code_revision="a" * 40,
         )
     assert not output.exists()
+
+
+def test_explicit_relocated_members_preserve_original_native_binding(native, tmp_path):
+    from quanthus.pipelines.securities_warehouse.native_base23_reader import _read_native_tables
+
+    root, materialization, manifest, config = native
+    relocated = {}
+    destination = tmp_path / "paired-dwd"
+    destination.mkdir()
+    for index, table in enumerate(PARENT_TABLES):
+        for record in materialization["layout"][table]["files"]:
+            relative = record["path"]
+            target = destination / (str(index) + ".parquet")
+            (root / relative).rename(target)
+            relocated[relative] = target
+    result = _read_native_tables(
+        root,
+        config,
+        PARENT_TABLES,
+        profile=(KIND, "2.3", manifest["purpose"], "native_base23"),
+        independent_files=True,
+        relocated_members=relocated,
+    )
+    assert result.binding["manifest_sha256"] == config["layers"]["dwd"]["manifest_sha256"]
+    assert all(result.files(table)[0] in relocated.values() for table in PARENT_TABLES)
+    # The ordinary reader continues to demand its original physical closure.
+    with pytest.raises(NativeBase23Error, match="member is missing"):
+        read_native_parent_references(root, config)
+
+
+@pytest.mark.parametrize("damage", ["missing-key", "extra-key", "bytes", "aliased-path", "symlink"])
+def test_relocated_native_members_remain_exact_and_independently_verified(native, tmp_path, damage):
+    from quanthus.pipelines.securities_warehouse.native_base23_reader import _read_native_tables
+
+    root, materialization, manifest, config = native
+    relocated = {
+        record["path"]: root / record["path"]
+        for table in PARENT_TABLES
+        for record in materialization["layout"][table]["files"]
+    }
+    key = next(iter(relocated))
+    if damage == "missing-key":
+        relocated.pop(key)
+    elif damage == "extra-key":
+        relocated["payload/unselected.parquet"] = tmp_path / "unselected.parquet"
+    elif damage == "bytes":
+        relocated[key].write_bytes(b"bad")
+    elif damage == "aliased-path":
+        other = next(k for k in relocated if k != key)
+        relocated[key] = relocated[other]
+    else:
+        link = tmp_path / "link.parquet"
+        link.symlink_to(relocated[key])
+        relocated[key] = link
+    with pytest.raises(NativeBase23Error, match="relocated|differs"):
+        _read_native_tables(
+            root,
+            config,
+            PARENT_TABLES,
+            profile=(KIND, "2.3", manifest["purpose"], "native_base23"),
+            independent_files=True,
+            relocated_members=relocated,
+        )

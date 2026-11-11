@@ -487,8 +487,15 @@ def build_corporate_action_revision(
     return check_corporate_action_revision(output)
 
 
-def check_corporate_action_revision(revision_dir: Path) -> CorporateActionRevision:
-    """Verify checksums and the row-level reconciliation of one immutable revision."""
+def check_corporate_action_revision(
+    revision_dir: Path, *, expected_revision: str | None = None
+) -> CorporateActionRevision:
+    """Verify one revision, optionally bound to an explicit identity after relocation.
+
+    Ordinary revisions must still match their directory name. An enclosing immutable
+    package can supply its bound revision identity when retaining the unchanged files
+    in a different directory; this does not infer scope or confer execution authority.
+    """
 
     revision_dir = revision_dir.resolve()
     manifest = _load_object(revision_dir / MANIFEST_FILE)
@@ -498,7 +505,9 @@ def check_corporate_action_revision(revision_dir: Path) -> CorporateActionRevisi
     ):
         raise CorporateActionRevisionError("unsupported corporate-action revision manifest")
     revision = str(manifest.get("revision", ""))
-    if not revision or revision != revision_dir.name:
+    if not revision or revision != (
+        revision_dir.name if expected_revision is None else expected_revision
+    ):
         raise CorporateActionRevisionError("corporate-action revision does not match its directory")
     try:
         knowledge_cutoff = datetime.fromisoformat(str(manifest["knowledge_cutoff"]))
@@ -520,6 +529,8 @@ def check_corporate_action_revision(revision_dir: Path) -> CorporateActionRevisi
     try:
         for line in (revision_dir / CHECKSUM_FILE).read_text(encoding="utf-8").splitlines():
             digest, name = line.split(maxsplit=1)
+            if name in ledger_checksums:
+                raise CorporateActionRevisionError("duplicate corporate-action checksum member")
             ledger_checksums[name] = f"sha256:{digest}"
     except (OSError, ValueError) as exc:
         raise CorporateActionRevisionError("invalid corporate-action checksum ledger") from exc

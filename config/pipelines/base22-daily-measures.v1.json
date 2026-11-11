@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "contract_id": "p10-base22-retained-daily-measures-v1",
+  "through_date": "2026-08-31",
+  "timezone": "Asia/Shanghai",
+  "purpose": "P10 isolated retained raw-to-typed observations; no market, historical PIT or consumer admission",
+  "tables": {
+    "dwd_security_valuation": {
+      "source_family": "valuation_daily_delta",
+      "source_label": "baostock.query_history_k_data_plus.valuation",
+      "business_date": "raw.date and raw.market_date, observation_start Shanghai date",
+      "vendor_identity": "security_id equals stock_code; dated listing maps vendor code",
+      "fields": [
+        "pe_ttm",
+        "pb",
+        "ps_ttm",
+        "pcf_ttm"
+      ],
+      "nonempty_unhandled_fields_fail_closed": [
+        "total_share",
+        "total_mv"
+      ],
+      "nullable_ratios": "preserve null; zero and negative ratios are genuine observations",
+      "calendar": "exact trade_date, venue from referenced dated listing, day session"
+    },
+    "dwd_index_bar": {
+      "source_family": "index_daily_delta",
+      "source_label": "baostock.query_history_k_data_plus.adjustflag=3",
+      "business_date": "raw.date, observation_start Shanghai date",
+      "identity": "exact active dated index_code/index_id; currency from index",
+      "fields": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "amount"
+      ],
+      "nullable_calendar": "retain model-permitted null; do not invent index venue/session",
+      "raw_only_known_descriptive_fields": [
+        "pct_chg"
+      ]
+    }
+  },
+  "knowledge": "actual governance observation, never business-date backfill; preserve original raw acquisition strings and provider acquisition unknown",
+  "numerics": "Decimal exact scale38_10 serialization; retained float shortest Decimal must recover identical IEEE754 bits; original vendor Decimal remains unknown",
+  "bounds": {
+    "raw_rows_per_family_per_day": 8192,
+    "parent_rows_per_table": 32768,
+    "typed_rows_per_day_per_table": 32768
+  },
+  "stages": [
+    "freeze exact source/code/config/parents and write/cold budget",
+    "copy one immutable history entity closure",
+    "per-day retained raw projection",
+    "seal scoped local byte closure; no final READY",
+    "offline full raw replay and global keys/parents",
+    "two physical relocations with independent processes and native source/network denial",
+    "disposable missing/corrupt failures"
+  ],
+  "physical_rules": "independent regular files; exact payload/physical sets; every full hash; no links or old-source fallback",
+  "consumer_admission": "NOT_GRANTED",
+  "complete_Base22": false
+}

@@ -47,6 +47,7 @@ class NativeImageProfile:
     assess_delivery: Callable[..., dict[str, Any]]
     validate_table: Callable[[str, list[Path]], None] | None = None
     manifest_fields: tuple[tuple[str, Any], ...] = ()
+    scan_factory: Callable[..., GlobalScan] | None = None
 
 
 BASE23_PROFILE = NativeImageProfile(
@@ -568,7 +569,8 @@ def audit_native_image(
     if (root / "manifest.json").exists():
         declared |= {"manifest.json", "READY"}
     summaries = {}
-    with scan_type(budget, read_only_roots=[root]) as scan:
+    factory = profile.scan_factory or scan_type
+    with factory(budget, read_only_roots=[root]) as scan:
         for table in sorted(ss):
             budget.begin_stage("whole-table-" + table)
             entry = record["layout"][table]
@@ -682,20 +684,14 @@ def audit_native_image(
     return result
 
 
-def seal_native_image(
+def native_manifest(
     root: Path,
     receipt: Mapping[str, Any],
     *,
     code_revision: str,
     profile: NativeImageProfile = BASE23_PROFILE,
 ) -> dict[str, Any]:
-    """Seal only a successful full structural scan; independent acceptance follows.
-
-    Called on the mutable job-owned root outside its readonly audit namespace.
-    No sealed output can be overwritten. READY is always the last image file.
-    """
-    if (root / "READY").exists() or (root / "manifest.json").exists():
-        raise BoundedError("NATIVE_IMAGE_SEALED_OUTPUT_ALREADY_EXISTS")
+    """Prepare the exact native manifest from a full scan, without publication."""
     if (
         not receipt.get("assessment", {}).get("build_eligible")
         or receipt.get("kind") != profile.kind
@@ -720,6 +716,20 @@ def seal_native_image(
     }
     manifest.update(dict(profile.manifest_fields))
     manifest["content_digest"] = digest(manifest)
+    return manifest
+
+
+def seal_native_image(
+    root: Path,
+    receipt: Mapping[str, Any],
+    *,
+    code_revision: str,
+    profile: NativeImageProfile = BASE23_PROFILE,
+) -> dict[str, Any]:
+    """Seal a full structural scan; legacy marker and no-overwrite rules remain."""
+    if (root / "READY").exists() or (root / "manifest.json").exists():
+        raise BoundedError("NATIVE_IMAGE_SEALED_OUTPUT_ALREADY_EXISTS")
+    manifest = native_manifest(root, receipt, code_revision=code_revision, profile=profile)
     _write(root / "manifest.json", manifest)
     with (root / "READY").open("x", encoding="utf-8") as stream:
         stream.write(file_sha(root / "manifest.json") + "\n")

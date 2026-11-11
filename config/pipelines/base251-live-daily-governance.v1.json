@@ -1,0 +1,32 @@
+{
+  "build_id": "cn02-standard-daily-2.5.1",
+  "consumer_admission": "NOT_GRANTED",
+  "execution_authorized": false,
+  "layers": {
+    "dwd": {
+      "content_digest": "sha256:1d0e4bd5fbf40bf2876883faf82b98fd81e95a93a82b9d23d248759a38b3f692",
+      "format": "native_standard_base",
+      "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+      "materialization_sha256": "sha256:f93e001c666367113d6e0e6aa1150e247b4d477edc2284e908fd092f57bd1514",
+      "package_id": "standard-base-2.5.1-8cd966be87fc"
+    }
+  },
+  "purpose": "isolated_daily_governance",
+  "schema_version": "quanthus.standard-base-daily-governance.v1",
+  "standard_parent_reference": {
+    "contract": "p10-standard-base-daily-parent-bootstrap-v1",
+    "native_scan_identity": "sha256:62a36a1816525a6c2a964e37381a93eb59b9ba1f6884096bda3430d915e11470",
+    "pair_registration_identity": "sha256:416cf063f76e065484d6a1ab0dd4b61929f6aafebd5cc39c4512f3bdec3d79d6",
+    "source_replay_identity": "sha256:d1f2629227c825c86377cbc580d03b16b8a57ff82a0aade0f356a186cc483523",
+    "status": "SOURCE_AUDITED_GOVERNANCE_BOOTSTRAP_ONLY",
+    "tables": [
+      "dwd_listing",
+      "dwd_security",
+      "dwd_trading_calendar",
+      "dwd_market_index",
+      "dwd_trading_venue"
+    ],
+    "trading_or_research_admission": false
+  },
+  "through_date": "2026-10-31"
+}

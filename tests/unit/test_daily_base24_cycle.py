@@ -448,7 +448,8 @@ def test_replay_publication_preserves_latest_and_disclosed_gaps(tmp_path):
         assert current["consumer_admission"] == "NOT_GRANTED"
 
 
-def test_closed_session_acquires_events_without_price_requests(monkeypatch, tmp_path):
+@pytest.mark.parametrize("seal_fails", [False, True])
+def test_closed_session_acquires_events_without_price_requests(monkeypatch, tmp_path, seal_fails):
     config = {"root": str(tmp_path)}
     run = tmp_path / "run"
     run.mkdir()
@@ -469,7 +470,23 @@ def test_closed_session_acquires_events_without_price_requests(monkeypatch, tmp_
         return {}
 
     monkeypatch.setattr(cycle, "provider", provider)
+    from quanthus.pipelines.securities_warehouse import standard_daily_live
+
+    def finish(config, run, day, value, **kwargs):
+        if seal_fails:
+            raise ValueError("closed-standard-seal-failed")
+        value["standard_delivery"] = "independent-standard-delivery"
+
+    monkeypatch.setattr(standard_daily_live, "finish", finish)
+    if seal_fails:
+        with pytest.raises(ValueError, match="closed-standard-seal-failed"):
+            cycle.collect(config, run, date(2026, 10, 10))
+        assert not (run / "receipt.json").exists()
+        assert not (tmp_path / "DATES.json").exists()
+        return
     result = cycle.collect(config, run, date(2026, 10, 10))
+    assert cycle.object_at(run / "receipt.json") == result
+    assert result["standard_delivery"] == "independent-standard-delivery"
     assert result["status"] == "AUTHORITATIVE_CLOSED_EVENT_SOURCE_READY"
     assert result["price_provider_requests"] == 0
     assert [a for a, _ in calls] == ["calendar", "universe", "events"]

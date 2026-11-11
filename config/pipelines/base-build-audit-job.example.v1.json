@@ -1,0 +1,22 @@
+{
+  "contract": "p10-standard-base-pair-audit-job-v1",
+  "builder_revision": "0000000000000000000000000000000000000000",
+  "ods": "/data/base-build/work/stages/ods/attempt-000001/output/ODS",
+  "dwd": "/data/base-build/work/stages/dwd/attempt-000001/output/DWD",
+  "work_root": "/var/tmp/base-build-audit/attempt-000001",
+  "frozen_input_identity": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "environment_lock": "/code/ops/data/base-build-environment.v1.json",
+  "wheelhouse": "/data/base-build/runtime/wheelhouse",
+  "denied_input_roots": [
+    "/data/inputs/base-ods",
+    "/data/inputs/base-dwd",
+    "/data/inputs/daily-and-references"
+  ],
+  "limits": {
+    "allocated_bytes": 25769803776,
+    "temp_bytes": 17179869184,
+    "free_floor_bytes": 17179869184,
+    "rss_bytes": 4294967296,
+    "wall_seconds": 14400
+  }
+}

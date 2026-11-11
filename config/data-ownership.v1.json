@@ -294,5 +294,23 @@
     "temporarily_ignore": "Defer a nonessential data-dependent capability and continue unaffected business work; keep its issue and unavailable status visible.",
     "accept_known_limitation": "Explicitly record purpose, limitation, impact and evidence grade for a business result allowed by its existing contract; never claim missing evidence is established or data is repaired/qualified."
   },
-  "consumer_stop_rule": "Stop only the affected step when an existing hard safety, PIT, protected-partition or activation gate cannot be met. Registering a data issue does not automatically stop the whole business line."
+  "consumer_stop_rule": "Stop only the affected step when an existing hard safety, PIT, protected-partition or activation gate cannot be met. Registering a data issue does not automatically stop the whole business line.",
+  "warehouse_quality_principle": {
+    "authority": "Owner explicit instruction 2026-10-08",
+    "objective": "Reliable business decisions rather than theoretical absolute precision",
+    "requirements_basis": [
+      "declared data use",
+      "actual decision risk",
+      "repair cost"
+    ],
+    "local_noncritical_defect_blocks_other_qualified_deliveries": false,
+    "required_disposition": [
+      "affected tables/keys/fields",
+      "evidence and uncertainty",
+      "permitted and unavailable uses",
+      "business impact",
+      "smallest useful remediation"
+    ],
+    "source_truth_PIT_and_frozen_consumer_gates_preserved": true
+  }
 }

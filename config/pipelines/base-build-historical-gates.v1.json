@@ -1,0 +1,12 @@
+{
+  "contract": "p10-standard-base-historical-gates-v1",
+  "rule": "Registered observations require a governed disposition before paired publication; selected historical_quality evidence and inherited case registrations also bind the scope, so omitted DWD rows cannot hide a known diagnostic. Absence is proved against the complete paired closure, never declared by a job switch.",
+  "new_quality_held_allowed": 0,
+  "inherited_held": "EXACT_PREDECESSOR_SET_NO_EXPANSION",
+  "cases": [
+    {"id": "SZSE-300114-20250217-volume-coverage", "venue": "SZSE", "stock_code": "300114", "market_date": "2025-02-17", "disposition": "PENDING", "reason": "Minute volume differs by 49 and the original coverage binding is missing."},
+    {"id": "SZSE-002336-20200617-tradability", "venue": "SZSE", "stock_code": "002336", "market_date": "2020-06-17", "disposition": "PENDING", "reason": "Positive daily volume conflicts with historical JUSTIFIED_NO_DATA/daily_status_not_tradable."},
+    {"id": "SZSE-002500-20200617-tradability", "venue": "SZSE", "stock_code": "002500", "market_date": "2020-06-17", "disposition": "PENDING", "reason": "Positive daily volume conflicts with historical JUSTIFIED_NO_DATA/daily_status_not_tradable."},
+    {"id": "SSE-688065-20230615-tradability", "venue": "SSE", "stock_code": "688065", "market_date": "2023-06-15", "disposition": "PENDING", "reason": "Positive daily volume conflicts with historical JUSTIFIED_NO_DATA/daily_status_not_tradable."}
+  ]
+}

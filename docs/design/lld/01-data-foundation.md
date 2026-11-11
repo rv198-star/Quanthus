@@ -46,6 +46,81 @@ same-image notification/backup/TMP roles. Its operational boundary is owned by
 interfaces remain frozen; Weekly financial qualification is scoped, and source
 integration does not activate timers or modify warehouse products.
 
+Base 2.4 delivery status is resolved by `base24_release_status.py` with the exact
+manifest and receipt pins in `config/pipelines/base24-acceptance-bindings.v1.json`.
+The sealed manifest records build-time state; later independent acceptance is an
+additive, hash-bound receipt, never an in-place manifest rewrite. The resolver
+requires both ODS and DWD receipts, two distinct source-hidden/network-denied cold
+processes per image, and the exact missing/corrupt rejection evidence. Only the
+two independent-acceptance checks may supersede their sealed `NOT_RUN` values;
+failed schema, key, lineage or other structural checks cannot be overridden.
+The original limitation registry remains effective. This metadata reconciliation
+reports recorded image acceptance separately from current payload verification,
+October Daily/Weekly qualification and research/trading consumer admission. It
+does not replace physical reader integrity checks or grant those consumer uses.
+The local delivery index locates physical image roots and carries its own receipt
+copies; it is not another image or an external runtime dependency. See the current
+[Base 2.4 delivery checkpoint](../../work-items/base24-build.md).
+
+The CN02 successor's isolated frozen-input Daily orchestration is owned by
+`src/quanthus/pipelines/securities_warehouse/daily_base24_job.py` and
+`config/pipelines/base24-daily-window.v1.json` under `P10-DATA-BASE24-050` and
+`META-OPS-CN02-001`. The DAG creates one daily-core ODS catalog and one immutable
+core, then builds and fully replays the native-5m composite. Only daily and native
+5m enter this product; Weekly and 1m are not prerequisites. Pinned source controls
+and exact selected releases must match before projection and after verification.
+The versioned Shanghai window is enforced through final job receipt creation;
+an expired or failed job retains evidence without a job READY. Explicit historical
+replay cannot establish natural T-day acquisition or consumer/production admission.
+`daily_base24_intake.py` freezes exact already sealed market/event releases,
+native-5m and Base identities plus configuration/prior controls into an immutable
+dated plan. Publisher and runner share the offline control/date checks. The plan
+seal is atomically visible last; same-identity recovery may complete an interrupted
+publication but cannot overwrite a different plan. Intake does not scan or qualify
+payloads, infer acquisition times or claim producer/consumer admission: each payload
+still passes its existing domain verifier in the downstream DAG. The 20:45 intake
+deadline reserves the final 15 minutes for build and replay.
+This runner consumes already sealed inputs. Acquisition scheduling, fresh source
+qualification, independent new-process cold acceptance, notifications and single-writer
+cutover remain separate obligations; timer examples do not install or enable them.
+See [the migration work item](../../work-items/cn02-project-migration.md) for operation.
+
+The source-producing successor is `daily_base24_cycle.py`, invoked by
+`ops/bin/run-cn02-base24-cycle`. Its source-only worker imports the separately
+pinned published collector revision `f839af0033ab4aa8cbe6d9fb933f29db88792e91`;
+it never invokes that revision's legacy complete-Daily/DWD cycle or loads old-node
+service environments. The legacy lane schedule is used only as the collector's
+validated request protocol, not as CN02 deployment ownership, a 1m dependency or
+a T+1 schedule. A new private `cn02_base24_daily_cycle_v1` configuration pins the
+Base, release policy, collector and pipeline revisions, isolated output root and
+at most two native-5m capture workers. One target-date supplier universe is shared
+by market/events acquisition; one immutable daily reference binds all 5m shards.
+Only two source lanes and supplier-native 5m are invoked. Raw SDK strings and real
+observation clocks are retained. Unknown provider availability remains unknown.
+
+The cycle verifies the actual authoritative calendar, including every requested
+date, before deciding whether to collect market prices. Closed dates still acquire
+announcement evidence against an explicit previous open-date universe; they never
+create a price session or an empty substitute market table. On open dates the
+cycle constructs and publishes a qualified daily core once before optional 5m
+completion. An unqualified 5m scope retains its original R3 status, a local alert
+and a core-only receipt; it cannot enter the composite pointer or receive a final
+cycle READY. This preserves useful qualified daily data without weakening strict
+native quality checks. Core and full-product pointers use new Base2.4-specific
+names and never masquerade as legacy CURRENT or grant research/execution admission.
+
+The dated index serializes updates across backfill and current-day jobs. Replaying
+an older date cannot regress the latest pointer; each pointer discloses known
+per-date states rather than implying gap-free coverage. Exact completed retries
+reverify and reuse. The configured Shanghai intake/delivery windows remain binding;
+late work requires explicit recovery mode, keeps actual completion time and is not
+described as on-time delivery. Ordinary operation permits at most two attempts per
+date before requiring an explicit disposition. Write budgets and per-device free
+space/inode checks precede each bounded batch; child processes have finite time/RSS
+limits and retain failures. Formal cold acceptance and node cutover remain explicit
+evidence obligations. The Owner separately authorized actual CN02 Daily activation
+and the October 8 onward backfill on 2026-10-20; this does not activate P3/P5/P6.
+
 Physical data contracts and P1 historical acceptance remain here. From 2026-10-03 acquisition,
 shared quality/governance, maintenance and source recovery/repair belong to P10 under
 [`12-permanent-data-line.md`](12-permanent-data-line.md). Other lines only register data defects
@@ -119,6 +194,17 @@ keys from independently checksummed raw evidence.
 
 Raw files never receive in-place corrections. A source correction creates a new revision and
 new downstream snapshot id.
+
+The non-activated [P10 Daily price-basis candidate](01-data-foundation/daily-price-basis.md)
+addresses #473 through an explicit version of the existing Daily builder. Its candidate package
+cannot enter default CURRENT or consumer admission; source replacement and release remain gated.
+
+The additive [Base 2.2 independent image engineering contract](01-data-foundation/base22-independent-image.md)
+prepares CN02-only synthetic construction and cold verification through the Shanghai business
+date 2026-08-31. The separate approved Phase2 scope permits bounded retained-source governance
+and observation outputs; full source qualification, complete-image acceptance and release remain gated.
+The linked child also owns the approved opt-in holder exact-column preparation, with the
+legacy model and sealed observations retained unchanged.
 
 The ODS Base packaging, source precedence, completeness boundary, and recovery lifecycle are
 owned by [`01-data-foundation/ods-base.md`](01-data-foundation/ods-base.md). It is separate from
@@ -464,6 +550,16 @@ SHA-precondition pointer CAS. It also records accepted-ODS recovery copies, rest
 drills, and denies purge until every retention precondition passes. Production evidence for these
 paths, creation of an externally reviewed corrected release set, and failure-independent restore
 qualification remain open; code coverage alone does not authorize cutover or cleanup.
+
+Accepted-ODS recovery assessments verify each retained copy receipt against its existing
+SHA-named `copy-index` entry before counting failure domains. The index must bind the exact
+receipt bytes, copy id and root-relative path; missing, orphaned or inconsistent index entries
+and symbolic-link evidence fail closed. An interrupted receipt/index write is not recovery
+proof and must not be repaired by deriving a new index from untrusted receipt contents. This
+P10 / `OPS-HERMES-GC-001` (#310) evidence-integrity slice is covered by
+`tests/unit/test_accepted_ods_recovery_receipts.py`. It preserves the correction horizon and
+copy-only purge prohibition, does not re-enable the retired dual-lane runtime, and does not
+implement successful-cache GC, live copy revalidation, reference inventory or cleanup authority.
 
 ### 5.6 Monthly-complete DWD/DWS Base
 

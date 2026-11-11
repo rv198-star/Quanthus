@@ -1,0 +1,17 @@
+{
+  "contract_id": "p10-base231-official-profile-current-financial-origin-v1",
+  "business_through": "2026-09-30",
+  "business_timezone": "Asia/Shanghai",
+  "source": "CNINFO official company-profile PDF, actual code header and exact retained company name",
+  "date_field": "成立日期",
+  "scope": "CURRENT_FINANCIAL_LITERAL_SOURCE_REPORTED_ORIGIN_ONLY",
+  "binding": "Unique original company/org/security, exact retained display name and first IPO date; original financial literal source closure remains required",
+  "financial_window": "source-reported establishment date <= report period end < actual first IPO date; new governance knowledge only",
+  "legal_form_or_continuity_qualification": false,
+  "historical_name_or_listing_extension": false,
+  "historical_PIT_admission": "NOT_GRANTED",
+  "consumer_admission": "NOT_GRANTED",
+  "original_source_values_and_clocks": "unchanged",
+  "missing_ambiguous_mismatched_dates": "hold affected issuer only",
+  "current_profile_snapshot": "actual current receipt time, never a September historical capture"
+}

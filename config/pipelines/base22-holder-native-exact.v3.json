@@ -1,0 +1,28 @@
+{
+  "schema_version": 3,
+  "contract_id": "p10-base22-holder-native-exact-v3-preparation",
+  "purpose": "isolated_native_exact_precision_preparation",
+  "parent_schema_contract_sha256": "sha256:a57938ee94a91510133cbfbe78373c32c38673a5a3780dd759d250d8ddefe97c",
+  "approved_11_scale_parent": "p10-base22-holder-exact-v2",
+  "v2_unchanged": true,
+  "table": "dwd_shareholder_count_observation",
+  "field": {
+    "name": "average_holding_exact",
+    "precision": 41,
+    "scale": 13,
+    "nullable": true
+  },
+  "physical_decimal": "decimal256",
+  "legacy_integer_digits_preserved": 28,
+  "raw_field": "raw_average_holding",
+  "rule": "exact_retained_native_decimal_text_else_null_only_for_source_null",
+  "unsupported_or_nonfinite": "fail_closed",
+  "old_columns_parser_provenance_time": "unchanged",
+  "vendor_original_decimal_or_publication_availability": "not_inferred",
+  "maximum_batch_rows": 16384,
+  "business_through": "2026-08-31",
+  "timezone": "Asia/Shanghai",
+  "whole_image_schema_admission": "pending_final_candidate_review",
+  "source_admission": "not_granted_by_representation",
+  "consumer_admission": "NOT_GRANTED"
+}

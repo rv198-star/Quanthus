@@ -119,6 +119,23 @@ def library_contracts(config: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
             spec = next(x for x in config["sources"] if x["key"] == key)
             request = futures_module.request(spec["contract_scope"]["contract"])
             parser = partial(futures_module.parse, contract=spec["contract_scope"]["contract"])
+        elif capability in {"margin.single_security.bounded", "block_trades.a_share.bounded"}:
+            a_shares = importlib.import_module("astock.a_shares")
+            spec = next(x for x in config["sources"] if x["key"] == key)
+            scope = spec["sample_scope"]
+            if capability == "margin.single_security.bounded":
+                arguments = {
+                    "code": scope["security_code"],
+                    "start": scope["start"],
+                    "end": scope["end"],
+                    "limit": scope["limit"],
+                }
+                request = a_shares.margin_request(**arguments)
+                parser = partial(a_shares.parse_margin, **arguments)
+            else:
+                arguments = {"trade_date": scope["trade_date"], "limit": scope["limit"]}
+                request = a_shares.block_request(**arguments)
+                parser = partial(a_shares.parse_blocks, **arguments)
         else:
             parser = {
                 "lpr.history": lpr.parse,
@@ -340,6 +357,69 @@ def normalize(result: Any, spec: dict[str, Any], config: dict[str, Any]) -> dict
                         for k, v in (*item.amounts_native, *item.percentages_native)
                     },
                     flow_basis="VENDOR_CLASSIFIED_SECONDARY_TRADING_NOT_CREATION_REDEMPTION",
+                )
+            elif kind in {"a_share_margin", "a_share_block_trade"}:
+                scope = spec["sample_scope"]
+                session = item.session_date
+                if not re.fullmatch(
+                    r"(?:sh(?:60|68)[0-9]{4}|sz(?:00|30)[0-9]{4}|bj(?:[48][0-9]{5}|92[0-9]{4}))",
+                    item.security,
+                ):
+                    raise ValueError("SOURCE_A_SHARE_SECURITY_SCOPE_MISMATCH")
+                if kind == "a_share_margin":
+                    if item.security != scope["security"]:
+                        raise ValueError("SOURCE_A_SHARE_SECURITY_SCOPE_MISMATCH")
+                    if not date.fromisoformat(scope["start"]) <= session <= date.fromisoformat(
+                        scope["end"]
+                    ):
+                        raise ValueError("SOURCE_A_SHARE_SESSION_SCOPE_MISMATCH")
+                    row.update(
+                        record_key=f"{item.security}:{session}",
+                        unqualified_source_fields=dict(item.unqualified_fields),
+                        margin_basis="VENDOR_FINANCING_AND_STOCK_LENDING_BALANCES_AND_FLOWS",
+                    )
+                    flags.add("BALANCE_DIFFERENCE_NOT_ADMITTED_AS_DAILY_CHANGE")
+                else:
+                    if session.isoformat() != scope["trade_date"]:
+                        raise ValueError("SOURCE_A_SHARE_SESSION_SCOPE_MISMATCH")
+                    row.update(
+                        record_key=f"{item.security}:{session}:{item.source_rank}",
+                        source_row_rank=item.source_rank,
+                        row_identity_basis="VENDOR_DAILY_RANK_NOT_EXCHANGE_TRADE_ID",
+                        buyer_branch=item.buyer,
+                        seller_branch=item.seller,
+                        price_basis="VENDOR_BLOCK_AND_CLOSE_REFERENCES_NO_ADJUSTMENT_INFERENCE",
+                        transaction_basis="VENDOR_BLOCK_TRADE_DISCLOSURE_NOT_PORTFOLIO_FILL",
+                    )
+                    values = dict(item.source_fields)
+                    if values["DEAL_AMT"] != values["DEAL_PRICE"] * values["DEAL_VOLUME"]:
+                        flags.add("BLOCK_TRADE_REPORTED_AMOUNT_DIFFERS_FROM_PRICE_TIMES_SHARES")
+                        row["reported_amount_matches_price_times_shares"] = False
+                    else:
+                        row["reported_amount_matches_price_times_shares"] = True
+                if set(dict(item.source_fields)) != set(spec["fields"]):
+                    raise ValueError("SOURCE_A_SHARE_METRIC_SET_MISMATCH")
+                dates.append(session)
+                flags.update(
+                    {
+                        "FIXED_SESSION_SAMPLE_NOT_LATEST_COVERAGE",
+                        "BOUNDED_FIRST_PAGE_NO_COMPLETENESS",
+                        "SESSION_DATE_NOT_PUBLICATION_OR_HISTORICAL_KNOWLEDGE",
+                        "VENDOR_REFERENCE_NOT_EXCHANGE_INDEPENDENTLY_RECONCILED",
+                    }
+                )
+                row.update(
+                    security=item.security,
+                    source_name=item.name,
+                    session_date=session.isoformat(),
+                    date_basis="VENDOR_REPORTED_SESSION_LABEL",
+                    source_clock_kind="SESSION_DATE_ONLY_NOT_PUBLICATION",
+                    sample_scope=scope,
+                    source_reported_total=item.reported_total,
+                    source_reported_pages=item.reported_pages,
+                    source_returned_rows=len(result.records),
+                    all_matching_rows_acquired=len(result.records) == item.reported_total,
+                    metrics={k: metric(v, spec["fields"][k]) for k, v in item.source_fields},
                 )
             elif kind == "futures_contract_price":
                 scope = spec["contract_scope"]

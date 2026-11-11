@@ -64,6 +64,33 @@ The [Base 2.4 construction integration](p10-base24-main-integration.md) brings
 the remaining bounded ODS/DWD builders and synthetic regressions into main.
 It excludes collector deployment, container/timer operations and data switching.
 
+### Historical Base preparation inventory
+
+These retained Base 2.2/2.4 rows record the original preparation scope. Current Base 2.5.1 sealing, delivery and Daily alignment are recorded by [#600](https://github.com/rv198-star/Quanthus/issues/600); independent-node reconstruction remains deferred under [#601](https://github.com/rv198-star/Quanthus/issues/601). Main source integration is tracked in [#603](https://github.com/rv198-star/Quanthus/issues/603).
+
+| ID | Title | Depends on | Disposition |
+| --- | --- | --- | --- |
+| P10-DATA-BASE24-000 | ODS/DWD Base 2.4 and CN02 T-day Daily, REQ v1.3 | P10-DATA-000 | [#527](https://github.com/rv198-star/Quanthus/issues/527); [execution plan](base24-build.md); source/capacity/image/reader acceptance pending |
+| P10-DATA-BASE24-010 | 证明2020起原生5m与退市证券来源可行性并保全原始字节 | P10-DATA-BASE24-000 | [#529](https://github.com/rv198-star/Quanthus/issues/529); bounded preparation ready; not accepted |
+| P10-DATA-BASE24-020 | 闭合历史listing×session分母和逐桶/日/月/年覆盖账本 | P10-DATA-BASE24-000 | [#530](https://github.com/rv198-star/Quanthus/issues/530); bounded preparation ready; not accepted |
+| P10-DATA-BASE24-030 | 复用既有8/9月5m并修复9月底来源→DWD断点 | P10-DATA-BASE24-010, P10-DATA-BASE24-020, P10-DATA-BASE24-060 | [#531](https://github.com/rv198-star/Quanthus/issues/531); dependent execution blocked; safe design may proceed; not accepted |
+| P10-DATA-BASE24-040 | 构建新ODS闭包及完整33表DWD Base2.4实体配对 | P10-DATA-BASE24-030, P10-DATA-BASE24-020, P10-DATA-BASE24-060 | [#532](https://github.com/rv198-star/Quanthus/issues/532); dependent execution blocked; safe design may proceed; not accepted |
+| P10-DATA-BASE24-050 | 适配CN02 1d+5m读取器并生成真实隔离October Daily | P10-DATA-BASE24-040 | [#533](https://github.com/rv198-star/Quanthus/issues/533); dependent execution blocked; safe design may proceed; not accepted |
+| P10-DATA-BASE24-060 | 冻结每盘峰值容量、保留/回收与分片恢复方案 | P10-DATA-BASE24-000 | [#528](https://github.com/rv198-star/Quanthus/issues/528); bounded preparation ready; not accepted |
+| P10-DATA-BASE24-070 | 完成成对镜像恢复、全表冷验收与损坏失败关闭 | P10-DATA-BASE24-040, P10-DATA-BASE24-050, P10-DATA-BASE24-060 | [#534](https://github.com/rv198-star/Quanthus/issues/534); dependent execution blocked; safe design may proceed; not accepted |
+| P10-DATA-BASE24-080 | 准备CN01→CN02单writer交接、OCI/GDrive与成对回滚 | P10-DATA-BASE24-070, P10-DATA-BASE24-050 | [#535](https://github.com/rv198-star/Quanthus/issues/535); dependent execution blocked; safe design may proceed; not accepted |
+| P10-DATA-BASE24-090 | 取得CN02自然T日盘后、异常恢复及逐端真实运行证据 | P10-DATA-BASE24-080 | [#536](https://github.com/rv198-star/Quanthus/issues/536); dependent execution blocked; safe design may proceed; not accepted |
+| P10-DATA-BASE22-000 | Base 2.2 独立基准镜像：领域闭合、隔离构建与最终验收 | P10-DATA-000; [four-principle programme](base22-build.md) | open finite programme; #480; complete candidate/acceptance pending |
+| P10-DATA-BASE22-010 | 闭合剩余公司行动60键并物化完整领域修复 | P10-DATA-BASE22-000 | #481; 60 original keys remain |
+| P10-DATA-BASE22-020 | 闭合股东208冲突及weekly非空领域并完成原生合并 | P10-DATA-BASE22-000 | #482; 208 conflicts and source-domain closure remain |
+| P10-DATA-BASE22-030 | 闭合normalization原证据或有资格完整新revision | P10-DATA-BASE22-010; legacy #471 retained | #483; exact original evidence/full successor pending |
+| P10-DATA-BASE22-040 | 补齐42个August分钟release原始价格口径证据 | P10-DATA-BASE22-000; legacy #473 retained | #484; 42 releases have missing original metadata |
+| P10-DATA-BASE22-050 | 闭合权威August日历、上市身份和状态生命周期 | P10-DATA-BASE22-000 | #485; whole-market evidence pending |
+| P10-DATA-BASE22-060 | 完成精确33表August覆盖账本与领域集成 | P10-DATA-BASE22-010, P10-DATA-BASE22-020, P10-DATA-BASE22-030, P10-DATA-BASE22-040, P10-DATA-BASE22-050 | #486; independent qualified integration may continue |
+| P10-DATA-BASE22-070 | 冻结完整预算并构建CN02实体独立候选 | P10-DATA-BASE22-060 | #487; full candidate not built |
+| P10-DATA-BASE22-080 | 完成整份镜像两次独立冷验收和损坏负测 | P10-DATA-BASE22-070 | #488; whole-image acceptance not run |
+| P10-DATA-BASE22-090 | 准备精确版本发布、同步和回滚方案 | P10-DATA-BASE22-080 for final identity | #489; preparation only, production execution requires Owner confirmation |
+
 #424 keeps its subgroup scope and execution gates. P3 #412 and P5 #402 retain input admission,
 research and explicit business disposition; source recovery/repair belongs to P10. They may
 continue permitted business work but their required-data gates remain unaccepted.

@@ -1,0 +1,11 @@
+{
+  "contract": "p10-standard-calendar-day-delivery-v1",
+  "market_day": "Retain the original source-replayed seven-table 1d/native5m projection and all raw/reference members.",
+  "closed_day": "Deliver observed calendar and original events with complete observed market-reference source; do not manufacture bars.",
+  "coverage": "One delivery for every calendar day after the paired Base cutoff. Market event windows retain the original covered_after date; overlaps are explicit observations.",
+  "unchanged_event_observations": "Only exactly equal business facts and equal subject sets may select the earliest actual knowledge_from row, with deterministic source-hash ties. Retain all original observations in ODS. No invented clock or closed knowledge interval.",
+  "changed_event_fact": "REJECT_REQUIRES_GOVERNED_REVISION",
+  "new_quality_held": 0,
+  "consumer_admission": "NOT_GRANTED",
+  "execution_authorized": false
+}

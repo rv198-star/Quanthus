@@ -8979,6 +8979,144 @@
       "reviewed_modules": [
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-612-20261111T121242422791Z",
+      "recorded_at": "2026-11-11T12:12:42.422791+00:00",
+      "actor": "Codex independent v2 reviewer; Owner-started #612",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "outcome": "progress",
+      "summary": "Accept fixed v2 contract/result and small allocation; Worker fails three contract cases, 612/R1 await bounded reacceptance.",
+      "evidence": [
+        {
+          "id": "AUDIT612-V2",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+          "sha256": "0b6b7722c2cece772e1e57bb6feabfc931bdab86137f3b6263cc7354a4727c22",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed-A2 reconstruction/readback and three Worker counterexamples; bounded allocation accepted, Worker repair pending."
+        }
+      ],
+      "updates": [
+        {
+          "module": "FACTS",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "Fixed A2, consumed 2020-2021: independent 90648/90573, 75 blocks, all groups and 449 candidate days match",
+          "remaining": "Latest-sealed raw-price description only; new scientific/PIT uses require their own contracts",
+          "next_action": "Retain the result and select the next named signal question under existing governance",
+          "supersedes": "CP-611-20261111T112133530157Z",
+          "evidence": [
+            "AUDIT612-V2"
+          ]
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "A2 bytes and values verified; three reproduced Worker defects: failed-stage publication, candidate-days gate, partial-package recovery",
+          "remaining": "610 must repair these differences before reusable Worker acceptance",
+          "next_action": "Repair F1/F2/F3 with transition regressions; defer PR617 merge, retain qualified A2 result",
+          "supersedes": "CP-610-20261111T111218136234Z",
+          "evidence": [
+            "AUDIT612-V2"
+          ]
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "Adopt the small allocation branch: retain P2 guards, prioritize a named signal question, defer Worker expansion",
+          "remaining": "Strategy economics and complete monetary ROI unmeasured; R1 waits on 610",
+          "next_action": "Bounded 610 closure first; 613/614 remain condition-triggered",
+          "supersedes": "CP-611-20261111T112133530157Z",
+          "evidence": [
+            "AUDIT612-V2"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-REVIEW-001",
+          "number": 612,
+          "title": "[META-RESEARCH-REVIEW-001] 独立审阅首个结果并完成采用、入账与长期证据留存",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T12:10:42Z",
+          "body_sha256": "b795d4c462449adc94934fe9b431492a70f09791e40aca287c3de4c728794bc1"
+        }
+      ]
+    },
+    {
+      "id": "CP-610-20261111T121243488180Z",
+      "recorded_at": "2026-11-11T12:12:43.488180+00:00",
+      "actor": "Codex independent v2 reviewer; Owner-started #612",
+      "work_item": "P3-RESEARCH-HF-001",
+      "outcome": "reopened",
+      "summary": "Reopen only three proven Worker defects; 609 and 611 remain complete.",
+      "evidence": [
+        {
+          "id": "AUDIT612-V2",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+          "sha256": "0b6b7722c2cece772e1e57bb6feabfc931bdab86137f3b6263cc7354a4727c22",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed-A2 reconstruction/readback and three Worker counterexamples; bounded allocation accepted, Worker repair pending."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "The independent 612 checkpoint already records REPRO partial status; this record reconciles 610 lifecycle.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-HF-001",
+          "number": 610,
+          "title": "[P3-RESEARCH-HF-001] 为首个研究任务打通最小HF读取、限额运行与结果回传",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T12:10:39Z",
+          "body_sha256": "4c04179d733f09a19a84b7ff21440784563f141a426b3060ff8511920b69ab95"
+        }
+      ],
+      "reviewed_modules": [
+        "REPRO"
+      ]
+    },
+    {
+      "id": "CP-2-20261111T121244409272Z",
+      "recorded_at": "2026-11-11T12:12:44.409272+00:00",
+      "actor": "Codex independent v2 reviewer; Owner-started #612",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "Append independent v2 evidence and model task policy using existing governance.",
+      "evidence": [
+        {
+          "id": "AUDIT612-V2",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+          "sha256": "0b6b7722c2cece772e1e57bb6feabfc931bdab86137f3b6263cc7354a4727c22",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed-A2 reconstruction/readback and three Worker counterexamples; bounded allocation accepted, Worker repair pending."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "No TRACE mechanism or authority change.",
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
     }
   ]
 }

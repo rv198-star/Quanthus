@@ -786,6 +786,107 @@
         "CP-611-20261111T112133530157Z"
       ],
       "supersedes": null
+    },
+    {
+      "recorded_at": "2026-11-11T12:15:34.375152+00:00",
+      "actor": "Codex independent v2 reviewer; Owner-started #612",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Original execution ~1.7h / Owner ~2h, v1 audit and Sol repair retained. Independent reconstruction 55.922s / 1960212KiB peak; HF readback 5.886s; complete checks in final-validation. Full active-time, tokens and billing unknown_not_zero.",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/logs/make-check.log"
+      ],
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "reject_candidate",
+      "id": "CON-R1-WORKER-V2-INDEPENDENT-20261111",
+      "question_id": "P3-RESEARCH-HF-001-CONFORMANCE",
+      "family": "hf-dwd-worker-contract",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "修正后的v2能否满足固定任务的单节点HF Worker工程合同？",
+      "consumer": "R2调用方、独立审阅者和Worker维护者",
+      "scope": "Unmodified 2dc01f18 Worker with authentic A2 inputs/outputs and independent synthetic transition/sample/recovery probes",
+      "claim_ceiling": "Fixed A2 values and bytes verified; three reproducible contract defects remain in reusable Worker.",
+      "decision_effect": "Reopen 610 for F1 failed-stage publication, F2 candidate-day gate, F3 partial-package recovery; defer PR617 merge and R1 closure. Retain completed 609/611 and independent acceptance of the A2 result.",
+      "reopen_conditions": [
+        "All three counterexamples fixed with transition regressions, complete checks and independent difference review."
+      ],
+      "retained_assets": [
+        "Exact source/environment closure and immutable A2 package",
+        "Independent fault probes and bounded repair instructions",
+        "All v1/v2 history, costs and consumed exposure"
+      ],
+      "evidence": [
+        {
+          "id": "AUDIT612-V2",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+          "sha256": "0b6b7722c2cece772e1e57bb6feabfc931bdab86137f3b6263cc7354a4727c22",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed-A2 reconstruction/readback and three Worker counterexamples; bounded allocation accepted, Worker repair pending."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-612-20261111T121242422791Z"
+      ],
+      "supersedes": "CON-R1-WORKER-V2-20261111"
+    },
+    {
+      "recorded_at": "2026-11-11T12:15:34.375345+00:00",
+      "actor": "Codex independent v2 reviewer; Owner-started #612",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Original execution ~1.7h / Owner ~2h, v1 audit and Sol repair retained. Independent reconstruction 55.922s / 1960212KiB peak; HF readback 5.886s; complete checks in final-validation. Full active-time, tokens and billing unknown_not_zero.",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/logs/make-check.log"
+      ],
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "park",
+      "id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "question_id": "RESEARCH-R1-HF-002",
+      "family": "tradability-execution-screen",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ],
+      "question": "固定未复权价格筛选的T+1价格守卫阻断频率是否触发优先执行调查？",
+      "consumer": "R2有限研究任务下达者与独立采用审阅者",
+      "scope": "已消费2020-2021开发窗；决策2020-03-02至2021-12-30，执行尾2021-12-31；2019仅日历年龄；latest sealed retrospective",
+      "claim_ceiling": "Independent fixed descriptive counts, sample/concentration and small allocation branch; new capital/PIT uses retain separate contracts.",
+      "decision_effect": "Adopt 90648 candidate opportunities / 75 blocks (0.0827376%) and the small branch. Keep P2 guards, prioritize a named signal question, defer Worker expansion. Park this answered question; 610 repairs only the Worker differences.",
+      "reopen_conditions": [
+        "A material input/formula change or contradictory independent evidence requires a new bounded request; retain prior exposure."
+      ],
+      "retained_assets": [
+        "Independent pandas/numpy reconstruction, all grouped counts match",
+        "Ten HF files independently downloaded at immutable revision and verified",
+        "Candidate days 207/242 independently qualify the adopted allocation branch"
+      ],
+      "evidence": [
+        {
+          "id": "AUDIT612-V2",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+          "sha256": "0b6b7722c2cece772e1e57bb6feabfc931bdab86137f3b6263cc7354a4727c22",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed-A2 reconstruction/readback and three Worker counterexamples; bounded allocation accepted, Worker repair pending."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-612-20261111T121242422791Z"
+      ],
+      "supersedes": "CON-R1-PRICE-GUARD-V2-20261111"
     }
   ]
 }

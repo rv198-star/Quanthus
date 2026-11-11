@@ -48,6 +48,7 @@ the P6 critical path.
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03 | open epic |
+| P10-DATA-HIST-1D-FULL-001 | Publish a standalone full daily history through the Base 2.5.1 cutoff | P10-DATA-000; Hist #602; #600 | [#619](https://github.com/rv198-star/Quanthus/issues/619); [construction and publication](p10-hist-1d-full.md); Owner authorized immediate HF default replacement, old revision retained |
 | P10-DATA-OPS-016 | Integrate the CN02 acquisition/container operational stack | P10-DATA-000 | [#537](https://github.com/rv198-star/Quanthus/issues/537); [source integration](p10-container-main-integration.md); release activation and full Weekly acceptance remain separate |
 | P10-DATA-SUPPLY-000 | Update the upstream reference and qualify supplementary sources | P10-DATA-000 | [#581](https://github.com/rv198-star/Quanthus/issues/581); [runtime lineage and bounded screening](p10-source-supply-20261029.md); #582–#585 track capability-specific remaining gates |
 | P10-DATA-SUPPLY-001 | Establish CN02 lineage and the updated upstream baseline | P10-DATA-SUPPLY-000 | [#582](https://github.com/rv198-star/Quanthus/issues/582); ready; bounded evidence in the supply work item |

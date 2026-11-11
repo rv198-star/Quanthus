@@ -1,0 +1,52 @@
+{
+  "schema_version": "quanthus.hist-1d.full.v1",
+  "product": "Quanthus Hist-1D v2",
+  "issue": 619,
+  "owner": "P10",
+  "acceptance_profile": "hist1d-full-source-preserving-v1",
+  "authority": "Owner explicitly requested immediate construction and replacement of the current HF default release, 2026-11-11",
+  "scope": {
+    "start": "1990-12-19",
+    "business_through": "2026-10-31",
+    "cutover": "2020-01-01",
+    "venues": ["SSE", "SZSE"],
+    "security_type": "A-share ordinary equity, including delisted listings",
+    "interval_size": "1d",
+    "price_basis": "UNADJUSTED"
+  },
+  "parents": {
+    "historical": {"repo": "rv192/quanthus-hist-1d", "revision": "0824ed0bcec6b979777a387a41ca3a8c0e491098", "manifest_sha256": "7cefe59c560a12dd4f5bb4ef1d6f327ea43ece7b4a56fe85ac1e90edc9459506"},
+    "modern": {"repo": "rv192/quanthus-base25-sealed", "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3", "manifest_sha256": "8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef"}
+  },
+  "values": {"price_type": "DECIMAL(38,10)", "factor_type": "DECIMAL(38,18)", "volume_unit": "share", "turnover_unit": "CNY"},
+  "time": {
+    "business_timezone": "Asia/Shanghai",
+    "timestamp_storage": "UTC",
+    "bar_coordinates": "Preserve each parent byte-for-byte; derive trading dates in Asia/Shanghai and join calendar_session_id. Parent midnight/session coordinates and unknown reference clocks remain disclosed.",
+    "knowledge": "Preserve actual source knowledge clocks. Retrospective research, without historical-PIT promotion."
+  },
+  "reference_merge": {
+    "ordinary": "Use complete Base2.5.1 references after checking Hist is a value-identical subset.",
+    "intervals": "Keep Base full source intervals and add Hist observations absent by id and knowledge_from; reject conflicting duplicate source identities.",
+    "factors": "Merge PROVIDER_ADJUST_FACTOR/PROVIDER_NATIVE event keys, require identical overlap values, preserve event/source/knowledge fields, derive effective_to from the next source event.",
+    "tradability": "Frozen Base2.5.1 reference snapshot; coverage is audited against current selected bars. Existing missing-observation reasons are reference-version facts, not current bar absence or trading authority."
+  },
+  "quality_segments": [
+    {"start": "1990-12-19", "end": "2004-12-31", "grade": "REFERENCE", "profile": "inherited Hist-1D v1"},
+    {"start": "2005-01-01", "end": "2019-12-31", "grade": "CYCLE_RESEARCH", "profile": "hist1d-cycle-research-binary-st-v1", "binary_st_missing_max": 0, "binary_st_conflicts_max": 0},
+    {"start": "2020-01-01", "end": "2026-10-31", "grade": "BASE251_SOURCE_OBSERVATIONS", "profile": "inherited sealed Base2.5.1 governance grade; price observations and reference qualifications reported separately"}
+  ],
+  "acceptance": {
+    "bar_source_byte_changes_max": 0,
+    "new_bar_rows_max": 0,
+    "new_duplicate_current_bar_keys_max": 0,
+    "new_calendar_fk_errors_max": 0,
+    "historical_unexplained_gaps_max": 0,
+    "factor_event_value_conflicts_max": 0,
+    "reference_limitations": "Retain inherited modern missing-factor, lifecycle/calendar, status and historical-source limitations with exact affected-scope ledgers. No absent state is imputed.",
+    "deferred_subtype_issue": "https://github.com/rv198-star/Quanthus/issues/606"
+  },
+  "publication": {"repo": "rv192/quanthus-hist-1d", "replace_default_after_verification": true, "preserve_old_revision": true, "base_and_production_mutation": false},
+  "raw_sources": "Historical source backups and sealed Base2.5.1 ODS remain the source archives; publication carries parent identities, selected member hashes and recovery references.",
+  "budget": {"threads": 2, "duckdb_memory": "2GB", "free_space_floor_bytes": 2000000000, "scope": "Local parent composition and publication; no new collection"}
+}

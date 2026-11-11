@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Launch one reviewed Base build under its own control set (issue #600 P1.3).
+
+Starts the pinned controller as a single systemd unit: PrivateNetwork=yes, the
+outer wall clock that covers both audit passes, the isolated interpreter and the
+global BUILD.lock. Refuses to start unless the reviewed frozen input, environment
+identity, repository revision and target paths still match what was prepared.
+
+This tool only launches. It never edits data, controls or the repository.
+"""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+import pathlib
+import re
+import subprocess
+import sys
+
+
+def sha256(path: pathlib.Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def shell(command: str) -> str:
+    done = subprocess.run(["bash", "-lc", command], capture_output=True, text=True)
+    return (done.stdout + done.stderr).strip()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--job", required=True, type=pathlib.Path)
+    parser.add_argument("--contract", required=True, type=pathlib.Path)
+    parser.add_argument("--execution", required=True, type=pathlib.Path)
+    parser.add_argument("--repository", required=True, type=pathlib.Path)
+    parser.add_argument("--unit", required=True)
+    parser.add_argument("--log", required=True, type=pathlib.Path)
+    parser.add_argument("--wall-seconds", type=int, default=43200)
+    parser.add_argument("--expect-frozen", required=True)
+    parser.add_argument("--expect-environment", required=True)
+    parser.add_argument("--dry-run", action="store_true",
+                        help="print the unit command without starting it")
+    options = parser.parse_args()
+
+    if os.geteuid() != 0:
+        raise SystemExit("run as root")
+    if not re.fullmatch(r"[0-9a-z][0-9a-z_.-]{0,60}", options.unit):
+        raise SystemExit("unsafe unit name")
+
+    job = json.loads(options.job.read_text())
+    contract = json.loads(options.contract.read_text())
+    execution = json.loads(options.execution.read_text())
+    revision = job["builder_revision"]
+    work_root, audit_parent = pathlib.Path(job["work_root"]), pathlib.Path(execution["audit_parent"])
+
+    active = shell("systemctl list-units --all --no-legend --no-pager "
+                   "| grep -E 'quanthus-base-build-|quanthus-base251-' || true")
+    if active:
+        raise SystemExit(f"a build unit is present:\n{active}")
+    if shell(f"systemctl cat {options.unit} 2>/dev/null | head -1"):
+        raise SystemExit(f"unit {options.unit} already exists")
+    if work_root.exists() or audit_parent.exists():
+        raise SystemExit("target work root or audit parent already exists")
+    if options.log.exists():
+        raise SystemExit(f"log already exists {options.log}")
+    head = shell(f"git -C {options.repository} rev-parse HEAD")
+    dirty = shell(f"git -C {options.repository} status --porcelain")
+    if head != revision or dirty:
+        raise SystemExit(f"clean pinned worktree required, head={head} dirty={dirty[:200]}")
+
+    frozen = json.loads(pathlib.Path(job["frozen"]).read_text())
+    if frozen["identity"] != options.expect_frozen:
+        raise SystemExit(f"frozen identity changed: {frozen['identity']}")
+    if sha256(pathlib.Path(job["environment_lock"])) != options.expect_environment:
+        raise SystemExit("environment lock changed")
+    if contract["base_version"] != "2.5.1" or contract["business_through"] != "2026-10-31":
+        raise SystemExit("contract scope changed")
+
+    lock = pathlib.Path("/srv/quanthus-base22-data/build/base25-20261031/controls/BUILD.lock")
+    with lock.open("a+") as stream:
+        try:
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise SystemExit("global BUILD.lock is held")
+        fcntl.flock(stream, fcntl.LOCK_UN)
+
+    command = [
+        "systemd-run", f"--unit={options.unit}", "--collect", "--service-type=exec",
+        "--property=PrivateNetwork=yes",
+        f"--property=WorkingDirectory={options.repository}",
+        f"--property=RuntimeMaxSec={options.wall_seconds}",
+        f"--property=StandardOutput=append:{options.log}",
+        f"--property=StandardError=append:{options.log}",
+        "--property=Nice=10",
+        f"--setenv=PYTHONPATH={options.repository}/src:{options.repository}",
+        "--setenv=PYTHONTZPATH=",
+        "--setenv=PYTHONDONTWRITEBYTECODE=1",
+        "/usr/bin/flock", "--wait", "30", str(lock),
+        execution["runtime_python"], "-m",
+        "quanthus.pipelines.securities_warehouse.base_build", "build",
+        "--job", str(options.job), "--contract", str(options.contract),
+        "--execution", str(options.execution),
+    ]
+    record = {
+        "unit": options.unit,
+        "revision": revision,
+        "job": str(options.job),
+        "contract": str(options.contract),
+        "execution": str(options.execution),
+        "job_sha256": sha256(options.job),
+        "contract_sha256": sha256(options.contract),
+        "execution_sha256": sha256(options.execution),
+        "work_root": str(work_root),
+        "audit_parent": str(audit_parent),
+        "frozen_input_identity": frozen["identity"],
+        "environment_identity": options.expect_environment,
+        "outer_wall_seconds": options.wall_seconds,
+        "command": command,
+    }
+    print(json.dumps(record, ensure_ascii=False, indent=2))
+    if options.dry_run:
+        print("DRY_RUN_ONLY: nothing started")
+        return 0
+    done = subprocess.run(["sudo", "-n", *command] if os.geteuid() != 0 else command,
+                          capture_output=True, text=True)
+    print(done.stdout.strip())
+    if done.returncode:
+        print(done.stderr.strip(), file=sys.stderr)
+    return done.returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+

@@ -138,3 +138,197 @@ staging has no `READY` and cannot advance `BASE_CURRENT.json`.
 The ODS Base is a reconstruction and recovery seed, not a daily merge target. Normal post-Base ODS
 remains immutable daily release files. A later compaction creates a new Base revision; it never
 appends into or edits an existing Base.
+
+## 6. Base 2.3 current-daily-purpose compaction
+
+The Owner authorized paired ODS/DWD Base 2.3 packaging through 2026-09-30 and
+purpose-specific delivery of qualified data while deferring noncritical unavailable
+uses. The successor `config/pipelines/ods-base23-daily-compaction.v1.json` governs
+this explicit current-daily reconstruction seed; the final July policies above
+remain immutable and their complete-minute acceptance is not claimed by this scope.
+
+`src/quanthus/pipelines/ods_monthly.py` freezes the exact original seed and release
+identities, business-date/role coverage, schema evidence and file closure before
+writing. A job-specific immutable contract binds the tracked policy and each
+freshly qualified original revision; these source inventories remain run evidence,
+not repository data. Audit TMP quotas apply to that scratch directory; independent
+image writes reserve the frozen member and evidence bytes on the destination
+filesystem, preserve its free-space floor, and reject a growing source before
+exceeding its frozen member size. All physical seed members, selected daily/event/weekly/minute
+raw revisions and original manifests are independently copied into one image.
+Preserved source-root strings are archival provenance and never runtime inputs.
+Multiple retained revisions stay distinct; no implicit numerical merge or source
+priority is introduced. Original knowledge/acquisition times and unknown values
+stay unchanged. Actual build/seal times are separate from the business cutoff.
+
+Every authoritative open date requires the complete daily core and event artifact
+sets. The exact unavailable minute date/frequency roles are disclosed in the
+versioned contract and block minute completeness/execution qualification. Existing
+financial/shareholder, lifecycle, historical PIT and consumer restrictions remain
+in effect. Native raw integrity does not qualify those uses or curated DWD repair.
+
+Cold verification reads only image-local original manifests, contract and plan,
+rechecks exact physical closure and every hash, decodes all native Parquet fields
+with typed summaries and verifies SQLite integrity. Native decoding preserves
+original row-group boundaries within the existing 16,384-row cap, disables
+Parquet read-ahead, closes each reader and hashes IPC buffers without an extra
+Python byte copy. The summary records actual maximum decoded batch rows/bytes;
+wide raw JSON groups must not be combined into a multi-GiB batch. The registered
+RSS/TMP/free-space thresholds remain unchanged, and a single oversized group or
+row still fails closed rather than being skipped. Two independent physical
+ownership relocations and new processes deny old source roots/cache/network;
+missing/corrupt disposable probes fail closed and all bytes are restored before
+READY is written last. The same offline evaluator also accepts the final sealed
+envelope and recomputes its summary from local evidence. Contract tests live in
+`tests/unit/test_ods_monthly.py`. Publication binds exact ODS/DWD identities and
+independent receipts; no legacy CURRENT or consumer gate is changed here.
+
+## 7. Monthly warehouse source read admission
+
+Design status: approved implementation under the Owner's October 12 ODS completion
+instruction. Delivery gate: open; the source adapter's engineering evidence and
+target-node deployment/cutover evidence are distinct.
+
+The July Base already declares `reconstruction_seed=true` and
+`execution_authorized=false`. These fields describe the ODS layer's role and lack
+of trading authority, rather than making reconstruction impossible. The monthly
+seal's `consumer_admission=NOT_GRANTED` does not grant any consumer purpose by
+publication alone. Admission for an explicit warehouse source read is recorded by
+the successor `ods-base23-warehouse-input.v1.json` contract and a fresh adapter
+receipt; it does not edit that immutable seal or grant trading, research, financial,
+shareholder, lifecycle or minute-use qualification.
+
+`ods_monthly_input.open_monthly_input` binds the complete image identity, model,
+contract and original independent-copy receipts before the expensive scan. It
+reuses the existing native raw audit once per admission, requires unchanged local
+file fingerprints and contract/model/envelope bytes across that scan, and maps the
+original seed dataset IDs and each original release's artifact descriptions to
+image-local files. The archive roots are never opened. Every retained raw revision
+stays separate, including multiple releases for one role/date. A release creation
+clock cannot establish provider acquisition or priority. Unknown/nonempty artifacts
+fail classification before the expensive pass. Unknown original clocks remain
+unknown; late observations are constrained by the explicit observation cutoff and
+never backdated to the monthly business cutoff.
+
+The ordinary verifier has an explicit `--monthly-consumer-contract` branch;
+`--policy` continues to invoke the frozen July verifier. Warehouse input planning
+has an explicit `monthly_base` mode, a pinned consumer contract and a bounded audit
+scratch root. It emits the ordinary immutable plan/ledger files with a new input
+kind, raw revision retention rule, preserved source clocks and purpose restrictions.
+It does not relabel this plan as a legacy July `base` plan or pass it to an unchanged
+July executor. The model coverage matrix describes source availability, not the
+qualification of every derived table. Capacity estimates remain planning estimates,
+not permission to materialize a new complete DWD image.
+
+The source read API resolves only declared members, rechecks their hash/size and
+independent inode before returning a native read path, and never falls back to an
+old Base or a supplier directory. New-process relocated-image regression tests and
+real-image native admission cover this path. Production daily acquisition does not
+read an ODS Base to collect new observations; the DWD Base reader and post-September
+increment binding are separate interfaces. This source admission cannot establish
+a paired production switch or turn older increments into Base 2.3 increments.
+
+Operations are in `docs/operations/ods-base-runbook.md`; regressions are in
+`tests/unit/test_ods_monthly_input.py`. GitHub code distribution, target recovery,
+paired consumer compatibility and authorized switch/rollback remain explicit steps.
+
+## Base 2.4 opt-in native 5m source evidence
+
+Work item: `P10-DATA-BASE24-010` / #529, under the
+[v1.3 execution plan](../../work-items/base24-build.md). Design status: draft;
+delivery gate: blocked for real source/range qualification. This successor does
+not change the accepted July policies, existing float collector or Base 2.3 seals.
+
+`src/quanthus/providers/native_5m_exact.py` implements
+`p10-native-5m-exact-v1`: one explicit `sh`/`sz` security and business date,
+supplier-native frequency `5`, unadjusted basis `3`. Response fields, request
+echo, all returned dates/codes and pagination completion must agree. Numbers are
+finite `Decimal` values; original numeric lexemes retain source scale, zero and
+exponent through independent Parquet serialization. Source timestamps retain
+their millisecond instant in Asia/Shanghai. Empty results do not prove suspension,
+no applicable bars or complete historical coverage. This parser does not assign
+R0/R1/R2 or assert bucket/session completeness or independently qualify units.
+
+Wire capture wraps only an already authenticated process-local SDK socket. It
+retains unchanged response bytes, request hashes, actual receive clocks and
+completion state; outbound login bytes/credentials are never captured. Actual
+sends (including pagination), response bytes and wall time are bounded. Short
+send, EOF, truncation and exhausted limits fail closed even if the SDK swallows
+the exception. The original socket is restored on every exit. The caller owns a
+single supplier process/lock, registered shared request budget, explicit timeout,
+private new output paths physically disjoint from inputs, and external RSS/disk
+stops. This is not a replacement scheduler or a shared-budget exemption.
+
+Regressions: `tests/unit/test_native_5m_exact.py`, alongside the retained
+`tests/unit/test_native_5m_baostock.py`. Tests are synthetic; actual retired-security,
+2020-boundary, unit/basis and complete-range source qualification remain separate
+evidence gates. Protected raw responses are kept outside safe review exports.
+
+The captured-frame entry validates native server envelope version `00.9.10` and
+response type96, byte framing, bounded decompression, JSON records, exact request
+echo and a short terminal first page before parsing. Original responses with or
+without a genuine final body newline are supported. This fixes the installed
+SDK0.9.4's unconditional last-character slice; an empty SDK basis is still rejected
+by the original response-object entry. A full first page fails with
+`WIRE_TERMINAL_PAGE_UNPROVEN` rather than silently stopping at a provider cap.
+The opaque vendor checksum field is retained and syntax-checked, not claimed as
+independently verified; capture SHA256 binds the unchanged bytes. Actual request
+restarts retain cumulative usage and may replay already acquired bytes offline.
+
+## Base 2.4 historical coverage prerequisite
+
+Work item: `P10-DATA-BASE24-020` / #530, within the same draft successor.
+`src/quanthus/pipelines/securities_warehouse/base24_coverage.py` implements
+`p10-base24-historical-denominator-v1`. It consumes explicitly bound source ids,
+SSE/SZSE dated listing intervals and per-venue open/closed calendar cells. Every
+civil date in the declared range must have a source cell; weekends are not
+inferred. Conflicting calendar values fail closed. Missing or conflicting listing
+intervals remain unresolved keys, without guessed precedence or a reduced universe.
+A delisting boundary on an open day remains required/uncertain until specific
+source evidence qualifies its exclusion. Current snapshots do not become past PIT.
+
+The compact prerequisite counts known listing/session units and month/venue totals
+without expanding all security-day observations into a database. It explicitly
+leaves complete-universe admission, source/ODS/DWD bucket census, suspension
+exemptions, minute bucket/session rules and the inherited index scope to their own
+gates. BSE is counted as outside this explicit minute product boundary, not removed
+from other retained domains. Tests: `tests/unit/test_base24_coverage.py` cover retired
+and new listings, unknown dates, venue/calendar conflicts, missing closed dates
+and unbound sources. A structurally complete input is not a full-coverage grant.
+
+
+## Base 2.4 default frequency projection and bounded window transport
+
+Work items: `P10-DATA-BASE24-010` / #529 and `P10-DATA-BASE24-030` / #531.
+Design status: approved engineering scope under the Owner's explicit 1m separation;
+delivery gate: blocked for complete source, image and reader qualification.
+
+`config/pipelines/base24-default-frequency.v1.json` and
+`securities_warehouse/base24_scope.py` freeze a new opt-in `1d` + supplier-native
+`5m` source projection. Original seed dataset identities select optional 1m
+archives, hotfixes, bars and coverage metadata for `NOT_INCLUDED`; known incremental
+1m bars/meta/coverage have the same disposition. Shared trading calendars,
+after-hours fixed-price observations, acquisition evidence and original manifests
+remain selected. Unknown 1m-lane artifacts fail classification. Selection binds
+original manifest bytes and exact member hashes/sizes, and never modifies or deletes
+the sealed source. Excluded logical bytes describe prospective new-image savings,
+not current free space. The legacy Daily builder and July policies continue to
+require their original inputs; they are not silently granted a different reader.
+
+`native_5m_exact.NativeWindow` extends the existing exact parser to a bounded
+single-security window of at most 366 inclusive civil dates. An explicitly bound
+installed SDK page transport sends requests; only each fresh original wire frame
+proves fields, date range, frequency, basis, exact page number and page size. A full
+page requires continuation, including an empty terminal page when needed. All
+records must be within scope and strictly ordered by timestamp across and within
+pages; duplicates, null rows, changed echo, missing terminal evidence or exhausted
+row/page/wire limits reject the entire partition. A default partition is bounded
+by 20,000 rows and 16 pages; it never expands all securities into memory. The
+existing exact-day and legacy SDK contracts remain unchanged. Serialization uses
+the same Decimal/lexeme preserving independent Parquet path, after all pages pass.
+A successful finite-window experiment is not a complete-range coverage grant.
+
+Tests: `tests/unit/test_base24_scope.py` and
+`tests/unit/test_native_5m_exact.py`. New image assembly, opt-in consumer reader,
+shared job source qualification, full-universe/bucket census, actual peak budget,
+and cold verification remain separate tracked implementation/acceptance work.

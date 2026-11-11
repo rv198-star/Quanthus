@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "contract_id": "p10-base22-primary-issuer-literal-class-terms-revision-v1",
+  "scope": "candidate_intermediate_only",
+  "base_contract_sha256": "sha256:a57938ee94a91510133cbfbe78373c32c38673a5a3780dd759d250d8ddefe97c",
+  "table": "dwd_corporate_action_term",
+  "term_type_prefix": "SOURCE_CLASS_GROSS_CASH_",
+  "roles": ["SOURCE_FLOATING_SHAREHOLDERS", "SOURCE_LARGE_SHAREHOLDERS", "SOURCE_RESTRICTED_SHAREHOLDERS", "SOURCE_SMALL_MEDIUM_SHAREHOLDERS", "SOURCE_UNRESTRICTED_SHAREHOLDERS"],
+  "class_meaning": "literal_publisher_class_not_inferred_listing_or_actual_holder_membership",
+  "physical_schema": "unchanged_pinned_v1_1",
+  "amount_basis": "explicit_gross_CNY_per_one_share_preserve_zero_and_exact_Decimal",
+  "option_id": "null_class_is_not_a_choice",
+  "priority_id": "explicit_implemented_issuer_class_terms_over_ambiguous_normalized_uniform_cash-v1",
+  "revision_rule": "close_exact_old_action_and_terms_open_real_governance_version_with_complete_literal_class_pair",
+  "publication_unavailable": true,
+  "unknown_non_cash_terms": "remain_unknown_not_imputed",
+  "virtual_average_FX_or_entitlement_computation": "forbidden",
+  "consumer_admission": "NOT_GRANTED",
+  "full_image_integration": "SEPARATE_GATE"
+}

@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+"""Publish a verified, self-contained aligned Daily runtime."""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from quanthus.pipelines.securities_warehouse.daily_aligned_runtime import main
+
+if __name__ == "__main__":
+    main()

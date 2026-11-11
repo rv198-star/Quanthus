@@ -3,7 +3,7 @@
   "authority": "reviewed_declared_processing_dependencies",
   "coverage": "展示已登记的静态加工依赖，不是某次运行的实际消费记录。每个 DWD 字段都会标明字段级证明状态：有精确证据时展示字段加工链；尚未登记字段映射时仅展示所属表已证明的加工上下文并明确不可视为字段映射。未画出的字段连线不代表没有其他依赖。",
   "evidence": {
-    "market": {"path":"src/quanthus/pipelines/securities_warehouse/market_observation.py","sha256":"sha256:5b72512cd75c9ee0d2ef17f89174b6e9a044dd354be904b7f20364bbdd6a561f","locator":"_bar_query"},
+    "market": {"path":"src/quanthus/pipelines/securities_warehouse/market_observation.py","sha256":"sha256:b453186590a06a8ddc891f4a1245b3cc30e18751a380a7690fda7e3e27ac749e","locator":"_bar_query"},
     "provider": {"path":"src/quanthus/backtest/direct_dwd_provider.py","sha256":"sha256:08fb354bb3386661c20ea19f0de3afd7aadc450cc55c1a6c03cb2241fc3ad063","locator":"daily_ohlcv_none.parquet"},
     "panel": {"path":"src/quanthus/backtest/baseline_research.py","sha256":"sha256:3a3a31010dba64a1fe10fd8500fc4ae96fa6286a421752efc54cbd79b210bff1","locator":"_feature_panel_query"},
     "structure": {"path":"src/quanthus/structure_v2.py","sha256":"sha256:29693a9cf81545e8e7e34db7e5f5403f5e7f782c4d845b8cc64f700390121158","locator":"build_structure_v2"},

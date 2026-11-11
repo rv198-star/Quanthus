@@ -19,12 +19,19 @@ from zoneinfo import ZoneInfo
 from .base22 import canonical, file_sha
 from .base22_sources import _tree, disjoint_output, physical_path
 from .base24_image import KIND as BASE_KIND
+from .closing_auction_source import PROVIDER as AUCTION_PROVIDER
 from .daily_core_domain import _TABLE_KEYS, verify_daily_domain_increment
 from .native5m_daily_source import verify_native5m_source
 from .native_base24_reader import require_daily_core_governance
+from .native_base_standard_reader import FORMAT as STANDARD_FORMAT
+from .native_base_standard_reader import (
+    require_daily_core_governance as require_standard_governance,
+)
 
 KIND = "cn02_base24_daily_1d_native5m_v1"
 SCOPE = "p10-base24-1d5m-v1"
+STANDARD_KIND = "standard_base_daily_1d_native5m_projection_v1"
+STANDARD_SCOPE = "p10-standard-base-daily-1d5m-v1"
 
 
 def _json(path: Path) -> dict[str, Any]:
@@ -107,7 +114,7 @@ def _rows(native: Path, daily: Mapping[str, Mapping[str, Any]]) -> Iterator[dict
     }
     manifest = _json(native / "manifest.json")
     sealed = datetime.fromisoformat(manifest["sealed_at"])
-    revision = "baostock-native-5m@" + file_sha(native / "manifest.json")[7:19]
+    manifest_suffix = file_sha(native / "manifest.json")[7:19]
     for batch in pq.ParquetFile(native / "minute-real-observed.parquet").iter_batches(
         batch_size=8192, use_threads=False
     ):
@@ -120,10 +127,15 @@ def _rows(native: Path, daily: Mapping[str, Mapping[str, Any]]) -> Iterator[dict
                 .replace(tzinfo=ZoneInfo("Asia/Shanghai"))
                 .astimezone(timezone.utc)
             )
+            source_name = (
+                AUCTION_PROVIDER
+                if statuses[code].get("source_composition") == AUCTION_PROVIDER
+                else "baostock-native-5m"
+            )
             yield {
-                "record_source": "baostock-native-5m",
+                "record_source": source_name,
                 "source_record_id": f"{code}.json.gz#code={code}&ts={row['source_ts']}",
-                "source_revision": revision,
+                "source_revision": source_name + "@" + manifest_suffix,
                 "source_artifact_sha256": row["raw_sha256"],
                 "knowledge_from": max(sealed, observed_bound, parent["knowledge_from"]),
                 "knowledge_to": None,
@@ -144,13 +156,17 @@ def _rows(native: Path, daily: Mapping[str, Mapping[str, Any]]) -> Iterator[dict
 def _inputs(
     core: Path, native: Path, config: Mapping[str, Any]
 ) -> tuple[dict[str, Any], dict[str, Any], Any, dict[str, Any]]:
-    require_daily_core_governance(config)
+    standard = config.get("layers", {}).get("dwd", {}).get("format") == STANDARD_FORMAT
+    if standard:
+        require_standard_governance(config)
+    else:
+        require_daily_core_governance(config)
     verify_daily_domain_increment(core)
     manifest = _json(core / "manifest.json")
     base = manifest.get("base", {})
     expected = config["layers"]["dwd"]
     if (
-        base.get("kind") != BASE_KIND
+        base.get("kind") != ("quanthus_dwd_base_bundle_v1" if standard else BASE_KIND)
         or base.get("business_through") != config.get("through_date")
         or any(
             base.get(k) != expected[k]
@@ -179,7 +195,11 @@ def _identity(core: Path, native: Path, config: Path, code_revision: str) -> dic
         "native5m": file_sha(native / "manifest.json"),
         "config": file_sha(config),
         "code": code_revision,
-        "scope": SCOPE,
+        "scope": (
+            STANDARD_SCOPE
+            if _json(config).get("layers", {}).get("dwd", {}).get("format") == STANDARD_FORMAT
+            else SCOPE
+        ),
     }
 
 
@@ -270,8 +290,8 @@ def build(
         ]
         document = {
             "schema_version": 1,
-            "kind": KIND,
-            "product_scope": SCOPE,
+            "kind": STANDARD_KIND if identity["scope"] == STANDARD_SCOPE else KIND,
+            "product_scope": identity["scope"],
             "identity": identity,
             "base": manifest["base"],
             "market_date": manifest["market_date"],
@@ -323,8 +343,9 @@ def _verify(
     root = physical_path(root)
     manifest = _json(root / "manifest.json")
     if (
-        manifest.get("kind") != KIND
-        or manifest.get("product_scope") != SCOPE
+        manifest.get("kind") not in {KIND, STANDARD_KIND}
+        or manifest.get("product_scope")
+        != ({KIND: SCOPE, STANDARD_KIND: STANDARD_SCOPE}.get(manifest.get("kind")))
         or manifest.get("default_intervals") != ["1d", "5m"]
         or manifest.get("one_minute") != "NOT_IN_PRODUCT"
         or manifest.get("consumer_admission") != "NOT_GRANTED"

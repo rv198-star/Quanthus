@@ -1,0 +1,49 @@
+{
+  "contract": "p10-base-build-environment-v1",
+  "external_decoder": {
+    "command": "zstd",
+    "minimum_version": "1.4.8",
+    "scope": "restore_only_verified_uncompressed_members"
+  },
+  "installation": "offline_require_hashes_binary_only",
+  "platform": {
+    "glibc_minimum": "2.28",
+    "implementation": "CPython",
+    "machine": "x86_64",
+    "python_minimum": "3.10.12",
+    "python_minor": "3.10",
+    "system": "Linux"
+  },
+  "runtime_no_network": true,
+  "timezone": {
+    "PYTHONTZPATH": "",
+    "provider": "tzdata",
+    "zone": "Asia/Shanghai"
+  },
+  "wheels": [
+    {
+      "bytes": 21534632,
+      "distribution": "duckdb",
+      "filename": "duckdb-1.5.6-cp310-cp310-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+      "sha256": "dbd348e9ebdc8b28f1f9930efb5a74a382063c35d9c43901075566fbae50ab5c",
+      "url": "https://files.pythonhosted.org/packages/58/05/4ed0a651d55c8cbf9f7e826cfa95e67c9955a5db22a0c7c0cc5378f4a90c/duckdb-1.5.6-cp310-cp310-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+      "version": "1.5.6"
+    },
+    {
+      "bytes": 47564532,
+      "distribution": "pyarrow",
+      "filename": "pyarrow-23.0.1-cp310-cp310-manylinux_2_28_x86_64.whl",
+      "sha256": "c33b5bf406284fd0bba436ed6f6c3ebe8e311722b441d89397c54f871c6863a2",
+      "url": "https://files.pythonhosted.org/packages/f8/82/c40b68001dbec8a3faa4c08cd8c200798ac732d2854537c5449dc859f55a/pyarrow-23.0.1-cp310-cp310-manylinux_2_28_x86_64.whl",
+      "version": "23.0.1"
+    },
+    {
+      "bytes": 347996,
+      "distribution": "tzdata",
+      "filename": "tzdata-2026.5-py2.py3-none-any.whl",
+      "sha256": "b683bd1b6659ddcd810ff02ad09ba821d4bf1065072805063eb35c49617905ac",
+      "url": "https://files.pythonhosted.org/packages/94/21/1e5995a1c920cce14e4bffae20c665ec10e7ed03ab25e006cd741092b718/tzdata-2026.5-py2.py3-none-any.whl",
+      "version": "2026.5"
+    }
+  ]
+}

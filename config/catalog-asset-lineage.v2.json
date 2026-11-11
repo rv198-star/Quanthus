@@ -3,7 +3,7 @@
   "authority": "reviewed_governed_asset_lineage",
   "scope": "Data Lineage nodes are governed ODS/DWD/Research ADM assets only; fields are nested asset coordinates and processing is edge metadata.",
   "evidence_sha256": {
-    "src/quanthus/pipelines/securities_warehouse/market_observation.py": "sha256:5b72512cd75c9ee0d2ef17f89174b6e9a044dd354be904b7f20364bbdd6a561f",
+    "src/quanthus/pipelines/securities_warehouse/market_observation.py": "sha256:b453186590a06a8ddc891f4a1245b3cc30e18751a380a7690fda7e3e27ac749e",
     "src/quanthus/pipelines/securities_warehouse/disclosure_event.py": "sha256:99d456309d352527ab4ca78a0e95d809a087f3743af96f9464bf2471f52ec53f"
   },
   "additional_ods_assets": [

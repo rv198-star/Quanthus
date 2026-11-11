@@ -1,0 +1,192 @@
+{
+  "observed_at": "2026-11-05T10:50:30.452448+00:00",
+  "review_mode": "OFFLINE_EXISTING_RAW_ONLY",
+  "external_requests": 0,
+  "cases_admitted": 0,
+  "input_policy_or_grade_changed": false,
+  "two_daily_candidates": [
+    {
+      "coordinate": "002336/2020-06-17",
+      "Baostock_window_sha256": "8c28522aa34a6c5b0e9d3e850c6d91e0cbd4ef08caccff806ffeae03451ff15c",
+      "Baostock_acquired_interval": {
+        "requested_at": "2026-11-05T06:27:02.024283+00:00",
+        "completed_at": "2026-11-05T06:27:02.045247+00:00"
+      },
+      "Baostock_date_rows": {
+        "2020-06-16": {
+          "date": "2020-06-16",
+          "code": "sz.002336",
+          "open": "5.2300",
+          "high": "5.2500",
+          "low": "5.1800",
+          "close": "5.2200",
+          "preclose": "5.1900",
+          "volume": "1118342",
+          "amount": "5828618.9800",
+          "adjustflag": "3",
+          "turn": "0.299700",
+          "tradestatus": "1",
+          "pctChg": "0.578000",
+          "isST": "1"
+        },
+        "2020-06-17": {
+          "date": "2020-06-17",
+          "code": "sz.002336",
+          "open": "5.2200",
+          "high": "5.2200",
+          "low": "5.2200",
+          "close": "5.2200",
+          "preclose": "5.2200",
+          "volume": "1118342",
+          "amount": "0.0000",
+          "adjustflag": "3",
+          "turn": "0.299700",
+          "tradestatus": "0",
+          "pctChg": "0.000000",
+          "isST": "1"
+        },
+        "2020-06-18": {
+          "date": "2020-06-18",
+          "code": "sz.002336",
+          "open": "5.2900",
+          "high": "5.3200",
+          "low": "5.2000",
+          "close": "5.2100",
+          "preclose": "5.2200",
+          "volume": "1933170",
+          "amount": "10126395.5600",
+          "adjustflag": "3",
+          "turn": "0.518000",
+          "tradestatus": "1",
+          "pctChg": "-0.191600",
+          "isST": "1"
+        }
+      },
+      "exact_same_volume_as_previous_observed_day": true,
+      "SZSE_raw_sha256": "sha256:9e2f9f3eb44675cbbf539f0104b554a62bb12993f7e722557b7cf92ac284a92b",
+      "SZSE_actual_request_interval": {
+        "requested_at": "2026-11-05T06:46:53.162428+00:00",
+        "completed_at": "2026-11-05T06:46:53.969991+00:00"
+      },
+      "SZSE_displayed_fields": {
+        "cjgs": "0.00",
+        "cjje": "0.00",
+        "ks": "5.22",
+        "zg": "5.22",
+        "zd": "5.22",
+        "ss": "5.22"
+      },
+      "SZSE_units": {
+        "cjgs": "万股 (2 decimal places)",
+        "cjje": "万元 (2 decimal places)"
+      },
+      "interpretation": "Supports invalid repeated nonzero daily volume on a supplier nontrading-status row; not proof of supplier internal copy algorithm. Displayed official zero alone does not supply share-level precision.",
+      "effective_revision_admitted": false
+    },
+    {
+      "coordinate": "002500/2020-06-17",
+      "Baostock_window_sha256": "da49db98b7db4d32f393181aa5e16313e84f7b3cbba32f8ee6d68dbb95305a1f",
+      "Baostock_acquired_interval": {
+        "requested_at": "2026-11-05T06:27:03.046690+00:00",
+        "completed_at": "2026-11-05T06:27:03.076417+00:00"
+      },
+      "Baostock_date_rows": {
+        "2020-06-16": {
+          "date": "2020-06-16",
+          "code": "sz.002500",
+          "open": "6.4100",
+          "high": "6.4500",
+          "low": "6.3600",
+          "close": "6.3900",
+          "preclose": "6.3900",
+          "volume": "38945309",
+          "amount": "249122222.3700",
+          "adjustflag": "3",
+          "turn": "1.376800",
+          "tradestatus": "1",
+          "pctChg": "0.000000",
+          "isST": "0"
+        },
+        "2020-06-17": {
+          "date": "2020-06-17",
+          "code": "sz.002500",
+          "open": "6.3900",
+          "high": "6.3900",
+          "low": "6.3900",
+          "close": "6.3900",
+          "preclose": "6.3900",
+          "volume": "38945309",
+          "amount": "0.0000",
+          "adjustflag": "3",
+          "turn": "1.376800",
+          "tradestatus": "0",
+          "pctChg": "0.000000",
+          "isST": "0"
+        },
+        "2020-06-18": {
+          "date": "2020-06-18",
+          "code": "sz.002500",
+          "open": "6.3900",
+          "high": "6.3900",
+          "low": "6.3900",
+          "close": "6.3900",
+          "preclose": "6.3900",
+          "volume": "0",
+          "amount": "0.0000",
+          "adjustflag": "3",
+          "turn": "",
+          "tradestatus": "0",
+          "pctChg": "0.000000",
+          "isST": "0"
+        }
+      },
+      "exact_same_volume_as_previous_observed_day": true,
+      "SZSE_raw_sha256": "sha256:b2ce5afcf7760186a2292a82b1c59d1273fb4f4de8d428bc1a762d313adf32b7",
+      "SZSE_actual_request_interval": {
+        "requested_at": "2026-11-05T06:46:54.989479+00:00",
+        "completed_at": "2026-11-05T06:46:55.221844+00:00"
+      },
+      "SZSE_displayed_fields": {
+        "cjgs": "0.00",
+        "cjje": "0.00",
+        "ks": "6.39",
+        "zg": "6.39",
+        "zd": "6.39",
+        "ss": "6.39"
+      },
+      "SZSE_units": {
+        "cjgs": "万股 (2 decimal places)",
+        "cjje": "万元 (2 decimal places)"
+      },
+      "interpretation": "Supports invalid repeated nonzero daily volume on a supplier nontrading-status row; not proof of supplier internal copy algorithm. Displayed official zero alone does not supply share-level precision.",
+      "effective_revision_admitted": false
+    }
+  ],
+  "candidate_clock_discrepancies": [
+    {
+      "coordinate": "002336/2020-06-17",
+      "candidate_csv_observed_at": "2026-11-05T07:04:34.334376+00:00",
+      "raw_capture_requested_at": "2026-11-05T06:46:53.162428+00:00",
+      "raw_capture_completed_at": "2026-11-05T06:46:53.969991+00:00",
+      "raw_sha256": "sha256:9e2f9f3eb44675cbbf539f0104b554a62bb12993f7e722557b7cf92ac284a92b",
+      "finding": "CSV timestamp is not the saved raw acquisition interval; its authority as a separate observation clock is not evidenced. Retain capture receipt interval for any future governed revision."
+    },
+    {
+      "coordinate": "002500/2020-06-17",
+      "candidate_csv_observed_at": "2026-11-05T07:04:34.334376+00:00",
+      "raw_capture_requested_at": "2026-11-05T06:46:54.989479+00:00",
+      "raw_capture_completed_at": "2026-11-05T06:46:55.221844+00:00",
+      "raw_sha256": "sha256:b2ce5afcf7760186a2292a82b1c59d1273fb4f4de8d428bc1a762d313adf32b7",
+      "finding": "CSV timestamp is not the saved raw acquisition interval; its authority as a separate observation clock is not evidenced. Retain capture receipt interval for any future governed revision."
+    },
+    {
+      "coordinate": "302132/2025-02-17",
+      "candidate_csv_observed_at": "2026-11-05T07:04:34.334376+00:00",
+      "raw_capture_requested_at": "2026-11-05T06:46:56.244990+00:00",
+      "raw_capture_completed_at": "2026-11-05T06:46:56.460490+00:00",
+      "raw_sha256": "sha256:ea41779177e637748485645c927bf993a757e9c406c124e4d4c775577a1ea135",
+      "finding": "CSV timestamp is not the saved raw acquisition interval; its authority as a separate observation clock is not evidenced. Retain capture receipt interval for any future governed revision."
+    }
+  ],
+  "three_statuses_universal_rule_rejected": "688065 on 2023-06-15 has supplier tradestatus=0 with positive amount and varying OHLC, confirmed activity in existing vendor raw. Do not apply tradestatus=0 => volume=0 as a general repair."
+}

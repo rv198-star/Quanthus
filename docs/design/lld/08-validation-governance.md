@@ -96,3 +96,9 @@ additionally waits for the predeclared real-calendar observation budget and targ
 closes and reconciles the paper ledger, records a signed human review, and proves zero notification,
 broker, or live-capital authority. A negative or inconclusive result may close P6 honestly;
 missing prospective time may not.
+
+## 8. Successor data interface
+
+[Base 2.4 P6 input handoff](08-validation-governance/p6-base24-inputs.md) owns the
+opt-in source binding and purpose-specific checks. It does not change the frozen
+P6 runtime or confer a new activation.

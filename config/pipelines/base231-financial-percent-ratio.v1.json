@@ -1,0 +1,16 @@
+{
+  "contract_id": "p10-base231-explicit-percent-financial-ratio-v1",
+  "business_through": "2026-09-30",
+  "source_scope": "qualified tdx.f10.major_financial_indicators.literal.v1 native observations",
+  "authority": "original explicit (%) label and PERCENT unit must agree with the exact original concept",
+  "exact_multiplier": "0.01",
+  "output_unit": "RATIO",
+  "output_decimal": "decimal128(38,10)",
+  "precision_failure": "hold; never round original data to fit",
+  "preserve": "original facts, concepts, tokens, null, zero, text, publication and capture evidence",
+  "knowledge": "actual new interpretation clock; unknown historical publication remains unknown",
+  "monetary_scope": "SOURCE_LITERAL_YUAN remains literal; CNY and FX are not inferred",
+  "lifecycle": "TMP until integrated and independently accepted",
+  "historical_PIT_admission": "NOT_GRANTED",
+  "consumer_admission": "NOT_GRANTED"
+}

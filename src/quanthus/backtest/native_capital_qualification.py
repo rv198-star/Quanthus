@@ -188,6 +188,8 @@ def census(
                 "currency",
                 "quote_currency",
                 "trading_currency",
+                "listing_currency",
+                "lot_size",
                 "instrument_type",
                 "listing_type",
             }

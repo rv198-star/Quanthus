@@ -90,6 +90,8 @@ def capture(
     path: Path,
     plan_digest: str,
     supersedes: str | None = None,
+    *,
+    daily_fields: str = FIELDS,
 ) -> dict[str, Any]:
     sidecar = path.with_suffix(path.suffix + ".receipt.json")
     if path.exists() or sidecar.exists():
@@ -103,7 +105,7 @@ def capture(
     if method == "daily":
         args = {
             "code": task["code"],
-            "fields": FIELDS,
+            "fields": daily_fields,
             "start_date": task["start_date"],
             "end_date": task["end_date"],
             "frequency": "d",

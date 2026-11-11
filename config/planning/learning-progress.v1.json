@@ -8680,6 +8680,41 @@
         "TRACE"
       ],
       "no_change_reason": "交付同一限定工程工具的兼容性与结果计数修复；保留既有TRACE模块等级。"
+    },
+    {
+      "id": "CP-3-PR595-ACCEPTANCE-20261111",
+      "recorded_at": "2026-11-11T15:14:23.368408+00:00",
+      "actor": "Codex; Owner authorized historical PR595 audit, repair and merge",
+      "work_item": "META-GATE-001",
+      "outcome": "no_module_change",
+      "summary": "PR595当前main复审完成：精确0bff76a6通过真实make local-acceptance完整检查；同一head的make local-acceptance-verify返回REUSED_NOT_RERUN，全部Job成员字节和元数据保持一致。最终仅追加本证据及生成蓝图，完整工程检查依AGENTS文档/账本例外复用，并另验规划、文档和精确base历史。 实际测试计数：{\"collected\": 8927, \"errors\": 0, \"exit_status\": 0, \"failed\": 0, \"failed_and_shared_TMP_retained\": true, \"passed\": 8892, \"skipped\": 35, \"successful_function_TMP_reclaimed\": 3213}。",
+      "evidence": [
+        {
+          "id": "CURRENT-MAIN-RUN-AND-VERIFY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/historical-pr595-pr599-20261111/PR595-ACCEPTANCE.json",
+          "sha256": "81e4321f4f505386c9adab512174e02a8284d002168035b1bf964cf2ee50d494",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本地工程profile的完整检查及相同提交、路径、运行时的只读凭据验证。最终文档/账本提交的代码闭包等价核验另留PR交付证据，严格CLI复用仍仅适用原测试head。"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "交付可审计的本地工程验收工具与两项复审修复；TRACE既有模块等级保持，META-GATE-001整体Issue #3继续开放。",
+      "issue_observations": [
+        {
+          "work_item": "META-GATE-001",
+          "number": 3,
+          "title": "[META-GATE-001] Automate release gate reporting",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-08-19T15:46:34Z",
+          "body_sha256": "caa1eb55e38b5e171007abeb30c9f0d05978e646001dac03fc386f473744e06e"
+        }
+      ]
     }
   ]
 }

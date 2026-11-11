@@ -8734,6 +8734,43 @@
         "FACTS",
         "CLOSEOUT"
       ]
+    },
+    {
+      "id": "CP-612-20261111T093823872826Z",
+      "recorded_at": "2026-11-11T09:38:23.872826+00:00",
+      "actor": "Codex / Astra; independent audit closeout",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "outcome": "no_module_change",
+      "summary": "#612独立审计完成并关闭；原研究验收未通过，#609-611已重开；本条只对账生命周期。",
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "模块判断已在CP-612-20261111T092552053641Z记录；关闭审计issue不提升研究结果或消费者资格。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-REVIEW-001",
+          "number": 612,
+          "title": "[META-RESEARCH-REVIEW-001] 独立审阅首个结果并完成采用、入账与长期证据留存",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-11T09:38:21Z",
+          "body_sha256": "745742bf6942eabf9909a1a92a66a283d4598dc6a74adab6aabbdbe20aa00342"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
     }
   ]
 }

@@ -85,6 +85,11 @@ C2（#429 / META-OPS-MINUTE-002）限于 research 1m incr 同一次采集进程�
 该边界可独立推进；它不宣告 C 包的恢复身份、协议分类及全编排预算目标完成。
 详细接口与停止语义由 LLD 的 “Opt-in same-attempt 1m residual retry” 节治理。
 
+2026-09-28，Owner 批准把反复单日期追补升级为整个 1m 链路优化。
+独立子工作项 [META-OPS-MINUTE-005](minute-chain-reliability.md) 统一跟踪准入/物化闭环、
+raw 与资格分离、来源口径、残余队列、日期调度及回归灰度；上级 PIT/READY 和拓扑边界不变。
+首片 META-OPS-MINUTE-006 / #455 只保护合格整票新 attempt 落盘，不授权来源语义修正。
+
 ### 2026-09-25 逐票分钟来源恢复增量（#440 / PR #442）
 
 9/24 待补暴露了腾讯抽样预检的局限：一只未成熟股票会在扫描前中断，无法得知其余逐票缺口。

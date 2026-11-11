@@ -13,8 +13,10 @@ import json
 import os
 import socket
 import sys
+import tempfile
 import time
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -31,6 +33,7 @@ from quanthus.providers.minute_recovery import (
 from quanthus.providers.minute_source_selection import (
     MinuteCandidate,
     choose_whole_security,
+    qualify_candidate,
 )
 from quanthus.providers.paid_minute_source import normalized_candidate
 from quanthus.providers.tencent_m1_normalize import normalize_symbol
@@ -691,6 +694,84 @@ def _merge_write(home: Path, symbol: str, frequency: str, frame: Any) -> tuple[i
     return len(frame), path
 
 
+def _require_fresh_qualified_home(home: Path) -> None:
+    """Reject reuse before changing an earlier attempt's files or receipts."""
+    if home.is_symlink() or (home.exists() and (not home.is_dir() or any(home.iterdir()))):
+        raise ValueError("qualified 1m requires a fresh, empty attempt home; retain prior evidence")
+
+
+def _write_qualified_one_minute(
+    home: Path,
+    symbol: str,
+    frame: Any,
+    *,
+    candidate: MinuteCandidate,
+    market_date: str,
+    daily: dict[str, Any],
+    expected_semantic_sha256: str,
+) -> tuple[int, Path, str]:
+    """Publish one whole security only if its staged bytes reproduce qualification.
+
+    Never merge with an earlier file, even on a different date. Cross-attempt
+    recovery must instead enter a new attempt through its separately governed
+    verifier. A no-replace link also protects against a late target-file collision.
+    """
+    import pandas as pd
+
+    path = home / f"{symbol}_1m.parquet"
+    if path.exists() or path.is_symlink():
+        raise FileExistsError(f"qualified 1m target already exists: {path.name}")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{symbol}_1m-", suffix=".parquet", dir=home,
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
+    try:
+        frame.to_parquet(temporary, index=False)
+        materialized = pd.read_parquet(temporary)
+        materialized_candidate = replace(
+            candidate,
+            rows=tuple(
+                {
+                    "stock_code": row.stock_code,
+                    "ts": str(row.ts),
+                    "open": row.open,
+                    "high": row.high,
+                    "low": row.low,
+                    "close": row.close,
+                    "volume": row.volume,
+                    "amount": None if pd.isna(row.amount) else row.amount,
+                }
+                for row in materialized.itertuples(index=False)
+            ),
+        )
+        digest = qualify_candidate(
+            materialized_candidate,
+            symbol=symbol,
+            market_date=market_date,
+            daily_volume=daily["volume"],
+            daily_close=daily["close"],
+            traded=daily["tradestatus"] == "1",
+        )
+        if digest != expected_semantic_sha256:
+            raise ValueError("qualified 1m materialization differs from selected source semantics")
+        if len(materialized):
+            # Unlike replace(), link() cannot overwrite a competing writer's
+            # target. The existing node/attempt lock still owns process exclusion.
+            os.link(temporary, path)
+        elif path.exists() or path.is_symlink():
+            raise FileExistsError(f"qualified 1m target already exists: {path.name}")
+        return len(materialized), path, digest
+    finally:
+        unwinding = sys.exc_info()[0] is not None
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError as exc:
+            if not unwinding:
+                raise
+            print(f"minute staging cleanup failed: {exc}", file=sys.stderr)
+
+
 def collect(
     *,
     home: Path,
@@ -723,6 +804,10 @@ def collect(
         or recovery_policy is not None
     ):
         raise ValueError("Tencent 1m requires paired sealed evidence and research incr mode")
+    if tencent_enabled:
+        if len(set(symbols)) != len(symbols):
+            raise ValueError("qualified 1m requires unique symbols")
+        _require_fresh_qualified_home(home)
     if paid_audit_dir is not None and (
         not tencent_enabled or paid_audit_dir.is_symlink() or not paid_audit_dir.is_dir()
     ):
@@ -809,6 +894,7 @@ def collect(
         history = list(previous.get("attempts", []))
         attempts_total += 1
         writing = False
+        selected: MinuteCandidate | None = None
         try:
             if native_5m:
                 assert market_date is not None
@@ -875,13 +961,12 @@ def collect(
                         f"{tencent_error or 'no qualified 1m source'}; "
                         f"candidate rejections={decision.rejected}"
                     )
+                selected = next(
+                    candidate for candidate in candidates
+                    if candidate.provider == decision.selected_provider
+                )
                 if decision.selected_provider == "paid-tushare-style-proxy-stk_mins":
                     import pandas as pd
-
-                    selected = next(
-                        candidate for candidate in candidates
-                        if candidate.provider == decision.selected_provider
-                    )
                     frame = pd.DataFrame(
                         {
                             **row,
@@ -940,7 +1025,18 @@ def collect(
             if not meta.get("ok"):
                 raise RuntimeError(str(meta.get("error") or "minute bars request failed"))
             writing = True
-            rows, path = _merge_write(home, symbol, frequency, frame)
+            if selected is not None:
+                assert market_date is not None
+                rows, path, materialized_digest = _write_qualified_one_minute(
+                    home, symbol, frame,
+                    candidate=selected,
+                    market_date=market_date,
+                    daily=tencent_daily[symbol],
+                    expected_semantic_sha256=meta["source_semantic_sha256"],
+                )
+                meta["materialized_semantic_sha256"] = materialized_digest
+            else:
+                rows, path = _merge_write(home, symbol, frequency, frame)
             results[symbol] = {
                 **meta,
                 "status": "done",
@@ -972,8 +1068,8 @@ def collect(
                     }
                 )
                 results[symbol]["attempts"] = history
-                if writing:
-                    raise  # Storage failures must not induce more network traffic.
+            if writing and (recovery_policy or tencent_enabled):
+                raise  # Storage/consistency failures must not induce more network traffic.
             if native_5m and consecutive_errors >= 3:
                 raise RuntimeError(
                     "BaoStock native 5m circuit opened after 3 consecutive failures"
@@ -1122,6 +1218,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--max-pages must be at least 1")
     del args.no_lock  # lane attempts are isolated; this flag preserves legacy CLI compatibility
     try:
+        if args.tencent_daily_path is not None or args.tencent_status_path is not None:
+            # Check the requested path before resolve() erases a final symlink.
+            _require_fresh_qualified_home(Path(args.home))
         return collect(
             home=Path(args.home).resolve(),
             layer=args.layer,

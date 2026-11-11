@@ -513,16 +513,19 @@ def test_missing_receipt_digest_is_rejected(tmp_path):
     "damage",
     ["failed", "running", "missing", "identity", "outputs", "latest_attempt", "digest"],
 )
+@pytest.mark.parametrize("phase", ["fetch", "screen"])
+@pytest.mark.parametrize("built", [False, True])
 def test_publish_requires_guardian_success_even_with_complete_package(
-    tmp_path, specimen, monkeypatch, damage
+    tmp_path, specimen, monkeypatch, damage, phase, built
 ):
-    identity, package = prepare_package(tmp_path, specimen, monkeypatch)
-    original = {p.name: p.read_bytes() for p in package.iterdir()}
+    identity, package = prepare_package(tmp_path, specimen, monkeypatch, build=built)
+    original = {p.name: p.read_bytes() for p in package.iterdir()} if built else None
     resources = worker.read(tmp_path / "resources.json")
     attempts = worker.read(tmp_path / "attempts.json")
-    record = resources["screen"]
+    record = resources[phase]
+    index = 0 if phase == "fetch" else 1
     if damage == "missing":
-        resources.pop("screen")
+        resources.pop(phase)
     elif damage == "latest_attempt":
         attempts.append({**record, "attempt": 2, "status": "running"})
     else:
@@ -533,11 +536,12 @@ def test_publish_requires_guardian_success_even_with_complete_package(
         elif damage == "identity":
             record["identity"] = {**identity, "identity_digest": "another-job"}
         elif damage == "outputs":
-            record["output_digests"]["result.json"] = "sha256:" + "0" * 64
+            name = "fetch.json" if phase == "fetch" else "result.json"
+            record["output_digests"][name] = "sha256:" + "0" * 64
         record.pop("digest")
         record = worker.seal(record) if damage != "digest" else record
-        resources["screen"] = record
-        attempts[-1] = record
+        resources[phase] = record
+        attempts[index] = record
     worker.write(tmp_path / "resources.json", resources)
     worker.write(tmp_path / "attempts.json", attempts)
     calls = []
@@ -554,7 +558,10 @@ def test_publish_requires_guardian_success_even_with_complete_package(
     with pytest.raises(worker.GuardError):
         worker.publish(specimen, [], identity, tmp_path)
     assert calls == []
-    assert {p.name: p.read_bytes() for p in package.iterdir()} == original
+    if built:
+        assert {p.name: p.read_bytes() for p in package.iterdir()} == original
+    else:
+        assert not (tmp_path / "package").exists()
 
 
 @pytest.mark.parametrize("outcome", ["timeout", "nonzero", "success"])
@@ -653,6 +660,27 @@ def test_interruption_during_packaging_recovers_from_staging(tmp_path, specimen,
     package = worker.build_package(specimen, [], identity, tmp_path)
     worker.verify_package(package)
     assert (tmp_path / "package-quarantine").is_dir()
+
+
+def test_ready_staging_resumes_atomic_promotion_with_identical_bytes(
+    tmp_path, specimen, monkeypatch
+):
+    identity, _ = prepare_package(tmp_path, specimen, monkeypatch, build=False)
+    original_rename = Path.rename
+
+    def interrupted_rename(path, target):
+        if path.name == "package.staging":
+            raise OSError("synthetic promotion interruption")
+        return original_rename(path, target)
+
+    monkeypatch.setattr(Path, "rename", interrupted_rename)
+    with pytest.raises(OSError, match="promotion interruption"):
+        worker.build_package(specimen, [], identity, tmp_path)
+    staging = tmp_path / "package.staging"
+    first = {p.name: p.read_bytes() for p in staging.iterdir()}
+    monkeypatch.setattr(Path, "rename", original_rename)
+    package = worker.build_package(specimen, [], identity, tmp_path)
+    assert {p.name: p.read_bytes() for p in package.iterdir()} == first
 
 
 def test_corrupted_ready_package_is_rejected_and_never_quarantined(tmp_path, specimen, monkeypatch):

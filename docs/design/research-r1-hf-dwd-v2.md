@@ -62,6 +62,29 @@ T+1通过全交易所日历的明确下一开放日连接，禁止在过滤或�
 
 原执行主动工时约1.7h/Owner约2h及审计成本持续累计；此次明确授权的修复段上限2h主动工时，计入总线8h，不重置旧成本。超出时交精确差集并停止对应阶段。
 
+## F1–F3执行合同修订
+
+Owner在v2独立审计后要求Sol修复并自审。研究公式、输入、样本阈值和已接受A2结果保持原版本；
+本段明确原有阶段成功与恢复合同的实现。`request.v2.a3.json`绑定修后代码和新Job，
+至多一次固定参数canary，已有A1/A2原包和资源记录保留。
+
+- Guardian在启动子进程前记录当前attempt为`running`，使之前的成功回执失效；在子进程退出、
+  资源检查及产物摘要核验完成后写`research-stage-completion.v1`终态回执。
+- 回执绑定完整identity、phase、attempt、status、exit_code/failure、产物digest及资源峰值，
+  自带规范化摘要，并与attempt日志的当前记录完全相同。fetch绑定fetch回执；screen绑定result/run。
+- screen需要fetch最终成功。首次封包、复用完整包及发布重试均核验fetch/screen最终成功，
+  当前attempt和产物摘要一致；失败、运行中、缺失、旧attempt或身份错配在接触HF API前拒绝。
+  子进程写出结果只是产物准备完成，阶段成功由Guardian终态控制。
+- 最小年度日期门槛明确统计候选实际出现的决策日，对照组日期另行报告。
+- 在`package.staging/`写完成员/manifest，并原子写入READY，完整校验和上传额度通过后再原子
+  改名为`package/`。已有完整staging可按原字节继续提升；无READY的中断目录移至
+  `package-quarantine/`并记录恢复路径，使用现有成功输出重新封包。已有READY的损坏或冲突包停止，
+  保留原字节。完成包在上传重试中不重新封装。
+
+本次定点修复估算45分钟主动工作，完整检查/网络等待另计；旧执行、两轮审计和修复费用继续累计。
+长期证据写入`cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained/`；
+作者自审交#612差集复验。
+
 ## A2代码绑定修订
 
 A1 canary完成并保留在fb21637f；随后自审发现上传额度在重试路径遗漏、回执摘要可缺失两项守卫缺口。新增`request.v2.a2.json`只改变attempt/path及曝光记录，指标、阈值与输入56成员保持v2冻结值。A2复用已校验输入缓存并绑定修正代码，计算作为一次原因已定位重试计入累计成本；A1不发布为最终包。中止旧代码尚未完成的make check，最终代码重新完整检查。

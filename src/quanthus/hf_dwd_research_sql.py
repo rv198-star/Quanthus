@@ -196,7 +196,7 @@ def calculate(
         and top10 <= d["max_top10_listing_share"]
         and all(
             x["candidate"]["opportunities"] >= d["min_nominal_per_year"]
-            and x["control"]["decision_days"] >= d["min_decision_days_per_year"]
+            and x["candidate"]["decision_days"] >= d["min_decision_days_per_year"]
             for x in by_year.values()
         )
     )

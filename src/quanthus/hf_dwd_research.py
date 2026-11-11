@@ -425,7 +425,8 @@ def screen(
 
     from quanthus.hf_dwd_research_sql import TABLES, calculate
 
-    bound_read(job, "fetch.json", identity)
+    fetched = bound_read(job, "fetch.json", identity)
+    verified_stage_success(job, "fetch", identity, {"fetch.json": fetched["digest"]})
     verify_members(job / "source", request, members)
     if (job / "result.json").is_file():
         existing = bound_read(job, "result.json", identity)
@@ -475,6 +476,57 @@ def artifact_name(request: dict[str, Any], kind: str) -> str:
     return f"{request['task_id']}-{request['attempt_id']}-{kind}.json"
 
 
+def stage_output_digests(job: Path, phase: str, identity: dict[str, Any]) -> dict[str, str]:
+    names = ("fetch.json",) if phase == "fetch" else ("result.json", "run.json")
+    receipts = {name: bound_read(job, name, identity) for name in names}
+    if phase == "screen":
+        require(
+            receipts["run.json"]["result_digest"] == receipts["result.json"]["digest"],
+            "run/result identity differs",
+        )
+    return {name: receipt["digest"] for name, receipt in receipts.items()}
+
+
+def verified_stage_success(
+    job: Path, phase: str, identity: dict[str, Any], outputs: dict[str, str]
+) -> dict[str, Any]:
+    require(
+        (job / "resources.json").is_file() and (job / "attempts.json").is_file(),
+        "Guardian completion missing",
+    )
+    resources, attempts = read(job / "resources.json"), read(job / "attempts.json")
+    require(isinstance(resources, dict) and isinstance(attempts, list), "Guardian record shape")
+    entry = resources.get(phase)
+    require(isinstance(entry, dict), "Guardian completion missing: " + phase)
+    require(
+        entry.get("schema") == "quanthus.research-stage-completion.v1"
+        and entry.get("identity") == identity
+        and entry.get("phase") == phase,
+        "Guardian completion identity/phase",
+    )
+    require(
+        entry.get("digest") == digest({k: v for k, v in entry.items() if k != "digest"}),
+        "Guardian completion digest",
+    )
+    require(
+        entry.get("status") == "succeeded"
+        and type(entry.get("exit_code")) is int
+        and entry.get("exit_code") == 0
+        and entry.get("failure") is None,
+        "Guardian stage has not succeeded: " + phase,
+    )
+    history = [x for x in attempts if isinstance(x, dict) and x.get("phase") == phase]
+    require(
+        bool(history)
+        and history[-1] == entry
+        and type(entry.get("attempt")) is int
+        and entry.get("attempt") == len(history),
+        "Guardian completion is not the latest attempt",
+    )
+    require(entry.get("output_digests") == outputs, "Guardian completion output identity")
+    return entry
+
+
 def verify_package(package: Path) -> dict[str, Any]:
     matches = list(package.glob("*-manifest.json"))
     require(len(matches) == 1, "package manifest cardinality")
@@ -507,8 +559,15 @@ def build_package(
     result = bound_read(job, "result.json", identity)
     run = bound_read(job, "run.json", identity)
     require(run["result_digest"] == result["digest"], "run/result identity differs")
+    completions = {
+        "fetch": verified_stage_success(job, "fetch", identity, {"fetch.json": fetched["digest"]}),
+        "screen": verified_stage_success(
+            job, "screen", identity, {"result.json": result["digest"], "run.json": run["digest"]}
+        ),
+    }
     verify_members(job / "source", request, members)
     package = job / "package"
+    staging = job / "package.staging"
     values = {
         "request": request,
         "closure": {"members": members},
@@ -516,32 +575,67 @@ def build_package(
         "fetch-receipt": fetched,
         "result": result,
         "run-receipt": run,
-        "resource-receipts": read(job / "resources.json"),
-        "stage-attempts": read(job / "attempts.json"),
+        "resource-receipts": completions,
+        "stage-attempts": [
+            x for x in read(job / "attempts.json") if x.get("phase") in {"fetch", "screen"}
+        ],
     }
-    if package.exists():
+
+    def verified_existing(path: Path) -> None:
+        require(path.is_dir() and not path.is_symlink(), "invalid package directory")
         require(
-            sum(x.stat().st_size for x in package.iterdir())
-            <= request["budget"]["max_upload_bytes"],
+            sum(x.stat().st_size for x in path.iterdir()) <= request["budget"]["max_upload_bytes"],
             "package upload budget exceeded",
         )
-        manifest = verify_package(package)
+        manifest = verify_package(path)
         require(manifest["identity"] == identity, "existing package identity")
         for kind, value in values.items():
             # Operational publish attempts are tracked outside the once-frozen package.
             if kind == "stage-attempts":
                 continue
             require(
-                read(package / artifact_name(request, kind)) == value,
+                read(path / artifact_name(request, kind)) == value,
                 "existing package content conflict",
             )
-        return package
-    package.mkdir()
+
+    def quarantine_partial(path: Path) -> None:
+        require(path.is_dir() and not path.is_symlink(), "invalid partial package directory")
+        retained = job / "package-quarantine"
+        retained.mkdir(exist_ok=True)
+        target = retained / f"{path.name}-{time.time_ns()}"
+        path.rename(target)
+        log = job / "package-recovery.json"
+        previous = read(log) if log.exists() else []
+        write(
+            log,
+            [
+                *previous,
+                {
+                    "from": path.name,
+                    "retained": str(target.relative_to(job)),
+                    "reason": "incomplete_without_READY",
+                    "recorded_at": now(),
+                },
+            ],
+        )
+
+    if package.exists():
+        if list(package.glob("*-READY")):
+            verified_existing(package)
+            return package
+        quarantine_partial(package)
+    if staging.exists():
+        if list(staging.glob("*-READY")):
+            verified_existing(staging)
+            staging.rename(package)
+            return package
+        quarantine_partial(staging)
+    staging.mkdir()
     for kind, value in values.items():
-        write(package / artifact_name(request, kind), value)
+        write(staging / artifact_name(request, kind), value)
     artifacts = {
         p.name: {"sha256": file_digest(p), "size_bytes": p.stat().st_size}
-        for p in package.iterdir()
+        for p in staging.iterdir()
     }
     manifest = {
         "schema": "quanthus.research-package.v2",
@@ -554,16 +648,14 @@ def build_package(
         "created_at": now(),
     }
     manifest["digest"] = digest(manifest)
-    manifest_path = package / artifact_name(request, "manifest")
+    manifest_path = staging / artifact_name(request, "manifest")
     write(manifest_path, manifest)
-    (package / f"{request['task_id']}-{request['attempt_id']}-READY").write_text(
-        file_digest(manifest_path) + "\n"
-    )
-    require(
-        sum(x.stat().st_size for x in package.iterdir()) <= request["budget"]["max_upload_bytes"],
-        "package upload budget exceeded",
-    )
-    verify_package(package)
+    ready = staging / f"{request['task_id']}-{request['attempt_id']}-READY"
+    ready_partial = ready.with_name(ready.name + ".partial")
+    ready_partial.write_text(file_digest(manifest_path) + "\n")
+    ready_partial.replace(ready)
+    verified_existing(staging)
+    staging.rename(package)
     return package
 
 
@@ -726,6 +818,26 @@ def launch_guarded(phase: str, request_path: Path, job: Path, cache: Path | None
         failure = None
         peak = 0
         scratch = 0
+        running = seal(
+            {
+                "schema": "quanthus.research-stage-completion.v1",
+                "identity": identity,
+                "phase": phase,
+                "attempt": index,
+                "status": "running",
+                "exit_code": None,
+                "failure": None,
+                "output_digests": {},
+                "log": logfile.name,
+                "recorded_at": now(),
+            }
+        )
+        attempts.append(running)
+        write(job / "attempts.json", attempts)
+        resources = read(job / "resources.json") if (job / "resources.json").is_file() else {}
+        if phase != "publish":
+            resources[phase] = running
+            write(job / "resources.json", resources)
         with logfile.open("wb") as log:
             process = subprocess.Popen(
                 command,
@@ -757,20 +869,35 @@ def launch_guarded(phase: str, request_path: Path, job: Path, cache: Path | None
                 time.sleep(0.2)
             code = process.wait()
         elapsed = time.monotonic() - started
-        attempt = {
-            "phase": phase,
-            "attempt": index,
-            "exit_code": code,
-            "failure": failure,
-            "wall_seconds": elapsed,
-            "peak_rss_bytes": peak,
-            "peak_scratch_bytes": scratch,
-            "log": logfile.name,
-            "recorded_at": now(),
-        }
-        attempts.append(attempt)
+        outputs = {}
+        if failure is None and code == 0 and phase != "publish":
+            try:
+                outputs = stage_output_digests(job, phase, identity)
+            except (GuardError, OSError, KeyError, TypeError, ValueError):
+                failure = "stage_receipt_invalid"
+        if failure is None and elapsed > limit:
+            failure = "stage_wall_exceeded"
+        if failure is None and time.time() - state["created_epoch"] > b["max_job_wall_seconds"]:
+            failure = "job_wall_exceeded"
+        attempt = seal(
+            {
+                "schema": "quanthus.research-stage-completion.v1",
+                "identity": identity,
+                "phase": phase,
+                "attempt": index,
+                "status": "succeeded" if code == 0 and failure is None else "failed",
+                "exit_code": code,
+                "failure": failure,
+                "output_digests": outputs,
+                "wall_seconds": elapsed,
+                "peak_rss_bytes": peak,
+                "peak_scratch_bytes": scratch,
+                "log": logfile.name,
+                "recorded_at": now(),
+            }
+        )
+        attempts[-1] = attempt
         write(job / "attempts.json", attempts)
-        resources = read(job / "resources.json") if (job / "resources.json").is_file() else {}
         # Immutable package keeps resources before publish; upload records remain separate.
         if phase != "publish":
             resources[phase] = attempt

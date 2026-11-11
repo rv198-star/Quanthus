@@ -49,7 +49,7 @@ def remove_owned(path: Path) -> None:
     shutil.rmtree(path, onerror=writable)
 
 
-@pytest.hookimpl(hookwrapper=True)  # type: ignore[untyped-decorator]
+@pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item: Any, call: Any) -> Any:
     global _reclaimed
     outcome = yield

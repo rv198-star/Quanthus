@@ -45,7 +45,7 @@ def audit(root: Path, hist: Path, base: Path) -> dict[str, Any]:
     scratch = root / "audit-tmp"
     scratch.mkdir()
     c = importlib.import_module("duckdb").connect(
-        str(scratch / "audit.duckdb"), config={"threads": 2, "memory_limit": "2GB"}
+        str(scratch / "audit.duckdb"), config={"threads": 2, "memory_limit": "8GB"}
     )
     c.execute("SET TimeZone='Asia/Shanghai'")
     c.execute("SET preserve_insertion_order=false")

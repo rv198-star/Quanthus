@@ -48,5 +48,5 @@
   },
   "publication": {"repo": "rv192/quanthus-hist-1d", "replace_default_after_verification": true, "preserve_old_revision": true, "base_and_production_mutation": false},
   "raw_sources": "Historical source backups and sealed Base2.5.1 ODS remain the source archives; publication carries parent identities, selected member hashes and recovery references.",
-  "budget": {"threads": 2, "duckdb_memory": "2GB", "free_space_floor_bytes": 2000000000, "scope": "Local parent composition and publication; no new collection"}
+  "budget": {"threads": 2, "duckdb_memory": "2GB", "audit_memory": "8GB", "free_space_floor_bytes": 2000000000, "scope": "Local parent composition and publication; no new collection. Full listing/session DISTINCT audit uses the declared separate audit memory budget."}
 }

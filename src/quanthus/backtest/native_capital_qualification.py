@@ -153,7 +153,9 @@ def census(
             f"count(*) FILTER(WHERE CAST(knowledge_from AS DATE)>CAST({clock} AS DATE)),"
             f"min({clock}),max({clock}),min(knowledge_from),max(knowledge_from) FROM q_{table}"
         )
-        n, missing_clock, missing_known, later, first, last, kfirst, klast = query.fetchone()
+        count_row = query.fetchone()
+        assert count_row is not None
+        n, missing_clock, missing_known, later, first, last, kfirst, klast = count_row
         entry.update(
             rows=n,
             missing_business_clock=missing_clock,
@@ -174,10 +176,12 @@ def census(
         entry["missing_required"].extend(sorted(missing_keys))
         if not missing_keys:
             keys = ",".join('"' + name + '"' for name in KEYS[table])
-            entry["duplicate_keys"] = c.execute(
+            duplicate_row = c.execute(
                 f"SELECT count(*) FROM (SELECT {keys} FROM q_{table} "
                 f"GROUP BY {keys} HAVING count(*)>1)"
-            ).fetchone()[0]
+            ).fetchone()
+            assert duplicate_row is not None
+            entry["duplicate_keys"] = duplicate_row[0]
         profiles = {}
         for name in sorted(
             names
@@ -234,13 +238,15 @@ def census(
         not tables["dwd_corporate_action"]["missing_required"]
         and not tables["dwd_corporate_action_term"]["missing_required"]
     ):
-        extra["terms_without_header_in_same_scope"] = c.execute(
+        orphan_row = c.execute(
             "SELECT count(*) FROM q_dwd_corporate_action_term t WHERE NOT EXISTS "
             "(SELECT 1 FROM q_dwd_corporate_action a "
             "WHERE a.corporate_action_id=t.corporate_action_id)"
-        ).fetchone()[0]
+        ).fetchone()
+        assert orphan_row is not None
+        extra["terms_without_header_in_same_scope"] = orphan_row[0]
     c.close()
-    return clean(
+    result = clean(
         {
             "schema": "quanthus.native-capital-source-census.v1",
             "qualification_only": True,
@@ -252,3 +258,5 @@ def census(
             "strategy_or_pnl_evaluated": False,
         }
     )
+    assert isinstance(result, dict)
+    return result

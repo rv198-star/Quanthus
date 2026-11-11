@@ -146,6 +146,8 @@ def native_market_session(
             for x in (op, close, upper, lower)
         ):
             raise NativeAdapterError("NATIVE_PRICE_OR_BOUND_UNKNOWN")
+        assert isinstance(op, Decimal) and isinstance(close, Decimal)
+        assert isinstance(upper, Decimal) and isinstance(lower, Decimal)
         if not lower <= op <= upper or lower >= upper:
             raise NativeAdapterError("NATIVE_PRICE_BOUND_CONFLICT")
         state = (

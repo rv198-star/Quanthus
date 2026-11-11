@@ -131,6 +131,8 @@ Deepseek 负责已验收模板的固定执行及公式/反例齐全的小实现�
 完整 `make check` 为 **8,888 passed / 35 skipped / 62 warnings，801.98 秒**，进程 exit 0；
 包含原 40 项 Worker 专项。跳过项沿用该环境缺少的可选依赖。相关候选与审计文件 lint 通过，
 Hosted CI 未运行。后续文档/账本变更验证执行闭包相同，重跑受影响检查及准确 PR base 历史校验。
+文档/治理跟进检查为 **64 passed，1.55 秒**；精确 stacked PR base `4c5bba4c` 和
+main base `b73b37d7` 的追加历史检查通过。审计提交见 [PR #621](https://github.com/rv198-star/Quanthus/pull/621)。
 原测试全部通过与三个新反例分别留证，整改需要把这些遗漏转换成正式回归。
 审计脚本的格式化前后 AST 完全相同，复算按实际执行提交保留，没有重复计算。
 Git 直连一次 TLS 失败后代理重试成功，工具等待、初始化参数纠正和初次样式检查成本保留。

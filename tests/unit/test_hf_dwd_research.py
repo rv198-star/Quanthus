@@ -731,7 +731,7 @@ def test_sample_gate_uses_candidate_days_at_boundary(
         OVER (ORDER BY trade_date)) px FROM dwd_trading_calendar
       WHERE venue_id='{SSE}' AND trade_date>=DATE '2020-01-02';
     CREATE TABLE dwd_security_bar AS SELECT 'L' listing_id,calendar_session_id,
-      trade_date observation_start,px open,px close,2e8 turnover,'1d' interval_size,
+      trade_date observation_start,px AS "open",px AS "close",2e8 turnover,'1d' interval_size,
       'UNADJUSTED' price_basis,NULL::TIMESTAMP knowledge_to FROM prices;
     CREATE TABLE dwd_tradability_state AS SELECT 'L' listing_id,calendar_session_id,
       trade_date observation_start,px*1.1 upper_price,true is_tradable,true can_buy,

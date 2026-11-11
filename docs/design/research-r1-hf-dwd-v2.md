@@ -3,7 +3,7 @@
 | 项 | 值 |
 |---|---|
 | Design status | approved — Owner 2026-11-11要求Sol按#609→#610→#611修复，每步自审 |
-| Delivery gate | open — 每步验收回执在对应issue；最终采用交独立审阅 |
+| Delivery gate | accepted — 固定v2单节点Worker及描述性结果经[#612独立差集验收](../acceptance/research-r1-f1f3-independent-audit-612-20261111.md)；新任务按新请求与环境准入 |
 | Parent | [探索推进准则](exploration-governance.md) |
 | Work items | META-RESEARCH-SELECT-001 / #609；P3-RESEARCH-HF-001 / #610；P3-RESEARCH-PILOT-001 / #611 |
 | Frozen request | `config/research/research-r1/request.v2.json`；精确闭包`closure.v2.json`；环境`runtime.v2.lock` |

@@ -24,6 +24,8 @@ The [v2 independent acceptance](acceptance/research-r1-v2-independent-audit-612-
 accepts the recorded A2 result and specifies three bounded Worker repairs before reuse.
 The [F1–F3 repair self-audit](acceptance/research-r1-f1f3-self-audit-20261111.md)
 records the corrected stage gates, package recovery and A4 delivery for independent reacceptance.
+The [F1–F3 independent difference audit](acceptance/research-r1-f1f3-independent-audit-612-20261111.md)
+records the terminal-stage, candidate-date and package-recovery acceptance and retained A4 evidence.
 
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its

@@ -8807,6 +8807,50 @@
         "FACTS",
         "CLOSEOUT"
       ]
+    },
+    {
+      "id": "CP-610-20261111T111218136234Z",
+      "recorded_at": "2026-11-11T11:12:18.136234+00:00",
+      "actor": "Codex / Sol 6.1; ordered R1 repair",
+      "work_item": "P3-RESEARCH-HF-001",
+      "outcome": "progress",
+      "summary": "R1 v2限定Worker工程自审通过：40专项/8888完整测试，真实HF全文件回读与幂等，A1保留A2最终。",
+      "evidence": [
+        {
+          "id": "E610-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/retained/610-self-audit.json",
+          "sha256": "df1de87eef8c59927073aa6b97d637b463e3679d4c4092e1e85d286b15ba1b9a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "限定Linux/Python3.10.12和56成员的v2 Worker工程自审；采用待独立审阅。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "R1 v2: 2dc01f18，40专项/8888完整检查，HF cd7029e1全包回读与同内容发布幂等；A1/A2同指标",
+          "remaining": "只覆盖固定描述任务和一个合格Linux节点；最终采用/第二Worker由独立审阅和触发条件决定",
+          "next_action": "611复用同一已发布结果，612独立验收；需要新任务时冻结完整request",
+          "evidence": [
+            "E610-SELF-AUDIT"
+          ],
+          "supersedes": "CP-612-20261111T092552053641Z"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-HF-001",
+          "number": 610,
+          "title": "[P3-RESEARCH-HF-001] 为首个研究任务打通最小HF读取、限额运行与结果回传",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-11T11:12:16Z",
+          "body_sha256": "2303682c50f33c3ad4d0c8922add2da032626f73ac8529a431504ca110133a32"
+        }
+      ]
     }
   ]
 }

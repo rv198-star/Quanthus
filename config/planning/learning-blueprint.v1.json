@@ -586,6 +586,16 @@
         "CLOSEOUT"
       ],
       "contribution": "按有效设计复算与解释；保留原始代理统计及失败记录"
+    },
+    {
+      "id": "P3-RESEARCH-REUSE-001",
+      "issue": 613,
+      "modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "contribution": "检验R1既有20日原始价格动量区间对次日开盘至收盘响应的增量，决定后续回放或停放；验证已验收输入与Worker的复用成本。"
     }
   ]
 }

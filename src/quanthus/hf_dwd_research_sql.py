@@ -1,7 +1,9 @@
-"""Frozen R1 v2 descriptive screen; no replay or trading activation."""
+"""Frozen R1/R2 descriptive screens; no replay or trading activation."""
 
 from __future__ import annotations
 
+import math
+import random
 from typing import Any
 
 SSE = "venue_bec59e31eb6bb28111a10d7e6d2c689f"
@@ -29,6 +31,18 @@ def calculate(
             raise ValueError(f"missing required table: {table}")
         connection.read_parquet(paths[table], hive_partitioning=True).create_view(table)
     connection.execute("SET TimeZone='Asia/Shanghai'")
+    analysis = request.get("analysis")
+    r2_columns = ""
+    if analysis:
+        r2_columns = f"""
+      n.op AS next_open,n.px AS next_close,n.trade_date AS execution_date,
+      (f.positive_closes21=21 AND f.returns20=20 AND f.amounts20=20
+       AND f.listing_age_floor_sessions>={filters["min_listing_sessions"]}
+       AND f.average_amount20>={filters["min_avg_turnover_prior20"]}
+       AND f.return_vol20<={filters["max_unadjusted_close_return_vol20"]}
+       AND abs(f.unadjusted_return)<={filters["max_abs_unadjusted_close_return"]}
+       AND f.momentum20 IS NOT NULL AND isfinite(f.momentum20)) IS TRUE AS base_selected,
+        """
     connection.execute(f"""
     CREATE TEMP TABLE calendar AS
     SELECT calendar_session_id, venue_id, CAST(trade_date AS DATE) AS trade_date,
@@ -125,6 +139,7 @@ def calculate(
        AND abs(f.unadjusted_return)<={filters["max_abs_unadjusted_close_return"]}
        AND f.momentum20 BETWEEN {filters["unadjusted_momentum20_band"][0]}
          AND {filters["unadjusted_momentum20_band"][1]}) IS TRUE AS selected,
+      {r2_columns}
       CASE
        WHEN n.listing_id IS NULL OR n.security_ok IS NOT TRUE THEN 'missing_next_identity'
        WHEN NOT {positive("n.op")} THEN 'missing_or_invalid_open'
@@ -139,6 +154,15 @@ def calculate(
     WHERE f.trade_date BETWEEN DATE '{scope["decision_start"]}'
       AND DATE '{scope["decision_end"]}';
     """)
+
+    if analysis:
+        lo, hi = filters["unadjusted_momentum20_band"]
+        if connection.execute(
+            "SELECT count(*) FROM labelled WHERE universe AND base_selected "
+            f"AND selected IS DISTINCT FROM (momentum20 BETWEEN {lo} AND {hi})"
+        ).fetchone()[0]:
+            raise ValueError("R2 momentum cohorts disagree with original band")
+        return momentum_markout(connection, analysis)
 
     def summary(predicate: str) -> dict[str, Any]:
         count, passed, days, listings = connection.execute(
@@ -227,4 +251,203 @@ def calculate(
         "panel_rows": connection.execute("SELECT count(*) FROM panel").fetchone()[0],
         "claim_ceiling": "Fixed retrospective raw-price screen and next-open price guard only; "
         "existing P2 constraints retained; strategy economics not evaluated.",
+    }
+
+
+def circular_block_interval(
+    rows: list[dict[str, Any]], analysis: dict[str, Any]
+) -> tuple[float, float]:
+    """Resample complete market dates in circular blocks separately within each year."""
+    parameters = analysis["bootstrap"]
+    generator = random.Random(parameters["seed"])
+    by_year = [
+        [row["increment"] for row in rows if int(row["date"][:4]) == year]
+        for year in analysis["required_years"]
+    ]
+    if any(not values for values in by_year):
+        raise ValueError("bootstrap missing required year")
+    draws = []
+    for _ in range(parameters["replicates"]):
+        sample = []
+        for values in by_year:
+            selected = []
+            while len(selected) < len(values):
+                start = generator.randrange(len(values))
+                selected.extend(
+                    values[(start + offset) % len(values)]
+                    for offset in range(parameters["block_sessions"])
+                )
+            sample.extend(selected[: len(values)])
+        draws.append(math.fsum(sample) / len(sample))
+    draws.sort()
+    return draws[math.ceil(0.025 * len(draws)) - 1], draws[math.ceil(0.975 * len(draws)) - 1]
+
+
+def markout_decision(
+    daily: list[dict[str, Any]], groups: dict[str, Any], analysis: dict[str, Any]
+) -> dict[str, Any]:
+    """Apply only the frozen routing gate, preserving insufficient and uncertain outcomes."""
+    years = analysis["required_years"]
+    year_values = {
+        str(year): [row["increment"] for row in daily if int(row["date"][:4]) == year]
+        for year in years
+    }
+    year_means = {
+        year: math.fsum(values) / len(values) if values else None
+        for year, values in year_values.items()
+    }
+    gaps = [
+        f"paired_days.{year}"
+        for year, values in year_values.items()
+        if len(values) < analysis["min_paired_days_per_year"]
+    ]
+    for name, group in groups.items():
+        for key, minimum in (
+            ("opportunities", analysis["min_group_opportunities"]),
+            ("listings", analysis["min_group_listings"]),
+        ):
+            if group[key] < minimum:
+                gaps.append(name + "." + key)
+        for year in years:
+            if group["by_year"][str(year)] < analysis["min_group_opportunities_per_year"]:
+                gaps.append(name + ".opportunities." + str(year))
+        for key, maximum in (
+            ("top_listing_share", analysis["max_top_listing_share"]),
+            ("top10_listing_share", analysis["max_top10_listing_share"]),
+        ):
+            if group[key] is None or group[key] > maximum:
+                gaps.append(name + "." + key)
+    mean = math.fsum(row["increment"] for row in daily) / len(daily) if daily else None
+    lower = upper = None
+    branch, verdict = "insufficient", "inconclusive"
+    if not gaps:
+        lower, upper = circular_block_interval(daily, analysis)
+        if (
+            mean is not None
+            and mean >= analysis["minimum_mean_increment"]
+            and all(value is not None and value > 0 for value in year_means.values())
+            and lower > 0
+        ):
+            branch, verdict = "advance", "supported"
+        elif upper < analysis["minimum_mean_increment"]:
+            branch, verdict = "below_minimum", "not_met"
+        else:
+            branch = "uncertain"
+    return {
+        "sample_sufficient": not gaps,
+        "sample_gaps": gaps,
+        "paired_days": len(daily),
+        "paired_days_by_year": {year: len(values) for year, values in year_values.items()},
+        "mean_increment": mean,
+        "mean_increment_by_year": year_means,
+        "interval95": [lower, upper],
+        "decision_branch": branch,
+        "verdict": verdict,
+        "decision": analysis["decision_branches"][branch],
+    }
+
+
+def momentum_markout(connection: Any, analysis: dict[str, Any]) -> dict[str, Any]:
+    """Describe disjoint momentum cohorts after the same accepted next-open check."""
+    connection.execute(f"""
+    CREATE TEMP TABLE r2_base AS
+    SELECT *,CASE
+      WHEN next_open_reason<>'pass' THEN next_open_reason
+      WHEN NOT {positive("next_close")} THEN 'missing_or_invalid_next_close'
+      WHEN NOT isfinite(next_close/next_open-1) THEN 'nonfinite_response'
+      ELSE 'pass' END AS label_reason
+    FROM labelled WHERE universe AND base_selected;
+    CREATE TEMP TABLE r2_valid AS
+    SELECT *,next_close/next_open-1 AS response FROM r2_base WHERE label_reason='pass';
+    CREATE TEMP TABLE r2_cells AS
+    SELECT trade_date,venue_id,
+      count(*) FILTER(WHERE selected) AS candidate_count,
+      count(*) FILTER(WHERE NOT selected) AS control_count,
+      avg(response) FILTER(WHERE selected) AS candidate_mean,
+      avg(response) FILTER(WHERE NOT selected) AS control_mean,
+      avg(CAST(response>0 AS DOUBLE)) FILTER(WHERE selected) AS candidate_positive_rate,
+      avg(CAST(response>0 AS DOUBLE)) FILTER(WHERE NOT selected) AS control_positive_rate,
+      avg(CAST(response< -0.01 AS DOUBLE)) FILTER(WHERE selected) AS candidate_loss1pct_rate,
+      avg(CAST(response< -0.01 AS DOUBLE)) FILTER(WHERE NOT selected) AS control_loss1pct_rate
+    FROM r2_valid GROUP BY trade_date,venue_id;
+    CREATE TEMP TABLE r2_paired_dates AS
+    SELECT trade_date FROM r2_cells WHERE candidate_count>0 AND control_count>0
+    GROUP BY trade_date HAVING count(DISTINCT venue_id)=2;
+    """)
+    query = connection.execute(
+        "SELECT c.* FROM r2_cells c JOIN r2_paired_dates p USING(trade_date) "
+        "ORDER BY trade_date,venue_id"
+    )
+    names = [x[0] for x in query.description]
+    paired = [dict(zip(names, row, strict=True)) for row in query.fetchall()]
+    for row in paired:
+        row["trade_date"] = row["trade_date"].isoformat()
+        row["increment"] = row["candidate_mean"] - row["control_mean"]
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in paired:
+        grouped.setdefault(row["trade_date"], []).append(row)
+    daily = [
+        {"date": day, "increment": math.fsum(r["increment"] for r in rows) / len(rows)}
+        for day, rows in grouped.items()
+    ]
+    groups = {}
+    for name, selected in (("candidate", "TRUE"), ("control", "FALSE")):
+        predicate = (
+            f"selected={selected} AND trade_date IN (SELECT trade_date FROM r2_paired_dates)"
+        )
+        n, listings = connection.execute(
+            f"SELECT count(*),count(DISTINCT listing_id) FROM r2_valid WHERE {predicate}"
+        ).fetchone()
+        concentration = connection.execute(
+            f"SELECT count(*) n FROM r2_valid WHERE {predicate} GROUP BY listing_id ORDER BY n DESC"
+        ).fetchall()
+        groups[name] = {
+            "opportunities": n,
+            "listings": listings,
+            "by_year": {
+                str(year): connection.execute(
+                    f"SELECT count(*) FROM r2_valid WHERE {predicate} AND year(trade_date)={year}"
+                ).fetchone()[0]
+                for year in analysis["required_years"]
+            },
+            "top_listing_share": concentration[0][0] / n if n else None,
+            "top10_listing_share": sum(x[0] for x in concentration[:10]) / n if n else None,
+        }
+    ledger = [
+        {"group": "candidate" if selected else "control", "reason": reason, "count": count}
+        for selected, reason, count in connection.execute(
+            "SELECT selected,label_reason,count(*) FROM r2_base GROUP BY 1,2 ORDER BY 1,2"
+        ).fetchall()
+    ]
+    if (
+        sum(row["count"] for row in ledger)
+        != connection.execute("SELECT count(*) FROM r2_base").fetchone()[0]
+    ):
+        raise ValueError("R2 reason accounting differs")
+    return {
+        "schema": "quanthus.momentum-band-markout.v1",
+        "analysis": analysis,
+        "groups_on_paired_dates": groups,
+        "paired_cells": paired,
+        "paired_daily": daily,
+        "label_ledger": ledger,
+        "valid_unpaired_opportunities": connection.execute(
+            "SELECT count(*) FROM r2_valid WHERE trade_date NOT IN "
+            "(SELECT trade_date FROM r2_paired_dates)"
+        ).fetchone()[0],
+        "unpaired_cells": [
+            {
+                "date": day.isoformat(),
+                "venue_id": venue,
+                "candidate_count": candidate,
+                "control_count": control,
+            }
+            for day, venue, candidate, control in connection.execute(
+                "SELECT trade_date,venue_id,candidate_count,control_count FROM r2_cells "
+                "WHERE trade_date NOT IN (SELECT trade_date FROM r2_paired_dates) "
+                "ORDER BY trade_date,venue_id"
+            ).fetchall()
+        ],
+        **markout_decision(daily, groups, analysis),
+        "claim_ceiling": analysis["claim_ceiling"],
     }

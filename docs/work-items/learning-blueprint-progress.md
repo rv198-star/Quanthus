@@ -128,6 +128,7 @@ GitHub 状态只表示任务生命周期；实时检查：`make blueprint-audit`
 | [META-RESEARCH-SELECT-001 / #609](https://github.com/rv198-star/Quanthus/issues/609) | FACTS, CLOSEOUT | 重审事前问题合同、指标语义、阈值和准入；保留原曝光 | closed |
 | [P3-RESEARCH-HF-001 / #610](https://github.com/rv198-star/Quanthus/issues/610) | REPRO | 修复并验收固定HF输入、资源边界与不可变结果包 | closed |
 | [P3-RESEARCH-PILOT-001 / #611](https://github.com/rv198-star/Quanthus/issues/611) | FACTS, CLOSEOUT | 按有效设计复算与解释；保留原始代理统计及失败记录 | closed |
+| [P3-RESEARCH-REUSE-001 / #613](https://github.com/rv198-star/Quanthus/issues/613) | FACTORS, REPRO, CLOSEOUT | 检验R1既有20日原始价格动量区间对次日开盘至收盘响应的增量，决定后续回放或停放；验证已验收输入与Worker的复用成本。 | 未对账 |
 
 ## 证据索引
 

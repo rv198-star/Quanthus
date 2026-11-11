@@ -762,3 +762,145 @@ def test_sample_gate_uses_candidate_days_at_boundary(
     assert all(row["control"]["decision_days"] >= 3 for row in result["by_year"].values())
     assert result["sample_sufficient"] is sufficient
     assert result["decision_branch"] == ("small" if sufficient else "insufficient")
+
+
+@pytest.fixture
+def r2_request():
+    return json.loads((ROOT / "config/research/research-r2/request.v1.json").read_text())
+
+
+def test_r2_request_is_valid_and_bootstrap_is_bound(r2_request):
+    worker.validate_request(r2_request)
+    r2_request["analysis"]["bootstrap"]["quantile"] = "linear"
+    with pytest.raises(worker.GuardError, match="bootstrap method"):
+        worker.validate_request(r2_request)
+
+
+def test_r2_reuses_features_and_next_session_label(synthetic, r2_request):
+    source, run, q = synthetic
+    q["analysis"] = r2_request["analysis"]
+    source.execute("UPDATE dwd_security_bar SET close=NULL WHERE observation_start='2020-03-04'")
+    result, c = run()
+    assert result["decision_branch"] == "insufficient"
+    row = c.execute(
+        "SELECT next_open,next_close,execution_date FROM labelled WHERE trade_date='2020-03-03'"
+    ).fetchone()
+    assert row[0] > 0 and row[1] is None and str(row[2]) == "2020-03-04"
+    assert {"group": "candidate", "reason": "missing_or_invalid_next_close", "count": 1} in result[
+        "label_ledger"
+    ]
+    assert (
+        c.execute("SELECT count(*) FROM labelled WHERE base_selected AND NOT selected").fetchone()[
+            0
+        ]
+        == 0
+    )
+    c.close()
+
+
+def test_r2_closed_band_edges(synthetic, r2_request):
+    _, run, q = synthetic
+    _, c = run()
+    value = c.execute("SELECT momentum20 FROM labelled WHERE trade_date='2020-03-03'").fetchone()[0]
+    c.close()
+    q["analysis"] = r2_request["analysis"]
+    for band in ([value, value + 0.1], [value - 0.1, value]):
+        q["screen"]["unadjusted_momentum20_band"] = band
+        _, c = run()
+        assert c.execute("SELECT selected FROM labelled WHERE trade_date='2020-03-03'").fetchone()[
+            0
+        ]
+        c.close()
+
+
+def test_r2_pairing_weights_and_disjoint_reason_accounting(r2_request):
+    from quanthus.hf_dwd_research_sql import momentum_markout
+
+    c = duckdb.connect()
+    c.execute(
+        "CREATE TABLE labelled(trade_date DATE,venue_id VARCHAR,listing_id VARCHAR,"
+        "universe BOOLEAN,base_selected BOOLEAN,selected BOOLEAN,next_open_reason VARCHAR,"
+        "next_open DOUBLE,next_close DOUBLE)"
+    )
+    rows = []
+    for venue, candidates, control in (
+        (SSE, [0.02, 0.04], [0.01]),
+        (SZSE, [0.08], [0.02, 0.02, 0.02]),
+    ):
+        for selected, values in ((True, candidates), (False, control)):
+            for i, response in enumerate(values):
+                rows.append(
+                    (
+                        "2020-03-02",
+                        venue,
+                        venue + str(selected) + str(i),
+                        True,
+                        True,
+                        selected,
+                        "pass",
+                        10.0,
+                        10 * (1 + response),
+                    )
+                )
+    # A missing control on SZSE excludes the entire second date from paired statistics.
+    rows.extend([("2020-03-03", v, v, True, True, True, "pass", 10.0, 11.0) for v in (SSE, SZSE)])
+    rows.append(("2020-03-02", SSE, "bad-close", True, True, False, "pass", 10.0, None))
+    rows.append(("2020-03-02", SSE, "overflow", True, True, False, "pass", 1e-300, 1e300))
+    c.executemany("INSERT INTO labelled VALUES(?,?,?,?,?,?,?,?,?)", rows)
+    result = momentum_markout(c, r2_request["analysis"])
+    assert result["paired_days"] == 1
+    assert result["mean_increment"] == pytest.approx(0.04)
+    assert result["groups_on_paired_dates"]["candidate"]["opportunities"] == 3
+    assert result["groups_on_paired_dates"]["control"]["opportunities"] == 4
+    assert result["valid_unpaired_opportunities"] == 2
+    assert len(result["unpaired_cells"]) == 2
+    assert sum(x["count"] for x in result["label_ledger"]) == len(rows)
+    reasons = {x["reason"] for x in result["label_ledger"]}
+    assert reasons == {"pass", "missing_or_invalid_next_close", "nonfinite_response"}
+    c.close()
+
+
+@pytest.mark.parametrize(
+    ("value", "branch"), [(0.001, "advance"), (0.0, "below_minimum"), (0.0005, "uncertain")]
+)
+def test_r2_frozen_routing_branches(r2_request, value, branch):
+    from quanthus.hf_dwd_research_sql import markout_decision
+
+    analysis = r2_request["analysis"]
+    daily = [
+        {"date": f"{year}-03-{day:02d}", "increment": value}
+        for year in (2020, 2021)
+        for day in range(1, 21)
+    ]
+    analysis["min_paired_days_per_year"] = 20
+    groups = {
+        name: {
+            "opportunities": 6000,
+            "listings": 200,
+            "by_year": {"2020": 3000, "2021": 3000},
+            "top_listing_share": 0.01,
+            "top10_listing_share": 0.1,
+        }
+        for name in ("candidate", "control")
+    }
+    result = markout_decision(daily, groups, analysis)
+    assert result["decision_branch"] == branch
+    assert result["interval95"] == pytest.approx([value, value])
+    groups["control"]["top10_listing_share"] = 0.21
+    result = markout_decision(daily, groups, analysis)
+    assert result["decision_branch"] == "insufficient"
+    assert result["sample_gaps"] == ["control.top10_listing_share"]
+
+
+def test_r2_bootstrap_repeatability_and_preserved_year_sizes(r2_request):
+    from quanthus.hf_dwd_research_sql import circular_block_interval
+
+    analysis = r2_request["analysis"]
+    daily = [
+        {"date": f"{year}-03-{i:02d}", "increment": year - 2020 + i / 100}
+        for year, size in ((2020, 21), (2021, 12))
+        for i in range(1, size)
+    ]
+    assert circular_block_interval(daily, analysis) == circular_block_interval(daily, analysis)
+    lower, upper = circular_block_interval(daily, analysis)
+    assert 0.35 < lower <= upper < 0.6

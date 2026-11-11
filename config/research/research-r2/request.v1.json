@@ -1,0 +1,142 @@
+{
+  "schema_version": "quanthus.hf-dwd-research-request.v2",
+  "request_id": "RESEARCH-R2-MOMENTUM-001",
+  "task_id": "RESEARCH-R2-MOMENTUM-001-T1",
+  "attempt_id": "A1",
+  "authority": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "content_digest": "sha256:1d0e4bd5fbf40bf2876883faf82b98fd81e95a93a82b9d23d248759a38b3f692",
+    "business_through": "2026-10-31"
+  },
+  "scope": {
+    "partition": "development",
+    "calendar_start": "2019-01-01",
+    "read_start": "2020-01-02",
+    "decision_start": "2020-03-02",
+    "decision_end": "2021-12-30",
+    "execution_end": "2021-12-31",
+    "forbidden_after": "2022-01-01",
+    "knowledge_view": "latest_sealed_retrospective",
+    "interval_semantics": "Asia/Shanghai date; effective [from,to)"
+  },
+  "closure": {
+    "path": "config/research/research-r1/closure.v2.json",
+    "sha256": "sha256:a2fe359ecff110eab7a139a5a197b538a71889a38cd8d7530201fbcf4c5d954c",
+    "exact_members": 56,
+    "exact_bytes": 187921175
+  },
+  "environment": {
+    "python": "3.10.12",
+    "platform": "linux",
+    "lock_path": "config/research/research-r1/runtime.v2.lock",
+    "lock_sha256": "sha256:f8626d30f642e4f68509e187e00b1cb042cdbe73ff848c399364809799b03cf3"
+  },
+  "screen": {
+    "min_listing_sessions": 120,
+    "min_avg_turnover_prior20": 100000000.0,
+    "max_unadjusted_close_return_vol20": 0.5,
+    "max_abs_unadjusted_close_return": 0.04,
+    "unadjusted_momentum20_band": [
+      0.02,
+      0.12
+    ],
+    "volatility_formula": "sample_std(close_t/close_tminus1-1 over current20)*sqrt(252); 21 consecutive positive finite closes; excludes corporate action adjustment",
+    "listing_age_rule": "calendar open sessions since listing effective_from; start clipped to 2019 for older listings, guaranteed >=120 before first decision",
+    "next_open_rule": "next open calendar_session joined by venue; valid listing/security [from,to), positive finite open, tradable and can_buy true, positive finite upper limit, open < upper-0.005",
+    "unknown_rule": "missing/invalid required input blocks admission; disjoint ordered reason ledger",
+    "control": "same decision dates and listing universe; positive finite close and current tradability; no candidate filters"
+  },
+  "decision": {
+    "consumer": "Next research allocator deciding whether this fixed raw-momentum band deserves a costed-replay tranche",
+    "primary_metric": "mean of same-date same-venue disjoint candidate-control next-session open-to-close response differences",
+    "minimum_mean_increment": 0.0005,
+    "branches": {
+      "insufficient": "inconclusive; park without changing the sample or thresholds",
+      "advance": "supported for a costed-replay candidate only when mean increment >=5bp, each year >0 and 95pct bootstrap lower >0",
+      "below_minimum": "not_met when the 95pct bootstrap upper is below 5bp; park this fixed band in this use",
+      "uncertain": "inconclusive otherwise; park pending a genuinely new question or material evidence"
+    }
+  },
+  "budget": {
+    "threads": 2,
+    "duckdb_memory_bytes": 3221225472,
+    "max_rss_bytes": 6442450944,
+    "max_scratch_bytes": 2147483648,
+    "max_download_bytes": 536870912,
+    "max_upload_bytes": 4194304,
+    "max_stage_wall_seconds": {
+      "fetch": 300,
+      "screen": 180,
+      "publish": 180
+    },
+    "max_job_wall_seconds": 1800,
+    "max_cpu_seconds": 240,
+    "max_compute_attempts": 1,
+    "max_publish_attempts": 3
+  },
+  "publish": {
+    "dataset": "rv192/quanthus-research-r1",
+    "private": true,
+    "path_prefix": "runs/RESEARCH-R2-MOMENTUM-001/RESEARCH-R2-MOMENTUM-001-T1/A1",
+    "ttl_review_after": "2026-12-12",
+    "cleanup_owner": "CN02 research task maintainer",
+    "retained_evidence_root": "/srv/agentdock/quanthus-ops/research-r2-momentum-20261112/retained"
+  },
+  "exposure": {
+    "previous_window_already_consumed": true,
+    "predecessor": "R1 v2 A2/A4 and all earlier same-window studies; retained",
+    "question_delta": "Adds a previously unevaluated future intraday price-response label and disjoint ablation of the fixed momentum band; no fit, threshold grid or fresh-holdout claim",
+    "recompute_reason": "One newly authorized R2 study; original R1 package and conclusions retained"
+  },
+  "analysis": {
+    "kind": "momentum-band-next-session-markout.v1",
+    "consumer": "Next research allocator deciding whether this fixed raw-momentum band deserves a costed-replay tranche",
+    "question": "Holding all other R1 filters fixed, does momentum20 in [0.02,0.12] add next-session open-to-close price response against the disjoint out-of-band group?",
+    "baseline": "R1 universe and all original filters except momentum band; finite momentum required",
+    "candidate": "baseline AND momentum20 in original closed [0.02,0.12] band",
+    "control": "baseline AND finite momentum20 outside original closed band",
+    "label": "next-session unadjusted close / open - 1; positive finite prices, same next-open price guard; a descriptive response label",
+    "aggregation": "Equal-weight listings within each date/venue/group; candidate minus disjoint control; mean the two venue differences within each paired date, then equal-weight paired dates",
+    "required_venues": [
+      "venue_bec59e31eb6bb28111a10d7e6d2c689f",
+      "venue_8c0bd9088a0dc88f28e5e7fa8efdce87"
+    ],
+    "required_years": [
+      2020,
+      2021
+    ],
+    "min_paired_days_per_year": 200,
+    "min_group_opportunities": 5000,
+    "min_group_opportunities_per_year": 500,
+    "min_group_listings": 100,
+    "max_top_listing_share": 0.05,
+    "max_top10_listing_share": 0.2,
+    "minimum_mean_increment": 0.0005,
+    "minimum_mean_increment_rationale": "5bp is a preregistered routing threshold for funding a later costed replay, not a net return or execution gate",
+    "bootstrap": {
+      "method": "year-stratified circular moving blocks of paired dates",
+      "block_sessions": 20,
+      "replicates": 2000,
+      "seed": 20261112,
+      "confidence": 0.95,
+      "quantile": "nearest_rank"
+    },
+    "secondary": [
+      "candidate/control positive-response frequency",
+      "candidate/control close-below-open-by-more-than-1pct frequency"
+    ],
+    "decision_branches": {
+      "insufficient": "inconclusive; park without changing the sample or thresholds",
+      "advance": "supported for a costed-replay candidate only when mean increment >=5bp, each year >0 and 95pct bootstrap lower >0",
+      "below_minimum": "not_met when the 95pct bootstrap upper is below 5bp; park this fixed band in this use",
+      "uncertain": "inconclusive otherwise; park pending a genuinely new question or material evidence"
+    },
+    "independent_check": {
+      "scope": "independently rebuilt pandas/numpy feature and next-session joins plus paired summaries; no producer SQL import",
+      "float_abs_tolerance": 1e-10
+    },
+    "claim_ceiling": "Latest-sealed 2020-2021 descriptive incremental signal screen. Next-session intraday price response is not an executable same-day round trip; no strategy economic adoption, training or protected partition activation."
+  }
+}

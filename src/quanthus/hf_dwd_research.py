@@ -171,6 +171,50 @@ def validate_request(request: dict[str, Any]) -> None:
     require(request["publish"]["dataset"] == "rv192/quanthus-research-r1", "result dataset")
     require(bool(request["publish"]["cleanup_owner"]), "retention owner")
     date.fromisoformat(request["publish"]["ttl_review_after"])
+    if "analysis" in request:
+        analysis = request["analysis"]
+        require(isinstance(analysis, dict), "analysis shape")
+        require(analysis.get("kind") == "momentum-band-next-session-markout.v1", "analysis kind")
+        require(analysis.get("required_years") == [2020, 2021], "analysis years")
+        require(
+            analysis.get("required_venues")
+            == ["venue_bec59e31eb6bb28111a10d7e6d2c689f", "venue_8c0bd9088a0dc88f28e5e7fa8efdce87"],
+            "analysis venues",
+        )
+        for key in (
+            "min_paired_days_per_year",
+            "min_group_opportunities",
+            "min_group_opportunities_per_year",
+            "min_group_listings",
+        ):
+            require(type(analysis[key]) is int and analysis[key] > 0, "analysis sample budget")
+        for key in ("minimum_mean_increment", "max_top_listing_share", "max_top10_listing_share"):
+            value = analysis[key]
+            require(
+                type(value) in (float, int) and math.isfinite(value) and 0 < value <= 1,
+                "analysis numeric threshold",
+            )
+        bootstrap = analysis["bootstrap"]
+        require(
+            bootstrap.get("method") == "year-stratified circular moving blocks of paired dates"
+            and bootstrap.get("confidence") == 0.95
+            and bootstrap.get("quantile") == "nearest_rank",
+            "analysis bootstrap method",
+        )
+        for key, lower, upper in (
+            ("block_sessions", 1, 60),
+            ("replicates", 100, 5000),
+            ("seed", 0, 2**32 - 1),
+        ):
+            require(
+                type(bootstrap[key]) is int and lower <= bootstrap[key] <= upper,
+                "analysis bootstrap budget",
+            )
+        require(
+            request["decision"]["minimum_mean_increment"] == analysis["minimum_mean_increment"]
+            and request["decision"]["branches"] == analysis["decision_branches"],
+            "analysis decision binding",
+        )
 
 
 def load_bundle(request_path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:

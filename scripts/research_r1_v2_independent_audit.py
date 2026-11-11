@@ -84,6 +84,12 @@ def checked_source(original, out, spec):
         "job.json",
         "publish.json",
     ):
+        if (
+            name == "publish.json"
+            and spec.get("allow_unpublished") is True
+            and not (original / name).is_file()
+        ):
+            continue
         shutil.copyfile(original / name, out / name)
     result = read(out / "result.json")
     assert result["identity"]["git"] == spec["execution_git"]
@@ -107,7 +113,7 @@ def checked_source(original, out, spec):
     return request, members, isolated, result
 
 
-def reproduce(original, out, spec):
+def reproduce(original, out, spec, evaluator=None):
     import duckdb
     import numpy as np
     import pandas as pd
@@ -255,14 +261,16 @@ def reproduce(original, out, spec):
         .sort_index()
     )
     panel["universe"] = good_close & panel.security_ok & panel.is_tradable.eq(True).fillna(False)
-    panel["selected"] = (
+    panel["base_selected"] = (
         (closes21 == 21)
         & (panel.age >= filt["min_listing_sessions"])
         & (prior >= filt["min_avg_turnover_prior20"])
         & (vol <= filt["max_unadjusted_close_return_vol20"])
         & (raw_returns.abs() <= filt["max_abs_unadjusted_close_return"])
-        & momentum.between(*filt["unadjusted_momentum20_band"])
+        & np.isfinite(momentum)
     )
+    panel["momentum20"] = momentum
+    panel["selected"] = panel.base_selected & momentum.between(*filt["unadjusted_momentum20_band"])
     columns = [
         "listing_id",
         "calendar_session_id",
@@ -272,6 +280,8 @@ def reproduce(original, out, spec):
         "is_tradable",
         "can_buy",
     ]
+    if evaluator is not None:
+        columns.extend(["px", "day"])
     future = panel[columns].rename(columns={x: "next_" + x for x in columns if x != "listing_id"})
     labelled = panel.loc[panel.day.between(scope["decision_start"], scope["decision_end"])].merge(
         future,
@@ -306,6 +316,9 @@ def reproduce(original, out, spec):
         ],
         "pass",
     )
+
+    if evaluator is not None:
+        return evaluator(q, labelled, author, out, began)
 
     def stats(rows):
         n = len(rows)

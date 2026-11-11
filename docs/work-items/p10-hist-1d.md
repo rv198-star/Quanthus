@@ -18,7 +18,7 @@ Retrospective observations use their recorded acquisition clock. Its use grade i
 
 CN02 workspace: `/srv/quanthus-base22-data/work/hist-1d-602-20261111`.
 Versioned implementation: `quanthus.pipelines.hist_1d`, `hist_1d_collect`,
-`hist_1d_materialize` and `hist_1d_audit`.
+`hist_1d_materialize`, `hist_1d_factor_completion`, `hist_1d_audit` and `hist_1d_release`.
 
 - Recovered four byte-verified Base 2.3 cloud archives and 1,238 selected members.
   Archive daily history was sparse before 2011; 2005 initially contained 200 listings.
@@ -26,9 +26,22 @@ Versioned implementation: `quanthus.pipelines.hist_1d`, `hist_1d_collect`,
   rows; every accepted source byte digest and request identity was verified, with no
   empty captures. Four authentication failures remain preserved alongside separately
   bound successful session-recovery captures.
-- Full candidate contains 10,569,845 daily bars and 362 Parquet files, totaling
-  360,174,821 bytes. Existing archive business keys are retained; supplements fill
-  missing keys. Source-evidenced suspended sessions generate states without new bars.
+- Final candidate contains 10,569,845 daily bars, 13 tables and 365 Parquet files
+  (822,376,160 bytes). Its 397 manifested members total 827,035,626 bytes. Supplements
+  fill missing archive keys; source-evidenced suspensions generate states without bars.
+- A bounded 144-query completion added 830 native-factor observations. A source code
+  returning predecessor history outside its frozen listing lifetime is excluded:
+  601607 has 21 such observations before 2010-03-05, all retained in an exclusion ledger.
+  The final 35,314 factors have no duplicate effective events, broken intervals,
+  nonpositive values or basis mismatches. Every bar-bearing security has a factor series.
+  000005's first 18 reference-grade bars precede its first observed factor and remain
+  explicitly unadjustable; cross-reorganization returns retain their listing boundary.
+- Exactly 567 legacy midnight bar coordinates are mapped through their existing
+  calendar-session foreign key under `hist1d-session-clock-v1`. OHLCV, turnover and
+  source fields are byte-value equivalent; the original source bytes remain retained.
+- Trading-venue, listed-company and frozen tradability references are included.
+  The old tradability snapshot's missing-observation reasons overlap 3,646,988 Hist bars;
+  this reference-version reconciliation is separate from current coverage.
 - Final audit has zero unexplained listing/session gaps in both quality tiers, zero
   duplicate bar keys and zero source/universe differences. All 112 listings delisted
   within the publication interval have bars. The audit includes 142,826 additionally
@@ -39,6 +52,12 @@ Versioned implementation: `quanthus.pipelines.hist_1d`, `hist_1d_collect`,
 - Native-factor overlap conflicts are zero. An independent 2010 sample for 600601 has
   231 comparison days, equal unadjusted closes and maximum common-anchor adjusted-close
   difference of 0.000253061 CNY, below one 0.01-CNY quote tick.
+- Candidate: `release-candidate-a2`, built from `product-full-a3`. Full manifest SHA256:
+  `60062d17b9eeaf48ce455014ff898fb04d4a99e5723a87fb51d26c0736d04a92`.
+- Private HF candidate: `rv192/quanthus-hist-1d` at
+  `75b0eab6650bc957e6cb0519cef3a3ca9698b544`; all 397 member identities match the
+  manifest (372 LFS SHA256 content IDs and 25 full small-file downloads). READY and
+  public anonymous-reader acceptance await the status-subtype disposition.
 
 ## Status capability and remaining acceptance
 
@@ -47,6 +66,8 @@ SZSE short-name history supplies 7,503 change records from 1994 onward; corrobor
 ST and *ST names populate `SPECIAL_TREATMENT` as ST and DELISTING_RISK. Source conflicts
 and unresolved subtypes remain UNKNOWN with reason codes. Reference-period regime
 history is separately graded.
+In 2005–2010, 215 distinct securities retain an UNKNOWN subtype: 186 unresolved and
+29 official-name/provider-class disagreements. Binary provider observations are kept.
 
 The existing relay's historical `namechange` endpoint is at its daily quota. Bounded
 official SSE probes found a historical-announcement candidate, while 2001 test windows
@@ -64,7 +85,9 @@ members with explicit supersession of authentication failures.
 ```bash
 python -m quanthus.pipelines.hist_1d_collect --workspace WORKSPACE --base251 SEALED_DWD
 python -m quanthus.pipelines.hist_1d_materialize --workspace WORKSPACE --base251 SEALED_DWD --output NEW_PRODUCT
-python -m quanthus.pipelines.hist_1d_audit --workspace WORKSPACE --base251 SEALED_DWD --hist-root NEW_PRODUCT --output NEW_AUDIT
+python -m quanthus.pipelines.hist_1d_factor_completion --workspace WORKSPACE --base251 SEALED_DWD --product NEW_PRODUCT --output COMPLETED_PRODUCT
+python -m quanthus.pipelines.hist_1d_audit --workspace WORKSPACE --base251 SEALED_DWD --hist-root COMPLETED_PRODUCT --output NEW_AUDIT
+python -m quanthus.pipelines.hist_1d_release --workspace WORKSPACE --base251 SEALED_DWD --product COMPLETED_PRODUCT --audit NEW_AUDIT --output NEW_CANDIDATE
 python scripts/read_hist_1d.py --revision FIXED_DATASET_REVISION
 ```
 

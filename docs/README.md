@@ -29,6 +29,10 @@ records the corrected stage gates, package recovery and A4 delivery for independ
 The [F1–F3 independent difference audit](acceptance/research-r1-f1f3-independent-audit-612-20261111.md)
 records the terminal-stage, candidate-date and package-recovery acceptance and retained A4 evidence.
 
+For the R2 fixed-momentum question, start with the [R2 value brief](work-items/research-r2-value-brief.md)
+and its [frozen comparison contract](design/research-r2-momentum-markout-v1.md).
+It records the second resource decision and the scope of the next costed-replay candidate.
+
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its
 acceptance and the current no-new-comparison disposition.

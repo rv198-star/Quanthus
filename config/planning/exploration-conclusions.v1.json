@@ -994,6 +994,61 @@
         "CP-610-20261111T153609474025Z"
       ],
       "supersedes": "CON-R1-WORKER-F1F3-SELF-AUDIT-20261111"
+    },
+    {
+      "id": "CON-R2-MOMENTUM-20261112",
+      "recorded_at": "2026-11-11T18:13:37.311156+00:00",
+      "actor": "Codex R2 author self-audit with independent implementation reconstruction",
+      "question_id": "RESEARCH-R2-MOMENTUM-001-QUESTION",
+      "family": "raw-momentum20-band-markout",
+      "work_item": "P3-RESEARCH-REUSE-001",
+      "modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "保持R1其他筛选和下一开放日守卫，原20日动量[2%,12%]是否对次日盘中响应提供至少5bp平均增量，值得进入资金回放？",
+      "consumer": "Next research allocator selecting one bounded costed-capital-replay candidate",
+      "scope": "2020-2021 consumed development window; same 56 HF members and raw-price screen; same-date/venue disjoint out-of-band control; one formal and one independently rebuilt computation",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "已消费2020–2021开发窗的固定盘中价格响应比较和研究资源路由；经济评价由后继T+1持仓、费用、滑点、退出和资金回放完成。",
+      "decision_effect": "平均增量6.4101bp、两年均正、95pct区间[2.1334,10.5830]bp且样本门槛满足；将精确原区间列为后继资金回放候选。Worker池仍备用；后继比较尚未启动。",
+      "reopen_conditions": [
+        "后继资金回放的明确持仓/退出、费用、对照、输入用途和完整预算就绪后，按新问题预登记推进。",
+        "若独立审阅发现具体身份、时间或分组反例，只处理受影响差集，保留本次原包与所有成本。"
+      ],
+      "retained_assets": [
+        "Versioned R2 request and semantic golden cases",
+        "R1 fixed-input Worker and cache reused with no input network download",
+        "Independent pandas/numpy R2 evaluation entrypoint",
+        "Immutable 10-file HF package and readback receipt"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "复用实测为取数2.034s、输入下载0B、正式64.278s、独立63.549s、发布/全回读10.039s；完整检查pytest810.84s。新增设计/实现/审阅/交接与R1返工持续累计；完整主动工时、Token及账单未完整计量，不重置8h总线预算。",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-r2-momentum-20261112/job-a1/attempts.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-r2-momentum-20261112/independent/independent-reproduction.json",
+        "hf:rv192/quanthus-research-r1@5980c7d3d0278335ee8232440ff8219df328a5a6/runs/RESEARCH-R2-MOMENTUM-001/RESEARCH-R2-MOMENTUM-001-T1/A1"
+      ],
+      "evidence": [
+        {
+          "id": "R2-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r2-momentum-20261112/retained/audit-summary.json",
+          "sha256": "bcd7309412bab741b2c8aa701529ce4f09b0cae520bf9e55084c7ce0fb791f0d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "2020-2021 fixed raw-momentum descriptive response and resource routing, with independent implementation reconstruction and HF/CN02 readback; costed capital replay is the next separate assessment."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-613-20261111T181214226620Z"
+      ],
+      "supersedes": null
     }
   ]
 }

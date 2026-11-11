@@ -26,7 +26,7 @@
     "60分钟内无法确认消费者与具体未满足接口就不继续开发。",
     "出现新数据、训练、阈值、P6/生产或超预算要求时只停止对应步骤。"
   ],
-  "memory_sha256": "bed3a759cba548fe671a9e0fe9f1ac361af8d9b96d4738a5876259bcf8872aed",
+  "memory_sha256": "2d09af923cd9b276bb5f4ecd5b92652d33764ca0e74c8be3f5952972340e0896",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -87,6 +87,11 @@
       "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
       "relation": "respect",
       "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "保留R2的固定盘中响应资源决定、旧曝光及成本。此文件是已退役示例，仅刷新当前索引，不启动R2后继或重做比较。"
     }
   ],
   "cumulative_cost_review": "既有Head2和持仓尝试全部保留，旧总成本未知而非零；新批次独立记账，不伪装新方向抹去原投入。",

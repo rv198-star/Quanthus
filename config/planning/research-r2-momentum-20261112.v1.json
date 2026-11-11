@@ -95,5 +95,8 @@
       "relation": "different_scope",
       "rationale": "This is a deterministic R1 raw-momentum interval against next-session open-to-close response, without Head2 training, refitting, feature additions to that model, cutoff movement, or its adoption gate; preserve the rejected March use and all costs."
     }
-  ]
+  ],
+  "execution_record": "docs/work-items/research-r2-value-brief.md",
+  "execution_disposition": "COMPLETED_ADVANCE_TO_COSTED_REPLAY_CANDIDATE; successor not started",
+  "proposal_role": "Executed proposal; original pre-run memory binding and request pinned at 6dd072acc5797bf55bed610771fda7ad1b7217cc, preflight receipt retained. Not a successor activation."
 }

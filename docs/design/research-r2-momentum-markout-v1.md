@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved within Owner-activated #613 bounded research |
-| Delivery gate | open; request and synthetic/actual evidence determine the scoped disposition |
+| Delivery gate | accepted for the bounded resource decision after author self-audit and independent reconstruction; [evidence and value brief](../work-items/research-r2-value-brief.md) |
 | Parent | [Exploration governance](exploration-governance.md) |
 | Work item | P3-RESEARCH-REUSE-001 / #613; bus #608 |
 | Request | `config/research/research-r2/request.v1.json` |

@@ -96,7 +96,10 @@ def main():
     ORDER BY l.listing_id, day
     """).df()
     con.close()
-    assert not panel.duplicated(['listing_id','day']).any()
+    duplicate_listing_day_rows = int(panel.duplicated(['listing_id','day'], keep=False).sum())
+    duplicate_listing_session_rows = int(panel.duplicated(['listing_id','calendar_session_id'], keep=False).sum())
+    panel.to_parquet(out / 'independent-panel.parquet', index=False)
+    save(out / 'panel-quality.json', {'rows':len(panel), 'duplicate_listing_day_rows':duplicate_listing_day_rows, 'duplicate_listing_session_rows':duplicate_listing_session_rows, 'examples':panel.loc[panel.duplicated(['listing_id','day'],keep=False)].head(12).to_dict('records')})
     parts = []
     for _, g in panel.groupby('listing_id', sort=False):
         g = g.copy()
@@ -130,7 +133,7 @@ def main():
     total['nominal_blocked_reasons']['next_limit_blocked'] = total['nominal_blocked_reasons'].pop('next_limit')
     old = json.loads((args.original/'result.json').read_text())
     diff = {k:{'original':v,'independent':total.get(k)} for k,v in old['totals'].items() if total.get(k)!=v}
-    report = {'audit_git':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(), 'candidate_git':req['candidate_git'], 'totals':total,'differences':diff, 'by_year':{str(k):summarize(g) for k,g in rows.groupby(rows.day.dt.year)},'by_venue':{str(k):summarize(g) for k,g in rows.groupby('venue')}, 'diagnostics':{'first_nominal_date':rows.loc[rows.nominal,'day'].min(), 'last_nominal_date':rows.loc[rows.nominal,'day'].max(), 'old_listings_excluded_by_window_age_only':int(rows.age_truncated.sum()), 'null_or_nonpositive_open_executable_universe':int((rows.universe&rows.executable&~rows.strict_exec).sum()),'unknown_tradability_panel_rows':int(panel.tradable.isna().sum()),'can_buy_differs_from_tradable':int((panel.buy.fillna(False)!=panel.tradable.fillna(False)).sum()), 'distinct_nominal_listings':int(rows.loc[rows.nominal,'listing'].nunique()), 'top10_listing_nominal_share':float(rows.loc[rows.nominal].groupby('listing').size().nlargest(10).sum()/rows.nominal.sum())}, 'runtime':{'python':os.sys.version,'duckdb':duckdb.__version__,'pandas':pd.__version__,'numpy':np.__version__,'wall_seconds':time.monotonic()-start,'peak_rss_kib':resource.getrusage(resource.RUSAGE_SELF).ru_maxrss}, 'claim':'Reproduces original implemented proxy; diagnostic only, no corrected strategy or unseen sample'}
+    report = {'audit_git':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(), 'candidate_git':req['candidate_git'], 'totals':total,'differences':diff, 'by_year':{str(k):summarize(g) for k,g in rows.groupby(rows.day.dt.year)},'by_venue':{str(k):summarize(g) for k,g in rows.groupby('venue')}, 'diagnostics':{'duplicate_listing_day_rows':duplicate_listing_day_rows, 'duplicate_listing_session_rows':duplicate_listing_session_rows, 'first_nominal_date':rows.loc[rows.nominal,'day'].min(), 'last_nominal_date':rows.loc[rows.nominal,'day'].max(), 'old_listings_excluded_by_window_age_only':int(rows.age_truncated.sum()), 'null_or_nonpositive_open_executable_universe':int((rows.universe&rows.executable&~rows.strict_exec).sum()),'unknown_tradability_panel_rows':int(panel.tradable.isna().sum()),'can_buy_differs_from_tradable':int((panel.buy.fillna(False)!=panel.tradable.fillna(False)).sum()), 'distinct_nominal_listings':int(rows.loc[rows.nominal,'listing'].nunique()), 'top10_listing_nominal_share':float(rows.loc[rows.nominal].groupby('listing').size().nlargest(10).sum()/rows.nominal.sum())}, 'runtime':{'python':os.sys.version,'duckdb':duckdb.__version__,'pandas':pd.__version__,'numpy':np.__version__,'wall_seconds':time.monotonic()-start,'peak_rss_kib':resource.getrusage(resource.RUSAGE_SELF).ru_maxrss}, 'claim':'Reproduces original implemented proxy; diagnostic only, no corrected strategy or unseen sample'}
     save(out/'independent-reproduction.json',report)
     print(json.dumps(report,ensure_ascii=False,default=str))
     if diff:

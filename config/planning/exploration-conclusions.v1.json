@@ -1101,6 +1101,61 @@
         "CP-627-20261111T184458053645Z"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-CAPITAL-QUAL-A-20261112",
+      "recorded_at": "2026-11-11T19:43:41.625984+00:00",
+      "actor": "Codex bounded source qualification and prototype self-review",
+      "question_id": "RESEARCH-CAPITAL-001-NATIVE-QUALIFICATION",
+      "family": "raw-momentum20-capital-replay",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "Are the frozen native inputs ready for the planned P2 capital consumer?",
+      "consumer": "Research allocator and successor native FrameSource implementer",
+      "scope": "A delivery complete:2020-2021 business source census and single relation check, native action/unit/clock and directional-state prototype; capital consumer blocked before B.",
+      "execution_status": "completed",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Input/prototype qualification only. Multi-record economic events and local state/action holds remain; R2 signal result retained; capital comparison not run.",
+      "decision_effect": "Park full B/C before further allocation. Route exact frozen source identities and economic-event/state purpose debt to existing P10 #556; retain scoped engineering and keep Workers standby.",
+      "reopen_conditions": [
+        "P10 versioned mapping for economic event composition/replacement/unknown and qualified directional state/bounds scope on the fixed source.",
+        "Consumer dual-clock contract, frozen final request, golden checks and explicitly allocated B tranche."
+      ],
+      "retained_assets": [
+        "config/research/research-capital-qual/request.v1.json",
+        "config/research/research-capital-qual/closure.v1.json",
+        "config/research/research-capital-qual/relations.v1.json",
+        "src/quanthus/backtest/native_capital_adapter.py",
+        "docs/work-items/research-capital-qualification-a-value-brief.md",
+        "P10 existing556 and raw qualification receipts"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "A authorized at most60 active minutes; machine waits separately metered. Source fetch136.89s, census10.80s, relation12.63s; initial launch and type/check repairs retained. R1/R2 exposure and missing historical active/token/billing costs remain cumulative. No BCD allocation inferred.",
+      "attempt_refs": [
+        "git:e7913ef23a45016fce1493467e5340409886b8c9",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/job-a1/census.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/relations-a1/relations.json"
+      ],
+      "evidence": [
+        {
+          "id": "A-RELATIONS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/relations-a1/relations.json",
+          "sha256": "c3681728ac307937e1269d9f908eacdc2f89ede1517261aba29e113465c18d2d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact key/unit/source-clock qualification only; capital consumer blocked before B; no PnL."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-628-20261111T194217114480Z"
+      ],
+      "supersedes": null
     }
   ]
 }

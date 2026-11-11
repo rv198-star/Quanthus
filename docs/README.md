@@ -35,7 +35,7 @@ It records the second resource decision and the scope of the next costed-replay 
 
 For the next capital comparison, see the [native seam and staged plan](design/research-capital-replay-plan-v1.md)
 and its [code/metadata review](acceptance/research-capital-seam-20261112.md).
-Successor #628 awaits native input qualification and staged funding.
+Successor #628 has delivered A input qualification and a thin prototype; full capital consumption is held for the P10 economic-event view. See the [A value brief](work-items/research-capital-qualification-a-value-brief.md). B/C/D remain unfunded.
 
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its

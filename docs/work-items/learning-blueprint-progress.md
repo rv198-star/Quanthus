@@ -124,6 +124,7 @@ GitHub 状态只表示任务生命周期；实时检查：`make blueprint-audit`
 | [META-TRACE-001 / #2](https://github.com/rv198-star/Quanthus/issues/2) | TRACE | 维护项目可追溯机制；本轮接入学习MVP，既有长期任务继续保留 | open |
 | [P10-DATA-STAGE34-PREFIX-001 / #566](https://github.com/rv198-star/Quanthus/issues/566) | DATA, REFERENCE, S03, S04 | 固定128家2021上市前缀的限定来源资格；P10交接与P5参考、候选评价和消费者准入分开验收 | closed |
 | [P10-DATA-STAGE34-ROUTE-002 / #571](https://github.com/rv198-star/Quanthus/issues/571) | DATA, REFERENCE, S03, S04 | 245家2021潜在身份路线的零采集现存来源资格；与旧128交接、研究参考、质量及消费者准入分开验收 | open |
+| [META-RESEARCH-REVIEW-001 / #612](https://github.com/rv198-star/Quanthus/issues/612) | FACTS, REPRO, CLOSEOUT | 独立审阅 #609-611 的统计语义、工程交付与投入判断；记录缺陷、长期证据和模型分工，限定本批次成熟度。 | 未对账 |
 
 ## 证据索引
 

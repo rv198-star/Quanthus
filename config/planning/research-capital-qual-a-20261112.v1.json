@@ -1,0 +1,102 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-CAPITAL-QUAL-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "raw-momentum20-capital-replay",
+  "work_item": "P3-RESEARCH-CAPITAL-001",
+  "modules": [
+    "FACTORS",
+    "REPRO",
+    "CLOSEOUT"
+  ],
+  "question": "Can the frozen native Base2.5.1 inputs satisfy identity, currency, direction, action and clock requirements for the planned P2 capital consumer?",
+  "consumer": "Successor B allocator and native FrameSource implementer",
+  "scope": "Owner-approved A only, one bounded native census and synthetic adapter handshake; 2020-2021 market,2019 calendar; no capital result",
+  "deliverable": "Exact qualified/blocked input contract, raw source census receipt, tested minimal adapter and next-tranche decision",
+  "decision_if_pass": "Declare the qualified coordinates and precise remaining B implementation; propose the remaining bounded tranche",
+  "decision_if_fail": "Retain blockers and qualified coordinates; route actual shared source debt to bounded P10, stop affected capital path",
+  "acceptance": [
+    "Frozen exact126-member closure, environment, source/use and code before row access",
+    "Bounded actual source schema, identity/state/action/clock evidence",
+    "Synthetic positive/negative production adapter handshake and complete checks",
+    "Truthful A go/park, cost/value, HF/CN02 evidence and scoped ledgers"
+  ],
+  "stop_conditions": [
+    "At most60 active minutes, machine checks separately metered; one source census attempt",
+    "No new collection, repair, PIT clock rewrite,2022+ market, strategy PnL, Worker rollout or production",
+    "Stop unresolved action/unit/clock coordinates rather than filling unknown values"
+  ],
+  "memory_sha256": "4061ebf3aecf6d98dac6b1add44a9461a126bf71124e5667fcd761075cabf589",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior outcomes, exposure and costs. This A delivery addresses the628 native-input readiness gap only; no old result or parked fit is rerun."
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior outcomes, exposure and costs. This A delivery addresses the628 native-input readiness gap only; no old result or parked fit is rerun."
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior outcomes, exposure and costs. This A delivery addresses the628 native-input readiness gap only; no old result or parked fit is rerun."
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior outcomes, exposure and costs. This A delivery addresses the628 native-input readiness gap only; no old result or parked fit is rerun."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior outcomes, exposure and costs. This A delivery addresses the628 native-input readiness gap only; no old result or parked fit is rerun."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior outcomes, exposure and costs. This A delivery addresses the628 native-input readiness gap only; no old result or parked fit is rerun."
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior outcomes, exposure and costs. This A delivery addresses the628 native-input readiness gap only; no old result or parked fit is rerun."
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior outcomes, exposure and costs. This A delivery addresses the628 native-input readiness gap only; no old result or parked fit is rerun."
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior outcomes, exposure and costs. This A delivery addresses the628 native-input readiness gap only; no old result or parked fit is rerun."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior outcomes, exposure and costs. This A delivery addresses the628 native-input readiness gap only; no old result or parked fit is rerun."
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior outcomes, exposure and costs. This A delivery addresses the628 native-input readiness gap only; no old result or parked fit is rerun."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior outcomes, exposure and costs. This A delivery addresses the628 native-input readiness gap only; no old result or parked fit is rerun."
+    }
+  ],
+  "cumulative_cost_review": "R1/R2/seam work and missing historical active time/token/billing retained as unknown_not_zero. Owner now explicitly allocates628 A at most60 active minutes; B/C/D are unallocated.",
+  "runtime_authority_boundary": "Owner explicitly approved A and task628 existing SSH on CN02; isolated directory and GitHub versioned code only; new market reads bounded by this exact qualification request",
+  "budget": {
+    "wall_seconds": 3600,
+    "max_new_bytes": 536870912,
+    "network_requests": 160,
+    "accounting_owner": "628 A first-hour tranche, original bus608 costs retained"
+  }
+}

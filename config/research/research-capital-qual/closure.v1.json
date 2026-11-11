@@ -1,0 +1,635 @@
+{
+  "schema": "quanthus.native-capital-closure.v1",
+  "members": [
+    {
+      "path": "contract/base-build-delivery.v1.json",
+      "sha256": "sha256:d76cd56dfd5a7d276fcba1002b66cef7c6dcf31a7e3166e75af733a9ad380b50",
+      "size_bytes": 3880
+    },
+    {
+      "path": "payload/dwd_listing/all/part-000000.parquet",
+      "sha256": "sha256:4ff7daaacd3785c2b7dbb5fed23cc9958eed00ccc84ba1315c2d6766620b2116",
+      "size_bytes": 318617
+    },
+    {
+      "path": "payload/dwd_listing/all/part-000001.parquet",
+      "sha256": "sha256:579206bd62fed960a408541ee9453866d4cdde4a138e631e4ef748968183d585",
+      "size_bytes": 7519
+    },
+    {
+      "path": "payload/dwd_security/all/part-000000.parquet",
+      "sha256": "sha256:1f7968ed6b90cc87599066c7f96e79323d42085ba3accbbf31a75ae7a02e50c0",
+      "size_bytes": 287313
+    },
+    {
+      "path": "payload/dwd_security/all/part-000001.parquet",
+      "sha256": "sha256:e7bd7f3ee15cda06f7422d03acf959da60542fc307a38512b06d62d20cd031df",
+      "size_bytes": 6868
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=1/part-000000.parquet",
+      "sha256": "sha256:0ef12e98d078aef4bc41cdad9e6792b31c4f2b1a2daef777664ab1907b0ea716",
+      "size_bytes": 2218026
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=10/part-000001.parquet",
+      "sha256": "sha256:79c9b7e091d663786ce2467044795850c964b5ab50fbb1df0ada53a3b58a7aff",
+      "size_bytes": 2416266
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=11/part-000002.parquet",
+      "sha256": "sha256:528eab167e30f55cb990987f19275942b0ac0d4a8ef53c6a95debaaa8f60b4b4",
+      "size_bytes": 3103656
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=12/part-000003.parquet",
+      "sha256": "sha256:32026be073fe062e48d917a386b2516dd306322e106b2b41c66e8e2b36ece90f",
+      "size_bytes": 3398150
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=2/part-000004.parquet",
+      "sha256": "sha256:88fcf395fae1ccce9476b4146556cf69ee9c9581d1c73769e6a4547d56db0c16",
+      "size_bytes": 2753075
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=3/part-000005.parquet",
+      "sha256": "sha256:613ae6578278da44dc1383e5e99b8186abec8d1d01cea857355e9f39b8a1db13",
+      "size_bytes": 2996670
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=4/part-000006.parquet",
+      "sha256": "sha256:d9115557ceccfba8fc843b2de4ef3bf3336a03b2373dfc358ee9c29e65f2e82e",
+      "size_bytes": 2874958
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=5/part-000007.parquet",
+      "sha256": "sha256:db6c1801dfe66e5c35be85d7d5e67c5166124e572863b0d7e543077501b1c4e3",
+      "size_bytes": 2543497
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=6/part-000008.parquet",
+      "sha256": "sha256:8fe3c4019f4db474610bbd4c9b57e27d7ae74a0ed17aaf10e17da7b33e35780f",
+      "size_bytes": 3564516
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=7/part-000009.parquet",
+      "sha256": "sha256:fbb851b8634b23e04381de3427f39b5ef6dd5c98203e510205a747cedf57a676",
+      "size_bytes": 3224523
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=8/part-000010.parquet",
+      "sha256": "sha256:3d7039ac956696ce4a554b254e8f923294de35718459e2ebe0c47012a0659e78",
+      "size_bytes": 3018988
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=9/part-000011.parquet",
+      "sha256": "sha256:8cd73a652d62b4e0e6213e85b532f0d17ed0a4fffb785c36337f8015859100a9",
+      "size_bytes": 3179461
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=1/part-000012.parquet",
+      "sha256": "sha256:d0d1ce94708ff4e666d5ae3adc60c83d43c4a98651181be63bed4e609ed5eb8e",
+      "size_bytes": 3043621
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=10/part-000013.parquet",
+      "sha256": "sha256:02aa79f23bc2ef90282caa629b331512fdecfdac1698a15c113db258b4ccc6de",
+      "size_bytes": 2695441
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=11/part-000014.parquet",
+      "sha256": "sha256:372eeaf4ab3d3d709b575f6428c2904558d43ff6456cd389fc219681ab0a7402",
+      "size_bytes": 3594544
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=12/part-000015.parquet",
+      "sha256": "sha256:94668c965f2e9582f103a85ceec8ec7b8963eabc8fbcede282a4913433b8c971",
+      "size_bytes": 3785039
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=2/part-000016.parquet",
+      "sha256": "sha256:b447ba90fdc415791a7a43bcfee28610badac8bcbcca749daee4b93a45274563",
+      "size_bytes": 2357734
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=3/part-000017.parquet",
+      "sha256": "sha256:6a7d34dcf36737dc915caac5df454ba2f06ad4bda514f7574fff79572cb9d5da",
+      "size_bytes": 3425649
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=4/part-000018.parquet",
+      "sha256": "sha256:6ab935677528c29fc63645ebf07b870cc956dbcac168cc6536afa7724f9e65dd",
+      "size_bytes": 3227979
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=5/part-000019.parquet",
+      "sha256": "sha256:6b3647ebbeb406af726b60dfb29c8db142f7be864313ec11c01a7676b8393e10",
+      "size_bytes": 2864751
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=6/part-000020.parquet",
+      "sha256": "sha256:e35e07272e49b430aec55993fd2f845d34cdbfb91c26259e238ffc549b85d8aa",
+      "size_bytes": 3296038
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=7/part-000021.parquet",
+      "sha256": "sha256:c52f5c6238a297b1257448f4a6f281256c666244c28ec0946fb3f854aa26ba6f",
+      "size_bytes": 3490229
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=8/part-000022.parquet",
+      "sha256": "sha256:a0712928cba039ea92d5399ae97a5b549dd3bafb50d7fa949c848090aed601e5",
+      "size_bytes": 3514197
+    },
+    {
+      "path": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/observation_start_month=9/part-000023.parquet",
+      "sha256": "sha256:5a0f8255cd0e2c919d63a157cd346292ca0f0ed544a3b17c992990608ffb0c61",
+      "size_bytes": 3261645
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2020/observation_start_month=1/part-000349.parquet",
+      "sha256": "sha256:06db4d87e769d9d9273b398f8457e8112b5875488f005bb6438d23932eec030e",
+      "size_bytes": 2983996
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2020/observation_start_month=10/part-000350.parquet",
+      "sha256": "sha256:649c06dab500a0675afab69b3d8cb0778fd8f80aa9f4d1f2f5b5d7c512a05f50",
+      "size_bytes": 3366181
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2020/observation_start_month=11/part-000351.parquet",
+      "sha256": "sha256:89a4d397c917803dda24424e6e2c2627aa3f20c6c50aa7c4365d8e7df83aa4d8",
+      "size_bytes": 4646320
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2020/observation_start_month=12/part-000352.parquet",
+      "sha256": "sha256:1a210062ce97ef3a194795f2dc7ec655727d15f2e5073c138a9096ff4bc8899e",
+      "size_bytes": 5112411
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2020/observation_start_month=2/part-000353.parquet",
+      "sha256": "sha256:951a078383b6d16b65bdadd6c4089cdb8ee0b678e8ee2ba8e20a878e107ee40c",
+      "size_bytes": 3901164
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2020/observation_start_month=3/part-000354.parquet",
+      "sha256": "sha256:004c7b2d863342746a1cecf95cb8a84cbca06f3d374c1731b6081ea640e17703",
+      "size_bytes": 4076590
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2020/observation_start_month=4/part-000355.parquet",
+      "sha256": "sha256:905fb1b539627c17970be98da136dae28b78d36968f51685feb12883ca08ab90",
+      "size_bytes": 4066249
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2020/observation_start_month=5/part-000356.parquet",
+      "sha256": "sha256:71385137e9f821393da6ce1a4126f08d1fdf7afe3c71ed522e6acd64b4fa7fbb",
+      "size_bytes": 3616057
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2020/observation_start_month=6/part-000357.parquet",
+      "sha256": "sha256:2cecbea747751fbd7b6931d983122be85dd7242289669e8042c2ea828b44848c",
+      "size_bytes": 3832024
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2020/observation_start_month=7/part-000358.parquet",
+      "sha256": "sha256:5b62ed25512656491a2f82b3fd7856d3de7046a92ccd39ac9bbd28aa46e62fa1",
+      "size_bytes": 4506352
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2020/observation_start_month=8/part-000359.parquet",
+      "sha256": "sha256:61789c68a1b48fbc9e56100aee1a846283b8c29000ecab54cdf17aa185186846",
+      "size_bytes": 4380091
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2020/observation_start_month=9/part-000360.parquet",
+      "sha256": "sha256:5294dd9111e8b264f7f25bed37707ae0b45b6733fe588d2a6668c11ee729d607",
+      "size_bytes": 4596260
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2021/observation_start_month=1/part-000361.parquet",
+      "sha256": "sha256:a1406a61c19f11af7855979344fecc8cd77466e2e5038852919a047517d23b23",
+      "size_bytes": 5051285
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2021/observation_start_month=10/part-000362.parquet",
+      "sha256": "sha256:d95320d4612e73b56701e26172a731cf8143d17bf875918f708e5ea31a6a2894",
+      "size_bytes": 4393678
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2021/observation_start_month=11/part-000363.parquet",
+      "sha256": "sha256:8e07743c411f1f1d25eacc6609c57c0bb2853c78dd094e9c821efb605082dafa",
+      "size_bytes": 5977962
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2021/observation_start_month=12/part-000364.parquet",
+      "sha256": "sha256:85146cc4d0b361225547a0d588105bd2244154d9b8eff3db1281f48e84100acd",
+      "size_bytes": 6413991
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2021/observation_start_month=2/part-000365.parquet",
+      "sha256": "sha256:9064d222a6e56a7b316ac0c5ee01cd50f32e93a6ccde335544b7eb69413d0a75",
+      "size_bytes": 3773604
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2021/observation_start_month=3/part-000366.parquet",
+      "sha256": "sha256:731b8a9ebfd6756418a8e0162a91b3b3487a50abccd736d2687ea37cdfcc2ff7",
+      "size_bytes": 5740456
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2021/observation_start_month=4/part-000367.parquet",
+      "sha256": "sha256:e57c42356caa3bbaa3994d797c62e03dcb297f634fd8ff359bd9a27fe19e509b",
+      "size_bytes": 5310944
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2021/observation_start_month=5/part-000368.parquet",
+      "sha256": "sha256:f3250bc19c9ea78ab629a16405cc65c07c8bf913075eb040e2fc75322453ab96",
+      "size_bytes": 4786420
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2021/observation_start_month=6/part-000369.parquet",
+      "sha256": "sha256:e282ff4487f46532e1e9eed78497b8de86479ec7553507d92df3571250e1b66b",
+      "size_bytes": 5566796
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2021/observation_start_month=7/part-000370.parquet",
+      "sha256": "sha256:8d111ac169197edde71fa426ef0f8953d67d35a5c18987398e903b29b62e9cd1",
+      "size_bytes": 5746086
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2021/observation_start_month=8/part-000371.parquet",
+      "sha256": "sha256:2c004743aecea3020d5301067b97bc57bca55bfae933932189276a4500727121",
+      "size_bytes": 5976080
+    },
+    {
+      "path": "payload/dwd_tradability_state/observation_start_year=2021/observation_start_month=9/part-000372.parquet",
+      "sha256": "sha256:4b38dd54993321268473424071e31c8893f60a747df4a15887e67c8b93d5f3ab",
+      "size_bytes": 5515001
+    },
+    {
+      "path": "payload/dwd_trading_calendar/trade_date_year=2019/part-000029.parquet",
+      "sha256": "sha256:bc95d77da9cb35fe99569549efdd1c720a6932db49f924fa8abbd307b481a59f",
+      "size_bytes": 32637
+    },
+    {
+      "path": "payload/dwd_trading_calendar/trade_date_year=2020/part-000030.parquet",
+      "sha256": "sha256:a4db1c9d85de1dcd2cc90f9c9d63574064f9614a6e0be070daa37a11e466f3bb",
+      "size_bytes": 36877
+    },
+    {
+      "path": "payload/dwd_trading_calendar/trade_date_year=2021/part-000031.parquet",
+      "sha256": "sha256:9db4bb143543ee5f8d1ae9fe86d16694007bb40f9aac5b7de1d080558092801f",
+      "size_bytes": 42813
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=1/part-000634.parquet",
+      "sha256": "sha256:f1e0131b0b9b963d0d9b1e32a3503068b6035e03f1c4e950f37760744b73cacf",
+      "size_bytes": 7026
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=1/part-000635.parquet",
+      "sha256": "sha256:2ab1eefc7a470a3cee3663b9b9ac46f709b426cbf7bf9f56c26244a39fb23308",
+      "size_bytes": 6330
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=1/part-000636.parquet",
+      "sha256": "sha256:bdd034757613a45a318e60acf7a7cd26b3e35c66d4a74e6867b1f8b5fc9b373e",
+      "size_bytes": 6402
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=10/part-000637.parquet",
+      "sha256": "sha256:c294598e59550e2a8d3f1312a1aa455c020e0f21d3cb0cb4b8a2550cad327ff1",
+      "size_bytes": 11133
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=10/part-000638.parquet",
+      "sha256": "sha256:58f21bf308019c236069ed21a6add2f7591a0cd57e7c4c187a39aed61b7bb5a3",
+      "size_bytes": 8551
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=11/part-000639.parquet",
+      "sha256": "sha256:dc469cebca428ab101423f6f67c2c79634c7bfbf3cbfba5b9d0e32e1653f4cf0",
+      "size_bytes": 10503
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=11/part-000640.parquet",
+      "sha256": "sha256:7da06dadb2be443a604254a84fb5c268f5766dcba9315115ef778a1b893b6614",
+      "size_bytes": 8233
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=12/part-000641.parquet",
+      "sha256": "sha256:cebc79b8c5f2f1c1fd619e32d44618873f243d5b29b00c047e1036b7fa319d2d",
+      "size_bytes": 9818
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=12/part-000642.parquet",
+      "sha256": "sha256:6b1b7bb789a2fe28a11d2264dcd6caa0d264e084610ae3dd05699ad032c875c9",
+      "size_bytes": 7328
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=12/part-000643.parquet",
+      "sha256": "sha256:c772efd75c3e453ca39c923936e81abec9bdea7f9e7f3b02bf4255b10f3c86a7",
+      "size_bytes": 6585
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=2/part-000644.parquet",
+      "sha256": "sha256:4167c2e27c82b04d32b94cfe0fdb3fa68fc2072b28278b7d0e4bece00879e283",
+      "size_bytes": 7183
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=2/part-000645.parquet",
+      "sha256": "sha256:8f734d02eeb91cf422fe1813bbfc84f8440ee1c08be0fa08fc14861f27ee9d4f",
+      "size_bytes": 6333
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=3/part-000646.parquet",
+      "sha256": "sha256:67fc43a60fe703f2c8e4c3b40ea54d9973da556e68bc9425028529f7cb0f93e7",
+      "size_bytes": 15660
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=3/part-000647.parquet",
+      "sha256": "sha256:0f56ffbe349086e81df1ee38d470223e8fccaa06fe34f5c339f02bc52e396a49",
+      "size_bytes": 6333
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=4/part-000648.parquet",
+      "sha256": "sha256:1e78cf172136e14b4968506823af32cc410c26a9c338f7996f021bad10b5b149",
+      "size_bytes": 74946
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=4/part-000649.parquet",
+      "sha256": "sha256:9376e0369c9e3f6212b98669fa0741d619b1e3f90e2d77f84fc971928517c9b1",
+      "size_bytes": 13943
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=5/part-000650.parquet",
+      "sha256": "sha256:446a6e903f9fe46b978ebc718585b1d5e75098376e5c201d25f6edbbefd91295",
+      "size_bytes": 93293
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=5/part-000651.parquet",
+      "sha256": "sha256:8a2e942334923988cb4a36824ace1999e78cb0120efa8a8ee7d0d42db6a0153e",
+      "size_bytes": 46017
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=6/part-000652.parquet",
+      "sha256": "sha256:b833701777910e9d2a7a1df5ca4c31b10ea76342e7731ec88a3397e024d29621",
+      "size_bytes": 177600
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=6/part-000653.parquet",
+      "sha256": "sha256:4c88f186471cdca8e8b5f3634af4ade8bd9bef281a0a99f4a19cae62efebfab3",
+      "size_bytes": 90957
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=7/part-000654.parquet",
+      "sha256": "sha256:7ebd273cf588c0df07487412e46b29090ee01795d1ac20053b2b87991349eec3",
+      "size_bytes": 115776
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=7/part-000655.parquet",
+      "sha256": "sha256:51db48240c48a15de7b28aa9435d274a5286e7cb6289eea8184318f834c99afc",
+      "size_bytes": 65368
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=8/part-000656.parquet",
+      "sha256": "sha256:c813a30e52f4fd3dd375098bbc6c1d8c7c57250ee7820c56e137e15f1e6a56e0",
+      "size_bytes": 29036
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=8/part-000657.parquet",
+      "sha256": "sha256:c561d27c7350cfaa2ad61d60f4b1f78b1bd550248f177f28b42da9f13cda79a9",
+      "size_bytes": 18738
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=9/part-000658.parquet",
+      "sha256": "sha256:a9552c9c00d7da0c45c47a7ff44f7fe00ec6487fb48babef35a9206f2b828ec4",
+      "size_bytes": 18310
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2020/effective_at_month=9/part-000659.parquet",
+      "sha256": "sha256:dd51c0a2618831f4e82c271bfb27de2d2f47500b49e3e9c693990085e09769a9",
+      "size_bytes": 12251
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=1/part-000660.parquet",
+      "sha256": "sha256:52e90fdb53b44058dff1d1b5d2489261581d8e0b76b53ace05945a3487153717",
+      "size_bytes": 7307
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=1/part-000661.parquet",
+      "sha256": "sha256:b0228a687c45d3878ff21db8d6393205c9b20d5e15f01eac236f3cde4e905b85",
+      "size_bytes": 6604
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=10/part-000662.parquet",
+      "sha256": "sha256:8558fd603435dbe26aa93a0242b46cb041983526a426fe0004aecc362f840dfa",
+      "size_bytes": 14206
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=10/part-000663.parquet",
+      "sha256": "sha256:de77215339c6afd9b799290e79ae5e84ea569e3d379dca60cd71c05b911153eb",
+      "size_bytes": 10349
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=10/part-000664.parquet",
+      "sha256": "sha256:6c90e3799d9e1d9e2077e3cfd3baea547caabd87b8439c42c7740a2519936e90",
+      "size_bytes": 6403
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=11/part-000665.parquet",
+      "sha256": "sha256:a4faf2ce010ae4431698984c300f129aeeae595a1d7c23c93a3866b1a62a6fe2",
+      "size_bytes": 11100
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=11/part-000666.parquet",
+      "sha256": "sha256:5f87e6768bcaad7924c369af88269cc7e0ebb9d5e68c31addbe2a1b62413772a",
+      "size_bytes": 8454
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=12/part-000667.parquet",
+      "sha256": "sha256:6a9621fdc171b7ef05cd22cb6704323f9c7fd0e5848988686d46a49564c17a33",
+      "size_bytes": 11883
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=12/part-000668.parquet",
+      "sha256": "sha256:af73b05fabbe68c827c602187f9e0f916ada3c00c7396e529613176a7bb9e7ce",
+      "size_bytes": 8257
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=12/part-000669.parquet",
+      "sha256": "sha256:64da63c2084d23157bd29f95fdb7f8152d856a0ea068ee5de9aa12e03f3f6f42",
+      "size_bytes": 6855
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=2/part-000670.parquet",
+      "sha256": "sha256:29b94377d2e43d30da1a39f7d7027ffb146fcf68c4c23244334be13f0313b48f",
+      "size_bytes": 8133
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=2/part-000671.parquet",
+      "sha256": "sha256:c42e075470814a6b24fd7f1877af828ea1a86b7e75fd0dbee07eba036278936c",
+      "size_bytes": 6332
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=3/part-000672.parquet",
+      "sha256": "sha256:64fce9618610a66d6842385c47acb4c8d0243071639db2cfe792e8dbde3741f0",
+      "size_bytes": 23348
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=3/part-000673.parquet",
+      "sha256": "sha256:bff9dd0193a5f7ee39bcf63c1af175a747a9b7367e5a2598fde7ec329a5e78c3",
+      "size_bytes": 7703
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=4/part-000674.parquet",
+      "sha256": "sha256:fb27e8ee2058ed9cb71fe673bb7cbb61e7a635cba07d61d1ea6d5ea995bfcb19",
+      "size_bytes": 26661
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=4/part-000675.parquet",
+      "sha256": "sha256:59158df0e375e0fa571897dc69da30d2a8fded0ae04bd97a75f2ac1ab901e096",
+      "size_bytes": 18208
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=4/part-000676.parquet",
+      "sha256": "sha256:606e5b8e467e6ca9a2a90dff5d3d47165b55fddf523f3ef39feba11ca0fc5b8f",
+      "size_bytes": 9045
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=5/part-000677.parquet",
+      "sha256": "sha256:ca8c682e5667cf3de6582caabdd31a904f406b3cfaf03b694de4975341465818",
+      "size_bytes": 58489
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=5/part-000678.parquet",
+      "sha256": "sha256:17b5b416c322133ea79eaf691fb331a277764a26dc3333d578773bacc970050e",
+      "size_bytes": 58384
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=5/part-000679.parquet",
+      "sha256": "sha256:ce002e8f16379297286191f61bf15804301c9c22fc61732f6df20940229bddfd",
+      "size_bytes": 18087
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=6/part-000680.parquet",
+      "sha256": "sha256:dcef526b77cddd21f8e487cab5323b3e679c7f3a9864398346b4a98a30d11043",
+      "size_bytes": 108765
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=6/part-000681.parquet",
+      "sha256": "sha256:8474544baf7babc93a05335840b7871009e1c02ff57b9173eee429b6a87115ab",
+      "size_bytes": 112779
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=6/part-000682.parquet",
+      "sha256": "sha256:fa77af3c45ac1f173a75a709690410a1f67979a480a6fd235dc8b03c3b906694",
+      "size_bytes": 21754
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=7/part-000683.parquet",
+      "sha256": "sha256:9d68a5e05a5da7353b221f15a3235393c7f873aa9af51b591c481f8ad77c3e7b",
+      "size_bytes": 66066
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=7/part-000684.parquet",
+      "sha256": "sha256:45f4b789e3f98905fc61a720cbec16a1989ff0f8d19c192756eaee017a627703",
+      "size_bytes": 61561
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=7/part-000685.parquet",
+      "sha256": "sha256:1bba2186b9cafc97a008b6431c4299cbcd6b4e1b26e85ccf50cbcfb19af8674c",
+      "size_bytes": 10976
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=8/part-000686.parquet",
+      "sha256": "sha256:7647a96d55d4d446e8e288b709746d42017d44e69de6a82c2d887e273e8508d5",
+      "size_bytes": 24458
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=8/part-000687.parquet",
+      "sha256": "sha256:4950fb519242aa197e8b66abf08f5baad3e9d12e290998cee4d8910eec664605",
+      "size_bytes": 16491
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=9/part-000688.parquet",
+      "sha256": "sha256:fe906368149fb7c97995388de82501ace984ba18a6462f82ee459f32a7b4e589",
+      "size_bytes": 19211
+    },
+    {
+      "path": "payload/dwd_corporate_action/effective_at_year=2021/effective_at_month=9/part-000689.parquet",
+      "sha256": "sha256:0c43765378fc82e64e663772c7c630c29cc58d1747f65e382c13416a83c0bbad",
+      "size_bytes": 12938
+    },
+    {
+      "path": "payload/dwd_corporate_action_term/effective_at_year=2020/part-000082.parquet",
+      "sha256": "sha256:a667094d995cd340a6f96ef25ba8343dff0f1830ab7c52bce743a05cbc17b973",
+      "size_bytes": 702551
+    },
+    {
+      "path": "payload/dwd_corporate_action_term/effective_at_year=2020/part-000083.parquet",
+      "sha256": "sha256:17917459ccea90edf5f15848fe612bb798256929fedfed67f65b81da037eca87",
+      "size_bytes": 189064
+    },
+    {
+      "path": "payload/dwd_corporate_action_term/effective_at_year=2020/part-000084.parquet",
+      "sha256": "sha256:a4bd34a2a77bcfd284e2464827cba2a501056ae017115848939f3023af33d650",
+      "size_bytes": 7130
+    },
+    {
+      "path": "payload/dwd_corporate_action_term/effective_at_year=2021/part-000085.parquet",
+      "sha256": "sha256:6ef9b9e23db36cc6a995c5012918b69c27ebd44eb482e9947c005598f5dab789",
+      "size_bytes": 292974
+    },
+    {
+      "path": "payload/dwd_corporate_action_term/effective_at_year=2021/part-000086.parquet",
+      "sha256": "sha256:4215f09f888c06f2f0ec253beab3be2a6a64f1681b58e2b6fca24ac8c0b1b43f",
+      "size_bytes": 215132
+    },
+    {
+      "path": "payload/dwd_corporate_action_term/effective_at_year=2021/part-000087.parquet",
+      "sha256": "sha256:6679d777b0d628d8ae10f46a9722dd3a05505f03925663d2f6ab6b20d04c9f8e",
+      "size_bytes": 42400
+    },
+    {
+      "path": "payload/dwd_corporate_action_term/effective_at_year=2021/part-000088.parquet",
+      "sha256": "sha256:3ed416e5b23f39a08151591d3bc58dd5327862f268a3cd3ced10d3ef5653d106",
+      "size_bytes": 7362
+    },
+    {
+      "path": "payload/dwd_listing_status_interval/all/part-000000.parquet",
+      "sha256": "sha256:f2e3dc7f5047684fd1c71d04757eed2f89315473692d8062c3f7d2fcf6fe7bce",
+      "size_bytes": 419991
+    },
+    {
+      "path": "payload/dwd_price_limit_regime/all/part-000000.parquet",
+      "sha256": "sha256:718aee036f82b068db4c99e4abb99f7f48e7f99334401509d90c10f0c658d9b0",
+      "size_bytes": 170365
+    },
+    {
+      "path": "payload/dwd_quality_exception/detected_at_year=2026/part-000000.parquet",
+      "sha256": "sha256:cce33bc9b98a3df91878834f9bb8c4b79b806804215ec12b5b91aee4812734af",
+      "size_bytes": 162340
+    },
+    {
+      "path": "payload/dwd_quality_exception/detected_at_year=2026/part-000001.parquet",
+      "sha256": "sha256:4d9510724853914488015f0ad0c145604856875dab63f2e67599d362444313ab",
+      "size_bytes": 15739
+    },
+    {
+      "path": "payload/dwd_security_identifier/all/part-000000.parquet",
+      "sha256": "sha256:7126cc931c898bdfbadc4aea6975a87928612e6de8297ebdeed7f4eb885cfe42",
+      "size_bytes": 287324
+    },
+    {
+      "path": "payload/dwd_security_identifier/all/part-000001.parquet",
+      "sha256": "sha256:454ac9bea5d53295bfb3a84e2b46078f26b87b9b5ab00da583748e279d4f5681",
+      "size_bytes": 6321
+    },
+    {
+      "path": "payload/dwd_trading_venue/all/part-000000.parquet",
+      "sha256": "sha256:ba7e6c9bdcde4918c3167e1efbd9db49b02244fbd64f4d2c5da343b219ad5fed",
+      "size_bytes": 4657
+    }
+  ]
+}

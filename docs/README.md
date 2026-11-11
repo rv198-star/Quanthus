@@ -17,6 +17,8 @@ These link past results to selection; they do not activate new research or produ
 
 For the HF-DWD R1 batch, see the [independent audit](acceptance/research-r1-independent-audit-612-20261111.md)
 and the proposed [model task allocation standard](operations/research-model-task-standard-v1.md).
+The [R1 v2 repair contract](design/research-r1-hf-dwd-v2.md) defines the corrected metric,
+input closure, bounded execution and per-stage self-audit.
 
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its

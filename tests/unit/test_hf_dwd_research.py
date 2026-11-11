@@ -474,3 +474,14 @@ def test_package_upload_size_guard(tmp_path, specimen, monkeypatch):
     specimen["budget"]["max_upload_bytes"] = 1
     with pytest.raises(worker.GuardError, match="upload budget"):
         prepare_package(tmp_path, specimen, monkeypatch)
+    with pytest.raises(worker.GuardError, match="upload budget"):
+        worker.build_package(specimen, [], {"identity_digest": "same", "git": "a" * 40}, tmp_path)
+
+
+def test_missing_receipt_digest_is_rejected(tmp_path):
+    identity = {"id": "same"}
+    worker.write(
+        tmp_path / "fetch.json", {"schema": "quanthus.research-fetch.v2", "identity": identity}
+    )
+    with pytest.raises(worker.GuardError, match="digest missing"):
+        worker.bound_read(tmp_path, "fetch.json", identity)

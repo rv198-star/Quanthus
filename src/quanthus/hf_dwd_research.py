@@ -408,6 +408,7 @@ def bound_read(job: Path, name: str, identity: dict[str, Any]) -> dict[str, Any]
     }
     if name in schemas:
         require(data.get("schema") == schemas[name], "stage receipt kind differs")
+        require("digest" in data, "stage receipt digest missing")
     require(data["identity"] == identity, "stage identity differs: " + name)
     if "digest" in data:
         require(
@@ -519,6 +520,11 @@ def build_package(
         "stage-attempts": read(job / "attempts.json"),
     }
     if package.exists():
+        require(
+            sum(x.stat().st_size for x in package.iterdir())
+            <= request["budget"]["max_upload_bytes"],
+            "package upload budget exceeded",
+        )
         manifest = verify_package(package)
         require(manifest["identity"] == identity, "existing package identity")
         for kind, value in values.items():
@@ -700,8 +706,6 @@ def launch_guarded(phase: str, request_path: Path, job: Path, cache: Path | None
                 and bool(auth.get("cause")),
                 "retry authorization identity/cause",
             )
-        if phase == "publish":
-            build_package(request, members, identity, job)
         index = len(previous) + 1
         started = time.monotonic()
         limit = b["max_stage_wall_seconds"][phase]

@@ -9154,6 +9154,122 @@
         "REPRO",
         "CLOSEOUT"
       ]
+    },
+    {
+      "id": "CP-610-20261111T145506490958Z",
+      "recorded_at": "2026-11-11T14:55:06.490958+00:00",
+      "actor": "Sol 6.1 author repair/self-audit",
+      "work_item": "P3-RESEARCH-HF-001",
+      "outcome": "progress",
+      "summary": "F1-F3 and failed-output cache guard repaired; 81 focused/8929 complete tests pass, A4 immutable delivery; await independent reacceptance.",
+      "evidence": [
+        {
+          "id": "E610-F1F3-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained/self-audit.json",
+          "sha256": "0f30b0ebbd1c892a0e402d406b4a6eaaa465cdb4a10226ffe6d1aa4fc1258800",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Author self-audit of F1/F2/F3 and failed-output reuse, exact A4 delivery; independent adoption pending at 612."
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "1351be2b execution and type-only 061429f5 equivalent compilation: final 81/8929 checks, A4 complete HF readback and idempotence; 3 audited gaps fixed",
+          "remaining": "Author self-audit complete; independent difference review at 612 pending",
+          "next_action": "Review F1 transition/cache cases, F2 candidate days and F3 package recovery before R1 closure or Worker reuse",
+          "evidence": [
+            "E610-F1F3-SELF-AUDIT"
+          ],
+          "supersedes": "CP-612-20261111T121242422791Z"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-HF-001",
+          "number": 610,
+          "title": "[P3-RESEARCH-HF-001] 为首个研究任务打通最小HF读取、限额运行与结果回传",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T14:53:58Z",
+          "body_sha256": "bb7e0a959931003ea87c8610fdc22241bef0e7acb187664f4727e6e79f139ab6"
+        }
+      ]
+    },
+    {
+      "id": "CP-612-20261111T145508178862Z",
+      "recorded_at": "2026-11-11T14:55:08.178862+00:00",
+      "actor": "Sol 6.1 author repair/self-audit",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "outcome": "no_module_change",
+      "summary": "Author repair and A4 evidence delivered; 612 remains open for independent difference review.",
+      "evidence": [
+        {
+          "id": "E610-F1F3-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained/self-audit.json",
+          "sha256": "0f30b0ebbd1c892a0e402d406b4a6eaaa465cdb4a10226ffe6d1aa4fc1258800",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Author self-audit of F1/F2/F3 and failed-output reuse, exact A4 delivery; independent adoption pending at 612."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "REPRO engineering update is recorded by 610. FACTS/CLOSEOUT scientific decisions and admission remain unchanged; no independent acceptance by the author.",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-REVIEW-001",
+          "number": 612,
+          "title": "[META-RESEARCH-REVIEW-001] 独立审阅首个结果并完成采用、入账与长期证据留存",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T14:54:01Z",
+          "body_sha256": "c9dc33999b3ceb1a971925650c62d0729ac1891b9e285c4fd068ea0bb1d0ee41"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-2-20261111T145509936774Z",
+      "recorded_at": "2026-11-11T14:55:09.936774+00:00",
+      "actor": "Sol 6.1 author repair/self-audit",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "Append bounded Worker repair self-audit via existing governance.",
+      "evidence": [
+        {
+          "id": "E610-F1F3-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained/self-audit.json",
+          "sha256": "0f30b0ebbd1c892a0e402d406b4a6eaaa465cdb4a10226ffe6d1aa4fc1258800",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Author self-audit of F1/F2/F3 and failed-output reuse, exact A4 delivery; independent adoption pending at 612."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "No TRACE mechanism or authority change; preserve all old checkpoints and costs.",
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
     }
   ]
 }

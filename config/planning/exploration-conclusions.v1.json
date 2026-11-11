@@ -887,6 +887,59 @@
         "CP-612-20261111T121242422791Z"
       ],
       "supersedes": "CON-R1-PRICE-GUARD-V2-20261111"
+    },
+    {
+      "recorded_at": "2026-11-11T14:55:54.224161+00:00",
+      "actor": "Sol 6.1 author repair/self-audit",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "All original execution/audit/repair costs retained. A3 Guardian61.541s and final A4 61.034s, preliminary full check interrupted143; final full suite784.21s. Initial regression26fail/55pass, C1 before2fail/1pass and final81pass retained. Local type-only bytecode proof plus no new mypy diagnostics; full active-time, tokens and bills unknown_not_zero.",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained/self-audit.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/logs/make-check-final.log",
+        "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/logs/make-check-a3-interrupted.log"
+      ],
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "id": "CON-R1-WORKER-F1F3-SELF-AUDIT-20261111",
+      "question_id": "P3-RESEARCH-HF-001-CONFORMANCE",
+      "family": "hf-dwd-worker-contract",
+      "work_item": "P3-RESEARCH-HF-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "修正后的v2能否满足固定任务的单节点HF Worker工程合同？",
+      "consumer": "R2调用方、独立审阅者和Worker维护者",
+      "scope": "1351be2b actual A4 Worker execution; 061429f5 local type annotation has identical compiled module under Python3.10.12; fixed input and math retained",
+      "claim_ceiling": "Author regressions, complete local validation and exact A4 HF delivery support corrected Worker as an adoption candidate; independent difference review at 612 remains open.",
+      "decision_effect": "Offer repaired F1/F2/F3 and failed-output reuse guard for independent reacceptance. 610/612/R1 stay open. Accepted A2 market counts and allocation branch remain unchanged; no new question or Worker expansion.",
+      "reopen_conditions": [
+        "Independent reviewer finds a concrete transition, identity, budget, sample or package mismatch.",
+        "New task/node/source/config scope requires a separately frozen bounded request."
+      ],
+      "retained_assets": [
+        "81 focused tests and old-code failure evidence",
+        "Complete 8929 passed/35 skipped result and preserved interrupted preliminary check",
+        "A4 bad249962cdcd801d9ef617ae92577bc5ddefb33 full-file readback and idempotent same package",
+        "A3 unpublished predecessor, failed network attempts and cumulative cost records"
+      ],
+      "evidence": [
+        {
+          "id": "E610-F1F3-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained/self-audit.json",
+          "sha256": "0f30b0ebbd1c892a0e402d406b4a6eaaa465cdb4a10226ffe6d1aa4fc1258800",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Author self-audit of F1/F2/F3 and failed-output reuse, exact A4 delivery; independent adoption pending at 612."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-610-20261111T145506490958Z"
+      ],
+      "supersedes": "CON-R1-WORKER-V2-INDEPENDENT-20261111"
     }
   ]
 }

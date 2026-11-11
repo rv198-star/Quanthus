@@ -26,67 +26,67 @@
     "60分钟内无法确认消费者与具体未满足接口就不继续开发。",
     "出现新数据、训练、阈值、P6/生产或超预算要求时只停止对应步骤。"
   ],
-  "memory_sha256": "4280c0d2b02ff2a08ca21a7e036b5faf816d0f9a8bbf38f60cb162cb6ffdb55e",
+  "memory_sha256": "e86cdb0dda2c33ccf88728cff11008db0baed4f25219f210733049824c64d844",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
       "relation": "respect",
-      "rationale": "Preserve scoped conclusions, historical costs and exposure. Refresh this retired non-authorizing example only; R1 result adoption and bounded 610 repair follow the independent review. No new task activated."
+      "rationale": "Preserve scope, exposure and cumulative costs; this retired example only refreshes the current index. Repaired Worker awaits independent difference review; no new task activated."
     },
     {
       "conclusion_id": "CON-HELD-NEED-20261029",
       "relation": "respect",
-      "rationale": "Preserve scoped conclusions, historical costs and exposure. Refresh this retired non-authorizing example only; R1 result adoption and bounded 610 repair follow the independent review. No new task activated."
+      "rationale": "Preserve scope, exposure and cumulative costs; this retired example only refreshes the current index. Repaired Worker awaits independent difference review; no new task activated."
     },
     {
       "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
       "relation": "respect",
-      "rationale": "Preserve scoped conclusions, historical costs and exposure. Refresh this retired non-authorizing example only; R1 result adoption and bounded 610 repair follow the independent review. No new task activated."
+      "rationale": "Preserve scope, exposure and cumulative costs; this retired example only refreshes the current index. Repaired Worker awaits independent difference review; no new task activated."
     },
     {
       "conclusion_id": "CON-DECISION-SELECTION-20261029",
       "relation": "respect",
-      "rationale": "Preserve scoped conclusions, historical costs and exposure. Refresh this retired non-authorizing example only; R1 result adoption and bounded 610 repair follow the independent review. No new task activated."
+      "rationale": "Preserve scope, exposure and cumulative costs; this retired example only refreshes the current index. Repaired Worker awaits independent difference review; no new task activated."
     },
     {
       "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
       "relation": "respect",
-      "rationale": "Preserve scoped conclusions, historical costs and exposure. Refresh this retired non-authorizing example only; R1 result adoption and bounded 610 repair follow the independent review. No new task activated."
+      "rationale": "Preserve scope, exposure and cumulative costs; this retired example only refreshes the current index. Repaired Worker awaits independent difference review; no new task activated."
     },
     {
       "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
       "relation": "respect",
-      "rationale": "Preserve scoped conclusions, historical costs and exposure. Refresh this retired non-authorizing example only; R1 result adoption and bounded 610 repair follow the independent review. No new task activated."
+      "rationale": "Preserve scope, exposure and cumulative costs; this retired example only refreshes the current index. Repaired Worker awaits independent difference review; no new task activated."
     },
     {
       "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
       "relation": "respect",
-      "rationale": "Preserve scoped conclusions, historical costs and exposure. Refresh this retired non-authorizing example only; R1 result adoption and bounded 610 repair follow the independent review. No new task activated."
+      "rationale": "Preserve scope, exposure and cumulative costs; this retired example only refreshes the current index. Repaired Worker awaits independent difference review; no new task activated."
     },
     {
       "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
       "relation": "respect",
-      "rationale": "Preserve scoped conclusions, historical costs and exposure. Refresh this retired non-authorizing example only; R1 result adoption and bounded 610 repair follow the independent review. No new task activated."
+      "rationale": "Preserve scope, exposure and cumulative costs; this retired example only refreshes the current index. Repaired Worker awaits independent difference review; no new task activated."
     },
     {
       "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
       "relation": "respect",
-      "rationale": "Preserve scoped conclusions, historical costs and exposure. Refresh this retired non-authorizing example only; R1 result adoption and bounded 610 repair follow the independent review. No new task activated."
+      "rationale": "Preserve scope, exposure and cumulative costs; this retired example only refreshes the current index. Repaired Worker awaits independent difference review; no new task activated."
     },
     {
       "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
       "relation": "respect",
-      "rationale": "Preserve scoped conclusions, historical costs and exposure. Refresh this retired non-authorizing example only; R1 result adoption and bounded 610 repair follow the independent review. No new task activated."
-    },
-    {
-      "conclusion_id": "CON-R1-WORKER-V2-INDEPENDENT-20261111",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, historical costs and exposure. Refresh this retired non-authorizing example only; R1 result adoption and bounded 610 repair follow the independent review. No new task activated."
+      "rationale": "Preserve scope, exposure and cumulative costs; this retired example only refreshes the current index. Repaired Worker awaits independent difference review; no new task activated."
     },
     {
       "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
       "relation": "respect",
-      "rationale": "Preserve scoped conclusions, historical costs and exposure. Refresh this retired non-authorizing example only; R1 result adoption and bounded 610 repair follow the independent review. No new task activated."
+      "rationale": "Preserve scope, exposure and cumulative costs; this retired example only refreshes the current index. Repaired Worker awaits independent difference review; no new task activated."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-SELF-AUDIT-20261111",
+      "relation": "respect",
+      "rationale": "Preserve scope, exposure and cumulative costs; this retired example only refreshes the current index. Repaired Worker awaits independent difference review; no new task activated."
     }
   ],
   "cumulative_cost_review": "既有Head2和持仓尝试全部保留，旧总成本未知而非零；新批次独立记账，不伪装新方向抹去原投入。",

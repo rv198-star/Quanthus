@@ -332,6 +332,7 @@ def fault_probes(q, members, identity, seed, out):
                         "cause": "audit: failed child already wrote outputs",
                     },
                 )
+                request["budget"]["max_stage_wall_seconds"]["screen"] = 5
                 retry_child = (
                     "import sys,json;from pathlib import Path;"
                     f"sys.path.insert(0,{str(ROOT / 'src')!r});"
@@ -346,7 +347,11 @@ def fault_probes(q, members, identity, seed, out):
                     ),
                 ):
                     assert worker.launch_guarded("screen", REQUEST, job, None) == 1
-                assert read(job / "resources.json")["screen"]["status"] == "failed"
+                retry = read(job / "resources.json")["screen"]
+                assert retry["status"] == "failed" and retry["failure"] is None
+                assert (
+                    "Guardian stage has not succeeded: screen" in (job / "screen-2.log").read_text()
+                )
                 rejected_publish(job)
             else:
                 worker.build_package(q, members, identity, job)

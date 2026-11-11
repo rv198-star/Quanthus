@@ -299,14 +299,39 @@ def _copy(connection: Any, query: str, output: Path) -> None:
 
 
 def _lineage(path: Path, artifact: Any, alias: str) -> str:
+    """Bind the release artifact clock, never the per-row response arrival time.
+
+    One daily artifact is admitted, replayed and compared as a whole, so its
+    availability instant is the artifact's fixed `knowledge_cutoff`. A
+    per-row `acquired_at` would let one row of an acquisition batch appear
+    known before the same batch's own parent rows, which is not an admissible
+    availability ordering.
+    """
+    cutoff = artifact.knowledge_cutoff
+    if cutoff.tzinfo is None or cutoff.utcoffset() is None:
+        raise DailyDomainBuildError("daily artifact knowledge cutoff lacks a timezone")
     return f"""
       {_sql(str(artifact.source_revision).split("@")[0])}::VARCHAR AS record_source,
       {alias}.source_record_id,
       {_sql(artifact.source_revision)}::VARCHAR AS source_revision,
       {_sql(artifact.sha256)}::VARCHAR AS source_artifact_sha256,
-      CAST({alias}.acquired_at AS TIMESTAMPTZ) AS knowledge_from,
+      CAST({_sql(cutoff.isoformat())} AS TIMESTAMPTZ) AS knowledge_from,
       NULL::TIMESTAMPTZ AS knowledge_to
     """
+
+
+def daily_parent_cutoff(selected: Mapping[str, Any]):
+    """Use the earliest real cutoff of projected artifacts for shared parent references."""
+    names = (
+        ("market_daily_core", "daily_ohlcv_none_delta"),
+        ("market_daily_core", "valuation_daily_delta"),
+        ("market_daily_core", "index_daily_delta"),
+        ("market_daily_core", "daily_status_observation_delta"),
+        ("calendar_daily_events", "announcements_delta"),
+    )
+    if "market_daily_core" not in selected and "calendar_reference" in selected:
+        selected = {**selected, "market_daily_core": selected["calendar_reference"]}
+    return min(_artifact(selected, lane, name)[1].knowledge_cutoff for lane, name in names)
 
 
 def _path_relation(paths: Sequence[Path]) -> str:
@@ -889,19 +914,23 @@ def build_daily_domain_increment(
             if "dwd_listing" in overlay:
                 listing_files = [*listing_files, overlay["dwd_listing"]]
                 security_files = [*security_files, overlay["dwd_security"]]
-        connection.execute(
-            f"CREATE VIEW base_listing AS SELECT * FROM {_path_relation(listing_files)}"
+        from .daily_reference_views import reference_relation
+
+        cutoff = (
+            daily_parent_cutoff(selected)
+            if config.get("layers", {}).get("dwd", {}).get("format") == "native_standard_base"
+            else None
         )
-        connection.execute(
-            f"CREATE VIEW base_security AS SELECT * FROM {_path_relation(security_files)}"
-        )
-        connection.execute(
-            f"CREATE VIEW base_calendar AS SELECT * FROM {_path_relation(calendar_files)}"
-        )
-        connection.execute(
-            f"CREATE VIEW base_market_index AS SELECT * FROM {_path_relation(market_index_files)}"
-        )
-        connection.execute(f"CREATE VIEW base_venue AS SELECT * FROM {_path_relation(venue_files)}")
+        for view, paths in (
+            ("base_listing", listing_files),
+            ("base_security", security_files),
+            ("base_calendar", calendar_files),
+            ("base_market_index", market_index_files),
+            ("base_venue", venue_files),
+        ):
+            connection.execute(
+                f"CREATE VIEW {view} AS SELECT * FROM {reference_relation(paths, cutoff)}"
+            )
 
         outputs, held_disclosure_count = _project_daily_tables(
             connection,

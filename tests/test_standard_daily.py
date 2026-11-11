@@ -35,6 +35,11 @@ def test_market_and_closed_delivery_replay_only_self_contained_sources(
             "market_daily_core" if kind == "market" else "calendar_reference": roots["sources"]
             / "2026-10-08/market",
         }
+        observed = None
+        if kind == "closed":
+            from tests.test_observed_daily_calendar import observation
+
+            observed = observation(tmp_path / "observed-calendar")
         with Budget(tmp_path / (kind + "-publisher"), list(roots.values()), limits()) as budget:
             body = publish(
                 projection=roots["daily"] if kind == "market" else None,
@@ -44,6 +49,7 @@ def test_market_and_closed_delivery_replay_only_self_contained_sources(
                 output=output,
                 code_revision="a" * 40,
                 budget=budget,
+                calendar_observation=observed,
             )
         assert body["day_kind"] == kind
         deliveries[kind] = output
@@ -96,6 +102,14 @@ def test_next_generic_base_consumes_only_ordinary_market_and_closed_deliveries(
 
     selection, roots, configuration = standard_next_inputs(tmp_path, ods, dwd, "a" * 40)
     paths = [Path(p) for key, p in roots.items() if key.startswith("delivery-")]
+    from quanthus.pipelines.securities_warehouse.base_build_standard_daily import select
+
+    clipped, clipped_roots, clipped_config = select(
+        ods=ods, dwd=dwd, daily_roots=paths, target_version="2.6", through_date="2026-10-12"
+    )
+    assert [p["day"] for p in clipped["packages"] if p["role"] == "daily"] == ["2026-10-12"]
+    assert "delivery-2026-10-13" not in clipped_roots
+    assert [d["day"] for d in clipped_config["closed_days"]] == ["2026-10-10", "2026-10-11"]
     next_area, wire_area = tmp_path / "next-inputs", tmp_path / "next-wire"
     frozen = freeze(selection, roots)
     c = delivery_contract(

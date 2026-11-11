@@ -180,6 +180,13 @@ def prepare(
         r.get("market_daily_core", r.get("calendar_reference"))["artifacts"]["trading_calendar"]
         for r in originals
     ]
+    from .observed_daily_calendar import project as observed_calendar
+
+    calendars.extend(
+        observed_calendar(root, body["calendar_observation"], None, body["market_date"])
+        for _, root, body in selected
+        if body.get("calendar_observation")
+    )
     days, _, calendar_union = qualified_calendar_union(
         calendars, binding["predecessor_through"], binding["through_date"]
     )
@@ -333,6 +340,8 @@ def select(
     for root in sorted(daily_roots):
         body = inspect(root)
         day = body["market_date"]
+        if not after < day <= through_date:
+            continue
         sid = "delivery-" + day
         if sid in roots:
             raise BoundedError("BUILD_STANDARD_DELIVERY_DAY_DUPLICATE")
@@ -342,6 +351,12 @@ def select(
         assert observed is not None
         calendar, artifact = observed["artifacts"]["trading_calendar"]
         calendars.append((calendar, artifact))
+        if body.get("calendar_observation"):
+            from .observed_daily_calendar import project as observed_calendar
+
+            calendars.append(
+                observed_calendar(root, body["calendar_observation"], None, body["market_date"])
+            )
         if body["day_kind"] == "market":
             packages.append(
                 {

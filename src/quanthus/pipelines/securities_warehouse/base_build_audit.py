@@ -17,7 +17,14 @@ from .base22 import digest
 from .base22_bounded import BoundedError, Budget
 from .base23_native_image import image_schemas
 from .base_build_composition import audit_standard_image
-from .base_build_inputs import _fingerprint, _tree, canonical, file_sha, identity, member
+from .base_build_inputs import (
+    _fingerprint,
+    _tree,
+    canonical,
+    file_sha,
+    identity,
+    member,
+)
 from .base_build_ods import audit_ods
 from .base_build_period import PARENTS, VerifiedInputs, load, prepare_period
 from .base_build_profile import REFERENCE_TABLES, UPDATED_TABLES
@@ -34,7 +41,11 @@ def physical_guard(root: Path) -> dict[str, Any]:
         h.update(canonical([relative, *stamp]) + b"\n")
         size += stamp[2]
         count += 1
-    return {"files": count, "bytes": size, "physical_identity": "sha256:" + h.hexdigest()}
+    return {
+        "files": count,
+        "bytes": size,
+        "physical_identity": "sha256:" + h.hexdigest(),
+    }
 
 
 def _same_file(left: Path, right: Path) -> None:
@@ -176,7 +187,12 @@ def _closure(
 
 
 def _audit_structure(
-    *, ods: Path, dwd: Path, contract: dict[str, Any], expected_input_identity: str, budget: Budget
+    *,
+    ods: Path,
+    dwd: Path,
+    contract: dict[str, Any],
+    expected_input_identity: str,
+    budget: Budget,
 ) -> tuple[dict[str, Any], dict[str, Path]]:
     """Full layer scans and paired closure; source replay remains explicit below."""
     before = {"ods": physical_guard(ods), "dwd": physical_guard(dwd)}
@@ -205,7 +221,12 @@ def _audit_structure(
 
 
 def audit_structure(
-    *, ods: Path, dwd: Path, contract: dict[str, Any], expected_input_identity: str, budget: Budget
+    *,
+    ods: Path,
+    dwd: Path,
+    contract: dict[str, Any],
+    expected_input_identity: str,
+    budget: Budget,
 ) -> dict[str, Any]:
     result, _ = _audit_structure(
         ods=ods,
@@ -218,7 +239,12 @@ def audit_structure(
 
 
 def audit_pair(
-    *, ods: Path, dwd: Path, contract: dict[str, Any], expected_input_identity: str, budget: Budget
+    *,
+    ods: Path,
+    dwd: Path,
+    contract: dict[str, Any],
+    expected_input_identity: str,
+    budget: Budget,
 ) -> dict[str, Any]:
     """Cold source replay from paired products; never open original input roots."""
     result, references = _audit_structure(
@@ -240,7 +266,11 @@ def audit_pair(
         load(member(dwd, "contract/dwd-domain-model.v1.1-extension.json")),
     )
     configuration = load(member(ods, "evidence/period/CONFIG.json"))
-    if set(configuration) != {"source_evidence_id", "closed_days", "calendar_reference"}:
+    if set(configuration) != {
+        "source_evidence_id",
+        "closed_days",
+        "calendar_reference",
+    }:
         raise BoundedError("BUILD_PAIR_AUDIT_SOURCE_CONFIGURATION_INVALID")
     replay = prepare_period(
         inputs=inputs,
@@ -267,7 +297,11 @@ def audit_pair(
     result.update(
         historical_gate=historical,
         historical_disposition=(
-            "PASS_NO_APPLICABLE_REGISTERED_CASE"
+            (
+                "PASS_ALL_REGISTERED_CASES_GOVERNED"
+                if any(c["scope_registered"] for c in historical["cases"])
+                else "PASS_NO_APPLICABLE_REGISTERED_CASE"
+            )
             if historical["publication_eligible"]
             else "PENDING_REGISTERED_CASE_DISPOSITION"
         ),

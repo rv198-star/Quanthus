@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Protocol
 from zoneinfo import ZoneInfo
 
 from quanthus.forward_validation.contracts import ForwardValidationContractError, fail
@@ -89,6 +89,11 @@ def _repo_binding(root: Path, value: object, field: str) -> tuple[Path, dict[str
     if _sha(path) != expected:
         fail("binding_digest_drift", field)
     return path, _object(path, field)
+
+
+class RuntimeIdentity(Protocol):
+    @property
+    def config_sha256(self) -> str: ...
 
 
 @dataclass(frozen=True)
@@ -408,7 +413,7 @@ def load_owner_activation_mandate(
 def activation_decision_from_mapping(
     raw: Mapping[str, object],
     *,
-    runtime: P6ProspectiveRuntimeConfig,
+    runtime: RuntimeIdentity,
     path: Path | None = None,
     expected_mandate_digest: str | None = None,
 ) -> P6ActivationDecision:

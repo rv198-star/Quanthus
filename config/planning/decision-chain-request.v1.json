@@ -1,0 +1,79 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RECORDED-B-DECISION-CHAIN-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "recorded-decision-chain-delivery",
+  "work_item": "META-LEARN-001",
+  "modules": [
+    "EXPERT",
+    "REPRO",
+    "CLOSEOUT"
+  ],
+  "question": "能否用原B准确记录交付从入场决定到原模拟成交、持仓和退出的可追溯查阅链？",
+  "consumer": "Owner及已有研究调用者的历史审查，不参与交易或新研究比较",
+  "scope": "已有2012–2021 B记录及#580已封存持仓投影；不新增采集、训练、评分、经济回放或生产/P6",
+  "deliverable": "真实完整链的只读查询JSON/离线HTML，准确来源与未知，不造新策略",
+  "decision_if_pass": "按工程用途交付并更新蓝图，不自动启动新实验",
+  "decision_if_fail": "交付具体关联/来源缺口，停止受影响阶段，不补采或放宽身份",
+  "acceptance": [
+    "原B精确来源和事件键资格通过，PR580普通主线交付",
+    "原模拟记录、未知、Decimal与完整事件分母保留",
+    "独立对账/冷读/损坏拒绝、本地检查和蓝图交接"
+  ],
+  "stop_conditions": [
+    "45分钟无法建立准确B身份/连接键则停止关联",
+    "首条完整链60分钟仍不成立则停止扩建",
+    "4小时整体截止，写入前容量门槛和8GiB余量有效"
+  ],
+  "memory_sha256": "cbc331f034daa3be315acfde50c245e2a41a6d340346baa281057bc90ba814c0",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    }
+  ],
+  "cumulative_cost_review": "本批单独记录时间、产物及检查；原Head2、量能、持仓影子等失败和未知成本不清零。",
+  "runtime_authority_boundary": "Owner批准2026-10-29下一批计划；本文件只是规划，真实范围和时间/写入由外部authority及冻结输入约束。",
+  "budget": {
+    "wall_seconds": 14400,
+    "max_new_bytes": 67108864,
+    "network_requests": 0,
+    "accounting_owner": "本job输出；适用检查TMP另行实测冻结，GitHub普通代码操作另计"
+  },
+  "execution_disposition": "COMPLETED_RECORDED_B_CHAIN_ONLY; no successor experiment activated",
+  "execution_record": "docs/acceptance/recorded-b-decision-chain-20261029.md",
+  "proposal_role": "Retained non-authorizing proposal; original executed request and authority pinned in the job; prior conclusions and costs retained."
+}

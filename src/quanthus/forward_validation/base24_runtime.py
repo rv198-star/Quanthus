@@ -16,11 +16,11 @@ from types import MappingProxyType
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from quanthus.forward_validation.base24_contract import CLOCK_VERSION as CLOCK_VERSION
 from quanthus.forward_validation.contracts import fail
 from quanthus.forward_validation.serialization import digest_value
 
 VERSION = "quanthus.p6-base24-runtime-inputs.v1"
-CLOCK_VERSION = "quanthus.p6-after-close-decision-clock.v1"
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 

@@ -1,0 +1,79 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "HISTORICAL-DECISION-REVIEW-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "historical-decision-review-delivery",
+  "work_item": "META-LEARN-001",
+  "modules": [
+    "FACTS",
+    "EXPERT",
+    "REPRO"
+  ],
+  "question": "能否从已消费的准确历史轨迹直接交付原因和来源可追溯的复盘输出？",
+  "consumer": "Owner及现有研究调用方的历史决策查阅；不参与交易决定",
+  "scope": "只读固定2012–2021已消费derived选择；不采集、重训、重评分、经济回放或部署",
+  "deliverable": "准确事件查询CLI、JSON与离线HTML；不伪造正式candidate包",
+  "decision_if_pass": "交付研究查阅能力；只更新相应工程事实，不提升模型采用资格",
+  "decision_if_fail": "交付具体缺口及独立小修复；不追源、不自动开新实验",
+  "acceptance": [
+    "R1身份保留，原abstain/缺值语义不变",
+    "全8393键与538事件对齐，12预定类别案例逐字段核对",
+    "真实输出、独立进程复现、破坏拒绝、本地检查及蓝图更新"
+  ],
+  "stop_conditions": [
+    "45分钟内无法建立准确输入和用途则停止对应消费步骤",
+    "2小时没有真实案例贯通则只保留最小CLI方向，不以合成示例冒充交付",
+    "6小时或128MiB写入/RSS1GiB/8GiB可用空间门槛触发则停止该批次"
+  ],
+  "memory_sha256": "cbc331f034daa3be315acfde50c245e2a41a6d340346baa281057bc90ba814c0",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+    }
+  ],
+  "cumulative_cost_review": "既有研究消耗与负结论完整保留；本批是新增有限交付投入，不重置旧曝光或未知成本。",
+  "runtime_authority_boundary": "本文件仅规划，不是运行授权；执行需要当前任务授权和TPlan预算，真实输入还须原有用途准入。",
+  "budget": {
+    "wall_seconds": 21600,
+    "max_new_bytes": 134217728,
+    "network_requests": 0,
+    "accounting_owner": "current TPlan mission; source network budget zero, authorized GitHub code operations separate"
+  },
+  "execution_disposition": "COMPLETED_RETROSPECTIVE_REVIEW_DELIVERY; no successor activated",
+  "execution_record": "docs/acceptance/historical-decision-review-20261029.md",
+  "proposal_role": "Retained non-authorizing completed proposal; exact original request stays frozen in the job."
+}

@@ -1,0 +1,16 @@
+{
+  "contract": "p10-base24-dwd-partition-repair-v1",
+  "authority": "outputs/evidence/BASE25-OWNER-DAILY-REVISION-DECISION.json",
+  "correction_contract": "config/pipelines/base-build-historical-corrections.v1.json",
+  "target": "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/observation_start_month=6/part-000008.parquet",
+  "original_sha256": "sha256:6661f13c9bee6c3206af98ec3a1e4762ddf4d4627bb37fce709072f44405b9a9",
+  "original_size_bytes": 2797067,
+  "corrected_sha256": "sha256:8fe3c4019f4db474610bbd4c9b57e27d7ae74a0ed17aaf10e17da7b33e35780f",
+  "corrected_size_bytes": 3564516,
+  "hits": {
+    "002336": 1,
+    "002500": 1
+  },
+  "input_plan_sha256": "sha256:324e4e802000192a076066b5ab0b7858d11b379911ef2af19f191e39a82b69bc",
+  "original_manifest_sha256": "sha256:04345d9cfb7d99dae9e65b11bd28591095156e48378b5b44245fc3d36a944b3a"
+}

@@ -1,0 +1,11 @@
+[Unit]
+Description=P10 oci-mirror verified data/quality email checkpoint
+
+[Timer]
+OnCalendar=*-*-* 00:35:00 Asia/Shanghai
+AccuracySec=1min
+Persistent=false
+Unit=quanthus-p10-deadline@oci-mirror.service
+
+[Install]
+WantedBy=timers.target

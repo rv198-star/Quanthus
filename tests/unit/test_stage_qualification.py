@@ -210,6 +210,22 @@ def test_qualification_sampler_does_not_backfill_a_missing_preregistered_stratum
         )
 
 
+def test_explicit_successor_caps_keep_shortfall_without_backfilling_or_changing_legacy() -> None:
+    config = load_qualification_config(CONFIG)
+    episodes, activity = _qualification_population()
+    episodes = [e for e in episodes if e.observation != "reclaimed"]
+    contexts = select_qualification_contexts(
+        episodes, activity, report_start=date(2022, 1, 4), report_end=date(2024, 12, 31),
+        sampling=config["sampling"], target_caps=True,
+    )
+    assert len(contexts) == 560
+    assert len({c.episode_id for c in contexts}) == 560
+    assert not any(c.sampling_stratum == "qualification_reclaimed_ambiguity" for c in contexts)
+    with pytest.raises(StageQualificationError, match="unique episodes; need"):
+        select_qualification_contexts(episodes, activity, report_start=date(2022, 1, 4),
+                                      report_end=date(2024, 12, 31), sampling=config["sampling"])
+
+
 def test_qualification_hard_gate_passes_only_complete_preregistered_evidence() -> None:
     config = load_qualification_config(CONFIG)
     gates = config["hard_gates"]

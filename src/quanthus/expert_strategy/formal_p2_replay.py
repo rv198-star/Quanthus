@@ -11,8 +11,8 @@ import tempfile
 from collections import defaultdict
 from collections.abc import Mapping
 from contextlib import ExitStack
-from dataclasses import dataclass, replace
-from datetime import date, datetime, time
+from dataclasses import asdict, dataclass, replace
+from datetime import date, datetime, time, timezone
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
@@ -103,15 +103,12 @@ def _rate(value: Decimal) -> Decimal:
 
 def _stable_id(prefix: str, *values: object) -> str:
     normalized = tuple(
-        value.isoformat() if isinstance(value, (date, datetime)) else value
-        for value in values
+        value.isoformat() if isinstance(value, (date, datetime)) else value for value in values
     )
     return f"{prefix}_{hashlib.sha256(canonical_json_bytes(normalized)).hexdigest()[:24]}"
 
 
-def _decision_digest_in_window(
-    decisions: list[tuple[date, str]], start: date, end: date
-) -> str:
+def _decision_digest_in_window(decisions: list[tuple[date, str]], start: date, end: date) -> str:
     return digest_value(
         sorted(item for market_date, item in decisions if start <= market_date <= end)
     )
@@ -123,9 +120,7 @@ def _load_parent_industry_mapping(
     industry = load_static_industry_mapping(
         event_library / "adm" / "static_industry_mapping.json",
         expected_version="static-level1-concentration-research-v1",
-        required_security_ids=tuple(
-            sorted({item.record.identity.security_id for item in events})
-        ),
+        required_security_ids=tuple(sorted({item.record.identity.security_id for item in events})),
     )
     if any(
         item.static_industry_id
@@ -390,8 +385,14 @@ class FormalP2ReplayRuntime:
         }[intervention_id]
 
     def run_variant(
-        self, intervention_id: str | None, output_root: Path
+        self,
+        intervention_id: str | None,
+        output_root: Path,
+        *,
+        allocation_audit: bool = False,
     ) -> tuple[FormalReplayEvidence, dict[str, bytes]]:
+        if type(allocation_audit) is not bool:
+            raise ValueError("allocation_audit must be boolean")
         self._validate_intervention_id(intervention_id)
         topology = self.registry.topology_manifest
         held_intervention_id = self._held_intervention_id(intervention_id)
@@ -430,6 +431,7 @@ class FormalP2ReplayRuntime:
             data_manifest_sha256=self.session.reader.data_manifest_sha256,
         )
         decisions: list[dict[str, Any]] = []
+        allocation_frames: list[dict[str, Any]] | None = [] if allocation_audit else None
         transitions: list[PositionTransition] = []
         events: list[EngineEvent] = []
         equity: list[dict[str, Any]] = [
@@ -455,6 +457,9 @@ class FormalP2ReplayRuntime:
                 events,
             )
             candidates = self._entry_candidates(frame, runner, intervention_id)
+            audit_options = (
+                {} if allocation_frames is None else {"allocation_audit": allocation_frames}
+            )
             self._execute_frame(
                 frame_index,
                 frame,
@@ -466,6 +471,7 @@ class FormalP2ReplayRuntime:
                 decisions,
                 transitions,
                 events,
+                **audit_options,
             )
             market_value = _money(
                 sum((_market_value(item.ledger) for item in runtimes.values()), Decimal("0"))
@@ -564,6 +570,46 @@ class FormalP2ReplayRuntime:
                 **self._manifest_metadata(intervention_id),
             }
         )
+        if allocation_frames is not None:
+            # Operational observation is separate from the sealed legacy replay identity.
+            # No allocator/evaluator is called here, and no original byte is rewritten.
+            identity = {
+                "run": run.manifest({}),
+                "execution_policy": json.loads(json.dumps(asdict(self.engine.policy), default=str)),
+                "strategy_card_digest": self.registry.card.semantic_digest,
+                "topology_manifest_digest": topology.digest,
+                "industry_artifact_digest": self.industry.artifact_digest,
+                "population": self._population_manifest_fields(),
+                "source_metadata": self._manifest_metadata(intervention_id),
+                "scope": {
+                    "decision_start": self.decision_start.isoformat(),
+                    "decision_end": self.decision_end.isoformat(),
+                    "execution_end": self.execution_end.isoformat(),
+                },
+                "code_and_config_sha256": {
+                    str(path.relative_to(self.repository_root)): hashlib.sha256(
+                        path.read_bytes()
+                    ).hexdigest()
+                    for folder, pattern in (("src/quanthus", "*.py"), ("config", "*.json"))
+                    for path in sorted((self.repository_root / folder).rglob(pattern))
+                },
+            }
+            audit = {
+                "schema_version": "quanthus.entry-allocation-audit.v1",
+                "purpose": "ALREADY_COMPUTED_ALLOCATION_OBSERVATION_ONLY",
+                "execution_authorized": False,
+                "historical_PIT_claim": False,
+                "identity": identity,
+                "legacy_replay_digest": replay_digest,
+                "legacy_artifacts_sha256": {
+                    name: hashlib.sha256(payload).hexdigest()
+                    for name, payload in sorted(artifacts.items())
+                },
+                "frames": allocation_frames,
+            }
+            artifacts["entry-allocation-audit.json"] = canonical_json_bytes(
+                {**audit, "audit_digest": digest_value(audit)}
+            )
         return evidence, artifacts
 
     def _entry_candidates(
@@ -910,6 +956,8 @@ class FormalP2ReplayRuntime:
         decisions: list[dict[str, Any]],
         transitions: list[PositionTransition],
         events: list[EngineEvent],
+        *,
+        allocation_audit: list[dict[str, Any]] | None = None,
     ) -> None:
         active = tuple(
             ActiveUnitExposure(
@@ -946,6 +994,46 @@ class FormalP2ReplayRuntime:
             active_exposures=active,
             accepted_entries=(),
         )
+        if allocation_audit is not None:
+            allocation_payload = allocation.to_dict()
+            allocation_audit.append(
+                {
+                    "market_date": frame.snapshot.market_date.isoformat(),
+                    "decision_at": frame.decision_at.isoformat(),
+                    "observed_at": datetime.now(timezone.utc).isoformat(),
+                    "snapshot_id": frame.snapshot.snapshot_id,
+                    "snapshot_source_revision": frame.snapshot.source_revision,
+                    "execution_date": frame.execution_date.isoformat(),
+                    "knowledge_cutoff": frame.snapshot.knowledge_cutoff.isoformat(),
+                    "available_units": [
+                        {
+                            "unit_id": item.lifecycle.unit_id,
+                            "lifecycle_digest": item.lifecycle.digest,
+                            "ledger_digest": digest_value(_ledger(item.ledger)),
+                        }
+                        for item in available
+                    ],
+                    "active_lifecycle_digests": [item.lifecycle_digest for item in active],
+                    "entries": [
+                        {
+                            "entry_key": f"entry:{item.item.record.event_id}",
+                            "opportunity_id": item.opportunity_id,
+                            "formal_decision_digest": item.decision.digest,
+                            "security_id": item.item.record.identity.security_id,
+                            "panel_security_id": item.item.panel_security_id,
+                            "final_action": item.decision.action.final_action.value,
+                            "allocation_decision_id": (
+                                _stable_id("allocation", item.opportunity_id)
+                                if item.decision.action.final_action is GovernedAction.TRIAL_ENTRY
+                                else None
+                            ),
+                        }
+                        for item in candidates
+                    ],
+                    "allocation": allocation_payload,
+                    "allocation_digest": digest_value(allocation_payload),
+                }
+            )
         by_opportunity = {item.opportunity_id: item for item in allocation.decisions}
         by_unit = {
             str(item.considered_unit_id): next(
@@ -1339,12 +1427,10 @@ class FormalP2ReplayRuntime:
                 )
             raw = json.loads(native_path.read_bytes())
             native = {
-                (item["market_date"], item["decision_key"]): item["final_action"]
-                for item in raw
+                (item["market_date"], item["decision_key"]): item["final_action"] for item in raw
             }
         observed = {
-            (item["market_date"], item["decision_key"]): item["final_action"]
-            for item in decisions
+            (item["market_date"], item["decision_key"]): item["final_action"] for item in decisions
         }
         change_count = (
             sum(observed.get(key) != action for key, action in native.items()) if native else 0

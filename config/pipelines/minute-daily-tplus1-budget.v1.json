@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "policy_id": "p10-1m-daily-and-tplus1-bounded-ops-v1",
+  "authority": "P10 #495 / #505; Owner 2026-10-09",
+  "status": "governance_accepted_runtime_activation_separately_gated",
+  "product_scope": "optional_source_native_1m_only",
+  "timezone": "Asia/Shanghai",
+  "per_target_market_date": {
+    "T": {
+      "phase": "same_exchange_trading_session",
+      "routine_target_wall_seconds": 1800,
+      "cumulative_hard_wall_seconds": 3600,
+      "eligible_after": "session_completed_and_source_current_date_present",
+      "allowed": "raw_capture_initial_grade_and_versioned_research_ODS_DWD_if_qualified"
+    },
+    "T_plus_1": {
+      "phase": "first_subsequent_verified_exchange_trading_session",
+      "cumulative_hard_wall_seconds": 3600,
+      "eligible_after": "verified_next_exchange_trading_day_and_source_maturity_probe",
+      "allowed": "target_date_only_recheck_source_revision_and_bounded_remedial_correction",
+      "split_across_checks_allowed": true,
+      "window_not_reset_by_retry_or_midnight": true,
+      "source_maturity_probe_min_symbols": 12,
+      "source_maturity_probe_max_symbols": 24,
+      "source_revision_comparison": "per_symbol_target_market_date_native_1m_observation_digest_not_full_rolling_800_bar_response_sha256",
+      "narrow_repoll_only_after": "proved_target_date_revision_or_new_reliable_source_evidence",
+      "no_new_evidence_action": "stop_without_spending_remaining_budget",
+      "next_trade_day_reference": "authoritative_trading_calendar_not_weekday_arithmetic"
+    },
+    "combined_cumulative_hard_wall_seconds": 7200,
+    "expired_next_day_action": "no_automatic_T_plus_2_retries_register_separate_business_value_justified_recovery"
+  },
+  "immutable_accounting": {
+    "key": [
+      "market_date",
+      "phase",
+      "policy_id"
+    ],
+    "fields": [
+      "attempt_id",
+      "started_at",
+      "finished_at",
+      "elapsed_wall_seconds",
+      "cumulative_wall_seconds",
+      "provider_request_count",
+      "target_date_observation_digest_before",
+      "target_date_observation_digest_after",
+      "raw_response_sha256",
+      "changed_securities",
+      "grade_counts_before",
+      "grade_counts_after",
+      "new_release_manifest_sha256",
+      "stop_reason"
+    ],
+    "shared_attempt_budget_not_reinitialized_by_restart": true,
+    "lock_scope": "single_market_date_phase",
+    "source_revisions_as_new_versioned_corrections_not_overwrite": true,
+    "knowledge_time_actual_acquisition_never_backdated": true
+  },
+  "grade_admission": {
+    "R0": "formal_ODS_DWD_and_restricted_research",
+    "R1": "formal_ODS_DWD_observed_only_defect_record_and_gap_aware_research",
+    "R2": "formal_ODS_DWD_observed_only_quality_reasons_and_explicit_consumer_restriction",
+    "R3": "no_formal_ODS_DWD_original_raw_or_ohlcv_quarantine_evidence_only_with_rejection_metadata",
+    "SUSPENDED": "status_metadata_only_no_minute_bars",
+    "prerequisites": [
+      "versioned_R2_R3_ingestion_contract_503",
+      "source_SHA_PIT_identity_units_invariants"
+    ]
+  },
+  "independence": {
+    "daily_core_unblocked_by_1m": true,
+    "native_5m_independent_status": true,
+    "legacy_four_lane_unchanged": true,
+    "formal_consumer_admission_separate": true,
+    "no_P3_P5_protected_research_or_P6_auto_activation": true
+  },
+  "review_after_completed_market_sessions": 10,
+  "rollout_gate": "versioned_runtime_controller_tests_isolated_Linux_replay_and_separate_production_cutover"
+}

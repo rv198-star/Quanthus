@@ -4,9 +4,28 @@ This file is the level-zero router for people and AI sessions. It names the curr
 branch and the smallest context set for common tasks; detailed rules and design stay in child
 nodes.
 
+For current learning-system work (#540–#548), use the generated
+[module blueprint and progress](work-items/learning-blueprint-progress.md) and its
+[checkpoint mechanism](design/blueprint-progress.md). The historical phase evidence below
+is not a substitute for that task-scoped current view.
+
+For new exploration or delivery of research assets, also use the approved
+[exploration engineering requirements](design/exploration-governance.md),
+[retained conclusions and decisions](work-items/exploration-decisions.md), and
+[next delivery plan](work-items/exploration-next-20261029.md).
+These link past results to selection; they do not activate new research or production.
+
+The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
+links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its
+acceptance and the current no-new-comparison disposition.
+
+For read-only lookup of already-recorded held decisions, use the
+[historical review contract](design/historical-decision-review-v1.md) and its
+[real-archive acceptance](acceptance/historical-decision-review-20261029.md).
+
 | Field | Value |
 | --- | --- |
-| Current phase | P6 implementation open; P5 optional research deferred |
+| Current phase | P6 closed under Owner historical scope; P5 optional research deferred |
 | Gate source | `config/p3-gates.v1.json` |
 
 Permanent data ownership: P10 owns acquisition and shared quality/governance under
@@ -16,6 +35,11 @@ bypass, temporary ignore or acceptance of a known limitation; they do not recove
 data. Historical evidence and existing safety/research/production gates remain unchanged.
 
 ## Current branch
+
+P6 is closed under the Owner's 2026-10-23 historical-mechanism scope.
+The [closeout](acceptance/p6-owner-scope-closeout-20261023.md) cancels the
+remaining prospective activation and 66+20-session observation/review work;
+it does not accept those unperformed gates or open P7. P10 #538 stays separate.
 
 - P1 is accepted with the versioned C1 fail-closed condition.
 - P2 is conditionally accepted for historical and paper research under the frozen

@@ -1,0 +1,71 @@
+{
+  "schema_version": 2,
+  "policy_id": "quanthus-1m-loss-aware-r2-storage-v2",
+  "authority": "ADR-0016; Owner 2026-10-09 explicit: R3 cannot enter warehouse; R2 may enter with clear defect recording",
+  "issue": "P10-DATA-WH-003 #503",
+  "product_scope": "intraday-1m-loss-aware-v2",
+  "source_input": "immutable grade-assessed 1m v1 packages and original Tencent SHA evidence; never re-fetch or overwrite v1",
+  "ingestion": {
+    "R0": {
+      "formal_ods_original_native_raw": true,
+      "formal_dwd_real_observed_bars": true,
+      "default_research_admitted": true
+    },
+    "R1": {
+      "formal_ods_original_native_raw": true,
+      "formal_dwd_real_observed_bars": true,
+      "default_research_admitted": true,
+      "preserve_missing_times_and_auction_flags": true
+    },
+    "R2": {
+      "formal_ods_original_native_raw": true,
+      "formal_dwd_real_observed_bars": true,
+      "default_research_admitted": false,
+      "quality_metadata_required": [
+        "quality_reason",
+        "missing_actual_minutes",
+        "critical_gap",
+        "source_raw_sha256",
+        "source_semantic_disagreement",
+        "source_acquired_at_or_after",
+        "amount_quality",
+        "forbidden_consumers"
+      ]
+    },
+    "R3": {
+      "formal_ods_original_native_raw": false,
+      "formal_dwd_real_observed_bars": false,
+      "default_research_admitted": false,
+      "retain_original_raw_only_in_separate_immutable_quarantine": true,
+      "minimal_rejection_metadata_allowed": true
+    },
+    "SUSPENDED": {
+      "formal_ods_original_native_raw": false,
+      "formal_dwd_real_observed_bars": false,
+      "status_metadata_only": true
+    }
+  },
+  "thresholds": {
+    "research_grade_only": [
+      "R0",
+      "R1"
+    ],
+    "min_traded_research_fraction": "0.99",
+    "min_board_research_fraction": "0.98",
+    "R2_zero_optimization_target": true,
+    "R2_zero_is_a_publication_prerequisite": false
+  },
+  "hard_invariants": [
+    "source_correct_stock_date_venue_units_unadjusted_PIT",
+    "raw_SHA256_and_unchanged_source_evidence",
+    "source_observed_no_synthetic_minute_OHLC",
+    "R2_store_as_restricted_not_reclassified",
+    "R3_source_bytes_do_not_enter_formal_v2_ODS_or_DWD",
+    "source_conflicts_preserved_and_no_silent_vendor_equivalence",
+    "strict_1m_and_legacy_four_lane_data_pointers_unchanged"
+  ],
+  "allowed_default_research_consumer": "explicit_gap_aware_non_execution_development_only",
+  "R2_allowed_consumer": "quality_review_and_explicitly_approved_gap_tolerant_research_only_not_default_admission",
+  "strict_consumer": "forbidden_without_separate_strict_contract",
+  "rollout": "new_versioned_product_path_no_rewrite_old_v1_or_P6_or_OCI_mirror"
+}

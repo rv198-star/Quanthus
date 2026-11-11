@@ -1,0 +1,85 @@
+{
+  "schema_version": "quanthus.stage34-successor-request.v1",
+  "request_id": "stage34-prefix128-retrospective-20261027-v1",
+  "work_items": [
+    "P5-STATE-002",
+    "P5-STATE-003",
+    "P10-DATA-STAGE34-PREFIX-001"
+  ],
+  "owner_authority": "Owner authorized original four batches and explicitly continued on2026-10-27; qualify existing2012-2021 sources and independent references before one frozen candidate evaluation.",
+  "purpose": "DEVELOPMENT_RETROSPECTIVE_FIXED_CANDIDATE_REPLICATION",
+  "input_selection": {
+    "sha256": "90dace3a2a140b3270c684a815e775ebd73ef1f194cb9285dabf1508748c5d89",
+    "issuers": 128,
+    "start": "each true2021 first listing",
+    "through": "2021-12-31",
+    "calendar_keys_upper_bound": 19302,
+    "no_replacement_or_result_driven_resampling": true
+  },
+  "exposure": {
+    "known_identity_code_exclusions_checked": true,
+    "recent_head2_company_overlap": 0,
+    "not_global_nonexposure_proof": true,
+    "not_new_holdout": true,
+    "new_reference_must_not_read_candidate_outputs": true
+  },
+  "frozen_candidate": "config/stage-learning/development-candidate.v1.json",
+  "semantic_protocol": "config/stage-learning/qualification-protocol.v2.json",
+  "frozen_candidate_mutation": false,
+  "reference_tier": "SYNTHETIC_EXPERT_CONSENSUS",
+  "human_reference_claim": false,
+  "historical_provider_acquisition": "UNAVAILABLE_RETAINED",
+  "historical_platform_as_known": false,
+  "data_authority": {
+    "line": "P10",
+    "existing_roots_only": true,
+    "new_network_requests": 0,
+    "market_business_years": [
+      2021
+    ],
+    "unknown_action_coverage_blocks_affected_source": true,
+    "no_missing_imputation": true
+  },
+  "research_authority": {
+    "market_read_after_exact_member_freeze": true,
+    "reference_after_source_qualification": true,
+    "scoring_after_reference_sufficiency": true,
+    "candidate_and_R0_only": true,
+    "parameter_search": false,
+    "protected2022_2026_read": false,
+    "future_settlement_or_economic_result": false,
+    "production_or_P6": false
+  },
+  "acceptance": {
+    "minimum_definite_references_per_stage": 100,
+    "minimum_ambiguous_references": 50,
+    "maximum_unjudgeable_reference_rate": 0.1,
+    "one_context_per_episode": true,
+    "other_quality_gates_from_frozen_protocol": true,
+    "sample_shortfall_is_inconclusive_not_quality_failure": true
+  },
+  "budget": {
+    "existing_source_phase_seconds": 2700,
+    "all_native_outputs_bytes": 134217728,
+    "temp_bytes": 134217728,
+    "rss_bytes": 4294967296,
+    "duckdb_memory_limit": "2GB",
+    "threads": 1,
+    "minimum_free_bytes": 8589934592,
+    "new_source_requests": 0,
+    "followup_scoring_only_after_new_budget_receipt": true
+  },
+  "stages": [
+    "P5 successor purpose/selection freeze",
+    "P10 exact physical-member checks",
+    "one immutable native/raw subset",
+    "non-action census and exact Decimal source correspondence",
+    "action evidence/coordinate closure or exact blockers",
+    "only then candidate-blind reference and sufficiency",
+    "only then fixed candidate and one research consumer"
+  ],
+  "non_claims": [
+    "This successor does not mutate old P5 requests or reopen consumed2022-2024 or2025.",
+    "Source governance pass does not grant semantic reference, model or consumer acceptance."
+  ]
+}

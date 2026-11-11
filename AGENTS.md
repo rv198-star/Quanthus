@@ -50,6 +50,29 @@
 - Existing execution/deployment safeguards remain. The #424 SSH override is task-scoped, not a
   general P10 remote-access override.
 
+### Warehouse quality iron law — Owner 2026-10-08
+
+- **Business value over absolute precision.** Follow
+  [ADR 0016](docs/architecture/adr-0016-value-proportional-warehouse-quality.md)
+  and P10 LLD 12 §2A before changing warehouse admission, supplier qualification or
+  data-release topology. A rule must name its real product, consumer, required resolution,
+  material decision risk and cost before becoming a global blocking gate.
+- **Isolate noncritical defects.** Failure of optional/archive-only 1m data must not
+  unconditionally block independently qualified daily-core data. Never describe unavailable,
+  ambiguous or incomplete minute products as READY. Current legacy four-lane READY remains
+  in force until a separately approved versioned product/consumer design and rollout (#496).
+- **Hard truth still wins.** Preserve security/date/unit/price-basis identity, raw SHA/lineage,
+  PIT and protected windows, source-observed versus derived, no fabricated minute OHLC or
+  residual shares, and strict strategy/trading activation gates. No source-priority vote
+  merely because vendor bars disagree; consumers requiring true high-precision input fail closed.
+- **Cost- and impact-bounded investigation.** Record affected consumers, measurable signal
+  impact, finite sampling/time/request budget and stop condition. If further precision has no
+  demonstrated material beneficiary, retain the open quality debt and restore higher-value
+  engineering. Never endlessly replay identical raw/source requests.
+- P10 #495 governs quality tiers and traceable exceptions; #496 governs daily/minute release
+  decoupling. Neither this documentation nor a diagnosed source issue authorizes changing
+  sealed evidence, deployment, disabled timers, DWD/OCI publication or prior acceptances.
+
 ## Current active task routing — P3-STRAT-003
 
 - `P3-STRAT-003` / #317 and B-R1 / #412 were reopened under the Owner's explicit continuation.
@@ -108,6 +131,52 @@
   result-bearing training, P3-STRAT data-authority inheritance, P6 mutation, promotion or trading.
 - Negative, partial, data-limited, compute-limited and inconclusive outcomes are all valid.
 
+## Blueprint-linked work
+
+- For learning-system work under #540–#548, read
+  `docs/work-items/learning-blueprint-progress.md` and run
+  `python3 scripts/blueprint_progress.py context --issue NUMBER` before starting.
+  Register a new work item and its module contribution before expanding this tracked scope.
+- At an accepted milestone, rejection, blocker, defer/stop, issue close or reopen, append one
+  evidence-bound checkpoint through `scripts/blueprint_progress.py record --checkpoint PATH`.
+  State the module/facet affected, exact scope, remaining gap and next action. An explicit
+  no-module-change disposition is valid; routine logs need no checkpoint.
+- Keep issue lifecycle, engineering, research quality, purpose value and consumer admission
+  separate. Issue closure and green tests never promote a state head or grant execution.
+  Preserve old checkpoints, failures and frozen research gates. TPlan tracks execution;
+  the repository ledger owns the current reported module view, not scientific authority.
+- Regenerate and check the blueprint in the same handoff. Reconcile exact live issue metadata
+  after closure/reopening; a drift is a bookkeeping gap, not a new global data/research gate.
+  Fix that gap before claiming the affected progress, while unrelated authorized work continues.
+  The governing mechanism is `docs/design/blueprint-progress.md`.
+
+## Exploration-driven delivery — Owner 2026-10-29
+
+- For prospective research, exploratory changes, or delivery of research assets, read
+  `docs/design/exploration-governance.md` and the current blueprint before selecting work.
+  The direction layer selects questions and adopts useful assets; TPlan executes bounded work.
+  Do not start a new general agent platform or perpetual experiment service by implication.
+- Query `python3 scripts/exploration_governance.py context --family FAMILY --module MODULE`.
+  Before execution, prepare a versioned proposal and run `preflight --request PATH`; explain
+  applicability of every current related conclusion, the consumer, decision branches, finite
+  budget and stop conditions. A check pass is not data, training, P6 or production authority.
+- Preserve scoped negative, inconclusive, blocked and invalid outcomes separately. Append the
+  conclusion, evidence, actual decision, retained assets, cumulative-cost review and reopening
+  condition to `config/planning/exploration-conclusions.v1.json`; link a blueprint checkpoint.
+  Never turn a source/reference failure into a negative market label or task closure into adoption.
+- Parked directions require a material new question/condition with evidence before reopening.
+  New issues, samples, features, agents or retries do not reset a direction's cost or sample
+  exposure. Unknown historical cost stays unknown. Reusable engineering can be delivered even
+  when the candidate failed its value gate; keep its use grade explicit.
+- Prefer justified usable delivery and necessary repair over another low-value trial. No fixed
+  70/30 quota is adopted. No eligible worthwhile task is a valid wait/stop state; do not generate
+  work to consume a budget. Review within existing authority without routine Owner reapproval.
+- Use proportional evidence for the declared decision, preserving hard safety/PIT/frozen gates.
+  Shared-data defects stay with P10. No collection or policy changes follow from a proposed loop.
+- Run `make exploration-check` and an append-only check against the exact PR base, plus normal
+  local checks. Record only affected blueprint facets. Existing sealed requests remain immutable;
+  this policy does not require retroactive migration of every historical experiment.
+
 ## Development
 
 - Support Python 3.10 or newer.
@@ -115,6 +184,29 @@
 - Do not commit market data, credentials, run artifacts, or local databases.
 - Prefer deterministic ordering and explicit reason codes over implicit behavior.
 - Run `make check` before a handoff.
+
+### Local acceptance default — Owner 2026-10-29
+
+- Treat GitHub-hosted CI as unavailable by default. Use local acceptance to continue
+  authorized engineering and PR review; do not wait for account payment, buy runner
+  capacity, repeatedly rerun billing-blocked jobs, or describe them as executed tests.
+  GitHub remains the code-distribution and PR history channel.
+- Run applicable focused regressions, lint/type checks and `make check` locally.
+  For blueprint work also check immutable history against the exact PR base and
+  reconcile affected live issue metadata. Run Web checks when the change affects Web;
+  explicitly report unavailable runtime versions, optional dependencies and skipped checks.
+- Bind evidence to the exact tested code/config/test closure, runtime, commands,
+  results, logs and SHA256. A documentation/ledger-only follow-up may reuse an existing
+  complete `make check` result after proving that its executable/config/test closure
+  is byte-identical; rerun affected planning/documentation checks and record the reuse.
+  Changed dependencies, test selection or semantic inputs invalidate that reuse.
+  This does not replace a required independent construction or cold acceptance.
+- Separate local pass, existing baseline failures, not-run checks and remote CI status.
+  Review actual failures on their merits; unavailable CI is neither a code pass nor a
+  new research/data gate. Retain scientific, PIT, consumer, production and merge authority.
+- Use ordinary authorized PR/merge operations only. Do not forge hosted-CI success,
+  use admin bypass, change branch protection/workflows/account settings, or start a
+  self-hosted runner merely to replace unavailable hosted CI.
 
 ## Batch data construction
 
@@ -165,3 +257,14 @@
 - Preserve node-local read-only/deployment boundaries and current approved interfaces when
   NexusAgent operates on remote nodes. Do not revive retired OCI-specific tunnels, credentials,
   users, or host assumptions as a workaround.
+
+### P10 daily-core implementation and rollout scope (2026-10-08)
+
+Owner has explicitly authorized the new-standard restart with 2026-09-24 as baseline.
+See `docs/work-items/p10-daily-core-20260924-recovery.md` (from repository root) and
+`config/pipelines/warehouse-quality-policy.v1.json`. The opt-in `daily-core-v1` product
+requires market and calendar/event ODS only, publishes seven DWD tables with 1d bars,
+and uses `CURRENT_DAILY_CORE.json` plus immutable dated descriptors. It does not
+change the old four-lane CURRENT, assert 1m/5m acceptance, or activate P6/training.
+Dedicated CN01/Hermes daily-core services and OCI core-only mirroring are allowed
+after their baseline, physical-source, contract and runtime verification.

@@ -1,0 +1,483 @@
+{
+  "schema_version": "quanthus.learning-system-planning.v1",
+  "planning_only": true,
+  "decision_date": "2026-10-23",
+  "owner_direction": "调整PRD、整个蓝图与issue体系：12+X状态识别、可复用因子、多专家决策、局部训练迭代；先基础MVP，再扩展。客观/算法/定性只是分类示例，合理性由设计评估确认。",
+  "milestone": "Learning Decision System MVP",
+  "epic_id": "META-LEARN-001",
+  "execution_authority": {
+    "market_data_read": false,
+    "result_training": false,
+    "strategy_results": false,
+    "promotion": false,
+    "production": false,
+    "protected_partitions": false
+  },
+  "preserve": [
+    "P3-STRAT-003 的冻结问题与另一会话实施",
+    "P5-STAGE-001 sealed requests/results and NOT_RUN history",
+    "P6 Owner scope closeout; no 66+20 restart",
+    "P10 permanent data ownership",
+    "0 / ABSTAIN / X semantic separation"
+  ],
+  "tasks": [
+    {
+      "id": "META-LEARN-001",
+      "title": "交付状态识别、因子、多专家与一次局部训练的基础MVP",
+      "phase": "meta",
+      "area": "roadmap",
+      "status": "ready",
+      "kind": "epic",
+      "stage": "mvp",
+      "deps": [],
+      "owned_paths": [
+        "docs/work-items/learning-system-mvp.md"
+      ],
+      "reuse": [
+        "P3 #317 的比较基线",
+        "P10 当前已资格化供给",
+        "既有 Feature Registry、P2、专家与 Worker"
+      ],
+      "steps": [
+        "统筹六个MVP子项，按精确产物复用前置数据；保持一份当前缺口表。",
+        "分别记录工程闭环、状态识别质量、策略增量和生产启用，不以工单关闭相互替代。"
+      ],
+      "acceptance": [
+        "六个MVP子项有精确交接，至少一个具备参考资格的状态头完成真实训练与独立比较。",
+        "实际完成一次局部更新，能接受新候选或保留旧版；不要求结果必须正向。",
+        "若所有状态头均未资格化，记录受阻/无结论，不能把纯合成闭环称为产品MVP完成。"
+      ],
+      "priority": "high",
+      "design_path": "docs/work-items/learning-system-mvp.md",
+      "issue": {
+        "number": 540,
+        "url": "https://github.com/rv198-star/Quanthus/issues/540"
+      },
+      "parent_issue": {
+        "number": 32,
+        "url": "https://github.com/rv198-star/Quanthus/issues/32"
+      },
+      "dependency_issues": [],
+      "blocking_children": [
+        {
+          "id": "P3-FACTOR-001",
+          "number": 541,
+          "url": "https://github.com/rv198-star/Quanthus/issues/541"
+        },
+        {
+          "id": "P5-STATE-002",
+          "number": 542,
+          "url": "https://github.com/rv198-star/Quanthus/issues/542"
+        },
+        {
+          "id": "P5-STATE-003",
+          "number": 543,
+          "url": "https://github.com/rv198-star/Quanthus/issues/543"
+        },
+        {
+          "id": "P5-LOCAL-001",
+          "number": 544,
+          "url": "https://github.com/rv198-star/Quanthus/issues/544"
+        },
+        {
+          "id": "P3-EXPERT-007",
+          "number": 545,
+          "url": "https://github.com/rv198-star/Quanthus/issues/545"
+        },
+        {
+          "id": "META-LEARN-002",
+          "number": 546,
+          "url": "https://github.com/rv198-star/Quanthus/issues/546"
+        }
+      ]
+    },
+    {
+      "id": "P3-FACTOR-001",
+      "title": "统一因子目录与分类契约并交付首批有用途证据的因子切片",
+      "phase": "P3",
+      "area": "labels",
+      "status": "ready",
+      "kind": "task",
+      "stage": "mvp",
+      "deps": [],
+      "owned_paths": [
+        "src/quanthus/feature_registry.py",
+        "src/quanthus/label_registry.py",
+        "config/p3-baseline-features.research.v1.json"
+      ],
+      "reuse": [
+        "既有八项日频特征、Continuous Facts、Catalog及血缘"
+      ],
+      "steps": [
+        "在统一目录清点现有资产，按业务领域建立视图；分别记录形成链、输出类型及证据，区分事实、特征、状态评估与决策，不拆成客观/算法/定性三个互斥库。",
+        "选择支持首批状态/专家用途的最小因子集，冻结单位、版本、知识时间、缺值语义、依赖和相关重复暴露。",
+        "通过新增版本/sidecar接入既有严格Registry，保留旧schema和公式；人工/模型解释绑定原证据及判断者版本，模型输出复用须有无环依赖和时序隔离。"
+      ],
+      "acceptance": [
+        "同一输入与定义得到可复现面板；来源、时点、修订、缺失均可追溯。",
+        "分类可容纳跨领域和多步形成链且不重复资产；公式正确性与增量用途价值分开报告，不要求每个领域填满或以数值输出证明客观性。",
+        "明确哪些来源是P10问题，领域计算不私自补采；一个Job共享前置数据只物化一次。"
+      ],
+      "priority": "high",
+      "design_path": "docs/work-items/learning-system-mvp.md",
+      "issue": {
+        "number": 541,
+        "url": "https://github.com/rv198-star/Quanthus/issues/541"
+      },
+      "parent_issue": {
+        "number": 540,
+        "url": "https://github.com/rv198-star/Quanthus/issues/540"
+      },
+      "dependency_issues": []
+    },
+    {
+      "id": "P5-STATE-002",
+      "title": "冻结首轮状态学习的输入、独立参考、可训练头与预算",
+      "phase": "P5",
+      "area": "ml",
+      "status": "ready",
+      "kind": "task",
+      "stage": "mvp",
+      "deps": [],
+      "owned_paths": [
+        "config/planning/learning-system-mvp.v1.json",
+        "src/quanthus/stage_learning/p5_input_census.py",
+        "src/quanthus/stage_learning/p5_contracts.py"
+      ],
+      "reuse": [
+        "#400/#402 的目标、census和失败证据；旧request仅作复用来源"
+      ],
+      "steps": [
+        "逐项判定当前Base 2.4可用字段、时间语义、参考标签与旧P5输入契约的兼容性；现有授权之外的读取先停在精确请求。",
+        "形成新的有界输入/request身份，保留12头词汇及0/X/ABSTAIN差异；逐头给出可训、可评或明确缺口。",
+        "冻结train/validation/calibration/evaluation时间隔离、独立episode、因子闭包、基线、主指标和严重错误切片。",
+        "按代表性样本测量后登记trial、CPU/GPU时间、RSS、磁盘峰值与停止预算，再形成明确的结果性执行准入。"
+      ],
+      "acceptance": [
+        "不把规则silver当独立真值，不用未来信息改写当时状态；无独立参考的头保持不可评。",
+        "至少一个可执行状态头的资格证据，或精确的缺证据/资源阻塞结论；禁止用空表和零样本补齐。",
+        "旧2012–2021/受保护分区边界不自动改变；新来源不继承P3的2025/2026授权。",
+        "为P5-STATE-003留下明确可运行身份、预算、接受/拒绝标准及权限状态。"
+      ],
+      "priority": "high",
+      "design_path": "docs/work-items/learning-system-mvp.md",
+      "issue": {
+        "number": 542,
+        "url": "https://github.com/rv198-star/Quanthus/issues/542"
+      },
+      "parent_issue": {
+        "number": 540,
+        "url": "https://github.com/rv198-star/Quanthus/issues/540"
+      },
+      "dependency_issues": []
+    },
+    {
+      "id": "P5-STATE-003",
+      "title": "训练并评价首个有资格的12+X分层状态模型版本",
+      "phase": "P5",
+      "area": "ml",
+      "status": "blocked",
+      "kind": "task",
+      "stage": "mvp",
+      "deps": [
+        "P3-FACTOR-001",
+        "P5-STATE-002"
+      ],
+      "owned_paths": [
+        "src/quanthus/stage_learning/",
+        "config/planning/learning-system-mvp.v1.json"
+      ],
+      "reuse": [
+        "旧P5 R/L/G/T0/T1接口、Worker与恢复实现；按实测与准入选择最小充分模型"
+      ],
+      "steps": [
+        "仅在新运行单明确准入后执行冻结的规则/简单学习基线和一个状态候选，不做架构搜索。",
+        "以同一信息集比较状态支持程度；需要概率时独立校准。允许仅k/12头可用，其余明确未知。",
+        "记录模型/因子/数据/标签/代码/超参/seed身份，真实训练成本、恢复和独立评价。"
+      ],
+      "acceptance": [
+        "交付真实checkpoint、逐头覆盖/歧义/错误/校准与时间外评价；合成测试不能替代训练完成。",
+        "嵌套状态可共存，父状态未知不转成子状态负例，X不等于看空或强制卖出。",
+        "结论允许增益、不增益、退化或无结论；完整12头有效性不得从部分头外推。"
+      ],
+      "priority": "high",
+      "design_path": "docs/work-items/learning-system-mvp.md",
+      "issue": {
+        "number": 543,
+        "url": "https://github.com/rv198-star/Quanthus/issues/543"
+      },
+      "parent_issue": {
+        "number": 540,
+        "url": "https://github.com/rv198-star/Quanthus/issues/540"
+      },
+      "dependency_issues": [
+        {
+          "id": "P3-FACTOR-001",
+          "number": 541,
+          "url": "https://github.com/rv198-star/Quanthus/issues/541"
+        },
+        {
+          "id": "P5-STATE-002",
+          "number": 542,
+          "url": "https://github.com/rv198-star/Quanthus/issues/542"
+        }
+      ]
+    },
+    {
+      "id": "P5-LOCAL-001",
+      "title": "完成一次单模块局部训练及新旧版本比较",
+      "phase": "P5",
+      "area": "ml",
+      "status": "blocked",
+      "kind": "task",
+      "stage": "mvp",
+      "deps": [
+        "P5-STATE-003"
+      ],
+      "owned_paths": [
+        "src/quanthus/stage_learning/",
+        "src/quanthus/expert_evaluation/"
+      ],
+      "reuse": [
+        "已资格化checkpoint、旧模型、固定评价器与输入切片"
+      ],
+      "steps": [
+        "根据训练/开发数据定位一个具体薄弱点；冻结只改一个状态头、因子、专家assessment或策略映射的候选方案。",
+        "冻结其他模块；除预登记对照外只训练一个新候选，不根据封存评价继续试到成功。",
+        "检查共享encoder、归一化、校准等间接影响，列出需重算的依赖；真正独立的旧产物复用。"
+      ],
+      "acceptance": [
+        "存在一次实际训练/拟合与可复验的新旧差异；未执行则不能称学习闭环完成。",
+        "比较局部质量和受影响的未修改头/模块，记录接受、拒绝或无结论；负结果保留旧版。",
+        "正式候选映射/权重变更必须是新版本；数据、风控、资金和否决守护不可作为可优化参数。"
+      ],
+      "priority": "high",
+      "design_path": "docs/work-items/learning-system-mvp.md",
+      "issue": {
+        "number": 544,
+        "url": "https://github.com/rv198-star/Quanthus/issues/544"
+      },
+      "parent_issue": {
+        "number": 540,
+        "url": "https://github.com/rv198-star/Quanthus/issues/540"
+      },
+      "dependency_issues": [
+        {
+          "id": "P5-STATE-003",
+          "number": 543,
+          "url": "https://github.com/rv198-star/Quanthus/issues/543"
+        }
+      ]
+    },
+    {
+      "id": "P3-EXPERT-007",
+      "title": "把合格状态输出接入候选专家并验证完整决策影响",
+      "phase": "P3",
+      "area": "experts",
+      "status": "blocked",
+      "kind": "task",
+      "stage": "mvp",
+      "deps": [
+        "P5-LOCAL-001",
+        "P3-STRAT-003"
+      ],
+      "owned_paths": [
+        "src/quanthus/expert_evaluation/",
+        "src/quanthus/aggregator.py",
+        "config/expert-strategies/"
+      ],
+      "reuse": [
+        "现有两专家、P2、评分/约束/否决接口和P3比较结果；不改冻结候选"
+      ],
+      "steps": [
+        "契约与合成桥接可在STATE-002后并行准备；真实比较等待依赖和独立用途准入。",
+        "为取得研究比较资格的状态输出冻结一个新expert assessment及policy mapping；该资格要求输入、独立参考、PIT、安全与精确研究运行准入，不要求候选已胜过规则；记录适用/弃权和共同源依赖。",
+        "使用相同输入、成本、资金与候选分母比较旧组合和新组合；按显式实验身份复用现有P3证据，不另跑同一已接受实验。",
+        "在本项既有准入包绑定P3产物/控制版本、参考用途、窗口及比较条件；有效负结果可按证据范围使用，无效执行不能充当有效基线。证据不兼容或不可用时记录受影响步骤受阻；替代比较另需用途准入，依赖变更由总项明确处理，不继承旧分区权限。"
+      ],
+      "acceptance": [
+        "每次行动变化可追到因子、状态与专家版本；未知数据不变成卖出原因。",
+        "报告胜率及样本分母、盈亏比、成本、回撤、覆盖和分情形稳定性；不能只选一个好看的指标。",
+        "完整策略无增益/退化时保留旧组合；研究准入不自动授予P7、盘中、邮件或实盘权限。",
+        "研究比较资格与模型采用资格分别记录；采用/晋级仍须冻结的质量、价值、安全门槛与独立许可，不因完成隔离比较而取得。"
+      ],
+      "priority": "high",
+      "design_path": "docs/work-items/learning-system-mvp.md",
+      "issue": {
+        "number": 545,
+        "url": "https://github.com/rv198-star/Quanthus/issues/545"
+      },
+      "parent_issue": {
+        "number": 540,
+        "url": "https://github.com/rv198-star/Quanthus/issues/540"
+      },
+      "dependency_issues": [
+        {
+          "id": "P5-LOCAL-001",
+          "number": 544,
+          "url": "https://github.com/rv198-star/Quanthus/issues/544"
+        },
+        {
+          "id": "P3-STRAT-003",
+          "number": 317,
+          "url": "https://github.com/rv198-star/Quanthus/issues/317"
+        }
+      ]
+    },
+    {
+      "id": "META-LEARN-002",
+      "title": "验收首轮学习闭环、复现与安全保留旧版能力",
+      "phase": "meta",
+      "area": "roadmap",
+      "status": "blocked",
+      "kind": "task",
+      "stage": "mvp",
+      "deps": [
+        "P3-FACTOR-001",
+        "P5-STATE-003",
+        "P5-LOCAL-001",
+        "P3-EXPERT-007"
+      ],
+      "owned_paths": [
+        "docs/acceptance/",
+        "docs/work-items/learning-system-mvp.md"
+      ],
+      "reuse": [
+        "各子项精确产物、成本日志、已有读取器与独立复现方式"
+      ],
+      "steps": [
+        "将同一次资格化特征/状态中间数据传给所需消费者，记录依赖图、构建/复用和时间/空间成本。",
+        "独立重建合同要求的部分，核对局部升级、组合比较、决定和旧版保留；故障演练不触碰生产。",
+        "给出工程闭环、识别质量、策略价值、使用授权四个独立结论。"
+      ],
+      "acceptance": [
+        "至少一项真实状态学习及一次局部更新可复现；不能只凭接口、issue关闭或训练进程结束验收。",
+        "候选被拒绝时旧版本仍可读取且身份不变；若无可用状态头则产品MVP仍未达成。",
+        "生命周期评审可为接受、拒绝或无结论；拒绝/无结论保留旧版且Shadow保持关闭，不以规则转换或实际Shadow作为本MVP必达产物。",
+        "保留成本、限制与下一次最小改进问题；不自动启动P6前瞻、P7或下一轮训练。"
+      ],
+      "priority": "high",
+      "design_path": "docs/work-items/learning-system-mvp.md",
+      "issue": {
+        "number": 546,
+        "url": "https://github.com/rv198-star/Quanthus/issues/546"
+      },
+      "parent_issue": {
+        "number": 540,
+        "url": "https://github.com/rv198-star/Quanthus/issues/540"
+      },
+      "dependency_issues": [
+        {
+          "id": "P3-FACTOR-001",
+          "number": 541,
+          "url": "https://github.com/rv198-star/Quanthus/issues/541"
+        },
+        {
+          "id": "P5-STATE-003",
+          "number": 543,
+          "url": "https://github.com/rv198-star/Quanthus/issues/543"
+        },
+        {
+          "id": "P5-LOCAL-001",
+          "number": 544,
+          "url": "https://github.com/rv198-star/Quanthus/issues/544"
+        },
+        {
+          "id": "P3-EXPERT-007",
+          "number": 545,
+          "url": "https://github.com/rv198-star/Quanthus/issues/545"
+        }
+      ]
+    },
+    {
+      "id": "P3-EXPERT-008",
+      "title": "在基础MVP后按职责和边际贡献逐个扩展专家角色",
+      "phase": "P3",
+      "area": "experts",
+      "status": "blocked",
+      "kind": "task",
+      "stage": "expansion",
+      "deps": [
+        "META-LEARN-002"
+      ],
+      "owned_paths": [
+        "src/quanthus/expert_evaluation/experts/",
+        "config/expert-evaluations/"
+      ],
+      "reuse": [
+        "既有专家协议、因子库、弃权及归因能力"
+      ],
+      "steps": [
+        "先定位现有组合确有遗漏的决策问题，选择一个有独立职责及合格输入的专家。",
+        "分别固定assessment与policy effect，比较加入前后及共用因子/相关暴露；首批不以专家数量作为目标。"
+      ],
+      "acceptance": [
+        "有贡献、无增益或有害均可形成明确处置；没有输入资格的新闻/基本面专家只阻塞自身。",
+        "一份候选、一套预登记对照和资源预算，禁止专家角色穷举或自动晋级。"
+      ],
+      "priority": "normal",
+      "design_path": "docs/work-items/learning-system-mvp.md",
+      "issue": {
+        "number": 547,
+        "url": "https://github.com/rv198-star/Quanthus/issues/547"
+      },
+      "parent_issue": {
+        "number": 32,
+        "url": "https://github.com/rv198-star/Quanthus/issues/32"
+      },
+      "dependency_issues": [
+        {
+          "id": "META-LEARN-002",
+          "number": 546,
+          "url": "https://github.com/rv198-star/Quanthus/issues/546"
+        }
+      ]
+    },
+    {
+      "id": "P3-DECISION-001",
+      "title": "在基础MVP后有界改进专家组合和整体决策机制",
+      "phase": "P3",
+      "area": "experts",
+      "status": "blocked",
+      "kind": "task",
+      "stage": "expansion",
+      "deps": [
+        "META-LEARN-002"
+      ],
+      "owned_paths": [
+        "src/quanthus/aggregator.py",
+        "config/expert-strategies/",
+        "src/quanthus/expert_evaluation/"
+      ],
+      "reuse": [
+        "既有固定优先级聚合与完整P2策略评价"
+      ],
+      "steps": [
+        "选择一个明确的场景适用、评分映射、冲突处理或组合权重问题，提出新策略版本。",
+        "冻结可变参数和不可变守护，按预算比较固定组合与一个候选机制；其他条件和数据相同。"
+      ],
+      "acceptance": [
+        "组合改进通过完整策略评价和版本契约，局部专家分数不能替代经济影响。",
+        "保留硬否决、数据/PIT、可交易性与资金约束，原生产聚合逻辑不被运行时自动改写。",
+        "可回退、无增益即保留旧版；P7使用与资本扩展仍单独决定。"
+      ],
+      "priority": "normal",
+      "design_path": "docs/work-items/learning-system-mvp.md",
+      "issue": {
+        "number": 548,
+        "url": "https://github.com/rv198-star/Quanthus/issues/548"
+      },
+      "parent_issue": {
+        "number": 32,
+        "url": "https://github.com/rv198-star/Quanthus/issues/32"
+      },
+      "dependency_issues": [
+        {
+          "id": "META-LEARN-002",
+          "number": 546,
+          "url": "https://github.com/rv198-star/Quanthus/issues/546"
+        }
+      ]
+    }
+  ]
+}

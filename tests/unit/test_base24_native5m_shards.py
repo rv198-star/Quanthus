@@ -7,12 +7,14 @@ from pathlib import Path
 
 import pytest
 
+from quanthus.pipelines.securities_warehouse import base24_native5m_shards as shards
 from quanthus.pipelines.securities_warehouse.base24_native5m_acquire import (
     Native5mAcquireError,
     run_acquisition,
 )
 from quanthus.pipelines.securities_warehouse.base24_native5m_shards import (
     freeze_shard_selections,
+    freeze_shard_source_index,
     merge_shard_outputs,
 )
 from quanthus.providers.native_5m_exact import SHANGHAI, ExactBar
@@ -147,6 +149,65 @@ def test_merge_revalidates_and_materializes_full_canonical_root(tmp_path):
     assert not (output / "staging").exists()
 
 
+def test_merge_reuses_pinned_verified_source_index_for_available_shards(tmp_path):
+    plan, _, roots = _build_shards(tmp_path)
+    source_index = tmp_path / "source-index"
+    indexed = freeze_shard_source_index(
+        plan,
+        sources=roots[:1],
+        output=source_index,
+        evaluator_version="test-evaluator-v1",
+    )
+    assert indexed["source_count"] == 1
+    assert indexed["completed"] == 2
+    index_sha256 = hashlib.sha256((source_index / "INDEX.json").read_bytes()).hexdigest()
+
+    output = tmp_path / "canonical"
+    merged = merge_shard_outputs(
+        plan,
+        sources=roots,
+        output=output,
+        verified_source_index=source_index,
+        verified_source_index_sha256=index_sha256,
+        verified_source_index_evaluator_version="test-evaluator-v1",
+    )
+    assert merged["status"] == "COMPLETE"
+    evidence = json.loads((output / "MERGE.json").read_text())
+    assert evidence["verified_source_index"] == {
+        "path": str(source_index),
+        "sha256": index_sha256,
+        "evaluator_version": "test-evaluator-v1",
+        "reused_source_labels": [roots[0][0]],
+    }
+
+
+def test_merge_rejects_changed_source_bound_to_verified_index(tmp_path):
+    plan, _, roots = _build_shards(tmp_path)
+    source_index = tmp_path / "source-index"
+    freeze_shard_source_index(
+        plan,
+        sources=roots[:1],
+        output=source_index,
+        evaluator_version="test-evaluator-v1",
+    )
+    index_sha256 = hashlib.sha256((source_index / "INDEX.json").read_bytes()).hexdigest()
+    parquet = next((roots[0][1] / "partitions").glob("*/exact.parquet"))
+    with parquet.open("ab") as stream:
+        stream.write(b"changed")
+
+    output = tmp_path / "canonical"
+    with pytest.raises(Native5mAcquireError, match="SHARD_SOURCE_INDEX_CHANGED"):
+        merge_shard_outputs(
+            plan,
+            sources=roots,
+            output=output,
+            verified_source_index=source_index,
+            verified_source_index_sha256=index_sha256,
+            verified_source_index_evaluator_version="test-evaluator-v1",
+        )
+    assert not output.exists()
+
+
 def test_merge_accepts_verified_partial_selection_after_bounded_cutover(tmp_path):
     plan = _plan()
     initial = freeze_shard_selections(
@@ -195,6 +256,140 @@ def test_merge_accepts_verified_partial_selection_after_bounded_cutover(tmp_path
     assert merged["completed"] == 4
 
 
+def test_merge_allows_verified_partition_to_supersede_prior_hold(tmp_path):
+    plan = _plan(1)
+    selection = freeze_shard_selections(
+        plan,
+        terminal_partition_ids=(),
+        shard_ids=("original",),
+        maximum_data_sends=3,
+        maximum_control_calls=4,
+    )["original"]
+    held_root = tmp_path / "held"
+
+    def fail(staging, request):
+        wire = staging / "wire"
+        wire.mkdir()
+        (wire / "response.wire").write_bytes(request.code.encode())
+        raise RuntimeError("WIRE_PAGE_INVALID")
+
+    held = run_acquisition(
+        plan,
+        held_root,
+        fail,
+        source_roots=(),
+        selection_bytes=selection,
+        max_attempts_per_partition=1,
+    )
+    assert held["status"] == "COMPLETE_WITH_HELD"
+
+    retry_root = tmp_path / "retry"
+    retry = run_acquisition(
+        plan,
+        retry_root,
+        _fetch,
+        source_roots=(),
+        selection_bytes=selection,
+    )
+    assert retry["status"] == "COMPLETE"
+
+    source_index = tmp_path / "held-source-index"
+    freeze_shard_source_index(
+        plan,
+        sources=(("original", held_root),),
+        output=source_index,
+        evaluator_version="test-evaluator-v1",
+    )
+    index_sha256 = hashlib.sha256((source_index / "INDEX.json").read_bytes()).hexdigest()
+    output = tmp_path / "canonical"
+    merged = merge_shard_outputs(
+        plan,
+        sources=(("original", held_root), ("retry", retry_root)),
+        output=output,
+        verified_source_index=source_index,
+        verified_source_index_sha256=index_sha256,
+        verified_source_index_evaluator_version="test-evaluator-v1",
+    )
+    assert merged["completed"] == 1
+    assert merged["held"] == 0
+    evidence = json.loads((output / "MERGE.json").read_text())
+    assert evidence["superseded_holds"] == [
+        {
+            "partition_id": json.loads(plan)["windows"][0]["partition_id"],
+            "selected_partition_source": "retry",
+            "superseded_hold_sources": ["original"],
+        }
+    ]
+
+
+def test_merge_rejects_two_completed_candidates_for_same_partition(tmp_path):
+    plan = _plan(1)
+    selection = freeze_shard_selections(
+        plan,
+        terminal_partition_ids=(),
+        shard_ids=("only",),
+        maximum_data_sends=1,
+        maximum_control_calls=2,
+    )["only"]
+    roots = []
+    for name in ("first", "second"):
+        root = tmp_path / name
+        run_acquisition(
+            plan,
+            root,
+            _fetch,
+            source_roots=(),
+            selection_bytes=selection,
+        )
+        roots.append((name, root))
+    with pytest.raises(Native5mAcquireError, match="TERMINAL_CLOSURE"):
+        merge_shard_outputs(plan, sources=roots, output=tmp_path / "canonical")
+
+
+def test_merge_retains_latest_of_repeated_verified_holds(tmp_path):
+    plan = _plan(1)
+    selection = freeze_shard_selections(
+        plan,
+        terminal_partition_ids=(),
+        shard_ids=("only",),
+        maximum_data_sends=3,
+        maximum_control_calls=2,
+    )["only"]
+
+    def fail(staging, request):
+        wire = staging / "wire"
+        wire.mkdir()
+        (wire / "response.wire").write_bytes(request.code.encode())
+        raise RuntimeError("WIRE_PAGE_INVALID")
+
+    roots = []
+    for name in ("original", "retry"):
+        root = tmp_path / name
+        result = run_acquisition(
+            plan,
+            root,
+            fail,
+            source_roots=(),
+            selection_bytes=selection,
+            max_attempts_per_partition=1,
+        )
+        assert result["status"] == "COMPLETE_WITH_HELD"
+        roots.append((name, root))
+
+    output = tmp_path / "canonical"
+    merged = merge_shard_outputs(plan, sources=roots, output=output)
+    assert merged["completed"] == 0
+    assert merged["held"] == 1
+    evidence = json.loads((output / "MERGE.json").read_text())
+    assert evidence["repeated_holds"] == [
+        {
+            "partition_id": json.loads(plan)["windows"][0]["partition_id"],
+            "selected_hold_source": "retry",
+            "prior_hold_sources": ["original"],
+        }
+    ]
+
+
 @pytest.mark.parametrize("defect", ["missing", "duplicate"])
 def test_merge_rejects_missing_or_duplicate_terminal_partition_before_output(tmp_path, defect):
     plan, _, roots = _build_shards(tmp_path)
@@ -222,3 +417,53 @@ def test_merge_rejects_extra_partition_or_selection_mismatch(tmp_path, defect):
     ):
         merge_shard_outputs(plan, sources=roots, output=output)
     assert not output.exists()
+
+
+@pytest.mark.parametrize("invalid_label", ["../escape", "nested/escape", ".", "", "absolute"])
+@pytest.mark.parametrize("operation", ["merge", "index"])
+def test_source_labels_reject_paths_before_any_output(tmp_path, invalid_label, operation):
+    plan, _, roots = _build_shards(tmp_path)
+    label = str(tmp_path / "escape") if invalid_label == "absolute" else invalid_label
+    sources = [(label, roots[0][1]), roots[1]]
+    before = {
+        str(path): path.read_bytes()
+        for _, root in roots
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+    original_children = set(tmp_path.iterdir())
+    output = tmp_path / "canonical"
+    with pytest.raises(Native5mAcquireError, match="SHARD_MERGE_SOURCE_SET_INVALID"):
+        if operation == "merge":
+            merge_shard_outputs(plan, sources=sources, output=output)
+        else:
+            freeze_shard_source_index(
+                plan, sources=sources, output=output, evaluator_version="test-v1"
+            )
+    assert set(tmp_path.iterdir()) == original_children
+    assert before == {str(Path(path)): Path(path).read_bytes() for path in before}
+
+
+@pytest.mark.parametrize("error_type", [PermissionError, OSError])
+def test_source_index_scan_errors_reject_incomplete_inventory(tmp_path, monkeypatch, error_type):
+    plan, _, roots = _build_shards(tmp_path)
+    blocked = roots[0][1] / "unreadable-evidence"
+    blocked.mkdir()
+    marker = blocked / "sentinel.txt"
+    marker.write_bytes(b"unchanged synthetic evidence")
+    scandir = shards.os.scandir
+
+    def fail_scan(path):
+        if Path(path) == blocked:
+            raise error_type("deterministic synthetic scan failure")
+        return scandir(path)
+
+    monkeypatch.setattr(shards.os, "scandir", fail_scan)
+    output = tmp_path / "source-index"
+    with pytest.raises(Native5mAcquireError, match="SHARD_SOURCE_INDEX_SCAN_FAILED"):
+        freeze_shard_source_index(
+            plan, sources=roots, output=output, evaluator_version="test-v1"
+        )
+    assert not output.exists()
+    assert not output.with_name(".source-index.job").exists()
+    assert marker.read_bytes() == b"unchanged synthetic evidence"

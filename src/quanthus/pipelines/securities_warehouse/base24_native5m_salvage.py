@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import pyarrow.parquet as pq
+import pyarrow.parquet as pq  # type: ignore[import-untyped]
 
 from quanthus.pipelines.securities_warehouse.base24_native5m_acquire import (
     BUCKETS,
@@ -127,7 +127,7 @@ def _failure_capture(
     wire_root = failure.parent / "wire"
     receipt_path = wire_root / "wire-receipt.json"
     try:
-        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt: dict[str, Any] = json.loads(receipt_path.read_text(encoding="utf-8"))
         records = receipt["records"]
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise Native5mSalvageError("WIRE_RECEIPT_INVALID") from exc
@@ -215,7 +215,7 @@ def _audit_partition(
 ) -> dict[str, Any]:
     try:
         receipt_path = root / "RECEIPT.json"
-        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt: dict[str, Any] = json.loads(receipt_path.read_text(encoding="utf-8"))
         ready = (root / "READY").read_text(encoding="ascii").strip()
     except (OSError, ValueError, TypeError) as exc:
         raise Native5mSalvageError("SALVAGE_PARTITION_INVALID") from exc
@@ -273,7 +273,7 @@ def audit_salvage(
     """Cold-verify a package using only its contained wire evidence and code."""
     try:
         manifest_path = root / "manifest.json"
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest: dict[str, Any] = json.loads(manifest_path.read_text(encoding="utf-8"))
         ready = (root / "READY").read_text(encoding="ascii").strip()
     except (OSError, ValueError, TypeError) as exc:
         raise Native5mSalvageError("SALVAGE_PACKAGE_INVALID") from exc

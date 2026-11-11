@@ -1,0 +1,51 @@
+{
+  "schema_version": "quanthus.p6-historical-replay-plan.v1",
+  "work_item": "P6-HISTORY-001",
+  "mode": "historical_replay",
+  "owner_direction_date": "2026-10-22",
+  "timezone": "Asia/Shanghai",
+  "source": {
+    "schema_version": "quanthus.p10-base24-p6-purpose-qualification.v1",
+    "manifest_sha256": "sha256:9251e3e1736831d30a3efd59a101a27791ce01bdbd64824b2691540489099e47",
+    "calendar_member": "source/tables/trading_calendar.parquet",
+    "calendar_sha256": "sha256:02a407b7e83010ee7fba13a702a4b5be3c73750e425f49a3840de68562778cf9",
+    "open_sessions_sha256": "sha256:bb3286f245714719c5fbfd8f94a8dff5fe0963499fae543ec88728a98931fbce"
+  },
+  "policy_reference": {
+    "path": "config/forward-validation/activation/p6-base24-cycle-runtime.v1.json",
+    "sha256": "sha256:8a8d010e76739e19294279d7c887ee52d902aa7fa2629fc5c11d61fc57ac76ae"
+  },
+  "scope": {
+    "start": "2026-01-05",
+    "end": "2026-10-20",
+    "venues": ["SSE", "SZSE"]
+  },
+  "warmup": {"start": "2026-01-05", "end": "2026-07-06", "sessions": 120},
+  "decisions": {"start": "2026-07-07", "end": "2026-09-14", "sessions": 50},
+  "settlement_tail": {"start": "2026-09-15", "end": "2026-10-20", "sessions": 20},
+  "smoke": {"start": "2026-07-07", "end": "2026-07-13", "sessions": 5},
+  "report_slices": [
+    {"id": "S1", "start": "2026-07-07", "end": "2026-07-29", "sessions": 17},
+    {"id": "S2", "start": "2026-07-30", "end": "2026-08-21", "sessions": 17},
+    {"id": "S3", "start": "2026-08-24", "end": "2026-09-14", "sessions": 16}
+  ],
+  "semantics": {
+    "signal_profile": "close-to-next-open-v1",
+    "feature_cutoff": "bound_session_close",
+    "slice_ledger_reset": false,
+    "slice_independence_claim": false,
+    "warmup_counts_as_observation": false,
+    "future_data_required": false,
+    "unknown_knowledge_time": "block_affected_entry_preserve_unknown",
+    "zero_admitted_days": "blocked_not_successful_replay",
+    "historical_availability_is_source_qualification": true
+  },
+  "authority": {
+    "protected_partitions_authorized": false,
+    "prospective_budget_write": false,
+    "sealed_ledger_write": false,
+    "notification": false,
+    "broker": false,
+    "live_capital": false
+  }
+}

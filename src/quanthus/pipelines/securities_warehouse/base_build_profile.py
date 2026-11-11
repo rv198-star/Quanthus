@@ -74,7 +74,7 @@ def delivery_contract(legacy: dict[str, Any], *, version: str, through: str,
     result["table_policy"] = {
         "daily_updated_tables": sorted(UPDATED_TABLES),
         "reference_extension_tables": sorted(REFERENCE_TABLES),
-        "reference_extension_rule": "SOURCE_REPLAYED_NEW_IDENTITIES_ONLY_NO_PREDECESSOR_REWRITE",
+        "reference_extension_rule": "SOURCE_REPLAYED_IDENTITY_VERSIONS_NO_PREDECESSOR_REWRITE",
         "other_tables": "INHERIT_ORIGINAL_ROWS_AND_COVERAGE_NO_REFRESH_INFERRED",
         "unhandled_nonempty_artifacts": "REJECT_UNLESS_EXPLICIT_EXISTING_ODS_ONLY_DISPOSITION",
         "closed_day_events": "REQUIRED_THROUGH_TARGET_CUTOFF",
@@ -116,7 +116,7 @@ def validate_contract(contract: dict[str, Any]) -> None:
     expected = {
         "daily_updated_tables": sorted(UPDATED_TABLES),
         "reference_extension_tables": sorted(REFERENCE_TABLES),
-        "reference_extension_rule": "SOURCE_REPLAYED_NEW_IDENTITIES_ONLY_NO_PREDECESSOR_REWRITE",
+        "reference_extension_rule": "SOURCE_REPLAYED_IDENTITY_VERSIONS_NO_PREDECESSOR_REWRITE",
         "other_tables": "INHERIT_ORIGINAL_ROWS_AND_COVERAGE_NO_REFRESH_INFERRED",
         "unhandled_nonempty_artifacts": "REJECT_UNLESS_EXPLICIT_EXISTING_ODS_ONLY_DISPOSITION",
         "closed_day_events": "REQUIRED_THROUGH_TARGET_CUTOFF",

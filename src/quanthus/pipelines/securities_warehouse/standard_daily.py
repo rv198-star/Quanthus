@@ -17,6 +17,7 @@ from typing import Any
 
 from quanthus.pipelines.contracts import OdsRelease
 
+from .base22 import file_sha as source_file_sha
 from .base22_bounded import BoundedError, Budget, Limits, Member, independent_copy
 from .base22_sources import disjoint_output
 from .base23_identity_overlay import build_overlay
@@ -36,6 +37,7 @@ from .daily_core_domain import (
     _project_announcements,
     _project_daily_tables,
     _project_trading_calendar,
+    daily_parent_cutoff,
 )
 from .native_base23_reader import NativeBase23
 
@@ -59,7 +61,11 @@ def save(path: Path, value: dict[str, Any]) -> None:
 
 
 def copy_file(source: Path, target: Path, budget: Budget) -> None:
-    independent_copy(Member(source, file_sha(source), source.stat().st_size, 0), target, budget)
+    # Legacy ODS can have archive hardlinks. Copy bytes independently; the copy
+    # primitive verifies source fingerprints and the destination SHA/nlink.
+    independent_copy(
+        Member(source, source_file_sha(source), source.stat().st_size, 0), target, budget
+    )
 
 
 def _sources(root: Path, body: dict[str, Any]) -> dict[str, Any]:
@@ -109,7 +115,7 @@ def inspect(root: Path, *, sealed: bool = True) -> dict[str, Any]:
                 raise BoundedError("DAILY_DELIVERY_MEMBER_CHANGED")
     body = load(member(root, "DELIVERY.json"))
     if (
-        set(body)
+        (set(body) - {"calendar_observation"})
         != {
             "contract",
             "day_kind",
@@ -127,6 +133,8 @@ def inspect(root: Path, *, sealed: bool = True) -> dict[str, Any]:
         or body.get("policy_sha256") != file_sha(POLICY)
         or file_sha(member(root, "contract.json")) != file_sha(POLICY)
         or body.get("day_kind") not in {"market", "closed"}
+        or "calendar_observation" in body
+        and body.get("day_kind") != "closed"
         or body["market_date"] != content.get("market_date")
         or body["day_kind"] != content.get("day_kind")
         or date.fromisoformat(body["market_date"]).isoformat() != body["market_date"]
@@ -211,7 +219,12 @@ def _replay(
     )
     calendar = _artifact({"market_daily_core": market}, "market_daily_core", "trading_calendar")
     with _connection(budget) as connection:
-        _views(connection, parents, overlay)
+        _views(
+            connection,
+            parents,
+            overlay,
+            knowledge_cutoff=daily_parent_cutoff(selected),
+        )
         grades = {}
         if body["day_kind"] == "market":
             projection = member(root, "projection")
@@ -282,6 +295,12 @@ def _replay(
             )
             if held:
                 raise BoundedError("DAILY_DELIVERY_NEW_CLOSED_QUALITY_HELD")
+            if body.get("calendar_observation"):
+                from .observed_daily_calendar import project as project_calendar
+
+                calendar = project_calendar(
+                    root, body["calendar_observation"], output, day.isoformat()
+                )
             cal = _project_trading_calendar(
                 connection,
                 path=calendar[0],
@@ -339,6 +358,7 @@ def publish(
     output: Path,
     code_revision: str,
     budget: Budget,
+    calendar_observation: Path | None = None,
 ) -> dict[str, Any]:
     from .daily_core_domain import _verify_base
 
@@ -369,8 +389,22 @@ def publish(
         "projection": file_sha(projection / "manifest.json") if projection else None,
         "sources": {k: file_sha(p / "release.json") for k, p in sources.items()},
     }
+    if calendar_observation is not None:
+        from .observed_daily_calendar import validate as validate_calendar
+
+        if projection is not None:
+            raise BoundedError("DAILY_DELIVERY_MARKET_CALENDAR_OVERRIDE_FORBIDDEN")
+        validate_calendar(calendar_observation.parent, day=day)
+        request["calendar_observation"] = file_sha(calendar_observation)
     output = disjoint_output(
-        output, [base_root, config, *sources.values(), *([projection] if projection else [])]
+        output,
+        [
+            base_root,
+            config,
+            *sources.values(),
+            *([projection] if projection else []),
+            *([calendar_observation.parent] if calendar_observation else []),
+        ],
     )
     if output.exists():
         body = inspect(output)
@@ -381,21 +415,51 @@ def publish(
     stage = budget.destination(budget.root / "delivery-staging")
     stage.mkdir()
     try:
-        copy_file(config, stage / "config.json", budget)
-        copy_file(POLICY, stage / "contract.json", budget)
+        from .daily_copy_budget import CopyReservation
+
+        targets = {
+            stage / "config.json": config.stat().st_size,
+            stage / "contract.json": POLICY.stat().st_size,
+        }
+        if projection:
+            targets.update(
+                {
+                    stage / "projection" / name: member(projection, name).stat().st_size
+                    for name in sorted(_tree(projection))
+                }
+            )
+        for role, source in sources.items():
+            for name in [
+                "release.json",
+                *(a.relative_path.as_posix() for a in releases[role].artifacts),
+            ]:
+                targets[stage / "sources" / role / name] = member(source, name).stat().st_size
+            if (source / "READY").exists():
+                targets[stage / "sources" / role / "READY"] = (source / "READY").stat().st_size
+        if calendar_observation is not None:
+            observed = load(calendar_observation)
+            for name in ["calendar.json", *observed["original_files"]]:
+                targets[stage / "calendar-observation" / name] = (
+                    member(calendar_observation.parent, name).stat().st_size
+                )
+        copy_budget = CopyReservation(budget, targets)
+        copy_file(config, stage / "config.json", copy_budget)
+        copy_file(POLICY, stage / "contract.json", copy_budget)
         if projection:
             for path in sorted(_tree(projection)):
-                copy_file(member(projection, path), member(stage, "projection/" + path), budget)
+                copy_file(
+                    member(projection, path), member(stage, "projection/" + path), copy_budget
+                )
         records = {}
         for role, source in sources.items():
             release = releases[role]
             prefix = "sources/" + role
             for name in ["release.json", *(a.relative_path.as_posix() for a in release.artifacts)]:
-                copy_file(member(source, name), member(stage, prefix + "/" + name), budget)
+                copy_file(member(source, name), member(stage, prefix + "/" + name), copy_budget)
             if (source / "READY").exists():
                 if (source / "READY").read_text().strip() != file_sha(source / "release.json"):
                     raise BoundedError("DAILY_DELIVERY_ORIGINAL_SOURCE_READY_CHANGED")
-                copy_file(source / "READY", stage / prefix / "READY", budget)
+                copy_file(source / "READY", stage / prefix / "READY", copy_budget)
             records[role] = {
                 "path": prefix + "/release.json",
                 "release_id": release.release_id,
@@ -416,7 +480,30 @@ def publish(
             "code_revision": code_revision,
             "policy_sha256": file_sha(POLICY),
         }
+        if calendar_observation is not None:
+            from .observed_daily_calendar import CONTRACT as CALENDAR_CONTRACT
+
+            original = load(calendar_observation)
+            for name in ["calendar.json", *original["original_files"]]:
+                copy_file(
+                    member(calendar_observation.parent, name),
+                    member(stage, "calendar-observation/" + name),
+                    copy_budget,
+                )
+            body["calendar_observation"] = {
+                "contract": CALENDAR_CONTRACT,
+                "path": "calendar-observation/calendar.json",
+                "sha256": file_sha(calendar_observation),
+            }
+        copy_budget.finish()
         replay = _replay(stage, body, parent, budget, budget.root / "publish-replay")
+        if calendar_observation is not None:
+            calendar_path = "calendar-observation/observed-calendar.parquet"
+            copy_file(replay.calendar[0], member(stage, calendar_path), budget)
+            body["calendar_observation"]["projection_path"] = calendar_path
+            body["calendar_observation"]["projection_sha256"] = file_sha(
+                member(stage, calendar_path)
+            )
         for table, paths in replay.tables.items():
             body["table_paths"][table] = []
             for index, path in enumerate(paths):

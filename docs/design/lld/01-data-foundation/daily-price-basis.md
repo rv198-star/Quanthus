@@ -11,7 +11,7 @@ Machine contract: `config/pipelines/daily-price-basis.v1.json`.
 | Parent | [LLD 01](../01-data-foundation.md) |
 | Ownership | [LLD 12](../12-permanent-data-line.md) |
 | Work item | META-DATA-GAP-004 / #473 |
-| Code | `src/quanthus/pipelines/securities_warehouse/daily_domain.py`, `daily_price_basis.py` |
+| Code | `src/quanthus/pipelines/securities_warehouse/daily_price_basis_domain.py`, `daily_price_basis.py` |
 | Tests | `tests/unit/test_p10_daily_price_basis.py`, `tests/unit/test_p3_strat_003_semantic_equivalence.py` |
 
 This draft describes a bounded code candidate. It creates no new execution or release authority.
@@ -24,7 +24,8 @@ uses `UNADJUSTED`. Daily construction instead emits `none`, while multiple consu
 `UNADJUSTED`. The completed 35-session diagnostic and temporary adapter prove the specific
 historical mismatch; neither authorizes another attempt or establishes historical availability.
 
-This candidate changes the **existing** `build_daily_domain_increment` entrypoint. Explicit
+This candidate retains the versioned `build_daily_domain_increment` implementation in
+`daily_price_basis_domain.py`, isolated from the byte-frozen legacy `daily_domain.py`. Explicit
 `price_basis_policy="p10-daily-unadjusted-v1"` selects the new version. It is not a new scheduler,
 recovery service, cache or research-owned adapter. Ordinary calls retain the legacy projection,
 package kind and manifest version. No command, schedule or consumer selects the new policy yet.
@@ -94,7 +95,7 @@ bounded handoff/release review; this list is exposure analysis, not authorizatio
 ## Remaining formal #473 handoff
 
 1. Approve publication/release of the versioned implementation; this local candidate has not been
-   pushed or deployed. Select the exact bounded historical correction or prospective construction
+   activated or deployed. Source integration preserves the candidate without selecting it. Select the exact bounded historical correction or prospective construction
    scope separately; this implementation does not rebuild the 35 packages.
 2. Freeze authorized immutable source members/hashes, producer/source versions, full dates/universe,
    clock evidence grades, exclusions and replacement lineage. Verify actual bytes in the authorized

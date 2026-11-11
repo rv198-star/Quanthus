@@ -1,0 +1,113 @@
+{
+  "schema_version": "quanthus.p6-owner-scope-closeout.v1",
+  "decision_id": "p6-owner-closeout-20261023-v1",
+  "authority": {
+    "kind": "explicit_owner_message",
+    "date": "2026-10-23",
+    "timezone": "Asia/Shanghai",
+    "quote": "那我觉得可以认为P6线已经完成了，剩下那25%是用未来66交易日数据？这个我觉得没有必要性了"
+  },
+  "programme_status": "completed_under_owner_revised_scope",
+  "historical_mechanism_accepted": true,
+  "prospective_work_disposition": "cancelled_not_accepted",
+  "retired_work_items": [
+    "P6-ACTIVATE-001",
+    "P6-REVIEW-001"
+  ],
+  "p6_r1_remaining_prospective_scope": "cancelled_not_accepted",
+  "observation_requirement_retired_from_current_scope": {
+    "collection_trading_sessions": 66,
+    "maturity_tail_trading_sessions": 20
+  },
+  "current_scope_progress": {
+    "complete_percent": 100,
+    "remaining_percent": 0,
+    "remaining_execution_time": "none"
+  },
+  "p10_issue_538_disposition": "independent_branch_remains_open",
+  "controller_disposition": "remain_disabled_no_service_mutation",
+  "additional_authority": {
+    "prospective_acceptance": false,
+    "strict_historical_pit_acceptance": false,
+    "strategy_economic_acceptance": false,
+    "production_activation": false,
+    "p7": false,
+    "notification": false,
+    "broker": false,
+    "live_capital": false,
+    "protected_partition_access": false
+  },
+  "evidence": {
+    "historical_mechanism": "docs/acceptance/p6-fixed-snapshot-mechanism-20261022.md",
+    "runtime_code_revision": "a200f6d3d2dfd6242c346c933ee26e3ac46d9f0e",
+    "runtime_image": "sha256:6b6ec9b360191702ba70c6f442558af0b87ca309e76e1181140f1e57d6afc627",
+    "runtime_handoff": "/srv/agentdock/AgentDock/base22-review-afe2526/p6-runtime-readiness-20261022T162632Z-a200f6d/handoff.md",
+    "runtime_handoff_sha256": "e923c2b1c26d5bd444bb132e81e2ce6ca93b07386f072cd94077d484b0bfc193"
+  },
+  "preserved_bindings": [
+    {
+      "path": "config/forward-validation/activation/p6-base24-cycle-runtime.v1.json",
+      "sha256": "8a8d010e76739e19294279d7c887ee52d902aa7fa2629fc5c11d61fc57ac76ae"
+    },
+    {
+      "path": "config/forward-validation/activation/p6-owner-activation-mandate.v1.json",
+      "sha256": "f6af5da6ea6e731869dd003facb4976f72d9b49f92b7ddf64b210960770969de"
+    },
+    {
+      "path": "config/forward-validation/activation/p6-prospective-runtime.v1.json",
+      "sha256": "b8935da7f639d67632de3aef66be50082b59dc3a1d0281f694ea121954d919ce"
+    },
+    {
+      "path": "config/forward-validation/data/p6-base24-inputs.v1.json",
+      "sha256": "835c0c49ce405007096f209de8820f2ce65766f392ca7d680d1d9da3038bf819"
+    },
+    {
+      "path": "config/forward-validation/data/p6-base24-purpose.v1.json",
+      "sha256": "7086d909b644773254ee75afe1f731be0280ca8195455ee68c9860dd5adb9ccc"
+    },
+    {
+      "path": "config/forward-validation/data/p6-prospective-data-boundary.v1.json",
+      "sha256": "2bb30bb47c0283cd0b2a51455518f7d0a956c817320116b5b7861b689a927c73"
+    },
+    {
+      "path": "config/forward-validation/entry/p6-data-001-owner-value-decision.v1.json",
+      "sha256": "43302286655036c220086b1fa9a6da2741ef4cccbe6807d0c0da809ea9563e99"
+    },
+    {
+      "path": "config/forward-validation/entry/p6-prospective-mvp-entry.v1.json",
+      "sha256": "1e081004243d74047991f3963a9173dc008bcfad2bc8cca8200cf7186cd79c7b"
+    },
+    {
+      "path": "config/forward-validation/paper/p6-paper-lane.v1.json",
+      "sha256": "50fc7745570814ae927252469e11fe038c7a1b25f0f0bb8e3ce9e911d9eac0d8"
+    },
+    {
+      "path": "config/forward-validation/runtime/p6-fixed-snapshot-replay.v1.json",
+      "sha256": "c450ab0d4dce72cf5b31900271f260ed7df3e338566bb34867711d2d592da986"
+    },
+    {
+      "path": "config/forward-validation/runtime/p6-forward-worker.v1.json",
+      "sha256": "7a9875fe94cb781095077518b74ffc1f22c614ad9b67e72f67f27e250536a393"
+    },
+    {
+      "path": "config/forward-validation/runtime/p6-historical-replay-plan.v1.json",
+      "sha256": "0adb809eac537f768af21b5013b304df281311bd07d460c73e97927dbd01362b"
+    },
+    {
+      "path": "config/forward-validation/scorecards/p6-role-scorecards.v1.json",
+      "sha256": "49b91d1295717f4d21b58558d356da5846f74dbebbe9d565b9a05b24117d0fe0"
+    },
+    {
+      "path": "config/forward-validation/web/p6-forward-product-view.v1.json",
+      "sha256": "84ba31428bae5fed3187fb3962417014aa409e848ab0d45e64706ac13b0c2d0b"
+    },
+    {
+      "path": "docs/design/lld/08-validation-governance/p6-forward-validation.md",
+      "sha256": "2336837cd5023f2aec475b8185df6a824566a9f1a779d13c477c6b0309cc3f67"
+    },
+    {
+      "path": "docs/acceptance/p6-fixed-snapshot-mechanism-20261022.md",
+      "sha256": "d5d3ffc59ef21906921ed90df8ad4282749b847489a3d1b74b2ba78f1b6d4725"
+    }
+  ]
+}

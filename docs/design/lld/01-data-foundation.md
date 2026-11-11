@@ -22,6 +22,30 @@ date. No downstream module may read vendor frames directly.
 
 ## 2. Scope
 
+The opt-in P10 Base 2.4 source interfaces are integrated under
+[the bounded P6 main-integration work item](../../work-items/p6-main-integration.md).
+`native_base24_reader.py`, `base24_input_view.py`, `base24_p6_handoff.py` and
+`base24_p6_purpose.py` own standalone reading, explicit source projection and
+purpose qualification. They preserve physical hashes, field times and scoped
+unavailable uses; a readable governance snapshot is not historical PIT or an
+execution admission. Existing frozen legacy interfaces retain their contracts.
+
+The remaining Base 2.4 construction modules are integrated separately under
+[the P10 construction work item](../../work-items/p10-base24-main-integration.md):
+bounded native-5m acquisition/qualification, monthly projection and ownership
+transfer, independent ODS materialization/verification, domain observation
+adapters and paired acceptance reconciliation. They share immutable job-local
+prerequisites with explicit TMP lifecycles. This opt-in 1d/native-5m profile
+preserves actual knowledge clocks, the exact 33-table DWD model and independent
+cold-verification requirements; merging it does not rebuild or switch a Base.
+
+The [P10 collection/container integration](../../work-items/p10-container-main-integration.md)
+adds the CN02 1d/native-5m Daily cycle, frozen-input intake, bounded recovery and
+same-image notification/backup/TMP roles. Its operational boundary is owned by
+[LLD 12](12-permanent-data-line.md#5-execution-and-invariants). Legacy Daily
+interfaces remain frozen; Weekly financial qualification is scoped, and source
+integration does not activate timers or modify warehouse products.
+
 Base 2.4 delivery status is resolved by `base24_release_status.py` with the exact
 manifest and receipt pins in `config/pipelines/base24-acceptance-bindings.v1.json`.
 The sealed manifest records build-time state; later independent acceptance is an
@@ -102,6 +126,14 @@ shared quality/governance, maintenance and source recovery/repair belong to P10 
 [`12-permanent-data-line.md`](12-permanent-data-line.md). Other lines only register data defects
 and choose a disclosed business bypass, temporary ignore or acceptance of a known limitation;
 they do not repair data. The source, schema, PIT, topology and release contracts below are unchanged.
+
+**P10 数仓质量与发布依赖的现行上位原则：** 2026-10-08 接受
+[ADR 0016](../../architecture/adr-0016-value-proportional-warehouse-quality.md)：
+数据质量按实际消费者用途、业务风险和修复成本裁决，非关键分钟缺口
+不得无条件阻断其他独立合格的数据产品。下述 P1 历史验收与物理合约、
+PIT 及不可变发布边界仍保持原状；四 Lane READY 的生产解耦属于
+[P10 #496](https://github.com/rv198-star/Quanthus/issues/496) 的单独工程评审/发布，
+并**未**由 ADR 0016 自动改成新的生产 READY 条件。
 
 P1 includes SSE/SZSE daily bars from 2011 onward, security lifecycle, trading calendar,
 corporate actions, adjustment factors, tradability, historical ST state, board-specific price

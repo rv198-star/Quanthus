@@ -1,0 +1,103 @@
+{
+  "schema_version": "quanthus.learning-route-qualification.v1",
+  "work_items": [
+    540,
+    542,
+    545,
+    546
+  ],
+  "recorded_at": "2026-10-28T15:12:48.922571+00:00",
+  "assessment_code_sha": "66be5431005385af209dbaf4482363ab23b21a04",
+  "governing_route": "docs/work-items/learning-next-route-20261028.md",
+  "evidence": [
+    {
+      "path": "/srv/agentdock/.codex/learning-route4-7-20261028T144800Z-66be543/evidence/identity-capacity.safe.json",
+      "sha256": "9f6a9010767e66844c5fac038162fcb802522eceb48129bb71a65e10dd7b5d7e"
+    },
+    {
+      "path": "/srv/agentdock/.codex/learning-route4-7-20261028T144800Z-66be543/evidence/consumer-port-review.safe.json",
+      "sha256": "4ef58b3948b0792ffa732128925d42a67ee52b0bc30b6aa82955108f362b3d2e"
+    },
+    {
+      "path": "/srv/agentdock/.codex/learning-route4-7-20261028T144800Z-66be543/evidence/metadata-os-trace.safe.json",
+      "sha256": "3529911e200dfcf715dfb2c7f5e15f8b8673d9490a942e040618e66bff3a410c"
+    },
+    {
+      "path": "/srv/agentdock/.codex/learning-route4-7-20261028T144800Z-66be543/evidence/metadata-unchanged.safe.json",
+      "sha256": "29d8e8957d4560394bcd28fc3d90e1f791152ff3cba6e05555c5242cbe43698c"
+    },
+    {
+      "path": "/srv/agentdock/.codex/learning-route4-7-20261028T144800Z-66be543/evidence/shared-blueprint-baseline.safe.json",
+      "sha256": "aa3981b1756c9fe6956f72c17aff6cf359f49793c63352348be5a52eb7c9150b"
+    }
+  ],
+  "status": "NOT_QUALIFIED",
+  "reason_codes": [
+    "PURPOSE_COMPATIBLE_CONSUMER_POLICY_UNFROZEN",
+    "FRESH_SOURCE_ACTION_CLOSURE_UNQUALIFIED",
+    "FRESH_PURPOSE_REFERENCE_UNQUALIFIED",
+    "MATERIAL_ERROR_AND_COST_CRITERIA_UNFROZEN"
+  ],
+  "known_inventory": {
+    "previous_distinct_head2_issuers": 240,
+    "remaining_under_previous_exclusions_upper_bound": 13,
+    "months": [
+      "2021-11",
+      "2021-12"
+    ],
+    "same_issuers_both_months": true,
+    "newer_held_identity_codes_checked": 535,
+    "known_held_overlap_with_remaining": 0,
+    "qualified_new_source_closures": 0,
+    "qualified_new_references": 0,
+    "native_metadata_members": 3,
+    "native_metadata_bytes": 648743,
+    "is_global_available_cohort_census": false
+  },
+  "consumer_disposition": {
+    "original_mvp": "model/expert/algorithmic decision, no mandatory human queue",
+    "retained_head2": "current20 orderly consolidation only; no risk/loss/sell probability",
+    "algorithmic_entry": "existing port verified; new score-to-action policy not frozen or admitted",
+    "held_risk": "Head2 excluded as risk substitute; old 10/11 reduction mapping remains parked",
+    "factor541": "old price-breakout queue is consumed research with different target; not fresh Head2 utility evidence"
+  },
+  "steps": {
+    "4": {
+      "status": "ASSESSMENT_COMPLETE_GATE_NOT_PASSED",
+      "performed": "identity/calendar/exposure and static consumer audit only",
+      "remaining": "purpose-specific policy, source/action closure, independent reference, exact split/criteria and measured run budget"
+    },
+    "5": {
+      "status": "NOT_RUN",
+      "reason": "step4 gate not passed; no existing research queue or consumed evaluation relabeled as fresh"
+    },
+    "6": {
+      "status": "NOT_RUN",
+      "reason": "no newly qualified useful candidate/learnable error; no seven-feature update claimed from four-feature fixture"
+    },
+    "7": {
+      "status": "NOT_ADMITTED",
+      "engineering": "prior scoped reader/runner assets retained, no new result engine",
+      "quality": "no new candidate qualification",
+      "value": "not assessed on new comparison",
+      "admission": "no consumer/P3/P6/production expansion"
+    }
+  },
+  "authority": {
+    "grants_authority": false,
+    "training": false,
+    "new_network_acquisition": false,
+    "new_market_price_rows_read": 0,
+    "protected_result_access": false,
+    "consumer_admission": "NOT_GRANTED",
+    "production_or_P6": false,
+    "threshold_changes": false,
+    "nine_feature_retest": false
+  },
+  "next_gate": {
+    "reviewer": "Astra per conditional route",
+    "decision": "review algorithmic-entry purpose and independent reference design before proposing a newly versioned request",
+    "preferred_direction": "one bounded algorithmic entry comparison only if purpose and reference qualify; otherwise park learning campaign without rewriting original MVP",
+    "not_required": "invented human-review demand, training to obtain a positive result, new data collection before a justified use"
+  }
+}

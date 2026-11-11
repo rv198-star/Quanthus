@@ -4,6 +4,19 @@ Stable ids are the join key between requirements, designs, code, tests, and GitH
 The GitHub issue title must begin with the id in brackets. Closing an issue requires links to
 acceptance evidence; closing an epic requires all blocking child ids to close.
 
+For the learning-system MVP (#540–#548), start at the generated
+[blueprint and module progress](learning-blueprint-progress.md). Stable module/work-item
+links and append-only outcomes follow the [progress mechanism](../design/blueprint-progress.md).
+Issue closure, engineering completion, research quality, value and admission stay separate;
+this routing does not replace existing domain gates or reopen historical work.
+
+`META-TRACE-001` / #2 also owns the approved
+[exploration engineering requirements](../design/exploration-governance.md).
+Use [retained conclusions](exploration-decisions.md) before selecting new research or asset
+delivery. The [three-batch plan](exploration-next-20261029.md) now links its
+[executed consumer delivery and task-selection outcome](learning-consumer-cycle-20261029.md).
+No successor experiment is activated by that outcome.
+
 P10-DATA-000 is the permanent standing data epic and is excluded from automatic epic closure.
 Acquisition and shared quality/governance belong to P10 under
 [`../design/lld/12-permanent-data-line.md`](../design/lld/12-permanent-data-line.md).
@@ -11,6 +24,20 @@ Legacy ids and historical rows below remain traceability, not permission for bus
 recover/repair data. The reviewed live routing inventory is `config/data-ownership.v1.json`.
 
 ## Whole-project CN02 migration
+
+P6 on the migrated node is tracked in
+[P6-R1 / P6-HISTORY-001](p6-cn02-start.md). The Owner closed this line on 2026-10-23 under
+the completed historical-mechanism scope. The [scope closeout](../acceptance/p6-owner-scope-closeout-20261023.md)
+cancels prospective activation and the 66+20-session collection/review; it does
+not claim their acceptance. P6 has no remaining scheduled work. The earlier
+historical route and its evidence remain retained. The recovered database, disabled
+rehearsal and deferred official prospective activation are separate gates.
+The fixed-snapshot mechanism run, fresh independent reproduction and read-only
+semantic review now have [bounded engineering acceptance](../acceptance/p6-fixed-snapshot-mechanism-20261022.md).
+They add zero official prospective observations and do not accept P6-REVIEW-001.
+The Owner's later [CN02-only runtime decision](cn02-project-migration.md#current-runtime-ownership-cn02-only)
+retires OCI from future Quanthus responsibility; no OCI inspection remains on
+the P6 critical path.
 
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
@@ -21,6 +48,28 @@ recover/repair data. The reviewed live routing inventory is `config/data-ownersh
 | ID | Title | Depends on | Disposition |
 | --- | --- | --- | --- |
 | P10-DATA-000 | Coordinate permanent data acquisition, quality and governance | Owner instruction 2026-10-03 | open epic |
+| P10-DATA-OPS-016 | Integrate the CN02 acquisition/container operational stack | P10-DATA-000 | [#537](https://github.com/rv198-star/Quanthus/issues/537); [source integration](p10-container-main-integration.md); release activation and full Weekly acceptance remain separate |
+| P10-DATA-SUPPLY-000 | Update the upstream reference and qualify supplementary sources | P10-DATA-000 | [#581](https://github.com/rv198-star/Quanthus/issues/581); [runtime lineage and bounded screening](p10-source-supply-20261029.md); #582–#585 track capability-specific remaining gates |
+| P10-DATA-SUPPLY-001 | Establish CN02 lineage and the updated upstream baseline | P10-DATA-SUPPLY-000 | [#582](https://github.com/rv198-star/Quanthus/issues/582); ready; bounded evidence in the supply work item |
+| P10-DATA-SUPPLY-002 | Freeze source contracts and candidate/rejection ledgers | P10-DATA-SUPPLY-001 | [#583](https://github.com/rv198-star/Quanthus/issues/583); ready; unresolved definitions remain explicit |
+| P10-DATA-SUPPLY-003 | Qualify financial, disclosure and regulatory APIs | P10-DATA-SUPPLY-002 | blocked full functional closure; [#584](https://github.com/rv198-star/Quanthus/issues/584); named bounded samples retained |
+| P10-DATA-SUPPLY-004 | Qualify media, RSS and institution discovery | P10-DATA-SUPPLY-002 | blocked full functional closure; [#585](https://github.com/rv198-star/Quanthus/issues/585); named bounded samples retained |
+| P10-DATA-SUPPLY-005 | Maintain independent astock fork and source absorption | P10-DATA-SUPPLY-000 | [#587](https://github.com/rv198-star/Quanthus/issues/587); [public subproject](../design/astock-subproject.md); ready for bounded source-library engineering; no production migration |
+
+The bounded [P6 main integration](p6-main-integration.md) separates the required
+P10 source interfaces, P6 consumer and #538 regression into dependent PRs. Its
+code merges do not replace #539's future full-Base publication acceptance.
+
+The [Base 2.4 construction integration](p10-base24-main-integration.md) brings
+the remaining bounded ODS/DWD builders and synthetic regressions into main.
+It excludes collector deployment, container/timer operations and data switching.
+
+### Historical Base preparation inventory
+
+These retained Base 2.2/2.4 rows record the original preparation scope. Current Base 2.5.1 sealing, delivery and Daily alignment are recorded by [#600](https://github.com/rv198-star/Quanthus/issues/600); independent-node reconstruction remains deferred under [#601](https://github.com/rv198-star/Quanthus/issues/601). Main source integration is tracked in [#603](https://github.com/rv198-star/Quanthus/issues/603).
+
+| ID | Title | Depends on | Disposition |
+| --- | --- | --- | --- |
 | P10-DATA-BASE24-000 | ODS/DWD Base 2.4 and CN02 T-day Daily, REQ v1.3 | P10-DATA-000 | [#527](https://github.com/rv198-star/Quanthus/issues/527); [execution plan](base24-build.md); source/capacity/image/reader acceptance pending |
 | P10-DATA-BASE24-010 | 证明2020起原生5m与退市证券来源可行性并保全原始字节 | P10-DATA-BASE24-000 | [#529](https://github.com/rv198-star/Quanthus/issues/529); bounded preparation ready; not accepted |
 | P10-DATA-BASE24-020 | 闭合历史listing×session分母和逐桶/日/月/年覆盖账本 | P10-DATA-BASE24-000 | [#530](https://github.com/rv198-star/Quanthus/issues/530); bounded preparation ready; not accepted |
@@ -503,23 +552,27 @@ need or independently new admissible evidence.
 | P5-GBDT-001 | Train constrained GBDT research pipeline | P5 | deferred; optional research |
 | P5-PROMOTE-001 | Implement model promotion/shadow gate | P5 | deferred; optional research |
 | P5-STAGE-001 | Learned Stage assessment dual-track research | P5 | blocked pending bounded input/reference qualification; #400/#402 reopened under Owner continuation; A/#401 accepted preregistration-only; B exact-input census active, C partial, D/#404 synthetic recovery active, E/F/G NOT_RUN; `docs/work-items/p5-stage-001.md` current recovery checkpoint |
-| P6-000 | Coordinate the bounded P6 prospective-validation program | P6 | open epic |
+| P6-000 | Coordinate the bounded P6 prospective-validation program | P6 | closed under Owner-revised historical scope; `docs/acceptance/p6-owner-scope-closeout-20261023.md` |
 | P6-GOV-001 | Freeze entry proposal, observation budget, stop rules, and rollback | P6 | closed by `docs/acceptance/p6-gov001-prospective-mvp-entry-20260917.md`; proposal is entry-only and grants no activation/downstream authority |
 | P6-DATA-001 | Enforce prospective DWD boundary, access ledger, and correction disposition | P6 | closed by `docs/acceptance/p6-data001-prospective-boundary-20260917.md`; owner value checkpoint accepted, no activation/prospective read |
 | P6-SCORE-001 | Freeze role-specific forward scorecards and loss attribution | P6 | closed by `docs/acceptance/p6-score001-forward-scorecards-20260917.md`; pre-result role cards and material-loss attribution frozen |
 | P6-GOV-002 | Implement composite Forward Worker and disabled-state rehearsal | P6 | closed by `docs/acceptance/p6-gov002-forward-worker-20260917.md`; existing replay queue/worker only, disabled rehearsal sealed/recoverable, official cycles still blocked |
 | P6-PAPER-001 | Implement isolated P2 paper lane and fixed-unit ledger | P6 | closed by `docs/acceptance/p6-paper001-paper-lane-20260917.md`; exact P2 reuse, fixed-unit/non-compounding paper authority, balanced ledger |
 | P6-WEB-001 | Project forward and paper evidence in candidate detail | P6 | closed by `docs/acceptance/p6-web001-forward-paper-product-view-20260917.md`; digest-bound read-only candidate detail projection, no activation/write authority |
-| P6-ACTIVATE-001 | Authorize and run the first official prospective cycle | P6 | ready |
-| P6-REVIEW-001 | Complete the time-matured simulation review | P6 | blocked by P6-ACTIVATE-001 and closed budget |
+| P6-ACTIVATE-001 | Authorize and run the first official prospective cycle | P6 | closed as Owner-cancelled / not planned, not accepted; `docs/acceptance/p6-owner-scope-closeout-20261023.md` |
+| P6-REVIEW-001 | Complete the time-matured simulation review | P6 | closed as Owner-cancelled / not planned, not accepted; `docs/acceptance/p6-owner-scope-closeout-20261023.md` |
 
 P6 runtime closeout on 2026-09-19 is recorded in
 `docs/acceptance/p6-activate001-production-activation-status-20260919.md`. The independent closeout
 review and repair are recorded append-only in
 `docs/acceptance/p6-activate001-closeout-repair-20260919.md`. Production activation is enabled and
-official collection is `0 / 66`; `P6-ACTIVATE-001` remains open only because its frozen acceptance
+official collection was `0 / 66`; `P6-ACTIVATE-001` remains open because its frozen acceptance
 requires the first legal post-activation official cycle plus independent reproduction.
 `P6-REVIEW-001` already exists as GitHub #120 and must not be duplicated.
+That activation statement describes the archived old-node checkpoint. The current
+CN02 closeout above keeps the local controller disabled; deployment and
+prospective continuation are no longer scheduled under this scope. Do not infer current
+production state or a repaired historical PIT source from old planning rows.
 
 | P7-LIVE-001 | Define email-advice and actual-operation reporting boundary; defer broker adapter | P7 | blocked by P6 review |
 | P7-RECON-001 | Reconcile advice with operator-reported fills, changes, or no action | P7 | blocked by P7-LIVE-001 |

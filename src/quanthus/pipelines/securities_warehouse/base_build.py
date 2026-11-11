@@ -47,6 +47,7 @@ JOB_KEYS = {
     "closed_days",
     "limits",
 }
+JOB_REAUDIT_KEYS = JOB_KEYS | {"materialization_revision"}
 AUDIT_JOB = "p10-standard-base-pair-audit-job-v1"
 AUDIT_KEYS = {
     "contract",
@@ -60,13 +61,16 @@ AUDIT_KEYS = {
     "limits",
     "denied_input_roots",
 }
+AUDIT_MATERIALIZATION_REVISION = "materialization_revision"
 
 
 def validate_audit_job(job: dict[str, Any]) -> None:
+    materialization_revision = job.get(AUDIT_MATERIALIZATION_REVISION, job.get("builder_revision"))
     if (
-        set(job) != AUDIT_KEYS
+        set(job) not in (AUDIT_KEYS, AUDIT_KEYS | {AUDIT_MATERIALIZATION_REVISION})
         or job.get("contract") != AUDIT_JOB
         or not re.fullmatch(r"[0-9a-f]{40}", str(job.get("builder_revision")))
+        or not re.fullmatch(r"[0-9a-f]{40}", str(materialization_revision))
         or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(job.get("frozen_input_identity")))
     ):
         raise BoundedError("BUILD_AUDIT_JOB_SCHEMA_OR_IDENTITY_INVALID")
@@ -96,7 +100,12 @@ def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any
     _preflight_paths(products, Path(job["work_root"]), limits, 0)
     for raw in job["denied_input_roots"]:
         path = Path(raw)
-        if path.exists() and os.access(path, os.R_OK):
+        try:
+            readable = path.exists() and os.access(path, os.R_OK)
+        except PermissionError:
+            # InaccessiblePaths may deny traversal of an original source's parent.
+            readable = False
+        if readable:
             raise BoundedError("BUILD_AUDIT_ORIGINAL_SOURCE_STILL_READABLE")
     sources = [Path(p) for p in products.values()]
     owned = False
@@ -111,7 +120,9 @@ def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any
                 expected_input_identity=job["frozen_input_identity"],
                 budget=budget,
             )
-            if receipt["binding"]["code_revision"] != job["builder_revision"]:
+            if receipt["binding"]["code_revision"] != job.get(
+                AUDIT_MATERIALIZATION_REVISION, job["builder_revision"]
+            ):
                 raise BoundedError("BUILD_AUDIT_CODE_BINDING_CHANGED")
             _save_new(budget.root / "AUDIT.json", receipt)
             completion = {
@@ -119,6 +130,11 @@ def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any
                 "job_identity": identity(job),
                 "work_root": job["work_root"],
                 "code_revision": job["builder_revision"],
+                **(
+                    {"materialization_revision": receipt["binding"]["code_revision"]}
+                    if AUDIT_MATERIALIZATION_REVISION in job
+                    else {}
+                ),
                 "policy_identity": identity(contract),
                 "environment_identity": environment["lock_sha256"],
                 "audit_identity": receipt["identity"],
@@ -143,6 +159,11 @@ def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any
                     "job_identity": identity(job),
                     "frozen_input_identity": job["frozen_input_identity"],
                     "code_revision": job["builder_revision"],
+                    **(
+                        {"materialization_revision": job[AUDIT_MATERIALIZATION_REVISION]}
+                        if AUDIT_MATERIALIZATION_REVISION in job
+                        else {}
+                    ),
                     "policy_identity": identity(contract),
                     "failed_at": datetime.now(timezone.utc).isoformat(),
                     "exception_type": type(exc).__name__,
@@ -173,9 +194,13 @@ def run_audit(*, job: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any
 
 def validate_job(job: dict[str, Any]) -> None:
     if (
-        set(job) != JOB_KEYS
+        set(job) not in (JOB_KEYS, JOB_REAUDIT_KEYS)
         or job["contract"] != JOB
         or not re.fullmatch(r"[0-9a-f]{40}", str(job["builder_revision"]))
+        or (
+            "materialization_revision" in job
+            and not re.fullmatch(r"[0-9a-f]{40}", str(job["materialization_revision"]))
+        )
     ):
         raise BoundedError("BUILD_JOB_SCHEMA_OR_REVISION_INVALID")
     for key in (
@@ -325,7 +350,9 @@ def run(
 
     def build(output: Path, dependencies: dict[str, Path]) -> dict[str, Any]:
         with Budget(
-            output, sources, remaining_stage_limits(Path(job["work_root"]), sources, limits)
+            output,
+            sources,
+            remaining_stage_limits(Path(job["work_root"]), sources, limits),
         ) as budget:
             result = prepare_period(
                 inputs=inputs,

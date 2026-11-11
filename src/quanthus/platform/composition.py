@@ -80,6 +80,9 @@ def create_platform_kernel(
     product_catalog_path: Path | None = None,
     candidate_evidence_path: Path | None = None,
     candidate_run_root: Path | None = None,
+    p6_runtime_path: Path | None = None,
+    p6_forward_run_root: Path | None = None,
+    p6_worker_revision: str | None = None,
     expert_evidence_path: Path | None = None,
     expert_run_root: Path | None = None,
     data_catalog_sources_path: Path | None = None,
@@ -125,6 +128,9 @@ def create_platform_kernel(
         root,
         store,
         candidate_run_root=candidate_run_root,
+        runtime_path=p6_runtime_path,
+        forward_run_root=p6_forward_run_root,
+        worker_revision=p6_worker_revision,
     )
     data_catalog = DataIndicatorCatalog(
         data_catalog_sources_path,
@@ -198,6 +204,9 @@ def platform_kernel_from_env() -> PlatformKernel:
     attribution_value = os.environ.get("QUANTHUS_ATTRIBUTION_PUBLICATION_ROOT", "").strip()
     candidate_run_value = os.environ.get("QUANTHUS_CANDIDATE_RUN_ROOT", "").strip()
     expert_run_value = os.environ.get("QUANTHUS_EXPERT_RUN_ROOT", "").strip()
+    p6_runtime_value = os.environ.get("QUANTHUS_P6_RUNTIME_CONFIG", "").strip()
+    p6_run_value = os.environ.get("QUANTHUS_P6_FORWARD_RUN_ROOT", "").strip()
+    p6_revision_value = os.environ.get("QUANTHUS_P6_EXPECTED_WORKER_REVISION", "").strip()
     return create_platform_kernel(
         store=PostgresPlatformStore(dsn),
         cipher_key=cipher_key,
@@ -206,4 +215,7 @@ def platform_kernel_from_env() -> PlatformKernel:
         attribution_root=Path(attribution_value) if attribution_value else None,
         candidate_run_root=Path(candidate_run_value) if candidate_run_value else None,
         expert_run_root=Path(expert_run_value) if expert_run_value else None,
+        p6_runtime_path=Path(p6_runtime_value) if p6_runtime_value else None,
+        p6_forward_run_root=Path(p6_run_value) if p6_run_value else None,
+        p6_worker_revision=p6_revision_value or None,
     )

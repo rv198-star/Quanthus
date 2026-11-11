@@ -1,0 +1,555 @@
+{
+  "schema_version": "quanthus.blueprint.v1",
+  "repository": "rv198-star/Quanthus",
+  "grants_authority": false,
+  "scope": "Learning MVP #540 and its 12+X modules; references to P10/P3/P6 do not reopen their sealed gates",
+  "modules": [
+    {
+      "id": "MVP",
+      "name": "学习决策系统整体",
+      "purpose": "形成有实际用途、可比较并可保留旧版的有限学习闭环",
+      "parent": null,
+      "kind": "capability",
+      "depends_on": [
+        "CLOSEOUT"
+      ],
+      "focus_facet": "value",
+      "watch_paths": []
+    },
+    {
+      "id": "DATA",
+      "name": "P10 数据供给",
+      "purpose": "引用已资格化供给；本蓝图不接受整座数仓",
+      "parent": "MVP",
+      "kind": "dependency",
+      "depends_on": [],
+      "focus_facet": "admission",
+      "watch_paths": []
+    },
+    {
+      "id": "FACTS",
+      "name": "连续事实",
+      "purpose": "支撑演化、趋势演化与结构秩序",
+      "parent": "MVP",
+      "kind": "capability",
+      "depends_on": [
+        "DATA"
+      ],
+      "focus_facet": "quality",
+      "watch_paths": [
+        "src/quanthus/structure_facts*.py",
+        "src/quanthus/structure_order*.py",
+        "src/quanthus/structure_trend*.py",
+        "src/quanthus/stage_learning/factor_slice.py",
+        "src/quanthus/expert_strategy/held_structure_inputs.py"
+      ]
+    },
+    {
+      "id": "FACTORS",
+      "name": "统一因子切片",
+      "purpose": "同一资产可跨状态/专家复用，保留单位、时点与血缘",
+      "parent": "MVP",
+      "kind": "capability",
+      "depends_on": [
+        "FACTS"
+      ],
+      "focus_facet": "engineering",
+      "watch_paths": [
+        "src/quanthus/feature_registry.py",
+        "src/quanthus/label_registry.py",
+        "src/quanthus/stage_learning/factor_slice.py",
+        "config/research/factor541-*.json"
+      ]
+    },
+    {
+      "id": "REFERENCE",
+      "name": "输入与独立参考",
+      "purpose": "按候选冻结来源、参考、暴露、时间及预算",
+      "parent": "MVP",
+      "kind": "capability",
+      "depends_on": [
+        "FACTORS"
+      ],
+      "focus_facet": "quality",
+      "watch_paths": [
+        "src/quanthus/stage_learning/p5_input_census.py",
+        "src/quanthus/stage_learning/qualification.py",
+        "src/quanthus/stage_learning/prefix_qualification.py",
+        "src/quanthus/stage_learning/review_list.py",
+        "src/quanthus/stage_learning/entry_qualification.py"
+      ]
+    },
+    {
+      "id": "STATES",
+      "name": "12+X 分层表达",
+      "purpose": "背景、条件/事件和修饰共存，不强制唯一标签",
+      "parent": "MVP",
+      "kind": "capability",
+      "depends_on": [
+        "FACTS"
+      ],
+      "focus_facet": "quality",
+      "watch_paths": [
+        "src/quanthus/stage_proposition_bundle.py",
+        "config/stage-learning/stage-proposition-bundle.v1.json"
+      ]
+    },
+    {
+      "id": "TRAIN",
+      "name": "真实状态学习",
+      "purpose": "真实拟合与独立比较，工程执行和识别质量分开",
+      "parent": "MVP",
+      "kind": "capability",
+      "depends_on": [
+        "REFERENCE"
+      ],
+      "focus_facet": "quality",
+      "watch_paths": [
+        "src/quanthus/stage_learning/local_head.py"
+      ]
+    },
+    {
+      "id": "UPDATE",
+      "name": "局部更新",
+      "purpose": "一次有界更新与保留旧版机制",
+      "parent": "MVP",
+      "kind": "capability",
+      "depends_on": [
+        "TRAIN"
+      ],
+      "focus_facet": "quality",
+      "watch_paths": [
+        "src/quanthus/stage_learning/head2_revision.py"
+      ]
+    },
+    {
+      "id": "EXPERT",
+      "name": "专家接入及比较",
+      "purpose": "复用专家/约束/否决链验证完整决策影响",
+      "parent": "MVP",
+      "kind": "capability",
+      "depends_on": [
+        "FACTORS"
+      ],
+      "focus_facet": "value",
+      "watch_paths": [
+        "src/quanthus/stage_learning/head2_consumer.py",
+        "config/research/learning-mvp/stage34-breakout-list-use.v1.json",
+        "src/quanthus/stage_learning/review_list.py",
+        "config/research/learning-mvp/stage34-breakout-list-use.v2.json",
+        "src/quanthus/expert_strategy/held_structure_preflight.py",
+        "scripts/expert545_preflight.py",
+        "config/research/expert545-held-preflight.v1.json",
+        "src/quanthus/expert_strategy/held_structure_shadow.py",
+        "src/quanthus/expert_strategy/held_structure_integrity.py",
+        "scripts/expert545_held_structure.py",
+        "scripts/expert545_capture_b_trace.py",
+        "config/research/expert545-held-structure.v1.json",
+        "src/quanthus/stage_learning/entry_baseline.py",
+        "src/quanthus/stage_learning/entry_consolidation.py",
+        "scripts/entry_consolidation_diagnostic.py",
+        "config/research/learning-mvp/entry-consolidation-diagnostic.v1.json",
+        "config/research/learning-mvp/entry-confirmation-qualification-request.v1.json",
+        "scripts/entry_confirmation_qualification.py",
+        "config/research/learning-mvp/entry-confirmation-activation.v1.json",
+        "src/quanthus/expert_strategy/decision_review.py",
+        "scripts/learning_decision_review.py",
+        "config/research/decision-review-delivery.v1.json",
+        "src/quanthus/expert_strategy/decision_chain.py",
+        "scripts/learning_decision_chain.py",
+        "config/research/decision-chain-delivery.v1.json"
+      ]
+    },
+    {
+      "id": "REPRO",
+      "name": "独立复现",
+      "purpose": "按各运行契约独立重建，不能以重新加载代替重训",
+      "parent": "MVP",
+      "kind": "capability",
+      "depends_on": [
+        "TRAIN"
+      ],
+      "focus_facet": "engineering",
+      "watch_paths": []
+    },
+    {
+      "id": "CLOSEOUT",
+      "name": "学习闭环收口",
+      "purpose": "四类结论分别给出；负结果不能伪装产品可用",
+      "parent": "MVP",
+      "kind": "capability",
+      "depends_on": [
+        "EXPERT",
+        "UPDATE",
+        "REPRO"
+      ],
+      "focus_facet": "value",
+      "watch_paths": []
+    },
+    {
+      "id": "P6",
+      "name": "条件性模拟",
+      "purpose": "仅跟踪本新候选是否进入已有P6，不重开已封存P6",
+      "parent": "MVP",
+      "kind": "capability",
+      "depends_on": [
+        "CLOSEOUT"
+      ],
+      "focus_facet": "admission",
+      "watch_paths": []
+    },
+    {
+      "id": "S00",
+      "name": "无序震荡",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [],
+      "focus_facet": "quality",
+      "watch_paths": []
+    },
+    {
+      "id": "S01",
+      "name": "止跌企稳",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [
+        "S12"
+      ],
+      "focus_facet": "quality",
+      "watch_paths": []
+    },
+    {
+      "id": "S02",
+      "name": "有序整理 / Head2",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [],
+      "focus_facet": "quality",
+      "watch_paths": [
+        "src/quanthus/stage_learning/head2_facts.py",
+        "src/quanthus/stage_learning/head2_temporal.py",
+        "src/quanthus/stage_learning/head2_census.py",
+        "config/research/learning-mvp/head2-*.json",
+        "src/quanthus/stage_learning/head_comparison.py"
+      ]
+    },
+    {
+      "id": "S03",
+      "name": "突破尝试",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [],
+      "focus_facet": "quality",
+      "watch_paths": [
+        "config/stage-learning/development-candidate.v1.json",
+        "src/quanthus/stage_learning/qualification.py",
+        "src/quanthus/stage_learning/prefix_qualification.py",
+        "src/quanthus/stage_learning/review_list.py"
+      ]
+    },
+    {
+      "id": "S04",
+      "name": "突破接受",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [
+        "S03"
+      ],
+      "focus_facet": "quality",
+      "watch_paths": [
+        "config/stage-learning/development-candidate.v1.json",
+        "src/quanthus/stage_learning/qualification.py",
+        "src/quanthus/stage_learning/prefix_qualification.py",
+        "src/quanthus/stage_learning/review_list.py"
+      ]
+    },
+    {
+      "id": "S05",
+      "name": "上升趋势",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [],
+      "focus_facet": "quality",
+      "watch_paths": []
+    },
+    {
+      "id": "S06",
+      "name": "回调检验",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [
+        "S05"
+      ],
+      "focus_facet": "quality",
+      "watch_paths": []
+    },
+    {
+      "id": "S07",
+      "name": "结构重建",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [],
+      "focus_facet": "quality",
+      "watch_paths": []
+    },
+    {
+      "id": "S08",
+      "name": "上行加速/延伸",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [],
+      "focus_facet": "quality",
+      "watch_paths": []
+    },
+    {
+      "id": "S09",
+      "name": "高位量价背离",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [],
+      "focus_facet": "quality",
+      "watch_paths": []
+    },
+    {
+      "id": "S10",
+      "name": "结构破坏",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [],
+      "focus_facet": "quality",
+      "watch_paths": [
+        "src/quanthus/stage_projection.py",
+        "config/stage-10-11-projection.v1.json"
+      ]
+    },
+    {
+      "id": "S11",
+      "name": "破坏后反弹",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [
+        "S10"
+      ],
+      "focus_facet": "quality",
+      "watch_paths": [
+        "src/quanthus/stage_projection.py",
+        "config/stage-10-11-projection.v1.json"
+      ]
+    },
+    {
+      "id": "S12",
+      "name": "下降趋势",
+      "purpose": "独立记录该状态的开发证据、质量、用途与资格",
+      "parent": "STATES",
+      "kind": "state",
+      "depends_on": [],
+      "focus_facet": "quality",
+      "watch_paths": []
+    },
+    {
+      "id": "CONTROL",
+      "name": "0 / ABSTAIN / X 控制",
+      "purpose": "区分中性、证据不足和推断冻结，不把缺数据当卖出",
+      "parent": "STATES",
+      "kind": "control",
+      "depends_on": [],
+      "focus_facet": "engineering",
+      "watch_paths": []
+    },
+    {
+      "id": "TRACE",
+      "name": "蓝图与任务进度关联",
+      "purpose": "将工作项、模块结果和证据连成可恢复的项目视图；不改变研究或生产门槛",
+      "parent": null,
+      "kind": "capability",
+      "depends_on": [],
+      "focus_facet": "engineering",
+      "watch_paths": [
+        "src/quanthus/blueprint_progress.py",
+        "scripts/blueprint_progress.py",
+        "src/quanthus/exploration_governance.py",
+        "scripts/exploration_governance.py",
+        "config/planning/exploration-conclusions.v1.json",
+        "config/planning/next-delivery-request.v1.json"
+      ]
+    }
+  ],
+  "work_items": [
+    {
+      "id": "META-LEARN-001",
+      "issue": 540,
+      "modules": [
+        "MVP",
+        "DATA",
+        "FACTS",
+        "FACTORS",
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "P6",
+        "S00",
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "CONTROL"
+      ],
+      "contribution": "统筹完整学习MVP；模块资格不能由子issue数量推出"
+    },
+    {
+      "id": "P3-FACTOR-001",
+      "issue": 541,
+      "modules": [
+        "FACTS",
+        "FACTORS"
+      ],
+      "contribution": "交付首批可复用、可追溯且有用途的因子切片"
+    },
+    {
+      "id": "P5-STATE-002",
+      "issue": 542,
+      "modules": [
+        "REFERENCE",
+        "DATA",
+        "S00",
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12"
+      ],
+      "contribution": "逐头确认输入、参考、时间与预算；不自动打开训练"
+    },
+    {
+      "id": "P5-STATE-003",
+      "issue": 543,
+      "modules": [
+        "STATES",
+        "TRAIN",
+        "CONTROL",
+        "S00",
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12"
+      ],
+      "contribution": "真实训练与状态评价；k个头的结果不外推全12头"
+    },
+    {
+      "id": "P5-LOCAL-001",
+      "issue": 544,
+      "modules": [
+        "UPDATE",
+        "TRAIN",
+        "S02"
+      ],
+      "contribution": "真实局部更新及新旧比较；可拒绝新候选"
+    },
+    {
+      "id": "P3-EXPERT-007",
+      "issue": 545,
+      "modules": [
+        "FACTS",
+        "EXPERT"
+      ],
+      "contribution": "在实际持仓范围生成受限连续Facts并经原专家安全链验证完整决策差异；不自动取得策略价值或生产准入"
+    },
+    {
+      "id": "META-LEARN-002",
+      "issue": 546,
+      "modules": [
+        "MVP",
+        "CLOSEOUT",
+        "REPRO",
+        "P6"
+      ],
+      "contribution": "独立复现，分别交付工程/质量/价值/资格结论"
+    },
+    {
+      "id": "P3-EXPERT-008",
+      "issue": 547,
+      "modules": [
+        "EXPERT"
+      ],
+      "contribution": "后续按边际价值扩展专家，未因规划而启动"
+    },
+    {
+      "id": "P3-DECISION-001",
+      "issue": 548,
+      "modules": [
+        "EXPERT",
+        "CLOSEOUT"
+      ],
+      "contribution": "后续有界优化组合机制，保留硬约束"
+    },
+    {
+      "id": "META-TRACE-001",
+      "issue": 2,
+      "modules": [
+        "TRACE"
+      ],
+      "contribution": "维护项目可追溯机制；本轮接入学习MVP，既有长期任务继续保留"
+    },
+    {
+      "id": "P10-DATA-STAGE34-PREFIX-001",
+      "issue": 566,
+      "modules": [
+        "DATA",
+        "REFERENCE",
+        "S03",
+        "S04"
+      ],
+      "contribution": "固定128家2021上市前缀的限定来源资格；P10交接与P5参考、候选评价和消费者准入分开验收"
+    },
+    {
+      "id": "P10-DATA-STAGE34-ROUTE-002",
+      "issue": 571,
+      "modules": [
+        "DATA",
+        "REFERENCE",
+        "S03",
+        "S04"
+      ],
+      "contribution": "245家2021潜在身份路线的零采集现存来源资格；与旧128交接、研究参考、质量及消费者准入分开验收"
+    }
+  ]
+}

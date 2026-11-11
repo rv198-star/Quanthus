@@ -1,4 +1,27 @@
-# META-OPS-CN02-001: Move the Quanthus project to CN02
+# CN02 project runtime ownership
+
+Parent: [work-item index](index.md). Governing design: [P10](../design/lld/12-permanent-data-line.md), [P6](../design/lld/08-validation-governance.md).
+
+## Current runtime ownership: CN02 only
+
+The Owner removed OCI from future Quanthus responsibility on 2026-10-22.
+Do not query OCI as a P6 writer or carry OCI/NexusAgent connectivity as a P6
+activation prerequisite. Earlier OCI receipts remain archival evidence.
+CN02 single-writer, frozen admission, PIT and explicit deployment gates still
+apply. This records ownership and authorizes no service start or migration.
+
+The bounded source-code integration is tracked in
+[p6-main-integration.md](p6-main-integration.md); the completed historical scope
+is recorded by [the P6 work item](p6-cn02-start.md). Detailed migration receipts
+remain on the preserved original task branch, not a new deployment instruction.
+
+## Historical migration preparation from 2026-10-20
+
+The following original preparation inventory is retained for design and receipt traceability. The current CN02-only ownership above supersedes earlier OCI prerequisites and future node roles in this historical text.
+
+The 2026-11-11 integration checkpoint retains CN02 Daily/Recovery at pipeline revision `76b242de1752d5dfd448f32a3ccbec2e9087071a` and the existing release image. Base 2.5.1 is sealed with materialization `adce892e` and audit `19e2926a`; [#600](https://github.com/rv198-star/Quanthus/issues/600) records the receipts and [#601](https://github.com/rv198-star/Quanthus/issues/601) retains the deferred independent-node reconstruction. This source integration changes no deployed entry or consumer admission.
+
+## META-OPS-CN02-001: Move the Quanthus project to CN02
 
 | Field | Value |
 | --- | --- |
@@ -10,7 +33,7 @@
 | Platform design | [Platform Kernel](../design/lld/11-platform-kernel.md); ADR 0010 and ADR 0012 |
 | Current runtime | Read the exact deployment inventory in the sole live ledger; repository examples are not installed-state evidence |
 
-## Goal and completion boundary
+### Goal and completion boundary
 
 CN02 must host the Quanthus functions and retained state needed to replace CN01 and
 OCI: code, acquisition/build schedules, ODS/DWD Base and increments, referenced
@@ -22,7 +45,7 @@ operation must no longer require either old node. Base 2.4 is the completed data
 foundation; its image acceptance does not establish project migration or consumer
 activation.
 
-### Current sequence: preserve data first, defer OCI systems
+#### Current sequence: preserve data first, defer OCI systems
 
 The Owner subsequently directed on 2026-10-20 that OCI application/system rebuilds
 may wait until development needs them. This supersedes the immediate runtime-build
@@ -72,7 +95,7 @@ research, training or strategy/economic evaluation to demonstrate infrastructure
 health. Existing protected artifacts may be transferred as opaque, access-controlled
 bytes under an exact inventory; they must not be rendered into review reports.
 
-### Daily activation successor authority
+#### Daily activation successor authority
 
 The source SDK adapter retains every original response before checking the
 returned security identity. A successful SDK status does not admit rows for a
@@ -110,7 +133,7 @@ and one 21:15 bounded recovery opportunity. Installed and enabled state must be
 verified on the node, not inferred from these files. A full product still requires
 real source qualification and independent cold evidence, including on new paths.
 
-## One deployment inventory and one live status
+### One deployment inventory and one live status
 
 Use the existing `current-gaps.json` under
 `/srv/agentdock/AgentDock/base22-review-afe2526/base231-budget-exhaustion-continuation-20261015T153555Z-c887578`.
@@ -138,7 +161,7 @@ complete inventory of OCI analytical artifacts. The retained development bundle
 is legacy ADS evidence, not proof of an active generic DWS service or of Base 2.4
 compatibility. Inventory what exists; do not build a new generic warehouse layer.
 
-## Daily target: daily and native 5m, completed on T
+### Daily target: daily and native 5m, completed on T
 
 The Owner confirmed on 2026-10-20 that CN01's historical T/T+1 acquisition covered
 both 1m and 5m. The CN02 successor must instead use the Base 2.4 default in
@@ -165,7 +188,7 @@ they do not hold unrelated qualified Daily output unless its existing consumer
 contract requires them. Data availability on T does not change the active
 `close-to-next-open-v1` execution rule: earliest execution remains T+1 open.
 
-### Frozen-input pipeline and proposed daily window
+#### Frozen-input pipeline and proposed daily window
 
 The Owner's 2026-10-20 window is a 17:00–18:00 start with delivery before 21:00
 Shanghai. `config/pipelines/base24-daily-window.v1.json` selects 17:30 and enforces
@@ -235,7 +258,7 @@ and source/network denial remain explicit acceptance modes, not replaced by the
 in-process product replay. Rollback before activation is to leave these examples
 uninstalled; the old writer and all existing source/services remain unchanged.
 
-## Select OCI assets before transfer
+### Select OCI assets before transfer
 
 For each installed Quanthus unit, image, volume and artifact root, record its
 actual consumer/reference, current function, source/configuration identity,
@@ -268,7 +291,7 @@ state before target builds. This finding is not evidence of market-data corrupti
 Source services/images remain untouched until the separately confirmed retirement
 procedure; selecting an asset out of the target does not authorize deleting it.
 
-## Dependency graph and parallel execution
+### Dependency graph and parallel execution
 
 ```mermaid
 flowchart TD
@@ -306,7 +329,7 @@ them when their closure is unchanged. Job-local transfer/check scratch is TMP.
 Published Run/ADM/evidence volumes and durable PostgreSQL state are not TMP and
 must not be swept by the earlier non-2.4 backup cleanup request.
 
-## Work packages and acceptance
+### Work packages and acceptance
 
 | Package | Concrete work | Completion evidence |
 | --- | --- | --- |
@@ -318,7 +341,7 @@ must not be swept by the earlier non-2.4 backup cleanup request.
 | M6 single-writer cutover | Produce and review drain order, final transfer, exact commands, failure conditions and paired rollback; then execute only the separately confirmed cutover | Old writers/submitters fenced before enabling new writers; actual CN02 scheduled run and delivery; no normal runtime reads, code, database, queue, remote fetch or proxy dependency on CN01/OCI |
 | M7 retirement | Disable only superseded Quanthus entrypoints after acceptance; preserve old code/state/config for the agreed rollback window | Independent restore proof, exact allowlist and retained recovery identities; unrelated applications and sealed research ledgers unchanged |
 
-## Database, artifacts and secrets
+### Database, artifacts and secrets
 
 PostgreSQL contains users, sessions/MFA bindings, security audit, Job/lease state,
 Run indexes and active evidence pointers. Copying Parquet alone is not application
@@ -351,7 +374,7 @@ bindings still work. Record paths/ownership and continuity checks, never secret
 contents or private keys in the repository or readable review export. Stop only
 the affected step if a new credential, permission or provider purchase is required.
 
-## Capacity and runtime differences
+### Capacity and runtime differences
 
 Freeze same-UTC filesystem/device capacity and memory for each actual write batch.
 Budget existing Base files, current upload scratch, incoming logical dump/artifacts,
@@ -368,7 +391,7 @@ per-role peaks and the combined live set, then version the necessary scheduling/
 resource configuration while preserving application semantics and lease contracts.
 The financial/domain sample's 2 GiB DuckDB limit is not a whole-platform budget.
 
-## Cutover, rollback and final completion
+### Cutover, rollback and final completion
 
 Prepare commands against actual deployed units and Compose versions. Include path
 and socket activation, queue submitters, manual entrypoints and backup jobs, not
@@ -390,7 +413,7 @@ no-CN01/no-OCI dependency check pass. A Weekly not yet due is not a fabricated
 successful run. Consumer and research gates remain unchanged. The separately
 accepted Base image remains complete even while these migration gates are open.
 
-## Reporting and validation
+### Reporting and validation
 
 Report separately: Base 2.4 data product, Daily/Weekly continuation, platform/state
 migration, and final cutover/retirement. The former 70% engineering estimate covers
@@ -405,7 +428,7 @@ accepted artifacts and deployment status are not changed by this preparation.
 Run focused documentation/ownership contracts and `make check` before handoff.
 Unit and synthetic checks are engineering evidence, not migration acceptance.
 
-### Daily interrupted-source recovery
+#### Daily interrupted-source recovery
 
 The first real CN02 market acquisition on 2026-10-20 reached its explicit one-hour
 budget before completing the population. SDK responses are captured at both the

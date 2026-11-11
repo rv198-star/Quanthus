@@ -1,0 +1,530 @@
+{
+  "schema_version": "quanthus.exploration-memory.v1",
+  "grants_authority": false,
+  "records": [
+    {
+      "id": "CON-HEAD2-MARCH-20261029",
+      "recorded_at": "2026-10-29T11:03:04.933411+00:00",
+      "actor": "Codex; Owner-approved engineering mechanism",
+      "question_id": "CON-HEAD2-MARCH-20261029-QUESTION",
+      "family": "head2-entry-filter",
+      "work_item": "META-LEARN-001",
+      "modules": [
+        "S02",
+        "EXPERT"
+      ],
+      "question": "March 截止的 Head2 入场候选是否通过固定用途采用门槛？",
+      "consumer": "Quanthus research task selection and existing expert consumers",
+      "scope": "TRAIN20 / EVAL87，2021-03-31训练截止，原固定基准和用途；回溯研究。",
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "reject_candidate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "只拒绝此候选的此用途；不证明所有Head2或12+X无效；不授予P6/生产资格。",
+      "decision_effect": "停放此入场过滤方向的新fit、特征追加和截止调整；交付独立合格组件，不自动转向3/4。",
+      "reopen_conditions": [
+        "出现有独立证据支持的不同消费者问题。",
+        "对应范围的来源、参考和评价资格以及新任务预算明确；旧曝光不清零。"
+      ],
+      "retained_assets": [
+        "复用已支持的读取器、编码器、Facts和比较接口。",
+        "历史March拟合驱动P2仍开放，排除在支持接口外。"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "历史尝试消耗仍见原收据；本次未重建总量，不把未知计为零。下一批预算与原成本分开。",
+      "attempt_refs": [],
+      "evidence": [
+        {
+          "id": "MARCH",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "075a02885be6656abcc9cb1de15b20c2fda34657",
+          "path": "docs/acceptance/learning-march-astra-review-20261029.md",
+          "sha256": "9fec4bea6792095b4408852432e023df64b5e489c67379b999defd96e19670d0",
+          "claim_ceiling": "只拒绝此候选的此用途；不证明所有Head2或12+X无效；不授予P6/生产资格。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261028T202135817023Z",
+        "CP-540-20261029T083255376941Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "id": "CON-HELD-NEED-20261029",
+      "recorded_at": "2026-10-29T11:03:04.936783+00:00",
+      "actor": "Codex; Owner-approved engineering mechanism",
+      "question_id": "CON-HELD-NEED-20261029-QUESTION",
+      "family": "held-structure-action-mapping",
+      "work_item": "P3-EXPERT-007",
+      "modules": [
+        "EXPERT"
+      ],
+      "question": "完整既有持仓轨迹是否支持追加结构决策试验？",
+      "consumer": "Quanthus research task selection and existing expert consumers",
+      "scope": "538 episodes / 8393 reviews；既有回溯轨迹；16个旧建议15个被安全退出覆盖，1个改变动作。",
+      "execution_status": "completed",
+      "verdict": "inconclusive",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "不是新的经济效果实验，也未观测所有入场/资金分配替代方案；不外推需求不存在。",
+      "decision_effect": "当前没有成立的可重复未满足需求；不新开结构阈值试验；先接入已合格资产。",
+      "reopen_conditions": [
+        "有具体未满足消费者需求及可检验的增量决定。"
+      ],
+      "retained_assets": [
+        "完整trace核对、专家/veto接口可按原等级复用。"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "历史尝试消耗仍见原收据；本次未重建总量，不把未知计为零。下一批预算与原成本分开。",
+      "attempt_refs": [],
+      "evidence": [
+        {
+          "id": "HELD",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "075a02885be6656abcc9cb1de15b20c2fda34657",
+          "path": "docs/work-items/learning-delivery-20261029.md",
+          "sha256": "bb71626138c331faad2b12736613da09c8e22e6c0c991f40c2689dfe0c080f75",
+          "claim_ceiling": "不是新的经济效果实验，也未观测所有入场/资金分配替代方案；不外推需求不存在。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T083255376941Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "id": "CON-STAGE34-SOURCE-20261029",
+      "recorded_at": "2026-10-29T11:03:04.940326+00:00",
+      "actor": "Codex; Owner-approved engineering mechanism",
+      "question_id": "CON-STAGE34-SOURCE-20261029-QUESTION",
+      "family": "stage34-purpose-qualified-reference",
+      "work_item": "P5-STATE-002",
+      "modules": [
+        "S03",
+        "S04"
+      ],
+      "question": "245身份的现有路线是否具备3/4评价所需来源和独立参考？",
+      "consumer": "Quanthus research task selection and existing expert consumers",
+      "scope": "只检查已选定现存inventory；身份数量不等于合格参考容量。",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "仅所查来源路线未合格；不证明全局无来源或3/4无用。",
+      "decision_effect": "停放当前来源路线下的训练和评分；不记录为状态3/4无效；独立合格业务继续。",
+      "reopen_conditions": [
+        "准确的目的兼容行动来源闭包和独立参考准入材料齐备。",
+        "明确实际用途与有限预算；补采仍由P10及相应授权负责。"
+      ],
+      "retained_assets": [
+        "保留既有来源评估和表示工程；不将未评分当作负标签。"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "历史尝试消耗仍见原收据；本次未重建总量，不把未知计为零。下一批预算与原成本分开。",
+      "attempt_refs": [],
+      "evidence": [
+        {
+          "id": "STAGE34",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "075a02885be6656abcc9cb1de15b20c2fda34657",
+          "path": "docs/acceptance/stage34-reference-route-20261028.md",
+          "sha256": "766e6f54dc0b150f2ca16814188320c2afebc87063de14805b91829126ebc5f3",
+          "claim_ceiling": "仅所查来源路线未合格；不证明全局无来源或3/4无用。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261027T192528495073Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "recorded_at": "2026-10-29T12:20:02.539271+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved bounded steps1-3",
+      "work_item": "META-LEARN-001",
+      "execution_status": "completed",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "本轮实际脚本耗时和资源见job收据；包括准备/交接的完整AI成本未汇总，不填零；旧研究成本与曝光完整保留。",
+      "attempt_refs": [],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T121833583946Z"
+      ],
+      "supersedes": null,
+      "id": "CON-CONSUMER-DELIVERY-20261029",
+      "question_id": "NEXT-ASSET-CONSUMER-001",
+      "family": "learning-asset-consumer-delivery",
+      "modules": [
+        "EXPERT",
+        "CLOSEOUT"
+      ],
+      "question": "已有资产能否通过现有专家消费者形成可运行且解释拒绝/未知原因的调用交付？",
+      "consumer": "FormalStrategyRunner / existing aggregator research caller",
+      "scope": "当前普通代码及冻结registry；合成输入四类行为与完整输出身份，未接入新的真实市场或模型用途。",
+      "verdict": "supported",
+      "disposition": "park",
+      "claim_ceiling": "支持调用说明和接口工程交付；不提升模型质量、经济价值、历史PIT、P6或生产准入。",
+      "decision_effect": "采用现有指南交付，不新造runner或adapter；该说明需求关闭，进一步扩建停放。",
+      "reopen_conditions": [
+        "具名实际调用方发现指南无法覆盖的可复现接口缺口。"
+      ],
+      "retained_assets": [
+        "现有正式策略消费者/聚合器API。",
+        "已执行验证的调用指南及JSON原因、政策/拓扑/证据身份。"
+      ],
+      "evidence": [
+        {
+          "id": "CALL",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/learning-consumer-cycle-20261029T120743Z/evidence/consumer-example.json",
+          "sha256": "89b971765c4228245f642fe5d2e82f26f27fe8dfc8caccb999cdcbe05a151b87",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "现有正式消费API的合成调用与未知/弃权/否决保持；不是生产或科学验收。"
+        }
+      ]
+    },
+    {
+      "recorded_at": "2026-10-29T12:20:02.539271+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved bounded steps1-3",
+      "work_item": "META-LEARN-001",
+      "execution_status": "completed",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "本轮实际脚本耗时和资源见job收据；包括准备/交接的完整AI成本未汇总，不填零；旧研究成本与曝光完整保留。",
+      "attempt_refs": [],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T121833583946Z"
+      ],
+      "supersedes": null,
+      "id": "CON-DECISION-SELECTION-20261029",
+      "question_id": "NEXT-DECISION-NEED-001",
+      "family": "existing-decision-gap-selection",
+      "modules": [
+        "EXPERT",
+        "CLOSEOUT"
+      ],
+      "question": "已有持仓和入场证据是否支持一个新的有价值最小比较？",
+      "consumer": "Learning work selection for existing algorithmic decisions",
+      "scope": "三类已知需求；已消费8393持仓复核、原790入场诊断和后续March固定用途失败结论；不是全项目需求穷举。",
+      "verdict": "inconclusive",
+      "disposition": "park",
+      "claim_ceiling": "没有在当前证据确立新实质缺口；未观测不等于没有，全项目学习价值未被否定。",
+      "decision_effect": "NO_GO新比较；第三步NOT_RUN_CONDITION_NOT_MET；保留交付资产，后续无具体需求则停止探索。",
+      "reopen_conditions": [
+        "具体观察到的未满足消费者决定及允许替代动作。",
+        "用途兼容输入/参考及有限成本明确；保留原曝光、失败和费用，不调整阈值或补采。"
+      ],
+      "retained_assets": [
+        "原持仓普查、入场诊断和March结论按身份复用。",
+        "本轮安全需求筛选矩阵及不运行第三步的理由。"
+      ],
+      "evidence": [
+        {
+          "id": "SELECT",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/learning-consumer-cycle-20261029T120743Z/evidence/decision-selection.json",
+          "sha256": "80b9cc2fd2743d9f0f464083b5f7210a85dc12f628153e120dad532158564c6b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "已消费安全统计及原报告上的任务选择；不证明全局不存在其他决策缺口。"
+        }
+      ]
+    },
+    {
+      "id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "recorded_at": "2026-10-29T13:43:26.298616+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved three-step delivery",
+      "work_item": "META-LEARN-001",
+      "question_id": "HISTORICAL-DECISION-REVIEW-001",
+      "family": "historical-decision-review-delivery",
+      "modules": [
+        "FACTS",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "能否从准确已消费轨迹交付可直接查阅、可追溯的历史决定解释？",
+      "consumer": "Owner和已有研究调用方；只读回溯查阅",
+      "scope": "固定351成员的2012–2021轨迹；8393审查/538事件/343证券；原2026-10-25实际观察截止保持。",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "真实工程查阅能力与精确追溯已验证；不是新科学样本、投资增益、历史PIT、模型或交易准入。",
+      "decision_effect": "交付CLI/JSON/离线HTML及待审工程变更。没有确认一个新决策缺陷，不自动重开Head2、量能或阈值比较。",
+      "reopen_conditions": [
+        "现有调用者提出一个被准确事件和原字段支撑的未满足决定或具体查阅缺陷。",
+        "新增研究另需有限问题/资格/用途/预算，不以本工具可运行替代准入。"
+      ],
+      "retained_assets": [
+        "准确投影代码、冻结输入契约、模型/用途身份回归、使用说明。",
+        "独立构建、全键普查、12类原字段核验、无源/无网络冷读及损坏拒绝证据。",
+        "既有科学停放结论、所有原失败、曝光和未知成本保持。"
+      ],
+      "evidence": [
+        {
+          "id": "FIELDS",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-review-delivery-20261029T130059Z/evidence/independent-fields.safe.json",
+          "sha256": "8444ea65b55f6f6eb14bd7654a5c1b949503fdcd0edce7b9f8b808e7b2d953db",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "全8393键及12类原字段独立读取核验；不是全量新科学验证"
+        },
+        {
+          "id": "COLD",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-review-delivery-20261029T130059Z/evidence/cold-acceptance.safe.json",
+          "sha256": "b45c0f129429c13ba24290cd0359eaf6c85e2296903775665dca30e4d2cf8a1a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "无源目录的隔离冷读和损坏/缺文件失败关闭；原模型用途等级不变"
+        },
+        {
+          "id": "BUILD",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-review-delivery-20261029T130059Z/evidence/independent-build.safe.json",
+          "sha256": "a2edfee2405605b9f90a8ae438c6165e41327d761c4455bdf0bbfa8886fe7dc8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "两份真实投影独立构建、文件字节一致及不同inode；没有重训模型"
+        },
+        {
+          "id": "VIEW",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-review-delivery-20261029T130059Z/evidence/review-deliverable.safe.json",
+          "sha256": "7a782593b3ad6e66ff6feda107c5ab303d497da775747ba1ac681bc1776fe753",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "准确封存镜像和12类离线复盘视图可使用；不推断投资效用"
+        }
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "本job脚本墙钟、输出字节和RSS逐项记录；包含AI与暂停在内的完整人工/模型成本未统一汇总，不填零。原研究累计成本和曝光仍保留；原型及正式独立构建分别记账。",
+      "attempt_refs": [
+        "cn02:/srv/quanthus-base22-data/jobs/decision-review-delivery-20261029T130059Z/logs/build-primary-final.txt",
+        "cn02:/srv/quanthus-base22-data/jobs/decision-review-delivery-20261029T130059Z/logs/independent-build.txt"
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T134116537370Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "id": "CON-RECORDED-B-CHAIN-20261029",
+      "recorded_at": "2026-10-29T15:43:57.968158+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved original B decision-chain delivery",
+      "work_item": "META-LEARN-001",
+      "question_id": "RECORDED-B-DECISION-CHAIN-001",
+      "family": "recorded-decision-chain-delivery",
+      "modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "能否用原B准确记录交付从入场决定到原模拟成交、持仓和退出的可追溯查阅链？",
+      "consumer": "Owner及已有研究调用者的历史审查，不参与交易或新研究比较",
+      "scope": "原B2012–2021精确记录及#580原持仓投影；22955入场/8393持仓/17062事件。",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "只读工程查阅和原字段/连接证明；不是策略/预测增益、历史PIT、反事实或交易资格。",
+      "decision_effect": "交付原模拟完整记录链和7类案例；分配考虑不等于订单、缺失理由未知；无新可改变决定的科学用途证据，不自动重开比较或P6。",
+      "reopen_conditions": [
+        "具体调用者提出准确事件和原字段支持的未满足决定或可重复工程缺陷。",
+        "新增研究另须用途、资格和有限预算；全部旧失败、曝光和成本保留。"
+      ],
+      "retained_assets": [
+        "准确B适配、冻结契约、查询/离线HTML和合成回归。",
+        "原B/#580字节相等、独立引用核对、两次隔离冷读和负测收据。",
+        "原停放/拒绝/未知成本保留；本地原环境失败和复验分别保留。"
+      ],
+      "evidence": [
+        {
+          "id": "CHAIN_FIELDS",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/independent-fields.safe.json",
+          "sha256": "bb7ad5105bb6708a5e142a3763581de71fa4539117f1de973321f6aa8c148b44",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原B11文件逐字相等、完整入场/持仓/引擎分母及独立引用和行动单元核对；不做经济计算"
+        },
+        {
+          "id": "CHAIN_COLD",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/cold-acceptance.safe.json",
+          "sha256": "03cb08eda1786953bc38f328f0913048d481af9d281c6093afe3efa95de9ddb0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "一份独立实体副本两位置/两新进程、空文件系统与网络命名空间、native旧源打开/网络连接0和损坏/缺失拒绝"
+        },
+        {
+          "id": "CHAIN_VIEW",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/query-delivery.safe.json",
+          "sha256": "b4db69c640da046cb117a11e581f4cf23b2a05ff74086668f03bc15631d65974",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "准确只读包及7类实际案例，未知和原模拟身份保留；不是新策略"
+        },
+        {
+          "id": "CHAIN_CHECK",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/post-test-code-closure.safe.json",
+          "sha256": "29b34aa101579ddcab4ba6b21e25089a97f7534fc9c861cbbbddc3657af71aae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "1479文件与本地全仓/环境复验完全同字节；不是GitHub CI通过"
+        }
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "本job激活墙钟和脚本/RSS/字节在交接实测；模型token/计费不可完整归因，不填零。插件载入失败、一次完整make和15项环境复验均保留，不重跑科学实验。",
+      "attempt_refs": [
+        "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/initial-plugin-import-make-check.safe.json",
+        "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/make-check.safe.json",
+        "cn02:/srv/quanthus-base22-data/jobs/decision-chain-delivery-20261029T145734Z/evidence/environment-recheck.safe.json"
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T154357968158Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "recorded_at": "2026-10-29T16:52:34.415776+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved 1–3",
+      "work_item": "META-LEARN-001",
+      "question_id": "ENTRY-ALLOCATION-DELIVERY-001",
+      "family": "entry-allocation-observability",
+      "modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "能否交付准确原B漏斗，并保存现成分配结果而不改变交易？",
+      "consumer": "Owner和已有只读研究复核方",
+      "scope": "原B2012–2021已消费记录/实际2026回溯观察截止；新audit仅合成，无新经济路径。",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "工程观测与查阅；13519旧原因未知不是策略负结果，非投资价值/历史PIT/生产P6准入。",
+      "decision_effect": "交付中文漏斗/可选sidecar；停止历史原因恢复，不重开新比较或改变阈值/分配规则。",
+      "reopen_conditions": [
+        "准确原事件支持具体未满足消费决定及允许替代动作。",
+        "未来另有合格运行授权时选择audit，不补造旧记录。"
+      ],
+      "retained_assets": [
+        "中文离线漏斗、来源身份JSON和原行定位。",
+        "原提交/开关七文件等同、一次分配/序列化及合成成本证据。",
+        "旧输入不变、独立统计、隔离冷读；旧失败/费用/曝光不清零。"
+      ],
+      "evidence": [
+        {
+          "id": "FUNNEL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/evidence/funnel-delivery.safe.json",
+          "sha256": "b18a548a9663fabfb7fd286dd23904b98ef263b43cd14ae9a0712245bc7fa5c3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原B完整漏斗与独立连接；不是策略增益"
+        },
+        {
+          "id": "AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/evidence/synthetic-behavior-cost.safe.json",
+          "sha256": "43285972cf1ab658eb57f2ac6d8d9ec913d3c54763eb735e4408f2bfd7117013",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "原提交/开关audit七文件相等，仅合成"
+        },
+        {
+          "id": "COLD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/evidence/cold-funnel.safe.json",
+          "sha256": "be4ae770c5ed9e405922c66303229dd6b979c3d4e431222a46df1c83bae91f2d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "隔离新进程无旧源/网络；旧包构建证明复用"
+        }
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "脚本/RSS/字节有实测；完整AI token/计费不能归因，不填零。保留初次preflight、fixture错误及Git超时，旧费用/曝光不清零。",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/logs/proposal-preflight.txt",
+        "cn02:/srv/agentdock/.codex/entry-allocation-delivery-20261029T163322Z/logs/focused-audit-initial.txt"
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T164848737757Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "recorded_at": "2026-10-29T21:09:39.133468+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved conditional 1–3",
+      "question_id": "ENTRY-ALLOCATION-CONSUMER-001",
+      "family": "entry-allocation-consumer-adoption",
+      "work_item": "META-LEARN-001",
+      "modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "目前是否有实际、近期且已获准合格的调用任务需要新增allocation audit接入？",
+      "consumer": "具名FormalP2ReplayBackend/P3Strat003ReplayRuntime维护者与Owner",
+      "scope": "列明代码入口、当前任务/激活记录、#540/#545/#546及有界open issue/PR快照；无行情/标签/经济结果读取。",
+      "claim_ceiling": "仅本轮当前接入条件未成立；不等于未来无需求、工程能力无用或策略价值负结果。",
+      "decision_effect": "按第一步条件收口；第2/3步NOT_RUN_CONDITION_NOT_MET，不增接线/日志、不为补旧审计重放；PR589能力按原级保留。",
+      "cost_review": "需求检查514.246秒；完整检查及交接另记实际receipt。模型token、完整费用与历史费用未知不填零，保留初次提案/工具失败和旧研究投入。",
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "reopen_conditions": [
+        "具名近期任务及负责调用方确需一个未满足的分配审计决定。",
+        "绑定精确输入/用途/窗口/配置及有限运行预算，按现有门槛取得执行资格。",
+        "仅对新运行显式选择audit；旧缺失原因保持NOT_RECORDED，不自动回放或追补。"
+      ],
+      "retained_assets": [
+        "PR589已交付的默认关闭allocation_audit与旧七文件行为证据；不重写旧封存产物。",
+        "具名调用入口和有界需求评估，避免以可能的未来复用为由持续制造接线工作。",
+        "旧漏斗/费用/曝光/负结果和Head2、P6停放状态。"
+      ],
+      "evidence": [
+        {
+          "id": "CALLER-ASSESSMENT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/entry-allocation-consumer-20261029T210011Z/evidence/caller-assessment.safe.json",
+          "sha256": "7099680e577d15a4bbb3c71c703424e50c74d3f56e093def0c0d8b0dca02c3df",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅所列调用入口及当前任务的有界需求检查，不是全局无需求或策略价值负结果。"
+        }
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/.codex/entry-allocation-consumer-20261029T210011Z/logs/proposal-preflight.txt",
+        "cn02:/srv/agentdock/.codex/entry-allocation-consumer-20261029T210011Z/logs/proposal-preflight-v2.txt"
+      ],
+      "blueprint_checkpoints": [
+        "CP-540-20261029T164848737757Z",
+        "CP-540-20261029T210855864308Z"
+      ],
+      "supersedes": null
+    }
+  ]
+}

@@ -1,5 +1,15 @@
+# P10 data pipeline image
 
-### Reference-import failure continuation (v1)
+Build and operation instructions: [container runbook](../../docs/operations/p10-container-jobs.md).
+Source integration and verification: [P10-DATA-OPS-016](../../docs/work-items/p10-container-main-integration.md).
+
+The image contains versioned code/runtime only. Acquisition through ODS/DWD,
+scoped Weekly, operational mail, GDrive transport and TMP housekeeping use explicit
+roles of that image. Data, state and secrets stay in configured host binds. The
+checked-in examples are not deployable until their exact identities and private
+paths are provisioned and independently qualified.
+
+## Reference-import failure continuation (v1)
 
 Source bundles include the exact tracked `pyproject.toml` as well as `src` and
 `config`. Collector subprocesses run with their own bundle as working directory;

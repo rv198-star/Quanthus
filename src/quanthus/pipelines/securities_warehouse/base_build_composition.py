@@ -21,7 +21,7 @@ from .base23_native_image import (
     validate_selection,
 )
 from .base24_delivery import PURPOSE
-from .base_build_delta import _connection, relation
+from .base_build_delta import LINEAGE, _connection, relation
 from .base_build_inputs import (
     GENERIC_KINDS,
     _tree,
@@ -156,13 +156,39 @@ def build_composition_plan(*, predecessor: Path, delta: Path, rules: dict[str, A
             with _connection(budget) as connection:
                 old = relation([member(predecessor, i["path"]) for i in inherited])
                 new = relation([member(delta, i["path"]) for i in added])
-                keys = [k for k in rules["tables"][table]["business_key"]
-                        if k != "effective_from"]
+                business = list(rules["tables"][table]["business_key"])
+                names = pq.ParquetFile(member(delta, added[0]["path"])).schema_arrow.names
+                values = [name for name in names if name not in LINEAGE]
+                fact = " AND ".join("a." + identifier(name)
+                                   + " IS NOT DISTINCT FROM b." + identifier(name)
+                                   for name in values)
+                keys = [k for k in business if k != "effective_from"]
                 overlap = " AND ".join("a." + identifier(k) + " IS NOT DISTINCT FROM b."
                                        + identifier(k) for k in keys)
-                if connection.execute("SELECT 1 FROM " + new + " a JOIN " + old
-                                      + " b ON " + overlap + " LIMIT 1").fetchone() is not None:
+                # Reusing an inherited identity with a new effective interval or
+                # new business values stays rejected exactly as before.
+                if connection.execute(
+                    "SELECT 1 FROM " + new + " a JOIN " + old + " b ON " + overlap
+                    + " WHERE NOT (" + fact + ") LIMIT 1",
+                ).fetchone() is not None:
                     raise BoundedError("BUILD_COMPOSITION_IDENTITY_EXTENSION_OVERLAPS_PREDECESSOR")
+                # The identical fact may only gain a strictly earlier knowledge
+                # version; a restatement at or after the predecessor clock adds
+                # no admissible earlier observation and stays rejected.
+                if connection.execute(
+                    "SELECT 1 FROM " + new + " a JOIN " + old + " b ON " + overlap
+                    + " WHERE " + fact + " AND a.knowledge_from>=b.knowledge_from LIMIT 1",
+                ).fetchone() is not None:
+                    raise BoundedError("BUILD_COMPOSITION_IDENTITY_EXTENSION_REWRITES_PREDECESSOR")
+                # A genuinely new identity must still become effective inside the
+                # admitted interval, exactly as before.
+                lower, upper = binding["predecessor_through"], binding["through_date"]
+                if connection.execute(
+                    "SELECT 1 FROM " + new + " a WHERE NOT EXISTS (SELECT 1 FROM " + old
+                    + " b WHERE " + overlap + ") AND (CAST(a.effective_from AS DATE)<=DATE '"
+                    + lower + "' OR CAST(a.effective_from AS DATE)>DATE '" + upper + "') LIMIT 1",
+                ).fetchone() is not None:
+                    raise BoundedError("BUILD_COMPOSITION_NEW_IDENTITY_EFFECTIVE_OUTSIDE_INTERVAL")
         if table in period_files and (not added or sum(i["rows"] for i in added)
                                         != period["tables"][table]["output_rows"]):
             raise BoundedError("BUILD_COMPOSITION_PERIOD_CENSUS_CHANGED")

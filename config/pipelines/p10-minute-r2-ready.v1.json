@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "policy_id": "p10-1m-r2-minimum-ready-v1",
+  "authority": "Owner 2026-10-10: R3=0 and physically qualified minimum R2 is READY, without R2 secondary approval",
+  "scope": "P10 source-native 1m current and separately versioned Oct 08 historical correction successor",
+  "ready_if": {
+    "all_verified_traded_securities_have_grade": ["R0", "R1", "R2"],
+    "R3_count_equals": 0,
+    "admitted_raw_equals_traded_count": true,
+    "requires_sha_sealed_physical_Ods_Dwd_verification": true,
+    "suspended_excluded_from_traded_population": true,
+    "requires_extra_per_board_or_R0_R1_threshold": false,
+    "requires_R2_additional_approval": false
+  },
+  "grade_admission": {
+    "R0": "real source, default gap-aware development research",
+    "R1": "real source with verified evidence, default gap-aware development research",
+    "R2": "real source, recorded defects and true missing intervals, default gap-aware development research",
+    "R3": "rejected from formal ODS/DWD; forensic quarantine only",
+    "SUSPENDED": "metadata only, excluded from traded count"
+  },
+  "hard_invariants": [
+    "unchanged_evidence_sha_and_point_in_time_truth",
+    "missing_minute_ohlcv_not_fabricated",
+    "per_security_grade_reason_and_missing_timestamps_preserved",
+    "strict_240_source_and_protected_P3_P5_P6_activation_unchanged",
+    "legacy_sealed_manifest_and_grade_rows_immutable"
+  ],
+  "existing_legacy_evidence": "new versioned READY qualification or physically rematerialized successor; never mutate old V1/V2 seal",
+  "notification": "one explicit PASS or FAIL when real sealed R2-minimum READY is established or fails",
+  "strict_consumer_rule": "consumer-specific genuine source/240-minute/auction requirement remains a data contract, not a new central R2 approval gate"
+}

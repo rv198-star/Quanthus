@@ -13,12 +13,13 @@ import json
 import os
 import shutil
 from collections.abc import Mapping
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any, Union
 
 from quanthus.aggregator import GovernedAction
 from quanthus.backtest.contracts import MARKET_TIMEZONE, EventType, OrderSide
@@ -28,6 +29,7 @@ from quanthus.backtest.inputs import (
     buy_open_rejection_reason,
     market_session_from_p1,
 )
+from quanthus.backtest.snapshot_clock import SnapshotReplayClock
 from quanthus.event_library.contracts import EventIdentity, EventRecord, event_record_from_dict
 from quanthus.expert_evaluation import ExpertEvaluationSpec, artifact_from_bytes
 from quanthus.expert_evaluation.experts.trend_stability import (
@@ -81,6 +83,11 @@ from quanthus.forward_validation.prospective_source import (
 from quanthus.forward_validation.scorecards import build_role_scorecard, load_scorecard_policy
 from quanthus.forward_validation.serialization import canonical_json_bytes, digest_value
 from quanthus.platform.jobs import input_digest
+
+if TYPE_CHECKING:
+    from quanthus.forward_validation.base24_cycle import P6Base24CycleRuntime
+
+P6Runtime = Union[P6ProspectiveRuntimeConfig, "P6Base24CycleRuntime"]
 
 _INPUT_SCHEMA = "quanthus.p6-forward-cycle-input.v1"
 _OFFICIAL_ARTIFACT_SCHEMA = "quanthus.p6-official-cycle.v1"
@@ -243,6 +250,7 @@ class ProspectiveTrendObservation:
     raw_value: str | None
     evidence_digest: str
     knowledge_cutoff: datetime
+    snapshot_mechanism_only: bool = False
 
     @property
     def digest(self) -> str:
@@ -250,8 +258,14 @@ class ProspectiveTrendObservation:
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "schema_version": "quanthus.p6-prospective-trend-observation.v1",
-            "population": "p6_prospective_daily_candidates",
+            "schema_version": (
+                "quanthus.p6-fixed-snapshot-trend-observation.v1" if self.snapshot_mechanism_only
+                else "quanthus.p6-prospective-trend-observation.v1"
+            ),
+            "population": (
+                "p6_fixed_snapshot_mechanism_candidates" if self.snapshot_mechanism_only
+                else "p6_prospective_daily_candidates"
+            ),
             "partition": "prospective",
             "event_id": self.event_id,
             "market_date": self.market_date.isoformat(),
@@ -293,7 +307,7 @@ class P6ForwardState:
     paper_equity_history: tuple[Mapping[str, object], ...]
 
 
-def _initial_forward_state(runtime: P6ProspectiveRuntimeConfig) -> P6ForwardState:
+def _initial_forward_state(runtime: P6Runtime) -> P6ForwardState:
     policy = load_paper_policy(runtime.bindings["paper_lane"], root=runtime.root)
     return P6ForwardState(
         market_date=None,
@@ -332,7 +346,7 @@ def _forward_state_to_dict(state: P6ForwardState) -> dict[str, object]:
 def _load_prior_forward_state(
     *,
     job_input: OfficialCycleJobInput,
-    runtime: P6ProspectiveRuntimeConfig,
+    runtime: P6Runtime,
     run_root: Path,
 ) -> P6ForwardState:
     if job_input.prior_run_id is None:
@@ -436,7 +450,7 @@ def _load_prior_forward_state(
 
 
 def _activation(
-    job_input: OfficialCycleJobInput, runtime: P6ProspectiveRuntimeConfig
+    job_input: OfficialCycleJobInput, runtime: P6Runtime
 ) -> P6ActivationDecision:
     decision = activation_decision_from_mapping(
         job_input.activation_decision,
@@ -451,7 +465,7 @@ def _activation(
 
 
 def _release(
-    job_input: OfficialCycleJobInput, runtime: P6ProspectiveRuntimeConfig
+    job_input: OfficialCycleJobInput, runtime: P6Runtime
 ) -> ProspectiveDwdRelease:
     package = (
         runtime.daily_root
@@ -462,7 +476,13 @@ def _release(
     if runtime.daily_root.resolve() not in package.parents:
         fail("path_escape", "daily DWD package")
     receipt = load_visibility_receipt(job_input.visibility_receipt)
-    release = verify_prospective_dwd_release(package, receipt)
+    from quanthus.forward_validation.base24_cycle import P6Base24CycleRuntime, verify_release
+
+    release = (
+        verify_release(package, receipt)
+        if isinstance(runtime, P6Base24CycleRuntime)
+        else verify_prospective_dwd_release(package, receipt)
+    )
     if (
         release.manifest_sha256 != job_input.manifest_sha256
         or release.content_digest != job_input.content_digest
@@ -473,7 +493,7 @@ def _release(
     return release
 
 
-def _trend_spec(runtime: P6ProspectiveRuntimeConfig) -> ExpertEvaluationSpec:
+def _trend_spec(runtime: P6Runtime) -> ExpertEvaluationSpec:
     artifact = artifact_from_bytes(runtime.bindings["trend_evaluation_spec"].read_bytes())
     if not isinstance(artifact, ExpertEvaluationSpec):
         fail("binding_type_mismatch", "trend evaluation spec")
@@ -511,12 +531,14 @@ def _feature_evidence(feature: object | None, event_id: str) -> str:
 
 def _build_entry_decisions(
     *,
-    runtime: P6ProspectiveRuntimeConfig,
+    runtime: P6Runtime,
     projection: P6ProspectiveProjection,
+    candidates: Any | None = None,
 ) -> tuple[list[dict[str, Any]], list[tuple[Any, Any, ProspectiveTrendObservation]]]:
-    candidates = scan_projection_candidates(
-        projection, candidate_rule=runtime.bindings["candidate_rule"]
-    )
+    if candidates is None:
+        candidates = scan_projection_candidates(
+            projection, candidate_rule=runtime.bindings["candidate_rule"]
+        )
     registry = ExpertStrategyRegistry(runtime.root)
     runner = FormalStrategyRunner(registry.card, registry.topology_manifest.digest)
     trend_config = load_trend_stability_config(runtime.bindings["trend_expert"])
@@ -547,6 +569,7 @@ def _build_entry_decisions(
                 raw_value=raw_value,
                 evidence_digest=_feature_evidence(feature, event.event_id),
                 knowledge_cutoff=event.knowledge_cutoff,
+                snapshot_mechanism_only=event.snapshot_replay_clock_json is not None,
             )
             context = build_formal_expert_context(
                 event=event,
@@ -578,11 +601,12 @@ def _build_entry_decisions(
 
 def _paper_and_shadow(
     *,
-    runtime: P6ProspectiveRuntimeConfig,
+    runtime: P6Runtime,
     projection: P6ProspectiveProjection,
     decisions: list[tuple[Any, Any, ProspectiveTrendObservation]],
     ledger: PaperLedgerState,
     unavailable_unit_ids: set[str],
+    snapshot_replay_clock: SnapshotReplayClock | None = None,
 ) -> tuple[
     PaperLedgerState,
     list[dict[str, object]],
@@ -659,7 +683,10 @@ def _paper_and_shadow(
                 target_maximum_position=decision.target_maximum_position,
                 reason_codes=decision.action.reason_codes,
             )
-            intent = project_paper_intent(policy=paper_policy, ledger=ledger, decision=sealed)
+            intent = project_paper_intent(
+                policy=paper_policy, ledger=ledger, decision=sealed,
+                snapshot_replay_clock=snapshot_replay_clock,
+            )
             if intent is None:
                 fail("paper_intent_missing", candidate.record.event_id)
             pending.append(intent)
@@ -738,9 +765,10 @@ def _fill_payload(events: tuple[Any, ...]) -> Mapping[str, Any] | None:
 
 def _settle_prior_intents(
     *,
-    runtime: P6ProspectiveRuntimeConfig,
+    runtime: P6Runtime,
     projection: P6ProspectiveProjection,
     prior: P6ForwardState,
+    reader: HistoricalReplayFrameReader | None = None,
 ) -> tuple[
     PaperLedgerState,
     tuple[PaperPendingIntent, ...],
@@ -755,7 +783,8 @@ def _settle_prior_intents(
     retained_contexts: dict[str, Mapping[str, object]] = {}
     settlements: list[dict[str, object]] = []
     current = projection.signal_market_date
-    with HistoricalReplayFrameReader(projection.bundle) as reader:
+    with (HistoricalReplayFrameReader(projection.bundle) if reader is None
+          else nullcontext(reader)) as reader:
         for intent in sorted(prior.pending_intents, key=lambda item: item.paper_intent_id):
             context = prior.pending_contexts.get(intent.paper_intent_id)
             if context is None:
@@ -841,7 +870,8 @@ def _held_event(source: EventRecord, projection: P6ProspectiveProjection) -> Eve
         source.candidate_rule_digest,
         source.snapshot_manifest_digest,
         cutoff,
-        cutoff,
+        (cutoff if source.snapshot_replay_clock_json is None else
+         SnapshotReplayClock(projection.signal_market_date, cutoff).simulated_close),
         source.eligibility_evidence_digest,
         source.feature_window_manifest_digest,
         source.isolation_group_id,
@@ -849,16 +879,22 @@ def _held_event(source: EventRecord, projection: P6ProspectiveProjection) -> Eve
         source.split_policy_version,
         source.split_policy_digest,
         source.split_assignment,
+        snapshot_replay_clock_json=(
+            None if source.snapshot_replay_clock_json is None else
+            SnapshotReplayClock(projection.signal_market_date, cutoff).to_json()
+        ),
     )
 
 
 def _review_held_positions(
     *,
-    runtime: P6ProspectiveRuntimeConfig,
+    runtime: P6Runtime,
     projection: P6ProspectiveProjection,
     ledger: PaperLedgerState,
     positions: dict[str, dict[str, object]],
     pending_intents: tuple[PaperPendingIntent, ...],
+    reader: HistoricalReplayFrameReader | None = None,
+    snapshot_replay_clock: SnapshotReplayClock | None = None,
 ) -> tuple[
     PaperLedgerState,
     dict[str, dict[str, object]],
@@ -876,7 +912,8 @@ def _review_held_positions(
     new_intents: list[PaperPendingIntent] = []
     contexts: dict[str, dict[str, object]] = {}
     current = projection.signal_market_date
-    with HistoricalReplayFrameReader(projection.bundle) as reader, projection.feature_panel() as panel:
+    with (HistoricalReplayFrameReader(projection.bundle) if reader is None
+          else nullcontext(reader)) as reader, projection.feature_panel() as panel:
         for unit_id in sorted(positions):
             metadata = positions[unit_id]
             unit = ledger.unit(unit_id)
@@ -992,7 +1029,10 @@ def _review_held_positions(
                 target_maximum_position=decision.target_maximum_position,
                 reason_codes=decision.action.reason_codes,
             )
-            intent = project_paper_intent(policy=policy, ledger=ledger, decision=sealed)
+            intent = project_paper_intent(
+                policy=policy, ledger=ledger, decision=sealed,
+                snapshot_replay_clock=snapshot_replay_clock,
+            )
             if intent is None:
                 decisions[-1]["paper_disposition"] = "no_reduction_quantity"
                 continue
@@ -1052,11 +1092,13 @@ def _settle_forecasts(
     *,
     projection: P6ProspectiveProjection,
     forecasts: tuple[Mapping[str, object], ...],
+    reader: HistoricalReplayFrameReader | None = None,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     updated = [dict(item) for item in forecasts]
     settlements: list[dict[str, object]] = []
     current = projection.signal_market_date
-    with HistoricalReplayFrameReader(projection.bundle) as reader, projection.feature_panel() as panel:
+    with (HistoricalReplayFrameReader(projection.bundle) if reader is None
+          else nullcontext(reader)) as reader, projection.feature_panel() as panel:
         for item in updated:
             status = str(item.get("status"))
             if status in {"abstained", "settled", "not_executable", "unavailable"}:
@@ -1229,7 +1271,7 @@ def _settle_forecasts(
 
 def _paper_equity_record(
     *,
-    runtime: P6ProspectiveRuntimeConfig,
+    runtime: P6Runtime,
     ledger: PaperLedgerState,
     market_date: date,
 ) -> dict[str, object]:
@@ -1247,7 +1289,7 @@ def _paper_equity_record(
 
 def _scorecards(
     *,
-    runtime: P6ProspectiveRuntimeConfig,
+    runtime: P6Runtime,
     decision_rows: list[dict[str, Any]],
     held_decisions: list[dict[str, object]],
     pending: tuple[PaperPendingIntent, ...],
@@ -1386,7 +1428,7 @@ def _run_id(input_digest_value: str) -> str:
 def run_official_cycle(
     *,
     job_input: OfficialCycleJobInput,
-    runtime: P6ProspectiveRuntimeConfig,
+    runtime: P6Runtime,
     staging: Path,
     run_root: Path,
 ) -> OfficialCycleResult:
@@ -1427,13 +1469,28 @@ def run_official_cycle(
     if work.exists():
         shutil.rmtree(work)
     work.mkdir(parents=True)
-    projection = build_prospective_projection(
-        config=runtime,
-        activation=activation,
-        target=release,
-        output_root=work / "projection",
-        collect_candidates=collection_active,
+    from quanthus.forward_validation.base24_cycle import (
+        Base24Release,
+        P6Base24CycleRuntime,
+        build_projection,
     )
+
+    if isinstance(runtime, P6Base24CycleRuntime):
+        if not isinstance(release, Base24Release):
+            fail("binding_type_mismatch", "Base 2.4 runtime requires its explicit source adapter")
+        projection = build_projection(
+            config=runtime, activation=activation, target=release,
+            output_root=work / "projection", decision_at=job_input.consumed_at,
+            collect_candidates=collection_active,
+        )
+    else:
+        projection = build_prospective_projection(
+            config=runtime,
+            activation=activation,
+            target=release,
+            output_root=work / "projection",
+            collect_candidates=collection_active,
+        )
     _enforce_prospective_calendar(
         job_input=job_input,
         activation=activation,
@@ -1540,13 +1597,22 @@ def run_official_cycle(
     shadow = [*entry_shadow, *held_shadow]
     if job_input.consumed_at < release.visibility.consumer_visible_at:
         fail("consumption_before_visibility", "official input consumed_at predates visibility")
-    access = make_access_ledger_entry(
-        release=release,
-        admission=admission,
-        purpose="p6_forward_cycle_input",
-        decision_knowledge_cutoff=projection.bundle.snapshot.knowledge_cutoff.astimezone(timezone.utc),
-        consumed_at=job_input.consumed_at,
-    ).to_dict()
+    if isinstance(runtime, P6Base24CycleRuntime):
+        from quanthus.forward_validation.base24_cycle import access_entry
+
+        access = access_entry(
+            release=release, admission=admission,
+            decision_at=projection.bundle.snapshot.knowledge_cutoff,
+            consumed_at=job_input.consumed_at,
+        ).to_dict()
+    else:
+        access = make_access_ledger_entry(
+            release=release,
+            admission=admission,
+            purpose="p6_forward_cycle_input",
+            decision_knowledge_cutoff=projection.bundle.snapshot.knowledge_cutoff.astimezone(timezone.utc),
+            consumed_at=job_input.consumed_at,
+        ).to_dict()
     scorecards = _scorecards(
         runtime=runtime,
         decision_rows=decision_rows,

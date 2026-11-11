@@ -1,0 +1,11 @@
+[Unit]
+Description=Quanthus daily-core collection and recovery schedule (%i)
+
+[Timer]
+OnCalendar=*-*-* 08,12,18,20,22:30:00 Asia/Shanghai
+RandomizedDelaySec=30
+Persistent=true
+Unit=quanthus-daily-core@%i.service
+
+[Install]
+WantedBy=timers.target

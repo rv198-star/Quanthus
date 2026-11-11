@@ -1,0 +1,77 @@
+{
+  "schema_version": "quanthus.B-chain-contract.v1",
+  "purpose": "RECORDED_B_DECISION_CHAIN_REVIEW_ONLY",
+  "selection_sha256": "b971e5029f44875630268d91498fa7c53f3e32f99ff4db12202efe04cb1efdbf",
+  "roles": {
+    "decisions": {
+      "bytes": 13071889,
+      "sha256": "dd709604ec33bc02a5ead837def4b381cf5808210539b8e1a24ed828ab4204b6"
+    },
+    "events": {
+      "bytes": 11760614,
+      "sha256": "cbc16324256938a4e2670b4f6a6d612829719f97ad27abb4f35a6e1889cc7142"
+    },
+    "ledgers": {
+      "bytes": 2024,
+      "sha256": "bb609fb110752a78799c93222d55e990b03716d6651e8d90065085a2a417a860"
+    },
+    "original_manifest": {
+      "bytes": 2291,
+      "sha256": "2f6a080f10a511522a95c73190fe57b13b2d634c387383778e86d0e284847172"
+    },
+    "reconciliation": {
+      "bytes": 222,
+      "sha256": "98a3b75f1c904be3821bf0659f34e182fbb1c661e09d9a858fa12cfab5e271af"
+    },
+    "coordinates": {
+      "bytes": 2387321,
+      "sha256": "982f4fe907b5f30d2f5b190c6ba409dafe92092753bf369ff59857b69cd044bd"
+    },
+    "completion": {
+      "bytes": 5977,
+      "sha256": "4c52c3879c52d81af08b3d8f9004a3adb27c1ece3e03799e0bc6c5aa32400023"
+    },
+    "freeze": {
+      "bytes": 529396,
+      "sha256": "11255a74b0daf6338c3a7f8ea32b220042f30ae67d127f49b278d853d7e2dfd7"
+    },
+    "trace_receipt": {
+      "bytes": 1167,
+      "sha256": "68011e4e1dd49efd2619097ecc64ede33865e2c80ce82d8c72e39436877f29c2"
+    },
+    "review_manifest": {
+      "bytes": 93993,
+      "sha256": "f6b72f331edf4973d5ff3a31dedfa136d9df129b63f8267223a5b3c6d381a727"
+    },
+    "review_rows": {
+      "bytes": 21761804,
+      "sha256": "fdcbf10e424a40b295f1e24aed7f322a7b89f843b367e3ca0c47698eb43f9c1e"
+    }
+  },
+  "first_date": "2012-01-01",
+  "last_date": "2021-12-31",
+  "source_cutoff": "2026-10-25T08:51:06.934678+00:00",
+  "source_manifest_sha256": "sha256:bb02e9695716d29683e78c9c497b87286743b35f087d06509eafe43985ee2ff8",
+  "expected_counts": {
+    "entry_decisions": 22955,
+    "held_decisions": 8393,
+    "engine_events": 17062,
+    "filled_entries": 538,
+    "filled_exits": 535,
+    "review_rows": 8393
+  },
+  "maximum_output_bytes": 67108864,
+  "minimum_free_bytes": 8589934592,
+  "join_rules": {
+    "decision_signal": "Shanghai decision date + unit + exact formal decision digest + side; security from exact coordinates/retained held identity",
+    "event": "signal/order/intent/fill/action reference ids, never global sequence grouping",
+    "snapshots_settlements": "unique actual filled unit interval through original exit session, security checked when present",
+    "allocated_flag": "producer consideration only; neither order creation nor reservation is inferred",
+    "unknown_reason": "NOT_RECORDED; never derive from later price or nearby decision",
+    "ledger_scope": "retained end-of-run unit context, not per-episode performance",
+    "held_filled_flag": "held decision rows are pre-execution and record filled=false; actual exit determined only by explicit original fill events"
+  },
+  "historical_PIT_qualified": false,
+  "execution_authorized": false,
+  "consumer_admission": "RESEARCH_DIAGNOSTIC_ONLY"
+}

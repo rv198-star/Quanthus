@@ -31,6 +31,7 @@ from .base_build_period import load
 from .base_build_publication import (
     begin_transfer,
     pair_documents,
+    materialization_intent,
     portable_audit_identity,
     prepare_markers,
     recover_owned_markers,
@@ -166,13 +167,24 @@ def _no_active_workers(controls: Path) -> None:
         if not re.fullmatch(r"quanthus-base-build-[0-9a-f]{32}-[a-z0-9-]+", unit):
             raise BoundedError("BUILD_CONTROLLER_UNKNOWN_UNIT_PRESERVED")
         result = subprocess.run(
-            ["systemctl", "show", "--property=ActiveState", "--property=LoadState", unit],
+            [
+                "systemctl",
+                "show",
+                "--property=ActiveState",
+                "--property=LoadState",
+                unit,
+            ],
             capture_output=True,
             text=True,
             check=False,
         )
         state = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
-        if state.get("ActiveState") in {"active", "activating", "reloading", "deactivating"}:
+        if state.get("ActiveState") in {
+            "active",
+            "activating",
+            "reloading",
+            "deactivating",
+        }:
             raise BoundedError("BUILD_CONTROLLER_PREVIOUS_WORKER_STILL_RUNNING")
         if set(state) != {"ActiveState", "LoadState"} or state["ActiveState"] not in {
             "inactive",
@@ -327,7 +339,14 @@ def service_arguments(
     inaccessible = [p for p in inaccessible if not any(q in p.parents for q in masks)]
     if inaccessible:
         properties.append("InaccessiblePaths=" + " ".join("-" + str(p) for p in inaccessible))
-    arguments = ["systemd-run", "--quiet", "--wait", "--pipe", "--collect", "--unit=" + unit]
+    arguments = [
+        "systemd-run",
+        "--quiet",
+        "--wait",
+        "--pipe",
+        "--collect",
+        "--unit=" + unit,
+    ]
     for value in properties:
         arguments.extend(["-p", value])
     arguments.extend(
@@ -417,7 +436,10 @@ def run_service(
 
 
 def audit_completion(
-    job: dict[str, Any], contract: dict[str, Any], environment_identity: str, started_at: str
+    job: dict[str, Any],
+    contract: dict[str, Any],
+    environment_identity: str,
+    started_at: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     root = safe_path(job["work_root"])
     completion = load(member(root, "COMPLETION.json"))
@@ -436,6 +458,8 @@ def audit_completion(
         or completion.get("job_identity") != identity(job)
         or completion.get("work_root") != job["work_root"]
         or completion.get("code_revision") != job["builder_revision"]
+        or completion.get("materialization_revision", job["builder_revision"])
+        != job.get("materialization_revision", job["builder_revision"])
         or completion.get("policy_identity") != identity(contract)
         or completion.get("environment_identity") != environment_identity
         or completion.get("audit_sha256") != file_sha(audit_path)
@@ -480,6 +504,11 @@ def _audit(
     audit_job = {
         "contract": AUDIT_JOB,
         "builder_revision": job["builder_revision"],
+        **(
+            {"materialization_revision": job["materialization_revision"]}
+            if "materialization_revision" in job
+            else {}
+        ),
         "ods": str(products["ods"]),
         "dwd": str(products["dwd"]),
         "work_root": str(scratch / "output"),
@@ -572,6 +601,21 @@ def execute(
     if user.pw_uid == 0:
         raise BoundedError("BUILD_CONTROLLER_UNPRIVILEGED_WORKER_REQUIRED")
     root = safe_path(job["work_root"])
+    materialization_revision = job.get("materialization_revision", job["builder_revision"])
+    if not re.fullmatch(r"[0-9a-f]{40}", str(materialization_revision)):
+        raise BoundedError("BUILD_CONTROLLER_MATERIALIZATION_REVISION_INVALID")
+    resume = "materialization_revision" in job
+    if resume:
+        # A re-audit names the revision that produced these bytes. The product
+        # must already be materialized and must not carry any seal marker.
+        if not (root / "PUBLICATION.json").exists():
+            raise BoundedError("BUILD_CONTROLLER_MATERIALIZATION_NOT_FOUND")
+        for role in ("ODS", "DWD"):
+            for marker in ("manifest.json", "READY"):
+                if (root / "published" / role / marker).exists():
+                    raise BoundedError("BUILD_CONTROLLER_MARKER_REQUIRES_RECOVERY")
+        if (root / "PAIR-READY.json").exists():
+            raise BoundedError("BUILD_CONTROLLER_PAIR_ALREADY_COMPLETE")
     roots = load(safe_path(job["roots"]))
     sources = [safe_path(p) for p in roots.values()]
     readonly = [
@@ -607,17 +651,41 @@ def execute(
         controls = member(root, "controller")
         controls.mkdir(exist_ok=True)
         _no_active_workers(controls)
-        control_record(root / "CONTROLLER.json", owner_record)
+        if resume:
+            # The materialization owner record is immutable; a re-audit appends its
+            # own ownership record instead of rewriting the producer's. One file per
+            # owner identity keeps earlier re-audit attempts as immutable evidence.
+            control_record(
+                controls / ("reaudit-" + owner.removeprefix("sha256:")[:16] + ".json"),
+                {
+                    "contract": "p10-standard-base-controller-reaudit-v1",
+                    "owner_identity": owner,
+                    "job_identity": identity(job),
+                    "audit_revision": job["builder_revision"],
+                    "materialization_revision": materialization_revision,
+                    "environment_identity": environment["lock_sha256"],
+                },
+            )
+        else:
+            control_record(root / "CONTROLLER.json", owner_record)
         token = uuid.uuid4().hex
         attempt = controls / ("run-" + token)
         attempt.mkdir()
         control_record(
-            attempt / "START.json", {**owner_record, "owner_identity": owner, "started_at": now()}
+            attempt / "START.json",
+            {**owner_record, "owner_identity": owner, "started_at": now()},
         )
         try:
-            if not (root / "PUBLICATION.json").exists():
+            if resume:
+                # Re-audit path: the materialization and its transfer intent are
+                # already owned; never invoke the materialize worker again.
+                intent = materialization_intent(root)
+            elif not (root / "PUBLICATION.json").exists():
                 controller_capacity(
-                    root, sources, limits, len(load(safe_path(job["selection"]))["expected_days"])
+                    root,
+                    sources,
+                    limits,
+                    len(load(safe_path(job["selection"]))["expected_days"]),
                 )
                 os.chown(root, user.pw_uid, user.pw_gid)
                 os.chmod(root, 0o750)
@@ -656,7 +724,8 @@ def execute(
             # Resolve a killed no-overwrite marker link before the strict file
             # census in transfer recovery (which rejects multiple inode links).
             recover_owned_markers(
-                root, {role: root / "published" / role.upper() for role in ("ods", "dwd")}
+                root,
+                {role: root / "published" / role.upper() for role in ("ods", "dwd")},
             )
             products = resume_transfer(root, intent)
             protect_tree(root / "stages", strict=False)
@@ -683,7 +752,11 @@ def execute(
             if not receipt["publication_eligible"]:
                 if complete_markers or (root / "PAIR-READY.json").exists():
                     raise BoundedError("BUILD_CONTROLLER_INELIGIBLE_PAIR_HAS_MARKERS")
-                status, formal, pair = "PAIRED_BUILT_AUDITED_HISTORICAL_GATE_PENDING", False, None
+                status, formal, pair = (
+                    "PAIRED_BUILT_AUDITED_HISTORICAL_GATE_PENDING",
+                    False,
+                    None,
+                )
             else:
                 if not complete_markers:
                     documents = pair_documents(
@@ -692,6 +765,9 @@ def execute(
                         receipt=receipt,
                         contract=contract,
                         revision=job["builder_revision"],
+                        materialization_revision=job.get(
+                            "materialization_revision", job["builder_revision"]
+                        ),
                     )
                     writes = root / "publication-writes"
                     numbers = [int(p.name[8:]) for p in writes.iterdir()] if writes.exists() else []

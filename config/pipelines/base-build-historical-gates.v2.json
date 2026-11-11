@@ -1,0 +1,79 @@
+{
+  "contract": "p10-standard-base-historical-gates-v2",
+  "rule": "Registered observations require a versioned governed disposition before paired publication. Repairs bind to the predecessor partition; minute-granularity acceptance forbids exact daily/minute equality; permanent limitations keep the affected uses unavailable. Absence remains proved against the complete paired closure, never declared by a job switch.",
+  "new_quality_held_allowed": 0,
+  "inherited_held": "EXACT_PREDECESSOR_SET_NO_EXPANSION",
+  "evidence_root": "config/pipelines/historical-gate-evidence-v2",
+  "cases": [
+    {
+      "id": "SZSE-300114-20250217-volume-coverage",
+      "venue": "SZSE",
+      "stock_code": "300114",
+      "market_date": "2025-02-17",
+      "disposition": "ACCEPTED_MINUTE_LOT_GRANULARITY",
+      "reason": "Owner authorized the contract declaration that minute volume is lot-granular and the +49 difference is a minute-granularity artifact; source values are unchanged.",
+      "restrictions": [
+        "FORBID_EXACT_DAILY_MINUTE_VOLUME_EQUALITY",
+        "PRESERVE_DAILY_AND_MINUTE_VALUES"
+      ],
+      "evidence": [
+        {"path": "owner-302132-granularity.json", "sha256": "sha256:6a24cd2fd69ccceacb83b2488d294bd4a6a8b9cdef8dc1292ae79ae8f8936637"},
+        {"path": "300114-lineage.json", "sha256": "sha256:1e3dee19d9c84e179fcdfa35c275a4ba40a37c390686146bcb469dcebda36a37"},
+        {"path": "300114-alias-coverage.json", "sha256": "sha256:0ecd15eadec061f114594e5d9092654dfd3286261fa2540b18b6be399ba73700"}
+      ]
+    },
+    {
+      "id": "SZSE-002336-20200617-tradability",
+      "venue": "SZSE",
+      "stock_code": "002336",
+      "market_date": "2020-06-17",
+      "disposition": "REPAIRED_IN_PREDECESSOR",
+      "reason": "Owner authorized the versioned daily revision; 2.4r1 target partition was rebuilt and independently compared with only the authorized volume/turnover changes.",
+      "restrictions": [
+        "PRESERVE_ORIGINAL_SOURCE",
+        "NO_FURTHER_OVERRIDE"
+      ],
+      "evidence": [
+        {"path": "owner-daily-revision.json", "sha256": "sha256:128b1959a7d6f078d3c84a6895d3e04752e357dafa5ef1c112d25f2572e0ff0d"},
+        {"path": "base24r1-target-verification.json", "sha256": "sha256:bfd400a6466f7abf2dec8a07bf4281f089fb82c26e7a0b83b41c2d8c0bd71bc2"},
+        {"path": "base24r1-repair-receipt.json", "sha256": "sha256:02f7bb64db4f73476652dba04fcfdc8bb5dab10bfc337f20af689195cae56b71"}
+      ]
+    },
+    {
+      "id": "SZSE-002500-20200617-tradability",
+      "venue": "SZSE",
+      "stock_code": "002500",
+      "market_date": "2020-06-17",
+      "disposition": "REPAIRED_IN_PREDECESSOR",
+      "reason": "Owner authorized the versioned daily revision; 2.4r1 target partition was rebuilt and independently compared with only the authorized volume/turnover changes.",
+      "restrictions": [
+        "PRESERVE_ORIGINAL_SOURCE",
+        "NO_FURTHER_OVERRIDE"
+      ],
+      "evidence": [
+        {"path": "owner-daily-revision.json", "sha256": "sha256:128b1959a7d6f078d3c84a6895d3e04752e357dafa5ef1c112d25f2572e0ff0d"},
+        {"path": "base24r1-target-verification.json", "sha256": "sha256:bfd400a6466f7abf2dec8a07bf4281f089fb82c26e7a0b83b41c2d8c0bd71bc2"},
+        {"path": "base24r1-repair-receipt.json", "sha256": "sha256:02f7bb64db4f73476652dba04fcfdc8bb5dab10bfc337f20af689195cae56b71"}
+      ]
+    },
+    {
+      "id": "SSE-688065-20230615-tradability",
+      "venue": "SSE",
+      "stock_code": "688065",
+      "market_date": "2023-06-15",
+      "disposition": "ACCEPTED_PERMANENT_HISTORICAL_LIMITATION",
+      "reason": "Owner accepted the permanent historical limitation after no further authoritative source can be supplied; the relay 5m source remains unadmitted and native 5m remains unavailable.",
+      "restrictions": [
+        "HISTORICAL_PIT_UNAVAILABLE",
+        "CROSS_PROVIDER_EXACT_PRICE_UNAVAILABLE",
+        "COMPLETE_MARKET_COVERAGE_UNAVAILABLE",
+        "NATIVE_5M_UNAVAILABLE"
+      ],
+      "evidence": [
+        {"path": "owner-688065-permanent-limitation.json", "sha256": "sha256:cc89ba060d76229ef0333eaab8209ca63779d98933fe1ebfe49812fbb8d30548"},
+        {"path": "historical-disposition-decision.json", "sha256": "sha256:7aa33b13e35acc514707a8bffa9588e812d558c64cac8a34dfa7b3df212e5238"},
+        {"path": "backfill-raw-provenance-review.json", "sha256": "sha256:48c61bc3ecc53aad1c6ccd1589ba4a503c0a0ca9806eb5b2c4befcf9a4e9a98d"}
+      ]
+    }
+  ]
+}

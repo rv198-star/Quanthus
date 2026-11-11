@@ -38,13 +38,26 @@ def _object(path: Path) -> dict[str, Any]:
 
 def _proof(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     from .base_build_publication import CONTRACT as PAIR
-    from .base_build_publication import _require_audit, portable_audit_identity
+    from .base_build_publication import (
+        DUAL_REVISION_CONTRACT,
+        _require_audit,
+        portable_audit_identity,
+        require_gate_revisions,
+    )
 
     manifest = _object(member(root, "manifest.json"))
     contract = _object(member(root, "contract/base-build-delivery.v1.json"))
     proof = manifest.get("paired_audit", {})
-    _require_audit(proof, contract, manifest.get("code_revision"))
     gate = manifest.get("pairing", {})
+    if gate.get("contract") not in {PAIR, DUAL_REVISION_CONTRACT}:
+        raise NativeBase23Error("standard Base pairing contract differs")
+    materialization_revision = require_gate_revisions(gate, manifest.get("code_revision"))
+    _require_audit(
+        proof,
+        contract,
+        manifest.get("code_revision"),
+        materialization_revision=materialization_revision,
+    )
     content = manifest.get("content", {})
     if (
         manifest.get("kind") != GENERIC_KINDS["dwd"]
@@ -59,7 +72,6 @@ def _proof(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         or manifest.get("scan_identity") != proof["DWD"]["identity"]
         or manifest.get("materialization_sha256") != proof["DWD"]["materialization_sha256"]
         or manifest["materialization_sha256"] != file_sha(member(root, "MATERIALIZATION.json"))
-        or gate.get("contract") != PAIR
         or gate.get("identity") != identity({k: v for k, v in gate.items() if k != "identity"})
         or gate.get("binding") != proof["binding"]
         or gate.get("historical_gate") != proof["historical_gate"]

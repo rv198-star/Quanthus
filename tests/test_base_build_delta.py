@@ -51,11 +51,13 @@ def row(known_day, *, title="original", source="original-source", number="123456
     }
 
 
-def normalize(records):
+def normalize(records, *, allow_closed_identity=False):
     connection = duckdb.connect()
     table = pa.Table.from_pylist(records, schema=SCHEMA)
     connection.register("raw_input", table)
-    result = normalize_versions(connection, "raw_input", SCHEMA, KEY, [*KEY, "knowledge_from"])
+    result = normalize_versions(connection, "raw_input", SCHEMA, KEY,
+                                [*KEY, "knowledge_from"],
+                                allow_closed_identity=allow_closed_identity)
     restored = connection.execute(
         "SELECT * FROM normalized ORDER BY knowledge_from",
     ).to_arrow_table()
@@ -97,6 +99,18 @@ def test_closed_knowledge_versions_need_an_explicit_adapter():
     closed = {**row(8), "knowledge_to": datetime(2026, 10, 8, 12, tzinfo=timezone.utc)}
     with pytest.raises(BoundedError, match="CLOSED_KNOWLEDGE_VERSION_REQUIRES_ADAPTER"):
         normalize([closed, row(9)])
+
+
+def test_closed_identity_version_closes_at_next_identical_knowledge():
+    early, late = row(8), row(9, source="later-independent-source")
+    early["knowledge_to"] = late["knowledge_from"]
+    result, observed = normalize([early, late], allow_closed_identity=True)
+    assert result == {"input_rows": 2, "output_rows": 2, "identical_repeats": 0}
+    assert [item["knowledge_from"] for item in observed] == [
+        early["knowledge_from"], late["knowledge_from"]
+    ]
+    assert observed[0]["knowledge_to"] == late["knowledge_from"]
+    assert observed[1]["knowledge_to"] is None
 
 
 def test_distinct_business_keys_remain_distinct():

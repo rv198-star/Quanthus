@@ -1,0 +1,73 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-R1-HF-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "exploration",
+  "family": "tradability-execution-screen",
+  "work_item": "META-LEARN-001",
+  "modules": [
+    "FACTS",
+    "REPRO",
+    "CLOSEOUT"
+  ],
+  "question": "在 Base 2.5.1 的开放开发窗口（2020-01-02 至 2021-12-31）内，按冻结日线准入条件筛出的名义入场机会，在 T+1 开盘实际可成交的比例是多少，以及单个研究任务在单节点上的真实成本是多少？",
+  "consumer": "R2/R3 研究批次的下达者与 Worker 分发决策；结论用于决定下一笔投入是加信号、加执行约束还是加节点。",
+  "scope": "只读 Base 2.5.1 固定版本 2020-2021 日线、交易日历、可交易性、listing、security 五类表；不读 2022 年及以后任何行情；不回放策略、不调参、不新建通用平台。",
+  "deliverable": "一个单命令 HF→计算→固定结果包→HF 的执行包，一份名义机会与 T+1 可成交率的结果，以及单节点墙钟、内存、字节与主动工时记录。",
+  "decision_if_pass": "若执行折损可忽略，后续日线研究可继续使用理想成交假设并把预算投向信号筛选；若折损显著，则后续研究必须先内置执行约束。同时用实测成本决定是否扩展 Worker。",
+  "decision_if_fail": "若闭包无法校验、超出预算或结果不可解释，则只登记准确缺口并停止该批，不转现场调参；旧结论与曝光保持不变。",
+  "acceptance": [
+    "固定 HF 版本、源清单哈希、闭包成员与逐文件 SHA256 可核对。",
+    "名义机会、T+1 可成交与其阻断原因、全市场对照在同一口径下给出，样本量可见。",
+    "结果包有固定 HF 提交、路径、哈希与回读回执，并记录真实资源用量。"
+  ],
+  "stop_conditions": [
+    "闭包超出冻结下载预算或结果无法按事前口径解释时停止本批。",
+    "出现读取 2022 年及以后分区、修改阈值、训练或生产要求时停止对应步骤。"
+  ],
+  "memory_sha256": "295327bb6c1dad75c6f16bb92b040bd2a8211f4efdac08c7e3113b4efdf3ea6a",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "该结论只处理既有消费者调用说明的工程交付；本批不复用其合成调用结论，也不重启其审议。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "different_scope",
+      "rationale": "该结论处理的是旧学习线内是否新开一个比较；本批不新开比较，只测量新 Base 上的 T+1 可成交口径与单节点成本。",
+      "scope_difference": "旧结论的范围是既有持仓/入场证据内的决策缺口选择；本批的输入是 Base 2.5.1 固定版本的 2020-2021 可交易性口径，输出是执行折损与资源画像，不含策略绩效比较。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "保留其只读查阅结论与工程等级，不把本批测量结果当作其历史PIT或经济价值升级。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "保留原B记录链的工程结论；本批不重放也不重解释该链。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "different_scope",
+      "rationale": "该结论是原B漏斗的观测交付；本批测量的是新 Base 上的入场后 T+1 可成交比例，输入与时间范围不同。",
+      "scope_difference": "旧结论来自原B 2012-2021 已消费记录；本批来自 Base 2.5.1 固定版本的 2020-2021 密封 DWD，并新增全市场对照与资源画像。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "保留其接入需求未成立与停放条件；本批不新增分配审计接线。"
+    }
+  ],
+  "cumulative_cost_review": "Head2、持仓、Stage 3/4 与原漏斗的历史尝试成本保持未知非零；本批独立记账，不重置任何方向的曝光。",
+  "runtime_authority_boundary": "本文件只登记非授权提案；实际执行使用总线 #608 已冻结的范围与预算，TPlan 保有尝试、预算与恢复点，数据用途准入仍按 Base 2.5.1 与开发分区单独解析。",
+  "retrospective_preflight_note": "总线 #608 已在 2026-11-11 冻结本批范围与预算；本提案与 preflight 回执在首个有界批次执行后补录，用于把该批次绑回治理账本。该顺序偏差登记为流程缺陷，交由 #612 独立审阅处置。",
+  "budget": {
+    "wall_seconds": 3600,
+    "max_new_bytes": 1073741824,
+    "network_requests": 64,
+    "accounting_owner": "TPlan research R1 batch, with the HF fetch and run receipts as attempt evidence"
+  }
+}

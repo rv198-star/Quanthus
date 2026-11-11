@@ -37,7 +37,9 @@ def save(path, value):
 
 
 def canonical(value):
-    data = json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(",", ":"), allow_nan=False)
+    data = json.dumps(
+        value, sort_keys=True, ensure_ascii=True, separators=(",", ":"), allow_nan=False
+    )
     return "sha256:" + hashlib.sha256(data.encode()).hexdigest()
 
 
@@ -77,7 +79,9 @@ def provenance(original, retained, out):
     assert inventory(original / "package") == inventory(seed / "package")
     identity = read(seed / "result.json")["identity"]
     assert identity["git"] == EXECUTION and identity["request_digest"] == canonical(q)
-    assert identity["identity_digest"] == canonical({k: v for k, v in identity.items() if k != "identity_digest"})
+    assert identity["identity_digest"] == canonical(
+        {k: v for k, v in identity.items() if k != "identity_digest"}
+    )
     for name, expected in identity["code"].items():
         assert "sha256:" + hashlib.sha256(git_bytes(EXECUTION, name)).hexdigest() == expected
         assert (ROOT / name).read_bytes() == git_bytes(CANDIDATE, name)
@@ -88,7 +92,9 @@ def provenance(original, retained, out):
     for phase, output_names in (("fetch", ["fetch.json"]), ("screen", ["result.json", "run.json"])):
         entry = resources[phase]
         assert entry == sealed(entry) and entry["identity"] == identity
-        assert entry["status"] == "succeeded" and entry["exit_code"] == 0 and entry["failure"] is None
+        assert (
+            entry["status"] == "succeeded" and entry["exit_code"] == 0 and entry["failure"] is None
+        )
         assert entry == [a for a in attempts if a["phase"] == phase][-1]
         assert entry["output_digests"] == {n: read(seed / n)["digest"] for n in output_names}
     assert read(seed / "run.json")["result_digest"] == read(seed / "result.json")["digest"]
@@ -109,18 +115,37 @@ def provenance(original, retained, out):
     log_proof = read(retained / "final-validation.json")
     for name, expected in log_proof["logs"].items():
         assert sha(retained / name) == "sha256:" + expected
-    compiled = [marshal.dumps(compile(git_bytes(ref, "src/quanthus/hf_dwd_research.py"), "worker.py", "exec")) for ref in (EXECUTION, CANDIDATE)]
+    compiled = [
+        marshal.dumps(
+            compile(git_bytes(ref, "src/quanthus/hf_dwd_research.py"), "worker.py", "exec")
+        )
+        for ref in (EXECUTION, CANDIDATE)
+    ]
     assert compiled[0] == compiled[1]
     unchanged = {}
     for name in ("tests", "scripts", "ops", "config/research", "pyproject.toml", "Makefile"):
-        ids = [subprocess.check_output(["git", "rev-parse", f"{ref}:{name}"], cwd=ROOT, text=True).strip() for ref in (EXECUTION, CANDIDATE)]
+        ids = [
+            subprocess.check_output(
+                ["git", "rev-parse", f"{ref}:{name}"], cwd=ROOT, text=True
+            ).strip()
+            for ref in (EXECUTION, CANDIDATE)
+        ]
         assert ids[0] == ids[1]
         unchanged[name] = ids[0]
-    result = {"candidate": CANDIDATE, "execution": EXECUTION, "members": 56, "bytes": 187921175,
-              "source_rows_read": False, "separate_physical_copy": True, "identity": identity,
-              "compiled_identical": True, "compiled_sha256": hashlib.sha256(compiled[0]).hexdigest(),
-              "compile_filename": "worker.py", "unchanged_trees": unchanged,
-              "author_log_hashes_verified": len(log_proof["logs"])}
+    result = {
+        "candidate": CANDIDATE,
+        "execution": EXECUTION,
+        "members": 56,
+        "bytes": 187921175,
+        "source_rows_read": False,
+        "separate_physical_copy": True,
+        "identity": identity,
+        "compiled_identical": True,
+        "compiled_sha256": hashlib.sha256(compiled[0]).hexdigest(),
+        "compile_filename": "worker.py",
+        "unchanged_trees": unchanged,
+        "author_log_hashes_verified": len(log_proof["logs"]),
+    }
     save(out / "provenance.json", result)
     return q, members, identity, seed
 
@@ -145,7 +170,14 @@ def fault_probes(q, members, identity, seed, out):
             calls.append("HfApi")
             raise AssertionError("unexpected remote API construction")
 
-        with patch.dict(sys.modules, {"huggingface_hub": types.SimpleNamespace(HfApi=forbidden_api, CommitOperationAdd=lambda **k: k)}):
+        with patch.dict(
+            sys.modules,
+            {
+                "huggingface_hub": types.SimpleNamespace(
+                    HfApi=forbidden_api, CommitOperationAdd=lambda **k: k
+                )
+            },
+        ):
             try:
                 worker.publish(q, members, identity, job)
             except worker.GuardError as exc:
@@ -155,7 +187,18 @@ def fault_probes(q, members, identity, seed, out):
         assert calls == []
         return reason
 
-    damages = ("failed", "running", "missing", "identity", "output", "digest", "stale", "bool_exit", "failure", "phase")
+    damages = (
+        "failed",
+        "running",
+        "missing",
+        "identity",
+        "output",
+        "digest",
+        "stale",
+        "bool_exit",
+        "failure",
+        "phase",
+    )
     for packaged in (False, True):
         for phase in ("fetch", "screen"):
             for damage in damages:
@@ -191,7 +234,11 @@ def fault_probes(q, members, identity, seed, out):
                 save(job / "resources.json", resources)
                 save(job / "attempts.json", attempts)
                 reason = rejected_publish(job)
-                assert inventory(job / "package") == before if packaged else not (job / "package").exists()
+                assert (
+                    inventory(job / "package") == before
+                    if packaged
+                    else not (job / "package").exists()
+                )
                 if phase == "screen":
                     try:
                         worker.screen(q, members, identity, job)
@@ -243,7 +290,9 @@ def fault_probes(q, members, identity, seed, out):
         resources = read(job / "resources.json")
         del resources["screen"]
         save(job / "resources.json", resources)
-        save(job / "attempts.json", [a for a in read(job / "attempts.json") if a["phase"] == "fetch"])
+        save(
+            job / "attempts.json", [a for a in read(job / "attempts.json") if a["phase"] == "fetch"]
+        )
         request = copy.deepcopy(q)
         request["budget"]["max_stage_wall_seconds"]["screen"] = 1
         child = (
@@ -252,11 +301,23 @@ def fault_probes(q, members, identity, seed, out):
             "s=json.loads((p/'resources.json').read_text())['screen'];"
             "assert s['status']=='running' and s['attempt']==1;"
             + "".join(f"(p/{n!r}).write_text({value!r});" for n, value in outputs.items())
-            + ("time.sleep(5)" if outcome == "timeout" else "sys.exit(7)" if outcome == "nonzero" else "")
+            + (
+                "time.sleep(5)"
+                if outcome == "timeout"
+                else "sys.exit(7)"
+                if outcome == "nonzero"
+                else ""
+            )
         )
         popen = subprocess.Popen
         with patch.object(worker, "load_bundle", return_value=(request, members, identity)):
-            with patch.object(worker.subprocess, "Popen", side_effect=lambda cmd, **kw: popen([sys.executable, "-c", child], **kw)):
+            with patch.object(
+                worker.subprocess,
+                "Popen",
+                side_effect=lambda cmd, _spawn=popen, _code=child, **kw: _spawn(
+                    [sys.executable, "-c", _code], **kw
+                ),
+            ):
                 code = worker.launch_guarded("screen", REQUEST, job, None)
             assert code == (0 if outcome == "success" else 1)
             terminal = read(job / "resources.json")["screen"]
@@ -264,21 +325,39 @@ def fault_probes(q, members, identity, seed, out):
             assert terminal == sealed(terminal)
             if outcome != "success":
                 rejected_publish(job)
-                save(job / "retry-authorization.json", {"identity_digest": identity["identity_digest"], "cause": "audit: failed child already wrote outputs"})
+                save(
+                    job / "retry-authorization.json",
+                    {
+                        "identity_digest": identity["identity_digest"],
+                        "cause": "audit: failed child already wrote outputs",
+                    },
+                )
                 retry_child = (
                     "import sys,json;from pathlib import Path;"
                     f"sys.path.insert(0,{str(ROOT / 'src')!r});"
                     "from quanthus.hf_dwd_research import screen;"
                     f"screen(json.loads({json.dumps(request)!r}),json.loads({json.dumps(members)!r}),json.loads({json.dumps(identity)!r}),Path({str(job)!r}))"
                 )
-                with patch.object(worker.subprocess, "Popen", side_effect=lambda cmd, **kw: popen([sys.executable, "-c", retry_child], **kw)):
+                with patch.object(
+                    worker.subprocess,
+                    "Popen",
+                    side_effect=lambda cmd, _spawn=popen, _code=retry_child, **kw: _spawn(
+                        [sys.executable, "-c", _code], **kw
+                    ),
+                ):
                     assert worker.launch_guarded("screen", REQUEST, job, None) == 1
                 assert read(job / "resources.json")["screen"]["status"] == "failed"
                 rejected_publish(job)
             else:
                 worker.build_package(q, members, identity, job)
             assert all((job / n).read_text() == value for n, value in outputs.items())
-        results.append({"case": "guardian-" + outcome, "real_child": True, "failed_cache_retry_rejected": outcome != "success"})
+        results.append(
+            {
+                "case": "guardian-" + outcome,
+                "real_child": True,
+                "failed_cache_retry_rejected": outcome != "success",
+            }
+        )
     save(out / "fault-probes.json", results)
     return results
 
@@ -291,9 +370,20 @@ def candidate_days(q, out):
     results = []
     for left, right in ((0, 3), (2, 3), (3, 2), (3, 3), (4, 4)):
         request = copy.deepcopy(q)
-        request["scope"].update(decision_start="2020-12-28", decision_end="2021-01-07", execution_end="2021-01-08")
-        request["screen"].update(max_unadjusted_close_return_vol20=10, unadjusted_momentum20_band=[0.00001, 10])
-        request["decision"].update(min_nominal=1, min_nominal_per_year=1, min_decision_days_per_year=3, min_nominal_listings=1, max_top_listing_share=1, max_top10_listing_share=1)
+        request["scope"].update(
+            decision_start="2020-12-28", decision_end="2021-01-07", execution_end="2021-01-08"
+        )
+        request["screen"].update(
+            max_unadjusted_close_return_vol20=10, unadjusted_momentum20_band=[0.00001, 10]
+        )
+        request["decision"].update(
+            min_nominal=1,
+            min_nominal_per_year=1,
+            min_decision_days_per_year=3,
+            min_nominal_listings=1,
+            max_top_listing_share=1,
+            max_top10_listing_share=1,
+        )
         folder = out / "synthetic" / f"{left}-{right}"
         folder.mkdir(parents=True)
         db = duckdb.connect()
@@ -333,7 +423,9 @@ def candidate_days(q, out):
         assert actual == [left, right]
         assert all(result["by_year"][str(y)]["control"]["decision_days"] >= 4 for y in (2020, 2021))
         assert result["sample_sufficient"] is (min(left, right) >= 3)
-        results.append({"candidate_days": actual, "branch": result["decision_branch"], "pass": True})
+        results.append(
+            {"candidate_days": actual, "branch": result["decision_branch"], "pass": True}
+        )
     save(out / "candidate-days.json", results)
     return results
 
@@ -343,16 +435,36 @@ def hf_readback(retained, out):
 
     package = retained / "job-a4/package"
     api = HfApi()
-    names = {n[len(PREFIX) + 1:] for n in api.list_repo_files("rv192/quanthus-research-r1", repo_type="dataset", revision=REVISION) if n.startswith(PREFIX + "/")}
+    names = {
+        n[len(PREFIX) + 1 :]
+        for n in api.list_repo_files(
+            "rv192/quanthus-research-r1", repo_type="dataset", revision=REVISION
+        )
+        if n.startswith(PREFIX + "/")
+    }
     assert names == set(inventory(package)) and len(names) == 10
     hashes = {}
     for name in sorted(names):
-        path = Path(api.hf_hub_download("rv192/quanthus-research-r1", PREFIX + "/" + name, repo_type="dataset", revision=REVISION, force_download=True, cache_dir=str(out / "hf-cache")))
+        path = Path(
+            api.hf_hub_download(
+                "rv192/quanthus-research-r1",
+                PREFIX + "/" + name,
+                repo_type="dataset",
+                revision=REVISION,
+                force_download=True,
+                cache_dir=str(out / "hf-cache"),
+            )
+        )
         assert path.read_bytes() == (package / name).read_bytes()
         hashes[name] = sha(path)
     manifest = read(package / "RESEARCH-R1-HF-002-T1-A4-manifest.json")
     assert manifest == sealed(manifest) and manifest["digest"] == PACKAGE_DIGEST
-    result = {"revision": REVISION, "prefix": PREFIX, "files": hashes, "package_digest": PACKAGE_DIGEST}
+    result = {
+        "revision": REVISION,
+        "prefix": PREFIX,
+        "files": hashes,
+        "package_digest": PACKAGE_DIGEST,
+    }
     save(out / "hf-readback.json", result)
     return result
 
@@ -374,7 +486,14 @@ def main():
     else:
         result = hf_readback(args.retained, args.out)
         summary = {"files": len(result["files"]), "status": "PASS", "revision": REVISION}
-    summary.update(seconds=time.monotonic() - started, audit_git=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), candidate=CANDIDATE, execution=EXECUTION)
+    summary.update(
+        seconds=time.monotonic() - started,
+        audit_git=subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+        ).strip(),
+        candidate=CANDIDATE,
+        execution=EXECUTION,
+    )
     save(args.out / (args.mode + "-summary.json"), summary)
     print(json.dumps(summary))
 

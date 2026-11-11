@@ -940,6 +940,60 @@
         "CP-610-20261111T145506490958Z"
       ],
       "supersedes": "CON-R1-WORKER-V2-INDEPENDENT-20261111"
+    },
+    {
+      "recorded_at": "2026-11-11T15:36:12.379076+00:00",
+      "actor": "Codex independent difference review",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "All prior execution, Sol repairs, audits and A1-A4 exposures preserved. This audit: 54 cases 27.648s, HF readback 5.998s, complete make check 805.56s; synthetic fixture/tooling failures retained. Zero new market computation. Complete active time, tokens and billing unknown_not_zero.",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/audit-summary.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/logs/probe1.log",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/logs/sample2.log",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/logs/make-check.log"
+      ],
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "question_id": "P3-RESEARCH-HF-001-CONFORMANCE",
+      "family": "hf-dwd-worker-contract",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "修正后的v2能否满足固定任务的单节点HF Worker工程合同？",
+      "consumer": "R2调用方、独立审阅者和Worker维护者",
+      "scope": "Candidate bb99f99d, actual A4 1351be2b; independent 49 transition/recovery and 5 candidate-date cases; Linux/Python3.10.12 fixed v2 single-node contract",
+      "claim_ceiling": "Bounded Worker engineering accepted through independent fault verification, full local checks and fixed HF readback. Original scientific and consumer admission scope remains.",
+      "decision_effect": "Accept 610 Worker and close 612/R1 stage. Keep accepted A2/A4 descriptive metrics and small allocation branch; next named signal question, 613/614 conditional. PR617 audit blocker cleared; code merge follows ordinary workflow.",
+      "reopen_conditions": [
+        "Independent reviewer finds a concrete transition, identity, budget, sample or package mismatch.",
+        "New task/node/source/config scope requires a separately frozen bounded request."
+      ],
+      "retained_assets": [
+        "54 independent transition/recovery/sample probes and immutable A4 readback",
+        "Complete 8929 passed /35 skipped local acceptance; exact code/environment/test closure",
+        "Versioned single-node Worker and consumer/recovery guidance",
+        "Prior A2 independent reproduction, all author/audit failures and cumulative cost references"
+      ],
+      "evidence": [
+        {
+          "id": "E612-F1F3-INDEPENDENT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/audit-summary.json",
+          "sha256": "1acb7405ce504b5458320ebfa0b3c6eea10190b9753338a3641356c3308f33fa",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent bounded Worker F1/F2/F3/C1 acceptance; 49+5 probes, 8929 complete checks and A4 immutable evidence. Research and consumer admission retain their prior scope."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-610-20261111T153609474025Z"
+      ],
+      "supersedes": "CON-R1-WORKER-F1F3-SELF-AUDIT-20261111"
     }
   ]
 }

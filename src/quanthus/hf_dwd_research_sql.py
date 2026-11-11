@@ -270,7 +270,7 @@ def circular_block_interval(
     for _ in range(parameters["replicates"]):
         sample = []
         for values in by_year:
-            selected = []
+            selected: list[float] = []
             while len(selected) < len(values):
                 start = generator.randrange(len(values))
                 selected.extend(

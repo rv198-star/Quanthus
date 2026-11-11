@@ -92,5 +92,8 @@
     "max_new_bytes": 33554432,
     "network_requests": 20,
     "accounting_owner": "Bounded seam tranche under bus608, no reset of original total"
-  }
+  },
+  "execution_record": "docs/acceptance/research-capital-seam-20261112.md",
+  "execution_disposition": "SEAM_AND_PLAN_DELIVERED; capital experiment not run, successor628 pending qualification/allocation",
+  "proposal_role": "Executed metadata/code proposal; original memory/preflight binding retained at f0ca576d; successor is separately gated."
 }

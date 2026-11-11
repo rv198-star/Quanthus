@@ -1049,6 +1049,58 @@
         "CP-613-20261111T181214226620Z"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-CAPITAL-SEAM-20261112",
+      "recorded_at": "2026-11-11T18:46:49.530265+00:00",
+      "actor": "Codex code and frozen metadata review",
+      "question_id": "RESEARCH-CAPITAL-001-READINESS",
+      "family": "raw-momentum20-capital-replay",
+      "work_item": "P3-RESEARCH-REPLAY-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "Can the fixed R2 momentum candidate directly enter an existing Base2.5.1 costed-capital replay path?",
+      "consumer": "Research allocator deciding native input qualification and implementation funding",
+      "scope": "Source inspection at bfb16e25 and fixed HF1923c874 manifest only; seam delivery complete, no market-row or capital-result execution.",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "investigate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Only the successor capital replay is unready; code/metadata seam and plan delivered. Native data purpose qualification remains open; prior R2 signal result retained.",
+      "decision_effect": "Propose at most1h native input/clock/action qualification and thin synthetic handshake first; full3-5h plan conditional. Keep Workers standby.",
+      "reopen_conditions": [
+        "A tranche and task-scoped channel allocated; exact source/clock/action/currency contract and qualified closure ready.",
+        "Proceed to a fixed costed comparison only after adapter goldens, local checks and a frozen result request."
+      ],
+      "retained_assets": [
+        "docs/design/research-capital-replay-plan-v1.md",
+        "config/planning/research-capital-replay-preregistration.v1.json",
+        "docs/acceptance/research-capital-seam-20261112.md",
+        "R4 milestone18 and successor628"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Approved seam tranche capped at30 active minutes. Existing8937 complete checks reused after proving1819 execution files byte-identical;59 metadata tests rerun. R1/R2 failures, exposure and missing active/token/billing costs retained. Next1h and full3-5h are proposed allocations, not measured actual costs.",
+      "attempt_refs": [
+        "git:f0ca576d9b3154ac434ad6dbb8b7ab76f24262be/docs/acceptance/research-capital-seam-20261112.md",
+        "hf:rv192/quanthus-base25-sealed@1923c874b43d47e69190a6dc9546e6fd8f3d1ca3/DWD/manifest.json"
+      ],
+      "evidence": [
+        {
+          "id": "CAPITAL-SEAM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "f0ca576d9b3154ac434ad6dbb8b7ab76f24262be",
+          "path": "docs/acceptance/research-capital-seam-20261112.md",
+          "sha256": "5d0ed599c02cbdc70bf70070a83e4d43417ea9453830a4e6a1e7cea009afd637",
+          "claim_ceiling": "Code and frozen metadata seam/plan delivery; capital experiment not run; input-purpose qualification and successor allocation pending."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-627-20261111T184458053645Z"
+      ],
+      "supersedes": null
     }
   ]
 }

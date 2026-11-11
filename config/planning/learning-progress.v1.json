@@ -9524,6 +9524,116 @@
       "reviewed_modules": [
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-627-20261111T184458053645Z",
+      "recorded_at": "2026-11-11T18:44:58.053645+00:00",
+      "actor": "Codex capital seam review",
+      "work_item": "P3-RESEARCH-REPLAY-001",
+      "outcome": "progress",
+      "summary": "Approved seam tranche delivered code/metadata findings and executable successor plan; 627 complete, 628 awaits staged allocation.",
+      "evidence": [
+        {
+          "id": "CAPITAL-SEAM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "f0ca576d9b3154ac434ad6dbb8b7ab76f24262be",
+          "path": "docs/acceptance/research-capital-seam-20261112.md",
+          "sha256": "5d0ed599c02cbdc70bf70070a83e4d43417ea9453830a4e6a1e7cea009afd637",
+          "claim_ceiling": "Code and frozen metadata seam/plan delivery; capital experiment not run; input-purpose qualification and successor allocation pending."
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "R2 Worker accepted scope retained. Native Base2.5.1 capital replay still needs source-interface, directional-state, action and dual-clock qualification; 126-member family inspected at metadata level only.",
+          "remaining": "Successor A native input/clock/action qualification and thin adapter prototype, followed by fixed comparison and independent accounting.",
+          "next_action": "Decide at most1h A tranche and task-scoped channel for628; full plan3-5h, remaining allocation conditional on A.",
+          "evidence": [
+            "CAPITAL-SEAM"
+          ],
+          "supersedes": "CP-613-20261111T181214226620Z"
+        }
+      ],
+      "no_change_reason": "Code/metadata seam and plan only; R2 factor quality, resource decision and all consumer admission retain their prior scope. No capital experiment.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-REPLAY-001",
+          "number": 627,
+          "title": "[P3-RESEARCH-REPLAY-001] 核对动量候选资金回放接缝并冻结后继计划",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-11T18:44:46Z",
+          "body_sha256": "0f1812d4ad5f90df22e577dff2c86aa0c5197ce1660cfa874c698ceff099c49b"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-628-20261111T184501719603Z",
+      "recorded_at": "2026-11-11T18:45:01.719603+00:00",
+      "actor": "Codex successor planning",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "outcome": "no_module_change",
+      "summary": "Register628 staged plan, preregistration gates and budget; pending allocation and input qualification.",
+      "evidence": [
+        {
+          "id": "CAPITAL-SEAM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "f0ca576d9b3154ac434ad6dbb8b7ab76f24262be",
+          "path": "docs/acceptance/research-capital-seam-20261112.md",
+          "sha256": "5d0ed599c02cbdc70bf70070a83e4d43417ea9453830a4e6a1e7cea009afd637",
+          "claim_ceiling": "Code and frozen metadata seam/plan delivery; capital experiment not run; input-purpose qualification and successor allocation pending."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Planning and lifecycle only; no new quality/value/admission or market-row access.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-CAPITAL-001",
+          "number": 628,
+          "title": "[P3-RESEARCH-CAPITAL-001] 资格通过后完成固定动量候选的最小资金回放",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-11T18:44:50Z",
+          "body_sha256": "8a0328242020a2f50166fc95bf68019d95bb95523cdf7ace6291bded450d795a"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-2-CAPITAL-INDEX-20261112",
+      "recorded_at": "2026-11-11T18:46:00.488513+00:00",
+      "actor": "Codex capital seam closeout",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "Refresh retired proposal current index after recording the capital seam.",
+      "evidence": [
+        {
+          "id": "CAPITAL-SEAM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "f0ca576d9b3154ac434ad6dbb8b7ab76f24262be",
+          "path": "docs/acceptance/research-capital-seam-20261112.md",
+          "sha256": "5d0ed599c02cbdc70bf70070a83e4d43417ea9453830a4e6a1e7cea009afd637",
+          "claim_ceiling": "Code and frozen metadata seam/plan delivery; capital experiment not run; input-purpose qualification and successor allocation pending."
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "Existing index/view maintenance only; TRACE mechanism and maturity unchanged."
     }
   ]
 }

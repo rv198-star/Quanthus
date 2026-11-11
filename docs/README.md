@@ -33,6 +33,10 @@ For the R2 fixed-momentum question, start with the [R2 value brief](work-items/r
 and its [frozen comparison contract](design/research-r2-momentum-markout-v1.md).
 It records the second resource decision and the scope of the next costed-replay candidate.
 
+For the next capital comparison, see the [native seam and staged plan](design/research-capital-replay-plan-v1.md)
+and its [code/metadata review](acceptance/research-capital-seam-20261112.md).
+Successor #628 awaits native input qualification and staged funding.
+
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its
 acceptance and the current no-new-comparison disposition.

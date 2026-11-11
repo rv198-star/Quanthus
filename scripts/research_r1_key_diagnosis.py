@@ -17,6 +17,6 @@ for table,key in [('dwd_security','security_id'),('dwd_listing','listing_id'),('
   rows=c.execute(f'SELECT * FROM {table} WHERE knowledge_to IS NULL AND {key} IN (SELECT {key} FROM {table} WHERE knowledge_to IS NULL GROUP BY 1 HAVING count(*)>1) ORDER BY {key} LIMIT 20').fetchall()
   report[table]['duplicate_rows']=[dict(zip(columns,row)) for row in rows]
 c.read_parquet(str(a.audit/'independent-panel.parquet')).create_view('panel')
-report['panel_duplicate_listings']=c.execute('SELECT listing_id,count(*) rows,count(DISTINCT day) dates,min(day),max(day) FROM panel GROUP BY 1 HAVING count(*)>count(DISTINCT day) ORDER BY 1').fetchall()
+report['panel_duplicate_listings']=c.execute('SELECT listing_id,count(*) AS row_count,count(DISTINCT day) AS date_count,min(day),max(day) FROM panel GROUP BY 1 HAVING count(*)>count(DISTINCT day) ORDER BY 1').fetchall()
 (a.audit/'key-diagnosis.json').write_text(json.dumps(report,indent=2,default=str)+'\n')
 print(json.dumps(report,default=str))

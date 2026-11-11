@@ -36,6 +36,25 @@ def canonicalize_factors(connection: Any) -> Any:
         """).fetch_arrow_table()
 
 
+def qualify_factor_lifetimes(connection: Any) -> int:
+    connection.execute("""CREATE TEMP VIEW factor_lifetime_check AS SELECT f.*,
+        regexp_extract(source_record_id,'raw/baostock/(listing_[0-9a-f]{32})/',1) source_listing_id
+        FROM factor_candidates_raw f""")
+    connection.execute("""CREATE TEMP VIEW factor_lifetime_exclusions AS SELECT f.* EXCLUDE
+        (source_listing_id) FROM factor_lifetime_check f WHERE source_listing_id<>'' AND NOT EXISTS
+        (SELECT 1 FROM dwd_listing_status_interval s WHERE s.listing_id=f.source_listing_id
+        AND s.status_type='LISTING_LIFECYCLE' AND s.status_value='LISTED'
+        AND s.knowledge_to IS NULL AND s.effective_from<=f.effective_from
+        AND (s.effective_to IS NULL OR f.effective_from<s.effective_to))""")
+    connection.execute("""CREATE TEMP VIEW factor_candidates AS SELECT f.* EXCLUDE
+        (source_listing_id) FROM factor_lifetime_check f WHERE source_listing_id='' OR EXISTS
+        (SELECT 1 FROM dwd_listing_status_interval s WHERE s.listing_id=f.source_listing_id
+        AND s.status_type='LISTING_LIFECYCLE' AND s.status_value='LISTED'
+        AND s.knowledge_to IS NULL AND s.effective_from<=f.effective_from
+        AND (s.effective_to IS NULL OR f.effective_from<s.effective_to))""")
+    return int(connection.execute("SELECT count(*) FROM factor_lifetime_exclusions").fetchone()[0])
+
+
 def complete(workspace: Path, product: Path, base: Path, output: Path) -> dict[str, Any]:
     if file_sha256(base / "manifest.json") != BASE251_MANIFEST:
         raise ValueError("BASE251_REFERENCE_IDENTITY_MISMATCH")
@@ -48,6 +67,7 @@ def complete(workspace: Path, product: Path, base: Path, output: Path) -> dict[s
         "dwd_listing",
         "dwd_security",
         "dwd_trading_calendar",
+        "dwd_listing_status_interval",
         "dwd_security_bar",
         "dwd_adjustment_factor",
     ]:
@@ -128,8 +148,11 @@ def complete(workspace: Path, product: Path, base: Path, output: Path) -> dict[s
     original = sorted((product / "payload/dwd_adjustment_factor").rglob("*.parquet"))
     schema = pq.ParquetFile(original[0]).schema_arrow
     c.register("new_factors", pa.Table.from_pylist(factors, schema=schema))
-    c.execute("""CREATE TEMP VIEW factor_candidates AS
+    c.execute("""CREATE TEMP VIEW factor_candidates_raw AS
         SELECT * FROM dwd_adjustment_factor UNION ALL SELECT * FROM new_factors""")
+    excluded_count = qualify_factor_lifetimes(c)
+    excluded = c.execute("SELECT * FROM factor_lifetime_exclusions").fetch_arrow_table()
+    pq.write_table(excluded, output / "evidence/factor-outside-listing-lifetime.parquet")
     duplicates = c.execute("""SELECT * FROM factor_candidates QUALIFY count(*) OVER (
         PARTITION BY security_id,effective_from,adjustment_method,adjustment_direction)>1
         ORDER BY security_id,effective_from,knowledge_from""").fetch_arrow_table()
@@ -189,13 +212,15 @@ def complete(workspace: Path, product: Path, base: Path, output: Path) -> dict[s
             normalized.cast(pq.ParquetFile(old).schema_arrow), temporary, compression="zstd"
         )
         os.replace(temporary, destination)
-    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True,
-                                      cwd=Path(__file__).resolve().parents[3]).strip()
+    revision = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], text=True, cwd=Path(__file__).resolve().parents[3]
+    ).strip()
     summary = {
         "status": "FACTOR_COMPLETION_CANDIDATE",
         "securities": len(missing),
         "accepted_captures": len(receipts),
         "factor_rows_added": len(factors),
+        "factor_observations_outside_source_listing_lifetime": excluded_count,
         "equivalent_factor_observations": duplicates.num_rows,
         "canonical_factor_rows": final.num_rows,
         "empty_factor_histories": empty,

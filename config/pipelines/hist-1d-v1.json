@@ -104,6 +104,7 @@
     "factor_direction": "PROVIDER_NATIVE",
     "factor_field": "BaoStock adjustFactor; same native cumulative basis as sealed Base 2.5.1.",
     "factor_conflicts": "Exact overlap differences are retained and reviewed before acceptance.",
+    "factor_source_identity": "A code-based capture is eligible only within its source listing's frozen LISTING_LIFECYCLE interval. Preserve out-of-lifetime predecessor responses in an exclusion ledger. Native bases may reset at a successor listing boundary; do not silently stitch cross-reorganization returns.",
     "provider_binary_state": "PROVIDER_DAILY_STATE: NORMAL / ST / UNKNOWN.",
     "subtype": "SPECIAL_TREATMENT: official SZSE historical name corroborated by provider isST=1 distinguishes ST and DELISTING_RISK. Unresolved class retains UNKNOWN.",
     "official_name_clock": "SHA-bound SZSE-ACQUISITION.json knowledge_verified_at, fixed once; never filesystem mtime.",

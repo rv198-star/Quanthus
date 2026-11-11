@@ -266,6 +266,9 @@ tags: [finance, a-shares, historical, daily]
 hist1d-session-clock-v1，值与源字节保留，逐条变更见 legacy-clock-normalization 台账。
 000005 在 1990-12-19 至 1991-01-14 的 18 条参考级行情早于首条原生因子；
 这些日期的复权查询保留无适用因子状态。
+供应商以 601607 返回的 21 条上市前前身因子，按冻结上市区间排除并保全原响应，
+见 factor-outside-listing-lifetime 台账。600849→601607 在 2010-03-05 更换上市代码，
+各自有效区间使用对应原生因子；跨重组收益需另行处理该上市边界。
 P2 估值/股本及新增指数留待后续。
 
 周期研究级，非历史 PIT 认证。业务时间按 Asia/Shanghai，时间戳 UTC。

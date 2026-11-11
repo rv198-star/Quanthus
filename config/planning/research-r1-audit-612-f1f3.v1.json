@@ -1,0 +1,70 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-R1-AUDIT-612-F1F3",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "hf-dwd-worker-contract",
+  "work_item": "META-RESEARCH-REVIEW-001",
+  "modules": [
+    "REPRO"
+  ],
+  "question": "Independently verify the bounded F1-F3 and C1 repairs and the immutable A4 delivery",
+  "consumer": "R1 acceptance reviewer and R2 task allocator",
+  "scope": "bb99f99d candidate; actual A4 execution 1351be2b. Independent fault probes on isolated receipt/package copies, synthetic candidate-day boundaries, fixed HF readback and exact test closure. No new market computation.",
+  "deliverable": "Independent audit with concrete pass/fail dispositions, durable evidence and reconciled append-only records",
+  "decision_if_pass": "Accept the bounded single-node Worker and complete R1 acceptance bookkeeping; next tranche remains a named signal question",
+  "decision_if_fail": "Retain accepted A2 research result; keep only demonstrated remaining Worker gaps open with exact recovery path",
+  "acceptance": [
+    "Guardian terminal and failed-cache gates independently exercised before any HF call",
+    "Candidate-date boundaries and interrupted package recovery verified",
+    "A4 fixed HF package, receipts, code and tests bound and read back",
+    "Append-only conclusion/checkpoint and long-term evidence consistent"
+  ],
+  "stop_conditions": [
+    "No new market computation or source qualification; protect all original jobs",
+    "Stop adoption on any demonstrated contract mismatch; preserve the counterexample",
+    "Active audit ceiling 1.5h; one full check and focused fault probes, no repeated market runs"
+  ],
+  "memory_sha256": "e86cdb0dda2c33ccf88728cff11008db0baed4f25219f210733049824c64d844",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "Preserve the recorded scope, earlier evidence, consumer disposition and cumulative costs. This delivery only verifies the bounded Worker repair; no new scientific trial or prior parked direction is activated."
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "Preserve the recorded scope, earlier evidence, consumer disposition and cumulative costs. This delivery only verifies the bounded Worker repair; no new scientific trial or prior parked direction is activated."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "Preserve the recorded scope, earlier evidence, consumer disposition and cumulative costs. This delivery only verifies the bounded Worker repair; no new scientific trial or prior parked direction is activated."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "Preserve the recorded scope, earlier evidence, consumer disposition and cumulative costs. This delivery only verifies the bounded Worker repair; no new scientific trial or prior parked direction is activated."
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "Preserve the recorded scope, earlier evidence, consumer disposition and cumulative costs. This delivery only verifies the bounded Worker repair; no new scientific trial or prior parked direction is activated."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-SELF-AUDIT-20261111",
+      "relation": "respect",
+      "rationale": "Independently assess this author self-audit using the final code and A4 receipts; a new scoped judgment will retain prior failures and all costs."
+    }
+  ],
+  "cumulative_cost_review": "Original Deepseek execution, all audits, Sol corrections, A1-A4 exposure, failures and waits remain cumulative. This independent difference audit has 1.5h active ceiling and 30min machine-test budget. Missing complete active time, tokens and billing remain unknown_not_zero.",
+  "runtime_authority_boundary": "Owner explicitly starts independent audit; existing task-scoped SSH permission persists. Audit code and evidence only, no implementation fixes or new strategy run.",
+  "budget": {
+    "wall_seconds": 1800,
+    "max_new_bytes": 1073741824,
+    "network_requests": 40,
+    "accounting_owner": "612 independent difference acceptance; 1.5h active ceiling and 30min machine budget"
+  }
+}

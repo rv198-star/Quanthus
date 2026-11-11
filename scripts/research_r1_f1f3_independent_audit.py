@@ -404,7 +404,7 @@ def candidate_days(q, out):
           AND day(trade_date)-4 < {right} THEN 0.001 ELSE 0.05 END)) OVER(ORDER BY trade_date)) px
         FROM dwd_trading_calendar WHERE trade_date >= DATE '2020-01-02';
         CREATE TABLE dwd_security_bar AS SELECT 'L' listing_id,calendar_session_id,
-        trade_date observation_start,px open,px close,2e8 turnover,'1d' interval_size,
+        trade_date observation_start,px AS "open",px AS "close",2e8 turnover,'1d' interval_size,
         'UNADJUSTED' price_basis,NULL::TIMESTAMP knowledge_to FROM prices;
         CREATE TABLE dwd_tradability_state AS SELECT 'L' listing_id,calendar_session_id,
         trade_date observation_start,px*1.1 upper_price,true is_tradable,true can_buy,
@@ -471,7 +471,7 @@ def hf_readback(retained, out):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("mode", choices=("probe", "readback"))
+    p.add_argument("mode", choices=("probe", "sample", "readback"))
     p.add_argument("--original", type=Path, required=True)
     p.add_argument("--retained", type=Path, required=True)
     p.add_argument("--out", type=Path, required=True)
@@ -483,6 +483,9 @@ def main():
         probes = fault_probes(q, members, identity, seed, args.out)
         days = candidate_days(q, args.out)
         summary = {"fault_cases": len(probes), "sample_cases": len(days), "status": "PASS"}
+    elif args.mode == "sample":
+        days = candidate_days(read(REQUEST), args.out)
+        summary = {"sample_cases": len(days), "status": "PASS"}
     else:
         result = hf_readback(args.retained, args.out)
         summary = {"files": len(result["files"]), "status": "PASS", "revision": REVISION}

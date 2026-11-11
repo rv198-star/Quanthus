@@ -1,0 +1,138 @@
+{
+  "schema": "quanthus.native-capital-request.v1",
+  "request_id": "RESEARCH-CAPITAL-001",
+  "task_id": "RESEARCH-CAPITAL-001-T1",
+  "attempt_id": "A1",
+  "authority": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "content_digest": "sha256:1d0e4bd5fbf40bf2876883faf82b98fd81e95a93a82b9d23d248759a38b3f692"
+  },
+  "closure": {
+    "path": "config/research/research-capital-qual/closure.v1.json",
+    "sha256": "sha256:0f66acfcc8ef1a93f831b7272f59a86df13fe4a2f3717e4c8e5a812d4cbac13f",
+    "exact_members": 126,
+    "exact_bytes": 192098985
+  },
+  "scope": {
+    "calendar_start": "2019-01-01",
+    "market_start": "2020-01-02",
+    "execution_end": "2021-12-31",
+    "forbidden_after": "2022-01-01",
+    "knowledge_view": "latest_sealed_retrospective",
+    "purpose": "fixed guarded latest-sealed capital counterfactual",
+    "source_clock": "preserve original knowledge_from/to and announced/effective clocks; historical publication qualification not granted",
+    "simulation_clock": "separate explicit retrospective contract remains to be qualified",
+    "partition": "development",
+    "read_start": "2020-01-02",
+    "decision_start": "2020-03-02",
+    "decision_end": "2021-12-30",
+    "interval_semantics": "Asia/Shanghai date; effective [from,to)"
+  },
+  "environment": {
+    "python": "3.10.12",
+    "platform": "linux",
+    "lock_path": "config/research/research-capital/runtime.v1.lock",
+    "lock_sha256": "sha256:b2074bd5d841afa93428bb3a92d16fcd6bb8cdf3c82458512091a6a44b277eb2"
+  },
+  "budget": {
+    "threads": 2,
+    "duckdb_memory_bytes": 3221225472,
+    "max_rss_bytes": 6442450944,
+    "max_scratch_bytes": 4294967296,
+    "max_download_bytes": 536870912,
+    "max_upload_bytes": 4194304,
+    "max_stage_wall_seconds": {
+      "formal": 900,
+      "independent": 1200,
+      "publish": 180
+    },
+    "max_cpu_seconds": 1800,
+    "formal_attempts": 1,
+    "independent_constructions": 1,
+    "publish_attempts": 3
+  },
+  "authorization": {
+    "issue": 628,
+    "remaining_BCD": true,
+    "owner_instruction": "continue all remaining work, then audit",
+    "prior_A": "sealed and preserved; shared source holds unchanged",
+    "data_repair_owner": "P10; no source repair or new acquisition in this consumer"
+  },
+  "publish": {
+    "dataset": "rv192/quanthus-research-r1",
+    "private": true,
+    "path_prefix": "runs/RESEARCH-CAPITAL-001/RESEARCH-CAPITAL-001-T1/A1",
+    "retained_root": "/srv/agentdock/quanthus-ops/research-capital-replay-20261112/retained",
+    "ttl_review_after": "2026-12-12",
+    "cleanup_owner": "CN02 research task maintainer"
+  },
+  "source_knowledge_cutoff": "2026-11-11T20:19:54.776092+00:00",
+  "screen": {
+    "min_listing_sessions": 120,
+    "min_avg_turnover_prior20": 100000000.0,
+    "max_unadjusted_close_return_vol20": 0.5,
+    "max_abs_unadjusted_close_return": 0.04,
+    "unadjusted_momentum20_band": [
+      0.02,
+      0.12
+    ],
+    "volatility_formula": "sample_std(close_t/close_tminus1-1 over current20)*sqrt(252); 21 consecutive positive finite closes; excludes corporate action adjustment",
+    "listing_age_rule": "calendar open sessions since listing effective_from; start clipped to 2019 for older listings, guaranteed >=120 before first decision",
+    "next_open_rule": "next open calendar_session joined by venue; valid listing/security [from,to), positive finite open, tradable and can_buy true, positive finite upper limit, open < upper-0.005",
+    "unknown_rule": "missing/invalid required input blocks admission; disjoint ordered reason ledger",
+    "control": "baseline AND finite momentum20 outside original closed band"
+  },
+  "capital": {
+    "initial_cash_per_arm": "100000.00",
+    "position_fraction": "0.30",
+    "sizing_cash_buffer": "0.21",
+    "entry_lot": 100,
+    "compound_nav": false,
+    "arms": [
+      "candidate",
+      "disjoint_control",
+      "cash"
+    ],
+    "ranking": [
+      "raw_return_vol20 ASC",
+      "opaque listing_id ASC"
+    ],
+    "holding": "enter T+1 open after T close signal; fixed exit signal T+1 close, first legal sell T+2 open; carry same sell order",
+    "terminal": "mark open holdings using qualified 2021-12-31 close and report right-censoring; no forced fill or 2022 read",
+    "T_sizing": "floor(cash*0.30/(T native close*1.21)/100)*100; no future open in sizing",
+    "ranking_precision": "sample std formula unchanged, rounded to12 decimals for reproducible ranking, ties by opaque listing_id",
+    "year_return": "calendar-year system wealth change divided by fixed initial100000; trades grouped by exit year",
+    "unknown_action_date": "An IMPLEMENTED action without ex_date excludes that security from new entries and blocks any held consumption over this frozen window; observed effective_at is not substituted as event date.",
+    "cash_dividend_booking": "Existing P2 applies qualified per-share cash at native ex_date. Payment-date receivables/dividend tax timing are outside this fixed-source counterfactual."
+  },
+  "decision": {
+    "primary": "candidate minus control ending-system-wealth net return",
+    "min_closed_trades_each_arm": 100,
+    "min_closed_trades_each_year": 20,
+    "advance": {
+      "candidate_net_return_gt": 0,
+      "net_return_increment_gte": 0.01,
+      "each_year_increment_gt": 0,
+      "maximum_drawdown_increment_lte": 0.02,
+      "after_static_top3_candidate_profit_subtraction_increment_gt": 0
+    },
+    "branches": {
+      "blocked": "not_evaluated; stop affected comparison and preserve the exact input/semantic discrepancy",
+      "insufficient": "inconclusive; park without tuning",
+      "advance": "supported as a candidate for subsequent independent robustness validation",
+      "not_met": "sample sufficient and candidate net return<=0 OR net increment<=0; park this fixed holding use",
+      "uncertain": "inconclusive otherwise; park"
+    }
+  },
+  "r2_request": {
+    "path": "config/research/research-r2/request.v1.json",
+    "digest": "sha256:3d4f516389fbcf4ef143bb5a7468f37cf41b28edf84ae37355025e8aa9e27411"
+  },
+  "policy": {
+    "path": "config/p2-execution-policy.research.v1.json",
+    "sha256": "sha256:e2ee55ea09682eeb775b9acfcfc4bbba0908ddd4157705cd81fd8f050097c816"
+  },
+  "no_action_semantics": "Replay the exact sealed observation set. No row means no recorded action in that fixed set; unresolved source action exceptions and every multi-record economic key remain held. No attestation of unobserved historical actions is inferred."
+}

@@ -336,3 +336,19 @@ Conditional P2 acceptance excludes target two-window matching, forward/live intr
 partial fills, an email-provider adapter, and actual operator-report reconciliation. It also does
 not implement P3 candidate allocation, position lifecycle, exit decisions, or capital-constrained
 attribution. These remain governed by their activation blockers and later-phase work items.
+
+## Explicit fixed-source capital consumer
+
+Work item `P3-RESEARCH-CAPITAL-001` / #628 adds the bounded
+[capital counterfactual contract](../research-capital-replay-plan-v1.md).
+The source knowledge cutoff and simulated 2020–2021 market clock are separate, explicitly versioned
+inputs. Default historical PIT and the existing 2026 P6 clock keep their scopes. Official execution
+rejects this capital context. Corporate-action events retain their real known_at and record the
+explicit fixed-source context when applying at a simulated historical open.
+
+Paired optional native direction flags on MarketSession are additional source facts: a false buy
+flag cancels the original buy, and a false sell flag carries the same sell order. Default sessions
+without these fields keep their existing behavior. Price matching, fees and unit/pool settlement
+formulas use the existing P2 implementation. Synthetic acceptance lives in
+`tests/unit/test_native_capital_replay.py` and `test_native_capital_pipeline.py`; real execution and
+final review receipts are recorded by #628 separately.

@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Design status | draft for successor implementation; seam investigation approved by Owner |
+| Design status | approved for Owner continuation under the versioned guarded contract |
 | Delivery gate | blocked — native input/clock/action qualification and successor tranche allocation |
 | Parent | [Exploration governance](exploration-governance.md) |
 | Seam work item | P3-RESEARCH-REPLAY-001 / #627; bus #608 |
@@ -161,3 +161,40 @@ Owner已批准A首小时及#628的CN02 SSH。A取得实际源census、单行单�
 以及方向状态/上下界可用范围。3,074个多记录键含412组金额/股数差异，45条已实施行动还存在单行hold；
 现阶段不直接接资金账本。只有在真实合格范围与异常合同就绪后，才为本线最小B接入重新校准预算。
 P2核心与原R2候选保留；局部状态缺口按坐标治理，Worker维持备用。
+
+## 9. Owner继续授权后的有界消费者合同（2026-11-12）
+
+Owner在A交付后明确要求“继续推进，都做完再审计”，授权按原剩余阶段完成接线、固定计算、独立冷建与最终统一审阅；
+本次继续沿用#628的CN02 SSH例外。A的封存请求、失败、输入资格限制和原R1/R2曝光不变。
+版本化执行合同为`config/research/research-capital/request.v1.json`，过程归`RESEARCH-CAPITAL-001`。
+剩余主动工作封顶4小时，机器检查另计；共享数据采集/修复仍由P10 #556承担。
+
+本线实现**逐键保守消费**：先固定T候选，当前T输入未知关闭这一候选；次日未知或方向禁止由P2拒绝原买单，
+不重新排名。持仓的证券/日期遇行动多记录、未知有效日/单位或现有未解条款例外时，停止受影响臂并记录准确键。
+另一臂只执行其原已冻结问题。比较中任一臂受阻，主要收益差保持未评价；保留已完成P2步骤作工程核验。
+这是一条完整的失败出口，A调查中的全范围欠账不转化为源优先级、求和或数值填补规则。
+
+### 双时钟与方向事实
+
+新增`quanthus.capital-retrospective-clock.v1`只允许2020–2021、本固定任务及真实来源content digest，
+分别绑定实际source cutoff与T日15:00模拟时钟。Frame、Signal及持仓行动步骤都须显式声明该模式。
+源表头及每条term的knowledge/announced时间保留；行动known_at取共同可用时间，按实际source cutoff核验。
+默认历史PIT校验和原P6的2026机制时钟范围保持原定义；此模式进入official run时拒绝。
+
+MarketSession可携带成对的原生can_buy/can_sell布尔值。P2在原方向价格状态检查之外保留这一明确拒买/携卖事实，
+事件记录source_cannot_buy或source_cannot_sell及对应原始flags；费用、滑点、撮合数值和资金结算公式沿原冻结政策。
+
+### 固定来源条件及算法表示
+
+本次只回放精确封存**观察集合**。某证券日期无行动源记录时，消费语义为“该固定集合无已记录行动”；
+已有未解action exception、未知条款及多记录经济键始终有界阻断。该条件随结果交付，来源完整性治理仍归P10。
+
+数量固定为`floor(可用现金×0.30/(T日原生收盘×1.21)/100)×100`，次日开盘不参与选股或数量生成。
+波动率公式和阈值沿R2，排序表示固定至小数12位，表示相同后按opaque listing_id，以便两种数值实现严格对齐身份。
+分年净收益定义为当年系统财富变化除以固定初始100,000，闭合交易按退出年份计数；静态剔除仅扣候选最高三笔正贡献，不重放路径。
+
+DAG为固定源逐成员核验→一次共享T特征和原生执行事实TMP→两臂P2路径→主要比较；独立者另复制原生源，
+以pandas重建T面板和排序，再用独立Decimal收支/费用/资金池算法核对成交与现金分。
+正式比较和独立冷建各一次；资源守卫、停止、回传和最终审计按新请求封顶。
+
+无ex_date的已实施行动不以effective_at占位日期（包括周末）定位：该证券在本固定窗内关闭新入场并阻断持仓消费。现金分红沿P2既有ex_date入账；payment_date应收款与股息税时序不进入本次固定来源条件回放。

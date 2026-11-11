@@ -113,13 +113,13 @@ def checked_source(original, out, spec):
     return request, members, isolated, result
 
 
-def reproduce(original, out, spec, evaluator=None):
+def reproduce(original, out, spec, evaluator=None, source_resolver=None):
     import duckdb
     import numpy as np
     import pandas as pd
 
     began = time.monotonic()
-    q, members, source, author = checked_source(original, out, spec)
+    q, members, source, author = (source_resolver or checked_source)(original, out, spec)
     scope, filt = q["scope"], q["screen"]
     db = duckdb.connect()
     db.execute("SET threads=2")
@@ -269,6 +269,7 @@ def reproduce(original, out, spec, evaluator=None):
         & (raw_returns.abs() <= filt["max_abs_unadjusted_close_return"])
         & np.isfinite(momentum)
     )
+    panel["return_vol20"] = vol
     panel["momentum20"] = momentum
     panel["selected"] = panel.base_selected & momentum.between(*filt["unadjusted_momentum20_band"])
     columns = [

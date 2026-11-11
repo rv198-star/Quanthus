@@ -22,7 +22,11 @@ def positive(column: str) -> str:
 
 
 def calculate(
-    connection: Any, request: dict[str, Any], paths: dict[str, list[str]]
+    connection: Any,
+    request: dict[str, Any],
+    paths: dict[str, list[str]],
+    *,
+    features_only: bool = False,
 ) -> dict[str, Any]:
     """Only exact verified paths reach this function. Materialize the panel once."""
     scope, filters = request["scope"], request["screen"]
@@ -129,6 +133,10 @@ def calculate(
         ROWS BETWEEN 19 PRECEDING AND CURRENT ROW),
       prior20 AS(PARTITION BY listing_id ORDER BY trade_date
         ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING);
+    """)
+    if features_only:
+        return {"duplicate_listing_date_keys": duplicate_count}
+    connection.execute(f"""
     CREATE TEMP TABLE labelled AS
     SELECT f.*,
       ({positive("f.px")} AND f.security_ok IS TRUE AND f.is_tradable IS TRUE) AS universe,

@@ -91,7 +91,7 @@ def qualify_action(header: dict[str, Any], terms: list[dict[str, Any]]) -> Nativ
         term_known = term.get("knowledge_from")
         if not isinstance(term_known, datetime):
             raise NativeAdapterError("SOURCE_TERM_KNOWLEDGE_UNKNOWN")
-        term_clocks.append(SourceClock(term_known, effective, None))
+        term_clocks.append(SourceClock(term_known, effective, term.get("announced_at")))
     ids = tuple(term["corporate_action_term_id"] for term in terms)
     if len(set(ids)) != len(ids):
         raise NativeAdapterError("DUPLICATE_ACTION_TERM_ID")

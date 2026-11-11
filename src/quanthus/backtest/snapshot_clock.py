@@ -9,7 +9,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import date, datetime, time
+from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
+
+if TYPE_CHECKING:
+    from quanthus.backtest.capital_clock import CapitalReplayClock
 
 VERSION = "quanthus.p6-fixed-snapshot-clock.v1"
 SHANGHAI = ZoneInfo("Asia/Shanghai")
@@ -67,3 +71,14 @@ class SnapshotReplayClock:
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
+
+
+def parse_replay_clock(value: str) -> SnapshotReplayClock | CapitalReplayClock:
+    """Dispatch exact versioned research contexts; legacy scope stays unchanged."""
+    from quanthus.backtest.capital_clock import VERSION as CAPITAL_VERSION
+    from quanthus.backtest.capital_clock import CapitalReplayClock
+
+    raw = json.loads(value)
+    if isinstance(raw, dict) and raw.get("schema_version") == CAPITAL_VERSION:
+        return CapitalReplayClock.from_json(value)
+    return SnapshotReplayClock.from_json(value)

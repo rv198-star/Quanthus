@@ -152,6 +152,15 @@ def classify_security_day(
                 "rating": "R3",
                 "reason": "status_daily_conflict",
             }
+        if activity is None:
+            # A non-tradable status alone must not justify an empty minute day:
+            # Base 2.5 found tradestatus=0 on a session that actually traded.
+            return {
+                **key,
+                "disposition": "UNRESOLVED",
+                "rating": "R3",
+                "reason": "status_without_daily_corroboration",
+            }
         return {
             **key,
             "disposition": "JUSTIFIED_NO_DATA",

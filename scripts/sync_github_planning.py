@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Synchronize Quanthus design work with GitHub planning objects.
 
-The repository documents are the source of truth. This command manages only labels,
-milestones, and issues whose titles start with a Quanthus stable work-item id.
+Repository documents seed planning objects. Normal synchronization fills gaps while
+preserving live work; --refresh-metadata explicitly refreshes document-owned fields.
+Only issues whose titles start with a Quanthus stable work-item id are managed.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from urllib.parse import quote
 
 DEFAULT_REPOSITORY = "rv198-star/Quanthus"
 MANAGED_LABEL_PREFIXES = ("type:", "status:", "priority:", "phase:", "area:")
+ISSUE_TYPES = {name.casefold(): name for name in ("Epic", "Feature", "Bug", "Task")}
 
 
 @dataclass(frozen=True)
@@ -66,6 +68,8 @@ class IssueImplementationSpec:
 LABELS = (
     LabelSpec("type:epic", "5319E7", "Design chapter or delivery epic"),
     LabelSpec("type:task", "1D76DB", "Executable work item"),
+    LabelSpec("type:feature", "A2EEEF", "New or changed capability"),
+    LabelSpec("type:bug", "D73A4A", "Deviation from an existing requirement"),
     LabelSpec("status:ready", "0E8A16", "Ready under the current release gate"),
     LabelSpec("status:closed", "6E7781", "Accepted or completed with linked evidence"),
     LabelSpec("status:blocked", "B60205", "Blocked by an explicit predecessor gate"),
@@ -1024,6 +1028,16 @@ def work_items(root: Path) -> list[WorkItem]:
         if stable_id not in owners:
             raise ValueError(f"{stable_id} has no governing LLD work-item row")
         chapter, design_row = owners[stable_id]
+        issue_type = (
+            row.get("Type")
+            or design_row.get("Type")
+            or ("epic" if stable_id in PROGRAM_EPIC_IDS else "task")
+        )
+        issue_type = issue_type.casefold()
+        if issue_type not in ISSUE_TYPES:
+            raise ValueError(f"{stable_id} has invalid Issue Type: {issue_type}")
+        if stable_id == P10_EPIC_ID and issue_type != "epic":
+            raise ValueError("the permanent P10 epic must retain Epic type")
         phase = row["Phase"]
         dependencies = design_row.get("Dependency") or row.get("Depends on") or "None"
         evidence = design_row.get("Acceptance evidence", "Linked implementation evidence")
@@ -1083,7 +1097,7 @@ def work_items(root: Path) -> list[WorkItem]:
                     if stable_id in IMPLEMENTATION_SPECS
                     else chapter.path
                 ),
-                issue_type="epic" if stable_id in PROGRAM_EPIC_IDS else "task",
+                issue_type=issue_type,
             )
         )
     return items
@@ -1289,10 +1303,11 @@ def epic_body(
 
 
 class GitHub:
-    def __init__(self, repository: str) -> None:
+    def __init__(self, repository: str, *, refresh_metadata: bool = False) -> None:
         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
             raise ValueError("repository must use OWNER/NAME form")
         self.repository = repository
+        self.refresh_metadata = refresh_metadata
 
     def api(self, method: str, endpoint: str, payload: dict[str, Any] | None = None) -> Any:
         command = ["gh", "api", "--method", method, endpoint]
@@ -1389,11 +1404,16 @@ class GitHub:
         labels: list[str],
         milestone: int | None,
     ) -> tuple[dict[str, Any], str]:
+        permanent_epic = title.startswith(f"[{P10_EPIC_ID}]")
+        cancelled_p6 = any(title.startswith(f"[{key}]") for key in P6_CANCELLED_IDS)
+        if permanent_epic and "status:closed" in labels:
+            raise ValueError("the permanent P10 epic cannot be automatically closed")
+        # Closed history stays intact, including not_planned and migrated evidence.
+        # The explicit P6 cancellation decision still owns its retired issues' reason.
         if (
             existing is not None
             and existing.get("state", "").casefold() == "closed"
-            and "phase:P10" in labels
-            and not title.startswith(f"[{P10_EPIC_ID}]")
+            and not cancelled_p6
         ):
             return existing, "reused"
         existing_labels = [] if existing is None else [item["name"] for item in existing["labels"]]
@@ -1401,15 +1421,56 @@ class GitHub:
             name for name in existing_labels if not name.startswith(MANAGED_LABEL_PREFIXES)
         ]
         desired_labels = sorted(set(labels + unmanaged))
+        existing_body = None if existing is None else existing.get("body")
+        desired_body = body
+        if existing is not None and not self.refresh_metadata:
+            title = existing["title"]
+            desired_body = existing_body or body
+            desired_labels = sorted(
+                set(
+                    existing_labels
+                    + [
+                        name
+                        for name in labels
+                        if not any(
+                            value.startswith(name.split(":", 1)[0] + ":")
+                            for value in existing_labels
+                        )
+                    ]
+                )
+            )
+            milestone = (existing.get("milestone") or {}).get("number", milestone)
+            # A stale document must not close a live issue missing a status label.
+            if "status:closed" not in existing_labels and "status:closed" in desired_labels:
+                desired_labels.remove("status:closed")
+                desired_labels.append("status:triage")
+                desired_labels.sort()
+        if cancelled_p6:
+            desired_labels = sorted(
+                {name for name in desired_labels if not name.startswith("status:")}
+                | {"status:closed"}
+            )
+        planned_type = next((name[5:] for name in labels if name.startswith("type:")), None)
+        live_type = None if existing is None else (existing.get("type") or {}).get("name")
+        legacy_type = next((name[5:] for name in existing_labels if name.startswith("type:")), None)
+        selected_type = (
+            planned_type if self.refresh_metadata else (live_type or legacy_type or planned_type)
+        )
+        if isinstance(existing_body, str) and "<!-- quanthus-data-owner:P10 " in existing_body:
+            selected_type = live_type or legacy_type or planned_type
+        if permanent_epic:
+            selected_type = "epic"
+        native_type = None
+        if selected_type is not None:
+            native_type = ISSUE_TYPES.get(selected_type.casefold())
+            if native_type is None:
+                raise ValueError(f"unsupported Issue Type: {selected_type}")
         should_close = "status:closed" in desired_labels
-        cancelled_p6 = any(title.startswith(f"[{key}]") for key in P6_CANCELLED_IDS)
         close_payload = {"state": "closed"}
         if cancelled_p6:
             close_payload["state_reason"] = "not_planned"
-        if title.startswith(f"[{P10_EPIC_ID}]") and should_close:
+        if permanent_epic and should_close:
             raise ValueError("the permanent P10 epic cannot be automatically closed")
-        existing_body = None if existing is None else existing.get("body")
-        desired_body = body
         if isinstance(existing_body, str) and "<!-- quanthus-data-owner:P10 " in existing_body:
             # Migrated legacy issues keep live scope, evidence and release/status gates.
             # A broad planning refresh may update ownership, never replace their history.
@@ -1429,12 +1490,19 @@ class GitHub:
             and "<!-- quanthus-planning:v1 " in body
         ):
             desired_body = existing_body
+        if native_type is not None:
+            desired_labels = sorted(
+                {name for name in desired_labels if not name.startswith("type:")}
+                | {f"type:{native_type.casefold()}"}
+            )
         payload: dict[str, Any] = {
             "title": title,
             "body": desired_body,
             "labels": desired_labels,
             "milestone": milestone,
         }
+        if native_type is not None:
+            payload["type"] = native_type
         if existing is None:
             created = self.api("POST", f"/repos/{self.repository}/issues", payload)
             if should_close:
@@ -1453,9 +1521,11 @@ class GitHub:
             and existing_body == desired_body
             and sorted(existing_labels) == desired_labels
             and current_milestone_number == milestone
+            and (native_type is None or live_type == native_type)
             and (not should_close or existing.get("state", "").casefold() == "closed")
             and (
-                not should_close or not cancelled_p6
+                not should_close
+                or not cancelled_p6
                 or existing.get("state_reason") == "not_planned"
             )
         )
@@ -1484,14 +1554,12 @@ def issue_by_stable_id(
     return {key: values[0] for key, values in found.items() if values}
 
 
-def synchronize(root: Path, repository: str) -> dict[str, Any]:
+def synchronize(root: Path, repository: str, *, refresh_metadata: bool = False) -> dict[str, Any]:
     items = work_items(root)
     _, rows_by_chapter = chapter_rows(root)
     target_ids = {item.stable_id for item in items} | {f"LLD-{item.number}" for item in CHAPTERS}
-    closed_ids = {item.stable_id for item in items if item.status == "closed"} | {
-        f"LLD-{chapter.number}" for chapter in CHAPTERS if chapter.status == "closed"
-    }
     github = GitHub(repository)
+    github.refresh_metadata = refresh_metadata
 
     existing_issues = github.issues()
     issues_by_id = issue_by_stable_id(existing_issues, target_ids)
@@ -1574,7 +1642,8 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
             raise RuntimeError(
                 f"GitHub verification failed for {stable_id}: issue #{verification_issue['number']}"
             )
-        if stable_id in closed_ids and remote_issue.get("state", "").casefold() != "closed":
+        expected_closed = issues_by_id[stable_id].get("state", "").casefold() == "closed"
+        if expected_closed and remote_issue.get("state", "").casefold() != "closed":
             raise RuntimeError(
                 f"GitHub verification failed for {stable_id}: expected closed issue "
                 f"#{verification_issue['number']}"
@@ -1584,6 +1653,7 @@ def synchronize(root: Path, repository: str) -> dict[str, Any]:
 
     return {
         "repository": f"https://github.com/{repository}",
+        "metadata_policy": "refresh" if refresh_metadata else "fill-gaps",
         "labels": {"total": len(LABELS), **label_results},
         "milestones": {"total": len(MILESTONES), **milestone_results},
         "epics": {"total": len(CHAPTERS), **epic_results, "urls": epic_urls},
@@ -1617,6 +1687,11 @@ def project_root() -> Path:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--refresh-metadata",
+        action="store_true",
+        help=("Replace live metadata from a reviewed document plan; closed history stays intact"),
+    )
+    parser.add_argument(
         "--repo", default=DEFAULT_REPOSITORY, help="GitHub repository as OWNER/NAME"
     )
     parser.add_argument(
@@ -1633,7 +1708,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     try:
         result = (
-            synchronize(project_root(), args.repo)
+            synchronize(project_root(), args.repo, refresh_metadata=args.refresh_metadata)
             if args.apply
             else dry_run(project_root(), args.repo)
         )

@@ -1,5 +1,10 @@
 # Work-Item Traceability Index
 
+Maintenance workflow: [GitHub work agreement](../../CONTRIBUTING.md).
+`META-GITHUB-001` / [#624](https://github.com/rv198-star/Quanthus/issues/624) owns
+issue-type projection, metadata synchronization and safe worktree closeout.
+It is a maintenance task outside the LLD-derived synchronization inventory.
+
 Stable ids are the join key between requirements, designs, code, tests, and GitHub issues.
 The GitHub issue title must begin with the id in brackets. Closing an issue requires links to
 acceptance evidence; closing an epic requires all blocking child ids to close.
@@ -641,5 +646,19 @@ python3 scripts/sync_github_planning.py --apply
 
 The synchronization is idempotent, reconciles transient GitHub list inconsistencies, aborts on
 duplicate stable IDs, and preserves unmanaged labels. Credentials remain outside the repository.
+Normal synchronization creates missing issues and fills missing fields. Existing titles, scope,
+native types, status/priority/phase/area labels and assigned milestones remain live-owned. The
+compatibility `type:*` label follows the native type; if no native type exists, the current
+compatibility label is adopted before a document default. An optional `Type` column in the index
+or governing LLD table accepts `Epic`, `Feature`, `Bug` or `Task`. Legacy rows default to their
+existing Epic/Task classification.
+
+After reviewing a document-to-GitHub change, `--apply --refresh-metadata` explicitly replaces
+metadata from that plan. Closed history stays intact; migrated P10 scope and newer v2 contracts
+retain their protections. P10's standing Epic stays open, and the explicit P6 cancellation
+decision retains its `not_planned` disposition. A stale closed plan cannot close live work during
+ordinary synchronization. Tests cover these rules in
+`tests/contract/test_github_metadata_ownership.py`.
+
 Historical issue/work-item text about superseded OCI pipelines records past execution, not current
 routing authority. Current data responsibilities remain governed by ADR 0007.

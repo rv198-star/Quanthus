@@ -13,9 +13,13 @@ import json
 import os
 import socket
 import sys
+import tempfile
 import time
+from collections import Counter
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from http.client import HTTPException
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -28,11 +32,17 @@ from quanthus.providers.minute_recovery import (
     MinuteRecoveryPolicy,
     load_minute_recovery_policy,
 )
+from quanthus.providers.minute_references import (
+    MinuteReferences,
+    load_minute_references,
+    parse_reference_sha256,
+)
 from quanthus.providers.minute_source_selection import (
     MinuteCandidate,
     choose_whole_security,
+    qualify_candidate,
 )
-from quanthus.providers.paid_minute_source import normalized_candidate
+from quanthus.providers.paid_minute_source import PaidMinuteIdentityError, normalized_candidate
 from quanthus.providers.tencent_m1_normalize import normalize_symbol
 
 PAGE_SIZE = 800
@@ -58,6 +68,39 @@ EASTMONEY_CONSECUTIVE_ERROR_LIMIT = 20
 TENCENT_M1_URL = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/kline/mkline"
 TENCENT_MIN_INTERVAL_SECONDS = 0.18
 MINUTE_SOURCE_POLICY = "tencent-then-paid-audited-raw-v1"
+
+
+class MinuteProviderError(RuntimeError):
+    """A failed provider request, eligible for bounded network recovery."""
+
+
+class MinuteQualityError(RuntimeError):
+    """Captured source data cannot pass the unchanged admission rules."""
+
+
+class MinuteSemanticConflict(MinuteQualityError):
+    """Independently qualified whole-security sources disagree."""
+
+
+class MinuteIntegrityError(RuntimeError):
+    """Evidence identity or consistency cannot be trusted; stop the attempt."""
+
+
+def _failure_kind(exc: Exception, *, writing: bool) -> str:
+    if writing:
+        return "storage" if isinstance(exc, OSError) else "integrity"
+    if isinstance(exc, MinuteProviderError):
+        return "provider"
+    if isinstance(exc, MinuteSemanticConflict):
+        return "semantic_conflict"
+    if isinstance(exc, MinuteQualityError):
+        return "quality"
+    if isinstance(exc, MinuteIntegrityError):
+        return "integrity"
+    if isinstance(exc, OSError):
+        return "storage"
+    # Unknown exceptions must not invent provider outages or trigger requests.
+    return "internal"
 
 
 def _now_iso() -> str:
@@ -120,7 +163,7 @@ def tdx_client(*, budget: MinuteBudget | None = None) -> tuple[Any, str]:
             raise
         except Exception:  # noqa: BLE001 - provider failover must try the next endpoint
             continue
-    raise RuntimeError("no TDX endpoint returned a valid bars probe")
+    raise MinuteProviderError("no TDX endpoint returned a valid bars probe")
 
 
 def _eastmoney_secid(symbol: str) -> str:
@@ -137,6 +180,9 @@ def _eastmoney_payload(
     session: Any | None = None,
     budget: MinuteBudget | None = None,
 ) -> dict[str, Any]:
+    from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
+    from requests.exceptions import RequestException
+
     query = urlencode(
         {
             "secid": _eastmoney_secid(symbol),
@@ -174,16 +220,20 @@ def _eastmoney_payload(
             if data is None:
                 return {"code": symbol, "trends": [], "no_data": True}
             if str(data.get("code") or "").zfill(6) != symbol:
-                raise RuntimeError("Eastmoney returned a mismatched security")
+                raise MinuteIntegrityError("Eastmoney returned a mismatched security")
             return data
         except MinuteBudgetExceeded:
             raise
-        except Exception as exc:  # noqa: BLE001 - bounded provider retry
+        except RequestsJSONDecodeError as exc:
+            raise MinuteQualityError(f"invalid Eastmoney response JSON: {exc}") from exc
+        except (OSError, HTTPException, RequestException) as exc:
             last_error = exc
             if attempt < 4:
                 delay = 0.5 * (2**attempt)
                 budget.sleep(delay) if budget else time.sleep(delay)
-    raise RuntimeError(f"Eastmoney trends request failed: {last_error}")
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise MinuteQualityError(f"invalid Eastmoney response: {exc}") from exc
+    raise MinuteProviderError(f"Eastmoney trends request failed: {last_error}") from last_error
 
 
 def _eastmoney_ndays(market_date: str) -> int:
@@ -200,37 +250,16 @@ def _eastmoney_ndays(market_date: str) -> int:
 
 
 def _tencent_daily_evidence(
-    *, daily_path: Path, status_path: Path, market_date: str, symbols: Sequence[str]
-) -> dict[str, dict[str, Any]]:
+    *, daily_path: Path, status_path: Path, market_date: str, symbols: Sequence[str],
+    five_path: Path | None = None, require_first_five: bool = False,
+    expected_sha256: dict[str, str] | None = None,
+) -> MinuteReferences:
     """Require one sealed same-date market universe before Tencent 1m recovery."""
-    import pyarrow.parquet as pq
-
-    daily_rows = pq.read_table(
-        daily_path, columns=["stock_code", "market_date", "volume", "close"]
-    ).to_pylist()
-    status_rows = pq.read_table(
-        status_path, columns=["stock_code", "market_date", "tradestatus"]
-    ).to_pylist()
-    daily = {str(row["stock_code"]): row for row in daily_rows}
-    status = {str(row["stock_code"]): row for row in status_rows}
-    if (
-        len(daily) != len(daily_rows)
-        or len(status) != len(status_rows)
-        or not daily
-        or set(daily) != set(status)
-        or not set(symbols).issubset(daily)
-        or any(row["market_date"] != market_date for row in daily_rows + status_rows)
-        or any(str(row["tradestatus"]) not in {"0", "1"} for row in status_rows)
-    ):
-        raise ValueError("Tencent 1m sealed daily/status evidence is incomplete or wrong-date")
-    return {
-        code: {
-            "volume": daily[code]["volume"],
-            "close": daily[code]["close"],
-            "tradestatus": str(status[code]["tradestatus"]),
-        }
-        for code in symbols
-    }
+    return load_minute_references(
+        daily_path=daily_path, status_path=status_path, market_date=market_date,
+        symbols=symbols, five_path=five_path, require_first_five=require_first_five,
+        expected_sha256=expected_sha256,
+    )
 
 
 def _tencent_qualification_symbols(
@@ -280,8 +309,11 @@ def _tencent_one_minute_bars(
     last_error: Exception | None = None
     for attempt in range(1, 4):
         try:
-            with opener(request, timeout=12) as response:
-                raw = response.read()
+            try:
+                with opener(request, timeout=12) as response:
+                    raw = response.read()
+            except (OSError, HTTPException) as exc:
+                raise MinuteProviderError(f"Tencent transport failed: {exc}") from exc
             # Retain source bytes even when strict validation fails. A failed
             # qualification must remain auditable without publishing minute bars.
             temporary = raw_path.with_name(f"{raw_path.name}.tmp.{os.getpid()}")
@@ -291,13 +323,23 @@ def _tencent_one_minute_bars(
             ):
                 zipped.write(raw)
             os.replace(temporary, raw_path)
-            payload = json.loads(raw)
+            try:
+                payload = json.loads(raw)
+            except (ValueError, UnicodeError) as exc:
+                raise MinuteQualityError(f"invalid Tencent response JSON: {exc}") from exc
+            if not isinstance(payload, dict) or "code" not in payload:
+                raise MinuteQualityError("invalid Tencent response envelope")
             if payload.get("code") != 0:
                 # Provider faults such as code 11 (Redis unavailable) are
                 # transient, unlike a deterministic daily-volume mismatch.
                 # Keep the raw response and use the bounded transport retry.
-                raise RuntimeError(f"Tencent response code {payload.get('code')}")
-            source = payload["data"][provider_symbol]["m1"]
+                raise MinuteProviderError(f"Tencent response code {payload.get('code')}")
+            data = payload.get("data")
+            if not isinstance(data, dict):
+                raise MinuteQualityError("invalid Tencent response data")
+            if provider_symbol not in data:
+                raise MinuteIntegrityError("Tencent response security identity mismatch")
+            source = data[provider_symbol]["m1"]
             selected = [
                 row for row in source if str(row[0]).startswith(market_date.replace("-", ""))
             ]
@@ -316,6 +358,11 @@ def _tencent_one_minute_bars(
                     daily_close=daily["close"],
                     market_date=market_date,
                 )
+                # The research normalizer may describe a no-trade hypothesis,
+                # but exact daily volume does not prove which minute was empty.
+                # Formal source admission must never publish synthetic OHLC.
+                if detail.get("inferred_zero_volume_minutes"):
+                    raise ValueError("Tencent source grid contains unobserved minutes")
                 frame = pd.DataFrame(rows)
             # Pandas otherwise serializes an all-None column as Parquet null
             # type, not the governed nullable float64 amount field.
@@ -333,15 +380,19 @@ def _tencent_one_minute_bars(
                 "attempts": attempt,
                 **detail,
             }
-        except ValueError as exc:
-            # A source-quality mismatch is not a transport fault. Retrying the
-            # same preliminary snapshot three times only delays the scan.
-            raise RuntimeError(f"Tencent m1 request/validation failed for {symbol}: {exc}") from exc
-        except Exception as exc:  # noqa: BLE001 - retry bounded provider read
+        except MinuteProviderError as exc:
             last_error = exc
             if attempt < 3:
                 time.sleep(0.4 * attempt)
-    raise RuntimeError(f"Tencent m1 request/validation failed for {symbol}: {last_error}")
+        except (ValueError, KeyError, TypeError, IndexError) as exc:
+            # Captured data is deterministic within this attempt. Do not refetch
+            # it for missing rows, bad values, or an adapter rejection.
+            raise MinuteQualityError(
+                f"Tencent m1 request/validation failed for {symbol}: {exc}"
+            ) from exc
+    raise MinuteProviderError(
+        f"Tencent m1 request failed for {symbol}: {last_error}"
+    ) from last_error
 
 
 def _tencent_candidate(frame: Any, meta: dict[str, Any]) -> MinuteCandidate:
@@ -367,6 +418,10 @@ def _tencent_candidate(frame: Any, meta: dict[str, Any]) -> MinuteCandidate:
     )
 
 
+class PaidMinuteCandidateRejected(ValueError):
+    """Hash-verified raw cannot form a candidate under current reference rules."""
+
+
 def _paid_audit_candidate(
     audit_dir: Path,
     symbol: str,
@@ -384,9 +439,9 @@ def _paid_audit_candidate(
         receipt.get("stock_code") != symbol
         or receipt.get("market_date") != market_date
         or receipt.get("http_status") != 200
-        or receipt.get("status") != "qualified_candidate_not_published"
+        or receipt.get("status") not in {"qualified_candidate_not_published", "unqualified"}
     ):
-        raise ValueError("paid audit receipt is not a qualified same-date HTTP 200")
+        raise ValueError("paid audit receipt is not a same-date HTTP 200 capture")
     if raw_path.stat().st_size > 2_000_000:
         raise ValueError("paid audit raw capture is unexpectedly large")
     with gzip.open(raw_path, "rb") as source:
@@ -395,15 +450,26 @@ def _paid_audit_candidate(
         "source_raw_sha256"
     ):
         raise ValueError("paid audit raw SHA-256 or size mismatch")
-    return normalized_candidate(
-        raw,
-        symbol=symbol + suffix,
-        market_date=market_date,
-        daily_volume=daily["volume"],
-        daily_close=daily["close"],
-        first_5m_volume=None,
-        raw_ref=str(raw_path),
-    )
+    volume, close, first_five = daily["volume"], daily["close"], daily["first_5m_volume"]
+    if first_five is None:
+        raise ValueError("paid candidate replay lacks explicit sealed native-5m evidence")
+    try:
+        return normalized_candidate(
+            raw,
+            symbol=symbol + suffix,
+            market_date=market_date,
+            daily_volume=volume,
+            daily_close=close,
+            first_5m_volume=first_five,
+            raw_ref=str(raw_path),
+        )
+    except PaidMinuteIdentityError as exc:
+        raise MinuteIntegrityError(f"paid audit source identity invalid: {exc}") from exc
+    except (ValueError, KeyError) as exc:
+        # Integrity/code/date/HTTP checks above are still hard evidence faults.
+        # A current adapter rejection is different: it cannot preempt a valid
+        # whole-security peer or acquire fabricated rows merely to reach the gate.
+        raise PaidMinuteCandidateRejected(str(exc)) from exc
 
 
 def _eastmoney_one_minute_frame(data: dict[str, Any], symbol: str) -> Any:
@@ -413,7 +479,7 @@ def _eastmoney_one_minute_frame(data: dict[str, Any], symbol: str) -> Any:
     for raw in data.get("trends") or []:
         fields = str(raw).split(",")
         if len(fields) < 7:
-            raise RuntimeError("Eastmoney trends row has fewer than 7 fields")
+            raise MinuteQualityError("Eastmoney trends row has fewer than 7 fields")
         ts = pd.Timestamp(fields[0])
         rows.append(
             {
@@ -463,7 +529,10 @@ def _eastmoney_bars(
             session=session,
             **({"budget": budget} if budget else {}),
         )
-    minute = _eastmoney_one_minute_frame(payload, symbol)
+    try:
+        minute = _eastmoney_one_minute_frame(payload, symbol)
+    except (ValueError, TypeError) as exc:
+        raise MinuteQualityError(f"invalid Eastmoney minute values: {exc}") from exc
     if market_date is not None and not minute.empty:
         minute = minute.loc[minute["ts"].dt.strftime("%Y-%m-%d") == market_date].copy()
     if minute.empty:
@@ -522,34 +591,50 @@ def _baostock_native_5m_bars(
 
     started = time.monotonic()
     code = ("sh." if symbol.startswith("6") else "sz.") + symbol
-    response = client.query_history_k_data_plus(
-        code,
-        "date,time,code,open,high,low,close,volume,amount",
-        start_date=market_date,
-        end_date=market_date,
-        frequency="5",
-        adjustflag="3",
-    )
+    try:
+        response = client.query_history_k_data_plus(
+            code,
+            "date,time,code,open,high,low,close,volume,amount",
+            start_date=market_date,
+            end_date=market_date,
+            frequency="5",
+            adjustflag="3",
+        )
+    except (OSError, HTTPException) as exc:
+        raise MinuteProviderError(f"BaoStock native 5m transport failed: {exc}") from exc
     if str(response.error_code) != "0":
-        raise RuntimeError(f"BaoStock native 5m error={response.error_code}: {response.error_msg}")
+        raise MinuteProviderError(
+            f"BaoStock native 5m error={response.error_code}: {response.error_msg}"
+        )
     rows: list[dict[str, Any]] = []
     while response.next():
         raw = response.get_row_data()
         if len(raw) != 9 or raw[0] != market_date or raw[2] != code:
-            raise RuntimeError("BaoStock native 5m returned wrong date/code/schema")
-        timestamp = pd.to_datetime(raw[1], format="%Y%m%d%H%M%S%f", errors="raise")
+            raise MinuteIntegrityError("BaoStock native 5m returned wrong date/code/schema")
+        try:
+            timestamp = pd.to_datetime(raw[1], format="%Y%m%d%H%M%S%f", errors="raise")
+            if pd.isna(timestamp):
+                raise MinuteQualityError("BaoStock native 5m has empty captured timestamp")
+        except (ValueError, TypeError, OverflowError) as exc:
+            raise MinuteQualityError("BaoStock native 5m has invalid captured timestamp") from exc
         if timestamp.strftime("%Y-%m-%d") != market_date:
-            raise RuntimeError("BaoStock native 5m timestamp differs from market date")
+            raise MinuteIntegrityError("BaoStock native 5m timestamp differs from market date")
+        try:
+            numeric = [float(value) for value in raw[3:9]]
+        except (ValueError, TypeError, OverflowError) as exc:
+            raise MinuteQualityError(
+                "BaoStock native 5m has invalid captured numeric value"
+            ) from exc
         rows.append(
             {
                 "stock_code": symbol,
                 "ts": timestamp,
-                "open": float(raw[3]),
-                "high": float(raw[4]),
-                "low": float(raw[5]),
-                "close": float(raw[6]),
-                "volume": float(raw[7]),
-                "amount": float(raw[8]),
+                "open": numeric[0],
+                "high": numeric[1],
+                "low": numeric[2],
+                "close": numeric[3],
+                "volume": numeric[4],
+                "amount": numeric[5],
             }
         )
     frame = pd.DataFrame(
@@ -557,7 +642,7 @@ def _baostock_native_5m_bars(
     )
     if not frame.empty:
         if frame.duplicated(subset=["stock_code", "ts"]).any():
-            raise RuntimeError("BaoStock native 5m returned duplicate bar timestamps")
+            raise MinuteQualityError("BaoStock native 5m returned duplicate bar timestamps")
         frame = frame.sort_values("ts").reset_index(drop=True)
     return frame, {
         "ok": True,
@@ -617,7 +702,7 @@ def page_bars(
                 budget.remaining()
         except MinuteBudgetExceeded:
             raise
-        except Exception as exc:  # noqa: BLE001 - preserve provider failure in evidence
+        except (OSError, HTTPException) as exc:
             return pd.DataFrame(), {
                 "ok": False,
                 "error": f"{type(exc).__name__}: {exc}",
@@ -644,16 +729,24 @@ def page_bars(
             "latest": None,
         }
     raw = pd.concat(frames, ignore_index=True)
+    try:
+        timestamps = raw.apply(_row_timestamp, axis=1)
+        numeric = {
+            field: raw[field].astype(float)
+            for field in ("open", "high", "low", "close", "vol", "amount")
+        }
+    except (ValueError, TypeError, KeyError, OverflowError) as exc:
+        raise MinuteQualityError("TDX has invalid captured timestamp/numeric schema") from exc
     output = pd.DataFrame(
         {
             "stock_code": symbol,
-            "ts": raw.apply(_row_timestamp, axis=1),
-            "open": raw["open"].astype(float),
-            "high": raw["high"].astype(float),
-            "low": raw["low"].astype(float),
-            "close": raw["close"].astype(float),
-            "volume": raw["vol"].astype(float),
-            "amount": raw["amount"].astype(float),
+            "ts": timestamps,
+            "open": numeric["open"],
+            "high": numeric["high"],
+            "low": numeric["low"],
+            "close": numeric["close"],
+            "volume": numeric["vol"],
+            "amount": numeric["amount"],
         }
     )
     output = (
@@ -691,6 +784,84 @@ def _merge_write(home: Path, symbol: str, frequency: str, frame: Any) -> tuple[i
     return len(frame), path
 
 
+def _require_fresh_qualified_home(home: Path) -> None:
+    """Reject reuse before changing an earlier attempt's files or receipts."""
+    if home.is_symlink() or (home.exists() and (not home.is_dir() or any(home.iterdir()))):
+        raise ValueError("qualified 1m requires a fresh, empty attempt home; retain prior evidence")
+
+
+def _write_qualified_one_minute(
+    home: Path,
+    symbol: str,
+    frame: Any,
+    *,
+    candidate: MinuteCandidate,
+    market_date: str,
+    daily: dict[str, Any],
+    expected_semantic_sha256: str,
+) -> tuple[int, Path, str]:
+    """Publish one whole security only if its staged bytes reproduce qualification.
+
+    Never merge with an earlier file, even on a different date. Cross-attempt
+    recovery must instead enter a new attempt through its separately governed
+    verifier. A no-replace link also protects against a late target-file collision.
+    """
+    import pandas as pd
+
+    path = home / f"{symbol}_1m.parquet"
+    if path.exists() or path.is_symlink():
+        raise FileExistsError(f"qualified 1m target already exists: {path.name}")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{symbol}_1m-", suffix=".parquet", dir=home,
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
+    try:
+        frame.to_parquet(temporary, index=False)
+        materialized = pd.read_parquet(temporary)
+        materialized_candidate = replace(
+            candidate,
+            rows=tuple(
+                {
+                    "stock_code": row.stock_code,
+                    "ts": str(row.ts),
+                    "open": row.open,
+                    "high": row.high,
+                    "low": row.low,
+                    "close": row.close,
+                    "volume": row.volume,
+                    "amount": None if pd.isna(row.amount) else row.amount,
+                }
+                for row in materialized.itertuples(index=False)
+            ),
+        )
+        digest = qualify_candidate(
+            materialized_candidate,
+            symbol=symbol,
+            market_date=market_date,
+            daily_volume=daily["volume"],
+            daily_close=daily["close"],
+            traded=daily["tradestatus"] == "1",
+        )
+        if digest != expected_semantic_sha256:
+            raise ValueError("qualified 1m materialization differs from selected source semantics")
+        if len(materialized):
+            # Unlike replace(), link() cannot overwrite a competing writer's
+            # target. The existing node/attempt lock still owns process exclusion.
+            os.link(temporary, path)
+        elif path.exists() or path.is_symlink():
+            raise FileExistsError(f"qualified 1m target already exists: {path.name}")
+        return len(materialized), path, digest
+    finally:
+        unwinding = sys.exc_info()[0] is not None
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError as exc:
+            if not unwinding:
+                raise
+            print(f"minute staging cleanup failed: {exc}", file=sys.stderr)
+
+
 def collect(
     *,
     home: Path,
@@ -705,6 +876,8 @@ def collect(
     tencent_daily_path: Path | None = None,
     tencent_status_path: Path | None = None,
     paid_audit_dir: Path | None = None,
+    sealed_five_path: Path | None = None,
+    reference_sha256: dict[str, str] | None = None,
 ) -> int:
     if not symbols:
         raise ValueError("symbols must not be empty")
@@ -723,16 +896,28 @@ def collect(
         or recovery_policy is not None
     ):
         raise ValueError("Tencent 1m requires paired sealed evidence and research incr mode")
+    if tencent_enabled:
+        if len(set(symbols)) != len(symbols):
+            raise ValueError("qualified 1m requires unique symbols")
+        _require_fresh_qualified_home(home)
     if paid_audit_dir is not None and (
         not tencent_enabled or paid_audit_dir.is_symlink() or not paid_audit_dir.is_dir()
+        or sealed_five_path is None
     ):
-        raise ValueError("paid audit fallback requires a real directory and sealed 1m evidence")
+        raise ValueError(
+            "paid audit fallback requires a real directory and explicit sealed native-5m evidence"
+        )
+    if (sealed_five_path is not None or reference_sha256 is not None) and not tencent_enabled:
+        raise ValueError("sealed native-5m references require paired sealed daily/status evidence")
     tencent_daily = (
         _tencent_daily_evidence(
             daily_path=tencent_daily_path,
             status_path=tencent_status_path,
             market_date=market_date,
             symbols=symbols,
+            five_path=sealed_five_path,
+            require_first_five=paid_audit_dir is not None,
+            expected_sha256=reference_sha256,
         )
         if tencent_enabled
         else {}
@@ -754,7 +939,7 @@ def collect(
     results: dict[str, dict[str, Any]] = {}
     errors = 0
     done = 0
-    consecutive_errors = 0
+    consecutive_provider_errors = 0
     session: Any | None = None
     scan_round = 0
     attempts_total = 0
@@ -782,6 +967,12 @@ def collect(
                 "total": len(symbols),
                 "done": done,
                 "error": errors,
+                "scanned": len(results),
+                "unscanned": len(symbols) - len(results),
+                "error_types": dict(Counter(
+                    item["error_type"] for item in results.values() if item["status"] == "error"
+                )),
+                "consecutive_provider_errors": consecutive_provider_errors,
                 "current": current,
                 "elapsed_s": round(time.monotonic() - started, 1),
                 "updated_at": _now_iso(),
@@ -801,7 +992,7 @@ def collect(
         )
 
     def collect_symbol(symbol: str) -> None:
-        nonlocal current, client, server, done, errors, consecutive_errors, attempts_total
+        nonlocal current, client, server, done, errors, consecutive_provider_errors, attempts_total
         current = symbol
         if budget:
             budget.remaining()
@@ -809,6 +1000,7 @@ def collect(
         history = list(previous.get("attempts", []))
         attempts_total += 1
         writing = False
+        selected: MinuteCandidate | None = None
         try:
             if native_5m:
                 assert market_date is not None
@@ -816,6 +1008,7 @@ def collect(
             elif fallback == "tencent":
                 assert market_date is not None
                 candidates: list[MinuteCandidate] = []
+                interpretation_rejections: list[tuple[str, str]] = []
                 tencent_error: Exception | None = None
                 try:
                     frame, meta = _tencent_one_minute_bars(
@@ -825,8 +1018,11 @@ def collect(
                         home / "provider_raw" / "tencent-m1",
                     )
                     candidates.append(_tencent_candidate(frame, meta))
-                except (OSError, RuntimeError, ValueError) as exc:
+                except (MinuteProviderError, MinuteQualityError) as exc:
                     tencent_error = exc
+                    # A qualifying peer must not erase the rejected source's
+                    # captured failure from the successful selection receipt.
+                    interpretation_rejections.append(("tencent-mkline-validated", str(exc)))
                 audit_receipt = (
                     paid_audit_dir / "receipts" / f"{symbol}.json"
                     if paid_audit_dir is not None and tencent_daily[symbol]["tradestatus"] == "1"
@@ -849,14 +1045,25 @@ def collect(
                             }
                         ):
                             raise ValueError("paid audit receipt code/date/status mismatch")
-                        if audit_status == "qualified_candidate_not_published":
+                        captured_200 = audit_status in {
+                            "qualified_candidate_not_published", "unqualified"
+                        }
+                        if captured_200 != (audit_record.get("http_status") == 200):
+                            raise ValueError("paid audit receipt HTTP/status mismatch")
+                        if captured_200:
+                            # Old audit classification is neither current qualification
+                            # nor authority to exclude a now-qualified conflicting peer.
                             candidates.append(
                                 _paid_audit_candidate(
                                     paid_audit_dir, symbol, market_date, tencent_daily[symbol]
                                 )
                             )
-                    except (OSError, ValueError, KeyError, TypeError) as exc:
-                        raise RuntimeError(
+                    except PaidMinuteCandidateRejected as exc:
+                        interpretation_rejections.append(
+                            ("paid-tushare-style-proxy-stk_mins", str(exc))
+                        )
+                    except (ValueError, KeyError, TypeError) as exc:
+                        raise MinuteIntegrityError(
                             f"paid audit evidence invalid for {symbol}: {exc}"
                         ) from exc
                 decision = choose_whole_security(
@@ -870,18 +1077,25 @@ def collect(
                 )
                 if decision.status != "qualified_whole_security_candidate":
                     if decision.status == "blocked_cross_source_conflict":
-                        raise RuntimeError(f"cross-source minute conflict for {symbol}")
-                    raise RuntimeError(
+                        raise MinuteSemanticConflict(f"cross-source minute conflict for {symbol}")
+                    rejections = (*decision.rejected, *interpretation_rejections)
+                    if isinstance(tencent_error, MinuteProviderError):
+                        # A rejected offline peer cannot hide a real live outage.
+                        # Keep its quality evidence without retrying its raw.
+                        raise MinuteProviderError(
+                            f"{tencent_error}; "
+                            f"candidate rejections={rejections}"
+                        ) from tencent_error
+                    raise MinuteQualityError(
                         f"{tencent_error or 'no qualified 1m source'}; "
-                        f"candidate rejections={decision.rejected}"
+                        f"candidate rejections={rejections}"
                     )
+                selected = next(
+                    candidate for candidate in candidates
+                    if candidate.provider == decision.selected_provider
+                )
                 if decision.selected_provider == "paid-tushare-style-proxy-stk_mins":
                     import pandas as pd
-
-                    selected = next(
-                        candidate for candidate in candidates
-                        if candidate.provider == decision.selected_provider
-                    )
                     frame = pd.DataFrame(
                         {
                             **row,
@@ -911,7 +1125,7 @@ def collect(
                     source_selection_status=decision.status,
                     source_semantic_sha256=decision.normalized_sha256,
                     source_qualified=list(decision.qualified),
-                    source_rejected=list(decision.rejected),
+                    source_rejected=[*decision.rejected, *interpretation_rejections],
                 )
             elif fallback == "eastmoney":
                 frame, meta = _eastmoney_bars(
@@ -938,9 +1152,20 @@ def collect(
             if budget:
                 budget.remaining()
             if not meta.get("ok"):
-                raise RuntimeError(str(meta.get("error") or "minute bars request failed"))
+                raise MinuteProviderError(str(meta.get("error") or "minute bars request failed"))
             writing = True
-            rows, path = _merge_write(home, symbol, frequency, frame)
+            if selected is not None:
+                assert market_date is not None
+                rows, path, materialized_digest = _write_qualified_one_minute(
+                    home, symbol, frame,
+                    candidate=selected,
+                    market_date=market_date,
+                    daily=tencent_daily[symbol],
+                    expected_semantic_sha256=meta["source_semantic_sha256"],
+                )
+                meta["materialized_semantic_sha256"] = materialized_digest
+            else:
+                rows, path = _merge_write(home, symbol, frequency, frame)
             results[symbol] = {
                 **meta,
                 "status": "done",
@@ -950,7 +1175,7 @@ def collect(
             if previous.get("status") == "error":
                 errors -= 1
             done += 1
-            consecutive_errors = 0
+            consecutive_provider_errors = 0
             if recovery_policy:
                 history.append({"attempt": len(history) + 1, "round": scan_round, "status": "done"})
                 results[symbol]["attempts"] = history
@@ -959,9 +1184,14 @@ def collect(
         except Exception as exc:  # noqa: BLE001 - durable per-symbol failure evidence
             if previous.get("status") != "error":
                 errors += 1
-            consecutive_errors += 1
+            error_type = _failure_kind(exc, writing=writing)
+            retryable = error_type == "provider"
+            consecutive_provider_errors = consecutive_provider_errors + 1 if retryable else 0
             detail = f"{type(exc).__name__}: {exc}"
-            results[symbol] = {"status": "error", "error": detail}
+            results[symbol] = {
+                "status": "error", "error": detail,
+                "error_type": error_type, "retryable": retryable,
+            }
             if recovery_policy:
                 history.append(
                     {
@@ -969,13 +1199,17 @@ def collect(
                         "round": scan_round,
                         "status": "error",
                         "error": detail,
+                        "error_type": error_type,
+                        "retryable": retryable,
                     }
                 )
                 results[symbol]["attempts"] = history
-                if writing:
-                    raise  # Storage failures must not induce more network traffic.
-            if native_5m and consecutive_errors >= 3:
-                raise RuntimeError(
+            if error_type in {"integrity", "storage", "internal"}:
+                raise  # Hard faults must never induce more network traffic.
+            if not retryable:
+                return
+            if native_5m and consecutive_provider_errors >= 3:
+                raise MinuteProviderError(
                     "BaoStock native 5m circuit opened after 3 consecutive failures"
                 ) from exc
             if fallback is None and not native_5m:
@@ -983,24 +1217,12 @@ def collect(
                     client, server = tdx_client(**budget_kwargs)
                 except MinuteBudgetExceeded:
                     raise
-                except Exception:
+                except MinuteProviderError:
                     pass
-            elif (
-                consecutive_errors >= EASTMONEY_CONSECUTIVE_ERROR_LIMIT
-                and not (
-                    fallback == "tencent"
-                    and any(
-                        marker in detail.lower()
-                        for marker in (
-                            "tencent/daily volume mismatch",
-                            "tencent/daily close mismatch",
-                        )
-                    )
-                )
-            ):
-                raise RuntimeError(
+            elif consecutive_provider_errors >= EASTMONEY_CONSECUTIVE_ERROR_LIMIT:
+                raise MinuteProviderError(
                     f"{fallback or 'provider'} circuit opened after "
-                    f"{consecutive_errors} consecutive symbol failures"
+                    f"{consecutive_provider_errors} consecutive provider failures"
                 ) from exc
 
     current: str | None = None
@@ -1045,6 +1267,7 @@ def collect(
                     "status": "per_symbol_strict_scan_not_yet_published",
                     "policy": MINUTE_SOURCE_POLICY,
                     "paid_audit_dir": str(paid_audit_dir) if paid_audit_dir else None,
+                    "reference_inputs": tencent_daily.evidence(),
                 },
             )
         pending = list(symbols)
@@ -1063,7 +1286,10 @@ def collect(
                     record("running", symbol)
                 if sleep_seconds > 0 and (not recovery_policy or index < len(pending)):
                     budget.sleep(sleep_seconds) if budget else time.sleep(sleep_seconds)
-            pending = [code for code in symbols if results[code]["status"] == "error"]
+            pending = [
+                code for code in symbols
+                if results[code]["status"] == "error" and results[code]["retryable"]
+            ]
         if budget:
             budget.remaining()
         record("done" if errors == 0 else "done_with_errors")
@@ -1111,6 +1337,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--tencent-daily-path", type=Path)
     parser.add_argument("--tencent-status-path", type=Path)
     parser.add_argument("--paid-audit-dir", type=Path)
+    parser.add_argument("--sealed-five-path", type=Path)
+    parser.add_argument("--reference-sha256-json", type=parse_reference_sha256)
     parser.add_argument("--home", required=True)
     parser.add_argument("--no-lock", action="store_true")
     args = parser.parse_args(argv)
@@ -1122,6 +1350,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--max-pages must be at least 1")
     del args.no_lock  # lane attempts are isolated; this flag preserves legacy CLI compatibility
     try:
+        if args.tencent_daily_path is not None or args.tencent_status_path is not None:
+            # Check the requested path before resolve() erases a final symlink.
+            _require_fresh_qualified_home(Path(args.home))
         return collect(
             home=Path(args.home).resolve(),
             layer=args.layer,
@@ -1137,6 +1368,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             tencent_daily_path=args.tencent_daily_path,
             tencent_status_path=args.tencent_status_path,
             paid_audit_dir=args.paid_audit_dir,
+            sealed_five_path=args.sealed_five_path,
+            reference_sha256=args.reference_sha256_json,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"minute collector failed: {exc}", file=sys.stderr)

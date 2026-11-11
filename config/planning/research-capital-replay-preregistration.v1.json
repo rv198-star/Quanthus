@@ -1,0 +1,138 @@
+{
+  "schema_version": "quanthus.capital-replay-preregistration-plan.v1",
+  "status": "DRAFT_PENDING_QUALIFICATION_AND_TRANCHE",
+  "grants_authority": false,
+  "plan_id": "RESEARCH-CAPITAL-001",
+  "predecessor": "RESEARCH-R2-MOMENTUM-001",
+  "source": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "content_digest": "sha256:1d0e4bd5fbf40bf2876883faf82b98fd81e95a93a82b9d23d248759a38b3f692"
+  },
+  "scope": {
+    "market_start": "2020-01-02",
+    "decision_start": "2020-03-02",
+    "decision_end": "2021-12-30",
+    "execution_end": "2021-12-31",
+    "calendar_context_start": "2019-01-01",
+    "forbidden_market_after": "2022-01-01",
+    "use": "latest-sealed retrospective capital-replay research; source knowledge clocks retained separately from simulation",
+    "previous_exposure_retained": true
+  },
+  "screen_reference": {
+    "request": "config/research/research-r2/request.v1.json",
+    "git": "6dd072acc5797bf55bed610771fda7ad1b7217cc",
+    "candidate": "same R2 base filters AND momentum20 in closed [0.02,0.12]",
+    "control": "same R2 base filters AND finite momentum20 outside the band",
+    "execution_guard_separation": "Rank only from T fields; T+1 P2 rejects/fills the original selected order; no future-state reranking"
+  },
+  "capital": {
+    "initial_cash_per_arm": "100000.00",
+    "position_fraction": "0.30",
+    "sizing_cash_buffer": "0.21",
+    "entry_lot": 100,
+    "compound_nav": false,
+    "arms": [
+      "candidate",
+      "disjoint_control",
+      "cash"
+    ],
+    "ranking": [
+      "raw_return_vol20 ASC",
+      "opaque listing_id ASC"
+    ],
+    "holding": "enter T+1 open after T close signal; fixed exit signal T+1 close, first legal sell T+2 open; carry same sell order",
+    "terminal": "mark open holdings using qualified 2021-12-31 close and report right-censoring; no forced fill or 2022 read"
+  },
+  "costs": {
+    "policy": "config/p2-execution-policy.research.v1.json",
+    "sha256": "sha256:e2ee55ea09682eeb775b9acfcfc4bbba0908ddd4157705cd81fd8f050097c816",
+    "basis": "frozen research assumptions and actual P2 implementation; buy transfer fee zero, sell transfer fee 0.00001; no historical fee calibration implied"
+  },
+  "decision": {
+    "primary": "candidate minus control ending-system-wealth net return",
+    "min_closed_trades_each_arm": 100,
+    "min_closed_trades_each_year": 20,
+    "advance": {
+      "candidate_net_return_gt": 0,
+      "net_return_increment_gte": 0.01,
+      "each_year_increment_gt": 0,
+      "maximum_drawdown_increment_lte": 0.02,
+      "after_static_top3_candidate_profit_subtraction_increment_gt": 0
+    },
+    "branches": {
+      "blocked": "not_evaluated; stop affected comparison and preserve the exact input/semantic discrepancy",
+      "insufficient": "inconclusive; park without tuning",
+      "advance": "supported as a candidate for subsequent independent robustness validation",
+      "not_met": "sample sufficient and candidate net return<=0 OR net increment<=0; park this fixed holding use",
+      "uncertain": "inconclusive otherwise; park"
+    }
+  },
+  "stages": [
+    {
+      "id": "A",
+      "active_minutes": [
+        45,
+        60
+      ],
+      "deliverable": "qualified closure, clock/action/currency/directional-state contract and minimal synthetic adapter handshake",
+      "funding": "propose next tranche at most60m only"
+    },
+    {
+      "id": "B",
+      "active_minutes": [
+        60,
+        120
+      ],
+      "deliverable": "native FrameSource and fixed strategy with goldens, unchanged P2 execution/accounting core"
+    },
+    {
+      "id": "C",
+      "active_minutes": [
+        30,
+        45
+      ],
+      "deliverable": "one formal comparison and one independent cold construction"
+    },
+    {
+      "id": "D",
+      "active_minutes": [
+        30,
+        60
+      ],
+      "deliverable": "necessary review, local checks, immutable HF/CN02 evidence and value brief"
+    }
+  ],
+  "complete_active_hours_planning": [
+    3,
+    5
+  ],
+  "runtime_envelope_proposed": {
+    "node_preference": "CN02 existing environment, requalify first",
+    "threads": 2,
+    "duckdb_memory_bytes": 3221225472,
+    "max_rss_bytes": 6442450944,
+    "max_scratch_bytes": 4294967296,
+    "min_free_disk_bytes": 12884901888,
+    "max_download_bytes": 536870912,
+    "max_result_bytes": 4194304,
+    "job_wall_seconds": 7200,
+    "formal_attempts": 1,
+    "independent_constructions": 1,
+    "publish_attempts": 3
+  },
+  "remaining_before_market_row_access": [
+    "successor tranche and task-scoped control authorization",
+    "exact action/term/identity and clock purpose qualification request",
+    "exact executable Git, final members and environment lock",
+    "versioned retrospective contract preserving source clocks and existing PIT default"
+  ],
+  "remaining_before_result_run": [
+    "A qualified",
+    "B self-audit and local checks passed",
+    "final execution request frozen",
+    "independent reference construction and cash-cent comparison specified"
+  ],
+  "cost_history": "R1/R2 and all repairs, audits and exposure retained; complete active time/token/billing unknown_not_zero; old8h remainder not assumed"
+}

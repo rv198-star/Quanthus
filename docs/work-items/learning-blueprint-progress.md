@@ -129,6 +129,8 @@ GitHub 状态只表示任务生命周期；实时检查：`make blueprint-audit`
 | [P3-RESEARCH-HF-001 / #610](https://github.com/rv198-star/Quanthus/issues/610) | REPRO | 修复并验收固定HF输入、资源边界与不可变结果包 | closed |
 | [P3-RESEARCH-PILOT-001 / #611](https://github.com/rv198-star/Quanthus/issues/611) | FACTS, CLOSEOUT | 按有效设计复算与解释；保留原始代理统计及失败记录 | closed |
 | [P3-RESEARCH-REUSE-001 / #613](https://github.com/rv198-star/Quanthus/issues/613) | FACTORS, REPRO, CLOSEOUT | 检验R1既有20日原始价格动量区间对次日开盘至收盘响应的增量，决定后续回放或停放；验证已验收输入与Worker的复用成本。 | closed |
+| [P3-RESEARCH-REPLAY-001 / #627](https://github.com/rv198-star/Quanthus/issues/627) | FACTORS, REPRO, CLOSEOUT | 核对R2到既有P2资金回放的精确接缝，形成有预算、失败路径与用途门槛的后继计划 | 未对账 |
+| [P3-RESEARCH-CAPITAL-001 / #628](https://github.com/rv198-star/Quanthus/issues/628) | FACTORS, REPRO, CLOSEOUT | 分段完成Base2.5.1原生资金回放用途资格、最小适配、固定最短合法持仓比较和独立验收；当前等待后继拨款与控制渠道例外。 | 未对账 |
 
 ## 证据索引
 

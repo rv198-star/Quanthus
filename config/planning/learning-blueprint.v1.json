@@ -596,6 +596,26 @@
         "CLOSEOUT"
       ],
       "contribution": "检验R1既有20日原始价格动量区间对次日开盘至收盘响应的增量，决定后续回放或停放；验证已验收输入与Worker的复用成本。"
+    },
+    {
+      "id": "P3-RESEARCH-REPLAY-001",
+      "issue": 627,
+      "modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "contribution": "核对R2到既有P2资金回放的精确接缝，形成有预算、失败路径与用途门槛的后继计划"
+    },
+    {
+      "id": "P3-RESEARCH-CAPITAL-001",
+      "issue": 628,
+      "modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "contribution": "分段完成Base2.5.1原生资金回放用途资格、最小适配、固定最短合法持仓比较和独立验收；当前等待后继拨款与控制渠道例外。"
     }
   ]
 }

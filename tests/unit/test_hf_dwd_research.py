@@ -249,7 +249,7 @@ def test_stage_tamper_and_mixed_identity_fail(tmp_path):
         worker.bound_read(tmp_path, "r.json", identity)
 
 
-def prepare_package(tmp_path, specimen, monkeypatch):
+def prepare_package(tmp_path, specimen, monkeypatch, build=True):
     identity = {"identity_digest": "same", "git": "a" * 40}
     worker.write(
         tmp_path / "fetch.json",
@@ -269,16 +269,38 @@ def prepare_package(tmp_path, specimen, monkeypatch):
             }
         ),
     )
-    worker.write(tmp_path / "resources.json", {"screen": {"wall_seconds": 0.1}})
-    worker.write(tmp_path / "attempts.json", [])
+    resources = {}
+    for phase, names in (("fetch", ["fetch.json"]), ("screen", ["result.json", "run.json"])):
+        resources[phase] = worker.seal(
+            {
+                "schema": "quanthus.research-stage-completion.v1",
+                "identity": identity,
+                "phase": phase,
+                "attempt": 1,
+                "status": "succeeded",
+                "exit_code": 0,
+                "failure": None,
+                "output_digests": {name: worker.read(tmp_path / name)["digest"] for name in names},
+                "wall_seconds": 0.1,
+                "peak_rss_bytes": 1,
+                "peak_scratch_bytes": 1,
+                "log": phase + "-1.log",
+                "recorded_at": "2026-11-11T00:00:00+00:00",
+            }
+        )
+    worker.write(tmp_path / "resources.json", resources)
+    worker.write(tmp_path / "attempts.json", list(resources.values()))
     monkeypatch.setattr(worker, "verify_members", lambda *a: None)
-    return identity, worker.build_package(specimen, [], identity, tmp_path)
+    return identity, worker.build_package(specimen, [], identity, tmp_path) if build else None
 
 
 def test_package_retry_bytes_are_identical(tmp_path, specimen, monkeypatch):
     identity, package = prepare_package(tmp_path, specimen, monkeypatch)
     first = {p.name: p.read_bytes() for p in package.iterdir()}
-    worker.write(tmp_path / "attempts.json", [{"phase": "publish", "failure": "network"}])
+    attempts = worker.read(tmp_path / "attempts.json")
+    worker.write(
+        tmp_path / "attempts.json", [*attempts, {"phase": "publish", "failure": "network"}]
+    )
     worker.build_package(specimen, [], identity, tmp_path)
     assert first == {p.name: p.read_bytes() for p in package.iterdir()}
     assert all(specimen["task_id"] in name and specimen["attempt_id"] in name for name in first)
@@ -485,3 +507,227 @@ def test_missing_receipt_digest_is_rejected(tmp_path):
     )
     with pytest.raises(worker.GuardError, match="digest missing"):
         worker.bound_read(tmp_path, "fetch.json", identity)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    ["failed", "running", "missing", "identity", "outputs", "latest_attempt", "digest"],
+)
+def test_publish_requires_guardian_success_even_with_complete_package(
+    tmp_path, specimen, monkeypatch, damage
+):
+    identity, package = prepare_package(tmp_path, specimen, monkeypatch)
+    original = {p.name: p.read_bytes() for p in package.iterdir()}
+    resources = worker.read(tmp_path / "resources.json")
+    attempts = worker.read(tmp_path / "attempts.json")
+    record = resources["screen"]
+    if damage == "missing":
+        resources.pop("screen")
+    elif damage == "latest_attempt":
+        attempts.append({**record, "attempt": 2, "status": "running"})
+    else:
+        if damage == "failed":
+            record.update(exit_code=-9, failure="rss_exceeded", status="failed")
+        elif damage == "running":
+            record["status"] = "running"
+        elif damage == "identity":
+            record["identity"] = {**identity, "identity_digest": "another-job"}
+        elif damage == "outputs":
+            record["output_digests"]["result.json"] = "sha256:" + "0" * 64
+        record.pop("digest")
+        record = worker.seal(record) if damage != "digest" else record
+        resources["screen"] = record
+        attempts[-1] = record
+    worker.write(tmp_path / "resources.json", resources)
+    worker.write(tmp_path / "attempts.json", attempts)
+    calls = []
+
+    def forbidden_api(**kwargs):
+        calls.append("HF API")
+        pytest.fail("failed stage must be rejected before contacting HF")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        types.SimpleNamespace(HfApi=forbidden_api, CommitOperationAdd=lambda **kwargs: kwargs),
+    )
+    with pytest.raises(worker.GuardError):
+        worker.publish(specimen, [], identity, tmp_path)
+    assert calls == []
+    assert {p.name: p.read_bytes() for p in package.iterdir()} == original
+
+
+@pytest.mark.parametrize("outcome", ["timeout", "nonzero", "success"])
+def test_guardian_terminal_record_controls_written_child_outputs(
+    tmp_path, specimen, monkeypatch, outcome
+):
+    if sys.platform != "linux":
+        pytest.skip("qualified worker guardian uses Linux procfs")
+    identity, _ = prepare_package(tmp_path, specimen, monkeypatch, build=False)
+    result, run = worker.read(tmp_path / "result.json"), worker.read(tmp_path / "run.json")
+    for name in ("result.json", "run.json"):
+        (tmp_path / name).unlink()
+    resources = worker.read(tmp_path / "resources.json")
+    resources.pop("screen")
+    worker.write(tmp_path / "resources.json", resources)
+    worker.write(tmp_path / "attempts.json", [resources["fetch"]])
+    specimen["budget"]["max_stage_wall_seconds"]["screen"] = 1
+    child = (
+        "import json,time,sys;from pathlib import Path;"
+        f"p=Path({str(tmp_path)!r});"
+        "state=json.loads((p/'resources.json').read_text());"
+        "(p/'seen-running').write_text(str(state.get('screen',{}).get('status')));"
+        f"(p/'result.json').write_text({json.dumps(result)!r});"
+        f"(p/'run.json').write_text({json.dumps(run)!r});"
+        + (
+            "time.sleep(10)"
+            if outcome == "timeout"
+            else "sys.exit(7)"
+            if outcome == "nonzero"
+            else ""
+        )
+    )
+    original = subprocess.Popen
+    monkeypatch.setattr(worker, "load_bundle", lambda *args: (specimen, [], identity))
+    monkeypatch.setattr(
+        worker.subprocess,
+        "Popen",
+        lambda command, **kwargs: original([sys.executable, "-c", child], **kwargs),
+    )
+    assert worker.launch_guarded("screen", tmp_path / "q", tmp_path, None) == (
+        0 if outcome == "success" else 1
+    )
+    assert (tmp_path / "seen-running").read_text() == "running"
+    assert worker.read(tmp_path / "result.json") == result
+    terminal = worker.read(tmp_path / "resources.json")["screen"]
+    assert terminal == worker.read(tmp_path / "attempts.json")[-1]
+    assert terminal["status"] == ("succeeded" if outcome == "success" else "failed")
+    if outcome == "success":
+        assert terminal["identity"] == identity
+        assert terminal["output_digests"] == {
+            "result.json": result["digest"],
+            "run.json": run["digest"],
+        }
+        worker.build_package(specimen, [], identity, tmp_path)
+    else:
+        assert terminal["failure"] == ("stage_wall_exceeded" if outcome == "timeout" else None)
+        with pytest.raises(worker.GuardError):
+            worker.build_package(specimen, [], identity, tmp_path)
+
+
+@pytest.mark.parametrize("interrupted_name", ["package", "package.staging"])
+def test_incomplete_package_is_preserved_and_recovered_without_recompute(
+    tmp_path, specimen, monkeypatch, interrupted_name
+):
+    identity, _ = prepare_package(tmp_path, specimen, monkeypatch, build=False)
+    original = {name: (tmp_path / name).read_bytes() for name in ("result.json", "run.json")}
+    interrupted = tmp_path / interrupted_name
+    interrupted.mkdir()
+    name = worker.artifact_name(specimen, "request")
+    worker.write(interrupted / name, specimen)
+    partial = (interrupted / name).read_bytes()
+    package = worker.build_package(specimen, [], identity, tmp_path)
+    worker.verify_package(package)
+    assert all((tmp_path / name).read_bytes() == value for name, value in original.items())
+    retained = list((tmp_path / "package-quarantine").rglob(name))
+    assert len(retained) == 1 and retained[0].read_bytes() == partial
+    first = {p.name: p.read_bytes() for p in package.iterdir()}
+    worker.build_package(specimen, [], identity, tmp_path)
+    assert {p.name: p.read_bytes() for p in package.iterdir()} == first
+
+
+def test_interruption_during_packaging_recovers_from_staging(tmp_path, specimen, monkeypatch):
+    identity, _ = prepare_package(tmp_path, specimen, monkeypatch, build=False)
+    original_write = worker.write
+
+    def interrupted_write(path, value):
+        original_write(path, value)
+        if path.parent.name == "package.staging" and path.name.endswith("-identity.json"):
+            raise RuntimeError("synthetic package interruption")
+
+    monkeypatch.setattr(worker, "write", interrupted_write)
+    with pytest.raises(RuntimeError, match="synthetic package"):
+        worker.build_package(specimen, [], identity, tmp_path)
+    assert not (tmp_path / "package").exists()
+    monkeypatch.setattr(worker, "write", original_write)
+    package = worker.build_package(specimen, [], identity, tmp_path)
+    worker.verify_package(package)
+    assert (tmp_path / "package-quarantine").is_dir()
+
+
+def test_corrupted_ready_package_is_rejected_and_never_quarantined(tmp_path, specimen, monkeypatch):
+    identity, package = prepare_package(tmp_path, specimen, monkeypatch)
+    member = package / worker.artifact_name(specimen, "result")
+    member.write_text("corrupted")
+    with pytest.raises(worker.GuardError, match="member differs"):
+        worker.build_package(specimen, [], identity, tmp_path)
+    assert member.read_text() == "corrupted"
+    assert not (tmp_path / "package-quarantine").exists()
+
+
+@pytest.mark.parametrize(
+    ("days2020", "days2021", "sufficient"),
+    [(1, 1, False), (2, 3, False), (3, 2, False), (3, 3, True), (4, 4, True)],
+)
+def test_sample_gate_uses_candidate_days_at_boundary(
+    tmp_path, specimen, days2020, days2021, sufficient
+):
+    q = copy.deepcopy(specimen)
+    q["scope"].update(decision_end="2021-01-07", execution_end="2021-01-08")
+    q["screen"]["max_abs_unadjusted_close_return"] = 1e-12
+    q["decision"].update(
+        min_nominal=2,
+        min_nominal_per_year=1,
+        min_decision_days_per_year=3,
+        min_nominal_listings=1,
+        max_top_listing_share=1,
+        max_top10_listing_share=1,
+    )
+    holds = [date(2020, 3, 10) + timedelta(days=i) for i in range(days2020)]
+    holds += [date(2021, 1, 4) + timedelta(days=i) for i in range(days2021)]
+    c = duckdb.connect()
+    c.execute("CREATE TABLE holds(day DATE)")
+    c.executemany("INSERT INTO holds VALUES (?)", [(x,) for x in holds])
+    c.execute(f"""
+    CREATE TABLE dwd_trading_calendar AS
+      SELECT venue_id||CAST(d AS DATE)::VARCHAR calendar_session_id,venue_id,
+        CAST(d AS DATE) trade_date,true is_open,NULL::TIMESTAMP knowledge_to
+      FROM generate_series(DATE '2019-01-01',DATE '2021-01-08',INTERVAL 1 DAY) t(d)
+      CROSS JOIN (VALUES ('{SSE}'),('{SZSE}')) v(venue_id) WHERE isodow(d)<=5;
+    CREATE TABLE dwd_listing AS SELECT 'L' listing_id,'S' security_id,'{SSE}' venue_id,
+      DATE '2010-01-01' effective_from,NULL::DATE effective_to,NULL::TIMESTAMP knowledge_to;
+    CREATE TABLE dwd_security AS SELECT 'S' security_id,'common_equity' instrument_type,
+      DATE '2010-01-01' effective_from,NULL::DATE effective_to,NULL::TIMESTAMP knowledge_to;
+    CREATE TABLE prices AS SELECT calendar_session_id,trade_date,
+      10*pow(1.003,sum(CASE WHEN trade_date IN (SELECT day FROM holds) THEN 0 ELSE 1 END)
+        OVER (ORDER BY trade_date)) px FROM dwd_trading_calendar
+      WHERE venue_id='{SSE}' AND trade_date>=DATE '2020-01-02';
+    CREATE TABLE dwd_security_bar AS SELECT 'L' listing_id,calendar_session_id,
+      trade_date observation_start,px open,px close,2e8 turnover,'1d' interval_size,
+      'UNADJUSTED' price_basis,NULL::TIMESTAMP knowledge_to FROM prices;
+    CREATE TABLE dwd_tradability_state AS SELECT 'L' listing_id,calendar_session_id,
+      trade_date observation_start,px*1.1 upper_price,true is_tradable,true can_buy,
+      NULL::TIMESTAMP knowledge_to FROM prices;
+    """)
+    paths = {}
+    for table in (
+        "dwd_trading_calendar",
+        "dwd_listing",
+        "dwd_security",
+        "dwd_security_bar",
+        "dwd_tradability_state",
+    ):
+        p = tmp_path / (table + ".parquet")
+        c.execute(f"COPY {table} TO '{p}' (FORMAT PARQUET)")
+        paths[table] = [str(p)]
+    c.close()
+    result_connection = duckdb.connect()
+    result = calculate(result_connection, q, paths)
+    result_connection.close()
+    assert {year: row["candidate"]["decision_days"] for year, row in result["by_year"].items()} == {
+        "2020": days2020,
+        "2021": days2021,
+    }
+    assert all(row["control"]["decision_days"] >= 3 for row in result["by_year"].values())
+    assert result["sample_sufficient"] is sufficient
+    assert result["decision_branch"] == ("small" if sufficient else "insufficient")

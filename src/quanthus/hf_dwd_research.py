@@ -432,6 +432,12 @@ def screen(
         existing = bound_read(job, "result.json", identity)
         previous = bound_read(job, "run.json", identity)
         require(previous["result_digest"] == existing["digest"], "existing run/result conflict")
+        verified_stage_success(
+            job,
+            "screen",
+            identity,
+            {"result.json": existing["digest"], "run.json": previous["digest"]},
+        )
         return
     paths = {
         table: [

@@ -85,6 +85,13 @@ Owner在v2独立审计后要求Sol修复并自审。研究公式、输入、样�
 长期证据写入`cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained/`；
 作者自审交#612差集复验。
 
+发布前C1自审进一步复现：失败screen若已写出result/run，原恢复分支会直接返回，从而在下一次
+启动中把旧失败产物记为成功。缓存恢复也必须核验原screen的Guardian终态；失败或新attempt的
+running状态拒绝复用。成功计算直接进入publish；失败残留保留隔离后才能在已定位原因下重试。
+A3保留为未发布的中间canary，初步完整检查主动中止并留存；
+`research-r1-f1f3-correction.v1.json`记录一次已定位C1修正，`request.v2.a4.json`绑定最终代码。
+A3+A4累计两次计算，公式、阈值和56成员闭包相同；不再追加计算尝试。
+
 ## A2代码绑定修订
 
 A1 canary完成并保留在fb21637f；随后自审发现上传额度在重试路径遗漏、回执摘要可缺失两项守卫缺口。新增`request.v2.a2.json`只改变attempt/path及曝光记录，指标、阈值与输入56成员保持v2冻结值。A2复用已校验输入缓存并绑定修正代码，计算作为一次原因已定位重试计入累计成本；A1不发布为最终包。中止旧代码尚未完成的make check，最终代码重新完整检查。

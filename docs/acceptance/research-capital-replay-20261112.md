@@ -95,3 +95,7 @@ CN02隔离根：`/srv/agentdock/quanthus-ops/research-capital-replay-20261112`�
 本研究分支精确叠加于PR #630 head `05e3d774f49d79e93996527580233d803046cfb1`；相关分支与隔离目录留给审阅/集成，待后续PR、未合入提交和唯一证据依赖解除后再归档。无关PR模板修改保持原样。
 
 冻结请求scope.simulation_clock保留A阶段“待资格”说明文字，实际执行以同次冻结的显式资本时钟schema、cutoff、content绑定及§9合同完成核对；后继恢复请求应清理该历史描述，旧执行请求保持原身份。
+
+交付[Draft PR #631](https://github.com/rv198-star/Quanthus/pull/631)，base为#630。最终文档/账本树`78efacaac9510e1f50d54bd6facc6dd60e459c12`在CN02通过planning-check和64项文档/治理回归（1.82秒），issue元数据对账为RECONCILED。随后仅本报告和价值简报增加检查及PR定位文字，文档检查再行核对。
+
+普通HTTPS推送50秒超时后，经GitHub Git Data API交付相同树，使用非强制引用更新；本地未推送文档提交`c872166d43093b73c5d87461fd6bd1064d08edda`与GitHub提交`c2b310ed7d975e532933d231482282edb6b7fe67`仅author/committer时区表示不同，epoch与内容相同，旧提交保留在本地`refs/keep/research-capital-local-docs-20261112`。后续检查绑定GitHub实际提交和树，具体交付映射/运行记录作为CN02 closeout sidecar保存。

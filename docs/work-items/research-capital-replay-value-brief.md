@@ -37,3 +37,5 @@ E2语义、公司行动用途解释和恢复请求由主责模型处理；冻结
 ## 固定交付
 
 固定交付：私有HF `rv192/quanthus-research-r1@0c049aa223232abf04d56261d170ad618443f3f0`，目录`runs/RESEARCH-CAPITAL-001/RESEARCH-CAPITAL-001-T1/A1`，78文件/712,321B全回读一致；manifest SHA256 `07852757b1b663fd8b536faaed222126f3f4919c3868a25c4f73fcae6f690bf7`。CN02长期根`/srv/agentdock/quanthus-ops/research-capital-replay-20261112/retained/package`；收据为上一级`publish-readback.json`。
+
+[Draft PR #631](https://github.com/rv198-star/Quanthus/pull/631)叠加于#630；main集成待原专线。恢复后的完整回归8,974通过/35跳过，文档/治理回归64通过；最终作者自审通过，独立算法核对一致，后继独立角色审阅继续保留。

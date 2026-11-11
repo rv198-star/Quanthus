@@ -1,0 +1,36 @@
+{
+  "schema": "quanthus.r1-independent-audit.v2",
+  "request": "config/research/research-r1/request.v2.a2.json",
+  "request_digest": "sha256:570a417d78465e80405a41c931b969d2c93dce67b2a2d79ac7843a7b397643a8",
+  "execution_git": "2dc01f18a2e6655b67cb2aa771b226231026e5b9",
+  "reviewed_head": "4c5bba4c3fac1e499b55af87a8b34c7b1fe2a1ff",
+  "result_dataset": "rv192/quanthus-research-r1",
+  "result_revision": "cd7029e121093d0b423c922bfa94a9873d60855b",
+  "result_prefix": "runs/RESEARCH-R1-HF-002/RESEARCH-R1-HF-002-T1/A2",
+  "package_digest": "sha256:8dd2830058d28281a951cd74522ccf05023b3658cd5cf5cf6101a693e3649a5b",
+  "result_digest": "sha256:523a890a37212d10d54eb6301009d1ef274f005d987d99f8b9cf8017ace5efda",
+  "independence": "Do not import candidate SQL for reproduction; interval masks/pandas/numpy; copy verified 56 members to fresh isolated directory before row access. Synthetic contract probes may call candidate functions.",
+  "budget": {
+    "active_seconds": 5400,
+    "machine_seconds": 1800,
+    "rss_bytes": 6442450944,
+    "scratch_bytes": 2147483648,
+    "network_requests": 30
+  },
+  "acceptance": [
+    "Exact candidate/control/year/exchange/reason totals and sample/concentration branches",
+    "Immutable HF 10-file byte/digest readback",
+    "Failed-stage publication, partial recovery, retry identity and quotas checked independently",
+    "Separate scoped scientific decision from reusable Worker readiness"
+  ],
+  "stop": [
+    "Identity/partition mismatch stops row access",
+    "One independent materialization; no new parameter search",
+    "No original job mutation, source repair or production promotion"
+  ],
+  "retention": {
+    "review_after": "2026-12-11",
+    "owner": "CN02 research task maintainer",
+    "retain_until_review_resolved": true
+  }
+}

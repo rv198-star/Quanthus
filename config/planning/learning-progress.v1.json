@@ -8524,6 +8524,197 @@
       "reviewed_modules": [
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-3-20261029T222620991477Z",
+      "recorded_at": "2026-10-29T22:26:20.991477+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved bounded local acceptance delivery",
+      "work_item": "META-GATE-001",
+      "outcome": "no_module_change",
+      "summary": "为当前开发/PR复审交付本地make check入口、精确输入回执和保守复用；合成工程检查通过，实际完整job及复用结果另存本批交接。",
+      "evidence": [
+        {
+          "id": "PROFILE",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "4ffeb72ef3947c019e12ef73f4a25b80ab4b37b4",
+          "path": "config/local-acceptance.v1.json",
+          "sha256": "caad4a995fb33df7e89e5e07b1388092056b4fd260f336ad8b51cb14537d804f",
+          "claim_ceiling": "限定本地make check合同、预算和严格同输入复用，不是数据/科学/生产准入。"
+        },
+        {
+          "id": "SYNTHETIC",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/local-acceptance-20261029T221354Z/evidence/final-hardening.safe.json",
+          "sha256": "e2ce2f59613b0246385bcc3d4f767f06693041dbd033baa044745cc6b4165689",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "已有35个实现回归加最终保护性回归和静态检查；实际完整make check与复用尚另行记账。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "增加一项有实际工程调用方的限定能力，TRACE既有accepted等级及研究质量/价值/用途准入均不提升；本记录只绑定已完成的合成里程碑。",
+      "issue_observations": [
+        {
+          "work_item": "META-GATE-001",
+          "number": 3,
+          "title": "[META-GATE-001] Automate release gate reporting",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-08-19T15:46:34Z",
+          "body_sha256": "caa1eb55e38b5e171007abeb30c9f0d05978e646001dac03fc386f473744e06e"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-3-20261029T224147155570Z",
+      "recorded_at": "2026-10-29T22:41:47.155570+00:00",
+      "actor": "Codex / Sol 6.1; same Owner-approved local engineering batch",
+      "work_item": "META-GATE-001",
+      "outcome": "no_module_change",
+      "summary": "首次完整工程检查因临时目录回收竞态记为INCOMPLETE并保留；容量采样仅容忍ENOENT，权限/来源扫描仍关闭失败，回归通过后重新完整验收。",
+      "evidence": [
+        {
+          "id": "RACE-REPAIR",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/local-acceptance-20261029T221354Z/evidence/sampling-race-repair.safe.json",
+          "sha256": "ad106995e723e605f14a8bece98aa9075044b9b82d7502542e29dc5c68951463",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "只证明采样竞态修复及针对性合成回归；首次真实工程运行不完整，须新job完整验收。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "工程采样问题修复与有限预算收口，不把第一次失败清零或计成通过；科学/数据/生产和模块等级不变。",
+      "issue_observations": [
+        {
+          "work_item": "META-GATE-001",
+          "number": 3,
+          "title": "[META-GATE-001] Automate release gate reporting",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-08-19T15:46:34Z",
+          "body_sha256": "caa1eb55e38b5e171007abeb30c9f0d05978e646001dac03fc386f473744e06e"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-3-20261029T225817155084Z",
+      "recorded_at": "2026-10-29T22:58:17.155084+00:00",
+      "actor": "Codex / Sol 6.1; Owner-approved bounded engineering delivery",
+      "work_item": "META-GATE-001",
+      "outcome": "no_module_change",
+      "summary": "本批1–3完成：run/verify入口已真实使用，完整make check为5811通过/29跳过；同输入只读复用约3秒。首次不完整记录保留，新增39项回归纳入全量，更新本地工程交付证据。",
+      "evidence": [
+        {
+          "id": "ACTUAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/local-acceptance-20261029T221354Z/actual-run-9c48086/receipt.json",
+          "sha256": "6217033792e1f89b566ac2fc61413ad4c72586a6ba4ac50dec1ad1386fbd2613",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "精确9c480860提交的真实make check：5811通过/29跳过/8警告，退出0且输入前后相同；只适用当前本地工程profile。"
+        },
+        {
+          "id": "REUSE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/.codex/local-acceptance-20261029T221354Z/evidence/actual-reuse.safe.json",
+          "sha256": "9a097530a66d8eeff6c45118b10d5f1893bd6e9c59f674d4dc66fe1fbc4b38d0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "同一提交/工作区/运行时的真实只读复用约3秒，2829项文件及元数据前后相同；不是新跑或独立复现。"
+        },
+        {
+          "id": "PROFILE-FINAL",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "9c480860f2c9da3ac6f859959908e05d787f3116",
+          "path": "config/local-acceptance.v1.json",
+          "sha256": "b5ede4fc59dee4ac59270465bc150166bca57dfc5e077ff3b722221442bacb7e",
+          "claim_ceiling": "160MiB新run+checkout与已保留约32MiB旧证据共用原192MiB任务总额；8GiB磁盘余量、1GiB采样RSS与30分钟stop threshold；非硬隔离配额。"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "交付一项有限工程能力，TRACE既有accepted等级及研究质量、决策价值、消费者/生产准入均不升级；#3整体仍开放，严格复用仍仅相同提交。",
+      "issue_observations": [
+        {
+          "work_item": "META-GATE-001",
+          "number": 3,
+          "title": "[META-GATE-001] Automate release gate reporting",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-08-19T15:46:34Z",
+          "body_sha256": "caa1eb55e38b5e171007abeb30c9f0d05978e646001dac03fc386f473744e06e"
+        }
+      ]
+    },
+    {
+      "id": "CP-3-PR595-REVIEW-20261111",
+      "recorded_at": "2026-11-11T14:47:19.617717+00:00",
+      "actor": "Codex; Owner authorized PR595 review, repair and merge",
+      "work_item": "META-GATE-001",
+      "outcome": "no_module_change",
+      "summary": "在当前main复审本地验收工具，修复editable安装元数据误拒绝和teardown skip重复计数；原版两项失败、修订后44项回归通过，完整命令验收另行记录。",
+      "evidence": [
+        {
+          "id": "REVIEW-REGRESSION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/historical-pr595-pr599-20261111/PR595-FOCUSED.json",
+          "sha256": "d58a280b5b6048abf043197b019489c6a77e7c0bc80eb6f668d26104277ab9ba",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本地验收工具的聚焦工程回归和格式检查；完整当前main运行待执行。"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "交付同一限定工程工具的兼容性与结果计数修复；保留既有TRACE模块等级。"
+    },
+    {
+      "id": "CP-3-PR595-ACCEPTANCE-20261111",
+      "recorded_at": "2026-11-11T15:14:23.368408+00:00",
+      "actor": "Codex; Owner authorized historical PR595 audit, repair and merge",
+      "work_item": "META-GATE-001",
+      "outcome": "no_module_change",
+      "summary": "PR595当前main复审完成：精确0bff76a6通过真实make local-acceptance完整检查；同一head的make local-acceptance-verify返回REUSED_NOT_RERUN，全部Job成员字节和元数据保持一致。最终仅追加本证据及生成蓝图，完整工程检查依AGENTS文档/账本例外复用，并另验规划、文档和精确base历史。 实际测试计数：{\"collected\": 8927, \"errors\": 0, \"exit_status\": 0, \"failed\": 0, \"failed_and_shared_TMP_retained\": true, \"passed\": 8892, \"skipped\": 35, \"successful_function_TMP_reclaimed\": 3213}。",
+      "evidence": [
+        {
+          "id": "CURRENT-MAIN-RUN-AND-VERIFY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/historical-pr595-pr599-20261111/PR595-ACCEPTANCE.json",
+          "sha256": "81e4321f4f505386c9adab512174e02a8284d002168035b1bf964cf2ee50d494",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "本地工程profile的完整检查及相同提交、路径、运行时的只读凭据验证。最终文档/账本提交的代码闭包等价核验另留PR交付证据，严格CLI复用仍仅适用原测试head。"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "交付可审计的本地工程验收工具与两项复审修复；TRACE既有模块等级保持，META-GATE-001整体Issue #3继续开放。",
+      "issue_observations": [
+        {
+          "work_item": "META-GATE-001",
+          "number": 3,
+          "title": "[META-GATE-001] Automate release gate reporting",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-08-19T15:46:34Z",
+          "body_sha256": "caa1eb55e38b5e171007abeb30c9f0d05978e646001dac03fc386f473744e06e"
+        }
+      ]
     }
   ]
 }

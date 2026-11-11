@@ -1,5 +1,8 @@
 # Documentation Map
 
+For local checks and review while hosted CI is unavailable, use the
+[local engineering acceptance commands](operations/local-acceptance.md).
+
 This file is the level-zero router for people and AI sessions. It names the current delivery
 branch and the smallest context set for common tasks; detailed rules and design stay in child
 nodes.

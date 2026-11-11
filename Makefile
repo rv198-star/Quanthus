@@ -103,6 +103,15 @@ blueprint-audit:
 
 check: doctor compile test planning-check
 
+.PHONY: local-acceptance local-acceptance-verify
+local-acceptance:
+	@test -n "$(ACCEPTANCE_JOB)" || (echo "set ACCEPTANCE_JOB to a new absolute job directory"; exit 2)
+	PYTHONPATH=src $(PYTHON) -m quanthus.local_acceptance run --job "$(ACCEPTANCE_JOB)"
+
+local-acceptance-verify:
+	@test -n "$(ACCEPTANCE_JOB)" || (echo "set ACCEPTANCE_JOB to a trusted existing receipt directory"; exit 2)
+	PYTHONPATH=src $(PYTHON) -m quanthus.local_acceptance verify --job "$(ACCEPTANCE_JOB)"
+
 lint:
 	$(VENV)/bin/python -m ruff check .
 

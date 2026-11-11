@@ -20,6 +20,8 @@ and the proposed [model task allocation standard](operations/research-model-task
 The [R1 v2 repair contract](design/research-r1-hf-dwd-v2.md) defines the corrected metric,
 input closure, bounded execution and per-stage self-audit. See its
 [repair delivery and reviewer handoff](acceptance/research-r1-repair-20261111.md).
+The [v2 independent acceptance](acceptance/research-r1-v2-independent-audit-612-20261111.md)
+accepts the recorded A2 result and specifies three bounded Worker repairs before reuse.
 
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its

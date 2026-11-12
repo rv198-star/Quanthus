@@ -1,6 +1,6 @@
 {
   "schema": "maintenance.loop.v1",
-  "contract_version": "1.1.0",
+  "contract_version": "1.1.1",
   "repository": "rv198-star/Quanthus",
   "control_issue": 632,
   "transport": {
@@ -21,16 +21,11 @@
   ],
   "environments": [
     {
-      "id": "local-dev",
-      "required": true,
-      "max_snapshot_age_seconds": 93600,
-      "role": "source-development"
-    },
-    {
       "id": "cn02-dev",
       "required": true,
       "max_snapshot_age_seconds": 93600,
-      "role": "project-development-execution"
+      "role": "authoritative-development-and-maintenance-execution",
+      "node_alias": "CN02"
     }
   ],
   "authority_files": [
@@ -48,7 +43,7 @@
     "docs/design/exploration-governance.md",
     "config/data-ownership.v1.json"
   ],
-  "repair_environment": "local-dev",
+  "repair_environment": "cn02-dev",
   "repair_timeout_seconds": 1800,
   "repair_allowed_paths": [
     "AGENTS.md",
@@ -66,7 +61,8 @@
     "working_copy": "isolated-issue-worktree",
     "result": "candidate-needs-review",
     "max_new_repairs_per_repository_per_day": 1,
-    "merge": "existing-repository-owner-policy"
+    "merge": "existing-repository-owner-policy",
+    "location": "registered-authoritative-development-environment"
   },
   "effect": {
     "writer": "requesting-agent",
@@ -102,5 +98,10 @@
       "not_configured",
       "not_applicable"
     ]
+  },
+  "environment_selection": {
+    "authority": "Owner-confirmed actual project development workspace",
+    "mac_checkout": "excluded",
+    "selection": "match repository origin and registered server workspace; report actual workspace state without updating it"
   }
 }

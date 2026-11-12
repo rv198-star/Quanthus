@@ -35,6 +35,16 @@ class MaintenanceTests(unittest.TestCase):
         self.config = json.loads((SOURCE / "config/maintenance-loop.v1.json").read_text())
         self.config["authority_files"] = ["docs/maintenance/loop-contract.md"]
         self.config["dependency_files"] = ["requirements.lock.txt"]
+        # Unit fixture identity is independent of the deployed server registry.
+        self.config["environments"] = [
+            {
+                "id": "local-dev",
+                "required": True,
+                "role": "test-fixture",
+                "max_snapshot_age_seconds": 93600,
+            }
+        ]
+        self.config["repair_environment"] = "local-dev"
         (self.root / "docs/maintenance").mkdir(parents=True)
         (self.root / "docs/maintenance/loop-contract.md").write_text("versioned authority\n")
         (self.root / "config").mkdir()
@@ -62,7 +72,7 @@ class MaintenanceTests(unittest.TestCase):
         self.req = {
             "schema": "maintenance.request.v1",
             "repository": self.config["repository"],
-            "contract_version": "1.1.0",
+            "contract_version": self.config["contract_version"],
             "environment_id": "local-dev",
             "request_id": "request-one",
             "batch_id": "batch-one",
@@ -174,6 +184,18 @@ class MaintenanceTests(unittest.TestCase):
             },
             m.now(),
         )
+
+    def test_deployment_uses_the_owner_confirmed_server(self):
+        configured = json.loads((SOURCE / "config/maintenance-loop.v1.json").read_text())
+        expected = "cn02-dev" if configured["repository"].endswith("/Quanthus") else "oci-dev"
+        self.assertEqual([x["id"] for x in configured["environments"]], [expected])
+        self.assertTrue(configured["environments"][0]["required"])
+        self.assertEqual(configured["repair_environment"], expected)
+
+    def test_actual_registry_rejects_mac_intake(self):
+        configured = json.loads((SOURCE / "config/maintenance-loop.v1.json").read_text())
+        with self.assertRaises(ValueError):
+            m.request(self.req, configured, "local-dev")
 
     def test_authority_escape_is_rejected(self):
         (self.root / "config/maintenance-loop.v1.json").write_text(

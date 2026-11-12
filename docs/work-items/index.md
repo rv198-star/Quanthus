@@ -18,8 +18,9 @@ delivery. The [three-batch plan](exploration-next-20261029.md) now links its
 No successor experiment is activated by that outcome.
 
 For the HF-DWD research bus [#608](https://github.com/rv198-star/Quanthus/issues/608),
-the [R1 value brief](research-r1-value-brief.md) explains the latest project change,
-investment assessment and next decision, with links to the accepted evidence.
+the [current R4 capital value brief](research-capital-replay-value-brief.md) explains the latest project change,
+investment assessment and park decision, with [complete recovery acceptance](../acceptance/research-capital-recovery-20261112.md).
+The earlier [R1 brief](research-r1-value-brief.md) remains a stage snapshot; Draft #631 main integration is separate.
 
 P10-DATA-000 is the permanent standing data epic and is excluded from automatic epic closure.
 Acquisition and shared quality/governance belong to P10 under

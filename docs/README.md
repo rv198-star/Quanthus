@@ -35,12 +35,12 @@ It records the second resource decision and the scope of the next costed-replay 
 
 For the next capital comparison, see the [native seam and staged plan](design/research-capital-replay-plan-v1.md)
 and its [code/metadata review](acceptance/research-capital-seam-20261112.md).
-Successor #628 now delivers the guarded native capital consumer and an independently reconciled
-source-held run. Start with the [capital value brief](work-items/research-capital-replay-value-brief.md)
-and [execution/self-audit evidence](acceptance/research-capital-replay-20261112.md).
-The complete economic comparison awaits the encountered P10 action view; #628 remains open.
-For the remaining bounded work, use the [R4 recovery execution plan](design/research-capital-r4-recovery-plan-v1.md),
-covering P10 handoff, consumer binding, controlled execution and independent acceptance.
+Successor #628 / R4 now delivers the complete guarded capital comparison, independently cold-built
+and role-reviewed. Start with the [capital value brief](work-items/research-capital-replay-value-brief.md)
+and [recovery acceptance](acceptance/research-capital-recovery-20261112.md): the fixed holding use is
+inconclusive and parked under its original gates. The [three-stage recovery plan](design/research-capital-r4-recovery-plan-v1.md)
+records the executed scope; the [001 source-held report](acceptance/research-capital-replay-20261112.md)
+remains historical. Draft #631 is delivered atop #630; main integration stays with its existing owner.
 The earlier [A qualification brief](work-items/research-capital-qualification-a-value-brief.md)
 is preserved as the prior stage snapshot.
 

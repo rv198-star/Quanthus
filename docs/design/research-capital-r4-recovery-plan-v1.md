@@ -2,14 +2,18 @@
 
 | Field | Value |
 | --- | --- |
-| Design status | draft — Owner于2026-11-12要求先细化执行计划 |
-| Delivery gate | blocked — P10用途交付、恢复请求冻结和运行准入待执行 |
+| Design status | approved — Owner于2026-11-12要求按本计划三阶段八步启动执行 |
+| Delivery gate | accepted — [完整比较与独立验收](../acceptance/research-capital-recovery-20261112.md)，completed / inconclusive / park |
 | Parent | [资金回放合同与原计划](research-capital-replay-plan-v1.md) |
 | Milestone / work item | [R4](https://github.com/rv198-star/Quanthus/milestone/18) / [#628](https://github.com/rv198-star/Quanthus/issues/628)，总线[#608](https://github.com/rv198-star/Quanthus/issues/608) |
 | Shared data owner | P10 [#556](https://github.com/rv198-star/Quanthus/issues/556)；本次有界工作包标识`P10-DATA-R4-ACTION-001` |
 | Existing delivery | [PR #631](https://github.com/rv198-star/Quanthus/pull/631)，叠加于#630；[执行后自审](../acceptance/research-capital-replay-20261112.md) |
-| Current result | [价值简报](../work-items/research-capital-replay-value-brief.md)；完整经济比较`blocked / not_evaluated` |
-| This handoff | 执行方案与交接清单；数据修复、后继拨款和新结果计算在实际开工时绑定权限及预算 |
+| Current result | [价值简报](../work-items/research-capital-replay-value-brief.md)；完整经济比较`completed / inconclusive`；固定持仓用途`park` |
+| This handoff | 执行后验收与价值交接；原事前计划正文保留，固定版本`375f7f690b5bda1d1356e7c05e345bd4ccba920f` |
+
+2026-11-12执行记录：S1–S8按本计划交付，G1–G4通过；26文件HF固定发布与全回读完成。
+候选/对照净收益+0.31660% / −2.31747%，年度差与前三笔依赖门槛未通过，按原规则停放。
+实际身份、检查、失败和独立审阅见[恢复验收报告](../acceptance/research-capital-recovery-20261112.md)。以下正文为事前计划与原始预算基线。
 
 ## 1. 目标、当前位置和完成定义
 

@@ -136,3 +136,103 @@ def test_request_freezes_primary_boundary_and_censor_audit(clock_request):
         wrong[key][field] = value
         with pytest.raises(GuardError):
             validate_request(wrong)
+
+
+@pytest.mark.parametrize("overrun", ["wall", "scratch", "rss"])
+def test_reference_successful_exit_still_rejects_terminal_budget_overrun(
+    tmp_path, monkeypatch, overrun
+):
+    """A fast successful child may finish between monitor samples."""
+    import importlib
+    import types
+
+    monkeypatch.syspath_prepend(str(ROOT / "scripts"))
+    reference = importlib.import_module("research_r5_independent_audit")
+    out = tmp_path / "reference"
+    args = types.SimpleNamespace(out=out, original=tmp_path / "formal", execution_git="synthetic")
+    q = {
+        "budget": {
+            "max_stage_wall_seconds": {"screen": 1},
+            "max_rss_bytes": 1048576,
+            "max_scratch_bytes": 1024,
+        }
+    }
+    times = iter([0.0, 2.0 if overrun == "wall" else 0.5])
+    last = [0.0]
+
+    def clock():
+        last[0] = next(times, last[0])
+        return last[0]
+
+    class FinishedChild:
+        pid = 999999999
+
+        def __init__(self, *unused, **kwargs):
+            if overrun == "scratch":
+                (out / "result.json").write_bytes(b"x" * 2048)
+            if overrun == "rss":
+                (out / "independent-reproduction.json").write_text('{"peak_rss_kib":2048}')
+
+        def poll(self):
+            return 0
+
+        def wait(self):
+            return 0
+
+    monkeypatch.setattr(reference.time, "monotonic", clock)
+    monkeypatch.setattr(reference.subprocess, "Popen", FinishedChild)
+    assert reference.guarded(args, q) == 2
+    receipt = json.loads((out / "reference-guardian.json").read_text())
+    assert receipt["exit_code"] == 0
+    assert receipt["failure"] == overrun + "_exceeded"
+
+
+def test_reference_rejects_dirty_source_even_when_head_matches(tmp_path, monkeypatch):
+    import importlib
+    import subprocess
+    import sys
+
+    monkeypatch.syspath_prepend(str(ROOT / "scripts"))
+    reference = importlib.import_module("research_r5_independent_audit")
+    source = tmp_path / "source"
+    source.mkdir()
+    q = source / reference.REQUEST
+    q.parent.mkdir(parents=True)
+    q.write_text('{"environment":{"lock_path":"runtime.lock"}}')
+    tracked = source / "reference.py"
+    tracked.write_text("original\n")
+    for command in [
+        ["git", "init", "-q"],
+        ["git", "add", "."],
+        [
+            "git",
+            "-c",
+            "user.name=R5 Test",
+            "-c",
+            "user.email=r5@example.invalid",
+            "commit",
+            "-qm",
+            "synthetic source",
+        ],
+    ]:
+        subprocess.run(command, cwd=source, check=True, capture_output=True)
+    expected = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
+    tracked.write_text("tampered\n")
+    monkeypatch.setattr(reference, "ROOT", source)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "reference",
+            "--original",
+            str(tmp_path / "formal"),
+            "--out",
+            str(tmp_path / "out"),
+            "--execution-git",
+            expected,
+            "--guarded",
+        ],
+    )
+    with pytest.raises(AssertionError, match="tracked source tree must be clean"):
+        reference.main()
+    assert not (tmp_path / "out").exists()

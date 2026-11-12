@@ -6,7 +6,7 @@
 | Design status | draft — independent prospective design review pending |
 | Delivery gate | open |
 | Selection | `META-RESEARCH-R5-SELECT-001` / #640 |
-| Execution | `P3-RESEARCH-R5-CLOCK-001`; exact issue number recorded in the blueprint catalog |
+| Execution | `P3-RESEARCH-R5-CLOCK-001` / #642 |
 | Request | `config/research/research-r5/request.v1.json` |
 | Runtime | existing guarded `ops/bin/hf-dwd-research`; one narrow analysis dispatch |
 | Independent construction | separate pandas/numpy script, without producer SQL or aggregation imports |
@@ -41,6 +41,9 @@ verified input and execution delta. Selection consumes code, metadata and prior 
 - Decision interval is prospectively 2020-03-02 through 2021-12-29. The original
   2021-12-30 last decision is right-censored because a second following open would
   exceed the read boundary. Do not roll the boundary forward to complete it.
+  Its original base-screen candidate/control rows remain in a separately reasoned
+  audit denominator as `right_censored_second_session`, by decision year and group;
+  they supply no response or paired date to the primary comparison.
 - Reuse all original R2 base filters, closed momentum band [0.02,0.12], disjoint
   outside-band control and first-open price/status guard. No threshold, ranking,
   holding-period grid or capital path changes.
@@ -106,6 +109,10 @@ protected-partition or production authority.
 4. Independently compare counts, dates, groups, branches and primary/component
    summaries. Required integer/identity agreement is exact; float absolute tolerance
    is 1e-10. Keep independent-failure evidence and one identified bounded recovery.
+   The reference checks its clean tracked Git tree and records the three reference
+   scripts, request and full 25-package lock hashes. Its parent guard checks final
+   wall time, scratch and child-reported peak RSS after exit as well as live samples;
+   exit zero with an overrun remains failed acceptance.
 5. Publish one immutable named result package to the existing private HF results
    repository and read every file back at its fixed commit. Retain decision-worthy
    evidence on CN02. Append conclusions/blueprint checkpoints, update issues and the

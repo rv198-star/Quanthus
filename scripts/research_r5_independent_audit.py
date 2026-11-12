@@ -2,6 +2,7 @@
 """Independent pandas two-calendar reconstruction and bounded R5 reference run."""
 
 import argparse
+import hashlib
 import importlib.metadata
 import json
 import math
@@ -166,6 +167,7 @@ def evaluate(q, labelled, panel, author, out, began):
     receipt["schema"] = "quanthus.r5-clock-independent.v1"
     receipt["metrics"].update(extra)
     receipt["wall_seconds"] = time.monotonic() - began
+    receipt["peak_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     receipt["request_digest"] = canonical(q)
     receipt["execution_git"] = author["identity"]["git"]
     receipt["r4_capital_use"] = "park"
@@ -173,10 +175,12 @@ def evaluate(q, labelled, panel, author, out, began):
     return 2 if primary_code or receipt["mismatches"] else 0
 
 
-def guarded(args, q):
+def guarded(args, q, identity=None):
     args.out.mkdir(parents=True, exist_ok=True)
     marker = args.out / "reference-attempt-start.json"
     assert not marker.exists(), "one independent attempt; located recovery needs separate authority"
+    if identity is not None:
+        save(args.out / "reference-source-identity.json", identity)
     save(
         marker,
         {"git": args.execution_git, "request_digest": canonical(q), "started_epoch": time.time()},
@@ -217,12 +221,25 @@ def guarded(args, q):
                 break
             time.sleep(0.2)
         code = process.wait()
+    # A child may exit between polls after its final write or resource peak.
+    size = max(size, sum(p.stat().st_size for p in args.out.rglob("*") if p.is_file()))
+    reference_receipt = args.out / "independent-reproduction.json"
+    if reference_receipt.is_file():
+        peak = max(peak, int(read(reference_receipt).get("peak_rss_kib", 0)) * 1024)
+    elapsed = time.monotonic() - began
+    if failure is None:
+        if elapsed > q["budget"]["max_stage_wall_seconds"]["screen"]:
+            failure = "wall_exceeded"
+        elif peak > q["budget"]["max_rss_bytes"]:
+            failure = "rss_exceeded"
+        elif size > q["budget"]["max_scratch_bytes"]:
+            failure = "scratch_exceeded"
     receipt = {
         "git": args.execution_git,
         "request_digest": canonical(q),
         "exit_code": code,
         "failure": failure,
-        "wall_seconds": time.monotonic() - began,
+        "wall_seconds": elapsed,
         "peak_rss_bytes": peak,
         "peak_scratch_bytes": size,
     }
@@ -242,12 +259,34 @@ def main():
     assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip() == (
         args.execution_git
     )
+    assert not subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT, text=True
+    ).strip(), "reference tracked source tree must be clean"
+    protected = [
+        REQUEST,
+        q["environment"]["lock_path"],
+        "scripts/research_r5_independent_audit.py",
+        "scripts/research_r2_independent_audit.py",
+        "scripts/research_r1_v2_independent_audit.py",
+    ]
+    identity = {
+        "git": args.execution_git,
+        "tracked_tree_clean": True,
+        "files_sha256": {
+            name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in protected
+        },
+    }
+    assert (
+        "sha256:" + identity["files_sha256"][q["environment"]["lock_path"]]
+        == (q["environment"]["lock_sha256"])
+    )
     for line in (ROOT / q["environment"]["lock_path"]).read_text().splitlines():
         name, version = line.split("==", 1)
         assert importlib.metadata.version(name) == version, name
     if args.guarded:
-        return guarded(args, q)
+        return guarded(args, q, identity)
     resource.setrlimit(resource.RLIMIT_CPU, (q["budget"]["max_cpu_seconds"],) * 2)
+    save(args.out / "reference-source-identity.json", identity)
     spec = {
         "request": REQUEST,
         "request_digest": canonical(q),

@@ -277,3 +277,9 @@ and uses `CURRENT_DAILY_CORE.json` plus immutable dated descriptors. It does not
 change the old four-lane CURRENT, assert 1m/5m acceptance, or activate P6/training.
 Dedicated CN01/Hermes daily-core services and OCI core-only mirroring are allowed
 after their baseline, physical-source, contract and runtime verification.
+
+## Repository maintenance loop
+
+For repository maintenance intake, registered development-environment evidence,
+receipt recovery and rule-consumption review, follow
+`docs/maintenance/loop-contract.md` and `config/maintenance-loop.v1.json`.

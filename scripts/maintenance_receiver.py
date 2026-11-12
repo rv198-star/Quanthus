@@ -6,10 +6,13 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import subprocess
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
+from maintenance_evidence import operator_environment
 
 
 def main():
@@ -66,7 +69,8 @@ def main():
         command += ["--sources-file", job["sources_file"]]
     if job.get("executor"):
         command += ["--executor", job["executor"]]
-    result = subprocess.run(command, text=True, capture_output=True, timeout=1900)
+    environment = operator_environment(job["evidence"], os.environ) if job.get("evidence") else None
+    result = subprocess.run(command, text=True, capture_output=True, timeout=1900, env=environment)
     # stdout is the bounded, redacted transport summary; stderr remains private.
     logger.info("job=%s exit=%s summary=%s", args.job, result.returncode, result.stdout[-16000:])
     if result.stderr:

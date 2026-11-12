@@ -1,7 +1,7 @@
 {
   "schema": "maintenance.consumer-rule.v1",
   "rule_id": "loop3-versioned-consumption",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "active": true,
   "authority_path": "docs/maintenance/loop-contract.md",
   "consumer_entry": "scripts/maintenance_consumer.py:consume",

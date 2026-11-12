@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+import base64
 import copy
 import fcntl
+import hashlib
 import importlib.util
+import io
 import json
+import os
 import shutil
 import sqlite3
 import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from unittest import mock
 
@@ -22,8 +28,10 @@ SPEC = importlib.util.spec_from_file_location(
 )
 m = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(m)
-from maintenance_audit import valid_chain, verify
-from maintenance_sources import collect, native_tasks, verification
+import maintenance_evidence as evidence  # noqa: E402
+import maintenance_evidence_tools as evidence_tools  # noqa: E402
+from maintenance_audit import valid_chain, verify  # noqa: E402
+from maintenance_sources import collect, native_tasks, verification  # noqa: E402
 
 
 class MaintenanceTests(unittest.TestCase):
@@ -33,6 +41,8 @@ class MaintenanceTests(unittest.TestCase):
         self.root = Path(self.temp.name) / "repo"
         self.root.mkdir()
         self.config = json.loads((SOURCE / "config/maintenance-loop.v1.json").read_text())
+        # Historical body regressions use the explicit legacy backend.
+        self.config.pop("evidence_store", None)
         self.config["authority_files"] = ["docs/maintenance/loop-contract.md"]
         self.config["dependency_files"] = ["requirements.lock.txt"]
         # Unit fixture identity is independent of the deployed server registry.
@@ -582,7 +592,6 @@ class MaintenanceTests(unittest.TestCase):
         self.assertEqual(self.store.state("request-one"), "reserved")
 
     def test_actual_cli_processes_resume_original_ledger(self):
-        import os
 
         remote = Path(self.temp.name) / "github.json"
         remote.write_text(
@@ -710,6 +719,301 @@ else: print('[[]]')
         result = self.native_fixture(outside=True)["result"]
         self.assertEqual(result["status"], "failed")
         self.assertFalse(result["within_declared_paths"])
+
+
+
+# Private HF storage regressions. These use an in-memory Hub, never real credentials.
+
+
+class MemoryHF(evidence.HFStore):
+    def __init__(self):
+        super().__init__('owner/private-evidence', 'fixture', 'local-dev', 'fixture-credential')
+        self.head = '0' * 40
+        self.trees = {self.head: {}}
+        self.private = True
+        self.denied = False
+        self.conflict_once = False
+        self.lose_confirmation_once = False
+        self.commits = 0
+        self.posts = 0
+
+    def _commit(self, files):
+        tree = dict(self.trees[self.head])
+        tree.update(files)
+        self.head = format(len(self.trees), '040x')
+        self.trees[self.head] = tree
+        return self.head
+
+    def _request(self, method, path, body=None, missing=False):
+        if self.denied:
+            raise evidence.EvidenceError('HF evidence HTTP status 401')
+        if method == 'GET' and path.startswith('/api/datasets/'):
+            return json.dumps({'private': self.private, 'sha': self.head}).encode()
+        if method == 'GET' and '/resolve/' in path:
+            revision, relative = path.split('/resolve/', 1)[1].split('/', 1)
+            value = self.trees.get(revision, {}).get(urllib.parse.unquote(relative))
+            if value is None and not missing:
+                raise evidence.EvidenceError('HF evidence HTTP status 404')
+            return value
+        if method == 'POST':
+            self.posts += 1
+            entries = [json.loads(line) for line in body.splitlines()]
+            if self.conflict_once:
+                self.conflict_once = False
+                self._commit({'another-project/concurrent.json': b'{"retained":true}'})
+            if entries[0]['value']['parentCommit'] != self.head:
+                raise evidence.EvidenceError('HF evidence HTTP status 409', retryable=True)
+            files = {x['value']['path']: base64.b64decode(x['value']['content']) for x in entries[1:]}
+            self._commit(files)
+            self.commits += 1
+            if self.lose_confirmation_once:
+                self.lose_confirmation_once = False
+                raise evidence.EvidenceError('HF evidence transport failed', retryable=True)
+            return json.dumps({'commitOid': self.head}).encode()
+        raise AssertionError((method, path))
+
+
+class HFEvidenceBackendTests(unittest.TestCase):
+    def setUp(self):
+        self.hub = MemoryHF()
+        self.value = {'schema': 'maintenance.receipt.v1', 'result': {'status': 'observed'}}
+
+    def test_private_revision_readback_and_content_path(self):
+        ref = self.hub.put('receipt', self.value)
+        self.assertEqual(self.hub.read(ref), self.value)
+        self.assertRegex(ref['revision'], r'^[0-9a-f]{40}$')
+        self.assertTrue(ref['path'].startswith('fixture/local-dev/receipt/'))
+        self.assertEqual(ref['sha256'], hashlib.sha256(m.canonical(self.value).encode()).hexdigest())
+
+    def test_repeated_content_reuses_existing_object(self):
+        first = self.hub.put('receipt', self.value)
+        second = self.hub.put('receipt', self.value)
+        self.assertEqual(first, second)
+        self.assertEqual(self.hub.commits, 1)
+
+    def test_lost_commit_ack_reconciles_before_reposting(self):
+        self.hub.lose_confirmation_once = True
+        ref = self.hub.put('receipt', self.value)
+        self.assertEqual(self.hub.read(ref), self.value)
+        self.assertEqual(self.hub.commits, 1)
+        self.assertEqual(self.hub.posts, 1)
+
+    def test_concurrent_other_project_commit_is_preserved(self):
+        self.hub.conflict_once = True
+        ref = self.hub.put('receipt', self.value)
+        self.assertEqual(self.hub.read(ref), self.value)
+        self.assertIn('another-project/concurrent.json', self.hub.trees[self.hub.head])
+        self.assertEqual(self.hub.posts, 2)
+
+    def test_pinned_revision_survives_head_advancing(self):
+        ref = self.hub.put('receipt', self.value)
+        self.hub._commit({'unrelated.json': b'{}'})
+        self.assertNotEqual(ref['revision'], self.hub.head)
+        self.assertEqual(self.hub.read(ref), self.value)
+
+    def test_public_repository_rejects_publication(self):
+        self.hub.private = False
+        with self.assertRaisesRegex(ValueError, 'private'):
+            self.hub.put('receipt', self.value)
+        self.assertEqual(self.hub.posts, 0)
+
+    def test_auth_failure_does_not_write(self):
+        self.hub.denied = True
+        with self.assertRaisesRegex(ValueError, '401'):
+            self.hub.put('receipt', self.value)
+        self.assertEqual(self.hub.posts, 0)
+
+    def test_token_cannot_be_exported_in_evidence(self):
+        with self.assertRaisesRegex(ValueError, 'credential') as caught:
+            self.hub.put('report', {'value': 'fixture-credential'})
+        self.assertNotIn('fixture-credential', str(caught.exception))
+        self.assertEqual(self.hub.posts, 0)
+
+    def test_reference_rejects_cross_project_path_and_mutable_revision(self):
+        ref = self.hub.put('receipt', self.value)
+        for patch in [{'repository': 'other/repo'}, {'path': '../outside.json'}, {'path': ref['path'].replace('fixture/', 'other/', 1)}, {'revision': 'main'}, {'provider': 'other'}]:
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                self.hub.read(dict(ref, **patch))
+
+    def test_changed_content_at_pinned_path_is_detected(self):
+        ref = self.hub.put('receipt', self.value)
+        self.hub.trees[ref['revision']][ref['path']] = b'{"different":true}'
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            self.hub.read(ref)
+
+    def test_oversized_evidence_is_rejected_before_network(self):
+        with self.assertRaisesRegex(ValueError, 'size bound'):
+            self.hub.put('snapshot', {'data': 'x' * evidence.MAX_BYTES})
+        self.assertEqual(self.hub.posts, 0)
+
+    def test_redirect_drops_credential_across_hosts(self):
+        req = urllib.request.Request('https://huggingface.co/private', headers={'Authorization': 'Bearer fixture-credential'})
+        redirected = evidence.PrivateRedirect().redirect_request(req, None, 302, '', {}, 'https://cdn.example.invalid/private')
+        self.assertIsNone(redirected.get_header('Authorization'))
+        with self.assertRaises(ValueError):
+            evidence.PrivateRedirect().redirect_request(req, None, 302, '', {}, 'http://example.invalid/private')
+
+
+class HFPublicationTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture = MaintenanceTests('test_duplicate_probe_reuses_receipt_and_attempt')
+        self.fixture.setUp()
+        self.addCleanup(self.fixture.doCleanups)
+        self.fixture.config['evidence_store'] = {'kind': 'hf-private-dataset', 'project': 'fixture'}
+        self.hub = MemoryHF()
+        patcher = mock.patch.object(evidence.HFStore, 'from_config', return_value=self.hub)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_pipeline_keeps_full_objects_private_and_indexes_small(self):
+        receipt, delivery = self.fixture.pipeline()
+        self.assertTrue(all(self.fixture.audit(receipt, delivery)['checks'].values()))
+        self.assertTrue(self.fixture.posts)
+        for comment in self.fixture.posts:
+            self.assertTrue(comment['body'].startswith(evidence.MARKER))
+            self.assertNotIn('"snapshot"', comment['body'])
+            self.assertNotIn('fixture-credential', comment['body'])
+            self.assertLess(len(comment['body'].encode()), 3000)
+        self.assertEqual(self.fixture.store.attempt('request-one')['ordinal'], 1)
+
+    def test_pointer_and_original_result_stay_stable_after_restart(self):
+        receipt, _ = self.fixture.pipeline()
+        before = self.fixture.store.db.execute('SELECT pointer_json FROM evidence_references ORDER BY request_id,role').fetchall()
+        commits = self.hub.commits
+        self.fixture.store.close()
+        self.fixture.store = m.Store(self.fixture.state)
+        self.addCleanup(self.fixture.store.close)
+        self.assertEqual(self.fixture.claim(), receipt)
+        after = self.fixture.store.db.execute('SELECT pointer_json FROM evidence_references ORDER BY request_id,role').fetchall()
+        self.assertEqual(before, after)
+        self.assertEqual(self.hub.commits, commits)
+        self.assertEqual(self.fixture.store.attempt('request-one')['ordinal'], 1)
+
+    def test_hf_outage_retains_result_and_never_falls_back_to_full_body(self):
+        f = self.fixture
+        receipt = f.claim(dict(f.req, kind='snapshot'))
+        attempt = f.store.attempt('request-one')
+        self.hub.denied = True
+        with mock.patch.object(m, 'post_or_reuse') as post, self.assertRaises(ValueError):
+            m.publish(f.config, f.store, [])
+        post.assert_not_called()
+        self.assertEqual(f.store.get('request-one'), receipt)
+        self.assertEqual(f.store.publication('request-one'), 'pending')
+        self.hub.denied = False
+        with mock.patch.object(m, 'post_or_reuse', side_effect=f.fake_post), mock.patch.object(m, 'read_comment', side_effect=f.fake_read):
+            m.publish(f.config, f.store, [])
+        self.assertEqual(f.store.attempt('request-one'), attempt)
+        self.assertEqual(f.store.get('request-one'), receipt)
+        self.assertEqual(len(f.posts), 2)
+
+    def test_hf_pointer_is_saved_before_github_failure_and_reused(self):
+        f = self.fixture
+        receipt = f.claim(dict(f.req, kind='snapshot'))
+        with mock.patch.object(m, 'post_or_reuse', side_effect=ValueError('publication pending')), self.assertRaises(ValueError):
+            m.publish(f.config, f.store, [])
+        pointer = f.store.db.execute('SELECT pointer_json FROM evidence_references WHERE role="receipt"').fetchone()[0]
+        self.assertEqual(self.hub.commits, 1)
+        with mock.patch.object(m, 'post_or_reuse', side_effect=f.fake_post), mock.patch.object(m, 'read_comment', side_effect=f.fake_read):
+            m.publish(f.config, f.store, [])
+        self.assertEqual(f.store.db.execute('SELECT pointer_json FROM evidence_references WHERE role="receipt"').fetchone()[0], pointer)
+        self.assertEqual(f.store.get('request-one'), receipt)
+        self.assertEqual(self.hub.commits, 2)  # Receipt and delivery, once each.
+
+    def test_persisted_pointer_cannot_be_rewritten(self):
+        self.fixture.pipeline()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.fixture.store.db.execute('UPDATE evidence_references SET pointer_json="{}"')
+
+
+
+
+
+class HFOperatorAndToolTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.credentials = self.root / 'hf.env'
+        fixture_value = 'fixture-credential'
+        self.credentials.write_text(f'HF_TOKEN="{fixture_value}"\nIGNORED_SECRET=unrelated\n')  # scan-allow: fixture-literal
+        self.credentials.chmod(0o600)
+        self.proxy = self.root / 'proxy.env'
+        self.proxy.write_text('HTTPS_PROXY="http://proxy.example.invalid:8080"\nUNRELATED_SETTING=discard\n')
+        self.settings = {'repository': 'owner/private-evidence', 'credentials_file': str(self.credentials), 'proxy_file': str(self.proxy)}
+
+    def test_private_operator_file_maps_only_hf_and_proxy_values(self):
+        env = evidence.operator_environment(self.settings, {})
+        self.assertEqual(env['LOOP3_HF_REPO_ID'], 'owner/private-evidence')
+        self.assertEqual(env['LOOP3_HF_TOKEN'], 'fixture-credential')
+        self.assertEqual(env['HTTPS_PROXY'], 'http://proxy.example.invalid:8080')
+        self.assertNotIn('IGNORED_SECRET', env)
+        self.assertNotIn('UNRELATED_SETTING', env)
+
+    def test_group_readable_operator_secret_is_rejected(self):
+        self.credentials.chmod(0o640)
+        with self.assertRaisesRegex(ValueError, 'private'):
+            evidence.operator_environment(self.settings, {})
+
+    def test_operator_assignment_is_parsed_without_shell_execution(self):
+        fixture_value = '$(touch /tmp/never-executed-by-loop3)'
+        self.credentials.write_text(f'HF_TOKEN="{fixture_value}"\n')  # scan-allow: fixture-literal
+        env = evidence.operator_environment(self.settings, {})
+        self.assertEqual(env['LOOP3_HF_TOKEN'], '$(touch /tmp/never-executed-by-loop3)')
+
+    def test_mcp_initialization_discovery_and_notifications(self):
+        source = io.StringIO('\n'.join(json.dumps(x) for x in [
+            {'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {'protocolVersion': '2024-11-05'}},
+            {'jsonrpc': '2.0', 'method': 'notifications/initialized'},
+            {'jsonrpc': '2.0', 'id': 2, 'method': 'tools/list'},
+        ]) + '\n')
+        output = io.StringIO()
+        evidence_tools.serve(mock.Mock(), source, output)
+        messages = [json.loads(x) for x in output.getvalue().splitlines()]
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[0]['result']['protocolVersion'], '2024-11-05')
+        tools = messages[1]['result']['tools']
+        self.assertEqual({x['name'] for x in tools}, {'read_evidence', 'store_report', 'read_report'})
+        self.assertTrue(next(x for x in tools if x['name'] == 'read_evidence')['annotations']['readOnlyHint'])
+
+    def test_invalid_json_does_not_reuse_previous_request_id(self):
+        source = io.StringIO('{"id":7,"method":"ping"}\ninvalid-json\n')
+        output = io.StringIO()
+        evidence_tools.serve(mock.Mock(), source, output)
+        messages = [json.loads(x) for x in output.getvalue().splitlines()]
+        self.assertEqual(messages[0]['id'], 7)
+        self.assertIsNone(messages[1]['id'])
+
+    def test_report_write_read_and_retry_keep_stable_hf_reference(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            service = evidence_tools.EvidenceTools(self.settings, self.root / 'state')
+            self.addCleanup(service.cache.close)
+            hub = MemoryHF()
+            report = {'schema': 'maintenance.daily.v1', 'batch_id': 'batch-one', 'challenge': 'challenge-one', 'controller_run_id': 'run-one', 'status': 'NOOP'}
+            report['report_digest'] = m.digest(report)
+            with mock.patch.object(service, 'backend', return_value=hub):
+                pointer = service.call('store_report', {'project': 'controller', 'report': report})
+                hub._commit({'other-project/changed.json': b'{}'})
+                replay = service.call('store_report', {'project': 'controller', 'report': report})
+                self.assertEqual(pointer, replay)
+                self.assertEqual(service.call('read_report', {'pointer': pointer}), report)
+                self.assertEqual(hub.commits, 1)
+                bad = dict(report, status='changed')
+                with self.assertRaisesRegex(ValueError, 'digest'):
+                    service.call('store_report', {'project': 'controller', 'report': bad})
+
+    def test_tool_rejects_unregistered_project_before_reading(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            service = evidence_tools.EvidenceTools(self.settings, self.root / 'state')
+            self.addCleanup(service.cache.close)
+            with self.assertRaisesRegex(ValueError, 'registered'):
+                service.call('read_evidence', {'pointer': {'repository': 'outside/repo', 'environment_id': 'oci-dev'}})
+
+    def test_pointer_reader_binds_registered_project_and_environment(self):
+        config = {'repository': 'expected/repo', 'environments': [{'id': 'oci-dev'}]}
+        pointer = {'schema': 'maintenance.evidence-pointer.v1', 'repository': 'other/repo', 'environment_id': 'oci-dev'}
+        pointer['pointer_digest'] = m.digest(pointer)
+        with self.assertRaisesRegex(ValueError, 'registration'):
+            evidence.read_pointer(config, pointer)
 
 
 if __name__ == "__main__":

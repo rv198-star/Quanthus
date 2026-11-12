@@ -61,6 +61,13 @@ class Store:
             comment_id TEXT PRIMARY KEY, request_id TEXT NOT NULL, input_digest TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS supplements (
             request_id TEXT PRIMARY KEY, value TEXT NOT NULL, url TEXT);
+          CREATE TABLE IF NOT EXISTS evidence_references (
+            request_id TEXT NOT NULL, role TEXT NOT NULL, pointer_json TEXT NOT NULL,
+            PRIMARY KEY(request_id, role));
+          CREATE TRIGGER IF NOT EXISTS evidence_references_no_update BEFORE UPDATE ON evidence_references
+            BEGIN SELECT RAISE(ABORT, 'immutable evidence reference'); END;
+          CREATE TRIGGER IF NOT EXISTS evidence_references_no_delete BEFORE DELETE ON evidence_references
+            BEGIN SELECT RAISE(ABORT, 'immutable evidence reference'); END;
         """)
         self.db.execute(
             "INSERT OR IGNORE INTO ledger_meta VALUES (?,?)", ("id", identity("ledger"))

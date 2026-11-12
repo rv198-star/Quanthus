@@ -1,4 +1,7 @@
-# 仓库维护循环合同 v1.1.1
+# 仓库维护循环合同 v1.2.0
+
+> 1.2.0 evidence storage: full receipts, snapshots, delivery projections and controller reports are stored in the private HF dataset. GitHub carries request envelopes and digest-bound small pointers. See [HF private evidence](hf-evidence.md). Historical GitHub bodies stay under their original versions.
+
 
 实施与持久回执：[维护工单 #632](https://github.com/rv198-star/Quanthus/issues/632)。配置：[`maintenance-loop.v1.json`](../../config/maintenance-loop.v1.json)。
 
@@ -18,7 +21,7 @@ Python 3.9+ 标准库、Git、已有 gh 认证。WFF 的验证使用 Python 3.12
 
 每个实际执行轮次有持久 `receiver_run_id`；正式认领时记录 `received_at`、随机 `attempt_id`、实际序号与开始时间，完成时记录完成时间和运行身份。探针声明 `execution_model=in_process_probe`，后续消费者声明 `queued_rule_consumer_fixture`。它们使用接收器账本作为原生执行系统，external task 为不适用；repair 引用真实 Codex thread。重复投递沿用同一业务 attempt，发布重试另有 publication attempt。
 
-同一 request_id 绑定同一 canonical request digest。原生回执写入后保持不变。旧版 inbox、已发布回执及其摘要保留；退出登记的 Mac 账本归档保存，旧批次仍可从原 GitHub 回执追溯；旧批次缺失的时间/事件导出 `legacy_not_recorded`。新请求使用 1.1.1。
+同一 request_id 绑定同一 canonical request digest。原生回执写入后保持不变。旧版 inbox、已发布回执及其摘要保留；退出登记的 Mac 账本归档保存，旧批次仍可从原 GitHub 回执追溯；旧批次缺失的时间/事件导出 `legacy_not_recorded`。新请求使用 1.2.0。
 
 ## 环境来源
 
@@ -45,7 +48,7 @@ AgentDock 来源的 kind 为 `agentdock`。路径由部署维护者登记。新�
 ````text
 <!-- maintenance.request.v1 -->
 ```json
-{"schema":"maintenance.request.v1","contract_version":"1.1.1","repository":"rv198-star/Quanthus","environment_id":"cn02-dev","request_id":"BATCH-local","batch_id":"NEW-BATCH","challenge":"NEW-CHALLENGE","kind":"acceptance_probe","payload":{}}
+{"schema":"maintenance.request.v1","contract_version":"1.2.0","repository":"rv198-star/Quanthus","environment_id":"cn02-dev","request_id":"BATCH-local","batch_id":"NEW-BATCH","challenge":"NEW-CHALLENGE","kind":"acceptance_probe","payload":{}}
 ```
 ````
 
@@ -54,7 +57,7 @@ AgentDock 来源的 kind 为 `agentdock`。路径由部署维护者登记。新�
 ````text
 <!-- maintenance.request.v1 -->
 ```json
-{"schema":"maintenance.request.v1","contract_version":"1.1.1","repository":"rv198-star/Quanthus","environment_id":"cn02-dev","request_id":"BATCH-local-reconcile","batch_id":"NEW-BATCH","challenge":"NEW-CHALLENGE","kind":"reconcile","payload":{"target_request_id":"BATCH-local"}}
+{"schema":"maintenance.request.v1","contract_version":"1.2.0","repository":"rv198-star/Quanthus","environment_id":"cn02-dev","request_id":"BATCH-local-reconcile","batch_id":"NEW-BATCH","challenge":"NEW-CHALLENGE","kind":"reconcile","payload":{"target_request_id":"BATCH-local"}}
 ```
 ````
 
@@ -67,13 +70,13 @@ AgentDock 来源的 kind 为 `agentdock`。路径由部署维护者登记。新�
 3. 正式 reconcile 查询原账本，追加 reconciliation 并发布查询回执；该回执导出待恢复状态、原结果摘要和业务 attempt。
 4. 后续运行读原 outbox，记录 recovery/publication attempt，发布原回执并从 GitHub GET 读回。整个过程沿用原业务 attempt，不重跑消费者。
 
-已执行而回传中断时保留原结果；丢失网络确认时先匹配已有回执评论。新 receipt 仍是每请求一份 immutable 原生回执（`<!-- maintenance.receipt.v1 -->`）；其后单独发布 `<!-- maintenance.delivery.v1 -->`，绑定 receipt_digest 与最终地址，导出恢复链和消费者账本。补充证据也 GET 读回；它的地址通过后续 reconcile 可查。这样避免地址与自身摘要的循环依赖。
+已执行而回传中断时保留原结果。每请求一份 immutable 原生 receipt 及独立 delivery 存入 HF 私有 dataset；GitHub 仅发布 `<!-- maintenance.evidence-pointer.v1 -->` 小索引。delivery 绑定 receipt_digest 与最终索引地址，并导出恢复链和消费者账本。上传与索引发布各自读回；固定 HF revision、路径、原始内容 SHA256、协议摘要和身份全部核对一致。丢失确认时复用原结果及持久索引。
 
 事件有真实时间、run ID、前一事件摘要与自身摘要；events 表只追加，关键身份/结果与事件在同一事务提交。每次实际发布均有独立 publication_attempt_id。没有历史事件的旧批次保留历史缺口。
 
 ## 后续规则消费与效果
 
-正式规则入口是 `config/maintenance-consumer-rule.v1.json`，激活版本 1.1.1，权威内容为本合同。正式消费者入口为 `scripts/maintenance_consumer.py:consume`，通过 inbox 的 `rule_consumer_fixture` 队列进入，公网投递不得伪造此内部 kind 或保留的 `:fixture` 身份。
+正式规则入口是 `config/maintenance-consumer-rule.v1.json`，激活版本 1.2.0，权威内容为本合同。正式消费者入口为 `scripts/maintenance_consumer.py:consume`，通过 inbox 的 `rule_consumer_fixture` 队列进入，公网投递不得伪造此内部 kind 或保留的 `:fixture` 身份。
 
 父探针只排队候选输入；后续 receiver run 的消费者自己调用 `load_rule()` 加载实际入口、版本、authority digest。错误摘要产生 `rule_digest_mismatch` 拒绝，正确摘要产生 `activated_rule_matched` 接受。两例分别保存输入摘要、期望、实际行为与事件引用。消费者保存 rule_loaded、behavior_evaluated、rule_consumed；实际使用次数由持久 rule_consumed 事件查询得出。重投与恢复沿用子 attempt，使用次数不增加。
 
@@ -92,7 +95,7 @@ AgentDock 来源的 kind 为 `agentdock`。路径由部署维护者登记。新�
 | 5 恢复 | result_persisted → defer → 原账本 reconcile → later recovery → 发布/读回，原摘要和 attempt 稳定 |
 | 6 消费 | 后续正式 claim、独立规则加载、坏拒绝好接受、持久消费事件 |
 | 7 效果 | 基线/适用机会、真实消费引用、从事件重算的次数和处置，重开读取一致 |
-| 8 读回 | 原生回执、补充事件证据、分仓报告及汇总再次从 GitHub GET 读取一致 |
+| 8 读回 | GitHub 小索引 GET 一致；HF 中原生回执、补充事件证据、分仓报告及汇总按固定 revision 鉴权读回一致 |
 
 摘要算法：移除相应 `receipt_digest / evidence_digest / event_digest` 字段，JSON 按键排序、UTF-8、无多余空白，计算 SHA256。查询回执自身与其 target receipt digest 分开核对。
 

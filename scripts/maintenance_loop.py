@@ -22,10 +22,12 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from maintenance_consumer import consume, load_rule
+from maintenance_evidence import MARKER as EVIDENCE_MARKER
+from maintenance_evidence import pointer_for, read_pointer
 from maintenance_sources import collect
 from maintenance_store import Store, identity
 
-VERSION = "1.1.1"
+VERSION = "1.2.0"
 REQUEST_MARKER = "<!-- maintenance.request.v1 -->"
 RECEIPT_MARKER = "<!-- maintenance.receipt.v1 -->"
 ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
@@ -35,6 +37,8 @@ RUNTIME_FILES = [
     "scripts/maintenance_loop.py",
     "scripts/maintenance_receiver.py",
     "scripts/maintenance_store.py",
+    "scripts/maintenance_evidence.py",
+    "scripts/maintenance_evidence_tools.py",
     "scripts/maintenance_sources.py",
     "scripts/maintenance_consumer.py",
     "scripts/maintenance_audit.py",
@@ -130,7 +134,7 @@ def request(raw, config, environment):
     if environment not in {e["id"] for e in config["environments"]}:
         raise ValueError("environment is not registered")
     if (
-        raw.get("contract_version") not in {config["contract_version"], "1.0.0", "1.1.0"}
+        raw.get("contract_version") not in {config["contract_version"], "1.0.0", "1.1.0", "1.1.1"}
         or raw.get("kind") not in KINDS
     ):
         raise ValueError("unsupported contract or request kind")
@@ -720,6 +724,22 @@ def read_comment(config, comment):
     )
 
 
+def publication_payload(config, store, receipt, role, value):
+    selected = config.get("evidence_store", {})
+    if selected.get("kind") == "hf-private-dataset":
+        return EVIDENCE_MARKER, pointer_for(config, store, receipt, role, value)
+    if selected:
+        raise ValueError("unsupported evidence storage backend")
+    return (RECEIPT_MARKER if role == "receipt" else DELIVERY_MARKER), value
+
+
+def publication_readback(config, marker, public_value, full_value, comment):
+    if not matches(read_comment(config, comment), marker, public_value, config):
+        raise ValueError("publication index readback differs")
+    if marker == EVIDENCE_MARKER and read_pointer(config, public_value) != full_value:
+        raise ValueError("HF evidence readback differs")
+
+
 def ensure_delivery(config, store, key, receipt, comments):
     if receipt.get("runtime_version") != VERSION:
         return
@@ -748,9 +768,9 @@ def ensure_delivery(config, store, key, receipt, comments):
         value["evidence_digest"] = digest(value)
         store.db.execute("INSERT INTO supplements VALUES (?,?,NULL)", (key, canonical(value)))
         store.db.commit()
-    comment = post_or_reuse(config, DELIVERY_MARKER, value, comments)
-    if not matches(read_comment(config, comment), DELIVERY_MARKER, value, config):
-        raise ValueError("delivery evidence readback differs")
+    marker, public_value = publication_payload(config, store, receipt, "delivery", value)
+    comment = post_or_reuse(config, marker, public_value, comments)
+    publication_readback(config, marker, public_value, value, comment)
     store.db.execute("UPDATE supplements SET url=? WHERE request_id=?", (comment["html_url"], key))
     store.db.commit()
     store.event(
@@ -773,9 +793,8 @@ def publish(config, store, comments):
             if receipt.get("runtime_version") == VERSION and not any(
                 e["kind"] == "receipt_readback" for e in store.events(key)
             ):
-                reread = read_comment(config, {"html_url": publication})
-                if not matches(reread, RECEIPT_MARKER, receipt, config):
-                    raise ValueError("published receipt readback differs")
+                marker, public_value = publication_payload(config, store, receipt, "receipt", receipt)
+                publication_readback(config, marker, public_value, receipt, {"html_url": publication})
                 store.event(
                     key,
                     "receipt_readback",
@@ -825,7 +844,8 @@ def publish(config, store, comments):
             receipt_digest=receipt["receipt_digest"],
         )
         try:
-            comment = post_or_reuse(config, RECEIPT_MARKER, receipt, comments)
+            marker, public_value = publication_payload(config, store, receipt, "receipt", receipt)
+            comment = post_or_reuse(config, marker, public_value, comments)
             store.event(
                 key,
                 "receipt_published",
@@ -834,13 +854,13 @@ def publish(config, store, comments):
                 receipt_digest=receipt["receipt_digest"],
             )
             store.published(key, comment["html_url"])
-            reread = read_comment(config, comment)
+            publication_readback(config, marker, public_value, receipt, comment)
             reopened = Store(store.directory)
             try:
                 original = reopened.get(key)
             finally:
                 reopened.close()
-            if not matches(reread, RECEIPT_MARKER, original, config) or original != receipt:
+            if original != receipt:
                 raise ValueError("native receipt persistent readback differs")
             store.event(
                 key,

@@ -10636,6 +10636,145 @@
           "body_sha256": "f9e531c1a3a77cc74b3bb4e9a635782f313d64ee9e16cd68ae7caaa5af855dd8"
         }
       ]
+    },
+    {
+      "id": "CP-646-20261112T183344976640Z",
+      "recorded_at": "2026-11-12T18:33:44.976640+00:00",
+      "actor": "R6 primary after actual source merge,independent acceptance,HFreadback and remoteTMPcloseout",
+      "work_item": "P3-RESEARCH-R6-RANK1-001",
+      "outcome": "completed",
+      "summary": "R6交付和646真实关闭完成；main8bd08713、固定HF8文件、独立验收和CN02证据/TMP关闭均核验。仅同Task本地元数据worktree/ref在本PR后释放。",
+      "evidence": [
+        {
+          "id": "R6-MAIN-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/merge647-receipt.json",
+          "sha256": "cbebd2714a6df5ada2d134ffa9359798c5875f4809254d79672c010b8627b9b5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary merge8bd08713with exactbase/head parents and released tree"
+        },
+        {
+          "id": "R6-ISSUE-CLOSED",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/issue646-closed.json",
+          "sha256": "2cd7073c2a347d2642959dac9783b53982bf50cb70672302a85025d94ae9b659",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual closed/completed646 response at returned timestamp; body retained"
+        },
+        {
+          "id": "R6-REMOTE-CLOSE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/remote-resource-closeout.json",
+          "sha256": "bd3bae1f7a4db20c2b3edf1c1aaa41f8e700dbf5b5551f259378815fb82dc4b7",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "CN02onlyretainedroot remains;worktree/job/checkTMP removed;production and R2cache preserved"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本条仅记录实际关闭/源码/留存与资源事实，保留研究inconclusive/park与既有quality/admission。",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-R6-RANK1-001",
+          "number": 646,
+          "title": "[P3-RESEARCH-R6-RANK1-001] 验证既有单选入口对总体价格信息的承接",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-12T18:33:41Z",
+          "body_sha256": "e6eee2cf61175194532e4e08bc1a6552ea72cd8c1dce17a777d28bbc7d182fb5"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-646-R6-DELIVERY-CLOSED-20261113",
+      "recorded_at": "2026-11-12T21:03:19.890813+00:00",
+      "actor": "R6 primary actual delivery lifecycle observation",
+      "work_item": "P3-RESEARCH-R6-RANK1-001",
+      "outcome": "completed",
+      "summary": "源码普通合入main、HF/CN02证据及远端资源收尾、645/646和里程碑20真实关闭已完成；本条更新交付范围，研究结论及quality/admission保持。",
+      "evidence": [
+        {
+          "id": "R6-MAIN-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/merge647-receipt.json",
+          "sha256": "cbebd2714a6df5ada2d134ffa9359798c5875f4809254d79672c010b8627b9b5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary merge8bd08713with exactbase/head parents and released tree"
+        },
+        {
+          "id": "R6-ISSUE-CLOSED",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/issue646-closed.json",
+          "sha256": "2cd7073c2a347d2642959dac9783b53982bf50cb70672302a85025d94ae9b659",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual closed/completed646 response at returned timestamp; body retained"
+        },
+        {
+          "id": "R6-REMOTE-CLOSE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/remote-resource-closeout.json",
+          "sha256": "bd3bae1f7a4db20c2b3edf1c1aaa41f8e700dbf5b5551f259378815fb82dc4b7",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "CN02onlyretainedroot remains;worktree/job/checkTMP removed;production and R2cache preserved"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "R6fixedoriginalrank1 tool and independently accepted result delivered onmain8bd08713;immutable8fileHF result and verifiedCN02durable evidence;taskremoteTMPremoved.",
+          "remaining": "Any new scientific/economic consumer needs its own scope/input/use gate; originalrank1route parked andR5evidence retained.",
+          "next_action": "Reuse the delivered assets; no repeated diagnostic or Worker expansion without material decision value.",
+          "evidence": [
+            "R6-MAIN-MERGE",
+            "R6-ISSUE-CLOSED",
+            "R6-REMOTE-CLOSE"
+          ],
+          "supersedes": "CP-646-R6-RESEARCH-ACCEPTED-20261113"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "accepted",
+          "scope": "The finiteR6resource question and accepted source/evidence delivery are complete;645/646andmilestone20closed;actualrank1branchinconclusive/park.",
+          "remaining": "The next distinct decision-changing consumer is not selected; exactactive/model/billing and historicalcosts remain unknown_not_zero.",
+          "next_action": "Wait for a justified new consumer need; carry all prior exposure/cost and the parked use conditions.",
+          "evidence": [
+            "R6-MAIN-MERGE",
+            "R6-ISSUE-CLOSED",
+            "R6-REMOTE-CLOSE"
+          ],
+          "supersedes": "CP-646-R6-RESEARCH-ACCEPTED-20261113"
+        }
+      ],
+      "no_change_reason": "FACTORS用途保持inconclusive，既有quality/admission与R5总体证据保留；仅更新REPRO/CLOSEOUT已实际完成的源码/证据交付范围。",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-R6-RANK1-001",
+          "number": 646,
+          "title": "[P3-RESEARCH-R6-RANK1-001] 验证既有单选入口对总体价格信息的承接",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-12T18:33:41Z",
+          "body_sha256": "e6eee2cf61175194532e4e08bc1a6552ea72cd8c1dce17a777d28bbc7d182fb5"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
     }
   ],
   "history_imports": [

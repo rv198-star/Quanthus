@@ -62,7 +62,18 @@ PublishA1 completed in21.471256s within all limits. Long-term CN02 evidence is u
 `/srv/agentdock/quanthus-ops/research-r6-rank1-20261113/retained`;
 the preclose31-file retention manifest is SHA256
 `4c4117060144fd608596e1a56ceccd5c087437a0b957c0153bee7c88bae0cee1`.
-Source/release lifecycle remains pending at this checkpoint.
+PR647 ordinary merge `8bd0871375732b0f46b148367cc9faac14d9f65c` preserves exact
+base/head parents and the released head tree. The post-calculation2256-file executable/
+config/test closure matches09c33380 byte-for-byte;106metadata tests and exact-base
+history/view/issue reconciliation pass. Hosted jobs were independently read as having
+no steps and billing-related not-started annotations. Issue/resource terminal
+observations are in the appended actual-closeout checkpoints:646closed/completed at
+2026-11-12T18:33:41Z;645andmilestone20closed;CN02retains only the durable evidence
+root and has removed its task worktree/job/checkTMP. ProductionHEAD43cd2c27 and
+the shared originalR2cache are preserved. A postmerge remoteGit fetch timed out
+at69.43s; no deployment depended on that read, and the main merge was verified
+throughGitHub/localGit. The final metadata worktree/ref lease ends after its ordinary
+merge; no scientific or consumer status is promoted by closure.
 
 ## Costs and engineering verification
 

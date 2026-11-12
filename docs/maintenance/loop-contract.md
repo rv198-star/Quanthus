@@ -47,7 +47,7 @@ python3 scripts/maintenance_loop.py poll --state-dir /private/maintenance-state 
 ```
 ````
 
-支持 `snapshot / acceptance_probe / repair / effect`。只接收配置内作者；Web 通过工具核对实际评论作者。`repair` 的 payload 提供已有开放维护工单的 issue_number，只路由到 local-dev 的编码执行器。
+支持 `snapshot / acceptance_probe / repair / effect`。只接收配置内作者；Web 通过工具核对实际评论作者。`repair` 的 payload 提供已有开放维护工单的 issue_number + base_sha (current main)，只路由到 local-dev 的编码执行器。
 
 ## 回执与首次验收
 
@@ -63,7 +63,7 @@ python3 scripts/maintenance_loop.py poll --state-dir /private/maintenance-state 
 
 同一 improvement_id 串联来源、Issue、原生执行/attempt、验证、PR、合入、实际消费版本、后续适用任务、效果评价及下一决定。工程完成后，可用关联效果工单继续观察。
 
-效果请求保留 rule_id、实际消费版本、consumer_run_id、基线、适用机会、原证据、keep/revise/revert/wait/stop 判断及理由。脚本核对身份与引用；Agent 判断收益、误阻、成本和处置。无适用机会记录 wait 和复查条件。
+效果请求保留 rule_id、实际消费版本、consumer_run_id + rule_source_sha、基线、适用机会、原证据、keep/revise/revert/wait/stop 判断及理由。脚本核对身份与引用；Agent 判断收益、误阻、成本和处置。无适用机会记录 wait 和复查条件。
 
 每日先对账旧任务和复查效果，再选择新改进。每仓每日最多一项新编码任务，时长上限见配置。维护协议随正常 PR 进化，相关接口/权限/加载语义变化后重新验收受影响部分。
 

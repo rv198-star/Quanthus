@@ -216,10 +216,12 @@ class MaintenanceTests(unittest.TestCase):
         original = m.run
         def transport(argv, **kwargs):
             if argv[0] == "gh":
+                if argv[-1].endswith("/git/ref/heads/main"):
+                    return json.dumps({"object": {"sha": m.git(self.root, "rev-parse", "HEAD")}})
                 return json.dumps({"state": "open", "html_url": "https://github.com/owner/repo/issues/7",
                                    "title": "bounded fixture", "body": "write one allowed source file"})
             return original(argv, **kwargs)
-        req = dict(self.req, kind="repair", payload={"issue_number": 7})
+        req = dict(self.req, kind="repair", payload={"issue_number": 7, "base_sha": m.git(self.root, "rev-parse", "HEAD")})
         with mock.patch.object(m, "run", side_effect=transport):
             return self.claim(req, str(executable))
 

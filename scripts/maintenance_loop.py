@@ -55,6 +55,16 @@ def git(root, *args):
     return run(["git", "-C", str(root), *args]).strip()
 
 
+def ensure_commit(root, sha):
+    if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise ValueError("an exact source commit is required")
+    try:
+        git(root, "cat-file", "-e", sha + "^{commit}")
+    except ValueError:
+        run(["git", "-C", str(root), "-c", "credential.helper=", "-c",
+             "credential.helper=!gh auth git-credential", "fetch", "origin", sha], timeout=60)
+
+
 def load_config(root):
     config = json.loads((root / "config/maintenance-loop.v1.json").read_text())
     if config.get("schema") != "maintenance.loop.v1":
@@ -258,6 +268,7 @@ def probe(root, config, req, store):
               "evidence_refs": [f"https://github.com/{config['repository']}/blob/{git(root, 'rev-parse', 'HEAD')}/docs/maintenance/loop-contract.md"],
               "baseline_ref": "controlled-wrong-rule-version", "eligibility": "controlled-consumer-fixture",
               "observed_uses": 1, "rule_path": "docs/maintenance/loop-contract.md",
+              "rule_source_sha": git(root, "rev-parse", "HEAD"),
               "decision": "keep", "rationale": "Controlled probe consumed this authority version."}
     bad = dict(sample, consumed_rule_digest="0" * 64)
     rejected = False
@@ -308,13 +319,17 @@ def repair(root, config, req, store, executor):
     number = req.get("payload", {}).get("issue_number")
     if not isinstance(number, int) or isinstance(number, bool) or number < 1:
         raise ValueError("repair requires an existing issue_number")
+    base = req.get("payload", {}).get("base_sha")
+    ensure_commit(root, base)
+    current = json.loads(run(["gh", "api", f"repos/{config['repository']}/git/ref/heads/main"]))
+    if current["object"]["sha"] != base:
+        return {"status": "needs_reselection", "resume": "reconcile the Issue against current main and submit a new scoped request"}
     issue = json.loads(run(["gh", "api", f"repos/{config['repository']}/issues/{number}"]))
     if issue.get("pull_request") or issue.get("state") != "open":
         raise ValueError("repair must reference an open maintenance Issue")
     job = store.directory / "jobs" / req["request_id"]
     job.mkdir(parents=True, exist_ok=True, mode=0o700)
     worktree = job / "worktree"
-    base = git(root, "rev-parse", "HEAD")
     branch = "codex/loop3-" + hashlib.sha256(req["request_id"].encode()).hexdigest()[:16]
     run(["git", "-C", str(root), "worktree", "add", "-b", branch, str(worktree), base])
     prompt = ("Implement only the bounded repository maintenance Issue below. Read AGENTS.md, CONTRIBUTING.md "
@@ -370,12 +385,16 @@ def _claim(root, workspace, config, environment, raw, store, executor=None):
                 relative = req["payload"].get("rule_path", "")
                 if not isinstance(relative, str) or not relative or len(relative) > 512:
                     raise ValueError("effect rule path is required")
-                target = (root / relative).resolve()
-                if not target.is_relative_to(root) or (root / relative).is_symlink():
+                if relative.startswith("/") or ".." in Path(relative).parts:
                     raise ValueError("effect rule must belong to this repository")
-                git(root, "ls-files", "--error-unmatch", "--", relative)
+                rule_source = req["payload"].get("rule_source_sha")
+                ensure_commit(root, rule_source)
+                tree_entry = git(root, "ls-tree", rule_source, "--", relative)
+                if not tree_entry.startswith(("100644 blob ", "100755 blob ")):
+                    raise ValueError("effect rule must be a versioned regular file")
+                rule_bytes = subprocess.check_output(["git", "-C", str(root), "show", rule_source + ":" + relative])
                 result = {"status": "recorded", "effect": effect_event(req["payload"],
-                          file_digest(target))}
+                          hashlib.sha256(rule_bytes).hexdigest())}
         except subprocess.TimeoutExpired:
             result = {"status": "execution_uncertain", "resume": "inspect original native logs/worktree before any continuation"}
         except (ValueError, OSError, subprocess.SubprocessError) as error:
@@ -439,7 +458,7 @@ def publish(config, store, comments):
     return sent
 
 
-def poll(root, workspace, config, environment, store, executor=None):
+def _poll(root, workspace, config, environment, store, executor=None):
     comments = gh_comments(config)
     errors = []
     for comment in comments:
@@ -452,6 +471,18 @@ def poll(root, workspace, config, environment, store, executor=None):
     published = publish(config, store, comments)
     return {"schema": "maintenance.poll.v1", "environment_id": environment,
             "published_receipts": published, "rejected_requests": errors, "checked_at": now()}
+
+
+def poll(root, workspace, config, environment, store, executor=None):
+    with (store.directory / "poll.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError("receiver poll already active") from None
+        try:
+            return _poll(root, workspace, config, environment, store, executor)
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def main():

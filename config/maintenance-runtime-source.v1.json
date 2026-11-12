@@ -1,0 +1,8 @@
+{
+  "schema": "maintenance.runtime-source.v1",
+  "canonical_repository": "rv198-star/software-lifecycle-skills",
+  "canonical_path": "scripts/maintenance_loop.py",
+  "version": "1.0.0",
+  "sha256": "d99f1f2f1bd62d1c33f786a7b545e7aa301576f74179966417950a549e818f60",
+  "update_policy": "reviewed-source-copy-with-matching-digest"
+}

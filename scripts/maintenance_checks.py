@@ -16,7 +16,7 @@ from maintenance_audit import runtime_satisfies
 
 
 def changed_paths(root, base, head=None):
-    command = ["git", "-C", str(root), "diff", "--name-only", "-z", base]
+    command = ["git", "-C", str(root), "diff", "--no-renames", "--name-only", "-z", base]
     if head:
         command.append(head)
     raw = subprocess.check_output(command).decode()

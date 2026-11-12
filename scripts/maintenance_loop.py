@@ -481,14 +481,8 @@ def repair(root, config, req, store, executor):
             stderr=stderr,
             timeout=config["repair_timeout_seconds"],
         )
-    paths = set(
-        run(["git", "-C", str(worktree), "diff", base, "--name-only", "-z"]).split("\0")
-    ) - {""}
-    paths |= set(
-        run(["git", "-C", str(worktree), "ls-files", "--others", "--exclude-standard", "-z"]).split(
-            "\0"
-        )
-    ) - {""}
+    manifest = candidate_manifest(worktree, base)
+    paths = {entry["path"] for entry in manifest["files"]}
     allowed = all(
         any(fnmatch.fnmatchcase(p, pattern) for pattern in config["repair_allowed_paths"])
         for p in paths
@@ -501,7 +495,6 @@ def repair(root, config, req, store, executor):
                 native_id = item.get("thread_id")
         except ValueError:
             continue
-    manifest = candidate_manifest(worktree, base)
     return {
         "status": "needs_review" if result.returncode == 0 and allowed else "failed",
         "native_executor": "codex-exec",

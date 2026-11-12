@@ -272,7 +272,7 @@ def review(root, config, req, store, executor):
 
 def candidate_manifest(tree, base, revision=None):
     """Bind intended working content or the exact Git tree being committed/pushed."""
-    command = ["git", "-C", str(tree), "diff", "--name-only", "-z", base]
+    command = ["git", "-C", str(tree), "diff", "--no-renames", "--name-only", "-z", base]
     if revision:
         command.append(revision)
     paths = set(run(command).split("\0"))

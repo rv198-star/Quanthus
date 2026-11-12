@@ -1416,6 +1416,58 @@ class LearningWorkTests(MaintenanceFixture):
             self.assertEqual(request["contract_version"], config["contract_version"])
             self.assertEqual(m.request(request, config, request["environment_id"]), request)
 
+    def test_copy_then_delete_changes_candidate_digest_before_handoff(self):
+        import maintenance_work as work
+
+        source = self.root / "docs/original.md"
+        source.write_text("reviewed candidate")
+        m.git(self.root, "add", ".")
+        m.git(self.root, "commit", "-qm", "source baseline")
+        tree, request, accepted = self.candidate()
+        m.git(tree, "add", "docs/new-untracked.md")
+        self.assertEqual(
+            work.candidate_manifest(tree, accepted["base_sha"])["candidate_digest"],
+            accepted["candidate_digest"],
+        )
+        (tree / "docs/original.md").unlink()
+        m.git(tree, "add", "-A")
+        self.assertNotEqual(
+            work.candidate_manifest(tree, accepted["base_sha"])["candidate_digest"],
+            accepted["candidate_digest"],
+        )
+        with self.assertRaisesRegex(ValueError, "changed"):
+            m.handoff(self.root, self.config, request, self.store)
+
+    def test_legitimate_move_binds_deleted_source_and_added_destination(self):
+        import maintenance_work as work
+
+        source = self.root / "docs/original.md"
+        source.write_text("legitimate move")
+        m.git(self.root, "add", ".")
+        m.git(self.root, "commit", "-qm", "source baseline")
+        base = m.git(self.root, "rev-parse", "HEAD")
+        m.git(self.root, "mv", "docs/original.md", "docs/moved.md")
+        working = work.candidate_manifest(self.root, base)
+        files = {f["path"]: f for f in working["files"]}
+        self.assertEqual(set(files), {"docs/original.md", "docs/moved.md"})
+        self.assertIsNone(files["docs/original.md"]["sha256"])
+        tree = m.git(self.root, "write-tree")
+        self.assertEqual(
+            work.candidate_manifest(self.root, base, tree)["candidate_digest"],
+            working["candidate_digest"],
+        )
+
+    def test_rule_triggers_include_renamed_source_path(self):
+        import maintenance_checks as checks
+
+        source = self.root / "docs/original.md"
+        source.write_text("rule-sensitive source")
+        m.git(self.root, "add", ".")
+        m.git(self.root, "commit", "-qm", "source baseline")
+        base = m.git(self.root, "rev-parse", "HEAD")
+        m.git(self.root, "mv", "docs/original.md", "docs/moved.md")
+        self.assertIn("docs/original.md", checks.changed_paths(self.root, base))
+
     def test_formal_g2_rejects_python310_and_accepts_python312_evidence(self):
         self.config["verification_python"] = "3.12"
         receipt, delivery = self.pipeline()

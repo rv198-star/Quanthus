@@ -26,5 +26,8 @@ Parent: [研究 Epic #608](https://github.com/rv198-star/Quanthus/issues/608)，
 研究计算、自审、独立数值构建、独立角色验收及HF固定回读已完成。8文件/1269525B
 位于私有 `rv192/quanthus-research-r1@eb0d4ca3f71c1981f25f0c6f81cd7ccdefc04e87`，
 目录 `runs/RESEARCH-R6-RANK1-001/RESEARCH-R6-RANK1-001-T1/A1`。
-main源码/资源收尾正在完成，最终状态见验收文档。#645 选题已关闭，#646负责本批交付，
-#608保持开放。发布仅用21.47秒，一次完成并全回读。
+源码已通过普通PR647合入main（8bd0871375732b0f46b148367cc9faac14d9f65c）；
+研究、独立验收、HF与源码交付已完成；#645/#646与R6里程碑20已关闭，#608保持开放。
+CN02本任务worktree/job/check临时目录已释放；长期证据、生产与原R2缓存已核验保留。
+最后一本同Task元数据PR记录真实关闭，随后释放本地专用worktree与临时分支。
+发布仅用21.47秒，一次完成并全回读。

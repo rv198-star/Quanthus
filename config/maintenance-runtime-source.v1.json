@@ -2,16 +2,18 @@
   "schema": "maintenance.runtime-source.v1",
   "canonical_repository": "rv198-star/software-lifecycle-skills",
   "canonical_path": "scripts/maintenance_loop.py",
-  "version": "1.1.1",
-  "sha256": "9fb5338a2378fe34253bccc758a2fcf2441faff6e0e80cc740a43a35703ec573",
+  "version": "1.2.0",
+  "sha256": "c6cd06586ab0eadf51a7807b1a29977356e6d7b40db599d06d0c5755d12ab353",
   "files": {
     "scripts/maintenance_audit.py": "02f852aa2c008833ff6db1d5768501d1b4dcec4dea21b9a8bbc7929586ef6534",
     "scripts/maintenance_consumer.py": "2da6129900f52f775f718c60924e18f7e3f03699ef8a01fb5a14946d371e011b",
-    "scripts/maintenance_loop.py": "9fb5338a2378fe34253bccc758a2fcf2441faff6e0e80cc740a43a35703ec573",
-    "scripts/maintenance_receiver.py": "f804f5ee9bb09736b73b5b07cc8ef6a87be82be46fca11519ba183e160625d3c",
+    "scripts/maintenance_loop.py": "c6cd06586ab0eadf51a7807b1a29977356e6d7b40db599d06d0c5755d12ab353",
+    "scripts/maintenance_receiver.py": "8c623fa2b43512147d8643b46bf3f7952ed6d0dea59dad89db216e810f9a6861",
     "scripts/maintenance_sources.py": "1346c7c2cf9826829acd978c67b0618c0ccb9c8b6261b053407189d0032b49c8",
-    "scripts/maintenance_store.py": "64e609f9c5c90623810591d79e03f0db742dfa476b3232326621e5f74569b622",
-    "scripts/maintenance_verify.py": "dce315127394887e8d0fe833b6485d453bcc91dbb6dc9899744b04490a06c312"
+    "scripts/maintenance_store.py": "75c31d6ca82cef1255ac93611deb787830d1e3271973d21f4819d0a4952876c8",
+    "scripts/maintenance_verify.py": "dce315127394887e8d0fe833b6485d453bcc91dbb6dc9899744b04490a06c312",
+    "scripts/maintenance_evidence.py": "d0e868520ed3e77bb0d0bf172c0381f3b13b81b0968fa2a9e370da6506939312",
+    "scripts/maintenance_evidence_tools.py": "41bb25d5b2bccadcf9cd79f56239a3a04a9ff476d11ceb503fb5ad111033e3da"
   },
   "update_policy": "reviewed-source-copy-with-matching-digests"
 }

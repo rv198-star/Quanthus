@@ -1,6 +1,6 @@
 {
   "schema": "maintenance.loop.v1",
-  "contract_version": "1.1.1",
+  "contract_version": "1.2.0",
   "repository": "rv198-star/Quanthus",
   "control_issue": 632,
   "transport": {
@@ -12,7 +12,7 @@
     "delivery_marker": "<!-- maintenance.delivery.v1 -->",
     "ledger_query_kind": "reconcile"
   },
-  "controller_receipt_store": "https://github.com/rv198-star/software-lifecycle-skills/issues/1272",
+  "controller_receipt_store": "hf-private-dataset:controller/cloud/report",
   "allowed_request_authors": [
     "rv198-star"
   ],
@@ -31,7 +31,8 @@
   "authority_files": [
     "docs/maintenance/loop-contract.md",
     "AGENTS.md",
-    "CONTRIBUTING.md"
+    "CONTRIBUTING.md",
+    "docs/maintenance/hf-evidence.md"
   ],
   "dependency_files": [
     "uv.lock",
@@ -103,5 +104,12 @@
     "authority": "Owner-confirmed actual project development workspace",
     "mac_checkout": "excluded",
     "selection": "match repository origin and registered server workspace; report actual workspace state without updating it"
+  },
+  "evidence_store": {
+    "kind": "hf-private-dataset",
+    "project": "quanthus",
+    "repository_env": "LOOP3_HF_REPO_ID",
+    "token_env": "LOOP3_HF_TOKEN",
+    "github_projection": "digest-bound-pointer-only"
   }
 }

@@ -404,8 +404,21 @@ def handoff(root, config, req, store):
         for e in store.events(target)
         if e["kind"] == "candidate_handoff_commit" and e["data"]["candidate_digest"] == expected
     )
-    if git(tree, "rev-parse", "HEAD") not in allowed_heads:
-        raise ValueError("candidate history changed after review")
+    current_head = git(tree, "rev-parse", "HEAD")
+    if current_head not in allowed_heads:
+        # A committed result may outlive the process before its completion event.
+        parents = git(tree, "rev-list", "--parents", "-n", "1", current_head).split()[1:]
+        current_tree = git(tree, "rev-parse", "HEAD^{tree}")
+        recoverable = any(
+            e["kind"] == "candidate_handoff_commit_intent"
+            and e["data"]["candidate_digest"] == expected
+            and parents == [e["data"]["parent_sha"]]
+            and current_tree == e["data"]["tree_sha"]
+            and e["data"]["parent_sha"] in allowed_heads
+            for e in store.events(target)
+        )
+        if not recoverable:
+            raise ValueError("candidate history changed after review")
     # The trusted reviewer owns semantic/security acceptance before this explicit request.
     if git(tree, "status", "--porcelain"):
         # Reconcile the entire private index, including masked staged changes.
@@ -417,6 +430,10 @@ def handoff(root, config, req, store):
     if staged.returncode not in {0, 1}:
         raise ValueError("candidate index cannot be inspected")
     if staged.returncode == 1:
+        store.event(
+            target, "candidate_handoff_commit_intent", parent_sha=current_head,
+            tree_sha=staged_tree, candidate_digest=expected,
+        )
         git(
             tree,
             "commit",
@@ -431,7 +448,6 @@ def handoff(root, config, req, store):
         raise ValueError("candidate content changed during commit")
     if head not in allowed_heads:
         store.event(target, "candidate_handoff_commit", head_sha=head, candidate_digest=expected)
-    git(tree, "push", "origin", head + ":refs/heads/" + branch)
     prs = json.loads(
         run(
             [
@@ -445,7 +461,7 @@ def handoff(root, config, req, store):
                 "--state",
                 "all",
                 "--json",
-                "url,headRefOid,baseRefName,state",
+                "url,headRefOid,baseRefName,state,isDraft",
             ]
         )
     )
@@ -454,6 +470,7 @@ def handoff(root, config, req, store):
             raise ValueError("existing PR does not match the reviewed candidate")
         url = prs[0]["url"]
     else:
+        git(tree, "push", "origin", head + ":refs/heads/" + branch)
         body = job / "draft-pr-body.md"
         body.write_text(
             f"Refs #{candidate['issue_number']}\n\nReviewed candidate `{target}` at `{head}`.\n"
@@ -479,17 +496,26 @@ def handoff(root, config, req, store):
             ]
         ).strip()
     readback = json.loads(
-        run(["gh", "pr", "view", url, "--json", "url,headRefOid,baseRefName,state"])
+        run(["gh", "pr", "view", url, "--json", "url,headRefOid,baseRefName,state,isDraft"])
     )
     if readback["headRefOid"] != head or readback["baseRefName"] != "main":
         raise ValueError("draft PR readback does not match the candidate")
+    state, draft = readback["state"], readback.get("isDraft")
+    if state not in {"OPEN", "CLOSED", "MERGED"} or not isinstance(draft, bool):
+        raise ValueError("PR lifecycle readback is unavailable")
+    status = {
+        "OPEN": "draft_pr_published" if draft else "existing_ready_pr",
+        "CLOSED": "handoff_pr_closed",
+        "MERGED": "handoff_pr_merged",
+    }[state]
     return {
-        "status": "draft_pr_published",
+        "status": status,
         "target_request_id": target,
         "candidate_digest": expected,
         "head_sha": head,
         "pr_url": readback["url"],
         "pr_state": readback["state"],
+        "is_draft": draft,
         "review_ref": review_ref,
-        "resume": "project reviewer takes the draft PR; merge/deploy use existing authority",
+        "resume": "follow the reported PR lifecycle; merge/deploy use existing project authority",
     }

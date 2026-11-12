@@ -1239,6 +1239,7 @@ class LearningWorkTests(MaintenanceFixture):
                 "headRefOid": m.git(tree, "rev-parse", "HEAD"),
                 "baseRefName": "main",
                 "state": "OPEN",
+                "isDraft": True,
             }
             if argv[:3] == ["gh", "pr", "list"]:
                 return json.dumps([value] if created else [])
@@ -1363,6 +1364,7 @@ class LearningWorkTests(MaintenanceFixture):
                 "headRefOid": m.git(tree, "rev-parse", "HEAD"),
                 "baseRefName": "main",
                 "state": "OPEN",
+                "isDraft": True,
             }
             if argv[:3] == ["gh", "pr", "list"]:
                 return json.dumps([value])
@@ -1467,6 +1469,76 @@ class LearningWorkTests(MaintenanceFixture):
         base = m.git(self.root, "rev-parse", "HEAD")
         m.git(self.root, "mv", "docs/original.md", "docs/moved.md")
         self.assertIn("docs/original.md", checks.changed_paths(self.root, base))
+
+    def handoff_remote(self, tree, request, manifest, state):
+        import maintenance_work as work
+
+        original_run = work.run
+        def dispatch(argv, **kwargs):
+            if argv[0] == "git" and "push" in argv:
+                state["pushes"] = state.get("pushes", 0) + 1
+                return ""
+            if argv[:2] == ["gh", "api"]:
+                decision = {
+                    "decision": "accept", "candidate_request_id": self.req["request_id"],
+                    "candidate_digest": manifest["candidate_digest"],
+                    "candidate_head": manifest["base_sha"], "validation_refs": ["fixture checks"],
+                    "security_review_ref": "fixture security review",
+                }
+                return json.dumps({
+                    "user": {"login": "rv198-star"}, "html_url": request["payload"]["review_ref"],
+                    "body": "<!-- maintenance.candidate-review.v1 -->\n" + chr(96)*3 + "json\n"
+                    + json.dumps(decision) + "\n" + chr(96)*3,
+                })
+            value = {
+                "url": "https://github.com/" + self.config["repository"] + "/pull/8",
+                "headRefOid": m.git(tree, "rev-parse", "HEAD"), "baseRefName": "main",
+                "state": state.get("state", "OPEN"), "isDraft": state.get("draft", True),
+            }
+            if argv[:3] == ["gh", "pr", "list"]:
+                return json.dumps([value])
+            if argv[:3] == ["gh", "pr", "view"]:
+                return json.dumps(value)
+            return original_run(argv, **kwargs)
+        return dispatch
+
+    def test_handoff_reports_closed_merged_and_ready_pr_lifecycle(self):
+        import maintenance_work as work
+
+        tree, request, manifest = self.candidate()
+        state = {}
+        with mock.patch.object(work, "run", side_effect=self.handoff_remote(tree, request, manifest, state)):
+            for lifecycle, draft, expected in [
+                ("OPEN", True, "draft_pr_published"), ("OPEN", False, "existing_ready_pr"),
+                ("CLOSED", False, "handoff_pr_closed"), ("MERGED", False, "handoff_pr_merged"),
+            ]:
+                with self.subTest(state=lifecycle, draft=draft):
+                    state.update(state=lifecycle, draft=draft)
+                    result = m.handoff(self.root, self.config, request, self.store)
+                    self.assertEqual(result["status"], expected)
+                    self.assertEqual(result["pr_state"], lifecycle)
+                    self.assertEqual(result["is_draft"], draft)
+
+    def test_handoff_recovers_commit_before_completion_event_without_second_commit(self):
+        import maintenance_work as work
+
+        tree, request, manifest = self.candidate()
+        state = {}
+        original_event = self.store.event
+        def crash(key, kind, **data):
+            if kind == "candidate_handoff_commit":
+                raise OSError("crash after commit before completed journal")
+            return original_event(key, kind, **data)
+        with mock.patch.object(work, "run", side_effect=self.handoff_remote(tree, request, manifest, state)):
+            with mock.patch.object(self.store, "event", side_effect=crash):
+                with self.assertRaisesRegex(OSError, "crash after commit"):
+                    m.handoff(self.root, self.config, request, self.store)
+            head = m.git(tree, "rev-parse", "HEAD")
+            self.assertNotEqual(head, manifest["base_sha"])
+            self.assertEqual(state.get("pushes", 0), 0)
+            result = m.handoff(self.root, self.config, request, self.store)
+        self.assertEqual(result["head_sha"], head)
+        self.assertEqual(m.git(tree, "rev-list", "--count", manifest["base_sha"] + "..HEAD"), "1")
 
     def test_formal_g2_rejects_python310_and_accepts_python312_evidence(self):
         self.config["verification_python"] = "3.12"

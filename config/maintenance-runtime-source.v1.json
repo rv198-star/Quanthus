@@ -14,7 +14,7 @@
     "scripts/maintenance_verify.py": "39dfba384cc5fd3eaeea86160c55c824ce09823aa0b34739b69f41e67544103f",
     "scripts/maintenance_evidence.py": "d0e868520ed3e77bb0d0bf172c0381f3b13b81b0968fa2a9e370da6506939312",
     "scripts/maintenance_evidence_tools.py": "41bb25d5b2bccadcf9cd79f56239a3a04a9ff476d11ceb503fb5ad111033e3da",
-    "scripts/maintenance_work.py": "310421f233f3e6a8dd2b223b0296f0b9cdda7c846864cb307f73cd39bd063b3d",
+    "scripts/maintenance_work.py": "d439fc4eda9b061b60f53d752810fe7abf5d0fdd1a4393c93f6c614649ea9759",
     "scripts/maintenance_checks.py": "8368b9b2f47e86927c4299c3304266465e8df350b166f989be16d0011df15742"
   },
   "update_policy": "reviewed-source-copy-with-matching-digests"

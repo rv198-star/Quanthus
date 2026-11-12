@@ -1374,6 +1374,83 @@
       "blueprint_checkpoints": [
         "CP-642-R5-RESEARCH-ACCEPTED-20261112"
       ]
+    },
+    {
+      "id": "CON-R6-RANK1-20261113",
+      "recorded_at": "2026-11-12T18:22:22.381352+00:00",
+      "actor": "R6 primary decision after independent research acceptance and immutable HF readback",
+      "question_id": "RESEARCH-R6-RANK1-001-CONSUMPTION",
+      "family": "raw-momentum20-rank1-consumer",
+      "work_item": "P3-RESEARCH-R6-RANK1-001",
+      "modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "Does the frozen original T-close global rank1 preserve a useful two-open price increment for the existing selector consumer?",
+      "consumer": "Existing original nominal_choices rank1 and #608 research allocator",
+      "scope": "Original898nominals;fixed56members;already consumed2020-2021retrospective;448paired days,2right-censor;primary includesoriginalholdflags,neverrefill;2022+protected;R4fixedcapitalpark.",
+      "execution_status": "completed",
+      "verdict": "inconclusive",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "4.083071bp,95%[-10.144487,20.366333]bp;positive yearly7.455776/1.186184 butbelow5bp andintervalcrosses0;uncertain resource branch. Venuecomponent-1.639981bp andwithin+.315218bp are descriptive;R5supportedpopulationretained.",
+      "decision_effect": "Park additional spend on this existing rank1 price-consumption route; defer five-unit interface work, reuse oldfees/occupancy and preserveR4park/R5evidence.",
+      "reopen_conditions": [
+        "A material new consumer action or use condition with evidence changes the information value;freeze a finite contract first.",
+        "Carry allR1/R2/R4/R5/R6exposure,failed attempts andunknown-not-zero costs;no parameter grid or new marketwindow by renamedissue."
+      ],
+      "retained_assets": [
+        "src/quanthus/rank1_response.py",
+        "scripts/research_r6.py",
+        "scripts/research_r6_independent.py",
+        "config/research/research-r6/request.v1.json",
+        "docs/design/research-r6-rank1-response-v1.md",
+        "docs/work-items/research-r6-value-brief.md",
+        "hf:rv192/quanthus-research-r1@eb0d4ca3f71c1981f25f0c6f81cd7ccdefc04e87/runs/RESEARCH-R6-RANK1-001/RESEARCH-R6-RANK1-001-T1/A1",
+        "cn02:/srv/agentdock/quanthus-ops/research-r6-rank1-20261113/retained"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Prepare2.642887s;formal67.518031s;reference69.874503s,totalcompute137.392534s;source network0B;publishA1 21.471256s,8files1269525B fullreadback;completeLinuxmakecheck896.730370s,9175pass35skip. Pre-execution semantic/runtime repairs and wrapperwrongfield retained. Exact active/model/Token/billing and older costs unknown_not_zero andcumulative. Reuse before expanding new interface or sample.",
+      "attempt_refs": [
+        "git:09c333800c7511cb4802c3058f5d0c4ec7e62bbc",
+        "cn02:/srv/agentdock/quanthus-ops/research-r6-rank1-20261113/job-a1",
+        "cn02:/srv/agentdock/quanthus-ops/research-r6-rank1-20261113/retained/job/attempts.json"
+      ],
+      "evidence": [
+        {
+          "id": "R6-SELF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/actual-result-self-audit.json",
+          "sha256": "ff973d69168b0c6187c4319816d9c447e8339aeb4c2d1552db1087ae2d5c3920",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Formal/reference self-audit; same consumed2020-2021 and all previous cost/exposure retained"
+        },
+        {
+          "id": "R6-INDEPENDENT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/independent-research-acceptance.json",
+          "sha256": "889bf07fa80290204462cb3b26e92b4a4be589930d21f05e1e1c77b2c72b7cb0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent result/448daily-bootstrap/bridge/resource acceptance;14424nodes;uncertain/inconclusive/park"
+        },
+        {
+          "id": "R6-HF",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r6-rank1-20261113/retained/job/publish.json",
+          "sha256": "1a2aef3e6df3949746a190e9d7a06dc0e102c9fa3c4b3566608b01841886af35",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private immutableeb0d4ca3f71c1981f25f0c6f81cd7ccdefc04e87;8files1269525B all read back;publishA1caps passed"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-646-R6-RESEARCH-ACCEPTED-20261113"
+      ],
+      "supersedes": null
     }
   ]
 }

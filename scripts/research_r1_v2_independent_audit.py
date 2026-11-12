@@ -121,6 +121,7 @@ def reproduce(
     source_resolver=None,
     panel_evaluator=None,
     audit_decision_end=None,
+    calendar_observer=None,
 ):
     import duckdb
     import numpy as np
@@ -163,6 +164,8 @@ def reproduce(
     ].copy()
     assert not cal.calendar_session_id.duplicated().any()
     assert not cal.duplicated(["venue_id", "day"]).any()
+    if calendar_observer is not None:
+        calendar_observer(cal.copy())
     calendars = {v: g.sort_values("day").reset_index(drop=True) for v, g in cal.groupby("venue_id")}
     for calendar in calendars.values():
         assert int((calendar.day < scope["decision_start"]).sum()) >= filt["min_listing_sessions"]

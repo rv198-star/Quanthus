@@ -10462,6 +10462,180 @@
         "REPRO",
         "CLOSEOUT"
       ]
+    },
+    {
+      "id": "CP-645-20261112T175017886379Z",
+      "recorded_at": "2026-11-12T17:50:17.886379+00:00",
+      "actor": "R6 primary after read-only independent science selection review",
+      "work_item": "META-RESEARCH-R6-CONSUMER-001",
+      "outcome": "progress",
+      "summary": "选择已闭合：旧费用占用直接复用、原rank1作为唯一正式诊断、组合接线后置；合同科学预审GO，runtime最终预审和真实计算待完成。",
+      "evidence": [
+        {
+          "id": "R6-SELECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/selection.json",
+          "sha256": "bfacf33898b3a72b8ec58c98c373ea7fe54ce47ded2b2faf015de1b482a6b1f3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Metadata/code/old reports only; actual nominal rank1 consumer gap and bounded costs"
+        },
+        {
+          "id": "R6-DESIGN-PRE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/independent-design-review.json",
+          "sha256": "022c3bf107b9ad8838bd856071cd841826ca71222833d6a2a04fb7b7f83c73f8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent science GO, runtime release pending"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "选择和冻结阶段未产生新研究结果，保留所有模块当前工程/质量/用途/准入。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-R6-CONSUMER-001",
+          "number": 645,
+          "title": "[META-RESEARCH-R6-CONSUMER-001] 选择具名消费者并冻结R6最小验证",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-12T17:07:59Z",
+          "body_sha256": "037c5828e0b6f01920a76dbded321d0744a0732f926030ef957108ab7e400016"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-645-20261112T175413787293Z",
+      "recorded_at": "2026-11-12T17:54:13.787293+00:00",
+      "actor": "R6 primary after independent science/runtime pre-review",
+      "work_item": "META-RESEARCH-R6-CONSUMER-001",
+      "outcome": "completed",
+      "summary": "645选题和冻结交付完成并关闭，646执行；原898rank1为唯一有界诊断，旧费用占用直接复用，五单元后置。",
+      "evidence": [
+        {
+          "id": "R6-CODE-PRE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/independent-code-pre-review.json",
+          "sha256": "20ead422c44b80c5212d842f75874c3b8443842cba5fd632448e00de405bb432",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent code GO at09c33380, market execution still awaits fullLinux checks"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "仅完成消费者选择和冻结，后继真实研究结果及源码交付继续由646负责，模块成熟度保持。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-R6-CONSUMER-001",
+          "number": 645,
+          "title": "[META-RESEARCH-R6-CONSUMER-001] 选择具名消费者并冻结R6最小验证",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-12T17:54:09Z",
+          "body_sha256": "3bb1ec4f3fd255ab19817aec122c5422376f4a787f245ed6eb21659a770b08ff"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-646-R6-RESEARCH-ACCEPTED-20261113",
+      "recorded_at": "2026-11-12T18:22:22.381352+00:00",
+      "actor": "R6 primary decision after independent research acceptance and immutable HF readback",
+      "work_item": "P3-RESEARCH-R6-RANK1-001",
+      "outcome": "completed",
+      "summary": "R6原rank1两开盘消费448配对日4.0831bp，95%[-10.1445,20.3663]bp；按事前uncertain/inconclusive分支停放新增投入，保留R5总体与R4park。一次正式/一次独立与HF8文件回读完成。",
+      "evidence": [
+        {
+          "id": "R6-SELF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/actual-result-self-audit.json",
+          "sha256": "ff973d69168b0c6187c4319816d9c447e8339aeb4c2d1552db1087ae2d5c3920",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Formal/reference self-audit; same consumed2020-2021 and all previous cost/exposure retained"
+        },
+        {
+          "id": "R6-INDEPENDENT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/independent-research-acceptance.json",
+          "sha256": "889bf07fa80290204462cb3b26e92b4a4be589930d21f05e1e1c77b2c72b7cb0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent result/448daily-bootstrap/bridge/resource acceptance;14424nodes;uncertain/inconclusive/park"
+        },
+        {
+          "id": "R6-HF",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r6-rank1-20261113/retained/job/publish.json",
+          "sha256": "1a2aef3e6df3949746a190e9d7a06dc0e102c9fa3c4b3566608b01841886af35",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private immutableeb0d4ca3f71c1981f25f0c6f81cd7ccdefc04e87;8files1269525B all read back;publishA1caps passed"
+        }
+      ],
+      "updates": [
+        {
+          "module": "FACTORS",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "Original global daily rank1 on consumed2020-2021:448paired days,4.083071bp,CI[-10.144487,20.366333]bp;annual7.455776/1.186184;branchuncertain/park. R5population quality evidence retained.",
+          "remaining": "No eligible advance of this rank1 consumption route; concentration/venue differences described without post-result ranking changes.",
+          "next_action": "Park new spending on this rank1 route; reopen only on a material decision-changing need or new condition with cumulative exposure/cost.",
+          "evidence": [
+            "R6-SELF",
+            "R6-INDEPENDENT",
+            "R6-HF"
+          ],
+          "supersedes": "CP-541-20261027T220256362160Z"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "One formal/one independent physical cold build of fixed56members and898original nominals;14424nodes within1e-10;plannedclock/denominator/bridge and8fileHF fixedreadback accepted.",
+          "remaining": "Consumer-specific economic qualification remains separate; source/lifecycle delivery pending.",
+          "next_action": "Reuse accepted assets; do not rerun this diagnostic or build a new general platform.",
+          "evidence": [
+            "R6-SELF",
+            "R6-INDEPENDENT",
+            "R6-HF"
+          ],
+          "supersedes": "CP-642-R5-RESEARCH-ACCEPTED-20261112"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "accepted",
+          "scope": "A real existing-selector resource question resolved as inconclusive/park; old fees/occupancy reused and five-unit seam deferred; original R4park/R5evidence retained.",
+          "remaining": "Source/issue/milestone/resource closeout ongoing; precise active/model/billing and older costs unknown_not_zero.",
+          "next_action": "Complete ordinary source/lifecycle closeout; select a different justified consumer need before new research.",
+          "evidence": [
+            "R6-SELF",
+            "R6-INDEPENDENT",
+            "R6-HF"
+          ],
+          "supersedes": "CP-642-R5-RESEARCH-ACCEPTED-20261112"
+        }
+      ],
+      "no_change_reason": "",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-R6-RANK1-001",
+          "number": 646,
+          "title": "[P3-RESEARCH-R6-RANK1-001] 验证既有单选入口对总体价格信息的承接",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-12T17:28:13Z",
+          "body_sha256": "f9e531c1a3a77cc74b3bb4e9a635782f313d64ee9e16cd68ae7caaa5af855dd8"
+        }
+      ]
     }
   ],
   "history_imports": [

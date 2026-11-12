@@ -10151,6 +10151,50 @@
           "body_sha256": "ebac75a2c1eb34bdd7895164106159781dacb8b6f1b592db4d881cf6ae1e36b3"
         }
       ]
+    },
+    {
+      "id": "CP-633-INTEGRATION-ACCEPTANCE-20261112",
+      "recorded_at": "2026-11-12T09:35:32.330281+00:00",
+      "actor": "Codex integration owner",
+      "work_item": "META-RESEARCH-INTEGRATION-001",
+      "outcome": "progress",
+      "summary": "Integrated main and retained R4 history; import independent review passed, narrow publisher fixed-parent guard repaired, exact 37aaa47a complete local acceptance 9119 passed/35 skipped. Final combined independent audit and main merge pending.",
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "Engineering candidate acceptance and trace reconciliation only; retained research outcomes, maturity, consumer scope and sealed identities stay at their prior checkpoints.",
+      "evidence": [
+        {
+          "id": "EV-633-ENGINEERING-GUARD",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/r4-main-integration-20261112/ENGINEERING-ACCEPTANCE-GUARD.json",
+          "sha256": "449cd34d2237f7b7d05316be727ea39bc2c5eed5ea33ff6db25f62f5f0e43dc4",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact 37aaa47a code/config/test closure passed full local checks; final independent candidate acceptance pending."
+        },
+        {
+          "id": "EV-633-GUARD-PRESERVATION",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/r4-main-integration-20261112/PUBLISH-HEAD-PRESERVATION.json",
+          "sha256": "31f002e8a52537056dfc8ad12151ce8ab10ea0e76dbdebdb223883424781fe49",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "All main side-only and frozen paths retained; only two explicit research publisher/test repair paths differ from original source."
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-INTEGRATION-001",
+          "number": 633,
+          "title": "[META-RESEARCH-INTEGRATION-001] 集成 R1/R2/R4 研究资产并完成 main 独立审计",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-12T09:34:08Z",
+          "body_sha256": "12e611d4efc543620f5aa00e2148218298489062a8f9d0917a8a9b0caacc37a7"
+        }
+      ]
     }
   ],
   "history_imports": [

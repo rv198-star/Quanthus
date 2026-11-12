@@ -118,7 +118,8 @@ A checkpoint contains `id`, timezone-aware `recorded_at`, `actor`, `work_item`, 
 `summary`, `evidence`, `updates`, and optional `issue_observations`. Use a unique stable ID;
 ordinary checkpoint chronology cannot move backwards. The first record alone may use `baseline`.
 The bounded [history import v1 candidate](blueprint-history-import-v1.md) adds a separately
-validated ingestion clock for intact parallel history; its design is pending independent audit.
+validated ingestion clock for intact parallel history; its code/contract independent review has
+passed. Final integrated-candidate acceptance and main merge remain with #633 / #635.
 
 Each update contains `module`, `facet`, allowed `status`, `scope`, `remaining`, `next_action`,
 `evidence` IDs and `supersedes` (the previous checkpoint for this exact module/facet, or null).

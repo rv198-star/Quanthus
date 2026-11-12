@@ -47,6 +47,10 @@ remains historical. Draft #631 is delivered atop #630; main integration stays wi
 The earlier [A qualification brief](work-items/research-capital-qualification-a-value-brief.md)
 is preserved as the prior stage snapshot.
 
+For the R1/R2/R4 main integration candidate and its publication-guard repair, use the
+[integration acceptance report](acceptance/research-main-integration-20261112.md) and
+[history-import contract](design/blueprint-history-import-v1.md).
+
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its
 acceptance and the current no-new-comparison disposition.

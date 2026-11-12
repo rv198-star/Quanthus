@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Design status | draft — integration candidate, pending independent audit |
-| Delivery gate | blocked on independent audit of #633 and the aggregate PR |
+| Design status | approved — independent import code/contract review passed on ab2c07c5; import implementation unchanged in 37aaa47a |
+| Delivery gate | blocked on final integrated-candidate independent acceptance of #633 / #635 and main merge |
 | Work item | META-RESEARCH-INTEGRATION-001 / #633 |
 | Parent | [Blueprint-linked delivery progress](blueprint-progress.md) |
 | Runtime | `src/quanthus/blueprint_progress.py` |
@@ -84,6 +84,10 @@ evidence.
 This specific integration must also demonstrate exact preservation of main's 106-record
 prefix and all 34 R4-only records, both catalog deltas, the exploration conclusion ledger,
 frozen research artifacts, and the candidate's complete engineering checks.
+
+The [integration acceptance report](../acceptance/research-main-integration-20261112.md)
+records the independent import review, complete candidate checks and the separate final gate.
+The original import receipt retains its original target identity, clock and then-pending text.
 
 The original branch commits and pre-import main remain available. Before merge, discard
 or revise only this candidate to recover. After merge, any reversal follows a separately

@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Design status | approved — independent import code/contract review passed on ab2c07c5; import implementation unchanged in 37aaa47a |
-| Delivery gate | blocked on final integrated-candidate independent acceptance of #633 / #635 and main merge |
+| Delivery gate | accepted: final independent audit PASS; #635 ordinary merge 2d7a8bed39c12648b5774801e99676df6f172679; see post-merge closeout |
 | Work item | META-RESEARCH-INTEGRATION-001 / #633 |
 | Parent | [Blueprint-linked delivery progress](blueprint-progress.md) |
 | Runtime | `src/quanthus/blueprint_progress.py` |
@@ -88,6 +88,9 @@ frozen research artifacts, and the candidate's complete engineering checks.
 The [integration acceptance report](../acceptance/research-main-integration-20261112.md)
 records the independent import review, complete candidate checks and the separate final gate.
 The original import receipt retains its original target identity, clock and then-pending text.
+
+The [post-merge closeout](../acceptance/research-main-closeout-20261112.md) records final
+independent acceptance, ordinary main merge, PR/reference disposition and issue reconciliation.
 
 The original branch commits and pre-import main remain available. Before merge, discard
 or revise only this candidate to recover. After merge, any reversal follows a separately

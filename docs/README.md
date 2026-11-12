@@ -43,13 +43,15 @@ and role-reviewed. Start with the [capital value brief](work-items/research-capi
 and [recovery acceptance](acceptance/research-capital-recovery-20261112.md): the fixed holding use is
 inconclusive and parked under its original gates. The [three-stage recovery plan](design/research-capital-r4-recovery-plan-v1.md)
 records the executed scope; the [001 source-held report](acceptance/research-capital-replay-20261112.md)
-remains historical. Draft #631 is delivered atop #630; main integration stays with its existing owner.
+remains historical. The R1/R2/R4 chain, including #631, is integrated into main through #635.
 The earlier [A qualification brief](work-items/research-capital-qualification-a-value-brief.md)
 is preserved as the prior stage snapshot.
 
-For the R1/R2/R4 main integration candidate and its publication-guard repair, use the
-[integration acceptance report](acceptance/research-main-integration-20261112.md) and
-[history-import contract](design/blueprint-history-import-v1.md).
+For the accepted R1/R2/R4 main integration and lifecycle disposition, start with the
+[post-merge closeout](acceptance/research-main-closeout-20261112.md). The
+[candidate acceptance report](acceptance/research-main-integration-20261112.md) preserves its
+pre-merge evidence snapshot; the [history-import contract](design/blueprint-history-import-v1.md)
+is accepted under the final independent review and ordinary main merge.
 
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its

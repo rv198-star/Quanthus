@@ -117,9 +117,11 @@ is an audit failure, never an empty/green snapshot. No workflow edits or closes 
 A checkpoint contains `id`, timezone-aware `recorded_at`, `actor`, `work_item`, `outcome`,
 `summary`, `evidence`, `updates`, and optional `issue_observations`. Use a unique stable ID;
 ordinary checkpoint chronology cannot move backwards. The first record alone may use `baseline`.
-The bounded [history import v1 candidate](blueprint-history-import-v1.md) adds a separately
-validated ingestion clock for intact parallel history; its code/contract independent review has
-passed. Final integrated-candidate acceptance and main merge remain with #633 / #635.
+The accepted [history import v1 contract](blueprint-history-import-v1.md) adds a separately
+validated ingestion clock for intact parallel history. Code/contract and final integrated-candidate
+independent acceptance passed; #635 merged to main at 2d7a8bed39c12648b5774801e99676df6f172679.
+The [post-merge closeout](../acceptance/research-main-closeout-20261112.md) records #633 closure
+and the append-only lifecycle checkpoint; the original import receipt remains immutable.
 
 Each update contains `module`, `facet`, allowed `status`, `scope`, `remaining`, `next_action`,
 `evidence` IDs and `supersedes` (the previous checkpoint for this exact module/facet, or null).

@@ -10195,6 +10195,68 @@
           "body_sha256": "12e611d4efc543620f5aa00e2148218298489062a8f9d0917a8a9b0caacc37a7"
         }
       ]
+    },
+    {
+      "id": "CP-633-MAIN-CLOSED-20261112",
+      "recorded_at": "2026-11-12T10:14:10.603892+00:00",
+      "actor": "Codex integration owner",
+      "work_item": "META-RESEARCH-INTEGRATION-001",
+      "outcome": "progress",
+      "summary": "Final independent acceptance PASS; PR635 ordinary main merge 2d7a8bed and all original research heads retained as ancestors. Original stacked PRs and 10 remote temporary references disposed; issue633 closed completed and parent608 brief refreshed.",
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "Post-merge engineering lifecycle and exact closed-issue reconciliation only; research outcomes, maturity, fixed holding inconclusive/park decision, consumer admission and frozen identities remain at accepted prior checkpoints.",
+      "evidence": [
+        {
+          "id": "EV-633-FINAL-RELEASE",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/r4-main-integration-20261112/postmerge/independent-merge-release.json",
+          "sha256": "0505f3a3efd83f668fc9e03b0b04e04aad7506246d79fd035aa86f67850b8765",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent acceptance PASS and release for ordinary merge plus bounded lifecycle closeout."
+        },
+        {
+          "id": "EV-633-MAIN-MERGE",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/r4-main-integration-20261112/postmerge/PR635-MERGE-RECEIPT.json",
+          "sha256": "ee5f58eb3159425822255ca61770cc456dd3b83e041a913371f78429fe58337b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary merge2d7 with exact audited parents/tree; source ancestry independently verified."
+        },
+        {
+          "id": "EV-633-CLOSED-LIVE",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/r4-main-integration-20261112/postmerge/live-issues-closed633.json",
+          "sha256": "521666e6233745d9e0dad11cffae8ba8c67c6a9fec2d035783435274128f3c5f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "21 registered issues freshly read;633 observed closed/completed at exact returned timestamp and body hash."
+        },
+        {
+          "id": "EV-633-PR-DISPOSITION",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/r4-main-integration-20261112/postmerge/STACKED-PR-DISPOSITIONS.json",
+          "sha256": "2c8b0f38e333e6d2b30f89ab02b290b68865812da97dcfc10f07e463a0b73c3a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Original PR lifecycle and10 remote temporary branch dispositions with other ownership preserved."
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-INTEGRATION-001",
+          "number": 633,
+          "title": "[META-RESEARCH-INTEGRATION-001] 集成 R1/R2/R4 研究资产并完成 main 独立审计",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-12T10:12:25Z",
+          "body_sha256": "978634b4857eb356c74722ba1b151222374a961a2b6ce2e450df2370df53717f"
+        }
+      ]
     }
   ],
   "history_imports": [

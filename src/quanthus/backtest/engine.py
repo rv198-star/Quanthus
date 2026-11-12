@@ -157,7 +157,10 @@ class BacktestEngine:
                     if (
                         signal.snapshot_replay_clock_json is not None
                         and json.loads(signal.snapshot_replay_clock_json).get("schema_version")
-                        == "quanthus.capital-retrospective-clock.v1"
+                        in {
+                            "quanthus.capital-retrospective-clock.v1",
+                            "quanthus.capital-retrospective-clock.v2",
+                        }
                     )
                     else {}
                 ),
@@ -460,6 +463,10 @@ class BacktestEngine:
             from quanthus.backtest.capital_clock import CapitalReplayClock
 
             clock = CapitalReplayClock.from_json(snapshot_replay_clock_json)
+            try:
+                clock.validate_run(run.run_id)
+            except ValueError as exc:
+                raise BacktestInputError(str(exc)) from exc
             if (
                 run.official
                 or clock.market_date != action.effective_date
@@ -676,7 +683,10 @@ class BacktestEngine:
                     if (
                         signal.snapshot_replay_clock_json is not None
                         and json.loads(signal.snapshot_replay_clock_json).get("schema_version")
-                        == "quanthus.capital-retrospective-clock.v1"
+                        in {
+                            "quanthus.capital-retrospective-clock.v1",
+                            "quanthus.capital-retrospective-clock.v2",
+                        }
                     )
                     else {}
                 ),
@@ -1269,6 +1279,11 @@ class BacktestEngine:
             from quanthus.backtest.snapshot_clock import parse_replay_clock
 
             clock = parse_replay_clock(signal.snapshot_replay_clock_json)
+            if isinstance(clock, CapitalReplayClock):
+                try:
+                    clock.validate_run(run.run_id)
+                except ValueError as exc:
+                    raise BacktestInputError(str(exc)) from exc
             if isinstance(clock, CapitalReplayClock) and (
                 clock.data_content_digest != run.data_content_digest
             ):

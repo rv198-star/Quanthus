@@ -401,12 +401,20 @@ class StrategyReplaySpec:
                 from quanthus.backtest.capital_clock import CapitalReplayClock
 
                 clock = CapitalReplayClock.from_json(frame.snapshot_replay_clock_json)
+                clock.validate_run(self.run.run_id)
                 if clock.data_content_digest != self.run.data_content_digest:
                     raise ValueError("capital frame source identity differs from run")
                 capital_clocks.append(clock)
         if capital_clocks and (
             len(capital_clocks) != len(self.frames)
             or len({c.knowledge_cutoff for c in capital_clocks}) != 1
+            or len(
+                {
+                    (c.request_id, c.task_id, c.attempt_id, c.input_identity_json)
+                    for c in capital_clocks
+                }
+            )
+            != 1
         ):
             raise ValueError("capital replay requires one capital source cutoff across all frames")
         snapshot_ids = [frame.snapshot.snapshot_id for frame in self.frames]

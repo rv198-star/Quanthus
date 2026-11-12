@@ -15,6 +15,7 @@ import sys
 import time
 from pathlib import Path
 
+from quanthus.backtest.capital_purpose import copy_package, load_purpose, verify_package
 from quanthus.backtest.native_capital_replay import replay_arms
 from quanthus.backtest.policy import load_execution_policy
 from quanthus.hf_dwd_research import (
@@ -49,7 +50,38 @@ def identity(q, request, expected):
         cwd=ROOT,
         text=True,
     ).strip()
-    assert q["schema"] == "quanthus.native-capital-request.v1"
+    assert q["schema"] in {
+        "quanthus.native-capital-request.v1",
+        "quanthus.native-capital-request.v2",
+    }
+    if q["schema"].endswith(".v2"):
+        effective = q["effective_input"]
+        value = read(ROOT / effective["path"])
+        assert file_digest(ROOT / effective["path"]) == effective["manifest_sha256"]
+        assert digest(value) == effective["content_digest"]
+        for key in (
+            "authority",
+            "purpose",
+            "scope",
+            "screen",
+            "capital",
+            "decision",
+            "policy",
+            "r2_request",
+            "native_knowledge_cutoff",
+            "source_knowledge_cutoff",
+        ):
+            assert value[key] == q[key]
+        for name, sha in value["consumer_code"].items():
+            assert file_digest(ROOT / name) == sha
+        assert effective["clock_identity"] == {
+            "native_content_digest": q["authority"]["content_digest"],
+            "purpose_sha256": q["purpose"]["purpose_sha256"],
+            "consumer_closure_sha256": digest(value["consumer_code"]),
+            "native_knowledge_cutoff": q["native_knowledge_cutoff"],
+            "purpose_qualified_at": q["purpose"]["qualified_at"],
+        }
+        assert effective["source_revision"] == "capital-effective@" + effective["content_digest"]
     assert q["authorization"]["issue"] == 628 and q["authorization"]["remaining_BCD"] is True
     assert q["scope"]["forbidden_after"] == "2022-01-01"
     assert sys.version.split()[0] == q["environment"]["python"] and sys.platform == "linux"
@@ -68,6 +100,11 @@ def identity(q, request, expected):
         "environment": versions,
         "capital_use": "guarded-retrospective",
         "native_source_clock_preserved": True,
+        "request_id": q["request_id"],
+        "task_id": q["task_id"],
+        "attempt_id": q["attempt_id"],
+        "native_authority": q["authority"],
+        "effective_input": q.get("effective_input"),
     }
 
 
@@ -100,7 +137,7 @@ def load_native(db, q, members, source):
     ]:
         latest = db.execute(f"SELECT max(knowledge_from) FROM {table}").fetchone()[0]
         assert latest is not None and latest <= __import__("datetime").datetime.fromisoformat(
-            q["source_knowledge_cutoff"]
+            q.get("native_knowledge_cutoff", q["source_knowledge_cutoff"])
         )
     db.execute("""CREATE TEMP TABLE capital_execution AS
         SELECT p.listing_id,p.trade_date,l.security_id,l.venue_id,
@@ -133,6 +170,7 @@ def formal(q, members, ident, job):
     import duckdb
 
     began = time.monotonic()
+    purpose = load_purpose(q, job / "purpose") if "purpose" in q else None
     db = duckdb.connect()
     db.execute("SET TimeZone='Asia/Shanghai'")
     db.execute("SET threads=2")
@@ -166,7 +204,9 @@ def formal(q, members, ident, job):
         "native_execution_rows": db.execute("SELECT count(*) FROM capital_execution").fetchone()[0],
         "prerequisite_disposition": "build once per Job, shared by candidate/control",
     }
-    value = replay_arms(db, q, load_execution_policy(ROOT / q["policy"]["path"]), ident["git"])
+    value = replay_arms(
+        db, q, load_execution_policy(ROOT / q["policy"]["path"]), ident["git"], purpose
+    )
     db.close()
     result = {
         "schema": "quanthus.native-capital-result.v1",
@@ -198,6 +238,7 @@ def main():
     p.add_argument("--expected-git", required=True)
     p.add_argument("--guarded", action="store_true")
     p.add_argument("--author-job", type=Path)
+    p.add_argument("--purpose-cache", type=Path)
     a = p.parse_args()
     q = read(a.request)
     ident = identity(q, a.request, a.expected_git)
@@ -207,6 +248,10 @@ def main():
     if a.guarded:
         marker = a.work / "attempt-start.json"
         assert not marker.exists(), "one guarded attempt only"
+        if "purpose" in q:
+            assert a.purpose_cache is not None
+            copied = copy_package(q, a.purpose_cache, a.work / "purpose")
+            write(a.work / "purpose-copy.json", {"identity": ident, **copied})
         write(marker, {"identity": ident, "mode": a.mode, "started_epoch": time.time()})
         command = [
             sys.executable,
@@ -262,6 +307,11 @@ def main():
             "wall_seconds": time.monotonic() - began,
             "peak_rss_bytes": peak,
             "peak_job_bytes": size,
+            "output_digest": read(
+                a.work / ("result.json" if a.mode == "formal" else "independent.json")
+            ).get("digest")
+            if (a.work / ("result.json" if a.mode == "formal" else "independent.json")).is_file()
+            else None,
         }
         write(a.work / "guardian.json", receipt)
         print(json.dumps({k: v for k, v in receipt.items() if k != "identity"}))
@@ -270,6 +320,8 @@ def main():
         "one calculation or independent construction only"
     )
     write(a.work / "run-start.json", {"identity": ident, "mode": a.mode})
+    if "purpose" in q:
+        verify_package(q, a.work / "purpose")
     resource.setrlimit(resource.RLIMIT_CPU, (q["budget"]["max_cpu_seconds"],) * 2)
     fetch(q, members, ident, a.work, a.source_cache)
     verify_members(a.work / "source", q, members)

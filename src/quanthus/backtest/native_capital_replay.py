@@ -219,11 +219,25 @@ class FixedCapitalStrategy:
 class NativeCapitalStore:
     """Read verified native facts. No repair, source priority, or inferred action date."""
 
-    def __init__(self, db: Any, request: dict[str, Any]) -> None:
+    def __init__(
+        self, db: Any, request: dict[str, Any], purpose: dict[str, Any] | None = None
+    ) -> None:
         self.db, self.request = db, request
         self.cutoff = datetime.fromisoformat(request["source_knowledge_cutoff"])
         self.revision = request["authority"]["revision"]
         self.content = request["authority"]["content_digest"]
+        self.native_revision = self.revision
+        self.run_prefix = (
+            request.get("task_id", "RESEARCH-CAPITAL-001-T1")
+            + "-"
+            + request.get("attempt_id", "A1")
+        )
+        self.clock_identity: dict[str, Any] = {}
+        self.purpose_application: dict[str, Any] | None = None
+        if "effective_input" in request:
+            self.content = request["effective_input"]["content_digest"]
+            self.revision = request["effective_input"]["source_revision"]
+            self.clock_identity = request["effective_input"]["clock_identity"]
         self.accesses: list[dict[str, Any]] = []
         self.native_cache: dict[tuple[str, date], dict[str, Any] | None] = {}
         self.arm = ""
@@ -260,6 +274,25 @@ class NativeCapitalStore:
                 "AND count(DISTINCT venue_id)=1 AND count(DISTINCT listing_code)=1",
             )
         }
+        if "purpose" in request:
+            from quanthus.backtest.capital_purpose import effective_event, require
+
+            require(purpose is not None, "EXPLICIT_INPUT_REQUIRED")
+            assert purpose is not None
+            scope = purpose["manifest"]["scope"]
+            identity = self.identities.get(scope["listing_id"])
+            require(
+                identity is not None
+                and identity["security_id"] == scope["security_id"]
+                and identity["listing_code"] == scope["stock_code"],
+                "LISTING_BINDING",
+            )
+            key = scope["security_id"], date.fromisoformat(scope["ex_date"])
+            header, terms, self.purpose_application = effective_event(
+                request, purpose, self.actions.get(key, []), self.terms
+            )
+            self.actions[key] = [header]
+            self.terms[header["corporate_action_id"]] = terms
         self.calendars = {
             (r["venue_id"], r["trade_date"]): r
             for r in rows(
@@ -272,6 +305,16 @@ class NativeCapitalStore:
         }
 
     def clock(self, day: date) -> CapitalReplayClock:
+        if self.clock_identity:
+            return CapitalReplayClock(
+                day,
+                self.cutoff,
+                self.content,
+                self.request["request_id"],
+                self.request["task_id"],
+                self.request["attempt_id"],
+                json.dumps(self.clock_identity, sort_keys=True, separators=(",", ":")),
+            )
         return CapitalReplayClock(day, self.cutoff, self.content)
 
     def native(self, listing: str, day: date) -> dict[str, Any] | None:
@@ -308,16 +351,20 @@ class NativeCapitalStore:
         row = self.native(listing, day)
         state = OpenExecutionState.MISSING_EVIDENCE
         op = close = None
-        can_buy = can_sell = False
+        can_buy = can_sell = None
         if row is not None:
             if row["listing_currency"] != "CNY" or row["lot_size"] != 100:
                 raise CapitalInputHold("CURRENCY_OR_LOT_UNQUALIFIED", day, listing)
             known = [
                 row[k] for k in ("bar_known", "state_known", "listing_known", "security_known")
             ]
+            if any(k is None for k in known):
+                raise CapitalInputHold("SOURCE_KNOWLEDGE_UNKNOWN", day, listing)
             if any(k is not None and k > self.cutoff for k in known):
                 raise CapitalInputHold("SOURCE_KNOWLEDGE_AFTER_CUTOFF", day, listing)
             flags = [row[k] for k in ("is_tradable", "can_buy", "can_sell")]
+            if all(type(v) is bool for v in flags[1:]):
+                can_buy, can_sell = row["can_buy"], row["can_sell"]
             if row["reason_code"] == "SUSPENDED" and flags == [False, False, False]:
                 state = OpenExecutionState.SUSPENDED
             elif (
@@ -336,7 +383,6 @@ class NativeCapitalStore:
                             if op == lower
                             else OpenExecutionState.EXECUTABLE
                         )
-                        can_buy, can_sell = row["can_buy"], row["can_sell"]
                     else:
                         op = close = None
         return MarketSession(
@@ -347,8 +393,8 @@ class NativeCapitalStore:
             op,
             close,
             state,
-            self.revision,
-            "native-execution-" + listing + "-" + str(day),
+            self.native_revision,
+            self.run_prefix + "-native-execution-" + listing + "-" + str(day),
             can_buy,
             can_sell,
         )
@@ -393,7 +439,9 @@ class NativeCapitalStore:
         from dataclasses import replace
 
         native_action = item.source_pit_action(
-            cutoff=self.cutoff, source_revision=self.revision, snapshot_id=session.snapshot_id
+            cutoff=self.cutoff,
+            source_revision=action["source_revision"] if self.clock_identity else self.revision,
+            snapshot_id=session.snapshot_id,
         )
         native_action = replace(native_action, security_code=listing)
         return (
@@ -471,9 +519,13 @@ def nominal_choices(db: Any, q: dict[str, Any], store: NativeCapitalStore) -> li
 
 
 def replay_arms(
-    db: Any, q: dict[str, Any], policy: ExecutionPolicy, code_git: str
+    db: Any,
+    q: dict[str, Any],
+    policy: ExecutionPolicy,
+    code_git: str,
+    purpose: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    store = NativeCapitalStore(db, q)
+    store = NativeCapitalStore(db, q, purpose)
     nominal = nominal_choices(db, q, store)
     choices = {(r["arm"], r["date"]): r for r in nominal}
     days_by_venue = rows(
@@ -495,7 +547,9 @@ def replay_arms(
         frames = []
         for t, nxt in zip(days, days[1:], strict=False):
             clock = store.clock(t)
-            snap = SnapshotRef(t, store.cutoff, store.revision, "capital-" + arm + "-" + str(t))
+            snap = SnapshotRef(
+                t, store.cutoff, store.revision, store.run_prefix + "-capital-" + arm + "-" + str(t)
+            )
             frames.append(
                 StrategyReplayFrame(
                     snap,
@@ -513,12 +567,14 @@ def replay_arms(
             data_snapshot_id=frames[0].snapshot.snapshot_id,
             feature_version="R2-raw20-v1",
             rule_version=VERSION,
-            run_id="RESEARCH-CAPITAL-001-T1-A1-" + arm,
+            run_id=store.run_prefix + "-" + arm,
             execution_policy_version=policy.policy_version,
             execution_profile_id="close-to-next-open-v1",
             schedule_version=policy.profile("close-to-next-open-v1").schedule_version,
             data_content_digest=store.content,
-            data_manifest_sha256=q["authority"]["manifest_sha256"],
+            data_manifest_sha256=q.get("effective_input", {}).get(
+                "manifest_sha256", q["authority"]["manifest_sha256"]
+            ),
         )
         try:
             result = run_strategy_replay(
@@ -573,6 +629,9 @@ def replay_arms(
         "decision": capital_decision(arms),
         "historical_pit_claim": False,
         "source_knowledge_cutoff": q["source_knowledge_cutoff"],
+        "purpose_application": store.purpose_application,
+        "native_authority": q["authority"],
+        "effective_input": q.get("effective_input"),
         "no_action_semantics": q["no_action_semantics"],
     }
 

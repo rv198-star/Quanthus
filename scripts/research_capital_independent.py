@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import collections
 import json
+import re
 import subprocess
 import time
 from datetime import date, datetime
@@ -13,11 +14,88 @@ from zoneinfo import ZoneInfo
 
 from research_r1_v2_independent_audit import reproduce
 
-from quanthus.hf_dwd_research import digest, read, verify_members, write
+from quanthus.hf_dwd_research import digest, file_digest, read, verify_members, write
 
 ROOT = Path(__file__).resolve().parents[1]
 ZONE = ZoneInfo("Asia/Shanghai")
 D = Decimal
+
+
+def admit_author(q, author_job):
+    """A result file is adoptable only under its successful formal Guardian."""
+    guardian = read(author_job / "guardian.json")
+    assert guardian["mode"] == "formal"
+    assert type(guardian["exit_code"]) is int and guardian["exit_code"] == 0
+    assert guardian["failure"] is None
+    author = read(author_job / "result.json")
+    assert guardian["identity"] == author["identity"]
+    assert author["identity"]["request_digest"] == digest(q)
+    assert author["digest"] == digest({k: v for k, v in author.items() if k != "digest"})
+    if q["schema"].endswith(".v2") or "output_digest" in guardian:
+        assert guardian["output_digest"] == author["digest"]
+    return author
+
+
+def reference_purpose(q, root):
+    """Independent package/unit interpretation; no formal effective tables or loader."""
+    descriptor = q["purpose"]
+    names = set()
+    for entry in descriptor["members"]:
+        name = entry["path"]
+        assert name == Path(name).name and name not in names
+        names.add(name)
+        path = root / name
+        assert not path.is_symlink() and path.is_file()
+        assert path.stat().st_size == entry["bytes"] and file_digest(path) == entry["sha256"]
+    assert {p.name for p in root.iterdir()} == names
+    assert sum(x["bytes"] for x in descriptor["members"]) <= 4194304
+    assert file_digest(root / descriptor["purpose_path"]) == descriptor["purpose_sha256"]
+    m = read(root / descriptor["purpose_path"])
+    assert m["schema"] == "quanthus.p10-capital-purpose.v1"
+    assert (
+        m["status"] == "qualified_scoped_retrospective" and m["native_authority"] == q["authority"]
+    )
+    assert m["review_roles"]["review_status"] == "pass_after_package_completion"
+    assert digest(m["rule"]) == m["rule_digest"]
+    assert all(entry in descriptor["members"] for entry in m["members"])
+    assert set(m["documents"].values()) == {entry["path"] for entry in m["members"]}
+    docs = {key: read(root / path) for key, path in m["documents"].items()}
+    assert docs["source-receipts"]["source_hash_probe"] == m["sources"]
+    scope, event = m["scope"], m["effective_event"]
+    assert scope["use"] == "guarded_retrospective_capital_only"
+    assert scope["uncovered_policy"] == "original_native_guard"
+    assert date(2020, 1, 2) <= date.fromisoformat(scope["ex_date"]) <= date(2021, 12, 31)
+    assert event["ex_date"] == scope["ex_date"]
+    times = [
+        datetime.fromisoformat(m[k]) for k in ("observed_at", "knowledge_from", "qualified_at")
+    ]
+    assert all(t.tzinfo is not None for t in times)
+    assert times[0] <= times[1] == times[2] <= datetime.fromisoformat(q["source_knowledge_cutoff"])
+    assert m["knowledge_to"] is None and m["qualified_at"] == descriptor["qualified_at"]
+    em = docs["em-parser-proof"]["raw"]
+    f10 = docs["f10-parser-proof"]["matched_record"]
+    plan = em["IMPL_PLAN_PROFILE"]
+    assert plan.startswith("10派") and "元(含税,扣税后" in plan
+    amount = D(plan.split("派", 1)[1].split("元", 1)[0]) / D(10)
+    f10_tokens = re.findall(r"10派([0-9.]+)元\(含税\)", docs["f10-exact-block"]["raw_block"])
+    assert len(f10_tokens) == 1
+    assert amount == D(f10_tokens[0]) / 10 == D(em["PRETAX_BONUS_RMB"]) / 10
+    assert amount == D(f10["cash_per_share"]) == D(event["cash_per_share"])
+    assert event["currency"] == "CNY" and event["action_type"] == "CASH_DIVIDEND"
+    assert event["bonus_shares"] is None and event["transfer_shares"] is None
+    assert em["SECURITY_CODE"] == f10["stock_code"] == scope["stock_code"]
+    assert em["EX_DIVIDEND_DATE"][:10] == f10["ex_date"] == scope["ex_date"]
+    assert em["EQUITY_RECORD_DATE"][:10] == f10["record_date"] == event["record_date"]
+    assert em["REPORT_DATE"][:10] == event["report_date"]
+    assert em["NOTICE_DATE"][:10] == event["implementation_notice_date"]
+    assert f10["payment_date"] == event["payment_date"]
+    h = docs["history-identity-proof"]
+    assert h["exact_matches"] == 1 and h["raw_row"]["progress"] == "实施"
+    assert h["raw_row"]["stock_code"] == scope["stock_code"]
+    assert h["raw_row"]["ex_dividend_date"][:10] == scope["ex_date"]
+    assert h["raw_row"]["announce_date"][:10] == event["implementation_notice_date"]
+    assert docs["independent-review"]["verdict"] == "pass"
+    return m, docs, amount
 
 
 def cash(v):
@@ -46,6 +124,9 @@ class IndependentFacts:
     def __init__(self, source, members, choices, q):
         import duckdb
 
+        purpose = reference_purpose(q, source.parent.parent / "purpose") if "purpose" in q else None
+        self.purpose_events = {}
+        self.purpose_application = None
         self.db = duckdb.connect()
         self.db.execute("SET TimeZone='Asia/Shanghai'")
         self.db.execute("SET threads=2")
@@ -76,7 +157,9 @@ class IndependentFacts:
             self.db.execute(f"DROP VIEW {name}")
             self.db.execute(f"CREATE VIEW {name} AS SELECT * FROM keep_{name}")
             k = self.db.execute(f"SELECT max(knowledge_from) FROM {name}").fetchone()[0]
-            assert k is not None and k <= self.cutoff
+            assert k is not None and k <= datetime.fromisoformat(
+                q.get("native_knowledge_cutoff", q["source_knowledge_cutoff"])
+            )
         self.db.execute("CREATE TABLE selected_listings(listing_id VARCHAR PRIMARY KEY)")
         self.db.executemany(
             "INSERT INTO selected_listings VALUES(?)",
@@ -86,6 +169,7 @@ class IndependentFacts:
           SELECT l.listing_id,l.security_id,l.venue_id,l.listing_code,l.listing_currency,l.lot_size,
             CAST(c.trade_date AS DATE) AS day,c.open_at,c.close_at,b.open,b.close,
             b.knowledge_from AS bar_known,t.knowledge_from AS state_known,
+            l.knowledge_from AS listing_known,s.knowledge_from AS security_known,
             t.is_tradable,t.can_buy,t.can_sell,t.reason_code,t.upper_price,t.lower_price
           FROM dwd_listing l JOIN selected_listings z USING(listing_id)
           JOIN dwd_trading_calendar c USING(venue_id)
@@ -120,6 +204,94 @@ class IndependentFacts:
                 self.actions[a["security_id"], day].append(a)
                 if a["ex_date"] is None:
                     self.unknown_action_dates[a["security_id"]].append(a["corporate_action_id"])
+        if purpose is not None:
+            m, docs, amount = purpose
+            scope, event = m["scope"], m["effective_event"]
+            key = scope["security_id"], date.fromisoformat(scope["ex_date"])
+            group = self.actions.get(key, [])
+            expected = docs["source-records"]
+            headers = [a for a in expected["dwd_corporate_action"] if a["knowledge_to"] is None]
+            atoms = [t for t in expected["dwd_corporate_action_term"] if t["knowledge_to"] is None]
+
+            def plain(row):
+                return {
+                    k: str(v) if isinstance(v, (date, datetime, D)) else v for k, v in row.items()
+                }
+
+            assert sorted(
+                (plain(a) for a in group), key=lambda a: a["corporate_action_id"]
+            ) == sorted(headers, key=lambda a: a["corporate_action_id"])
+            actual_terms = [t for a in group for t in self.terms[a["corporate_action_id"]]]
+            assert sorted(
+                (plain(t) for t in actual_terms), key=lambda t: t["corporate_action_term_id"]
+            ) == sorted(atoms, key=lambda t: t["corporate_action_term_id"])
+            assert (
+                sorted(a["corporate_action_id"] for a in group) == scope["covered_latest_actions"]
+            )
+            assert (
+                sorted(t["corporate_action_term_id"] for t in actual_terms)
+                == scope["covered_latest_terms"]
+            )
+            assert {r["action_id"] for r in m["source_relations"]} == set(
+                scope["covered_latest_actions"]
+            )
+            assert {r["term_id"] for r in m["term_relations"]} == set(scope["covered_latest_terms"])
+            assert len(m["source_relations"]) == len(group) and len(m["term_relations"]) == len(
+                actual_terms
+            )
+            by_term = {t["corporate_action_term_id"]: t for t in atoms}
+            for relation in m["term_relations"]:
+                t = by_term[relation["term_id"]]
+                assert (
+                    relation["action_id"],
+                    relation["source_record_id"],
+                    relation["effective_event_id"],
+                ) == (t["corporate_action_id"], t["source_record_id"], event["economic_event_id"])
+                assert (
+                    relation["term_type"],
+                    relation["original_amount_per_share"],
+                    relation["original_ratio_numerator"],
+                    relation["original_ratio_denominator"],
+                ) == (
+                    t["term_type"],
+                    t["amount_per_share"],
+                    t["ratio_numerator"],
+                    t["ratio_denominator"],
+                )
+            assert all(
+                a["source_artifact_sha256"]
+                in {"sha256:" + s["sha256"].removeprefix("sha256:") for s in m["sources"]}
+                for a in group
+            )
+            listing = self.db.execute(
+                "SELECT security_id,listing_code FROM dwd_listing WHERE listing_id=?",
+                [scope["listing_id"]],
+            ).fetchall()
+            assert listing == [(scope["security_id"], scope["stock_code"])]
+            assert any(
+                a["source_record_id"]
+                == docs["f10-parser-proof"]["matched_record"]["source_row_key"]
+                for a in group
+            )
+            assert any(
+                a["corporate_action_id"]
+                == docs["history-identity-proof"]["reconstructed_action_id"]
+                and a["source_record_id"]
+                == docs["history-identity-proof"]["reconstructed_source_record_id"]
+                for a in group
+            )
+            self.purpose_events[key] = amount
+            self.purpose_application = {
+                "economic_event_id": event["economic_event_id"],
+                "source_action_ids": scope["covered_latest_actions"],
+                "source_term_ids": scope["covered_latest_terms"],
+                "purpose_sha256": q["purpose"]["purpose_sha256"],
+                "purpose_known_at": str(datetime.fromisoformat(m["knowledge_from"])),
+                "source_relations": m["source_relations"],
+                "cash_per_share": str(amount),
+                "scope": scope,
+                "native_rows_preserved": True,
+            }
         self.exceptions = collections.defaultdict(list)
         for e in query(self.db, "SELECT * FROM dwd_quality_exception"):
             if e["affected_table"] not in ("dwd_corporate_action", "dwd_corporate_action_term"):
@@ -162,6 +334,13 @@ class IndependentFacts:
             return "missing", None, None, False, False
         if r["listing_currency"] != "CNY" or r["lot_size"] != 100:
             raise ReferenceHold("CURRENCY_OR_LOT_UNQUALIFIED", day, listing)
+        if any(
+            r[k] is None for k in ("bar_known", "state_known", "listing_known", "security_known")
+        ):
+            raise ReferenceHold("SOURCE_KNOWLEDGE_UNKNOWN", day, listing)
+        directions = [r["can_buy"], r["can_sell"]]
+        if not all(type(v) is bool for v in directions):
+            directions = [None, None]
         if (
             r["reason_code"] == "SUSPENDED"
             and [r[k] for k in ("is_tradable", "can_buy", "can_sell")] == [False] * 3
@@ -175,10 +354,10 @@ class IndependentFacts:
         p = [r[k] for k in ("open", "close", "upper_price", "lower_price")]
         good = good and all(isinstance(v, D) and v.is_finite() and v > 0 for v in p)
         if not good:
-            return "missing", None, None, False, False
+            return "missing", None, None, *directions
         op, cl, up, lo = p
         if not lo < up or not lo <= op <= up:
-            return "missing", None, None, False, False
+            return "missing", None, None, *directions
         kind = "limit_up" if op == up else "limit_down" if op == lo else "ordinary"
         return kind, op, cl, r["can_buy"], r["can_sell"]
 
@@ -193,6 +372,10 @@ class IndependentFacts:
         if errors:
             raise ReferenceHold("UNRESOLVED_SOURCE_ACTION_EXCEPTION", day, listing, errors)
         actions = self.actions.get((r["security_id"], day), [])
+        if (r["security_id"], day) in self.purpose_events:
+            if self.availability(listing, day)[1] is None:
+                raise ReferenceHold("ACTION_OBSERVED_OPEN_MARK_UNAVAILABLE", day, listing)
+            return self.purpose_events[r["security_id"], day], D(0)
         ids = [a["corporate_action_id"] for a in actions]
         if len(actions) > 1:
             raise ReferenceHold("ACTION_EVENT_AMBIGUOUS", day, listing, ids)
@@ -531,7 +714,7 @@ def independent_decision(arms):
 
 def independent(q, members, identity, job, author_job):
     began = time.monotonic()
-    author = read(author_job / "result.json")
+    author = admit_author(q, author_job)
     assert author["identity"]["request_digest"] == digest(q)
     if author["identity"]["git"] != identity["git"]:
         recovery = read(ROOT / "config/research/research-capital/independent-recovery.v1.json")
@@ -553,6 +736,9 @@ def independent(q, members, identity, job, author_job):
     for item in members:
         one = job / "source/DWD" / item["path"]
         two = author_job / "source/DWD" / item["path"]
+        assert one.stat().st_ino != two.stat().st_ino or one.stat().st_dev != two.stat().st_dev
+    for item in q.get("purpose", {}).get("members", []):
+        one, two = job / "purpose" / item["path"], author_job / "purpose" / item["path"]
         assert one.stat().st_ino != two.stat().st_ino or one.stat().st_dev != two.stat().st_dev
     r2 = read(ROOT / q["r2_request"]["path"])
     r2_members = read(ROOT / r2["closure"]["path"])["members"]
@@ -577,6 +763,7 @@ def independent(q, members, identity, job, author_job):
             for r in selected.itertuples()
         ]
         facts = IndependentFacts(job / "source/DWD", members, skeleton, q)
+        assert facts.purpose_application == author.get("purpose_application")
         for r in skeleton:
             native = facts.row(r["listing_id"], date.fromisoformat(r["date"]))
             r["decision_hold"] = (
@@ -639,6 +826,7 @@ def independent(q, members, identity, job, author_job):
             "schema": "quanthus.native-capital-independent.v1",
             "identity": identity,
             "source_cold_rebuilt": True,
+            "purpose_application": facts.purpose_application,
             "physical_members": len(members),
             "member_bytes": sum(x["size_bytes"] for x in members),
             "nominal_choices_identical": True,

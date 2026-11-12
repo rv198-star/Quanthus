@@ -1,0 +1,147 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-CAPITAL-002",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "raw-momentum20-capital-replay",
+  "work_item": "P3-RESEARCH-CAPITAL-001",
+  "modules": [
+    "REPRO",
+    "CLOSEOUT"
+  ],
+  "question": "Does the original fixed R2 candidate meet its preregistered legal-holding P2 capital gate after the exact encountered source event receives a qualified explicit use version?",
+  "consumer": "Research allocator and the fixed guarded native capital consumer",
+  "scope": "Same consumed2020-2021 development window and R2[2%,12%], T sizing, legal holding, fees and original economic thresholds. Recovery of001, not a new sample. Explicit qualified P10 exact-key input; all uncovered guards retained.",
+  "deliverable": "Versioned input seam and true002 task/attempt identity, one guarded two-arm formal result, one necessary independent cold construction, role-separated acceptance, fixed HF/CN02 evidence and value handoff",
+  "decision_if_pass": "Apply the original supported/not_met/inconclusive branches after full cents/identity reconciliation and independent role review; supported only advances to separately scoped robustness work",
+  "decision_if_fail": "Keep exact blocked/invalid grade and original628/R4 OPEN with fixed gap; no economic adoption; stop after finite attempts",
+  "acceptance": [
+    "G1 fixed P10 purpose package and complete raw/source relation",
+    "G2 explicit composite/native/clock identity and frozen request, negative cases, code audit and complete checks",
+    "G3 both formal and necessary independent Guardians plus cash/identity/curve/branch reconciliation",
+    "G4 independent role acceptance then immutable publication/readback and useful decision brief"
+  ],
+  "stop_conditions": [
+    "First P10 at most45 minutes; original start2026-11-12T05:02:53Z; total successor active at most4h with old costs cumulative",
+    "One new formal and one cold construction, max1worker-hour for bounded compute/transfer; further holds require exact-key independent check before any full cold allowance",
+    "No2022+ market access, source collection expansion, production/P6 changes, threshold changes or new Worker activation"
+  ],
+  "memory_sha256": "01a0d12e881fc13b423910dc9e2fd048f09312b179c0c80d3d08228599398c13",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "Retain this finding in its original scope, all prior costs/exposure/stops and the original R2 signal-use grade. Reuse applicable input/receipt/engineering lessons for this separate fixed capital-use question; no prior model, proxy, volume filter, sample or platform direction is reopened."
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "Retain this finding in its original scope, all prior costs/exposure/stops and the original R2 signal-use grade. Reuse applicable input/receipt/engineering lessons for this separate fixed capital-use question; no prior model, proxy, volume filter, sample or platform direction is reopened."
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "Retain this finding in its original scope, all prior costs/exposure/stops and the original R2 signal-use grade. Reuse applicable input/receipt/engineering lessons for this separate fixed capital-use question; no prior model, proxy, volume filter, sample or platform direction is reopened."
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "Retain this finding in its original scope, all prior costs/exposure/stops and the original R2 signal-use grade. Reuse applicable input/receipt/engineering lessons for this separate fixed capital-use question; no prior model, proxy, volume filter, sample or platform direction is reopened."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "Retain this finding in its original scope, all prior costs/exposure/stops and the original R2 signal-use grade. Reuse applicable input/receipt/engineering lessons for this separate fixed capital-use question; no prior model, proxy, volume filter, sample or platform direction is reopened."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "Retain this finding in its original scope, all prior costs/exposure/stops and the original R2 signal-use grade. Reuse applicable input/receipt/engineering lessons for this separate fixed capital-use question; no prior model, proxy, volume filter, sample or platform direction is reopened."
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "Retain this finding in its original scope, all prior costs/exposure/stops and the original R2 signal-use grade. Reuse applicable input/receipt/engineering lessons for this separate fixed capital-use question; no prior model, proxy, volume filter, sample or platform direction is reopened."
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "Retain this finding in its original scope, all prior costs/exposure/stops and the original R2 signal-use grade. Reuse applicable input/receipt/engineering lessons for this separate fixed capital-use question; no prior model, proxy, volume filter, sample or platform direction is reopened."
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Retain this finding in its original scope, all prior costs/exposure/stops and the original R2 signal-use grade. Reuse applicable input/receipt/engineering lessons for this separate fixed capital-use question; no prior model, proxy, volume filter, sample or platform direction is reopened."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Retain this finding in its original scope, all prior costs/exposure/stops and the original R2 signal-use grade. Reuse applicable input/receipt/engineering lessons for this separate fixed capital-use question; no prior model, proxy, volume filter, sample or platform direction is reopened."
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "Retain this finding in its original scope, all prior costs/exposure/stops and the original R2 signal-use grade. Reuse applicable input/receipt/engineering lessons for this separate fixed capital-use question; no prior model, proxy, volume filter, sample or platform direction is reopened."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "reopen",
+      "rationale": "Material new condition: independently qualified exact-key P10 package at HF5ef2db2961af269a5ce281b84c8c272c9fb4d631 now resolves the encountered601186/2021-08-04 event. Retain all prior attempts, held grade, source truth and exposure; open only the explicit bounded recovery of the same question.",
+      "material_change": "P10 exact-key sidecar is now qualified by physical original SHA, explicit per-ten implementation text, exact source-ID replay and independent role review; immutable HF input fully read back.",
+      "evidence": [
+        {
+          "id": "R4-G1-P10",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/p10-r4-action-001/publish-readback.json",
+          "sha256": "32e637dd0c20aeb61417c6ffb7abbfa6582ea2df80a74803c81e6f33b1a5dddf",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Only exact601186/2021-08-04 qualified cash purpose input, fixed privateHF5ef2db2961af269a5ce281b84c8c272c9fb4d631 all10files34670B read back; no capital result yet."
+        }
+      ]
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "reopen",
+      "rationale": "Material new condition: independently qualified exact-key P10 package at HF5ef2db2961af269a5ce281b84c8c272c9fb4d631 now resolves the encountered601186/2021-08-04 event. Retain all prior attempts, held grade, source truth and exposure; open only the explicit bounded recovery of the same question.",
+      "material_change": "P10 exact-key sidecar is now qualified by physical original SHA, explicit per-ten implementation text, exact source-ID replay and independent role review; immutable HF input fully read back.",
+      "evidence": [
+        {
+          "id": "R4-G1-P10",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/p10-r4-action-001/publish-readback.json",
+          "sha256": "32e637dd0c20aeb61417c6ffb7abbfa6582ea2df80a74803c81e6f33b1a5dddf",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Only exact601186/2021-08-04 qualified cash purpose input, fixed privateHF5ef2db2961af269a5ce281b84c8c272c9fb4d631 all10files34670B read back; no capital result yet."
+        }
+      ]
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-REPLAY-20261112",
+      "relation": "reopen",
+      "rationale": "Material new condition: independently qualified exact-key P10 package at HF5ef2db2961af269a5ce281b84c8c272c9fb4d631 now resolves the encountered601186/2021-08-04 event. Retain all prior attempts, held grade, source truth and exposure; open only the explicit bounded recovery of the same question.",
+      "material_change": "P10 exact-key sidecar is now qualified by physical original SHA, explicit per-ten implementation text, exact source-ID replay and independent role review; immutable HF input fully read back.",
+      "evidence": [
+        {
+          "id": "R4-G1-P10",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/p10-r4-action-001/publish-readback.json",
+          "sha256": "32e637dd0c20aeb61417c6ffb7abbfa6582ea2df80a74803c81e6f33b1a5dddf",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Only exact601186/2021-08-04 qualified cash purpose input, fixed privateHF5ef2db2961af269a5ce281b84c8c272c9fb4d631 all10files34670B read back; no capital result yet."
+        }
+      ]
+    }
+  ],
+  "cumulative_cost_review": "Preserve R1/R2/A/001 formal, failed independentA1, recoveredA2 and all sample exposure. P10G1 actual about28min wall,10files34670B and full readback9.427s; exact full active/model/billing historical totals unknown_not_zero. Remaining work stays within this4h successor ceiling, not reset by IDs.",
+  "runtime_authority_boundary": "Owner explicitly activated the reviewed three-stage/eight-step R4 plan, including bounded P10 responsibility and conditional628 recovery; NexusDock CN02 default channel live. TPlanRESEARCH-CAPITAL-002 controls gates/attempts/budget.",
+  "budget": {
+    "wall_seconds": 14400,
+    "max_new_bytes": 536870912,
+    "network_requests": 200,
+    "accounting_owner": "TPlanRESEARCH-CAPITAL-002, prior exposure and costs cumulative"
+  }
+}

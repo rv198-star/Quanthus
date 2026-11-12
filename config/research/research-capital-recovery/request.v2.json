@@ -1,0 +1,234 @@
+{
+  "schema": "quanthus.native-capital-request.v2",
+  "request_id": "RESEARCH-CAPITAL-002",
+  "task_id": "RESEARCH-CAPITAL-002-T1",
+  "attempt_id": "A1",
+  "authority": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "content_digest": "sha256:1d0e4bd5fbf40bf2876883faf82b98fd81e95a93a82b9d23d248759a38b3f692"
+  },
+  "closure": {
+    "path": "config/research/research-capital-qual/closure.v1.json",
+    "sha256": "sha256:0f66acfcc8ef1a93f831b7272f59a86df13fe4a2f3717e4c8e5a812d4cbac13f",
+    "exact_members": 126,
+    "exact_bytes": 192098985
+  },
+  "scope": {
+    "calendar_start": "2019-01-01",
+    "market_start": "2020-01-02",
+    "execution_end": "2021-12-31",
+    "forbidden_after": "2022-01-01",
+    "knowledge_view": "latest_sealed_retrospective",
+    "purpose": "fixed guarded capital counterfactual with exact qualified P10 cash-purpose input",
+    "source_clock": "preserve original knowledge_from/to and announced/effective clocks; historical publication qualification not granted",
+    "simulation_clock": "quanthus.capital-retrospective-clock.v2; simulated T-close business clock distinct from unchanged native source clocks and genuinely new P10 interpretation/qualification clock",
+    "partition": "development",
+    "read_start": "2020-01-02",
+    "decision_start": "2020-03-02",
+    "decision_end": "2021-12-30",
+    "interval_semantics": "Asia/Shanghai date; effective [from,to)"
+  },
+  "environment": {
+    "python": "3.10.12",
+    "platform": "linux",
+    "lock_path": "config/research/research-capital/runtime.v1.lock",
+    "lock_sha256": "sha256:b2074bd5d841afa93428bb3a92d16fcd6bb8cdf3c82458512091a6a44b277eb2"
+  },
+  "budget": {
+    "threads": 2,
+    "duckdb_memory_bytes": 3221225472,
+    "max_rss_bytes": 6442450944,
+    "max_scratch_bytes": 4294967296,
+    "max_download_bytes": 536870912,
+    "max_upload_bytes": 4194304,
+    "max_stage_wall_seconds": {
+      "formal": 900,
+      "independent": 1200,
+      "publish": 180
+    },
+    "max_cpu_seconds": 1800,
+    "formal_attempts": 1,
+    "independent_constructions": 1,
+    "publish_attempts": 3
+  },
+  "authorization": {
+    "issue": 628,
+    "remaining_BCD": true,
+    "owner_instruction": "按照计划的三阶段八步启动这个R4",
+    "prior_A": "sealed original source qualification, original001 formal/failed and recovered independent results remain",
+    "data_repair_owner": "P10 bounded exact-key purpose delivered under Owner activation; consumer only applies that version explicitly"
+  },
+  "publish": {
+    "dataset": "rv192/quanthus-research-r1",
+    "private": true,
+    "path_prefix": "runs/RESEARCH-CAPITAL-002/RESEARCH-CAPITAL-002-T1/A1",
+    "retained_root": "/srv/agentdock/quanthus-ops/research-capital-002/retained",
+    "ttl_review_after": "2026-12-12",
+    "cleanup_owner": "CN02 research task maintainer"
+  },
+  "source_knowledge_cutoff": "2026-11-12T05:56:48.348451+00:00",
+  "screen": {
+    "min_listing_sessions": 120,
+    "min_avg_turnover_prior20": 100000000.0,
+    "max_unadjusted_close_return_vol20": 0.5,
+    "max_abs_unadjusted_close_return": 0.04,
+    "unadjusted_momentum20_band": [
+      0.02,
+      0.12
+    ],
+    "volatility_formula": "sample_std(close_t/close_tminus1-1 over current20)*sqrt(252); 21 consecutive positive finite closes; excludes corporate action adjustment",
+    "listing_age_rule": "calendar open sessions since listing effective_from; start clipped to 2019 for older listings, guaranteed >=120 before first decision",
+    "next_open_rule": "next open calendar_session joined by venue; valid listing/security [from,to), positive finite open, tradable and can_buy true, positive finite upper limit, open < upper-0.005",
+    "unknown_rule": "missing/invalid required input blocks admission; disjoint ordered reason ledger",
+    "control": "baseline AND finite momentum20 outside original closed band"
+  },
+  "capital": {
+    "initial_cash_per_arm": "100000.00",
+    "position_fraction": "0.30",
+    "sizing_cash_buffer": "0.21",
+    "entry_lot": 100,
+    "compound_nav": false,
+    "arms": [
+      "candidate",
+      "disjoint_control",
+      "cash"
+    ],
+    "ranking": [
+      "raw_return_vol20 ASC",
+      "opaque listing_id ASC"
+    ],
+    "holding": "enter T+1 open after T close signal; fixed exit signal T+1 close, first legal sell T+2 open; carry same sell order",
+    "terminal": "mark open holdings using qualified 2021-12-31 close and report right-censoring; no forced fill or 2022 read",
+    "T_sizing": "floor(cash*0.30/(T native close*1.21)/100)*100; no future open in sizing",
+    "ranking_precision": "sample std formula unchanged, rounded to12 decimals for reproducible ranking, ties by opaque listing_id",
+    "year_return": "calendar-year system wealth change divided by fixed initial100000; trades grouped by exit year",
+    "unknown_action_date": "An IMPLEMENTED action without ex_date excludes that security from new entries and blocks any held consumption over this frozen window; observed effective_at is not substituted as event date.",
+    "cash_dividend_booking": "Existing P2 applies qualified per-share cash at native ex_date. Payment-date receivables/dividend tax timing are outside this fixed-source counterfactual."
+  },
+  "decision": {
+    "primary": "candidate minus control ending-system-wealth net return",
+    "min_closed_trades_each_arm": 100,
+    "min_closed_trades_each_year": 20,
+    "advance": {
+      "candidate_net_return_gt": 0,
+      "net_return_increment_gte": 0.01,
+      "each_year_increment_gt": 0,
+      "maximum_drawdown_increment_lte": 0.02,
+      "after_static_top3_candidate_profit_subtraction_increment_gt": 0
+    },
+    "branches": {
+      "blocked": "not_evaluated; stop affected comparison and preserve the exact input/semantic discrepancy",
+      "insufficient": "inconclusive; park without tuning",
+      "advance": "supported as a candidate for subsequent independent robustness validation",
+      "not_met": "sample sufficient and candidate net return<=0 OR net increment<=0; park this fixed holding use",
+      "uncertain": "inconclusive otherwise; park"
+    }
+  },
+  "r2_request": {
+    "path": "config/research/research-r2/request.v1.json",
+    "digest": "sha256:3d4f516389fbcf4ef143bb5a7468f37cf41b28edf84ae37355025e8aa9e27411"
+  },
+  "policy": {
+    "path": "config/p2-execution-policy.research.v1.json",
+    "sha256": "sha256:e2ee55ea09682eeb775b9acfcfc4bbba0908ddd4157705cd81fd8f050097c816"
+  },
+  "no_action_semantics": "Replay the exact sealed observation set. No row means no recorded action in that fixed set; unresolved source action exceptions and every multi-record economic key remain held. No attestation of unobserved historical actions is inferred.",
+  "native_knowledge_cutoff": "2026-11-11T20:19:54.776092+00:00",
+  "recovery_of": {
+    "request_id": "RESEARCH-CAPITAL-001",
+    "request_digest": "sha256:9e27c9a3139a85a277ff19bac0025ed80e2535406dad8a9c8120a3b8720a5089",
+    "source_held_formal_git": "10cf1d4b0d5c465afbbc667e363ff8f872a56149",
+    "independent_recovery_git": "aa0dbb8a47fcc83b12306d1ef2c164371cbae07f",
+    "formal_and_both_independent_attempts_preserved": true,
+    "same_question_and_consumed_window": true
+  },
+  "purpose": {
+    "dataset": "rv192/quanthus-research-r1",
+    "revision": "5ef2db2961af269a5ce281b84c8c272c9fb4d631",
+    "path_prefix": "inputs/P10-DATA-R4-ACTION-001/P10-DATA-R4-ACTION-001-T1/A1",
+    "purpose_path": "P10-DATA-R4-ACTION-001-T1-A1-p10-purpose.json",
+    "purpose_sha256": "sha256:1942ce50c241ee6e75d5870511457dc6296554d7026612aee4caed6864e3131d",
+    "qualified_at": "2026-11-12T05:28:23.469272+00:00",
+    "members": [
+      {
+        "path": "P10-DATA-R4-ACTION-001-T1-A1-p10-READY",
+        "sha256": "sha256:deb8920e9c3c0cc54ac91790571fc7ed545a7bd73e9f62aaa1acb82546c6ed6f",
+        "bytes": 39
+      },
+      {
+        "path": "P10-DATA-R4-ACTION-001-T1-A1-p10-em-parser-proof.json",
+        "sha256": "sha256:8a81de802f6e1ce5b86f59bd9113f8f789c62e0ee8a684d58811c4633787c494",
+        "bytes": 2687
+      },
+      {
+        "path": "P10-DATA-R4-ACTION-001-T1-A1-p10-f10-exact-block.json",
+        "sha256": "sha256:80eee21dab66bb97614af57e9df1e6b8cb3d94659d2d1eabc1910d4a67333c0e",
+        "bytes": 1480
+      },
+      {
+        "path": "P10-DATA-R4-ACTION-001-T1-A1-p10-f10-parser-proof.json",
+        "sha256": "sha256:7fb753630642f3ee24cc9323f209cbb3602b1140fc17da69d32e8eaad4480244",
+        "bytes": 737
+      },
+      {
+        "path": "P10-DATA-R4-ACTION-001-T1-A1-p10-history-identity-proof.json",
+        "sha256": "sha256:b425340c587aef9f6bdfd2e2cdc77f869812769f1802aaebda45293d37c99730",
+        "bytes": 510
+      },
+      {
+        "path": "P10-DATA-R4-ACTION-001-T1-A1-p10-independent-review.json",
+        "sha256": "sha256:900d7cf2fb542e7ac6388d4d9386fe03df2277ab655bbd0cd297a6c7a777e9a8",
+        "bytes": 903
+      },
+      {
+        "path": "P10-DATA-R4-ACTION-001-T1-A1-p10-manifest.json",
+        "sha256": "sha256:793a73d145815e95a3757f82ef8e87e95a64fb9a37b80084c83de948674f2485",
+        "bytes": 1856
+      },
+      {
+        "path": "P10-DATA-R4-ACTION-001-T1-A1-p10-purpose.json",
+        "sha256": "sha256:1942ce50c241ee6e75d5870511457dc6296554d7026612aee4caed6864e3131d",
+        "bytes": 13250
+      },
+      {
+        "path": "P10-DATA-R4-ACTION-001-T1-A1-p10-source-receipts.json",
+        "sha256": "sha256:7bd529757a33889c46fcc6ecc65e4b8b528c0f6f205ba43c1077e235e22b55d1",
+        "bytes": 2634
+      },
+      {
+        "path": "P10-DATA-R4-ACTION-001-T1-A1-p10-source-records.json",
+        "sha256": "sha256:97feaa407151454598a2f2c4b3e3a5c9f8e2337029e207d801ac1ddd3e18f112",
+        "bytes": 10574
+      }
+    ]
+  },
+  "recovery_policy": {
+    "original_start_utc": "2026-11-12T05:02:53Z",
+    "total_active_seconds": 14400,
+    "first_P10_seconds": 2700,
+    "formal_attempts": 1,
+    "independent_constructions": 1,
+    "blocked_formal": "Independent exact-key/arrival check first; use full cold allowance only for a material reference dispute or explicit fixed acceptance requirement, with TPlan rationale before construction.",
+    "complete_formal": "Full independent cold construction mandatory",
+    "uncovered_purpose_key": "native guards unchanged; stop affected arm, no automated patch-and-rerun loop",
+    "publish_attempts": 3,
+    "control_channel": "NexusDock CN02",
+    "new_workers": "standby",
+    "historical_cost": "unknown_not_zero; preserve all A/R1/R2/001 costs and exposure"
+  },
+  "effective_input": {
+    "path": "config/research/research-capital-recovery/effective-input.v1.json",
+    "manifest_sha256": "sha256:54b795953d31e9ab1a59f01585fb978da752504f3d406675e31db43796f2ac48",
+    "content_digest": "sha256:b47f14d707739380c21e4760ca136647a80a78e4dce14c61187f5789efa3fb40",
+    "source_revision": "capital-effective@sha256:b47f14d707739380c21e4760ca136647a80a78e4dce14c61187f5789efa3fb40",
+    "clock_identity": {
+      "native_content_digest": "sha256:1d0e4bd5fbf40bf2876883faf82b98fd81e95a93a82b9d23d248759a38b3f692",
+      "purpose_sha256": "sha256:1942ce50c241ee6e75d5870511457dc6296554d7026612aee4caed6864e3131d",
+      "consumer_closure_sha256": "sha256:e9df3ee157033637de685c80ceb5a1f6aa0164395a7bd0b647ccd5c05d2c563f",
+      "native_knowledge_cutoff": "2026-11-11T20:19:54.776092+00:00",
+      "purpose_qualified_at": "2026-11-12T05:28:23.469272+00:00"
+    }
+  }
+}

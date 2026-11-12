@@ -92,7 +92,7 @@
     "src/quanthus/backtest/benchmark.py": "sha256:4e227da03684796d84c03327dc420b0af900edb864525a0c65a24e9e07bf2e57",
     "src/quanthus/backtest/candidate_batch.py": "sha256:97e819ea6086bd9505cf28f302f7990aacca279b7319d9afad8d250b636f9d04",
     "src/quanthus/backtest/capital_clock.py": "sha256:0174b40dc012bd3d1ae44014d53e19e25a89fe1900ddc8c1ae9d2651af710ec6",
-    "src/quanthus/backtest/capital_purpose.py": "sha256:8e8d0ae59936108d0625b2f32f4031e35621f70f1e285f4988b8daa37db79bbd",
+    "src/quanthus/backtest/capital_purpose.py": "sha256:b171cf74046af1c3d2e0028717c5b5f514242bf90a62f7e60126b526b00d1d00",
     "src/quanthus/backtest/contracts.py": "sha256:519f8f6c4145f9a39b2771374f7bc7ed87c7e21e8c2928d450f6ada19fa137b4",
     "src/quanthus/backtest/data_provider.py": "sha256:d229332fce231ecbf58d42b1d283b2a70d49f00aca07db8e57478fd301eb5746",
     "src/quanthus/backtest/direct_dwd_provider.py": "sha256:08fb354bb3386661c20ea19f0de3afd7aadc450cc55c1a6c03cb2241fc3ad063",

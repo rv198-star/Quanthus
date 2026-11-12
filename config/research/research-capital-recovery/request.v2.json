@@ -220,13 +220,13 @@
   },
   "effective_input": {
     "path": "config/research/research-capital-recovery/effective-input.v1.json",
-    "manifest_sha256": "sha256:54b795953d31e9ab1a59f01585fb978da752504f3d406675e31db43796f2ac48",
-    "content_digest": "sha256:b47f14d707739380c21e4760ca136647a80a78e4dce14c61187f5789efa3fb40",
-    "source_revision": "capital-effective@sha256:b47f14d707739380c21e4760ca136647a80a78e4dce14c61187f5789efa3fb40",
+    "manifest_sha256": "sha256:7a4258b581c4d1295d8208a4938a721f4643040eeda154784cc9a042fde9319a",
+    "content_digest": "sha256:81256d8391f1d0466a5b2f5215acee0a216ead98acc8ba481f1b9d4c6ca5af4c",
+    "source_revision": "capital-effective@sha256:81256d8391f1d0466a5b2f5215acee0a216ead98acc8ba481f1b9d4c6ca5af4c",
     "clock_identity": {
       "native_content_digest": "sha256:1d0e4bd5fbf40bf2876883faf82b98fd81e95a93a82b9d23d248759a38b3f692",
       "purpose_sha256": "sha256:1942ce50c241ee6e75d5870511457dc6296554d7026612aee4caed6864e3131d",
-      "consumer_closure_sha256": "sha256:e9df3ee157033637de685c80ceb5a1f6aa0164395a7bd0b647ccd5c05d2c563f",
+      "consumer_closure_sha256": "sha256:5cfbbbe5690c49fa24a7eae39ecb6582ec6d313c6378437c9f26e463248ac2fd",
       "native_knowledge_cutoff": "2026-11-11T20:19:54.776092+00:00",
       "purpose_qualified_at": "2026-11-12T05:28:23.469272+00:00"
     }

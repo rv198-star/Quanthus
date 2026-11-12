@@ -43,7 +43,8 @@ def verify_package(q: dict[str, Any], root: Path) -> dict[str, Any]:
     require({p.name for p in root.iterdir()} == set(names), "UNDECLARED_MEMBER")
     path = root / descriptor["purpose_path"]
     require(path.name in names and file_digest(path) == descriptor["purpose_sha256"], "MANIFEST")
-    return read(path)
+    manifest: dict[str, Any] = read(path)
+    return manifest
 
 
 def copy_package(q: dict[str, Any], cache: Path, target: Path) -> dict[str, Any]:

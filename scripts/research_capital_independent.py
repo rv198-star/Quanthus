@@ -334,20 +334,21 @@ class IndependentFacts:
             return "missing", None, None, False, False
         if r["listing_currency"] != "CNY" or r["lot_size"] != 100:
             raise ReferenceHold("CURRENCY_OR_LOT_UNQUALIFIED", day, listing)
-        if any(
-            r[k] is None for k in ("bar_known", "state_known", "listing_known", "security_known")
-        ):
-            raise ReferenceHold("SOURCE_KNOWLEDGE_UNKNOWN", day, listing)
         directions = [r["can_buy"], r["can_sell"]]
         if not all(type(v) is bool for v in directions):
             directions = [None, None]
         if (
             r["reason_code"] == "SUSPENDED"
             and [r[k] for k in ("is_tradable", "can_buy", "can_sell")] == [False] * 3
+            and all(r[k] is not None for k in ("state_known", "listing_known", "security_known"))
         ):
             return "suspended", None, None, False, False
         good = (
             all(type(r[k]) is bool for k in ("is_tradable", "can_buy", "can_sell"))
+            and all(
+                r[k] is not None
+                for k in ("bar_known", "state_known", "listing_known", "security_known")
+            )
             and r["is_tradable"]
             and r["reason_code"] == "TRADABLE_OBSERVED"
         )

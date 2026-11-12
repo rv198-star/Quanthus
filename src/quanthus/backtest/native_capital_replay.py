@@ -351,24 +351,30 @@ class NativeCapitalStore:
         row = self.native(listing, day)
         state = OpenExecutionState.MISSING_EVIDENCE
         op = close = None
-        can_buy = can_sell = None
+        can_buy: bool | None = None
+        can_sell: bool | None = None
         if row is not None:
             if row["listing_currency"] != "CNY" or row["lot_size"] != 100:
                 raise CapitalInputHold("CURRENCY_OR_LOT_UNQUALIFIED", day, listing)
             known = [
                 row[k] for k in ("bar_known", "state_known", "listing_known", "security_known")
             ]
-            if any(k is None for k in known):
-                raise CapitalInputHold("SOURCE_KNOWLEDGE_UNKNOWN", day, listing)
             if any(k is not None and k > self.cutoff for k in known):
                 raise CapitalInputHold("SOURCE_KNOWLEDGE_AFTER_CUTOFF", day, listing)
             flags = [row[k] for k in ("is_tradable", "can_buy", "can_sell")]
             if all(type(v) is bool for v in flags[1:]):
                 can_buy, can_sell = row["can_buy"], row["can_sell"]
-            if row["reason_code"] == "SUSPENDED" and flags == [False, False, False]:
+            if (
+                row["reason_code"] == "SUSPENDED"
+                and flags == [False, False, False]
+                and all(
+                    row[k] is not None for k in ("state_known", "listing_known", "security_known")
+                )
+            ):
                 state = OpenExecutionState.SUSPENDED
             elif (
                 all(type(v) is bool for v in flags)
+                and all(k is not None for k in known)
                 and flags[0]
                 and row["reason_code"] == "TRADABLE_OBSERVED"
             ):

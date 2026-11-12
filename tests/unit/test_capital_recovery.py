@@ -412,7 +412,7 @@ def test_formal_guardian_failure_cannot_reach_adoption(tmp_path, monkeypatch):
 
 def test_missing_price_bound_preserves_native_direction_facts():
     from quanthus.backtest.contracts import OpenExecutionState
-    from quanthus.backtest.native_capital_replay import CapitalInputHold, NativeCapitalStore
+    from quanthus.backtest.native_capital_replay import NativeCapitalStore
 
     day = date(2021, 8, 4)
     store = NativeCapitalStore.__new__(NativeCapitalStore)
@@ -450,8 +450,18 @@ def test_missing_price_bound_preserves_native_direction_facts():
     assert s.open_execution_state is OpenExecutionState.MISSING_EVIDENCE
     assert (s.source_can_buy, s.source_can_sell) == (True, False)
     row["bar_known"] = None
-    with pytest.raises(CapitalInputHold, match="SOURCE_KNOWLEDGE_UNKNOWN"):
-        store.session("L", day)
+    assert store.session("L", day).open_execution_state is OpenExecutionState.MISSING_EVIDENCE
+    row.update(
+        is_tradable=False,
+        can_buy=False,
+        can_sell=False,
+        reason_code="SUSPENDED",
+        open=None,
+        close=None,
+    )
+    assert store.session("L", day).open_execution_state is OpenExecutionState.SUSPENDED
+    row["state_known"] = None
+    assert store.session("L", day).open_execution_state is OpenExecutionState.MISSING_EVIDENCE
 
 
 def test_full_recovery_and_independent_decimal_path(tmp_path, monkeypatch):

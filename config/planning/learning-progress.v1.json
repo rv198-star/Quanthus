@@ -9854,6 +9854,77 @@
         "REPRO",
         "CLOSEOUT"
       ]
+    },
+    {
+      "id": "CP-628-20261112T072129212925Z",
+      "recorded_at": "2026-11-12T07:21:29.212925+00:00",
+      "actor": "Codex R4 primary owner; independent read-only code/result/document reviewer r4_code_pre_audit",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "outcome": "completed",
+      "summary": "R4 complete fixed capital comparison independently accepted. Original gates yield inconclusive/park; issue628 closed completed, old attempts/exposure and costs retained. Draft631 main integration separate.",
+      "evidence": [
+        {
+          "id": "R4-PUBLISH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-002/retained/publish-readback.json",
+          "sha256": "0589c7fdadf6dcb92105bad00b71d2993a63580923883e9327810d20d754a8b8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed private HF4e0d15571cf815024180d21cce1605391dc6a138 all26files899366B read back; completed full fixed2020-2021 comparison and independently cold-rebuilt cash/curve/branch."
+        },
+        {
+          "id": "R4-G4",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-002/retained/final-audit.json",
+          "sha256": "79f08a45db0d276f0d4cd713a8d084e75a0d43e99dba1365985e14b6b16f8a9d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent role accepted actual8b1 formal/cold evidence; completed/inconclusive/park this fixed holding use; original R2 signal use retained."
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "Fixed2020-2021 native126members and qualified P10 exact-purpose input, composite/source clock identity,002 task/attempt and guarded P2 consumer delivered. Formal and independent cold inputs, choices, rights, cash cents, fills/orders/pool, all curves/trades/branch agree; role-separated acceptance passed.",
+          "remaining": "Guarded retrospective research use; Draft631 atop630 main integration remains with the original integration line. General economic-event input debt remains P10/556.",
+          "next_action": "Reuse accepted seam for original main integration; other consumers follow their own input/use gates and frozen requests; do not repeat this result computation.",
+          "evidence": [
+            "R4-PUBLISH",
+            "R4-G4"
+          ],
+          "supersedes": "CP-628-20261111T215015198548Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "accepted",
+          "scope": "Original research allocation decision delivered: full comparison and independent acceptance, +2.63407 percentage-point full-window increment, failed2021 and static top3 gates, scientific inconclusive and park this fixed holding use. Accepted scope is the completed resource decision.",
+          "remaining": "Fixed candidate does not advance to robustness work; full active/model/billing cost unknown_not_zero. All old failures, effort and consumed-window exposure cumulative.",
+          "next_action": "Park this fixed holding use, prioritize existing-asset main integration; direction layer chooses the next real consumer question, Workers follow actual capacity/task-pool benefit.",
+          "evidence": [
+            "R4-PUBLISH",
+            "R4-G4"
+          ],
+          "supersedes": "CP-613-20261111T181214226620Z"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS"
+      ],
+      "no_change_reason": "Original R2 price-response finding retained in its original use; no quality/admission change. Only complete capital-consumer engineering and capital resource-decision delivery are updated.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-CAPITAL-001",
+          "number": 628,
+          "title": "[P3-RESEARCH-CAPITAL-001] 资格通过后完成固定动量候选的最小资金回放",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-12T07:19:01Z",
+          "body_sha256": "7ef224195a298e45ba11b8b4c153bc958402ebe4fabd5ab1a966763f0c2bd4f7"
+        }
+      ]
     }
   ]
 }

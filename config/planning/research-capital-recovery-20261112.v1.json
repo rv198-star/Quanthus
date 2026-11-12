@@ -143,5 +143,8 @@
     "max_new_bytes": 536870912,
     "network_requests": 200,
     "accounting_owner": "TPlanRESEARCH-CAPITAL-002, prior exposure and costs cumulative"
-  }
+  },
+  "execution_record": "docs/acceptance/research-capital-recovery-20261112.md",
+  "execution_disposition": "COMPLETED_INCONCLUSIVE_PARK_FIXED_HOLDING_USE; original preflight memory/request identity preserved; no successor activated",
+  "proposal_role": "Executed original proposal retained as non-authorizing history; its frozen execution identity is in HF002 and Git8b1."
 }

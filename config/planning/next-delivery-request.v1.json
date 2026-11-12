@@ -26,7 +26,7 @@
     "60分钟内无法确认消费者与具体未满足接口就不继续开发。",
     "出现新数据、训练、阈值、P6/生产或超预算要求时只停止对应步骤。"
   ],
-  "memory_sha256": "01a0d12e881fc13b423910dc9e2fd048f09312b179c0c80d3d08228599398c13",
+  "memory_sha256": "ace5bf3f7a1c22224359b6a70add8a712686c0b3f146f8e58da6479c97b0c55a",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -104,9 +104,9 @@
       "rationale": "Retired example index refresh only; preserve A input holds, prior exposure/cost and BCD allocation boundary."
     },
     {
-      "conclusion_id": "CON-CAPITAL-REPLAY-20261112",
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
       "relation": "respect",
-      "rationale": "Retired proposal index refresh only. Preserve guarded capital consumer delivery, exact source-held comparison, cumulative cost/exposure and P10 mapping before new recovery; no successor execution activated."
+      "rationale": "Retired example index refresh only. Preserve R4 independently accepted complete/inconclusive/park fixed-holding decision, all earlier costs/failures/exposure and original R2 signal-use grade. No successor, deployment or repetition is activated."
     }
   ],
   "cumulative_cost_review": "既有Head2和持仓尝试全部保留，旧总成本未知而非零；新批次独立记账，不伪装新方向抹去原投入。",

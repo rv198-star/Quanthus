@@ -1216,6 +1216,78 @@
         "CP-628-20261111T215015198548Z"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-CAPITAL-RECOVERY-20261112",
+      "recorded_at": "2026-11-12T07:22:16.461957+00:00",
+      "actor": "Codex primary semantic decision with independent read-only code/result/document role acceptance",
+      "question_id": "RESEARCH-CAPITAL-001-ECONOMIC-COMPARISON",
+      "family": "raw-momentum20-capital-replay",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "modules": [
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "Does the fixed R2 momentum candidate clear its preregistered P2 capital-use gate?",
+      "consumer": "Research allocator and guarded native P2 capital consumer",
+      "scope": "Same consumed2020-2021 development window, fixed R2[2%,12%], disjoint control, T sizing,30% parameter/21% buffer,100000CNY each, P2 fees and minimum legal holding; new qualified exact-key P10 purpose input with true knowledge clock. Recovery002 of001, same question and exposure.",
+      "execution_status": "completed",
+      "verdict": "inconclusive",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Full fixed holding-use comparison independently accepted; full-window candidate/control net returns+0.31660%/-2.31747%, increment+2.63407 percentage points.2021 increment-0.33023pp and static removal of candidate top3 increment-3.78895pp fail original gates. Park this precise holding use; original R2 signal finding retained.",
+      "decision_effect": "Close completed628/R4 and park this fixed holding use. Retain explicit qualified P10 input seam, complete capital/independent construction and exact evidence. Prioritize existing-asset main integration; Workers remain standby and no successor is activated.",
+      "reopen_conditions": [
+        "Material new evidence/question that can change the failed annual/positive-contribution concentration judgment, with a named consumer and limited prospective budget.",
+        "Preserve all R1/R2/A/001/002 failures/costs and2020-2021 exposure; freeze any future use/input/request and its independent acceptance before execution."
+      ],
+      "retained_assets": [
+        "src/quanthus/backtest/capital_purpose.py",
+        "src/quanthus/backtest/capital_clock.py",
+        "src/quanthus/backtest/native_capital_replay.py",
+        "scripts/research_capital_replay.py",
+        "scripts/research_capital_independent.py",
+        "config/research/research-capital-recovery/request.v2.json",
+        "config/research/research-capital-recovery/effective-input.v1.json",
+        "P10 exact-key HF5ef2db2961af269a5ce281b84c8c272c9fb4d631 input",
+        "docs/work-items/research-capital-replay-value-brief.md",
+        "docs/acceptance/research-capital-recovery-20261112.md"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Successor starts2026-11-12T05:02:53Z, active work cap4h with prior exposure/cost cumulative. One new formal92.278686s and cold73.404593s, peakRSS3505565696B; P10 publication/readback9.426802s and result26file899366B fixed readback77.979923s. Two full checks about29min including retained missing-history failures; exact Git object restored and complete8989pass/35skip. Prior001 three computations243.618s and132.16s publication, A/R1/R2/reviews/repairs all retained. Complete active/token/billing cost unknown_not_zero, machine/elapsed segments not summed as person-time.",
+      "attempt_refs": [
+        "git:8b1a76608c7e810c23cb3049f9af9f4a04ece697",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-002/formal-a1",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-002/independent-a1",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-002/evidence/checks-a2",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-002/evidence/checks-a3",
+        "hf:rv192/quanthus-research-r1@4e0d15571cf815024180d21cce1605391dc6a138/runs/RESEARCH-CAPITAL-002/RESEARCH-CAPITAL-002-T1/A1"
+      ],
+      "evidence": [
+        {
+          "id": "R4-PUBLISH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-002/retained/publish-readback.json",
+          "sha256": "0589c7fdadf6dcb92105bad00b71d2993a63580923883e9327810d20d754a8b8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed private HF4e0d15571cf815024180d21cce1605391dc6a138 all26files899366B read back; completed full fixed2020-2021 comparison and independently cold-rebuilt cash/curve/branch."
+        },
+        {
+          "id": "R4-G4",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-002/retained/final-audit.json",
+          "sha256": "79f08a45db0d276f0d4cd713a8d084e75a0d43e99dba1365985e14b6b16f8a9d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent role accepted actual8b1 formal/cold evidence; completed/inconclusive/park this fixed holding use; original R2 signal use retained."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-628-20261112T072129212925Z"
+      ],
+      "supersedes": "CON-CAPITAL-REPLAY-20261112"
     }
   ]
 }

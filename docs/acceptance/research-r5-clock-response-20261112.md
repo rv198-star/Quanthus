@@ -41,7 +41,7 @@ silently dropping incomplete dates from the audit population.
 
 One formal DuckDB construction and one separate pandas/numpy construction completed.
 The independent script does not import producer SQL/aggregation logic. Identity,
-integer counts, dates, groups and branch agree; 32,442 nodes were compared and the
+integer counts, dates, groups and branch agree; 32,442 result-JSON nodes were compared and the
 maximum floating error was 3.469446951953614e-17, below the fixed 1e-10 tolerance.
 The read-only `r5_design_review` role separately hashed 27 original evidence files
 and recomputed the mean, yearly values and 2,000 bootstrap replicates from sealed
@@ -125,3 +125,19 @@ PR#643 owns source delivery. Research acceptance stays bound to the original Git
 current-main integration and its exact complete/focused-check closure are recorded
 in the task's final source/lifecycle receipts. The current value brief and live
 issue/milestone carry the final lifecycle state.
+
+## Integrated-source complete-check receipt
+
+Current main21ffd6b74638f57052942ca53e8c15e4b09eb6e5 was merged normally
+into candidate3c0c39be5836ae94dc7224ce082fdf6a66296b58. A fresh complete Linux
+`make check` at that candidate passed: **9,154 passed / 35 skipped**, exit0,
+871.6814s. Log SHA256: `e7c96b20c7f6c1e6f4bf755932153cc2c60200a2759521c14b93716628dd0d05`.
+The complete tested executable/config/test closure is retained as
+`final-tested-closure.json`, SHA256
+`9a026cde1d91b1e941540a73a133b28e69532fdabf8a714896a20524cb293b06`.
+
+The nine frozen research entrypoints, request and test files remain byte-identical
+to research Gitb0e3ee71. Final documentation/ledger-only commits reuse that complete
+check after exact closure comparison and rerun the affected planning, append-only
+and documentation checks. Final receipts name the actual source head and ordinary
+merge identity; no market calculation is repeated for source bookkeeping.

@@ -654,6 +654,25 @@
         "CLOSEOUT"
       ],
       "contribution": "以既有R2总体的两开盘日历对齐原始价格响应和独立构建，决定是否保留这一分布级筛选资源；R4固定资金用途保持park。"
+    },
+    {
+      "id": "META-RESEARCH-R6-CONSUMER-001",
+      "issue": 645,
+      "modules": [
+        "TRACE",
+        "CLOSEOUT"
+      ],
+      "contribution": "以现有消费者的真实动作和完整成本选择至多一项最小R6验证；复用封存证据，独立审阅后执行并交付决策。"
+    },
+    {
+      "id": "P3-RESEARCH-R6-RANK1-001",
+      "issue": 646,
+      "modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "contribution": "固定原R4每日名义rank1及R5两开盘口径，独立构建选择/时钟/分母/日期与venue桥接，决定继续查证或停放这一价格消费路线。"
     }
   ]
 }

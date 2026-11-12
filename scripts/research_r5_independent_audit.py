@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REQUEST = "config/research/research-r5/request.v1.json"
 
 
-def evaluate(q, labelled, panel, author, out, began):
+def evaluate(q, labelled, panel, author, out, began, *, prepared_evaluator=None):
     import numpy as np
 
     prepared = None
@@ -172,6 +172,8 @@ def evaluate(q, labelled, panel, author, out, began):
     receipt["execution_git"] = author["identity"]["git"]
     receipt["r4_capital_use"] = "park"
     save(out / "independent-reproduction.json", receipt)
+    if not primary_code and not receipt["mismatches"] and prepared_evaluator is not None:
+        return prepared_evaluator(prepared, receipt["metrics"])
     return 2 if primary_code or receipt["mismatches"] else 0
 
 

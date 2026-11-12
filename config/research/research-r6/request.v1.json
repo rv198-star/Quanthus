@@ -1,0 +1,89 @@
+{
+  "schema_version": "quanthus.r6-rank1-request.v1",
+  "request_id": "RESEARCH-R6-RANK1-001",
+  "task_id": "RESEARCH-R6-RANK1-001-T1",
+  "attempt_id": "A1",
+  "input_request": {
+    "path": "config/research/research-r5/request.v1.json",
+    "sha256": "sha256:7aabe9d9f1bfa46bebc7566ff67114ae11fa51a95e143f15f2d2bdd22037064e"
+  },
+  "old_r4": {
+    "dataset": "rv192/quanthus-research-r1",
+    "revision": "4e0d15571cf815024180d21cce1605391dc6a138",
+    "member": "runs/RESEARCH-CAPITAL-002/RESEARCH-CAPITAL-002-T1/A1/RESEARCH-CAPITAL-002-T1-A1-formal-result.json.gz",
+    "sha256": "sha256:90211f3cdfe41b4044691dd7497f6198a1e8f1fbb31364c6aaa22e52b7704a6c",
+    "size_bytes": 601567,
+    "raw_sha256": "sha256:7111e08c8a57643de259783cadf6425b57e1fc7217a36666d30b7bf415faa3c7",
+    "raw_size_bytes": 10375462,
+    "nominal_sha256": "sha256:8f07c2105df8002577703ab420801a611e8971699593aa6588c4eed1f0d00b59",
+    "nominal_rows": 898
+  },
+  "old_r5": {
+    "dataset": "rv192/quanthus-research-r1",
+    "revision": "1f4778a9eeda7e7c993878ed0d2760bfbbae258d",
+    "member": "runs/RESEARCH-R5-CLOCK-001/RESEARCH-R5-CLOCK-001-T1/A1/RESEARCH-R5-CLOCK-001-T1-A1-result.json",
+    "sha256": "sha256:13b4bfc4580263e3e5d63830ebec41cfc5f18a74cb22c2b14be044e8fcf6cdae",
+    "size_bytes": 1412146
+  },
+  "analysis": {
+    "consumer": "Existing original global rank1 selector; #608 next-research allocator",
+    "primary_response": "open_to_next_open",
+    "nominal_selection": "Original R4 T-close global per-date/arm rank1; no future guard before selection; never refill",
+    "min_paired_days_per_year": 200,
+    "required_years": [
+      2020,
+      2021
+    ],
+    "minimum_mean_increment": 0.0005,
+    "bootstrap": {
+      "method": "year-stratified circular blocks of20eligible paired observations; gaps explicitly reported",
+      "block_sessions": 20,
+      "replicates": 2000,
+      "seed": 20261113,
+      "confidence": 0.95,
+      "quantile": "nearest_rank"
+    },
+    "decision_branches": {
+      "advance": "Retain original rank1 price evidence; assess one named economic consumer gap before any further work",
+      "below_minimum": "Park this rank1 price-consumption route; choose an independently justified question",
+      "uncertain": "Inconclusive; park new investment in this rank1 route",
+      "insufficient": "Inconclusive; retain exact shortfall and park this route"
+    },
+    "r4_capital_use": "park",
+    "claim_ceiling": "Consumed2020-2021 retrospective raw-price selector diagnostic and resource decision; R4 fixed capital use remains park. Economic/action/sell/production/training gates separate.",
+    "bridge": "Same paired dates: equal-venue population -> arm-specific chosen-venue population -> rank1; descriptive additive bridge only",
+    "float_abs_tolerance": 1e-10,
+    "coverage": "At least200paired dates per T-year; no population opportunity/listing threshold inherited",
+    "concentration_reports": [
+      "unique_listings",
+      "top1_share",
+      "top10_share",
+      "longest_same_listing_run",
+      "paired_date_gaps"
+    ]
+  },
+  "budget": {
+    "prepare_seconds": 300,
+    "compute_seconds": 180,
+    "publish_seconds": 180,
+    "max_rss_bytes": 6442450944,
+    "max_scratch_bytes": 2147483648,
+    "max_cpu_seconds": 240,
+    "max_download_bytes": 536870912,
+    "max_upload_bytes": 4194304,
+    "prepare_attempts": 1,
+    "formal_attempts": 1,
+    "reference_attempts": 1,
+    "publish_attempts": 3,
+    "planned_active_seconds": 7200
+  },
+  "publish": {
+    "dataset": "rv192/quanthus-research-r1",
+    "private": true,
+    "path_prefix": "runs/RESEARCH-R6-RANK1-001/RESEARCH-R6-RANK1-001-T1/A1",
+    "ttl_review_after": "2026-12-13",
+    "cleanup_owner": "CN02 research maintainer",
+    "retained_root": "/srv/agentdock/quanthus-ops/research-r6-rank1-20261113/retained"
+  },
+  "exposure": "All R1/R2/R4/R5 same-window exposure, costs and failed attempts retained;2022+market windows remain protected"
+}

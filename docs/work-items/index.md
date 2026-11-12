@@ -26,7 +26,10 @@ delivery. The [three-batch plan](exploration-next-20261029.md) now links its
 No successor experiment is activated by that outcome.
 
 For the HF-DWD research bus [#608](https://github.com/rv198-star/Quanthus/issues/608),
-start with the [R5 value brief](research-r5-value-brief.md), [clock-response contract](../design/research-r5-clock-response-v1.md)
+R6 selects an existing consumer in [#645](https://github.com/rv198-star/Quanthus/issues/645)
+and freezes the [original rank1 diagnostic](../design/research-r6-rank1-response-v1.md)
+for [#646](https://github.com/rv198-star/Quanthus/issues/646), native Task issues in milestone 20.
+The predecessor [R5 value brief](research-r5-value-brief.md), [clock-response contract](../design/research-r5-clock-response-v1.md)
 and [R5 independent acceptance](../acceptance/research-r5-clock-response-20261112.md) for #640/#642.
 The [R4 capital brief](research-capital-replay-value-brief.md) preserves the previous
 fixed-use park decision and [complete recovery acceptance](../acceptance/research-capital-recovery-20261112.md).

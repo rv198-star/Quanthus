@@ -1,0 +1,116 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-R6-RANK1-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "exploration",
+  "family": "raw-momentum20-rank1-consumer",
+  "work_item": "P3-RESEARCH-R6-RANK1-001",
+  "modules": [
+    "FACTORS",
+    "REPRO",
+    "CLOSEOUT"
+  ],
+  "question": "Does the original global daily rank1 retain a useful two-open price increment for this existing consumer?",
+  "consumer": "#608 research allocator and prospective screening protocol",
+  "scope": "Fixed original898nominals,fixed56member input closure, consumed2020-2021; no2022+market rows,capital replay,source repair or training",
+  "deliverable": "One formal and one physically cold independent reconstruction; exact nominal/label/bridge ledgers and resource disposition",
+  "decision_if_pass": "Retain rank1 price evidence and assess a named economic consumption gap before any new work",
+  "decision_if_fail": "Park this rank1 consumption route and preserve exposure and all costs",
+  "acceptance": [
+    "Named consumer, frozen scope/input, full-cost and prior-conclusion review",
+    "Independent design review before result-bearing work",
+    "Actual result/decision/evidence and appropriate issue/blueprint reconciliation"
+  ],
+  "stop_conditions": [
+    "Finite selected tranche and resource caps",
+    "Any identity/partition/resource violation stops the affected stage",
+    "Material seam expansion triggers ROI reassessment; shared data gaps go to P10; no parked R4 reopening"
+  ],
+  "memory_sha256": "72599243f28393b05ca399abe4b2f14bc7b67ebaacc3a946596a5e4725df15a6",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "Respect delivered historical/funnel/calling assets and parked consumer demands. No repeat guide, query, allocation or learning trial; R6 requires the new observed rank1 consumption gap."
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "Respect delivered historical/funnel/calling assets and parked consumer demands. No repeat guide, query, allocation or learning trial; R6 requires the new observed rank1 consumption gap."
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "Respect delivered historical/funnel/calling assets and parked consumer demands. No repeat guide, query, allocation or learning trial; R6 requires the new observed rank1 consumption gap."
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "Respect delivered historical/funnel/calling assets and parked consumer demands. No repeat guide, query, allocation or learning trial; R6 requires the new observed rank1 consumption gap."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "Respect delivered historical/funnel/calling assets and parked consumer demands. No repeat guide, query, allocation or learning trial; R6 requires the new observed rank1 consumption gap."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "Respect delivered historical/funnel/calling assets and parked consumer demands. No repeat guide, query, allocation or learning trial; R6 requires the new observed rank1 consumption gap."
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "Reuse previously accepted guards, source closures and independent construction while preserving all source qualifications, attempts, costs and parked uses; no rerun of delivered diagnostics."
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "Reuse accepted source/guard/publication and independent primitives; keep all prior scope, attempts and exposure. No new Worker platform or repeat price-guard diagnostic."
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Reuse accepted source/guard/publication and independent primitives; keep all prior scope, attempts and exposure. No new Worker platform or repeat price-guard diagnostic."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Reuse previously accepted guards, source closures and independent construction while preserving all source qualifications, attempts, costs and parked uses; no rerun of delivered diagnostics."
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "Respect original population intraday evidence and consumed window; R6 asks only whether its fixed existing rank1 consumer preserves a two-open price signal."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "Reuse previously accepted guards, source closures and independent construction while preserving all source qualifications, attempts, costs and parked uses; no rerun of delivered diagnostics."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "respect",
+      "rationale": "Reuse previously accepted guards, source closures and independent construction while preserving all source qualifications, attempts, costs and parked uses; no rerun of delivered diagnostics."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
+      "relation": "respect",
+      "rationale": "Respect all action/source qualifications, failures and fixed capital-use park. Reuse the old nominal identities and fee/exposure summary; no new capital replay, fee-free rerun or economic adoption."
+    },
+    {
+      "conclusion_id": "CON-R5-CLOCK-20261112",
+      "relation": "respect",
+      "rationale": "Respect supported population clock evidence. R6 holds original T-close nominal rank1 fixed and measures its new consumer-specific response; same-day/venue bridging prevents conflating different weights."
+    }
+  ],
+  "cumulative_cost_review": "All R1/R2/R4/R5 exposure, failures and costs retained. Kickoff/tool wait and older billing unknown_not_zero. Selection planned20active minutes; full selected work planned<=2active hours plus separately measured full-check wait.",
+  "runtime_authority_boundary": "Owner approved the next R6 batch; autonomous normal research within current source, partition and consumer gates. Nexus control, isolated worktrees, GitHub-only code distribution.",
+  "budget": {
+    "wall_seconds": 7200,
+    "max_new_bytes": 2147483648,
+    "network_requests": 100,
+    "accounting_owner": "R5 Mission with inherited exposure and unknown-not-zero history"
+  }
+}

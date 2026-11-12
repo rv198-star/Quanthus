@@ -10462,6 +10462,51 @@
         "REPRO",
         "CLOSEOUT"
       ]
+    },
+    {
+      "id": "CP-645-20261112T175017886379Z",
+      "recorded_at": "2026-11-12T17:50:17.886379+00:00",
+      "actor": "R6 primary after read-only independent science selection review",
+      "work_item": "META-RESEARCH-R6-CONSUMER-001",
+      "outcome": "progress",
+      "summary": "选择已闭合：旧费用占用直接复用、原rank1作为唯一正式诊断、组合接线后置；合同科学预审GO，runtime最终预审和真实计算待完成。",
+      "evidence": [
+        {
+          "id": "R6-SELECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/selection.json",
+          "sha256": "bfacf33898b3a72b8ec58c98c373ea7fe54ce47ded2b2faf015de1b482a6b1f3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Metadata/code/old reports only; actual nominal rank1 consumer gap and bounded costs"
+        },
+        {
+          "id": "R6-DESIGN-PRE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r6-research-20261113/independent-design-review.json",
+          "sha256": "022c3bf107b9ad8838bd856071cd841826ca71222833d6a2a04fb7b7f83c73f8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent science GO, runtime release pending"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "选择和冻结阶段未产生新研究结果，保留所有模块当前工程/质量/用途/准入。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-R6-CONSUMER-001",
+          "number": 645,
+          "title": "[META-RESEARCH-R6-CONSUMER-001] 选择具名消费者并冻结R6最小验证",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-12T17:07:59Z",
+          "body_sha256": "037c5828e0b6f01920a76dbded321d0744a0732f926030ef957108ab7e400016"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE",
+        "CLOSEOUT"
+      ]
     }
   ],
   "history_imports": [

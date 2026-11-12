@@ -39,6 +39,8 @@ Successor #628 now delivers the guarded native capital consumer and an independe
 source-held run. Start with the [capital value brief](work-items/research-capital-replay-value-brief.md)
 and [execution/self-audit evidence](acceptance/research-capital-replay-20261112.md).
 The complete economic comparison awaits the encountered P10 action view; #628 remains open.
+For the remaining bounded work, use the [R4 recovery execution plan](design/research-capital-r4-recovery-plan-v1.md),
+covering P10 handoff, consumer binding, controlled execution and independent acceptance.
 The earlier [A qualification brief](work-items/research-capital-qualification-a-value-brief.md)
 is preserved as the prior stage snapshot.
 

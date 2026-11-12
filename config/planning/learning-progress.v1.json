@@ -9817,6 +9817,43 @@
         "TRACE"
       ],
       "no_change_reason": "Conclusion/index maintenance only. Current main META-GATE-001 no-change TRACE observations reviewed via exact GitHub API snapshot; preserve both histories in the designated integration line. No TRACE mechanism or maturity upgrade."
+    },
+    {
+      "id": "CP-628-20261112T045120280922Z",
+      "recorded_at": "2026-11-12T04:51:20.280922+00:00",
+      "actor": "Codex R4 remaining-execution planning",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "outcome": "no_module_change",
+      "summary": "Delivered draft R4 recovery plan: three phases/eight steps, bounded P10 purpose handoff, actual consumer/identity seam, finite execution and independent review; no repair or new capital run started.",
+      "evidence": [
+        {
+          "id": "R4-PLAN",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "375f7f690b5bda1d1356e7c05e345bd4ccba920f",
+          "path": "docs/design/research-capital-r4-recovery-plan-v1.md",
+          "sha256": "e4ac0aa1d9a59fe846e72b0c375898d12dbdb5d8ed08b1227c6fd6fc512855be",
+          "claim_ceiling": "Draft execution and handoff plan only; future scope/budget and all G1-G4 gates await actual execution. Existing economic comparison remains blocked/not_evaluated."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Planning and current issue metadata maintenance only. Existing guarded-consumer engineering, R2 signal quality, source-held economics and consumer admission are unchanged; original attempts/exposure/cost retained.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-CAPITAL-001",
+          "number": 628,
+          "title": "[P3-RESEARCH-CAPITAL-001] 资格通过后完成固定动量候选的最小资金回放",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-12T04:50:46Z",
+          "body_sha256": "3c0afad6cd8d9a2ed75d94ae7ff379d7287e04e9438895ecd50eebb8daad0dc9"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
     }
   ]
 }

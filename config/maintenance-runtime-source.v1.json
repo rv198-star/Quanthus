@@ -3,18 +3,18 @@
   "canonical_repository": "rv198-star/software-lifecycle-skills",
   "canonical_path": "scripts/maintenance_loop.py",
   "version": "1.3.0",
-  "sha256": "30c75ddbb14bc202c35b2df2f95b184230f48c5f1405f478e69646788f0cd288",
+  "sha256": "d32b0dfeb3a0803e1b7e5c96987d02d581537940fe302a823300437967c8edef",
   "files": {
     "scripts/maintenance_audit.py": "b0f215dceb6464a26627f3d26eb5fd973ae2a8511687a648ba7840014761d414",
     "scripts/maintenance_consumer.py": "2da6129900f52f775f718c60924e18f7e3f03699ef8a01fb5a14946d371e011b",
-    "scripts/maintenance_loop.py": "30c75ddbb14bc202c35b2df2f95b184230f48c5f1405f478e69646788f0cd288",
+    "scripts/maintenance_loop.py": "d32b0dfeb3a0803e1b7e5c96987d02d581537940fe302a823300437967c8edef",
     "scripts/maintenance_receiver.py": "8c623fa2b43512147d8643b46bf3f7952ed6d0dea59dad89db216e810f9a6861",
     "scripts/maintenance_sources.py": "1346c7c2cf9826829acd978c67b0618c0ccb9c8b6261b053407189d0032b49c8",
     "scripts/maintenance_store.py": "75c31d6ca82cef1255ac93611deb787830d1e3271973d21f4819d0a4952876c8",
     "scripts/maintenance_verify.py": "39dfba384cc5fd3eaeea86160c55c824ce09823aa0b34739b69f41e67544103f",
     "scripts/maintenance_evidence.py": "d0e868520ed3e77bb0d0bf172c0381f3b13b81b0968fa2a9e370da6506939312",
     "scripts/maintenance_evidence_tools.py": "41bb25d5b2bccadcf9cd79f56239a3a04a9ff476d11ceb503fb5ad111033e3da",
-    "scripts/maintenance_work.py": "398f7d911d8163da22f5d1afad0eb4d4f41738da241031436dd488f942efc823",
+    "scripts/maintenance_work.py": "9b0f2063e6d8d798653aab81f6444f95bdbcac7c727dd0f21ee1b7f697f99a39",
     "scripts/maintenance_checks.py": "6ef7d74ab04851c131000b092c8e7562dc0364321268eecbfd9ea58f9f22133a"
   },
   "update_policy": "reviewed-source-copy-with-matching-digests"

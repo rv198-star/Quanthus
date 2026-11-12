@@ -119,5 +119,6 @@
   "review_timeout_seconds": 1200,
   "followup_seed_issues": [
     312
-  ]
+  ],
+  "executor_model": "auto/gpt-6-astra"
 }

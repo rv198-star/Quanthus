@@ -114,6 +114,9 @@ def load_config(root):
         target = (root / item).resolve()
         if not target.is_relative_to(root.resolve()) or not target.is_file():
             raise ValueError("maintenance authority unavailable")
+    model = config.get("executor_model")
+    if model is not None and (not isinstance(model, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}", model)):
+        raise ValueError("invalid registered executor model")
     return config
 
 
@@ -464,6 +467,7 @@ def repair(root, config, req, store, executor):
             [
                 executor,
                 "exec",
+                *(["--model", config["executor_model"]] if config.get("executor_model") else []),
                 "--sandbox",
                 "workspace-write",
                 "--cd",
@@ -501,6 +505,7 @@ def repair(root, config, req, store, executor):
     return {
         "status": "needs_review" if result.returncode == 0 and allowed else "failed",
         "native_executor": "codex-exec",
+        "executor_model": config.get("executor_model", "cli-default"),
         "native_thread_id": native_id,
         "exit_code": result.returncode,
         "base_sha": base,

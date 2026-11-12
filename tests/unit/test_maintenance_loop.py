@@ -1322,6 +1322,100 @@ class LearningWorkTests(MaintenanceFixture):
             with self.assertRaisesRegex(ValueError, "history changed"):
                 m.handoff(self.root, self.config, request, self.store)
 
+    def test_handoff_excludes_hidden_index_content_from_reviewed_commit(self):
+        import maintenance_work as work
+
+        tree, request, manifest = self.candidate()
+        tracked = tree / "requirements.lock.txt"
+        original_bytes = tracked.read_bytes()
+        tracked.write_text("unreviewed staged content")
+        m.git(tree, "add", "requirements.lock.txt")
+        tracked.write_bytes(original_bytes)
+        self.assertEqual(
+            work.candidate_manifest(tree, manifest["base_sha"])["candidate_digest"],
+            manifest["candidate_digest"],
+        )
+        original_run = work.run
+
+        def dispatch(argv, **kwargs):
+            if argv[0] == "git" and "push" in argv:
+                return ""
+            if argv[:2] == ["gh", "api"]:
+                decision = {
+                    "decision": "accept",
+                    "candidate_request_id": self.req["request_id"],
+                    "candidate_digest": manifest["candidate_digest"],
+                    "candidate_head": manifest["base_sha"],
+                    "validation_refs": ["fixture checks"],
+                    "security_review_ref": "fixture security review",
+                }
+                return json.dumps(
+                    {
+                        "user": {"login": "rv198-star"},
+                        "html_url": request["payload"]["review_ref"],
+                        "body": "<!-- maintenance.candidate-review.v1 -->\n```json\n"
+                        + json.dumps(decision)
+                        + "\n```",
+                    }
+                )
+            value = {
+                "url": "https://github.com/" + self.config["repository"] + "/pull/8",
+                "headRefOid": m.git(tree, "rev-parse", "HEAD"),
+                "baseRefName": "main",
+                "state": "OPEN",
+            }
+            if argv[:3] == ["gh", "pr", "list"]:
+                return json.dumps([value])
+            if argv[:3] == ["gh", "pr", "view"]:
+                return json.dumps(value)
+            return original_run(argv, **kwargs)
+
+        with mock.patch.object(work, "run", side_effect=dispatch):
+            result = m.handoff(self.root, self.config, request, self.store)
+        committed = subprocess.check_output(
+            ["git", "-C", str(tree), "show", result["head_sha"] + ":requirements.lock.txt"]
+        )
+        self.assertEqual(committed, original_bytes)
+
+    def test_interrupted_review_preserves_native_thread_and_worktree_recovery(self):
+        import maintenance_work as work
+
+        sha = m.git(self.root, "rev-parse", "HEAD")
+        req = dict(self.req, kind="review", payload={"from_sha": sha, "to_sha": sha})
+        executor = self.review_executor()
+        original_run = subprocess.run
+
+        def dispatch(argv, **kwargs):
+            if argv[0] == executor:
+                kwargs["stdout"].write(
+                    json.dumps({"type": "thread.started", "thread_id": "interrupted-review-thread"})
+                    + "\n"
+                )
+                kwargs["stdout"].flush()
+                raise subprocess.TimeoutExpired(argv, 1)
+            return original_run(argv, **kwargs)
+
+        with (
+            mock.patch.object(work, "followups", return_value=([], [{"changed": True}])),
+            mock.patch.object(subprocess, "run", side_effect=dispatch),
+        ):
+            receipt = self.claim(req, executor)
+        self.assertEqual(receipt["result"]["status"], "execution_uncertain")
+        self.assertEqual(receipt["result"].get("native_thread_id"), "interrupted-review-thread")
+        self.assertEqual(receipt["external_task"]["native_thread_id"], "interrupted-review-thread")
+        self.assertTrue(Path(receipt["result"]["recovery"]["worktree"]).is_dir())
+
+    def test_documented_new_handshakes_use_current_contract(self):
+        import re
+        config = m.load_config(SOURCE)
+        text = (SOURCE / "docs/maintenance/loop-contract.md").read_text()
+        examples = [json.loads(body) for body in re.findall(r"```json\s*([^`]+?)\s*```", text)]
+        requests = [value for value in examples if value.get("schema") == "maintenance.request.v1"]
+        self.assertGreaterEqual(len(requests), 2)
+        for request in requests:
+            self.assertEqual(request["contract_version"], config["contract_version"])
+            self.assertEqual(m.request(request, config, request["environment_id"]), request)
+
     def test_formal_g2_rejects_python310_and_accepts_python312_evidence(self):
         self.config["verification_python"] = "3.12"
         receipt, delivery = self.pipeline()

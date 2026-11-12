@@ -43,12 +43,12 @@ AgentDock 来源的 kind 为 `agentdock`。路径由部署维护者登记。新�
 
 ## Web 请求与恢复握手
 
-向本仓维护工单追加独立评论，正文只含以下 marker 与一个 JSON fence。同批使用全新 batch/challenge；同请求重投保持 JSON 内容一致。支持 snapshot、acceptance_probe、reconcile、repair、effect。作者必须位于配置 allowlist。
+向本仓维护工单追加独立评论，正文只含以下 marker 与一个 JSON fence。同批使用全新 batch/challenge；同请求重投保持 JSON 内容一致。支持 snapshot、acceptance_probe、reconcile、repair、review、handoff、effect。作者必须位于配置 allowlist。
 
 ````text
 <!-- maintenance.request.v1 -->
 ```json
-{"schema":"maintenance.request.v1","contract_version":"1.2.0","repository":"rv198-star/Quanthus","environment_id":"cn02-dev","request_id":"BATCH-local","batch_id":"NEW-BATCH","challenge":"NEW-CHALLENGE","kind":"acceptance_probe","payload":{}}
+{"schema":"maintenance.request.v1","contract_version":"1.3.0","repository":"rv198-star/Quanthus","environment_id":"cn02-dev","request_id":"BATCH-local","batch_id":"NEW-BATCH","challenge":"NEW-CHALLENGE","kind":"acceptance_probe","payload":{}}
 ```
 ````
 
@@ -57,7 +57,7 @@ AgentDock 来源的 kind 为 `agentdock`。路径由部署维护者登记。新�
 ````text
 <!-- maintenance.request.v1 -->
 ```json
-{"schema":"maintenance.request.v1","contract_version":"1.2.0","repository":"rv198-star/Quanthus","environment_id":"cn02-dev","request_id":"BATCH-local-reconcile","batch_id":"NEW-BATCH","challenge":"NEW-CHALLENGE","kind":"reconcile","payload":{"target_request_id":"BATCH-local"}}
+{"schema":"maintenance.request.v1","contract_version":"1.3.0","repository":"rv198-star/Quanthus","environment_id":"cn02-dev","request_id":"BATCH-local-reconcile","batch_id":"NEW-BATCH","challenge":"NEW-CHALLENGE","kind":"reconcile","payload":{"target_request_id":"BATCH-local"}}
 ```
 ````
 
@@ -116,6 +116,8 @@ repair 的 payload 给已有开放维护 Issue 的 issue_number 和精确 curren
 
 ### 正式只读审阅
 
+编码与审阅沿登记的现有Codex CLI；可选 `executor_model` 由版本化项目配置指定，控制请求不能选择模型。Quanthus登记经原凭据只读实测的Astra路由；原全局CLI配置继续作为其他调用的设置。
+
 同一控制入口接受 `kind=review`，payload 为精确 `from_sha`、`to_sha` 和最多10个 `followups`（每项含 `issue_number`，后续可带前次 `source_digest`）。在固定接收器的 Git 对象库读取 main 一阶连续窗口，最多审阅12个单元；余下单元保留，当前任务不占每日编码修复额度。现有 Codex 以 `read-only` sandbox 在独立 detached worktree 审阅实际 diff、合并PR/验证head及四类问题：返工、准入、薄验证、跨提交退化。
 
 无新提交时也跟进事故与修复的新结果。服务端读所选Issue全部评论及编辑，完整输入保留在私有job；回执只导出来源摘要、最后评论地址及必要审阅结论。云端确认报告实际覆盖后才接受 `proposed_reviewed_through`，pending单元沿原终点接续。用户确认、待批准PR和效果观察用独立跟进清单，不阻塞已完整审阅的代码游标。
@@ -124,7 +126,7 @@ repair 的 payload 给已有开放维护 Issue 的 issue_number 和精确 curren
 
 ### 本地候选到草稿PR
 
-`repair` 继续只产生隔离候选。`candidate_digest`绑定base及所有已提交、暂存、未暂存、未跟踪文件的内容和可执行位。候选接手者是当前Web维护控制Agent：通过已登记节点读取原生job、完整diff（含未跟踪文件）、检查结果并按项目要求完成安全扫描；在本仓可信账号的Issue评论中保存原request_id、candidate_digest、审阅结论与验证引用。
+`repair` 继续只产生隔离候选。`candidate_digest`绑定base与候选工作区的预期发布内容及可执行位；交接将完整暂存区对齐已审工作区，再核对暂存树和已提交树，覆盖未跟踪文件并阻止隐藏暂存内容混入。候选接手者是当前Web维护控制Agent：通过已登记节点读取原生job、完整diff（含未跟踪文件）、检查结果并按项目要求完成安全扫描；在本仓可信账号的Issue评论中保存原request_id、candidate_digest、审阅结论与验证引用。
 
 可信审阅评论以 `<!-- maintenance.candidate-review.v1 -->` 开头，紧随一个json代码块，其对象包含 `decision="accept"`、`candidate_request_id`、`candidate_digest`、原回执的 `candidate_head`、非空 `validation_refs` 列表和 `security_review_ref`。验证与安全引用由实际审阅者确认，接收器核对绑定及形状。草稿发布失败后，先查原handoff结果；需要继续时用新handoff请求保留原repair target、digest和review_ref，固定分支复用同一PR。
 

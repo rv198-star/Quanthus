@@ -204,31 +204,40 @@ def review(root, config, req, store, executor):
         "Your report proposes coverage; the controller accepts it and advances only "
         "contiguous reviewed units."
     )
-    with (
-        (job / "native.jsonl").open("w") as out,
-        (job / "native.stderr").open("w") as err,
-    ):
-        result = subprocess.run(
-            [
-                executor,
-                "exec",
-                "--sandbox",
-                "read-only",
-                "--cd",
-                str(tree),
-                "--json",
-                "--output-last-message",
-                str(job / "review.md"),
-                prompt,
-            ],
-            stdout=out,
-            stderr=err,
-            timeout=config.get("review_timeout_seconds", 1200),
-        )
+    timed_out = False
+    exit_code = None
+    with (job / "native.jsonl").open("w") as out, (job / "native.stderr").open("w") as err:
+        try:
+            result = subprocess.run(
+                [
+                    executor,
+                    "exec",
+                    *(
+                        ["--model", config["executor_model"]]
+                        if config.get("executor_model")
+                        else []
+                    ),
+                    "--sandbox",
+                    "read-only",
+                    "--cd",
+                    str(tree),
+                    "--json",
+                    "--output-last-message",
+                    str(job / "review.md"),
+                    prompt,
+                ],
+                stdout=out,
+                stderr=err,
+                timeout=config.get("review_timeout_seconds", 1200),
+            )
+            exit_code = result.returncode
+        except subprocess.TimeoutExpired:
+            timed_out = True
     clean = not git(tree, "status", "--porcelain") and git(tree, "rev-parse", "HEAD") == proposed
     report = (job / "review.md").read_text() if (job / "review.md").is_file() else ""
-    if len(report.encode()) > 60000:
-        raise ValueError("review report exceeds its bounded evidence size")
+    oversized = len(report.encode()) > 60000
+    if oversized:
+        report = "Report exceeds the bounded evidence size; inspect the retained original job."
     native_id = None
     for line in (job / "native.jsonl").read_text().splitlines():
         try:
@@ -238,31 +247,60 @@ def review(root, config, req, store, executor):
         except ValueError:
             pass
     return {
-        "status": "needs_coverage_acceptance"
-        if result.returncode == 0 and clean and report.strip() and native_id
+        "status": "execution_uncertain"
+        if timed_out
+        else "needs_coverage_acceptance"
+        if exit_code == 0 and clean and report.strip() and native_id and not oversized
         else "failed",
-        "exit_code": result.returncode,
+        "exit_code": exit_code,
         "execution_model": "codex_exec_read_only",
+        "executor_model": config.get("executor_model", "cli-default"),
         "native_thread_id": native_id,
         "window": window,
         "source_unchanged": clean,
         "followup_updates": updates,
         "review_report": report,
         "review_report_digest": hashlib.sha256(report.encode()).hexdigest(),
+        "recovery": {
+            "worktree": str(tree),
+            "native_log": str(job / "native.jsonl"),
+            "native_thread_id": native_id,
+        },
         "resume": "controller accepts coverage; carry pending units and follow-ups separately",
     }
 
 
-def candidate_manifest(tree, base):
-    """Bind committed, staged, unstaged AND untracked candidate content."""
-    paths = set(run(["git", "-C", str(tree), "diff", base, "--name-only", "-z"]).split("\0"))
-    paths |= set(
-        run(["git", "-C", str(tree), "ls-files", "--others", "--exclude-standard", "-z"]).split(
-            "\0"
+def candidate_manifest(tree, base, revision=None):
+    """Bind intended working content or the exact Git tree being committed/pushed."""
+    command = ["git", "-C", str(tree), "diff", "--name-only", "-z", base]
+    if revision:
+        command.append(revision)
+    paths = set(run(command).split("\0"))
+    if not revision:
+        paths |= set(
+            run(["git", "-C", str(tree), "ls-files", "--others", "--exclude-standard", "-z"]).split(
+                "\0"
+            )
         )
-    )
     files = []
     for name in sorted(paths - {""}):
+        if revision:
+            entry = git(tree, "--literal-pathspecs", "ls-tree", revision, "--", name)
+            if not entry:
+                files.append({"path": name, "sha256": None, "executable": False})
+                continue
+            mode, kind, object_id = entry.split("\t", 1)[0].split()
+            if mode not in {"100644", "100755"} or kind != "blob":
+                raise ValueError("committed candidate must contain regular files")
+            data = subprocess.check_output(["git", "-C", str(tree), "cat-file", "blob", object_id])
+            files.append(
+                {
+                    "path": name,
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                    "executable": mode == "100755",
+                }
+            )
+            continue
         path = tree / name
         if path.is_symlink() or not path.resolve().is_relative_to(tree.resolve()):
             raise ValueError("candidate paths must remain regular files in the isolated worktree")
@@ -370,23 +408,30 @@ def handoff(root, config, req, store):
         raise ValueError("candidate history changed after review")
     # The trusted reviewer owns semantic/security acceptance before this explicit request.
     if git(tree, "status", "--porcelain"):
-        git(tree, "add", "-A", "--", *[f["path"] for f in manifest["files"]])
+        # Reconcile the entire private index, including masked staged changes.
+        git(tree, "add", "-A", "--", ".")
+    staged_tree = git(tree, "write-tree")
+    if candidate_manifest(tree, base, staged_tree)["candidate_digest"] != expected:
+        raise ValueError("candidate index differs from reviewed content")
+    staged = subprocess.run(["git", "-C", str(tree), "diff", "--cached", "--quiet"])
+    if staged.returncode not in {0, 1}:
+        raise ValueError("candidate index cannot be inspected")
+    if staged.returncode == 1:
         git(
             tree,
             "commit",
             "-m",
             f"Refs #{candidate['issue_number']}: reviewed maintenance candidate",
         )
-        store.event(
-            target,
-            "candidate_handoff_commit",
-            head_sha=git(tree, "rev-parse", "HEAD"),
-            candidate_digest=expected,
-        )
     head = git(tree, "rev-parse", "HEAD")
-    if candidate_manifest(tree, base)["candidate_digest"] != expected:
+    if (
+        candidate_manifest(tree, base)["candidate_digest"] != expected
+        or candidate_manifest(tree, base, head)["candidate_digest"] != expected
+    ):
         raise ValueError("candidate content changed during commit")
-    git(tree, "push", "--set-upstream", "origin", branch)
+    if head not in allowed_heads:
+        store.event(target, "candidate_handoff_commit", head_sha=head, candidate_digest=expected)
+    git(tree, "push", "origin", head + ":refs/heads/" + branch)
     prs = json.loads(
         run(
             [

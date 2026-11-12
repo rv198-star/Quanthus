@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Parent | [探索准则](exploration-governance.md)，研究 Epic #608，R6 milestone 20 |
-| Design status | draft — Owner 已批准 R6；冻结合同待独立预审 |
-| Delivery gate | blocked — 仅代码、元数据和旧报告查证完成，尚未新增市场响应 |
+| Design status | approved — Owner 批准R6；独立科学/代码预审绑定09c333800c7511cb4802c3058f5d0c4ec7e62bbc |
+| Delivery gate | accepted for the frozen research and park decision；[实际验收](../acceptance/research-r6-rank1-response-20261113.md)，源码/生命周期另列 |
 | Selection | META-RESEARCH-R6-CONSUMER-001 / #645 |
 | Request | `config/research/research-r6/request.v1.json` |
 | Implementation | `src/quanthus/rank1_response.py`，`scripts/research_r6.py` |

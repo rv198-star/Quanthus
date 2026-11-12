@@ -112,5 +112,7 @@
     "max_new_bytes": 2147483648,
     "network_requests": 100,
     "accounting_owner": "R5 Mission with inherited exposure and unknown-not-zero history"
-  }
+  },
+  "execution_record": "CON-R6-RANK1-20261113",
+  "execution_disposition": "completed;selectedrank1route inconclusive/park;source/lifecycle separately tracked"
 }

@@ -25,7 +25,7 @@ from maintenance_consumer import consume, load_rule
 from maintenance_sources import collect
 from maintenance_store import Store, identity
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 REQUEST_MARKER = "<!-- maintenance.request.v1 -->"
 RECEIPT_MARKER = "<!-- maintenance.receipt.v1 -->"
 ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
@@ -130,7 +130,7 @@ def request(raw, config, environment):
     if environment not in {e["id"] for e in config["environments"]}:
         raise ValueError("environment is not registered")
     if (
-        raw.get("contract_version") not in {config["contract_version"], "1.0.0"}
+        raw.get("contract_version") not in {config["contract_version"], "1.0.0", "1.1.0"}
         or raw.get("kind") not in KINDS
     ):
         raise ValueError("unsupported contract or request kind")
@@ -917,7 +917,7 @@ def main():
     parser.add_argument("command", choices=["export", "claim", "reconcile", "effect", "poll"])
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--workspace", type=Path)
-    parser.add_argument("--environment-id", default="local-dev")
+    parser.add_argument("--environment-id", help="Defaults to the registered repair environment")
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--request", type=Path)
     parser.add_argument(
@@ -930,6 +930,7 @@ def main():
     root, store = args.root.resolve(), None
     try:
         config = load_config(root)
+        args.environment_id = args.environment_id or config["repair_environment"]
         workspace = (args.workspace or root).resolve()
         sources = json.loads(args.sources_file.read_text()) if args.sources_file else {}
         if args.environment_id not in {e["id"] for e in config["environments"]}:

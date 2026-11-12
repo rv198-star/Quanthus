@@ -1,4 +1,4 @@
-# 仓库维护循环合同 v1.1.0
+# 仓库维护循环合同 v1.1.1
 
 实施与持久回执：[维护工单 #632](https://github.com/rv198-star/Quanthus/issues/632)。配置：[`maintenance-loop.v1.json`](../../config/maintenance-loop.v1.json)。
 
@@ -12,13 +12,13 @@ GitHub 持有源码和研发工单；开发环境持有工作现场与本地验�
 
 ## 正式入口与身份
 
-Python 3.9+ 标准库、Git、已有 gh 认证。WFF 的验证使用 Python 3.12。配置登记五个必需环境：WFF local-dev；Quanthus local-dev/cn02-dev；AIWork local-dev/oci-dev。私有部署清单固定源码提交、登记工作区、持久 state-dir、解释器和 sources_file，维护源码通过 GitHub 分发。
+Python 3.9+ 标准库、Git、已有 gh 认证。WFF 的验证使用 Python 3.12。配置登记三个真实开发环境：WFF oci-dev（OCI）、Quanthus cn02-dev（CN02）、AIWork oci-dev（OCI）。Mac 上的源码副本退出登记，接收器直接在各项目实际开发服务器运行。私有部署清单固定源码提交、登记工作区、持久 state-dir、解释器和 sources_file，维护源码通过 GitHub 分发。
 
 `scripts/maintenance_receiver.py` 校验固定提交与维护代码配置后调用 `maintenance_loop.py poll`。环境内 poll/claim 进程锁保护同一 SQLite inbox/outbox。原工作区只读；repair 仍使用独立 worktree 和原有 Codex CLI。merge、业务验收及 TPlan/Coordinator/P10 的事实归属沿用项目现有规则。
 
 每个实际执行轮次有持久 `receiver_run_id`；正式认领时记录 `received_at`、随机 `attempt_id`、实际序号与开始时间，完成时记录完成时间和运行身份。探针声明 `execution_model=in_process_probe`，后续消费者声明 `queued_rule_consumer_fixture`。它们使用接收器账本作为原生执行系统，external task 为不适用；repair 引用真实 Codex thread。重复投递沿用同一业务 attempt，发布重试另有 publication attempt。
 
-同一 request_id 绑定同一 canonical request digest。原生回执写入后保持不变。旧版 inbox、已发布回执及其摘要保留；旧批次缺失的时间/事件导出 `legacy_not_recorded`。新请求使用 1.1.0。
+同一 request_id 绑定同一 canonical request digest。原生回执写入后保持不变。旧版 inbox、已发布回执及其摘要保留；退出登记的 Mac 账本归档保存，旧批次仍可从原 GitHub 回执追溯；旧批次缺失的时间/事件导出 `legacy_not_recorded`。新请求使用 1.1.1。
 
 ## 环境来源
 
@@ -26,7 +26,7 @@ Python 3.9+ 标准库、Git、已有 gh 认证。WFF 的验证使用 Python 3.12
 
 - `github_work`：实时开放 Issue/PR 摘要，属于选定工作；与正在执行的 attempt 分开呈现。
 - `native_tasks`：从既有 TPlan mission 或 AgentDock task JSON 读取 ID、状态、原生引用、来源摘要。已查询且无活跃任务显示 `status=ok, active_count=0`。
-- `executor`：实际 Python 接收器/消费者能力；local-dev 查询 Codex 版本与认证状态。远端按照 `repair_environment` 配置将编码执行器声明为不适用。
+- `executor`：实际 Python 接收器/消费者能力；登记的开发服务器查询既有 Codex 版本与认证状态；`repair_environment` 指向该实际开发环境。其他只承担采集职责的角色才按配置声明编码执行器不适用。
 - `verification`：`maintenance_verify.py` 实际执行相关测试，保存退出码、测试数、命令、时间、日志 SHA256、测试代码闭包与维护指纹；采集时重新核对来源与日志摘要。
 - `maintenance_executions`：原维护账本的 receiver 身份和活跃 attempt，不把开放 Issue 当成运行中的进程。
 
@@ -45,7 +45,7 @@ AgentDock 来源的 kind 为 `agentdock`。路径由部署维护者登记。新�
 ````text
 <!-- maintenance.request.v1 -->
 ```json
-{"schema":"maintenance.request.v1","contract_version":"1.1.0","repository":"rv198-star/Quanthus","environment_id":"local-dev","request_id":"BATCH-local","batch_id":"NEW-BATCH","challenge":"NEW-CHALLENGE","kind":"acceptance_probe","payload":{}}
+{"schema":"maintenance.request.v1","contract_version":"1.1.1","repository":"rv198-star/Quanthus","environment_id":"cn02-dev","request_id":"BATCH-local","batch_id":"NEW-BATCH","challenge":"NEW-CHALLENGE","kind":"acceptance_probe","payload":{}}
 ```
 ````
 
@@ -54,7 +54,7 @@ AgentDock 来源的 kind 为 `agentdock`。路径由部署维护者登记。新�
 ````text
 <!-- maintenance.request.v1 -->
 ```json
-{"schema":"maintenance.request.v1","contract_version":"1.1.0","repository":"rv198-star/Quanthus","environment_id":"local-dev","request_id":"BATCH-local-reconcile","batch_id":"NEW-BATCH","challenge":"NEW-CHALLENGE","kind":"reconcile","payload":{"target_request_id":"BATCH-local"}}
+{"schema":"maintenance.request.v1","contract_version":"1.1.1","repository":"rv198-star/Quanthus","environment_id":"cn02-dev","request_id":"BATCH-local-reconcile","batch_id":"NEW-BATCH","challenge":"NEW-CHALLENGE","kind":"reconcile","payload":{"target_request_id":"BATCH-local"}}
 ```
 ````
 
@@ -73,7 +73,7 @@ AgentDock 来源的 kind 为 `agentdock`。路径由部署维护者登记。新�
 
 ## 后续规则消费与效果
 
-正式规则入口是 `config/maintenance-consumer-rule.v1.json`，激活版本 1.1.0，权威内容为本合同。正式消费者入口为 `scripts/maintenance_consumer.py:consume`，通过 inbox 的 `rule_consumer_fixture` 队列进入，公网投递不得伪造此内部 kind 或保留的 `:fixture` 身份。
+正式规则入口是 `config/maintenance-consumer-rule.v1.json`，激活版本 1.1.1，权威内容为本合同。正式消费者入口为 `scripts/maintenance_consumer.py:consume`，通过 inbox 的 `rule_consumer_fixture` 队列进入，公网投递不得伪造此内部 kind 或保留的 `:fixture` 身份。
 
 父探针只排队候选输入；后续 receiver run 的消费者自己调用 `load_rule()` 加载实际入口、版本、authority digest。错误摘要产生 `rule_digest_mismatch` 拒绝，正确摘要产生 `activated_rule_matched` 接受。两例分别保存输入摘要、期望、实际行为与事件引用。消费者保存 rule_loaded、behavior_evaluated、rule_consumed；实际使用次数由持久 rule_consumed 事件查询得出。重投与恢复沿用子 attempt，使用次数不增加。
 
@@ -96,11 +96,11 @@ AgentDock 来源的 kind 为 `agentdock`。路径由部署维护者登记。新�
 
 摘要算法：移除相应 `receipt_digest / evidence_digest / event_digest` 字段，JSON 按键排序、UTF-8、无多余空白，计算 SHA256。查询回执自身与其 target receipt digest 分开核对。
 
-项目侧先完成五环境验收并持久发布三仓报告、跨仓汇总与读回确认；Web 再以新 batch/challenge 独立复查。五环境、三仓八项均通过且汇总读回后，输出 `LOOP3_READY_FOR_SCHEDULE`，附实际 batch、3/3、5/5 与汇总链接。每日任务仍由 Owner 创建。
+项目侧先完成三个真实开发环境验收并持久发布三仓报告、跨仓汇总与读回确认；Web 再以新 batch/challenge 独立复查。三环境、三仓八项均通过且汇总读回后，输出 `LOOP3_READY_FOR_SCHEDULE`，附实际 batch、3/3、3/3 与汇总链接。每日任务仍由 Owner 创建。
 
 ## 修复与每日运行
 
-repair 的 payload 给已有开放维护 Issue 的 issue_number 和精确 current-main base_sha，只路由 local-dev。候选代码/检查/原生日志交项目审阅；已发出的原生回执保持不变，awaiting_executor/deferred_budget 处置后经审阅使用新请求继续，中断编码先检查原生日志和保留 worktree。
+repair 的 payload 给已有开放维护 Issue 的 issue_number 和精确 current-main base_sha，只路由本仓登记的实际开发环境 `cn02-dev`。候选代码/检查/原生日志交项目审阅；已发出的原生回执保持不变，awaiting_executor/deferred_budget 处置后经审阅使用新请求继续，中断编码先检查原生日志和保留 worktree。
 
 每日先对账旧任务、恢复 outbox、复查后续效果，再按价值选新改进。每仓最多一项新编码任务，预算见配置；无适用机会记录 wait。用同一 improvement_id 串联来源、Issue、attempt、验证、PR、合入、目标规则、后续消费和效果决定。维护自身心跳排除出变化扫描；未完成来源沿原游标重试。
 

@@ -1,6 +1,6 @@
 {
   "schema": "maintenance.loop.v1",
-  "contract_version": "1.0.0",
+  "contract_version": "1.1.0",
   "repository": "rv198-star/Quanthus",
   "control_issue": 632,
   "transport": {
@@ -8,7 +8,9 @@
     "request_marker": "<!-- maintenance.request.v1 -->",
     "receipt_marker": "<!-- maintenance.receipt.v1 -->",
     "request_url": "https://github.com/rv198-star/Quanthus/issues/632",
-    "poll_interval_seconds": 60
+    "poll_interval_seconds": 60,
+    "delivery_marker": "<!-- maintenance.delivery.v1 -->",
+    "ledger_query_kind": "reconcile"
   },
   "controller_receipt_store": "https://github.com/rv198-star/software-lifecycle-skills/issues/1272",
   "allowed_request_authors": [
@@ -80,6 +82,25 @@
   "bootstrap": {
     "required_probe_kind": "acceptance_probe",
     "request_deadline_seconds": 300,
-    "receipt_query": "control-issue-comments: repository/environment/request/challenge and verified digest"
+    "receipt_query": "control-issue-comments: repository/environment/request/challenge and verified digest",
+    "recovery": "result persisted -> deferred outbox -> formal reconcile -> later receiver run publishes original result",
+    "consumer": "queued fixture claimed in a later receiver run through activated consumer entry"
+  },
+  "verification_test_path": "tests/unit/test_maintenance_loop.py",
+  "evidence_sources": {
+    "registration": "private operator manifest sources_file; request payloads never select local paths",
+    "required": [
+      "github_work",
+      "native_tasks",
+      "executor",
+      "verification",
+      "maintenance_executions"
+    ],
+    "states": [
+      "ok",
+      "failed",
+      "not_configured",
+      "not_applicable"
+    ]
   }
 }

@@ -357,6 +357,93 @@ def test_upload_uses_returned_commit_and_all_file_readback(tmp_path, specimen, m
     assert commits[0]["parent_commit"] == "b" * 40
 
 
+@pytest.mark.parametrize(
+    "head", [None, "", "main", "a" * 39, "a" * 41, "g" * 40, "a" * 40 + "\n", 123]
+)
+@pytest.mark.parametrize("existing", [False, True])
+def test_publish_rejects_invalid_head_before_remote_access(
+    tmp_path, specimen, monkeypatch, head, existing
+):
+    identity, package = prepare_package(tmp_path, specimen, monkeypatch)
+    before = {p.name: p.read_bytes() for p in package.iterdir()}
+    calls = []
+
+    class API:
+        def __init__(self, **kwargs):
+            pass
+
+        def dataset_info(self, *args):
+            calls.append("dataset_info")
+            return types.SimpleNamespace(sha=head, private=True)
+
+        def file_exists(self, **kwargs):
+            calls.append("file_exists")
+            return existing
+
+        def list_repo_files(self, **kwargs):
+            calls.append("list_repo_files")
+            return []
+
+        def create_commit(self, **kwargs):
+            calls.append("create_commit")
+            pytest.fail("invalid head reached remote write")
+
+        def hf_hub_download(self, **kwargs):
+            calls.append("hf_hub_download")
+            pytest.fail("invalid head reached remote download")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        types.SimpleNamespace(HfApi=API, CommitOperationAdd=lambda **kwargs: kwargs),
+    )
+    with pytest.raises(worker.GuardError, match="immutable result repository head"):
+        worker.publish(specimen, [], identity, tmp_path)
+    assert calls == ["dataset_info"]
+    assert not (tmp_path / "publish.json").exists()
+    assert before == {p.name: p.read_bytes() for p in package.iterdir()}
+
+
+def test_publish_existing_package_uses_fixed_head_without_commit(tmp_path, specimen, monkeypatch):
+    identity, package = prepare_package(tmp_path, specimen, monkeypatch)
+    revisions = []
+
+    class API:
+        def __init__(self, **kwargs):
+            pass
+
+        def dataset_info(self, *args):
+            return types.SimpleNamespace(sha="b" * 40, private=True)
+
+        def file_exists(self, **kwargs):
+            revisions.append(kwargs["revision"])
+            return True
+
+        def list_repo_files(self, **kwargs):
+            revisions.append(kwargs["revision"])
+            return [specimen["publish"]["path_prefix"] + "/" + p.name for p in package.iterdir()]
+
+        def hf_hub_download(self, **kwargs):
+            revisions.append(kwargs["revision"])
+            return str(package / kwargs["filename"].split("/")[-1])
+
+        def create_commit(self, **kwargs):
+            pytest.fail("already delivered package must not create a commit")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        types.SimpleNamespace(HfApi=API, CommitOperationAdd=lambda **kwargs: kwargs),
+    )
+    worker.publish(specimen, [], identity, tmp_path)
+    receipt = worker.read(tmp_path / "publish.json")
+    assert receipt["revision"] == "b" * 40
+    assert receipt["disposition"] == "already_delivered"
+    assert receipt["read_back_all_files"] is True
+    assert len(revisions) == 3 + len(list(package.iterdir()))
+    assert set(revisions) == {"b" * 40}
+
+
 def test_remote_content_conflict_never_overwrites(tmp_path, specimen, monkeypatch):
     identity, package = prepare_package(tmp_path, specimen, monkeypatch)
     wrong = tmp_path / "wrong"

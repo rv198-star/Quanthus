@@ -744,6 +744,8 @@ def publish(
     info = api.dataset_info(repo)
     require(info.private is True, "result repository must be private")
     head = info.sha
+    if not isinstance(head, str) or re.fullmatch(r"[0-9a-f]{40}", head) is None:
+        raise GuardError("immutable result repository head")
     exists = api.file_exists(
         repo_id=repo,
         repo_type="dataset",

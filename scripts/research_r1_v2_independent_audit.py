@@ -113,7 +113,15 @@ def checked_source(original, out, spec):
     return request, members, isolated, result
 
 
-def reproduce(original, out, spec, evaluator=None, source_resolver=None):
+def reproduce(
+    original,
+    out,
+    spec,
+    evaluator=None,
+    source_resolver=None,
+    panel_evaluator=None,
+    audit_decision_end=None,
+):
     import duckdb
     import numpy as np
     import pandas as pd
@@ -281,10 +289,12 @@ def reproduce(original, out, spec, evaluator=None, source_resolver=None):
         "is_tradable",
         "can_buy",
     ]
-    if evaluator is not None:
+    if evaluator is not None or panel_evaluator is not None:
         columns.extend(["px", "day"])
     future = panel[columns].rename(columns={x: "next_" + x for x in columns if x != "listing_id"})
-    labelled = panel.loc[panel.day.between(scope["decision_start"], scope["decision_end"])].merge(
+    label_end = audit_decision_end or scope["decision_end"]
+    assert scope["decision_end"] <= label_end <= scope["execution_end"]
+    labelled = panel.loc[panel.day.between(scope["decision_start"], label_end)].merge(
         future,
         how="left",
         left_on=["listing_id", "next_session"],
@@ -318,6 +328,9 @@ def reproduce(original, out, spec, evaluator=None, source_resolver=None):
         "pass",
     )
 
+    if panel_evaluator is not None:
+        assert evaluator is None
+        return panel_evaluator(q, labelled, panel, author, out, began)
     if evaluator is not None:
         return evaluator(q, labelled, author, out, began)
 

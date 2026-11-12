@@ -1288,6 +1288,92 @@
         "CP-628-20261112T072129212925Z"
       ],
       "supersedes": "CON-CAPITAL-REPLAY-20261112"
+    },
+    {
+      "id": "CON-R5-CLOCK-20261112",
+      "recorded_at": "2026-11-12T15:28:38.324484+00:00",
+      "actor": "R5 primary semantic decision after read-only independent research and transport acceptance",
+      "question_id": "RESEARCH-R5-CLOCK-001-POPULATION-CLOCK",
+      "family": "raw-momentum20-clock-aligned-screen",
+      "work_item": "P3-RESEARCH-R5-CLOCK-001",
+      "modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "Does the fixed raw-momentum20 population retain its incremental price response over T+1open to T+2open sufficiently to retain this screen evidence?",
+      "consumer": "#608 research allocator and prospective signal-screen protocol",
+      "scope": "Fixed56members,already consumed2020-2021 retrospective raw prices; decisions2020-03-02..2021-12-29,read<=2021-12-31;same common cohort for intraday/overnight/interaction; original R2 filters and closed[2%,12%]band;R4 fixed holding remains park.",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Independently accepted distribution-level price-response evidence:5.407834536bp,95%[0.766141827,10.064702068]bp,2020/2021positive,448paired dates; around85% retained relative to common-cohort intraday6.364523444bp. This use does not include economic adjustment,fees or executable second-open sale.",
+      "decision_effect": "Retain this evidence in the research allocator and complete this bounded question; require a named decision-changing consumer before the next tranche. Preserve R4 fixed-holding park,all previous exposure and costs.",
+      "reopen_conditions": [
+        "A named consumer specifies the action this evidence can change and a material unmet question or input/use requirement,with a prospective finite contract and independent acceptance.",
+        "Carry all R1/R2/R4/R5 exposures,failures and costs; preserve R4 original annual/concentration gates and qualify any economic consumer separately."
+      ],
+      "retained_assets": [
+        "src/quanthus/hf_clock_response.py",
+        "scripts/research_r5_independent_audit.py",
+        "config/research/research-r5/request.v1.json",
+        "docs/design/research-r5-clock-response-v1.md",
+        "docs/acceptance/research-r5-clock-response-20261112.md",
+        "docs/work-items/research-r5-value-brief.md",
+        "hf:rv192/quanthus-research-r1@1f4778a9eeda7e7c993878ed0d2760bfbbae258d/runs/RESEARCH-R5-CLOCK-001/RESEARCH-R5-CLOCK-001-T1/A1",
+        "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "One formal64.271350s and independent62.489182s; input network0B,focused17.864887s,original full Linux check877.428828s. Failed publishA1 180.197500s and transfer-onlyA2 49.014656s,both retained; original compute Job clock preserved on expiry. Current-main integration/full verification is recorded separately at source handoff. Design,independent review,guard repair and delivery dominate this narrow information gain; reuse before parameter/Worker expansion. Complete active/model/Token/billing and earlier R1/R2/R4 costs unknown_not_zero and cumulative.",
+      "attempt_refs": [
+        "git:b0e3ee717f80c9be5889c4b49db486ba9da2e18b",
+        "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/formal-a1",
+        "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/independent-a1",
+        "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/transport-A2"
+      ],
+      "evidence": [
+        {
+          "id": "R5-RESULT-AUDIT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained/evidence/actual-result-self-audit.json",
+          "sha256": "2d742a27f872f97ed0d0c45eaa93b2f7f2d953b4cf8d73cb508df440bec112a1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Frozen common-cohort primary/component statistics and original resource-use decision."
+        },
+        {
+          "id": "R5-INDEPENDENT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained/evidence/independent-research-acceptance.json",
+          "sha256": "a1e1c46e8dcb26e9f47c5146e888cf19814f5f665e048ea65fdb5ad4a36a881a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Read-only independent source hash, formal/reference reconciliation and independently recomputed 2000x20-session bootstrap acceptance."
+        },
+        {
+          "id": "R5-HF-PUBLISH",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained/transport-A2/publish-readback.json",
+          "sha256": "6d36bd6b931106724d1be9afffcb93ad6ee056d04ec7a865aa498bddb2f21413",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private immutable1f4778a9eeda7e7c993878ed0d2760bfbbae258d, ten exact original package members fully read back."
+        },
+        {
+          "id": "R5-TRANSFER-GUARD",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained/transport-A2/guardian.json",
+          "sha256": "0411220fce13db14c4f28535c4e3f571986a675c5f67445b71caa1b57a43d543",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Transfer-only A2 passed180s/live/terminal resource guard and preserved original job clock,attempts and package hashes."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-642-R5-RESEARCH-ACCEPTED-20261112"
+      ]
     }
   ]
 }

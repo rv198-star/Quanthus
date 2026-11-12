@@ -28,6 +28,7 @@ CODE_FILES = (
     "ops/bin/hf-dwd-research",
     "src/quanthus/hf_dwd_research.py",
     "src/quanthus/hf_dwd_research_sql.py",
+    "src/quanthus/hf_clock_response.py",
 )
 REQUEST_SCHEMA = "quanthus.hf-dwd-research-request.v2"
 REASONS = ("fetch", "screen", "publish")
@@ -174,7 +175,27 @@ def validate_request(request: dict[str, Any]) -> None:
     if "analysis" in request:
         analysis = request["analysis"]
         require(isinstance(analysis, dict), "analysis shape")
-        require(analysis.get("kind") == "momentum-band-next-session-markout.v1", "analysis kind")
+        require(
+            analysis.get("kind")
+            in {"momentum-band-next-session-markout.v1", "momentum-band-clock-aligned-markout.v1"},
+            "analysis kind",
+        )
+        if analysis["kind"] == "momentum-band-clock-aligned-markout.v1":
+            require(
+                analysis.get("primary_response") == "open_to_next_open"
+                and analysis.get("components") == ["intraday", "overnight", "interaction"],
+                "fixed clock response",
+            )
+            require(
+                s["decision_start"] == "2020-03-02"
+                and s["decision_end"] == "2021-12-29"
+                and s["execution_end"] == "2021-12-31",
+                "two-session boundary",
+            )
+            require(
+                analysis.get("audit_right_censored_decision") == "2021-12-30",
+                "fixed right-censor audit date",
+            )
         require(analysis.get("required_years") == [2020, 2021], "analysis years")
         require(
             analysis.get("required_venues")

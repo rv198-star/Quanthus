@@ -116,7 +116,9 @@ is an audit failure, never an empty/green snapshot. No workflow edits or closes 
 
 A checkpoint contains `id`, timezone-aware `recorded_at`, `actor`, `work_item`, `outcome`,
 `summary`, `evidence`, `updates`, and optional `issue_observations`. Use a unique stable ID;
-chronology cannot move backwards. The first record alone may use `baseline`.
+ordinary checkpoint chronology cannot move backwards. The first record alone may use `baseline`.
+The bounded [history import v1 candidate](blueprint-history-import-v1.md) adds a separately
+validated ingestion clock for intact parallel history; its design is pending independent audit.
 
 Each update contains `module`, `facet`, allowed `status`, `scope`, `remaining`, `next_action`,
 `evidence` IDs and `supersedes` (the previous checkpoint for this exact module/facet, or null).

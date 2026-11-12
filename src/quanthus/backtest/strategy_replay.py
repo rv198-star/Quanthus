@@ -105,7 +105,7 @@ class ReplayDecision:
                 or self.quantity <= 0
             ):
                 raise ValueError("enter quantity must be a positive integer")
-            if has_target and (
+            if self.target_percent is not None and (
                 not self.target_percent.is_finite()
                 or not Decimal("0") < self.target_percent <= Decimal("1")
             ):
@@ -237,17 +237,27 @@ class StrategyReplayFrame:
         repr=False,
     )
     source: ReplayFrameSource | None = field(default=None, compare=False, repr=False)
+    snapshot_replay_clock_json: str | None = None
 
     def __post_init__(self) -> None:
         if self.decision_at.tzinfo is None or self.decision_at.utcoffset() is None:
             raise ValueError("decision_at must be timezone-aware")
-        if self.snapshot.knowledge_cutoff > self.decision_at:
+        if self.snapshot_replay_clock_json is not None:
+            from quanthus.backtest.capital_clock import CapitalReplayClock
+
+            clock = CapitalReplayClock.from_json(self.snapshot_replay_clock_json)
+            if (
+                clock.market_date != self.snapshot.market_date
+                or clock.knowledge_cutoff != self.snapshot.knowledge_cutoff
+                or self.decision_at != clock.simulated_close
+            ):
+                raise ValueError("capital clock does not bind frame")
+        elif self.snapshot.knowledge_cutoff > self.decision_at:
             raise ValueError("frame decision cannot precede snapshot knowledge_cutoff")
         local_decision = self.decision_at.astimezone(MARKET_TIMEZONE)
         same_session_decision = local_decision.date() == self.snapshot.market_date
         overnight_pre_open_decision = (
-            local_decision.date() == self.execution_date
-            and local_decision.time() < NEXT_OPEN_TIME
+            local_decision.date() == self.execution_date and local_decision.time() < NEXT_OPEN_TIME
         )
         if not (same_session_decision or overnight_pre_open_decision):
             raise ValueError(
@@ -385,6 +395,28 @@ class StrategyReplaySpec:
                 raise ValueError(
                     "each execution date must equal the following frame's decision date"
                 )
+        capital_clocks = []
+        for frame in self.frames:
+            if frame.snapshot_replay_clock_json is not None:
+                from quanthus.backtest.capital_clock import CapitalReplayClock
+
+                clock = CapitalReplayClock.from_json(frame.snapshot_replay_clock_json)
+                clock.validate_run(self.run.run_id)
+                if clock.data_content_digest != self.run.data_content_digest:
+                    raise ValueError("capital frame source identity differs from run")
+                capital_clocks.append(clock)
+        if capital_clocks and (
+            len(capital_clocks) != len(self.frames)
+            or len({c.knowledge_cutoff for c in capital_clocks}) != 1
+            or len(
+                {
+                    (c.request_id, c.task_id, c.attempt_id, c.input_identity_json)
+                    for c in capital_clocks
+                }
+            )
+            != 1
+        ):
+            raise ValueError("capital replay requires one capital source cutoff across all frames")
         snapshot_ids = [frame.snapshot.snapshot_id for frame in self.frames]
         if len(snapshot_ids) != len(set(snapshot_ids)):
             raise ValueError("frame snapshot ids must be unique")
@@ -867,6 +899,7 @@ def _build_signal(
         aggregate_score=decision.aggregate_score,
         reason_code=decision.reason_code,
         decision_version=strategy_version,
+        snapshot_replay_clock_json=frame.snapshot_replay_clock_json,
     )
 
 
@@ -884,17 +917,15 @@ def _resolve_entry_quantity(
     if session.open_price is None:
         raise BacktestInputError("target-percent entry requires an observed next open")
     policy = engine.policy
-    fill_price = (session.open_price * (
-        Decimal("1") + policy.buy_cost.slippage_bps / Decimal("10000")
-    )).quantize(policy.money.price_tick, rounding=ROUND_HALF_UP)
+    fill_price = (
+        session.open_price * (Decimal("1") + policy.buy_cost.slippage_bps / Decimal("10000"))
+    ).quantize(policy.money.price_tick, rounding=ROUND_HALF_UP)
     target_cash = cash * decision.target_percent
     lot = policy.entry_lot_size
     lots = int(target_cash / fill_price / lot)
     while lots > 0:
         quantity = lots * lot
-        gross = (fill_price * quantity).quantize(
-            policy.money.cash_quantum, rounding=ROUND_HALF_UP
-        )
+        gross = (fill_price * quantity).quantize(policy.money.cash_quantum, rounding=ROUND_HALF_UP)
         commission = max(
             gross * policy.buy_cost.commission_rate,
             policy.buy_cost.minimum_commission,
@@ -935,6 +966,14 @@ def _apply_actions(
     session = frame.session(state.security_code)
     dividends = Decimal("0.00")
     for action_index, step in enumerate(corporate_actions, start=1):
+        from quanthus.backtest.capital_clock import bind_capital_action_context
+
+        try:
+            bind_capital_action_context(
+                step.snapshot_replay_clock_json, frame.snapshot_replay_clock_json
+            )
+        except ValueError as exc:
+            raise BacktestInputError(str(exc)) from exc
         if step.applied_at > session.open_at:
             raise BacktestInputError("corporate action must apply no later than the session open")
         application = engine.apply_corporate_action(
@@ -948,6 +987,7 @@ def _apply_actions(
             applied_at=step.applied_at,
             post_action_mark_price=step.post_action_mark_price,
             mark_snapshot_id=step.mark_snapshot_id,
+            snapshot_replay_clock_json=step.snapshot_replay_clock_json,
         )
         state = application.state
         groups.append(application.events)
@@ -1203,7 +1243,7 @@ def run_strategy_replay(
                 if session.close_price is not None:
                     mark_cursor = session.close_price
                 last_consumed = candidate_index
-                if session.open_execution_state not in {
+                if session.source_can_sell is not False and session.open_execution_state not in {
                     OpenExecutionState.SUSPENDED,
                     OpenExecutionState.SELL_BLOCKED_LIMIT_DOWN,
                     OpenExecutionState.MISSING_EVIDENCE,

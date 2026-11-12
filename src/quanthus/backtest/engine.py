@@ -152,6 +152,18 @@ class BacktestEngine:
                 "signal_id": signal.signal_id,
                 "snapshot_id": signal.snapshot.snapshot_id,
                 "decision_at": signal.decision_at.isoformat(),
+                **(
+                    {"snapshot_replay_clock_json": signal.snapshot_replay_clock_json}
+                    if (
+                        signal.snapshot_replay_clock_json is not None
+                        and json.loads(signal.snapshot_replay_clock_json).get("schema_version")
+                        in {
+                            "quanthus.capital-retrospective-clock.v1",
+                            "quanthus.capital-retrospective-clock.v2",
+                        }
+                    )
+                    else {}
+                ),
                 "profile_id": signal.profile_id,
                 "window_id": signal.window_id,
                 "security_code": signal.security_code,
@@ -221,6 +233,8 @@ class BacktestEngine:
                 append_event=append_event,
             )
         cancellation_reason = buy_open_rejection_reason(session.open_execution_state)
+        if cancellation_reason is None and session.source_can_buy is False:
+            cancellation_reason = "source_cannot_buy"
         if cancellation_reason is not None:
             return self._no_fill_result(
                 run=run,
@@ -267,6 +281,7 @@ class BacktestEngine:
                 "order_id": order.order_id,
                 "transition": "created_to_filled",
                 "open_execution_state": session.open_execution_state.value,
+                **session.source_direction_flags,
                 "source_snapshot_id": session.snapshot_id,
             },
         )
@@ -431,6 +446,7 @@ class BacktestEngine:
         applied_at: datetime,
         post_action_mark_price: Decimal,
         mark_snapshot_id: str,
+        snapshot_replay_clock_json: str | None = None,
     ) -> CorporateActionApplication:
         """Apply an already PIT-resolved corporate action to one positioned unit."""
 
@@ -443,7 +459,22 @@ class BacktestEngine:
             raise BacktestInputError("corporate action applied_at must be timezone-aware")
         if applied_at.astimezone(MARKET_TIMEZONE).date() != action.effective_date:
             raise BacktestInputError("corporate action must apply on its effective market date")
-        if action.known_at > applied_at:
+        if snapshot_replay_clock_json is not None:
+            from quanthus.backtest.capital_clock import CapitalReplayClock
+
+            clock = CapitalReplayClock.from_json(snapshot_replay_clock_json)
+            try:
+                clock.validate_run(run.run_id)
+            except ValueError as exc:
+                raise BacktestInputError(str(exc)) from exc
+            if (
+                run.official
+                or clock.market_date != action.effective_date
+                or clock.data_content_digest != run.data_content_digest
+                or action.known_at > clock.knowledge_cutoff
+            ):
+                raise BacktestInputError("capital action source clock or identity differs")
+        elif action.known_at > applied_at:
             raise BacktestInputError("corporate action was not known at application time")
         if opening_state.security_code != action.security_code:
             raise BacktestInputError("corporate action security does not match unit position")
@@ -484,6 +515,11 @@ class BacktestEngine:
             "security_code": action.security_code,
             "effective_date": action.effective_date.isoformat(),
             "known_at": action.known_at.isoformat(),
+            **(
+                {"snapshot_replay_clock_json": snapshot_replay_clock_json}
+                if snapshot_replay_clock_json is not None
+                else {}
+            ),
             "cash_dividend_per_share": decimal_text(action.cash_dividend_per_share),
             "cash_dividend": decimal_text(cash_dividend),
             "bonus_share_ratio": decimal_text(action.bonus_share_ratio),
@@ -587,6 +623,14 @@ class BacktestEngine:
         action_ids: set[str] = set()
         actions_by_date: dict[date, list[CorporateActionStep]] = {}
         for step in corporate_actions:
+            from quanthus.backtest.capital_clock import bind_capital_action_context
+
+            try:
+                bind_capital_action_context(
+                    step.snapshot_replay_clock_json, signal.snapshot_replay_clock_json
+                )
+            except ValueError as exc:
+                raise BacktestInputError(str(exc)) from exc
             if step.action.action_id in action_ids:
                 raise BacktestInputError("sell sequence corporate action ids must be unique")
             action_ids.add(step.action.action_id)
@@ -634,6 +678,18 @@ class BacktestEngine:
                 "signal_id": signal.signal_id,
                 "snapshot_id": signal.snapshot.snapshot_id,
                 "decision_at": signal.decision_at.isoformat(),
+                **(
+                    {"snapshot_replay_clock_json": signal.snapshot_replay_clock_json}
+                    if (
+                        signal.snapshot_replay_clock_json is not None
+                        and json.loads(signal.snapshot_replay_clock_json).get("schema_version")
+                        in {
+                            "quanthus.capital-retrospective-clock.v1",
+                            "quanthus.capital-retrospective-clock.v2",
+                        }
+                    )
+                    else {}
+                ),
                 "profile_id": signal.profile_id,
                 "window_id": signal.window_id,
                 "security_code": signal.security_code,
@@ -727,6 +783,7 @@ class BacktestEngine:
                     applied_at=step.applied_at,
                     post_action_mark_price=step.post_action_mark_price,
                     mark_snapshot_id=step.mark_snapshot_id,
+                    snapshot_replay_clock_json=step.snapshot_replay_clock_json,
                 )
                 current_state = application.state
                 current_mark_price = current_state.last_mark_price
@@ -765,6 +822,8 @@ class BacktestEngine:
                     )
 
             carry_reason = sell_carry_reasons.get(session.open_execution_state)
+            if carry_reason is None and session.source_can_sell is False:
+                carry_reason = "source_cannot_sell"
             if carry_reason is not None:
                 transition = "created_to_carried" if carried_sessions == 0 else "carried_to_carried"
                 append_event(
@@ -775,6 +834,7 @@ class BacktestEngine:
                         "order_id": order.order_id,
                         "transition": transition,
                         "open_execution_state": session.open_execution_state.value,
+                        **session.source_direction_flags,
                         "source_snapshot_id": session.snapshot_id,
                     },
                 )
@@ -818,6 +878,7 @@ class BacktestEngine:
                     "order_id": order.order_id,
                     "transition": transition,
                     "open_execution_state": session.open_execution_state.value,
+                    **session.source_direction_flags,
                     "source_snapshot_id": session.snapshot_id,
                 },
             )
@@ -1213,6 +1274,20 @@ class BacktestEngine:
             raise BacktestInputError(
                 "fixed snapshot mechanism evidence cannot enter an official run"
             )
+        if signal.snapshot_replay_clock_json is not None:
+            from quanthus.backtest.capital_clock import CapitalReplayClock
+            from quanthus.backtest.snapshot_clock import parse_replay_clock
+
+            clock = parse_replay_clock(signal.snapshot_replay_clock_json)
+            if isinstance(clock, CapitalReplayClock):
+                try:
+                    clock.validate_run(run.run_id)
+                except ValueError as exc:
+                    raise BacktestInputError(str(exc)) from exc
+            if isinstance(clock, CapitalReplayClock) and (
+                clock.data_content_digest != run.data_content_digest
+            ):
+                raise BacktestInputError("capital signal source content differs")
         if signal.profile_id != profile.profile_id:
             raise BacktestInputError("signal profile_id does not match run profile")
         if run.data_snapshot_id != signal.snapshot.snapshot_id:
@@ -1283,6 +1358,7 @@ class BacktestEngine:
                 "order_id": order.order_id,
                 "transition": transition,
                 "open_execution_state": session.open_execution_state.value,
+                **session.source_direction_flags,
                 "source_snapshot_id": session.snapshot_id,
             },
         )

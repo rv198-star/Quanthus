@@ -1,0 +1,70 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-R1-HF-002-F1F3-REPAIR",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "repair",
+  "family": "hf-dwd-worker-contract",
+  "work_item": "P3-RESEARCH-HF-001",
+  "modules": [
+    "REPRO"
+  ],
+  "question": "Close the three independently demonstrated Worker gaps without changing the accepted A2 scientific contract",
+  "consumer": "R2/R3 \u7814\u7a76\u6279\u6b21\u7684\u4e0b\u8fbe\u8005\u4e0e Worker \u5206\u53d1\u51b3\u7b56\uff1b\u7ed3\u8bba\u7528\u4e8e\u51b3\u5b9a\u4e0b\u4e00\u7b14\u6295\u5165\u662f\u52a0\u4fe1\u53f7\u3001\u52a0\u6267\u884c\u7ea6\u675f\u8fd8\u662f\u52a0\u8282\u70b9\u3002",
+  "scope": "F1 guardian stage completion, F2 candidate-day gate, F3 interrupted packaging; fixed 56-member input and unchanged v2 metrics; at most one A3 end-to-end canary",
+  "deliverable": "Failing regressions followed by minimal fixes, complete checks, A3 fixed-parameter canary and immutable HF readback, author self-audit for independent reacceptance",
+  "decision_if_pass": "Offer the corrected Worker for independent difference review at 612; retain A2 adoption and defer new questions/nodes",
+  "decision_if_fail": "Keep the affected Worker stage open, preserve outputs and logs, deliver precise remaining differences without changing thresholds",
+  "acceptance": [
+    "F1: bound terminal Guardian success required before first/retried publication; real child output then failure rejects",
+    "F2: candidate coverage under threshold or one day short rejects; exact boundary accepts",
+    "F3: interrupted staging/legacy half-package preserved and recoverable; complete package immutable and corruption rejects",
+    "Focused/lint/full local checks and one fixed-parameter real canary pass with exact code and evidence"
+  ],
+  "stop_conditions": [
+    "Stop on identity/partition mismatch or resource excess; no data repair or parameter tuning",
+    "At most one new A3 fixed-parameter canary; network retries bounded, no recompute on publish failure",
+    "If active repair budget is exhausted, hand off exact remaining differences and receipts"
+  ],
+  "memory_sha256": "4280c0d2b02ff2a08ca21a7e036b5faf816d0f9a8bbf38f60cb162cb6ffdb55e",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "Preserve this scoped conclusion, input exposure and total cost. The follow-up repairs only the independently identified Worker defects under the new explicit Owner instruction."
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "Preserve this scoped conclusion, input exposure and total cost. The follow-up repairs only the independently identified Worker defects under the new explicit Owner instruction."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "Preserve this scoped conclusion, input exposure and total cost. The follow-up repairs only the independently identified Worker defects under the new explicit Owner instruction."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "Preserve this scoped conclusion, input exposure and total cost. The follow-up repairs only the independently identified Worker defects under the new explicit Owner instruction."
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "Preserve this scoped conclusion, input exposure and total cost. The follow-up repairs only the independently identified Worker defects under the new explicit Owner instruction."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Preserve this scoped conclusion, input exposure and total cost. The follow-up repairs only the independently identified Worker defects under the new explicit Owner instruction."
+    }
+  ],
+  "cumulative_cost_review": "Original execution ~1.7h, prior audits and Sol repair remain cumulative in the 8h bus. This explicit Owner-requested follow-up plans 45 minutes active work plus measured machine waits; missing historical active-time/tokens/billing remain unknown_not_zero.",
+  "runtime_authority_boundary": "Owner explicitly requests Sol to repair all three audit findings and self-audit. Continue the existing task-scoped SSH and isolated job; frozen data and A2 history retained.",
+  "budget": {
+    "wall_seconds": 2700,
+    "max_new_bytes": 2147483648,
+    "network_requests": 100,
+    "accounting_owner": "610 bounded F1-F3 follow-up, cumulative R1 bus; machine checks/waits tracked separately"
+  }
+}

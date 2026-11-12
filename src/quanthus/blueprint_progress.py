@@ -63,7 +63,7 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def read_json(path: Path) -> dict[str, Any]:
+def _json_object(data: str | bytes) -> dict[str, Any]:
     def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         result: dict[str, Any] = {}
         for key, value in pairs:
@@ -71,10 +71,14 @@ def read_json(path: Path) -> dict[str, Any]:
             result[key] = value
         return result
 
-    result = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique)
+    result = json.loads(data, object_pairs_hook=unique)
     if not isinstance(result, dict):
         raise ProgressError("expected JSON object")
     return result
+
+
+def read_json(path: Path) -> dict[str, Any]:
+    return _json_object(path.read_text(encoding="utf-8"))
 
 
 def encoded(value: Any) -> bytes:
@@ -209,18 +213,138 @@ def validate_observation(row: dict[str, Any], work: dict[str, dict[str, Any]]) -
     )
 
 
+def _import_ledger(identity: Any, root: Path) -> dict[str, Any]:
+    require(
+        isinstance(identity, dict) and set(identity) == {"revision", "sha256"},
+        "history import ledger identity",
+    )
+    require(
+        bool(REVISION.fullmatch(str(identity["revision"]))),
+        "history import requires full Git SHA",
+    )
+    require(
+        bool(SHA.fullmatch(str(identity["sha256"]))),
+        "history import requires ledger SHA256",
+    )
+    result = subprocess.run(
+        ["git", "show", f"{identity['revision']}:{LEDGER}"],
+        cwd=root,
+        capture_output=True,
+        check=False,
+    )
+    require(result.returncode == 0, "unreadable history import ledger")
+    require(digest(result.stdout) == identity["sha256"], "history import ledger hash mismatch")
+    prior = _json_object(result.stdout)
+    require(prior.get("schema_version") == "quanthus.blueprint-progress.v1", "import ledger schema")
+    indexed(prior.get("records"), "import checkpoints")
+    return prior
+
+
+def history_import_times(ledger: dict[str, Any], root: Path) -> dict[str, datetime]:
+    """Bind unchanged source suffixes to a separate, audited ingestion clock."""
+    imports = ledger.get("history_imports", [])
+    require(isinstance(imports, list), "history imports must be a list")
+    times: dict[str, datetime] = {}
+    ids: set[str] = set()
+    previous_end = 0
+    for index, entry in enumerate(imports):
+        require(
+            isinstance(entry, dict)
+            and set(entry)
+            == {
+                "schema_version",
+                "id",
+                "imported_at",
+                "actor",
+                "reason",
+                "start_index",
+                "target",
+                "source",
+            },
+            "history import fields",
+        )
+        require(
+            entry["schema_version"] == "quanthus.blueprint-history-import.v1",
+            "history import schema",
+        )
+        import_id = entry["id"]
+        require(isinstance(import_id, str) and bool(ID.fullmatch(import_id)), "history import id")
+        require(import_id not in ids, "duplicate history import id")
+        ids.add(import_id)
+        nonempty(entry["actor"], "history import actor")
+        nonempty(entry["reason"], "history import reason")
+        imported_at = timestamp(entry["imported_at"])
+        target = _import_ledger(entry["target"], root)
+        source = _import_ledger(entry["source"], root)
+        require(
+            target.get("history_imports", []) == imports[:index],
+            "history import changed prior receipts",
+        )
+        require(
+            not source.get("history_imports"), "nested source history imports unsupported in v1"
+        )
+        target_records, source_records = target["records"], source["records"]
+        start = len(target_records)
+        require(
+            type(entry["start_index"]) is int and entry["start_index"] == start,
+            "history import start index",
+        )
+        require(start >= previous_end, "overlapping history imports")
+        require(
+            ledger["records"][:start] == target_records,
+            "history import target prefix changed",
+        )
+        shared = 0
+        for left, right in zip(target_records, source_records, strict=False):
+            if left != right:
+                break
+            shared += 1
+        require(
+            shared > 0 and shared < len(source_records),
+            "history import needs shared prefix and suffix",
+        )
+        suffix = source_records[shared:]
+        end = start + len(suffix)
+        require(
+            ledger["records"][start:end] == suffix,
+            "history import source suffix changed or incomplete",
+        )
+        source_times = [timestamp(row.get("recorded_at")) for row in source_records]
+        require(
+            all(left <= right for left, right in zip(source_times, source_times[1:], strict=False)),
+            "history import source time moved backwards",
+        )
+        require(imported_at >= max(source_times), "history import predates source records")
+        target_observed = observations(target)
+        for number, observed in observations({"records": suffix}).items():
+            prior = target_observed.get(number)
+            require(
+                prior is None
+                or prior == observed
+                or timestamp(observed.get("updated_at")) > timestamp(prior.get("updated_at")),
+                "history import would overwrite a newer or conflicting issue observation",
+            )
+        for row in suffix:
+            require(row["id"] not in times, "overlapping imported checkpoint")
+            times[row["id"]] = imported_at
+        previous_end = end
+    return times
+
+
 def validate_ledger(catalog: dict[str, Any], ledger: dict[str, Any], root: Path) -> None:
     validate_catalog(catalog)
     require(ledger.get("schema_version") == "quanthus.blueprint-progress.v1", "ledger schema")
     records = indexed(ledger.get("records"), "checkpoints")
+    imported_times = history_import_times(ledger, root)
     work = indexed(catalog["work_items"], "work items")
     current: dict[tuple[str, str], str] = {}
     last_time: datetime | None = None
     verified: set[bytes] = set()
     for index, (record_id, record) in enumerate(records.items()):
         recorded = timestamp(record.get("recorded_at"))
-        require(last_time is None or recorded >= last_time, "checkpoint time moved backwards")
-        last_time = recorded
+        effective_time = imported_times.get(record_id, recorded)
+        require(last_time is None or effective_time >= last_time, "checkpoint time moved backwards")
+        last_time = effective_time
         nonempty(record.get("actor"), "checkpoint actor")
         nonempty(record.get("summary"), "checkpoint summary")
         item = work.get(record.get("work_item", ""))
@@ -339,6 +463,16 @@ def check_append_only(old: dict[str, Any], new: dict[str, Any]) -> None:
     require(old.get("schema_version") == new.get("schema_version"), "ledger schema rewritten")
     prefix = old.get("records", [])
     require(new["records"][: len(prefix)] == prefix, "prior checkpoints edited or removed")
+    imports = old.get("history_imports", [])
+    require(
+        new.get("history_imports", [])[: len(imports)] == imports,
+        "prior history imports edited or removed",
+    )
+    for entry in new.get("history_imports", [])[len(imports) :]:
+        require(
+            type(entry.get("start_index")) is int and entry["start_index"] >= len(prefix),
+            "history import cannot cover prior checkpoints",
+        )
 
 
 def check_change_impact(
@@ -372,12 +506,16 @@ def cell(value: str) -> str:
 def render(catalog: dict[str, Any], ledger: dict[str, Any]) -> str:
     current = current_updates(ledger)
     observed = observations(ledger)
+    as_of = ledger["records"][-1]["recorded_at"]
+    for entry in ledger.get("history_imports", []):
+        if timestamp(entry["imported_at"]) > timestamp(as_of):
+            as_of = entry["imported_at"]
     lines = [
         "# 学习系统蓝图与模块进度",
         "",
         "<!-- Generated by scripts/blueprint_progress.py; do not edit. -->",
         "",
-        f"记录截至：{ledger['records'][-1]['recorded_at']}；这不是实时 GitHub 状态。",
+        f"记录截至：{as_of}；这不是实时 GitHub 状态。",
         "",
         "任务关闭、工程完成、研究质量、用途价值和使用资格分别记账。",
         "本视图不授予训练、数据访问、P6 或生产权限；不会按 issue 关闭比例计算产品完成率。",
@@ -451,6 +589,24 @@ def render(catalog: dict[str, Any], ledger: dict[str, Any]) -> str:
             f"{item['issue']}) | {', '.join(item['modules'])} | "
             f"{cell(item['contribution'])} | {row.get('state', '未对账')} |"
         )
+    if ledger.get("history_imports"):
+        lines.extend(
+            [
+                "",
+                "## 历史分支导入",
+                "",
+                "原 checkpoint 的 recorded_at、内容和先后关系保留；"
+                "imported_at 是并入本账本的时间。",
+                "",
+                "| 导入 | 来源 Git | 目标前缀 Git | 导入时间 |",
+                "| --- | --- | --- | --- |",
+            ]
+        )
+        for entry in ledger["history_imports"]:
+            lines.append(
+                f"| {cell(entry['id'])} | {entry['source']['revision']} | "
+                f"{entry['target']['revision']} | {entry['imported_at']} |"
+            )
     lines.extend(
         [
             "",

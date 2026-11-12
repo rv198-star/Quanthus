@@ -561,6 +561,80 @@
         "TRACE"
       ],
       "contribution": "本地make check统一入口、完整身份回执和保守复用；只服务当前工程交付，不提升研究/用途准入"
+    },
+    {
+      "id": "META-RESEARCH-REVIEW-001",
+      "issue": 612,
+      "modules": [
+        "FACTS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "contribution": "独立审阅 #609-611 的统计语义、工程交付与投入判断；记录缺陷、长期证据和模型分工，限定本批次成熟度。"
+    },
+    {
+      "id": "META-RESEARCH-SELECT-001",
+      "issue": 609,
+      "modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ],
+      "contribution": "重审事前问题合同、指标语义、阈值和准入；保留原曝光"
+    },
+    {
+      "id": "P3-RESEARCH-HF-001",
+      "issue": 610,
+      "modules": [
+        "REPRO"
+      ],
+      "contribution": "修复并验收固定HF输入、资源边界与不可变结果包"
+    },
+    {
+      "id": "P3-RESEARCH-PILOT-001",
+      "issue": 611,
+      "modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ],
+      "contribution": "按有效设计复算与解释；保留原始代理统计及失败记录"
+    },
+    {
+      "id": "P3-RESEARCH-REUSE-001",
+      "issue": 613,
+      "modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "contribution": "检验R1既有20日原始价格动量区间对次日开盘至收盘响应的增量，决定后续回放或停放；验证已验收输入与Worker的复用成本。"
+    },
+    {
+      "id": "P3-RESEARCH-REPLAY-001",
+      "issue": 627,
+      "modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "contribution": "核对R2到既有P2资金回放的精确接缝，形成有预算、失败路径与用途门槛的后继计划"
+    },
+    {
+      "id": "P3-RESEARCH-CAPITAL-001",
+      "issue": 628,
+      "modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "contribution": "Complete fixed2020-2021 guarded capital comparison with explicit qualified P10 purpose input and independent cold/role acceptance; inconclusive original gates lead to park this fixed holding use. Draft631 main integration separate."
+    },
+    {
+      "id": "META-RESEARCH-INTEGRATION-001",
+      "issue": 633,
+      "modules": [
+        "TRACE"
+      ],
+      "contribution": "将已独立验收的R1/R2/R4研究链保真集成main；审计历史导入、精确代码环境与普通merge身份，不新增研究结果或提升用途准入。"
     }
   ]
 }

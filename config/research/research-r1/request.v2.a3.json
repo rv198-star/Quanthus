@@ -1,0 +1,99 @@
+{
+  "schema_version": "quanthus.hf-dwd-research-request.v2",
+  "request_id": "RESEARCH-R1-HF-002",
+  "task_id": "RESEARCH-R1-HF-002-T1",
+  "attempt_id": "A3",
+  "authority": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "content_digest": "sha256:1d0e4bd5fbf40bf2876883faf82b98fd81e95a93a82b9d23d248759a38b3f692",
+    "business_through": "2026-10-31"
+  },
+  "scope": {
+    "partition": "development",
+    "calendar_start": "2019-01-01",
+    "read_start": "2020-01-02",
+    "decision_start": "2020-03-02",
+    "decision_end": "2021-12-30",
+    "execution_end": "2021-12-31",
+    "forbidden_after": "2022-01-01",
+    "knowledge_view": "latest_sealed_retrospective",
+    "interval_semantics": "Asia/Shanghai date; effective [from,to)"
+  },
+  "closure": {
+    "path": "config/research/research-r1/closure.v2.json",
+    "sha256": "sha256:a2fe359ecff110eab7a139a5a197b538a71889a38cd8d7530201fbcf4c5d954c",
+    "exact_members": 56,
+    "exact_bytes": 187921175
+  },
+  "environment": {
+    "python": "3.10.12",
+    "platform": "linux",
+    "lock_path": "config/research/research-r1/runtime.v2.lock",
+    "lock_sha256": "sha256:f8626d30f642e4f68509e187e00b1cb042cdbe73ff848c399364809799b03cf3"
+  },
+  "screen": {
+    "min_listing_sessions": 120,
+    "min_avg_turnover_prior20": 100000000.0,
+    "max_unadjusted_close_return_vol20": 0.5,
+    "max_abs_unadjusted_close_return": 0.04,
+    "unadjusted_momentum20_band": [
+      0.02,
+      0.12
+    ],
+    "volatility_formula": "sample_std(close_t/close_tminus1-1 over current20)*sqrt(252); 21 consecutive positive finite closes; excludes corporate action adjustment",
+    "listing_age_rule": "calendar open sessions since listing effective_from; start clipped to 2019 for older listings, guaranteed >=120 before first decision",
+    "next_open_rule": "next open calendar_session joined by venue; valid listing/security [from,to), positive finite open, tradable and can_buy true, positive finite upper limit, open < upper-0.005",
+    "unknown_rule": "missing/invalid required input blocks admission; disjoint ordered reason ledger",
+    "control": "same decision dates and listing universe; positive finite close and current tradability; no candidate filters"
+  },
+  "decision": {
+    "consumer": "R2 task allocator; first decide whether execution-guard investigation outranks a signal screen; retain existing P2 execution constraints",
+    "min_nominal": 5000,
+    "min_nominal_per_year": 500,
+    "min_decision_days_per_year": 200,
+    "min_nominal_listings": 100,
+    "max_top_listing_share": 0.05,
+    "max_top10_listing_share": 0.2,
+    "material_block_rate": 0.01,
+    "material_year_block_rate": 0.02,
+    "branches": {
+      "invalid": "stop and preserve attempt; no new market conclusion",
+      "insufficient": "inconclusive, park without expanding data or tuning",
+      "material": "prioritize a bounded execution-guard investigation",
+      "small": "retain existing guards and prioritize one concrete signal question; no ideal-fill waiver"
+    }
+  },
+  "budget": {
+    "threads": 2,
+    "duckdb_memory_bytes": 3221225472,
+    "max_rss_bytes": 6442450944,
+    "max_scratch_bytes": 2147483648,
+    "max_download_bytes": 536870912,
+    "max_upload_bytes": 4194304,
+    "max_stage_wall_seconds": {
+      "fetch": 300,
+      "screen": 180,
+      "publish": 180
+    },
+    "max_job_wall_seconds": 1800,
+    "max_cpu_seconds": 240,
+    "max_compute_attempts": 2,
+    "max_publish_attempts": 3
+  },
+  "publish": {
+    "dataset": "rv192/quanthus-research-r1",
+    "private": true,
+    "path_prefix": "runs/RESEARCH-R1-HF-002/RESEARCH-R1-HF-002-T1/A3",
+    "ttl_review_after": "2026-12-11",
+    "cleanup_owner": "CN02 research task maintainer",
+    "retained_evidence_root": "/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained"
+  },
+  "exposure": {
+    "predecessor": "RESEARCH-R1-HF-001/A1",
+    "previous_window_already_consumed": true,
+    "recompute_reason": "One fixed-parameter acceptance canary after audited F1/F2/F3 Worker repair; same source closure, formulas and thresholds; retain A1/A2 and all prior exposure/cost",
+    "attempt_predecessor": "RESEARCH-R1-HF-002-T1/A2 at 2dc01f18; independently accepted in #612"
+  }
+}

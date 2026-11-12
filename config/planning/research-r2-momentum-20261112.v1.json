@@ -1,0 +1,102 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-R2-MOMENTUM-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "exploration",
+  "family": "raw-momentum20-band-markout",
+  "work_item": "P3-RESEARCH-REUSE-001",
+  "modules": [
+    "FACTORS",
+    "REPRO",
+    "CLOSEOUT"
+  ],
+  "question": "Holding all other R1 filters fixed, does momentum20 in [0.02,0.12] add next-session open-to-close price response against the disjoint out-of-band group?",
+  "consumer": "Next research allocator deciding whether this fixed raw-momentum band deserves a costed-replay tranche",
+  "scope": "Same 56 fixed HF members and 2020-2021 market window as accepted R1; 2019 calendar only. One frozen mean-increment study; one formal compute and one necessary independent construction.",
+  "deliverable": "Prespecified response comparison, bounded Worker reuse, immutable HF result and readable value/next-decision brief",
+  "decision_if_pass": "Nominate this fixed band for one subsequent costed-replay proposal; original trading and adoption gates remain",
+  "decision_if_fail": "Park the fixed band in this use or record insufficient/uncertain; retain all evidence and do not tune thresholds",
+  "acceptance": [
+    "Question, fixed groups, target and primary 5bp routing rule frozen before new row access",
+    "Shared source and feature construction once per Job; exact source/code/request/environment and limits",
+    "Synthetic semantic/negative cases, one formal run, independent paired-metric comparison and complete checks",
+    "Explicit value/cost decision, HF all-file readback and retained evidence with scoped ledger"
+  ],
+  "stop_conditions": [
+    "At most one formal computation and one independent construction; no data repair, tuning, new features or protected 2022+ access",
+    "Stop scientific adoption on identity, join, missing label or independent metric conflict; preserve exact receipts",
+    "One-hour active tranche from 613; machine checks recorded separately; previous cumulative unknown cost retained"
+  ],
+  "memory_sha256": "bed3a759cba548fe671a9e0fe9f1ac361af8d9b96d4738a5876259bcf8872aed",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "Retain the precise prior result, old exposure, total costs and consumer boundaries. This task only evaluates the existing fixed raw-price momentum band under the newly authorized R2 question; no prior fit or parked policy is restarted."
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "Retain the precise prior result, old exposure, total costs and consumer boundaries. This task only evaluates the existing fixed raw-price momentum band under the newly authorized R2 question; no prior fit or parked policy is restarted."
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "Retain the precise prior result, old exposure, total costs and consumer boundaries. This task only evaluates the existing fixed raw-price momentum band under the newly authorized R2 question; no prior fit or parked policy is restarted."
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "Retain the precise prior result, old exposure, total costs and consumer boundaries. This task only evaluates the existing fixed raw-price momentum band under the newly authorized R2 question; no prior fit or parked policy is restarted."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "Retain the precise prior result, old exposure, total costs and consumer boundaries. This task only evaluates the existing fixed raw-price momentum band under the newly authorized R2 question; no prior fit or parked policy is restarted."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "Retain the precise prior result, old exposure, total costs and consumer boundaries. This task only evaluates the existing fixed raw-price momentum band under the newly authorized R2 question; no prior fit or parked policy is restarted."
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "Retain the precise prior result, old exposure, total costs and consumer boundaries. This task only evaluates the existing fixed raw-price momentum band under the newly authorized R2 question; no prior fit or parked policy is restarted."
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "Retain the precise prior result, old exposure, total costs and consumer boundaries. This task only evaluates the existing fixed raw-price momentum band under the newly authorized R2 question; no prior fit or parked policy is restarted."
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Retain the precise prior result, old exposure, total costs and consumer boundaries. This task only evaluates the existing fixed raw-price momentum band under the newly authorized R2 question; no prior fit or parked policy is restarted."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Retain the precise prior result, old exposure, total costs and consumer boundaries. This task only evaluates the existing fixed raw-price momentum band under the newly authorized R2 question; no prior fit or parked policy is restarted."
+    }
+  ],
+  "cumulative_cost_review": "R1, Deepseek/Sol repairs, all audits, failures and exposures remain cumulative in bus608. Owner now starts conditional issue613; this new tranche has a 3600s active ceiling, with measured compute/check waits separately. Missing historical active time/token/billing remain unknown_not_zero; no remainder of the old 8h envelope is invented.",
+  "runtime_authority_boundary": "Owner explicitly starts next research task and authorizes this 613 bounded SSH run on CN02. Existing data-purpose/partition/activation constraints retained.",
+  "budget": {
+    "wall_seconds": 3600,
+    "max_new_bytes": 2147483648,
+    "network_requests": 50,
+    "accounting_owner": "613 one-hour active tranche, cumulative608; machine checks and two bounded constructions separately metered"
+  },
+  "additional_history_boundary_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "different_scope",
+      "rationale": "This is a deterministic R1 raw-momentum interval against next-session open-to-close response, without Head2 training, refitting, feature additions to that model, cutoff movement, or its adoption gate; preserve the rejected March use and all costs."
+    }
+  ],
+  "execution_record": "docs/work-items/research-r2-value-brief.md",
+  "execution_disposition": "COMPLETED_ADVANCE_TO_COSTED_REPLAY_CANDIDATE; successor not started",
+  "proposal_role": "Executed proposal; original pre-run memory binding and request pinned at 6dd072acc5797bf55bed610771fda7ad1b7217cc, preflight receipt retained. Not a successor activation."
+}

@@ -1,0 +1,72 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-R1-AUDIT-612",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "tradability-execution-screen-audit",
+  "work_item": "META-RESEARCH-REVIEW-001",
+  "modules": [
+    "FACTS",
+    "REPRO",
+    "CLOSEOUT"
+  ],
+  "question": "Independent reproduction and contract audit of the first R1 batch and model task allocation",
+  "consumer": "R1 reviewer and research task allocator",
+  "scope": "Already consumed 2020-2021 closure; isolated reproduction, synthetic probes and history checks; no new strategy trial",
+  "deliverable": "Audit, counterexamples, append-only conclusions/blueprint and model task policy",
+  "decision_if_pass": "Retain supported scoped assets; allocate by task risk",
+  "decision_if_fail": "Freeze adoption, preserve originals, reopen unmet contract work",
+  "acceptance": [
+    "Exact independent reproduction and contract dispositions",
+    "Durable evidence readback and append-only ledger",
+    "Model task boundaries and escalation"
+  ],
+  "stop_conditions": [
+    "Stop row access on identity or partition mismatch",
+    "Build independent derived input once; maximum 30 machine minutes"
+  ],
+  "memory_sha256": "295327bb6c1dad75c6f16bb92b040bd2a8211f4efdac08c7e3113b4efdf3ea6a",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "该结论只处理既有消费者调用说明的工程交付；本批不复用其合成调用结论，也不重启其审议。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "different_scope",
+      "rationale": "该结论处理的是旧学习线内是否新开一个比较；本批不新开比较，只测量新 Base 上的 T+1 可成交口径与单节点成本。",
+      "scope_difference": "旧结论的范围是既有持仓/入场证据内的决策缺口选择；本批的输入是 Base 2.5.1 固定版本的 2020-2021 可交易性口径，输出是执行折损与资源画像，不含策略绩效比较。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "保留其只读查阅结论与工程等级，不把本批测量结果当作其历史PIT或经济价值升级。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "保留原B记录链的工程结论；本批不重放也不重解释该链。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "different_scope",
+      "rationale": "该结论是原B漏斗的观测交付；本批测量的是新 Base 上的入场后 T+1 可成交比例，输入与时间范围不同。",
+      "scope_difference": "旧结论来自原B 2012-2021 已消费记录；本批来自 Base 2.5.1 固定版本的 2020-2021 密封 DWD，并新增全市场对照与资源画像。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "保留其接入需求未成立与停放条件；本批不新增分配审计接线。"
+    }
+  ],
+  "cumulative_cost_review": "Head2、持仓、Stage 3/4 与原漏斗的历史尝试成本保持未知非零；本批独立记账，不重置任何方向的曝光。",
+  "runtime_authority_boundary": "Owner requested #612 audit and explicitly allowed SSH for this task; isolated audit only",
+  "budget": {
+    "wall_seconds": 1800,
+    "max_new_bytes": 2147483648,
+    "network_requests": 20,
+    "accounting_owner": "#612 audit TPlan"
+  }
+}

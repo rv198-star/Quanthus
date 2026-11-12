@@ -1,0 +1,16 @@
+{
+  "id": "RESEARCH-R1-INDEPENDENT-AUDIT-612",
+  "purpose": "Independent audit of fixed #609-611 artifacts; exact reproduction plus synthetic failure probes, no new strategy selection",
+  "candidate_git": "d23386bfc55ed3996e954cd7e81e978e344ff76d",
+  "base_git": "b73b37d74f26b719af08e7510eb87def3c45d18b",
+  "source_manifest_sha256": "8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+  "source_revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+  "result_revision": "5d945c495859f5459153d59bf2b0baeab6d4c871",
+  "rows_allowed": "2020-01-02 through 2021-12-31; original listing/security metadata only",
+  "construction": "Copy and rehash exact 55 members into isolated audit root; build independent pandas rolling calculations; original SQL only in synthetic probes",
+  "checks": ["exact totals and strata", "keys and missingness", "listing-age truncation", "price-level versus return volatility synthetic counterexample", "missing-open fail-closed", "changed request/source identities", "publish tampering and retry identity with fake HF"],
+  "acceptance": "Exact arithmetic reproduction establishes reported computation only; adoption assessed against original issue contract and metric meaning",
+  "budgets": {"wall_seconds": 1800, "scratch_bytes": 2147483648, "rss_bytes": 6442450944, "cpu_threads": 2, "hf_read_bytes": 1048576},
+  "stop": "Stop if source hash, exact scope or resources fail; discrepancy retains original artifacts and freezes adoption",
+  "retention": {"audit_minimal_evidence": "CN02 durable plus GitHub audit metadata", "temporary_copy": "30 days from audit completion; CN02 research maintainer; no automatic deletion"}
+}

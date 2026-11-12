@@ -1,0 +1,18 @@
+{
+  "schema": "quanthus.capital-independent-recovery.v1",
+  "purpose": "One targeted verifier correction after native extra-venue calendar preflight failed; no source/producer/parameter changes",
+  "request_digest": "sha256:9e27c9a3139a85a277ff19bac0025ed80e2535406dad8a9c8120a3b8720a5089",
+  "producer_git": "10cf1d4b0d5c465afbbc667e363ff8f872a56149",
+  "producer_result_digest": "sha256:fcc912e8935564f9bb517954a2af40310989eae0bf7c33d6ddca331153212070",
+  "failed_job_name": "independent-a1",
+  "allowed_job_name": "independent-a2",
+  "max_additional_cold_constructions": 1,
+  "defect": "Reference calendar omitted the immutable R2 required_venues filter; producer already used it",
+  "required_venues_source": "config/research/research-r2/request.v1.json:analysis.required_venues",
+  "authority": "Owner continue all remaining work then audit; targeted implementation recovery within same4h envelope; prior attempt/cost retained",
+  "allowed_changed_paths": [
+    "scripts/research_capital_independent.py",
+    "tests/unit/test_native_capital_pipeline.py",
+    "config/research/research-capital/independent-recovery.v1.json"
+  ]
+}

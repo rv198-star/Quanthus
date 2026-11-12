@@ -1,0 +1,87 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-CAPITAL-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "raw-momentum20-capital-replay",
+  "work_item": "P3-RESEARCH-CAPITAL-001",
+  "modules": [
+    "REPRO"
+  ],
+  "question": "Can the fixed capital consumer be completed and deliver a reconciled comparison or the exact on-path input blocker under preserved source guards?",
+  "consumer": "Research allocator and fixed P2 capital research consumer",
+  "scope": "Owner continuation of628 BCD. Reuse frozen2020-2021 inputs and R2 filters, preserve existing P10 holds. Engineering first, one bounded execution and independent cold construction, then final audit.",
+  "deliverable": "Tested native consumer, versioned dual-clock contract, fixed strategy, full or exactly blocked capital receipt and final evidence/value handoff",
+  "decision_if_pass": "Record the preregistered capital resource branch only if all actually consumed input gates and independent cents/identities pass",
+  "decision_if_fail": "Record exact blocker and P10 ownership; retain engineering and no partial PnL adoption",
+  "acceptance": [
+    "Frozen exact input, clock, policy and run identities",
+    "P2 semantic and failure goldens plus complete checks",
+    "One formal and one independently cold-built input/ledger outcome",
+    "Final audit, evidence readback and scoped ledgers"
+  ],
+  "stop_conditions": [
+    "At most4 remaining active hours under existing complete3-5h plan; machine budget separate",
+    "No collection/shared source repair, production, new Workers, tuning or2022+ market access",
+    "Unqualified held action stops the affected arm; missing entries reject without future reranking"
+  ],
+  "memory_sha256": "8f6799970fd1588832b94e2f4e8b865b055dee28b1a73c2f8077882064baf80e",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "Retain prior outcome/cost/exposure. This delivers the authorized guarded consumer; A shared source holds remain enforced and no source qualification is invented."
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "Retain prior outcome/cost/exposure. This delivers the authorized guarded consumer; A shared source holds remain enforced and no source qualification is invented."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "Retain prior outcome/cost/exposure. This delivers the authorized guarded consumer; A shared source holds remain enforced and no source qualification is invented."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "Retain prior outcome/cost/exposure. This delivers the authorized guarded consumer; A shared source holds remain enforced and no source qualification is invented."
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "Retain prior outcome/cost/exposure. This delivers the authorized guarded consumer; A shared source holds remain enforced and no source qualification is invented."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Retain prior outcome/cost/exposure. This delivers the authorized guarded consumer; A shared source holds remain enforced and no source qualification is invented."
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "Retain prior outcome/cost/exposure. This delivers the authorized guarded consumer; A shared source holds remain enforced and no source qualification is invented."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "Retain prior outcome/cost/exposure. This delivers the authorized guarded consumer; A shared source holds remain enforced and no source qualification is invented."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "respect",
+      "rationale": "Retain prior outcome/cost/exposure. This delivers the authorized guarded consumer; A shared source holds remain enforced and no source qualification is invented."
+    }
+  ],
+  "cumulative_cost_review": "Prior A, R1/R2 attempts, repairs, audits and sample exposure retained. Owner explicitly requested continuing all remaining work before audit; remaining active plan at most4h, complete costs remain unknown_not_zero.",
+  "runtime_authority_boundary": "Owner continuation authorizes628 remaining stages and existing task628 CN02 SSH. Shared repair stays P10; default PIT/official gates retained.",
+  "budget": {
+    "wall_seconds": 14400,
+    "max_new_bytes": 536870912,
+    "network_requests": 200,
+    "accounting_owner": "TPlan RESEARCH-CAPITAL-001; prior A/R1/R2 exposure/cost retained"
+  },
+  "execution_record": "docs/acceptance/research-capital-replay-20261112.md",
+  "execution_disposition": "GUARDED_CONSUMER_DELIVERED_COMPARISON_BLOCKED_AT_P10_KEY; original preflight identity and attempted evidence preserved"
+}

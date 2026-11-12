@@ -1,0 +1,63 @@
+{
+  "schema_version": "quanthus.hf-dwd-research-request.v1",
+  "request_id": "RESEARCH-R1-HF-001",
+  "task_id": "RESEARCH-R1-HF-001-T1",
+  "attempt_id": "A1",
+  "frozen_at": "2026-11-11",
+  "authority": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "content_digest": "sha256:1d0e4bd5fbf40bf2876883faf82b98fd81e95a93a82b9d23d248759a38b3f692",
+    "business_through": "2026-10-31"
+  },
+  "scope": {
+    "partition": "development",
+    "read_start": "2020-01-02",
+    "decision_start": "2020-01-02",
+    "decision_end": "2021-12-30",
+    "execution_end": "2021-12-31",
+    "forbidden_after": "2022-01-01",
+    "closed_reason": "Only the open development partition may be read; 2022-2024 arbitration and 2025 permanent blind stay unopened."
+  },
+  "closure": {
+    "purpose": "honest 2020-2021 tradability and opportunity screen, no strategy replay",
+    "include_prefixes": [
+      "contract/base-build-delivery.v1.json",
+      "payload/dwd_security_bar/interval_size=1d/observation_start_year=2020/",
+      "payload/dwd_security_bar/interval_size=1d/observation_start_year=2021/",
+      "payload/dwd_trading_calendar/trade_date_year=2020/",
+      "payload/dwd_trading_calendar/trade_date_year=2021/",
+      "payload/dwd_tradability_state/observation_start_year=2020/",
+      "payload/dwd_tradability_state/observation_start_year=2021/",
+      "payload/dwd_listing/",
+      "payload/dwd_security/"
+    ]
+  },
+  "screen": {
+    "min_listing_sessions": 120,
+    "min_avg_amount_20": 100000000.0,
+    "max_realized_vol_20": 0.5,
+    "max_entry_day_return": 0.04,
+    "momentum_band": [0.02, 0.12],
+    "control": "same next-open executability measured on the whole eligible universe"
+  },
+  "budget": {
+    "max_download_bytes": 1073741824,
+    "max_wall_seconds": 3600
+  },
+  "publish": {
+    "dataset": "rv192/quanthus-research-r1",
+    "private": true,
+    "path_prefix": "runs/RESEARCH-R1-HF-001/RESEARCH-R1-HF-001-T1/A1",
+    "retention": "temporary_hf_default"
+  },
+  "decision": {
+    "consumer": "R2/R3 research tranche allocation and Worker distribution decision",
+    "branches": [
+      "If single-task cost is small and the loss rate is material, the next tranche invests in execution-aware research design instead of more signal complexity.",
+      "If the loss rate is immaterial, later daily research may keep ideal-fill assumptions and spend the tranche on signal screens.",
+      "If the closure cannot be verified or the run exceeds budget, record the gap and stop this batch."
+    ]
+  }
+}

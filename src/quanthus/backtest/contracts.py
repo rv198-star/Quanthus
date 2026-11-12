@@ -122,9 +122,9 @@ class BacktestSignal:
             raise ValueError("aggregate_score must be finite")
         _require_aware(self.decision_at, "decision_at")
         if self.snapshot_replay_clock_json is not None:
-            from quanthus.backtest.snapshot_clock import SnapshotReplayClock
+            from quanthus.backtest.snapshot_clock import parse_replay_clock
 
-            clock = SnapshotReplayClock.from_json(self.snapshot_replay_clock_json)
+            clock = parse_replay_clock(self.snapshot_replay_clock_json)
             if (
                 clock.market_date != self.snapshot.market_date
                 or clock.knowledge_cutoff != self.snapshot.knowledge_cutoff
@@ -187,8 +187,23 @@ class MarketSession:
     open_execution_state: OpenExecutionState
     source_revision: str
     snapshot_id: str
+    source_can_buy: bool | None = None
+    source_can_sell: bool | None = None
+
+    @property
+    def source_direction_flags(self) -> dict[str, bool]:
+        if self.source_can_buy is None:
+            return {}
+        assert self.source_can_sell is not None
+        return {"source_can_buy": self.source_can_buy, "source_can_sell": self.source_can_sell}
 
     def __post_init__(self) -> None:
+        if (self.source_can_buy is None) != (self.source_can_sell is None):
+            raise ValueError("native direction flags must be supplied together")
+        if self.source_can_buy is not None and (
+            type(self.source_can_buy) is not bool or type(self.source_can_sell) is not bool
+        ):
+            raise ValueError("native direction flags must be booleans")
         _require_aware(self.open_at, "open_at")
         _require_aware(self.close_at, "close_at")
         if self.open_at >= self.close_at:
@@ -780,6 +795,7 @@ class CorporateActionStep:
     applied_at: datetime
     post_action_mark_price: Decimal
     mark_snapshot_id: str
+    snapshot_replay_clock_json: str | None = None
 
 
 @dataclass(frozen=True)

@@ -394,3 +394,240 @@ def test_failed_audit_preserves_a_failure_receipt(setup):
     assert result.returncode == 1
     assert read_json(output)["status"] == "AUDIT_FAILED"
     assert read_json(output)["module_status_changed"] is False
+
+
+def history_snapshot(root, ledger, message):
+    """Commit the exact ledger blob so tests exercise Git/SHA binding too."""
+    (root / LEDGER).write_bytes(encoded(ledger))
+    subprocess.run(["git", "add", CATALOG, LEDGER], cwd=root, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-qm",
+            message,
+        ],
+        cwd=root,
+        check=True,
+    )
+    return {
+        "revision": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=root, text=True
+        ).strip(),
+        "sha256": digest(encoded(ledger)),
+    }
+
+
+@pytest.fixture
+def parallel_history(setup):
+    catalog, baseline, root = setup
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    target = copy.deepcopy(baseline)
+    later = successor(baseline, "TARGET")
+    later.update(
+        recorded_at="2026-10-27T04:00:00Z", updates=[], no_change_reason="Target metadata review"
+    )
+    target["records"].append(later)
+    target_identity = history_snapshot(root, target, "target")
+    source = copy.deepcopy(baseline)
+    first = successor(baseline, "SOURCE-1")
+    second = successor(baseline, "SOURCE-2")
+    second["recorded_at"] = "2026-10-27T02:00:00Z"
+    second["updates"][0].update(status="inconclusive", supersedes="SOURCE-1")
+    source["records"].extend([first, second])
+    source_identity = history_snapshot(root, source, "source")
+    candidate = copy.deepcopy(target)
+    candidate["records"].extend(copy.deepcopy(source["records"][1:]))
+    candidate["history_imports"] = [
+        {
+            "schema_version": "quanthus.blueprint-history-import.v1",
+            "id": "IMPORT-TEST",
+            "imported_at": "2026-10-27T05:00:00Z",
+            "actor": "test",
+            "reason": "Preserve parallel recorded history",
+            "start_index": len(target["records"]),
+            "target": target_identity,
+            "source": source_identity,
+        }
+    ]
+    (root / LEDGER).write_bytes(encoded(candidate))
+    return catalog, target, source, candidate, root
+
+
+def test_import_preserves_both_histories_and_normal_recording(parallel_history):
+    catalog, target, source, candidate, root = parallel_history
+    validate_ledger(catalog, candidate, root)
+    check_append_only(target, candidate)
+    assert candidate["records"][:2] == target["records"]
+    assert candidate["records"][2:] == source["records"][1:]
+    assert current_updates(candidate)[("S02", "quality")]["checkpoint"] == "SOURCE-2"
+    view = render(catalog, candidate)
+    assert "记录截至：2026-10-27T05:00:00Z" in view
+    assert candidate["history_imports"][0]["source"]["revision"] in view
+    assert cli(root, "render").returncode == 0
+    assert (
+        cli(
+            root, "check", "--base-ref", candidate["history_imports"][0]["target"]["revision"]
+        ).returncode
+        == 0
+    )
+    next_record = successor(target, "AFTER-IMPORT")
+    next_record.update(
+        recorded_at="2026-10-27T06:00:00Z", updates=[], no_change_reason="Next ordinary checkpoint"
+    )
+    new = root / "next.json"
+    new.write_bytes(encoded(next_record))
+    assert cli(root, "record", "--checkpoint", str(new)).returncode == 0
+    written = read_json(root / LEDGER)
+    assert written["records"][:-1] == candidate["records"]
+    assert written["history_imports"] == candidate["history_imports"]
+
+
+@pytest.mark.parametrize(
+    "defect,match",
+    [
+        ("no_receipt", "time moved backwards"),
+        ("target_edit", "target prefix changed"),
+        ("source_edit", "source suffix changed"),
+        ("source_time", "source suffix changed"),
+        ("source_order", "source suffix changed"),
+        ("source_delete", "source suffix changed"),
+        ("hash", "hash mismatch"),
+        ("short_revision", "full Git SHA"),
+        ("missing_revision", "unreadable history"),
+        ("start", "start index"),
+        ("before_target", "time moved backwards"),
+        ("before_source", "predates source"),
+        ("schema", "import schema"),
+        ("unknown_field", "import fields"),
+        ("duplicate_receipt", "duplicate history import"),
+    ],
+)
+def test_import_rejects_tampering_and_invalid_receipts(parallel_history, defect, match):
+    catalog, _, _, candidate, root = parallel_history
+    receipt = candidate["history_imports"][0]
+    if defect == "no_receipt":
+        del candidate["history_imports"]
+    elif defect == "target_edit":
+        candidate["records"][1]["summary"] = "retroactive"
+    elif defect == "source_edit":
+        candidate["records"][2]["summary"] = "retroactive"
+    elif defect == "source_time":
+        candidate["records"][2]["recorded_at"] = receipt["imported_at"]
+    elif defect == "source_order":
+        candidate["records"][2:] = list(reversed(candidate["records"][2:]))
+    elif defect == "source_delete":
+        candidate["records"].pop()
+    elif defect == "hash":
+        receipt["source"]["sha256"] = "f" * 64
+    elif defect == "short_revision":
+        receipt["source"]["revision"] = "a" * 7
+    elif defect == "missing_revision":
+        receipt["source"]["revision"] = "f" * 40
+    elif defect == "start":
+        receipt["start_index"] = 1
+    elif defect == "before_target":
+        receipt["imported_at"] = "2026-10-27T03:00:00Z"
+    elif defect == "before_source":
+        receipt["imported_at"] = "2026-10-27T00:30:00Z"
+    elif defect == "schema":
+        receipt["schema_version"] = "quanthus.blueprint-history-import.v2"
+    elif defect == "unknown_field":
+        receipt["bypass"] = True
+    else:
+        candidate["history_imports"].append(copy.deepcopy(receipt))
+    with pytest.raises(ProgressError, match=match):
+        validate_ledger(catalog, candidate, root)
+
+
+@pytest.mark.parametrize(
+    "defect,match",
+    [
+        ("source_chronology", "source time moved backwards"),
+        ("duplicate_id", "duplicate checkpoints"),
+        ("nested_source", "nested source"),
+        ("no_common_prefix", "shared prefix"),
+        ("no_source_suffix", "shared prefix"),
+        ("old_issue", "issue observation"),
+        ("same_time_conflict", "issue observation"),
+        ("bad_evidence", "requires referenced evidence"),
+        ("missing_authority", "explicit authority"),
+    ],
+)
+def test_import_checks_semantics_even_with_correct_source_hash(parallel_history, defect, match):
+    catalog, target, source, candidate, root = parallel_history
+    if defect == "source_chronology":
+        source["records"][2]["recorded_at"] = "2026-10-27T00:30:00Z"
+    elif defect == "duplicate_id":
+        source["records"][2]["id"] = source["records"][1]["id"]
+    elif defect == "nested_source":
+        source["history_imports"] = [{"id": "NESTED"}]
+    elif defect == "no_common_prefix":
+        source["records"][0]["summary"] = "different baseline"
+    elif defect == "no_source_suffix":
+        source["records"] = source["records"][:1]
+    elif defect in {"old_issue", "same_time_conflict"}:
+        row = source["records"][2]["issue_observations"][0]
+        row["body_sha256"] = "c" * 64
+        if defect == "old_issue":
+            row["updated_at"] = "2026-10-25T00:00:00Z"
+    elif defect == "bad_evidence":
+        source["records"][2]["updates"][0]["evidence"] = ["UNKNOWN"]
+    else:
+        source["records"][2]["updates"][0].update(
+            facet="admission", status="accepted", supersedes=None
+        )
+    candidate["history_imports"][0]["source"] = history_snapshot(root, source, defect)
+    candidate["records"] = copy.deepcopy(target["records"] + source["records"][1:])
+    with pytest.raises(ProgressError, match=match):
+        validate_ledger(catalog, candidate, root)
+
+
+def test_import_rejects_competing_module_updates(parallel_history):
+    catalog, target, _, candidate, root = parallel_history
+    target["records"][1]["updates"] = [copy.deepcopy(candidate["records"][2]["updates"][0])]
+    candidate["history_imports"][0]["target"] = history_snapshot(root, target, "conflict")
+    candidate["records"][:2] = copy.deepcopy(target["records"])
+    with pytest.raises(ProgressError, match="stale module checkpoint"):
+        validate_ledger(catalog, candidate, root)
+
+
+def test_import_allows_newer_issue_observation(parallel_history):
+    catalog, _, source, candidate, root = parallel_history
+    row = source["records"][2]["issue_observations"][0]
+    row.update(updated_at="2026-10-27T00:00:00Z", body_sha256="c" * 64)
+    candidate["history_imports"][0]["source"] = history_snapshot(root, source, "newer issue")
+    candidate["records"][2:] = copy.deepcopy(source["records"][1:])
+    validate_ledger(catalog, candidate, root)
+
+
+def test_after_import_ordinary_clock_cannot_move_backwards(parallel_history):
+    catalog, _, _, candidate, root = parallel_history
+    record = successor(candidate, "AFTER")
+    record.update(
+        recorded_at="2026-10-27T04:30:00Z",
+        updates=[],
+        no_change_reason="Ordinary clock must follow imported_at",
+    )
+    candidate["records"].append(record)
+    with pytest.raises(ProgressError, match="time moved backwards"):
+        validate_ledger(catalog, candidate, root)
+
+
+@pytest.mark.parametrize("defect", ["edit", "remove", "retroactive"])
+def test_import_receipts_are_append_only(parallel_history, defect):
+    _, _, _, candidate, _ = parallel_history
+    old = copy.deepcopy(candidate)
+    if defect == "edit":
+        candidate["history_imports"][0]["reason"] = "rewritten"
+    elif defect == "remove":
+        del candidate["history_imports"]
+    else:
+        del old["history_imports"]
+    with pytest.raises(ProgressError, match="prior history imports|prior checkpoints"):
+        check_append_only(old, candidate)

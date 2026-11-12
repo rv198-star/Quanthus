@@ -1,0 +1,16 @@
+{
+  "schema": "quanthus.native-capital-independent-check-request.v1",
+  "parent_request": "config/research/research-capital-qual/request.v1.json",
+  "parent_request_digest": "sha256:475bdda78b01f8286fe510fcd23f69b4c59627587b1f9ec3149134644d03f61a",
+  "parent_census_digest": "sha256:cb58c2a52e5e7844eed2e78f6b1ef1181d89d698863400612568ce9cf2ca7c7b",
+  "purpose": "One narrow independently written source relation/unit check after census; no PnL, no repeat of full census",
+  "cause": "State observation-missing flags and special source action term classes require exact consumer exclusion keys",
+  "max_wall_seconds": 180,
+  "max_cpu_seconds": 240,
+  "max_rss_bytes": 4294967296,
+  "source_scope": "same frozen126 members,2020-2021 business rows and2019 calendar",
+  "new_source_acquisition": false,
+  "source_census_attempts_total": 1,
+  "independent_relation_checks": 1,
+  "source_clocks": "preserve; no historical PIT or execution admission inferred"
+}

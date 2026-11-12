@@ -26,47 +26,87 @@
     "60分钟内无法确认消费者与具体未满足接口就不继续开发。",
     "出现新数据、训练、阈值、P6/生产或超预算要求时只停止对应步骤。"
   ],
-  "memory_sha256": "295327bb6c1dad75c6f16bb92b040bd2a8211f4efdac08c7e3113b4efdf3ea6a",
+  "memory_sha256": "ace5bf3f7a1c22224359b6a70add8a712686c0b3f146f8e58da6479c97b0c55a",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
       "relation": "respect",
-      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
     },
     {
       "conclusion_id": "CON-HELD-NEED-20261029",
       "relation": "respect",
-      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
     },
     {
       "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
       "relation": "respect",
-      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
     },
     {
       "conclusion_id": "CON-DECISION-SELECTION-20261029",
       "relation": "respect",
-      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
     },
     {
       "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
       "relation": "respect",
-      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
     },
     {
       "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
       "relation": "respect",
-      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
     },
     {
       "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
       "relation": "respect",
-      "rationale": "保留限定结论、费用及曝光；刷新非授权提案的当前记忆不重开旧研究或激活新任务。"
+      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
     },
     {
       "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
       "relation": "respect",
-      "rationale": "本轮当前接入条件未成立；保留可复用能力和未来具名需求的重开条件，不将旧提案激活。"
+      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "保留R2的固定盘中响应资源决定、旧曝光及成本。此文件是已退役示例，仅刷新当前索引，不启动R2后继或重做比较。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "Preserve the capital input readiness gap, successor funding gate and all prior costs. This retired example refreshes its index only; no experiment is activated."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "respect",
+      "rationale": "Retired example index refresh only; preserve A input holds, prior exposure/cost and BCD allocation boundary."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
+      "relation": "respect",
+      "rationale": "Retired example index refresh only. Preserve R4 independently accepted complete/inconclusive/park fixed-holding decision, all earlier costs/failures/exposure and original R2 signal-use grade. No successor, deployment or repetition is activated."
     }
   ],
   "cumulative_cost_review": "既有Head2和持仓尝试全部保留，旧总成本未知而非零；新批次独立记账，不伪装新方向抹去原投入。",

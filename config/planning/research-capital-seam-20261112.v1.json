@@ -1,0 +1,99 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-CAPITAL-SEAM-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "raw-momentum20-capital-replay",
+  "work_item": "P3-RESEARCH-REPLAY-001",
+  "modules": [
+    "FACTORS",
+    "REPRO",
+    "CLOSEOUT"
+  ],
+  "question": "What exact seams separate the accepted fixed R2 momentum response candidate from an executable T+1 costed-capital comparison using existing code and Base2.5.1?",
+  "consumer": "Research allocator deciding whether to fund the complete replay adapter/qualification/comparison tranche",
+  "scope": "Read-only source and frozen metadata, no market rows or capital experiment; 30-minute active seam tranche approved by Owner",
+  "deliverable": "Evidence-bound interface matrix, preregistration plan, complete tranche costs and failure/stop routes",
+  "decision_if_pass": "Freeze the smallest follow-on work package with exact entry gates and then progress within approved authority",
+  "decision_if_fail": "Record concrete missing seams and costs; stop this seam tranche without inferring a negative market result",
+  "acceptance": [
+    "Exact source/consumer/identity/time/action/reference seams inspected",
+    "Fixed candidate, control, executable holding/exit, capital and cost plan",
+    "Finite follow-on stages, entry gates and failure paths with truthful cost accounting"
+  ],
+  "stop_conditions": [
+    "30-minute active tranche; no new market-row reads or actual capital result",
+    "No source collection, data repair, PIT clock rewrite, protected partitions, Worker rollout or production changes",
+    "A missing adapter or reference is estimated and routed, not silently implemented as an unbounded extension"
+  ],
+  "memory_sha256": "2d09af923cd9b276bb5f4ecd5b92652d33764ca0e74c8be3f5952972340e0896",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior result, exposure and costs. This authorized metadata/code seam study consumes the R2 routing result and does not rerun the old experiments, fit or parked question."
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior result, exposure and costs. This authorized metadata/code seam study consumes the R2 routing result and does not rerun the old experiments, fit or parked question."
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior result, exposure and costs. This authorized metadata/code seam study consumes the R2 routing result and does not rerun the old experiments, fit or parked question."
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior result, exposure and costs. This authorized metadata/code seam study consumes the R2 routing result and does not rerun the old experiments, fit or parked question."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior result, exposure and costs. This authorized metadata/code seam study consumes the R2 routing result and does not rerun the old experiments, fit or parked question."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior result, exposure and costs. This authorized metadata/code seam study consumes the R2 routing result and does not rerun the old experiments, fit or parked question."
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior result, exposure and costs. This authorized metadata/code seam study consumes the R2 routing result and does not rerun the old experiments, fit or parked question."
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior result, exposure and costs. This authorized metadata/code seam study consumes the R2 routing result and does not rerun the old experiments, fit or parked question."
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior result, exposure and costs. This authorized metadata/code seam study consumes the R2 routing result and does not rerun the old experiments, fit or parked question."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior result, exposure and costs. This authorized metadata/code seam study consumes the R2 routing result and does not rerun the old experiments, fit or parked question."
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "Preserve the scoped prior result, exposure and costs. This authorized metadata/code seam study consumes the R2 routing result and does not rerun the old experiments, fit or parked question."
+    }
+  ],
+  "cumulative_cost_review": "R1/R2 execution, repairs, audits, consumed 2020-2021 window and missing historical effort/token/billing carry forward as unknown_not_zero. This is the approved 30-minute seam tranche; a 1-2h complete replay was only a conditional planning estimate.",
+  "runtime_authority_boundary": "Owner approved advancing the stated seam/preregistration step. Local code and public frozen HF metadata are used. NexusAgent unavailable; no new remote SSH exception is inferred from closed613.",
+  "budget": {
+    "wall_seconds": 1800,
+    "max_new_bytes": 33554432,
+    "network_requests": 20,
+    "accounting_owner": "Bounded seam tranche under bus608, no reset of original total"
+  },
+  "execution_record": "docs/acceptance/research-capital-seam-20261112.md",
+  "execution_disposition": "SEAM_AND_PLAN_DELIVERED; capital experiment not run, successor628 pending qualification/allocation",
+  "proposal_role": "Executed metadata/code proposal; original memory/preflight binding retained at f0ca576d; successor is separately gated."
+}

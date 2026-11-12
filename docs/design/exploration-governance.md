@@ -146,6 +146,41 @@ cost and remaining work. Do not count trials, issue closures, code volume or pos
 percentage as product success. A finite delivery stage may define a weighted denominator;
 the 12+X blueprint itself still has no issue-count-derived completion percentage.
 
+## User-facing batch value handoff
+
+At kickoff, name the project goal and the decision or usable capability this batch should
+change. Reuse that sentence at closeout and report the actual change, including a narrow or
+inconclusive result. If scope moves toward necessary repair or engineering, explain that
+change when it occurs and reassess the remaining research value and cost.
+
+Every bounded batch ends with a short value brief in the conversation itself. Its first
+screen answers these questions in plain language:
+
+| Question | Required answer |
+| --- | --- |
+| What was this batch for? | The project goal, prior situation and unresolved question. |
+| What did we get? | The concrete finding, usable asset or resolved blocker, with its actual scope. |
+| What changes now? | A before/after capability and the affected consumer or resource decision; distinguish a recommendation from an action already taken. |
+| Where is the project now? | The named stage reached and the material remaining gap to the project goal. |
+| Was the investment worthwhile? | Known cumulative effort and cost, unknown fields, observed reuse and a candid value judgment; keep expected savings separate from measured savings. |
+| What is the next decision? | Continue, adopt, stop or park; name the next consumer, prerequisite and smallest useful evidence delta where one exists. |
+
+Lead with the value judgment and its practical consequence. Put issue/PR lifecycle,
+test counts, hashes and detailed logs in the evidence layer after that explanation.
+Describe material limitations once at the relevant result. A small finding or expensive
+delivery must remain visible in the value assessment; prose must not inflate it.
+
+Maintain one current brief at the top of the parent research issue and link its durable
+counterpart. Refresh the parent's affected task checkboxes and mark prior stage summaries
+as history. Preserve the historical decisions and evidence. Stage completion and main-branch
+availability must each be stated accurately. If a next batch is proposed, carry forward the
+existing exposure and cumulative costs rather than starting their accounting again.
+
+This is a communication contract using the existing conclusion and blueprint records.
+It adds no reporting service, new scientific gate or recurring task. The Owner should be
+able to judge project progress from the ordinary reply without opening the audit logs.
+See the [R1 value brief](../work-items/research-r1-value-brief.md) for an applied example.
+
 ## Research basis
 
 The mechanism adapts [RD-Agent-Quant's hypothesis/feedback cycle](https://arxiv.org/html/2505.15155v2),

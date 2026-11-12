@@ -8715,6 +8715,1504 @@
           "body_sha256": "caa1eb55e38b5e171007abeb30c9f0d05978e646001dac03fc386f473744e06e"
         }
       ]
+    },
+    {
+      "id": "CP-612-20261111T092552053641Z",
+      "recorded_at": "2026-11-11T09:25:52.053641+00:00",
+      "actor": "Codex / Astra; Owner-requested independent audit #612",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "outcome": "progress",
+      "summary": "R1原统计与HF包独立复核通过；评价语义与Worker合同未通过，原三项重开，保留工程证据与模型任务边界。",
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "FACTS",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "R1 Base2.5.1 2020-2021描述代理；原33409/33392可复现，security有效期连接、波动率和上市年龄有语义缺陷",
+          "remaining": "原批次实际可成交率/策略假设采用冻结；旧Facts资产保留原范围",
+          "next_action": "新请求明确语义并对拍，修消费者时间连接；不修源数据",
+          "evidence": [
+            "AUDIT612"
+          ],
+          "supersedes": "CP-545-20261028T094548750254Z"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "R1源闭包和HF结果字节完整、独立复算一致；通用执行包合同未通过",
+          "remaining": "缺开盘价、身份绑定、不可变发布及资源守卫；旧reader资产仍按原范围使用",
+          "next_action": "先修#610精确缺口并负测，再复用Worker",
+          "evidence": [
+            "AUDIT612"
+          ],
+          "supersedes": "CP-540-20261029T164848737757Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "本批采用未通过；撤回理想成交推广，当前轻任务暂不扩Worker",
+          "remaining": "事前阈值、最小样本与完整累计成本缺项；信号/执行投入选择待有效合同",
+          "next_action": "Sol/Astra主责#609语义；Deepseek只接E0/E1；#613/#614保持条件触发",
+          "evidence": [
+            "AUDIT612"
+          ],
+          "supersedes": "CP-540-20261029T121833583946Z"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-REVIEW-001",
+          "number": 612,
+          "title": "[META-RESEARCH-REVIEW-001] 独立审阅首个结果并完成采用、入账与长期证据留存",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-11T06:31:33Z",
+          "body_sha256": "745742bf6942eabf9909a1a92a66a283d4598dc6a74adab6aabbdbe20aa00342"
+        }
+      ]
+    },
+    {
+      "id": "CP-2-20261111T092740125507Z",
+      "recorded_at": "2026-11-11T09:27:40.125507+00:00",
+      "actor": "Codex / Astra; #612 audit",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "R1审计只追加有证据的记录与工作项索引，TRACE校验器及权限无变化。",
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本条仅对账任务生命周期/记账机制，保持既有科学、工程与资格结论的适用范围。",
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-609-20261111T092741147614Z",
+      "recorded_at": "2026-11-11T09:27:41.147614+00:00",
+      "actor": "Codex / Astra; #612 audit",
+      "work_item": "META-RESEARCH-SELECT-001",
+      "outcome": "no_module_change",
+      "summary": "独立审计后重开#609，确认当前issue元数据；模块判断已由#612专属checkpoint记录。",
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本条仅对账任务生命周期/记账机制，保持既有科学、工程与资格结论的适用范围。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-SELECT-001",
+          "number": 609,
+          "title": "[META-RESEARCH-SELECT-001] 选择首个高ROI问题并冻结用途、输入与有限预算",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T09:22:29Z",
+          "body_sha256": "bceaaa2c218260c96e8140bdfd57a40df991e291280ec99e8ac8002d0597f197"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-610-20261111T092742138299Z",
+      "recorded_at": "2026-11-11T09:27:42.138299+00:00",
+      "actor": "Codex / Astra; #612 audit",
+      "work_item": "P3-RESEARCH-HF-001",
+      "outcome": "no_module_change",
+      "summary": "独立审计后重开#610，确认当前issue元数据；模块判断已由#612专属checkpoint记录。",
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本条仅对账任务生命周期/记账机制，保持既有科学、工程与资格结论的适用范围。",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-HF-001",
+          "number": 610,
+          "title": "[P3-RESEARCH-HF-001] 为首个研究任务打通最小HF读取、限额运行与结果回传",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T09:22:36Z",
+          "body_sha256": "2303682c50f33c3ad4d0c8922add2da032626f73ac8529a431504ca110133a32"
+        }
+      ],
+      "reviewed_modules": [
+        "REPRO"
+      ]
+    },
+    {
+      "id": "CP-611-20261111T092743517402Z",
+      "recorded_at": "2026-11-11T09:27:43.517402+00:00",
+      "actor": "Codex / Astra; #612 audit",
+      "work_item": "P3-RESEARCH-PILOT-001",
+      "outcome": "no_module_change",
+      "summary": "独立审计后重开#611，确认当前issue元数据；模块判断已由#612专属checkpoint记录。",
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本条仅对账任务生命周期/记账机制，保持既有科学、工程与资格结论的适用范围。",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-PILOT-001",
+          "number": 611,
+          "title": "[P3-RESEARCH-PILOT-001] 完成首个有界比较、HF结果包与下一笔投入判断",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T09:22:42Z",
+          "body_sha256": "c4ac6a6827f84ac9784e53e47231bb3dedccb4f31429809bd17c1a57901562a1"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-612-20261111T093823872826Z",
+      "recorded_at": "2026-11-11T09:38:23.872826+00:00",
+      "actor": "Codex / Astra; independent audit closeout",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "outcome": "no_module_change",
+      "summary": "#612独立审计完成并关闭；原研究验收未通过，#609-611已重开；本条只对账生命周期。",
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "模块判断已在CP-612-20261111T092552053641Z记录；关闭审计issue不提升研究结果或消费者资格。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-REVIEW-001",
+          "number": 612,
+          "title": "[META-RESEARCH-REVIEW-001] 独立审阅首个结果并完成采用、入账与长期证据留存",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-11T09:38:21Z",
+          "body_sha256": "745742bf6942eabf9909a1a92a66a283d4598dc6a74adab6aabbdbe20aa00342"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-609-20261111T101525257030Z",
+      "recorded_at": "2026-11-11T10:15:25.257030+00:00",
+      "actor": "Codex / Sol 6.1; Owner ordered repair",
+      "work_item": "META-RESEARCH-SELECT-001",
+      "outcome": "no_module_change",
+      "summary": "#609 v2用途、公式、分区/输入、样本与资源分支事前冻结且自审通过；进入#610实现。",
+      "evidence": [
+        {
+          "id": "E609-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/retained/609-self-audit.json",
+          "sha256": "61f1c256fed5328a6ac539cc7c67563b46b1ba6aca3aec7797ac2f705808bfb8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "#609新合同与元数据检查；没有新结果或策略采用。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本条完成设计与阶段生命周期，不把未运行的描述筛选提升为研究或消费者资格。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-SELECT-001",
+          "number": 609,
+          "title": "[META-RESEARCH-SELECT-001] 选择首个高ROI问题并冻结用途、输入与有限预算",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-11T10:15:23Z",
+          "body_sha256": "bceaaa2c218260c96e8140bdfd57a40df991e291280ec99e8ac8002d0597f197"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-610-20261111T111218136234Z",
+      "recorded_at": "2026-11-11T11:12:18.136234+00:00",
+      "actor": "Codex / Sol 6.1; ordered R1 repair",
+      "work_item": "P3-RESEARCH-HF-001",
+      "outcome": "progress",
+      "summary": "R1 v2限定Worker工程自审通过：40专项/8888完整测试，真实HF全文件回读与幂等，A1保留A2最终。",
+      "evidence": [
+        {
+          "id": "E610-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/retained/610-self-audit.json",
+          "sha256": "df1de87eef8c59927073aa6b97d637b463e3679d4c4092e1e85d286b15ba1b9a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "限定Linux/Python3.10.12和56成员的v2 Worker工程自审；采用待独立审阅。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "R1 v2: 2dc01f18，40专项/8888完整检查，HF cd7029e1全包回读与同内容发布幂等；A1/A2同指标",
+          "remaining": "只覆盖固定描述任务和一个合格Linux节点；最终采用/第二Worker由独立审阅和触发条件决定",
+          "next_action": "611复用同一已发布结果，612独立验收；需要新任务时冻结完整request",
+          "evidence": [
+            "E610-SELF-AUDIT"
+          ],
+          "supersedes": "CP-612-20261111T092552053641Z"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-HF-001",
+          "number": 610,
+          "title": "[P3-RESEARCH-HF-001] 为首个研究任务打通最小HF读取、限额运行与结果回传",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-11T11:12:16Z",
+          "body_sha256": "2303682c50f33c3ad4d0c8922add2da032626f73ac8529a431504ca110133a32"
+        }
+      ]
+    },
+    {
+      "id": "CP-611-20261111T112133530157Z",
+      "recorded_at": "2026-11-11T11:21:33.530157+00:00",
+      "actor": "Codex / Sol 6.1; ordered R1 repair",
+      "work_item": "P3-RESEARCH-PILOT-001",
+      "outcome": "progress",
+      "summary": "v2候选90648/通过90573，75阻断0.08274%；样本、分年分所、原因与集中度对账通过，保留原守卫，待独审采用。",
+      "evidence": [
+        {
+          "id": "E611-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/retained/611-self-audit.json",
+          "sha256": "977e54733a82a26ec188dcba64dae8c727b3928ed4ad71be319a9ec59f24091e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R1 v2已曝光开发窗的未复权价格筛选与T+1守卫描述自审；采用交独立审阅。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "FACTS",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "2dc01f18/v2 A2：449日、2868listing，90648候选，75个价格守卫阻断；时序/原价收益语义固定且作者自审通过",
+          "remaining": "仅latest-sealed回顾描述；旧v1失效历史保留，独立复算/采用待612",
+          "next_action": "独立按v2合同验证样本和核心语义，保留source/PIT用途边界",
+          "evidence": [
+            "E611-SELF-AUDIT"
+          ],
+          "supersedes": "CP-612-20261111T092552053641Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "按事前1%/2%资源门槛命中small；保留P2原守卫、下一笔选具名信号问题，第二Worker仍条件触发",
+          "remaining": "策略经济价值未评价；资源建议最终采用交独审，旧成本/失败持续累计",
+          "next_action": "612独立审阅后再决定R1里程碑及613/614下一笔",
+          "evidence": [
+            "E611-SELF-AUDIT"
+          ],
+          "supersedes": "CP-612-20261111T092552053641Z"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-PILOT-001",
+          "number": 611,
+          "title": "[P3-RESEARCH-PILOT-001] 完成首个有界比较、HF结果包与下一笔投入判断",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-11T11:21:31Z",
+          "body_sha256": "c4ac6a6827f84ac9784e53e47231bb3dedccb4f31429809bd17c1a57901562a1"
+        }
+      ]
+    },
+    {
+      "id": "CP-612-20261111T112345330581Z",
+      "recorded_at": "2026-11-11T11:23:45.330581+00:00",
+      "actor": "Codex / Sol 6.1; v2 independent-review handoff",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "outcome": "no_module_change",
+      "summary": "612重开用于v2独立审阅；原v1审计和拒绝历史保留，Sol作为作者只交自审。",
+      "evidence": [
+        {
+          "id": "E611-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/retained/611-self-audit.json",
+          "sha256": "977e54733a82a26ec188dcba64dae8c727b3928ed4ad71be319a9ec59f24091e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R1 v2已曝光开发窗的未复权价格筛选与T+1守卫描述自审；采用交独立审阅。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "此条仅对账新审阅版本和生命周期；独立采用尚未执行。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-REVIEW-001",
+          "number": 612,
+          "title": "[META-RESEARCH-REVIEW-001] 独立审阅首个结果并完成采用、入账与长期证据留存",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T11:23:41Z",
+          "body_sha256": "6bd95575cdc5635f81dc82d3a797c6418dbd30ce6923b5b3d3416d68bc3f65f3"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-2-20261111T112813411699Z",
+      "recorded_at": "2026-11-11T11:28:13.411699+00:00",
+      "actor": "Codex / Sol 6.1; R1 repair metadata",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "追加R1 v2自审结论与独立审阅入口；TRACE机制和权限未改变。",
+      "evidence": [
+        {
+          "id": "E611-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/retained/611-self-audit.json",
+          "sha256": "977e54733a82a26ec188dcba64dae8c727b3928ed4ad71be319a9ec59f24091e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R1 v2已曝光开发窗的未复权价格筛选与T+1守卫描述自审；采用交独立审阅。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "复用既有追加账本/蓝图机制；无新的治理代码、阈值或全局权限变更。",
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-612-20261111T121242422791Z",
+      "recorded_at": "2026-11-11T12:12:42.422791+00:00",
+      "actor": "Codex independent v2 reviewer; Owner-started #612",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "outcome": "progress",
+      "summary": "Accept fixed v2 contract/result and small allocation; Worker fails three contract cases, 612/R1 await bounded reacceptance.",
+      "evidence": [
+        {
+          "id": "AUDIT612-V2",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+          "sha256": "0b6b7722c2cece772e1e57bb6feabfc931bdab86137f3b6263cc7354a4727c22",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed-A2 reconstruction/readback and three Worker counterexamples; bounded allocation accepted, Worker repair pending."
+        }
+      ],
+      "updates": [
+        {
+          "module": "FACTS",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "Fixed A2, consumed 2020-2021: independent 90648/90573, 75 blocks, all groups and 449 candidate days match",
+          "remaining": "Latest-sealed raw-price description only; new scientific/PIT uses require their own contracts",
+          "next_action": "Retain the result and select the next named signal question under existing governance",
+          "supersedes": "CP-611-20261111T112133530157Z",
+          "evidence": [
+            "AUDIT612-V2"
+          ]
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "A2 bytes and values verified; three reproduced Worker defects: failed-stage publication, candidate-days gate, partial-package recovery",
+          "remaining": "610 must repair these differences before reusable Worker acceptance",
+          "next_action": "Repair F1/F2/F3 with transition regressions; defer PR617 merge, retain qualified A2 result",
+          "supersedes": "CP-610-20261111T111218136234Z",
+          "evidence": [
+            "AUDIT612-V2"
+          ]
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "Adopt the small allocation branch: retain P2 guards, prioritize a named signal question, defer Worker expansion",
+          "remaining": "Strategy economics and complete monetary ROI unmeasured; R1 waits on 610",
+          "next_action": "Bounded 610 closure first; 613/614 remain condition-triggered",
+          "supersedes": "CP-611-20261111T112133530157Z",
+          "evidence": [
+            "AUDIT612-V2"
+          ]
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-REVIEW-001",
+          "number": 612,
+          "title": "[META-RESEARCH-REVIEW-001] 独立审阅首个结果并完成采用、入账与长期证据留存",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T12:10:42Z",
+          "body_sha256": "b795d4c462449adc94934fe9b431492a70f09791e40aca287c3de4c728794bc1"
+        }
+      ]
+    },
+    {
+      "id": "CP-610-20261111T121243488180Z",
+      "recorded_at": "2026-11-11T12:12:43.488180+00:00",
+      "actor": "Codex independent v2 reviewer; Owner-started #612",
+      "work_item": "P3-RESEARCH-HF-001",
+      "outcome": "reopened",
+      "summary": "Reopen only three proven Worker defects; 609 and 611 remain complete.",
+      "evidence": [
+        {
+          "id": "AUDIT612-V2",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+          "sha256": "0b6b7722c2cece772e1e57bb6feabfc931bdab86137f3b6263cc7354a4727c22",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed-A2 reconstruction/readback and three Worker counterexamples; bounded allocation accepted, Worker repair pending."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "The independent 612 checkpoint already records REPRO partial status; this record reconciles 610 lifecycle.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-HF-001",
+          "number": 610,
+          "title": "[P3-RESEARCH-HF-001] 为首个研究任务打通最小HF读取、限额运行与结果回传",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T12:10:39Z",
+          "body_sha256": "4c04179d733f09a19a84b7ff21440784563f141a426b3060ff8511920b69ab95"
+        }
+      ],
+      "reviewed_modules": [
+        "REPRO"
+      ]
+    },
+    {
+      "id": "CP-2-20261111T121244409272Z",
+      "recorded_at": "2026-11-11T12:12:44.409272+00:00",
+      "actor": "Codex independent v2 reviewer; Owner-started #612",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "Append independent v2 evidence and model task policy using existing governance.",
+      "evidence": [
+        {
+          "id": "AUDIT612-V2",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+          "sha256": "0b6b7722c2cece772e1e57bb6feabfc931bdab86137f3b6263cc7354a4727c22",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed-A2 reconstruction/readback and three Worker counterexamples; bounded allocation accepted, Worker repair pending."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "No TRACE mechanism or authority change.",
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-612-20261111T122125202765Z",
+      "recorded_at": "2026-11-11T12:21:25.202765+00:00",
+      "actor": "Codex independent v2 reviewer",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "outcome": "no_module_change",
+      "summary": "Reconcile the completed v2 audit handoff comment and open bounded-repair entry.",
+      "evidence": [
+        {
+          "id": "AUDIT612-V2",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+          "sha256": "0b6b7722c2cece772e1e57bb6feabfc931bdab86137f3b6263cc7354a4727c22",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed-A2 reconstruction/readback and three Worker counterexamples; bounded allocation accepted, Worker repair pending."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "The prior v2 checkpoint already captures all FACTS/REPRO/CLOSEOUT decisions. This entry acknowledges final live issue metadata.",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-REVIEW-001",
+          "number": 612,
+          "title": "[META-RESEARCH-REVIEW-001] 独立审阅首个结果并完成采用、入账与长期证据留存",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T12:20:34Z",
+          "body_sha256": "b795d4c462449adc94934fe9b431492a70f09791e40aca287c3de4c728794bc1"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-610-20261111T145506490958Z",
+      "recorded_at": "2026-11-11T14:55:06.490958+00:00",
+      "actor": "Sol 6.1 author repair/self-audit",
+      "work_item": "P3-RESEARCH-HF-001",
+      "outcome": "progress",
+      "summary": "F1-F3 and failed-output cache guard repaired; 81 focused/8929 complete tests pass, A4 immutable delivery; await independent reacceptance.",
+      "evidence": [
+        {
+          "id": "E610-F1F3-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained/self-audit.json",
+          "sha256": "0f30b0ebbd1c892a0e402d406b4a6eaaa465cdb4a10226ffe6d1aa4fc1258800",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Author self-audit of F1/F2/F3 and failed-output reuse, exact A4 delivery; independent adoption pending at 612."
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "1351be2b execution and type-only 061429f5 equivalent compilation: final 81/8929 checks, A4 complete HF readback and idempotence; 3 audited gaps fixed",
+          "remaining": "Author self-audit complete; independent difference review at 612 pending",
+          "next_action": "Review F1 transition/cache cases, F2 candidate days and F3 package recovery before R1 closure or Worker reuse",
+          "evidence": [
+            "E610-F1F3-SELF-AUDIT"
+          ],
+          "supersedes": "CP-612-20261111T121242422791Z"
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-HF-001",
+          "number": 610,
+          "title": "[P3-RESEARCH-HF-001] 为首个研究任务打通最小HF读取、限额运行与结果回传",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T14:53:58Z",
+          "body_sha256": "bb7e0a959931003ea87c8610fdc22241bef0e7acb187664f4727e6e79f139ab6"
+        }
+      ]
+    },
+    {
+      "id": "CP-612-20261111T145508178862Z",
+      "recorded_at": "2026-11-11T14:55:08.178862+00:00",
+      "actor": "Sol 6.1 author repair/self-audit",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "outcome": "no_module_change",
+      "summary": "Author repair and A4 evidence delivered; 612 remains open for independent difference review.",
+      "evidence": [
+        {
+          "id": "E610-F1F3-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained/self-audit.json",
+          "sha256": "0f30b0ebbd1c892a0e402d406b4a6eaaa465cdb4a10226ffe6d1aa4fc1258800",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Author self-audit of F1/F2/F3 and failed-output reuse, exact A4 delivery; independent adoption pending at 612."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "REPRO engineering update is recorded by 610. FACTS/CLOSEOUT scientific decisions and admission remain unchanged; no independent acceptance by the author.",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-REVIEW-001",
+          "number": 612,
+          "title": "[META-RESEARCH-REVIEW-001] 独立审阅首个结果并完成采用、入账与长期证据留存",
+          "state": "open",
+          "state_reason": "reopened",
+          "updated_at": "2026-11-11T14:54:01Z",
+          "body_sha256": "c9dc33999b3ceb1a971925650c62d0729ac1891b9e285c4fd068ea0bb1d0ee41"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-2-20261111T145509936774Z",
+      "recorded_at": "2026-11-11T14:55:09.936774+00:00",
+      "actor": "Sol 6.1 author repair/self-audit",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "Append bounded Worker repair self-audit via existing governance.",
+      "evidence": [
+        {
+          "id": "E610-F1F3-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained/self-audit.json",
+          "sha256": "0f30b0ebbd1c892a0e402d406b4a6eaaa465cdb4a10226ffe6d1aa4fc1258800",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Author self-audit of F1/F2/F3 and failed-output reuse, exact A4 delivery; independent adoption pending at 612."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "No TRACE mechanism or authority change; preserve all old checkpoints and costs.",
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-610-20261111T153609474025Z",
+      "recorded_at": "2026-11-11T15:36:09.474025+00:00",
+      "actor": "Codex independent difference review",
+      "work_item": "P3-RESEARCH-HF-001",
+      "outcome": "completed",
+      "summary": "F1-F3 and failed-output recovery independently accepted: 54 probes, 8929 complete checks and A4 fixed readback; close 610.",
+      "evidence": [
+        {
+          "id": "E612-F1F3-INDEPENDENT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/audit-summary.json",
+          "sha256": "1acb7405ce504b5458320ebfa0b3c6eea10190b9753338a3641356c3308f33fa",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent bounded Worker F1/F2/F3/C1 acceptance; 49+5 probes, 8929 complete checks and A4 immutable evidence. Research and consumer admission retain their prior scope."
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "Fixed v2 single-node Linux/Python3.10.12 Worker at bb99f99d; actual A4 1351be2b; all 54 independent difference cases, complete checks and immutable HF package verified",
+          "remaining": "Next task/node/source/semantic scope requires its own frozen request and qualification; model-economics and other scientific gates retain prior states",
+          "next_action": "Reuse this bounded Worker for the next named signal question; expand Workers only when 613/614 conditions are met",
+          "evidence": [
+            "E612-F1F3-INDEPENDENT"
+          ],
+          "supersedes": "CP-610-20261111T145506490958Z"
+        }
+      ],
+      "no_change_reason": "",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-HF-001",
+          "number": 610,
+          "title": "[P3-RESEARCH-HF-001] 为首个研究任务打通最小HF读取、限额运行与结果回传",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-11T15:34:55Z",
+          "body_sha256": "bf2db080af6df5f0d0b6c312ebb20b6d3526300ef6651f53ea17df8a5915b2c4"
+        }
+      ]
+    },
+    {
+      "id": "CP-612-20261111T153612117960Z",
+      "recorded_at": "2026-11-11T15:36:12.117960+00:00",
+      "actor": "Codex independent difference review",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "outcome": "completed",
+      "summary": "Independent difference acceptance and durable evidence complete; 612 and R1 close with accepted prior A2 result retained.",
+      "evidence": [
+        {
+          "id": "E612-F1F3-INDEPENDENT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/audit-summary.json",
+          "sha256": "1acb7405ce504b5458320ebfa0b3c6eea10190b9753338a3641356c3308f33fa",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent bounded Worker F1/F2/F3/C1 acceptance; 49+5 probes, 8929 complete checks and A4 immutable evidence. Research and consumer admission retain their prior scope."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "610 records scoped REPRO engineering acceptance. FACTS/CLOSEOUT scientific decisions and all consumer admission remain as previously recorded; this checkpoint reconciles review closure.",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-REVIEW-001",
+          "number": 612,
+          "title": "[META-RESEARCH-REVIEW-001] 独立审阅首个结果并完成采用、入账与长期证据留存",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-11T15:35:01Z",
+          "body_sha256": "070351f352d0b2c6a09b367154ced732a91ed9b9e2d27ffa655c161052fbe656"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-2-20261111T153719289002Z",
+      "recorded_at": "2026-11-11T15:37:19.289002+00:00",
+      "actor": "Codex independent difference review",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "R1 independent acceptance recorded with scoped REPRO update and reconciled lifecycle; governance mechanism unchanged.",
+      "evidence": [
+        {
+          "id": "E612-F1F3-INDEPENDENT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/audit-summary.json",
+          "sha256": "1acb7405ce504b5458320ebfa0b3c6eea10190b9753338a3641356c3308f33fa",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent bounded Worker F1/F2/F3/C1 acceptance; 49+5 probes, 8929 complete checks and A4 immutable evidence. Research and consumer admission retain their prior scope."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Append-only conclusion/checkpoint and the retired proposal memory index are refreshed using the existing governance scripts. No change to TRACE engineering/quality/value/admission or governance semantics.",
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-2-20261111T161205189042Z",
+      "recorded_at": "2026-11-11T16:12:05.189042+00:00",
+      "actor": "Codex / Sol 6.1 value-handoff repair",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "Deliver R1 project-value brief and an explicit value-first conversation/parent-issue handoff contract after Owner feedback.",
+      "evidence": [
+        {
+          "id": "HANDOFF-RULE",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "93736781fbba13b90da9c28104fc3170e9aa25d0",
+          "path": "docs/design/exploration-governance.md",
+          "sha256": "b42c63e533ef2e957d7a7f4f50bf6c6c6b76ff10d6835bad05de9ba422bbbf6b",
+          "claim_ceiling": "Communication contract and value interpretation of the already accepted R1 evidence; current scientific results and module maturity remain unchanged."
+        },
+        {
+          "id": "R1-VALUE-BRIEF",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "93736781fbba13b90da9c28104fc3170e9aa25d0",
+          "path": "docs/work-items/research-r1-value-brief.md",
+          "sha256": "3c70853e53f66e20c90b0a5e2d14e48901ee59ad22edc6707a850f639a51aa66",
+          "claim_ceiling": "Communication contract and value interpretation of the already accepted R1 evidence; current scientific results and module maturity remain unchanged."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Only the human-facing reporting contract, R1 explanation and research-bus summary change. Existing ledger/validator mechanisms and every module facet retain their prior scope and status; this is no new research result or additional capability acceptance.",
+      "issue_observations": [
+        {
+          "work_item": "META-TRACE-001",
+          "number": 2,
+          "title": "[META-TRACE-001] Maintain requirement-to-issue traceability",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-10-27T07:42:42Z",
+          "body_sha256": "e484d42d4cb654a41137ba39ba0210496298847f26d045dff5794d86faa68d7d"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-613-20261111T181214226620Z",
+      "recorded_at": "2026-11-11T18:12:14.226620+00:00",
+      "actor": "Codex R2 author self-audit and independent construction",
+      "work_item": "P3-RESEARCH-REUSE-001",
+      "outcome": "progress",
+      "summary": "R2固定动量区间以6.4101bp均值、正年度与正95pct下界通过预登记资源门槛；进入后续资金回放候选，复用收益和证据完整。",
+      "evidence": [
+        {
+          "id": "R2-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r2-momentum-20261112/retained/audit-summary.json",
+          "sha256": "bcd7309412bab741b2c8aa701529ce4f09b0cae520bf9e55084c7ce0fb791f0d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "2020-2021 fixed raw-momentum descriptive response and resource routing, with independent implementation reconstruction and HF/CN02 readback; costed capital replay is the next separate assessment."
+        }
+      ],
+      "updates": [
+        {
+          "module": "FACTORS",
+          "facet": "quality",
+          "status": "accepted",
+          "scope": "R2固定动量[2%,12%]与互斥对照：449配对日，平均增量6.4101bp，95%区间[2.1334,10.5830]bp；2020/2021均为正，独立重建一致",
+          "remaining": "用途为已消费2020–2021开发窗的盘中价格响应描述；T+1持仓、费用与资金表现待回放",
+          "next_action": "冻结后继回放的持仓/退出、费用、对照、输入与采用门槛；保留旧曝光和成本",
+          "evidence": [
+            "R2-SELF-AUDIT"
+          ],
+          "supersedes": "CP-541-20261027T220256362160Z"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "R2复用固定56成员、18依赖环境与既有Guardian/HF合同；输入0B网络下载，64.28s正式计算、63.55s独立重建；8937完整检查，10文件HF回读与47文件CN02回读",
+          "remaining": "当前研究和单节点合同；R1 PR617及叠加R2 PR626仍待main集成，Worker新节点需按任务资格进入",
+          "next_action": "按30分钟回放接缝建议决定完整后继段；有实际任务池或容量需求再接入备用Worker",
+          "evidence": [
+            "R2-SELF-AUDIT"
+          ],
+          "supersedes": "CP-610-20261111T153609474025Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "accepted",
+          "scope": "R2在本次资源路由用途通过：固定区间进入带费用资金回放候选；第二个不同问题与已有链路复用完成",
+          "remaining": "策略经济价值与完整货币ROI待相应后继验证；完整主动工时及历史账单unknown_not_zero",
+          "next_action": "优先核对现成资金回放接缝并预登记最小比较，不扩阈值或平台",
+          "evidence": [
+            "R2-SELF-AUDIT"
+          ],
+          "supersedes": "CP-612-20261111T121242422791Z"
+        }
+      ],
+      "no_change_reason": "",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-REUSE-001",
+          "number": 613,
+          "title": "[P3-RESEARCH-REUSE-001] 复用首轮资产取得第二个低成本研究决定",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-11T18:11:25Z",
+          "body_sha256": "839828c80f73eba20b0b02b01aa712d73859c205a8491a81ce48e43d13c761c5"
+        }
+      ]
+    },
+    {
+      "id": "CP-2-R2-INDEX-20261112",
+      "recorded_at": "2026-11-11T18:12:44.222146+00:00",
+      "actor": "Codex R2 closeout",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "R2结论入账后的已退役示例proposal索引刷新，治理机制保持。",
+      "evidence": [
+        {
+          "id": "R2-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r2-momentum-20261112/retained/audit-summary.json",
+          "sha256": "bcd7309412bab741b2c8aa701529ce4f09b0cae520bf9e55084c7ce0fb791f0d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "2020-2021 fixed raw-momentum descriptive response and resource routing, with independent implementation reconstruction and HF/CN02 readback; costed capital replay is the next separate assessment."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "仅更新既有退役示例的当前结论索引和记忆摘要；TRACE工程、质量、价值与准入沿用原状态。",
+      "reviewed_modules": [
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-627-20261111T184458053645Z",
+      "recorded_at": "2026-11-11T18:44:58.053645+00:00",
+      "actor": "Codex capital seam review",
+      "work_item": "P3-RESEARCH-REPLAY-001",
+      "outcome": "progress",
+      "summary": "Approved seam tranche delivered code/metadata findings and executable successor plan; 627 complete, 628 awaits staged allocation.",
+      "evidence": [
+        {
+          "id": "CAPITAL-SEAM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "f0ca576d9b3154ac434ad6dbb8b7ab76f24262be",
+          "path": "docs/acceptance/research-capital-seam-20261112.md",
+          "sha256": "5d0ed599c02cbdc70bf70070a83e4d43417ea9453830a4e6a1e7cea009afd637",
+          "claim_ceiling": "Code and frozen metadata seam/plan delivery; capital experiment not run; input-purpose qualification and successor allocation pending."
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "R2 Worker accepted scope retained. Native Base2.5.1 capital replay still needs source-interface, directional-state, action and dual-clock qualification; 126-member family inspected at metadata level only.",
+          "remaining": "Successor A native input/clock/action qualification and thin adapter prototype, followed by fixed comparison and independent accounting.",
+          "next_action": "Decide at most1h A tranche and task-scoped channel for628; full plan3-5h, remaining allocation conditional on A.",
+          "evidence": [
+            "CAPITAL-SEAM"
+          ],
+          "supersedes": "CP-613-20261111T181214226620Z"
+        }
+      ],
+      "no_change_reason": "Code/metadata seam and plan only; R2 factor quality, resource decision and all consumer admission retain their prior scope. No capital experiment.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-REPLAY-001",
+          "number": 627,
+          "title": "[P3-RESEARCH-REPLAY-001] 核对动量候选资金回放接缝并冻结后继计划",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-11T18:44:46Z",
+          "body_sha256": "0f1812d4ad5f90df22e577dff2c86aa0c5197ce1660cfa874c698ceff099c49b"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-628-20261111T184501719603Z",
+      "recorded_at": "2026-11-11T18:45:01.719603+00:00",
+      "actor": "Codex successor planning",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "outcome": "no_module_change",
+      "summary": "Register628 staged plan, preregistration gates and budget; pending allocation and input qualification.",
+      "evidence": [
+        {
+          "id": "CAPITAL-SEAM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "f0ca576d9b3154ac434ad6dbb8b7ab76f24262be",
+          "path": "docs/acceptance/research-capital-seam-20261112.md",
+          "sha256": "5d0ed599c02cbdc70bf70070a83e4d43417ea9453830a4e6a1e7cea009afd637",
+          "claim_ceiling": "Code and frozen metadata seam/plan delivery; capital experiment not run; input-purpose qualification and successor allocation pending."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Planning and lifecycle only; no new quality/value/admission or market-row access.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-CAPITAL-001",
+          "number": 628,
+          "title": "[P3-RESEARCH-CAPITAL-001] 资格通过后完成固定动量候选的最小资金回放",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-11T18:44:50Z",
+          "body_sha256": "8a0328242020a2f50166fc95bf68019d95bb95523cdf7ace6291bded450d795a"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-2-CAPITAL-INDEX-20261112",
+      "recorded_at": "2026-11-11T18:46:00.488513+00:00",
+      "actor": "Codex capital seam closeout",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "Refresh retired proposal current index after recording the capital seam.",
+      "evidence": [
+        {
+          "id": "CAPITAL-SEAM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "f0ca576d9b3154ac434ad6dbb8b7ab76f24262be",
+          "path": "docs/acceptance/research-capital-seam-20261112.md",
+          "sha256": "5d0ed599c02cbdc70bf70070a83e4d43417ea9453830a4e6a1e7cea009afd637",
+          "claim_ceiling": "Code and frozen metadata seam/plan delivery; capital experiment not run; input-purpose qualification and successor allocation pending."
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "Existing index/view maintenance only; TRACE mechanism and maturity unchanged."
+    },
+    {
+      "id": "CP-628-20261111T194217114480Z",
+      "recorded_at": "2026-11-11T19:42:17.114480+00:00",
+      "actor": "Codex native input qualification and prototype self-review",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "outcome": "completed",
+      "summary": "A input qualification and thin prototype delivered; capital consumer held for P10 economic-event/state view; BCD unallocated.",
+      "evidence": [
+        {
+          "id": "A-RELATIONS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/relations-a1/relations.json",
+          "sha256": "c3681728ac307937e1269d9f908eacdc2f89ede1517261aba29e113465c18d2d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact key/unit/source-clock qualification only; capital consumer blocked before B; no PnL."
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "partial",
+          "supersedes": "CP-627-20261111T184458053645Z",
+          "evidence": [
+            "A-RELATIONS"
+          ],
+          "scope": "Native126-member inputs verified; source census and one relation check delivered; action units/source clocks and side mapping prototype. Prior R1/R2 worker acceptance retained.",
+          "remaining": "Full capital consumer needs economic-event composition/replacement scope, 45 action holds, directional-state/bounds dispositions and explicit retrospective dual-clock FrameSource.",
+          "next_action": "P10 existing556 provides versioned qualified scope; then separately allocate bounded B."
+        }
+      ],
+      "no_change_reason": "Prior R2 signal quality and resource routing retained; this qualification batch computes no new market effect or capital outcome.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-CAPITAL-001",
+          "number": 628,
+          "title": "[P3-RESEARCH-CAPITAL-001] 资格通过后完成固定动量候选的最小资金回放",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-11T19:42:11Z",
+          "body_sha256": "2ad01553b578b6988a4ade382bdb66787d9b85c21a574d668083db0ec979dd7e"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-2-CAPITAL-QUAL-A-INDEX-20261112",
+      "recorded_at": "2026-11-11T19:43:43.011790+00:00",
+      "actor": "Codex bounded A closeout",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "Refresh retired proposal index after native A qualification; no TRACE capability change.",
+      "evidence": [
+        {
+          "id": "A-RELATIONS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/relations-a1/relations.json",
+          "sha256": "c3681728ac307937e1269d9f908eacdc2f89ede1517261aba29e113465c18d2d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact key/unit/source-clock qualification only; capital consumer blocked before B; no PnL."
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "Index and view maintenance only; prior TRACE mechanism and maturity retained."
+    },
+    {
+      "id": "CP-628-20261111T195818439642Z",
+      "recorded_at": "2026-11-11T19:58:18.439642+00:00",
+      "actor": "Codex A final checks and publication closeout",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "outcome": "no_module_change",
+      "summary": "A8955 checks and26-file private HF/CN02 readback complete;628 remains open and BCD not run.",
+      "evidence": [
+        {
+          "id": "A-PUBLISH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/retained/publish-readback.json",
+          "sha256": "e003f956b9e2d8ecb896b5846dc489130598058e825fc58847e3cb81f8377201",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Qualification-only26-file immutable HF readback and CN02 verification; capital BCD not run."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Final issue metadata, checks and evidence lifecycle only; scoped A engineering recorded in preceding checkpoint, previous signal quality/value retained.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-CAPITAL-001",
+          "number": 628,
+          "title": "[P3-RESEARCH-CAPITAL-001] 资格通过后完成固定动量候选的最小资金回放",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-11T19:58:08Z",
+          "body_sha256": "523a8b1ecb737e0a98d772673af18936306d65d42d6781e36d989b23bf8080b5"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-628-20261111T215015198548Z",
+      "recorded_at": "2026-11-11T21:50:15.198548+00:00",
+      "actor": "Codex post-execution author audit and independent-algorithm reconciliation",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "outcome": "blocked",
+      "summary": "B guarded native capital consumer delivered; formal and corrected cold reference reconcile exact on-path source hold; complete economic comparison parked at P10 #556.",
+      "evidence": [
+        {
+          "id": "CAPITAL-PUBLISH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-replay-20261112/retained/publish-readback.json",
+          "sha256": "3be70ed3743db6e8d3b1146662779411dab2bd58478614326127b7f67dad76f1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "78-file fixed private HF/CN02 package, exact producer and independent cold identities; all completed financial receipts agree, comparison source-held; author self-review, no second-agent audit."
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Native126-member capital consumer, explicit source/simulation clock and side-specific P2 path implemented; one formal and one corrected independent cold construction reconcile T nominal choices and all committed cash-cent/fill/order receipts; control full window completes.",
+          "remaining": "Full candidate comparison held at601186/2021-08-04 multi-record economic event; new versioned P10 use mapping, bounded recovery request, independent role review and main integration remain.",
+          "next_action": "P10 existing556 first resolves the actually encountered economic key from qualified retained evidence; retain original attempts/parameters/exposure and separately freeze necessary recovery.",
+          "evidence": [
+            "CAPITAL-PUBLISH"
+          ],
+          "supersedes": "CP-628-20261111T194217114480Z"
+        }
+      ],
+      "no_change_reason": "Prior R2 signal quality and CLOSEOUT value decisions retained. Source hold does not create a negative market label or economic adoption; no new FACTORS/CLOSEOUT facet update.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-CAPITAL-001",
+          "number": 628,
+          "title": "[P3-RESEARCH-CAPITAL-001] 资格通过后完成固定动量候选的最小资金回放",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-11T21:49:27Z",
+          "body_sha256": "843030fefb0f8d51cd8ffc15bc220e1538544b8d33c644e2065df5b848977111"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-2-CAPITAL-REPLAY-INDEX-20261112",
+      "recorded_at": "2026-11-11T21:51:36.532411+00:00",
+      "actor": "Codex capital replay closeout",
+      "work_item": "META-TRACE-001",
+      "outcome": "no_module_change",
+      "summary": "Refresh retired next proposal index after guarded capital consumer and source-held comparison; TRACE mechanism unchanged.",
+      "evidence": [
+        {
+          "id": "CAPITAL-PUBLISH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-replay-20261112/retained/publish-readback.json",
+          "sha256": "3be70ed3743db6e8d3b1146662779411dab2bd58478614326127b7f67dad76f1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "78-file fixed private HF/CN02 package, exact producer and independent cold identities; all completed financial receipts agree, comparison source-held; author self-review, no second-agent audit."
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "Conclusion/index maintenance only. Current main META-GATE-001 no-change TRACE observations reviewed via exact GitHub API snapshot; preserve both histories in the designated integration line. No TRACE mechanism or maturity upgrade."
+    },
+    {
+      "id": "CP-628-20261112T045120280922Z",
+      "recorded_at": "2026-11-12T04:51:20.280922+00:00",
+      "actor": "Codex R4 remaining-execution planning",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "outcome": "no_module_change",
+      "summary": "Delivered draft R4 recovery plan: three phases/eight steps, bounded P10 purpose handoff, actual consumer/identity seam, finite execution and independent review; no repair or new capital run started.",
+      "evidence": [
+        {
+          "id": "R4-PLAN",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "375f7f690b5bda1d1356e7c05e345bd4ccba920f",
+          "path": "docs/design/research-capital-r4-recovery-plan-v1.md",
+          "sha256": "e4ac0aa1d9a59fe846e72b0c375898d12dbdb5d8ed08b1227c6fd6fc512855be",
+          "claim_ceiling": "Draft execution and handoff plan only; future scope/budget and all G1-G4 gates await actual execution. Existing economic comparison remains blocked/not_evaluated."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Planning and current issue metadata maintenance only. Existing guarded-consumer engineering, R2 signal quality, source-held economics and consumer admission are unchanged; original attempts/exposure/cost retained.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-CAPITAL-001",
+          "number": 628,
+          "title": "[P3-RESEARCH-CAPITAL-001] 资格通过后完成固定动量候选的最小资金回放",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-12T04:50:46Z",
+          "body_sha256": "3c0afad6cd8d9a2ed75d94ae7ff379d7287e04e9438895ecd50eebb8daad0dc9"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-628-20261112T072129212925Z",
+      "recorded_at": "2026-11-12T07:21:29.212925+00:00",
+      "actor": "Codex R4 primary owner; independent read-only code/result/document reviewer r4_code_pre_audit",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "outcome": "completed",
+      "summary": "R4 complete fixed capital comparison independently accepted. Original gates yield inconclusive/park; issue628 closed completed, old attempts/exposure and costs retained. Draft631 main integration separate.",
+      "evidence": [
+        {
+          "id": "R4-PUBLISH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-002/retained/publish-readback.json",
+          "sha256": "0589c7fdadf6dcb92105bad00b71d2993a63580923883e9327810d20d754a8b8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed private HF4e0d15571cf815024180d21cce1605391dc6a138 all26files899366B read back; completed full fixed2020-2021 comparison and independently cold-rebuilt cash/curve/branch."
+        },
+        {
+          "id": "R4-G4",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-002/retained/final-audit.json",
+          "sha256": "79f08a45db0d276f0d4cd713a8d084e75a0d43e99dba1365985e14b6b16f8a9d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent role accepted actual8b1 formal/cold evidence; completed/inconclusive/park this fixed holding use; original R2 signal use retained."
+        }
+      ],
+      "updates": [
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "Fixed2020-2021 native126members and qualified P10 exact-purpose input, composite/source clock identity,002 task/attempt and guarded P2 consumer delivered. Formal and independent cold inputs, choices, rights, cash cents, fills/orders/pool, all curves/trades/branch agree; role-separated acceptance passed.",
+          "remaining": "Guarded retrospective research use; Draft631 atop630 main integration remains with the original integration line. General economic-event input debt remains P10/556.",
+          "next_action": "Reuse accepted seam for original main integration; other consumers follow their own input/use gates and frozen requests; do not repeat this result computation.",
+          "evidence": [
+            "R4-PUBLISH",
+            "R4-G4"
+          ],
+          "supersedes": "CP-628-20261111T215015198548Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "accepted",
+          "scope": "Original research allocation decision delivered: full comparison and independent acceptance, +2.63407 percentage-point full-window increment, failed2021 and static top3 gates, scientific inconclusive and park this fixed holding use. Accepted scope is the completed resource decision.",
+          "remaining": "Fixed candidate does not advance to robustness work; full active/model/billing cost unknown_not_zero. All old failures, effort and consumed-window exposure cumulative.",
+          "next_action": "Park this fixed holding use, prioritize existing-asset main integration; direction layer chooses the next real consumer question, Workers follow actual capacity/task-pool benefit.",
+          "evidence": [
+            "R4-PUBLISH",
+            "R4-G4"
+          ],
+          "supersedes": "CP-613-20261111T181214226620Z"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS"
+      ],
+      "no_change_reason": "Original R2 price-response finding retained in its original use; no quality/admission change. Only complete capital-consumer engineering and capital resource-decision delivery are updated.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-CAPITAL-001",
+          "number": 628,
+          "title": "[P3-RESEARCH-CAPITAL-001] 资格通过后完成固定动量候选的最小资金回放",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-12T07:19:01Z",
+          "body_sha256": "7ef224195a298e45ba11b8b4c153bc958402ebe4fabd5ab1a966763f0c2bd4f7"
+        }
+      ]
+    },
+    {
+      "id": "CP-633-INTEGRATION-CANDIDATE-20261112",
+      "recorded_at": "2026-11-12T08:26:37.957032+00:00",
+      "actor": "Codex integration owner",
+      "work_item": "META-RESEARCH-INTEGRATION-001",
+      "outcome": "progress",
+      "summary": "Prepared normal-merge candidate preserving main and complete R4 history; versioned import pending independent audit.",
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "Engineering integration candidate; existing module maturity and research outcomes remain at their exact retained checkpoints.",
+      "evidence": [
+        {
+          "id": "EV-633-PRESERVATION",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/r4-main-integration-20261112/MERGE-PRESERVATION.json",
+          "sha256": "bed1da4bb16ce966de2ddea7f8d450205f211df7f2634b2624a8495c778205d5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Verified exact both-side file/catalog/ledger preservation before candidate engineering acceptance."
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-INTEGRATION-001",
+          "number": 633,
+          "title": "[META-RESEARCH-INTEGRATION-001] 集成 R1/R2/R4 研究资产并完成 main 独立审计",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-12T07:56:39Z",
+          "body_sha256": "ebac75a2c1eb34bdd7895164106159781dacb8b6f1b592db4d881cf6ae1e36b3"
+        }
+      ]
+    },
+    {
+      "id": "CP-633-INTEGRATION-ACCEPTANCE-20261112",
+      "recorded_at": "2026-11-12T09:35:32.330281+00:00",
+      "actor": "Codex integration owner",
+      "work_item": "META-RESEARCH-INTEGRATION-001",
+      "outcome": "progress",
+      "summary": "Integrated main and retained R4 history; import independent review passed, narrow publisher fixed-parent guard repaired, exact 37aaa47a complete local acceptance 9119 passed/35 skipped. Final combined independent audit and main merge pending.",
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "Engineering candidate acceptance and trace reconciliation only; retained research outcomes, maturity, consumer scope and sealed identities stay at their prior checkpoints.",
+      "evidence": [
+        {
+          "id": "EV-633-ENGINEERING-GUARD",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/r4-main-integration-20261112/ENGINEERING-ACCEPTANCE-GUARD.json",
+          "sha256": "449cd34d2237f7b7d05316be727ea39bc2c5eed5ea33ff6db25f62f5f0e43dc4",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact 37aaa47a code/config/test closure passed full local checks; final independent candidate acceptance pending."
+        },
+        {
+          "id": "EV-633-GUARD-PRESERVATION",
+          "location": "external_receipt",
+          "kind": "assessment",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/r4-main-integration-20261112/PUBLISH-HEAD-PRESERVATION.json",
+          "sha256": "31f002e8a52537056dfc8ad12151ce8ab10ea0e76dbdebdb223883424781fe49",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "All main side-only and frozen paths retained; only two explicit research publisher/test repair paths differ from original source."
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-INTEGRATION-001",
+          "number": 633,
+          "title": "[META-RESEARCH-INTEGRATION-001] 集成 R1/R2/R4 研究资产并完成 main 独立审计",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-12T09:34:08Z",
+          "body_sha256": "12e611d4efc543620f5aa00e2148218298489062a8f9d0917a8a9b0caacc37a7"
+        }
+      ]
+    }
+  ],
+  "history_imports": [
+    {
+      "schema_version": "quanthus.blueprint-history-import.v1",
+      "id": "IMPORT-R4-993ce0e0-20261112",
+      "imported_at": "2026-11-12T08:20:56.522265+00:00",
+      "actor": "Codex integration owner; independent audit pending under issue #633",
+      "reason": "Preserve exact main prefix and complete R4 suffix with original recorded_at; bounded main integration candidate only.",
+      "start_index": 106,
+      "target": {
+        "revision": "28f6081b950dcf2b271ea81e3c8b8c79bc98d75d",
+        "sha256": "e12b9bb70612d8c14c916c12eb34f37567e5c85b73a009d5b448ea996f8a6f20"
+      },
+      "source": {
+        "revision": "993ce0e02f43ba9993a6280cb13b1b662fdbb0c7",
+        "sha256": "a0f80c71a98ac847f3bc7a4aa50dae4b1d01721e6c1fe5aede064f0cb698742d"
+      }
     }
   ]
 }

@@ -18,6 +18,39 @@ For new exploration or delivery of research assets, also use the approved
 [next delivery plan](work-items/exploration-next-20261029.md).
 These link past results to selection; they do not activate new research or production.
 
+For the HF-DWD R1 batch, see the [independent audit](acceptance/research-r1-independent-audit-612-20261111.md)
+and the proposed [model task allocation standard](operations/research-model-task-standard-v1.md).
+For its project effect, investment assessment and next decision, start with the
+[R1 value brief](work-items/research-r1-value-brief.md).
+The [R1 v2 repair contract](design/research-r1-hf-dwd-v2.md) defines the corrected metric,
+input closure, bounded execution and per-stage self-audit. See its
+[repair delivery and reviewer handoff](acceptance/research-r1-repair-20261111.md).
+The [v2 independent acceptance](acceptance/research-r1-v2-independent-audit-612-20261111.md)
+accepts the recorded A2 result and specifies three bounded Worker repairs before reuse.
+The [F1–F3 repair self-audit](acceptance/research-r1-f1f3-self-audit-20261111.md)
+records the corrected stage gates, package recovery and A4 delivery for independent reacceptance.
+The [F1–F3 independent difference audit](acceptance/research-r1-f1f3-independent-audit-612-20261111.md)
+records the terminal-stage, candidate-date and package-recovery acceptance and retained A4 evidence.
+
+For the R2 fixed-momentum question, start with the [R2 value brief](work-items/research-r2-value-brief.md)
+and its [frozen comparison contract](design/research-r2-momentum-markout-v1.md).
+It records the second resource decision and the scope of the next costed-replay candidate.
+
+For the next capital comparison, see the [native seam and staged plan](design/research-capital-replay-plan-v1.md)
+and its [code/metadata review](acceptance/research-capital-seam-20261112.md).
+Successor #628 / R4 now delivers the complete guarded capital comparison, independently cold-built
+and role-reviewed. Start with the [capital value brief](work-items/research-capital-replay-value-brief.md)
+and [recovery acceptance](acceptance/research-capital-recovery-20261112.md): the fixed holding use is
+inconclusive and parked under its original gates. The [three-stage recovery plan](design/research-capital-r4-recovery-plan-v1.md)
+records the executed scope; the [001 source-held report](acceptance/research-capital-replay-20261112.md)
+remains historical. Draft #631 is delivered atop #630; main integration stays with its existing owner.
+The earlier [A qualification brief](work-items/research-capital-qualification-a-value-brief.md)
+is preserved as the prior stage snapshot.
+
+For the R1/R2/R4 main integration candidate and its publication-guard repair, use the
+[integration acceptance report](acceptance/research-main-integration-20261112.md) and
+[history-import contract](design/blueprint-history-import-v1.md).
+
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its
 acceptance and the current no-new-comparison disposition.

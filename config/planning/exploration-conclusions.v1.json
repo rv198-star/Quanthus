@@ -525,6 +525,769 @@
         "CP-540-20261029T210855864308Z"
       ],
       "supersedes": null
+    },
+    {
+      "recorded_at": "2026-11-11T09:26:42.468137+00:00",
+      "actor": "Codex / Astra; independent #612 audit",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "consumer": "R1审阅、研究任务下达者与Worker维护者",
+      "scope": "固定 d23386bf 与HF A1；2020-2021已消费闭包的独立审计",
+      "consumer_admission": "not_granted_by_this_record",
+      "cost_review": "原主动工时自报1.7h、Owner约2h；fetch187.067s/compute10.399s；独立复算66.763s。原失败/等待及模型账单未知非零。审计完整本地检查与网络恢复另见固定回执。",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/reproduction-attempt1-parse-failure.log",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/reproduction.log"
+      ],
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-612-20261111T092552053641Z"
+      ],
+      "supersedes": null,
+      "id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "question_id": "R1-ORIGINAL-PROXY-REPRODUCTION",
+      "family": "tradability-execution-screen-reproduction",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "原始闭包、HF包和原实现统计是否可核验复现？",
+      "claim_ceiling": "固定原代理统计及字节完整性；保留重复键、公式和时间语义缺陷。",
+      "decision_effect": "保留原HF A1与独立复算作为审计查询资产；通用Worker交付待整改。",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "reopen_conditions": [
+        "源/代码/config改变或发现原摘要/对拍差异时重新核对受影响闭包。"
+      ],
+      "retained_assets": [
+        "固定55成员输入清单与哈希",
+        "HF五文件完整回读",
+        "独立pandas复算与分年分所对拍"
+      ]
+    },
+    {
+      "recorded_at": "2026-11-11T09:26:42.468137+00:00",
+      "actor": "Codex / Astra; independent #612 audit",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "consumer": "R1审阅、研究任务下达者与Worker维护者",
+      "scope": "固定 d23386bf 与HF A1；2020-2021已消费闭包的独立审计",
+      "consumer_admission": "not_granted_by_this_record",
+      "cost_review": "原主动工时自报1.7h、Owner约2h；fetch187.067s/compute10.399s；独立复算66.763s。原失败/等待及模型账单未知非零。审计完整本地检查与网络恢复另见固定回执。",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/reproduction-attempt1-parse-failure.log",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/reproduction.log"
+      ],
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-612-20261111T092552053641Z"
+      ],
+      "supersedes": null,
+      "id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "question_id": "RESEARCH-R1-HF-001",
+      "family": "tradability-execution-screen",
+      "modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ],
+      "question": "该批结果能否支持实际可成交率及后续日线理想成交假设？",
+      "claim_ceiling": "原评价因有效期连接/波动率/上市年龄语义缺陷为invalid；策略用途保持未评价。",
+      "decision_effect": "冻结采用并重开#609/#611；原执行约束继续；下一笔先修消费者语义与合同，#613/#614仍按条件触发。",
+      "execution_status": "invalid",
+      "verdict": "not_evaluated",
+      "disposition": "investigate",
+      "reopen_conditions": [
+        "新版本合同明确指标/分母/最小样本/效应阈值、时间连接和warmup，完成自审与独立反例后再运行。"
+      ],
+      "retained_assets": [
+        "原结果、失败和已消费曝光",
+        "四个security代码沿革连接遗漏诊断；归消费者修复",
+        "模型E0-E3任务分级文档"
+      ]
+    },
+    {
+      "recorded_at": "2026-11-11T09:26:42.468137+00:00",
+      "actor": "Codex / Astra; independent #612 audit",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "consumer": "R1审阅、研究任务下达者与Worker维护者",
+      "scope": "固定 d23386bf 与HF A1；2020-2021已消费闭包的独立审计",
+      "consumer_admission": "not_granted_by_this_record",
+      "cost_review": "原主动工时自报1.7h、Owner约2h；fetch187.067s/compute10.399s；独立复算66.763s。原失败/等待及模型账单未知非零。审计完整本地检查与网络恢复另见固定回执。",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/reproduction-attempt1-parse-failure.log",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/reproduction.log"
+      ],
+      "evidence": [
+        {
+          "id": "AUDIT612",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-20261111/retained/review-summary.json",
+          "sha256": "e2c820b1898abb901e077a9b2c814c1757409166c4caf65367974a531bb649ae",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "仅#609-611固定批次独立审计；原统计复现和合同缺陷处置，消费者资格保持原门槛。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-612-20261111T092552053641Z"
+      ],
+      "supersedes": null,
+      "id": "CON-R1-WORKER-CONTRACT-20261111",
+      "question_id": "P3-RESEARCH-HF-001-CONFORMANCE",
+      "family": "hf-dwd-worker-contract",
+      "modules": [
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "首版执行包是否满足#610单节点复用合同？",
+      "claim_ceiling": "限定d23386bf合同审计；成功路径可用原型与通用执行验收分别处置。",
+      "decision_effect": "重开#610，PR617待整改；Deepseek可按精确测试合同实现E1修复，独立验收后交付。",
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "investigate",
+      "reopen_conditions": [
+        "身份/白名单/缺失/资源/不可变发布/环境/TTL合同补齐并通过相称负测；代码与运行闭包绑定。"
+      ],
+      "retained_assets": [
+        "固定HF取数与分阶段原型",
+        "无网络合成篡改、缺开盘价和重复发布反例",
+        "原完整检查5814通过/29跳过"
+      ]
+    },
+    {
+      "recorded_at": "2026-11-11T11:26:46.928692+00:00",
+      "actor": "Codex / Sol 6.1; ordered repair and author self-audit",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "旧原执行约1.7h/Owner约2h、独立审计与未知历史成本保留。修复A1 compute Guardian65.070s、A2 63.048s（same metrics），A2首次阶段73.892s，幂等回读8.223s；最终完整检查783.17s、旧代码检查约514s处中止，开发及网络失败保留；主动工时、Token和账单无完整计量。",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/retained/a2-final-attempts.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/retained/development-failures.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/logs/make-check.log"
+      ],
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "id": "CON-R1-WORKER-V2-20261111",
+      "question_id": "P3-RESEARCH-HF-001-CONFORMANCE",
+      "family": "hf-dwd-worker-contract",
+      "work_item": "P3-RESEARCH-HF-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "修正后的v2能否满足固定任务的单节点HF Worker工程合同？",
+      "consumer": "R2调用方、独立审阅者和Worker维护者",
+      "scope": "2dc01f18完整Git；request.v2.a2.json；固定56成员、Linux/Python3.10.12、一个CN02；修复代码/元数据/时序与失败路径",
+      "claim_ceiling": "40专项与8888完整检查、真实固定包回读/幂等的作者工程自审；最终采用及扩Worker待独审与触发。",
+      "decision_effect": "交付v2为采用候选；旧v1 failure与原始HF A1保留，612重开审v2，第二Worker不自动启动。",
+      "reopen_conditions": [
+        "新输入/节点/代码/环境/任务超出此闭包时冻结新request并重新验收相关差异。",
+        "发现身份、资源、时间或发布反例时停止受影响阶段，保留全部尝试。"
+      ],
+      "retained_assets": [
+        "56成员精确闭包与18项依赖锁",
+        "阶段化有界Worker和40项反例/黄金测试",
+        "HF cd7029e121093d0b423c922bfa94a9873d60855b完整包与回读回执",
+        "A1被替代canary、A2正式尝试和成本/失败记录"
+      ],
+      "evidence": [
+        {
+          "id": "E610-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/retained/610-self-audit.json",
+          "sha256": "df1de87eef8c59927073aa6b97d637b463e3679d4c4092e1e85d286b15ba1b9a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "限定Linux/Python3.10.12和56成员的v2 Worker工程自审；采用待独立审阅。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-610-20261111T111218136234Z"
+      ],
+      "supersedes": "CON-R1-WORKER-CONTRACT-20261111"
+    },
+    {
+      "recorded_at": "2026-11-11T11:26:46.928692+00:00",
+      "actor": "Codex / Sol 6.1; ordered repair and author self-audit",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "旧原执行约1.7h/Owner约2h、独立审计与未知历史成本保留。修复A1 compute Guardian65.070s、A2 63.048s（same metrics），A2首次阶段73.892s，幂等回读8.223s；最终完整检查783.17s、旧代码检查约514s处中止，开发及网络失败保留；主动工时、Token和账单无完整计量。",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/retained/a2-final-attempts.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/retained/development-failures.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/logs/make-check.log"
+      ],
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "id": "CON-R1-PRICE-GUARD-V2-20261111",
+      "question_id": "RESEARCH-R1-HF-002",
+      "family": "tradability-execution-screen",
+      "work_item": "P3-RESEARCH-PILOT-001",
+      "modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ],
+      "question": "固定未复权价格筛选的T+1价格守卫阻断频率是否触发优先执行调查？",
+      "consumer": "R2有限研究任务下达者与独立采用审阅者",
+      "scope": "已消费2020-2021开发窗；决策2020-03-02至2021-12-30，执行尾2021-12-31；2019仅日历年龄；latest sealed retrospective",
+      "claim_ceiling": "冻结描述筛选与价格守卫的计数及资源分支；策略资金/绩效/PIT资格保持原门槛，最终采用交612独审。",
+      "decision_effect": "90648候选/90573通过，75阻断0.08274%；2020为0.10142%、2021为0.06702%，样本及集中度均满足事前门槛，建议small分支：保留原守卫，下一笔选具名信号问题，暂缓第二Worker。",
+      "reopen_conditions": [
+        "具名消费者要求新研究问题或真实资金/执行路径时另冻用途和有效合同。",
+        "必要独立复算发现差异时冻结采用并定位，不改阈值救结果。"
+      ],
+      "retained_assets": [
+        "HF固定A2及result digest523a890a37212d10d54eb6301009d1ef274f005d987d99f8b9cf8017ace5efda",
+        "分年分所、互斥原因和集中度自审",
+        "原v1无效解释和旧曝光；v2不同公式/warmup单独记录"
+      ],
+      "evidence": [
+        {
+          "id": "E611-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-repair-20261111/retained/611-self-audit.json",
+          "sha256": "977e54733a82a26ec188dcba64dae8c727b3928ed4ad71be319a9ec59f24091e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R1 v2已曝光开发窗的未复权价格筛选与T+1守卫描述自审；采用交独立审阅。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-611-20261111T112133530157Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "recorded_at": "2026-11-11T12:15:34.375152+00:00",
+      "actor": "Codex independent v2 reviewer; Owner-started #612",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Original execution ~1.7h / Owner ~2h, v1 audit and Sol repair retained. Independent reconstruction 55.922s / 1960212KiB peak; HF readback 5.886s; complete checks in final-validation. Full active-time, tokens and billing unknown_not_zero.",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/logs/make-check.log"
+      ],
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "reject_candidate",
+      "id": "CON-R1-WORKER-V2-INDEPENDENT-20261111",
+      "question_id": "P3-RESEARCH-HF-001-CONFORMANCE",
+      "family": "hf-dwd-worker-contract",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "修正后的v2能否满足固定任务的单节点HF Worker工程合同？",
+      "consumer": "R2调用方、独立审阅者和Worker维护者",
+      "scope": "Unmodified 2dc01f18 Worker with authentic A2 inputs/outputs and independent synthetic transition/sample/recovery probes",
+      "claim_ceiling": "Fixed A2 values and bytes verified; three reproducible contract defects remain in reusable Worker.",
+      "decision_effect": "Reopen 610 for F1 failed-stage publication, F2 candidate-day gate, F3 partial-package recovery; defer PR617 merge and R1 closure. Retain completed 609/611 and independent acceptance of the A2 result.",
+      "reopen_conditions": [
+        "All three counterexamples fixed with transition regressions, complete checks and independent difference review."
+      ],
+      "retained_assets": [
+        "Exact source/environment closure and immutable A2 package",
+        "Independent fault probes and bounded repair instructions",
+        "All v1/v2 history, costs and consumed exposure"
+      ],
+      "evidence": [
+        {
+          "id": "AUDIT612-V2",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+          "sha256": "0b6b7722c2cece772e1e57bb6feabfc931bdab86137f3b6263cc7354a4727c22",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed-A2 reconstruction/readback and three Worker counterexamples; bounded allocation accepted, Worker repair pending."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-612-20261111T121242422791Z"
+      ],
+      "supersedes": "CON-R1-WORKER-V2-20261111"
+    },
+    {
+      "recorded_at": "2026-11-11T12:15:34.375345+00:00",
+      "actor": "Codex independent v2 reviewer; Owner-started #612",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Original execution ~1.7h / Owner ~2h, v1 audit and Sol repair retained. Independent reconstruction 55.922s / 1960212KiB peak; HF readback 5.886s; complete checks in final-validation. Full active-time, tokens and billing unknown_not_zero.",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/logs/make-check.log"
+      ],
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "park",
+      "id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "question_id": "RESEARCH-R1-HF-002",
+      "family": "tradability-execution-screen",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "modules": [
+        "FACTS",
+        "CLOSEOUT"
+      ],
+      "question": "固定未复权价格筛选的T+1价格守卫阻断频率是否触发优先执行调查？",
+      "consumer": "R2有限研究任务下达者与独立采用审阅者",
+      "scope": "已消费2020-2021开发窗；决策2020-03-02至2021-12-30，执行尾2021-12-31；2019仅日历年龄；latest sealed retrospective",
+      "claim_ceiling": "Independent fixed descriptive counts, sample/concentration and small allocation branch; new capital/PIT uses retain separate contracts.",
+      "decision_effect": "Adopt 90648 candidate opportunities / 75 blocks (0.0827376%) and the small branch. Keep P2 guards, prioritize a named signal question, defer Worker expansion. Park this answered question; 610 repairs only the Worker differences.",
+      "reopen_conditions": [
+        "A material input/formula change or contradictory independent evidence requires a new bounded request; retain prior exposure."
+      ],
+      "retained_assets": [
+        "Independent pandas/numpy reconstruction, all grouped counts match",
+        "Ten HF files independently downloaded at immutable revision and verified",
+        "Candidate days 207/242 independently qualify the adopted allocation branch"
+      ],
+      "evidence": [
+        {
+          "id": "AUDIT612-V2",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-v2-20261111/retained/audit-summary.json",
+          "sha256": "0b6b7722c2cece772e1e57bb6feabfc931bdab86137f3b6263cc7354a4727c22",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent fixed-A2 reconstruction/readback and three Worker counterexamples; bounded allocation accepted, Worker repair pending."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-612-20261111T121242422791Z"
+      ],
+      "supersedes": "CON-R1-PRICE-GUARD-V2-20261111"
+    },
+    {
+      "recorded_at": "2026-11-11T14:55:54.224161+00:00",
+      "actor": "Sol 6.1 author repair/self-audit",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "All original execution/audit/repair costs retained. A3 Guardian61.541s and final A4 61.034s, preliminary full check interrupted143; final full suite784.21s. Initial regression26fail/55pass, C1 before2fail/1pass and final81pass retained. Local type-only bytecode proof plus no new mypy diagnostics; full active-time, tokens and bills unknown_not_zero.",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained/self-audit.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/logs/make-check-final.log",
+        "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/logs/make-check-a3-interrupted.log"
+      ],
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "id": "CON-R1-WORKER-F1F3-SELF-AUDIT-20261111",
+      "question_id": "P3-RESEARCH-HF-001-CONFORMANCE",
+      "family": "hf-dwd-worker-contract",
+      "work_item": "P3-RESEARCH-HF-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "修正后的v2能否满足固定任务的单节点HF Worker工程合同？",
+      "consumer": "R2调用方、独立审阅者和Worker维护者",
+      "scope": "1351be2b actual A4 Worker execution; 061429f5 local type annotation has identical compiled module under Python3.10.12; fixed input and math retained",
+      "claim_ceiling": "Author regressions, complete local validation and exact A4 HF delivery support corrected Worker as an adoption candidate; independent difference review at 612 remains open.",
+      "decision_effect": "Offer repaired F1/F2/F3 and failed-output reuse guard for independent reacceptance. 610/612/R1 stay open. Accepted A2 market counts and allocation branch remain unchanged; no new question or Worker expansion.",
+      "reopen_conditions": [
+        "Independent reviewer finds a concrete transition, identity, budget, sample or package mismatch.",
+        "New task/node/source/config scope requires a separately frozen bounded request."
+      ],
+      "retained_assets": [
+        "81 focused tests and old-code failure evidence",
+        "Complete 8929 passed/35 skipped result and preserved interrupted preliminary check",
+        "A4 bad249962cdcd801d9ef617ae92577bc5ddefb33 full-file readback and idempotent same package",
+        "A3 unpublished predecessor, failed network attempts and cumulative cost records"
+      ],
+      "evidence": [
+        {
+          "id": "E610-F1F3-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r1-f1f3-20261111/retained/self-audit.json",
+          "sha256": "0f30b0ebbd1c892a0e402d406b4a6eaaa465cdb4a10226ffe6d1aa4fc1258800",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Author self-audit of F1/F2/F3 and failed-output reuse, exact A4 delivery; independent adoption pending at 612."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-610-20261111T145506490958Z"
+      ],
+      "supersedes": "CON-R1-WORKER-V2-INDEPENDENT-20261111"
+    },
+    {
+      "recorded_at": "2026-11-11T15:36:12.379076+00:00",
+      "actor": "Codex independent difference review",
+      "consumer_admission": "not_granted_by_this_record",
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "All prior execution, Sol repairs, audits and A1-A4 exposures preserved. This audit: 54 cases 27.648s, HF readback 5.998s, complete make check 805.56s; synthetic fixture/tooling failures retained. Zero new market computation. Complete active time, tokens and billing unknown_not_zero.",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/audit-summary.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/logs/probe1.log",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/logs/sample2.log",
+        "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/logs/make-check.log"
+      ],
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "question_id": "P3-RESEARCH-HF-001-CONFORMANCE",
+      "family": "hf-dwd-worker-contract",
+      "work_item": "META-RESEARCH-REVIEW-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "修正后的v2能否满足固定任务的单节点HF Worker工程合同？",
+      "consumer": "R2调用方、独立审阅者和Worker维护者",
+      "scope": "Candidate bb99f99d, actual A4 1351be2b; independent 49 transition/recovery and 5 candidate-date cases; Linux/Python3.10.12 fixed v2 single-node contract",
+      "claim_ceiling": "Bounded Worker engineering accepted through independent fault verification, full local checks and fixed HF readback. Original scientific and consumer admission scope remains.",
+      "decision_effect": "Accept 610 Worker and close 612/R1 stage. Keep accepted A2/A4 descriptive metrics and small allocation branch; next named signal question, 613/614 conditional. PR617 audit blocker cleared; code merge follows ordinary workflow.",
+      "reopen_conditions": [
+        "Independent reviewer finds a concrete transition, identity, budget, sample or package mismatch.",
+        "New task/node/source/config scope requires a separately frozen bounded request."
+      ],
+      "retained_assets": [
+        "54 independent transition/recovery/sample probes and immutable A4 readback",
+        "Complete 8929 passed /35 skipped local acceptance; exact code/environment/test closure",
+        "Versioned single-node Worker and consumer/recovery guidance",
+        "Prior A2 independent reproduction, all author/audit failures and cumulative cost references"
+      ],
+      "evidence": [
+        {
+          "id": "E612-F1F3-INDEPENDENT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-audit612-f1f3-20261111/retained/audit-summary.json",
+          "sha256": "1acb7405ce504b5458320ebfa0b3c6eea10190b9753338a3641356c3308f33fa",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent bounded Worker F1/F2/F3/C1 acceptance; 49+5 probes, 8929 complete checks and A4 immutable evidence. Research and consumer admission retain their prior scope."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-610-20261111T153609474025Z"
+      ],
+      "supersedes": "CON-R1-WORKER-F1F3-SELF-AUDIT-20261111"
+    },
+    {
+      "id": "CON-R2-MOMENTUM-20261112",
+      "recorded_at": "2026-11-11T18:13:37.311156+00:00",
+      "actor": "Codex R2 author self-audit with independent implementation reconstruction",
+      "question_id": "RESEARCH-R2-MOMENTUM-001-QUESTION",
+      "family": "raw-momentum20-band-markout",
+      "work_item": "P3-RESEARCH-REUSE-001",
+      "modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "保持R1其他筛选和下一开放日守卫，原20日动量[2%,12%]是否对次日盘中响应提供至少5bp平均增量，值得进入资金回放？",
+      "consumer": "Next research allocator selecting one bounded costed-capital-replay candidate",
+      "scope": "2020-2021 consumed development window; same 56 HF members and raw-price screen; same-date/venue disjoint out-of-band control; one formal and one independently rebuilt computation",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "已消费2020–2021开发窗的固定盘中价格响应比较和研究资源路由；经济评价由后继T+1持仓、费用、滑点、退出和资金回放完成。",
+      "decision_effect": "平均增量6.4101bp、两年均正、95pct区间[2.1334,10.5830]bp且样本门槛满足；将精确原区间列为后继资金回放候选。Worker池仍备用；后继比较尚未启动。",
+      "reopen_conditions": [
+        "后继资金回放的明确持仓/退出、费用、对照、输入用途和完整预算就绪后，按新问题预登记推进。",
+        "若独立审阅发现具体身份、时间或分组反例，只处理受影响差集，保留本次原包与所有成本。"
+      ],
+      "retained_assets": [
+        "Versioned R2 request and semantic golden cases",
+        "R1 fixed-input Worker and cache reused with no input network download",
+        "Independent pandas/numpy R2 evaluation entrypoint",
+        "Immutable 10-file HF package and readback receipt"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "复用实测为取数2.034s、输入下载0B、正式64.278s、独立63.549s、发布/全回读10.039s；完整检查pytest810.84s。新增设计/实现/审阅/交接与R1返工持续累计；完整主动工时、Token及账单未完整计量，不重置8h总线预算。",
+      "attempt_refs": [
+        "cn02:/srv/agentdock/quanthus-ops/research-r2-momentum-20261112/job-a1/attempts.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-r2-momentum-20261112/independent/independent-reproduction.json",
+        "hf:rv192/quanthus-research-r1@5980c7d3d0278335ee8232440ff8219df328a5a6/runs/RESEARCH-R2-MOMENTUM-001/RESEARCH-R2-MOMENTUM-001-T1/A1"
+      ],
+      "evidence": [
+        {
+          "id": "R2-SELF-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r2-momentum-20261112/retained/audit-summary.json",
+          "sha256": "bcd7309412bab741b2c8aa701529ce4f09b0cae520bf9e55084c7ce0fb791f0d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "2020-2021 fixed raw-momentum descriptive response and resource routing, with independent implementation reconstruction and HF/CN02 readback; costed capital replay is the next separate assessment."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-613-20261111T181214226620Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "id": "CON-CAPITAL-SEAM-20261112",
+      "recorded_at": "2026-11-11T18:46:49.530265+00:00",
+      "actor": "Codex code and frozen metadata review",
+      "question_id": "RESEARCH-CAPITAL-001-READINESS",
+      "family": "raw-momentum20-capital-replay",
+      "work_item": "P3-RESEARCH-REPLAY-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "Can the fixed R2 momentum candidate directly enter an existing Base2.5.1 costed-capital replay path?",
+      "consumer": "Research allocator deciding native input qualification and implementation funding",
+      "scope": "Source inspection at bfb16e25 and fixed HF1923c874 manifest only; seam delivery complete, no market-row or capital-result execution.",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "investigate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Only the successor capital replay is unready; code/metadata seam and plan delivered. Native data purpose qualification remains open; prior R2 signal result retained.",
+      "decision_effect": "Propose at most1h native input/clock/action qualification and thin synthetic handshake first; full3-5h plan conditional. Keep Workers standby.",
+      "reopen_conditions": [
+        "A tranche and task-scoped channel allocated; exact source/clock/action/currency contract and qualified closure ready.",
+        "Proceed to a fixed costed comparison only after adapter goldens, local checks and a frozen result request."
+      ],
+      "retained_assets": [
+        "docs/design/research-capital-replay-plan-v1.md",
+        "config/planning/research-capital-replay-preregistration.v1.json",
+        "docs/acceptance/research-capital-seam-20261112.md",
+        "R4 milestone18 and successor628"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Approved seam tranche capped at30 active minutes. Existing8937 complete checks reused after proving1819 execution files byte-identical;59 metadata tests rerun. R1/R2 failures, exposure and missing active/token/billing costs retained. Next1h and full3-5h are proposed allocations, not measured actual costs.",
+      "attempt_refs": [
+        "git:f0ca576d9b3154ac434ad6dbb8b7ab76f24262be/docs/acceptance/research-capital-seam-20261112.md",
+        "hf:rv192/quanthus-base25-sealed@1923c874b43d47e69190a6dc9546e6fd8f3d1ca3/DWD/manifest.json"
+      ],
+      "evidence": [
+        {
+          "id": "CAPITAL-SEAM",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "f0ca576d9b3154ac434ad6dbb8b7ab76f24262be",
+          "path": "docs/acceptance/research-capital-seam-20261112.md",
+          "sha256": "5d0ed599c02cbdc70bf70070a83e4d43417ea9453830a4e6a1e7cea009afd637",
+          "claim_ceiling": "Code and frozen metadata seam/plan delivery; capital experiment not run; input-purpose qualification and successor allocation pending."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-627-20261111T184458053645Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "id": "CON-CAPITAL-QUAL-A-20261112",
+      "recorded_at": "2026-11-11T19:43:41.625984+00:00",
+      "actor": "Codex bounded source qualification and prototype self-review",
+      "question_id": "RESEARCH-CAPITAL-001-NATIVE-QUALIFICATION",
+      "family": "raw-momentum20-capital-replay",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "Are the frozen native inputs ready for the planned P2 capital consumer?",
+      "consumer": "Research allocator and successor native FrameSource implementer",
+      "scope": "A delivery complete:2020-2021 business source census and single relation check, native action/unit/clock and directional-state prototype; capital consumer blocked before B.",
+      "execution_status": "completed",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Input/prototype qualification only. Multi-record economic events and local state/action holds remain; R2 signal result retained; capital comparison not run.",
+      "decision_effect": "Park full B/C before further allocation. Route exact frozen source identities and economic-event/state purpose debt to existing P10 #556; retain scoped engineering and keep Workers standby.",
+      "reopen_conditions": [
+        "P10 versioned mapping for economic event composition/replacement/unknown and qualified directional state/bounds scope on the fixed source.",
+        "Consumer dual-clock contract, frozen final request, golden checks and explicitly allocated B tranche."
+      ],
+      "retained_assets": [
+        "config/research/research-capital-qual/request.v1.json",
+        "config/research/research-capital-qual/closure.v1.json",
+        "config/research/research-capital-qual/relations.v1.json",
+        "src/quanthus/backtest/native_capital_adapter.py",
+        "docs/work-items/research-capital-qualification-a-value-brief.md",
+        "P10 existing556 and raw qualification receipts"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "A authorized at most60 active minutes; machine waits separately metered. Source fetch136.89s, census10.80s, relation12.63s; initial launch and type/check repairs retained. R1/R2 exposure and missing historical active/token/billing costs remain cumulative. No BCD allocation inferred.",
+      "attempt_refs": [
+        "git:e7913ef23a45016fce1493467e5340409886b8c9",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/job-a1/census.json",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/relations-a1/relations.json"
+      ],
+      "evidence": [
+        {
+          "id": "A-RELATIONS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/relations-a1/relations.json",
+          "sha256": "c3681728ac307937e1269d9f908eacdc2f89ede1517261aba29e113465c18d2d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact key/unit/source-clock qualification only; capital consumer blocked before B; no PnL."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-628-20261111T194217114480Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "id": "CON-CAPITAL-REPLAY-20261112",
+      "recorded_at": "2026-11-11T21:51:12.998523+00:00",
+      "actor": "Codex post-execution author audit; independent algorithm cold reference",
+      "question_id": "RESEARCH-CAPITAL-001-ECONOMIC-COMPARISON",
+      "family": "raw-momentum20-capital-replay",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "modules": [
+        "REPRO"
+      ],
+      "question": "Does the fixed R2 momentum candidate clear its preregistered P2 capital-use gate?",
+      "consumer": "Research allocator and guarded native P2 capital consumer",
+      "scope": "2020-2021 consumed development window, fixed R2 band and disjoint control, fixed T sizing and minimum legal holding; original P10 source guards retained.",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Guarded consumer delivered and all committed receipts reconcile to an independently built Decimal referee. Candidate actual held action source conflict blocks full economic comparison; author self-review and algorithmic independence are recorded separately.",
+      "decision_effect": "Deliver bounded engineering; prioritize P10 existing556 exact on-path economic-event use mapping before further financial evaluation. Keep Worker deployment and additional strategy trials parked.",
+      "reopen_conditions": [
+        "Versioned P10 qualified composition/replacement/unknown use mapping for601186/2021-08-04, bound to exact source and genuine new knowledge clock.",
+        "New consumer input admission/recovery request with cumulative attempts/cost and finite new computation authority; original formal and both reference attempts preserved."
+      ],
+      "retained_assets": [
+        "src/quanthus/backtest/native_capital_replay.py",
+        "src/quanthus/backtest/capital_clock.py",
+        "scripts/research_capital_replay.py",
+        "scripts/research_capital_independent.py",
+        "config/research/research-capital/request.v1.json",
+        "config/research/research-capital/independent-recovery.v1.json",
+        "docs/work-items/research-capital-replay-value-brief.md",
+        "docs/acceptance/research-capital-replay-20261112.md"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Original remaining4h active envelope retained, no reset. Formal92.452s + failed independent73.953s + targeted recovery77.213s; source new download0B, peakRSS about3.41GB. Publication78files712321B full readback132.16s. A/R1/R2 failed attempts, reviews and2020-2021 exposure cumulative; complete active/token/billing costs unknown_not_zero.",
+      "attempt_refs": [
+        "git:10cf1d4b0d5c465afbbc667e363ff8f872a56149",
+        "git:aa0dbb8a47fcc83b12306d1ef2c164371cbae07f",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-replay-20261112/formal-a1",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-replay-20261112/independent-a1",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-replay-20261112/independent-a2",
+        "hf:rv192/quanthus-research-r1@0c049aa223232abf04d56261d170ad618443f3f0/runs/RESEARCH-CAPITAL-001/RESEARCH-CAPITAL-001-T1/A1"
+      ],
+      "evidence": [
+        {
+          "id": "CAPITAL-PUBLISH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-replay-20261112/retained/publish-readback.json",
+          "sha256": "3be70ed3743db6e8d3b1146662779411dab2bd58478614326127b7f67dad76f1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "78-file fixed private HF/CN02 package, exact producer and independent cold identities; all completed financial receipts agree, comparison source-held; author self-review, no second-agent audit."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-628-20261111T215015198548Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "id": "CON-CAPITAL-RECOVERY-20261112",
+      "recorded_at": "2026-11-12T07:22:16.461957+00:00",
+      "actor": "Codex primary semantic decision with independent read-only code/result/document role acceptance",
+      "question_id": "RESEARCH-CAPITAL-001-ECONOMIC-COMPARISON",
+      "family": "raw-momentum20-capital-replay",
+      "work_item": "P3-RESEARCH-CAPITAL-001",
+      "modules": [
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "question": "Does the fixed R2 momentum candidate clear its preregistered P2 capital-use gate?",
+      "consumer": "Research allocator and guarded native P2 capital consumer",
+      "scope": "Same consumed2020-2021 development window, fixed R2[2%,12%], disjoint control, T sizing,30% parameter/21% buffer,100000CNY each, P2 fees and minimum legal holding; new qualified exact-key P10 purpose input with true knowledge clock. Recovery002 of001, same question and exposure.",
+      "execution_status": "completed",
+      "verdict": "inconclusive",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Full fixed holding-use comparison independently accepted; full-window candidate/control net returns+0.31660%/-2.31747%, increment+2.63407 percentage points.2021 increment-0.33023pp and static removal of candidate top3 increment-3.78895pp fail original gates. Park this precise holding use; original R2 signal finding retained.",
+      "decision_effect": "Close completed628/R4 and park this fixed holding use. Retain explicit qualified P10 input seam, complete capital/independent construction and exact evidence. Prioritize existing-asset main integration; Workers remain standby and no successor is activated.",
+      "reopen_conditions": [
+        "Material new evidence/question that can change the failed annual/positive-contribution concentration judgment, with a named consumer and limited prospective budget.",
+        "Preserve all R1/R2/A/001/002 failures/costs and2020-2021 exposure; freeze any future use/input/request and its independent acceptance before execution."
+      ],
+      "retained_assets": [
+        "src/quanthus/backtest/capital_purpose.py",
+        "src/quanthus/backtest/capital_clock.py",
+        "src/quanthus/backtest/native_capital_replay.py",
+        "scripts/research_capital_replay.py",
+        "scripts/research_capital_independent.py",
+        "config/research/research-capital-recovery/request.v2.json",
+        "config/research/research-capital-recovery/effective-input.v1.json",
+        "P10 exact-key HF5ef2db2961af269a5ce281b84c8c272c9fb4d631 input",
+        "docs/work-items/research-capital-replay-value-brief.md",
+        "docs/acceptance/research-capital-recovery-20261112.md"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Successor starts2026-11-12T05:02:53Z, active work cap4h with prior exposure/cost cumulative. One new formal92.278686s and cold73.404593s, peakRSS3505565696B; P10 publication/readback9.426802s and result26file899366B fixed readback77.979923s. Two full checks about29min including retained missing-history failures; exact Git object restored and complete8989pass/35skip. Prior001 three computations243.618s and132.16s publication, A/R1/R2/reviews/repairs all retained. Complete active/token/billing cost unknown_not_zero, machine/elapsed segments not summed as person-time.",
+      "attempt_refs": [
+        "git:8b1a76608c7e810c23cb3049f9af9f4a04ece697",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-002/formal-a1",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-002/independent-a1",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-002/evidence/checks-a2",
+        "cn02:/srv/agentdock/quanthus-ops/research-capital-002/evidence/checks-a3",
+        "hf:rv192/quanthus-research-r1@4e0d15571cf815024180d21cce1605391dc6a138/runs/RESEARCH-CAPITAL-002/RESEARCH-CAPITAL-002-T1/A1"
+      ],
+      "evidence": [
+        {
+          "id": "R4-PUBLISH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-002/retained/publish-readback.json",
+          "sha256": "0589c7fdadf6dcb92105bad00b71d2993a63580923883e9327810d20d754a8b8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed private HF4e0d15571cf815024180d21cce1605391dc6a138 all26files899366B read back; completed full fixed2020-2021 comparison and independently cold-rebuilt cash/curve/branch."
+        },
+        {
+          "id": "R4-G4",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-capital-002/retained/final-audit.json",
+          "sha256": "79f08a45db0d276f0d4cd713a8d084e75a0d43e99dba1365985e14b6b16f8a9d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent role accepted actual8b1 formal/cold evidence; completed/inconclusive/park this fixed holding use; original R2 signal use retained."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-628-20261112T072129212925Z"
+      ],
+      "supersedes": "CON-CAPITAL-REPLAY-20261112"
     }
   ]
 }

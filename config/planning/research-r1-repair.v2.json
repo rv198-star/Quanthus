@@ -1,0 +1,68 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-R1-HF-002-REPAIR",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "repair",
+  "family": "hf-dwd-worker-contract",
+  "work_item": "P3-RESEARCH-HF-001",
+  "modules": [
+    "REPRO"
+  ],
+  "question": "修正首版研究执行包和有界描述合同，能否提供可验证、可恢复的单节点执行资产？",
+  "consumer": "R2/R3 研究批次的下达者与 Worker 分发决策；结论用于决定下一笔投入是加信号、加执行约束还是加节点。",
+  "scope": "2019日历仅上市年龄；2020-2021已曝光行情；固定56成员；无公司行动加工或策略回放",
+  "deliverable": "v2合同、单节点执行包、反例验收和重跑结果；交独立审阅",
+  "decision_if_pass": "交付具名R2调用方，按事前1%/2%价格守卫门槛安排下一笔；保留原执行约束",
+  "decision_if_fail": "保留准确失败和原曝光，停止受影响阶段；不改阈值/不扩样本",
+  "acceptance": [
+    "#609新公式/最小样本/分支与准确闭包在新结果之前冻结并preflight",
+    "#610身份、资源、缺失、损坏、重试、不可变发布逐项测试通过",
+    "#611固定提交真实运行和HF完整回读，保留全部尝试及成本"
+  ],
+  "stop_conditions": [
+    "任何身份/分区/资源错误停止对应阶段",
+    "计算最多一次已定位重试；上传最多三次，复用固定包；达到修复预算转交精确缺口"
+  ],
+  "memory_sha256": "f86dc16908f5e0cbdeb4818f0ce3721e2b882740ab4d3ecc8e4a550e187396c7",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "保留原结论及其适用范围；本批按已明确F1-F8修复工程合同和描述口径，不重开旧策略/学习试验或提升旧结果。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "保留原结论及其适用范围；本批按已明确F1-F8修复工程合同和描述口径，不重开旧策略/学习试验或提升旧结果。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "保留原结论及其适用范围；本批按已明确F1-F8修复工程合同和描述口径，不重开旧策略/学习试验或提升旧结果。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "保留原结论及其适用范围；本批按已明确F1-F8修复工程合同和描述口径，不重开旧策略/学习试验或提升旧结果。"
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "保留原结论及其适用范围；本批按已明确F1-F8修复工程合同和描述口径，不重开旧策略/学习试验或提升旧结果。"
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-CONTRACT-20261111",
+      "relation": "respect",
+      "rationale": "保留原结论及其适用范围；本批按已明确F1-F8修复工程合同和描述口径，不重开旧策略/学习试验或提升旧结果。"
+    }
+  ],
+  "cumulative_cost_review": "原执行约1.7h/Owner约2h、审计和未知历史费用持续累计；新增修复段上限2h主动工时，总线8h不重置。",
+  "runtime_authority_boundary": "Owner switched Sol and explicitly requested ordered completion of #609-611; same existing SSH path and isolated research job; self-audit before each next stage",
+  "budget": {
+    "wall_seconds": 7200,
+    "max_new_bytes": 2147483648,
+    "network_requests": 100,
+    "accounting_owner": "R1 repair tranche under Owner continuation; old ~1.7h plus audit and old unknown costs retained within 8h bus"
+  }
+}

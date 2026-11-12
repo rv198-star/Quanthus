@@ -1,0 +1,90 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-R1-AUDIT-612-V2",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "tradability-execution-screen-audit",
+  "work_item": "META-RESEARCH-REVIEW-001",
+  "modules": [
+    "FACTS",
+    "REPRO",
+    "CLOSEOUT"
+  ],
+  "question": "Independently accept or reject the repaired R1 v2 semantic result and bounded Worker contract",
+  "consumer": "R1 reviewer and research task allocator",
+  "scope": "Read the exact 56-member v2 closure; calendar-only 2019, market/state 2020-2021. One isolated pandas/numpy construction plus synthetic fault probes and exact HF readback.",
+  "deliverable": "Audit, counterexamples, append-only conclusions/blueprint and model task policy",
+  "decision_if_pass": "Retain supported scoped assets; allocate by task risk",
+  "decision_if_fail": "Freeze adoption, preserve originals, reopen unmet contract work",
+  "acceptance": [
+    "Exact independent reproduction and contract dispositions",
+    "Durable evidence readback and append-only ledger",
+    "Model task boundaries and escalation"
+  ],
+  "stop_conditions": [
+    "Stop row access on identity or partition mismatch",
+    "Build independent derived input once; maximum 30 machine minutes"
+  ],
+  "memory_sha256": "7fb5780532a117e37240b3da8236a102912b58048247cba148e4c04a1bf2a096",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "保留已记录范围、旧曝光和费用；本轮仅审阅修复v2，不重开旧研究或改变原消费者用途。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "保留已记录范围、旧曝光和费用；本轮仅审阅修复v2，不重开旧研究或改变原消费者用途。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "保留已记录范围、旧曝光和费用；本轮仅审阅修复v2，不重开旧研究或改变原消费者用途。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "保留已记录范围、旧曝光和费用；本轮仅审阅修复v2，不重开旧研究或改变原消费者用途。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "保留已记录范围、旧曝光和费用；本轮仅审阅修复v2，不重开旧研究或改变原消费者用途。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "保留已记录范围、旧曝光和费用；本轮仅审阅修复v2，不重开旧研究或改变原消费者用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "保留已记录范围、旧曝光和费用；本轮仅审阅修复v2，不重开旧研究或改变原消费者用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "保留已记录范围、旧曝光和费用；本轮仅审阅修复v2，不重开旧研究或改变原消费者用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-V2-20261111",
+      "relation": "respect",
+      "rationale": "独立核查该v2作者候选的证据与失败路径；验收后追加处置，不继承作者通过判断。"
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-20261111",
+      "relation": "respect",
+      "rationale": "独立核查该v2作者候选的证据与失败路径；验收后追加处置，不继承作者通过判断。"
+    }
+  ],
+  "cumulative_cost_review": "Original execution ~1.7h / Owner ~2h, v1 audit, Sol repair, failures and exposure remain cumulative. v2 audit active budget 1.5h; machine budget 30min; missing active-time/token/billing values remain unknown_not_zero.",
+  "runtime_authority_boundary": "Owner explicitly starts independent acceptance; task-scoped SSH already authorized. Audit scripts and evidence only; no candidate/source repairs or new research.",
+  "budget": {
+    "wall_seconds": 1800,
+    "max_new_bytes": 2147483648,
+    "network_requests": 30,
+    "accounting_owner": "#612 v2 audit TPlan; 1.5h active-time ceiling"
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "schema": "quanthus.native-capital-qualification-request.v1",
+  "request_id": "RESEARCH-CAPITAL-QUAL-001",
+  "task_id": "RESEARCH-CAPITAL-QUAL-001-T1",
+  "attempt_id": "A1",
+  "authority": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "content_digest": "sha256:1d0e4bd5fbf40bf2876883faf82b98fd81e95a93a82b9d23d248759a38b3f692"
+  },
+  "closure": {
+    "path": "config/research/research-capital-qual/closure.v1.json",
+    "sha256": "sha256:0f66acfcc8ef1a93f831b7272f59a86df13fe4a2f3717e4c8e5a812d4cbac13f",
+    "exact_members": 126,
+    "exact_bytes": 192098985
+  },
+  "scope": {
+    "calendar_start": "2019-01-01",
+    "market_start": "2020-01-02",
+    "execution_end": "2021-12-31",
+    "forbidden_after": "2022-01-01",
+    "knowledge_view": "latest_sealed_retrospective",
+    "purpose": "Source schema/identity/currency/directional-state/action/clock qualification only; no strategy or capital result",
+    "source_clock": "preserve original knowledge_from/to and announced/effective clocks; historical publication qualification not granted",
+    "simulation_clock": "separate explicit retrospective contract remains to be qualified"
+  },
+  "environment": {
+    "python": "3.10.12",
+    "platform": "linux",
+    "lock_path": "config/research/research-r1/runtime.v2.lock",
+    "lock_sha256": "sha256:f8626d30f642e4f68509e187e00b1cb042cdbe73ff848c399364809799b03cf3"
+  },
+  "budget": {
+    "threads": 2,
+    "duckdb_memory_bytes": 3221225472,
+    "max_rss_bytes": 6442450944,
+    "max_scratch_bytes": 4294967296,
+    "max_download_bytes": 536870912,
+    "max_qualification_wall_seconds": 600,
+    "max_cpu_seconds": 600,
+    "source_census_attempts": 1,
+    "max_action_examples": 8
+  },
+  "authorization": {
+    "work_item": "P3-RESEARCH-CAPITAL-001",
+    "issue": 628,
+    "tranche": "A only, at most60 active minutes",
+    "owner": "Owner explicitly approved first hour and628 SSH to isolated CN02 directory",
+    "no_capital_experiment": true
+  },
+  "publish": {
+    "dataset": "rv192/quanthus-research-r1",
+    "private": true,
+    "path_prefix": "runs/RESEARCH-CAPITAL-QUAL-001/RESEARCH-CAPITAL-QUAL-001-T1/A1",
+    "retained_root": "/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/retained"
+  }
+}

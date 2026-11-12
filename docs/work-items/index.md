@@ -5,6 +5,9 @@ Maintenance workflow: [GitHub work agreement](../../CONTRIBUTING.md).
 issue-type projection, metadata synchronization and safe worktree closeout.
 It is a maintenance task outside the LLD-derived synchronization inventory.
 
+`META-GITHUB-MILESTONE-001` / [#637](https://github.com/rv198-star/Quanthus/issues/637)
+tracks the native Milestone batch rules shared with WFF and AIWork, outside the LLD-derived synchronization inventory.
+
 Stable ids are the join key between requirements, designs, code, tests, and GitHub issues.
 The GitHub issue title must begin with the id in brackets. Closing an issue requires links to
 acceptance evidence; closing an epic requires all blocking child ids to close.

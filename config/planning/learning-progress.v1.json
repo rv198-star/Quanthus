@@ -10407,6 +10407,61 @@
           "body_sha256": "22c61668c4713112bbff17cef2017c4ad19527e8165793aab9317bf95f76e406"
         }
       ]
+    },
+    {
+      "id": "CP-642-R5-CLOSED-20261112",
+      "recorded_at": "2026-11-12T15:53:28.221878+00:00",
+      "actor": "R5 primary after independent acceptance and ordinary source merge",
+      "work_item": "P3-RESEARCH-R5-CLOCK-001",
+      "outcome": "completed",
+      "summary": "R5研究、独立验收及固定HF交付通过，PR643已普通merge到main，642现已真实closed/completed；本记录只完成关闭观察与源码交付对账。",
+      "evidence": [
+        {
+          "id": "R5-SOURCE-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained/closeout/merge643-receipt.json",
+          "sha256": "7bd50d66774a1849a7e7135a36530db66b10da234f28e45584a1496ce804f6ec",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary PR643 merge with exact released base/head,parent and tree equality."
+        },
+        {
+          "id": "R5-CLOSED-ISSUE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained/closeout/issue642-closed.json",
+          "sha256": "a2c3e3c09f675b89d7845d7d8d063e24fc92e0eece9d991eca0b4e9884233c05",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Real closed/completed642 body,timestamp and labels after accepted research/publication/source delivery."
+        },
+        {
+          "id": "R5-MERGE-RELEASE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained/closeout/independent-premerge-release.json",
+          "sha256": "d3958a91127a33e869d19abb84c1532cabb55d05ede913a2af6504c2d737631d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent acceptance and release for exact bd572ff3 ordinary source merge."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Postmerge exact issue lifecycle and source bookkeeping only; accepted R5 population evidence, original input/clock/gates, R4park, cumulative cost/exposure and admission facets remain unchanged.",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-R5-CLOCK-001",
+          "number": 642,
+          "title": "[P3-RESEARCH-R5-CLOCK-001] 检验固定动量盘中响应在跨夜日历窗口的延续并作资源决定",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-12T15:53:24Z",
+          "body_sha256": "307aedaf68c4afd8f13dbd91aa180e28ae5511a6f30e6b4af9689d2ff2ac0e2b"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ]
     }
   ],
   "history_imports": [

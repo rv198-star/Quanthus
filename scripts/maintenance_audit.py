@@ -3,8 +3,21 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 
 from maintenance_store import digest
+
+
+def runtime_satisfies(actual, required):
+    if not required:
+        return True
+    version = re.fullmatch(r"(\d+)\.(\d+)(?:\.\d+)?", actual or "")
+    policy = re.fullmatch(r"(\d+)\.(\d+)(\+)?", required)
+    if not version or not policy:
+        return False
+    observed = tuple(map(int, version.group(1, 2)))
+    expected = tuple(map(int, policy.group(1, 2)))
+    return observed >= expected if policy[3] else observed == expected
 
 
 def signed(value, field):
@@ -64,6 +77,7 @@ def verify(receipt, delivery, requests, config, expected, checked_at):
         and all(
             x["evidence"]["operational_fingerprint"] == expected["operational_fingerprint"]
             and x["evidence"]["exit_code"] == 0
+            and runtime_satisfies(x["evidence"].get("runtime"), config.get("verification_python"))
             for x in sources["verification"]["sources"]
         )
     )

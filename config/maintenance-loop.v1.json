@@ -1,6 +1,6 @@
 {
   "schema": "maintenance.loop.v1",
-  "contract_version": "1.2.0",
+  "contract_version": "1.3.0",
   "repository": "rv198-star/Quanthus",
   "control_issue": 632,
   "transport": {
@@ -32,7 +32,9 @@
     "docs/maintenance/loop-contract.md",
     "AGENTS.md",
     "CONTRIBUTING.md",
-    "docs/maintenance/hf-evidence.md"
+    "docs/maintenance/hf-evidence.md",
+    "docs/maintenance/lessons.md",
+    "Makefile"
   ],
   "dependency_files": [
     "uv.lock",
@@ -111,5 +113,11 @@
     "repository_env": "LOOP3_HF_REPO_ID",
     "token_env": "LOOP3_HF_TOKEN",
     "github_projection": "digest-bound-pointer-only"
-  }
+  },
+  "verification_python": "3.10+",
+  "review_max_commits": 12,
+  "review_timeout_seconds": 1200,
+  "followup_seed_issues": [
+    312
+  ]
 }

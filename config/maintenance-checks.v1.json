@@ -1,0 +1,34 @@
+{
+  "schema": "maintenance.checks.v1",
+  "python": "3.10+",
+  "rules": [
+    {
+      "lesson_id": "Q-RECOVERY-COMPAT",
+      "state": "active",
+      "authority": "docs/operations/ods-dwd-incident-log.md",
+      "paths": [
+        "ops/bin/run-cn01-ods-daily",
+        "ops/bin/run-ods-daily-with-retry",
+        "ops/bin/recover-matured-ods-daily",
+        "src/quanthus/data_catalog.py",
+        "config/schedules/*",
+        "tests/unit/test_cn01_ods_orchestrator.py",
+        "tests/unit/test_data_catalog.py",
+        "tests/unit/test_schedule_contracts.py"
+      ],
+      "commands": [
+        [
+          "{python}",
+          "-m",
+          "pytest",
+          "-q",
+          "tests/unit/test_cn01_ods_orchestrator.py",
+          "tests/unit/test_data_catalog.py",
+          "tests/unit/test_schedule_contracts.py"
+        ]
+      ],
+      "timeout_seconds": 180,
+      "failure_owner": "当前恢复变更作者及P10审阅者；数据修复仍归P10"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-# 仓库维护循环合同 v1.2.0
+# 仓库维护循环合同 v1.3.0
 
 > 1.2.0 evidence storage: full receipts, snapshots, delivery projections and controller reports are stored in the private HF dataset. GitHub carries request envelopes and digest-bound small pointers. See [HF private evidence](hf-evidence.md). Historical GitHub bodies stay under their original versions.
 
@@ -21,7 +21,7 @@ Python 3.9+ 标准库、Git、已有 gh 认证。WFF 的验证使用 Python 3.12
 
 每个实际执行轮次有持久 `receiver_run_id`；正式认领时记录 `received_at`、随机 `attempt_id`、实际序号与开始时间，完成时记录完成时间和运行身份。探针声明 `execution_model=in_process_probe`，后续消费者声明 `queued_rule_consumer_fixture`。它们使用接收器账本作为原生执行系统，external task 为不适用；repair 引用真实 Codex thread。重复投递沿用同一业务 attempt，发布重试另有 publication attempt。
 
-同一 request_id 绑定同一 canonical request digest。原生回执写入后保持不变。旧版 inbox、已发布回执及其摘要保留；退出登记的 Mac 账本归档保存，旧批次仍可从原 GitHub 回执追溯；旧批次缺失的时间/事件导出 `legacy_not_recorded`。新请求使用 1.2.0。
+同一 request_id 绑定同一 canonical request digest。原生回执写入后保持不变。旧版 inbox、已发布回执及其摘要保留；退出登记的 Mac 账本归档保存，旧批次仍可从原 GitHub 回执追溯；旧批次缺失的时间/事件导出 `legacy_not_recorded`。新请求使用 1.3.0。
 
 ## 环境来源
 
@@ -108,3 +108,34 @@ repair 的 payload 给已有开放维护 Issue 的 issue_number 和精确 curren
 每日先对账旧任务、恢复 outbox、复查后续效果，再按价值选新改进。每仓最多一项新编码任务，预算见配置；无适用机会记录 wait。用同一 improvement_id 串联来源、Issue、attempt、验证、PR、合入、目标规则、后续消费和效果决定。维护自身心跳排除出变化扫描；未完成来源沿原游标重试。
 
 保存新 run_id、来源游标、环境状态、阶段变化、效果和恢复项，追加汇总并 GET 读回。确认信号：`LOOP3_DAILY_OK / LOOP3_DAILY_NOOP / LOOP3_DAILY_PARTIAL / LOOP3_DAILY_BLOCKED`。每日 OK/NOOP 需要三仓完成本轮盘点；首次 READY 依上面的完整八项。接口、权限、加载语义改变后对受影响环境重新验收。
+
+
+## learning-v2：真实夜审、业务结果与规则执行
+
+作业与启用分三阶段：可试运行、规则在自然任务中采用、持续收益。可运行要求正式审阅调用与结果读回、三仓路由和候选接手明确；至少一个有限真实窗口已试跑。其余仓逐仓报告覆盖。后续真实采用随正常任务积累，暂无机会记 observing。
+
+### 正式只读审阅
+
+同一控制入口接受 `kind=review`，payload 为精确 `from_sha`、`to_sha` 和最多10个 `followups`（每项含 `issue_number`，后续可带前次 `source_digest`）。在固定接收器的 Git 对象库读取 main 一阶连续窗口，最多审阅12个单元；余下单元保留，当前任务不占每日编码修复额度。现有 Codex 以 `read-only` sandbox 在独立 detached worktree 审阅实际 diff、合并PR/验证head及四类问题：返工、准入、薄验证、跨提交退化。
+
+无新提交时也跟进事故与修复的新结果。服务端读所选Issue全部评论及编辑，完整输入保留在私有job；回执只导出来源摘要、最后评论地址及必要审阅结论。云端确认报告实际覆盖后才接受 `proposed_reviewed_through`，pending单元沿原终点接续。用户确认、待批准PR和效果观察用独立跟进清单，不阻塞已完整审阅的代码游标。
+
+每个跟进项只需原Issue/任务引用、已读来源摘要、下一触发条件和接手人。每轮先旧结果后新窗口；读到历史真实成果时按原项目归属，补状态对账，不重跑已完成业务。失败/中断审阅返回原生线程与保留worktree的恢复入口，不自动重发模型任务。
+
+### 本地候选到草稿PR
+
+`repair` 继续只产生隔离候选。`candidate_digest`绑定base及所有已提交、暂存、未暂存、未跟踪文件的内容和可执行位。候选接手者是当前Web维护控制Agent：通过已登记节点读取原生job、完整diff（含未跟踪文件）、检查结果并按项目要求完成安全扫描；在本仓可信账号的Issue评论中保存原request_id、candidate_digest、审阅结论与验证引用。
+
+可信审阅评论以 `<!-- maintenance.candidate-review.v1 -->` 开头，紧随一个json代码块，其对象包含 `decision="accept"`、`candidate_request_id`、`candidate_digest`、原回执的 `candidate_head`、非空 `validation_refs` 列表和 `security_review_ref`。验证与安全引用由实际审阅者确认，接收器核对绑定及形状。草稿发布失败后，先查原handoff结果；需要继续时用新handoff请求保留原repair target、digest和review_ref，固定分支复用同一PR。
+
+审阅者明确接受候选后，通过 `kind=handoff` 指定 `target_request_id`、`candidate_digest` 和上述 `review_ref`。接收器重新核对候选、可信评论作者与绑定值，提交、普通push、创建draft PR并读回精确head。候选变动立即停止交接；重复交接按固定分支复用已有PR。此路径不合入、不部署，AIWork每个新PR合入仍需Owner明示同意。Web端若缺少实际节点读diff/验证能力，明确把原target、摘要与原生日志交给当前Codex维护任务接手；Owner处理各仓规定的合入决定。未完成审阅时保留 `needs_review` 和接手人。
+
+### 正常开发入口与效果复核
+
+每个普通代码任务按 [触发导航](lessons.md) 运行 `python scripts/maintenance_checks.py --base <本任务精确base> --run`，使用本仓规定Python；命令读取当前已版本化的 `config/maintenance-checks.v1.json`，只运行触及路径的现有检查。代码修复执行器同样要求此动作。PR审阅者复查触发范围、实际结果与同类路径。领域判断仍在原权威，lessons只作导航；新增规则先找原有同义项并修改原入口。
+
+采用记录沿原任务保存 lesson_id、规则提交、触发条件、命令/判断和结果；日常报告引用它们。对当前少量重点规则观察适用机会、检查执行、同类失败/返工、拦截或逃逸、误阻与实际额外成本。同一任务重试只算一个机会。没有机会记等待，小样本列事实，不以调用数、规则数或报告数宣称收益。
+
+复发归因到漏执行、覆盖不足、执行错误或环境变化，分别修入口、规则或适用范围。合法任务误阻、规则冲突、已有更强检查或适用模块退役时复核/收窄/退出。严重安全或完整性规则按风险保留。普通重复教训参考三个独立日期升格；已确认严重问题及时固化。对比多个可比机会与维护成本后再记录持续收益。
+
+完整证据仍在私有HF与原生账本，GitHub保留版本化规则/代码、PR和小索引。日报保存代码窗口与接受游标、独立结果跟进清单、发现及处置、原权威规则提交、候选接手和三阶段状态。沿原身份恢复；协议fixture的效果单列。

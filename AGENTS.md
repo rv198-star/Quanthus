@@ -283,6 +283,13 @@ after their baseline, physical-source, contract and runtime verification.
 
 ## Repository maintenance loop
 
+For every code task, use the exact task base with
+`python scripts/maintenance_checks.py --base <base> --run` in the required project Python.
+Read `docs/maintenance/lessons.md` for triggered business checks and failure ownership;
+record actual actions/results in the original task evidence. PR reviewers verify applicability.
+Night review also follows unresolved incident/user-result updates, including days without commits.
+
+
 For repository maintenance intake, registered development-environment evidence,
 receipt recovery and rule-consumption review, follow
 `docs/maintenance/loop-contract.md` and `config/maintenance-loop.v1.json`.

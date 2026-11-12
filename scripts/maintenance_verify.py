@@ -12,6 +12,7 @@ from pathlib import Path
 
 from maintenance_loop import RUNTIME_FILES, file_digest, fingerprint, git, load_config
 from maintenance_store import digest, identity, now
+from maintenance_audit import runtime_satisfies
 
 
 def main():
@@ -21,6 +22,10 @@ def main():
     args = parser.parse_args()
     root = args.root.resolve()
     config = load_config(root)
+    if not runtime_satisfies(sys.version.split()[0], config.get("verification_python")):
+        print(json.dumps({"status": "blocked", "reason": "verification_python_mismatch",
+                          "actual": sys.version.split()[0], "required": config["verification_python"]}))
+        return 2
     test = config["verification_test_path"]
     command = [
         sys.executable,

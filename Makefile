@@ -101,7 +101,13 @@ blueprint-render:
 blueprint-audit:
 	$(PYTHON) scripts/blueprint_progress.py audit --output artifacts/blueprint/issues.json
 
-check: doctor compile test planning-check
+MAINTENANCE_BASE ?= $(shell git merge-base HEAD origin/main)
+
+.PHONY: maintenance-checks
+maintenance-checks:
+	PYTHONPATH=src $(PYTHON) scripts/maintenance_checks.py --base "$(MAINTENANCE_BASE)" --run
+
+check: maintenance-checks doctor compile test planning-check
 
 .PHONY: local-acceptance local-acceptance-verify
 local-acceptance:

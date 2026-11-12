@@ -34,7 +34,7 @@ from maintenance_audit import valid_chain, verify  # noqa: E402
 from maintenance_sources import collect, native_tasks, verification  # noqa: E402
 
 
-class MaintenanceTests(unittest.TestCase):
+class MaintenanceFixture(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -59,9 +59,7 @@ class MaintenanceTests(unittest.TestCase):
         (self.root / "docs/maintenance/loop-contract.md").write_text("versioned authority\n")
         (self.root / "config").mkdir()
         for relative in m.RUNTIME_FILES:
-            if relative == "config/maintenance-consumer-rule.v1.json" or relative.startswith(
-                "scripts/"
-            ):
+            if relative.startswith(("scripts/", "config/")):
                 (self.root / relative).parent.mkdir(exist_ok=True)
                 shutil.copy2(SOURCE / relative, self.root / relative)
         (self.root / "config/maintenance-loop.v1.json").write_text(json.dumps(self.config))
@@ -109,7 +107,7 @@ class MaintenanceTests(unittest.TestCase):
                 "verification": {
                     "status": "ok",
                     "sources": [
-                        {"evidence": {"operational_fingerprint": fingerprint, "exit_code": 0}}
+                        {"evidence": {"operational_fingerprint": fingerprint, "exit_code": 0, "runtime": "3.12.14"}}
                     ],
                 },
             },
@@ -195,6 +193,9 @@ class MaintenanceTests(unittest.TestCase):
             m.now(),
         )
 
+
+
+class MaintenanceTests(MaintenanceFixture):
     def test_deployment_uses_the_owner_confirmed_server(self):
         configured = json.loads((SOURCE / "config/maintenance-loop.v1.json").read_text())
         expected = "cn02-dev" if configured["repository"].endswith("/Quanthus") else "oci-dev"
@@ -1014,6 +1015,335 @@ class HFOperatorAndToolTests(unittest.TestCase):
         pointer['pointer_digest'] = m.digest(pointer)
         with self.assertRaisesRegex(ValueError, 'registration'):
             evidence.read_pointer(config, pointer)
+
+
+class LearningWorkTests(MaintenanceFixture):
+    # Reuse setup/helpers without rerunning the inherited bootstrap test cases.
+    def review_executor(self, mutate=False):
+        path = Path(self.temp.name) / "review-executor"
+        path.write_text(
+            "#!" + sys.executable + "\n" + "import json,sys\nfrom pathlib import Path\n"
+            'a=sys.argv\ntree=Path(a[a.index("--cd")+1])\n'
+            'assert a[a.index("--sandbox")+1]=="read-only"\n'
+            + ('(tree/"unexpected-write").write_text("bad")\n' if mutate else "")
+            + 'Path(a[a.index("--output-last-message")+1]).write_text("Reviewed selected diffs; four categories and follow-up evidence recorded; coverage awaits acceptance.")\n'
+            'print(json.dumps({"type":"thread.started","thread_id":"real-cli-shape-fixture"}))\n'
+        )
+        path.chmod(0o700)
+        return str(path)
+
+    def test_review_returns_contiguous_prefix_and_pending_without_repair_budget(self):
+        import maintenance_work as work
+
+        start = m.git(self.root, "rev-parse", "HEAD")
+        commits = []
+        for content in ("one", "two"):
+            (self.root / "docs/change.md").write_text(content)
+            m.git(self.root, "add", ".")
+            m.git(self.root, "commit", "-qm", content)
+            commits.append(m.git(self.root, "rev-parse", "HEAD"))
+        config = dict(self.config, review_max_commits=1)
+        req = dict(self.req, kind="review", payload={"from_sha": start, "to_sha": commits[-1]})
+        with (
+            mock.patch.object(work, "followups", return_value=([], [])),
+            mock.patch.object(work, "change_context", return_value={}),
+        ):
+            self.new_run()
+            receipt = m.claim(
+                self.root, self.root, config, "local-dev", req, self.store, self.review_executor()
+            )
+        self.assertEqual(receipt["result"]["status"], "needs_coverage_acceptance")
+        self.assertEqual(receipt["result"]["window"]["selected_units"], commits[:1])
+        self.assertEqual(receipt["result"]["window"]["pending_units"], commits[1:])
+        self.assertEqual(receipt["result"]["window"]["proposed_reviewed_through"], commits[0])
+        self.assertTrue(receipt["result"]["source_unchanged"])
+        self.assertEqual(m.git(self.root, "rev-parse", "HEAD"), commits[-1])
+        self.assertEqual(receipt["native_attempt"]["execution_model"], "bounded_code_review")
+        with mock.patch.object(m, "review", side_effect=AssertionError("duplicate review")):
+            self.assertEqual(self.claim(req), receipt)
+
+    def test_empty_window_still_processes_result_updates(self):
+        import maintenance_work as work
+
+        sha = m.git(self.root, "rev-parse", "HEAD")
+        req = dict(
+            self.req,
+            kind="review",
+            payload={"from_sha": sha, "to_sha": sha, "followups": [{"issue_number": 141}]},
+        )
+        update = {"issue_number": 141, "changed": True, "state": "open"}
+        with mock.patch.object(
+            work, "followups", return_value=([{"comments": ["new result"]}], [update])
+        ):
+            receipt = self.claim(req, self.review_executor())
+        self.assertEqual(receipt["result"]["window"]["selected_units"], [])
+        self.assertEqual(receipt["result"]["followup_updates"], [update])
+
+    def test_review_detects_source_mutation_despite_executor_zero_exit(self):
+        import maintenance_work as work
+
+        sha = m.git(self.root, "rev-parse", "HEAD")
+        req = dict(self.req, kind="review", payload={"from_sha": sha, "to_sha": sha})
+        with mock.patch.object(work, "followups", return_value=([], [{"changed": True}])):
+            receipt = self.claim(req, self.review_executor(mutate=True))
+        self.assertEqual(receipt["result"]["status"], "failed")
+        self.assertFalse(receipt["result"]["source_unchanged"])
+        self.assertFalse((self.root / "unexpected-write").exists())
+
+    def test_no_new_inputs_does_not_start_a_model_run(self):
+        import maintenance_work as work
+
+        sha = m.git(self.root, "rev-parse", "HEAD")
+        req = dict(self.req, kind="review", payload={"from_sha": sha, "to_sha": sha})
+        with mock.patch.object(work, "followups", return_value=([], [])):
+            receipt = self.claim(req, self.review_executor())
+        self.assertEqual(receipt["result"]["status"], "no_new_review_inputs")
+        self.assertFalse((self.state / "jobs" / req["request_id"]).exists())
+
+    def test_followup_source_digest_detects_edit_to_older_comment(self):
+        import maintenance_work as work
+
+        issue = {
+            "number": 141,
+            "html_url": "https://github.com/example/repo/issues/141",
+            "state": "open",
+            "updated_at": "2026-11-13T00:00:00Z",
+            "body": "incident",
+        }
+        comments = [
+            {"id": 1, "body": "old", "updated_at": "a", "html_url": "first"},
+            {"id": 2, "body": "latest unchanged", "updated_at": "b", "html_url": "last"},
+        ]
+
+        def fetch():
+            return mock.patch.object(
+                work, "run", side_effect=[json.dumps(issue), json.dumps([comments])]
+            )
+
+        with fetch():
+            _, first = work.followups(self.config, [{"issue_number": 141}])
+        selection = [{"issue_number": 141, "source_digest": first[0]["source_digest"]}]
+        with fetch():
+            _, same = work.followups(self.config, selection)
+        self.assertFalse(same[0]["changed"])
+        comments[0]["body"] = "edited historical evidence"
+        with fetch():
+            _, edited = work.followups(self.config, selection)
+        self.assertTrue(edited[0]["changed"])
+        self.assertEqual(edited[0]["latest_comment_url"], "last")
+        self.assertNotIn("body", edited[0])
+
+    def test_review_rejects_non_first_parent_boundary(self):
+        import maintenance_work as work
+
+        base = m.git(self.root, "rev-parse", "HEAD")
+        m.git(self.root, "checkout", "-qb", "side")
+        (self.root / "side.txt").write_text("side")
+        m.git(self.root, "add", ".")
+        m.git(self.root, "commit", "-qm", "side")
+        side = m.git(self.root, "rev-parse", "HEAD")
+        m.git(self.root, "checkout", "-qb", "main-fixture", base)
+        (self.root / "main.txt").write_text("main")
+        m.git(self.root, "add", ".")
+        m.git(self.root, "commit", "-qm", "main")
+        m.git(self.root, "merge", "--no-ff", "-qm", "merge", "side")
+        with self.assertRaisesRegex(ValueError, "first-parent"):
+            work.inventory(self.root, side, m.git(self.root, "rev-parse", "HEAD"), 12)
+
+    def candidate(self):
+        import maintenance_work as work
+
+        base = m.git(self.root, "rev-parse", "HEAD")
+        job = work.job_path(self.store, self.req["request_id"])
+        job.mkdir(parents=True)
+        tree = job / "worktree"
+        branch = "codex/loop3-test-candidate"
+        m.git(self.root, "worktree", "add", "-b", branch, str(tree), base)
+        (tree / "docs/new-untracked.md").write_text("reviewed candidate")
+        manifest = work.candidate_manifest(tree, base)
+        result = dict(
+            manifest,
+            status="needs_review",
+            candidate_branch=branch,
+            issue_number=7,
+            candidate_head=base,
+        )
+        with mock.patch.object(m, "repair", return_value=result):
+            self.claim(dict(self.req, kind="repair"), executor="/fixture/executor")
+        request = dict(
+            self.req,
+            kind="handoff",
+            request_id="handoff-one",
+            payload={
+                "target_request_id": self.req["request_id"],
+                "candidate_digest": manifest["candidate_digest"],
+                "review_ref": "https://github.com/"
+                + self.config["repository"]
+                + "/issues/7#issuecomment-99",
+            },
+        )
+        return tree, request, manifest
+
+    def test_candidate_digest_binds_untracked_bytes_and_executable_mode(self):
+        import maintenance_work as work
+
+        tree, _, first = self.candidate()
+        path = tree / "docs/new-untracked.md"
+        path.write_text("changed after review")
+        second = work.candidate_manifest(tree, first["base_sha"])
+        self.assertNotEqual(first["candidate_digest"], second["candidate_digest"])
+        path.chmod(0o755)
+        self.assertNotEqual(
+            second["candidate_digest"],
+            work.candidate_manifest(tree, first["base_sha"])["candidate_digest"],
+        )
+
+    def test_handoff_stops_before_publication_if_untracked_candidate_changed(self):
+        tree, request, _ = self.candidate()
+        (tree / "docs/new-untracked.md").write_text("changed")
+        with self.assertRaisesRegex(ValueError, "changed"):
+            m.handoff(self.root, self.config, request, self.store)
+        self.assertEqual(m.git(tree, "status", "--porcelain"), "?? docs/new-untracked.md")
+
+    def test_handoff_recovers_lost_pr_create_ack_without_second_pr_or_commit(self):
+        import maintenance_work as work
+
+        tree, request, manifest = self.candidate()
+        original_run = work.run
+        created = []
+
+        def dispatch(argv, **kwargs):
+            if argv[0] == "git" and "push" in argv:
+                return ""
+            if argv[:2] == ["gh", "api"]:
+                return json.dumps(
+                    {
+                        "user": {"login": "rv198-star"},
+                        "html_url": request["payload"]["review_ref"],
+                        "body": "<!-- maintenance.candidate-review.v1 -->\n```json\n"
+                        + json.dumps(
+                            {
+                                "decision": "accept",
+                                "candidate_request_id": self.req["request_id"],
+                                "candidate_digest": manifest["candidate_digest"],
+                                "candidate_head": manifest["base_sha"],
+                                "validation_refs": ["fixture checks passed"],
+                                "security_review_ref": "fixture security review",
+                            }
+                        )
+                        + "\n```",
+                    }
+                )
+            value = {
+                "url": "https://github.com/" + self.config["repository"] + "/pull/8",
+                "headRefOid": m.git(tree, "rev-parse", "HEAD"),
+                "baseRefName": "main",
+                "state": "OPEN",
+            }
+            if argv[:3] == ["gh", "pr", "list"]:
+                return json.dumps([value] if created else [])
+            if argv[:3] == ["gh", "pr", "create"]:
+                created.append(value)
+                raise ValueError("lost ack after remote created PR")
+            if argv[:3] == ["gh", "pr", "view"]:
+                return json.dumps(value)
+            return original_run(argv, **kwargs)
+
+        with mock.patch.object(work, "run", side_effect=dispatch):
+            with self.assertRaisesRegex(ValueError, "lost ack"):
+                m.handoff(self.root, self.config, request, self.store)
+            head = m.git(tree, "rev-parse", "HEAD")
+            result = m.handoff(self.root, self.config, request, self.store)
+        self.assertEqual(len(created), 1)
+        self.assertEqual(result["status"], "draft_pr_published")
+        self.assertEqual(result["head_sha"], head)
+
+    def test_handoff_rejects_non_accepting_review_even_with_matching_digest(self):
+        import maintenance_work as work
+
+        tree, request, manifest = self.candidate()
+        run = work.run
+        decision = {
+            "decision": "reject",
+            "candidate_request_id": self.req["request_id"],
+            "candidate_digest": manifest["candidate_digest"],
+            "candidate_head": manifest["base_sha"],
+            "validation_refs": ["checks"],
+            "security_review_ref": "security",
+        }
+
+        def dispatch(argv, **kwargs):
+            if argv[:2] == ["gh", "api"]:
+                return json.dumps(
+                    {
+                        "user": {"login": "rv198-star"},
+                        "html_url": request["payload"]["review_ref"],
+                        "body": "<!-- maintenance.candidate-review.v1 -->\n```json\n"
+                        + json.dumps(decision)
+                        + "\n```",
+                    }
+                )
+            return run(argv, **kwargs)
+
+        with mock.patch.object(work, "run", side_effect=dispatch):
+            with self.assertRaisesRegex(ValueError, "explicitly accept"):
+                m.handoff(self.root, self.config, request, self.store)
+        self.assertEqual(m.git(tree, "rev-parse", "HEAD"), manifest["base_sha"])
+
+    def test_handoff_rejects_new_history_with_same_reviewed_content(self):
+        import maintenance_work as work
+
+        tree, request, manifest = self.candidate()
+        m.git(tree, "commit", "--allow-empty", "-qm", "unreviewed history")
+        run = work.run
+        decision = {
+            "decision": "accept",
+            "candidate_request_id": self.req["request_id"],
+            "candidate_digest": manifest["candidate_digest"],
+            "candidate_head": manifest["base_sha"],
+            "validation_refs": ["checks"],
+            "security_review_ref": "security",
+        }
+
+        def dispatch(argv, **kwargs):
+            if argv[:2] == ["gh", "api"]:
+                return json.dumps(
+                    {
+                        "user": {"login": "rv198-star"},
+                        "html_url": request["payload"]["review_ref"],
+                        "body": "<!-- maintenance.candidate-review.v1 -->\n```json\n"
+                        + json.dumps(decision)
+                        + "\n```",
+                    }
+                )
+            return run(argv, **kwargs)
+
+        with mock.patch.object(work, "run", side_effect=dispatch):
+            with self.assertRaisesRegex(ValueError, "history changed"):
+                m.handoff(self.root, self.config, request, self.store)
+
+    def test_formal_g2_rejects_python310_and_accepts_python312_evidence(self):
+        self.config["verification_python"] = "3.12"
+        receipt, delivery = self.pipeline()
+        proof = receipt["snapshot"]["source_status"]["verification"]["sources"][0]["evidence"]
+        proof["runtime"] = "3.10.12"
+        self.assertFalse(self.audit(receipt, delivery)["checks"]["2_environment"])
+        proof["runtime"] = "3.12.14"
+        self.assertTrue(self.audit(receipt, delivery)["checks"]["2_environment"])
+
+    def test_trigger_selection_sees_new_untracked_business_path(self):
+        import maintenance_checks as checks
+
+        base = m.git(self.root, "rev-parse", "HEAD")
+        (self.root / "docs/trigger.md").write_text("new business input")
+        paths = checks.changed_paths(self.root, base)
+        rule = {
+            "lesson_id": "existing-business-rule",
+            "state": "active",
+            "paths": ["docs/trigger.md"],
+        }
+        retired = dict(rule, state="retired")
+        self.assertEqual(checks.select_rules({"rules": [rule, retired]}, paths), [rule])
 
 
 if __name__ == "__main__":

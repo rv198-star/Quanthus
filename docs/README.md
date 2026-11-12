@@ -53,6 +53,11 @@ For the accepted R1/R2/R4 main integration and lifecycle disposition, start with
 pre-merge evidence snapshot; the [history-import contract](design/blueprint-history-import-v1.md)
 is accepted under the final independent review and ordinary main merge.
 
+For R5, start with its [current value brief](work-items/research-r5-value-brief.md) and
+[fixed clock-response contract](design/research-r5-clock-response-v1.md). #640 owns selection;
+#642 delivers the independently accepted population clock diagnostic, its fixed HF result and
+[acceptance evidence](acceptance/research-r5-clock-response-20261112.md). The R4 fixed capital use remains parked.
+
 The executed [consumer delivery and decision selection](work-items/learning-consumer-cycle-20261029.md)
 links the [runnable existing-consumer guide](operations/learning-assets-consumer.md) to its
 acceptance and the current no-new-comparison disposition.

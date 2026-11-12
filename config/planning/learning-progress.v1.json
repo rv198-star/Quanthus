@@ -10257,6 +10257,156 @@
           "body_sha256": "978634b4857eb356c74722ba1b151222374a961a2b6ce2e450df2370df53717f"
         }
       ]
+    },
+    {
+      "id": "CP-640-20261112T141954688412Z",
+      "recorded_at": "2026-11-12T14:19:54.688412+00:00",
+      "actor": "R5 main agent after independent selection and design review",
+      "work_item": "META-RESEARCH-R5-SELECT-001",
+      "outcome": "completed",
+      "summary": "R5选择一个具新增信息且最低接缝成本的日历对齐总体价格诊断；独立选题/合同/实现预审通过，640关闭并交642。R4资金用途保留park。",
+      "evidence": [
+        {
+          "id": "R5-SELECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r5-research-20261112/selection.json",
+          "sha256": "d7a8e32ab045379f25289a4f76a1234bace474c9cfae544fea5ef1c97cc6bd65",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Metadata/code/prior-report selection of A, B defer/C no new demand, one prospective diagnostic; no market rows or economic adoption."
+        },
+        {
+          "id": "R5-PRE-REVIEW",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r5-research-20261112/independent-pre-execution-review.json",
+          "sha256": "93cd544911a9ce2243afffd1c3d85fb0152cd31cad8e9dc0bb5fca71ab6dce2b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent read-only contract/implementation pre-review at b0e3ee71; actual Linux complete check and result-bearing execution are separate."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本节点交付选题、合同和后继资源安排；未获得新的科学结果，保持现有模块工程/质量/价值/准入判断。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-R5-SELECT-001",
+          "number": 640,
+          "title": "[META-RESEARCH-R5-SELECT-001] 按实际决策价值选题并冻结最小研究合同",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-12T14:19:30Z",
+          "body_sha256": "b535bd1f18958693fe5efef4efaff2a8b5628eda030d0c0657b4ad4bdefc35d4"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE",
+        "CLOSEOUT"
+      ]
+    },
+    {
+      "id": "CP-642-R5-RESEARCH-ACCEPTED-20261112",
+      "recorded_at": "2026-11-12T15:28:38.324484+00:00",
+      "actor": "R5 primary semantic decision after read-only independent research and transport acceptance",
+      "work_item": "P3-RESEARCH-R5-CLOCK-001",
+      "outcome": "completed",
+      "summary": "R5已取得并独立验收总体日历时钟结论：5.4078bp且达到冻结保留门槛，保留分布级证据、R4继续park；固定HF十文件全回读，CN02长期证据已验证。",
+      "evidence": [
+        {
+          "id": "R5-RESULT-AUDIT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained/evidence/actual-result-self-audit.json",
+          "sha256": "2d742a27f872f97ed0d0c45eaa93b2f7f2d953b4cf8d73cb508df440bec112a1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Frozen common-cohort primary/component statistics and original resource-use decision."
+        },
+        {
+          "id": "R5-INDEPENDENT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained/evidence/independent-research-acceptance.json",
+          "sha256": "a1e1c46e8dcb26e9f47c5146e888cf19814f5f665e048ea65fdb5ad4a36a881a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Read-only independent source hash, formal/reference reconciliation and independently recomputed 2000x20-session bootstrap acceptance."
+        },
+        {
+          "id": "R5-HF-PUBLISH",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained/transport-A2/publish-readback.json",
+          "sha256": "6d36bd6b931106724d1be9afffcb93ad6ee056d04ec7a865aa498bddb2f21413",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private immutable1f4778a9eeda7e7c993878ed0d2760bfbbae258d, ten exact original package members fully read back."
+        },
+        {
+          "id": "R5-TRANSFER-GUARD",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "cn02:/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained/transport-A2/guardian.json",
+          "sha256": "0411220fce13db14c4f28535c4e3f571986a675c5f67445b71caa1b57a43d543",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Transfer-only A2 passed180s/live/terminal resource guard and preserved original job clock,attempts and package hashes."
+        }
+      ],
+      "updates": [
+        {
+          "module": "FACTORS",
+          "facet": "quality",
+          "status": "accepted",
+          "scope": "Same consumed2020-2021 fixed raw-momentum20 common cohort:448paired dates,5.407834536bp,95%[0.766141827,10.064702068]bp,positive yearly means; same-cohort intraday6.364523444bp,overnight-0.999288056bp and interaction0.042599148bp reconcile.",
+          "remaining": "Distribution-level retrospective raw-price evidence; costs,company-action economics and executable second-open sell remain consumer-specific.",
+          "next_action": "Retain this scoped evidence; define a concrete next consumer before new spending.",
+          "evidence": [
+            "R5-RESULT-AUDIT",
+            "R5-INDEPENDENT",
+            "R5-HF-PUBLISH",
+            "R5-TRANSFER-GUARD"
+          ],
+          "supersedes": "CP-613-20261111T181214226620Z"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "Versioned two-authoritative-session joins,one formal/one independent pandas construction,32442nodes/max error3.47e-17,terminal/source guards and fixed ten-file HF package accepted; minimum durable evidence copied and byte verified onCN02.",
+          "remaining": "Each new consumer still needs exact input,code,environment,purpose and evaluation contract; source delivery lifecycle is tracked separately.",
+          "next_action": "Reuse accepted clock/cohort/identity/publication assets without rerunning the accepted diagnostic.",
+          "evidence": [
+            "R5-RESULT-AUDIT",
+            "R5-INDEPENDENT",
+            "R5-HF-PUBLISH",
+            "R5-TRANSFER-GUARD"
+          ],
+          "supersedes": "CP-628-20261112T072129212925Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "accepted",
+          "scope": "The R5 research allocator now retains the supported population clock-response evidence; roughly85% of common-cohort intraday increment remains. This finite resource-routing question is resolved with independent acceptance and durable evidence.",
+          "remaining": "R4 fixed holding remains parked; the next concrete consumer is not yet named. Complete active/model/billing and historical costs remain unknown_not_zero.",
+          "next_action": "Close this finite batch after source/lifecycle acceptance; allocate the next tranche only to a named decision with new useful information.",
+          "evidence": [
+            "R5-RESULT-AUDIT",
+            "R5-INDEPENDENT",
+            "R5-HF-PUBLISH",
+            "R5-TRANSFER-GUARD"
+          ],
+          "supersedes": "CP-628-20261112T072129212925Z"
+        }
+      ],
+      "no_change_reason": "",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-R5-CLOCK-001",
+          "number": 642,
+          "title": "[P3-RESEARCH-R5-CLOCK-001] 检验固定动量盘中响应在跨夜日历窗口的延续并作资源决定",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-12T13:42:08Z",
+          "body_sha256": "22c61668c4713112bbff17cef2017c4ad19527e8165793aab9317bf95f76e406"
+        }
+      ]
     }
   ],
   "history_imports": [

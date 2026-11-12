@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Parent | [Exploration governance](exploration-governance.md), research Epic #608, R5 milestone 19 |
-| Design status | draft — independent prospective design review pending |
-| Delivery gate | open |
+| Design status | approved — Owner R5 activation and independent pre-execution review of b0e3ee717f80c9be5889c4b49db486ba9da2e18b |
+| Delivery gate | accepted for the frozen research and distribution-level resource decision; [evidence](../acceptance/research-r5-clock-response-20261112.md) |
 | Selection | `META-RESEARCH-R5-SELECT-001` / #640 |
 | Execution | `P3-RESEARCH-R5-CLOCK-001` / #642 |
 | Request | `config/research/research-r5/request.v1.json` |

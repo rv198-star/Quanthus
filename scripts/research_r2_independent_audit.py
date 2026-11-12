@@ -11,7 +11,7 @@ from pathlib import Path
 from research_r1_v2_independent_audit import canonical, read, reproduce, save
 
 
-def evaluate(q, labelled, author, out, began):
+def evaluate(q, labelled, author, out, began, labeler=None):
     import numpy as np
 
     a = q["analysis"]
@@ -19,13 +19,18 @@ def evaluate(q, labelled, author, out, began):
     assert (
         base.selected == base.momentum20.between(*q["screen"]["unadjusted_momentum20_band"])
     ).all()
-    base["label_reason"] = base.reason
-    passed = base.reason.eq("pass")
-    close_ok = np.isfinite(base.next_px) & (base.next_px > 0)
-    base.loc[passed & ~close_ok, "label_reason"] = "missing_or_invalid_next_close"
-    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
-        base["response"] = base.next_px / base.next_op - 1
-    base.loc[passed & close_ok & ~np.isfinite(base.response), "label_reason"] = "nonfinite_response"
+    if labeler is None:
+        base["label_reason"] = base.reason
+        passed = base.reason.eq("pass")
+        close_ok = np.isfinite(base.next_px) & (base.next_px > 0)
+        base.loc[passed & ~close_ok, "label_reason"] = "missing_or_invalid_next_close"
+        with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+            base["response"] = base.next_px / base.next_op - 1
+        base.loc[passed & close_ok & ~np.isfinite(base.response), "label_reason"] = (
+            "nonfinite_response"
+        )
+    else:
+        base = labeler(base)
     valid = base.loc[base.label_reason.eq("pass")]
     cells = []
     for (day, venue), rows in valid.groupby(["day", "venue_id"], sort=True):

@@ -133,6 +133,8 @@ GitHub 状态只表示任务生命周期；实时检查：`make blueprint-audit`
 | [P3-RESEARCH-REPLAY-001 / #627](https://github.com/rv198-star/Quanthus/issues/627) | FACTORS, REPRO, CLOSEOUT | 核对R2到既有P2资金回放的精确接缝，形成有预算、失败路径与用途门槛的后继计划 | closed |
 | [P3-RESEARCH-CAPITAL-001 / #628](https://github.com/rv198-star/Quanthus/issues/628) | FACTORS, REPRO, CLOSEOUT | Complete fixed2020-2021 guarded capital comparison with explicit qualified P10 purpose input and independent cold/role acceptance; inconclusive original gates lead to park this fixed holding use. Draft631 main integration separate. | closed |
 | [META-RESEARCH-INTEGRATION-001 / #633](https://github.com/rv198-star/Quanthus/issues/633) | TRACE | 将已独立验收的R1/R2/R4研究链保真集成main；审计历史导入、精确代码环境与普通merge身份，不新增研究结果或提升用途准入。 | closed |
+| [META-RESEARCH-R5-SELECT-001 / #640](https://github.com/rv198-star/Quanthus/issues/640) | TRACE, CLOSEOUT | 按具名消费者的决策影响、取得答案的把握和完整成本选择至多一个R5问题；冻结用途、预算及独立验收，不以立项或历史重算提升模块成熟度。 | 未对账 |
+| [P3-RESEARCH-R5-CLOCK-001 / #642](https://github.com/rv198-star/Quanthus/issues/642) | FACTORS, REPRO, CLOSEOUT | 以既有R2总体的两开盘日历对齐原始价格响应和独立构建，决定是否保留这一分布级筛选资源；R4固定资金用途保持park。 | 未对账 |
 
 ## 历史分支导入
 

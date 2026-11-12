@@ -635,6 +635,25 @@
         "TRACE"
       ],
       "contribution": "将已独立验收的R1/R2/R4研究链保真集成main；审计历史导入、精确代码环境与普通merge身份，不新增研究结果或提升用途准入。"
+    },
+    {
+      "id": "META-RESEARCH-R5-SELECT-001",
+      "issue": 640,
+      "modules": [
+        "TRACE",
+        "CLOSEOUT"
+      ],
+      "contribution": "按具名消费者的决策影响、取得答案的把握和完整成本选择至多一个R5问题；冻结用途、预算及独立验收，不以立项或历史重算提升模块成熟度。"
+    },
+    {
+      "id": "P3-RESEARCH-R5-CLOCK-001",
+      "issue": 642,
+      "modules": [
+        "FACTORS",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "contribution": "以既有R2总体的两开盘日历对齐原始价格响应和独立构建，决定是否保留这一分布级筛选资源；R4固定资金用途保持park。"
     }
   ]
 }

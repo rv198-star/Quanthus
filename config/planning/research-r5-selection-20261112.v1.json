@@ -1,0 +1,90 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-R5-SELECTION-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "research-r5-selection",
+  "work_item": "META-RESEARCH-R5-SELECT-001",
+  "modules": [
+    "TRACE",
+    "CLOSEOUT"
+  ],
+  "question": "Which of at most three existing consumer needs deserves the next bounded R5 research tranche?",
+  "consumer": "#608 research allocator and prospective screening protocol",
+  "scope": "Metadata/code/prior reports only during selection",
+  "deliverable": "Evidence-bound A/B/C choice, independent design review and exact successor642 contract",
+  "decision_if_pass": "Select one bounded question and freeze its contract",
+  "decision_if_fail": "NO_GO with evidence and reopening condition",
+  "acceptance": [
+    "Named consumer, frozen scope/input, full-cost and prior-conclusion review",
+    "Independent design review before result-bearing work",
+    "Actual result/decision/evidence and appropriate issue/blueprint reconciliation"
+  ],
+  "stop_conditions": [
+    "Finite selected tranche and resource caps",
+    "Any identity/partition/resource violation stops the affected stage",
+    "Material seam expansion triggers ROI reassessment; shared data gaps go to P10; no parked R4 reopening"
+  ],
+  "memory_sha256": "ace5bf3f7a1c22224359b6a70add8a712686c0b3f146f8e58da6479c97b0c55a",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "Respect the prior scoped delivered/parked consumer or learning result. No new need is inferred from an old asset; selection explicitly declined repeating the old consumer diagnostics or stopped learned-state trials."
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "Respect the prior scoped delivered/parked consumer or learning result. No new need is inferred from an old asset; selection explicitly declined repeating the old consumer diagnostics or stopped learned-state trials."
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "Respect the prior scoped delivered/parked consumer or learning result. No new need is inferred from an old asset; selection explicitly declined repeating the old consumer diagnostics or stopped learned-state trials."
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "Respect the prior scoped delivered/parked consumer or learning result. No new need is inferred from an old asset; selection explicitly declined repeating the old consumer diagnostics or stopped learned-state trials."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "Respect the prior scoped delivered/parked consumer or learning result. No new need is inferred from an old asset; selection explicitly declined repeating the old consumer diagnostics or stopped learned-state trials."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "Respect the prior scoped delivered/parked consumer or learning result. No new need is inferred from an old asset; selection explicitly declined repeating the old consumer diagnostics or stopped learned-state trials."
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "Reuse only accepted input/guard/immutable publication assets and preserve fixed price-screen findings, all failures and same-window exposure. No new Worker build, price-guard inquiry or prior contract repair is proposed."
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Reuse only accepted input/guard/immutable publication assets and preserve fixed price-screen findings, all failures and same-window exposure. No new Worker build, price-guard inquiry or prior contract repair is proposed."
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "Retain the supported intraday response on its original population. Measure one new calendar-aligned label on a prospectively common cohort; report the common-cohort intraday baseline separately and preserve old exposure."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
+      "relation": "respect",
+      "rationale": "Respect completed inconclusive/park for the fixed single-position capital use. This question measures the population-level raw-price clock seam, changes screen-resource routing only and does not rerun or advance R4."
+    }
+  ],
+  "cumulative_cost_review": "R1/R2/R4 and earlier same-window costs/failures/exposure remain cumulative; missing model/active/billing cost unknown_not_zero. Selection cap60active minutes; selected complete diagnostic estimated1-2active hours with full regression waiting separately measured.",
+  "runtime_authority_boundary": "Owner explicitly invoked TPlan and instructed autonomous R5 research through completion except unresolvable problems. NexusAgent controls isolated CN02 tasks; only this fixed existing development-data purpose is activated after independent contract review.",
+  "budget": {
+    "wall_seconds": 3600,
+    "max_new_bytes": 67108864,
+    "network_requests": 40,
+    "accounting_owner": "R5 Mission with inherited exposure and unknown-not-zero history"
+  }
+}

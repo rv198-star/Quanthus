@@ -1,0 +1,151 @@
+{
+  "schema_version": "quanthus.hf-dwd-research-request.v2",
+  "request_id": "RESEARCH-R5-CLOCK-001",
+  "task_id": "RESEARCH-R5-CLOCK-001-T1",
+  "attempt_id": "A1",
+  "authority": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "content_digest": "sha256:1d0e4bd5fbf40bf2876883faf82b98fd81e95a93a82b9d23d248759a38b3f692",
+    "business_through": "2026-10-31"
+  },
+  "scope": {
+    "partition": "development",
+    "calendar_start": "2019-01-01",
+    "read_start": "2020-01-02",
+    "decision_start": "2020-03-02",
+    "decision_end": "2021-12-29",
+    "execution_end": "2021-12-31",
+    "forbidden_after": "2022-01-01",
+    "knowledge_view": "latest_sealed_retrospective",
+    "interval_semantics": "Asia/Shanghai date; effective [from,to)"
+  },
+  "closure": {
+    "path": "config/research/research-r1/closure.v2.json",
+    "sha256": "sha256:a2fe359ecff110eab7a139a5a197b538a71889a38cd8d7530201fbcf4c5d954c",
+    "exact_members": 56,
+    "exact_bytes": 187921175
+  },
+  "environment": {
+    "python": "3.10.12",
+    "platform": "linux",
+    "lock_path": "config/research/research-capital/runtime.v1.lock",
+    "lock_sha256": "sha256:b2074bd5d841afa93428bb3a92d16fcd6bb8cdf3c82458512091a6a44b277eb2"
+  },
+  "screen": {
+    "min_listing_sessions": 120,
+    "min_avg_turnover_prior20": 100000000.0,
+    "max_unadjusted_close_return_vol20": 0.5,
+    "max_abs_unadjusted_close_return": 0.04,
+    "unadjusted_momentum20_band": [
+      0.02,
+      0.12
+    ],
+    "volatility_formula": "sample_std(close_t/close_tminus1-1 over current20)*sqrt(252); 21 consecutive positive finite closes; excludes corporate action adjustment",
+    "listing_age_rule": "calendar open sessions since listing effective_from; start clipped to 2019 for older listings, guaranteed >=120 before first decision",
+    "next_open_rule": "next open calendar_session joined by venue; valid listing/security [from,to), positive finite open, tradable and can_buy true, positive finite upper limit, open < upper-0.005",
+    "unknown_rule": "missing/invalid required input blocks admission; disjoint ordered reason ledger",
+    "control": "baseline AND finite momentum20 outside original closed band"
+  },
+  "decision": {
+    "consumer": "#608 research allocator and prospective signal-screen protocol",
+    "primary_metric": "mean paired same-date/venue candidate-control T+1-open to T+2-open raw-price response",
+    "minimum_mean_increment": 0.0005,
+    "branches": {
+      "insufficient": "inconclusive; park this raw-band calendar-aligned screen; retain exact shortfall",
+      "advance": "supported for retaining distribution-level evidence only; wait for a separately named consumer; R4 remains park",
+      "below_minimum": "not_met for this fixed raw-band calendar-aligned screen; park and direct next selection budget to an independent question",
+      "uncertain": "inconclusive; park this screen branch; preserve exposure/cost and require material new evidence for reopening"
+    }
+  },
+  "budget": {
+    "threads": 2,
+    "duckdb_memory_bytes": 3221225472,
+    "max_rss_bytes": 6442450944,
+    "max_scratch_bytes": 2147483648,
+    "max_download_bytes": 536870912,
+    "max_upload_bytes": 4194304,
+    "max_stage_wall_seconds": {
+      "fetch": 300,
+      "screen": 180,
+      "publish": 180
+    },
+    "max_job_wall_seconds": 1800,
+    "max_cpu_seconds": 240,
+    "max_compute_attempts": 1,
+    "max_publish_attempts": 3
+  },
+  "publish": {
+    "dataset": "rv192/quanthus-research-r1",
+    "private": true,
+    "path_prefix": "runs/RESEARCH-R5-CLOCK-001/RESEARCH-R5-CLOCK-001-T1/A1",
+    "ttl_review_after": "2026-12-12",
+    "cleanup_owner": "CN02 research task maintainer",
+    "retained_evidence_root": "/srv/agentdock/quanthus-ops/research-r5-clock-20261112/retained"
+  },
+  "exposure": {
+    "previous_window_already_consumed": true,
+    "predecessor": "All R1/R2/R4 same-window exposure, failures and costs retained; 2021-12-30 decision excluded prospectively to preserve T+2<=2021-12-31",
+    "question_delta": "One calendar-aligned label and exact intraday/overnight decomposition on the population, used for screen-resource disposition; no R4 capital replay reopening",
+    "recompute_reason": "Owner activated R5 autonomous research; one formal computation and one independent construction for the new predeclared question"
+  },
+  "analysis": {
+    "kind": "momentum-band-clock-aligned-markout.v1",
+    "consumer": "#608 research allocator and prospective signal-screen protocol",
+    "question": "Does the fixed raw-momentum20 band retain its incremental price response over the calendar-aligned T+1 open to T+2 open interval, enough to retain this distribution-level screen branch?",
+    "baseline": "R1 universe and all original filters except momentum band; finite momentum required",
+    "candidate": "baseline AND momentum20 in original closed [0.02,0.12] band",
+    "control": "baseline AND finite momentum20 outside original closed band",
+    "label": "T+2 unadjusted open / T+1 unadjusted open - 1; exact next two venue calendar sessions, valid identity and positive finite prices; calendar-aligned price response only",
+    "aggregation": "Equal-weight listings within each date/venue/group; candidate minus disjoint control; mean the two venue differences within each paired date, then equal-weight paired dates",
+    "required_venues": [
+      "venue_bec59e31eb6bb28111a10d7e6d2c689f",
+      "venue_8c0bd9088a0dc88f28e5e7fa8efdce87"
+    ],
+    "required_years": [
+      2020,
+      2021
+    ],
+    "min_paired_days_per_year": 200,
+    "min_group_opportunities": 5000,
+    "min_group_opportunities_per_year": 500,
+    "min_group_listings": 100,
+    "max_top_listing_share": 0.05,
+    "max_top10_listing_share": 0.2,
+    "minimum_mean_increment": 0.0005,
+    "minimum_mean_increment_rationale": "Prospective 5bp minimum information-difference threshold for this resource-routing screen, inherited as a conservative fixed requirement from R2; not an economic break-even threshold",
+    "bootstrap": {
+      "method": "year-stratified circular moving blocks of paired dates",
+      "block_sessions": 20,
+      "replicates": 2000,
+      "seed": 20261112,
+      "confidence": 0.95,
+      "quantile": "nearest_rank"
+    },
+    "secondary": [
+      "intraday response on the same common cohort",
+      "overnight response on the same common cohort",
+      "multiplicative interaction and decomposition residual"
+    ],
+    "decision_branches": {
+      "insufficient": "inconclusive; park this raw-band calendar-aligned screen; retain exact shortfall",
+      "advance": "supported for retaining distribution-level evidence only; wait for a separately named consumer; R4 remains park",
+      "below_minimum": "not_met for this fixed raw-band calendar-aligned screen; park and direct next selection budget to an independent question",
+      "uncertain": "inconclusive; park this screen branch; preserve exposure/cost and require material new evidence for reopening"
+    },
+    "independent_check": {
+      "scope": "independently rebuilt pandas/numpy feature and next-session joins plus paired summaries; no producer SQL import",
+      "float_abs_tolerance": 1e-10
+    },
+    "claim_ceiling": "Same consumed 2020-2021 retrospective raw-price cohort diagnostic. Second-open sell qualification, costs and company-action economic adjustment are outside this label. R4 fixed holding use remains parked; no capital/training/production adoption.",
+    "primary_response": "open_to_next_open",
+    "common_cohort": "All three responses share the original R2 baseline, disjoint band groups, first-open guard, finite positive first close and valid positive second open; equal-weight paired venues/dates",
+    "components": [
+      "intraday",
+      "overnight",
+      "interaction"
+    ],
+    "audit_right_censored_decision": "2021-12-30"
+  }
+}

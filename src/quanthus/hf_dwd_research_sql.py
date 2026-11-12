@@ -36,6 +36,9 @@ def calculate(
         connection.read_parquet(paths[table], hive_partitioning=True).create_view(table)
     connection.execute("SET TimeZone='Asia/Shanghai'")
     analysis = request.get("analysis")
+    label_end = scope["decision_end"]
+    if analysis and analysis["kind"] == "momentum-band-clock-aligned-markout.v1":
+        label_end = analysis["audit_right_censored_decision"]
     r2_columns = ""
     if analysis:
         r2_columns = f"""
@@ -160,7 +163,7 @@ def calculate(
     FROM features f LEFT JOIN panel n ON n.listing_id=f.listing_id
       AND n.calendar_session_id=f.next_session
     WHERE f.trade_date BETWEEN DATE '{scope["decision_start"]}'
-      AND DATE '{scope["decision_end"]}';
+      AND DATE '{label_end}';
     """)
 
     if analysis:
@@ -170,6 +173,10 @@ def calculate(
             f"AND selected IS DISTINCT FROM (momentum20 BETWEEN {lo} AND {hi})"
         ).fetchone()[0]:
             raise ValueError("R2 momentum cohorts disagree with original band")
+        if analysis["kind"] == "momentum-band-clock-aligned-markout.v1":
+            from quanthus.hf_clock_response import clock_markout
+
+            return clock_markout(connection, analysis)
         return momentum_markout(connection, analysis)
 
     def summary(predicate: str) -> dict[str, Any]:
@@ -382,6 +389,11 @@ def momentum_markout(connection: Any, analysis: dict[str, Any]) -> dict[str, Any
     SELECT trade_date FROM r2_cells WHERE candidate_count>0 AND control_count>0
     GROUP BY trade_date HAVING count(DISTINCT venue_id)=2;
     """)
+    return summarize_markout(connection, analysis)
+
+
+def summarize_markout(connection: Any, analysis: dict[str, Any]) -> dict[str, Any]:
+    """Summarize an already-qualified disjoint response population."""
     query = connection.execute(
         "SELECT c.* FROM r2_cells c JOIN r2_paired_dates p USING(trade_date) "
         "ORDER BY trade_date,venue_id"

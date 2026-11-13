@@ -164,6 +164,13 @@ def collect_role(
     model_id = contract.get("reference", {}).get("reader_model_id")
     if model_id is not None and model_id != AUTO_SOL_MODEL:
         raise ValueError("R9_REFERENCE_MODEL_NOT_FROZEN")
+    deadline = datetime.fromisoformat(
+        contract.get("runtime", {})
+        .get("reference_absolute_stop", ABSOLUTE_STOP.isoformat())
+        .replace("Z", "+00:00")
+    )
+    if deadline.tzinfo is None:
+        raise ValueError("R9_REFERENCE_DEADLINE_TIMEZONE")
     raw = qualified.read_bytes()
     if hashlib.sha256(raw).hexdigest() != contract["qualified_input"]["qualified_cases_sha256"]:
         raise ValueError("R9_REFERENCE_QUALIFIED_HASH")
@@ -201,7 +208,7 @@ def collect_role(
         }
         if not row["available"]:
             return receipt
-        remaining = (ABSOLUTE_STOP - datetime.now(timezone.utc)).total_seconds()
+        remaining = (deadline - datetime.now(timezone.utc)).total_seconds()
         if remaining <= 3:
             receipt["status"] = "DEADLINE_NOT_RUN"
             return receipt

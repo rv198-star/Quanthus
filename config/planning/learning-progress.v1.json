@@ -11851,6 +11851,109 @@
       ],
       "no_change_reason": "本批仅使用既有账本/薄接口，不修改TRACE控制语义或授予研究资格。",
       "issue_observations": []
+    },
+    {
+      "id": "CP-662-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "recorded_at": "2026-11-13T14:55:39.014023+00:00",
+      "actor": "R9primary; independent r5guardsemanticQA",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "blocked",
+      "summary": "autoSol已恢复并真实完成16guard意见，独立QA0TRUE/8FALSE/0UNKNOWN，当前A2/RT2类别支持失败；后段reference/fit/updateNOT_RUN，另行登记A3前瞻分层开发试验。",
+      "evidence": [
+        {
+          "id": "R9-RT2-GUARD-QA",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/rt2-guard-qa.json",
+          "sha256": "6070f2016410e33d29450478069069828e4f841c17827b98c8addd27951cba63",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "16opinions8cases153citationsQA; guardTRUE0FALSE8; currentA2RT2supportfailureonly, modelnotfit"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "A2/RT2fixed64guard8 classsupportfailed; newA3separateprospectivedevelopmentquestion",
+          "remaining": "当前guard无正类；原后段NOT_RUN，未发生模型更新或经济比较",
+          "next_action": "保留A2/RT2失败与原8h记录，独立A3按新R0代理分层问题/预算和原门槛执行，不给当前批补样",
+          "evidence": [
+            "R9-RT2-GUARD-QA"
+          ],
+          "supersedes": "CP-662-R9-A2-SOURCE-READY-20261113"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "A2/RT2fixed64guard8 classsupportfailed; newA3separateprospectivedevelopmentquestion",
+          "remaining": "当前guard无正类；原后段NOT_RUN，未发生模型更新或经济比较",
+          "next_action": "保留A2/RT2失败与原8h记录，独立A3按新R0代理分层问题/预算和原门槛执行，不给当前批补样",
+          "evidence": [
+            "R9-RT2-GUARD-QA"
+          ],
+          "supersedes": "CP-662-R9-A2-SOURCE-READY-20261113"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "A2/RT2fixed64guard8 classsupportfailed; newA3separateprospectivedevelopmentquestion",
+          "remaining": "当前guard无正类；原后段NOT_RUN，未发生模型更新或经济比较",
+          "next_action": "保留A2/RT2失败与原8h记录，独立A3按新R0代理分层问题/预算和原门槛执行，不给当前批补样",
+          "evidence": [
+            "R9-RT2-GUARD-QA"
+          ],
+          "supersedes": "CP-662-R9-A2-SOURCE-READY-20261113"
+        }
+      ],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "S02",
+        "TRACE"
+      ],
+      "no_change_reason": "研究硬门未过，原学习/交易准入保持；服务恢复与当前guard样本类别支持分开。",
+      "issue_observations": []
+    },
+    {
+      "id": "CP-665-A3-PREREGISTERED-20261113",
+      "recorded_at": "2026-11-13T14:55:39.649542+00:00",
+      "actor": "R9primary; independentr5designconditionalGO",
+      "work_item": "P5-RESEARCH-R9-STRATIFIED-001",
+      "outcome": "no_module_change",
+      "summary": "独立前瞻登记R0语义代理分层开发试验；新1536池尚未读行情，旧A2/RT2失败保留，真实学习准入待实际门槛。",
+      "evidence": [
+        {
+          "id": "R9-RT2-GUARD-QA",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/rt2-guard-qa.json",
+          "sha256": "6070f2016410e33d29450478069069828e4f841c17827b98c8addd27951cba63",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "16opinions8cases153citationsQA; guardTRUE0FALSE8; currentA2RT2supportfailureonly, modelnotfit"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "S02",
+        "TRACE"
+      ],
+      "no_change_reason": "本条只登记新问题/消费者/有限预算，不授予实际参考、学习或交易资格；待源/参考各关实际结果。",
+      "issue_observations": []
     }
   ],
   "history_imports": [

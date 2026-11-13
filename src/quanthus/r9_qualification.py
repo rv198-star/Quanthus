@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -98,8 +98,12 @@ def check_roles(value: dict[str, Any]) -> None:
         "evaluation": 24,
     }:
         raise ValueError("R9_ROLE_DENOMINATOR")
+    _check_windows_and_roles(rows)
+
+
+def _check_windows_and_roles(rows: list[dict[str, Any]]) -> None:
     for key in ("company_id", "security_id", "listing_id", "sample_id", "episode_id"):
-        if len({r[key] for r in rows}) != 64:
+        if len({r[key] for r in rows}) != len(rows):
             raise ValueError("R9_ROLE_IDENTITY_OVERLAP")
     for row in rows:
         sessions = row["sessions"]
@@ -135,6 +139,7 @@ def case_facts(
     calendar_digest: str,
     action_digest: str,
     block_reasons: list[str],
+    include_primary: bool = False,
 ) -> dict[str, Any]:
     """Keep unavailable subjects; never substitute a different day or security."""
     wanted = identity["sessions"]
@@ -195,7 +200,7 @@ def case_facts(
             ]
             for r in native
         ]
-    return {
+    result = {
         "identity": identity,
         "available": features is not None,
         "reason": encoded.reason if encoded else facts.reason,
@@ -205,14 +210,32 @@ def case_facts(
         "admissions": [a.to_dict() for a in admissions],
         "block_reasons": block_reasons,
     }
+    if include_primary:
+        result["primary_facts"] = primary
+    return result
 
 
 def qualify(
     project: Path, source: Path, identities: Path, request: Path, output: Path
 ) -> dict[str, Any]:
-    import duckdb
-    import pyarrow as pa  # type: ignore[import-untyped]
+    return _qualify(project, source, identities, request, output)
 
+
+def qualify_pool(
+    project: Path, source: Path, identities: Path, request: Path, output: Path
+) -> dict[str, Any]:
+    return _qualify(project, source, identities, request, output, candidate_pool=True)
+
+
+def _qualify(
+    project: Path,
+    source: Path,
+    identities: Path,
+    request: Path,
+    output: Path,
+    *,
+    candidate_pool: bool = False,
+) -> dict[str, Any]:
     if output.exists():
         raise ValueError("R9_FRESH_OUTPUT_REQUIRED")
     q = json.loads(request.read_bytes())
@@ -220,13 +243,34 @@ def qualify(
     if hashlib.sha256(raw_identity).hexdigest() != q["fixed_role_identity"]["sha256"]:
         raise ValueError("R9_IDENTITY_HASH")
     subjects = json.loads(raw_identity)
-    check_roles(subjects)
+    if candidate_pool:
+        required = {
+            ("train", "2020-03-31"),
+            ("train", "2020-04-30"),
+            ("guard", "2020-07-31"),
+            ("update", "2020-08-31"),
+            ("evaluation", "2020-11-30"),
+            ("evaluation", "2020-12-31"),
+        }
+        if (
+            q["schema_version"] != "quanthus.r9-stratified-chain.v1"
+            or len(subjects["rows"]) != 1536
+            or Counter((r["role"], r["anchor"]) for r in subjects["rows"])
+            != dict.fromkeys(required, 256)
+        ):
+            raise ValueError("R9_A3_FIXED_POOL")
+        _check_windows_and_roles(subjects["rows"])
+    else:
+        check_roles(subjects)
     # Reuse only the exact native member verifier, not R7's three-stock use admission.
     base = json.loads((project / "config/research/research-r7/request.v2.json").read_bytes())
     if q["source"]["revision"] != base["authority"]["revision"]:
         raise ValueError("R9_SOURCE_AUTHORITY")
     members = verified_members(source, project, base)
     cutoff = datetime.fromisoformat(q["source"]["knowledge_cutoff"])
+    import duckdb
+    import pyarrow as pa  # type: ignore[import-untyped]
+
     db = duckdb.connect()
     db.execute("SET TimeZone='Asia/Shanghai'")
     db.execute("SET threads=2")
@@ -281,7 +325,11 @@ def qualify(
     cursor = db.execute(query)
     names = [x[0] for x in cursor.description]
     all_rows = [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
-    if len(all_rows) != 2560 or len({(r["sample_id"], r["market_date"]) for r in all_rows}) != 2560:
+    expected = len(subjects["rows"]) * 40
+    if (
+        len(all_rows) != expected
+        or len({(r["sample_id"], r["market_date"]) for r in all_rows}) != expected
+    ):
         raise ValueError("R9_NATIVE_DUPLICATE_OR_DENOMINATOR")
     venue_rows = db.execute("SELECT venue_id,mic_code FROM dwd_trading_venue").fetchall()
     venues = {a: {"XSHG": "SSE", "XSHE": "SZSE"}.get(b, "") for a, b in venue_rows}
@@ -294,21 +342,27 @@ def qualify(
         [m for m in members if m["path"].startswith("payload/dwd_trading_calendar/")]
     )
     action_digest = digest([m for m in members if "/dwd_corporate_action" in m["path"]])
+    by_case: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in all_rows:
+        by_case[row["sample_id"]].append(row)
+    actions_by_security: dict[str, list[date | None]] = defaultdict(list)
+    for security, ex_date in db.execute(
+        "SELECT security_id,ex_date FROM dwd_corporate_action WHERE action_status='IMPLEMENTED'"
+    ).fetchall():
+        actions_by_security[security].append(ex_date)
     result = []
     for identity in subjects["rows"]:
         first, last = identity["sessions"][0]["date"], identity["anchor"]
-        actions = db.execute(
-            "SELECT corporate_action_id FROM dwd_corporate_action WHERE security_id=? "
-            "AND action_status='IMPLEMENTED' "
-            "AND (ex_date IS NULL OR ex_date BETWEEN ?::DATE AND ?::DATE)",
-            [identity["security_id"], first, last],
-        ).fetchall()
+        actions = any(
+            day is None or first <= day.isoformat() <= last
+            for day in actions_by_security[identity["security_id"]]
+        )
         reasons = ["native_action_or_unknown_date"] if actions else []
         for table, key_json, exception, effective in quality:
             key = json.loads(key_json)
             if quality_blocks(identity, table, key, effective):
                 reasons.append("unresolved_required_input:" + exception)
-        native = [r for r in all_rows if r["sample_id"] == identity["sample_id"]]
+        native = by_case[identity["sample_id"]]
         result.append(
             case_facts(
                 identity,
@@ -319,6 +373,7 @@ def qualify(
                 calendar_digest=calendar_digest,
                 action_digest=action_digest,
                 block_reasons=sorted(set(reasons)),
+                include_primary=candidate_pool,
             )
         )
     verified_members(source, project, base)
@@ -329,7 +384,7 @@ def qualify(
         canonical({"rows": [r["packet"] for r in result]}) + b"\n"
     )
     summary = {
-        "subjects": 64,
+        "subjects": len(subjects["rows"]),
         "admitted": sum(r["available"] for r in result),
         "role_admission": {
             role: dict(

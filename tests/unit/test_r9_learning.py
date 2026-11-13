@@ -144,7 +144,7 @@ def test_duplicate_case_cannot_shrink_the_opinion_denominator(tmp_path):
         review_role(qualified, raw, review, request, out, role="guard")
 
 
-@pytest.mark.parametrize("change", ["legacy", "mixed", "prompt", "valid"])
+@pytest.mark.parametrize("change", ["legacy", "mixed", "prompt", "no_start", "false_start", "valid"])
 def test_canonical_qa_cannot_reuse_or_mix_old_protocol_opinions(tmp_path, change):
     from quanthus.r9_reference import (
         CANONICAL_RUBRIC,
@@ -182,6 +182,12 @@ def test_canonical_qa_cannot_reuse_or_mix_old_protocol_opinions(tmp_path, change
             del envelope["opinions"][0]["protocol"]
         if change == "prompt":
             envelope["opinions"][0]["prompt_sha256"] = "0" * 64
+        if change in {"no_start", "false_start"}:
+            envelope["opinions"][0].pop("prompt_sha256")
+            if change == "no_start":
+                envelope["opinions"][0].pop("call_started")
+            else:
+                envelope["opinions"][0]["call_started"] = False
         raw.write_text(json.dumps(envelope))
         qa["raw_reference_sha256"] = hashlib.sha256(raw.read_bytes()).hexdigest()
         review.write_text(json.dumps(qa))

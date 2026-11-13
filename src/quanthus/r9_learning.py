@@ -105,10 +105,16 @@ def review_role(
                     reader=opinion["reader"],
                     packet=json.dumps(row["packet"], separators=(",", ":")),
                 )
-                if opinion.get("protocol") != protocol or (
-                    opinion.get("call_started")
-                    and opinion.get("prompt_sha256")
-                    != hashlib.sha256(expected_prompt.encode()).hexdigest()
+                started = opinion.get("call_started") is True
+                needs_prompt = started or opinion.get("status") == "VALID"
+                if (
+                    opinion.get("protocol") != protocol
+                    or (opinion.get("status") == "VALID" and not started)
+                    or (
+                        needs_prompt
+                        and opinion.get("prompt_sha256")
+                        != hashlib.sha256(expected_prompt.encode()).hexdigest()
+                    )
                 ):
                     raise ValueError("R9_QA_OPINION_PROTOCOL_BINDING")
             if (

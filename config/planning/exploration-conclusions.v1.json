@@ -1984,6 +1984,58 @@
         "CP-665-A4-CANONICAL-SUPPORT-STOP-20261113"
       ],
       "supersedes": "CON-R9-A3-REFERENCE-TARGET-NONCONFORMANT-20261113"
+    },
+    {
+      "id": "CON-R9-CALIBRATION-CHANNEL-FAILED-20261114",
+      "recorded_at": "2026-11-13T21:13:00.740200+00:00",
+      "actor": "current R9 primary; independent transport/semantic exclusion QA",
+      "question_id": "R9-REFERENCE-CALIBRATION-RECOVERY-002",
+      "family": "local-learning-r9-calibration",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "modules": [
+        "REFERENCE"
+      ],
+      "question": "Can the fixed12-case clause-level calibration produce usable positive/negative semantic anchors?",
+      "consumer": "#543/#544 research S02 version selection; #662 reference qualification",
+      "scope": "Existing source-bound2020 pool; exclude old64companies; fixed12panel and24CLIstarts,0retry; source5e2f1387",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "investigate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "CLI early exit yielded0opinions and12technicalUNKNOWN; no market-negative labels or learned model result",
+      "decision_effect": "Stop paid reference collection for this tranche; preserve panel/attempt/evidence andoldA4; deliver Draft runner repair and require max2 bounded channel probes before another calibration allocation.",
+      "reopen_conditions": [
+        "Explicit new at-most2call channel diagnostic allocation and fixed recovery request; current24failures/80cumulativeCLIstarts retained.",
+        "Complete events/opinion/schema/protocol binding under the corrected output capture; independent QA before using any market reference; later learning needs its own class/split gates."
+      ],
+      "retained_assets": [
+        "Fixed12selection and full by-anchor denominator ledger",
+        "108file CN02 evidence snapshot and verified local archive fe831fa49f596a7d3b414aa537a2d56b4119e6d2ef19605605af9869f2223fac",
+        "Draft PR669 source and output/trace guards; original raw5e2f1387 separate from repaired dabb9c3c"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Original56CLIstarts + recovery24 =80starts; recovery collector38.755s. 90min window20:00:40Z..21:30:40Z includes all preparation/review/tests/delivery. Server-accepted calls, active model time, exact billing and older effort remain unknown. Full makecheck interrupted at215pass/1skip after1164.98s; this is not a full pass.",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-calibration-20261114/evidence-final/evidence-manifest.json",
+        "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-calibration-20261114/make-check-release.log"
+      ],
+      "evidence": [
+        {
+          "id": "R9-CALIBRATION-002-ACTUAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-calibration-20261114/actual-finding.json",
+          "sha256": "c50c07c9f29343843b7c96ce4f50a97d951c758a986314dba869a473647f9b50",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "24CLIstarts;0opinions;0TRUE0FALSE12UNKNOWN; no research quality or consumer promotion"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-665-A4-CANONICAL-SUPPORT-STOP-20261113",
+        "CP-662-20261113T210903199307Z"
+      ],
+      "supersedes": null
     }
   ]
 }

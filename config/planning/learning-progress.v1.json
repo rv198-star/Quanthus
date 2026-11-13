@@ -12167,6 +12167,47 @@
       ],
       "no_change_reason": "当前差异仅文档、结论/蓝图和退休提案索引；实际源码/配置/测试闭包与e043相同。TRACE无新机制或准入变化；补齐相对已验基线的显式影响评审。",
       "issue_observations": []
+    },
+    {
+      "id": "CP-662-20261113T210903199307Z",
+      "recorded_at": "2026-11-13T21:09:03.199307+00:00",
+      "actor": "current R9 primary; independent code and semantic review",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "blocked",
+      "summary": "Fixed12 calibration blocked by24 CLI starts with0 opinions; 0positive0negative12UNKNOWN; no fit/update or retry.",
+      "evidence": [
+        {
+          "id": "R9-CALIBRATION-002-ACTUAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-calibration-20261114/actual-finding.json",
+          "sha256": "c50c07c9f29343843b7c96ce4f50a97d951c758a986314dba869a473647f9b50",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "24CLIstarts;0opinions;0TRUE0FALSE12UNKNOWN; no research quality or consumer promotion"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Current reference, learning and consumer maturity is unchanged: no usable new reference or adopted model. Engineering is a Draft candidate; existing canonical evidence is retained.",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+          "number": 662,
+          "title": "[P5-RESEARCH-R9-QUALIFY-001] 核实单模块局部学习资格并冻结执行或停放差集",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T21:09:00Z",
+          "body_sha256": "7c4848b25a03a661fc5a0e6d7aa28c2a81bbcda8036b6b92ba31c12712ac80ae"
+        }
+      ],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "S02",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

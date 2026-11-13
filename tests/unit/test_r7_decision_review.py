@@ -64,6 +64,7 @@ def native_input(tmp_path: Path) -> tuple[Path, dict[str, object], Path]:
             "trade_date": day,
             "calendar_session_id": venue + str(day),
             "is_open": True,
+            "open_at": datetime(day.year, day.month, day.day, 1, tzinfo=timezone.utc),
             "close_at": datetime(day.year, day.month, day.day, 7, tzinfo=timezone.utc),
         }
         for venue in ("venue0", "venue1")

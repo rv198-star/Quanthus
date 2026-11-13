@@ -164,7 +164,7 @@ def materialize(
     db.execute("""
         CREATE TEMP TABLE unqualified_panel AS
         SELECT i.listing_code AS code,i.security_id,i.listing_id,i.venue_id,
-               CAST(c.trade_date AS DATE) market_date,c.calendar_session_id,c.close_at,
+               CAST(c.trade_date AS DATE) market_date,c.calendar_session_id,c.open_at,c.close_at,
                b.open,b.high,b.low,b.close,b.volume,b.turnover,
                b.source_record_id bar_source_record_id,b.source_artifact_sha256 bar_source_sha256,
                b.knowledge_from bar_knowledge_from,b.knowledge_to bar_knowledge_to,
@@ -187,7 +187,7 @@ def materialize(
            AND CAST(close_at AS DATE)=market_date
            AND CAST(observation_start AS DATE)=market_date
            AND CAST(observation_end AS DATE)=market_date
-           AND observation_start<=observation_end AND observation_end<=close_at
+           AND observation_start=open_at AND observation_end=close_at
            AND isfinite(open) AND isfinite(high) AND isfinite(low) AND isfinite(close)
            AND isfinite(volume) AND isfinite(turnover)
            AND open>0 AND low>0 AND high>=open AND open>=low
@@ -195,8 +195,8 @@ def materialize(
            AS bar_admitted,
           (CAST(state_observation_start AS DATE)=market_date
            AND CAST(state_observation_end AS DATE)=market_date
-           AND state_observation_start<=state_observation_end
-           AND state_observation_end<=close_at) IS TRUE AS state_admitted
+           AND state_observation_start=open_at
+           AND state_observation_end=close_at) IS TRUE AS state_admitted
         FROM unqualified_panel;
     """)
     _unique(db, "SELECT code,market_date FROM native_panel", "R7_NATIVE_DUPLICATE")

@@ -1597,6 +1597,77 @@
         "CP-658-R8-ROUTING-20261113"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R9-LOCAL-QUALIFICATION-20261113",
+      "recorded_at": "2026-11-13T08:35:36.566686+00:00",
+      "actor": "R9 primary; independent direction challenge incorporated",
+      "question_id": "R9-LOCAL-QUALIFICATION-001",
+      "family": "local-learning-r9",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "modules": [
+        "REFERENCE",
+        "UPDATE",
+        "EXPERT"
+      ],
+      "question": "R8之后哪一个现有模块值得单次局部学习，当前精确输入和角色是否具备执行资格？",
+      "consumer": "#543/#544状态识别研究版本选择及Owner，保持原expert入场/资金用途边界",
+      "scope": "HEAD2_S02 and STRUCTURE_S04, source/accepted metadata only; conditional Head2 recognition false-positive control selected; no new market/opinion/model body reads",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "当前真实局部更新受精确artifact及角色支持度资格阻塞；不是Head2识别用途无价值或模型失败，R9完整里程碑未完成。",
+      "decision_effect": "选择Head2误报控制为条件路线，暂停fit/update及经济运行；S04新增学习投入暂缓。保留原R7、双专家、原模型身份和全部历史结果；#662/R9/#540-546开放。",
+      "reopen_conditions": [
+        "原March7feature parent、原TRAIN20完整features/labels派生闭包、参考承诺及身份/支持度元数据可验证恢复。",
+        "对预先固定的一次update/guard/eval角色划分证明原issuer/episode/time及类别/月份支持度；在原曝光与预算中冻结运行。",
+        "保留原0.5阈值、七维编码、原scaler、触发和一次更新保留政策；精确源码/输入用途独立预审后执行。"
+      ],
+      "retained_assets": [
+        "Current guarded update/reader/expert primitives and original R7/original two-expert combination",
+        "Conditional HEAD2-S02-FP-GUARDED-UPDATE contract,12-class exact recovery checklist, actual scope correction and bounded storage/HF index observations"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "R9从08:10:14UTC起算，首2h/总8h包含准备、失败、审阅及交付；首阶段新市场/参考/fit/update/资金均0，Nexus/GitHub/HF控制与证据请求非零；旧学习/研究曝光和未知主动/模型/账单成本累计。",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/selection-envelope.json",
+        "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/artifact-location-evidence.json"
+      ],
+      "evidence": [
+        {
+          "id": "R9-QUALIFICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/qualification-assessment-v2.json",
+          "sha256": "3246514635de091db9079a44b5a9b64ba85ef3b182ed80c9186097e393bee30d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R9 two-module eligibility, conditional recognition route and bounded artifact path/index observations only; no new fit/update/quality/economic result"
+        },
+        {
+          "id": "R9-DIRECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/independent-direction-review.json",
+          "sha256": "326cb6f4be6749cf2c83618e64e522b1dd6e4544d0ea75c32976833c00d1c3aa",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R9 two-module eligibility, conditional recognition route and bounded artifact path/index observations only; no new fit/update/quality/economic result"
+        },
+        {
+          "id": "R9-LOCATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/artifact-location-evidence.json",
+          "sha256": "8b9223f0616f50192b268aa4df0e709f55ded4b3928ceca710b60746ee64d741",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R9 two-module eligibility, conditional recognition route and bounded artifact path/index observations only; no new fit/update/quality/economic result"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-662-R9-QUALIFICATION-BLOCKED-20261113"
+      ],
+      "supersedes": null
     }
   ]
 }

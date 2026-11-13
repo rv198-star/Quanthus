@@ -1,0 +1,152 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "R9-LOCAL-QUALIFICATION-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "exploration",
+  "family": "local-learning-r9",
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "modules": [
+    "REFERENCE",
+    "STATES",
+    "TRAIN",
+    "UPDATE",
+    "EXPERT",
+    "REPRO",
+    "CLOSEOUT",
+    "S02",
+    "S04"
+  ],
+  "question": "R8之后，已有Head2或状态4是否具备一个真实决策缺口、独立参考及同一合格链的单模块更新执行资格？",
+  "consumer": "Owner及#542/#544/#545维护者，决定是否投入一个局部学习候选；保留旧版或形成明确解锁工作包",
+  "scope": "至多Head2和状态4两候选；源码、版本化资格/验收、已消费安全摘要和R8结论。新增市场行、参考意见、2022+读取0；无fit/update/economic execution until separate exact qualified contract.",
+  "deliverable": "候选资格矩阵、来源/参考/更新链和消费者差集、单一冻结执行合同或明确NOT_RUN及最小解锁条件",
+  "decision_if_pass": "只选择一个通过全部前置的模块，冻结精确输入/划分/独立参考/同输入消费者及门槛，经预审执行一次局部更新和必要独立复现",
+  "decision_if_fail": "保留R7及原组合，停放当前候选训练；不以本资格Task关闭完整R9或#540-546，不立空的后继训练单",
+  "acceptance": [
+    "两候选逐项核对来源、参考独立性/范围、旧模型/更新链、实际动作与消费者门槛",
+    "原停放结论按用途尊重，元数据和工程成功不代替学习资格",
+    "有独立复核的精准差集或完整合格合同，并记录累计曝光与成本"
+  ],
+  "stop_conditions": [
+    "首2h截止2026-11-13T10:10:14Z仍无合格候选，停止训练投入；总8h截止2026-11-13T16:10:14Z",
+    "不为了资格改标签/阈值/安全规则或重开旧入场/持仓/资金停放问题",
+    "仅已知安全资格回执，无源采集/修复/新市场行/新参考/保护分区读取"
+  ],
+  "memory_sha256": "bd0b4031ca64655bab9ad0f23e1f14fb63be6f2574bc8ce0949581bc849525e6",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "Head2原March入场过滤用途已拒绝；本轮仅审核旧checkpoint/参考/更新链能否支持R8之后的新消费者，不重fit或改阈值延续原入场路线。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "旧持仓完整诊断只剩单个未覆盖动作，原路线无已证明的可重复学习需求；保留诊断，不把缺失入场数据当新学习证据。"
+    },
+    {
+      "conclusion_id": "CON-STAGE34-SOURCE-20261029",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "旧持仓完整诊断只剩单个未覆盖动作，原路线无已证明的可重复学习需求；保留诊断，不把缺失入场数据当新学习证据。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "respect",
+      "rationale": "R7固定63条是已消费工程复核输入和连续事实解释入口，无独立状态参考或训练准入；不扩称通用状态训练集。"
+    },
+    {
+      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "relation": "respect",
+      "rationale": "R8两接入缺少合法增量且资金未执行；不得把此结果作为合格学习缺口或把量能失败交给模型修正；新学习需单独具名实际用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R5-CLOCK-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R6-RANK1-20261113",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    }
+  ],
+  "cumulative_cost_review": "本批从08:10:14UTC起算，首2h和总8h包含准备/失败/审阅/交付；R1-R8及Head2/结构状态所有曝光与历史成本持续累计；输入网络/新市场读取本阶段0，模型/主动/账单未知非零。",
+  "runtime_authority_boundary": "Owner已确认按R9计划推进；本提案仅资格选择。真实学习需精确合格合同和原领域准入，不变更P10/P6/生产权限。",
+  "budget": {
+    "wall_seconds": 28800,
+    "max_new_bytes": 67108864,
+    "network_requests": 0,
+    "accounting_owner": "R9主线；0请求指新增市场/参考来源，GitHub/Nexus控制及证据传输另列"
+  }
+}

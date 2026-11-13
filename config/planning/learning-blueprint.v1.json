@@ -748,6 +748,23 @@
         "TRACE"
       ],
       "contribution": "R8具名状态消费问题的有界资格、固定B/C或准确NO_GO及独立交付；保持原策略/数据/训练/生产门槛"
+    },
+    {
+      "id": "P5-RESEARCH-R9-QUALIFY-001",
+      "issue": 662,
+      "modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "S02",
+        "S04",
+        "TRACE"
+      ],
+      "contribution": "R9首阶段至多两候选模块的独立参考、实际消费者和局部更新资格核查；通过才冻结单次学习，否则精确差集停放并保留旧版"
     }
   ]
 }

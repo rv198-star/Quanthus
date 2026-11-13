@@ -2036,6 +2036,75 @@
         "CP-662-20261113T210903199307Z"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R9-CALIBRATION-QUALIFIED-20261114",
+      "recorded_at": "2026-11-13T23:24:18.183346+00:00",
+      "actor": "R9 primary; independent complete path/clause/trace QA",
+      "question_id": "R9-REFERENCE-CALIBRATION-RECOVERY-002",
+      "family": "local-learning-r9-calibration",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "modules": [
+        "REFERENCE"
+      ],
+      "question": "Can the fixed12-case clause-level calibration produce usable positive/negative semantic anchors?",
+      "consumer": "#543/#544 research S02 version selection; #662 reference qualification",
+      "scope": "Samefixed12panel, newSSH003 runtimeafterexact2syntheticchannelgate;24VALIDrealopinions,2TRUE10FALSE0UNKNOWN,709citations; originalfailedv2kept",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Fixedpanel establishes operable positive/negative semantic anchors for independent prospective qualification; actualfit/update still0",
+      "decision_effect": "Adopt calibration anchors andunchangedfourclauseprotocol for one separately frozen64company study with oldsupport/trigger/retention gates. OriginalA4 andalloldtrials retained.",
+      "reopen_conditions": [
+        "Successor study excludes old64/calibration12 companies, fixes role identities before newopinions andpasses original support/time/company/month floors.",
+        "Onefit and original loss-triggeredupdate only; committedpredictions before learner/evaluator unblinding; fixedsameevalFPstrictdown/FNnonincrease; genuineNO_UPDATE retained."
+      ],
+      "retained_assets": [
+        "Real2reader channelguard andverifiedsourcefeb82c13",
+        "24originalopinions andexclusion-onlyQA with6nondecisive errornotes;12semanticcases",
+        "PrivateHF64109016ae49800905b463b2f904d2fcea31175f;148files1036616Bfullreadback"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Old80CLI retained +2syntheticproviderchannel +24realcalibration =106CLI;2offlinefixtureCLI separate. Fullnativecheck935.90s, stagepreparation/networkfailures/QA/wait/publicationallcumulative; exactolderbilling/effortunknown. Newstudycaps separate, originaldeadlines/K1late854s unchanged.",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/calibration-evidence/calibration-ssh-003/references.sealed.json",
+        "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/hf-calibration-publication.json"
+      ],
+      "evidence": [
+        {
+          "id": "R9-SSH-CALIBRATED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/calibration-evidence/summary/calibration.safe.json",
+          "sha256": "7c9047c2828969e25b07fa93c615d7a6d6df92f8dcd84e6aa47bbcaa7c43776e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed12 development panel2TRUE10FALSE0UNKNOWN;24opinions all independently admitted;709literalcitations; later independent study gates required"
+        },
+        {
+          "id": "R9-SSH-CALIBRATION-HF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/hf-calibration-publication.json",
+          "sha256": "2ef83cec5449c60a114a8e8e0cd351ac97370798b16f2f52704deb562c805a09",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private64109016;148files1036616B all readback verified; research106CLI;fit/update0"
+        },
+        {
+          "id": "R9-CHANNEL-003-FULLCHECK",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/channel-full-check-receipt.json",
+          "sha256": "466a4a5f17db6626bb197d5072b1ba498eef8421a13336e35a943078ab5d7276",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exactfeb82c13 nativePython3.10 fullcheck9320pass35skip; not the unexecuted successor implementation"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-662-20261113T232150518420Z"
+      ],
+      "supersedes": "CON-R9-CALIBRATION-CHANNEL-FAILED-20261114"
     }
   ]
 }

@@ -216,9 +216,15 @@ def case_facts(
 
 
 def qualify(
-    project: Path, source: Path, identities: Path, request: Path, output: Path
+    project: Path,
+    source: Path,
+    identities: Path,
+    request: Path,
+    output: Path,
+    *,
+    include_primary: bool = False,
 ) -> dict[str, Any]:
-    return _qualify(project, source, identities, request, output)
+    return _qualify(project, source, identities, request, output, include_primary=include_primary)
 
 
 def qualify_pool(
@@ -235,6 +241,7 @@ def _qualify(
     output: Path,
     *,
     candidate_pool: bool = False,
+    include_primary: bool = False,
 ) -> dict[str, Any]:
     if output.exists():
         raise ValueError("R9_FRESH_OUTPUT_REQUIRED")
@@ -373,7 +380,7 @@ def _qualify(
                 calendar_digest=calendar_digest,
                 action_digest=action_digest,
                 block_reasons=sorted(set(reasons)),
-                include_primary=candidate_pool,
+                include_primary=candidate_pool or include_primary,
             )
         )
     verified_members(source, project, base)

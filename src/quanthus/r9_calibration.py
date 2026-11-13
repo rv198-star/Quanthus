@@ -186,6 +186,10 @@ def channel_fixture() -> dict[str, Any]:
 
 def selection_payload(request: Path) -> dict[str, Any]:
     c = strict_json(request.read_text())
+    if c.get("schema_version") == "quanthus.r9-study-reference.v1":
+        from quanthus.r9_study import reference_payload
+
+        return reference_payload(request)
     if c.get("schema_version") == PROBE_SCHEMA:
         packet = channel_fixture()
         if hashlib.sha256(canonical(packet)).hexdigest() != c["source"]["packet_sha256"]:
@@ -271,6 +275,8 @@ class ResourceGuard:
         if sys.platform != "linux" or not Path("/proc/self/statm").exists():
             raise ValueError("R9_CALIBRATION_LINUX_LIMITS_REQUIRED")
         self.runtime, self.output, self.sandbox = runtime, output, sandbox
+        self.budget_root = Path(runtime.get("budget_root", output))
+        self.sandbox_budget_root = Path(runtime.get("sandbox_budget_root", sandbox))
         self.lock, self.done, self.stopped = threading.Lock(), threading.Event(), threading.Event()
         self.processes: list[subprocess.Popen[Any]] = []
         self.reason = ""
@@ -298,11 +304,11 @@ class ResourceGuard:
                 self.peak_rss = max(self.peak_rss, rss)
                 if rss > self.runtime["rss_bytes"]:
                     self.stop("R9_CALIBRATION_RSS_LIMIT")
-                if directory_bytes(self.output) > self.runtime["output_bytes"]:
+                if directory_bytes(self.budget_root) > self.runtime["output_bytes"]:
                     self.stop("R9_CALIBRATION_OUTPUT_LIMIT")
                 if any(p.stat().st_size > 1048576 for p in self.output.glob("*.opinion.json")):
                     self.stop("R9_CALIBRATION_OPINION_LIMIT")
-                if directory_bytes(self.sandbox) > self.runtime["tmp_bytes"]:
+                if directory_bytes(self.sandbox_budget_root) > self.runtime["tmp_bytes"]:
                     self.stop("R9_CALIBRATION_TMP_LIMIT")
             except (OSError, ValueError) as exc:
                 self.stop(f"R9_CALIBRATION_LIMIT_MONITOR:{type(exc).__name__}")
@@ -361,13 +367,19 @@ def collect(request: Path, selected: Path, output: Path, sandbox: Path) -> dict[
     if canonical(frozen) != canonical(selection_payload(request)):
         raise ValueError("R9_CALIBRATION_PROTOCOL_BINDING")
     probe = c.get("schema_version") == PROBE_SCHEMA
-    call_cap = 2 if probe else 24
+    study = c.get("schema_version") == "quanthus.r9-study-reference.v1"
+    case_cap = (
+        {"train": 24, "guard": 8, "update": 8, "evaluation": 24}[c["role"]]
+        if study
+        else (1 if probe else 12)
+    )
+    call_cap = case_cap * 2
     provider = c["reference"].get("provider_id")
     if not isinstance(provider, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", provider):
         raise ValueError("R9_CALIBRATION_PROVIDER_BINDING")
     if (
         c["reference"]["models"] != list(MODELS)
-        or len(frozen["rows"]) != (1 if probe else 12)
+        or len(frozen["rows"]) != case_cap
         or c["reference"]["maximum_calls"] != call_cap
         or c["reference"]["retries"] != 0
         or c["reference"]["concurrency"] != 2

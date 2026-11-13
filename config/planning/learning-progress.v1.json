@@ -12258,6 +12258,79 @@
         "S02",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-662-20261113T232150518420Z",
+      "recorded_at": "2026-11-13T23:21:50.518420+00:00",
+      "actor": "R9 primary; independent semantic andcode review",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "progress",
+      "summary": "真实参考校准资格通过：2TRUE10FALSE，24意见及709引文独立QA；148文件私有HF全回读；进入独立新批次的事前资格。",
+      "evidence": [
+        {
+          "id": "R9-SSH-CALIBRATED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/calibration-evidence/summary/calibration.safe.json",
+          "sha256": "7c9047c2828969e25b07fa93c615d7a6d6df92f8dcd84e6aa47bbcaa7c43776e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed12 development panel2TRUE10FALSE0UNKNOWN;24opinions all independently admitted;709literalcitations; later independent study gates required"
+        },
+        {
+          "id": "R9-SSH-CALIBRATION-HF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/hf-calibration-publication.json",
+          "sha256": "2ef83cec5449c60a114a8e8e0cd351ac97370798b16f2f52704deb562c805a09",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private64109016;148files1036616B all readback verified; research106CLI;fit/update0"
+        },
+        {
+          "id": "R9-CHANNEL-003-FULLCHECK",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/channel-full-check-receipt.json",
+          "sha256": "466a4a5f17db6626bb197d5072b1ba498eef8421a13336e35a943078ab5d7276",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exactfeb82c13 nativePython3.10 fullcheck9320pass35skip; not the unexecuted successor implementation"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "Fixed12 clause-level calibration anchors,2positive10negative, calibrated operationalAIreference for new prospective development qualification",
+          "remaining": "Successor guard/eval/train/update support, onefit/conditionalupdate andconsumercomparison remain toexecute",
+          "next_action": "Freeze independent64fromsamequalifiedpool excludingold64/cal12; retain original support/learning gates",
+          "evidence": [
+            "R9-SSH-CALIBRATED",
+            "R9-SSH-CALIBRATION-HF"
+          ],
+          "supersedes": "CP-540-20261028T202135817023Z"
+        }
+      ],
+      "no_change_reason": "All other module maturity and original consumers remain at their prior scoped grades; successor learning not executed.",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+          "number": 662,
+          "title": "[P5-RESEARCH-R9-QUALIFY-001] 核实单模块局部学习资格并冻结执行或停放差集",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T21:50:18Z",
+          "body_sha256": "7c4848b25a03a661fc5a0e6d7aa28c2a81bbcda8036b6b92ba31c12712ac80ae"
+        }
+      ],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "S02",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

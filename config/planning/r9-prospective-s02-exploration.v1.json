@@ -1,0 +1,122 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-R9-PROSPECTIVE-S02-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "exploration",
+  "family": "local-learning-r9-calibrated-study",
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "modules": [
+    "REFERENCE",
+    "STATES",
+    "TRAIN",
+    "UPDATE",
+    "EXPERT",
+    "S02",
+    "TRACE"
+  ],
+  "question": "经真实校准的四条件参考能否在独立公司中支持一次S02学习、原触发条件更新及包含收缩宽幅难例的版本选择？",
+  "consumer": "#543/#544 research S02 version selection and readable changed-case report",
+  "scope": "one fixed64prospective development study from existing1536qualifiedpool, excluding old64andcalibration12; trainMar/Apr, guard+updateAug disjointcompanies, evaluationNov/Dec; no source acquisition,2022+,returns",
+  "deliverable": "source/role denominator andgatedfourclauseQA; onev0/conditionalv1, committedpredictions, R0/v0/v1comparison andreadableS02sidecar; coldreconstruction or precisefirstgatefailure",
+  "decision_if_pass": "researchchoose-v1 only underretention andFPstrictdown/FNnonincrease; otherwise truthfulretain-v0/NO_UPDATE branch and sidecar",
+  "decision_if_fail": "preserve exactfirstsupport/source/QA gap; laterroles andlearningNOT_RUN; no replacement",
+  "acceptance": [
+    "train>=12definite &>=4/class &>=2month blocks;guard>=2/class;evaluation>=12definite &>=5uniquecompany/class &>=2monthblocks;update>=1definite",
+    "all64 R0/v0/v1 predictions, checkpoints andretentionchoice before evaluation label access",
+    "retention accepted AND evaluationFP strictly decreases versusv0 AND FN nonincrease; otherwise retainv0",
+    "one independent native126member source qualification, feature/R0 reconstruction andfreshfit/conditionalupdate; exactcheckpoints/predictions andsameFPFN/decision; reference not revoted"
+  ],
+  "stop_conditions": [
+    "2026-11-14T01:52:01+00:00 total deadline including preparation anddelivery; reference window<=7200s, max128CLI0retry",
+    "firstsourcecapacity orsupport/QA failure stops laterrole/fit; no resampling, labelrepair, thresholdchange orforcedupdate"
+  ],
+  "memory_sha256": "dcd2b133453ef2aab9d813ff16588c5999918b2aeb0d2dcdd56546a40096a8c1",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "relation": "different_scope",
+      "rationale": "保留两接入NO_GO；消费者限定识别版本评审与S02研究报告sidecar，不重开原动作映射。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
+      "relation": "different_scope",
+      "rationale": "原A4保持不重投/不重标；本次从其未选择公司取独立校准面板，检验参考可操作性，符合原恢复条件。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R9-CALIBRATION-QUALIFIED-20261114",
+      "relation": "respect",
+      "rationale": "Realcalibration independentlyqualified2TRUE10FALSE andsealedprotocol; this successor preserves anchors andindependently qualifies newcompanies underoriginalgates."
+    }
+  ],
+  "cumulative_cost_review": "prior80researchCLI +2syntheticproviderchannel +24calibration =106CLIstarts; old2loopbackfixtures separate; newstudy<=128CLI/0retry => cumulative<=234. All prior originaldeadlines/K1late854s andcosts retained. This new3h allocation includes implementation preparation since22:52:01Z, test/review/wait/run/delivery; no old clock reset.",
+  "runtime_authority_boundary": "Owner明确要求继续完成R9并走SSH；主代理据此冻结独立学习批次，维持原语义、支持地板和学习/比较门；不改旧A1/A2/RT2/A3/A4及校准证据。",
+  "budget": {
+    "wall_seconds": 10800,
+    "max_new_bytes": 67108864,
+    "network_requests": 128,
+    "accounting_owner": "RESEARCH-R9-CALIBRATION-001;priorcostsretained"
+  }
+}

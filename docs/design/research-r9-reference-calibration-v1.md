@@ -6,13 +6,21 @@
 | Delivery gate | open |
 | Parent | [探索治理](exploration-governance.md)、[批准 S02 语义](stage-orderly-consolidation-boundary-repair.md) §§2–7 |
 | Work item | P5-RESEARCH-R9-QUALIFY-001 / #662；#542/#543/#544；R9 milestone23 |
-| Contract | `config/planning/r9-reference-calibration.v2.json`（v1过期记录保留） |
+| Contract | `config/planning/r9-reference-calibration.v3.json`；前置通道门 `config/planning/r9-channel-probe.v1.json`；v1/v2历史保留 |
 | Code / tests | `src/quanthus/r9_calibration.py` / `tests/unit/test_r9_calibration.py` |
 
 原首笔窗口为2026-11-13T17:12:32Z至18:42:32Z，过期且未执行参考。
 Owner在接手会话明确批准追加最多90分钟：2026-11-13T20:00:40Z至21:30:40Z，
 包含准备、失败、审阅、QA和交付；沿用同一Mission，原时限和成本保留。
 旧56次研究调用、A1/A2/RT2/A3/A4结果、曝光、截止偏差全部保留；当前A4不重投、不重标。
+
+Owner在当前接手会话要求继续完成R9并指定SSH。v2的24次失败与旧窗口保留；
+修复后的前置通道门固定一个代码内合成HLC40、两模型各一个临时上下文，最多2次CLI，
+独占attempt标记防止再次执行。该门已取得2份完整有效意见，仅用于通道诊断。
+每次CLI显式绑定provider，并将其request/stream重试次数均覆盖为0，保持全局配置。
+v3随后在2026-11-13T22:32:42Z至2026-11-14T00:02:42Z执行原12例面板，
+最多24次调用、零重试；本笔包括发布、执行、QA和交付。此前82次真实provider研究/通道CLI、
+2次离线loopback fixture及全部准备/故障成本累计保留。
 
 ## 校准面板
 
@@ -37,8 +45,9 @@ Owner在接手会话明确批准追加最多90分钟：2026-11-13T20:00:40Z至21
 ## 后续两阶段
 
 校准合格后另行事前冻结学习合同、容量/隔离/预算，保留原支持度、0.5阈值、train-only scaler、
-一次fit与原loss触发的一次guarded update、retention和预测提交后解封eval。当前模块先只服务校准，
-不提前建设未合格学习驱动。若NO_UPDATE则保留真实分支，完整MVP实际更新KR继续开放。
+一次fit与原loss触发的一次guarded update、retention和预测提交后解封eval。校准入口只负责参考形成，
+合格后的薄驱动与固定新批次见[独立S02学习设计](research-r9-prospective-s02-v1.md)。
+若NO_UPDATE则保留真实分支，完整MVP实际更新KR继续开放。
 
 近端消费者为#543/#544识别版本选择；可见交付是S02研究报告sidecar，逐例显示R0/v0/v1及FP/FN。
 若评价为富集样本，结果按该分布解释；真实复核工作量需要自然机会分母。

@@ -10916,6 +10916,157 @@
           "body_sha256": "87bf2ba89083b9446d14b792da182a745d74142f4bcf38865aecc88a310942ec"
         }
       ]
+    },
+    {
+      "id": "CP-652-R7-DELIVERY-CLOSED-20261113",
+      "recorded_at": "2026-11-13T03:33:50.763279+00:00",
+      "actor": "R7 primary; independent integration GO",
+      "work_item": "P3-RESEARCH-R7-A-001",
+      "outcome": "progress",
+      "summary": "R7源码PR656普通合入main，652/653与里程碑21实际关闭，Feature651继续承担R8；原63行工程范围和旧停放结论保持。",
+      "evidence": [
+        {
+          "id": "R7-CLOSEOUT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r7-multio-p-20261113/r7-closeout-observation.json",
+          "sha256": "68ce17433202c8c620afcdd329c88eb7cf90ace52ccd51feb5eb7ca820c9cf8c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "actual R7 source integration and closure observations; fixed research explanation scope only"
+        }
+      ],
+      "updates": [
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "R7固定63个security-day工程复核：三算子有来源，原Trend/Risk两专家确有回执；sidecar不改63个决定，系统保持阻新",
+          "remaining": "R7固定研究复核已交付；R8机会/经济用途、R9状态学习/局部更新仍依原资格与验收",
+          "next_action": "R8围绕13条趋势提议均被原风险阈值否决的具体分歧，先冻结决定、机会资格、对照和经济门槛",
+          "evidence": [
+            "R7-CLOSEOUT"
+          ],
+          "supersedes": "CP-652-20261113T022850952419Z"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "R7固定126成员输入及正式/独立物理副本，63rows/summary完全一致；独立角色另核公式与回执，固定HF回读通过",
+          "remaining": "R7固定研究复核已交付；R8机会/经济用途、R9状态学习/局部更新仍依原资格与验收",
+          "next_action": "R8围绕13条趋势提议均被原风险阈值否决的具体分歧，先冻结决定、机会资格、对照和经济门槛",
+          "evidence": [
+            "R7-CLOSEOUT"
+          ],
+          "supersedes": "CP-652-20261113T022850952419Z"
+        }
+      ],
+      "no_change_reason": "仅刷新既有EXPERT/REPRO工程交付去向，其他模块/分项/使用准入保持。",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-R7-A-001",
+          "number": 652,
+          "title": "[P3-RESEARCH-R7-A-001] 复用固定输入并接通三算子与双专家最短闭环",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-13T03:30:46Z",
+          "body_sha256": "cc016dbe2bcab7e356af43cd75df50485a177f79cbb258d9ee3e2a5cbb5f7983"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-653-R7-ACCEPTANCE-CLOSED-20261113",
+      "recorded_at": "2026-11-13T03:33:50.763279+00:00",
+      "actor": "R7 primary; independent integration GO",
+      "work_item": "P3-RESEARCH-R7-B-001",
+      "outcome": "no_module_change",
+      "summary": "真实报告、独立验收、最终Linux完整检查和HF回读通过，653已实际关闭。",
+      "evidence": [
+        {
+          "id": "R7-CLOSEOUT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r7-multio-p-20261113/r7-closeout-observation.json",
+          "sha256": "68ce17433202c8c620afcdd329c88eb7cf90ace52ccd51feb5eb7ca820c9cf8c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "actual R7 source integration and closure observations; fixed research explanation scope only"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只登记实际关闭与有限保留引用，已接受的R7工程范围保持。",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-R7-B-001",
+          "number": 653,
+          "title": "[P3-RESEARCH-R7-B-001] 交付可查询决策报告并完成独立验收",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-13T03:30:55Z",
+          "body_sha256": "880d01a4d6777cba7fc6e8338a9bcc44c82e28057d4e6b51256521813ab31ffe"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-651-R7-DELIVERED-R8-PENDING-20261113",
+      "recorded_at": "2026-11-13T03:33:50.763279+00:00",
+      "actor": "R7 primary; independent integration GO",
+      "work_item": "P3-MULTIOP-MVP-001",
+      "outcome": "no_module_change",
+      "summary": "R7交付与两子项实际关闭，Feature651保持开放承担尚未启动的R8。",
+      "evidence": [
+        {
+          "id": "R7-CLOSEOUT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r7-multio-p-20261113/r7-closeout-observation.json",
+          "sha256": "68ce17433202c8c620afcdd329c88eb7cf90ace52ccd51feb5eb7ca820c9cf8c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "actual R7 source integration and closure observations; fixed research explanation scope only"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只登记实际关闭与有限保留引用，已接受的R7工程范围保持。",
+      "issue_observations": [
+        {
+          "work_item": "P3-MULTIOP-MVP-001",
+          "number": 651,
+          "title": "[P3-MULTIOP-MVP-001] 最小多算子状态与双专家研究决策闭环",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T03:30:38Z",
+          "body_sha256": "045c6dab7f34803fcbf6e92f685e1a2435abb06171c265e4aaf39ebe6a684bdb"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

@@ -1,0 +1,134 @@
+{
+  "schema": "quanthus.r9-conditional-local-update.v1",
+  "id": "HEAD2-S02-FP-GUARDED-UPDATE",
+  "status": "blocked_exact_inputs_and_role_capacity",
+  "grants_authority": false,
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "parent_checkpoint_sha256": "958eb4a2b2d04b91a0b1f073d106c5b687c8b2332491fc396e4b2ef7afb1f0bf",
+  "original_train_manifest_sha256": "5b18e075167e23c3c286666a2d25abae9d7d15e4bb58c0bc79cce12e659c10f6",
+  "original_eval_manifest_sha256": "6858a54dca8251b0efa0d26cd63e5dafcc09ed5174c5acc3e9eebc72c45000d3",
+  "purpose": "state2 recognition false-positive control, development research version comparison only",
+  "reference_grade": "original candidate-blind operational AI reference; entire pool consumed development evidence",
+  "roles": {
+    "train": "exact originalTRAIN20 unchanged",
+    "update": {
+      "maximum": 8,
+      "selection": "fixed chronological order then stable issuer/episode/key hash, before gradient/loss/new predictions; no selection by old false-positive cases"
+    },
+    "guard": {
+      "maximum": 8,
+      "minimum_each_class": 2,
+      "gradient_use": false
+    },
+    "evaluation": {
+      "maximum": 24,
+      "minimum_definite": 12,
+      "minimum_distinct_issuers_per_class": 5,
+      "minimum_time_blocks": 2,
+      "follows_all_train_update_guard": true
+    },
+    "identity_isolation": [
+      "issuer",
+      "episode",
+      "sample_key"
+    ],
+    "support_preflight": "identity/date/support metadata only; fail if exact selected split cannot satisfy original floors; no repeated alternative split search",
+    "time_relations": {
+      "update": "min(update)>max(train)",
+      "guard": "min(guard)>max(train) and max(guard)<=max(update)",
+      "evaluation": "min(evaluation)>max(train,update,guard)"
+    }
+  },
+  "frozen_policy": "config/research/learning-mvp/head2-revision.v2.json",
+  "frozen_values": {
+    "features": 7,
+    "raw_threshold": 0.5,
+    "parent_fit_steps": 200,
+    "update_steps": 100,
+    "learning_rate": 0.05,
+    "l2": 0.01,
+    "original_train_weight": 0.5,
+    "update_weight": 0.5,
+    "scaler": "original train-only unchanged",
+    "update_loss_trigger": 0.6931471805599453,
+    "maximum_updates": 1
+  },
+  "before_model_execution": [
+    "verify checkpoint bytes, parent policy/feature digest and complete gen0",
+    "verify original features AND labels against complete qualified derived closure before first update; old archived March fit driver with openP2 is excluded",
+    "verify original reference commitments and all exact role/input hashes",
+    "verify source/exposure/purpose and finite remaining original batch resource budget; independent design pre-review"
+  ],
+  "trigger_not_met": "retain parent v0, no forced update",
+  "retention": "original guard: no increase in positive errors, negative errors or update loss; reject or uncertain keeps v0",
+  "research_choice": "only if original trigger+guard pass, evaluate fixed0.5 FP reduction with FN not increased; one comparison and necessary independent rebuild; retain all unknown/unavailable denominators",
+  "consumer_boundary": "state-recognition version decision only; pending Head2 expert envelope remains ABSTAINED/NOT_GRANTED; entry/capital/P6/production unchanged",
+  "new_acquisition_authorized": false,
+  "fit_or_update_authorized": false,
+  "input_paths": null,
+  "role_manifest": null,
+  "budget": "within original R9 start08:10:14UTC, qualification2h,total8h; no budget reset after recovery",
+  "required_recovery_members": [
+    {
+      "path": "private/checkpoint.json",
+      "expected_sha256": "958eb4a2b2d04b91a0b1f073d106c5b687c8b2332491fc396e4b2ef7afb1f0bf"
+    },
+    {
+      "path": "private/training20.json",
+      "pin_source": "private/training-members.frozen.json + originalTRAIN20 manifest"
+    },
+    {
+      "path": "private/facts87.json",
+      "pin_source": "evidence/qualification.safe.json facts_sha256"
+    },
+    {
+      "path": "private/reference-identities.json",
+      "pin_source": "inputs/code/source qualification receipts"
+    },
+    {
+      "path": "reference/commit-A.json",
+      "pin_source": "evidence/reference-support.safe.json panel_A_sha256, packet/rubric hashes"
+    },
+    {
+      "path": "reference/commit-B.json",
+      "pin_source": "evidence/reference-support.safe.json panel_B_sha256, packet/rubric hashes"
+    },
+    {
+      "path": "reference/packet.json",
+      "pin_source": "reference-support.safe.json and qualification.safe.json packet_sha256"
+    },
+    {
+      "path": "inputs.frozen.private.json",
+      "pin_source": "original source/member/code identity closure"
+    },
+    {
+      "path": "private/training-members.frozen.json",
+      "pin_source": "original full derived features AND labels closure"
+    },
+    {
+      "path": "evidence/qualification.safe.json",
+      "expected_sha256": "20fc610c2c9dc0cdca26160b036118621dfe21db052805d0ed3a52b039cfaf09"
+    },
+    {
+      "path": "evidence/reference-support.safe.json",
+      "expected_sha256": "1bdbd4da1910163b7073173054f68b638c2ff3e2560174ec0ea043c50597145b"
+    },
+    {
+      "path": "evidence/source-postcheck.safe.json",
+      "expected_sha256": "945a73335183db829779e3e370841c16b6a753aa57f8314a7752b5a764f2e711"
+    }
+  ],
+  "recovery_scope": "existing exact model/reference/derived evidence only; no market acquisition, relabeling, inference of missing historical values or rerun of archived fit",
+  "role_capacity_status": "not verified",
+  "source_reuse_status": "not qualified",
+  "prospective_runtime_caps": {
+    "cpu_cores": 2,
+    "rss_bytes": 2147483648,
+    "job_tmp_bytes": 536870912,
+    "minimum_free_bytes": 8589934592,
+    "per_primary_or_cold_wall_seconds": 600,
+    "primary_update_attempts": 1,
+    "necessary_independent_attempts": 1,
+    "note": "prospective ceiling only; exact executable/source run remains blocked until measured/qualified metadata and request"
+  }
+}

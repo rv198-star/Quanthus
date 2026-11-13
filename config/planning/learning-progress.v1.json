@@ -11413,6 +11413,310 @@
           "body_sha256": "116106bcc68db4b37d00137c73bfadf77955d01bb16dcb72fed28cf0c457f32d"
         }
       ]
+    },
+    {
+      "id": "CP-662-R9-QUALIFICATION-BLOCKED-20261113",
+      "recorded_at": "2026-11-13T08:34:55.406192+00:00",
+      "actor": "R9 mainline; independent direction challenge incorporated",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "blocked",
+      "summary": "R9首阶段选定Head2识别误报控制条件路线；精确parent/TRAIN20/参考承诺与角色元数据不可达，学习未执行；S04当前前置未资格化，R9/原MVP继续开放。",
+      "evidence": [
+        {
+          "id": "R9-QUALIFICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/qualification-assessment-v2.json",
+          "sha256": "3246514635de091db9079a44b5a9b64ba85ef3b182ed80c9186097e393bee30d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R9 two-module eligibility, conditional recognition route and bounded artifact path/index observations only; no new fit/update/quality/economic result"
+        },
+        {
+          "id": "R9-DIRECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/independent-direction-review.json",
+          "sha256": "326cb6f4be6749cf2c83618e64e522b1dd6e4544d0ea75c32976833c00d1c3aa",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R9 two-module eligibility, conditional recognition route and bounded artifact path/index observations only; no new fit/update/quality/economic result"
+        },
+        {
+          "id": "R9-LOCATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/artifact-location-evidence.json",
+          "sha256": "8b9223f0616f50192b268aa4df0e709f55ded4b3928ceca710b60746ee64d741",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R9 two-module eligibility, conditional recognition route and bounded artifact path/index observations only; no new fit/update/quality/economic result"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "R9当前Head2状态识别误报控制条件用途，原历史资产/参考等级/专家权限保留",
+          "remaining": "精确March7feature parent及原TRAIN20派生闭包、参考承诺/身份支持度元数据未当前资格化；实际update/compare尚未执行",
+          "next_action": "按条件合同恢复精确旧成员并一次metadata role-capacity预检；通过后冻结单次guarded update，失败保留v0；原entry/资金用途停放",
+          "evidence": [
+            "R9-QUALIFICATION",
+            "R9-DIRECTION",
+            "R9-LOCATION"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "R9当前Head2状态识别误报控制条件用途，原历史资产/参考等级/专家权限保留",
+          "remaining": "精确March7feature parent及原TRAIN20派生闭包、参考承诺/身份支持度元数据未当前资格化；实际update/compare尚未执行",
+          "next_action": "按条件合同恢复精确旧成员并一次metadata role-capacity预检；通过后冻结单次guarded update，失败保留v0；原entry/资金用途停放",
+          "evidence": [
+            "R9-QUALIFICATION",
+            "R9-DIRECTION",
+            "R9-LOCATION"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "R9当前Head2状态识别误报控制条件用途，原历史资产/参考等级/专家权限保留",
+          "remaining": "精确March7feature parent及原TRAIN20派生闭包、参考承诺/身份支持度元数据未当前资格化；实际update/compare尚未执行",
+          "next_action": "按条件合同恢复精确旧成员并一次metadata role-capacity预检；通过后冻结单次guarded update，失败保留v0；原entry/资金用途停放",
+          "evidence": [
+            "R9-QUALIFICATION",
+            "R9-DIRECTION",
+            "R9-LOCATION"
+          ],
+          "supersedes": "CP-540-20261028T202135817023Z"
+        }
+      ],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "S02",
+        "S04"
+      ],
+      "no_change_reason": "保留既有工程与历史质量/用途分面；只刷新REFERENCE/UPDATE/EXPERT本次条件用途的准入路由，不授予学习或生产资格。",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+          "number": 662,
+          "title": "[P5-RESEARCH-R9-QUALIFY-001] 核实单模块局部学习资格并冻结执行或停放差集",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T08:33:39Z",
+          "body_sha256": "0617a2a4764082eec7f887d24ba68fb2b5442d74dbf1811a3e6c5e036d0727d6"
+        }
+      ]
+    },
+    {
+      "id": "CP-662-R9-TRACE-NOCHANGE-20261113",
+      "recorded_at": "2026-11-13T08:36:01.377615+00:00",
+      "actor": "R9 primary",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "no_module_change",
+      "summary": "R9本批仅资格/条件合同与阻塞记录，探索机制本身不变；承认TRACE路径影响并保留原机制验收。",
+      "evidence": [
+        {
+          "id": "R9-QUALIFICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/qualification-assessment-v2.json",
+          "sha256": "3246514635de091db9079a44b5a9b64ba85ef3b182ed80c9186097e393bee30d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R9 two-module eligibility, conditional recognition route and bounded artifact path/index observations only; no new fit/update/quality/economic result"
+        },
+        {
+          "id": "R9-DIRECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/independent-direction-review.json",
+          "sha256": "326cb6f4be6749cf2c83618e64e522b1dd6e4544d0ea75c32976833c00d1c3aa",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R9 two-module eligibility, conditional recognition route and bounded artifact path/index observations only; no new fit/update/quality/economic result"
+        },
+        {
+          "id": "R9-LOCATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/artifact-location-evidence.json",
+          "sha256": "8b9223f0616f50192b268aa4df0e709f55ded4b3928ceca710b60746ee64d741",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R9 two-module eligibility, conditional recognition route and bounded artifact path/index observations only; no new fit/update/quality/economic result"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "新增版本化资格和路由元数据，不改变探索机制、调度、追踪语义或授权。",
+      "issue_observations": []
+    },
+    {
+      "id": "CP-662-R9-SOURCE-CAPACITY-STOP-20261113",
+      "recorded_at": "2026-11-13T10:38:14.193816+00:00",
+      "actor": "R9 primary; two independent actualsource reviewers",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "blocked",
+      "summary": "固定64新链源资格56可用，guard上界3<minimum4，参考/fit/update均0；首2h完整资格TIME_GATE_MISSED，原8h内补充诊断交付，R9真实学习未完成。",
+      "evidence": [
+        {
+          "id": "R9-SOURCE-RESULT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/qualification.safe.json",
+          "sha256": "0c2ccdc13dc963e3cd941717c444cf32c04e6f52e69d83bc36a9c8259013ffe3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        },
+        {
+          "id": "R9-ACTUAL-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/independent-actual-source-review.json",
+          "sha256": "646549680afae6fae94320cdda0befd1397d1def995441f9df6296066fb1edaf",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        },
+        {
+          "id": "R9-TIMING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/time-gate-variance.json",
+          "sha256": "8d88a0794fff3a3d83e1e0d16b6ad5c53f9ca949f6ce1a5ad88a4a6fb11b7363",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "R9 fixed64newbaseline source-capacity stop; oldMarchreuse remains unavailable; source/ref/learning facets separate",
+          "remaining": "guard8仅3源合格<2类各2最低4；reference/fit/update均未运行；首2h完整资格晚14m14s",
+          "next_action": "保留当前64分母和已消费窗口；另行冻结先sourcequal并保证充分角色容量的后继方案，再付参考费；当前attempt不补样或调角色",
+          "evidence": [
+            "R9-SOURCE-RESULT",
+            "R9-ACTUAL-REVIEW",
+            "R9-TIMING"
+          ],
+          "supersedes": "CP-662-R9-QUALIFICATION-BLOCKED-20261113"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "R9 fixed64newbaseline source-capacity stop; oldMarchreuse remains unavailable; source/ref/learning facets separate",
+          "remaining": "guard8仅3源合格<2类各2最低4；reference/fit/update均未运行；首2h完整资格晚14m14s",
+          "next_action": "保留当前64分母和已消费窗口；另行冻结先sourcequal并保证充分角色容量的后继方案，再付参考费；当前attempt不补样或调角色",
+          "evidence": [
+            "R9-SOURCE-RESULT",
+            "R9-ACTUAL-REVIEW",
+            "R9-TIMING"
+          ],
+          "supersedes": "CP-662-R9-QUALIFICATION-BLOCKED-20261113"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "R9 fixed64newbaseline source-capacity stop; oldMarchreuse remains unavailable; source/ref/learning facets separate",
+          "remaining": "guard8仅3源合格<2类各2最低4；reference/fit/update均未运行；首2h完整资格晚14m14s",
+          "next_action": "保留当前64分母和已消费窗口；另行冻结先sourcequal并保证充分角色容量的后继方案，再付参考费；当前attempt不补样或调角色",
+          "evidence": [
+            "R9-SOURCE-RESULT",
+            "R9-ACTUAL-REVIEW",
+            "R9-TIMING"
+          ],
+          "supersedes": "CP-662-R9-QUALIFICATION-BLOCKED-20261113"
+        }
+      ],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "S02",
+        "S04",
+        "TRACE"
+      ],
+      "no_change_reason": "保留实际源资格工程与原状态/学习/用途等级；此新链不具备真实参考及局部更新准入，不将源容量失败记成模型负结果。",
+      "issue_observations": []
+    },
+    {
+      "id": "CP-662-R9-SOURCE-STOP-LIVE-20261113",
+      "recorded_at": "2026-11-13T10:40:42.038325+00:00",
+      "actor": "R9 primary",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "no_module_change",
+      "summary": "真实#662保持OPEN并记录sourceguard容量停止/NOT_RUN及首2h时间门偏差；R9完整学习目标开放。",
+      "evidence": [
+        {
+          "id": "R9-SOURCE-RESULT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/qualification.safe.json",
+          "sha256": "0c2ccdc13dc963e3cd941717c444cf32c04e6f52e69d83bc36a9c8259013ffe3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        },
+        {
+          "id": "R9-ACTUAL-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/independent-actual-source-review.json",
+          "sha256": "646549680afae6fae94320cdda0befd1397d1def995441f9df6296066fb1edaf",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        },
+        {
+          "id": "R9-TIMING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/time-gate-variance.json",
+          "sha256": "8d88a0794fff3a3d83e1e0d16b6ad5c53f9ca949f6ce1a5ad88a4a6fb11b7363",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "S02",
+        "S04",
+        "TRACE"
+      ],
+      "no_change_reason": "本条只对账issue生命周期/正文，不改变模块成熟度、学习用途或原失败记录。",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+          "number": 662,
+          "title": "[P5-RESEARCH-R9-QUALIFY-001] 核实单模块局部学习资格并冻结执行或停放差集",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T10:39:49Z",
+          "body_sha256": "0720bcc2b56f5247e778aedf2cc59f171482a3366bdda8fdcb41d26b9e0bafc7"
+        }
+      ]
     }
   ],
   "history_imports": [

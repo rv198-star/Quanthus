@@ -126,7 +126,12 @@
     "schema_repair_calls": 0,
     "all_failed_calls_count_toward_cap": true,
     "per_call_timeout_seconds": 90,
-    "completion_total_opinion_cap": 128
+    "completion_total_opinion_cap": 128,
+    "validator": "exactqualifiedSHA/64identitySHA; exactcase/reader/schema/noduplicateJSON; exactliteralHLCcitation; TRUEsupportitselfcoversbothwindows; trace toolsinvalid; semanticQA separate",
+    "prompt_source": "src/quanthus/r9_reference.py:RUBRIC",
+    "trace": "onlythread/turn/itemmessageorreasoning events; anytool/file/retrieval/unknown event invalidates opinion",
+    "failure": "zero schema repaircalls; eachfailed call counted; nextcase proceeds under absolute128cap; no substitution",
+    "semantic_QA": "afterguard16opinions and beforelaterreferences: independentreadonlycheck allactualopinions/rationale/citations vsfrozenrubric; invalidopinions downgradeUNKNOWN(no newlabel/revote/repair), checkfourpositiveconditions/counterevidence/current20evidence; sameQA onotherrolesbeforefit"
   },
   "learning": {
     "newbaseline": true,
@@ -264,5 +269,14 @@
     "after_screen": "firsteligible per fixedgroup/hash; no borrowing, secondpool or later replacement; freeze64identityhash then originalfullqualifier",
     "failures": "full256eligibility ledger; capacityfailure stop; HLCqualificationmissing retained without replacement",
     "exposure": "A1excluded; allold2020-2021exposure cumulative; development-grade, no untouchedholdout claim"
+  },
+  "qualified_input": {
+    "producer_git": "60b71a1987ed2571261626470cc8b90be904aef2",
+    "identity_sha256": "3e6c7ee9505766edcb96aa4d95dab1d722866e7b8e899defa53e3a6b149a2bd0",
+    "qualified_cases_sha256": "8467ded5229e75dba1c670cdb7c2a0d48ed830ee4a4267558ea92908ea484a51",
+    "reference_packets_sha256": "18d4ddebef6c87db172ae96464360e206d235faf99bfe7d9b32e3305cb9c8837",
+    "admitted": 64,
+    "source_first_pool": 256,
+    "source_first_eligible": 229
   }
 }

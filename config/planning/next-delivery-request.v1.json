@@ -1,153 +1,53 @@
 {
   "schema_version": "quanthus.exploration-request.v1",
-  "id": "NEXT-ASSET-CONSUMER-001",
+  "id": "R9-CHANNEL-PROBE-002-PROPOSED",
   "status": "proposed",
   "grants_authority": false,
-  "kind": "delivery",
-  "family": "learning-asset-consumer-delivery",
-  "work_item": "META-LEARN-001",
+  "kind": "repair",
+  "family": "r9-reference-channel-repair",
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
   "modules": [
-    "FACTS",
-    "EXPERT",
-    "REPRO"
+    "REFERENCE"
   ],
-  "question": "已有主线资产能否通过一个现存真实消费者入口提供可解释、可复用的研究输出？",
-  "consumer": "已有研究调用方与查看候选决定的研究人员；首先核对现有入口，不能假定需要新UI。",
-  "scope": "首先只查既有接口/合同/测试和已准入收据；不重跑旧实验、不读取新行情、不重训、不部署。",
-  "deliverable": "确认一个实际消费者与输入/输出合同；若入口已具备则交付使用方式和缺口结论，确缺最小接线才开发并验收。",
-  "decision_if_pass": "把已有合格资产交给该消费者；记录工程使用范围，不提升模型经济价值或生产资格。",
-  "decision_if_fail": "明确缺少的消费者或接口；无真实使用需要则停止，转需求选择，不新建通用平台。",
+  "question": "Can a corrected bounded CLI adapter return one complete two-reader pair before further calibration spending?",
+  "consumer": "#662 channel qualification before S02 calibration",
+  "scope": "at most2newcalls on one frozen existing development packet; no automatic remaining22calls, no fit/update, no new source or market window",
+  "deliverable": "two complete strict trace/opinion receipts or exact first failure; preserve all previous80CLIstarts",
   "acceptance": [
-    "一个具名现有消费者与可重放的最小调用合同。",
-    "已合格结果的可读输出能追溯输入、版本、拒绝/未知原因；可用与不可用不混淆。",
-    "现有入口已经满足时直接复用，不重复实现；原6模型读取验收不算新进度。"
+    "prepare and offline-test an exact2call startup guard before live execution",
+    "both readers have complete valid events, opinion and source/protocol bindings; no expected truth labels imposed"
   ],
   "stop_conditions": [
-    "60分钟内无法确认消费者与具体未满足接口就不继续开发。",
-    "出现新数据、训练、阈值、P6/生产或超预算要求时只停止对应步骤。"
+    "max2CLIinvocations including failures;0retries; first transport error stops queue",
+    "20min wall including preparation/review/delivery, with an explicit fixed deadline only after Owner allocation",
+    "no automatic activation of larger panel or learning"
   ],
-  "memory_sha256": "d25df2672fa8b1de1178cd9c37dcd1510e31beda9deaf9d0cde420a62723fe60",
+  "decision_if_pass": "request a separately bounded remaining calibration study; do not train from this pair",
+  "decision_if_fail": "retain failure and exact adapter/runtime gap; no further invocation",
+  "memory_sha256": "d7b79c7063d2c122e486c330bd2681a80e90e5a5a688b37d4ead9df6411c97f0",
   "prior_reviews": [
-    {
-      "conclusion_id": "CON-HEAD2-MARCH-20261029",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
-    },
-    {
-      "conclusion_id": "CON-HELD-NEED-20261029",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
-    },
-    {
-      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
-    },
-    {
-      "conclusion_id": "CON-DECISION-SELECTION-20261029",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
-    },
-    {
-      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
-    },
-    {
-      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
-    },
-    {
-      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
-    },
-    {
-      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
-    },
-    {
-      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
-    },
-    {
-      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
-    },
-    {
-      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
-    },
-    {
-      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
-      "relation": "respect",
-      "rationale": "Preserve scoped conclusions, exposure and cumulative cost. This retired example refreshes its current index after bounded Worker independent acceptance; no successor task is activated."
-    },
-    {
-      "conclusion_id": "CON-R2-MOMENTUM-20261112",
-      "relation": "respect",
-      "rationale": "保留R2的固定盘中响应资源决定、旧曝光及成本。此文件是已退役示例，仅刷新当前索引，不启动R2后继或重做比较。"
-    },
-    {
-      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
-      "relation": "respect",
-      "rationale": "Preserve the capital input readiness gap, successor funding gate and all prior costs. This retired example refreshes its index only; no experiment is activated."
-    },
-    {
-      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
-      "relation": "respect",
-      "rationale": "Retired example index refresh only; preserve A input holds, prior exposure/cost and BCD allocation boundary."
-    },
-    {
-      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
-      "relation": "respect",
-      "rationale": "Retired example index refresh only. Preserve R4 independently accepted complete/inconclusive/park fixed-holding decision, all earlier costs/failures/exposure and original R2 signal-use grade. No successor, deployment or repetition is activated."
-    },
-    {
-      "conclusion_id": "CON-R5-CLOCK-20261112",
-      "relation": "respect",
-      "rationale": "Retired non-authorizing example index refresh only. Retain R5 accepted raw-price population clock evidence and next-consumer requirement; preserve R4 fixed-use park and cumulative exposure/cost. No new research is activated."
-    },
-    {
-      "conclusion_id": "CON-R6-RANK1-20261113",
-      "relation": "respect",
-      "rationale": "Respect R6 original-rank1 inconclusive/park and original R5 retained population evidence. This already-completed example remains non-authorizing and does not start any successor or reopen rank1/capital uses."
-    },
-    {
-      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
-      "relation": "respect",
-      "rationale": "Retain R7 fixed engineering delivery and all prior exposure/cost; this retired proposal refresh is not successor execution."
-    },
-    {
-      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
-      "relation": "respect",
-      "rationale": "Retired example metadata index only; retain this current scoped conclusion and no new execution authority."
-    },
     {
       "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
       "relation": "respect",
-      "rationale": "Retiredexampleindexonly; preserveRT2classsupportfailure andoldcost, no newexecutionauthority."
+      "rationale": "Retain the scoped old stop, source and scientific results. This proposal repairs only CLI receipt acquisition, with2explicit calls; old A4 and the24failed calibration starts remain unchanged."
     },
     {
       "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
       "relation": "respect",
-      "rationale": "Preserve finalcanonicalguardclasssupportfailure, allcost/exposure and qualifiedengineering. Retired delivery example does not activate a new reference or learning study."
+      "rationale": "Retain the scoped old stop, source and scientific results. This proposal repairs only CLI receipt acquisition, with2explicit calls; old A4 and the24failed calibration starts remain unchanged."
+    },
+    {
+      "conclusion_id": "CON-R9-CALIBRATION-CHANNEL-FAILED-20261114",
+      "relation": "respect",
+      "rationale": "Retain the scoped old stop, source and scientific results. This proposal repairs only CLI receipt acquisition, with2explicit calls; old A4 and the24failed calibration starts remain unchanged."
     }
   ],
-  "cumulative_cost_review": "既有Head2和持仓尝试全部保留，旧总成本未知而非零；新批次独立记账，不伪装新方向抹去原投入。",
-  "runtime_authority_boundary": "本文件仅规划，不是运行授权；执行需要当前任务授权和TPlan预算，真实输入还须原有用途准入。",
+  "cumulative_cost_review": "prior80CLIstarts and all old cost/exposure retained; this max2call proposal has no allocation yet",
+  "runtime_authority_boundary": "PROPOSED ONLY; current24call tranche exhausted; requires explicit additional Owner call/time allocation before any invocation",
   "budget": {
-    "wall_seconds": 14400,
-    "max_new_bytes": 268435456,
-    "network_requests": 0,
-    "accounting_owner": "TPlan batch and family-linked attempt receipts; this validator does not execute or debit budgets"
-  },
-  "execution_disposition": "COMPLETED_WITH_CONDITIONAL_COMPARISON_NOT_RUN; no successor activated",
-  "execution_record": "docs/work-items/learning-consumer-cycle-20261029.md",
-  "proposal_role": "Retained non-authorizing proposal example, not the next active task. Original execution request is pinned in its job."
+    "wall_seconds": 1200,
+    "max_new_bytes": 67108864,
+    "network_requests": 2,
+    "accounting_owner": "RESEARCH-R9-CALIBRATION-001; carry prior costs"
+  }
 }

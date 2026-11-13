@@ -1,0 +1,126 @@
+{
+  "schema": "quanthus.r9-new-baseline-metadata-screen.v1",
+  "id": "R9-HEAD2-NEW-BASELINE-METADATA-001",
+  "status": "metadata_only",
+  "grants_training_authority": false,
+  "within_original_mission": "RESEARCH-R9-LOCAL-001",
+  "reason": "Old March parent unavailable; original R9 permits a new baseline/candidate sequence; independent direction recommends at most30min source/role/reference-design screen",
+  "source": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "manifest_sha256": "8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "closure": "config/research/research-capital-qual/closure.v1.json",
+    "closure_sha256": "0f66acfcc8ef1a93f831b7272f59a86df13fe4a2f3717e4c8e5a812d4cbac13f",
+    "cache": "/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/job-a1/source",
+    "knowledge_cutoff": "2026-11-11T20:19:54.776092+00:00"
+  },
+  "allowed_now": "manifest/member hashes, parquet footer schemas, and security/listing/company/calendar identity/date columns only; no OHLCV, model/labels or new reference calls",
+  "selection": {
+    "universe": "ordinary common-stock Shanghai/Shenzhen listings unambiguously active continuously from2020-01-02 through2020-12-31 at fixed knowledge view; unique company and security across roles",
+    "order": "SHA256 of R9-HEAD2-BASELINE-V1|company_id|security_id|listing_id; never price/model/ref outcome",
+    "roles": [
+      {
+        "role": "train",
+        "anchor": "2020-03-31",
+        "count": 12
+      },
+      {
+        "role": "train",
+        "anchor": "2020-04-30",
+        "count": 12
+      },
+      {
+        "role": "guard",
+        "anchor": "2020-07-31",
+        "count": 8
+      },
+      {
+        "role": "update",
+        "anchor": "2020-08-31",
+        "count": 8
+      },
+      {
+        "role": "evaluation",
+        "anchor": "2020-11-30",
+        "count": 12
+      },
+      {
+        "role": "evaluation",
+        "anchor": "2020-12-31",
+        "count": 12
+      }
+    ],
+    "windows": "exact prior40open daily sessions through anchor; prior20/current20 nonoverlap",
+    "no_replacement": "fixed64 subjects; unavailable/unknown retained; no resampling after values or reference support"
+  },
+  "planned_reference": {
+    "cases": 64,
+    "readers": 2,
+    "maximum_opinions": 128,
+    "grade": "candidate-blind operational AI reference, correlated provider caveat recorded; no claim of independent market truth",
+    "selection_no_reference_or_prediction_visibility": true,
+    "support": "original24/8/8/24role caps, train>=12definite &>=4/class &>=2month blocks;guard>=2/class;eval>=12definite,>=5issuer/class,>=2month blocks",
+    "unknown": "disagreement/unjudgeable remainsUNKNOWN; no third vote or replacement",
+    "historical_timing_scenario": "12case dual-reader method673s;64cases linear scenario ~60min, not measured forecast",
+    "reference_wall_cap_seconds": 7200,
+    "gated_order": [
+      {
+        "role": "guard",
+        "maximum_cases": 8,
+        "maximum_opinions": 16,
+        "pass": "admitted definite>=2per class"
+      },
+      {
+        "role": "evaluation",
+        "maximum_cases": 24,
+        "maximum_opinions": 48,
+        "pass": "admitted definite>=12,>=5uniquecompanies/class,>=2month blocks"
+      },
+      {
+        "role": "train",
+        "maximum_cases": 24,
+        "maximum_opinions": 48,
+        "pass": "admitted definite>=12,>=4/class,>=2month blocks"
+      },
+      {
+        "role": "update",
+        "maximum_cases": 8,
+        "maximum_opinions": 16,
+        "pass": "at least1admitteddefinite; full policy/source guard"
+      }
+    ],
+    "commitment": "packets and all completed opinion envelopes hash-committed before training; learner sees support receipts and allowedtrain/update/guard labels only; full eval opinions open after newv0/v1/retention-choice and both eval predictions committed",
+    "stop_on_gate_failure": "whole fit/update remainsNOT_RUN; later opinion rolesNOT_RUN; preserve unknowns and64denominator, no resampling/role transfer"
+  },
+  "planned_learning": "new v0 200step fit plus at most1 triggered100stepguarded update; original7features/.5threshold/train-onlyscaler/optimizer fixed; no originalMarch identity claim",
+  "planned_consumer": "state-recognition version selection: FP decrease and FN not increase under original retention guard; no entry/capital/P6 activation",
+  "budget": {
+    "original_start": "2026-11-13T08:10:14Z",
+    "qualification_deadline": "2026-11-13T10:10:14Z",
+    "overall_deadline": "2026-11-13T16:10:14Z",
+    "this_metadata_screen_deadline": "2026-11-13T10:10:14Z",
+    "metadata_reads_no_price_rows": true
+  },
+  "GO_requires": [
+    "exact source/cache/footer and identity/40session capacity",
+    "thin adapter scope and independent pre-review",
+    "bounded reference engine/rubric and calls",
+    "freeze new exact source/domain/role/code contract before OHLCV reads; qualify references before fit"
+  ],
+  "stop": "at qualification deadline or if P10 rebuild/broadarchivehunt/newreferenceplatform required; keep accurate partial asset and gaps",
+  "exposure": "2020-2021 old broad-window exposure continues; prior exact issuer exposure incomplete, no freshholdout claim",
+  "fixed_identity_manifest": {
+    "sha256": "5a63f72cc0af7a1bf0936596a9eece09ecce6b064d1ddbe10ff01562d143ec0d",
+    "bytes": 249759,
+    "source_role_manifest": "CN02retained/new-baseline-role-identities.private.json",
+    "subjects": 64,
+    "unique_companies": 64,
+    "pool": 3744
+  },
+  "new_chain_semantics": {
+    "anchor": "T close, the last of exact40open sessions; prior20/current20 nonoverlap; no inheritedMarchT-1 convention",
+    "comparison": "v1 vs this batch newv0 on identical neweval; oldFP12vs3 is selection motivation only",
+    "role_time_order": "train<guard<=update<evaluation with entity/episode/key isolation",
+    "NO_UPDATE": "original trigger not met retainsv0; no changed update set or threshold; not counted as actual update"
+  }
+}

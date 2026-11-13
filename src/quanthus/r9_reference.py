@@ -19,6 +19,11 @@ from quanthus.structure_v2_inputs import canonical
 
 ABSOLUTE_STOP = datetime(2026, 11, 13, 15, 10, 14, tzinfo=timezone.utc)
 READERS = ("short_term", "fund")
+AUTO_SOL_MODEL = "auto/gpt-6.1-sol"
+AUTO_SOL_METADATA_WARNING = (
+    "Model metadata for `auto/gpt-6.1-sol` not found. Defaulting to fallback metadata; "
+    "this can degrade performance and cause issues."
+)
 RUBRIC = """You are a candidate-blind research reader, role {reader}.
 Use only the supplied normalized HLC40. Do not use tools, files, retrieval, or outside knowledge.
 Rows 1..20 are the preceding window; rows 21..40 are the CURRENT 20-session proposition.
@@ -36,6 +41,64 @@ TRUE requires support; FALSE requires counterevidence. Cite both windows when as
 contraction or its absence. Include reasons and uncertainty in rationale; do not use Markdown.
 Packet: {packet}
 """
+
+CANONICAL_RUBRIC_VERSION = "canonical-s02-reference-repair-v1"
+CANONICAL_SCHEMA = "quanthus.r9-canonical-reference-repair.v1"
+CANONICAL_RUBRIC = """You are a candidate-blind research reader, role {reader}.
+Use only the supplied normalized HLC40. Do not use tools, files, retrieval, or outside knowledge.
+Rows 1..20 are the preceding window; rows 21..40 are the CURRENT 20-session proposition.
+Judge observed orderly consolidation under this canonical S02 meaning:
+positive evidence of low net directional progress, a materially narrow current range,
+and material range contraction relative to the preceding window, without coherent directional
+relocation across the current window. All of these conditions need defensible evidence.
+Orderly does not mean a smooth, monotonic, or quiet path. Repeated two-sided travel or sharp
+reversals INSIDE an already tight contracting band do not, by themselves, veto consolidation.
+Movement of the range center between windows is descriptive context, not a mandatory stability
+gate; center movement without coherent directional relocation cannot alone veto consolidation.
+Distinguish a tight contracting oscillation from a materially broad or expanding structure.
+A coherent directional relocation is sustained repricing, not merely any directional leg,
+a recent excursion, or high turnover inside the bounded band. A narrow but noncontracting
+range is insufficient. Neither contraction alone nor low net progress alone is sufficient.
+Assess supporting and contrary evidence across the full current window. TRUE requires positive
+evidence for all four necessary conditions. FALSE requires clear contrary evidence for at least
+one necessary condition, even if another condition remains uncertain. Otherwise return UNKNOWN.
+Use qualitative reasoning; do not invent numerical thresholds, classifiers or feature formulas.
+Do not infer future breakout, investment merit or any other market outcome.
+Never force class balance.
+Return exactly one JSON object with keys case_id,reviewer,label,support,counterevidence,rationale.
+case_id must equal supplied case_id; reviewer must be {reader}; label is TRUE,FALSE,UNKNOWN.
+support and counterevidence are lists of exact price citations, each with exactly
+offset (integer1..40), field (H,L,C), value (exact supplied string), reason (nonempty).
+TRUE requires support; FALSE requires counterevidence. Cite both windows when asserting
+contraction or its absence. Include reasons and uncertainty in rationale; do not use Markdown.
+Packet: {packet}
+"""
+
+
+def reference_rubric(contract: dict[str, Any]) -> str:
+    reference = contract.get("reference", {})
+    if not isinstance(reference, dict):
+        raise ValueError("R9_REFERENCE_RUBRIC_METADATA")
+    version = reference.get("rubric_version")
+    declared = "rubric_version" in reference or "rubric_sha256" in reference
+    if contract.get("schema_version") != CANONICAL_SCHEMA and not declared:
+        return RUBRIC
+    if contract.get("schema_version") != CANONICAL_SCHEMA or version != CANONICAL_RUBRIC_VERSION:
+        raise ValueError("R9_REFERENCE_RUBRIC_VERSION")
+    if reference.get("rubric_sha256") != hashlib.sha256(CANONICAL_RUBRIC.encode()).hexdigest():
+        raise ValueError("R9_REFERENCE_RUBRIC_BINDING")
+    return CANONICAL_RUBRIC
+
+
+def reference_protocol(contract: dict[str, Any], request_sha256: str) -> dict[str, str]:
+    rubric = reference_rubric(contract)
+    if contract.get("schema_version") != CANONICAL_SCHEMA:
+        return {}
+    return {
+        "request_sha256": request_sha256,
+        "rubric_version": CANONICAL_RUBRIC_VERSION,
+        "rubric_sha256": hashlib.sha256(rubric.encode()).hexdigest(),
+    }
 
 
 def strict_json(text: str) -> Any:
@@ -98,12 +161,19 @@ def validate_opinion(value: Any, packet: dict[str, Any], reader: str) -> dict[st
     return value
 
 
-def validate_trace(text: str) -> None:
+def validate_trace(text: str, *, model_id: str | None = None) -> None:
     events = [strict_json(line) for line in text.splitlines() if line.strip()]
     if not events or not all(isinstance(event, dict) for event in events):
         raise ValueError("R9_REFERENCE_TRACE_SHAPE")
     if events[-1].get("type") != "turn.completed":
         raise ValueError("R9_REFERENCE_TRACE_INCOMPLETE")
+    if (
+        sum(event.get("type") == "turn.started" for event in events) != 1
+        or sum(event.get("type") == "turn.completed" for event in events) != 1
+    ):
+        raise ValueError("R9_REFERENCE_TRACE_TURN_BOUNDARY")
+    turn_started = False
+    metadata_warning_seen = False
     for event in events:
         if not isinstance(event, dict):
             raise ValueError("R9_REFERENCE_TRACE_SHAPE")
@@ -119,11 +189,28 @@ def validate_trace(text: str) -> None:
         if "item" in event:
             if not isinstance(event["item"], dict):
                 raise ValueError("R9_REFERENCE_TRACE_ITEM_SHAPE")
+            if (
+                not turn_started
+                and model_id == AUTO_SOL_MODEL
+                and event["type"] == "item.completed"
+                and set(event) == {"type", "item"}
+                and set(event["item"]) == {"id", "type", "message"}
+                and isinstance(event["item"]["id"], str)
+                and bool(event["item"]["id"])
+                and event["item"].get("type") == "error"
+                and event["item"].get("message") == AUTO_SOL_METADATA_WARNING
+            ):
+                if metadata_warning_seen:
+                    raise ValueError("R9_REFERENCE_REPEATED_METADATA_WARNING")
+                metadata_warning_seen = True
+                continue
             if not isinstance(event["item"].get("type"), str) or event["item"].get("type") not in {
                 "agent_message",
                 "reasoning",
             }:
                 raise ValueError("R9_REFERENCE_TOOL_OR_CONTEXT_TRACE")
+        if event["type"] == "turn.started":
+            turn_started = True
 
 
 def collect_role(
@@ -132,6 +219,18 @@ def collect_role(
     if output.exists() or role not in {"guard", "evaluation", "train", "update"}:
         raise ValueError("R9_REFERENCE_FRESH_ROLE_OUTPUT")
     contract = json.loads(request.read_bytes())
+    rubric = reference_rubric(contract)
+    protocol = reference_protocol(contract, hashlib.sha256(request.read_bytes()).hexdigest())
+    model_id = contract.get("reference", {}).get("reader_model_id")
+    if model_id is not None and model_id != AUTO_SOL_MODEL:
+        raise ValueError("R9_REFERENCE_MODEL_NOT_FROZEN")
+    deadline = datetime.fromisoformat(
+        contract.get("runtime", {})
+        .get("reference_absolute_stop", ABSOLUTE_STOP.isoformat())
+        .replace("Z", "+00:00")
+    )
+    if deadline.tzinfo is None:
+        raise ValueError("R9_REFERENCE_DEADLINE_TIMEZONE")
     raw = qualified.read_bytes()
     if hashlib.sha256(raw).hexdigest() != contract["qualified_input"]["qualified_cases_sha256"]:
         raise ValueError("R9_REFERENCE_QUALIFIED_HASH")
@@ -165,14 +264,19 @@ def collect_role(
             "packet_sha256": hashlib.sha256(canonical(packet)).hexdigest(),
             "status": "UNAVAILABLE",
             "call_started": False,
+            "model_id": model_id or "configured_default",
         }
+        if protocol:
+            receipt["protocol"] = protocol
         if not row["available"]:
             return receipt
-        remaining = (ABSOLUTE_STOP - datetime.now(timezone.utc)).total_seconds()
+        remaining = (deadline - datetime.now(timezone.utc)).total_seconds()
         if remaining <= 3:
             receipt["status"] = "DEADLINE_NOT_RUN"
             return receipt
-        prompt = RUBRIC.format(reader=reader, packet=json.dumps(packet, separators=(",", ":")))
+        prompt = rubric.format(reader=reader, packet=json.dumps(packet, separators=(",", ":")))
+        if protocol:
+            receipt["prompt_sha256"] = hashlib.sha256(prompt.encode()).hexdigest()
         (stem.with_suffix(".prompt.txt")).write_text(prompt)
         then = time.monotonic()
         receipt["call_started"] = True
@@ -186,6 +290,7 @@ def collect_role(
                     [
                         "codex",
                         "exec",
+                        *(["--model", model_id] if model_id is not None else []),
                         "--ephemeral",
                         "--sandbox",
                         "read-only",
@@ -199,6 +304,7 @@ def collect_role(
                     ],
                     stdout=events_file,
                     stderr=stderr_file,
+                    stdin=subprocess.DEVNULL,
                     start_new_session=True,
                 )
                 try:
@@ -215,7 +321,7 @@ def collect_role(
                 raise ValueError("R9_REFERENCE_OUTPUT_BYTES")
             if process.returncode != 0:
                 raise ValueError("R9_REFERENCE_PROCESS_EXIT:" + str(process.returncode))
-            validate_trace(stem.with_suffix(".events.jsonl").read_text())
+            validate_trace(stem.with_suffix(".events.jsonl").read_text(), model_id=model_id)
             opinion = validate_opinion(
                 strict_json(stem.with_suffix(".opinion.json").read_text()), packet, reader
             )
@@ -253,7 +359,10 @@ def collect_role(
         "train": positive + negative >= 12 and min(positive, negative) >= 4 and blocks >= 2,
         "update": positive + negative >= 1,
     }[role]
-    raw = canonical({"opinions": opinions, "resolved": resolved}) + b"\n"
+    sealed: dict[str, Any] = {"opinions": opinions, "resolved": resolved}
+    if protocol:
+        sealed["protocol"] = protocol
+    raw = canonical(sealed) + b"\n"
     (output / "references.sealed.json").write_bytes(raw)
     summary = {
         "role": role,
@@ -270,5 +379,7 @@ def collect_role(
         "fit_runs": 0,
         "update_runs": 0,
     }
+    if protocol:
+        summary["protocol"] = protocol
     (output / "support.safe.json").write_bytes(canonical(summary) + b"\n")
     return summary

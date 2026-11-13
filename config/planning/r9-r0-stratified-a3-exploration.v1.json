@@ -1,0 +1,153 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "R9-R0-STRATIFIED-A3",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "exploration",
+  "family": "local-learning-r9-stratified",
+  "work_item": "P5-RESEARCH-R9-STRATIFIED-001",
+  "modules": [
+    "REFERENCE",
+    "STATES",
+    "TRAIN",
+    "UPDATE",
+    "EXPERT",
+    "REPRO",
+    "CLOSEOUT",
+    "S02",
+    "TRACE"
+  ],
+  "question": "在预注册R0-support/other各半的源合格开发样本中，独立盲参考是否具备足够双类，以完成一次新v0/条件更新及同样本R0/v0/v1版本选择？",
+  "consumer": "543/544开发级识别版本评审，按该R0分层采样分布解释；不是A2补样或旧entry/资金重启",
+  "scope": "One1536fixedidentitypool sourcequalified, frozenR0fourpredicateproxy strata, firsthash64 atfixed6anchors; independentblindreference andoriginallearninggates; no newsource/protectedwindows/production",
+  "deliverable": "actualblindreference support; onequalifiednewbaseline/conditionalguardedupdate andsameevaluation/coldreproduction or precise scientificstop result",
+  "decision_if_pass": "Onlyqualifiedactualreference supports one newv0 and conditionalguardedupdate, predictionscommittedbeforeevalunblind andsameinputR0/v0/v1review",
+  "decision_if_fail": "Anystratum/referencegatefailure stopscurrentA3laterstages, nosecondpool/cohort; NO_UPDATE/retentionfailure truebranch keepsv0, noforcedupdate",
+  "acceptance": [
+    "两候选逐项核对来源、参考独立性/范围、旧模型/更新链、实际动作与消费者门槛",
+    "原停放结论按用途尊重，元数据和工程成功不代替学习资格",
+    "有独立复核的精准差集或完整合格合同，并记录累计曝光与成本"
+  ],
+  "stop_conditions": [
+    "Once1536pool,anystratumquota shortage stopsA3; nosecondpool/date/parameteradjustment",
+    "Originalreference/support/threshold/trigger/retentiongates; guardfailure stopslaterroles; NO_UPDATEdoesnotforceupdate",
+    "A3start14:42total17:42/reference17:12UTC, sourcecompute600s/reference7200s/newCLI128; allprior24andold16:10variance retained"
+  ],
+  "memory_sha256": "dfa404e3d1c362d687fcbf24638c6c3130f39251c397b575abd657c797ab9aa2",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "Head2原March入场过滤用途已拒绝；本轮仅审核旧checkpoint/参考/更新链能否支持R8之后的新消费者，不重fit或改阈值延续原入场路线。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "旧持仓完整诊断只剩单个未覆盖动作，原路线无已证明的可重复学习需求；保留诊断，不把缺失入场数据当新学习证据。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "旧持仓完整诊断只剩单个未覆盖动作，原路线无已证明的可重复学习需求；保留诊断，不把缺失入场数据当新学习证据。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R5-CLOCK-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R6-RANK1-20261113",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "respect",
+      "rationale": "R7固定63条是已消费工程复核输入和连续事实解释入口，无独立状态参考或训练准入；不扩称通用状态训练集。"
+    },
+    {
+      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "relation": "respect",
+      "rationale": "R8两接入缺少合法增量且资金未执行；不得把此结果作为合格学习缺口或把量能失败交给模型修正；新学习需单独具名实际用途。"
+    },
+    {
+      "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "relation": "different_scope",
+      "rationale": "保留A2/RT2当前8guard0正类与后段NOT_RUN；Owner要求继续，独立新开发试验前瞻允许R0语义代理分层，非补样重投。",
+      "scope_difference": "新问题/消费者限定R0-stratifieddevelopment distribution；排除A1/A2公司；一次1536候选先源/R0分层后冻结64，禁止AI标签/学习模型/收益选样，新有限3h预算另列。"
+    }
+  ],
+  "cumulative_cost_review": "AllR9from08:10:14costs/exposure retained, old8hdeadline16:10kept; previous24researchCLI andcurrentA3new128max152 cumulative. New3htranche from14:42 coverspreparation/failedattempts/review/transfers/waits/delivery; no reset or doublecountwall.",
+  "runtime_authority_boundary": "Owner已确认执行R9；在原8h中走允许的新baseline分支。元数据/科学合同冻结后，精确producer与sourceguard独立审阅/测试通过才读固定OHLCV；参考支持过才fit/update；原生产和保护窗口不变。",
+  "budget": {
+    "wall_seconds": 10800,
+    "max_new_bytes": 67108864,
+    "network_requests": 128,
+    "accounting_owner": "RESEARCH-R9-A3-001; priorRESEARCH-R9-LOCAL-001 records/costs kept; researchCLI excludesGitHub/HFcontroloperations but thosecosts separatelyretained"
+  }
+}

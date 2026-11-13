@@ -32,6 +32,11 @@ records the corrected stage gates, package recovery and A4 delivery for independ
 The [F1–F3 independent difference audit](acceptance/research-r1-f1f3-independent-audit-612-20261111.md)
 records the terminal-stage, candidate-date and package-recovery acceptance and retained A4 evidence.
 
+For R9, start with the [current value brief](work-items/research-r9-value-brief.md) and
+[RT2/A3/canonical reference closeout](acceptance/research-r9-reference-closeout-20261113.md).
+Source qualification and the reference protocol are delivered; the fixed guard lacks positive
+support, so actual fit/update and the R9 milestone remain open.
+
 For the R2 fixed-momentum question, start with the [R2 value brief](work-items/research-r2-value-brief.md)
 and its [frozen comparison contract](design/research-r2-momentum-markout-v1.md).
 It records the second resource decision and the scope of the next costed-replay candidate.

@@ -1,0 +1,169 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "R9-REFERENCE-RECOVERY-RT2",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "exploration",
+  "family": "local-learning-r9",
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "modules": [
+    "REFERENCE",
+    "STATES",
+    "TRAIN",
+    "UPDATE",
+    "EXPERT",
+    "REPRO",
+    "CLOSEOUT",
+    "S02",
+    "S04"
+  ],
+  "question": "同64合格输入及原科学门槛下，修正Sol执行路由后能否完成R9盲参考与局部学习闭环？",
+  "consumer": "Owner及#542/#544/#545维护者，决定是否投入一个局部学习候选；保留旧版或形成明确解锁工作包",
+  "scope": "Onlyconfiguredreferenceexecutionroute changes tosameSol auto/gpt-6.1-sol; no newmarketread/selection; old8failedCLI plus onebounded128opinionfreshRT2; originaldeadlineandallscientificgatespreserved",
+  "deliverable": "actualblindreference support; onequalifiednewbaseline/conditionalguardedupdate andsameevaluation/coldreproduction or precise scientificstop result",
+  "decision_if_pass": "只按本批同eval新v1/v0及原守卫决定研究版本；不沿用旧FP12vs3作对照，不授予专家交易用途",
+  "decision_if_fail": "源/参考不足则不拟合，触发未到NO_UPDATE，更新/评价未过保留本批newv0；所有64subject和unknown保留，不换样/角色/阈值",
+  "acceptance": [
+    "两候选逐项核对来源、参考独立性/范围、旧模型/更新链、实际动作与消费者门槛",
+    "原停放结论按用途尊重，元数据和工程成功不代替学习资格",
+    "有独立复核的精准差集或完整合格合同，并记录累计曝光与成本"
+  ],
+  "stop_conditions": [
+    "Same64 input/roles/rubric/threshold/guard; scientificsupportfailure stops currentlaterstage withoutresampling",
+    "Reference absolute15:10:14UTC / total16:10:14UTC preserved; cumulativeCLIcap136 (8old128new);0schema repair",
+    "Onlyone healthyrouteRT2, allinvalid calls retained, no voted/repaired/repeatedopinion; no protected2022/P6/production/sourceacquisition"
+  ],
+  "memory_sha256": "8fcd76336cf8c6f41c62e4307e79ee697b6e7d92f85af4be4394e5f745628185",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "Head2原March入场过滤用途已拒绝；本轮仅审核旧checkpoint/参考/更新链能否支持R8之后的新消费者，不重fit或改阈值延续原入场路线。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "旧持仓完整诊断只剩单个未覆盖动作，原路线无已证明的可重复学习需求；保留诊断，不把缺失入场数据当新学习证据。"
+    },
+    {
+      "conclusion_id": "CON-STAGE34-SOURCE-20261029",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "旧持仓完整诊断只剩单个未覆盖动作，原路线无已证明的可重复学习需求；保留诊断，不把缺失入场数据当新学习证据。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "本批只核对R9候选学习资格与旧资产身份；保留本记录既有范围、结果、成本及消费者门槛，不执行其停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R5-CLOCK-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R6-RANK1-20261113",
+      "relation": "respect",
+      "rationale": "保留本条原用途结论及累计成本/曝光；R9仅审核两个候选的独立参考、同链局部更新和实际消费者资格，不复跑本记录结果或重开停放用途。"
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "respect",
+      "rationale": "R7固定63条是已消费工程复核输入和连续事实解释入口，无独立状态参考或训练准入；不扩称通用状态训练集。"
+    },
+    {
+      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "relation": "respect",
+      "rationale": "R8两接入缺少合法增量且资金未执行；不得把此结果作为合格学习缺口或把量能失败交给模型修正；新学习需单独具名实际用途。"
+    },
+    {
+      "conclusion_id": "CON-R9-A2-SOURCE-READY-REFERENCE-BLOCKED-20261113",
+      "relation": "reopen",
+      "rationale": "CurrentOwner continuesR9; exactsameCN02/endpoint/key withexplicitauto/gpt6.1-sol responds15.216s, replacingfailedcodexroute. No oldvalidopinions. Same64/rubric/feature/threshold/support/guard remain; preserve8failedcalls andcost; onefiniteRT2only.",
+      "material_change": "verifiedhealthyexecutionroute; fixedmodel/runtime onallnewreaderopinions; oneexactpreludeCLIwarning scoped; cumulativeCLIcap136=8old+128new withoutdeadline reset",
+      "evidence": [
+        {
+          "id": "R9-RT2-HEALTH",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/cn02-auto-sol-health.safe.json",
+          "sha256": "412ee8636457bff4d799278f29c53b6769bcf7b5b94529a3f016f2681db07073",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "one_no_market_healthprobe only; no state/learning/referencequalification"
+        }
+      ]
+    }
+  ],
+  "cumulative_cost_review": "AllpriorA1/A2 costs/exposure,8failedreferenceCLI andoldhealthprobes kept; currenttwo no-markethealthprobesCN0215.216s/local28.075s. No oldvalidopinions.128newopinions plus8failed136 cumulativeCLI limit; original8hdeadline16:10:14Z remains.",
+  "runtime_authority_boundary": "Owner已确认执行R9；在原8h中走允许的新baseline分支。元数据/科学合同冻结后，精确producer与sourceguard独立审阅/测试通过才读固定OHLCV；参考支持过才fit/update；原生产和保护窗口不变。",
+  "budget": {
+    "wall_seconds": 28800,
+    "max_new_bytes": 67108864,
+    "network_requests": 0,
+    "accounting_owner": "R9主线；0请求指新增市场/参考来源，GitHub/Nexus控制及证据传输另列"
+  }
+}

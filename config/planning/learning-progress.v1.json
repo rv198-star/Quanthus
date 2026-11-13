@@ -11851,6 +11851,322 @@
       ],
       "no_change_reason": "本批仅使用既有账本/薄接口，不修改TRACE控制语义或授予研究资格。",
       "issue_observations": []
+    },
+    {
+      "id": "CP-662-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "recorded_at": "2026-11-13T14:55:39.014023+00:00",
+      "actor": "R9primary; independent r5guardsemanticQA",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "blocked",
+      "summary": "autoSol已恢复并真实完成16guard意见，独立QA0TRUE/8FALSE/0UNKNOWN，当前A2/RT2类别支持失败；后段reference/fit/updateNOT_RUN，另行登记A3前瞻分层开发试验。",
+      "evidence": [
+        {
+          "id": "R9-RT2-GUARD-QA",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/rt2-guard-qa.json",
+          "sha256": "6070f2016410e33d29450478069069828e4f841c17827b98c8addd27951cba63",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "16opinions8cases153citationsQA; guardTRUE0FALSE8; currentA2RT2supportfailureonly, modelnotfit"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "A2/RT2fixed64guard8 classsupportfailed; newA3separateprospectivedevelopmentquestion",
+          "remaining": "当前guard无正类；原后段NOT_RUN，未发生模型更新或经济比较",
+          "next_action": "保留A2/RT2失败与原8h记录，独立A3按新R0代理分层问题/预算和原门槛执行，不给当前批补样",
+          "evidence": [
+            "R9-RT2-GUARD-QA"
+          ],
+          "supersedes": "CP-662-R9-A2-SOURCE-READY-20261113"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "A2/RT2fixed64guard8 classsupportfailed; newA3separateprospectivedevelopmentquestion",
+          "remaining": "当前guard无正类；原后段NOT_RUN，未发生模型更新或经济比较",
+          "next_action": "保留A2/RT2失败与原8h记录，独立A3按新R0代理分层问题/预算和原门槛执行，不给当前批补样",
+          "evidence": [
+            "R9-RT2-GUARD-QA"
+          ],
+          "supersedes": "CP-662-R9-A2-SOURCE-READY-20261113"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "A2/RT2fixed64guard8 classsupportfailed; newA3separateprospectivedevelopmentquestion",
+          "remaining": "当前guard无正类；原后段NOT_RUN，未发生模型更新或经济比较",
+          "next_action": "保留A2/RT2失败与原8h记录，独立A3按新R0代理分层问题/预算和原门槛执行，不给当前批补样",
+          "evidence": [
+            "R9-RT2-GUARD-QA"
+          ],
+          "supersedes": "CP-662-R9-A2-SOURCE-READY-20261113"
+        }
+      ],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "S02",
+        "TRACE"
+      ],
+      "no_change_reason": "研究硬门未过，原学习/交易准入保持；服务恢复与当前guard样本类别支持分开。",
+      "issue_observations": []
+    },
+    {
+      "id": "CP-665-A3-PREREGISTERED-20261113",
+      "recorded_at": "2026-11-13T14:55:39.649542+00:00",
+      "actor": "R9primary; independentr5designconditionalGO",
+      "work_item": "P5-RESEARCH-R9-STRATIFIED-001",
+      "outcome": "no_module_change",
+      "summary": "独立前瞻登记R0语义代理分层开发试验；新1536池尚未读行情，旧A2/RT2失败保留，真实学习准入待实际门槛。",
+      "evidence": [
+        {
+          "id": "R9-RT2-GUARD-QA",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/rt2-guard-qa.json",
+          "sha256": "6070f2016410e33d29450478069069828e4f841c17827b98c8addd27951cba63",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "16opinions8cases153citationsQA; guardTRUE0FALSE8; currentA2RT2supportfailureonly, modelnotfit"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "S02",
+        "TRACE"
+      ],
+      "no_change_reason": "本条只登记新问题/消费者/有限预算，不授予实际参考、学习或交易资格；待源/参考各关实际结果。",
+      "issue_observations": []
+    },
+    {
+      "id": "CP-665-A3-CANONICAL-REFERENCE-DEFECT-20261113",
+      "recorded_at": "2026-11-13T15:45:11.106888+00:00",
+      "actor": "R9primary with independent r4source and r5canonical direction review",
+      "work_item": "P5-RESEARCH-R9-STRATIFIED-001",
+      "outcome": "no_module_change",
+      "summary": "A3完整源准入通过，原提示guard0正7负1未知停止后段；跨合同发现canonical参考协议偏差，准备同64一次修复；学习0。",
+      "evidence": [
+        {
+          "id": "R9-CANONICAL-REFERENCE-DEFECT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/canonical-defect-finding.json",
+          "sha256": "ca4f8ef0f7e9130f4ba3f9c20579797bc92e345af15f0a8f5f86830b6279d60c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "A3sourceGO; oldrubricguard0/7/1; crosscontractconformancegap, not current modelquality"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "S02",
+        "TRACE"
+      ],
+      "no_change_reason": "保留旧票及其原提示用途，当前无模型训练/更新；修复只对齐原canonical S02，不重采样/改门槛。",
+      "issue_observations": []
+    },
+    {
+      "id": "CP-665-A3-REFERENCE-ADMISSION-20261113",
+      "recorded_at": "2026-11-13T15:45:11.106888+00:00",
+      "actor": "R9primary with independent r4source and r5canonical direction review",
+      "work_item": "P5-RESEARCH-R9-STRATIFIED-001",
+      "outcome": "blocked",
+      "summary": "A3完整源准入通过，原提示guard0正7负1未知停止后段；跨合同发现canonical参考协议偏差，准备同64一次修复；学习0。",
+      "evidence": [
+        {
+          "id": "R9-CANONICAL-REFERENCE-DEFECT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/canonical-defect-finding.json",
+          "sha256": "ca4f8ef0f7e9130f4ba3f9c20579797bc92e345af15f0a8f5f86830b6279d60c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "A3sourceGO; oldrubricguard0/7/1; crosscontractconformancegap, not current modelquality"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "A3sourceadmitted; oldrubricreference target nonconformant for canonical S02",
+          "remaining": "No actualfit/update; originalsupportgates remain required",
+          "next_action": "One independentpre-reviewed canonical protocol repair on same64, oldopinions/cost kept; no newpool/thresholdchange",
+          "evidence": [
+            "R9-CANONICAL-REFERENCE-DEFECT"
+          ],
+          "supersedes": "CP-662-RT2-CLASS-SUPPORT-FAILED-20261113"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "A3sourceadmitted; oldrubricreference target nonconformant for canonical S02",
+          "remaining": "No actualfit/update; originalsupportgates remain required",
+          "next_action": "One independentpre-reviewed canonical protocol repair on same64, oldopinions/cost kept; no newpool/thresholdchange",
+          "evidence": [
+            "R9-CANONICAL-REFERENCE-DEFECT"
+          ],
+          "supersedes": "CP-662-RT2-CLASS-SUPPORT-FAILED-20261113"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "A3sourceadmitted; oldrubricreference target nonconformant for canonical S02",
+          "remaining": "No actualfit/update; originalsupportgates remain required",
+          "next_action": "One independentpre-reviewed canonical protocol repair on same64, oldopinions/cost kept; no newpool/thresholdchange",
+          "evidence": [
+            "R9-CANONICAL-REFERENCE-DEFECT"
+          ],
+          "supersedes": "CP-662-RT2-CLASS-SUPPORT-FAILED-20261113"
+        }
+      ],
+      "issue_observations": []
+    },
+    {
+      "id": "CP-665-A4-CANONICAL-SUPPORT-STOP-20261113",
+      "recorded_at": "2026-11-13T16:18:27.702103+00:00",
+      "actor": "R9primary; independent r4code/source and r5actualsemanticQA",
+      "work_item": "P5-RESEARCH-R9-STRATIFIED-001",
+      "outcome": "blocked",
+      "summary": "canonical参考协议真实修复并交付；同64guard独立QA0正8负，原双类门不满足，fit/update0；HF288文件固定回读，R9目标保持开放。",
+      "evidence": [
+        {
+          "id": "R9-A4-ACTUAL-QA",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/canonical-a4-actual-finding.json",
+          "sha256": "8214bb0ca01a413726d266e2560a8b6b3cde83301cbb8c3912483e218f9611bd",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Canonical guard8cases16opinions137citations; 0TRUE8FALSE; fit/update0; fixedlearningbatch blocked"
+        },
+        {
+          "id": "R9-A4-ENGINEERING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/make-check-canonical-receipt.json",
+          "sha256": "3908add46b9a614271cbbdd04164c4b12a987e5cec20d89eb149d91bfc970ae0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exacte043localmakecheck9298pass35skip63warnings; not modelquality"
+        },
+        {
+          "id": "R9-RT2-A3-A4-HF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/r9-reference-publication-receipt.json",
+          "sha256": "f3788d6a8325a5aaaa87c6fa5293a611a6ab8e71bb968b745c9d64278f88a243",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private pinned55224432;288files41584250B fullsize/SHAreadback; R9notcomplete"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "Canonical A4 same64 guardedlearning support failure; original trial and old opinions retained",
+          "remaining": "guardpositive0<2; laterreference/fit/update/compare/coldNOT_RUN",
+          "next_action": "Preserve fixedbatch STOP; first obtain purpose-qualified positive/negative reference assets or independent calibration anchors before any new frozen learning study",
+          "evidence": [
+            "R9-A4-ACTUAL-QA",
+            "R9-RT2-A3-A4-HF"
+          ],
+          "supersedes": "CP-665-A3-REFERENCE-ADMISSION-20261113"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "Canonical A4 same64 guardedlearning support failure; original trial and old opinions retained",
+          "remaining": "guardpositive0<2; laterreference/fit/update/compare/coldNOT_RUN",
+          "next_action": "Preserve fixedbatch STOP; first obtain purpose-qualified positive/negative reference assets or independent calibration anchors before any new frozen learning study",
+          "evidence": [
+            "R9-A4-ACTUAL-QA",
+            "R9-RT2-A3-A4-HF"
+          ],
+          "supersedes": "CP-665-A3-REFERENCE-ADMISSION-20261113"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "Canonical A4 same64 guardedlearning support failure; original trial and old opinions retained",
+          "remaining": "guardpositive0<2; laterreference/fit/update/compare/coldNOT_RUN",
+          "next_action": "Preserve fixedbatch STOP; first obtain purpose-qualified positive/negative reference assets or independent calibration anchors before any new frozen learning study",
+          "evidence": [
+            "R9-A4-ACTUAL-QA",
+            "R9-RT2-A3-A4-HF"
+          ],
+          "supersedes": "CP-665-A3-REFERENCE-ADMISSION-20261113"
+        }
+      ],
+      "issue_observations": []
+    },
+    {
+      "id": "CP-665-A4-DELIVERY-TRACE-REVIEW-20261113",
+      "recorded_at": "2026-11-13T16:26:13.275866+00:00",
+      "actor": "R9primary after independent exact tested-base review",
+      "work_item": "P5-RESEARCH-R9-STRATIFIED-001",
+      "outcome": "no_module_change",
+      "summary": "最终文档/账本回写明确评审TRACE影响：只刷新当前路由、证据与阻塞状态，跟踪机制和模块成熟度不变。",
+      "evidence": [
+        {
+          "id": "R9-A4-ACTUAL-QA",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/canonical-a4-actual-finding.json",
+          "sha256": "8214bb0ca01a413726d266e2560a8b6b3cde83301cbb8c3912483e218f9611bd",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Canonical guard8cases16opinions137citations; 0TRUE8FALSE; fit/update0; fixedlearningbatch blocked"
+        },
+        {
+          "id": "R9-A4-ENGINEERING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/make-check-canonical-receipt.json",
+          "sha256": "3908add46b9a614271cbbdd04164c4b12a987e5cec20d89eb149d91bfc970ae0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exacte043localmakecheck9298pass35skip63warnings; not modelquality"
+        },
+        {
+          "id": "R9-RT2-A3-A4-HF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/r9-reference-publication-receipt.json",
+          "sha256": "f3788d6a8325a5aaaa87c6fa5293a611a6ab8e71bb968b745c9d64278f88a243",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private pinned55224432;288files41584250B fullsize/SHAreadback; R9notcomplete"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "当前差异仅文档、结论/蓝图和退休提案索引；实际源码/配置/测试闭包与e043相同。TRACE无新机制或准入变化；补齐相对已验基线的显式影响评审。",
+      "issue_observations": []
     }
   ],
   "history_imports": [

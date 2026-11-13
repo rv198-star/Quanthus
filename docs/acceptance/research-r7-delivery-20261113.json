@@ -71,5 +71,28 @@
     "hosted_ci": "billing unavailable, jobs had zero steps; ordinary local-acceptance path",
     "maintenance": "exactbase selected=[]",
     "macos_supplement": "214 passed /9failed; Linux /proc absent; retained separately"
+  },
+  "code_integration": {
+    "pr": 656,
+    "merged": true,
+    "merge": "31a6ae94cb8b1e445b847937784ba57d5ab61703",
+    "parents": [
+      "9b38b41038a2eabcb346ad3b189dc5eb56f332ea",
+      "bbf6669dac6dc535fd25bd1eae0f12b6f242c5d8"
+    ],
+    "tree_equal_candidate": true,
+    "actual_main": "31a6ae94cb8b1e445b847937784ba57d5ab61703"
+  },
+  "lifecycle": {
+    "tasks": {
+      "652": "closed",
+      "653": "closed"
+    },
+    "R7_milestone21": "closed",
+    "feature651": "open",
+    "R8_milestone22": "open,not_started",
+    "R9_milestone23": "open,not_started",
+    "evidence": "r7-closeout-observation.json; immutable external receipt",
+    "temporary_references": "retained through lifecycle-only successor merge, then archived/removed; final receipt in CN02 retained root"
   }
 }

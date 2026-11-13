@@ -1,0 +1,141 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "R8-STATE-CONSUMPTION-SELECT-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "exploration",
+  "family": "multiop-state-consumption-r8",
+  "work_item": "META-RESEARCH-R8-SELECT-001",
+  "modules": [
+    "FACTS",
+    "FACTORS",
+    "STATES",
+    "CONTROL",
+    "EXPERT",
+    "REPRO",
+    "CLOSEOUT",
+    "TRACE"
+  ],
+  "question": "R7是否给出一个有实际动作差异、完整输入/基线资格且值得新增状态消费的具名问题？",
+  "consumer": "R7研究负责人及Formal P2维护者，决定是否支付一次完整B/C研究预算",
+  "scope": "仅R7封存63行包/源码政策/既有资格与产物元数据；最多两个具名选择；不读新增市场行、未来标签/结果或2022+",
+  "deliverable": "两个以内候选的动作键、资格/旧结论/总成本比较；一个完整冻结合同及独立预审，或准确NO_GO差集",
+  "decision_if_pass": "只为一个合格新状态映射冻结B/C和主用途门槛，独立通过后进入一次正式/必要独立比较",
+  "decision_if_fail": "保留R7和原组合，停止本批比较投入；登记具体资格差集与最小重开条件，研究结果保持not_evaluated",
+  "acceptance": [
+    "实际事件和原字段支持问题，系统守卫与专家策略否决分清",
+    "原同输入同用途B可复现，C仅一个新增状态消费且非目标参数/规则固定",
+    "完整资金输入/公司行动/机会资格和主用途门槛结果前冻结，并经独立设计预审；否则给出可复核NO_GO"
+  ],
+  "stop_conditions": [
+    "首2h到08:37:48UTC仍无动作缺口/输入/B/门槛则停止比较投入",
+    "不移除系统安全规则或把缺资格当成功准入",
+    "整批8h到14:37:48UTC准确收尾，不重置原窗口曝光/失败/成本"
+  ],
+  "memory_sha256": "aadec84f6fb5b218315f09732a6c8f4e818d78e5c7d010f244bab41e295884ab",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "原March Head2入场候选被拒绝、原始映射/学习结论保留；本段仅核R7现有证据与新缺口，不重跑或调参该候选。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "原16个结构持仓建议15个被既有安全退出覆盖的有限差集保留；本段不重复原持仓映射试验。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "保留本条原用途、资格、曝光和成本；本段仅已验收R7包/现有政策的选题资格核对，不重建旧证据或启动原停放方向。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "保留本条原用途、资格、曝光和成本；本段仅已验收R7包/现有政策的选题资格核对，不重建旧证据或启动原停放方向。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "保留本条原用途、资格、曝光和成本；本段仅已验收R7包/现有政策的选题资格核对，不重建旧证据或启动原停放方向。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "保留本条原用途、资格、曝光和成本；本段仅已验收R7包/现有政策的选题资格核对，不重建旧证据或启动原停放方向。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "保留本条原用途、资格、曝光和成本；本段仅已验收R7包/现有政策的选题资格核对，不重建旧证据或启动原停放方向。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "保留本条原用途、资格、曝光和成本；本段仅已验收R7包/现有政策的选题资格核对，不重建旧证据或启动原停放方向。"
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途、资格、曝光和成本；本段仅已验收R7包/现有政策的选题资格核对，不重建旧证据或启动原停放方向。"
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途、资格、曝光和成本；本段仅已验收R7包/现有政策的选题资格核对，不重建旧证据或启动原停放方向。"
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途、资格、曝光和成本；本段仅已验收R7包/现有政策的选题资格核对，不重建旧证据或启动原停放方向。"
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "保留本条原用途、资格、曝光和成本；本段仅已验收R7包/现有政策的选题资格核对，不重建旧证据或启动原停放方向。"
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途、资格、曝光和成本；本段仅已验收R7包/现有政策的选题资格核对，不重建旧证据或启动原停放方向。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "原固定动量资金/rank1用途及失败年度/集中度判断保持停放；只复用合格工程，不以R8改名重跑原问题。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "respect",
+      "rationale": "原固定动量资金/rank1用途及失败年度/集中度判断保持停放；只复用合格工程，不以R8改名重跑原问题。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
+      "relation": "respect",
+      "rationale": "原固定动量资金/rank1用途及失败年度/集中度判断保持停放；只复用合格工程，不以R8改名重跑原问题。"
+    },
+    {
+      "conclusion_id": "CON-R5-CLOCK-20261112",
+      "relation": "respect",
+      "rationale": "保留本条原用途、资格、曝光和成本；本段仅已验收R7包/现有政策的选题资格核对，不重建旧证据或启动原停放方向。"
+    },
+    {
+      "conclusion_id": "CON-R6-RANK1-20261113",
+      "relation": "respect",
+      "rationale": "原固定动量资金/rank1用途及失败年度/集中度判断保持停放；只复用合格工程，不以R8改名重跑原问题。"
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "respect",
+      "rationale": "复用已验收63行工程包作资格选题。13条提议与现有risk否决仅提供具体侦察入口，须另核实际机会资格与可改变决定。"
+    }
+  ],
+  "cumulative_cost_review": "所有R1-R7、Head2/结构/持仓旧成本和样本曝光累计；本批起算06:37:48UTC，app工作区创建等待无响应已计入，改用Git隔离worktree；本阶段输入网络0B，主动/模型账单未知非零。",
+  "runtime_authority_boundary": "Owner当前明确按原R8计划严格执行；原8h、首2h关口不重置。此提案仅资格选择，正式比较需后继固定合同和独立预审；无采集/训练/P6/生产授权。",
+  "budget": {
+    "wall_seconds": 28800,
+    "max_new_bytes": 67108864,
+    "network_requests": 0,
+    "accounting_owner": "R8主线；首2h选择关口；0网络请求为新增市场输入，GitHub源码/控制/证据传输单列"
+  }
+}

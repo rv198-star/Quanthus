@@ -1518,6 +1518,85 @@
         "CP-652-20261113T022850952419Z"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "recorded_at": "2026-11-13T07:07:57.732774+00:00",
+      "actor": "R8 primary; independent direction and feasibility review",
+      "question_id": "R8-STATE-CONSUMPTION-001",
+      "family": "multiop-state-consumption-r8",
+      "work_item": "META-RESEARCH-R8-SELECT-001",
+      "modules": [
+        "EXPERT",
+        "REPRO"
+      ],
+      "question": "当前R7两项具名结构接入选择能否形成有合法动作差异、完整输入与同用途基线的R8资金比较？",
+      "consumer": "R7研究负责人及FormalP2维护者，决定是否投入一次完整B/C",
+      "scope": "fixed R7 three securities,63 April2020 engineering reviews; two named entry-consumption choices; no new DWD or economic outcome reads",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Two named choices on fixed R7 scope lack admissible incremental action; economic comparison not run. R7 engineering status/scope unchanged, next-action routing refreshed. No negative return or global multi-operator conclusion.",
+      "decision_effect": "Keep original combination and R7 report. Stop further adaptation/capital run on the two choices: raw margin changes0proposals; three nearest neutral+active risk-allowed keys fail P4 turnover>=1.5 even optimistic bounds. R9 not triggered.",
+      "reopen_conditions": [
+        "Named consumer supplies an admissible P4 opportunity and a single legitimate state mapping with actual action difference distinct from old parked uses.",
+        "Freeze same-input baseline, economic-use gate, full source/clock/industry/action/funding qualification and finite budget before outcomes; retain old exposures and failures."
+      ],
+      "retained_assets": [
+        "Authenticated63row selection census and3exact optimistic necessity exclusions; mathematical missing-value bounds without source imputation",
+        "Independent mapping/clock/capital-path feasibility and policy identity receipts; original R7 and existing FormalP2 interfaces preserved"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Decision reached within first2h; start06:37:48UTC, no formal/independent capital run and0Bnew input network. App-create wait and all source/receipt preparation retained; active/model/token costs unknown-not-zero, all prior research exposure/cost cumulative. Full delivery time recorded separately.",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/selection-inspection-plan.json",
+        "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/selection-envelope.json"
+      ],
+      "evidence": [
+        {
+          "id": "R8-PRIMARY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/selection-inspection.json",
+          "sha256": "a64728aa798ca7ee09273ac86ca59396d7fed351ace37a27cef920e9dd98a712",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Existing R7 same63 algebraic proposal feasibility and optimistic P4 necessary-condition exclusion; no capital result"
+        },
+        {
+          "id": "R8-DIRECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/independent-direction-review.json",
+          "sha256": "d39fc1d02acdebf3d75ef121394bcbebc5733c729c186c7de89abd5565e3dc2d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent two-choice selection and old mapping boundary review"
+        },
+        {
+          "id": "R8-FEASIBILITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/independent-feasibility-review.json",
+          "sha256": "7e2dbf63e528874817756881523316c19518d3fcb902e3140a6ed62c0b33bb2a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent Decimal input authentication/bounds and existing P4/FormalP2 source feasibility"
+        },
+        {
+          "id": "R8-POLICY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/selection-policy-equivalence.json",
+          "sha256": "e34e71c754ecd0cf50a9f53ad952225c195a5d0dad491e57a6a2ad268be80778",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R7 actual card1.0.1 authoritative; inspected literal thresholds equal old card"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-658-R8-QUALIFICATION-NOGO-20261113",
+        "CP-658-R8-ROUTING-20261113"
+      ],
+      "supersedes": null
     }
   ]
 }

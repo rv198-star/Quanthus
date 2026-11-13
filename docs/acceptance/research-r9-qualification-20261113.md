@@ -29,6 +29,6 @@ Head2原入场用途停放继续；独立方向审阅指出识别误报控制仍
 
 ## 工程检查与版本
 
-准备件c102的90项元数据检查通过，原导入失败保留。新增源码使旧9231/35完整检查不再适用于最终变更；最终在格式化版本新跑全部`make check`，实际结果随最终回执与工单记载。格式化/SQL空白/Arrow typing marker之后AST（SQL空白归一）与真实sourceproducer一致，原源资格产物不重复构建。
+准备件c102的90项元数据检查通过，原导入失败保留。新增源码使旧9231/35完整检查不再适用于最终变更；最终在`eafc790981c4211ab0617a44f02e8e2bfeb541d8`新跑完整`make check`，9241 passed、35 skipped、63 warnings，完整命令921.397s，Python3.10.12；日志SHA `4ed13b4bfca8062461d985409fb5d5155763a413dbadc31f73d749c37a1904b5`。35项跳过涉及未配置Postgres/生产artifact、内核rootnamespace及可选astock/sklearn/torch依赖。新增两文件Ruff和隔离mypy通过。后继docs/config-planning变化通过执行/依赖/测试闭包逐blob+mode一致后复用此完整结果，并重跑精确base元数据检查。格式化/SQL空白/Arrow typing marker之后AST（SQL空白归一）与真实sourceproducer一致，原源资格产物不重复构建。
 
 最终交付保留原始来源/失败/审阅、时间偏差、固定64及完整不可用分母。普通main、私有HF及CN02归档记录随最终回执；#662和R9/#540–546保持开放。当前不宣称研究版本采用或完整学习MVP验收。

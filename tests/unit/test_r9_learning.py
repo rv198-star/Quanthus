@@ -142,3 +142,53 @@ def test_duplicate_case_cannot_shrink_the_opinion_denominator(tmp_path):
     )
     with pytest.raises(ValueError, match="ROLE_DENOMINATOR"):
         review_role(qualified, raw, review, request, out, role="guard")
+
+
+@pytest.mark.parametrize("change", ["legacy", "mixed", "prompt", "valid"])
+def test_canonical_qa_cannot_reuse_or_mix_old_protocol_opinions(tmp_path, change):
+    from quanthus.r9_reference import (
+        CANONICAL_RUBRIC,
+        CANONICAL_RUBRIC_VERSION,
+        CANONICAL_SCHEMA,
+        reference_protocol,
+    )
+
+    qualified, raw, review, request, out, qa = fixture(tmp_path)
+    contract = json.loads(request.read_text())
+    contract.update(
+        schema_version=CANONICAL_SCHEMA,
+        reference={
+            "rubric_version": CANONICAL_RUBRIC_VERSION,
+            "rubric_sha256": hashlib.sha256(CANONICAL_RUBRIC.encode()).hexdigest(),
+        },
+    )
+    request.write_text(json.dumps(contract))
+    protocol = reference_protocol(contract, hashlib.sha256(request.read_bytes()).hexdigest())
+    envelope = json.loads(raw.read_text())
+    rows = json.loads(qualified.read_text())["rows"]
+    if change != "legacy":
+        envelope["protocol"] = protocol
+        for opinion in envelope["opinions"]:
+            row = next(r for r in rows if r["identity"]["sample_id"] == opinion["case_id"])
+            prompt = CANONICAL_RUBRIC.format(
+                reader=opinion["reader"], packet=json.dumps(row["packet"], separators=(",", ":"))
+            )
+            opinion.update(
+                protocol=protocol,
+                call_started=True,
+                prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
+            )
+        if change == "mixed":
+            del envelope["opinions"][0]["protocol"]
+        if change == "prompt":
+            envelope["opinions"][0]["prompt_sha256"] = "0" * 64
+        raw.write_text(json.dumps(envelope))
+        qa["raw_reference_sha256"] = hashlib.sha256(raw.read_bytes()).hexdigest()
+        review.write_text(json.dumps(qa))
+    if change == "valid":
+        result = review_role(qualified, raw, review, request, out, role="guard")
+        assert result["support_pass"] and result["protocol"] == protocol
+    else:
+        with pytest.raises(ValueError, match="PROTOCOL_BINDING"):
+            review_role(qualified, raw, review, request, out, role="guard")
+        assert not out.exists()

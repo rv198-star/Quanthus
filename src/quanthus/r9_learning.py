@@ -7,7 +7,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from quanthus.r9_reference import READERS, strict_json, validate_opinion
+from quanthus.r9_reference import (
+    READERS,
+    reference_protocol,
+    reference_rubric,
+    strict_json,
+    validate_opinion,
+)
 from quanthus.structure_v2_inputs import canonical
 
 
@@ -43,6 +49,7 @@ def review_role(
     if output.exists():
         raise ValueError("R9_QA_FRESH_OUTPUT")
     contract = json.loads(request.read_bytes())
+    protocol = reference_protocol(contract, file_digest(request))
     if file_digest(qualified) != contract["qualified_input"]["qualified_cases_sha256"]:
         raise ValueError("R9_QA_INPUT_BINDING")
     qa = strict_json(review.read_text())
@@ -63,7 +70,10 @@ def review_role(
         or len({r["identity"]["sample_id"] for r in rows}) != expected
     ):
         raise ValueError("R9_QA_ROLE_DENOMINATOR")
-    opinions = strict_json(raw_reference.read_text())["opinions"]
+    envelope = strict_json(raw_reference.read_text())
+    if protocol and envelope.get("protocol") != protocol:
+        raise ValueError("R9_QA_PROTOCOL_BINDING")
+    opinions = envelope["opinions"]
     pairs = [(o["case_id"], o["reader"]) for o in opinions]
     wanted = {(r["identity"]["sample_id"], reader) for r in rows for reader in READERS}
     if len(pairs) != expected * 2 or len(wanted) != expected * 2 or set(pairs) != wanted:
@@ -90,6 +100,17 @@ def review_role(
         both = [o for o in opinions if o["case_id"] == case_id]
         labels = []
         for opinion in both:
+            if protocol:
+                expected_prompt = reference_rubric(contract).format(
+                    reader=opinion["reader"],
+                    packet=json.dumps(row["packet"], separators=(",", ":")),
+                )
+                if opinion.get("protocol") != protocol or (
+                    opinion.get("call_started")
+                    and opinion.get("prompt_sha256")
+                    != hashlib.sha256(expected_prompt.encode()).hexdigest()
+                ):
+                    raise ValueError("R9_QA_OPINION_PROTOCOL_BINDING")
             if (
                 opinion["status"] == "VALID"
                 and row["available"]
@@ -115,6 +136,8 @@ def review_role(
         "support": summary,
         "invalidated_opinions": len(invalid),
     }
+    if protocol:
+        result["protocol"] = protocol
     payload = canonical(result) + b"\n"
     output.write_bytes(payload)
     summary = {
@@ -124,5 +147,7 @@ def review_role(
         "fit_runs": 0,
         "update_runs": 0,
     }
+    if protocol:
+        summary["protocol"] = protocol
     output.with_name("support.qa.safe.json").write_bytes(canonical(summary) + b"\n")
     return summary

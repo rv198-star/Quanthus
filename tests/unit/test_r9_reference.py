@@ -158,3 +158,36 @@ def test_metadata_warning_and_completion_require_exactly_one_real_turn():
     events.insert(3, {"type": "turn.started"})
     with pytest.raises(ValueError, match="TURN_BOUNDARY"):
         validate_trace("\n".join(map(json.dumps, events)), model_id=AUTO_SOL_MODEL)
+
+
+def test_rubric_version_cannot_silently_reinterpret_old_receipts():
+    import hashlib
+
+    from quanthus.r9_reference import (
+        CANONICAL_RUBRIC,
+        CANONICAL_RUBRIC_VERSION,
+        CANONICAL_SCHEMA,
+        RUBRIC,
+        reference_rubric,
+    )
+
+    assert reference_rubric({}) == RUBRIC
+    request = {
+        "schema_version": CANONICAL_SCHEMA,
+        "reference": {"rubric_version": CANONICAL_RUBRIC_VERSION},
+    }
+    with pytest.raises(ValueError, match="RUBRIC_BINDING"):
+        reference_rubric(request)
+    request["reference"]["rubric_sha256"] = hashlib.sha256(CANONICAL_RUBRIC.encode()).hexdigest()
+    assert reference_rubric(request) == CANONICAL_RUBRIC
+    request["reference"]["rubric_version"] = "undeclared-repair"
+    with pytest.raises(ValueError, match="RUBRIC_VERSION"):
+        reference_rubric(request)
+
+
+@pytest.mark.parametrize("reference", [{}, {"rubric_version": None}, {"rubric_sha256": "0" * 64}])
+def test_canonical_request_cannot_fall_back_to_legacy_rubric(reference):
+    from quanthus.r9_reference import CANONICAL_SCHEMA, reference_rubric
+
+    with pytest.raises(ValueError, match="RUBRIC_VERSION"):
+        reference_rubric({"schema_version": CANONICAL_SCHEMA, "reference": reference})

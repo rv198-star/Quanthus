@@ -1861,6 +1861,58 @@
         "CP-662-RT2-CLASS-SUPPORT-FAILED-20261113"
       ],
       "supersedes": "CON-R9-A2-SOURCE-READY-REFERENCE-BLOCKED-20261113"
+    },
+    {
+      "id": "CON-R9-A3-REFERENCE-TARGET-NONCONFORMANT-20261113",
+      "recorded_at": "2026-11-13T15:45:11.106888+00:00",
+      "actor": "R9primary; r5independentsemanticQA",
+      "question_id": "R9-R0-STRATIFIED-A3",
+      "family": "local-learning-r9-stratified",
+      "work_item": "P5-RESEARCH-R9-STRATIFIED-001",
+      "modules": [
+        "REFERENCE",
+        "UPDATE",
+        "EXPERT"
+      ],
+      "question": "固定R0分层开发输入能否支持canonical S02局部学习？",
+      "consumer": "#543/#544状态识别研究版本选择及Owner，保持原expert入场/资金用途边界",
+      "scope": "SameHF126; A3one1536pool and64selected; oldrubricguard16opinions only; canonicaltargetgap independently found",
+      "execution_status": "invalid",
+      "verdict": "not_evaluated",
+      "disposition": "investigate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "A3source and oldrubricopinions preserved; reference target nonconformant forcanonicalS02; nofit/update",
+      "decision_effect": "StopA3laterphases. One targeted canonical reference repair on exactlysame64, originalgates andwall; no newpool, labelmixing, replacement or forcedupdate.",
+      "reopen_conditions": [
+        "Independentlyapprovedcanonicalrubric mapping and synthetic adversarial conformance; same64source/roles/hashes; oldopinions kept separately",
+        "One<=128newcalls;A3plusrepair<=144;allR9research<=168;reference17:12,total17:42UTC unchanged; anygatefailure stop"
+      ],
+      "retained_assets": [
+        "ExactA3sourcepool/selection/packets",
+        "16oldrubricopinions andQA173literalcitations",
+        "Versionedcanonicalprompt isolated fromoldRUBRIC"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Original08:10clock, A3start14:42, old16:10deadlineandK1late854s retained. ResearchCLI40actual before repair (8failed,RT2valid16,A3valid16);source29.569s,guard370.532s;preparation/tests/review/waiting cumulative; billingunknown-not-zero.",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/canonical-defect-finding.json"
+      ],
+      "evidence": [
+        {
+          "id": "R9-CANONICAL-REFERENCE-DEFECT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/canonical-defect-finding.json",
+          "sha256": "ca4f8ef0f7e9130f4ba3f9c20579797bc92e345af15f0a8f5f86830b6279d60c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "A3sourceGO; oldrubricguard0/7/1; crosscontractconformancegap, not current modelquality"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-665-A3-REFERENCE-ADMISSION-20261113"
+      ],
+      "supersedes": null
     }
   ]
 }

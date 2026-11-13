@@ -42,6 +42,64 @@ contraction or its absence. Include reasons and uncertainty in rationale; do not
 Packet: {packet}
 """
 
+CANONICAL_RUBRIC_VERSION = "canonical-s02-reference-repair-v1"
+CANONICAL_SCHEMA = "quanthus.r9-canonical-reference-repair.v1"
+CANONICAL_RUBRIC = """You are a candidate-blind research reader, role {reader}.
+Use only the supplied normalized HLC40. Do not use tools, files, retrieval, or outside knowledge.
+Rows 1..20 are the preceding window; rows 21..40 are the CURRENT 20-session proposition.
+Judge observed orderly consolidation under this canonical S02 meaning:
+positive evidence of low net directional progress, a materially narrow current range,
+and material range contraction relative to the preceding window, without coherent directional
+relocation across the current window. All of these conditions need defensible evidence.
+Orderly does not mean a smooth, monotonic, or quiet path. Repeated two-sided travel or sharp
+reversals INSIDE an already tight contracting band do not, by themselves, veto consolidation.
+Movement of the range center between windows is descriptive context, not a mandatory stability
+gate; center movement without coherent directional relocation cannot alone veto consolidation.
+Distinguish a tight contracting oscillation from a materially broad or expanding structure.
+A coherent directional relocation is sustained repricing, not merely any directional leg,
+a recent excursion, or high turnover inside the bounded band. A narrow but noncontracting
+range is insufficient. Neither contraction alone nor low net progress alone is sufficient.
+Assess supporting and contrary evidence across the full current window. TRUE requires positive
+evidence for all four necessary conditions. FALSE requires clear contrary evidence for at least
+one necessary condition, even if another condition remains uncertain. Otherwise return UNKNOWN.
+Use qualitative reasoning; do not invent numerical thresholds, classifiers or feature formulas.
+Do not infer future breakout, investment merit or any other market outcome.
+Never force class balance.
+Return exactly one JSON object with keys case_id,reviewer,label,support,counterevidence,rationale.
+case_id must equal supplied case_id; reviewer must be {reader}; label is TRUE,FALSE,UNKNOWN.
+support and counterevidence are lists of exact price citations, each with exactly
+offset (integer1..40), field (H,L,C), value (exact supplied string), reason (nonempty).
+TRUE requires support; FALSE requires counterevidence. Cite both windows when asserting
+contraction or its absence. Include reasons and uncertainty in rationale; do not use Markdown.
+Packet: {packet}
+"""
+
+
+def reference_rubric(contract: dict[str, Any]) -> str:
+    reference = contract.get("reference", {})
+    if not isinstance(reference, dict):
+        raise ValueError("R9_REFERENCE_RUBRIC_METADATA")
+    version = reference.get("rubric_version")
+    declared = "rubric_version" in reference or "rubric_sha256" in reference
+    if contract.get("schema_version") != CANONICAL_SCHEMA and not declared:
+        return RUBRIC
+    if contract.get("schema_version") != CANONICAL_SCHEMA or version != CANONICAL_RUBRIC_VERSION:
+        raise ValueError("R9_REFERENCE_RUBRIC_VERSION")
+    if reference.get("rubric_sha256") != hashlib.sha256(CANONICAL_RUBRIC.encode()).hexdigest():
+        raise ValueError("R9_REFERENCE_RUBRIC_BINDING")
+    return CANONICAL_RUBRIC
+
+
+def reference_protocol(contract: dict[str, Any], request_sha256: str) -> dict[str, str]:
+    rubric = reference_rubric(contract)
+    if contract.get("schema_version") != CANONICAL_SCHEMA:
+        return {}
+    return {
+        "request_sha256": request_sha256,
+        "rubric_version": CANONICAL_RUBRIC_VERSION,
+        "rubric_sha256": hashlib.sha256(rubric.encode()).hexdigest(),
+    }
+
 
 def strict_json(text: str) -> Any:
     def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -161,6 +219,8 @@ def collect_role(
     if output.exists() or role not in {"guard", "evaluation", "train", "update"}:
         raise ValueError("R9_REFERENCE_FRESH_ROLE_OUTPUT")
     contract = json.loads(request.read_bytes())
+    rubric = reference_rubric(contract)
+    protocol = reference_protocol(contract, hashlib.sha256(request.read_bytes()).hexdigest())
     model_id = contract.get("reference", {}).get("reader_model_id")
     if model_id is not None and model_id != AUTO_SOL_MODEL:
         raise ValueError("R9_REFERENCE_MODEL_NOT_FROZEN")
@@ -206,13 +266,17 @@ def collect_role(
             "call_started": False,
             "model_id": model_id or "configured_default",
         }
+        if protocol:
+            receipt["protocol"] = protocol
         if not row["available"]:
             return receipt
         remaining = (deadline - datetime.now(timezone.utc)).total_seconds()
         if remaining <= 3:
             receipt["status"] = "DEADLINE_NOT_RUN"
             return receipt
-        prompt = RUBRIC.format(reader=reader, packet=json.dumps(packet, separators=(",", ":")))
+        prompt = rubric.format(reader=reader, packet=json.dumps(packet, separators=(",", ":")))
+        if protocol:
+            receipt["prompt_sha256"] = hashlib.sha256(prompt.encode()).hexdigest()
         (stem.with_suffix(".prompt.txt")).write_text(prompt)
         then = time.monotonic()
         receipt["call_started"] = True
@@ -295,7 +359,10 @@ def collect_role(
         "train": positive + negative >= 12 and min(positive, negative) >= 4 and blocks >= 2,
         "update": positive + negative >= 1,
     }[role]
-    raw = canonical({"opinions": opinions, "resolved": resolved}) + b"\n"
+    sealed: dict[str, Any] = {"opinions": opinions, "resolved": resolved}
+    if protocol:
+        sealed["protocol"] = protocol
+    raw = canonical(sealed) + b"\n"
     (output / "references.sealed.json").write_bytes(raw)
     summary = {
         "role": role,
@@ -312,5 +379,7 @@ def collect_role(
         "fit_runs": 0,
         "update_runs": 0,
     }
+    if protocol:
+        summary["protocol"] = protocol
     (output / "support.safe.json").write_bytes(canonical(summary) + b"\n")
     return summary

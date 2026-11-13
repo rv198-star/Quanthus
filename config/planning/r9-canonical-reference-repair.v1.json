@@ -1,0 +1,333 @@
+{
+  "schema_version": "quanthus.r9-canonical-reference-repair.v1",
+  "request_id": "RESEARCH-R9-CANONICAL-REFERENCE-REPAIR-A4",
+  "work_item": "P5-RESEARCH-R9-STRATIFIED-001",
+  "scientific_design_status": "frozen_after_independent_metadata_review",
+  "runtime_status": "implementation_and_code_acceptance_pending",
+  "owner_authority": "Owner最新明确继续R9除不可解决阻碍外努力完成；独立r5前瞻开发试验条件GO；新增有限3h tranche，保留A1/A2/RT2历史及原截止偏差",
+  "purpose": "Canonical S02 reference conformance repair on exactly the same frozen A3 inputs; one baseline and conditional update only after all original support gates",
+  "source": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "manifest_sha256": "8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "closure": "config/research/research-capital-qual/closure.v1.json",
+    "closure_sha256": "0f66acfcc8ef1a93f831b7272f59a86df13fe4a2f3717e4c8e5a812d4cbac13f",
+    "cache": "/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/job-a1/source",
+    "knowledge_cutoff": "2026-11-11T20:19:54.776092+00:00"
+  },
+  "fixed_role_identity": {
+    "status": "1536candidateidentityhash pinnedbeforeprice; selected64hashbeforeanyreference"
+  },
+  "roles": [
+    {
+      "role": "train",
+      "anchor": "2020-03-31",
+      "count": 12
+    },
+    {
+      "role": "train",
+      "anchor": "2020-04-30",
+      "count": 12
+    },
+    {
+      "role": "guard",
+      "anchor": "2020-07-31",
+      "count": 8
+    },
+    {
+      "role": "update",
+      "anchor": "2020-08-31",
+      "count": 8
+    },
+    {
+      "role": "evaluation",
+      "anchor": "2020-11-30",
+      "count": 12
+    },
+    {
+      "role": "evaluation",
+      "anchor": "2020-12-31",
+      "count": 12
+    }
+  ],
+  "role_time_order": "train<guard<=update<evaluation with entity/episode/key isolation",
+  "scope": {
+    "market_year": 2020,
+    "all_source_semantics": "latest_sealed_retrospective at actual2026 source cutoff; Tclose market observation separate; no historicalPIT claim",
+    "anchor": "last of exact40consecutive open daily sessions; prior20/current20",
+    "new_market_acquisition": false,
+    "protected2022plus": false,
+    "denominator": 64,
+    "replace_or_reassign_cases": false,
+    "prior_exposure": "all2020-2021 broad-window exposure cumulative; prior exactissuer exposure incomplete; development-grade new reference, not untouchedholdout",
+    "candidate_pool_denominator": 1536
+  },
+  "source_qualification": {
+    "before_price_read": [
+      "bindcomplete126memberSHA/sizeclosure",
+      "exactpublishedproducer/codepre-review andsyntheticguardtests",
+      "freeze1536identity/windowsSHA beforevalues; fixedsourcequalifiedR0stratified64SHA beforeanyreference"
+    ],
+    "columns": "HLC and associated OHLCV/source/clock/currency/rawbasis/tradability/action/quality identity needed for native40 admission only",
+    "windows": "only exactselected listing_id/calendar_session_id 40tuple per case; no records afteranchor",
+    "guards": [
+      "uniqueidentity/session/nativebar/state; CNY/UNADJUSTED daily semantics and observationopen/close binding",
+      "exact40continuity and fullHLC positive finite low<=close<=high",
+      "suspension/nontradable,missingbar,unresolved required daily-input quality or implemented action/unknown actiondate withincase coordinate =>UNAVAILABLE",
+      "no imputedbars/volume/adjustments/PIT; exclude optionalminute-only defects from daily-HLC gate"
+    ],
+    "materialize_once": "one1536exact40source/admission/Facts job-localmaterialization; selected64 reusewithoutrebuilding; formalcoldconstructionseparatemodefromphysicalsourcecopy"
+  },
+  "reference": {
+    "cases": 64,
+    "readers": 2,
+    "maximum_opinions": 128,
+    "grade": "candidate-blind operational AI reference, correlated provider caveat recorded; no claim of independent market truth",
+    "support": "original24/8/8/24role caps, train>=12definite &>=4/class &>=2month blocks;guard>=2/class;eval>=12definite,>=5issuer/class,>=2month blocks",
+    "unknown": "disagreement/unjudgeable remainsUNKNOWN; no third vote or replacement",
+    "historical_timing_scenario": "12case dual-reader method673s;64cases linear scenario ~60min, not measured forecast",
+    "reference_wall_cap_seconds": 7200,
+    "gated_order": [
+      {
+        "role": "guard",
+        "maximum_cases": 8,
+        "maximum_opinions": 16,
+        "pass": "admitted definite>=2per class"
+      },
+      {
+        "role": "evaluation",
+        "maximum_cases": 24,
+        "maximum_opinions": 48,
+        "pass": "admitted definite>=12,>=5uniquecompanies/class,>=2month blocks"
+      },
+      {
+        "role": "train",
+        "maximum_cases": 24,
+        "maximum_opinions": 48,
+        "pass": "admitted definite>=12,>=4/class,>=2month blocks"
+      },
+      {
+        "role": "update",
+        "maximum_cases": 8,
+        "maximum_opinions": 16,
+        "pass": "at least1admitteddefinite; full policy/source guard"
+      }
+    ],
+    "commitment": "packets and all completed opinion envelopes hash-committed before training; learner sees support receipts and allowedtrain/update/guard labels only; full eval opinions open after newv0/v1/retention-choice and both eval predictions committed",
+    "stop_on_gate_failure": "whole fit/update remainsNOT_RUN; later opinion rolesNOT_RUN; preserve unknowns and64denominator, no resampling/role transfer",
+    "rubric": "canonical low-directional bounded material contraction without coherent relocation; center movement is modifier; in-band churn alone not a veto",
+    "reader_model": "CN02 configuredmagpie endpoint with explicitauto/gpt-6.1-sol per invocation; fixedsame model/route/runtime for allRT2opinions",
+    "maximum_calls": 168,
+    "engineering_probe_calls": 1,
+    "source_gate_first": true,
+    "invalid_tool_or_context_trace": "no research reference acceptance if readeruses tools/retrieval or sees unallowedcontext; failclosed, finite schema-repair allowance must be predeclared",
+    "fit_after_all_support_gates": true,
+    "schema_repair_calls": 0,
+    "all_failed_calls_count_toward_cap": true,
+    "per_call_timeout_seconds": 90,
+    "completion_total_opinion_cap": 128,
+    "validator": "exactqualifiedSHA/64identitySHA; exactcase/reader/schema/noduplicateJSON; exactliteralHLCcitation; TRUEsupportitselfcoversbothwindows; trace toolsinvalid; semanticQA separate",
+    "prompt_source": "src/quanthus/r9_reference.py:CANONICAL_RUBRIC",
+    "trace": "onlythread/turn/itemmessageorreasoning events; anytool/file/retrieval/unknown event invalidates opinion",
+    "failure": "Any support/QA failure stops later phases; original40+repair128 cap168 cumulative; no threshold/sample rescue",
+    "semantic_QA": "Independent exact citation/rationale review against canonical P3-STAGE-011 sections2-7; in-band reversal or center movement alone is not a veto; preserve UNKNOWN; QA can only exclude invalid opinions",
+    "reader_model_id": "auto/gpt-6.1-sol",
+    "previous_failed_cli_calls": 8,
+    "new_reference_cli_cap": 128,
+    "maximum_valid_or_schema_repair_retries": 0,
+    "output_directory": "reference-canonical-a4/<role>",
+    "prior_opinions_valid": 16,
+    "metadata_diagnostic_exception": "oneexactAUTO_SOL_METADATA_WARNING beforeturn.started; exactoutertype/item andinnerid/type/message only; modelidmustbeauto/gpt-6.1-sol; anyothereventerror/tool stillreject",
+    "recovery": "One canonical-conformance repair, same64/roles/source. OriginalA3stopped after guard; old opinions remain old rubric. Fresh isolated readers see no old labels/counts. No second repair/revote/newpool.",
+    "previous_rt2_valid_calls": 16,
+    "sampling_visibility": "OnlyfrozenR0fourpredicateproxy explicitlyallowed forstrata; noAIlabels/newv0/v1predictions/futureoutcomes",
+    "reader_visibility": "OnlyopaqueID/availability/HLC40; noR0proxy/strata/roles/issuer/features/otheropinions",
+    "rubric_version": "canonical-s02-reference-repair-v1",
+    "rubric_sha256": "26876e84b4d60e09932c995f1406baea97d55cb4326ff3ceaed32036d7376979",
+    "previous_a3_calls": 16,
+    "selection_no_reference_or_prediction_visibility": true
+  },
+  "learning": {
+    "newbaseline": true,
+    "oldMarch_checkpoint_reuse": false,
+    "policy": {
+      "family": "single-fixed-l2-logistic",
+      "initialization": "zero",
+      "fit_steps": 200,
+      "update_steps": 100,
+      "learning_rate": 0.05,
+      "l2": 0.01,
+      "update_loss_trigger": 0.6931471805599453,
+      "trigger_provenance_sha256": "d20e77b27dd661d4b4cb1f1b3e3393216145d72cea0466128bba17932b8fce42",
+      "original_train_weight": 0.5,
+      "new_update_weight": 0.5,
+      "scaler": "initial-train-only; unchanged during update",
+      "maximum_updates": 1
+    },
+    "features": [
+      "absolute_directional_efficiency",
+      "range_width",
+      "width_change",
+      "absolute_center_shift",
+      "range_traversal",
+      "counter_direction_excursion_share",
+      "counter_direction_undefined"
+    ],
+    "raw_threshold": 0.5,
+    "max_fit": 1,
+    "max_update": 1,
+    "train_only_scaler": true,
+    "role_validation": "original head2_revision.validate_roles, with actual admitted+definite support gates",
+    "trigger": "original logloss0.6931471805599453; no forcedupdate or changedset after NO_UPDATE",
+    "retention": {
+      "gradient_use": false,
+      "positive_errors_may_increase": false,
+      "negative_errors_may_increase": false,
+      "update_batch_mean_loss_may_increase": false,
+      "rejected_update": "preserve; evaluate preselected v0; no second update or tuning"
+    },
+    "candidate_choice": "same newevaluation,FP strictly decreases andFN does not increase vs newv0; old12vs3 onlymotivatesquestion; guardfailure keepsv0",
+    "commit_before_eval_unblind": [
+      "newv0 checkpoint",
+      "candidate checkpoint if actualupdate",
+      "retention versionselection",
+      "bothv0/v1 evaluation predictions"
+    ],
+    "if_no_update_or_insufficient_support": "record NOT_RUN/NO_UPDATE at true stage, retain source/ref assets and current system; do not claim actuallearningupdate/MVP complete"
+  },
+  "consumer": "543/544 developmentrecognition versionchoice conditionalonR0-stratifiedsample; report samecaseR0/v0/v1 FP/FN; no prevalence/probability/economic/trading admission",
+  "runtime": {
+    "cpu_cores": 2,
+    "rss_bytes": 2147483648,
+    "tmp_bytes": 1073741824,
+    "output_bytes": 67108864,
+    "minimum_free_bytes": 8589934592,
+    "source_prepare_wall_seconds": 600,
+    "per_reference_call_wall_seconds": 90,
+    "reference_total_wall_seconds": 7200,
+    "concurrency": 2,
+    "primary_fit_update_wall_seconds": 600,
+    "cold_fit_update_wall_seconds": 600,
+    "total_batch_deadline": "2026-11-13T17:42:00.588931+00:00",
+    "qualification_deadline": "2026-11-13T10:10:14Z",
+    "no_reset": "allpreparation, source/endpoint failures, oldrouteprobes, design, waiting and reference cost counted from08:10:14UTC",
+    "reference_absolute_stop": "2026-11-13T17:12:00.588931+00:00",
+    "qualification_deadline_original_status": "TIME_GATE_MISSED; remains historicalfailedK1",
+    "tranche_start": "2026-11-13T14:42:00.588931+00:00",
+    "wall_seconds": 10800,
+    "prior_batch_deadline": "2026-11-13T16:10:14Z",
+    "budget_accounting": "allpreparation/failures/reviews/waiting included inA3wall; totalelapsedfromoriginal08:10:14 remains,costsnotreset; originaldeadlinevariance separatelyretained; canonical repair explicitly adds <=128new CLI, A3+repair<=144, overall<=168; no wall extension"
+  },
+  "implementation_bindings": {
+    "src/quanthus/r7_native.py": "d93a32f05bbb764519c713ccb089593d7421eeb51c7ec5b42ba8daed82943aa9",
+    "src/quanthus/structure_v2_inputs.py": "b336e3ee48889ca7ccb9903c0d2ddf55e84e9b9fe56472cc34b7e640339e2275",
+    "src/quanthus/stage_learning/head2_facts.py": "8be2f1f2ff57a299b126a5e1937ab85025cacddfd1b0f02ca195638a49288235",
+    "src/quanthus/stage_learning/head2_revision.py": "09c5d9c4a29adaf153f789bbb7ecc2d548c502cf1b8928110e6e524a9a99a395",
+    "src/quanthus/stage_learning/local_head.py": "e7db806ed750b8c088c296e142f182a8ecfbcb461ee3f3dd86862bff506dc810"
+  },
+  "implementation_to_freeze_before_market_rows": "Exactpublishedr9_stratified.py.make_pool +r9_qualification.qualify_pool one1536job; original64qualify byte-regression first; selected64immutableexport in a3-selected then identity/qualifiedSHA frozenbeforeanynewreference",
+  "HF_publication": "runs/RESEARCH-R9-LOCAL-001/RESEARCH-R9-LOCAL-001-T1/<attempt> with pinnedmanifest; valuablecontracts/results retainedCN02",
+  "independent_review": "r5_design_review metadatawindow/roles/sourcepins GO; actualsource/reference/fit andcode gatedseparately",
+  "selection": {
+    "seed": "R9-R0-STRATIFIED-A3-20261113",
+    "candidate_count": 1536,
+    "groups": [
+      {
+        "role": "train",
+        "anchor": "2020-03-31",
+        "pool": 256,
+        "take": 12,
+        "r0_support_take": 6,
+        "other_take": 6
+      },
+      {
+        "role": "train",
+        "anchor": "2020-04-30",
+        "pool": 256,
+        "take": 12,
+        "r0_support_take": 6,
+        "other_take": 6
+      },
+      {
+        "role": "guard",
+        "anchor": "2020-07-31",
+        "pool": 256,
+        "take": 8,
+        "r0_support_take": 4,
+        "other_take": 4
+      },
+      {
+        "role": "update",
+        "anchor": "2020-08-31",
+        "pool": 256,
+        "take": 8,
+        "r0_support_take": 4,
+        "other_take": 4
+      },
+      {
+        "role": "evaluation",
+        "anchor": "2020-11-30",
+        "pool": 256,
+        "take": 12,
+        "r0_support_take": 6,
+        "other_take": 6
+      },
+      {
+        "role": "evaluation",
+        "anchor": "2020-12-31",
+        "pool": 256,
+        "take": 12,
+        "r0_support_take": 6,
+        "other_take": 6
+      }
+    ],
+    "prior_identities": [
+      {
+        "path": "/srv/agentdock/quanthus-ops/research-r9-local-20261113/retained/new-baseline-role-identities.private.json",
+        "sha256": "5a63f72cc0af7a1bf0936596a9eece09ecce6b064d1ddbe10ff01562d143ec0d"
+      },
+      {
+        "path": "/srv/agentdock/quanthus-ops/research-r9-source-first-20261113/screen-a2/role-identities.private.json",
+        "sha256": "3e6c7ee9505766edcb96aa4d95dab1d722866e7b8e899defa53e3a6b149a2bd0"
+      }
+    ],
+    "known_historical_codes": [
+      "000001",
+      "300750",
+      "600519"
+    ],
+    "historical_exposure": "knownenumerable companies excluded; fullold87referenceidentitylist unavailable, unknown exposure explicitlycarried, nofreshholdoutclaim",
+    "source_first": "qualifyall1536exact40 first; rawimmutable4Decimalprimary feedonly frozenR0proxy. Unavailable excludedwithoutnegative label",
+    "R0_proxy": {
+      "path": "config/stage-learning/order-rule-screen.v1.json",
+      "semantic_digest": "sha256:74d257c75e57b0fa9d09fd183496ee63a3d9cbed21492c36acecc4f7e71bf7f0",
+      "scope": "exactfourfactStage2predicate projectedonapprovedHead2exact40; sampling semanticproxy, notanindependentlabel orwhole61profileadmission",
+      "order": "eachpreassigned256group remainsfixedhash order; takefirstsourcequalified fromeachR0support/otherstratum",
+      "stop": "anyquotashortage stops allsampling; nosecondpool/replacement/newdate/thresholdtuning"
+    },
+    "forbidden_selection": [
+      "newv0/v1predictions",
+      "AI labels/consensus",
+      "futureoutcomes/returns",
+      "parametersearch"
+    ],
+    "blind_packets": "caseID/available/normalizedHLC40 only; noR0/strata/role/issuer/features",
+    "repair_source": "Reuse exact already frozen A3 selected64 without any new sample, replacement, role transfer, recomputation or feature/parameter change"
+  },
+  "qualified_input": {
+    "producer_git": "24846b904ff9f3fabd7e9608d40260057101f903",
+    "identity_sha256": "33aab2d6c9ca99c1b4dc4c0695c377723a2a82fbec221e8592222ab3a2d2b449",
+    "qualified_cases_sha256": "8d6c981b378d4cbd67187654b3cd31ae2d2df4f1632bbdf00d804d3f7d773d95",
+    "reference_packets_sha256": "eb640c683d372e7a2a507b68159b47a29c215db647f5423edc460b31506efe19",
+    "admitted": 64
+  },
+  "canonical_conformance": {
+    "governing_design": "docs/design/stage-orderly-consolidation-boundary-repair.md sections2-7",
+    "retained_failure": "A3guard0TRUE7FALSE1UNKNOWN under older stable-center rubric; internal QA remains, target conformance gap separately recorded",
+    "repair_scope": "reference protocol text only; no new predicates/thresholds/fit/retention policy",
+    "positive": "low directional progress AND material narrowness AND contraction AND absence of coherent relocation",
+    "center": "continuous modifier, not independent truth veto",
+    "churn": "high in-band two-sided movement not independent truth veto",
+    "materiality": "qualitative evidence; uncertainty UNKNOWN; neither forced balance nor automatic R0 agreement"
+  }
+}

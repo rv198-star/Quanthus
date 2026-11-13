@@ -1,6 +1,8 @@
 import hashlib
+import io
 import json
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -185,11 +187,11 @@ def fake_process(command, **kwargs):
         {"type": "item.completed", "item": {"type": "agent_message", "text": "{}"}},
         {"type": "turn.completed", "usage": {}},
     ]
-    kwargs["stdout"].write("\n".join(map(json.dumps, events)))
-    kwargs["stdout"].flush()
 
     class Process:
         returncode, pid = 0, 123
+        stdout = io.BytesIO("\n".join(map(json.dumps, events)).encode())
+        stderr = io.BytesIO(b"")
 
         def wait(self, timeout):
             return 0
@@ -261,3 +263,95 @@ def test_expired_request_never_creates_attempt(task_request, tmp_path):
             tmp_path / "sandbox",
         )
     assert not (tmp_path / "attempt.json").exists()
+
+
+def test_empty_success_exit_stops_the_queue_without_retry(task_request, tmp_path, monkeypatch):
+    monkeypatch.setattr(cal, "ResourceGuard", FakeGuard)
+    calls = []
+
+    class EmptyProcess:
+        returncode, pid = 0, 123
+
+        def __init__(self):
+            self.stdout, self.stderr = io.BytesIO(b""), io.BytesIO(b"stdin notice")
+
+        def wait(self, timeout):
+            return 0
+
+        def poll(self):
+            return 0
+
+    def launch(*args, **kwargs):
+        calls.append(1)
+        return EmptyProcess()
+
+    monkeypatch.setattr(cal.subprocess, "Popen", launch)
+    cal.prepare(task_request, tmp_path / "selected")
+    result = cal.collect(
+        task_request,
+        tmp_path / "selected/selected.private.json",
+        tmp_path / "out",
+        tmp_path / "sandbox",
+    )
+    assert 1 <= len(calls) <= 2
+    assert result["calls"] == len(calls) and result["valid"] == 0
+    assert result["resource_monitor"]["stop_reason"] == "R9_CALIBRATION_TRACE_FAILURE"
+    sealed = json.loads((tmp_path / "out/references.sealed.json").read_text())
+    assert len(sealed["opinions"]) == 24
+    assert sum(r["status"] == "NOT_RUN" for r in sealed["opinions"]) >= 22
+
+
+def test_stream_limit_applies_only_to_captured_bytes(tmp_path):
+    guard = FakeGuard({}, tmp_path, tmp_path)
+    sink = io.BytesIO()
+    cal.capture_stream(io.BytesIO(b"x" * 300000), sink, guard)
+    assert len(sink.getvalue()) == 262144
+    assert guard.reason == "R9_CALIBRATION_STREAM_LIMIT"
+
+
+def test_timeout_drains_streams_and_stops_following_slots(task_request, tmp_path, monkeypatch):
+    monkeypatch.setattr(cal, "ResourceGuard", FakeGuard)
+    monkeypatch.setattr(cal.os, "killpg", lambda *args: None)
+    processes = []
+
+    class SlowStream(io.BytesIO):
+        def read(self, n):
+            time.sleep(0.01)
+            return super().read(n)
+
+    class TimedProcess:
+        pid = 123
+
+        def __init__(self):
+            self.returncode = None
+            self.stdout, self.stderr = SlowStream(b"tail"), SlowStream(b"error tail")
+
+        def wait(self, timeout):
+            if self.returncode is None:
+                self.returncode = -9
+                raise cal.subprocess.TimeoutExpired("fake-cli", timeout)
+            return self.returncode
+
+        def poll(self):
+            return self.returncode
+
+    def launch(*args, **kwargs):
+        p = TimedProcess()
+        processes.append(p)
+        return p
+
+    monkeypatch.setattr(cal.subprocess, "Popen", launch)
+    cal.prepare(task_request, tmp_path / "selected")
+    result = cal.collect(
+        task_request,
+        tmp_path / "selected/selected.private.json",
+        tmp_path / "out",
+        tmp_path / "sandbox",
+    )
+    assert 1 <= result["calls"] <= 2
+    assert result["valid"] == 0
+    assert all(p.stdout.closed and p.stderr.closed for p in processes)
+    rows = json.loads((tmp_path / "out/references.sealed.json").read_text())["opinions"]
+    attempted = [r for r in rows if r["call_started"]]
+    assert all(r["error"] == "R9_CALIBRATION_TIMEOUT" for r in attempted)
+    assert all(r["process_exit_code"] == -9 and r["termination_signal"] == 9 for r in attempted)

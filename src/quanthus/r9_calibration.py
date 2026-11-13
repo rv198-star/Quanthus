@@ -16,7 +16,7 @@ from contextlib import suppress
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from quanthus.r9_reference import strict_json, validate_trace
 from quanthus.structure_v2_inputs import canonical
@@ -129,7 +129,7 @@ def validate(value: Any, packet: dict[str, Any], reader: str) -> dict[str, Any]:
 def select(
     pool: list[dict[str, Any]], excluded: set[str], anchors: list[str]
 ) -> list[dict[str, Any]]:
-    result = []
+    result: list[dict[str, Any]] = []
     for anchor in anchors:
         rows = [
             r
@@ -276,10 +276,29 @@ class ResourceGuard:
                     self.stop("R9_CALIBRATION_RSS_LIMIT")
                 if directory_bytes(self.output) > self.runtime["output_bytes"]:
                     self.stop("R9_CALIBRATION_OUTPUT_LIMIT")
+                if any(p.stat().st_size > 1048576 for p in self.output.glob("*.opinion.json")):
+                    self.stop("R9_CALIBRATION_OPINION_LIMIT")
                 if directory_bytes(self.sandbox) > self.runtime["tmp_bytes"]:
                     self.stop("R9_CALIBRATION_TMP_LIMIT")
             except (OSError, ValueError) as exc:
                 self.stop(f"R9_CALIBRATION_LIMIT_MONITOR:{type(exc).__name__}")
+
+
+def capture_stream(stream: BinaryIO, sink: BinaryIO, guard: ResourceGuard) -> None:
+    """Bound only job output streams; do not limit the client's shared SQLite files."""
+    total = 0
+    try:
+        while block := stream.read(16384):
+            remaining = 262144 - total
+            sink.write(block[:remaining])
+            total += min(len(block), remaining)
+            if len(block) > remaining:
+                guard.stop("R9_CALIBRATION_STREAM_LIMIT")
+                return
+    except (OSError, ValueError):
+        guard.stop("R9_CALIBRATION_STREAM_FAILURE")
+    finally:
+        stream.close()
 
 
 def filtered_trace(trace: str, model: str) -> str:
@@ -381,8 +400,8 @@ def collect(request: Path, selected: Path, output: Path, sandbox: Path) -> dict[
         process = None
         try:
             with (
-                stem.with_suffix(".events.jsonl").open("w") as events,
-                stem.with_suffix(".stderr.txt").open("w") as errors,
+                stem.with_suffix(".events.jsonl").open("wb") as events,
+                stem.with_suffix(".stderr.txt").open("wb") as errors,
             ):
                 command = [
                     "codex",
@@ -402,25 +421,26 @@ def collect(request: Path, selected: Path, output: Path, sandbox: Path) -> dict[
                     str(stem.with_suffix(".opinion.json")),
                     prompt,
                 ]
-                # Each of 3 child-written files is <=256KiB; all 24 calls, duplicated
-                # receipts and sealed opinions stay below the 64MiB aggregate budget.
-                wrapper = (
-                    "import os,resource,sys;"
-                    "resource.setrlimit(resource.RLIMIT_FSIZE,(262144,262144));"
-                    "os.execvp(sys.argv[1],sys.argv[1:])"
-                )
                 with guard.lock:
                     if guard.stopped.is_set():
                         raise ValueError(guard.reason)
                     process = subprocess.Popen(
-                        [sys.executable, "-c", wrapper, *command],
+                        command,
                         stdin=subprocess.DEVNULL,
-                        stdout=events,
-                        stderr=errors,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
                         start_new_session=True,
                     )
                     receipt["call_started"] = True
                     guard.processes.append(process)
+                if process.stdout is None or process.stderr is None:
+                    raise ValueError("R9_CALIBRATION_PIPE_MISSING")
+                readers = [
+                    threading.Thread(target=capture_stream, args=(stream, sink, guard), daemon=True)
+                    for stream, sink in ((process.stdout, events), (process.stderr, errors))
+                ]
+                for thread in readers:
+                    thread.start()
                 try:
                     process.wait(timeout=min(117, remaining - 3))
                 except subprocess.TimeoutExpired:
@@ -428,6 +448,16 @@ def collect(request: Path, selected: Path, output: Path, sandbox: Path) -> dict[
                         os.killpg(process.pid, signal.SIGKILL)
                     process.wait(timeout=2)
                     raise ValueError("R9_CALIBRATION_TIMEOUT") from None
+                finally:
+                    for thread in readers:
+                        thread.join(timeout=2)
+                if any(thread.is_alive() for thread in readers):
+                    with suppress(ProcessLookupError):
+                        os.killpg(process.pid, signal.SIGKILL)
+                    raise ValueError("R9_CALIBRATION_PIPE_DRAIN_TIMEOUT")
+                receipt["process_exit_code"] = process.returncode
+                if guard.stopped.is_set():
+                    raise ValueError(guard.reason)
             if process.returncode != 0:
                 raise ValueError(f"R9_CALIBRATION_PROCESS_EXIT:{process.returncode}")
             trace = stem.with_suffix(".events.jsonl").read_text()
@@ -448,12 +478,22 @@ def collect(request: Path, selected: Path, output: Path, sandbox: Path) -> dict[
             subprocess.TimeoutExpired,
         ) as exc:
             receipt.update(status="INVALID_OR_FAILED", error=str(exc)[:1000])
+            if str(exc).startswith(("R9_REFERENCE_TRACE_", "R9_CALIBRATION_TRACE_")):
+                guard.stop("R9_CALIBRATION_TRACE_FAILURE")
             if process is not None and process.poll() is None:
                 with suppress(ProcessLookupError):
                     os.killpg(process.pid, signal.SIGKILL)
                 process.wait(timeout=2)
             if process is not None and process.poll() is not None and process.returncode != 0:
                 guard.stop("R9_CALIBRATION_PROCESS_FAILURE")
+            if process is not None:
+                receipt["process_exit_code"] = process.returncode
+                receipt["termination_signal"] = (
+                    -process.returncode
+                    if process.returncode is not None and process.returncode < 0
+                    else None
+                )
+            receipt["resource_stop_reason"] = guard.reason
         receipt.update(
             seconds=round(time.monotonic() - started, 3),
             completed_at=datetime.now(timezone.utc).isoformat(),
@@ -489,7 +529,8 @@ def collect(request: Path, selected: Path, output: Path, sandbox: Path) -> dict[
             "peak_rss_bytes": guard.peak_rss,
             "cpu_affinity": guard.affinity,
             "stop_reason": guard.reason,
-            "child_file_bytes_cap": 262144,
+            "stream_bytes_cap": 262144,
+            "opinion_bytes_monitor_cap": 1048576,
         },
     }
     write(output / "receipt.safe.json", result)
@@ -510,6 +551,8 @@ def summarize(
         raise ValueError("R9_CALIBRATION_QA_BINDING")
     if sealed["request_sha256"] != sha(request) or sealed["selected_sha256"] != sha(selected):
         raise ValueError("R9_CALIBRATION_REFERENCE_BINDING")
+    if sealed["rubric_sha256"] != frozen["rubric_sha256"]:
+        raise ValueError("R9_CALIBRATION_REFERENCE_RUBRIC")
     if not isinstance(review.get("reviewer"), str) or not review["reviewer"].strip():
         raise ValueError("R9_CALIBRATION_QA_REVIEWER")
     expected = {
@@ -538,6 +581,21 @@ def summarize(
         packet = entry["source_row"]["packet"]
         keys = [(packet["case_id"], f"reader_{x}") for x in "ab"]
         pair = [opinions[k] for k in keys]
+        for r, key in zip(pair, keys, strict=True):
+            blind = {k: packet[k] for k in ("case_id", "HLC40")}
+            prompt = (
+                RUBRIC
+                + f"\ncase_id={packet['case_id']}; reader={key[1]}\nPacket: "
+                + json.dumps(blind)
+            )
+            if (
+                r["request_sha256"] != sha(request)
+                or r["selected_sha256"] != sha(selected)
+                or r["rubric_sha256"] != frozen["rubric_sha256"]
+                or r["model_id"] != MODELS[0 if key[1] == "reader_a" else 1]
+                or r["prompt_sha256"] != hashlib.sha256(prompt.encode()).hexdigest()
+            ):
+                raise ValueError("R9_CALIBRATION_OPINION_BINDING")
         valid = all(
             r["status"] == "VALID" and k not in excluded for r, k in zip(pair, keys, strict=True)
         )

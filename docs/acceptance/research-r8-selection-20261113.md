@@ -52,3 +52,9 @@ FormalP2已有5×100000、30%试仓、3..40会话和完整资金/持仓/退出�
 
 私有HF `rv192/quanthus-research-r1@2b1ab15dcedb10b8414ec9f96bacc3fb5dbeae8e`，目录
 `runs/RESEARCH-R8-COMBINATION-001/RESEARCH-R8-COMBINATION-001-T1/A1`。14文件/41,286字节全部按固定版本回读并逐字节一致；传输用时11.18秒。manifest SHA256为`a787c216e79995c8cf6d77ce3a822a8d2cb911ca4ea12bfa67df9d5a89b33c20`。源码检查与main交付另记，固定包只承担本次资格处置证据。
+
+## 本地验收绑定
+
+CN02固定候选a31e7164的90项元数据测试通过（pytest3.99秒），两个精确ed80追加历史检查与维护选择通过（selected=[]）；检查工作树干净。日志SHA256为`e931842b948c5bbc119dd6d8b735c8ba7fe6c9abc886385b0fe34df96a751251`。
+2350个非docs/planning文件及mode与1409执行版逐项一致，R7完整9231passed/35skipped原日志SHA已在CN02重新认证。因此按既有规范复用完整检查，后继文档索引只作精确base复核。
+RAW_MARGIN选择是接口映射的选题级代数诊断，未注册第三位专家或改变正式双专家拓扑，未形成获准的C；LEGACY_INTENSITY也保持未准入公式诊断。

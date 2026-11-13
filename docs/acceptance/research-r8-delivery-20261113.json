@@ -97,5 +97,74 @@
     "metadata_checks": "newly rerun on candidate; planning proposals/cost/qualification audited separately"
   },
   "retained_root": "/srv/agentdock/quanthus-ops/research-r8-combination-20261113/retained",
-  "lifecycle": "repository checks, ordinary merge and exact closure tracked separately"
+  "lifecycle": "repository checks, ordinary merge and exact closure tracked separately",
+  "metadata_validation": {
+    "candidate": "a31e7164bc612693ae44178912afa4dfe3c37984",
+    "base": "ed80dddd1679aa4a3fb3286aea0378a09958abc2",
+    "checks": [
+      {
+        "command": [
+          "/opt/quanthus/venvs/base24-py310-20261021T131338Z/bin/python",
+          "scripts/maintenance_checks.py",
+          "--base",
+          "ed80dddd1679aa4a3fb3286aea0378a09958abc2",
+          "--run"
+        ],
+        "exit_code": 0,
+        "seconds": 0.26394910702947527,
+        "summary": "nfig/planning/r8-state-consumption-select-request.v1.json\",\n    \"docs/acceptance/research-r8-delivery-20261113.json\",\n    \"docs/acceptance/research-r8-selection-20261113.md\",\n    \"docs/work-items/exploration-decisions.md\",\n    \"docs/work-items/learning-blueprint-progress.md\",\n    \"docs/work-items/research-r8-value-brief.md\"\n  ],\n  \"selected\": [],\n  \"executed\": [],\n  \"effect_status\": \"observing\"\n}\n"
+      },
+      {
+        "command": [
+          "/opt/quanthus/venvs/base24-py310-20261021T131338Z/bin/python",
+          "scripts/blueprint_progress.py",
+          "check",
+          "--base-ref",
+          "ed80dddd1679aa4a3fb3286aea0378a09958abc2"
+        ],
+        "exit_code": 0,
+        "seconds": 0.4580176710151136,
+        "summary": "BLUEPRINT_CHECK_PASS (links/hashes/history/view; not scientific acceptance)\n"
+      },
+      {
+        "command": [
+          "/opt/quanthus/venvs/base24-py310-20261021T131338Z/bin/python",
+          "scripts/exploration_governance.py",
+          "check",
+          "--base-ref",
+          "ed80dddd1679aa4a3fb3286aea0378a09958abc2"
+        ],
+        "exit_code": 0,
+        "seconds": 0.227450271951966,
+        "summary": "EXPLORATION_RECORDS_CHECKED; no scientific or execution authority granted\n"
+      },
+      {
+        "command": [
+          "/opt/quanthus/venvs/base24-py310-20261021T131338Z/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "tests/unit/test_blueprint_progress.py",
+          "tests/unit/test_exploration_governance.py"
+        ],
+        "exit_code": 0,
+        "seconds": 4.603250217041932,
+        "summary": "........................................................................ [ 80%]\n..................                                                       [100%]\n90 passed in 3.99s\n"
+      },
+      {
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0,
+        "seconds": 0.16798139899037778,
+        "summary": ""
+      }
+    ],
+    "log_sha256": "e931842b948c5bbc119dd6d8b735c8ba7fe6c9abc886385b0fe34df96a751251",
+    "fullcheck_reuse": "2350file/modes exact1409; original fullcheck 9231/35 raw log hash verified",
+    "working_tree_status": ""
+  },
+  "validation_disposition": "90 metadata tests and exactbase checks pass; old complete check reused only after2350file/mode proof; scientific qualification independently reviewed"
 }

@@ -684,7 +684,8 @@
         "CONTROL",
         "EXPERT",
         "REPRO",
-        "CLOSEOUT"
+        "CLOSEOUT",
+        "TRACE"
       ],
       "contribution": "复用现有连续事实与双专家，交付固定开发用途的统一可查询决策入口；用途比较与学习升级分别按R8/R9准入"
     },
@@ -698,7 +699,8 @@
         "CONTROL",
         "EXPERT",
         "REPRO",
-        "CLOSEOUT"
+        "CLOSEOUT",
+        "TRACE"
       ],
       "contribution": "固定小开发样本上的三算子sidecar与原双专家规则求值，保留实际源时钟和原映射"
     },
@@ -712,7 +714,8 @@
         "CONTROL",
         "EXPERT",
         "REPRO",
-        "CLOSEOUT"
+        "CLOSEOUT",
+        "TRACE"
       ],
       "contribution": "交付可查询研究决策卡、独立验收与可恢复证据，不重开既有策略或训练"
     }

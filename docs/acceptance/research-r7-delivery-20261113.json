@@ -1,0 +1,54 @@
+{
+  "schema": "quanthus.r7-engineering-delivery.v1",
+  "compute_git": "299a8be90068d0039e8fc390488380922f246fad",
+  "render_git": "e85948c0d2c8302578c97a84518229ad8a8651c4",
+  "request_path": "config/research/research-r7/request.v2.json",
+  "request_sha256": "2fb053dbf89c5db0d79841da1fe820dd68d5da065abc15de26bbd51bd0d53c8e",
+  "result_manifest_sha256": "e22c9caa24396b3acf51aaacd18a7f0f26156c6b079647ca4f78d3dc07f19d4a",
+  "private_hf": {
+    "dataset": "rv192/quanthus-research-r1",
+    "private": true,
+    "revision": "f3e38f6296a9b25d20ffaaf03e62ee55907144a5",
+    "prefix": "runs/RESEARCH-R7-MULTIOP-001/RESEARCH-R7-MULTIOP-001-T1/A2",
+    "files": {
+      "a2-type-comment-equivalence.json": {
+        "sha256": "ecc7354e9e8f8a4e7a86e3e0762b896dafbbd4d7c7e25aa59599b61d5067bef9",
+        "bytes": 163
+      },
+      "report-released.html": {
+        "sha256": "cd96c8cdc3ab3970e9389315c60c7f92e9760b3659ba4882b10048dfb5e84f44",
+        "bytes": 2354060
+      },
+      "READY": {
+        "sha256": "86f58ed0f66e5effaccd9de87cc060c524df1fc9cbb3d7371c88de16431d0b1a",
+        "bytes": 94
+      },
+      "summary.json": {
+        "sha256": "0aced316414c852599a7a56e833a6139a4d8ff9c8003b7f398361d63edc404b7",
+        "bytes": 1090
+      },
+      "manifest.json": {
+        "sha256": "e22c9caa24396b3acf51aaacd18a7f0f26156c6b079647ca4f78d3dc07f19d4a",
+        "bytes": 32075
+      },
+      "a2-receipt.json": {
+        "sha256": "cba3d585503cab552d9f5198d67809c2a66ed6ca82977466ba63099d615ec635",
+        "bytes": 1970
+      },
+      "input-copy.json": {
+        "sha256": "6f30b34130ca9257505499a956872ec719c0f6d8dcf7778b46a516a436b7e931",
+        "bytes": 114
+      },
+      "rows.jsonl": {
+        "sha256": "d2d3b1dadaba476d98ad6295c46ce94564e5e763c7ef361e25822288c76ee7fa",
+        "bytes": 731168
+      }
+    },
+    "total_bytes": 3120734,
+    "wall_seconds": 9.155762828071602,
+    "fixed_revision_all_readback": true,
+    "publication_scope": "independently verified engineering result; final complete checks and main delivery tracked separately"
+  },
+  "transport_contract": "separately frozen transfer-only hf-publication-plan.json under task evidence; A2 target is authoritative for this publication",
+  "compute_descriptor_note": "The immutable A2 compute request retained an unused inherited A1 publication prefix. Actual delivery follows the separately frozen A2 transport plan and this exact revision/path receipt; no compute input or result is rewritten."
+}

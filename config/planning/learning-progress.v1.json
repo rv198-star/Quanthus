@@ -12208,6 +12208,56 @@
         "S02",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-662-20261113T215020884840Z",
+      "recorded_at": "2026-11-13T21:50:20.884840+00:00",
+      "actor": "R9 primary; independent code/semantic review",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "progress",
+      "summary": "Owner SSH override verified; isolated fsize startup failure reproduced; CN02 full makecheck9319pass35skip. Research80starts and prior12UNKNOWN unchanged.",
+      "evidence": [
+        {
+          "id": "SSH-OFFLINE-CAUSE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-ssh-20261114/ssh-diagnostic-finding.json",
+          "sha256": "647f11e6eadd0233218d21335e773b8dca8a20721691641023b25d9715bd691f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Controlled loopback fixture reproduces global fsize startup failure;2offlineCLIstarts,0newrealmodelrequests"
+        },
+        {
+          "id": "SSH-NATIVE-CHECK",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-ssh-20261114/full-check-receipt.json",
+          "sha256": "bf128e35a1c4a39585bef8f2b7f8fc10a30ba87201d4fd35f2cfd34534f02c4f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact f9998c87 CN02/Python3.10.12 fullmakecheck exit0;9319pass35skip; engineering only"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Existing scoped engineering maturity remains; this follow-up adds native verification and execution-fault evidence. Scientific reference, learning and consumer grades are unchanged; no new live allocation.",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+          "number": 662,
+          "title": "[P5-RESEARCH-R9-QUALIFY-001] 核实单模块局部学习资格并冻结执行或停放差集",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T21:50:18Z",
+          "body_sha256": "7c4848b25a03a661fc5a0e6d7aa28c2a81bbcda8036b6b92ba31c12712ac80ae"
+        }
+      ],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "S02",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

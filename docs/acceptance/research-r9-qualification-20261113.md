@@ -26,4 +26,8 @@ Head2 March gen0固定SHA`958eb4a2b2d04b91a0b1f073d106c5b687c8b2332491fc396e4b2e
 
 ## 验证
 
-本次只变更docs/config-planning。提交前需核对功能/配置/测试/依赖闭包并按仓库规则复用精确9231/35完整检查；重跑受影响元数据检查、原历史追加及精确base检查。实际源码/测试/发布回执补入本节；本段不是检查通过声明。
+本次只变更docs/config-planning。CN02在`c1022854a1d718536b79b634653518f8b28e8912`新跑元数据回归90 passed /4.08s；实际import origin核对为该隔离候选src。初次pytest错误导入了旧editable包，收集失败已保留；明确PYTHONPATH后通过，未改测试或源码。最终日志SHA256 `dc5841832c111b7f49bd1aa1377e8e8146762beaf8c6e1065fa601dc66532d23`。
+
+2,350个非docs/config-planning文件及mode与完整验收版`1409c64d9410b4d81b671e2c2ddcee31a69331ce`一致，依AGENTS复用原9231 passed/35 skipped；原始完整检查日志在CN02重新核SHA `824e540f8bbf485fc65998f33968c9baf470ab23301eba969f77996731e6bfba`。精确base蓝图/结论append-only、maintenance（无新增功能检查触发）及diff通过。此后仅本验收文档补记真实结果，最终元数据CLI再核对。未启动托管CI、学习或资金运行。
+
+独立方向及准备合同审阅0必要P1/P2。最终普通main/私有HF与CN02封存身份记录在#662及本任务长期回执，不据此关闭原学习目标。

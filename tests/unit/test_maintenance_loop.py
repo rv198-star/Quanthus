@@ -1032,6 +1032,90 @@ class LearningWorkTests(MaintenanceFixture):
         path.chmod(0o700)
         return str(path)
 
+    def partial_review_fixture(self):
+        import maintenance_work as work
+
+        start = m.git(self.root, "rev-parse", "HEAD")
+        path = "docs/history path\n名字.txt"
+        commits, blobs = [], {}
+        for content in ("historical one", "historical two", "current endpoint"):
+            (self.root / path).write_text(content)
+            m.git(self.root, "add", ".")
+            m.git(self.root, "commit", "-qm", content)
+            commits.append(m.git(self.root, "rev-parse", "HEAD"))
+            blobs[m.git(self.root, "rev-parse", "HEAD:" + path)] = content
+        remote = Path(self.temp.name) / "promisor.git"
+        work.run(["git", "clone", "--bare", "--no-local", str(self.root), str(remote)])
+        m.git(remote, "config", "uploadpack.allowFilter", "true")
+        m.git(remote, "config", "uploadpack.allowAnySHA1InWant", "true")
+        clone = Path(self.temp.name) / "partial"
+        work.run(["git", "clone", "--filter=blob:none", "--no-checkout", remote.as_uri(), str(clone)])
+        self.assertEqual(m.git(clone, "config", "remote.origin.promisor"), "true")
+        return clone, start, commits, blobs, remote
+
+    def test_review_materializes_partial_clone_history_before_offline_executor(self):
+        import maintenance_work as work
+
+        clone, start, commits, blobs, remote = self.partial_review_fixture()
+        missing_remote = str(Path(self.temp.name) / "offline.git")
+        m.git(clone, "config", "remote.origin.url", missing_remote)
+        absent = subprocess.run(
+            ["git", "-C", str(clone), "cat-file", "-e", next(iter(blobs))],
+            capture_output=True, timeout=10,
+        )
+        self.assertNotEqual(absent.returncode, 0)
+        m.git(clone, "config", "remote.origin.url", remote.as_uri())
+        executor = Path(self.temp.name) / "offline-review-executor"
+        executor.write_text(
+            "#!" + sys.executable + "\nimport os,sys,json,subprocess\nfrom pathlib import Path\n"
+            'a=sys.argv\nroot=a[a.index("--cd")+1]\nos.environ["GIT_ALLOW_PROTOCOL"]=""\n'
+            + "expected=" + repr(blobs) + "\n"
+            'for oid,text in expected.items():\n'
+            ' assert subprocess.check_output(["git","-C",root,"cat-file","blob",oid],text=True)==text\n'
+            'Path(a[a.index("--output-last-message")+1]).write_text("Historical blobs read with every fetch protocol disabled.")\n'
+            'print(json.dumps({"type":"thread.started","thread_id":"offline-history-fixture"}))\n'
+        )
+        executor.chmod(0o700)
+        req = dict(self.req, kind="review", payload={"from_sha": start, "to_sha": commits[-1]})
+        with (
+            mock.patch.object(work, "followups", return_value=([], [])),
+            mock.patch.object(work, "change_context", return_value={}),
+        ):
+            result = work.review(clone, self.config, req, self.store, str(executor))
+        self.assertEqual(result["status"], "needs_coverage_acceptance")
+        self.assertEqual(result["object_preparation"]["blob_count"], 3)
+        self.assertEqual(result["object_preparation"]["blob_set_digest"], m.digest(sorted(blobs)))
+        self.assertTrue(result["source_unchanged"])
+
+    def test_history_preparation_timeout_is_not_a_started_model(self):
+        import maintenance_work as work
+
+        sha = m.git(self.root, "rev-parse", "HEAD")
+        req = dict(self.req, kind="review", payload={"from_sha": sha, "to_sha": sha})
+        with (
+            mock.patch.object(work, "followups", return_value=([], [{"changed": True}])),
+            mock.patch.object(work, "prepare_review_objects", side_effect=subprocess.TimeoutExpired("git", 120)),
+            self.assertRaisesRegex(ValueError, "timed out before sandbox launch"),
+        ):
+            work.review(self.root, self.config, req, self.store, self.review_executor())
+        self.assertFalse((work.job_path(self.store, req["request_id"]) / "native.jsonl").exists())
+
+    def test_unavailable_history_stops_before_worktree_and_executor(self):
+        import maintenance_work as work
+
+        clone, start, commits, _, _ = self.partial_review_fixture()
+        m.git(clone, "config", "remote.origin.url", str(Path(self.temp.name) / "offline.git"))
+        req = dict(self.req, kind="review", payload={"from_sha": start, "to_sha": commits[-1]})
+        with (
+            mock.patch.object(work, "followups", return_value=([], [])),
+            mock.patch.object(work, "change_context", return_value={}),
+            self.assertRaisesRegex(ValueError, "historical review objects unavailable"),
+        ):
+            work.review(clone, self.config, req, self.store, self.review_executor())
+        job = work.job_path(self.store, req["request_id"])
+        self.assertFalse((job / "review-worktree").exists())
+        self.assertFalse((job / "native.jsonl").exists())
+
     def test_review_returns_contiguous_prefix_and_pending_without_repair_budget(self):
         import maintenance_work as work
 

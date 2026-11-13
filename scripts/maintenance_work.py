@@ -60,6 +60,42 @@ def inventory(root, start, end, limit):
     }
 
 
+def prepare_review_objects(root, units):
+    """Materialize historical diff blobs before entering the read-only sandbox."""
+    objects = set()
+    for unit in units:
+        records = run(
+            ["git", "-C", str(root), "diff-tree", "--no-commit-id", "--no-abbrev",
+             "--no-renames", "--raw", "-r", "-z", unit + "^1", unit]
+        ).split("\0")
+        for index in range(0, len(records) - 1, 2):
+            fields = records[index].split()
+            if len(fields) != 5 or not fields[0].startswith(":"):
+                raise ValueError("invalid historical review diff")
+            for mode, oid in ((fields[0][1:], fields[2]), (fields[1], fields[3])):
+                # Submodule commits belong to their own repository, not this object store.
+                if mode in {"000000", "160000"}:
+                    continue
+                if mode not in {"100644", "100755", "120000"} or not re.fullmatch(r"[0-9a-f]{40}", oid):
+                    raise ValueError("invalid historical review object")
+                objects.add(oid)
+    ordered = sorted(objects)
+    if ordered:
+        result = subprocess.run(
+            ["git", "-C", str(root), "-c", "credential.helper=", "-c",
+             "credential.helper=!gh auth git-credential", "cat-file", "--batch-check"],
+            input="\n".join(ordered) + "\n", capture_output=True, text=True, timeout=120,
+        )
+        lines = result.stdout.splitlines()
+        complete = result.returncode == 0 and len(lines) == len(ordered)
+        for oid, line in zip(ordered, lines):
+            fields = line.split()
+            complete = complete and len(fields) == 3 and fields[:2] == [oid, "blob"] and fields[2].isdigit()
+        if not complete:
+            raise ValueError("historical review objects unavailable before sandbox launch")
+    return {"blob_count": len(ordered), "blob_set_digest": digest(ordered)}
+
+
 def followups(config, selected):
     """Keep full source text private; return small edit-sensitive source pointers."""
     if not isinstance(selected, list) or len(selected) > 10:
@@ -165,11 +201,16 @@ def review(root, config, req, store, executor):
     tree = job / "review-worktree"
     if tree.exists():
         raise ValueError("existing review worktree requires inspection before restarting")
+    try:
+        prepared = prepare_review_objects(root, window["selected_units"])
+    except subprocess.TimeoutExpired:
+        raise ValueError("historical review object preparation timed out before sandbox launch") from None
     proposed = window["proposed_reviewed_through"]
     git(root, "worktree", "add", "--detach", str(tree), proposed)
     inputs = {
         "repository": config["repository"],
         "window": window,
+        "object_preparation": prepared,
         "followups": sources,
         "change_context": change_context(config, window["selected_units"]),
     }
@@ -255,6 +296,7 @@ def review(root, config, req, store, executor):
         "exit_code": exit_code,
         "execution_model": "codex_exec_read_only",
         "executor_model": config.get("executor_model", "cli-default"),
+        "object_preparation": prepared,
         "native_thread_id": native_id,
         "window": window,
         "source_unchanged": clean,

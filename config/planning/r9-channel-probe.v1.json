@@ -1,0 +1,66 @@
+{
+  "schema_version": "quanthus.r9-channel-probe.v1",
+  "request_id": "R9-CHANNEL-PROBE-003-SSH",
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "owner_authority": "Owner当前指令：所以继续完成R9吧；并明确改走SSH。主代理据此恢复原Mission，先作最多2次通道门；历史额度/失败/成本保留。",
+  "source": {
+    "grade": "synthetic channel diagnostics only; excluded from market reference and learning",
+    "packet_sha256": "80f67ccc08ed9b38e70a6bf9c079a4a30d98485f0b4ae5b14a5140f725a4df05"
+  },
+  "reference": {
+    "models": [
+      "auto/gpt-6.1-sol",
+      "auto/gpt-6-astra"
+    ],
+    "reader_names": [
+      "reader_a",
+      "reader_b"
+    ],
+    "maximum_calls": 2,
+    "retries": 0,
+    "concurrency": 2,
+    "per_call_seconds": 120,
+    "protocol": "four necessary clauses each TRUE/FALSE/UNKNOWN, supporting and counter evidence citations; overall strong Kleene AND",
+    "clauses": [
+      "low_directional_efficiency",
+      "materially_narrow",
+      "material_contraction",
+      "no_coherent_relocation"
+    ],
+    "blinding": "opaque case_id and normalized HLC40 only; no identity/anchor/stratum/features/predictions/other votes/old reference statistics",
+    "overall": "any FALSE => FALSE; all TRUE => TRUE; otherwise UNKNOWN",
+    "agreement": "two matching valid total labels; disagreements UNKNOWN; clause disagreements retained",
+    "old_A4": "diagnostic from old opinions only; no new calls or edits",
+    "calibration_grade": "fixed panel forms semantic anchors only; no transfer success claim; later independent cases and original guard floors must qualify",
+    "semantic_QA": "independent role checks complete paths, all clauses, citations, counterevidence and old-approved-definition alignment; QA invalidates but never supplies labels",
+    "provider_id": "magpie",
+    "request_max_retries": 0,
+    "stream_max_retries": 0
+  },
+  "acceptance": {
+    "channel": "both readers complete strict trace/opinion/binding; no expected truth class",
+    "if_fail": "stop invocation; diagnose exact fault without retries",
+    "if_pass": "freeze separate bounded real12 calibration before any further reference calls"
+  },
+  "runtime": {
+    "started_at": "2026-11-13T22:27:59Z",
+    "calibration_deadline": "2026-11-13T22:47:59Z",
+    "rss_bytes": 2147483648,
+    "cpu_cores": 2,
+    "tmp_bytes": 1073741824,
+    "output_bytes": 67108864,
+    "no_deadline_reset": true,
+    "attempt_marker": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/channel-probe-003.attempt.json"
+  },
+  "consumer": {
+    "immediate": "#543/#544 research S02 version selection and readable changed-case report",
+    "later": "bounded S02 sidecar for research review, no existing stage34 review_list/entry activation",
+    "original_A4_and_R8": "unchanged",
+    "learning": "separate contract only after calibration; one fit and original loss-triggered guarded update, same evaluation FP strictly down FN nonincrease, R0 comparison"
+  },
+  "cumulative_cost": "80prior researchCLI +2offline loopback fixtures retained; preparation since22:05:30Z accounted separately; this allocation starts at recorded started_at and expires after20min including its publication/review/run/delivery. <=2real-providerCLI,0retries,fit/update0",
+  "predecessor": {
+    "request": "config/planning/r9-reference-calibration.v2.json",
+    "disposition": "immutable failed24/0valid; old deadline21:30:40Z retained"
+  }
+}

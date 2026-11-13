@@ -72,6 +72,7 @@ def task_request(tmp_path):
             },
             "selection": {"anchors": anchors},
             "reference": {
+                "provider_id": "magpie",
                 "models": list(cal.MODELS),
                 "maximum_calls": 24,
                 "retries": 0,
@@ -307,6 +308,39 @@ def test_stream_limit_applies_only_to_captured_bytes(tmp_path):
     cal.capture_stream(io.BytesIO(b"x" * 300000), sink, guard)
     assert len(sink.getvalue()) == 262144
     assert guard.reason == "R9_CALIBRATION_STREAM_LIMIT"
+
+
+def test_synthetic_channel_probe_is_exactly_two_calls(task_request, tmp_path, monkeypatch):
+    c = json.loads(task_request.read_text())
+    c["schema_version"] = cal.PROBE_SCHEMA
+    c["source"] = {
+        "grade": "synthetic channel only",
+        "packet_sha256": hashlib.sha256(cal.canonical(cal.channel_fixture())).hexdigest(),
+    }
+    c["reference"]["maximum_calls"] = 2
+    cal.write(task_request, c)
+    monkeypatch.setattr(cal, "ResourceGuard", FakeGuard)
+    calls = []
+
+    def launch(command, **kwargs):
+        calls.append(command)
+        return fake_process(command, **kwargs)
+
+    monkeypatch.setattr(cal.subprocess, "Popen", launch)
+    selected = tmp_path / "selected"
+    assert cal.prepare(task_request, selected)["cases"] == 1
+    result = cal.collect(
+        task_request, selected / "selected.private.json", tmp_path / "out", tmp_path / "sandbox"
+    )
+    assert result["calls"] == result["valid"] == len(calls) == 2
+    assert json.loads((tmp_path / "attempt.json").read_text())["maximum_calls"] == 2
+    assert {call[call.index("--model") + 1] for call in calls} == set(cal.MODELS)
+    for call in calls:
+        assert "--ephemeral" in call
+        assert 'model_provider="magpie"' in call
+        assert "model_providers.magpie.request_max_retries=0" in call
+        assert "model_providers.magpie.stream_max_retries=0" in call
+    assert result["fit_runs"] == result["update_runs"] == 0
 
 
 def test_timeout_drains_streams_and_stops_following_slots(task_request, tmp_path, monkeypatch):

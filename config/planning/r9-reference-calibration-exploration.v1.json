@@ -1,0 +1,115 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "R9-REFERENCE-CALIBRATION-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "exploration",
+  "family": "local-learning-r9-calibration",
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "modules": [
+    "REFERENCE",
+    "STATES",
+    "TRAIN",
+    "UPDATE",
+    "EXPERT",
+    "S02",
+    "TRACE"
+  ],
+  "question": "固定12例四条件盲参考能否建立有来源的正负/边界语义锚，以解除R9参考可操作性缺口？",
+  "consumer": "#543/#544 research S02 version selection and readable changed-case report",
+  "scope": "one existing source-qualified A3 pool, exclude old selected companies;12new calibration cases; no2022+/newsource/fit/returns",
+  "deliverable": "sealed four-clause opinions, QA, semantic anchors or exactgap, finite prospective learning request if qualified",
+  "decision_if_pass": "seal calibrated protocol and anchors; freeze independent remaining-company study with same original learning guards before fit",
+  "decision_if_fail": "deliver finite discovery/semantic gap; no training on failed panel",
+  "acceptance": [
+    "at least2QA-admittedTRUE and2FALSE from12 with exact4-clause reasoning, source/protocol binding; UNKNOWN retained",
+    "independent actualpath/clauses/citation QA; no labelrescue or oldA4revote"
+  ],
+  "stop_conditions": [
+    "18:42:32UTCcalibrationhardstop;24callsincludingfailed;0retries",
+    "any quota/support/QA failure freezes downstream learning until a justified separately frozen recovery"
+  ],
+  "memory_sha256": "d25df2672fa8b1de1178cd9c37dcd1510e31beda9deaf9d0cde420a62723fe60",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "relation": "different_scope",
+      "rationale": "保留两接入NO_GO；消费者限定识别版本评审与S02研究报告sidecar，不重开原动作映射。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
+      "relation": "different_scope",
+      "rationale": "原A4保持不重投/不重标；本次从其未选择公司取独立校准面板，检验参考可操作性，符合原恢复条件。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    }
+  ],
+  "cumulative_cost_review": "prior researchCLI56 incl8failed; all new prep/fail/review/test/delivery counted; old K1late854s and old deadlines retained",
+  "runtime_authority_boundary": "Owner批准建议1-3；仅本精确校准合同先执行，学习/消费者需独立合格新合同；生产与保护分区不动",
+  "budget": {
+    "wall_seconds": 5400,
+    "max_new_bytes": 67108864,
+    "network_requests": 24,
+    "accounting_owner": "RESEARCH-R9-CALIBRATION-001;priorcostsretained"
+  }
+}

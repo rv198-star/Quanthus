@@ -11560,6 +11560,163 @@
       ],
       "no_change_reason": "新增版本化资格和路由元数据，不改变探索机制、调度、追踪语义或授权。",
       "issue_observations": []
+    },
+    {
+      "id": "CP-662-R9-SOURCE-CAPACITY-STOP-20261113",
+      "recorded_at": "2026-11-13T10:38:14.193816+00:00",
+      "actor": "R9 primary; two independent actualsource reviewers",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "blocked",
+      "summary": "固定64新链源资格56可用，guard上界3<minimum4，参考/fit/update均0；首2h完整资格TIME_GATE_MISSED，原8h内补充诊断交付，R9真实学习未完成。",
+      "evidence": [
+        {
+          "id": "R9-SOURCE-RESULT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/qualification.safe.json",
+          "sha256": "0c2ccdc13dc963e3cd941717c444cf32c04e6f52e69d83bc36a9c8259013ffe3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        },
+        {
+          "id": "R9-ACTUAL-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/independent-actual-source-review.json",
+          "sha256": "646549680afae6fae94320cdda0befd1397d1def995441f9df6296066fb1edaf",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        },
+        {
+          "id": "R9-TIMING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/time-gate-variance.json",
+          "sha256": "8d88a0794fff3a3d83e1e0d16b6ad5c53f9ca949f6ce1a5ad88a4a6fb11b7363",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "R9 fixed64newbaseline source-capacity stop; oldMarchreuse remains unavailable; source/ref/learning facets separate",
+          "remaining": "guard8仅3源合格<2类各2最低4；reference/fit/update均未运行；首2h完整资格晚14m14s",
+          "next_action": "保留当前64分母和已消费窗口；另行冻结先sourcequal并保证充分角色容量的后继方案，再付参考费；当前attempt不补样或调角色",
+          "evidence": [
+            "R9-SOURCE-RESULT",
+            "R9-ACTUAL-REVIEW",
+            "R9-TIMING"
+          ],
+          "supersedes": "CP-662-R9-QUALIFICATION-BLOCKED-20261113"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "R9 fixed64newbaseline source-capacity stop; oldMarchreuse remains unavailable; source/ref/learning facets separate",
+          "remaining": "guard8仅3源合格<2类各2最低4；reference/fit/update均未运行；首2h完整资格晚14m14s",
+          "next_action": "保留当前64分母和已消费窗口；另行冻结先sourcequal并保证充分角色容量的后继方案，再付参考费；当前attempt不补样或调角色",
+          "evidence": [
+            "R9-SOURCE-RESULT",
+            "R9-ACTUAL-REVIEW",
+            "R9-TIMING"
+          ],
+          "supersedes": "CP-662-R9-QUALIFICATION-BLOCKED-20261113"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "R9 fixed64newbaseline source-capacity stop; oldMarchreuse remains unavailable; source/ref/learning facets separate",
+          "remaining": "guard8仅3源合格<2类各2最低4；reference/fit/update均未运行；首2h完整资格晚14m14s",
+          "next_action": "保留当前64分母和已消费窗口；另行冻结先sourcequal并保证充分角色容量的后继方案，再付参考费；当前attempt不补样或调角色",
+          "evidence": [
+            "R9-SOURCE-RESULT",
+            "R9-ACTUAL-REVIEW",
+            "R9-TIMING"
+          ],
+          "supersedes": "CP-662-R9-QUALIFICATION-BLOCKED-20261113"
+        }
+      ],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "S02",
+        "S04",
+        "TRACE"
+      ],
+      "no_change_reason": "保留实际源资格工程与原状态/学习/用途等级；此新链不具备真实参考及局部更新准入，不将源容量失败记成模型负结果。",
+      "issue_observations": []
+    },
+    {
+      "id": "CP-662-R9-SOURCE-STOP-LIVE-20261113",
+      "recorded_at": "2026-11-13T10:40:42.038325+00:00",
+      "actor": "R9 primary",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "no_module_change",
+      "summary": "真实#662保持OPEN并记录sourceguard容量停止/NOT_RUN及首2h时间门偏差；R9完整学习目标开放。",
+      "evidence": [
+        {
+          "id": "R9-SOURCE-RESULT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/qualification.safe.json",
+          "sha256": "0c2ccdc13dc963e3cd941717c444cf32c04e6f52e69d83bc36a9c8259013ffe3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        },
+        {
+          "id": "R9-ACTUAL-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/independent-actual-source-review.json",
+          "sha256": "646549680afae6fae94320cdda0befd1397d1def995441f9df6296066fb1edaf",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        },
+        {
+          "id": "R9-TIMING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/time-gate-variance.json",
+          "sha256": "8d88a0794fff3a3d83e1e0d16b6ad5c53f9ca949f6ce1a5ad88a4a6fb11b7363",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "S02",
+        "S04",
+        "TRACE"
+      ],
+      "no_change_reason": "本条只对账issue生命周期/正文，不改变模块成熟度、学习用途或原失败记录。",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+          "number": 662,
+          "title": "[P5-RESEARCH-R9-QUALIFY-001] 核实单模块局部学习资格并冻结执行或停放差集",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T10:39:49Z",
+          "body_sha256": "0720bcc2b56f5247e778aedf2cc59f171482a3366bdda8fdcb41d26b9e0bafc7"
+        }
+      ]
     }
   ],
   "history_imports": [

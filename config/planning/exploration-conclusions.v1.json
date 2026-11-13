@@ -1668,6 +1668,76 @@
         "CP-662-R9-QUALIFICATION-BLOCKED-20261113"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R9-SOURCE-CAPACITY-STOP-20261113",
+      "recorded_at": "2026-11-13T10:38:14.681456+00:00",
+      "actor": "R9 primary; independent direction and sourceevidence reviews",
+      "question_id": "R9-LOCAL-QUALIFICATION-001",
+      "family": "local-learning-r9",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "modules": [
+        "REFERENCE",
+        "UPDATE",
+        "EXPERT"
+      ],
+      "question": "R8之后哪一个现有模块值得单次局部学习，当前精确输入和角色是否具备执行资格？",
+      "consumer": "#543/#544状态识别研究版本选择及Owner，保持原expert入场/资金用途边界",
+      "scope": "Twoexistingmoduleassessment plus fixed64newHead2baseline allowedbyR9; actualnative40source qualification only; no reference or model run",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "source-capacity blocked/model not_evaluated for thisfixed64attempt, original2h qualification missed; R9 learning incomplete, currentguards/modelunchanged",
+      "decision_effect": "Stop fixed64reference/fit/update beforepaying opinions:guardavailable3<minimum4. Preserve newbaseline design/nativequalifier/56available inputs; no postresultreplacement, roletransfer or deadline/costreset; R9/#540–546 stayopen.",
+      "reopen_conditions": [
+        "A prospective successor contract establishes sourcequalified rolecapacity before independentreferencecost, preserving current64exposure and allfailedcosts.",
+        "Actualdefinite/class/company/timeblock support andblindcommit gates pass, then freeze one samechainnewv0/update comparison; do not retune thisfailedattempt."
+      ],
+      "retained_assets": [
+        "Newnative64qualification code, source/action/state exactguards and reasonbearing64denominator",
+        "Fixednewbaseline/conditionalupdate design, actual56sourceadmissions, privatepacketsunused, twoindependentaudits andtimingvariance"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Start08:10:14UTC; fullsourcequalification10:24:28.020 misses2h by854.020s. Source5.025s/RSS568754176B; no newDWDnetwork,0researchopinions/fit/update. Original8h and alldesign/oldartifactprobe/networkfailures/waiting/checks/deliverycumulate; model/active/billing unknown-not-zero.",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/selection-envelope.json",
+        "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/artifact-location-evidence.json"
+      ],
+      "evidence": [
+        {
+          "id": "R9-SOURCE-RESULT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/qualification.safe.json",
+          "sha256": "0c2ccdc13dc963e3cd941717c444cf32c04e6f52e69d83bc36a9c8259013ffe3",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        },
+        {
+          "id": "R9-ACTUAL-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/independent-actual-source-review.json",
+          "sha256": "646549680afae6fae94320cdda0befd1397d1def995441f9df6296066fb1edaf",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        },
+        {
+          "id": "R9-TIMING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/time-gate-variance.json",
+          "sha256": "8d88a0794fff3a3d83e1e0d16b6ad5c53f9ca949f6ce1a5ad88a4a6fb11b7363",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Post-deadline supplemental sourcecapacity diagnostic and currentattempt stop; no reference/fit/update/model/economic result; original2h gate missed"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-662-R9-SOURCE-CAPACITY-STOP-20261113"
+      ],
+      "supersedes": "CON-R9-LOCAL-QUALIFICATION-20261113"
     }
   ]
 }

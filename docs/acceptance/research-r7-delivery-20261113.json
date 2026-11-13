@@ -50,5 +50,26 @@
     "publication_scope": "independently verified engineering result; final complete checks and main delivery tracked separately"
   },
   "transport_contract": "separately frozen transfer-only hf-publication-plan.json under task evidence; A2 target is authoritative for this publication",
-  "compute_descriptor_note": "The immutable A2 compute request retained an unused inherited A1 publication prefix. Actual delivery follows the separately frozen A2 transport plan and this exact revision/path receipt; no compute input or result is rewritten."
+  "compute_descriptor_note": "The immutable A2 compute request retained an unused inherited A1 publication prefix. Actual delivery follows the separately frozen A2 transport plan and this exact revision/path receipt; no compute input or result is rewritten.",
+  "integration_validation": {
+    "returncode": 0,
+    "wall_seconds": 1025.4236315260641,
+    "source": "1409c64d9410b4d81b671e2c2ddcee31a69331ce",
+    "base": "9b38b41038a2eabcb346ad3b189dc5eb56f332ea",
+    "command": [
+      "make",
+      "check",
+      "PYTHON=/opt/quanthus/venvs/base24-py310-20261021T131338Z/bin/python",
+      "MAINTENANCE_BASE=9b38b41038a2eabcb346ad3b189dc5eb56f332ea"
+    ],
+    "log_sha256": "824e540f8bbf485fc65998f33968c9baf470ab23301eba969f77996731e6bfba",
+    "setup_seconds": 3.972728678956628,
+    "test_summary": "9231 passed, 35 skipped, 63 warnings in 1016.19s (0:16:56)",
+    "working_tree_status": "",
+    "executable_closure_sha256": "572b4f6eb1aa4bfbfd2addc9a61bb342324ca197649ecb8be935a80141696012",
+    "metadata_only_successor_reuse": "all executable/config/research/policy/test/dependency files and modes identical; docs/config-planning bookkeeping checked separately",
+    "hosted_ci": "billing unavailable, jobs had zero steps; ordinary local-acceptance path",
+    "maintenance": "exactbase selected=[]",
+    "macos_supplement": "214 passed /9failed; Linux /proc absent; retained separately"
+  }
 }

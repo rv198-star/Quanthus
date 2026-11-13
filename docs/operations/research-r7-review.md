@@ -45,5 +45,16 @@ fill claims in this package.
 For a fresh build, first activate an input-qualified bounded request under the existing
 exploration/TPlan rules. The request fixes the three-security window and complete input
 closure; `build --source ... --package ...` is intentionally not a general arbitrary-data API.
+For reproduction of this accepted A2 scope, use the delivered source, the SHA-verified
+126-member native root as `SOURCE`, and a new empty destination as `REBUILT_PACKAGE`:
+
+```bash
+PYTHONPATH=src python3 -B scripts/research_r7_review.py build \
+  --source "$SOURCE" --package "$REBUILT_PACKAGE"
+```
+
+The source loads the versioned A2 request. The manifest records the actual build commit;
+compare rows/summary and the semantic digest when reproducing from a later documentation
+commit. Changing source scope, policy or input requires its own bounded request.
 R8 owns a new opportunity/decision question and full capital comparison. R9 retains the
 learning-input, independent-reference and local-update gates of #540/#546.

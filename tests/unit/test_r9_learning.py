@@ -144,7 +144,9 @@ def test_duplicate_case_cannot_shrink_the_opinion_denominator(tmp_path):
         review_role(qualified, raw, review, request, out, role="guard")
 
 
-@pytest.mark.parametrize("change", ["legacy", "mixed", "prompt", "no_start", "false_start", "valid"])
+@pytest.mark.parametrize(
+    "change", ["legacy", "mixed", "prompt", "no_start", "false_start", "valid"]
+)
 def test_canonical_qa_cannot_reuse_or_mix_old_protocol_opinions(tmp_path, change):
     from quanthus.r9_reference import (
         CANONICAL_RUBRIC,

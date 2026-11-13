@@ -137,6 +137,9 @@ GitHub 状态只表示任务生命周期；实时检查：`make blueprint-audit`
 | [P3-RESEARCH-R5-CLOCK-001 / #642](https://github.com/rv198-star/Quanthus/issues/642) | FACTORS, REPRO, CLOSEOUT | 以既有R2总体的两开盘日历对齐原始价格响应和独立构建，决定是否保留这一分布级筛选资源；R4固定资金用途保持park。 | closed |
 | [META-RESEARCH-R6-CONSUMER-001 / #645](https://github.com/rv198-star/Quanthus/issues/645) | TRACE, CLOSEOUT | 以现有消费者的真实动作和完整成本选择至多一项最小R6验证；复用封存证据，独立审阅后执行并交付决策。 | closed |
 | [P3-RESEARCH-R6-RANK1-001 / #646](https://github.com/rv198-star/Quanthus/issues/646) | FACTORS, REPRO, CLOSEOUT | 固定原R4每日名义rank1及R5两开盘口径，独立构建选择/时钟/分母/日期与venue桥接，决定继续查证或停放这一价格消费路线。 | closed |
+| [P3-MULTIOP-MVP-001 / #651](https://github.com/rv198-star/Quanthus/issues/651) | FACTS, FACTORS, STATES, CONTROL, EXPERT, REPRO, CLOSEOUT | 复用现有连续事实与双专家，交付固定开发用途的统一可查询决策入口；用途比较与学习升级分别按R8/R9准入 | 未对账 |
+| [P3-RESEARCH-R7-A-001 / #652](https://github.com/rv198-star/Quanthus/issues/652) | FACTS, FACTORS, STATES, CONTROL, EXPERT, REPRO, CLOSEOUT | 固定小开发样本上的三算子sidecar与原双专家规则求值，保留实际源时钟和原映射 | 未对账 |
+| [P3-RESEARCH-R7-B-001 / #653](https://github.com/rv198-star/Quanthus/issues/653) | FACTS, FACTORS, STATES, CONTROL, EXPERT, REPRO, CLOSEOUT | 交付可查询研究决策卡、独立验收与可恢复证据，不重开既有策略或训练 | 未对账 |
 
 ## 历史分支导入
 

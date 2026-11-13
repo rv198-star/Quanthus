@@ -109,7 +109,7 @@ def materialize(
             "AND CAST(effective_from AS DATE)<=? "
             "AND (effective_to IS NULL OR CAST(effective_to AS DATE)>?)",
             [identity["security_id"], start, end],
-        ).fetchone()[0]
+        ).fetchone()[0]  # type: ignore[index]
         require(count == 1, "R7_SECURITY_METADATA_COVERAGE")
     holds: dict[str, list[str]] = {}
     action_counts: dict[str, int] = {}

@@ -486,6 +486,7 @@ def render_html(result: dict[str, Any]) -> str:
                     identity["date"],
                     action["final_action"],
                     reasons,
+                    json.dumps(decision, ensure_ascii=False),
                     json.dumps(row["unavailable_reasons"]),
                 ]
             )

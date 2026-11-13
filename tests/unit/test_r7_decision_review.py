@@ -198,6 +198,7 @@ def test_real_shape_native_adapter_and_unchanged_experts(
     view = render_html(selected)
     assert "000001" in view and "</script>" in view
     assert "http://" not in view and "https://" not in view
+    assert "trend_stable" in view.split('data-search="', 1)[1].split('">', 1)[0]
 
 
 def test_action_hold_preserves_denominator_and_blocks_derived_coordinates(

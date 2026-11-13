@@ -9,16 +9,33 @@ from quanthus.r9_qualification import case_facts, check_roles, quality_blocks
 
 def roles():
     rows = []
-    for role, anchor, count in (("train", "2020-03-31", 12), ("train", "2020-04-30", 12),
-                               ("guard", "2020-07-31", 8), ("update", "2020-08-31", 8),
-                               ("evaluation", "2020-11-30", 12), ("evaluation", "2020-12-31", 12)):
+    for role, anchor, count in (
+        ("train", "2020-03-31", 12),
+        ("train", "2020-04-30", 12),
+        ("guard", "2020-07-31", 8),
+        ("update", "2020-08-31", 8),
+        ("evaluation", "2020-11-30", 12),
+        ("evaluation", "2020-12-31", 12),
+    ):
         for _ in range(count):
             i = len(rows)
             end = date.fromisoformat(anchor)
-            sessions = [{"date": str(end - timedelta(days=39-j)), "session_id": f"{i}/{j}"}
-                        for j in range(40)]
-            rows.append({key: f"{key}-{i}" for key in ("company_id", "security_id", "listing_id",
-                                                       "sample_id", "episode_id")})
+            sessions = [
+                {"date": str(end - timedelta(days=39 - j)), "session_id": f"{i}/{j}"}
+                for j in range(40)
+            ]
+            rows.append(
+                {
+                    key: f"{key}-{i}"
+                    for key in (
+                        "company_id",
+                        "security_id",
+                        "listing_id",
+                        "sample_id",
+                        "episode_id",
+                    )
+                }
+            )
             rows[-1].update(role=role, anchor=anchor, sessions=sessions, listing_code=f"{i:06d}")
     return {"rows": rows}
 
@@ -53,15 +70,31 @@ def test_role_time_order_rejects_future_training():
 def sample():
     identity = roles()["rows"][0]
     identity["venue_id"] = "synthetic-venue"
-    native = [{"market_date": date.fromisoformat(s["date"]), "calendar_session_id": s["session_id"],
-               "bar_ok": True, "state_ok": True, "high": Decimal(105+i % 3), "low": Decimal(95),
-               "close": Decimal(100+i % 2), "volume": Decimal(1000),
-               "source_record_id": f"row-{i}", "source_revision": "synthetic", "source_artifact_sha256": "sha256:"+"1"*64,
-               "knowledge_from": "2026-01-01T00:00:00+00:00"}
-              for i, s in enumerate(identity["sessions"])]
-    kwargs = {"cutoff": datetime(2026, 11, 11, tzinfo=timezone.utc), "exchange": "SSE",
-              "request_digest": "sha256:"+"2"*64, "calendar_digest": "sha256:"+"3"*64,
-              "action_digest": "sha256:"+"4"*64, "block_reasons": []}
+    native = [
+        {
+            "market_date": date.fromisoformat(s["date"]),
+            "calendar_session_id": s["session_id"],
+            "bar_ok": True,
+            "state_ok": True,
+            "high": Decimal(105 + i % 3),
+            "low": Decimal(95),
+            "close": Decimal(100 + i % 2),
+            "volume": Decimal(1000),
+            "source_record_id": f"row-{i}",
+            "source_revision": "synthetic",
+            "source_artifact_sha256": "sha256:" + "1" * 64,
+            "knowledge_from": "2026-01-01T00:00:00+00:00",
+        }
+        for i, s in enumerate(identity["sessions"])
+    ]
+    kwargs = {
+        "cutoff": datetime(2026, 11, 11, tzinfo=timezone.utc),
+        "exchange": "SSE",
+        "request_digest": "sha256:" + "2" * 64,
+        "calendar_digest": "sha256:" + "3" * 64,
+        "action_digest": "sha256:" + "4" * 64,
+        "block_reasons": [],
+    }
     return identity, native, kwargs
 
 
@@ -101,20 +134,43 @@ def test_required_calendar_and_state_quality_follow_exact_coordinate():
     identity, _, _ = sample()
     session, day = identity["sessions"][5]["session_id"], identity["sessions"][5]["date"]
     assert quality_blocks(identity, "dwd_trading_calendar", {"calendar_session_id": session})
-    assert quality_blocks(identity, "dwd_trading_calendar", {"venue_id": identity["venue_id"], "trade_date": day})
-    assert quality_blocks(identity, "dwd_tradability_state", {"listing_id": identity["listing_id"], "trade_date": day})
-    assert not quality_blocks(identity, "dwd_trading_calendar", {"venue_id": "other", "trade_date": day})
-    assert not quality_blocks(identity, "dwd_tradability_state", {"listing_id": "other", "trade_date": day})
-    assert not quality_blocks(identity, "dwd_tradability_state", {"listing_id": identity["listing_id"], "trade_date": "2021-01-01"})
-    assert not quality_blocks(identity, "dwd_security_bar", {"listing_id": identity["listing_id"], "trade_date": day, "interval_size": "1m"})
+    assert quality_blocks(
+        identity, "dwd_trading_calendar", {"venue_id": identity["venue_id"], "trade_date": day}
+    )
+    assert quality_blocks(
+        identity, "dwd_tradability_state", {"listing_id": identity["listing_id"], "trade_date": day}
+    )
+    assert not quality_blocks(
+        identity, "dwd_trading_calendar", {"venue_id": "other", "trade_date": day}
+    )
+    assert not quality_blocks(
+        identity, "dwd_tradability_state", {"listing_id": "other", "trade_date": day}
+    )
+    assert not quality_blocks(
+        identity,
+        "dwd_tradability_state",
+        {"listing_id": identity["listing_id"], "trade_date": "2021-01-01"},
+    )
+    assert not quality_blocks(
+        identity,
+        "dwd_security_bar",
+        {"listing_id": identity["listing_id"], "trade_date": day, "interval_size": "1m"},
+    )
 
 
 def test_quality_timestamp_boundary_and_other_issuer_same_session():
     identity, _, _ = sample()
     first = identity["sessions"][0]
-    local_midnight = datetime.fromisoformat(first["date"]+"T00:00:00+08:00")
+    local_midnight = datetime.fromisoformat(first["date"] + "T00:00:00+08:00")
     utc_time = local_midnight.astimezone(timezone.utc)
-    assert quality_blocks(identity, "dwd_tradability_state", {
-        "listing_id": identity["listing_id"], "observation_start": utc_time.isoformat()}, utc_time)
-    assert not quality_blocks(identity, "dwd_tradability_state", {
-        "security_id": "OTHER", "calendar_session_id": first["session_id"]})
+    assert quality_blocks(
+        identity,
+        "dwd_tradability_state",
+        {"listing_id": identity["listing_id"], "observation_start": utc_time.isoformat()},
+        utc_time,
+    )
+    assert not quality_blocks(
+        identity,
+        "dwd_tradability_state",
+        {"security_id": "OTHER", "calendar_session_id": first["session_id"]},
+    )

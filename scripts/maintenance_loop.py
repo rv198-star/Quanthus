@@ -26,12 +26,13 @@ from maintenance_evidence import MARKER as EVIDENCE_MARKER
 from maintenance_evidence import pointer_for, read_pointer
 from maintenance_sources import collect
 from maintenance_store import Store, identity
+from maintenance_work import candidate_manifest, handoff, review
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 REQUEST_MARKER = "<!-- maintenance.request.v1 -->"
 RECEIPT_MARKER = "<!-- maintenance.receipt.v1 -->"
 ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
-KINDS = {"snapshot", "acceptance_probe", "repair", "effect", "reconcile"}
+KINDS = {"snapshot", "acceptance_probe", "repair", "review", "handoff", "effect", "reconcile"}
 DELIVERY_MARKER = "<!-- maintenance.delivery.v1 -->"
 RUNTIME_FILES = [
     "scripts/maintenance_loop.py",
@@ -43,7 +44,10 @@ RUNTIME_FILES = [
     "scripts/maintenance_consumer.py",
     "scripts/maintenance_audit.py",
     "scripts/maintenance_verify.py",
+    "scripts/maintenance_work.py",
+    "scripts/maintenance_checks.py",
     "config/maintenance-consumer-rule.v1.json",
+    "config/maintenance-checks.v1.json",
 ]
 
 
@@ -110,6 +114,9 @@ def load_config(root):
         target = (root / item).resolve()
         if not target.is_relative_to(root.resolve()) or not target.is_file():
             raise ValueError("maintenance authority unavailable")
+    model = config.get("executor_model")
+    if model is not None and (not isinstance(model, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}", model)):
+        raise ValueError("invalid registered executor model")
     return config
 
 
@@ -134,13 +141,13 @@ def request(raw, config, environment):
     if environment not in {e["id"] for e in config["environments"]}:
         raise ValueError("environment is not registered")
     if (
-        raw.get("contract_version") not in {config["contract_version"], "1.0.0", "1.1.0", "1.1.1"}
+        raw.get("contract_version") not in {config["contract_version"], "1.0.0", "1.1.0", "1.1.1", "1.2.0"}
         or raw.get("kind") not in KINDS
     ):
         raise ValueError("unsupported contract or request kind")
     if raw["request_id"].endswith(":fixture"):
         raise ValueError("reserved fixture identity")
-    if raw["kind"] == "repair" and environment != config["repair_environment"]:
+    if raw["kind"] in {"repair", "review", "handoff"} and environment != config["repair_environment"]:
         raise ValueError("coding tasks use the registered source-maintenance executor")
     if not isinstance(raw.get("payload", {}), dict) or len(canonical(raw)) > 20000:
         raise ValueError("invalid or oversized payload")
@@ -450,6 +457,9 @@ def repair(root, config, req, store, executor):
         + canonical(config["repair_allowed_paths"])
         + "\nIssue: "
         + canonical({"url": issue["html_url"], "title": issue["title"], "body": issue["body"]})
+        + "\nBefore handoff run scripts/maintenance_checks.py --base " + base
+        + " --run using the required project Python. Read docs/maintenance/lessons.md; "
+        "record triggered checks and their outcomes in the original task evidence."
     )
     (job / "input.json").write_text(canonical(req))
     with (job / "native.jsonl").open("w") as stdout, (job / "native.stderr").open("w") as stderr:
@@ -457,6 +467,7 @@ def repair(root, config, req, store, executor):
             [
                 executor,
                 "exec",
+                *(["--model", config["executor_model"]] if config.get("executor_model") else []),
                 "--sandbox",
                 "workspace-write",
                 "--cd",
@@ -470,14 +481,8 @@ def repair(root, config, req, store, executor):
             stderr=stderr,
             timeout=config["repair_timeout_seconds"],
         )
-    paths = set(
-        run(["git", "-C", str(worktree), "diff", base, "--name-only", "-z"]).split("\0")
-    ) - {""}
-    paths |= set(
-        run(["git", "-C", str(worktree), "ls-files", "--others", "--exclude-standard", "-z"]).split(
-            "\0"
-        )
-    ) - {""}
+    manifest = candidate_manifest(worktree, base)
+    paths = {entry["path"] for entry in manifest["files"]}
     allowed = all(
         any(fnmatch.fnmatchcase(p, pattern) for pattern in config["repair_allowed_paths"])
         for p in paths
@@ -493,9 +498,13 @@ def repair(root, config, req, store, executor):
     return {
         "status": "needs_review" if result.returncode == 0 and allowed else "failed",
         "native_executor": "codex-exec",
+        "executor_model": config.get("executor_model", "cli-default"),
         "native_thread_id": native_id,
         "exit_code": result.returncode,
         "base_sha": base,
+        "issue_number": number,
+        "candidate_digest": manifest["candidate_digest"],
+        "candidate_files": manifest["files"],
         "candidate_head": git(worktree, "rev-parse", "HEAD"),
         "candidate_branch": branch,
         "changed_path_count": len(paths),
@@ -511,6 +520,9 @@ def repair(root, config, req, store, executor):
 
 def receipt_for(root, workspace, config, environment, req, store, result, executor, sources):
     store.complete_attempt(req["request_id"], result["status"])
+    external = {"status": "not_applicable", "reason": "no external coding thread for this result"}
+    if req["kind"] in {"repair", "review"} and result.get("native_thread_id"):
+        external = {"native_thread_id": result["native_thread_id"]}
     receipt = {
         "schema": "maintenance.receipt.v1",
         "runtime_version": VERSION,
@@ -525,12 +537,7 @@ def receipt_for(root, workspace, config, environment, req, store, result, execut
         "received_at": store.meta(req["request_id"])["received_at"],
         "ledger_handle": store.handle,
         "native_attempt": store.attempt(req["request_id"]),
-        "external_task": {
-            "status": "not_applicable",
-            "reason": "transport or controlled fixture uses the receiver ledger",
-        }
-        if req["kind"] != "repair"
-        else {"native_thread_id": result.get("native_thread_id")},
+        "external_task": external,
         "recorded_at": now(),
         "snapshot": snapshot(root, workspace, config, environment, store, executor, sources),
         "result": result,
@@ -585,9 +592,10 @@ def _claim(
         result = {"status": "reconciled", "target": store.projection(target)}
     else:
         store.begin_attempt(
-            key, "codex_exec" if req["kind"] == "repair" else "in_process_transport"
+            key, "codex_exec" if req["kind"] == "repair" else
+            "bounded_code_review" if req["kind"] == "review" else "in_process_transport"
         )
-        if req["kind"] == "repair" and not created:
+        if req["kind"] in {"repair", "review"} and not created:
             result = {
                 "status": "execution_uncertain",
                 "resume": "inspect original native execution before further dispatch",
@@ -597,6 +605,12 @@ def _claim(
                 result = {"status": "observed"}
                 if req["kind"] == "repair":
                     result = repair(root, config, req, store, executor)
+                elif req["kind"] == "review":
+                    for field in ("from_sha", "to_sha"):
+                        ensure_commit(root, req.get("payload", {}).get(field))
+                    result = review(root, config, req, store, executor)
+                elif req["kind"] == "handoff":
+                    result = handoff(root, config, req, store)
                 elif req["kind"] == "effect":
                     relative = req["payload"].get("rule_path", "")
                     if (

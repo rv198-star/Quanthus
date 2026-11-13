@@ -83,6 +83,8 @@ def load_request(project: Path) -> dict[str, Any]:
 
 
 def _valid(row: dict[str, Any]) -> bool:
+    if not row["bar_admitted"]:
+        return False
     values = [row[key] for key in ("open", "high", "low", "close", "volume", "turnover")]
     if any(value is None for value in values):
         return False

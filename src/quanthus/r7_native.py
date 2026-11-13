@@ -103,6 +103,14 @@ def materialize(
     )
     require(len(identities) == 3, "R7_AMBIGUOUS_LISTING")
     require(len({row["security_id"] for row in identities}) == 3, "R7_SECURITY_IDENTITY")
+    for identity in identities:
+        count = db.execute(
+            "SELECT count(*) FROM dwd_security WHERE security_id=? "
+            "AND CAST(effective_from AS DATE)<=? "
+            "AND (effective_to IS NULL OR CAST(effective_to AS DATE)>?)",
+            [identity["security_id"], start, end],
+        ).fetchone()[0]
+        require(count == 1, "R7_SECURITY_METADATA_COVERAGE")
     holds: dict[str, list[str]] = {}
     action_counts: dict[str, int] = {}
     quality = _rows(
@@ -143,6 +151,7 @@ def materialize(
           AND c.venue_id IN (SELECT venue_id FROM identities);
     """)
     _unique(db, "SELECT venue_id,trade_date FROM calendar", "R7_CALENDAR_DUPLICATE")
+    _unique(db, "SELECT calendar_session_id FROM calendar", "R7_SESSION_ID_DUPLICATE")
     sessions = _rows(db, "SELECT venue_id,trade_date FROM calendar ORDER BY venue_id,trade_date")
     by_venue: dict[str, set[date]] = {}
     for session in sessions:
@@ -153,7 +162,7 @@ def materialize(
         "R7_CALENDAR_SESSION_GAP",
     )
     db.execute("""
-        CREATE TEMP TABLE native_panel AS
+        CREATE TEMP TABLE unqualified_panel AS
         SELECT i.listing_code AS code,i.security_id,i.listing_id,i.venue_id,
                CAST(c.trade_date AS DATE) market_date,c.calendar_session_id,c.close_at,
                b.open,b.high,b.low,b.close,b.volume,b.turnover,
@@ -161,7 +170,8 @@ def materialize(
                b.knowledge_from bar_knowledge_from,b.knowledge_to bar_knowledge_to,
                b.currency,b.price_basis,b.observation_start,b.observation_end,
                t.is_tradable,t.can_buy,t.can_sell,t.upper_price,t.lower_price,
-               t.source_artifact_sha256 state_source_sha256,t.knowledge_from state_knowledge_from
+               t.source_artifact_sha256 state_source_sha256,t.knowledge_from state_knowledge_from,
+               t.observation_start state_observation_start,t.observation_end state_observation_end
         FROM identities i JOIN calendar c ON i.venue_id=c.venue_id
           AND CAST(c.trade_date AS DATE)>=CAST(i.effective_from AS DATE)
           AND (i.effective_to IS NULL OR CAST(c.trade_date AS DATE)<CAST(i.effective_to AS DATE))
@@ -171,17 +181,35 @@ def materialize(
         LEFT JOIN dwd_tradability_state t ON t.listing_id=i.listing_id
           AND t.calendar_session_id=c.calendar_session_id;
     """)
+    db.execute("""
+        CREATE TEMP TABLE native_panel AS SELECT *,
+          (currency='CNY' AND price_basis='UNADJUSTED' AND close_at IS NOT NULL
+           AND CAST(close_at AS DATE)=market_date
+           AND CAST(observation_start AS DATE)=market_date
+           AND CAST(observation_end AS DATE)=market_date
+           AND observation_start<=observation_end AND observation_end<=close_at
+           AND isfinite(open) AND isfinite(high) AND isfinite(low) AND isfinite(close)
+           AND isfinite(volume) AND isfinite(turnover)
+           AND open>0 AND low>0 AND high>=open AND open>=low
+           AND low<=close AND close<=high AND volume>=0 AND turnover>=0) IS TRUE
+           AS bar_admitted,
+          (CAST(state_observation_start AS DATE)=market_date
+           AND CAST(state_observation_end AS DATE)=market_date
+           AND state_observation_start<=state_observation_end
+           AND state_observation_end<=close_at) IS TRUE AS state_admitted
+        FROM unqualified_panel;
+    """)
     _unique(db, "SELECT code,market_date FROM native_panel", "R7_NATIVE_DUPLICATE")
     db.execute("""
         CREATE TEMP VIEW source_daily_universe AS
         SELECT security_id,market_date FROM native_panel;
         CREATE TEMP VIEW source_daily_ohlcv_none AS
         SELECT security_id,market_date AS date,open,high,low,close,volume,turnover AS amount
-        FROM native_panel WHERE close IS NOT NULL;
+        FROM native_panel WHERE bar_admitted;
         CREATE TEMP VIEW source_price_limit_execution_daily AS
         SELECT security_id,market_date AS execution_date,
-               coalesce(is_tradable AND can_buy,false) entry_policy_allows,
-               coalesce(is_tradable,false) is_executable,
+               coalesce(is_tradable AND can_buy AND state_admitted,false) entry_policy_allows,
+               coalesce(is_tradable AND state_admitted,false) is_executable,
                NULL::DOUBLE upper_limit_pct,NULL::DOUBLE lower_limit_pct,
                upper_price AS upper_limit_price,lower_price AS lower_limit_price
         FROM native_panel;

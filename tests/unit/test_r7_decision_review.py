@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -47,7 +48,15 @@ def native_input(tmp_path: Path) -> tuple[Path, dict[str, object], Path]:
         }
         for i, code in enumerate(("000001", "300750", "600519"))
     ]
-    tables["dwd_security"] = [{**common, "security_id": "sec000001"}]
+    tables["dwd_security"] = [
+        {
+            **common,
+            "security_id": "sec" + code,
+            "effective_from": datetime(2018, 1, 1, tzinfo=timezone.utc),
+            "effective_to": None,
+        }
+        for code in ("000001", "300750", "600519")
+    ]
     tables["dwd_trading_calendar"] = [
         {
             **common,
@@ -100,6 +109,12 @@ def native_input(tmp_path: Path) -> tuple[Path, dict[str, object], Path]:
                     "upper_price": price + 10,
                     "lower_price": price - 10,
                     "source_artifact_sha256": "sha256:" + "b" * 64,
+                    "observation_start": datetime(
+                        day.year, day.month, day.day, 1, tzinfo=timezone.utc
+                    ),
+                    "observation_end": datetime(
+                        day.year, day.month, day.day, 7, tzinfo=timezone.utc
+                    ),
                 }
             )
     tables["dwd_security_bar"] = bars
@@ -253,3 +268,73 @@ def test_output_escaping_and_fixed_safety_request() -> None:
     view = render_html(copy.deepcopy(result))
     assert '<script>alert("bad")</script>' not in view
     assert "&lt;script&gt;" in view
+
+
+@pytest.mark.parametrize(
+    "defect", ["currency", "future_bar", "infinite_volume", "session_reuse", "security_missing"]
+)
+def test_invalid_native_history_and_identity_fail_closed(
+    native_input: tuple[Path, dict[str, object], Path], tmp_path: Path, defect: str
+) -> None:
+    pa = pytest.importorskip("pyarrow")
+    pq = pytest.importorskip("pyarrow.parquet")
+    source, request, project = native_input
+    table = {"session_reuse": "dwd_trading_calendar", "security_missing": "dwd_security"}.get(
+        defect, "dwd_security_bar"
+    )
+    path = source / "DWD" / f"payload/{table}/all/part-000000.parquet"
+    native = pq.read_table(path)
+    rows = native.to_pylist()
+    if defect == "security_missing":
+        rows = rows[:1]
+    elif defect == "session_reuse":
+        affected = [
+            r
+            for r in rows
+            if r["venue_id"] == "venue0" and r["trade_date"] in [date(2020, 4, 1), date(2020, 4, 2)]
+        ]
+        affected[1]["calendar_session_id"] = affected[0]["calendar_session_id"]
+    else:
+        row = next(
+            r
+            for r in rows
+            if r["listing_id"] == "list000001"
+            and r["observation_start"].date() == date(2020, 3, 25)
+        )
+        if defect == "currency":
+            row["currency"] = "USD"
+            for name in ["open", "high", "low", "close"]:
+                row[name] *= 2
+        elif defect == "future_bar":
+            row["observation_end"] += timedelta(days=1)
+        else:
+            row["volume"] = float("inf")
+    pq.write_table(pa.Table.from_pylist(rows, schema=native.schema), path)
+    closure = json.loads((project / "closure.json").read_bytes())
+    for item in closure["members"]:
+        if item["path"] == path.relative_to(source / "DWD").as_posix():
+            item.update(sha256=file_sha(path), size_bytes=path.stat().st_size)
+    (project / "closure.json").write_bytes(encoded(closure))
+    request["closure"]["sha256"] = file_sha(project / "closure.json")  # type: ignore[index]
+    request["closure"]["exact_bytes"] = sum(  # type: ignore[index]
+        item["size_bytes"] for item in closure["members"]
+    )
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    if defect in {"session_reuse", "security_missing"}:
+        with pytest.raises(
+            ValueError, match="R7_SESSION_ID_DUPLICATE|R7_SECURITY_METADATA_COVERAGE"
+        ):
+            materialize(source, project, request, scratch)  # type: ignore[arg-type]
+    else:
+        data = materialize(source, project, request, scratch)  # type: ignore[arg-type]
+        result = project_rows(data, ROOT, request)  # type: ignore[arg-type]
+        assert result["summary"]["row_count"] == 66
+        row = next(
+            r
+            for r in result["rows"]
+            if r["identity"]["code"] == "000001" and r["identity"]["date"] == "2020-04-01"
+        )
+        assert row["operators"]["trend"]["status"] == "ABSTAIN"
+        assert row["operators"]["structure"]["status"] == "X"
+        assert row["unavailable_reasons"]

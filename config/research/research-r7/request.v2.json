@@ -1,0 +1,109 @@
+{
+  "schema_version": "quanthus.r7-multiop-request.v1",
+  "request_id": "RESEARCH-R7-MULTIOP-001",
+  "task_id": "RESEARCH-R7-MULTIOP-001-T1",
+  "attempt_id": "A2",
+  "work_item": "P3-RESEARCH-R7-A-001",
+  "authority": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "manifest_sha256": "sha256:8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "content_digest": "sha256:1d0e4bd5fbf40bf2876883faf82b98fd81e95a93a82b9d23d248759a38b3f692"
+  },
+  "closure": {
+    "path": "config/research/research-capital-qual/closure.v1.json",
+    "sha256": "sha256:0f66acfcc8ef1a93f831b7272f59a86df13fe4a2f3717e4c8e5a812d4cbac13f",
+    "exact_members": 126,
+    "exact_bytes": 192098985
+  },
+  "source_knowledge_cutoff": "2026-11-11T20:19:54.776092+00:00",
+  "scope": {
+    "securities": [
+      "000001",
+      "300750",
+      "600519"
+    ],
+    "read_start": "2020-01-02",
+    "report_start": "2020-04-01",
+    "report_end": "2020-04-30",
+    "knowledge_view": "latest_sealed_retrospective",
+    "source_pit_qualified": false,
+    "purpose": "real-data engineering decision review; fixed security-day subjects, not accepted P4 opportunities",
+    "position_state": "empty",
+    "candidate_population": "all three listing x open-session pairs in report window; no response-based selection"
+  },
+  "coordinate": {
+    "trend": "legacy total-return index formula, admitted only after exact selected action-free/quality guards",
+    "structure": "UNADJUSTED native OHLC, action/gap resets",
+    "volume": "native volume ratio to prior20 excluding T",
+    "join": "security/listing/venue+date+snapshot+source_cutoff; each coordinate labeled"
+  },
+  "runtime": {
+    "threads": 2,
+    "memory_bytes": 2147483648,
+    "scratch_bytes": 1073741824,
+    "timeout_seconds": 180,
+    "cpu_seconds": 240,
+    "max_output_bytes": 16777216,
+    "max_input_bytes": 268435456,
+    "formal_attempts": 2,
+    "repeat_reads": 1,
+    "independent_rebuilds": 2,
+    "wall_budget_seconds": 21600,
+    "network_input_bytes": 0
+  },
+  "decisions": {
+    "baseline": "unchanged accepted Trend Stability + Position Risk mapping on same engineering review input",
+    "sidecar_consumption": "explanation_only; never append optional facts into original expert context",
+    "p4_opportunity_qualified": false,
+    "execution": "NOT_RUN_DECISION_REVIEW",
+    "p2_or_fills": "none; order/fill/position change remain unexecuted",
+    "on_input_error": "retain exact gap and affected listing; never fabricate inputs or alter sample",
+    "on_no_actions": "retain correct guard result and expert receipts",
+    "entry_evidence_ready": false,
+    "reason": "fixed security-day review is not an admitted original P4 opportunity; original system guardian must block entry"
+  },
+  "publication": {
+    "dataset": "rv192/quanthus-research-r1",
+    "private": true,
+    "prefix": "runs/RESEARCH-R7-MULTIOP-001/RESEARCH-R7-MULTIOP-001-T1/A1",
+    "retained_root": "/srv/agentdock/quanthus-ops/research-r7-multiop-20261113/retained"
+  },
+  "exposure": "R1/R2/R4/R5/R6 same-window exposure and failed attempts/cost retained; no2022+reads, no training/P6/production",
+  "implementation_bindings": {
+    "src/quanthus/backtest/baseline_research.py": "sha256:3a3a31010dba64a1fe10fd8500fc4ae96fa6286a421752efc54cbd79b210bff1",
+    "src/quanthus/structure_facts.py": "sha256:829c520886fb242bedd1d3e4b1ab06b54457a3c82829a94b9a6e6acf040a201e",
+    "src/quanthus/expert_evaluation/experts/trend_stability.py": "sha256:70b747a7b7f51579f95d64986d6e9697e8de65d5962b2082c1e3aff0f3b45d14",
+    "src/quanthus/expert_strategy/runner.py": "sha256:96d00567ec4b0008e753aed1874136337a108d2c36a684d897117fc4d124d69b",
+    "src/quanthus/expert_strategy/position_risk.py": "sha256:521925258416e48f8bda585b16253dea81224d29bea50a5336febc2b06c53b56",
+    "src/quanthus/aggregator.py": "sha256:2b650ae51851239bfda8d068c07b77f0637c5af59e0326656782aef4f5eefdea",
+    "config/p3-baseline-features.research.v1.json": "sha256:f336c21b4724b1e0c0a52faca7ab3a725831437d6aea9a945ee52ba0f884fbd9",
+    "config/expert-evaluations/experts/trend-stability.v1.json": "sha256:938970cc2ca9b4d317c4cccef2e90e1495d15db94897f39d0da597ebd6250015",
+    "config/structure-continuous-facts.research.v1.json": "sha256:cb439d70825811a0f642142f39c75da8bb9ac89e3b4d79dc78c6a1c006bd062d"
+  },
+  "input_guards": {
+    "range": "2020-01-02..2020-04-30 including warmup",
+    "tables": [
+      "dwd_corporate_action",
+      "dwd_corporate_action_term",
+      "dwd_quality_exception",
+      "dwd_listing",
+      "dwd_trading_calendar",
+      "dwd_security_bar",
+      "dwd_tradability_state"
+    ],
+    "action_free_only": true,
+    "unknown_ex_date": "listing unavailable",
+    "duplicate_listing_or_calendar_or_bar_state": "fail closed",
+    "missing_bar_or_invalid_OHLC": "row unavailable, reset structure continuity; preserve denominator",
+    "late_source": "source excluded at actual cutoff; missing remains unavailable",
+    "source_clock": "actual 2026 source cutoff in expert context; simulated T separate",
+    "all_listings_unavailable": "partial delivery, R7 complete acceptance not passed"
+  },
+  "recovery": {
+    "predecessor_git": "6d3166ab1d2790e760be8bfed74fa57756858012",
+    "reason": "independent P2 review: invalid historical observations and weak daily-session binding; exact scope and policy retained",
+    "cumulative_budget": "original21600seconds from kickoff, all attempts/checks included; no reset",
+    "accepted_attempt": "A2 subject to independent reacceptance"
+  }
+}

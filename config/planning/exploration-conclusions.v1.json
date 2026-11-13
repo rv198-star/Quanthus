@@ -1451,6 +1451,73 @@
         "CP-646-R6-RESEARCH-ACCEPTED-20261113"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "recorded_at": "2026-11-13T03:01:10.381778+00:00",
+      "actor": "R7 primary with independent code and actual-result roles",
+      "question_id": "R7-MULTIOP-DELIVERY-001",
+      "family": "multiop-expert-decision-delivery",
+      "work_item": "P3-RESEARCH-R7-A-001",
+      "modules": [
+        "EXPERT",
+        "REPRO"
+      ],
+      "question": "能否把固定真实开发输入的三算子和既有双专家接成可查询、可复现的最小研究解释入口？",
+      "consumer": "Owner与研究负责人，用于核对依据、专家分歧和原治理动作",
+      "scope": "3securities×21Apr2020sessions=63reviews;57commonoperators/6warmupabstentions;actual2026sourceclock;original2expertmapping;allentryblockedwithoutP4opportunity",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "固定研究解释工程样机；独立角色核对可见数据公式及真实专家/守卫，未取得P4机会、资金/模型/生产资格",
+      "decision_effect": "交付研究复核入口；R8可针对13条Trend入场提议均被原PositionRisk否决的具体分歧，先冻结实际问题和机会资格。",
+      "reopen_conditions": [
+        "新的实际使用范围需精确输入、用途和有限预算；旧样本曝光/成本继续累计。"
+      ],
+      "retained_assets": [
+        "63行可追溯三算子/双专家包、最终HTML和原映射对齐工具",
+        "10项新合同回归、独立代码/实际结果验收与固定HF回读"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "正式A2/独立3.38/3.18秒，A1及286.7/431.1秒中止检查和后续完整检查累计；前置超首小时规划，整批原6h上限保留；主动/模型/历史费用未知非零。",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-11/lian/work/r7-multio-p-20261113/source-inventory-and-repair.json"
+      ],
+      "evidence": [
+        {
+          "id": "R7-CODE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r7-multio-p-20261113/independent-code-review.json",
+          "sha256": "5251dfd679061126e78fc4a24a8c74efe0b2681a0a53761bd7b4d3fcb29ff840",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent code scope at299a8be9; repaired native historical/session guards"
+        },
+        {
+          "id": "R7-RESULT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r7-multio-p-20261113/independent-real-result-review.json",
+          "sha256": "43e490de16a3e3d3360ee11a6e84f80f0e56f06543f0ea3f37db29ae0da83c22",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed63rowengineering review and selected independent formulas; no capital/training admission"
+        },
+        {
+          "id": "R7-HF",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r7-multio-p-20261113/publication-summary.json",
+          "sha256": "e057939d63fb5d3583f33dc48b91699153ef6a8eb684e5720e1efd7018c05e99",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private fixedrevision8files fullreadback; engineering report only"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-652-20261113T022850952419Z"
+      ],
+      "supersedes": null
     }
   ]
 }

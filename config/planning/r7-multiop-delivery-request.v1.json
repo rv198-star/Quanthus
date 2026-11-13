@@ -1,0 +1,135 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "R7-MULTIOP-DELIVERY-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "multiop-expert-decision-delivery",
+  "work_item": "P3-RESEARCH-R7-A-001",
+  "modules": [
+    "FACTS",
+    "FACTORS",
+    "STATES",
+    "CONTROL",
+    "EXPERT",
+    "REPRO",
+    "CLOSEOUT"
+  ],
+  "question": "能否在真实已消费开发数据上交付三算子、双专家、原治理动作的可查询工程样机？",
+  "consumer": "Owner和研究负责人，用于查阅依据、专家职责和动作限制，定位下一最小改进",
+  "scope": "固定3证券2020-04，2020-01-02预热；既有126成员native闭包；源观察2026和模拟T分列；新的security-day工程诊断，不冒充旧P4机会或交易轨迹",
+  "deliverable": "固定请求、三算子sidecar、两专家完整回执、可查询报告和复现命令",
+  "decision_if_pass": "采用固定研究解释入口，R8按真实动作缺口另定；保留旧策略和训练停放",
+  "decision_if_fail": "保留可支持字段和准确输入/接缝差集，受影响范围停放；不为样机广泛采集或调参",
+  "acceptance": [
+    "所有固定样本及弃权原因保留，三算子真值和两专家调用可追溯",
+    "sidecar不改变原上下文和动作；重复语义结果一致",
+    "实际输入、时钟、报告和错误路径经过自审及独立验收"
+  ],
+  "stop_conditions": [
+    "首小时没有最短可行闭环时记录准确差集，不扩建平台",
+    "需要公司行动解释/共享修复则相应listing failclosed，归P10",
+    "整批6小时到限交付准确差集，R8/R9、训练和2022+不自动启动"
+  ],
+  "memory_sha256": "2280a0bb6533eb5441cba3fec4bd683c80f9f24fc3aa73e1cc38b1dcea5fbc39",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "原入场/持仓/分配或动量消费方向继续按原结论停放；R7独立sidecar不改原映射，不回放这些经济候选。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "原入场/持仓/分配或动量消费方向继续按原结论停放；R7独立sidecar不改原映射，不回放这些经济候选。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "复用已交付代码和限定证据；保留此条历史用途、曝光及费用；R7仅固定输入工程解释，不改变原策略或启动原停放实验。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "复用已交付代码和限定证据；保留此条历史用途、曝光及费用；R7仅固定输入工程解释，不改变原策略或启动原停放实验。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "复用已交付代码和限定证据；保留此条历史用途、曝光及费用；R7仅固定输入工程解释，不改变原策略或启动原停放实验。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "复用已交付代码和限定证据；保留此条历史用途、曝光及费用；R7仅固定输入工程解释，不改变原策略或启动原停放实验。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "复用已交付代码和限定证据；保留此条历史用途、曝光及费用；R7仅固定输入工程解释，不改变原策略或启动原停放实验。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "原入场/持仓/分配或动量消费方向继续按原结论停放；R7独立sidecar不改原映射，不回放这些经济候选。"
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "复用已交付代码和限定证据；保留此条历史用途、曝光及费用；R7仅固定输入工程解释，不改变原策略或启动原停放实验。"
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "复用已交付代码和限定证据；保留此条历史用途、曝光及费用；R7仅固定输入工程解释，不改变原策略或启动原停放实验。"
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "复用已交付代码和限定证据；保留此条历史用途、曝光及费用；R7仅固定输入工程解释，不改变原策略或启动原停放实验。"
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "复用已交付代码和限定证据；保留此条历史用途、曝光及费用；R7仅固定输入工程解释，不改变原策略或启动原停放实验。"
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "复用已交付代码和限定证据；保留此条历史用途、曝光及费用；R7仅固定输入工程解释，不改变原策略或启动原停放实验。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "原入场/持仓/分配或动量消费方向继续按原结论停放；R7独立sidecar不改原映射，不回放这些经济候选。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "respect",
+      "rationale": "原入场/持仓/分配或动量消费方向继续按原结论停放；R7独立sidecar不改原映射，不回放这些经济候选。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
+      "relation": "respect",
+      "rationale": "原入场/持仓/分配或动量消费方向继续按原结论停放；R7独立sidecar不改原映射，不回放这些经济候选。"
+    },
+    {
+      "conclusion_id": "CON-R5-CLOCK-20261112",
+      "relation": "respect",
+      "rationale": "复用已交付代码和限定证据；保留此条历史用途、曝光及费用；R7仅固定输入工程解释，不改变原策略或启动原停放实验。"
+    },
+    {
+      "conclusion_id": "CON-R6-RANK1-20261113",
+      "relation": "respect",
+      "rationale": "原入场/持仓/分配或动量消费方向继续按原结论停放；R7独立sidecar不改原映射，不回放这些经济候选。"
+    }
+  ],
+  "cumulative_cost_review": "R1/R2/R4/R5/R6、Head2、持仓和旧量能方向曝光及成本保持累计；本批单记，未知主动/模型费用unknown_not_zero。旧封存包被清理，停止追档，复用现成native闭包做新工程用途。",
+  "runtime_authority_boundary": "Owner 2026-11-13批准创建R7-R9并按计划启动R7；新请求冻结三证券一月已消费开发窗工程诊断，无采集/训练/生产/交易",
+  "budget": {
+    "wall_seconds": 21600,
+    "max_new_bytes": 1073741824,
+    "network_requests": 0,
+    "accounting_owner": "R7主线；GitHub源码/结果发布及工程检查成本单列"
+  }
+}

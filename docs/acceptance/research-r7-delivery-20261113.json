@@ -1,0 +1,75 @@
+{
+  "schema": "quanthus.r7-engineering-delivery.v1",
+  "compute_git": "299a8be90068d0039e8fc390488380922f246fad",
+  "render_git": "e85948c0d2c8302578c97a84518229ad8a8651c4",
+  "request_path": "config/research/research-r7/request.v2.json",
+  "request_sha256": "2fb053dbf89c5db0d79841da1fe820dd68d5da065abc15de26bbd51bd0d53c8e",
+  "result_manifest_sha256": "e22c9caa24396b3acf51aaacd18a7f0f26156c6b079647ca4f78d3dc07f19d4a",
+  "private_hf": {
+    "dataset": "rv192/quanthus-research-r1",
+    "private": true,
+    "revision": "f3e38f6296a9b25d20ffaaf03e62ee55907144a5",
+    "prefix": "runs/RESEARCH-R7-MULTIOP-001/RESEARCH-R7-MULTIOP-001-T1/A2",
+    "files": {
+      "a2-type-comment-equivalence.json": {
+        "sha256": "ecc7354e9e8f8a4e7a86e3e0762b896dafbbd4d7c7e25aa59599b61d5067bef9",
+        "bytes": 163
+      },
+      "report-released.html": {
+        "sha256": "cd96c8cdc3ab3970e9389315c60c7f92e9760b3659ba4882b10048dfb5e84f44",
+        "bytes": 2354060
+      },
+      "READY": {
+        "sha256": "86f58ed0f66e5effaccd9de87cc060c524df1fc9cbb3d7371c88de16431d0b1a",
+        "bytes": 94
+      },
+      "summary.json": {
+        "sha256": "0aced316414c852599a7a56e833a6139a4d8ff9c8003b7f398361d63edc404b7",
+        "bytes": 1090
+      },
+      "manifest.json": {
+        "sha256": "e22c9caa24396b3acf51aaacd18a7f0f26156c6b079647ca4f78d3dc07f19d4a",
+        "bytes": 32075
+      },
+      "a2-receipt.json": {
+        "sha256": "cba3d585503cab552d9f5198d67809c2a66ed6ca82977466ba63099d615ec635",
+        "bytes": 1970
+      },
+      "input-copy.json": {
+        "sha256": "6f30b34130ca9257505499a956872ec719c0f6d8dcf7778b46a516a436b7e931",
+        "bytes": 114
+      },
+      "rows.jsonl": {
+        "sha256": "d2d3b1dadaba476d98ad6295c46ce94564e5e763c7ef361e25822288c76ee7fa",
+        "bytes": 731168
+      }
+    },
+    "total_bytes": 3120734,
+    "wall_seconds": 9.155762828071602,
+    "fixed_revision_all_readback": true,
+    "publication_scope": "independently verified engineering result; final complete checks and main delivery tracked separately"
+  },
+  "transport_contract": "separately frozen transfer-only hf-publication-plan.json under task evidence; A2 target is authoritative for this publication",
+  "compute_descriptor_note": "The immutable A2 compute request retained an unused inherited A1 publication prefix. Actual delivery follows the separately frozen A2 transport plan and this exact revision/path receipt; no compute input or result is rewritten.",
+  "integration_validation": {
+    "returncode": 0,
+    "wall_seconds": 1025.4236315260641,
+    "source": "1409c64d9410b4d81b671e2c2ddcee31a69331ce",
+    "base": "9b38b41038a2eabcb346ad3b189dc5eb56f332ea",
+    "command": [
+      "make",
+      "check",
+      "PYTHON=/opt/quanthus/venvs/base24-py310-20261021T131338Z/bin/python",
+      "MAINTENANCE_BASE=9b38b41038a2eabcb346ad3b189dc5eb56f332ea"
+    ],
+    "log_sha256": "824e540f8bbf485fc65998f33968c9baf470ab23301eba969f77996731e6bfba",
+    "setup_seconds": 3.972728678956628,
+    "test_summary": "9231 passed, 35 skipped, 63 warnings in 1016.19s (0:16:56)",
+    "working_tree_status": "",
+    "executable_closure_sha256": "572b4f6eb1aa4bfbfd2addc9a61bb342324ca197649ecb8be935a80141696012",
+    "metadata_only_successor_reuse": "all executable/config/research/policy/test/dependency files and modes identical; docs/config-planning bookkeeping checked separately",
+    "hosted_ci": "billing unavailable, jobs had zero steps; ordinary local-acceptance path",
+    "maintenance": "exactbase selected=[]",
+    "macos_supplement": "214 passed /9failed; Linux /proc absent; retained separately"
+  }
+}

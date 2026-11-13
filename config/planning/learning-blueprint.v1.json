@@ -673,6 +673,51 @@
         "CLOSEOUT"
       ],
       "contribution": "固定原R4每日名义rank1及R5两开盘口径，独立构建选择/时钟/分母/日期与venue桥接，决定继续查证或停放这一价格消费路线。"
+    },
+    {
+      "id": "P3-MULTIOP-MVP-001",
+      "issue": 651,
+      "modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "contribution": "复用现有连续事实与双专家，交付固定开发用途的统一可查询决策入口；用途比较与学习升级分别按R8/R9准入"
+    },
+    {
+      "id": "P3-RESEARCH-R7-A-001",
+      "issue": 652,
+      "modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "contribution": "固定小开发样本上的三算子sidecar与原双专家规则求值，保留实际源时钟和原映射"
+    },
+    {
+      "id": "P3-RESEARCH-R7-B-001",
+      "issue": 653,
+      "modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "contribution": "交付可查询研究决策卡、独立验收与可恢复证据，不重开既有策略或训练"
     }
   ]
 }

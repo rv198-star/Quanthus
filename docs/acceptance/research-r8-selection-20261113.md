@@ -47,3 +47,8 @@ FormalP2已有5×100000、30%试仓、3..40会话和完整资金/持仓/退出�
 
 两项具名选择NO_GO；经济执行blocked/NOT_RUN_CONDITION_NOT_MET，收益效果not_evaluated，原组合保留，R9未触发。蓝图保持模块状态与工程范围不变；追加CP658资格处置及路由记录，下一笔改为合格事件触发，旧R7证据继续绑定原工程底座。
 独立资格/可行性审阅已通过；元数据检查、普通main交付、HF/CN02留存和资源收尾按实际回执补记。完整make check仅在证明非docs/planning闭包与已通过的1409执行版逐字节相同时复用；相关元数据和精确base检查重跑。
+
+## 固定资格结果包
+
+私有HF `rv192/quanthus-research-r1@2b1ab15dcedb10b8414ec9f96bacc3fb5dbeae8e`，目录
+`runs/RESEARCH-R8-COMBINATION-001/RESEARCH-R8-COMBINATION-001-T1/A1`。14文件/41,286字节全部按固定版本回读并逐字节一致；传输用时11.18秒。manifest SHA256为`a787c216e79995c8cf6d77ce3a822a8d2cb911ca4ea12bfa67df9d5a89b33c20`。源码检查与main交付另记，固定包只承担本次资格处置证据。

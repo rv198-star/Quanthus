@@ -11717,6 +11717,140 @@
           "body_sha256": "0720bcc2b56f5247e778aedf2cc59f171482a3366bdda8fdcb41d26b9e0bafc7"
         }
       ]
+    },
+    {
+      "id": "CP-662-R9-A2-SOURCE-READY-20261113",
+      "recorded_at": "2026-11-13T13:28:42.399118+00:00",
+      "actor": "R9 primary; independent source/code/direction reviewers",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "blocked",
+      "summary": "A2一次固定256metadata先筛229合格，固定64后全部HLC准入，源容量问题解除；模型服务8调用429/0有效意见，已停止请求，fit/update0；R9继续开放。",
+      "evidence": [
+        {
+          "id": "R9-A2-SOURCE-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/a2-actual-source-independent-review.json",
+          "sha256": "5ff1d79f3acb64a1c790301f335ed931f88319a60ac92c683d808a4e38605752",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independentmetadata/sourceadmission only; all64admitted; newreference/fit/update0"
+        },
+        {
+          "id": "R9-A2-SERVICE-BLOCKER",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/a2-service-blocker.json",
+          "sha256": "a5a80d915461f0c776dde3a0ff4bb39c5bcdb72612e6bfc001dc14f6814dcc7e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "8failedCLIinvocations/0validopinions; endpoint429, fit/update0"
+        },
+        {
+          "id": "R9-A2-DESIGN-CODE-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/a2-reference-pre-review.json",
+          "sha256": "300d56e1dee8d93632f8e344c4aa55635de89e2127a410462ed7fa88cabbf1c7",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Code/design pre-review GOguard only; reference semanticQA stillpending"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "A2fixed64qualified retrospective2020Head2input; sourcecapacityresolved; referenceendpointblocked",
+          "remaining": "原A1guard3问题已由prospectiveA2源先行解决；当前64/64sourcequalified，参考服务429尚无有效意见，fit/update0，原K1晚854s保留",
+          "next_action": "保留同64及所有失败/预算；服务恢复并冻结有界参考恢复合同后，从guard盲参考与语义QA继续，再同链v0/条件update与比较",
+          "evidence": [
+            "R9-A2-SOURCE-AUDIT",
+            "R9-A2-SERVICE-BLOCKER",
+            "R9-A2-DESIGN-CODE-REVIEW"
+          ],
+          "supersedes": "CP-662-R9-SOURCE-CAPACITY-STOP-20261113"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "A2fixed64qualified retrospective2020Head2input; sourcecapacityresolved; referenceendpointblocked",
+          "remaining": "原A1guard3问题已由prospectiveA2源先行解决；当前64/64sourcequalified，参考服务429尚无有效意见，fit/update0，原K1晚854s保留",
+          "next_action": "保留同64及所有失败/预算；服务恢复并冻结有界参考恢复合同后，从guard盲参考与语义QA继续，再同链v0/条件update与比较",
+          "evidence": [
+            "R9-A2-SOURCE-AUDIT",
+            "R9-A2-SERVICE-BLOCKER",
+            "R9-A2-DESIGN-CODE-REVIEW"
+          ],
+          "supersedes": "CP-662-R9-SOURCE-CAPACITY-STOP-20261113"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "A2fixed64qualified retrospective2020Head2input; sourcecapacityresolved; referenceendpointblocked",
+          "remaining": "原A1guard3问题已由prospectiveA2源先行解决；当前64/64sourcequalified，参考服务429尚无有效意见，fit/update0，原K1晚854s保留",
+          "next_action": "保留同64及所有失败/预算；服务恢复并冻结有界参考恢复合同后，从guard盲参考与语义QA继续，再同链v0/条件update与比较",
+          "evidence": [
+            "R9-A2-SOURCE-AUDIT",
+            "R9-A2-SERVICE-BLOCKER",
+            "R9-A2-DESIGN-CODE-REVIEW"
+          ],
+          "supersedes": "CP-662-R9-SOURCE-CAPACITY-STOP-20261113"
+        }
+      ],
+      "reviewed_modules": [
+        "REFERENCE",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "S02"
+      ],
+      "no_change_reason": "保留S02/学习/专家原等级；本次仅形成合格输入与候选盲参考执行入口，真实学习仍待参考服务恢复及支持度门槛。",
+      "issue_observations": []
+    },
+    {
+      "id": "CP-662-R9-A2-TRACE-NOCHANGE-20261113",
+      "recorded_at": "2026-11-13T13:29:32.162135+00:00",
+      "actor": "R9primary",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "no_module_change",
+      "summary": "A2使用既有蓝图/结论机制记录源准入和外部参考阻塞；TRACE机制无模块等级变更。",
+      "evidence": [
+        {
+          "id": "R9-A2-SOURCE-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/a2-actual-source-independent-review.json",
+          "sha256": "5ff1d79f3acb64a1c790301f335ed931f88319a60ac92c683d808a4e38605752",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independentmetadata/sourceadmission only; all64admitted; newreference/fit/update0"
+        },
+        {
+          "id": "R9-A2-SERVICE-BLOCKER",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/a2-service-blocker.json",
+          "sha256": "a5a80d915461f0c776dde3a0ff4bb39c5bcdb72612e6bfc001dc14f6814dcc7e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "8failedCLIinvocations/0validopinions; endpoint429, fit/update0"
+        },
+        {
+          "id": "R9-A2-DESIGN-CODE-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/a2-reference-pre-review.json",
+          "sha256": "300d56e1dee8d93632f8e344c4aa55635de89e2127a410462ed7fa88cabbf1c7",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Code/design pre-review GOguard only; reference semanticQA stillpending"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "TRACE"
+      ],
+      "no_change_reason": "本批仅使用既有账本/薄接口，不修改TRACE控制语义或授予研究资格。",
+      "issue_observations": []
     }
   ],
   "history_imports": [

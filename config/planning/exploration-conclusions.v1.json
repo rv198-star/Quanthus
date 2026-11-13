@@ -1738,6 +1738,77 @@
         "CP-662-R9-SOURCE-CAPACITY-STOP-20261113"
       ],
       "supersedes": "CON-R9-LOCAL-QUALIFICATION-20261113"
+    },
+    {
+      "id": "CON-R9-A2-SOURCE-READY-REFERENCE-BLOCKED-20261113",
+      "recorded_at": "2026-11-13T13:28:42.399118+00:00",
+      "actor": "R9 primary; independent source/code/direction review",
+      "question_id": "R9-LOCAL-QUALIFICATION-001",
+      "family": "local-learning-r9",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "modules": [
+        "REFERENCE",
+        "UPDATE",
+        "EXPERT"
+      ],
+      "question": "R8之后哪一个现有模块值得单次局部学习，当前精确输入和角色是否具备执行资格？",
+      "consumer": "#543/#544状态识别研究版本选择及Owner，保持原expert入场/资金用途边界",
+      "scope": "SameHF126closure; onefixed256metadataqualification pool excluding A1companies; exact64frozen andallHLCadmitted; partialreferenceinfraattemptonly",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "investigate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "A2sourceadmissionready; modelreferenceprovider429blocked; fit/update/economicsnotrun",
+      "decision_effect": "Retain64qualified source+features+blindedpackets and source-firstadapter. Stop further429opinionrequests; keepR9and#662open; resumeonlyfromproviderhealthandfrozenfinitecontinuation, withalloldfailure/cost/exposurecarried.",
+      "reopen_conditions": [
+        "Configuredreaderproviderresponds successfully withno-markethealthreceipt; anytransportattemptallowance specifiedbefore opinions, old8failureskept.",
+        "Samefixed64andQA rubric; guard/eval/train/update support gates andsamechainv0/update/predictionscommit retained; originalbudgetdeadline doesnotreset."
+      ],
+      "retained_assets": [
+        "A2metadata-first256→64algorithm andfullrejectledger",
+        "64admitted exact40session windows, derived7features andblindHLC40packets",
+        "ExactqualifiedSHA/referencecode plus independentmetadata reconstruction and providerfailurelogs"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Original08:10:14UTCstart and16:10:14deadline carried; A1K1miss854s stays. A2source3.763+5.016s;8failedCLIinvocations(6timeouts2interrupted),0validopinions; oneHTTPhealth403andoneproxyCLIhealth42940s; allpreparation/review/testing/transfers/waitingcumulate. Modelactive/billingunknown-not-zero.",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/a2-git-publication.json",
+        "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/a2-reference-git-publication.json"
+      ],
+      "evidence": [
+        {
+          "id": "R9-A2-SOURCE-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/a2-actual-source-independent-review.json",
+          "sha256": "5ff1d79f3acb64a1c790301f335ed931f88319a60ac92c683d808a4e38605752",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independentmetadata/sourceadmission only; all64admitted; newreference/fit/update0"
+        },
+        {
+          "id": "R9-A2-SERVICE-BLOCKER",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/a2-service-blocker.json",
+          "sha256": "a5a80d915461f0c776dde3a0ff4bb39c5bcdb72612e6bfc001dc14f6814dcc7e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "8failedCLIinvocations/0validopinions; endpoint429, fit/update0"
+        },
+        {
+          "id": "R9-A2-DESIGN-CODE-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-local-20261113/a2-reference-pre-review.json",
+          "sha256": "300d56e1dee8d93632f8e344c4aa55635de89e2127a410462ed7fa88cabbf1c7",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Code/design pre-review GOguard only; reference semanticQA stillpending"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-662-R9-A2-SOURCE-READY-20261113"
+      ],
+      "supersedes": "CON-R9-SOURCE-CAPACITY-STOP-20261113"
     }
   ]
 }

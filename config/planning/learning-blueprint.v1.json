@@ -718,6 +718,36 @@
         "TRACE"
       ],
       "contribution": "交付可查询研究决策卡、独立验收与可恢复证据，不重开既有策略或训练"
+    },
+    {
+      "id": "META-RESEARCH-R8-SELECT-001",
+      "issue": 658,
+      "modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "contribution": "R8具名状态消费问题的有界资格、固定B/C或准确NO_GO及独立交付；保持原策略/数据/训练/生产门槛"
+    },
+    {
+      "id": "P3-RESEARCH-R8-COMPARE-001",
+      "issue": 659,
+      "modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "contribution": "R8具名状态消费问题的有界资格、固定B/C或准确NO_GO及独立交付；保持原策略/数据/训练/生产门槛"
     }
   ]
 }

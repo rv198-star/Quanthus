@@ -11067,6 +11067,226 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-658-20261113T065712794836Z",
+      "recorded_at": "2026-11-13T06:57:12.794836+00:00",
+      "actor": "R8 primary",
+      "work_item": "META-RESEARCH-R8-SELECT-001",
+      "outcome": "no_module_change",
+      "summary": "Owner已启动R8，登记658/659和原8h/首2h关口，进行已封存R7及现有政策的资格选择。",
+      "evidence": [
+        {
+          "id": "R8-START",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/selection-envelope.json",
+          "sha256": "4dc3ad4cf5480bbfd53a0a2fc3f367bb93a3ce489d74f99704ff213dd0dbe1db",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Owner R8 startup and bounded existing-asset selection only"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "本记录仅启动及工单登记；原模块工程/质量/用途/准入保持。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-R8-SELECT-001",
+          "number": 658,
+          "title": "[META-RESEARCH-R8-SELECT-001] 核实R7动作缺口并冻结一个R8用途合同",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T06:48:23Z",
+          "body_sha256": "371fe3fb5c3465b03ff72cc7b064330e1ccb3c28f594e8d07c9bdd1c4c78441f"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-658-R8-QUALIFICATION-NOGO-20261113",
+      "recorded_at": "2026-11-13T07:08:03.923552+00:00",
+      "actor": "R8 primary with two read-only independent roles",
+      "work_item": "META-RESEARCH-R8-SELECT-001",
+      "outcome": "no_module_change",
+      "summary": "首2h内两具名R8结构消费选择NO_GO：margin接入63条提议无变化，3个最近中性活跃键失败于原P4必要成交额条件；正式B/C资金比较按关口未启动。",
+      "evidence": [
+        {
+          "id": "R8-PRIMARY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/selection-inspection.json",
+          "sha256": "a64728aa798ca7ee09273ac86ca59396d7fed351ace37a27cef920e9dd98a712",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Existing R7 same63 algebraic proposal feasibility and optimistic P4 necessary-condition exclusion; no capital result"
+        },
+        {
+          "id": "R8-DIRECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/independent-direction-review.json",
+          "sha256": "d39fc1d02acdebf3d75ef121394bcbebc5733c729c186c7de89abd5565e3dc2d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent two-choice selection and old mapping boundary review"
+        },
+        {
+          "id": "R8-FEASIBILITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/independent-feasibility-review.json",
+          "sha256": "7e2dbf63e528874817756881523316c19518d3fcb902e3140a6ed62c0b33bb2a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent Decimal input authentication/bounds and existing P4/FormalP2 source feasibility"
+        },
+        {
+          "id": "R8-POLICY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/selection-policy-equivalence.json",
+          "sha256": "e34e71c754ecd0cf50a9f53ad952225c195a5d0dad491e57a6a2ad268be80778",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R7 actual card1.0.1 authoritative; inspected literal thresholds equal old card"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "保留R7既有工程和原组合，不改变任何模型/策略工程质量、价值或准入；只登记当前固定范围资格处置。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-R8-SELECT-001",
+          "number": 658,
+          "title": "[META-RESEARCH-R8-SELECT-001] 核实R7动作缺口并冻结一个R8用途合同",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T06:48:23Z",
+          "body_sha256": "371fe3fb5c3465b03ff72cc7b064330e1ccb3c28f594e8d07c9bdd1c4c78441f"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-658-R8-ROUTING-20261113",
+      "recorded_at": "2026-11-13T07:11:55.168596+00:00",
+      "actor": "R8 primary with two read-only independent roles",
+      "work_item": "META-RESEARCH-R8-SELECT-001",
+      "outcome": "progress",
+      "summary": "保持R7既有EXPERT/REPRO工程状态与范围，只把下一笔路径更新为R8两选择NO_GO后的合格事件触发条件。",
+      "evidence": [
+        {
+          "id": "R7-CLOSEOUT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r7-multio-p-20261113/r7-closeout-observation.json",
+          "sha256": "68ce17433202c8c620afcdd329c88eb7cf90ace52ccd51feb5eb7ca820c9cf8c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "actual R7 source integration and closure observations; fixed research explanation scope only"
+        },
+        {
+          "id": "R8-PRIMARY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/selection-inspection.json",
+          "sha256": "a64728aa798ca7ee09273ac86ca59396d7fed351ace37a27cef920e9dd98a712",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Existing R7 same63 algebraic proposal feasibility and optimistic P4 necessary-condition exclusion; no capital result"
+        },
+        {
+          "id": "R8-DIRECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/independent-direction-review.json",
+          "sha256": "d39fc1d02acdebf3d75ef121394bcbebc5733c729c186c7de89abd5565e3dc2d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent two-choice selection and old mapping boundary review"
+        },
+        {
+          "id": "R8-FEASIBILITY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/independent-feasibility-review.json",
+          "sha256": "7e2dbf63e528874817756881523316c19518d3fcb902e3140a6ed62c0b33bb2a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent Decimal input authentication/bounds and existing P4/FormalP2 source feasibility"
+        },
+        {
+          "id": "R8-POLICY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/selection-policy-equivalence.json",
+          "sha256": "e34e71c754ecd0cf50a9f53ad952225c195a5d0dad491e57a6a2ad268be80778",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "R7 actual card1.0.1 authoritative; inspected literal thresholds equal old card"
+        }
+      ],
+      "updates": [
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "R7固定63个security-day工程复核：三算子有来源，原Trend/Risk两专家确有回执；sidecar不改63个决定，系统保持阻新",
+          "remaining": "R7固定研究复核底座保持；R8当前两选择NO_GO，未运行经济比较，R9尚无合格薄弱模块。",
+          "next_action": "保留R7；只有具名消费者、合格P4事件和合法单一状态映射确实改变动作、同输入B及事前用途门槛齐备时再启动有界比较。",
+          "evidence": [
+            "R7-CLOSEOUT",
+            "R8-PRIMARY",
+            "R8-DIRECTION",
+            "R8-FEASIBILITY"
+          ],
+          "supersedes": "CP-652-R7-DELIVERY-CLOSED-20261113"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "R7固定126成员输入及正式/独立物理副本，63rows/summary完全一致；独立角色另核公式与回执，固定HF回读通过",
+          "remaining": "R7固定研究复核底座保持；R8当前两选择NO_GO，未运行经济比较，R9尚无合格薄弱模块。",
+          "next_action": "保留R7；只有具名消费者、合格P4事件和合法单一状态映射确实改变动作、同输入B及事前用途门槛齐备时再启动有界比较。",
+          "evidence": [
+            "R7-CLOSEOUT",
+            "R8-PRIMARY",
+            "R8-DIRECTION",
+            "R8-FEASIBILITY"
+          ],
+          "supersedes": "CP-652-R7-DELIVERY-CLOSED-20261113"
+        }
+      ],
+      "no_change_reason": "此记录只更新既有工程底座的后续路由，未新增模块成熟度/识别质量/经济价值或使用准入。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-R8-SELECT-001",
+          "number": 658,
+          "title": "[META-RESEARCH-R8-SELECT-001] 核实R7动作缺口并冻结一个R8用途合同",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T06:48:23Z",
+          "body_sha256": "371fe3fb5c3465b03ff72cc7b064330e1ccb3c28f594e8d07c9bdd1c4c78441f"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

@@ -1,0 +1,170 @@
+{
+  "schema": "quanthus.r8-qualification-delivery.v1",
+  "scope": "R7 fixed63row/two-choice qualification; economic comparison not run",
+  "decision": "NO_GO_CURRENT_CHOICES_PRESERVE_ORIGINAL_COMBINATION",
+  "economic_execution": "NOT_RUN_CONDITION_NOT_MET",
+  "economic_verdict": "not_evaluated",
+  "source_base": "ed80dddd1679aa4a3fb3286aea0378a09958abc2",
+  "inspection_script_sha256": "c4129376477566ce70b469606c0bcfcd62d64f9782b01aef0d2bfe1040605fed",
+  "input_R7_manifest": "e22c9caa24396b3acf51aaacd18a7f0f26156c6b079647ca4f78d3dc07f19d4a",
+  "R7_actual_card_semantic_digest": "805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c",
+  "private_HF": {
+    "status": "PRIVATE_FIXED_REVISION_ALL_FILES_READBACK",
+    "repo": "rv192/quanthus-research-r1",
+    "private": true,
+    "revision": "2b1ab15dcedb10b8414ec9f96bacc3fb5dbeae8e",
+    "prefix": "runs/RESEARCH-R8-COMBINATION-001/RESEARCH-R8-COMBINATION-001-T1/A1",
+    "files": {
+      "READY": {
+        "bytes": 88,
+        "sha256": "834bd29946fd3d3fad9858b5ebb43d2bc289841bc3ac4e5cfc10e1f6c644a0ae"
+      },
+      "independent-direction-review.json": {
+        "bytes": 1215,
+        "sha256": "d39fc1d02acdebf3d75ef121394bcbebc5733c729c186c7de89abd5565e3dc2d"
+      },
+      "independent-feasibility-review.json": {
+        "bytes": 1343,
+        "sha256": "7e2dbf63e528874817756881523316c19518d3fcb902e3140a6ed62c0b33bb2a"
+      },
+      "manifest.json": {
+        "bytes": 2899,
+        "sha256": "a787c216e79995c8cf6d77ce3a822a8d2cb911ca4ea12bfa67df9d5a89b33c20"
+      },
+      "selection-envelope.json": {
+        "bytes": 422,
+        "sha256": "4dc3ad4cf5480bbfd53a0a2fc3f367bb93a3ce489d74f99704ff213dd0dbe1db"
+      },
+      "selection-inspection-plan.json": {
+        "bytes": 393,
+        "sha256": "0155707220a1c8c77e0c02ba168e1a323b344d789bcaff9c75d185b2e97075fe"
+      },
+      "selection-inspection.json": {
+        "bytes": 14800,
+        "sha256": "a64728aa798ca7ee09273ac86ca59396d7fed351ace37a27cef920e9dd98a712"
+      },
+      "selection-policy-equivalence.json": {
+        "bytes": 638,
+        "sha256": "e34e71c754ecd0cf50a9f53ad952225c195a5d0dad491e57a6a2ad268be80778"
+      },
+      "selection-proposal-preflight.json": {
+        "bytes": 1257,
+        "sha256": "d0cf323bfeae8b9bc63a7fb183f352be6e993ffd87fb8dcf4658b58b4cbd3189"
+      },
+      "selection-request.v1.json": {
+        "bytes": 7825,
+        "sha256": "67fb850d32f2136a41f7fd68b9cfb258458564675c49832f2ce4ccfe20651029"
+      },
+      "selection_inspect.py": {
+        "bytes": 5756,
+        "sha256": "c4129376477566ce70b469606c0bcfcd62d64f9782b01aef0d2bfe1040605fed"
+      },
+      "source-closure.json": {
+        "bytes": 940,
+        "sha256": "7d6550f68f7bc6836675218511579f028fc28f15da203ac9ee6a1d71315b1544"
+      },
+      "sra-lite-allocation.json": {
+        "bytes": 1975,
+        "sha256": "5ea7ea091a51c793ee8b39b0b3decf701882cb7c87da421048104758c34a372d"
+      },
+      "value-brief.md": {
+        "bytes": 1735,
+        "sha256": "21b034b2a3a229e348e04576072c3ed89f886e3ce74f0894cf1a4beb3f2ce36d"
+      }
+    },
+    "total_bytes": 41286,
+    "wall_seconds": 11.18094328395091,
+    "reuse_existing_prefix": false,
+    "scope": "qualification only; full repository delivery tracked separately"
+  },
+  "fullcheck_reuse": {
+    "tested_source": "1409c64d9410b4d81b671e2c2ddcee31a69331ce",
+    "base": "ed80dddd1679aa4a3fb3286aea0378a09958abc2",
+    "files": 2350,
+    "blobs_and_modes_equal": true,
+    "changed_paths": [
+      "config/planning/exploration-conclusions.v1.json",
+      "config/planning/learning-blueprint.v1.json",
+      "config/planning/learning-progress.v1.json",
+      "config/planning/next-delivery-request.v1.json",
+      "docs/work-items/exploration-decisions.md",
+      "docs/work-items/learning-blueprint-progress.md",
+      "config/planning/r8-state-consumption-select-request.v1.json",
+      "docs/acceptance/research-r8-selection-20261113.md",
+      "docs/work-items/research-r8-value-brief.md"
+    ],
+    "fullcheck": "9231passed/35skipped from R7 Linux exact tested source; original log SHA824e540f8bbf485fc65998f33968c9baf470ab23301eba969f77996731e6bfba",
+    "metadata_checks": "newly rerun on candidate; planning proposals/cost/qualification audited separately"
+  },
+  "retained_root": "/srv/agentdock/quanthus-ops/research-r8-combination-20261113/retained",
+  "lifecycle": "repository checks, ordinary merge and exact closure tracked separately",
+  "metadata_validation": {
+    "candidate": "a31e7164bc612693ae44178912afa4dfe3c37984",
+    "base": "ed80dddd1679aa4a3fb3286aea0378a09958abc2",
+    "checks": [
+      {
+        "command": [
+          "/opt/quanthus/venvs/base24-py310-20261021T131338Z/bin/python",
+          "scripts/maintenance_checks.py",
+          "--base",
+          "ed80dddd1679aa4a3fb3286aea0378a09958abc2",
+          "--run"
+        ],
+        "exit_code": 0,
+        "seconds": 0.26394910702947527,
+        "summary": "nfig/planning/r8-state-consumption-select-request.v1.json\",\n    \"docs/acceptance/research-r8-delivery-20261113.json\",\n    \"docs/acceptance/research-r8-selection-20261113.md\",\n    \"docs/work-items/exploration-decisions.md\",\n    \"docs/work-items/learning-blueprint-progress.md\",\n    \"docs/work-items/research-r8-value-brief.md\"\n  ],\n  \"selected\": [],\n  \"executed\": [],\n  \"effect_status\": \"observing\"\n}\n"
+      },
+      {
+        "command": [
+          "/opt/quanthus/venvs/base24-py310-20261021T131338Z/bin/python",
+          "scripts/blueprint_progress.py",
+          "check",
+          "--base-ref",
+          "ed80dddd1679aa4a3fb3286aea0378a09958abc2"
+        ],
+        "exit_code": 0,
+        "seconds": 0.4580176710151136,
+        "summary": "BLUEPRINT_CHECK_PASS (links/hashes/history/view; not scientific acceptance)\n"
+      },
+      {
+        "command": [
+          "/opt/quanthus/venvs/base24-py310-20261021T131338Z/bin/python",
+          "scripts/exploration_governance.py",
+          "check",
+          "--base-ref",
+          "ed80dddd1679aa4a3fb3286aea0378a09958abc2"
+        ],
+        "exit_code": 0,
+        "seconds": 0.227450271951966,
+        "summary": "EXPLORATION_RECORDS_CHECKED; no scientific or execution authority granted\n"
+      },
+      {
+        "command": [
+          "/opt/quanthus/venvs/base24-py310-20261021T131338Z/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "tests/unit/test_blueprint_progress.py",
+          "tests/unit/test_exploration_governance.py"
+        ],
+        "exit_code": 0,
+        "seconds": 4.603250217041932,
+        "summary": "........................................................................ [ 80%]\n..................                                                       [100%]\n90 passed in 3.99s\n"
+      },
+      {
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0,
+        "seconds": 0.16798139899037778,
+        "summary": ""
+      }
+    ],
+    "log_sha256": "e931842b948c5bbc119dd6d8b735c8ba7fe6c9abc886385b0fe34df96a751251",
+    "fullcheck_reuse": "2350file/modes exact1409; original fullcheck 9231/35 raw log hash verified",
+    "working_tree_status": ""
+  },
+  "validation_disposition": "90 metadata tests and exactbase checks pass; old complete check reused only after2350file/mode proof; scientific qualification independently reviewed"
+}

@@ -1,0 +1,96 @@
+{
+  "schema_version": "quanthus.r9-calibration.v1",
+  "request_id": "RESEARCH-R9-CALIBRATION-001-SSH-003",
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "owner_authority": "Owner最新指令：所以继续完成R9吧；SSH路线。主代理在2/2真实通道门通过后，按原三阶段目标冻结新90分钟/12例/24调用/0重试校准；历史窗口与成本保留。",
+  "source": {
+    "pool_path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/qualified-pool/qualified-cases.private.json",
+    "pool_sha256": "4821d9dd69c1086201a03f77ea76de72723da94fa095fa7945edda96130edcda",
+    "exclude_path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/selected/qualified-cases.private.json",
+    "exclude_sha256": "8d6c981b378d4cbd67187654b3cd31ae2d2df4f1632bbdf00d804d3f7d773d95",
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "grade": "latest-sealed-retrospective; previously materialized development source; no historical PIT availability claim"
+  },
+  "selection": {
+    "anchors": [
+      "2020-03-31",
+      "2020-04-30",
+      "2020-07-31",
+      "2020-08-31"
+    ],
+    "exclude": "all original A3 selected companies; A3 pool already excludes A1/A2 enumerated companies",
+    "per_anchor": {
+      "positive_intent": "available and abs(directional_efficiency)<=0.33 and width_change<=-0.20; take smallest range_width, tie sample_id",
+      "boundary_intent": "same eligible set excluding selected positive; take index len//2 after range_width/sample_id sort",
+      "negative_intent": "available width_change>0; take largest width_change, tie sample_id"
+    },
+    "maximum_cases": 12,
+    "fallback": "any shortage stops; no replacement or second pool",
+    "selection_grade": "unlabeled illustrative discovery; criteria are sampling proxies, not truth thresholds"
+  },
+  "reference": {
+    "models": [
+      "auto/gpt-6.1-sol",
+      "auto/gpt-6-astra"
+    ],
+    "reader_names": [
+      "reader_a",
+      "reader_b"
+    ],
+    "maximum_calls": 24,
+    "retries": 0,
+    "concurrency": 2,
+    "per_call_seconds": 120,
+    "protocol": "four necessary clauses each TRUE/FALSE/UNKNOWN, supporting and counter evidence citations; overall strong Kleene AND",
+    "clauses": [
+      "low_directional_efficiency",
+      "materially_narrow",
+      "material_contraction",
+      "no_coherent_relocation"
+    ],
+    "blinding": "opaque case_id and normalized HLC40 only; no identity/anchor/stratum/features/predictions/other votes/old reference statistics",
+    "overall": "any FALSE => FALSE; all TRUE => TRUE; otherwise UNKNOWN",
+    "agreement": "two matching valid total labels; disagreements UNKNOWN; clause disagreements retained",
+    "old_A4": "diagnostic from old opinions only; no new calls or edits",
+    "calibration_grade": "fixed panel forms semantic anchors only; no transfer success claim; later independent cases and original guard floors must qualify",
+    "semantic_QA": "independent role checks complete paths, all clauses, citations, counterevidence and old-approved-definition alignment; QA invalidates but never supplies labels",
+    "provider_id": "magpie",
+    "request_max_retries": 0,
+    "stream_max_retries": 0
+  },
+  "acceptance": {
+    "panel": "at least2QA-admittedTRUE and2FALSE from12 with exact4-clause reasoning, source/protocol binding; UNKNOWN retained",
+    "if_fail": "deliver finite discovery/semantic gap; no training on failed panel",
+    "if_pass": "seal calibrated protocol and anchors; freeze independent remaining-company study with same original learning guards before fit"
+  },
+  "runtime": {
+    "started_at": "2026-11-13T22:32:42Z",
+    "calibration_deadline": "2026-11-14T00:02:42Z",
+    "rss_bytes": 2147483648,
+    "cpu_cores": 2,
+    "tmp_bytes": 1073741824,
+    "output_bytes": 67108864,
+    "no_deadline_reset": true,
+    "attempt_marker": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/calibration-ssh-003.attempt.json"
+  },
+  "consumer": {
+    "immediate": "#543/#544 research S02 version selection and readable changed-case report",
+    "later": "bounded S02 sidecar for research review, no existing stage34 review_list/entry activation",
+    "original_A4_and_R8": "unchanged",
+    "learning": "separate contract only after calibration; one fit and original loss-triggered guarded update, same evaluation FP strictly down FN nonincrease, R0 comparison"
+  },
+  "cumulative_cost": "80priorresearchCLI +2synthetic real-providerchannelCLI =82starts;2offline loopbackfixtures separately; currentrealpanel<=24newstarts; preparation/failed network/code/tests/review/wait/delivery all cumulative; no old deadline reset",
+  "predecessor": {
+    "path": "config/planning/r9-reference-calibration.v2.json",
+    "started_at": "2026-11-13T20:00:40Z",
+    "calibration_deadline": "2026-11-13T21:30:40Z",
+    "disposition": "24CLI0valid; preserved unchanged",
+    "channel_gate": {
+      "request": "config/planning/r9-channel-probe.v1.json",
+      "calls": 2,
+      "valid": 2,
+      "sealed_sha256": "b93183f84451573d9b0a44ecba6af75905e60e15449f31ab1d8b08c489705071"
+    }
+  }
+}

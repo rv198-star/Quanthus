@@ -38,7 +38,7 @@ from quanthus.r7_native import file_sha, materialize, require
 from quanthus.structure_facts import build_continuous_structure_facts
 from quanthus.structure_intelligence import StructureSourceRow
 
-REQUEST = "config/research/research-r7/request.v1.json"
+REQUEST = "config/research/research-r7/request.v2.json"
 SCHEMA = "quanthus.r7-decision-review.v1"
 PAYLOADS = {"rows.jsonl", "summary.json"}
 FILES = PAYLOADS | {"manifest.json", "READY"}

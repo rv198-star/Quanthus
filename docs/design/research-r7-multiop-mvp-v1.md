@@ -6,7 +6,7 @@
 | Delivery gate | open |
 | Work items | Feature #651; implementation #652; acceptance #653; research Epic #608 |
 | Parent | [expert/aggregator LLD](lld/04-experts-aggregator.md); [exploration governance](exploration-governance.md) |
-| Runtime request | `config/research/research-r7/request.v1.json` |
+| Runtime request | `config/research/research-r7/request.v2.json` (A2 repair; original v1 retained) |
 | Proposal | `config/planning/r7-multiop-delivery-request.v1.json` |
 
 ## Purpose and smallest useful delivery
@@ -77,8 +77,8 @@ reported separately. The HTML is an offline report of exactly those rows, with n
 ## Budget, failure and acceptance
 
 R7's six-hour batch ceiling includes design, implementation, checking, review, integration and
-delivery. The request pins per-run memory, CPU, timeout, scratch and output limits. Formal and
-independent construction each have one attempt; failed inputs remain explicit. One cached-source
+delivery. The request pins per-run memory, CPU, timeout, scratch and output limits. The original formal/independent A1 pair is retained as unaccepted; one targeted A2 repair pair
+closes the independently found historical-row and session-binding defects under the same total budget. One cached-source
 copy and one independent physical copy are allowed; network input budget is zero.
 
 Reject wrong source hashes, identities, cutoff, duplicate/ambiguous rows, unsafe paths, output

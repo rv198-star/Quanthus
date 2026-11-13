@@ -97,7 +97,15 @@
     "metadata_checks": "newly rerun on candidate; planning proposals/cost/qualification audited separately"
   },
   "retained_root": "/srv/agentdock/quanthus-ops/research-r8-combination-20261113/retained",
-  "lifecycle": "repository checks, ordinary merge and exact closure tracked separately",
+  "lifecycle": {
+    "658": "closed",
+    "659": "closed",
+    "feature651": "closed",
+    "R8_milestone22": "closed",
+    "R9_milestone23": "open_not_triggered",
+    "economic_execution": "NOT_RUN_CONDITION_NOT_MET",
+    "temporary_refs": "retained only through lifecycle successor merge, then removed"
+  },
   "metadata_validation": {
     "candidate": "a31e7164bc612693ae44178912afa4dfe3c37984",
     "base": "ed80dddd1679aa4a3fb3286aea0378a09958abc2",
@@ -166,5 +174,15 @@
     "fullcheck_reuse": "2350file/modes exact1409; original fullcheck 9231/35 raw log hash verified",
     "working_tree_status": ""
   },
-  "validation_disposition": "90 metadata tests and exactbase checks pass; old complete check reused only after2350file/mode proof; scientific qualification independently reviewed"
+  "validation_disposition": "90 metadata tests and exactbase checks pass; old complete check reused only after2350file/mode proof; scientific qualification independently reviewed",
+  "code_integration": {
+    "pr": 660,
+    "merged": true,
+    "actual_main": "b142a9dcfffa443e5c335048bddde9ae2fdb4410",
+    "parents": [
+      "ed80dddd1679aa4a3fb3286aea0378a09958abc2",
+      "c3eca74d774d93c120bc911a3ac492e6479eb18f"
+    ],
+    "tree_equal_candidate": true
+  }
 }

@@ -11287,6 +11287,132 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-651-R8-CLOSED-20261113",
+      "recorded_at": "2026-11-13T07:32:15.170668+00:00",
+      "actor": "R8 primary; independent qualification/integration accepted",
+      "work_item": "P3-MULTIOP-MVP-001",
+      "outcome": "no_module_change",
+      "summary": "R8按原资格失败分支交付两选择NO_GO，实际工单/Feature关闭，经济比较未运行，原工程/策略及R9门槛保持。",
+      "evidence": [
+        {
+          "id": "R8-CLOSED",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/closure-observation.json",
+          "sha256": "2beb805d9ea98f66f26a22d9052b61107dc34c15a7f85e61b096d36d2a29d62a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual bounded R8 source and lifecycle closure; economic comparison remains not run"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只登记真实生命周期，不将关闭转化为模块成熟度或经济/学习/生产准入。",
+      "reviewed_modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P3-MULTIOP-MVP-001",
+          "number": 651,
+          "title": "[P3-MULTIOP-MVP-001] 最小多算子状态与双专家研究决策闭环",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-13T07:30:48Z",
+          "body_sha256": "a97c63a6b7974db3408f9f182f3c0ce310f7de8248402c86adfd17b20c64a8b7"
+        }
+      ]
+    },
+    {
+      "id": "CP-658-R8-CLOSED-20261113",
+      "recorded_at": "2026-11-13T07:32:15.655772+00:00",
+      "actor": "R8 primary; independent qualification/integration accepted",
+      "work_item": "META-RESEARCH-R8-SELECT-001",
+      "outcome": "no_module_change",
+      "summary": "R8按原资格失败分支交付两选择NO_GO，实际工单/Feature关闭，经济比较未运行，原工程/策略及R9门槛保持。",
+      "evidence": [
+        {
+          "id": "R8-CLOSED",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/closure-observation.json",
+          "sha256": "2beb805d9ea98f66f26a22d9052b61107dc34c15a7f85e61b096d36d2a29d62a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual bounded R8 source and lifecycle closure; economic comparison remains not run"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只登记真实生命周期，不将关闭转化为模块成熟度或经济/学习/生产准入。",
+      "reviewed_modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-R8-SELECT-001",
+          "number": 658,
+          "title": "[META-RESEARCH-R8-SELECT-001] 核实R7动作缺口并冻结一个R8用途合同",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-13T07:30:29Z",
+          "body_sha256": "3e1129e54cf6b568246d1ce572c3715d5fcabaa0474bdecf07168f42b33eb157"
+        }
+      ]
+    },
+    {
+      "id": "CP-659-R8-CLOSED-20261113",
+      "recorded_at": "2026-11-13T07:32:16.027122+00:00",
+      "actor": "R8 primary; independent qualification/integration accepted",
+      "work_item": "P3-RESEARCH-R8-COMPARE-001",
+      "outcome": "no_module_change",
+      "summary": "R8按原资格失败分支交付两选择NO_GO，实际工单/Feature关闭，经济比较未运行，原工程/策略及R9门槛保持。",
+      "evidence": [
+        {
+          "id": "R8-CLOSED",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r8-combination-20261113/closure-observation.json",
+          "sha256": "2beb805d9ea98f66f26a22d9052b61107dc34c15a7f85e61b096d36d2a29d62a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual bounded R8 source and lifecycle closure; economic comparison remains not run"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "只登记真实生命周期，不将关闭转化为模块成熟度或经济/学习/生产准入。",
+      "reviewed_modules": [
+        "FACTS",
+        "FACTORS",
+        "STATES",
+        "CONTROL",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-R8-COMPARE-001",
+          "number": 659,
+          "title": "[P3-RESEARCH-R8-COMPARE-001] 执行R8固定比较或资格停放并完成独立用途验收",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-13T07:30:39Z",
+          "body_sha256": "116106bcc68db4b37d00137c73bfadf77955d01bb16dcb72fed28cf0c457f32d"
+        }
+      ]
     }
   ],
   "history_imports": [

@@ -3,7 +3,14 @@ from copy import deepcopy
 
 import pytest
 
-from quanthus.r9_reference import collect_role, strict_json, validate_opinion, validate_trace
+from quanthus.r9_reference import (
+    AUTO_SOL_METADATA_WARNING,
+    AUTO_SOL_MODEL,
+    collect_role,
+    strict_json,
+    validate_opinion,
+    validate_trace,
+)
 
 
 def valid():
@@ -56,11 +63,12 @@ def test_unknown_or_invalid_outputs_cannot_become_definite_labels(change):
 def test_actual_tool_trace_and_incomplete_turn_fail_closed():
     events = [
         {"type": "thread.started", "thread_id": "t"},
+        {"type": "turn.started"},
         {"type": "item.completed", "item": {"type": "agent_message", "text": "{}"}},
         {"type": "turn.completed", "usage": {}},
     ]
     validate_trace("\n".join(map(json.dumps, events)))
-    events[1]["item"]["type"] = "command_execution"
+    events[2]["item"]["type"] = "command_execution"
     with pytest.raises(ValueError, match="TOOL_OR_CONTEXT"):
         validate_trace("\n".join(map(json.dumps, events)))
     with pytest.raises(ValueError, match="INCOMPLETE"):
@@ -105,3 +113,48 @@ def test_prior_support_with_only_current_counterevidence_is_not_positive_support
     value["counterevidence"] = [value["support"].pop()]
     with pytest.raises(ValueError, match="TWO_WINDOW_SUPPORT"):
         validate_opinion(value, packet, "fund")
+
+
+def metadata_trace():
+    return [
+        {"type": "thread.started", "thread_id": "opaque"},
+        {
+            "type": "item.completed",
+            "item": {"id": "item_0", "type": "error", "message": AUTO_SOL_METADATA_WARNING},
+        },
+        {"type": "turn.started"},
+        {"type": "item.completed", "item": {"id": "item_1", "type": "agent_message", "text": "{}"}},
+        {"type": "turn.completed", "usage": {}},
+    ]
+
+
+def test_declared_model_exact_preturn_diagnostic_is_recorded_not_an_opinion():
+    validate_trace("\n".join(map(json.dumps, metadata_trace())), model_id=AUTO_SOL_MODEL)
+
+
+@pytest.mark.parametrize("change", ["after_turn", "suffix", "twice", "tool_field", "other_model"])
+def test_diagnostic_exception_does_not_accept_other_errors_or_tools(change):
+    events = metadata_trace()
+    model = AUTO_SOL_MODEL
+    if change == "after_turn":
+        events[1], events[2] = events[2], events[1]
+    elif change == "suffix":
+        events[1]["item"]["message"] += " another error"
+    elif change == "twice":
+        events.insert(2, deepcopy(events[1]))
+    elif change == "tool_field":
+        events[1]["item"]["tool"] = "read_file"
+    else:
+        model = "codex/gpt-6.1-sol"
+    with pytest.raises(ValueError):
+        validate_trace("\n".join(map(json.dumps, events)), model_id=model)
+
+
+def test_metadata_warning_and_completion_require_exactly_one_real_turn():
+    events = [e for e in metadata_trace() if e["type"] != "turn.started"]
+    with pytest.raises(ValueError, match="TURN_BOUNDARY"):
+        validate_trace("\n".join(map(json.dumps, events)), model_id=AUTO_SOL_MODEL)
+    events = metadata_trace()
+    events.insert(3, {"type": "turn.started"})
+    with pytest.raises(ValueError, match="TURN_BOUNDARY"):
+        validate_trace("\n".join(map(json.dumps, events)), model_id=AUTO_SOL_MODEL)

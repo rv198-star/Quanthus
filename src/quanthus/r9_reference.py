@@ -19,6 +19,11 @@ from quanthus.structure_v2_inputs import canonical
 
 ABSOLUTE_STOP = datetime(2026, 11, 13, 15, 10, 14, tzinfo=timezone.utc)
 READERS = ("short_term", "fund")
+AUTO_SOL_MODEL = "auto/gpt-6.1-sol"
+AUTO_SOL_METADATA_WARNING = (
+    "Model metadata for `auto/gpt-6.1-sol` not found. Defaulting to fallback metadata; "
+    "this can degrade performance and cause issues."
+)
 RUBRIC = """You are a candidate-blind research reader, role {reader}.
 Use only the supplied normalized HLC40. Do not use tools, files, retrieval, or outside knowledge.
 Rows 1..20 are the preceding window; rows 21..40 are the CURRENT 20-session proposition.
@@ -98,12 +103,19 @@ def validate_opinion(value: Any, packet: dict[str, Any], reader: str) -> dict[st
     return value
 
 
-def validate_trace(text: str) -> None:
+def validate_trace(text: str, *, model_id: str | None = None) -> None:
     events = [strict_json(line) for line in text.splitlines() if line.strip()]
     if not events or not all(isinstance(event, dict) for event in events):
         raise ValueError("R9_REFERENCE_TRACE_SHAPE")
     if events[-1].get("type") != "turn.completed":
         raise ValueError("R9_REFERENCE_TRACE_INCOMPLETE")
+    if (
+        sum(event.get("type") == "turn.started" for event in events) != 1
+        or sum(event.get("type") == "turn.completed" for event in events) != 1
+    ):
+        raise ValueError("R9_REFERENCE_TRACE_TURN_BOUNDARY")
+    turn_started = False
+    metadata_warning_seen = False
     for event in events:
         if not isinstance(event, dict):
             raise ValueError("R9_REFERENCE_TRACE_SHAPE")
@@ -119,11 +131,28 @@ def validate_trace(text: str) -> None:
         if "item" in event:
             if not isinstance(event["item"], dict):
                 raise ValueError("R9_REFERENCE_TRACE_ITEM_SHAPE")
+            if (
+                not turn_started
+                and model_id == AUTO_SOL_MODEL
+                and event["type"] == "item.completed"
+                and set(event) == {"type", "item"}
+                and set(event["item"]) == {"id", "type", "message"}
+                and isinstance(event["item"]["id"], str)
+                and bool(event["item"]["id"])
+                and event["item"].get("type") == "error"
+                and event["item"].get("message") == AUTO_SOL_METADATA_WARNING
+            ):
+                if metadata_warning_seen:
+                    raise ValueError("R9_REFERENCE_REPEATED_METADATA_WARNING")
+                metadata_warning_seen = True
+                continue
             if not isinstance(event["item"].get("type"), str) or event["item"].get("type") not in {
                 "agent_message",
                 "reasoning",
             }:
                 raise ValueError("R9_REFERENCE_TOOL_OR_CONTEXT_TRACE")
+        if event["type"] == "turn.started":
+            turn_started = True
 
 
 def collect_role(
@@ -132,6 +161,9 @@ def collect_role(
     if output.exists() or role not in {"guard", "evaluation", "train", "update"}:
         raise ValueError("R9_REFERENCE_FRESH_ROLE_OUTPUT")
     contract = json.loads(request.read_bytes())
+    model_id = contract.get("reference", {}).get("reader_model_id")
+    if model_id is not None and model_id != AUTO_SOL_MODEL:
+        raise ValueError("R9_REFERENCE_MODEL_NOT_FROZEN")
     raw = qualified.read_bytes()
     if hashlib.sha256(raw).hexdigest() != contract["qualified_input"]["qualified_cases_sha256"]:
         raise ValueError("R9_REFERENCE_QUALIFIED_HASH")
@@ -165,6 +197,7 @@ def collect_role(
             "packet_sha256": hashlib.sha256(canonical(packet)).hexdigest(),
             "status": "UNAVAILABLE",
             "call_started": False,
+            "model_id": model_id or "configured_default",
         }
         if not row["available"]:
             return receipt
@@ -186,6 +219,7 @@ def collect_role(
                     [
                         "codex",
                         "exec",
+                        *(["--model", model_id] if model_id is not None else []),
                         "--ephemeral",
                         "--sandbox",
                         "read-only",
@@ -199,6 +233,7 @@ def collect_role(
                     ],
                     stdout=events_file,
                     stderr=stderr_file,
+                    stdin=subprocess.DEVNULL,
                     start_new_session=True,
                 )
                 try:
@@ -215,7 +250,7 @@ def collect_role(
                 raise ValueError("R9_REFERENCE_OUTPUT_BYTES")
             if process.returncode != 0:
                 raise ValueError("R9_REFERENCE_PROCESS_EXIT:" + str(process.returncode))
-            validate_trace(stem.with_suffix(".events.jsonl").read_text())
+            validate_trace(stem.with_suffix(".events.jsonl").read_text(), model_id=model_id)
             opinion = validate_opinion(
                 strict_json(stem.with_suffix(".opinion.json").read_text()), packet, reader
             )

@@ -3,7 +3,7 @@
 | 字段 | 状态 |
 | --- | --- |
 | Design status | approved — Owner持续推进R9授权，独立方向审阅确认具体canonical接缝 |
-| Delivery gate | open；先语义/代码预审，再逐关参考与学习 |
+| Delivery gate | accepted-conditional — 参考工程通过；学习支持度blocked，见[实际验收](../acceptance/research-r9-reference-closeout-20261113.md) |
 | Work item | P5-RESEARCH-R9-STRATIFIED-001 / #665；父#542、R9 milestone23 |
 | Parent | [S02边界设计](stage-orderly-consolidation-boundary-repair.md) §§2–7；[探索治理](exploration-governance.md) |
 | Contract | `config/planning/r9-canonical-reference-repair.v1.json` |

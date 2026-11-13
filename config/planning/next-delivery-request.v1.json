@@ -26,7 +26,7 @@
     "60分钟内无法确认消费者与具体未满足接口就不继续开发。",
     "出现新数据、训练、阈值、P6/生产或超预算要求时只停止对应步骤。"
   ],
-  "memory_sha256": "46a578a5eb6bb8b8cdb031a2b020f15ff8c295530d521b4f3f60511c5f5d67d4",
+  "memory_sha256": "d25df2672fa8b1de1178cd9c37dcd1510e31beda9deaf9d0cde420a62723fe60",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -134,9 +134,9 @@
       "rationale": "Retiredexampleindexonly; preserveRT2classsupportfailure andoldcost, no newexecutionauthority."
     },
     {
-      "conclusion_id": "CON-R9-A3-REFERENCE-TARGET-NONCONFORMANT-20261113",
+      "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
       "relation": "respect",
-      "rationale": "Retired delivery example retains A3 reference-target failure, qualified source and one bounded canonical repair; it creates no activation."
+      "rationale": "Preserve finalcanonicalguardclasssupportfailure, allcost/exposure and qualifiedengineering. Retired delivery example does not activate a new reference or learning study."
     }
   ],
   "cumulative_cost_review": "既有Head2和持仓尝试全部保留，旧总成本未知而非零；新批次独立记账，不伪装新方向抹去原投入。",

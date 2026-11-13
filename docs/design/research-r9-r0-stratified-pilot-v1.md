@@ -3,7 +3,7 @@
 | 字段 | 状态 |
 | --- | --- |
 | Design status | approved — Owner要求继续R9直至完成或遇不可解决阻碍，独立方向审阅条件GO |
-| Delivery gate | open；真实source/reference/learning各自验收 |
+| Delivery gate | blocked — 原guard支持度失败；见[实际验收](../acceptance/research-r9-reference-closeout-20261113.md) |
 | Parent | [探索治理](exploration-governance.md)；#542；R9 milestone23 |
 | Work item | P5-RESEARCH-R9-STRATIFIED-001 / #665 |
 | Contract | `config/planning/r9-r0-stratified-a3.v1.json` |

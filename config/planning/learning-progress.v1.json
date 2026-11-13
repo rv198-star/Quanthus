@@ -12045,6 +12045,85 @@
         }
       ],
       "issue_observations": []
+    },
+    {
+      "id": "CP-665-A4-CANONICAL-SUPPORT-STOP-20261113",
+      "recorded_at": "2026-11-13T16:18:27.702103+00:00",
+      "actor": "R9primary; independent r4code/source and r5actualsemanticQA",
+      "work_item": "P5-RESEARCH-R9-STRATIFIED-001",
+      "outcome": "blocked",
+      "summary": "canonical参考协议真实修复并交付；同64guard独立QA0正8负，原双类门不满足，fit/update0；HF288文件固定回读，R9目标保持开放。",
+      "evidence": [
+        {
+          "id": "R9-A4-ACTUAL-QA",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/canonical-a4-actual-finding.json",
+          "sha256": "8214bb0ca01a413726d266e2560a8b6b3cde83301cbb8c3912483e218f9611bd",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Canonical guard8cases16opinions137citations; 0TRUE8FALSE; fit/update0; fixedlearningbatch blocked"
+        },
+        {
+          "id": "R9-A4-ENGINEERING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/make-check-canonical-receipt.json",
+          "sha256": "3908add46b9a614271cbbdd04164c4b12a987e5cec20d89eb149d91bfc970ae0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exacte043localmakecheck9298pass35skip63warnings; not modelquality"
+        },
+        {
+          "id": "R9-RT2-A3-A4-HF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/r9-reference-publication-receipt.json",
+          "sha256": "f3788d6a8325a5aaaa87c6fa5293a611a6ab8e71bb968b745c9d64278f88a243",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private pinned55224432;288files41584250B fullsize/SHAreadback; R9notcomplete"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "Canonical A4 same64 guardedlearning support failure; original trial and old opinions retained",
+          "remaining": "guardpositive0<2; laterreference/fit/update/compare/coldNOT_RUN",
+          "next_action": "Preserve fixedbatch STOP; first obtain purpose-qualified positive/negative reference assets or independent calibration anchors before any new frozen learning study",
+          "evidence": [
+            "R9-A4-ACTUAL-QA",
+            "R9-RT2-A3-A4-HF"
+          ],
+          "supersedes": "CP-665-A3-REFERENCE-ADMISSION-20261113"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "Canonical A4 same64 guardedlearning support failure; original trial and old opinions retained",
+          "remaining": "guardpositive0<2; laterreference/fit/update/compare/coldNOT_RUN",
+          "next_action": "Preserve fixedbatch STOP; first obtain purpose-qualified positive/negative reference assets or independent calibration anchors before any new frozen learning study",
+          "evidence": [
+            "R9-A4-ACTUAL-QA",
+            "R9-RT2-A3-A4-HF"
+          ],
+          "supersedes": "CP-665-A3-REFERENCE-ADMISSION-20261113"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "Canonical A4 same64 guardedlearning support failure; original trial and old opinions retained",
+          "remaining": "guardpositive0<2; laterreference/fit/update/compare/coldNOT_RUN",
+          "next_action": "Preserve fixedbatch STOP; first obtain purpose-qualified positive/negative reference assets or independent calibration anchors before any new frozen learning study",
+          "evidence": [
+            "R9-A4-ACTUAL-QA",
+            "R9-RT2-A3-A4-HF"
+          ],
+          "supersedes": "CP-665-A3-REFERENCE-ADMISSION-20261113"
+        }
+      ],
+      "issue_observations": []
     }
   ],
   "history_imports": [

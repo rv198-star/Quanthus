@@ -1913,6 +1913,77 @@
         "CP-665-A3-REFERENCE-ADMISSION-20261113"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
+      "recorded_at": "2026-11-13T16:18:27.702103+00:00",
+      "actor": "R9primary; independent r4code/source and r5actualsemanticQA",
+      "question_id": "R9-R0-STRATIFIED-A3",
+      "family": "local-learning-r9-stratified",
+      "work_item": "P5-RESEARCH-R9-STRATIFIED-001",
+      "modules": [
+        "REFERENCE",
+        "UPDATE",
+        "EXPERT"
+      ],
+      "question": "固定R0分层开发输入能否支持canonical S02局部学习？",
+      "consumer": "#543/#544状态识别研究版本选择及Owner，保持原expert入场/资金用途边界",
+      "scope": "One targeted canonical conformance repair on same A3fixed64/source/roles; guard16validopinions only; no later reference or learning",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Source64/64qualified; fixedA3/R0-stratifiedguard lacks canonical dualclassreferencesupport; actualguard0positive8negative; no new model/economic result",
+      "decision_effect": "Deliver source/ref/QA engineering and immutable evidence. Stopthisfixedstudy with no further protocol repair/sample/threshold changes. R9andoriginallearningissues remainOPEN, notcomplete.",
+      "reopen_conditions": [
+        "Exact resolvable purpose-compatible canonical S02 reference assets withoriginalclass/entity/month support andfixedrole/sealed-evalqualification before learning",
+        "Or independently qualified positive/negative semantic anchors establish an operable reference method, then a separately reviewed prospective finite study; currentA4neverrelabelled/revoted/resampled"
+      ],
+      "retained_assets": [
+        "SourcefirstA2 andA3completepool/selection ledgers",
+        "Canonicalrequest/rubric/protocol-bound collector/QA withverifiedlegacycompatibility",
+        "RT2/A3/A4originalopinions andQA, fixedprivateHF55224432withall288filesreadback"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Original08:10clock and16:10deadline/K1miss854s retained; A3start14:42 andfinal17:42cap unchanged. ResearchCLIactual56=old8fail+RT2 16+A3 16+A4 16, A4guard377.950s; allpreparation/testing/review/waiting/transfer/delivery cumulative. Billingactiveandoldercostunknown-not-zero.",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/canonical-a4-actual-finding.json",
+        "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/r9-reference-publication-receipt.json"
+      ],
+      "evidence": [
+        {
+          "id": "R9-A4-ACTUAL-QA",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/canonical-a4-actual-finding.json",
+          "sha256": "8214bb0ca01a413726d266e2560a8b6b3cde83301cbb8c3912483e218f9611bd",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Canonical guard8cases16opinions137citations; 0TRUE8FALSE; fit/update0; fixedlearningbatch blocked"
+        },
+        {
+          "id": "R9-A4-ENGINEERING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/make-check-canonical-receipt.json",
+          "sha256": "3908add46b9a614271cbbdd04164c4b12a987e5cec20d89eb149d91bfc970ae0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exacte043localmakecheck9298pass35skip63warnings; not modelquality"
+        },
+        {
+          "id": "R9-RT2-A3-A4-HF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-11/lian/work/r9-resume-20261113/r9-reference-publication-receipt.json",
+          "sha256": "f3788d6a8325a5aaaa87c6fa5293a611a6ab8e71bb968b745c9d64278f88a243",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private pinned55224432;288files41584250B fullsize/SHAreadback; R9notcomplete"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-665-A4-CANONICAL-SUPPORT-STOP-20261113"
+      ],
+      "supersedes": "CON-R9-A3-REFERENCE-TARGET-NONCONFORMANT-20261113"
     }
   ]
 }

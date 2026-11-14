@@ -250,3 +250,133 @@ def test_capital_predictions_exclude_non_event_roles_and_reject_conflicts():
     assert digest(result).startswith("sha256:")
     with pytest.raises(ValueError, match="CONFLICTING_EVENT"):
         event_predictions({"rows": [entry, dict(entry, v1=0.8)]})
+
+
+def test_pending_sell_integer_action_updates_order_and_lifecycle_once():
+    from datetime import timedelta
+
+    from quanthus.backtest.contracts import BacktestSignal, EventType, OrderSide
+    from quanthus.backtest.portfolio_replay import _state_from_snapshot
+    from quanthus.contracts import SnapshotRef
+    from quanthus.expert_strategy.formal_p2_replay import FormalP2ReplayRuntime, _SellSchedule
+    from quanthus.position_lifecycle import (
+        POSITION_STATE_MACHINE_TRIAL_REDUCTION_VERSION,
+        PositionLifecycleState,
+        PositionStage,
+    )
+    from quanthus.r10_replay import ControlledReplay
+
+    store, _, cal, day = action_store()
+    (step,) = store.action_steps("L", day)
+    with pytest.raises(ValueError, match="formal_sell_bonus_share_unsupported"):
+        FormalP2ReplayRuntime._validate_carried_sell_actions(None, [step])
+    candidate = object.__new__(ControlledReplay)
+    candidate._validate_carried_sell_actions([step])
+    policy = load_execution_policy(
+        Path(__file__).resolve().parents[2] / "config/p2-execution-policy.research.v1.json"
+    )
+    candidate.engine = BacktestEngine(policy)
+    before = replace(
+        UnitState.empty(unit_id="U", cash=Decimal("100000.00")),
+        security_code="L",
+        settled_quantity=100,
+        position_cost=Decimal("1000.00"),
+        cash=Decimal("99000.00"),
+        last_mark_price=Decimal("12.00"),
+        last_mark_snapshot_id="old-mark",
+    )
+    decision = date(2021, 6, 11)
+    snap = SnapshotRef(decision, store.cutoff, "R", "SN")
+    run = BacktestRunSpec(
+        "test",
+        "params",
+        "SN",
+        "F",
+        "R",
+        "RESEARCH-R10-001-T1-A1-C2",
+        policy.policy_version,
+        "close-to-next-open-v1",
+        policy.active_profile.schedule_version,
+        data_content_digest=clock(day).data_content_digest,
+    )
+    signal = BacktestSignal(
+        "SELL",
+        snap,
+        clock(decision).simulated_close,
+        "close-to-next-open-v1",
+        None,
+        "L",
+        OrderSide.SELL,
+        "U",
+        100,
+        Decimal("-1"),
+        "exit",
+        "V",
+        clock(decision).to_json(),
+    )
+    held = store.session("L", day)
+    next_day = day + timedelta(days=1)
+    executable = replace(
+        held,
+        session_date=next_day,
+        open_at=cal["open_at"] + timedelta(days=1),
+        close_at=cal["close_at"] + timedelta(days=1),
+        open_price=Decimal("9.20"),
+        close_price=Decimal("9.30"),
+        open_execution_state=OpenExecutionState.EXECUTABLE,
+    )
+    result = candidate.engine.run_sell_sequence(
+        run=run,
+        signal=signal,
+        sessions=[held, executable],
+        opening_state=before,
+        corporate_actions=[step],
+    )
+    states, fills, carries = {}, {}, {}
+    for e in result.events:
+        if e.event_type is EventType.DAILY_SNAPSHOT:
+            states[date.fromisoformat(e.payload["session_date"])] = _state_from_snapshot(
+                e, target_notional=before.target_notional
+            )
+        elif e.event_type is EventType.FILL:
+            fills[e.event_time.date()] = e
+        elif e.event_type is EventType.ORDER_STATUS and e.payload["transition"].endswith(
+            "to_carried"
+        ):
+            carries[e.event_time.date()] = e
+    schedule = _SellSchedule(True, states, fills, carries, result.events)
+    runtime = SimpleNamespace(
+        ledger=before,
+        opportunity_id="OP",
+        formal_security_id="S",
+        panel_security_id="L",
+        holding_sessions=3,
+        cooldown_sessions=0,
+        sell_schedule=schedule,
+        strategy_reduction_count=0,
+        lifecycle=PositionLifecycleState(
+            "U",
+            PositionStage.EXITING,
+            "L",
+            "OP",
+            POSITION_STATE_MACHINE_TRIAL_REDUCTION_VERSION,
+            clock(decision).simulated_close,
+            (),
+            (),
+        ),
+    )
+    transitions = []
+    candidate._apply_sell_schedule(
+        SimpleNamespace(execution_date=day), runtime, transitions, schedule, []
+    )
+    assert runtime.ledger.settled_quantity == 130
+    assert runtime.ledger.dividend_income == Decimal("15.80")
+    assert runtime.lifecycle.stage is PositionStage.EXITING
+    candidate._apply_sell_schedule(
+        SimpleNamespace(execution_date=next_day), runtime, transitions, schedule, []
+    )
+    assert runtime.ledger.settled_quantity == 0
+    assert runtime.ledger.dividend_income == Decimal("15.80")
+    assert runtime.lifecycle.stage is PositionStage.CLOSED
+    assert fills[next_day].payload["quantity"] == 130
+    assert len(transitions) == 2

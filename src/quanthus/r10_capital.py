@@ -9,7 +9,7 @@ import shutil
 import threading
 import time
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -144,6 +144,7 @@ def capital(project, contract, qualification, *, native=None, fit=None, output=N
     native = native or NativeInputs(project, contract, qualification / "native")
     results = {}
     active_arm = None
+    runtime = None
     try:
         benchmark = rows(
             native.db,
@@ -303,11 +304,17 @@ def capital(project, contract, qualification, *, native=None, fit=None, output=N
         write(output / "comparison.safe.json", result)
         return result
     except Exception as exc:
+        last_source_access = None
+        if runtime is not None:
+            store = runtime.session.reader.store
+            last_source_access = store.last_access
+            write(output / "source-accesses.partial.private.json", {"rows": store.accesses})
         write(
             output / "failure.safe.json",
             {
                 "status": failure_class(exc),
                 "active_arm": active_arm,
+                "last_source_access": last_source_access,
                 "type": type(exc).__name__,
                 "reason": str(exc),
                 "completed_arms": list(results),
@@ -562,6 +569,26 @@ def main():
         if args.command == "cold"
         else admitted(args.contract, args.qualification)
     )
+    capital_deadline = None
+    if args.command == "capital":
+        job = args.qualification.parent
+        window = job / "capital-window.safe.json"
+        if not window.exists():
+            attempts = [read(p)["started_at"] for p in job.glob("capital*/attempt.json")]
+            first = (
+                min(datetime.fromisoformat(v) for v in attempts)
+                if attempts
+                else datetime.now(timezone.utc)
+            )
+            write(
+                window,
+                {
+                    "started_at": first.isoformat(),
+                    "deadline": (first + timedelta(seconds=1800)).isoformat(),
+                    "scope": "all primary capital attempts; no clock reset on repair",
+                },
+            )
+        capital_deadline = datetime.fromisoformat(read(window)["deadline"])
     os.sched_setaffinity(0, sorted(os.sched_getaffinity(0))[: c["runtime"]["cpu_cores"]])
     done = threading.Event()
 
@@ -572,6 +599,8 @@ def main():
             reason = None
             if datetime.now(timezone.utc) >= datetime.fromisoformat(admission["C_deadline"]):
                 reason = "R10_C_DEADLINE"
+            elif capital_deadline is not None and datetime.now(timezone.utc) >= capital_deadline:
+                reason = "R10_CUMULATIVE_PRIMARY_CAPITAL_WINDOW"
             elif time.monotonic() >= PHASE["deadline"]:
                 reason = "R10_PHASE_COMPUTE_LIMIT:" + PHASE["name"]
             elif process_tree_rss(os.getpid()) > c["runtime"]["rss_bytes"]:

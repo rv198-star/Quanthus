@@ -14,6 +14,7 @@ from quanthus.backtest.baseline_research import (
     BaselineFeatureRow,
     _feature_panel_query,
 )
+from quanthus.backtest.contracts import EventType
 from quanthus.backtest.inputs import CoverageStatus
 from quanthus.backtest.native_capital_adapter import qualify_action
 from quanthus.backtest.native_capital_replay import (
@@ -397,7 +398,41 @@ class ControlledReplay(FormalP2ReplayRuntime):
         return None
 
     def _code_version(self):
-        return "r10-native-controlled-replay-1.1.0"
+        return "r10-native-controlled-replay-1.2.0"
+
+    def _validate_carried_sell_actions(self, actions):
+        # P2 itself checks exact integer holdings and preserves the pending-sell
+        # proportion. Its fractional-share rejection remains the final authority.
+        del actions
+
+    def _apply_sell_schedule(self, frame, runtime, transitions, schedule, events):
+        # Corporate-action accounting is already committed in the P2 schedule.
+        # Give the lifecycle the post-action ledger as the order-only baseline;
+        # do not post the dividend or shares a second time.
+        if frame.execution_date not in schedule.states_by_date:
+            return
+        for event in schedule.events:
+            p = event.payload
+            if event.event_type is EventType.CORPORATE_ACTION and p["effective_date"] == str(
+                frame.execution_date
+            ):
+                before = runtime.ledger
+                if (
+                    p["quantity_before"] != before.settled_quantity
+                    or p["security_code"] != before.security_code
+                    or Decimal(p["cash_before"]) != before.cash
+                    or Decimal(p["position_cost"]) != before.position_cost
+                ):
+                    raise ValueError("R10_CARRIED_ACTION_LEDGER_BINDING")
+                runtime.ledger = replace(
+                    before,
+                    settled_quantity=p["quantity_after"],
+                    cash=Decimal(p["cash_after"]),
+                    dividend_income=before.dividend_income + Decimal(p["cash_dividend"]),
+                    last_mark_price=Decimal(p["mark_price"]),
+                    last_mark_snapshot_id=p["mark_snapshot_id"],
+                )
+        return super()._apply_sell_schedule(frame, runtime, transitions, schedule, events)
 
     def _parameter_payload(self, intervention_id):
         return {
@@ -407,6 +442,7 @@ class ControlledReplay(FormalP2ReplayRuntime):
             "events": digest(self.frozen_events),
             "prediction_commitment": digest(self.predictions),
             "action_valuation_policy": "native-observed-open-mark-v1-execution-unmodified",
+            "carried_action_policy": "p2-native-integer-pending-sell-v1",
         }
 
     def _manifest_metadata(self, intervention_id):

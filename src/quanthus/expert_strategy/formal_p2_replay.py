@@ -905,11 +905,7 @@ class FormalP2ReplayRuntime:
                     "formal_position_mark_missing", "sell sequence lacks prior mark"
                 )
             candidate_actions = candidate.actions(runtime.panel_security_id, mark)
-            if any(item.action.bonus_share_ratio != 0 for item in candidate_actions):
-                raise ExpertEvaluationError(
-                    "formal_sell_bonus_share_unsupported",
-                    "carried sell encountered a quantity-changing action",
-                )
+            self._validate_carried_sell_actions(candidate_actions)
             actions.extend(candidate_actions)
             if candidate_actions:
                 mark = candidate_actions[-1].post_action_mark_price
@@ -951,6 +947,13 @@ class FormalP2ReplayRuntime:
             ).endswith("to_carried"):
                 carries[event.event_time.date()] = event
         return _SellSchedule(full_exit, states, fills, carries, result.events)
+
+    def _validate_carried_sell_actions(self, actions: Any) -> None:
+        if any(item.action.bonus_share_ratio != 0 for item in actions):
+            raise ExpertEvaluationError(
+                "formal_sell_bonus_share_unsupported",
+                "carried sell encountered a quantity-changing action",
+            )
 
     def _execute_frame(
         self,

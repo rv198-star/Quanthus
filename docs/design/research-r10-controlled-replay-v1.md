@@ -37,7 +37,7 @@ Design status: approved — Owner 2026-11-14明确选择按受控回放继续。
 
 原生源按同一knowledge cutoff读取，listing与security同时按2020–2021业务有效区间限定，逐日panel再取双方区间交集。原P4完整前缀与原cap先运行，然后排除已知公司、当前guard及时间不合格事件；source-only确定角色后才评分。prepare与screen使用的producer分别保留，原生特征SQL的逐字节兼容证明另列；原R7的baseline和Trend源文件保留其固定字节。
 
-新行动估值政策`native-observed-open-mark-v1-execution-unmodified`仅用于当前受控provider。P10 #679记录了送转日原生限价与真实OHLC冲突；原执行session继续按限价失败关闭，适配器对同一有效日、原生时钟、CNY/UNADJUSTED、完整正OHLC及来源凭据独立验明后，才把真实open作为既有P2的post-action mark。保留原行动条款解释、账本、整数股及pending-sell比例规则；没有改写限价或赋予成交资格。原P2的后续持仓mark/carry规则继续适用。既有送转卖出或碎股不支持时，准确登记SOURCE_HOLD和所在arm；代码异常单独登记IMPLEMENTATION_FAILURE。
+新行动估值政策`native-observed-open-mark-v1-execution-unmodified`仅用于当前受控provider。P10 #679记录了送转日原生限价与真实OHLC冲突；原执行session继续按限价失败关闭，适配器对同一有效日、原生时钟、CNY/UNADJUSTED、完整正OHLC及来源凭据独立验明后，才把真实open作为既有P2的post-action mark。保留原行动条款解释、账本、整数股及pending-sell比例规则；没有改写限价或赋予成交资格。原P2的后续持仓mark/carry规则继续适用。R10通过`p2-native-integer-pending-sell-v1`接入既有P2的整数股与待卖数量同步调整，并用P2同日行动后账本作为lifecycle订单变化的基线，分红和股数只记一次。默认Formal包装层的旧守卫保留；碎股或待卖比例不支持时准确登记SOURCE_HOLD和所在arm，代码异常单独登记IMPLEMENTATION_FAILURE。
 
 完整三arm各自初始化5×100000现金单位，原trial30%、hold3–40及原专家/否决不变，依次执行并封存交易、权益、费用、订单、现金、持仓与退出。结果保留原生沪深300的145个相同日期观测，另报告已平仓现金流归因；剩余头寸按完整权益和终态账本计入。分红及池内转账按既有P2记账，转账不算交易收益。
 

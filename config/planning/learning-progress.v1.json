@@ -14282,6 +14282,41 @@
         "TRAIN",
         "S02"
       ]
+    },
+    {
+      "id": "CP-682-20261114T154943272929Z",
+      "recorded_at": "2026-11-14T15:49:43.272929+00:00",
+      "actor": "Codex execution; actual managed-worktree protection receipt",
+      "work_item": "P5-RESEARCH-R10-DIAG-001",
+      "outcome": "no_module_change",
+      "summary": "Integrated diagnostic complete; app-primary clean checkout retained after managed archive refusal, with private evidence/transport commit preserved and task branches deleted.",
+      "evidence": [
+        {
+          "id": "RETAINED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r10-diagnostic-closeout/worktree-retention.json",
+          "sha256": "d033a3e6ba7a342213bac9d8065bd18e0da32a6c281496ba34baa7202b54373e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Resource retention and live issue observation only; no research or module qualification change."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Only record application-protected resource retention and actual issue timestamp; preserve all accepted diagnostic and scientific states.",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R10-DIAG-001",
+          "number": 682,
+          "title": "[P5-RESEARCH-R10-DIAG-001] 诊断训练必要条件与实际决策覆盖并冻结单候选草案",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-14T15:49:39Z",
+          "body_sha256": "f8ca144ff7387c49b24fb1c51da3f095657854ad2dfed63fe412fe7da19efc3a"
+        }
+      ],
+      "reviewed_modules": [
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

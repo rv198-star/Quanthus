@@ -1,0 +1,122 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "RESEARCH-R9-REFERENCE-ASSETS-S02-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "exploration",
+  "family": "local-learning-r9-qualified-assets",
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "modules": [
+    "REFERENCE",
+    "STATES",
+    "TRAIN",
+    "UPDATE",
+    "EXPERT",
+    "S02",
+    "TRACE"
+  ],
+  "question": "Can fixedqualifiedreference24 be reused as exposedtrain with one existing-source2021qualifiedcandidateframe?",
+  "consumer": "#543/#544 research S02 version selection and readable changed-case report",
+  "scope": "knownqualified24exposedtrainassets +newindependent2021guard8/update8/eval24; source1048qualifiedpool bound; newreference80max/0retry, no oldvotes repeated",
+  "deliverable": "realnewv0/conditionalguardedupdate, sealedpredictions, same-inputR0/v0/v1comparison, S02researchsidecar andindependentnativecold orfirsthardgateSTOP",
+  "decision_if_pass": "qualifiedS02researchversion choice withboundednewfutureevaluation; retainactualNO_UPDATE orretentionrejection branch",
+  "decision_if_fail": "recordexactnewsource/support gap andstopremainingnewrole calls; preserveallassets without labelrepair",
+  "acceptance": [
+    "train>=12definite &>=4/class &>=2month blocks;guard>=2/class;evaluation>=12definite &>=5uniquecompany/class &>=2monthblocks;update>=1definite",
+    "all64 R0/v0/v1 predictions, checkpoints andretentionchoice before learner/evaluator evaluation label access; independent semantic QA sees reference earlier and releases only support receipts to learner",
+    "retention accepted AND evaluationFP strictly decreases versusv0 AND FN nonincrease; otherwise retainv0",
+    "one independent native126member source qualification, feature/R0 reconstruction andfreshfit/conditionalupdate; exactcheckpoints/predictions andsameFPFN/decision; reference not revoted"
+  ],
+  "stop_conditions": [
+    "02:08Zreferencehardstop/02:18Ztotal includingallpreparation/review/delivery;80newCLIincludingfailures,0retry; old218CLI retained",
+    "originalsource/support/QA/retention gates;no sample replacement/thresholdchange/forcedupdate; alloldroles/labels retained"
+  ],
+  "memory_sha256": "dcd2b133453ef2aab9d813ff16588c5999918b2aeb0d2dcdd56546a40096a8c1",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "relation": "different_scope",
+      "rationale": "保留两接入NO_GO；消费者限定识别版本评审与S02研究报告sidecar，不重开原动作映射。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
+      "relation": "different_scope",
+      "rationale": "原A4保持不重投/不重标；本次从其未选择公司取独立校准面板，检验参考可操作性，符合原恢复条件。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R9-CALIBRATION-QUALIFIED-20261114",
+      "relation": "respect",
+      "rationale": "Realcalibration independentlyqualified2TRUE10FALSE andsealedprotocol; this successor preserves anchors andindependently qualifies newcompanies underoriginalgates."
+    }
+  ],
+  "cumulative_cost_review": "218actualCLIbeforethisnewphase; oldfailedtrialunused16notrolledover; new80max (guard16+eval48+update16), importedtrain0=>maxcumulative298. Newphase00:48..02:18 includesprep/source/code/review/wait/run/delivery; reference02:08 fixedbeforefirstnewopinion. Oldfirsttrial01:22/01:52andallpriorcosts/labels/stop preserved.",
+  "runtime_authority_boundary": "Owner持续要求完成R9；主代理在已停止旧trial之后另列合格参考资产复用的有限后继。旧窗口与112已用/16未用调用原样保留，未用额度不滚存；同一Mission总时钟/旧费用继续累计。",
+  "budget": {
+    "wall_seconds": 5400,
+    "max_new_bytes": 67108864,
+    "network_requests": 80,
+    "accounting_owner": "RESEARCH-R9-CALIBRATION-001;priorcostsretained"
+  }
+}

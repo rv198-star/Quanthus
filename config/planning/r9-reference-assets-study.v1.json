@@ -1,0 +1,242 @@
+{
+  "schema_version": "quanthus.r9-reference-assets-study.v1",
+  "request_id": "RESEARCH-R9-REFERENCE-ASSETS-S02-001",
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "owner_authority": "Owner持续要求完成R9；主代理在已停止旧trial之后另列合格参考资产复用的有限后继。旧窗口与112已用/16未用调用原样保留，未用额度不滚存；同一Mission总时钟/旧费用继续累计。",
+  "output_root": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/reference-assets-s02-001",
+  "source": {
+    "pool_path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/reference-assets-s02-001/pool/qualified-cases.private.json",
+    "pool_sha256": "f4a8343729506d7f23d4dcd71b943da2b10f2cf3b3a520353185d1bae42668ab",
+    "exclusions": [
+      {
+        "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/selected/qualified-cases.private.json",
+        "sha256": "8d6c981b378d4cbd67187654b3cd31ae2d2df4f1632bbdf00d804d3f7d773d95"
+      },
+      {
+        "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/calibration-ssh-003-selection/selected.private.json",
+        "sha256": "4e619a6bb52ace222aea1a2adaa20257875f42b5bbaa32c464c35f850e2302cf"
+      },
+      {
+        "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/prospective-s02-001/selected.private.json",
+        "sha256": "eaa64e3a903e24184c34b7e1923358c104fa01df724152b47ef931bb5b59fc88"
+      }
+    ],
+    "native_source": {
+      "dataset": "rv192/quanthus-base25-sealed",
+      "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+      "manifest_sha256": "8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+      "closure": "config/research/research-capital-qual/closure.v1.json",
+      "closure_sha256": "0f66acfcc8ef1a93f831b7272f59a86df13fe4a2f3717e4c8e5a812d4cbac13f",
+      "cache": "/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/job-a1/source",
+      "knowledge_cutoff": "2026-11-11T20:19:54.776092+00:00"
+    },
+    "grade": "existing sealed retrospective 2020NovDec imported training assets and 2021 independent development roles; qualified inputs only; no new acquisition or protected2022+read"
+  },
+  "calibration": {
+    "summary_path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/calibration-ssh-003-summary/calibration.safe.json",
+    "summary_sha256": "7c9047c2828969e25b07fa93c615d7a6d6df92f8dcd84e6aa47bbcaa7c43776e",
+    "positive": 2,
+    "negative": 10,
+    "qa_citations": 709,
+    "protocol": "unchanged four necessary clauses; QA only excludes; calibrated source anchors kept separate"
+  },
+  "selection": {
+    "layout": [
+      [
+        "train",
+        "2020-11-30",
+        "import",
+        12
+      ],
+      [
+        "train",
+        "2020-12-31",
+        "import",
+        12
+      ],
+      [
+        "guard",
+        "2021-05-31",
+        "narrow",
+        4
+      ],
+      [
+        "guard",
+        "2021-05-31",
+        "boundary",
+        2
+      ],
+      [
+        "guard",
+        "2021-05-31",
+        "expanding",
+        2
+      ],
+      [
+        "update",
+        "2021-06-30",
+        "hash",
+        8
+      ],
+      [
+        "evaluation",
+        "2021-11-30",
+        "narrow",
+        4
+      ],
+      [
+        "evaluation",
+        "2021-11-30",
+        "boundary",
+        4
+      ],
+      [
+        "evaluation",
+        "2021-11-30",
+        "expanding",
+        4
+      ],
+      [
+        "evaluation",
+        "2021-12-31",
+        "narrow",
+        4
+      ],
+      [
+        "evaluation",
+        "2021-12-31",
+        "boundary",
+        4
+      ],
+      [
+        "evaluation",
+        "2021-12-31",
+        "expanding",
+        4
+      ]
+    ],
+    "narrow": "available abs(directional_efficiency)<=.33 &width_change<=-.20; smallest range_width then sample_id",
+    "boundary": "same contracting candidates remaining after prior slots; centered contiguous count around lower-middle of range_width/sample_id order",
+    "expanding": "available width_change>0; largest width_change then sample_id",
+    "hash": "remaining same-anchor available rows ordered by unchanged R9-R0-STRATIFIED-A3-20261113 company/security/listing hash",
+    "proxy_grade": "unlabeled sampling intentions only; no source or model label/score used to select",
+    "denominator": 1048,
+    "selected": 64,
+    "no_replacement": true,
+    "design_delta": "OldtrialSTOP kept. ExactoldEval24 imported as exposedtrain, retiredfromfutureevaluation/guard/update inthislineage; new2021guardMay/updateJun/evalNovDec companies all disjoint. Oldlabels/opinions neverrevoted orrewritten. Allnew40 source/proxies fixedbefore newopinions."
+  },
+  "maximum_calls": 80,
+  "reference": {
+    "models": [
+      "auto/gpt-6.1-sol",
+      "auto/gpt-6-astra"
+    ],
+    "provider_id": "magpie",
+    "retries": 0,
+    "request_max_retries": 0,
+    "stream_max_retries": 0,
+    "concurrency": 2,
+    "per_call_seconds": 120,
+    "order": [
+      "import_train_assets",
+      "guard",
+      "evaluation",
+      "update"
+    ],
+    "support": "train>=12definite &>=4/class &>=2month blocks;guard>=2/class;evaluation>=12definite &>=5uniquecompany/class &>=2monthblocks;update>=1definite",
+    "qa": "independent all-path, clause/citation andtrace review; invalidate only; originalUNKNOWN/disagreements retained",
+    "gated_failure": "stop laterroles+fit/update; no extra opinions/replacement/reassignment",
+    "maximum_calls": 80,
+    "training_reference": "import48originalopinions/QA only; zero newtrain calls"
+  },
+  "learning": {
+    "feature_names": [
+      "absolute_directional_efficiency",
+      "range_width",
+      "width_change",
+      "absolute_center_shift",
+      "range_traversal",
+      "counter_direction_excursion_share",
+      "counter_direction_undefined"
+    ],
+    "fit_steps": 200,
+    "update_steps": 100,
+    "learning_rate": 0.05,
+    "l2": 0.01,
+    "update_loss_trigger": 0.6931471805599453,
+    "raw_threshold": 0.5
+  },
+  "learning_acceptance": {
+    "max_primary_fit": 1,
+    "max_conditional_update": 1,
+    "retention": "guard FN/FP andupdate meanloss each nonincrease; guard never in gradient",
+    "prediction_commitment": "all64 R0/v0/v1 predictions, checkpoints andretentionchoice before learner/evaluator evaluation label access; independent semantic QA sees reference earlier and releases only support receipts to learner",
+    "adoption": "retention accepted AND evaluationFP strictly decreases versusv0 AND FN nonincrease; otherwise retainv0",
+    "no_update": "preserve genuineNO_UPDATE andv0; actual-update MVP KR remains open",
+    "cold": "one independent native126member source qualification, feature/R0 reconstruction andfreshfit/conditionalupdate; exactcheckpoints/predictions andsameFPFN/decision; reference not revoted"
+  },
+  "consumer": {
+    "name": "#543/#544 readable S02 research sidecar",
+    "scope": "2021new proxy-enriched development versionchoice with2020Nov/Dec exposedreferenceassets usedonlytrain; full64/1048denominators",
+    "probability": null,
+    "expert_disposition": "pending/ABSTAIN",
+    "old_R8_and_March": "preserved"
+  },
+  "runtime": {
+    "started_at": "2026-11-14T00:48:00+00:00",
+    "reference_deadline": "2026-11-14T02:08:00+00:00",
+    "total_deadline": "2026-11-14T02:18:00+00:00",
+    "reference_window_seconds": 7200,
+    "fit_wall_seconds": 600,
+    "cold_wall_seconds": 600,
+    "rss_bytes": 2147483648,
+    "cpu_cores": 2,
+    "tmp_bytes": 1073741824,
+    "output_bytes": 67108864,
+    "resource_accounting": "entire study root across roles, QA,fit,cold andlogs; fixedphaseworker deadlines; no globalfile-size RLIMIT"
+  },
+  "implementation_bindings": {
+    "src/quanthus/r9_study.py": "887758d4ff515664726bf3d3aba1e0854ce6a5b2150808ddfa5c962b8e5b7cab",
+    "src/quanthus/r9_calibration.py": "39735f5d33089e3c9f1c7fe9bc7dfaf6ccfc51a72395a6830412f10d0b18d92c",
+    "src/quanthus/r9_qualification.py": "0d3e70323ab5a56c7624bdb48c53a48d9b1b780cc78e3752b1566e429fe72019",
+    "src/quanthus/r9_learning.py": "5b3d178d44195a1d2a99bdde7a2b1fd45f6ddd7b857ba4222898af4611b69217",
+    "src/quanthus/r9_stratified.py": "b862ebffa466f187783a287da8160f787135528ae7893d66c1e27d26ab14dd39",
+    "src/quanthus/r9_reference.py": "af6ee3b8af7262371b7e3727f4e2747c57e34458a0c2965a2aa322fefe0007b1",
+    "src/quanthus/r7_native.py": "d93a32f05bbb764519c713ccb089593d7421eeb51c7ec5b42ba8daed82943aa9",
+    "src/quanthus/structure_v2_inputs.py": "b336e3ee48889ca7ccb9903c0d2ddf55e84e9b9fe56472cc34b7e640339e2275",
+    "src/quanthus/stage_learning/head2_revision.py": "09c5d9c4a29adaf153f789bbb7ecc2d548c502cf1b8928110e6e524a9a99a395",
+    "src/quanthus/stage_learning/local_head.py": "e7db806ed750b8c088c296e142f182a8ecfbcb461ee3f3dd86862bff506dc810",
+    "src/quanthus/stage_learning/head2_facts.py": "8be2f1f2ff57a299b126a5e1937ab85025cacddfd1b0f02ca195638a49288235",
+    "src/quanthus/stage_learning/order_rule_screen.py": "b0163d2129ff119fdde3b4dce97f02d01f88546cda055fcc68880dd83a86e7a9",
+    "src/quanthus/r9_assets.py": "1a8033591aa48be4a06f670cd7a25e9b60987e48510c1b9adb94466f8cab8e7b"
+  },
+  "cumulative_cost": "218actualCLIbeforethisnewphase; oldfailedtrialunused16notrolledover; new80max (guard16+eval48+update16), importedtrain0=>maxcumulative298. Newphase00:48..02:18 includesprep/source/code/review/wait/run/delivery; reference02:08 fixedbeforefirstnewopinion. Oldfirsttrial01:22/01:52andallpriorcosts/labels/stop preserved.",
+  "imported_reference": {
+    "files": {
+      "role_request": {
+        "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/prospective-s02-001/request-evaluation.json",
+        "sha256": "4502b79ae730abcc956f0e15486e087251bcaafb2f413c63ae7a692d09819121"
+      },
+      "selection": {
+        "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/prospective-s02-001/selection-evaluation/selected.private.json",
+        "sha256": "0172a7bced89bfcf89f459d55135f8b28031eaff82cee1282a1e2785495b03ec"
+      },
+      "references": {
+        "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/prospective-s02-001/reference-evaluation/references.sealed.json",
+        "sha256": "253f1fca86c50e9c254f95b7b7b6c54fe568ec259f31ee618f6e2d14908742b8"
+      },
+      "qa": {
+        "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/prospective-s02-001/qa-evaluation.private.json",
+        "sha256": "6d22a904d08f8ff21fe82c48554f21b3bdf3fbe0294c20c7cf6263d23295ce26"
+      },
+      "resolved": {
+        "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/prospective-s02-001/qa-evaluation/resolved.private.json",
+        "sha256": "947037997d7fe8446e279a78e781b32c0ac9e449c8fdc4d82379edc04ad3eff7"
+      }
+    },
+    "mapping": "old evaluation24 -> new exposeddevelopment train24; originalrole andalloriginalfiles retained; permanently retiredfromfutureevaluation, guard,update inthislineage",
+    "target_rubric": "unchanged four necessary clauses",
+    "origin_study_request_sha256": "089241cd729a017bcfbe7f719dc2a7f320db01a0eb09af0fdf82436b8fbfbbc4",
+    "import_timing": "After finalsource/64identitystudy freeze, before paidnewreferencecalls; source/feature/labelset adapter verified once; no gradient untilalloriginalsupport gates pass"
+  }
+}

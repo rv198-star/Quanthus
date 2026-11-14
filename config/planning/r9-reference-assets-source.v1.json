@@ -1,0 +1,86 @@
+{
+  "schema_version": "quanthus.r9-reference-assets-source.v1",
+  "request_id": "R9-REFERENCE-ASSETS-SOURCE-001",
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "owner_authority": "Owner持续要求完成R9；主代理在已停止旧trial之后另列合格参考资产复用的有限后继。旧窗口与112已用/16未用调用原样保留，未用额度不滚存；同一Mission总时钟/旧费用继续累计。",
+  "question": "Can knownqualified24canonical reference assets serve train while onefixed2021source panel supports independentlaterroles?",
+  "source": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "manifest_sha256": "8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "closure": "config/research/research-capital-qual/closure.v1.json",
+    "closure_sha256": "0f66acfcc8ef1a93f831b7272f59a86df13fe4a2f3717e4c8e5a812d4cbac13f",
+    "cache": "/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/job-a1/source",
+    "knowledge_cutoff": "2026-11-11T20:19:54.776092+00:00"
+  },
+  "identity_source": {
+    "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/qualified-pool/qualified-cases.private.json",
+    "sha256": "4821d9dd69c1086201a03f77ea76de72723da94fa095fa7945edda96130edcda"
+  },
+  "origin_selected": {
+    "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/prospective-s02-001/selected.private.json",
+    "sha256": "eaa64e3a903e24184c34b7e1923358c104fa01df724152b47ef931bb5b59fc88"
+  },
+  "exclusions": [
+    {
+      "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/selected/qualified-cases.private.json",
+      "sha256": "8d6c981b378d4cbd67187654b3cd31ae2d2df4f1632bbdf00d804d3f7d773d95"
+    },
+    {
+      "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/calibration-ssh-003-selection/selected.private.json",
+      "sha256": "4e619a6bb52ace222aea1a2adaa20257875f42b5bbaa32c464c35f850e2302cf"
+    },
+    {
+      "path": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/prospective-s02-001/selected.private.json",
+      "sha256": "eaa64e3a903e24184c34b7e1923358c104fa01df724152b47ef931bb5b59fc88"
+    }
+  ],
+  "output_root": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/reference-assets-s02-001",
+  "candidate_frame": "Imported24exactoldEval2020Nov/Dec asnewtrain; remaining1024fromoriginal1536identities excludingall140oldcompanies, unchangedcompany/security/listinghashorder, four256groupsguard2021May/updateJune/evalNov/Dec; all40calendarwindows fixedbeforefirstnewOHLCread",
+  "source_grade": "existingfixed126publishedsealedmembers2020-2021; domainnativequalification only, no acquisition/backfill/repair or2022+read",
+  "import_exposure": "oldEval24 exposedtrainingassets in newstudy; permanently retiredfromfutureevaluation inthislineage; oldstudyunchangedSTOP",
+  "stage_boundary": "sourceconstruction only; zero referencecalls/fit/update; finalselection/hash andstudycontract independently frozenafterthisqualification",
+  "prospective_reference_budget": {
+    "new_calls_max": 80,
+    "retries": 0,
+    "cumulative_cli_ceiling": 298,
+    "existing_cli_starts": 218
+  },
+  "runtime": {
+    "started_at": "2026-11-14T00:48:00+00:00",
+    "reference_deadline": "2026-11-14T02:03:00+00:00",
+    "total_deadline": "2026-11-14T02:18:00+00:00",
+    "reference_window_seconds": 7200,
+    "fit_wall_seconds": 600,
+    "cold_wall_seconds": 600,
+    "rss_bytes": 2147483648,
+    "cpu_cores": 2,
+    "tmp_bytes": 1073741824,
+    "output_bytes": 67108864,
+    "resource_accounting": "entire study root across roles, QA,fit,cold andlogs; fixedphaseworker deadlines; no globalfile-size RLIMIT"
+  },
+  "implementation_bindings": {
+    "src/quanthus/r9_study.py": "2b9ae6a904edd4ae47662f2f988162d587c9afd5b876aee314ff8be467faa959",
+    "src/quanthus/r9_calibration.py": "39735f5d33089e3c9f1c7fe9bc7dfaf6ccfc51a72395a6830412f10d0b18d92c",
+    "src/quanthus/r9_qualification.py": "0d3e70323ab5a56c7624bdb48c53a48d9b1b780cc78e3752b1566e429fe72019",
+    "src/quanthus/r9_learning.py": "5b3d178d44195a1d2a99bdde7a2b1fd45f6ddd7b857ba4222898af4611b69217",
+    "src/quanthus/r9_stratified.py": "b862ebffa466f187783a287da8160f787135528ae7893d66c1e27d26ab14dd39",
+    "src/quanthus/r9_reference.py": "af6ee3b8af7262371b7e3727f4e2747c57e34458a0c2965a2aa322fefe0007b1",
+    "src/quanthus/r7_native.py": "d93a32f05bbb764519c713ccb089593d7421eeb51c7ec5b42ba8daed82943aa9",
+    "src/quanthus/structure_v2_inputs.py": "b336e3ee48889ca7ccb9903c0d2ddf55e84e9b9fe56472cc34b7e640339e2275",
+    "src/quanthus/stage_learning/head2_revision.py": "09c5d9c4a29adaf153f789bbb7ecc2d548c502cf1b8928110e6e524a9a99a395",
+    "src/quanthus/stage_learning/local_head.py": "e7db806ed750b8c088c296e142f182a8ecfbcb461ee3f3dd86862bff506dc810",
+    "src/quanthus/stage_learning/head2_facts.py": "8be2f1f2ff57a299b126a5e1937ab85025cacddfd1b0f02ca195638a49288235",
+    "src/quanthus/stage_learning/order_rule_screen.py": "b0163d2129ff119fdde3b4dce97f02d01f88546cda055fcc68880dd83a86e7a9",
+    "src/quanthus/r9_assets.py": "5759c2d95d98cff6a0ec5a301024e3921e9d46fcafed5fa13ef86c3920c8a460"
+  },
+  "predecessor": {
+    "request": "r9-prospective-s02.v1.json",
+    "source": "a95153893b7dfa6a4bff0b2103ef8de605e89250",
+    "disposition": "STOP_TRAIN_CLASS_SUPPORT_FAILED;1TRUE19FALSE4UNKNOWN;update/fit/compare/coldNR",
+    "reference_deadline": "2026-11-14T01:22:01+00:00",
+    "total_deadline": "2026-11-14T01:52:01+00:00",
+    "unused_calls": 16,
+    "unused_disposition": "notrolledover"
+  }
+}

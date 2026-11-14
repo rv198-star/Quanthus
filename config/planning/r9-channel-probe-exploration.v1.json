@@ -1,0 +1,53 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "R9-CHANNEL-PROBE-003-SSH",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "repair",
+  "family": "r9-reference-channel-repair",
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "modules": [
+    "REFERENCE"
+  ],
+  "question": "Can a corrected bounded CLI adapter return one complete two-reader pair before further calibration spending?",
+  "consumer": "#662 channel qualification before S02 calibration",
+  "scope": "exactly one fixed synthetic HLC40 packet; at most2new CLI invocations; no market rows, fit or update",
+  "deliverable": "two complete strict trace/opinion receipts or exact first failure; preserve all previous80CLIstarts",
+  "acceptance": [
+    "prepare and offline-test an exact2call startup guard before live execution",
+    "both readers have complete valid events, opinion and source/protocol bindings; no expected truth labels imposed"
+  ],
+  "stop_conditions": [
+    "max2CLI invocations incl failures; provider request_max_retries=stream_max_retries=0; no retry",
+    "fixed20min allocation starts 2026-11-13T22:27:59Z; earlier preparation stays cumulative",
+    "no real calibration until both strict receipts valid and a new bounded study frozen"
+  ],
+  "decision_if_pass": "freeze independently bounded real12calibration under current Owner completion directive; no automatic invocation by this runner",
+  "decision_if_fail": "retain failure and exact adapter/runtime gap; no further invocation",
+  "memory_sha256": "d7b79c7063d2c122e486c330bd2681a80e90e5a5a688b37d4ead9df6411c97f0",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "relation": "respect",
+      "rationale": "Retain the scoped old stop, source and scientific results. This proposal repairs only CLI receipt acquisition, with2explicit calls; old A4 and the24failed calibration starts remain unchanged."
+    },
+    {
+      "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
+      "relation": "respect",
+      "rationale": "Retain the scoped old stop, source and scientific results. This proposal repairs only CLI receipt acquisition, with2explicit calls; old A4 and the24failed calibration starts remain unchanged."
+    },
+    {
+      "conclusion_id": "CON-R9-CALIBRATION-CHANNEL-FAILED-20261114",
+      "relation": "respect",
+      "rationale": "Retain the scoped old stop, source and scientific results. This proposal repairs only CLI receipt acquisition, with2explicit calls; old A4 and the24failed calibration starts remain unchanged."
+    }
+  ],
+  "cumulative_cost_review": "80prior researchCLI +2offline loopback fixtures retained; preparation since22:05:30Z accounted separately; this allocation starts at recorded started_at and expires after20min including its publication/review/run/delivery. <=2real-providerCLI,0retries,fit/update0",
+  "runtime_authority_boundary": "Owner continuation directive recorded E7e901ce0; new fixed channel contract config/planning/r9-channel-probe.v1.json controls this finite tranche",
+  "budget": {
+    "wall_seconds": 1200,
+    "max_new_bytes": 67108864,
+    "network_requests": 2,
+    "accounting_owner": "RESEARCH-R9-CALIBRATION-001; carry prior costs"
+  }
+}

@@ -12258,6 +12258,373 @@
         "S02",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-662-20261113T232150518420Z",
+      "recorded_at": "2026-11-13T23:21:50.518420+00:00",
+      "actor": "R9 primary; independent semantic andcode review",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "progress",
+      "summary": "真实参考校准资格通过：2TRUE10FALSE，24意见及709引文独立QA；148文件私有HF全回读；进入独立新批次的事前资格。",
+      "evidence": [
+        {
+          "id": "R9-SSH-CALIBRATED",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/calibration-evidence/summary/calibration.safe.json",
+          "sha256": "7c9047c2828969e25b07fa93c615d7a6d6df92f8dcd84e6aa47bbcaa7c43776e",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed12 development panel2TRUE10FALSE0UNKNOWN;24opinions all independently admitted;709literalcitations; later independent study gates required"
+        },
+        {
+          "id": "R9-SSH-CALIBRATION-HF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/hf-calibration-publication.json",
+          "sha256": "2ef83cec5449c60a114a8e8e0cd351ac97370798b16f2f52704deb562c805a09",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private64109016;148files1036616B all readback verified; research106CLI;fit/update0"
+        },
+        {
+          "id": "R9-CHANNEL-003-FULLCHECK",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/channel-full-check-receipt.json",
+          "sha256": "466a4a5f17db6626bb197d5072b1ba498eef8421a13336e35a943078ab5d7276",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exactfeb82c13 nativePython3.10 fullcheck9320pass35skip; not the unexecuted successor implementation"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "Fixed12 clause-level calibration anchors,2positive10negative, calibrated operationalAIreference for new prospective development qualification",
+          "remaining": "Successor guard/eval/train/update support, onefit/conditionalupdate andconsumercomparison remain toexecute",
+          "next_action": "Freeze independent64fromsamequalifiedpool excludingold64/cal12; retain original support/learning gates",
+          "evidence": [
+            "R9-SSH-CALIBRATED",
+            "R9-SSH-CALIBRATION-HF"
+          ],
+          "supersedes": "CP-540-20261028T202135817023Z"
+        }
+      ],
+      "no_change_reason": "All other module maturity and original consumers remain at their prior scoped grades; successor learning not executed.",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+          "number": 662,
+          "title": "[P5-RESEARCH-R9-QUALIFY-001] 核实单模块局部学习资格并冻结执行或停放差集",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T21:50:18Z",
+          "body_sha256": "7c4848b25a03a661fc5a0e6d7aa28c2a81bbcda8036b6b92ba31c12712ac80ae"
+        }
+      ],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "S02",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-662-20261114T013522480446Z",
+      "recorded_at": "2026-11-14T01:35:22.480446+00:00",
+      "actor": "R9 primary; independent all-path clause/trace review",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "blocked",
+      "summary": "首个独立64例研究在训练正类1<4处停止；112原调用及16未用额度保留，后继参考资产复用另列新合同。",
+      "evidence": [
+        {
+          "id": "R9-FIRST64-TRAIN-SUPPORT-STOP",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/first-study-stop.safe.json",
+          "sha256": "c1b6f72a56493724dbb1c4e22f1724498ff1cc662203edb7b309b84d898ded56",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed64 oldtrial train1TRUE19FALSE4UNKNOWN stops before update reference/fit/compare/cold;112calls retained"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "Prospective2020 fixed64:guard3/5 passed,evaluation5/19 passed,train1/19/4unknown failed unchanged positivefloor4",
+          "remaining": "This trial has no qualified training class support; update reference,fit,comparison,cold all NOT_RUN",
+          "next_action": "Preserve STOP and original deadlines; separately freeze qualified old24 reference assets as exposedtrain with independent2021 future roles",
+          "evidence": [
+            "R9-FIRST64-TRAIN-SUPPORT-STOP"
+          ],
+          "supersedes": "CP-662-20261113T232150518420Z"
+        }
+      ],
+      "no_change_reason": "原批次源和参考资产保留；无状态学习或消费者采用。新后继不改旧trial角色/标签/费用。",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+          "number": 662,
+          "title": "[P5-RESEARCH-R9-QUALIFY-001] 核实单模块局部学习资格并冻结执行或停放差集",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T21:50:18Z",
+          "body_sha256": "7c4848b25a03a661fc5a0e6d7aa28c2a81bbcda8036b6b92ba31c12712ac80ae"
+        }
+      ],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "S02",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-662-R9-ASSETS-LEARNING-20261114T021613Z",
+      "recorded_at": "2026-11-14T02:16:13.528804+00:00",
+      "actor": "R9 primary; independent code/semantic/consumer/cold acceptance",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "outcome": "completed",
+      "summary": "真实S02局部拟合与条件更新分支完成；retain-v0；独立冷重建、旧v0恢复与私有HF全回读通过。",
+      "evidence": [
+        {
+          "id": "R9-ASSETS-REAL-LEARNING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/assets-learning-evidence/fit/comparison.safe.json",
+          "sha256": "c31481e51496e62c93ff3c8d773c90a0821626a7d28cd39689d90e1b061cfe2c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed2021development evaluation; actual200stepfit, originalconditionalupdate, same-inputversionchoice"
+        },
+        {
+          "id": "R9-ASSETS-COLD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/assets-learning-evidence/cold/receipt.safe.json",
+          "sha256": "00af3a27242e1509fbc39909a39056465efcef1c279b2ffef22fa6591e7537f6",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "COLD_FEATURE_FIT_UPDATE_PREDICTION_DECISION_MATCH"
+        },
+        {
+          "id": "R9-ASSETS-RESTORE-V0",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/assets-learning-evidence/restore-v0.safe.json",
+          "sha256": "e298678da27c692b0db9558ace9dd7357022676cf24665f6a7286a6d1a6eb2fe",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "RESTORED_V0_EXACT_PREDICTIONS"
+        },
+        {
+          "id": "R9-ASSETS-HF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/hf-reference-assets-publication.safe.json",
+          "sha256": "638bd67546f2f44bc441fef51f2c622cbaa799a6fdc0d46b7d295d62a36bd5dd",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private immutable fixedrevision; allfile sizes/SHA readback"
+        },
+        {
+          "id": "R9-ASSETS-FULL-CHECK",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/assets-full-check-receipt.json",
+          "sha256": "a42016f8abe73e9aa87fc0501186ba1548d5fd4c6626fdf6095c70b79c0c8818",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact9fcdf96a CN02Python3.10 makecheck9333passed35skipped63warnings"
+        },
+        {
+          "id": "R9-ASSETS-CONSUMER-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/assets-consumer-independent-audit.json",
+          "sha256": "27245218cd0b003a30156901af8605513580faae65ad0fdd90414ab8dca732be",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent same-evaluation confusion andcaseflip recomputation; primary/coldfilebyteequality"
+        }
+      ],
+      "updates": [
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "Exact2020training24assets5TRUE19FALSE reused; new2021guard/evaluation/update qualified under unchangedfourclauseQA; allunknown retained",
+          "remaining": "OperationalAIreference for this fixeddevelopment scope",
+          "next_action": "Preserve originalopinions/QA andallfuture-evaluation retirements; no automaticnewvotes",
+          "evidence": [
+            "R9-ASSETS-REAL-LEARNING",
+            "R9-ASSETS-COLD",
+            "R9-ASSETS-RESTORE-V0",
+            "R9-ASSETS-HF",
+            "R9-ASSETS-FULL-CHECK",
+            "R9-ASSETS-CONSUMER-AUDIT"
+          ],
+          "supersedes": "CP-662-20261114T013522480446Z"
+        },
+        {
+          "module": "REFERENCE",
+          "facet": "admission",
+          "status": "research_only",
+          "scope": "Reference assets actually consumed by the frozenR9fit andversioncomparison",
+          "remaining": "Other purposes keeptheir originalqualification gates",
+          "next_action": "Use exactpublishedR9assetbindings for researchrecovery",
+          "evidence": [
+            "R9-ASSETS-REAL-LEARNING",
+            "R9-ASSETS-COLD",
+            "R9-ASSETS-RESTORE-V0",
+            "R9-ASSETS-HF",
+            "R9-ASSETS-FULL-CHECK",
+            "R9-ASSETS-CONSUMER-AUDIT"
+          ],
+          "supersedes": "CP-665-A4-CANONICAL-SUPPORT-STOP-20261113"
+        },
+        {
+          "module": "TRAIN",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "Actual200stepfit on24qualified2020exposedtrainingassets; train-onlyscaler;64predictionssealed beforeevaluationunblind",
+          "remaining": "Fixed2021proxy-enriched development scope",
+          "next_action": "Retain exactv0checkpoint andits source/role/referencebindings",
+          "evidence": [
+            "R9-ASSETS-REAL-LEARNING",
+            "R9-ASSETS-COLD",
+            "R9-ASSETS-RESTORE-V0",
+            "R9-ASSETS-HF",
+            "R9-ASSETS-FULL-CHECK",
+            "R9-ASSETS-CONSUMER-AUDIT"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "TRAIN",
+          "facet": "admission",
+          "status": "research_only",
+          "scope": "One declaredS02researchfit completed andindependentlycoldreconstructed",
+          "remaining": "FulllearningMVP separatelyaggregates itsoriginalacceptance",
+          "next_action": "Keep downstreamuse limitedto the namedresearchsidecar",
+          "evidence": [
+            "R9-ASSETS-REAL-LEARNING",
+            "R9-ASSETS-COLD",
+            "R9-ASSETS-RESTORE-V0",
+            "R9-ASSETS-HF",
+            "R9-ASSETS-FULL-CHECK",
+            "R9-ASSETS-CONSUMER-AUDIT"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "quality",
+          "status": "inconclusive",
+          "scope": "Actualconditionalupdate status NO_UPDATE; runs0; loss0.22516247094588293; originaltrigger0.6931471805599453",
+          "remaining": "Globalactual-update KR remainsopen",
+          "next_action": "Preserve genuineNO_UPDATE/retentionrejection; noforcedgradient ornewtranche",
+          "evidence": [
+            "R9-ASSETS-REAL-LEARNING",
+            "R9-ASSETS-COLD",
+            "R9-ASSETS-RESTORE-V0",
+            "R9-ASSETS-HF",
+            "R9-ASSETS-FULL-CHECK",
+            "R9-ASSETS-CONSUMER-AUDIT"
+          ],
+          "supersedes": "BASELINE-20261027"
+        },
+        {
+          "module": "S02",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "Fixed2021evaluation metrics{'r0': {'FN': 1, 'FP': 4, 'TN': 12, 'TP': 7}, 'v0': {'FN': 5, 'FP': 0, 'TN': 16, 'TP': 3}, 'v1': None}; definite24/24; decisionretain-v0",
+          "remaining": "Proxy-enriched finite development distribution",
+          "next_action": "Read the publishedsamecaseFP/FN andchanged-case report whenchoosingresearchversions",
+          "evidence": [
+            "R9-ASSETS-REAL-LEARNING",
+            "R9-ASSETS-COLD",
+            "R9-ASSETS-RESTORE-V0",
+            "R9-ASSETS-HF",
+            "R9-ASSETS-FULL-CHECK",
+            "R9-ASSETS-CONSUMER-AUDIT"
+          ],
+          "supersedes": "CP-540-20261028T202135817023Z"
+        },
+        {
+          "module": "S02",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "Concrete researchconsumer nowhastrainedversioncomparison andretain-v0decision withcold/restoreevidence",
+          "remaining": "Further incrementalrecognition value requires a newconsumerquestion andboundedqualification",
+          "next_action": "Park paidreference expansion afterthisbatch; retain currentdecision",
+          "evidence": [
+            "R9-ASSETS-REAL-LEARNING",
+            "R9-ASSETS-COLD",
+            "R9-ASSETS-RESTORE-V0",
+            "R9-ASSETS-HF",
+            "R9-ASSETS-FULL-CHECK",
+            "R9-ASSETS-CONSUMER-AUDIT"
+          ],
+          "supersedes": "CP-540-20261029T083255376941Z"
+        },
+        {
+          "module": "S02",
+          "facet": "admission",
+          "status": "research_only",
+          "scope": "ReadableS02sidecar withprobability=null andexpert=pending/ABSTAIN; originalMarch/R8uses preserved",
+          "remaining": "Originalexpert/trading/source gates remainwiththeir owningcontracts",
+          "next_action": "Consume reportasresearchversionselection only",
+          "evidence": [
+            "R9-ASSETS-REAL-LEARNING",
+            "R9-ASSETS-COLD",
+            "R9-ASSETS-RESTORE-V0",
+            "R9-ASSETS-HF",
+            "R9-ASSETS-FULL-CHECK",
+            "R9-ASSETS-CONSUMER-AUDIT"
+          ],
+          "supersedes": "CP-540-20261028T202135817023Z"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "Exactsource/role/reference/checkpoint/predictioncommitments, independentcold andv0restore, privateHFfullreadback, fullnativeacceptance",
+          "remaining": "Historicalroot/reviewer exactbilling remainsunknown",
+          "next_action": "Retain sourcecommit9fcdf96a andimmutableevidence revision",
+          "evidence": [
+            "R9-ASSETS-REAL-LEARNING",
+            "R9-ASSETS-COLD",
+            "R9-ASSETS-RESTORE-V0",
+            "R9-ASSETS-HF",
+            "R9-ASSETS-FULL-CHECK",
+            "R9-ASSETS-CONSUMER-AUDIT"
+          ],
+          "supersedes": "CP-2-EXPLORATION-20261029T113141Z"
+        }
+      ],
+      "no_change_reason": "STATES/EXPERT整体等级和原March/R8用途不改；新结论仅覆盖本次S02研究版本选择。旧trial、标签、窗口和费用保留。",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+          "number": 662,
+          "title": "[P5-RESEARCH-R9-QUALIFY-001] 核实单模块局部学习资格并冻结执行或停放差集",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-13T21:50:18Z",
+          "body_sha256": "7c4848b25a03a661fc5a0e6d7aa28c2a81bbcda8036b6b92ba31c12712ac80ae"
+        }
+      ],
+      "reviewed_modules": [
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "S02",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

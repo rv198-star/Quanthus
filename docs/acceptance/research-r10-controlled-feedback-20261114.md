@@ -74,3 +74,13 @@ guard的FN由2降到0，FP由0增到1；loss由0.5735014164降到0.3920602817。
 完整日历月收益在capital/comparison.safe.json。按实际入场月归集的闭合贡献，C0六月/七月/八月为−5324.21/+5165.36/+4434.91；C2为−7050.05/−2872.95/−6754.69。C2的三个入场月和六个静态行业聚合净贡献均为负。
 
 公司/日期/行业集中度用“单组净PnL绝对值÷各组净PnL绝对值之和”。C0最大公司000875贡献+7566.20，占19.67%；最大入场日占20.65%，最大静态行业占51.70%。C2最大公司300928贡献−3131.29，占16.52%；最大入场日占16.91%，最大静态行业占36.00%。C1空仓，各占比null。28/28轮行业唯一匹配。C0扣除最大公司贡献后的其余贡献为−3290.14，收益集中性保留。此处为既有现金贡献分组，未重跑资金反事实。
+
+## 最终工程验证与固定发布
+
+CN02/Python3.10，最终工程候选`7eabc0ba43ca349b7ce3242b21f689ea72731130`：完整`make check`为9363 passed / 35 skipped / 63 warnings，pytest 875.22秒；maintenance、doctor、compile、planning通过。六个新增R10模块mypy通过，全部改动Python文件Ruff通过。35项跳过来自明确的可选集成依赖和result-only receipt fixture，逐项见完整日志。
+
+完整检查最初在92cdf2cf通过9363/35、889.34秒，随后最终类型检查发现115项新增类型问题。补齐声明、JSON容器及结构边界cast后，最终完整复验875.22秒通过。六模块执行AST与6d5fc440去除注解/cast后一致，导入对象身份及全部rawSHA经独立复核；原学习模块字节未改，封存producer、模型、参考和cold文件均保留。类型修复没有新增研究更新。
+
+[私有固定证据包](https://huggingface.co/datasets/rv192/quanthus-research-r1/tree/9f62b74d7e8f814c245ab7e1dc40f3c084999ea0/runs/RESEARCH-R10-FEEDBACK-001/20261114-controlled-v1)：revision`9f62b74d7e8f814c245ab7e1dc40f3c084999ea0`，537文件/68,982,233 bytes全部size/SHA回读；manifest SHA256`273cc3e634169a512c42029ee794b337c6db9fa6d801b61f9c6bee74638391a7`。包含参考请求/意见/QA、原模型与100步、主三arm、两个失败资金尝试、元数据序列化失败、cold、完整检查与原生154成员引用。原生源副本、DuckDB和测试TMP按临时生命周期清理，上游固定原件继续保留。
+
+任务原base为95c3c348；PR实际base bc0b1142仅追加三份维护文档，已读取并在本记录补充返工路径，exact-base blueprint/exploration追加历史检查及live issue对账通过。GitHub Actions因账户账单限制未启动（实际job steps0），按本仓本地验收默认普通合入，不使用admin bypass。

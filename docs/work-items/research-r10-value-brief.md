@@ -14,4 +14,4 @@ R10已实际完成固定2021原生源资格、一次S02监督更新、B/B+v0/B+v
 
 [结果审计](../acceptance/research-r10-controlled-feedback-20261114.md) · [本轮批准合同](../design/research-r10-controlled-replay-v1.md) · [下一阶段细则](../design/research-r10-next-feedback-v1.md)。
 
-新增参考64/64有效，health0、重试0。主fit进程1.89秒，完整三arm21.30秒，cold536.47秒。06:55UTC总时钟继续累计，失败、审阅、发布和收尾全计；主动/模型账单未知非零。旧R9 NO_UPDATE与288CLI+2离线fixture保留，本轮新增64次另列。完整Linux检查、私有HF全回读、PR普通合入及工单收尾在最终回执中登记。
+新增参考64/64有效，health0、重试0。主fit进程1.89秒，完整三arm21.30秒，cold536.47秒。06:55UTC总时钟继续累计，失败、审阅、发布和收尾全计；主动/模型账单未知非零。旧R9 NO_UPDATE与288CLI+2离线fixture保留，本轮新增64次另列。最终Linux完整检查9363 passed/35 skipped，新增6模块mypy和改动Python Ruff通过；私有HF固定`9f62b74d7e8f814c245ab7e1dc40f3c084999ea0`，537文件/68,982,233B全回读。普通合入和工单收尾在最终closeout回执登记。

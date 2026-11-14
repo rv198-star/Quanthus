@@ -57,11 +57,19 @@
     "accounting_owner": "Execution line; GitHub/fixed evidence transport separate, new market/reference network0"
   },
   "execution_receipt": {
-    "disposition": "engineering_checks_and_serial_review_in_progress",
+    "disposition": "fulfilled_engineering_asset_integration",
+    "source_pr": 683,
+    "merged_commit": "8db5c53008490d57828f2c6d87ec1c485fd8212f",
     "diagnostic_acceptance": "ACCEPTED",
+    "engineering_review": "GO",
+    "issue": 682,
+    "issue_state": "closed",
+    "parent_544": "open_current_brief_refreshed",
     "new_training_reference_market_capital": 0,
     "strict_wrapper_v1_receipt_reused": false,
-    "engineering_reuse": "current_AGENTS_doc_ledger_exception",
-    "original_budget_retained": true
+    "engineering_reuse": "current_AGENTS_doc_ledger_exception;2433 identical execution/config/test objects;fresh144 affected checks",
+    "original_budget_retained": true,
+    "resource_release_condition": "After lifecycle metadata merge, preserve/verify task private artifacts, remove own TMP, archive managed worktree and delete merged task branches. Final retention receipt in Task682.",
+    "next_experiment_authorized": false
   }
 }

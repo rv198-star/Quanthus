@@ -41,6 +41,12 @@ into the [R10 execution specification](design/research-r10-feedback-v1.md).
 The [R9 current value brief](work-items/research-r9-value-brief.md) links the final evidence;
 the [RT2/A3 closeout](acceptance/research-r9-reference-closeout-20261113.md) remains historical.
 
+For current R10 overall convergence, start with the [unified use entry](operations/research-r10-use.md)
+and [overall acceptance/feedback submission](acceptance/research-r10-overall-convergence-20261115.md).
+They map the original one-update/full-comparison contract to actual evidence, resolve consumer
+reading/coverage dispositions and freeze one optional reference-qualification proposal. Overall
+acceptance is pending independent review; Task682 remains accepted diagnostic-stage evidence.
+
 For the R2 fixed-momentum question, start with the [R2 value brief](work-items/research-r2-value-brief.md)
 and its [frozen comparison contract](design/research-r2-momentum-markout-v1.md).
 It records the second resource decision and the scope of the next costed-replay candidate.

@@ -845,6 +845,22 @@
         "TRACE"
       ],
       "contribution": "原R10误报、训练监督与实际决策覆盖的有界只读诊断；单候选非激活草案，保留B/v0及原模块资格"
+    },
+    {
+      "id": "P5-RESEARCH-R10-CONVERGE-001",
+      "issue": 686,
+      "modules": [
+        "MVP",
+        "S02",
+        "TRAIN",
+        "UPDATE",
+        "REFERENCE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "contribution": "R10原目标的整体证据汇总、反馈实际处置和统一可用入口；待独立整体验收，不提升12+X总体资格或启动新研究"
     }
   ]
 }

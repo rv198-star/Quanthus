@@ -1,75 +1,201 @@
 {
   "schema_version": "quanthus.exploration-request.v1",
-  "id": "R10-DIAG-ENGINEERING-CLOSEOUT-001",
+  "id": "R10-OVERALL-CONVERGENCE-DELIVERY-001",
   "status": "proposed",
   "grants_authority": false,
   "kind": "delivery",
-  "family": "r10-diagnostic-engineering-closeout",
-  "work_item": "P5-RESEARCH-R10-DIAG-001",
+  "family": "r10-overall-feedback-convergence",
+  "work_item": "P5-RESEARCH-R10-CONVERGE-001",
   "modules": [
+    "MVP",
+    "S02",
+    "TRAIN",
+    "UPDATE",
+    "REFERENCE",
+    "EXPERT",
+    "REPRO",
+    "CLOSEOUT",
     "TRACE"
   ],
-  "question": "Integrate independently accepted sealed diagnostics using the current AGENTS documentation/ledger complete-check reuse exception.",
-  "consumer": "Research owner and existing Quanthus maintainers",
-  "scope": "Verify26ef successor and2433 identical executable/config/test inputs, rerun changed metadata checks, freeze one serial final review, then ordinary PR/issue/resource closeout. No new research.",
-  "deliverable": "Exact closure/reuse proof, affected tests, independent review, normal merge and live lifecycle/retention receipts.",
-  "decision_if_pass": "Merge diagnostic assets and close Task682; preserve parked width-only and B/v0.",
-  "decision_if_fail": "Retain draft with named defect. If reuse closure differs, request one concrete minimal budget for the complete check; do not exceed original cap.",
+  "question": "Have the actual supervised update, complete decision comparison, usable feedback and final version/direction decision met the approved controlled R10 scope?",
+  "consumer": "Research owner and fullP2 review maintainer",
+  "scope": "Reuse sealed evidence, map original acceptance, resolve feedback dispositions and display explicit19/13 semantics in one read-only entry. At most one non-activated necessary successor contract.",
+  "deliverable": "Overall acceptance map, evidence-supported main explanation and gap dispositions, joined case/recognition/ledger entry, checks/governance/cost and one frozen audit package.",
+  "decision_if_pass": "Submit READY_FOR_R10_OVERALL_REVIEW; audit decides overall convergence and necessary successor, preserveB/v0 and rejectedv1.",
+  "decision_if_fail": "Deliver exact unfulfilled requirement and one executable minimal successor; overall remainsactive, no early closure.",
   "acceptance": [
-    "Byte-identical runtime/config/test closure including all configuration except four non-authorizing planning metadata files; affected metadata tested fresh.",
-    "Exact PR-base append-only checks and current issue observations; serial independent final review.",
-    "Ordinary merge, task/parent/blueprint live reconciliation, retained evidence and managed-worktree cleanup."
+    "OriginalA/B/C andR10-owned parent clauses connected to bound actual evidence and approved controlled-purpose amendment.",
+    "G01/G02/G03/G05 concretely treated; one main explanation, no posthoc threshold or relabeling.",
+    "One usable entry answers completion/version/label coverage/next action without joins;19/13 allocation/order/fill/reference states explicit.",
+    "CurrentAGENTS exact closure and affected checks; versioned candidate, actual task/blueprint and cost; one serial submission."
   ],
   "stop_conditions": [
-    "Original15:49:39UTC deadline and600CPU-second cap retained; no reset.",
-    "Changed executable/dependency/test input invalidates reuse and stops before unfunded full run.",
-    "New reference/training/market acquisition/capital replay remains zero."
+    "UTC16:47:01-17:47:01;1800CPU seconds,2GiB RSS,256MiB deliverable.",
+    "Newpaid reference/training/market acquisition/capital replay0; no second update or reinterpretation of frozen labels.",
+    "If needed runtime changes require full checks; use docs/ledger reuse only after byte-identical executable/config/test closure and fresh metadata checks."
   ],
-  "memory_sha256": "5760d483ab24b6d85dab43a1466110d95610823936dce6d6d36526c09e3bc625",
+  "memory_sha256": "1920355a5d2e0ce2d475450b2a8c1f328dd0b74d475b053b9610fa60ce145d10",
   "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R5-CLOCK-20261112",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R6-RANK1-20261113",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R9-CALIBRATION-QUALIFIED-20261114",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R9-PROSPECTIVE-TRAIN-SUPPORT-FAILED-20261114",
+      "relation": "respect",
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
     {
       "conclusion_id": "CON-R9-QUALIFIED-ASSETS-LEARNING-20261114",
       "relation": "respect",
-      "rationale": "Engineering closeout only; preserve all candidate stops, scoped outcomes, exposure and cumulative costs; no new scientific trial."
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
     },
     {
       "conclusion_id": "CON-MVP0-RESULT-AUDIT-20261114",
       "relation": "respect",
-      "rationale": "Engineering closeout only; preserve all candidate stops, scoped outcomes, exposure and cumulative costs; no new scientific trial."
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
     },
     {
       "conclusion_id": "CON-R10-CONTROLLED-CANDIDATE-REJECTED-20261114",
       "relation": "respect",
-      "rationale": "Engineering closeout only; preserve all candidate stops, scoped outcomes, exposure and cumulative costs; no new scientific trial."
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
     },
     {
       "conclusion_id": "CON-R10-WIDTH-ONLY-AUDITED-20261114",
       "relation": "respect",
-      "rationale": "Integrate accepted diagnostic assets only; preserve parked candidate, unchanged module maturity and all prior scientific boundaries."
+      "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
+    },
+    {
+      "conclusion_id": "CON-R10-OVERALL-CONVERGENCE-SUBMITTED-20261115",
+      "relation": "respect",
+      "rationale": "Submit overall candidate for audit only; do not treat this bounded execution as overall completion or activate the optional qualification."
     }
   ],
-  "cumulative_cost_review": "Previous diagnostic measured6.825273CPU seconds plus120-second uninstrumented reserve retained. This engineering handoff continues the original13:49:39UTC clock and600CPU cap; no new budget is assumed.",
-  "runtime_authority_boundary": "Existing human-authorized diagnostic/PR closeout handed back by audit. Current user AGENTS permits documentation/ledger reuse; strict wrapper-v1 reuse receipt is not claimed.",
+  "cumulative_cost_review": "AllR6-R10 and diagnostic/closeout costs,UNKNOWN and both timing deviations retained. New60minute/1800CPU protection envelope planned by audit within Owner continuation; not itemized Owner numeric approval.",
+  "runtime_authority_boundary": "Verified Owner continuation throughR10 whole convergence; this delivery uses existing evidence and necessary reading improvements only. No new research calls.",
   "budget": {
-    "wall_seconds": 2716,
-    "max_new_bytes": 67108864,
+    "wall_seconds": 3600,
+    "max_new_bytes": 268435456,
     "network_requests": 0,
-    "accounting_owner": "Execution line; GitHub/fixed evidence transport separate, new market/reference network0"
+    "accounting_owner": "Executionline; GitHub/fixed evidence transport separate, no market/reference network"
   },
   "execution_receipt": {
-    "disposition": "fulfilled_engineering_asset_integration",
-    "source_pr": 683,
-    "merged_commit": "8db5c53008490d57828f2c6d87ec1c485fd8212f",
-    "diagnostic_acceptance": "ACCEPTED",
-    "engineering_review": "GO",
-    "issue": 682,
-    "issue_state": "closed",
-    "parent_544": "open_current_brief_refreshed",
-    "new_training_reference_market_capital": 0,
-    "strict_wrapper_v1_receipt_reused": false,
-    "engineering_reuse": "current_AGENTS_doc_ledger_exception;2433 identical execution/config/test objects;fresh144 affected checks",
-    "original_budget_retained": true,
-    "resource_release_condition": "After lifecycle metadata merge, preserve/verify task private artifacts, remove own TMP, archive managed worktree and delete merged task branches. Final retention receipt in Task682.",
-    "next_experiment_authorized": false
+    "disposition": "complete_candidate_pending_independent_overall_audit",
+    "overall_goal_status": "active",
+    "work_item": 686,
+    "new_paid_reference_training_market_capital": 0,
+    "successor_contracts": 1,
+    "adoption": "reject_v1_retain_B_v0"
   }
 }

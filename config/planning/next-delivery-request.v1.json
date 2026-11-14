@@ -1,10 +1,10 @@
 {
   "schema_version": "quanthus.exploration-request.v1",
-  "id": "RESEARCH-R9-PROSPECTIVE-S02-001",
+  "id": "RESEARCH-R9-REFERENCE-ASSETS-S02-001",
   "status": "proposed",
   "grants_authority": false,
   "kind": "exploration",
-  "family": "local-learning-r9-calibrated-study",
+  "family": "local-learning-r9-qualified-assets",
   "work_item": "P5-RESEARCH-R9-QUALIFY-001",
   "modules": [
     "REFERENCE",
@@ -15,23 +15,23 @@
     "S02",
     "TRACE"
   ],
-  "question": "经真实校准的四条件参考能否在独立公司中支持一次S02学习、原触发条件更新及包含收缩宽幅难例的版本选择？",
+  "question": "Can fixedqualifiedreference24 be reused as exposedtrain with one existing-source2021qualifiedcandidateframe?",
   "consumer": "#543/#544 research S02 version selection and readable changed-case report",
-  "scope": "one fixed64prospective development study from existing1536qualifiedpool, excluding old64andcalibration12; trainMar/Apr, guard+updateAug disjointcompanies, evaluationNov/Dec; no source acquisition,2022+,returns",
-  "deliverable": "source/role denominator andgatedfourclauseQA; onev0/conditionalv1, committedpredictions, R0/v0/v1comparison andreadableS02sidecar; coldreconstruction or precisefirstgatefailure",
-  "decision_if_pass": "researchchoose-v1 only underretention andFPstrictdown/FNnonincrease; otherwise truthfulretain-v0/NO_UPDATE branch and sidecar",
-  "decision_if_fail": "preserve exactfirstsupport/source/QA gap; laterroles andlearningNOT_RUN; no replacement",
+  "scope": "knownqualified24exposedtrainassets +newindependent2021guard8/update8/eval24; source1048qualifiedpool bound; newreference80max/0retry, no oldvotes repeated",
+  "deliverable": "realnewv0/conditionalguardedupdate, sealedpredictions, same-inputR0/v0/v1comparison, S02researchsidecar andindependentnativecold orfirsthardgateSTOP",
+  "decision_if_pass": "qualifiedS02researchversion choice withboundednewfutureevaluation; retainactualNO_UPDATE orretentionrejection branch",
+  "decision_if_fail": "recordexactnewsource/support gap andstopremainingnewrole calls; preserveallassets without labelrepair",
   "acceptance": [
     "train>=12definite &>=4/class &>=2month blocks;guard>=2/class;evaluation>=12definite &>=5uniquecompany/class &>=2monthblocks;update>=1definite",
-    "all64 R0/v0/v1 predictions, checkpoints andretentionchoice before evaluation label access",
+    "all64 R0/v0/v1 predictions, checkpoints andretentionchoice before learner/evaluator evaluation label access; independent semantic QA sees reference earlier and releases only support receipts to learner",
     "retention accepted AND evaluationFP strictly decreases versusv0 AND FN nonincrease; otherwise retainv0",
     "one independent native126member source qualification, feature/R0 reconstruction andfreshfit/conditionalupdate; exactcheckpoints/predictions andsameFPFN/decision; reference not revoted"
   ],
   "stop_conditions": [
-    "2026-11-14T01:52:01+00:00 total deadline including preparation anddelivery; reference window<=7200s, max128CLI0retry",
-    "firstsourcecapacity orsupport/QA failure stops laterrole/fit; no resampling, labelrepair, thresholdchange orforcedupdate"
+    "02:08Zreferencehardstop/02:18Ztotal includingallpreparation/review/delivery;80newCLIincludingfailures,0retry; old218CLI retained",
+    "originalsource/support/QA/retention gates;no sample replacement/thresholdchange/forcedupdate; alloldroles/labels retained"
   ],
-  "memory_sha256": "dcd2b133453ef2aab9d813ff16588c5999918b2aeb0d2dcdd56546a40096a8c1",
+  "memory_sha256": "70718378b73c27e3a49c0986972bd9f4ddf7443d233eb0e8e639a1a4e636d304",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -109,14 +109,27 @@
       "conclusion_id": "CON-R9-CALIBRATION-QUALIFIED-20261114",
       "relation": "respect",
       "rationale": "Realcalibration independentlyqualified2TRUE10FALSE andsealedprotocol; this successor preserves anchors andindependently qualifies newcompanies underoriginalgates."
+    },
+    {
+      "conclusion_id": "CON-R9-PROSPECTIVE-TRAIN-SUPPORT-FAILED-20261114",
+      "relation": "different_scope",
+      "rationale": "旧固定trial停在训练1正<4；不改旧角色与票。本次完整复用既有合格参考24作exposedtrain，并独立冻结以后2021的guard/update/evaluation。",
+      "scope_difference": "消费者问题仍是S02版本选择；改变的是受控资产复用与2021未来评价设计，原trial STOP、旧费用/窗口/曝光全部保留；全部原学习门继续适用。"
+    },
+    {
+      "conclusion_id": "CON-R9-QUALIFIED-ASSETS-LEARNING-20261114",
+      "relation": "respect",
+      "rationale": "本有限批次已执行并交付真实拟合/NO_UPDATE/同样本比较/cold与恢复；该proposal作为历史执行索引保存，不启动后继。"
     }
   ],
-  "cumulative_cost_review": "prior80researchCLI +2syntheticproviderchannel +24calibration =106CLIstarts; old2loopbackfixtures separate; newstudy<=128CLI/0retry => cumulative<=234. All prior originaldeadlines/K1late854s andcosts retained. This new3h allocation includes implementation preparation since22:52:01Z, test/review/wait/run/delivery; no old clock reset.",
-  "runtime_authority_boundary": "Owner明确要求继续完成R9并走SSH；主代理据此冻结独立学习批次，维持原语义、支持地板和学习/比较门；不改旧A1/A2/RT2/A3/A4及校准证据。",
+  "cumulative_cost_review": "218actualCLIbeforethisnewphase; oldfailedtrialunused16notrolledover; new80max (guard16+eval48+update16), importedtrain0=>maxcumulative298. Newphase00:48..02:18 includesprep/source/code/review/wait/run/delivery; reference02:08 fixedbeforefirstnewopinion. Oldfirsttrial01:22/01:52andallpriorcosts/labels/stop preserved.",
+  "runtime_authority_boundary": "Owner持续要求完成R9；主代理在已停止旧trial之后另列合格参考资产复用的有限后继。旧窗口与112已用/16未用调用原样保留，未用额度不滚存；同一Mission总时钟/旧费用继续累计。",
   "budget": {
-    "wall_seconds": 10800,
+    "wall_seconds": 5400,
     "max_new_bytes": 67108864,
-    "network_requests": 128,
+    "network_requests": 80,
     "accounting_owner": "RESEARCH-R9-CALIBRATION-001;priorcostsretained"
-  }
+  },
+  "execution_record": "RESEARCH-R9-REFERENCE-ASSETS-S02-001",
+  "execution_disposition": "COMPLETED: realfit1/NO_UPDATE/retain-v0; cold64 andrestore64exact; furtherpaidreference expansion parked; source9fcdf96a; no futureactivation"
 }

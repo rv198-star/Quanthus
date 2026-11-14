@@ -2105,6 +2105,158 @@
         "CP-662-20261113T232150518420Z"
       ],
       "supersedes": "CON-R9-CALIBRATION-CHANNEL-FAILED-20261114"
+    },
+    {
+      "id": "CON-R9-PROSPECTIVE-TRAIN-SUPPORT-FAILED-20261114",
+      "recorded_at": "2026-11-14T01:35:22.480446+00:00",
+      "actor": "R9 primary; independent all-path clause/trace review",
+      "question_id": "R9-CALIBRATED-PROSPECTIVE-S02-001",
+      "family": "local-learning-r9-calibrated-study",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "modules": [
+        "REFERENCE"
+      ],
+      "question": "Can the frozen independent64 development study support the unchanged S02 learning and conditional update gates?",
+      "consumer": "#543/#544 research S02 version selection",
+      "scope": "sourcea9515389; fixed2020trainMarApr/guardAug/evalNovDec; no replacement or labelrepair",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "train1TRUE19FALSE4UNKNOWN fails positivefloor4; fit/update andconsumercomparison notrun",
+      "decision_effect": "Stop original trial after112calls; unused16notrolledover. Preserve allroles andopinions. Oldqualifiedevaluation24 can onlybe reused as exposedtraining in a separately frozenlaterstudy with newguard/update/evaluation.",
+      "reopen_conditions": [
+        "Original trial remains stopped; no resampling, revoting or role rewriting in that trial.",
+        "A distinct future-purpose study must bind exact qualified reference assets, retire them from future evaluation/guard/update, carry all prior exposure/costs and independently qualify later roles under unchanged gates."
+      ],
+      "retained_assets": [
+        "All112originalopinions andindependentexclusion-onlyQA",
+        "Qualified24evaluationassets5TRUE19FALSE in2monthblocks; source-boundfeature/packet/identity andoriginalrole retained",
+        "Fullnativea951check9330pass35skip63warnings"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "112newCLI; historical106+112=218research/channelCLI;2offlinefixturesseparate. Oldref01:22:01Z/total01:52:01Z retained; unused16notrolledover. Newasset-study separately bounded80calls/cumulative298; old/root/reviewer exactbillingunknown.",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/first-study-stop.safe.json"
+      ],
+      "evidence": [
+        {
+          "id": "R9-FIRST64-TRAIN-SUPPORT-STOP",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/first-study-stop.safe.json",
+          "sha256": "c1b6f72a56493724dbb1c4e22f1724498ff1cc662203edb7b309b84d898ded56",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed64 oldtrial train1TRUE19FALSE4UNKNOWN stops before update reference/fit/compare/cold;112calls retained"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-662-20261114T013522480446Z"
+      ],
+      "supersedes": null
+    },
+    {
+      "id": "CON-R9-QUALIFIED-ASSETS-LEARNING-20261114",
+      "recorded_at": "2026-11-14T02:16:13.528804+00:00",
+      "actor": "R9 primary; independent code/semantic/consumer/cold acceptance",
+      "question_id": "R9-REFERENCE-ASSETS-S02-001",
+      "family": "local-learning-r9-qualified-assets",
+      "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+      "modules": [
+        "REFERENCE",
+        "TRAIN",
+        "UPDATE",
+        "S02",
+        "TRACE"
+      ],
+      "question": "Can exactqualifiedreference24 be reused as exposedtrain with independent2021roles to complete realfit/conditionalupdate/versionchoice andcoldrecovery?",
+      "consumer": "#543/#544 readableS02researchversionchoice",
+      "scope": "Frozen9fcdf96a;1048source843admitted64selected; train2020NovDec/newguardMay2021/updateJun/evalNovDec; no replacement orrevote",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Real200stepv0fit; NO_UPDATE; retain-v0; fixed2021development metrics{'r0': {'FN': 1, 'FP': 4, 'TN': 12, 'TP': 7}, 'v0': {'FN': 5, 'FP': 0, 'TN': 16, 'TP': 3}, 'v1': None}; researchsidecaronly",
+      "decision_effect": "Adopt exactqualifiedreferenceasset reuse andreadableversionchoice workflow; actualmodeldecision retain-v0. Retain oldfailures andstop furtherpaidreference expansion afterthisboundedbatch.",
+      "reopen_conditions": [
+        "A new unmetconsumerdecision andfiniteauthority must precede furtherpaidreference/modeltrials; carryallhistoricalexposure andcosts.",
+        "Oldexposed24 neverreturnto futureevaluation/guard/update inthislineage; newroles mustpass originalsupport andpredictioncommitment gates.",
+        "FullMVPactual-update andothermodule gates keeptheir originalacceptance; NO_UPDATE isnotforced into a gradient."
+      ],
+      "retained_assets": [
+        "Exact24qualifiedtrainingreferenceassets andalloriginal48opinions/QA",
+        "Onefrozen2021development source/split/reference set andrealv0/conditionalcandidate",
+        "ReadableS02casecomparison, exactnativecold andv0restore proof",
+        "PrivateHF084437145701d9d6fd4e9b049deb6cb723924f53;1047files/33713027bytes fullreadback"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "CumulativeactualCLI288; old218retained;2offlinefixturesseparate; freshphaseactual70<=80. HostCLIparallelseconds12019.975; serverusage{'input_tokens': 4142578, 'cached_input_tokens': 2158720, 'output_tokens': 384237}; root/reviewer/olderbillingunknown. New00:48..02:18/ref02:08 preserved, olddeadlinesunchanged.",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/cli-cost-to-date.private.json",
+        "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/assets-learning-evidence/fit/manifest.json"
+      ],
+      "evidence": [
+        {
+          "id": "R9-ASSETS-REAL-LEARNING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/assets-learning-evidence/fit/comparison.safe.json",
+          "sha256": "c31481e51496e62c93ff3c8d773c90a0821626a7d28cd39689d90e1b061cfe2c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed2021development evaluation; actual200stepfit, originalconditionalupdate, same-inputversionchoice"
+        },
+        {
+          "id": "R9-ASSETS-COLD",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/assets-learning-evidence/cold/receipt.safe.json",
+          "sha256": "00af3a27242e1509fbc39909a39056465efcef1c279b2ffef22fa6591e7537f6",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "COLD_FEATURE_FIT_UPDATE_PREDICTION_DECISION_MATCH"
+        },
+        {
+          "id": "R9-ASSETS-RESTORE-V0",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/assets-learning-evidence/restore-v0.safe.json",
+          "sha256": "e298678da27c692b0db9558ace9dd7357022676cf24665f6a7286a6d1a6eb2fe",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "RESTORED_V0_EXACT_PREDICTIONS"
+        },
+        {
+          "id": "R9-ASSETS-HF",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/hf-reference-assets-publication.safe.json",
+          "sha256": "638bd67546f2f44bc441fef51f2c622cbaa799a6fdc0d46b7d295d62a36bd5dd",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private immutable fixedrevision; allfile sizes/SHA readback"
+        },
+        {
+          "id": "R9-ASSETS-FULL-CHECK",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/assets-full-check-receipt.json",
+          "sha256": "a42016f8abe73e9aa87fc0501186ba1548d5fd4c6626fdf6095c70b79c0c8818",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact9fcdf96a CN02Python3.10 makecheck9333passed35skipped63warnings"
+        },
+        {
+          "id": "R9-ASSETS-CONSUMER-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/r9-continuation-20261114/assets-consumer-independent-audit.json",
+          "sha256": "27245218cd0b003a30156901af8605513580faae65ad0fdd90414ab8dca732be",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent same-evaluation confusion andcaseflip recomputation; primary/coldfilebyteequality"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-662-R9-ASSETS-LEARNING-20261114T021613Z"
+      ],
+      "supersedes": null
     }
   ]
 }

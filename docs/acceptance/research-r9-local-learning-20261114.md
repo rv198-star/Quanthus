@@ -29,3 +29,13 @@ R0为4个误报、1个漏报；v0为0个误报、5个漏报。误报减少4个�
 旧首个64例研究单独停止：train为1正19负4未知，未达到原正类4；112次调用及16次未用额度保留，未滚存；其update参考/fit/compare/cold均未运行。后继完整复用其合格evaluation24作已曝光训练资产，原角色和票不改，永久退出未来评价/guard/update。
 
 [PR #670](https://github.com/rv198-star/Quanthus/pull/670) · [S02消费者报告（私有发布证据内）](https://huggingface.co/datasets/rv192/quanthus-research-r1/tree/084437145701d9d6fd4e9b049deb6cb723924f53/runs/RESEARCH-R9-CALIBRATION-001/RESEARCH-R9-CALIBRATION-001-T1/SSH-REFERENCE-ASSETS-S02-001)
+
+主交付已普通合入main `21642245fed63481081d5763103d6f9b2ca30963`（PR #670，02:19:05Z）；#662按completed关闭，原A3/A4固定试验#665按not_planned停止。#540/#543/#544/#608保持开放并更新当前简报；#544实际fit验收项已具证据，实际更新KR继续开放。
+
+科学运行与HF主体发布在总截止02:18Z前完成；GitHub收口超过该交付目标，未延长参考窗口或追加实验。行政尾项和独立验收、元数据/分支清理成本仍计入原Mission。
+
+预测封存后释放的5条非决定性评价注记已单独保存于私有HF `a260edfdb1fe379c9ce02f4facdd13e5c40e1ead`，文件SHA `5de2a2235b0ac9d63c362bb76c59ef321bcfa4b8c95e0f4e40fb2388807eb167`，1766字节全回读；原1047文件证据主体继续固定08443714，原意见/标签/QA不改。
+
+独立最终验收：训练scaler与200步梯度参数差值0；64预测与旧v0读回差值0；封存早于评价解封0.528324秒；126成员/64例/2560准入冷构造一致。原生mypy保留9个未改动依赖文件的43项既有错误；隔离follow-imports=skip另有1项导入Any返回提示，未宣称类型检查通过。
+
+R9 Milestone23已关闭；实时工单列表open=[]（里程碑计数接口短时缓存仍显示旧2，关闭依据为实际工单列表与两个PATCH闭合回执）。父级学习MVP保持开放。

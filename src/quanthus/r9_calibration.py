@@ -186,6 +186,10 @@ def channel_fixture() -> dict[str, Any]:
 
 def selection_payload(request: Path) -> dict[str, Any]:
     c = strict_json(request.read_text())
+    if c.get("schema_version") == "quanthus.r10-controlled-reference.v1":
+        from quanthus.r10_study import reference_payload
+
+        return reference_payload(request)
     if c.get("schema_version") == "quanthus.r9-study-reference.v1":
         from quanthus.r9_study import reference_payload
 
@@ -367,7 +371,10 @@ def collect(request: Path, selected: Path, output: Path, sandbox: Path) -> dict[
     if canonical(frozen) != canonical(selection_payload(request)):
         raise ValueError("R9_CALIBRATION_PROTOCOL_BINDING")
     probe = c.get("schema_version") == PROBE_SCHEMA
-    study = c.get("schema_version") == "quanthus.r9-study-reference.v1"
+    study = c.get("schema_version") in {
+        "quanthus.r9-study-reference.v1",
+        "quanthus.r10-controlled-reference.v1",
+    }
     case_cap = (
         {"train": 24, "guard": 8, "update": 8, "evaluation": 24}[c["role"]]
         if study

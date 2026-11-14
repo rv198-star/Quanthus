@@ -13274,6 +13274,482 @@
           "body_sha256": "abfefbbbdea780ed76a927553a1cc4fde9e0e50df18a2b57890e4647f66701d2"
         }
       ]
+    },
+    {
+      "id": "CP-673-R10-CONTROLLED-RESULT-20261114",
+      "recorded_at": "2026-11-14T11:01:42.318141+00:00",
+      "actor": "Codex; root author after independent source/semantic/usage GO",
+      "work_item": "META-RESEARCH-R10-QUALIFY-001",
+      "outcome": "completed",
+      "summary": "Owner批准受控2021替代；154源/773机会/32角色真实资格通过，已知1664公司排除，旧曝光未知保留。",
+      "evidence": [
+        {
+          "id": "R10-ACTUAL",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "9740f5f7e28d5b405fa60eb9dee95a54d2789e61",
+          "path": "docs/acceptance/research-r10-controlled-feedback-20261114.md",
+          "sha256": "4870e378cc7bb85d2b62f9a991b6de985a70c65a0622962f4cc98309ee7cda4c",
+          "claim_ceiling": "固定2021受控S02工程闭环及候选拒绝；正式独立有效性、整体12+X和采用资格仍按原门槛。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Owner批准受控2021替代；154源/773机会/32角色真实资格通过，已知1664公司排除，旧曝光未知保留。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-672-MVP0-R10-20261114"
+        },
+        {
+          "module": "REFERENCE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "Owner批准受控2021替代；154源/773机会/32角色真实资格通过，已知1664公司排除，旧曝光未知保留。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-540-20261027T192528495073Z"
+        },
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "Owner批准受控2021替代；154源/773机会/32角色真实资格通过，已知1664公司排除，旧曝光未知保留。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-662-R9-ASSETS-LEARNING-20261114T021613Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Owner批准受控2021替代；154源/773机会/32角色真实资格通过，已知1664公司排除，旧曝光未知保留。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-658-R8-ROUTING-20261113"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "Owner批准受控2021替代；154源/773机会/32角色真实资格通过，已知1664公司排除，旧曝光未知保留。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-672-MVP0-R10-20261114"
+        }
+      ],
+      "no_change_reason": "只调整受控S02研究接缝；其余映射模块沿用既有范围和资格。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-R10-QUALIFY-001",
+          "number": 673,
+          "title": "[META-RESEARCH-R10-QUALIFY-001] 冻结真实机会、曝光和R10更新/决策比较合同",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-14T11:00:03Z",
+          "body_sha256": "cded0d594b80c712fb1074d0340c6d132ea9a683fdae9dcdb496311d3ead9d33"
+        }
+      ],
+      "reviewed_modules": []
+    },
+    {
+      "id": "CP-674-R10-CONTROLLED-RESULT-20261114",
+      "recorded_at": "2026-11-14T11:01:43.949238+00:00",
+      "actor": "Codex; root author after independent source/semantic/usage GO",
+      "work_item": "P5-RESEARCH-R10-UPDATE-001",
+      "outcome": "completed",
+      "summary": "实际单次100步纠偏和独立识别/旧版恢复完成；guard FP0→1，eval FP0→5/FN6→2，保留与识别拒绝v1。",
+      "evidence": [
+        {
+          "id": "R10-ACTUAL",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "9740f5f7e28d5b405fa60eb9dee95a54d2789e61",
+          "path": "docs/acceptance/research-r10-controlled-feedback-20261114.md",
+          "sha256": "4870e378cc7bb85d2b62f9a991b6de985a70c65a0622962f4cc98309ee7cda4c",
+          "claim_ceiling": "固定2021受控S02工程闭环及候选拒绝；正式独立有效性、整体12+X和采用资格仍按原门槛。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "S02",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "实际单次100步纠偏和独立识别/旧版恢复完成；guard FP0→1，eval FP0→5/FN6→2，保留与识别拒绝v1。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-540-20261029T083255376941Z"
+        },
+        {
+          "module": "S02",
+          "facet": "quality",
+          "status": "rejected",
+          "scope": "实际单次100步纠偏和独立识别/旧版恢复完成；guard FP0→1，eval FP0→5/FN6→2，保留与识别拒绝v1。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-662-R9-ASSETS-LEARNING-20261114T021613Z"
+        },
+        {
+          "module": "S02",
+          "facet": "value",
+          "status": "rejected",
+          "scope": "实际单次100步纠偏和独立识别/旧版恢复完成；guard FP0→1，eval FP0→5/FN6→2，保留与识别拒绝v1。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-662-R9-ASSETS-LEARNING-20261114T021613Z"
+        },
+        {
+          "module": "S02",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "实际单次100步纠偏和独立识别/旧版恢复完成；guard FP0→1，eval FP0→5/FN6→2，保留与识别拒绝v1。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-662-R9-ASSETS-LEARNING-20261114T021613Z"
+        },
+        {
+          "module": "TRAIN",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "实际单次100步纠偏和独立识别/旧版恢复完成；guard FP0→1，eval FP0→5/FN6→2，保留与识别拒绝v1。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-540-20261029T083255376941Z"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "实际单次100步纠偏和独立识别/旧版恢复完成；guard FP0→1，eval FP0→5/FN6→2，保留与识别拒绝v1。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-540-20261029T083255376941Z"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "quality",
+          "status": "rejected",
+          "scope": "实际单次100步纠偏和独立识别/旧版恢复完成；guard FP0→1，eval FP0→5/FN6→2，保留与识别拒绝v1。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-662-R9-ASSETS-LEARNING-20261114T021613Z"
+        },
+        {
+          "module": "UPDATE",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "实际单次100步纠偏和独立识别/旧版恢复完成；guard FP0→1，eval FP0→5/FN6→2，保留与识别拒绝v1。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-665-A4-CANONICAL-SUPPORT-STOP-20261113"
+        },
+        {
+          "module": "REFERENCE",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "实际单次100步纠偏和独立识别/旧版恢复完成；guard FP0→1，eval FP0→5/FN6→2，保留与识别拒绝v1。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-673-R10-CONTROLLED-RESULT-20261114"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "实际单次100步纠偏和独立识别/旧版恢复完成；guard FP0→1，eval FP0→5/FN6→2，保留与识别拒绝v1。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-672-MVP0-R10-20261114"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "实际单次100步纠偏和独立识别/旧版恢复完成；guard FP0→1，eval FP0→5/FN6→2，保留与识别拒绝v1。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-673-R10-CONTROLLED-RESULT-20261114"
+        }
+      ],
+      "no_change_reason": "只调整受控S02研究接缝；其余映射模块沿用既有范围和资格。",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R10-UPDATE-001",
+          "number": 674,
+          "title": "[P5-RESEARCH-R10-UPDATE-001] 执行一次S02监督纠偏更新并完成独立识别比较",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-14T11:00:09Z",
+          "body_sha256": "04b650132936e653822b9bb7d0caea520cd4b93c99afa7117d3aea640b4a7eaa"
+        }
+      ],
+      "reviewed_modules": []
+    },
+    {
+      "id": "CP-675-R10-CONTROLLED-RESULT-20261114",
+      "recorded_at": "2026-11-14T11:01:45.493880+00:00",
+      "actor": "Codex; root author after independent source/semantic/usage GO",
+      "work_item": "P3-RESEARCH-R10-DECISION-001",
+      "outcome": "completed",
+      "summary": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。",
+      "evidence": [
+        {
+          "id": "R10-ACTUAL",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "9740f5f7e28d5b405fa60eb9dee95a54d2789e61",
+          "path": "docs/acceptance/research-r10-controlled-feedback-20261114.md",
+          "sha256": "4870e378cc7bb85d2b62f9a991b6de985a70c65a0622962f4cc98309ee7cda4c",
+          "claim_ceiling": "固定2021受控S02工程闭环及候选拒绝；正式独立有效性、整体12+X和采用资格仍按原门槛。"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-673-R10-CONTROLLED-RESULT-20261114"
+        },
+        {
+          "module": "MVP",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-540-20261029T071735748002Z"
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-672-MVP0-R10-20261114"
+        },
+        {
+          "module": "MVP",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-540-20261029T083255376941Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-673-R10-CONTROLLED-RESULT-20261114"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-540-20261029T083255376941Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "value",
+          "status": "rejected",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-540-20261028T202135817023Z"
+        },
+        {
+          "module": "EXPERT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-665-A4-CANONICAL-SUPPORT-STOP-20261113"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-674-R10-CONTROLLED-RESULT-20261114"
+        },
+        {
+          "module": "REPRO",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-546-20261028T112246237569Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-540-20261029T164848737757Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "quality",
+          "status": "research_only",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-546-20261028T112246237569Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "accepted",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-672-MVP0-R10-20261114"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "admission",
+          "status": "not_granted",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-546-20261028T112246237569Z"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "三arm完整资金、81账本平衡、冷37项一致和108秒使用验收GO；经济门拒绝v1，保留B/v0，误判约束为下一项。 范围限定于本次受控S02候选与接缝。",
+          "remaining": "历史曝光UNKNOWN使正式独立有效性仍待验收；v1拒绝，整体12+X及其他消费用途沿用原资格；最终检查/发布/合入收尾另作回执。",
+          "next_action": "保留B/v0与全部失败/费用；先解释新增误判并冻结至多一个改进假说，不在本批追加更新。",
+          "evidence": [
+            "R10-ACTUAL"
+          ],
+          "supersedes": "CP-674-R10-CONTROLLED-RESULT-20261114"
+        }
+      ],
+      "no_change_reason": "只调整受控S02研究接缝；其余映射模块沿用既有范围和资格。",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-R10-DECISION-001",
+          "number": 675,
+          "title": "[P3-RESEARCH-R10-DECISION-001] 完成学习输出的三arm资金比较、冷复现与反馈验收",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-14T11:00:18Z",
+          "body_sha256": "bad0765f333db7c05d6a376d026fd8dfa69be3f0f0fbbcbbeaf8b41a603ded75"
+        }
+      ],
+      "reviewed_modules": [
+        "S02"
+      ]
     }
   ],
   "history_imports": [

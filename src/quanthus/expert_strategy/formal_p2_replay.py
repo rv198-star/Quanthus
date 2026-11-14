@@ -269,17 +269,7 @@ class FormalP2ReplayRuntime:
                 "formal_attribution_population_duplicate",
                 "formal event population duplicates a security-date",
             )
-        provider_config = load_replay_data_provider_config(
-            self.repository_root / self.provider_config,
-            allowed_partitions=self.allowed_provider_partitions,
-        )
-        provider = ReplayDataProvider(provider_config)
-        self.session = self.stack.enter_context(
-            provider.open(
-                scope_start=self._provider_scope_start(),
-                scope_end=self.decision_end,
-            )
-        )
+        self.session = self.stack.enter_context(self._open_data_session())
         self.frames = self.session.reader.frames(self.decision_start, self.decision_end)
         if self.frames[-1].execution_date != self.execution_end:
             raise ExpertEvaluationError(
@@ -291,18 +281,7 @@ class FormalP2ReplayRuntime:
         )
         selected = tuple(sorted({item.panel_security_id for item in self.events}))
         panel_path = Path(self.temporary.name) / "formal-feature-panel.parquet"
-        self.panel = self.stack.enter_context(
-            BaselineFeaturePanel.build(
-                self.session.reader.bundle,
-                self.feature_registry,
-                scope_start=self.decision_start,
-                scope_end=self.execution_end,
-                output=panel_path,
-                data_content_digest=self.session.reader.data_content_digest,
-                data_manifest_sha256=self.session.reader.data_manifest_sha256,
-                allowed_security_ids=selected,
-            )
-        )
+        self.panel = self.stack.enter_context(self._build_feature_panel(selected, panel_path))
         self.p0_policy = load_policy(self.repository_root / "config/p0-policy.v1.json")
         self.engine = BacktestEngine(
             load_execution_policy(
@@ -322,6 +301,29 @@ class FormalP2ReplayRuntime:
         self.trend_spec = trend_spec
         self.trend_config = load_trend_stability_config(
             self.repository_root / "config/expert-evaluations/experts/trend-stability.v1.json"
+        )
+
+    def _open_data_session(self) -> Any:
+        provider_config = load_replay_data_provider_config(
+            self.repository_root / self.provider_config,
+            allowed_partitions=self.allowed_provider_partitions,
+        )
+        provider = ReplayDataProvider(provider_config)
+        return provider.open(
+            scope_start=self._provider_scope_start(),
+            scope_end=self.decision_end,
+        )
+
+    def _build_feature_panel(self, selected: tuple[str, ...], panel_path: Path) -> Any:
+        return BaselineFeaturePanel.build(
+            self.session.reader.bundle,
+            self.feature_registry,
+            scope_start=self.decision_start,
+            scope_end=self.execution_end,
+            output=panel_path,
+            data_content_digest=self.session.reader.data_content_digest,
+            data_manifest_sha256=self.session.reader.data_manifest_sha256,
+            allowed_security_ids=selected,
         )
 
     def _load_event_population(
@@ -375,6 +377,12 @@ class FormalP2ReplayRuntime:
     def _held_intervention_id(self, intervention_id: str | None) -> str | None:
         return intervention_id
 
+    def _run_id(self, intervention_id: str | None) -> str:
+        return (
+            f"{self.registry.card.strategy_id}.{self.registry.card.strategy_version}."
+            f"{intervention_id or 'native'}"
+        )
+
     @staticmethod
     def _variant_id(intervention_id: str | None) -> str:
         return {
@@ -420,10 +428,7 @@ class FormalP2ReplayRuntime:
             data_snapshot_id=self.session.reader.bundle.snapshot.snapshot_id,
             feature_version=self.panel.report.digest,
             rule_version=self.registry.card.strategy_version,
-            run_id=(
-                f"{self.registry.card.strategy_id}.{self.registry.card.strategy_version}."
-                f"{intervention_id or 'native'}"
-            ),
+            run_id=self._run_id(intervention_id),
             execution_policy_version=self.engine.policy.policy_version,
             execution_profile_id=self.engine.policy.active_profile.profile_id,
             schedule_version=self.engine.policy.active_profile.schedule_version,
@@ -629,12 +634,7 @@ class FormalP2ReplayRuntime:
                 if feature is None
                 else replace(feature, security_id=item.record.identity.security_id)
             )
-            observation = evaluate_trend_stability(
-                event=item.record,
-                feature=formal_feature,
-                config=self.trend_config,
-                spec=self.trend_spec,
-            )
+            observation = self._evaluate_trend_observation(item.record, formal_feature)
             context = build_formal_expert_context(
                 event=item.record,
                 feature=formal_feature,
@@ -660,6 +660,14 @@ class FormalP2ReplayRuntime:
                 )
             )
         return tuple(output)
+
+    def _evaluate_trend_observation(self, event: EventRecord, feature: Any) -> Any:
+        return evaluate_trend_stability(
+            event=event,
+            feature=feature,
+            config=self.trend_config,
+            spec=self.trend_spec,
+        )
 
     def _evaluate_entry_decision(
         self,
@@ -897,11 +905,7 @@ class FormalP2ReplayRuntime:
                     "formal_position_mark_missing", "sell sequence lacks prior mark"
                 )
             candidate_actions = candidate.actions(runtime.panel_security_id, mark)
-            if any(item.action.bonus_share_ratio != 0 for item in candidate_actions):
-                raise ExpertEvaluationError(
-                    "formal_sell_bonus_share_unsupported",
-                    "carried sell encountered a quantity-changing action",
-                )
+            self._validate_carried_sell_actions(candidate_actions)
             actions.extend(candidate_actions)
             if candidate_actions:
                 mark = candidate_actions[-1].post_action_mark_price
@@ -943,6 +947,13 @@ class FormalP2ReplayRuntime:
             ).endswith("to_carried"):
                 carries[event.event_time.date()] = event
         return _SellSchedule(full_exit, states, fills, carries, result.events)
+
+    def _validate_carried_sell_actions(self, actions: Any) -> None:
+        if any(item.action.bonus_share_ratio != 0 for item in actions):
+            raise ExpertEvaluationError(
+                "formal_sell_bonus_share_unsupported",
+                "carried sell encountered a quantity-changing action",
+            )
 
     def _execute_frame(
         self,
@@ -1311,6 +1322,7 @@ class FormalP2ReplayRuntime:
                 applied_at=step.applied_at,
                 post_action_mark_price=step.post_action_mark_price,
                 mark_snapshot_id=step.mark_snapshot_id,
+                snapshot_replay_clock_json=step.snapshot_replay_clock_json,
             )
             runtime.ledger = application.state
             events.extend(application.events)
@@ -1356,6 +1368,7 @@ class FormalP2ReplayRuntime:
             aggregate_score=score,
             reason_code=reason,
             decision_version=f"{self.registry.card.strategy_version}|{decision_digest}",
+            snapshot_replay_clock_json=frame.snapshot_replay_clock_json,
         )
 
     @staticmethod

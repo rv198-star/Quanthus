@@ -75,10 +75,18 @@ class SnapshotReplayClock:
 
 def parse_replay_clock(value: str) -> SnapshotReplayClock | CapitalReplayClock:
     """Dispatch exact versioned research contexts; legacy scope stays unchanged."""
-    from quanthus.backtest.capital_clock import RECOVERY_VERSION, CapitalReplayClock
+    from quanthus.backtest.capital_clock import (
+        CONTROLLED_VERSION,
+        RECOVERY_VERSION,
+        CapitalReplayClock,
+    )
     from quanthus.backtest.capital_clock import VERSION as CAPITAL_VERSION
 
     raw = json.loads(value)
-    if isinstance(raw, dict) and raw.get("schema_version") in {CAPITAL_VERSION, RECOVERY_VERSION}:
+    if isinstance(raw, dict) and raw.get("schema_version") in {
+        CAPITAL_VERSION,
+        RECOVERY_VERSION,
+        CONTROLLED_VERSION,
+    }:
         return CapitalReplayClock.from_json(value)
     return SnapshotReplayClock.from_json(value)

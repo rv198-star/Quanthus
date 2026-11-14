@@ -1,0 +1,148 @@
+{
+  "schema_version": "quanthus.r10-controlled-replay.v1",
+  "owner_approved": true,
+  "owner_approved_at": "2026-11-14T08:07:52.392234+00:00",
+  "owner_authority": "Owner明确选择：按受控回放继续（推荐）；固定2021窗口、排除1664公司，其余历史曝光未知；工程闭环，正式有效性/采用待验收",
+  "purpose": "EXPOSED_CONTROLLED_ENGINEERING_REPLAY",
+  "consumer_admission": "NOT_GRANTED",
+  "source": {
+    "dataset": "rv192/quanthus-base25-sealed",
+    "revision": "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+    "knowledge_cutoff": "2026-11-11T20:19:54.776092+00:00",
+    "primary_dwd_root": "/srv/agentdock/quanthus-ops/research-capital-qual-a-20261112/job-a1/source/DWD",
+    "full_dwd_root": "/srv/quanthus-base22-data/build/base25-20261031/work/paired-base251-adce892e-a1/published/DWD",
+    "primary_closure": "config/research/research-capital-qual/closure.v1.json",
+    "manifest_sha256": "8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+    "extra_members": 28,
+    "market_years": [
+      2020,
+      2021
+    ]
+  },
+  "old_assets": {
+    "root": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/reference-assets-s02-001",
+    "parent": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/reference-assets-s02-001/fit/v0.json",
+    "parent_sha256": "706a6a578a713310730ff54f8b9ce0d80b6fca74c5ee4f6bb68bd9349d87256d",
+    "selected": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/reference-assets-s02-001/selected.private.json",
+    "train_reference": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/reference-assets-s02-001/qa-train/resolved.private.json",
+    "update_reference": "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/reference-assets-s02-001/qa-guard/resolved.private.json"
+  },
+  "exposure_sources": [
+    "/srv/agentdock/quanthus-ops/research-r9-local-20261113/retained/new-baseline-role-identities.private.json",
+    "/srv/agentdock/quanthus-ops/research-r9-source-first-20261113/screen-a2/role-identities.private.json",
+    "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/selected/strata-ledger.private.json"
+  ],
+  "expected_known_company_exclusions": 1664,
+  "asset_hashes": {
+    "/srv/agentdock/quanthus-ops/research-r9-local-20261113/retained/new-baseline-role-identities.private.json": "5a63f72cc0af7a1bf0936596a9eece09ecce6b064d1ddbe10ff01562d143ec0d",
+    "/srv/agentdock/quanthus-ops/research-r9-source-first-20261113/screen-a2/role-identities.private.json": "3e6c7ee9505766edcb96aa4d95dab1d722866e7b8e899defa53e3a6b149a2bd0",
+    "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/selected/strata-ledger.private.json": "d2f216778bf18d4091938a8c18f60707d0a9d9a502b78b87af79a09627712d0c",
+    "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/reference-assets-s02-001/fit/v0.json": "706a6a578a713310730ff54f8b9ce0d80b6fca74c5ee4f6bb68bd9349d87256d",
+    "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/reference-assets-s02-001/selected.private.json": "b80854f36f912199ea5538aa49e5752a4deefa8bdf6170136705dd08b3d00a75",
+    "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/reference-assets-s02-001/qa-train/resolved.private.json": "db7a7c2ee47beb84e5210d3c70c8d5e4e527d6fe84393e630c6816725f7ea167",
+    "/srv/agentdock/quanthus-ops/research-r9-a3-20261113/reference-assets-s02-001/qa-guard/resolved.private.json": "743a2c278b2ea9f089a5b66eff44ddde11989c86ba38f4ee50a414ef555c4681"
+  },
+  "unknown_history": "LEGACY_EXPOSURE_UNKNOWN; never fresh",
+  "scan": {
+    "prefix_start": "2020-01-02",
+    "raw_start": "2021-06-01",
+    "raw_end": "2021-08-31",
+    "prefix_signal_end": "2021-08-31",
+    "calendar_wave_origin": "2020-01-02",
+    "terminal": "2021-12-31",
+    "model_anchor_strictly_after": "2021-05-31",
+    "exclude_known_after_full_p4_caps": true
+  },
+  "selection": {
+    "guard_anchor": "2021-05-31",
+    "guard_layout": {
+      "narrow": 4,
+      "boundary": 2,
+      "expanding": 2
+    },
+    "eval_month_layout": {
+      "2021-06": {
+        "narrow": 4,
+        "boundary": 2,
+        "expanding": 2
+      },
+      "2021-07": {
+        "narrow": 4,
+        "boundary": 2,
+        "expanding": 2
+      },
+      "2021-08": {
+        "narrow": 4,
+        "boundary": 2,
+        "expanding": 2
+      }
+    },
+    "source_proxy": "unchanged r9_calibration source-only narrow/boundary/expanding criteria; exclude used company before subsequent slot; no model/label/outcome input",
+    "same_company_choice": "one lowest R10|company|listing|anchor hash before source proxy; fixed month order",
+    "no_replacement": true
+  },
+  "industry": {
+    "use": "static_non_pit_concentration_only",
+    "scheme": "csrc-listed-company-industry-2012.snapshot-v1",
+    "snapshot_priority": [
+      "source_declared_as_of descending",
+      "effective_from descending"
+    ],
+    "ambiguous_latest": "unavailable; no vendor priority",
+    "projection": "ancestor with node_level1"
+  },
+  "benchmark": "000300.SH native1d CNY",
+  "strategy": {
+    "id": "candidate.p4-trend-risk",
+    "version": "1.0.1",
+    "semantic_digest": "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c",
+    "units": 5,
+    "unit_notional": "100000.00",
+    "trial_fraction": "0.30",
+    "holding_min": 3,
+    "holding_max": 40,
+    "legacy_disabled_B": "historical exposure carrier only"
+  },
+  "learning": {
+    "mode": "scheduled_supervised_correction",
+    "steps": 100,
+    "lr": 0.05,
+    "l2": 0.01,
+    "groups": [
+      0.5,
+      0.5
+    ],
+    "threshold": 0.5,
+    "scaler": "parent-fixed",
+    "candidates": 1
+  },
+  "reference": {
+    "models": [
+      "auto/gpt-6.1-sol",
+      "auto/gpt-6-astra"
+    ],
+    "provider_id": "magpie",
+    "maximum_calls": 64,
+    "health_calls": 2,
+    "retries": 0,
+    "concurrency": 2,
+    "per_call_seconds": 120
+  },
+  "runtime": {
+    "start": "2026-11-14T06:55:00+00:00",
+    "A_deadline": "2026-11-14T09:55:00+00:00",
+    "total_deadline": "2026-11-14T18:55:00+00:00",
+    "job_new_bytes": 8589934592,
+    "log_bytes": 134217728,
+    "rss_bytes": 2147483648,
+    "cpu_cores": 2
+  },
+  "gate": {
+    "result_execution_ready": false,
+    "futility": "known score based legal B/B+v0 differences >=2companies and2signal dates after E/eval seal",
+    "retention": "guardFN/FP and update meanloss nonincrease",
+    "recognition": "evalFN strictlylower,FP nonincrease",
+    "formal_adoption": "NOT_GRANTED_LEGACY_EXPOSURE_UNKNOWN"
+  },
+  "root": "/srv/agentdock/quanthus-ops/research-r10-feedback-20261114"
+}

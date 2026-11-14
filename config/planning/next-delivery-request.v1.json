@@ -198,6 +198,9 @@
     "successor_contracts": 1,
     "adoption": "reject_v1_retain_B_v0",
     "fixed_publication_revision": "f92055455600184cc788ceda0b7cbbe259d59003",
-    "original_submission_receipt_preserved_in": "PR687 and original frozen submission"
+    "original_submission_receipt_preserved_in": "PR687 and original frozen submission",
+    "task_state": "closed_completed",
+    "ordinary_delivery_merge": "13ac02ef1e6864afd134e618fe9536c6024a5ecf",
+    "lifecycle_checkpoint": "CP-686-R10-DELIVERED-CLOSED-20261115"
   }
 }

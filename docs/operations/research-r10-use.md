@@ -7,7 +7,7 @@ R10 受控负结果、反馈处置和统一入口已通过独立整体验收：*
 [固定私有交付入口](https://huggingface.co/datasets/rv192/quanthus-research-r1/blob/f92055455600184cc788ceda0b7cbbe259d59003/runs/RESEARCH-R10-FINAL-DELIVERY-001/20261115/publication/DELIVERY.md)包含原 73 文件冻结包、原 ZIP 和独立审计回执，旧提交措辞按历史读取。
 本机入口：`/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r10-final-delivery/README.md`。
 PR #687 已普通合入 `e81be2be19460c73bdb37207270e52ff4160be3f`。
-最终交付／工单与资源回执另附；R10 总责任由审计线在本次真实交付终验后关闭。
+[实际交付与工单关闭](../acceptance/research-r10-final-delivery-20261115.md)已记录；R10 总责任由审计线在本次真实交付终验后关闭。
 
 | 想做的判断 | 入口及明确语义 |
 |---|---|

@@ -317,15 +317,27 @@ class NativePanel:
         return None
 
 
+def event_predictions(payload):
+    result = {}
+    for row in payload["rows"]:
+        key = row.get("event_id")
+        if key is None:
+            continue  # Training/guard rows are sealed in the same file, outside the entry population.
+        if not isinstance(key, str) or not key:
+            raise ValueError("R10_PREDICTION_EVENT_ID")
+        if key in result and any(result[key][k] != row[k] for k in ("case_id", "v0", "v1")):
+            raise ValueError("R10_CONFLICTING_EVENT_PREDICTIONS")
+        result[key] = row
+    return result
+
+
 class ControlledReplay(FormalP2ReplayRuntime):
     def __init__(
         self, project: Path, native: NativeInputs, events: Path, predictions: Path | None = None
     ):
         self.native = native
         self.frozen_events = read(events)
-        self.predictions = (
-            {} if predictions is None else {r["event_id"]: r for r in read(predictions)["rows"]}
-        )
+        self.predictions = {} if predictions is None else event_predictions(read(predictions))
         self.event_rows = {r["event"]["event_id"]: r for r in self.frozen_events["rows"]}
         super().__init__(
             project,

@@ -13,8 +13,9 @@ from quanthus.backtest.contracts import BacktestRunSpec, OpenExecutionState, Uni
 from quanthus.backtest.engine import BacktestEngine
 from quanthus.backtest.policy import load_execution_policy
 from quanthus.backtest.snapshot_clock import SnapshotReplayClock
+from quanthus.r10_inputs import digest
 from quanthus.r10_prepare import source_select
-from quanthus.r10_replay import NativePanel, NativeStore, observed_action_mark
+from quanthus.r10_replay import NativePanel, NativeStore, event_predictions, observed_action_mark
 
 
 def clock(day=date(2021, 6, 2), **changes):
@@ -235,3 +236,17 @@ def test_action_mark_rejects_missing_invalid_or_wrong_clock(field, value):
     store, row, cal, _ = action_store()
     row[field] = value
     assert not observed_action_mark(row, cal, store.cutoff)
+
+
+def test_capital_predictions_exclude_non_event_roles_and_reject_conflicts():
+    entry = {"event_id": "E1", "case_id": "S1", "role": "opportunity", "v0": 0.2, "v1": 0.6}
+    rows = [
+        entry,
+        dict(entry, role="evaluation"),
+        {"event_id": None, "case_id": "guard", "v0": 0.1, "v1": 0.3},
+    ]
+    result = event_predictions({"rows": rows})
+    assert set(result) == {"E1"}
+    assert digest(result).startswith("sha256:")
+    with pytest.raises(ValueError, match="CONFLICTING_EVENT"):
+        event_predictions({"rows": [entry, dict(entry, v1=0.8)]})

@@ -169,5 +169,19 @@
     "id": "R10-QUALIFICATION-001",
     "revision": "95c3c3489b9c25eea74ea7936e2297e863afde3a",
     "execution_disposition": "executed_under_owner_controlled_replay_amendment"
+  },
+  "execution_receipt": {
+    "disposition": "fulfilled_archive_only_no_new_tranche",
+    "source_pr": 680,
+    "merged_commit": "c9d6ceb46c3c266b3629162348b923166d5d0930",
+    "completed_scope": "controlled_R10_engineering_and_candidate_rejection",
+    "hf_revision": "9f62b74d7e8f814c245ab7e1dc40f3c084999ea0",
+    "issues": [
+      673,
+      674,
+      675
+    ],
+    "formal_independence_and_adoption": "pending",
+    "next_experiment_authorized": false
   }
 }

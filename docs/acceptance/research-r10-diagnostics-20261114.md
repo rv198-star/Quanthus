@@ -6,7 +6,7 @@ The authorized tranche reads sealed evidence only: original train24 plus seven d
 
 ## Recorded result
 
-The31-row table retains original identities, clauses/citations, roles, per-row weights and gradient attribution. All1,868 original citations match the sealed HLC packets. Arithmetic at100 sealed pre-step states reconciles to observed checkpoint differences, with maximum cumulative residual below5.0e-16. Each update example has24/7 times the weight of an original training example. No computed state advances an optimizer.
+The31-row table retains original identities, clauses/citations, roles, per-row weights and gradient attribution. All1,868 original citations match the sealed HLC packets:1,804 belong to the31 training rows and64 to the separately quarantined UNKNOWN case. Arithmetic at100 sealed pre-step states reconciles to observed checkpoint differences, with maximum cumulative residual below5.0e-16. Each update example has24/7 times the weight of an original training example. No computed state advances an optimizer.
 
 The32-row table preserves original labels, three UNKNOWN cases and exposed development use. Six positives were corrected and six false positives introduced. The materially_narrow clause in all31 training rows exactly matches the whole label, leaving no narrow-TRUE/whole-FALSE training contrast.
 

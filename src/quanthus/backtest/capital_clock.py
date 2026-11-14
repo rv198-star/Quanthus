@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 VERSION = "quanthus.capital-retrospective-clock.v1"
 RECOVERY_VERSION = "quanthus.capital-retrospective-clock.v2"
+CONTROLLED_VERSION = "quanthus.r10-controlled-clock.v1"
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,8 @@ class CapitalReplayClock:
             ):
                 raise ValueError("legacy capital identity is fixed")
         else:
-            if not re.fullmatch(r"RESEARCH-CAPITAL-\d{3}", self.request_id):
+            controlled = self.request_id == "RESEARCH-R10-001"
+            if not controlled and not re.fullmatch(r"RESEARCH-CAPITAL-\d{3}", self.request_id):
                 raise ValueError("recovery request identity required")
             if not re.fullmatch(
                 re.escape(self.request_id) + r"-T[1-9]\d*", self.task_id or ""
@@ -59,8 +61,17 @@ class CapitalReplayClock:
                     raise ValueError("complete recovery input identity required")
             for name in ("native_knowledge_cutoff", "purpose_qualified_at"):
                 clock = datetime.fromisoformat(raw[name])
-                if clock.tzinfo is None or clock > self.knowledge_cutoff:
+                if clock.tzinfo is None or (
+                    clock > self.knowledge_cutoff
+                    and not (controlled and name == "purpose_qualified_at")
+                ):
                     raise ValueError("recovery material knowledge after cutoff")
+            if controlled and (
+                raw["native_content_digest"] != self.data_content_digest
+                or datetime.fromisoformat(raw["native_knowledge_cutoff"]) != self.knowledge_cutoff
+                or raw["purpose_sha256"] != raw["consumer_closure_sha256"]
+            ):
+                raise ValueError("controlled source or purpose binding differs")
 
     def validate_run(self, run_id: str) -> None:
         if self.input_identity_json is not None and not run_id.startswith(
@@ -74,7 +85,13 @@ class CapitalReplayClock:
 
     def to_dict(self) -> dict[str, object]:
         value: dict[str, object] = {
-            "schema_version": RECOVERY_VERSION if self.input_identity_json is not None else VERSION,
+            "schema_version": (
+                CONTROLLED_VERSION
+                if self.request_id == "RESEARCH-R10-001"
+                else RECOVERY_VERSION
+                if self.input_identity_json is not None
+                else VERSION
+            ),
             "request_id": self.request_id,
             "market_date": str(self.market_date),
             "knowledge_cutoff": self.knowledge_cutoff.isoformat(),
@@ -99,7 +116,7 @@ class CapitalReplayClock:
     def from_json(cls, text: str) -> CapitalReplayClock:
         try:
             raw = json.loads(text)
-            recovery = raw.get("schema_version") == RECOVERY_VERSION
+            recovery = raw.get("schema_version") in {RECOVERY_VERSION, CONTROLLED_VERSION}
             clock = cls(
                 date.fromisoformat(raw["market_date"]),
                 datetime.fromisoformat(raw["knowledge_cutoff"]),

@@ -11,7 +11,7 @@ import threading
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, datetime
 from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -1618,6 +1618,7 @@ def _feature_panel_query(
     scope_end: date,
     *,
     output_order: str = "date-security",
+    native_source_cutoff: datetime | None = None,
 ) -> str:
     if output_order == "date-security":
         order_by = "market_date, security_id"
@@ -1627,6 +1628,13 @@ def _feature_panel_query(
         raise BaselineResearchError("feature panel output order is not admitted")
     start = _sql_string(scope_start.isoformat())
     end = _sql_string(scope_end.isoformat())
+    action_visibility = "CAST(actions.known_at AS DATE) < CAST(actions.effective_date AS DATE)"
+    if native_source_cutoff is not None:
+        if native_source_cutoff.tzinfo is None:
+            raise BaselineResearchError("native feature source cutoff must be aware")
+        action_visibility = (
+            "actions.known_at <= TIMESTAMPTZ " + _sql_string(native_source_cutoff.isoformat())
+        )
     return f"""
         WITH mapped_actions AS (
             SELECT actions.security_id,
@@ -1634,7 +1642,7 @@ def _feature_panel_query(
                    CAST(actions.cash_dividend_per_share AS DOUBLE) AS cash_dividend_per_share,
                    CAST(actions.bonus_share_ratio AS DOUBLE) AS bonus_share_ratio
             FROM source_corporate_actions_normalized_mapped actions
-            WHERE CAST(actions.known_at AS DATE) < CAST(actions.effective_date AS DATE)
+            WHERE {action_visibility}
         ),
         mapped_exceptions AS (
             SELECT exceptions.security_id,

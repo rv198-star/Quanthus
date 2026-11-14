@@ -1050,6 +1050,7 @@ def _finalize_raw_candidates(
     split_policy: SplitPolicy,
     prospective_clock_json: str | None = None,
     snapshot_replay_cutoff: datetime | None = None,
+    replay_clock_factory: Callable[[date], str] | None = None,
 ) -> CandidateScanResult:
     from quanthus.backtest.snapshot_clock import SnapshotReplayClock
 
@@ -1154,7 +1155,10 @@ def _finalize_raw_candidates(
             split_assignment=assignment,
             prospective_clock_json=prospective_clock_json,
             snapshot_replay_clock_json=(
-                None if snapshot_replay_cutoff is None
+                replay_clock_factory(candidate.signal_date)
+                if replay_clock_factory is not None
+                else None
+                if snapshot_replay_cutoff is None
                 else SnapshotReplayClock(candidate.signal_date, snapshot_replay_cutoff).to_json()
             ),
         )
@@ -1360,6 +1364,7 @@ def finalize_candidate_scan_shards(
         split_policy=split_policy,
         prospective_clock_json=getattr(source_policy, "prospective_clock_json", None),
         snapshot_replay_cutoff=getattr(source_policy, "snapshot_replay_cutoff", None),
+        replay_clock_factory=getattr(source_policy, "replay_clock_for_date", None),
     )
 
 

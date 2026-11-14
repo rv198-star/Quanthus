@@ -175,9 +175,14 @@ class EventRecord:
         if self.signal_close.date() != self.identity.signal_date:
             raise EventContractError("signal_close date must match identity.signal_date")
         if self.snapshot_replay_clock_json is not None:
-            from quanthus.backtest.snapshot_clock import SnapshotReplayClock
+            from quanthus.backtest.snapshot_clock import parse_replay_clock
 
-            replay_clock = SnapshotReplayClock.from_json(self.snapshot_replay_clock_json)
+            replay_clock = parse_replay_clock(self.snapshot_replay_clock_json)
+            if json.loads(self.snapshot_replay_clock_json)["schema_version"] not in {
+                "quanthus.p6-fixed-snapshot-clock.v1",
+                "quanthus.r10-controlled-clock.v1",
+            }:
+                raise EventContractError("event replay clock version is not admitted")
             if (
                 self.prospective_clock_json is not None
                 or self.split_assignment != SplitAssignment.SNAPSHOT_REPLAY
@@ -209,9 +214,9 @@ class EventRecord:
     @property
     def decision_at(self) -> datetime:
         if self.snapshot_replay_clock_json is not None:
-            from quanthus.backtest.snapshot_clock import SnapshotReplayClock
+            from quanthus.backtest.snapshot_clock import parse_replay_clock
 
-            return SnapshotReplayClock.from_json(self.snapshot_replay_clock_json).knowledge_cutoff
+            return parse_replay_clock(self.snapshot_replay_clock_json).knowledge_cutoff
         if self.prospective_clock_json is None:
             return self.signal_close
         return prospective_clock(self.prospective_clock_json).decision_at
@@ -353,7 +358,8 @@ def event_record_from_dict(value: object) -> EventRecord:
             else canonical_json_bytes(raw["prospective_clock"]).decode("utf-8")
         ),
         snapshot_replay_clock_json=(
-            None if "snapshot_replay_clock" not in raw
+            None
+            if "snapshot_replay_clock" not in raw
             else canonical_json_bytes(raw["snapshot_replay_clock"]).decode("utf-8")
         ),
     )

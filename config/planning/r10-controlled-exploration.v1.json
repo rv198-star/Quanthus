@@ -1,0 +1,123 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "R10-CONTROLLED-ENGINEERING-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "exploration",
+  "family": "research-r10-controlled-engineering",
+  "work_item": "META-RESEARCH-R10-QUALIFY-001",
+  "modules": [
+    "MVP",
+    "REFERENCE",
+    "EXPERT",
+    "TRACE"
+  ],
+  "question": "历史曝光未知的固定2021受控回放能否完成一次实际更新、完整三arm与反馈工程闭环？",
+  "consumer": "研究负责人及FormalP2维护者，决定是否投入R10参考和实际更新/三arm",
+  "scope": "Owner已批准受控用途；排除1664已知R9公司，其余曝光UNKNOWN；原2021窗口/门/总时钟/预算不变",
+  "deliverable": "精确源与角色冻结、实际更新、三arm、冷构造与反馈；仅工程等级或准确停止证据",
+  "decision_if_pass": "按Owner受控授权与A实际资格执行B/C，正式有效性及候选采用仍待验收",
+  "decision_if_fail": "保留MVP v0和原R9/业务版本，停止受影响阶段；实际更新和完整比较验收保持开放",
+  "acceptance": [
+    "完整E/源/行业/行动/日历/价格/基准与实际读取回执齐备",
+    "32当前角色唯一隔离，排除已知1664公司；其余历史曝光UNKNOWN，eval24来自实际P4事件并在分数/参考前封存",
+    "B与B+v0治理后差异至少2公司/2日期；旧停放方向有实质新问题的证据",
+    "独立设计GO与有界实现估算；所有必需SHA和绝对时钟可解析"
+  ],
+  "stop_conditions": [
+    "A总3h到限仍无完整资格即停止；不滚动更换窗口/样本找结果",
+    "2022+市场不读、不采集/补采；只有A实际资格通过后执行固定64参考、唯一更新及三arm",
+    "R10全部12h且64参考+2健康上限仅为后继冻结预算，本提案不启动"
+  ],
+  "memory_sha256": "e3b1d88ee471d945b8d7a524f1be27cbb79baf5691c9374404a1522d060c2228",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-R9-CALIBRATION-QUALIFIED-20261114",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-R9-PROSPECTIVE-TRAIN-SUPPORT-FAILED-20261114",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-R9-QUALIFIED-ASSETS-LEARNING-20261114",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    },
+    {
+      "conclusion_id": "CON-MVP0-RESULT-AUDIT-20261114",
+      "relation": "respect",
+      "rationale": "保留原停放结论、曝光与成本；本轮Owner已批准固定2021历史曝光UNKNOWN受控工程回放。工程闭环逐项验收，独立有效性和候选采用仍待合格证据。"
+    }
+  ],
+  "cumulative_cost_review": "R6-R9全部失败/曝光/旧费用保留；R9 288CLI+2离线fixture；A零新增参考，读用/实现/等待累计；完整root/reviewer账单未知非零",
+  "runtime_authority_boundary": "Owner明确选择按受控回放继续；受控合同r10-controlled-replay.v1绑定执行，当前proposal只作结构预检",
+  "budget": {
+    "wall_seconds": 10800,
+    "max_new_bytes": 8589934592,
+    "network_requests": 0,
+    "accounting_owner": "R10-A主线；0新增市场/参考，GitHub/既有封存物传输单列，实测空间先过门"
+  }
+}

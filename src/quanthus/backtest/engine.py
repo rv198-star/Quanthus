@@ -160,6 +160,7 @@ class BacktestEngine:
                         in {
                             "quanthus.capital-retrospective-clock.v1",
                             "quanthus.capital-retrospective-clock.v2",
+                            "quanthus.r10-controlled-clock.v1",
                         }
                     )
                     else {}
@@ -686,6 +687,7 @@ class BacktestEngine:
                         in {
                             "quanthus.capital-retrospective-clock.v1",
                             "quanthus.capital-retrospective-clock.v2",
+                            "quanthus.r10-controlled-clock.v1",
                         }
                     )
                     else {}

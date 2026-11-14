@@ -1,187 +1,67 @@
 {
   "schema_version": "quanthus.exploration-request.v1",
-  "id": "R10-CONTROLLED-RESULT-CLOSEOUT-001",
+  "id": "R10-DIAG-ENGINEERING-CLOSEOUT-001",
   "status": "proposed",
   "grants_authority": false,
   "kind": "delivery",
-  "family": "research-r10-controlled-result-closeout",
-  "work_item": "P3-RESEARCH-R10-DECISION-001",
+  "family": "r10-diagnostic-engineering-closeout",
+  "work_item": "P5-RESEARCH-R10-DIAG-001",
   "modules": [
-    "MVP",
-    "S02",
-    "EXPERT",
-    "REPRO",
-    "CLOSEOUT",
     "TRACE"
   ],
-  "question": "将已完成的受控更新/三arm/冷构造结果发布并完成普通合入与工单对账。",
-  "consumer": "研究负责人/P5/FormalP2维护者",
-  "scope": "固定既有R10结果的检查、私有HF发布全回读、普通PR合入、工单/蓝图/成本收尾；新市场/参考/梯度/资金实验0。",
-  "deliverable": "完整不可变证据、可读入口、三类使用案例、误判优先反馈细则和最终闭包回执。",
-  "decision_if_pass": "关闭有限R10工单及milestone；保留B/v0与正式有效性/采用待验收范围。",
-  "decision_if_fail": "记录具体交付缺口与原预算；保留全部结果和拒绝决定。",
+  "question": "Integrate independently accepted sealed diagnostics using the current AGENTS documentation/ledger complete-check reuse exception.",
+  "consumer": "Research owner and existing Quanthus maintainers",
+  "scope": "Verify26ef successor and2433 identical executable/config/test inputs, rerun changed metadata checks, freeze one serial final review, then ordinary PR/issue/resource closeout. No new research.",
+  "deliverable": "Exact closure/reuse proof, affected tests, independent review, normal merge and live lifecycle/retention receipts.",
+  "decision_if_pass": "Merge diagnostic assets and close Task682; preserve parked width-only and B/v0.",
+  "decision_if_fail": "Retain draft with named defect. If reuse closure differs, request one concrete minimal budget for the complete check; do not exceed original cap.",
   "acceptance": [
-    "Linux最终make check及适用治理/追加历史检查。",
-    "完整私有产物发布与全部size/SHA回读，独立最终复审GO。",
-    "普通merge、实际工单/蓝图状态对账、成本与资源收尾。"
+    "Byte-identical runtime/config/test closure including all configuration except four non-authorizing planning metadata files; affected metadata tested fresh.",
+    "Exact PR-base append-only checks and current issue observations; serial independent final review.",
+    "Ordinary merge, task/parent/blueprint live reconciliation, retained evidence and managed-worktree cleanup."
   ],
   "stop_conditions": [
-    "沿用18:55UTC总deadline；不启动新实验。",
-    "P10/生产/保护市场分区权限沿用原门禁。"
+    "Original15:49:39UTC deadline and600CPU-second cap retained; no reset.",
+    "Changed executable/dependency/test input invalidates reuse and stops before unfunded full run.",
+    "New reference/training/market acquisition/capital replay remains zero."
   ],
-  "memory_sha256": "c12130a4b8c7c53c365d005ee9c1a412a95d307b0862d06742ffd081d42a1ad4",
+  "memory_sha256": "5760d483ab24b6d85dab43a1466110d95610823936dce6d6d36526c09e3bc625",
   "prior_reviews": [
-    {
-      "conclusion_id": "CON-HEAD2-MARCH-20261029",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-HELD-NEED-20261029",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-DECISION-SELECTION-20261029",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-R2-MOMENTUM-20261112",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-R5-CLOCK-20261112",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-R6-RANK1-20261113",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
-    {
-      "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
-      "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
-    },
     {
       "conclusion_id": "CON-R9-QUALIFIED-ASSETS-LEARNING-20261114",
       "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
+      "rationale": "Engineering closeout only; preserve all candidate stops, scoped outcomes, exposure and cumulative costs; no new scientific trial."
     },
     {
       "conclusion_id": "CON-MVP0-RESULT-AUDIT-20261114",
       "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
+      "rationale": "Engineering closeout only; preserve all candidate stops, scoped outcomes, exposure and cumulative costs; no new scientific trial."
     },
     {
       "conclusion_id": "CON-R10-CONTROLLED-CANDIDATE-REJECTED-20261114",
       "relation": "respect",
-      "rationale": "本提案只交付既有受控结果与拒绝决定，保留旧曝光/成本和停放边界；不激活新的研究。"
+      "rationale": "Engineering closeout only; preserve all candidate stops, scoped outcomes, exposure and cumulative costs; no new scientific trial."
+    },
+    {
+      "conclusion_id": "CON-R10-WIDTH-ONLY-AUDITED-20261114",
+      "relation": "respect",
+      "rationale": "Integrate accepted diagnostic assets only; preserve parked candidate, unchanged module maturity and all prior scientific boundaries."
     }
   ],
-  "cumulative_cost_review": "总时钟06:55UTC起持续累计；本轮64参考/health0/retry0，主fit1.89秒、三arm21.30秒、冷536.47秒，审阅/返工/发布/收尾继续计；完整主动工时与模型账单未知非零。",
-  "runtime_authority_boundary": "原R10执行与交付收口；此规划记录不授予下一轮训练、P6或生产权限。",
+  "cumulative_cost_review": "Previous diagnostic measured6.825273CPU seconds plus120-second uninstrumented reserve retained. This engineering handoff continues the original13:49:39UTC clock and600CPU cap; no new budget is assumed.",
+  "runtime_authority_boundary": "Existing human-authorized diagnostic/PR closeout handed back by audit. Current user AGENTS permits documentation/ledger reuse; strict wrapper-v1 reuse receipt is not claimed.",
   "budget": {
-    "wall_seconds": 7200,
-    "max_new_bytes": 134217728,
+    "wall_seconds": 2716,
+    "max_new_bytes": 67108864,
     "network_requests": 0,
-    "accounting_owner": "R10主线；GitHub/HF固定证据传输单列，新增市场/参考网络0"
-  },
-  "superseded_request": {
-    "id": "R10-QUALIFICATION-001",
-    "revision": "95c3c3489b9c25eea74ea7936e2297e863afde3a",
-    "execution_disposition": "executed_under_owner_controlled_replay_amendment"
+    "accounting_owner": "Execution line; GitHub/fixed evidence transport separate, new market/reference network0"
   },
   "execution_receipt": {
-    "disposition": "fulfilled_archive_only_no_new_tranche",
-    "source_pr": 680,
-    "merged_commit": "c9d6ceb46c3c266b3629162348b923166d5d0930",
-    "completed_scope": "controlled_R10_engineering_and_candidate_rejection",
-    "hf_revision": "9f62b74d7e8f814c245ab7e1dc40f3c084999ea0",
-    "issues": [
-      673,
-      674,
-      675
-    ],
-    "formal_independence_and_adoption": "pending",
-    "next_experiment_authorized": false
+    "disposition": "engineering_checks_and_serial_review_in_progress",
+    "diagnostic_acceptance": "ACCEPTED",
+    "new_training_reference_market_capital": 0,
+    "strict_wrapper_v1_receipt_reused": false,
+    "engineering_reuse": "current_AGENTS_doc_ledger_exception",
+    "original_budget_retained": true
   }
 }

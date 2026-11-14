@@ -322,7 +322,8 @@ def event_predictions(payload):
     for row in payload["rows"]:
         key = row.get("event_id")
         if key is None:
-            continue  # Training/guard rows are sealed in the same file, outside the entry population.
+            # Training/guard records share the seal, outside the entry population.
+            continue
         if not isinstance(key, str) or not key:
             raise ValueError("R10_PREDICTION_EVENT_ID")
         if key in result and any(result[key][k] != row[k] for k in ("case_id", "v0", "v1")):

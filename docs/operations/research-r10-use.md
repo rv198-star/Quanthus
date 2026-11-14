@@ -1,4 +1,30 @@
-# 三类实际使用案例
+# R10 当前统一使用入口
+
+当前完整交付是本机私有包 `outputs/quanthus-r10-overall/README.md`：
+`/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r10-overall/README.md`。
+它把完成情况、保留 B／v0 的理由、参考覆盖及下一动作放在同一页，并链接完整 19 事件与 13 成交链。
+整体结论处于独立交审；已接受的诊断子任务不替代 R10 整体验收。
+
+| 想做的判断 | 入口及明确语义 |
+|---|---|
+| 原 A/B/C 及 #544/#545/#546 的 R10 部分是否兑现 | `acceptance-entry.md`／`parent-acceptance-map.json`，14 项整体验收和 11 项父验收贡献 |
+| 为何保留 B／v0，下一笔该做什么 | `feedback-decision.md`，G01/G02/G03/G05 实际处置与唯一非激活参考资格合同 |
+| 哪些事件实际占用资金、成交和退出 | `decision-entry.md`，19 个完整卡片直接列出订单、入／退出成交、账本和结算，无需手工 join |
+| 哪些判断有本锚点参考 | `recognition-entry.md` 和各事件卡；13 笔成交精确参考为 0/13，其他日期同公司标签单列而不迁移 |
+| 原三类使用案例如何复核 | `usage-entry.md`，原事件键、三臂动作、实际容量及原因均展开 |
+
+阅读时将 **entry_eligible（通过专家／确认门）**、原 **allocated**、**capacity_disposition**、
+**reserved**、**order** 和 **fill** 分开。原 19 条 trial 的 allocated 都是 true，实际容量为
+13 条 reserved、6 条 rejected/no_empty_unit；只有 13 条有订单及入场成交。封存原字段未改写。
+
+版本决定仍是拒绝 v1、保留 B／研究 v0。实际经济门已经失败；即使参考相关两门另有资格解释，
+本次固定候选的采用合取仍失败。因此对当前已拒绝候选停止追加 13 个成交锚点票，当前阅读视图
+直接显示覆盖缺席，并保留完整资金决定。未来模型用途需先冻结原 B 合法入口的参考覆盖。
+
+来源和细节：[整体交审](../acceptance/research-r10-overall-convergence-20261115.md) ·
+[唯一后继资格提案](../design/research-r10-reference-boundary-proposal-v1.md)。
+
+## 原封存三类实际案例与历史使用验收
 
 这三例分别帮助研究负责人判断：更新是否传到真实决定、原专家门槛是否仍生效、状态不可用时应该做什么。逐项原始字段在私有发布的`study/feedback.safe.json`，CN02保留`/srv/agentdock/quanthus-ops/research-r10-feedback-20261114/feedback.safe.json`；使用共同event_id即可定位三臂decisions与分配审计。
 

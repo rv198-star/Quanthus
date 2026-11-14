@@ -2512,6 +2512,87 @@
         "CP-682-20261114T150628089423Z"
       ],
       "supersedes": "CON-R10-WIDTH-ONLY-DIAG-20261114"
+    },
+    {
+      "id": "CON-R10-OVERALL-CONVERGENCE-SUBMITTED-20261115",
+      "recorded_at": "2026-11-14T17:27:48.049585+00:00",
+      "actor": "Codex execution; Ownercontinued throughoverall convergence",
+      "question_id": "R10-OVERALL-CONVERGENCE-001",
+      "family": "r10-overall-feedback-convergence",
+      "work_item": "P5-RESEARCH-R10-CONVERGE-001",
+      "modules": [
+        "MVP",
+        "S02",
+        "TRAIN",
+        "UPDATE",
+        "REFERENCE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "question": "Does original controlledR10 one-update/full-comparison/usable-feedback/final-version scope converge on the bound results?",
+      "consumer": "Researchowner and fullP2 review maintainer",
+      "scope": "Existingsealed sources,31training/32development/19trials/13fills;14original acceptance and11parent contribution mappings. No new paid reference/training/market/capital.",
+      "execution_status": "completed",
+      "verdict": "inconclusive",
+      "disposition": "investigate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Candidate overall dossier ready for independent audit, not overall completed by execution. Existing v1reject retained; one optional non-activated reference qualification only.",
+      "decision_effect": "Submit completeoverall package. Stop duplicate clause-head training and extra13-label purchase for rejectedv1; expose actual capacity/order/fill semantics; freeze one4case/two-view16-opinion reference-invariance qualification.",
+      "reopen_conditions": [
+        "Audit determines remaining originalR10 requirement and either accepts overall convergence or explicitly organizes the one necessary bounded successor.",
+        "Any paid reference activation needs separate reviewed budget/runtime; new training/capital remains0 under this package."
+      ],
+      "retained_assets": [
+        "Original update/three arms/cold/restoration and all accepted stage receipts.",
+        "Unified complete19-event chain,32reference view,14acceptance map and11parent contributions.",
+        "Allold UNKNOWN/exposure/failures/cost and timing deviations, and one concrete non-activated semantic qualification contract."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "NewtrancheAuditAgent protection16:47:01-17:47:01UTC,1800CPU/2GiB/256MiB; oldbudgets/costs retained, not reset. Artifact generation under1CPU second; actual checks/transport separately recorded; no new paid study calls.",
+      "attempt_refs": [
+        "inputs.manifest.json",
+        "build-resource.json",
+        "feedback-resolution.json",
+        "successor-contract.draft.json"
+      ],
+      "evidence": [
+        {
+          "id": "OVERALL-MAP",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r10-overall/R10-acceptance-map.json",
+          "sha256": "48143391b274501be27223c09ffd53ea163806660ce912734985a696d72a4863",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Candidate14-row originalR10 mapping; overall independent review pending."
+        },
+        {
+          "id": "FEEDBACK-DISPOSITION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r10-overall/feedback-resolution.json",
+          "sha256": "efbc035a9d38379e26c4a20bfe4c88e1533ed5fc581f1a94bc245182bfb16fa6",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Sealed-evidence explanation and concrete G01/G02/G03/G05 dispositions; no new reference/training or adoption."
+        },
+        {
+          "id": "CONSUMER-VIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r10-overall/decision-consumer-view.json",
+          "sha256": "bbee98ce8d0144d1defa4ae162dc3c51385f2f7bb76129ef4d119e379ad3ec97",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Joined19/13 read-only view; no rewritten original field or cross-anchor label transfer."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-674-R10-CONTROLLED-RESULT-20261114",
+        "CP-675-R10-CONTROLLED-RESULT-20261114",
+        "CP-686-20261114T172546870458Z"
+      ],
+      "supersedes": null
     }
   ]
 }

@@ -86,9 +86,17 @@ def exposure(c: dict[str, Any]) -> tuple[set[str], list[dict[str, Any]]]:
     return identities, receipts
 
 
-def prepare(project: Path, contract: Path, root: Path, *, resume: bool = False) -> dict[str, Any]:
+def prepare(
+    project: Path,
+    contract: Path,
+    root: Path,
+    *,
+    resume: bool = False,
+    physical_dwd_root: Path | None = None,
+    deadline: str | None = None,
+) -> dict[str, Any]:
     c = read(contract)
-    if datetime.now(timezone.utc) >= datetime.fromisoformat(c["runtime"]["A_deadline"]):
+    if datetime.now(timezone.utc) >= datetime.fromisoformat(deadline or c["runtime"]["A_deadline"]):
         raise ValueError("R10_A_DEADLINE")
     root.mkdir(parents=True, exist_ok=True)
     binding = {
@@ -111,7 +119,9 @@ def prepare(project: Path, contract: Path, root: Path, *, resume: bool = False) 
             raise ValueError("R10_PREREQUISITE_BINDING_CHANGED")
     else:
         write(binding_path, binding)
-    native = NativeInputs(project, contract, root / "native", build=not resume)
+    native = NativeInputs(
+        project, contract, root / "native", build=not resume, physical_dwd_root=physical_dwd_root
+    )
     try:
         known, exp = exposure(c)
         if not (root / "known-exposure.private.json").exists():

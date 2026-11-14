@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import subprocess
+import time
 from collections import Counter
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
@@ -108,12 +110,20 @@ def load_bound(c, path):
     return read(p)
 
 
-def fit_correction(contract: Path, root: Path):
+def fit_correction(
+    contract: Path,
+    root: Path,
+    *,
+    reference_root=None,
+    parent_checkpoint=None,
+    old_rows_override=None,
+):
     """See evaluation support only; seal predictions before evaluation labels."""
     from quanthus.r9_study import head_rows
 
+    started = time.monotonic()
     c, admission = admitted(contract, root)
-    ref = root.parent / "reference"
+    ref = reference_root or root.parent / "reference"
     if datetime.now(timezone.utc) >= datetime.fromisoformat(admission["B_deadline"]):
         raise ValueError("R10_B_DEADLINE")
     supports = {
@@ -132,7 +142,8 @@ def fit_correction(contract: Path, root: Path):
     if sha(guard_path) != supports["guard"]["resolved_sha256"]:
         raise ValueError("R10_GUARD_BINDING")
     current = [r["source_row"] for r in read(root / "selected.private.json")["rows"]]
-    old = load_bound(c, c["old_assets"]["selected"])["rows"]
+    original_rows = load_bound(c, c["old_assets"]["selected"])["rows"]
+    old = original_rows if old_rows_override is None else old_rows_override
     train_labels = load_bound(c, c["old_assets"]["train_reference"])["resolved"]
     update_labels = load_bound(c, c["old_assets"]["update_reference"])["resolved"]
     groups = (
@@ -142,7 +153,9 @@ def fit_correction(contract: Path, root: Path):
             [r for r in current if r["identity"]["role"] == "guard"], read(guard_path)["resolved"]
         ),
     )
-    v0 = parent(c)
+    v0 = parent(c) if parent_checkpoint is None else parent_checkpoint
+    if hashlib.sha256(lh.dump_checkpoint(v0)).hexdigest() != c["old_assets"]["parent_sha256"]:
+        raise ValueError("R10_CONSTRUCTED_PARENT_DIFFERS")
     output = root.parent / "fit"
     output.mkdir()
     write(
@@ -163,6 +176,8 @@ def fit_correction(contract: Path, root: Path):
     )
     logs = []
     for step in range(1, 101):
+        if time.monotonic() - started >= 600:
+            raise ValueError("R10_UPDATE_COMPUTE_LIMIT")
         if step > 1:
             child = resume_scheduled_correction(child, *groups, stop_after=step)
         logs.append(
@@ -246,13 +261,23 @@ def fit_correction(contract: Path, root: Path):
         "guard_definite_rows": len(groups[2]),
         "retention": retention,
         "evaluation_label_files_opened": 0,
+        "construction": "primary" if parent_checkpoint is None else "independent_cold",
         "completed_at": datetime.now(timezone.utc).isoformat(),
+        "elapsed_seconds": time.monotonic() - started,
+        "source_commit": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=Path(__file__).resolve().parents[2], text=True
+        ).strip(),
+        "implementation_sha256": {
+            str(p.relative_to(Path(__file__).resolve().parents[2])): sha(p)
+            for folder, pattern in (("src/quanthus", "*.py"), ("config", "*.json"))
+            for p in sorted((Path(__file__).resolve().parents[2] / folder).rglob(pattern))
+        },
     }
     write(output / "manifest.json", result)
     return result
 
 
-def compare(contract: Path, root: Path):
+def compare(contract: Path, root: Path, *, reference_root=None):
     from quanthus.r9_stratified import r0_support
     from quanthus.stage_learning.order_rule_screen import load_rule
 
@@ -268,10 +293,11 @@ def compare(contract: Path, root: Path):
     for name, expected in sealed["files"].items():
         if sha(fit / name) != expected:
             raise ValueError("R10_PREDICTION_COMMITMENT_CHANGED")
-    support = read(root.parent / "reference/support-evaluation.safe.json")
+    reference_root = reference_root or root.parent / "reference"
+    support = read(reference_root / "support-evaluation.safe.json")
     if support != sealed["supports"]["evaluation"]:
         raise ValueError("R10_EVALUATION_COMMITMENT_CHANGED")
-    labels_path = root.parent / "reference/qa-evaluation/resolved.private.json"
+    labels_path = reference_root / "qa-evaluation/resolved.private.json"
     if sha(labels_path) != support["resolved_sha256"] or not support["support_pass"]:
         raise ValueError("R10_EVALUATION_SUPPORT_BINDING")
     label_package = read(labels_path)
@@ -413,10 +439,18 @@ def parent(c):
     )
 
 
-def screen(project: Path, contract: Path, root: Path):
+def screen(
+    project: Path,
+    contract: Path,
+    root: Path,
+    *,
+    native=None,
+    parent_checkpoint=None,
+    deadline: str | None = None,
+):
     c = read(contract)
     check_contract(c)
-    if datetime.now(timezone.utc) >= datetime.fromisoformat(c["runtime"]["A_deadline"]):
+    if datetime.now(timezone.utc) >= datetime.fromisoformat(deadline or c["runtime"]["A_deadline"]):
         raise ValueError("R10_A_DEADLINE")
     freeze = read(root / "source-freeze.safe.json")
     for name, expected in (
@@ -428,7 +462,7 @@ def screen(project: Path, contract: Path, root: Path):
             raise ValueError("R10_A_SOURCE_FREEZE_BINDING")
     if freeze["contract_sha256"] != sha(contract):
         raise ValueError("R10_A_CONTRACT_BINDING")
-    v0 = parent(c)
+    v0 = parent(c) if parent_checkpoint is None else parent_checkpoint
     cases = read(root / "E-cases.private.json")["rows"]
     prediction_path = root / "A-v0-predictions.private.json"
     predictions = {
@@ -444,7 +478,8 @@ def screen(project: Path, contract: Path, root: Path):
     }
     write(prediction_path, predictions)
     details = []
-    native = NativeInputs(project, contract, root / "native")
+    owned_native = native is None
+    native = native or NativeInputs(project, contract, root / "native")
     try:
         with ControlledReplay(project, native, root / "E.private.json", prediction_path) as run:
             runner = FormalStrategyRunner(run.registry.card, run.registry.topology_manifest.digest)
@@ -475,6 +510,9 @@ def screen(project: Path, contract: Path, root: Path):
         now = datetime.now(timezone.utc)
         total = datetime.fromisoformat(c["runtime"]["total_deadline"])
         b_end = min(now + timedelta(hours=4), total - timedelta(hours=5))
+        c_end = b_end + timedelta(hours=3)
+        if deadline is not None:
+            b_end = c_end = datetime.fromisoformat(deadline)
         result = {
             "status": "A_QUALIFIED" if passed else "A_FUTILITY_STOP",
             "result_execution_ready": passed,
@@ -494,14 +532,15 @@ def screen(project: Path, contract: Path, root: Path):
             "new_capital_trials": 0,
             "completed_at": now.isoformat(),
             "B_deadline": b_end.isoformat(),
-            "C_deadline": (b_end + timedelta(hours=3)).isoformat(),
+            "C_deadline": c_end.isoformat(),
             "total_deadline": total.isoformat(),
             "native_source_digest": native.content_digest,
         }
         write(root / "A-admission.safe.json", result)
         return result
     finally:
-        native.close()
+        if owned_native:
+            native.close()
 
 
 def main():

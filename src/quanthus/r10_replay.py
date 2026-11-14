@@ -15,8 +15,13 @@ from quanthus.backtest.baseline_research import (
     _feature_panel_query,
 )
 from quanthus.backtest.inputs import CoverageStatus
-from quanthus.backtest.native_capital_replay import NativeCapitalStore, NativeFrameSource
-from quanthus.backtest.strategy_replay import PITDailyBar, StrategyReplayFrame
+from quanthus.backtest.native_capital_adapter import qualify_action
+from quanthus.backtest.native_capital_replay import (
+    CapitalInputHold,
+    NativeCapitalStore,
+    NativeFrameSource,
+)
+from quanthus.backtest.strategy_replay import CorporateActionStep, PITDailyBar, StrategyReplayFrame
 from quanthus.contracts import SnapshotRef
 from quanthus.event_library.contracts import (
     EventIdentity,
@@ -50,6 +55,73 @@ class NativeStore(NativeCapitalStore):
 
     def clock(self, day: date):
         return self.native_inputs.clock(day)
+
+    def action_steps(self, listing: str, day: date):
+        self.action_hold(listing, day)
+        identity = self.identities[listing]
+        events = self.actions.get((identity["security_id"], day), [])
+        if not events:
+            self.record(listing, day, "no_recorded_action_in_fixed_snapshot")
+            return ()
+        action = events[0]
+        item = qualify_action(action, self.terms[action["corporate_action_id"]])
+        row = self.native(listing, day)
+        calendar = self.calendars[identity["venue_id"], day]
+        if not observed_action_mark(row, calendar, self.cutoff):
+            raise CapitalInputHold("ACTION_NATIVE_OBSERVED_MARK_UNQUALIFIED", day, listing)
+        session = self.session(listing, day)  # Original execution qualification is unchanged.
+        native_action = replace(
+            item.source_pit_action(
+                cutoff=self.cutoff,
+                source_revision=self.revision,
+                snapshot_id=session.snapshot_id,
+            ),
+            security_code=listing,
+        )
+        self.record(
+            listing,
+            day,
+            "native_observed_action_mark_only",
+            observed_open=str(row["open"]),
+            execution_state=session.open_execution_state.value,
+            execution_open=None if session.open_price is None else str(session.open_price),
+        )
+        return (
+            CorporateActionStep(
+                native_action,
+                calendar["open_at"],
+                row["open"],
+                session.snapshot_id,
+                self.clock(day).to_json(),
+            ),
+        )
+
+
+def observed_action_mark(row, calendar, cutoff) -> bool:
+    if row is None or row["currency"] != "CNY" or row["price_basis"] != "UNADJUSTED":
+        return False
+    prices = [row[k] for k in ("open", "high", "low", "close")]
+    if not all(isinstance(v, Decimal) and v.is_finite() and v > 0 for v in prices):
+        return False
+    if not all(
+        isinstance(row.get(k), str) and row[k]
+        for k in (
+            "source_record_id",
+            "source_revision",
+            "source_artifact_sha256",
+        )
+    ):
+        return False
+    op, high, low, close = prices
+    return (
+        low <= min(op, close) <= max(op, close) <= high
+        and row["bar_start"] == calendar["open_at"]
+        and row["bar_end"] == calendar["close_at"]
+        and all(
+            row[k] is not None and row[k] <= cutoff
+            for k in ("bar_known", "listing_known", "security_known")
+        )
+    )
 
 
 class MarketView:
@@ -312,7 +384,7 @@ class ControlledReplay(FormalP2ReplayRuntime):
         return None
 
     def _code_version(self):
-        return "r10-native-controlled-replay-1.0.0"
+        return "r10-native-controlled-replay-1.1.0"
 
     def _parameter_payload(self, intervention_id):
         return {
@@ -321,6 +393,7 @@ class ControlledReplay(FormalP2ReplayRuntime):
             "purpose": self.native.contract_digest,
             "events": digest(self.frozen_events),
             "prediction_commitment": digest(self.predictions),
+            "action_valuation_policy": "native-observed-open-mark-v1-execution-unmodified",
         }
 
     def _manifest_metadata(self, intervention_id):

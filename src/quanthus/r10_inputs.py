@@ -92,7 +92,15 @@ class ScopedPolicy:
 
 
 class NativeInputs:
-    def __init__(self, project: Path, contract: Path, root: Path, *, build: bool = False):
+    def __init__(
+        self,
+        project: Path,
+        contract: Path,
+        root: Path,
+        *,
+        build: bool = False,
+        physical_dwd_root: Path | None = None,
+    ):
         import duckdb
 
         self.project, self.contract, self.root = project, contract, root
@@ -100,8 +108,8 @@ class NativeInputs:
         check_contract(self.c)
         self.cutoff = datetime.fromisoformat(self.c["source"]["knowledge_cutoff"])
         self.contract_digest = "sha256:" + sha(contract)
-        self.primary = Path(self.c["source"]["primary_dwd_root"])
-        self.full = Path(self.c["source"]["full_dwd_root"])
+        self.primary = physical_dwd_root or Path(self.c["source"]["primary_dwd_root"])
+        self.full = physical_dwd_root or Path(self.c["source"]["full_dwd_root"])
         closure = read(project / self.c["source"]["primary_closure"])["members"]
         if sha(self.full / "manifest.json") != MANIFEST_SHA:
             raise ValueError("R10_SOURCE_MANIFEST")

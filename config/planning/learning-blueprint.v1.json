@@ -832,6 +832,19 @@
         "TRACE"
       ],
       "contribution": "R10有界后继：P3-RESEARCH-R10-DECISION-001；沿用原学习MVP验收，当前仅规划，不改变模块实际成熟度"
+    },
+    {
+      "id": "P5-RESEARCH-R10-DIAG-001",
+      "issue": 682,
+      "modules": [
+        "S02",
+        "TRAIN",
+        "UPDATE",
+        "REFERENCE",
+        "EXPERT",
+        "TRACE"
+      ],
+      "contribution": "原R10误报、训练监督与实际决策覆盖的有界只读诊断；单候选非激活草案，保留B/v0及原模块资格"
     }
   ]
 }

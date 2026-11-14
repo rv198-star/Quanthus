@@ -2311,6 +2311,67 @@
         "CP-672-MVP0-R10-20261114"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R10-CONTROLLED-CANDIDATE-REJECTED-20261114",
+      "recorded_at": "2026-11-14T11:02:39.879323+00:00",
+      "actor": "Codex after independent source/semantic/cold/usage GO",
+      "question_id": "R10-CONTROLLED-S02-CORRECTION-001",
+      "family": "research-r10-supervised-correction-controlled",
+      "work_item": "P3-RESEARCH-R10-DECISION-001",
+      "modules": [
+        "MVP",
+        "S02",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "question": "一次固定S02纠偏是否满足保留、识别及完整决策用途门？",
+      "consumer": "研究负责人、P5与FormalP2维护者",
+      "scope": "Owner批准的固定2021工程回放；排除1664已知公司，其余历史曝光UNKNOWN；773机会、guard8/eval24、唯一100步更新、三arm与独立冷构造。",
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "reject_candidate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "限定v1受控候选三门拒绝与工程闭环；正式独立有效性和采用仍待合格证据。",
+      "decision_effect": "保留B/v0，v1诊断归档；本批不追加更新。先解释新增误判，形成至多一个可证伪假说。",
+      "reopen_conditions": [
+        "存在具名误判原因及一个可检验的不同改进假说。",
+        "新候选的完整输入、历史曝光、角色/参考/用途资格及有限预算经独立预审；旧曝光与费用保留。"
+      ],
+      "retained_assets": [
+        "实际梯度、恢复点、837角色视图预测及原v0身份。",
+        "154来源绑定、三arm账本、冷37项匹配、三案例和108秒使用验收。",
+        "全部失败、原R9 NO_UPDATE、旧March/R8停放结论和累计费用。"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "总时钟06:55UTC起持续累计；本轮64参考/health0/retry0，主fit1.89秒、三arm21.30秒、冷536.47秒，审阅/返工/发布/收尾继续计；完整主动工时与模型账单未知非零。",
+      "attempt_refs": [
+        "r10-run-manifest.v1.json",
+        "capital-attempt-001",
+        "capital-attempt-002",
+        "capital",
+        "cold/verification.safe.json"
+      ],
+      "evidence": [
+        {
+          "id": "R10-ACTUAL",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "9740f5f7e28d5b405fa60eb9dee95a54d2789e61",
+          "path": "docs/acceptance/research-r10-controlled-feedback-20261114.md",
+          "sha256": "4870e378cc7bb85d2b62f9a991b6de985a70c65a0622962f4cc98309ee7cda4c",
+          "claim_ceiling": "固定2021受控S02工程闭环及候选拒绝；正式独立有效性、整体12+X和采用资格仍按原门槛。"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-673-R10-CONTROLLED-RESULT-20261114",
+        "CP-674-R10-CONTROLLED-RESULT-20261114",
+        "CP-675-R10-CONTROLLED-RESULT-20261114"
+      ],
+      "supersedes": null
     }
   ]
 }

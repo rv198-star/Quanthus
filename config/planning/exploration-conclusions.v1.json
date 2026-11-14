@@ -2441,6 +2441,77 @@
         "CP-682-20261114T142533613142Z"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R10-WIDTH-ONLY-AUDITED-20261114",
+      "recorded_at": "2026-11-14T15:07:20.686306+00:00",
+      "actor": "Codex execution; formal independent diagnostic receipt received",
+      "question_id": "R10-WIDTH-ONLY-NECESSARY-GATE-001",
+      "family": "r10-width-only-narrow-necessary-gate",
+      "work_item": "P5-RESEARCH-R10-DIAG-001",
+      "modules": [
+        "S02",
+        "TRAIN",
+        "UPDATE",
+        "REFERENCE",
+        "EXPERT",
+        "TRACE"
+      ],
+      "question": "Can one monotone width-only necessary gate retain all training narrow positives and reject all six development false positives?",
+      "consumer": "Quanthus audit and research-direction owner",
+      "scope": "Sealed original31 training rows, exposed32 development rows and19 decision events/13 fills; no new training/references/replay.",
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Independent diagnostic acceptance of the original40 files and the concrete monotone width-only stop. Contextual narrowness remains untested; no new research or admission.",
+      "decision_effect": "Keep width-only parked and integrate accepted diagnostic assets. Existing complete engineering evidence is reusable under current AGENTS after2433-file executable/config/test equality and fresh affected metadata checks; final serial review and ordinary merge remain.",
+      "reopen_conditions": [
+        "Any contextual narrowness successor needs a separately reviewed hypothesis, clause contrasts, recognition comparators R0/v0/candidate with frozen FP/FN gates, qualified exposure and purpose-specific input/reference/coverage.",
+        "No new research activated by engineering integration."
+      ],
+      "retained_assets": [
+        "31-row clause/weight/gradient attribution,32-row reconciliation,19-event/13-fill ledger links.",
+        "Two-case HLC/original-reader witness and single non-activated contract.",
+        "All historical exposure, failed candidates, UNKNOWN and accumulated costs."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Original R10 costs and13:49:39UTC start/15:49:39UTC deadline/600CPU-second cap retained. Earlier diagnostic measured6.825273CPU seconds plus120s uninstrumented reserve; engineering metadata checks counted separately. Historical841.91CPU-second full check is reused under current AGENTS, not rerun or billed as new zero-cost work.",
+      "attempt_refs": [
+        "diagnostic-summary.json",
+        "analysis-resource-receipt.json",
+        "validation-boundary.json",
+        "closure-reuse-proof.json",
+        "closeout-preflight.json"
+      ],
+      "evidence": [
+        {
+          "id": "DIAG-ACCEPTED",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r10-diagnostics/audit/diagnostic-acceptance-receipt.json",
+          "sha256": "03b54480909729abb81b9657c5671063ea99918b3e7cde46b40ecd0b5694116f",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Original40-file diagnostic acceptance and parked concrete candidate, no scientific adoption."
+        },
+        {
+          "id": "CLOSURE-REUSE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r10-diagnostic-closeout/closure-reuse-proof.json",
+          "sha256": "5afe1903e5532e4b83929d5e8c7ad40baa93e5d4f0808b816625ec841e2d69ff",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact executable/config/test closure equality under current AGENTS doc/ledger engineering exception; strict wrapper-v1 receipt not reused."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-674-R10-CONTROLLED-RESULT-20261114",
+        "CP-675-R10-CONTROLLED-RESULT-20261114",
+        "CP-682-20261114T142533613142Z",
+        "CP-682-20261114T150628089423Z"
+      ],
+      "supersedes": "CON-R10-WIDTH-ONLY-DIAG-20261114"
     }
   ]
 }

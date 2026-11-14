@@ -46,7 +46,7 @@ guard的FN由2降到0，FP由0增到1；loss由0.5735014164降到0.3920602817。
 
 保留全部失败：元数据mappingproxy序列化失败（实际梯度仍只执行一次）；首个资金尝试在首frame前因非事件None键失败；第二次资金尝试的C2遭旧Formal送转守卫SOURCE_HOLD；最终适配既有P2整数股与待卖比例规则后完整运行。原限价执行守卫保留。P10源冲突由[#679](https://github.com/rv198-star/Quanthus/issues/679)承接。旧R9 NO_UPDATE及本轮全部曝光、失败和费用均保留。
 
-后续优化从[三类实际案例](usage-cases.md)进入[执行细则](next-feedback-spec.md)。本批不追加第二次候选更新。
+后续优化从[三类实际案例](../operations/research-r10-use.md)进入[执行细则](../design/research-r10-next-feedback-v1.md)。本批不追加第二次候选更新。
 
 独立使用角色从交付README计时108秒完成三类案例定位与决定，手工join0次；9个动作键自动核验耗时0.028041秒。P5下一步先解释guard新增FP1及eval FP5，形成至多一个改进假说。原组装器未测manual_stitch_seconds保持null。
 

@@ -285,9 +285,13 @@ after their baseline, physical-source, contract and runtime verification.
 
 For every code task, use the exact task base with
 `python scripts/maintenance_checks.py --base <base> --run` in the required project Python.
-Read `docs/maintenance/lessons.md` for triggered business checks and failure ownership;
-record actual actions/results in the original task evidence. PR reviewers verify applicability.
-Night review also follows unresolved incident/user-result updates, including days without commits.
+At task start, use `docs/maintenance/lessons.md` to select relevant local methods by
+task goal and scenario as well as changed paths. Apply them before the relevant decision.
+For meaningful rework, useful exploration or a tracked method's use, retain key attempts,
+the effective change, outcome and extra cost in the original task. PR reviewers verify
+applicability. Night review follows those results even without new commits; it improves
+the original implementation or work entry and observes later normal tasks.
+Cross-repository learning is low priority and retrieved only for a concrete local need.
 
 
 For repository maintenance intake, registered development-environment evidence,

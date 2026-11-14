@@ -124,3 +124,10 @@ def test_source_hold_does_not_mask_an_implementation_error():
         failure_class(ExpertEvaluationError("other", "quantity-changing action"))
         == "IMPLEMENTATION_FAILURE"
     )
+
+
+def test_failed_evidence_serialization_does_not_leave_an_empty_receipt(tmp_path):
+    path = tmp_path / "receipt.json"
+    with pytest.raises(TypeError):
+        write(path, {"unsupported": object()})
+    assert not path.exists()

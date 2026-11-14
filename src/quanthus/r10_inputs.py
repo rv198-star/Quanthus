@@ -39,9 +39,10 @@ def sha(path: Path) -> str:
 
 
 def write(path: Path, value: Any) -> None:
+    payload = canonical(value) + b"\n"
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("xb") as stream:
-        stream.write(canonical(value) + b"\n")
+        stream.write(payload)
 
 
 def rows(db: Any, sql: str, params: list[Any] | None = None) -> list[dict[str, Any]]:

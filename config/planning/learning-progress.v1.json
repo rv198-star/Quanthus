@@ -13750,6 +13750,345 @@
       "reviewed_modules": [
         "S02"
       ]
+    },
+    {
+      "id": "CP-673-R10-CLOSEOUT-20261114",
+      "recorded_at": "2026-11-14T11:59:54.963065+00:00",
+      "actor": "Codex; merged R10 delivery and live API reconciliation",
+      "work_item": "META-RESEARCH-R10-QUALIFY-001",
+      "outcome": "no_module_change",
+      "summary": "PR680普通合入、R10有限工单/里程碑关闭及父项实际KR登记；仅确认真实生命周期和已发布证据。",
+      "evidence": [
+        {
+          "id": "R10-MERGED",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "c9d6ceb46c3c266b3629162348b923166d5d0930",
+          "path": "docs/acceptance/research-r10-controlled-feedback-20261114.md",
+          "sha256": "9947b11f47753c9757cc7f9645a318d857d1b878ee06b7e6003ca8e25b526382",
+          "claim_ceiling": "R10受控结果工程验收与原三门拒绝；本次仅更新真实GitHub生命周期观察。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "沿用CP-673/674/675-R10-CONTROLLED-RESULT-20261114的范围与模块结论：工程实测完成，v1拒绝，整体MVP/正式独立有效性和采用继续按原验收。关闭或父项勾选不提升模块资格。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-R10-QUALIFY-001",
+          "number": 673,
+          "title": "[META-RESEARCH-R10-QUALIFY-001] 冻结真实机会、曝光和R10更新/决策比较合同",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-14T11:56:44Z",
+          "body_sha256": "62db8a226ff8f9c7cc19bad67b7e4e55c52d55e37522d16d59128cc50abcc5dd"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "REFERENCE",
+        "EXPERT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-674-R10-CLOSEOUT-20261114",
+      "recorded_at": "2026-11-14T11:59:56.628927+00:00",
+      "actor": "Codex; merged R10 delivery and live API reconciliation",
+      "work_item": "P5-RESEARCH-R10-UPDATE-001",
+      "outcome": "no_module_change",
+      "summary": "PR680普通合入、R10有限工单/里程碑关闭及父项实际KR登记；仅确认真实生命周期和已发布证据。",
+      "evidence": [
+        {
+          "id": "R10-MERGED",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "c9d6ceb46c3c266b3629162348b923166d5d0930",
+          "path": "docs/acceptance/research-r10-controlled-feedback-20261114.md",
+          "sha256": "9947b11f47753c9757cc7f9645a318d857d1b878ee06b7e6003ca8e25b526382",
+          "claim_ceiling": "R10受控结果工程验收与原三门拒绝；本次仅更新真实GitHub生命周期观察。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "沿用CP-673/674/675-R10-CONTROLLED-RESULT-20261114的范围与模块结论：工程实测完成，v1拒绝，整体MVP/正式独立有效性和采用继续按原验收。关闭或父项勾选不提升模块资格。",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R10-UPDATE-001",
+          "number": 674,
+          "title": "[P5-RESEARCH-R10-UPDATE-001] 执行一次S02监督纠偏更新并完成独立识别比较",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-14T11:56:47Z",
+          "body_sha256": "5f8853f191269c56a0569d71882b60457492e1fd9838e5f7a216cef95b213478"
+        }
+      ],
+      "reviewed_modules": [
+        "S02",
+        "TRAIN",
+        "UPDATE",
+        "REFERENCE",
+        "REPRO",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-675-R10-CLOSEOUT-20261114",
+      "recorded_at": "2026-11-14T11:59:58.189274+00:00",
+      "actor": "Codex; merged R10 delivery and live API reconciliation",
+      "work_item": "P3-RESEARCH-R10-DECISION-001",
+      "outcome": "no_module_change",
+      "summary": "PR680普通合入、R10有限工单/里程碑关闭及父项实际KR登记；仅确认真实生命周期和已发布证据。",
+      "evidence": [
+        {
+          "id": "R10-MERGED",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "c9d6ceb46c3c266b3629162348b923166d5d0930",
+          "path": "docs/acceptance/research-r10-controlled-feedback-20261114.md",
+          "sha256": "9947b11f47753c9757cc7f9645a318d857d1b878ee06b7e6003ca8e25b526382",
+          "claim_ceiling": "R10受控结果工程验收与原三门拒绝；本次仅更新真实GitHub生命周期观察。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "沿用CP-673/674/675-R10-CONTROLLED-RESULT-20261114的范围与模块结论：工程实测完成，v1拒绝，整体MVP/正式独立有效性和采用继续按原验收。关闭或父项勾选不提升模块资格。",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-R10-DECISION-001",
+          "number": 675,
+          "title": "[P3-RESEARCH-R10-DECISION-001] 完成学习输出的三arm资金比较、冷复现与反馈验收",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-14T11:56:52Z",
+          "body_sha256": "41c43b62d6f33db225e9ef3a84dcfde032924606e5eb6fb847c57fa2e7a4810d"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "S02",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-540-R10-CLOSEOUT-20261114",
+      "recorded_at": "2026-11-14T12:00:00.968442+00:00",
+      "actor": "Codex; merged R10 delivery and live API reconciliation",
+      "work_item": "META-LEARN-001",
+      "outcome": "no_module_change",
+      "summary": "PR680普通合入、R10有限工单/里程碑关闭及父项实际KR登记；仅确认真实生命周期和已发布证据。",
+      "evidence": [
+        {
+          "id": "R10-MERGED",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "c9d6ceb46c3c266b3629162348b923166d5d0930",
+          "path": "docs/acceptance/research-r10-controlled-feedback-20261114.md",
+          "sha256": "9947b11f47753c9757cc7f9645a318d857d1b878ee06b7e6003ca8e25b526382",
+          "claim_ceiling": "R10受控结果工程验收与原三门拒绝；本次仅更新真实GitHub生命周期观察。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "沿用CP-673/674/675-R10-CONTROLLED-RESULT-20261114的范围与模块结论：工程实测完成，v1拒绝，整体MVP/正式独立有效性和采用继续按原验收。关闭或父项勾选不提升模块资格。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-001",
+          "number": 540,
+          "title": "[META-LEARN-001] 交付状态识别、因子、多专家与一次局部训练的基础MVP",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-14T11:56:55Z",
+          "body_sha256": "aecf2cf9ffc4b91e4d1599b8aeb6021904313f9621225aa106fabc578e130967"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "DATA",
+        "FACTS",
+        "FACTORS",
+        "REFERENCE",
+        "STATES",
+        "TRAIN",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "P6",
+        "S00",
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "CONTROL"
+      ]
+    },
+    {
+      "id": "CP-543-R10-CLOSEOUT-20261114",
+      "recorded_at": "2026-11-14T12:00:02.822803+00:00",
+      "actor": "Codex; merged R10 delivery and live API reconciliation",
+      "work_item": "P5-STATE-003",
+      "outcome": "no_module_change",
+      "summary": "PR680普通合入、R10有限工单/里程碑关闭及父项实际KR登记；仅确认真实生命周期和已发布证据。",
+      "evidence": [
+        {
+          "id": "R10-MERGED",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "c9d6ceb46c3c266b3629162348b923166d5d0930",
+          "path": "docs/acceptance/research-r10-controlled-feedback-20261114.md",
+          "sha256": "9947b11f47753c9757cc7f9645a318d857d1b878ee06b7e6003ca8e25b526382",
+          "claim_ceiling": "R10受控结果工程验收与原三门拒绝；本次仅更新真实GitHub生命周期观察。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "沿用CP-673/674/675-R10-CONTROLLED-RESULT-20261114的范围与模块结论：工程实测完成，v1拒绝，整体MVP/正式独立有效性和采用继续按原验收。关闭或父项勾选不提升模块资格。",
+      "issue_observations": [
+        {
+          "work_item": "P5-STATE-003",
+          "number": 543,
+          "title": "[P5-STATE-003] 训练并评价首个有资格的12+X分层状态模型版本",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-14T11:56:59Z",
+          "body_sha256": "baa8ec99da2a13dfb90903fed8d982f6dc08a4895b438174bb34782c7abb16bb"
+        }
+      ],
+      "reviewed_modules": [
+        "STATES",
+        "TRAIN",
+        "CONTROL",
+        "S00",
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12"
+      ]
+    },
+    {
+      "id": "CP-544-R10-CLOSEOUT-20261114",
+      "recorded_at": "2026-11-14T12:00:04.338931+00:00",
+      "actor": "Codex; merged R10 delivery and live API reconciliation",
+      "work_item": "P5-LOCAL-001",
+      "outcome": "no_module_change",
+      "summary": "PR680普通合入、R10有限工单/里程碑关闭及父项实际KR登记；仅确认真实生命周期和已发布证据。",
+      "evidence": [
+        {
+          "id": "R10-MERGED",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "c9d6ceb46c3c266b3629162348b923166d5d0930",
+          "path": "docs/acceptance/research-r10-controlled-feedback-20261114.md",
+          "sha256": "9947b11f47753c9757cc7f9645a318d857d1b878ee06b7e6003ca8e25b526382",
+          "claim_ceiling": "R10受控结果工程验收与原三门拒绝；本次仅更新真实GitHub生命周期观察。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "沿用CP-673/674/675-R10-CONTROLLED-RESULT-20261114的范围与模块结论：工程实测完成，v1拒绝，整体MVP/正式独立有效性和采用继续按原验收。关闭或父项勾选不提升模块资格。",
+      "issue_observations": [
+        {
+          "work_item": "P5-LOCAL-001",
+          "number": 544,
+          "title": "[P5-LOCAL-001] 完成一次单模块局部训练及新旧版本比较",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-14T11:57:02Z",
+          "body_sha256": "3c4e5c0c12b81cd790830e44eb5c3410e600b5bfdc4c4e94cd5ae928a18f14c9"
+        }
+      ],
+      "reviewed_modules": [
+        "UPDATE",
+        "TRAIN",
+        "S02"
+      ]
+    },
+    {
+      "id": "CP-545-R10-CLOSEOUT-20261114",
+      "recorded_at": "2026-11-14T12:00:06.078693+00:00",
+      "actor": "Codex; merged R10 delivery and live API reconciliation",
+      "work_item": "P3-EXPERT-007",
+      "outcome": "no_module_change",
+      "summary": "PR680普通合入、R10有限工单/里程碑关闭及父项实际KR登记；仅确认真实生命周期和已发布证据。",
+      "evidence": [
+        {
+          "id": "R10-MERGED",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "c9d6ceb46c3c266b3629162348b923166d5d0930",
+          "path": "docs/acceptance/research-r10-controlled-feedback-20261114.md",
+          "sha256": "9947b11f47753c9757cc7f9645a318d857d1b878ee06b7e6003ca8e25b526382",
+          "claim_ceiling": "R10受控结果工程验收与原三门拒绝；本次仅更新真实GitHub生命周期观察。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "沿用CP-673/674/675-R10-CONTROLLED-RESULT-20261114的范围与模块结论：工程实测完成，v1拒绝，整体MVP/正式独立有效性和采用继续按原验收。关闭或父项勾选不提升模块资格。",
+      "issue_observations": [
+        {
+          "work_item": "P3-EXPERT-007",
+          "number": 545,
+          "title": "[P3-EXPERT-007] 把合格状态输出接入候选专家并验证完整决策影响",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-14T11:57:05Z",
+          "body_sha256": "bc7ca294675ecd210f6396f7848b42e51641552a2570073285b10395d7aac21b"
+        }
+      ],
+      "reviewed_modules": [
+        "FACTS",
+        "EXPERT"
+      ]
+    },
+    {
+      "id": "CP-546-R10-CLOSEOUT-20261114",
+      "recorded_at": "2026-11-14T12:00:08.503524+00:00",
+      "actor": "Codex; merged R10 delivery and live API reconciliation",
+      "work_item": "META-LEARN-002",
+      "outcome": "no_module_change",
+      "summary": "PR680普通合入、R10有限工单/里程碑关闭及父项实际KR登记；仅确认真实生命周期和已发布证据。",
+      "evidence": [
+        {
+          "id": "R10-MERGED",
+          "kind": "assessment",
+          "location": "git",
+          "revision": "c9d6ceb46c3c266b3629162348b923166d5d0930",
+          "path": "docs/acceptance/research-r10-controlled-feedback-20261114.md",
+          "sha256": "9947b11f47753c9757cc7f9645a318d857d1b878ee06b7e6003ca8e25b526382",
+          "claim_ceiling": "R10受控结果工程验收与原三门拒绝；本次仅更新真实GitHub生命周期观察。"
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "沿用CP-673/674/675-R10-CONTROLLED-RESULT-20261114的范围与模块结论：工程实测完成，v1拒绝，整体MVP/正式独立有效性和采用继续按原验收。关闭或父项勾选不提升模块资格。",
+      "issue_observations": [
+        {
+          "work_item": "META-LEARN-002",
+          "number": 546,
+          "title": "[META-LEARN-002] 验收首轮学习闭环、复现与安全保留旧版能力",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-14T11:57:10Z",
+          "body_sha256": "bb0f98cedad65a6cc814eb5b2d5493ac012a6062b251c556cd2df0c188703a54"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "CLOSEOUT",
+        "REPRO",
+        "P6"
+      ]
     }
   ],
   "history_imports": [

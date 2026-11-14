@@ -11,6 +11,16 @@ from quanthus import r9_study as study
 from quanthus.stage_learning import head2_revision as hr
 
 
+def test_assets_require_imported_training_before_paid_roles():
+    from quanthus.r9_assets import ASSET_SCHEMA
+
+    config = {"schema_version": ASSET_SCHEMA}
+    assert study.prior_roles(config, "guard") == ("train",)
+    assert study.prior_roles(config, "evaluation") == ("train", "guard")
+    assert study.prior_roles(config, "update") == ("train", "guard", "evaluation")
+    assert study.prior_roles({"schema_version": study.SCHEMA}, "guard") == ()
+
+
 def pool_rows():
     rows = []
     groups = (

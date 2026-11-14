@@ -153,9 +153,10 @@ def prepare_source(request: Path) -> dict[str, Any]:
 
 def import_train(request: Path) -> dict[str, Any]:
     from quanthus.r9_learning import support
-    from quanthus.r9_study import bound, read, root_for, selected_rows
+    from quanthus.r9_study import bound, check_deadline, read, root_for, selected_rows
 
     c, root = read(request), root_for(request)
+    check_deadline(c)
     origin = c["imported_reference"]
     assets = {
         key: bound(Path(entry["path"]), entry["sha256"]) for key, entry in origin["files"].items()
@@ -225,11 +226,13 @@ def import_train(request: Path) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("source",))
+    parser.add_argument("action", choices=("source", "import"))
     parser.add_argument("--request", type=Path, required=True)
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args()
-    if args.worker:
+    if args.action == "import":
+        result = import_train(args.request)
+    elif args.worker:
         result = prepare_source(args.request)
     else:
         from quanthus.r9_study import run_limited

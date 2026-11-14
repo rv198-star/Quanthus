@@ -33,6 +33,17 @@ SCHEMA = "quanthus.r9-prospective-study.v1"
 REFERENCE_SCHEMA = "quanthus.r9-study-reference.v1"
 ROLES = ("guard", "evaluation", "train", "update")
 CAPS = {"train": 24, "guard": 8, "update": 8, "evaluation": 24}
+
+
+def prior_roles(c: dict[str, Any], role: str) -> tuple[str, ...]:
+    from quanthus.r9_assets import ASSET_SCHEMA
+
+    if c["schema_version"] == ASSET_SCHEMA:
+        sequence = ("train", "guard", "evaluation", "update")
+        return sequence[: sequence.index(role)]
+    return ROLES[: ROLES.index(role)]
+
+
 LAYOUT = (
     ("train", "2020-03-31", "boundary", 6),
     ("train", "2020-03-31", "expanding", 6),
@@ -258,9 +269,9 @@ def reference_payload(request: Path) -> dict[str, Any]:
     study = Path(c["study_request_path"])
     if cal.sha(study) != c["study_request_sha256"]:
         raise ValueError("R9_STUDY_REFERENCE_REQUEST")
-    contract(study)
+    study_config = contract(study)
     role = c["role"]
-    for prior in ROLES[: ROLES.index(role)]:
+    for prior in prior_roles(study_config, role):
         bound(root_for(study) / f"support-{prior}.safe.json", c["prior_support_sha256"][prior])
         role_support(study, prior)
     rows = selected_rows(study)
@@ -279,7 +290,7 @@ def reference_payload(request: Path) -> dict[str, Any]:
 
 def collect_role(request: Path, role: str) -> dict[str, Any]:
     c, root = contract(request), root_for(request)
-    for prior in ROLES[: ROLES.index(role)]:
+    for prior in prior_roles(c, role):
         role_support(request, prior)
     from quanthus.r9_assets import ASSET_SCHEMA, import_train
 
@@ -303,8 +314,7 @@ def collect_role(request: Path, role: str) -> dict[str, Any]:
         "study_request_sha256": cal.sha(request),
         "selected_sha256": cal.sha(root / "selected.private.json"),
         "prior_support_sha256": {
-            prior: cal.sha(root / f"support-{prior}.safe.json")
-            for prior in ROLES[: ROLES.index(role)]
+            prior: cal.sha(root / f"support-{prior}.safe.json") for prior in prior_roles(c, role)
         },
         "reference": {
             "models": list(cal.MODELS),

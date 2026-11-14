@@ -2257,6 +2257,60 @@
         "CP-662-R9-ASSETS-LEARNING-20261114T021613Z"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-MVP0-RESULT-AUDIT-20261114",
+      "recorded_at": "2026-11-14T06:08:29.875891+00:00",
+      "actor": "Codex root; independent result and semantic review GO",
+      "question_id": "MVP0-RESULT-AUDIT-001",
+      "family": "research-mvp0-audit",
+      "work_item": "META-RESEARCH-MVP0-AUDIT-001",
+      "modules": [
+        "MVP",
+        "REPRO",
+        "TRACE",
+        "CLOSEOUT"
+      ],
+      "question": "R6-R9能否按原范围组织为可使用的研究复核MVP v0，并准确承接R10实际学习用途验收？",
+      "consumer": "Owner及研究负责人，固定历史复核和研究版本选择",
+      "scope": "R6原rank1统计，R7固定63行，R8两项资格，R9原200步/64预测/NO_UPDATE；只读复算和交付接缝修复",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "研究复核MVP可用；完整学习MVP实际更新与完整决策比较仍开放，R10仅规划",
+      "decision_effect": "接受固定研究复核MVP v0；修复R7核心包入口与R9当前导航；R10先以零新参考资格核查承接真实更新/三arm/反馈",
+      "reopen_conditions": [
+        "出现可复验结果错误或影响实际使用的缺陷时限定修复",
+        "新参考/梯度/经济执行先按R10-A冻结用途、源、曝光、时钟和预算"
+      ],
+      "retained_assets": [
+        "R7原四文件core及报告字节不变",
+        "R9原v0/预测/NO_UPDATE/cold/恢复及参考暴露完整保留",
+        "R6park/R8NO_GO/March失败与历史288CLI保留"
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "本轮新增参考0；审计/复算/交付/等待另记，root/reviewer精确账单未知非零。R9历史288CLI加2离线fixture继续累计。",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-14/jie-s/work/mvp0-audit-20261114/r9-recheck.safe.json",
+        "/Users/william/Documents/Codex/2026-11-14/jie-s/work/mvp0-audit-20261114/retained-source-recheck.safe.json"
+      ],
+      "evidence": [
+        {
+          "id": "MVP0-AUDIT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/mvp0-audit-20261114/independent-final-review.safe.json",
+          "sha256": "7549b8d1a88a8d5a6f27b2c05f53b92d60fd2dbe572ebde1a056eae0a3463408",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed R6-R9 result and usable research-review bundle audit plus R10 plan; no R10 result execution"
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-672-MVP0-R10-20261114"
+      ],
+      "supersedes": null
     }
   ]
 }

@@ -1,0 +1,91 @@
+{
+  "schema_version": "quanthus.r10-feedback-plan.v1",
+  "status": "planning_ready_pending_exact_admission",
+  "result_execution_ready": false,
+  "work_items": {
+    "qualification": 673,
+    "update": 674,
+    "decision_feedback": 675
+  },
+  "milestone": 24,
+  "parent_issues": [
+    540,
+    543,
+    544,
+    545,
+    546
+  ],
+  "specification": "docs/design/research-r10-feedback-v1.md",
+  "purpose": "one supervised correction of R9 S02 false-negative weakness and full independent B/B+v0/B+v1 retrospective decision comparison",
+  "parent_checkpoint_sha256": "706a6a578a713310730ff54f8b9ce0d80b6fca74c5ee4f6bb68bd9349d87256d",
+  "old_r9_update_status": "NO_UPDATE",
+  "new_mode": "scheduled_supervised_correction",
+  "learning": {
+    "primary_updates": 1,
+    "steps": 100,
+    "learning_rate": 0.05,
+    "l2": 0.01,
+    "replay_group_weight": 0.5,
+    "update_group_weight": 0.5,
+    "fixed_scaler": true,
+    "raw_threshold": 0.5
+  },
+  "role_plan": {
+    "parent_replay": "exact original2020train24; remains retired from future update/guard/eval roles",
+    "update": "exact old2021May guard8;4TRUE3FALSE1UNKNOWN; original opinions untouched,7definite gradient,0revotes; future guard/eval retired",
+    "guard": "new2021May8;global company/alias exclusion",
+    "evaluation": "new24 exact real-event keys from E; global exposure clean; >=12definite,>=5unique companies/class,>=2months"
+  },
+  "raw_signal_window": [
+    "2021-06-01",
+    "2021-08-31"
+  ],
+  "replay_end": "2021-12-31",
+  "common_event_admission": "anchor(T-1)>max(train/update/guard.anchor)=2021-05-31; E0 excluded reasons preserved before score/label access; June1 exits all three arms equally",
+  "arms": {
+    "C0": "B",
+    "C1": "B+v0",
+    "C2": "B+v1"
+  },
+  "retention_gate": "guard FN/FP and update meanloss nonincrease",
+  "recognition_adoption_gate": "evaluation FN strictly decreases versus v0 AND FP nonincrease",
+  "final_adoption_all": [
+    "complete real parameter-changing candidate",
+    "sealed retention.accepted",
+    "recognition_adoption_gate",
+    "C2 after-cost return strictly above C0 and C1",
+    "C2 max drawdown not above C0 or C1",
+    "action differences across >=2companies and >=2signal dates"
+  ],
+  "budget": {
+    "wall_seconds": 43200,
+    "phase_seconds": {
+      "A": 10800,
+      "B": 14400,
+      "C": 10800,
+      "integration": 7200
+    },
+    "new_reference_cli_starts": 64,
+    "health_cli_starts": 2,
+    "retries": 0,
+    "concurrency": 2,
+    "per_call_seconds": 120,
+    "process_rss_bytes": 2147483648,
+    "cpu_cores": 2,
+    "job_write_bytes": 8589934592,
+    "free_bytes_before_start": 12884901888,
+    "new_market_requests": 0
+  },
+  "required_before_result_execution": [
+    "global_exposure_manifest",
+    "source_closure_and_actual_access",
+    "qualified_E0_E_and_eval24_key_manifests",
+    "industry_actions_calendar_price_and_benchmark_use_admission",
+    "retrospective_purpose_and_clock_contract",
+    "bounded_confirmation_adapter_and_variant_registration",
+    "all_parameter_policy_source_reference_code_hashes",
+    "independent_design_GO",
+    "absolute_UTC_deadlines"
+  ],
+  "history": "R6/R8/March parked uses and R9NO_UPDATE unchanged; historical288CLI plus2offlinefixture and unknown old bills retained; no new run in this planning delivery"
+}

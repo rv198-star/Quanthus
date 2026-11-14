@@ -12904,6 +12904,226 @@
           "work_item": "P5-RESEARCH-R9-STRATIFIED-001"
         }
       ]
+    },
+    {
+      "id": "CP-672-MVP0-R10-20261114",
+      "recorded_at": "2026-11-14T06:05:52.103888+00:00",
+      "actor": "Codex root; independent readonly audit and verified artifact checks",
+      "work_item": "META-RESEARCH-MVP0-AUDIT-001",
+      "outcome": "progress",
+      "summary": "R6–R9审计/MVP v0可用交付与R10执行细则",
+      "evidence": [
+        {
+          "id": "MVP0-AUDIT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/mvp0-audit-20261114/independent-final-review.safe.json",
+          "sha256": "7549b8d1a88a8d5a6f27b2c05f53b92d60fd2dbe572ebde1a056eae0a3463408",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed historical R6-R9 research audit and R10 plan; no actual R10 update or strategy activation"
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "R6–R9审计后的研究复核MVP v0可读/可查/可恢复；R7四文件交付接缝与R9当前导航修复",
+          "remaining": "完整学习MVP仍需实际局部更新与合格完整决策比较",
+          "next_action": "按R10-A先核真实机会/曝光/源，合格后一次监督更新及三arm验收",
+          "evidence": [
+            "MVP0-AUDIT"
+          ],
+          "supersedes": "CP-546-LOCAL-CI-20261029T090519818494Z"
+        },
+        {
+          "module": "MVP",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "固定研究复核与同案版本选择已可使用；R6park/R8NO_GO/R9FP-FN取舍按实际结果保留",
+          "remaining": "完整学习决策用途仍未完成；R10当前仅计划",
+          "next_action": "使用MVP v0反馈定位具体问题，按#673/#674/#675验收",
+          "evidence": [
+            "MVP0-AUDIT"
+          ],
+          "supersedes": "CP-540-20261028T202135817023Z"
+        },
+        {
+          "module": "REPRO",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "R6统计与R7全63行/R8必要条件独立复核；R9原200步/scaler/64分数差0且cold四文件一致；新包冷query通过",
+          "remaining": "R10新update与三arm独立冷构造待实际执行",
+          "next_action": "复用已审资产，R10按新运行身份完成一次cold与旧版恢复",
+          "evidence": [
+            "MVP0-AUDIT"
+          ],
+          "supersedes": "CP-658-R8-ROUTING-20261113"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "accepted",
+          "scope": "审计发现闭合、固定结果身份和MVP入口明确；R10真实接缝/预算/停止分支落实",
+          "remaining": "R10 exact源/机会/曝光及绝对时钟仍由A冻结",
+          "next_action": "先#673零新参考费用资格，拒绝把计划或NO_UPDATE记为实际更新",
+          "evidence": [
+            "MVP0-AUDIT"
+          ],
+          "supersedes": "CP-662-R9-ASSETS-LEARNING-20261114T021613Z"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "accepted",
+          "scope": "有限R6–R9结果审计与研究复核MVP组织完成；后继R10分为资格/一次更新/完整比较反馈",
+          "remaining": "本记录不结清完整学习MVP；GitHub最终合入/关闭按后继实际回执",
+          "next_action": "发布并普通合入本交付，保留原业务R0和研究v0",
+          "evidence": [
+            "MVP0-AUDIT"
+          ],
+          "supersedes": "CP-646-R6-DELIVERY-CLOSED-20261113"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "S02",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "TRACE",
+        "CLOSEOUT"
+      ],
+      "no_change_reason": "原科学结论/使用权限保留；R10只是规划，不计入实际训练更新或完整比较。",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-MVP0-AUDIT-001",
+          "number": 672,
+          "title": "[META-RESEARCH-MVP0-AUDIT-001] 审计R6–R9并交付研究复核MVP v0及R10执行细则",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-14T05:40:20Z",
+          "body_sha256": "a52bdb142a89c1def9f763a267eb2e2d5726da94314e062c50f717890282c8b6"
+        }
+      ]
+    },
+    {
+      "id": "CP-673-MVP0-R10-20261114",
+      "recorded_at": "2026-11-14T06:07:12.131423+00:00",
+      "actor": "Codex root; independently reviewed bounded R10 plan",
+      "work_item": "META-RESEARCH-R10-QUALIFY-001",
+      "outcome": "no_module_change",
+      "summary": "登记R10有限规划，前置/预算/真实验收明确；尚未执行",
+      "evidence": [
+        {
+          "id": "MVP0-AUDIT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/mvp0-audit-20261114/independent-final-review.safe.json",
+          "sha256": "7549b8d1a88a8d5a6f27b2c05f53b92d60fd2dbe572ebde1a056eae0a3463408",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed historical R6-R9 research audit and R10 plan; no actual R10 update or strategy activation"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "MVP",
+        "REFERENCE",
+        "EXPERT",
+        "TRACE"
+      ],
+      "no_change_reason": "R10为执行细则，实际update/完整比较未运行；原成熟度与用途权限保持",
+      "issue_observations": [
+        {
+          "work_item": "META-RESEARCH-R10-QUALIFY-001",
+          "number": 673,
+          "title": "[META-RESEARCH-R10-QUALIFY-001] 冻结真实机会、曝光和R10更新/决策比较合同",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-14T06:00:25Z",
+          "body_sha256": "2e0a05b8b719c0617b28d269ad47b74ac9c1a03848aa3962c49bfa8e2f7fd7c8"
+        }
+      ]
+    },
+    {
+      "id": "CP-674-MVP0-R10-20261114",
+      "recorded_at": "2026-11-14T06:07:12.831530+00:00",
+      "actor": "Codex root; independently reviewed bounded R10 plan",
+      "work_item": "P5-RESEARCH-R10-UPDATE-001",
+      "outcome": "no_module_change",
+      "summary": "登记R10有限规划，前置/预算/真实验收明确；尚未执行",
+      "evidence": [
+        {
+          "id": "MVP0-AUDIT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/mvp0-audit-20261114/independent-final-review.safe.json",
+          "sha256": "7549b8d1a88a8d5a6f27b2c05f53b92d60fd2dbe572ebde1a056eae0a3463408",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed historical R6-R9 research audit and R10 plan; no actual R10 update or strategy activation"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "S02",
+        "TRAIN",
+        "UPDATE",
+        "REFERENCE",
+        "REPRO",
+        "TRACE"
+      ],
+      "no_change_reason": "R10为执行细则，实际update/完整比较未运行；原成熟度与用途权限保持",
+      "issue_observations": [
+        {
+          "work_item": "P5-RESEARCH-R10-UPDATE-001",
+          "number": 674,
+          "title": "[P5-RESEARCH-R10-UPDATE-001] 执行一次S02监督纠偏更新并完成独立识别比较",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-14T05:56:11Z",
+          "body_sha256": "2e055266ba5b455b34cf3411c398922905f88b76ec2ed62c3671f6594d5c2f94"
+        }
+      ]
+    },
+    {
+      "id": "CP-675-MVP0-R10-20261114",
+      "recorded_at": "2026-11-14T06:07:13.490389+00:00",
+      "actor": "Codex root; independently reviewed bounded R10 plan",
+      "work_item": "P3-RESEARCH-R10-DECISION-001",
+      "outcome": "no_module_change",
+      "summary": "登记R10有限规划，前置/预算/真实验收明确；尚未执行",
+      "evidence": [
+        {
+          "id": "MVP0-AUDIT",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/work/mvp0-audit-20261114/independent-final-review.safe.json",
+          "sha256": "7549b8d1a88a8d5a6f27b2c05f53b92d60fd2dbe572ebde1a056eae0a3463408",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Fixed historical R6-R9 research audit and R10 plan; no actual R10 update or strategy activation"
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "MVP",
+        "S02",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "no_change_reason": "R10为执行细则，实际update/完整比较未运行；原成熟度与用途权限保持",
+      "issue_observations": [
+        {
+          "work_item": "P3-RESEARCH-R10-DECISION-001",
+          "number": 675,
+          "title": "[P3-RESEARCH-R10-DECISION-001] 完成学习输出的三arm资金比较、冷复现与反馈验收",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-14T06:00:28Z",
+          "body_sha256": "891465db7f90318c7119edbff7dfc7b184339c2438352b2f44d25763ea60f2dd"
+        }
+      ]
     }
   ],
   "history_imports": [

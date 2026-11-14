@@ -1,0 +1,167 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "MVP0-AUDIT-DELIVERY-20261114",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "research-mvp0-audit",
+  "work_item": "META-RESEARCH-MVP0-AUDIT-001",
+  "modules": [
+    "MVP",
+    "S02",
+    "UPDATE",
+    "EXPERT",
+    "REPRO",
+    "TRACE",
+    "CLOSEOUT"
+  ],
+  "question": "R6–R9结果和交付入口是否可组成研究复核MVP v0，后继R10如何完成真实学习用途缺口？",
+  "consumer": "Owner与研究负责人使用固定历史复核、研究版本比较和后续执行说明",
+  "scope": "只读已曝光R6–R9封存产物和源码，复算原结果；修复读取接缝和过时导航并打包；R10仅规划",
+  "deliverable": "独立结果审计、四文件R7核心包、R9固定checkpoint和报告、MVP v0入口及R10有限工作包",
+  "decision_if_pass": "交付研究复核MVP v0；实际更新与完整决策比较挂到R10和原#540验收",
+  "decision_if_fail": "修复或隔离受影响组件；保留合格组件并列出未验收范围",
+  "acceptance": [
+    "合同与封存分母、统计和版本决定一致",
+    "使用缺陷修复后实际冷读取通过",
+    "原始结果、未知、曝光和成本保留；R10有明确输入门及执行验收"
+  ],
+  "stop_conditions": [
+    "不调用新参考或改变冻结模型、政策、市场输入",
+    "不读2022+或启动生产；共享源问题交P10",
+    "本批总上限4小时；超出范围的严重缺陷单独留证和安排"
+  ],
+  "memory_sha256": "e3b1d88ee471d945b8d7a524f1be27cbb79baf5691c9374404a1522d060c2228",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-R5-CLOCK-20261112",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-R6-RANK1-20261113",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-R9-QUALIFIED-ASSETS-LEARNING-20261114",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    },
+    {
+      "conclusion_id": "CON-MVP0-RESULT-AUDIT-20261114",
+      "relation": "respect",
+      "rationale": "复核并保留原结论/未知/曝光/成本；本次审计只修复使用接缝和组织既有成果，不重开原试验。"
+    }
+  ],
+  "cumulative_cost_review": "R6–R9历史成本保留；R9累计288研究/通道CLI加2离线fixture，旧root/reviewer费用未知非零。本轮新增参考调用0，审计复算、交付和等待另计。",
+  "runtime_authority_boundary": "Owner2026-11-14明确要求审计、MVP v0组织及R10细则；本请求仅记录有限交付。CN02使用SSH agentdock。",
+  "budget": {
+    "wall_seconds": 14400,
+    "max_new_bytes": 268435456,
+    "network_requests": 0,
+    "accounting_owner": "主代理；0为新增市场及参考请求，SSH/GitHub和既有证据传输单列"
+  },
+  "execution_record": "CON-MVP0-RESULT-AUDIT-20261114",
+  "execution_disposition": "Completed result audit and MVP packaging; GitHub/publication closeout recorded separately; no R10 execution"
+}

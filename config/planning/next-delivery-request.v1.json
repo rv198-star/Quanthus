@@ -1,135 +1,123 @@
 {
   "schema_version": "quanthus.exploration-request.v1",
-  "id": "RESEARCH-R9-REFERENCE-ASSETS-S02-001",
+  "id": "R10-QUALIFICATION-001",
   "status": "proposed",
   "grants_authority": false,
   "kind": "exploration",
-  "family": "local-learning-r9-qualified-assets",
-  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "family": "research-r10-supervised-feedback-qualification",
+  "work_item": "META-RESEARCH-R10-QUALIFY-001",
   "modules": [
+    "MVP",
     "REFERENCE",
-    "STATES",
-    "TRAIN",
-    "UPDATE",
     "EXPERT",
-    "S02",
     "TRACE"
   ],
-  "question": "Can fixedqualifiedreference24 be reused as exposedtrain with one existing-source2021qualifiedcandidateframe?",
-  "consumer": "#543/#544 research S02 version selection and readable changed-case report",
-  "scope": "knownqualified24exposedtrainassets +newindependent2021guard8/update8/eval24; source1048qualifiedpool bound; newreference80max/0retry, no oldvotes repeated",
-  "deliverable": "realnewv0/conditionalguardedupdate, sealedpredictions, same-inputR0/v0/v1comparison, S02researchsidecar andindependentnativecold orfirsthardgateSTOP",
-  "decision_if_pass": "qualifiedS02researchversion choice withboundednewfutureevaluation; retainactualNO_UPDATE orretentionrejection branch",
-  "decision_if_fail": "recordexactnewsource/support gap andstopremainingnewrole calls; preserveallassets without labelrepair",
+  "question": "真实P4机会/原生源/全局曝光是否允许一次有意义的S02纠偏更新及完整B/B+v0/B+v1研究用途？",
+  "consumer": "研究负责人及FormalP2维护者，决定是否投入R10参考和实际更新/三arm",
+  "scope": "已封存2020–2021数据的有限资格与实现预检，原始Jun1–Aug31机会E0；打分前统一严格T-1 anchor>May31形成E；先封eval身份再检查v0动作，不读新标签或资金结果",
+  "deliverable": "精确源/机会/曝光/角色/政策/代码/时钟/预算manifest及独立预审；或逐项差集；实现细则见research-r10-feedback-v1",
+  "decision_if_pass": "按12h总上限冻结绝对时钟和所有执行身份，准入一次scheduled_supervised_correction与三arm；另记录结果性合同/用途权威",
+  "decision_if_fail": "保留MVP v0和原R9/业务版本，停止受影响阶段；实际更新和完整比较验收保持开放",
   "acceptance": [
-    "train>=12definite &>=4/class &>=2month blocks;guard>=2/class;evaluation>=12definite &>=5uniquecompany/class &>=2monthblocks;update>=1definite",
-    "all64 R0/v0/v1 predictions, checkpoints andretentionchoice before learner/evaluator evaluation label access; independent semantic QA sees reference earlier and releases only support receipts to learner",
-    "retention accepted AND evaluationFP strictly decreases versusv0 AND FN nonincrease; otherwise retainv0",
-    "one independent native126member source qualification, feature/R0 reconstruction andfreshfit/conditionalupdate; exactcheckpoints/predictions andsameFPFN/decision; reference not revoted"
+    "完整E/源/行业/行动/日历/价格/基准与实际读取回执齐备",
+    "全局公司别名曝光与角色隔离，eval24来自真实事件且先于分数选择封存",
+    "B与B+v0治理后差异至少2公司/2日期；旧停放方向有实质新问题的证据",
+    "独立设计GO与有界实现估算；所有必需SHA和绝对时钟可解析"
   ],
   "stop_conditions": [
-    "02:08Zreferencehardstop/02:18Ztotal includingallpreparation/review/delivery;80newCLIincludingfailures,0retry; old218CLI retained",
-    "originalsource/support/QA/retention gates;no sample replacement/thresholdchange/forcedupdate; alloldroles/labels retained"
+    "A总3h到限仍无完整资格即停止；不滚动更换窗口/样本找结果",
+    "新参考0、新梯度0、新资金比较0；2022+不读，缺共享源交P10",
+    "R10全部12h且64参考+2健康上限仅为后继冻结预算，本提案不启动"
   ],
-  "memory_sha256": "70718378b73c27e3a49c0986972bd9f4ddf7443d233eb0e8e639a1a4e636d304",
+  "memory_sha256": "e3b1d88ee471d945b8d7a524f1be27cbb79baf5691c9374404a1522d060c2228",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
-      "relation": "different_scope",
-      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
-      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-HELD-NEED-20261029",
-      "relation": "different_scope",
-      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
-      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
-      "relation": "different_scope",
-      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
-      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-DECISION-SELECTION-20261029",
-      "relation": "different_scope",
-      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
-      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
-      "relation": "different_scope",
-      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
-      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
-      "relation": "different_scope",
-      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
-      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
-      "relation": "different_scope",
-      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
-      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
-      "relation": "different_scope",
-      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
-      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
-      "relation": "different_scope",
-      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
-      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
-      "relation": "different_scope",
-      "rationale": "保留两接入NO_GO；消费者限定识别版本评审与S02研究报告sidecar，不重开原动作映射。",
-      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
-      "relation": "different_scope",
-      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
-      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
-      "relation": "different_scope",
-      "rationale": "原A4保持不重投/不重标；本次从其未选择公司取独立校准面板，检验参考可操作性，符合原恢复条件。",
-      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-R9-CALIBRATION-QUALIFIED-20261114",
       "relation": "respect",
-      "rationale": "Realcalibration independentlyqualified2TRUE10FALSE andsealedprotocol; this successor preserves anchors andindependently qualifies newcompanies underoriginalgates."
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-R9-PROSPECTIVE-TRAIN-SUPPORT-FAILED-20261114",
-      "relation": "different_scope",
-      "rationale": "旧固定trial停在训练1正<4；不改旧角色与票。本次完整复用既有合格参考24作exposedtrain，并独立冻结以后2021的guard/update/evaluation。",
-      "scope_difference": "消费者问题仍是S02版本选择；改变的是受控资产复用与2021未来评价设计，原trial STOP、旧费用/窗口/曝光全部保留；全部原学习门继续适用。"
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     },
     {
       "conclusion_id": "CON-R9-QUALIFIED-ASSETS-LEARNING-20261114",
       "relation": "respect",
-      "rationale": "本有限批次已执行并交付真实拟合/NO_UPDATE/同样本比较/cold与恢复；该proposal作为历史执行索引保存，不启动后继。"
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
+    },
+    {
+      "conclusion_id": "CON-MVP0-RESULT-AUDIT-20261114",
+      "relation": "respect",
+      "rationale": "当前仅R10-A先核真实消费者、源/曝光和动作资格；保留原停放结论及累计成本。任何同类入场经济用途重开必须在A以具体证据另作审查，本提案不自动重启旧候选。"
     }
   ],
-  "cumulative_cost_review": "218actualCLIbeforethisnewphase; oldfailedtrialunused16notrolledover; new80max (guard16+eval48+update16), importedtrain0=>maxcumulative298. Newphase00:48..02:18 includesprep/source/code/review/wait/run/delivery; reference02:08 fixedbeforefirstnewopinion. Oldfirsttrial01:22/01:52andallpriorcosts/labels/stop preserved.",
-  "runtime_authority_boundary": "Owner持续要求完成R9；主代理在已停止旧trial之后另列合格参考资产复用的有限后继。旧窗口与112已用/16未用调用原样保留，未用额度不滚存；同一Mission总时钟/旧费用继续累计。",
+  "cumulative_cost_review": "R6-R9全部失败/曝光/旧费用保留；R9 288CLI+2离线fixture；A零新增参考，读用/实现/等待累计；完整root/reviewer账单未知非零",
+  "runtime_authority_boundary": "当前Owner请求完成审计与执行细则；本提案为R10-A可启动的有限资格说明，结果性B/C在精确输入/用途与独立预审完成后按冻结合同执行。",
   "budget": {
-    "wall_seconds": 5400,
-    "max_new_bytes": 67108864,
-    "network_requests": 80,
-    "accounting_owner": "RESEARCH-R9-CALIBRATION-001;priorcostsretained"
-  },
-  "execution_record": "RESEARCH-R9-REFERENCE-ASSETS-S02-001",
-  "execution_disposition": "COMPLETED: realfit1/NO_UPDATE/retain-v0; cold64 andrestore64exact; furtherpaidreference expansion parked; source9fcdf96a; no futureactivation"
+    "wall_seconds": 10800,
+    "max_new_bytes": 8589934592,
+    "network_requests": 0,
+    "accounting_owner": "R10-A主线；0新增市场/参考，GitHub/既有封存物传输单列，实测空间先过门"
+  }
 }

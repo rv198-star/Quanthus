@@ -12,6 +12,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 from quanthus.backtest.engine import UnsupportedModeError
 from quanthus.backtest.native_capital_replay import CapitalInputHold
@@ -20,14 +21,14 @@ from quanthus.r10_inputs import NativeInputs, check_contract, digest, read, rows
 from quanthus.r10_replay import ControlledReplay
 from quanthus.r10_study import admitted, compare, fit_correction, load_bound, screen
 
-PHASE = {"name": "starting", "deadline": float("inf")}
+PHASE: dict[str, Any] = {"name": "starting", "deadline": float("inf")}
 
 
-def begin_phase(name, seconds):
+def begin_phase(name: str, seconds: float) -> None:
     PHASE.update(name=name, deadline=time.monotonic() + seconds)
 
 
-def failure_class(exc):
+def failure_class(exc: Exception) -> str:
     source_hold = (
         isinstance(exc, CapitalInputHold)
         or (
@@ -46,7 +47,9 @@ def failure_class(exc):
     return "SOURCE_HOLD" if source_hold else "IMPLEMENTATION_FAILURE"
 
 
-def check_fit(contract, qualification, fit):
+def check_fit(
+    contract: Path, qualification: Path, fit: Path
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     c, admission = admitted(contract, qualification)
     frozen = read(fit / "manifest.json")
     if (
@@ -63,9 +66,11 @@ def check_fit(contract, qualification, fit):
     return c, admission, frozen
 
 
-def trade_summary(events, identities):
+def trade_summary(
+    events: list[dict[str, Any]], identities: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
     """Cash plus external-pool flows reconcile closed round trips without outcome labels."""
-    active = {}
+    active: dict[str, dict[str, Any]] = {}
     closed = []
     for event in sorted(events, key=lambda e: (e["event_time"], e["sequence"], e["event_id"])):
         p = event["payload"]
@@ -99,6 +104,8 @@ def trade_summary(events, identities):
                 closed.append(dict(active.pop(unit), exit_date=p["session_date"]))
     wins = [r["cash_flow"] for r in closed if r["cash_flow"] > 0]
     losses = [r["cash_flow"] for r in closed if r["cash_flow"] < 0]
+    by_company: defaultdict[str, Decimal]
+    by_entry_date: defaultdict[str, Decimal]
     by_company, by_entry_date = defaultdict(Decimal), defaultdict(Decimal)
     for r in closed:
         by_company[r["company_id"]] += r["cash_flow"]
@@ -120,7 +127,15 @@ def trade_summary(events, identities):
     }
 
 
-def capital(project, contract, qualification, *, native=None, fit=None, output=None):
+def capital(
+    project: Path,
+    contract: Path,
+    qualification: Path,
+    *,
+    native: NativeInputs | None = None,
+    fit: Path | None = None,
+    output: Path | None = None,
+) -> dict[str, Any]:
     begin_phase("three_capital_arms", 1800)
     fit = fit or qualification.parent / "fit"
     output = output or qualification.parent / "capital"
@@ -327,7 +342,7 @@ def capital(project, contract, qualification, *, native=None, fit=None, output=N
             native.close()
 
 
-def audit_semantic(path):
+def audit_semantic(path: Path) -> str:
     value = read(path)
     value.pop("audit_digest")
     for frame in value["frames"]:
@@ -335,7 +350,7 @@ def audit_semantic(path):
     return digest(value)
 
 
-def cold(project, contract, qualification):
+def cold(project: Path, contract: Path, qualification: Path) -> dict[str, Any]:
     """Copy raw members; rebuild features, the old parent, child and three arms."""
     from quanthus.r9_study import head_rows
     from quanthus.r10_prepare import prepare
@@ -468,7 +483,7 @@ def cold(project, contract, qualification):
     return result
 
 
-def feedback(contract, qualification):
+def feedback(contract: Path, qualification: Path) -> dict[str, Any]:
     admitted(contract, qualification)
     job = qualification.parent
     read(job / "capital/comparison.safe.json")
@@ -548,7 +563,7 @@ def feedback(contract, qualification):
     return result
 
 
-def cold_authority(contract, qualification):
+def cold_authority(contract: Path, qualification: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     # Authority and resource metadata only; never hash/open primary feature/model bytes here.
     c = read(contract)
     check_contract(c)
@@ -558,7 +573,7 @@ def cold_authority(contract, qualification):
     return c, admission
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["capital", "cold", "feedback"])
     parser.add_argument("--contract", type=Path, required=True)
@@ -592,7 +607,7 @@ def main():
     os.sched_setaffinity(0, sorted(os.sched_getaffinity(0))[: c["runtime"]["cpu_cores"]])
     done = threading.Event()
 
-    def monitor():
+    def monitor() -> None:
         from quanthus.r9_calibration import directory_bytes, process_tree_rss
 
         while not done.wait(0.5):

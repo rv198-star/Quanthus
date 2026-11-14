@@ -10,6 +10,7 @@ from collections import Counter
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any, cast
 
 from quanthus.aggregator import GovernedAction
 from quanthus.expert_strategy.runner import FormalStrategyRunner
@@ -25,7 +26,7 @@ from quanthus.stage_learning import head2_revision as hr
 from quanthus.stage_learning import local_head as lh
 
 
-def admitted(contract: Path, root: Path):
+def admitted(contract: Path, root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     c = read(contract)
     check_contract(c)
     admission = read(root / "A-admission.safe.json")
@@ -51,7 +52,7 @@ def admitted(contract: Path, root: Path):
     return c, admission
 
 
-def review_reference(contract: Path, root: Path, role: str, qa: Path):
+def review_reference(contract: Path, root: Path, role: str, qa: Path) -> dict[str, Any]:
     from quanthus import r9_calibration as cal
 
     admitted(contract, root)
@@ -103,7 +104,7 @@ def review_reference(contract: Path, root: Path, role: str, qa: Path):
     return safe
 
 
-def load_bound(c, path):
+def load_bound(c: dict[str, Any], path: str | Path) -> Any:
     p = Path(path)
     if sha(p) != c["asset_hashes"][str(p)]:
         raise ValueError("R10_IMPORTED_ASSET_BINDING")
@@ -114,10 +115,10 @@ def fit_correction(
     contract: Path,
     root: Path,
     *,
-    reference_root=None,
-    parent_checkpoint=None,
-    old_rows_override=None,
-):
+    reference_root: Path | None = None,
+    parent_checkpoint: lh.HeadCheckpoint | None = None,
+    old_rows_override: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """See evaluation support only; seal predictions before evaluation labels."""
     from quanthus.r9_study import head_rows
 
@@ -277,7 +278,7 @@ def fit_correction(
     return result
 
 
-def compare(contract: Path, root: Path, *, reference_root=None):
+def compare(contract: Path, root: Path, *, reference_root: Path | None = None) -> dict[str, Any]:
     from quanthus.r9_stratified import r0_support
     from quanthus.stage_learning.order_rule_screen import load_rule
 
@@ -328,7 +329,7 @@ def compare(contract: Path, root: Path, *, reference_root=None):
         key = row["identity"]["sample_id"]
         label = labels[key]
         scores = predictions[key]
-        states = {"r0": r0_support(row["primary_facts"], rule)}
+        states: dict[str, bool | None] = {"r0": r0_support(row["primary_facts"], rule)}
         states.update({k: None if scores[k] is None else scores[k] >= 0.5 for k in ("v0", "v1")})
         for version, state in states.items():
             outcome = (
@@ -366,7 +367,7 @@ def compare(contract: Path, root: Path, *, reference_root=None):
     return result
 
 
-def reference_payload(request: Path):
+def reference_payload(request: Path) -> dict[str, Any]:
     from quanthus.r9_calibration import RUBRIC
 
     c = read(request)
@@ -396,7 +397,7 @@ def reference_payload(request: Path):
     }
 
 
-def prepare_references(contract: Path, root: Path):
+def prepare_references(contract: Path, root: Path) -> dict[str, Any]:
     c, admission = admitted(contract, root)
     output = root.parent / "reference"
     output.mkdir()
@@ -426,7 +427,7 @@ def prepare_references(contract: Path, root: Path):
     return {"requests": 2, "maximum_new_reference_starts": 64, "output": str(output)}
 
 
-def parent(c):
+def parent(c: dict[str, Any]) -> lh.HeadCheckpoint:
     path = Path(c["old_assets"]["parent"])
     raw = path.read_bytes()
     expected = c["old_assets"]["parent_sha256"]
@@ -444,10 +445,10 @@ def screen(
     contract: Path,
     root: Path,
     *,
-    native=None,
-    parent_checkpoint=None,
+    native: NativeInputs | None = None,
+    parent_checkpoint: lh.HeadCheckpoint | None = None,
     deadline: str | None = None,
-):
+) -> dict[str, Any]:
     c = read(contract)
     check_contract(c)
     if datetime.now(timezone.utc) >= datetime.fromisoformat(deadline or c["runtime"]["A_deadline"]):
@@ -488,11 +489,13 @@ def screen(
                 confirmation = run._entry_candidates(frame, runner, "r10-v0")
                 for b, b0 in zip(original, confirmation, strict=True):
                     event = b.item.record.event_id
-                    score = run.predictions[event]["v0"]
+                    score = cast(ControlledReplay, run).predictions[event]["v0"]
                     details.append(
                         {
                             "event_id": event,
-                            "company_id": run.event_rows[event]["company_id"],
+                            "company_id": cast(ControlledReplay, run).event_rows[event][
+                                "company_id"
+                            ],
                             "signal_date": str(frame.snapshot.market_date),
                             "B": b.decision.action.final_action.value,
                             "B_v0": b0.decision.action.final_action.value,
@@ -543,7 +546,7 @@ def screen(
             native.close()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command", choices=["screen", "prepare-references", "review-reference", "fit", "compare"]

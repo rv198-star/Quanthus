@@ -29,11 +29,11 @@ def source_select(
 ) -> list[dict[str, Any]]:
     selected = []
 
-    def number(r, key):
+    def number(r: dict[str, Any], key: str) -> Decimal:
         return Decimal(r["primary_facts"][key]["value"])
 
-    def companies_once(ordered):
-        representatives = {}
+    def companies_once(ordered: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        representatives: dict[str, dict[str, Any]] = {}
         for row in ordered:
             representatives.setdefault(row["identity"]["company_id"], row)
         return list(representatives.values())
@@ -211,7 +211,7 @@ def prepare(
                 case["event_id"] = event["event"]["event_id"]
             write(root / "E-cases.private.json", {"rows": event_cases})
         # One fixed representative event per company is selected before source strata.
-        representatives = {}
+        representatives: dict[str, dict[str, Any]] = {}
         for r in sorted(event_cases, key=case_order):
             representatives.setdefault(r["identity"]["company_id"], r)
         evaluation = []
@@ -226,7 +226,7 @@ def prepare(
         for entry in evaluation:
             entry["source_row"]["identity"]["role"] = "evaluation"
         # Current role identities are committed together, before scoring or new reference.
-        selected = {
+        selected: dict[str, Any] = {
             "rows": guard + evaluation,
             "contract_sha256": sha(contract),
             "legacy_exposure": "UNKNOWN_DIAGNOSTIC_ONLY",
@@ -293,7 +293,7 @@ def main() -> None:
     os.sched_setaffinity(0, sorted(os.sched_getaffinity(0))[: runtime["cpu_cores"]])
     stopped = threading.Event()
 
-    def monitor():
+    def monitor() -> None:
         from quanthus.r9_calibration import directory_bytes, process_tree_rss
 
         while not stopped.wait(0.5):

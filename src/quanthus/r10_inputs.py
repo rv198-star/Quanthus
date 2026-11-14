@@ -5,10 +5,11 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import defaultdict
+from collections.abc import Iterator
 from datetime import date, datetime
 from itertools import groupby
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quanthus.backtest.capital_clock import CapitalReplayClock
 from quanthus.backtest.native_capital_adapter import NativeAdapterError, qualify_action
@@ -18,7 +19,8 @@ from quanthus.event_library.rule_card import load_candidate_rule_card
 from quanthus.event_library.scan import CandidateDailyInput, scan_forward_candidate_series
 from quanthus.industry_mapping import IndustryMappingSource, StaticIndustryMapping
 from quanthus.r9_qualification import case_facts, quality_blocks
-from quanthus.structure_v2_inputs import canonical, digest
+from quanthus.structure_v2_inputs import canonical
+from quanthus.structure_v2_inputs import digest as digest
 
 MANIFEST_SHA = "8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef"
 REVISION = "1923c874b43d47e69190a6dc9546e6fd8f3d1ca3"
@@ -69,7 +71,7 @@ class ScopedPolicy:
     policy_version = "1.0.0"
     prospective_clock_json = None
 
-    def __init__(self, native: NativeInputs):
+    def __init__(self, native: NativeInputs) -> None:
         self.native = native
         self.semantic_digest = digest({"purpose": native.c["purpose"], "version": "1.0.0"})
         self.snapshot_replay_cutoff = native.cutoff
@@ -101,7 +103,7 @@ class NativeInputs:
         *,
         build: bool = False,
         physical_dwd_root: Path | None = None,
-    ):
+    ) -> None:
         import duckdb
 
         self.project, self.contract, self.root = project, contract, root
@@ -224,9 +226,13 @@ class NativeInputs:
             AND (l.effective_to IS NULL OR CAST(l.effective_to AS DATE)>DATE '2020-01-02')
             AND CAST(s.effective_from AS DATE)<=DATE '2021-12-31'
             AND (s.effective_to IS NULL OR CAST(s.effective_to AS DATE)>DATE '2020-01-02');""")
-        if db.execute(
-            "SELECT count(*) FROM (SELECT listing_id FROM identities GROUP BY 1 HAVING count(*)<>1)"
-        ).fetchone()[0]:
+        if cast(
+            tuple[Any, ...],
+            db.execute(
+                "SELECT count(*) FROM (SELECT listing_id FROM identities "
+                "GROUP BY 1 HAVING count(*)<>1)"
+            ).fetchone(),
+        )[0]:
             raise ValueError("R10_LISTING_AMBIGUITY")
         for mic in ["XSHG", "XSHE"]:
             days = db.execute(
@@ -267,10 +273,13 @@ class NativeInputs:
           CREATE VIEW capital_quality AS SELECT * FROM dwd_quality_exception
             WHERE CAST(affected_effective_at AS DATE)
               BETWEEN DATE '2020-01-02' AND DATE '2021-12-31';""")
-        if db.execute(
-            "SELECT count(*) FROM (SELECT listing_id,trade_date FROM daily "
-            "GROUP BY 1,2 HAVING count(*)<>1)"
-        ).fetchone()[0]:
+        if cast(
+            tuple[Any, ...],
+            db.execute(
+                "SELECT count(*) FROM (SELECT listing_id,trade_date FROM daily "
+                "GROUP BY 1,2 HAVING count(*)<>1)"
+            ).fetchone(),
+        )[0]:
             raise ValueError("R10_NATIVE_ROW_DUPLICATION")
         self._build_industry()
         self._build_actions()
@@ -328,7 +337,7 @@ class NativeInputs:
             "ORDER BY security_id",
         )
         # A native security must have a single static concentration membership.
-        unique = {}
+        unique: dict[str, dict[str, Any]] = {}
         for r in records:
             if (
                 r["security_id"] in unique
@@ -416,7 +425,7 @@ class NativeInputs:
         cursor = self.db.execute(query)
         columns = [r[0] for r in cursor.description]
 
-        def all_rows():
+        def all_rows() -> Iterator[dict[str, Any]]:
             while batch := cursor.fetchmany(2048):
                 for values in batch:
                     yield dict(zip(columns, values, strict=True))
@@ -436,7 +445,7 @@ class NativeInputs:
                 action_dates[security].add(day)
         other.close()
 
-        def series():
+        def series() -> Iterator[tuple[CandidateDailyInput, ...]]:
             for security, group in groupby(all_rows(), key=lambda r: r["security_id"]):
                 yield tuple(
                     CandidateDailyInput(
@@ -482,8 +491,8 @@ class NativeInputs:
             card=load_candidate_rule_card(
                 self.project / "config/p4-candidate-price-volume-transition.research.v1.json"
             ),
-            split_policy=policy,
-            source_policy=policy,
+            split_policy=cast(Any, policy),
+            source_policy=cast(Any, policy),
         )
 
     def identity(

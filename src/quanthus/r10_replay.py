@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 from quanthus.aggregator import GovernedAction
 from quanthus.backtest.baseline_research import (
@@ -14,7 +15,8 @@ from quanthus.backtest.baseline_research import (
     BaselineFeatureRow,
     _feature_panel_query,
 )
-from quanthus.backtest.contracts import EventType
+from quanthus.backtest.capital_clock import CapitalReplayClock
+from quanthus.backtest.contracts import CorporateActionStep, EventType
 from quanthus.backtest.inputs import CoverageStatus
 from quanthus.backtest.native_capital_adapter import qualify_action
 from quanthus.backtest.native_capital_replay import (
@@ -22,7 +24,7 @@ from quanthus.backtest.native_capital_replay import (
     NativeCapitalStore,
     NativeFrameSource,
 )
-from quanthus.backtest.strategy_replay import CorporateActionStep, PITDailyBar, StrategyReplayFrame
+from quanthus.backtest.strategy_replay import PITDailyBar, StrategyReplayFrame
 from quanthus.contracts import SnapshotRef
 from quanthus.event_library.contracts import (
     EventIdentity,
@@ -34,11 +36,12 @@ from quanthus.expert_evaluation.experts.trend_stability import evaluate_trend_st
 from quanthus.expert_evaluation.production import _EventInput
 from quanthus.expert_strategy.formal_p2_replay import FormalP2ReplayRuntime
 from quanthus.feature_registry import load_feature_registry
+from quanthus.industry_mapping import StaticIndustryMapping
 from quanthus.r10_inputs import MANIFEST_SHA, NativeInputs, digest, read, rows
 
 
 class NativeStore(NativeCapitalStore):
-    def __init__(self, native: NativeInputs):
+    def __init__(self, native: NativeInputs) -> None:
         self.native_inputs = native
         super().__init__(
             native.db,
@@ -54,10 +57,10 @@ class NativeStore(NativeCapitalStore):
             },
         )
 
-    def clock(self, day: date):
+    def clock(self, day: date) -> CapitalReplayClock:
         return self.native_inputs.clock(day)
 
-    def action_steps(self, listing: str, day: date):
+    def action_steps(self, listing: str, day: date) -> tuple[CorporateActionStep, ...]:
         self.action_hold(listing, day)
         identity = self.identities[listing]
         events = self.actions.get((identity["security_id"], day), [])
@@ -83,7 +86,7 @@ class NativeStore(NativeCapitalStore):
             listing,
             day,
             "native_observed_action_mark_only",
-            observed_open=str(row["open"]),
+            observed_open=str(cast(dict[str, Any], row)["open"]),
             execution_state=session.open_execution_state.value,
             execution_open=None if session.open_price is None else str(session.open_price),
         )
@@ -91,14 +94,16 @@ class NativeStore(NativeCapitalStore):
             CorporateActionStep(
                 native_action,
                 calendar["open_at"],
-                row["open"],
+                cast(dict[str, Any], row)["open"],
                 session.snapshot_id,
                 self.clock(day).to_json(),
             ),
         )
 
 
-def observed_action_mark(row, calendar, cutoff) -> bool:
+def observed_action_mark(
+    row: dict[str, Any] | None, calendar: dict[str, Any], cutoff: datetime
+) -> bool:
     if row is None or row["currency"] != "CNY" or row["price_basis"] != "UNADJUSTED":
         return False
     prices = [row[k] for k in ("open", "high", "low", "close")]
@@ -126,7 +131,7 @@ def observed_action_mark(row, calendar, cutoff) -> bool:
 
 
 class MarketView:
-    def __init__(self, store: NativeStore, snapshot: SnapshotRef):
+    def __init__(self, store: NativeStore, snapshot: SnapshotRef) -> None:
         self.store, self.snapshot = store, snapshot
 
     def bar(self, code: str) -> PITDailyBar:
@@ -186,7 +191,7 @@ class MarketView:
 
 
 class NativeReader:
-    def __init__(self, native: NativeInputs):
+    def __init__(self, native: NativeInputs) -> None:
         self.native, self.store = native, NativeStore(native)
         self.data_content_digest = native.content_digest
         self.data_manifest_sha256 = "sha256:" + MANIFEST_SHA
@@ -226,13 +231,13 @@ class NativeReader:
 
 
 class NativeSession:
-    def __init__(self, native: NativeInputs):
+    def __init__(self, native: NativeInputs) -> None:
         self.reader = NativeReader(native)
 
-    def __enter__(self):
+    def __enter__(self) -> Any:
         return self
 
-    def __exit__(self, *_args):
+    def __exit__(self, *_args: Any) -> None:
         return None
 
 
@@ -268,18 +273,21 @@ def controlled_feature_query(native: NativeInputs) -> str:
 
 
 class NativePanel:
-    def __init__(self, native: NativeInputs):
+    def __init__(self, native: NativeInputs) -> None:
         self.native = native
-        self.cache = {}
+        self.cache: dict[tuple[date, str], BaselineFeatureRow | None] = {}
         registry = load_feature_registry(
             native.project / "config/p3-baseline-features.research.v1.json"
         )
-        n, ready, entry, exceptions, unexplained, excluded = native.db.execute("""SELECT count(*),
+        n, ready, entry, exceptions, unexplained, excluded = cast(
+            tuple[Any, ...],
+            native.db.execute("""SELECT count(*),
             count(*) FILTER(WHERE feature_ready),count(*) FILTER(WHERE entry_eligible),
             count(*) FILTER(WHERE exception_active),
             count(*) FILTER(WHERE unexplained_price_transition),
             count(DISTINCT security_id) FILTER(WHERE scope_continuity_excluded)
-            FROM r10_features""").fetchone()
+            FROM r10_features""").fetchone(),
+        )
         self.report = BaselineFeaturePanelReport(
             "r10-native-controlled-v1",
             registry.registry_version,
@@ -311,15 +319,15 @@ class NativePanel:
             self.cache[key] = BaselineFeatureRow.from_mapping(found[0]) if valid else None
         return self.cache[key]
 
-    def __enter__(self):
+    def __enter__(self) -> Any:
         return self
 
-    def __exit__(self, *_args):
+    def __exit__(self, *_args: Any) -> None:
         return None
 
 
-def event_predictions(payload):
-    result = {}
+def event_predictions(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
     for row in payload["rows"]:
         key = row.get("event_id")
         if key is None:
@@ -336,7 +344,7 @@ def event_predictions(payload):
 class ControlledReplay(FormalP2ReplayRuntime):
     def __init__(
         self, project: Path, native: NativeInputs, events: Path, predictions: Path | None = None
-    ):
+    ) -> None:
         self.native = native
         self.frozen_events = read(events)
         self.predictions = {} if predictions is None else event_predictions(read(predictions))
@@ -349,17 +357,19 @@ class ControlledReplay(FormalP2ReplayRuntime):
             parent_event_run_digest=None,
         )
 
-    def _load_event_population(self, event_root):
+    def _load_event_population(
+        self, event_root: Path
+    ) -> tuple[tuple[_EventInput, ...], StaticIndustryMapping]:
         del event_root
         return tuple(
             _EventInput(event_record_from_dict(r["event"]), r["industry_id"], r["listing_id"])
             for r in self.frozen_events["rows"]
         ), self.native.industry
 
-    def _open_data_session(self):
+    def _open_data_session(self) -> NativeSession:
         return NativeSession(self.native)
 
-    def _evaluate_trend_observation(self, event, feature):
+    def _evaluate_trend_observation(self, event: EventRecord, feature: Any) -> Any:
         # The original event retains its simulated T-close. The observation is
         # produced now from a fixed native snapshot, so its anchor is source time.
         # This adapter is only an in-memory observation subject, never an EventRecord.
@@ -370,42 +380,44 @@ class ControlledReplay(FormalP2ReplayRuntime):
             signal_close=event.knowledge_cutoff,
         )
         return evaluate_trend_stability(
-            event=subject,
+            event=cast(EventRecord, subject),
             feature=feature,
             config=self.trend_config,
             spec=self.trend_spec,
         )
 
-    def _build_feature_panel(self, selected, panel_path):
+    def _build_feature_panel(self, selected: tuple[str, ...], panel_path: Path) -> NativePanel:
         del selected, panel_path
         return NativePanel(self.native)
 
-    def _run_id(self, intervention_id):
+    def _run_id(self, intervention_id: str | None) -> str:
         return "RESEARCH-R10-001-T1-A1-" + self._variant_id(intervention_id)
 
-    def _validate_intervention_id(self, intervention_id):
+    def _validate_intervention_id(self, intervention_id: str | None) -> None:
         if intervention_id not in (None, "r10-v0", "r10-v1"):
             raise ValueError("R10_VARIANT")
 
     @staticmethod
-    def _variant_id(intervention_id):
+    def _variant_id(intervention_id: str | None) -> str:
         return {None: "C0", "r10-v0": "C1", "r10-v1": "C2"}[intervention_id]
 
-    def _baseline_variant_directory(self):
+    def _baseline_variant_directory(self) -> str:
         return "C0"
 
-    def _held_intervention_id(self, intervention_id):
+    def _held_intervention_id(self, intervention_id: str | None) -> None:
         return None
 
-    def _code_version(self):
+    def _code_version(self) -> str:
         return "r10-native-controlled-replay-1.2.0"
 
-    def _validate_carried_sell_actions(self, actions):
+    def _validate_carried_sell_actions(self, actions: Any) -> None:
         # P2 itself checks exact integer holdings and preserves the pending-sell
         # proportion. Its fractional-share rejection remains the final authority.
         del actions
 
-    def _apply_sell_schedule(self, frame, runtime, transitions, schedule, events):
+    def _apply_sell_schedule(
+        self, frame: StrategyReplayFrame, runtime: Any, transitions: Any, schedule: Any, events: Any
+    ) -> None:
         # Corporate-action accounting is already committed in the P2 schedule.
         # Give the lifecycle the post-action ledger as the order-only baseline;
         # do not post the dividend or shares a second time.
@@ -434,7 +446,7 @@ class ControlledReplay(FormalP2ReplayRuntime):
                 )
         return super()._apply_sell_schedule(frame, runtime, transitions, schedule, events)
 
-    def _parameter_payload(self, intervention_id):
+    def _parameter_payload(self, intervention_id: str | None) -> dict[str, Any]:
         return {
             "strategy": self.registry.card.semantic_digest,
             "intervention": intervention_id,
@@ -445,7 +457,7 @@ class ControlledReplay(FormalP2ReplayRuntime):
             "carried_action_policy": "p2-native-integer-pending-sell-v1",
         }
 
-    def _manifest_metadata(self, intervention_id):
+    def _manifest_metadata(self, intervention_id: str | None) -> dict[str, Any]:
         return self._parameter_payload(intervention_id) | {
             "legacy_exposure": "UNKNOWN_DIAGNOSTIC_ONLY",
             "consumer_admission": "NOT_GRANTED",
@@ -454,8 +466,15 @@ class ControlledReplay(FormalP2ReplayRuntime):
         }
 
     def _evaluate_entry_decision(
-        self, runner, *, event_id, context, trend_state, entry_evidence_ready, intervention_id
-    ):
+        self,
+        runner: Any,
+        *,
+        event_id: str,
+        context: Any,
+        trend_state: str | None,
+        entry_evidence_ready: bool,
+        intervention_id: str | None,
+    ) -> Any:
         original = super()._evaluate_entry_decision(
             runner,
             event_id=event_id,
@@ -501,7 +520,8 @@ class ControlledReplay(FormalP2ReplayRuntime):
             target_maximum_position=original.target_maximum_position if passes else None,
         )
 
-    def _held_event(self, source, frame):
+    # Native context is instance-bound; the base calls this hook through self.
+    def _held_event(self, source: EventRecord, frame: StrategyReplayFrame) -> EventRecord:  # type: ignore[override]
         return EventRecord(
             EventIdentity(
                 source.identity.security_id,

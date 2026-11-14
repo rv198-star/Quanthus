@@ -107,7 +107,8 @@ def load_trend_stability_config(path: Path) -> TrendStabilityConfig:
         or config.expert_id != "expert.trend-stability"
         or config.expert_version != "1.0.0"
         or config.lifecycle != "active"
-        or config.stable_rule != "total_return_index >= sma20 > sma60 and momentum20 > 0"
+        or config.stable_rule
+        != "total_return_index >= sma20 > sma60 and momentum20 > 0"
         or config.fragile_rule != "total_return_index < sma60 and sma20 <= sma60"
         or config.fallback_state != "neutral"
         or config.missing_reason != "missing_required_t_close_trend_feature"
@@ -129,20 +130,14 @@ def classify_trend_stability(
     original opportunity-level assessment identity applies unchanged.
     """
 
-    required_values = (
-        None
-        if feature is None
-        else (
-            feature.total_return_index,
-            feature.sma20,
-            feature.sma60,
-            feature.momentum20,
-        )
+    required_values = None if feature is None else (
+        feature.total_return_index,
+        feature.sma20,
+        feature.sma60,
+        feature.momentum20,
     )
-    missing = (
-        feature is None
-        or not feature.feature_ready
-        or any(value is None for value in required_values or ())
+    missing = feature is None or not feature.feature_ready or any(
+        value is None for value in required_values or ()
     )
     if missing:
         return None, config.missing_reason
@@ -151,7 +146,10 @@ def classify_trend_stability(
     assert feature.sma20 is not None
     assert feature.sma60 is not None
     assert feature.momentum20 is not None
-    if feature.total_return_index >= feature.sma20 > feature.sma60 and feature.momentum20 > 0:
+    if (
+        feature.total_return_index >= feature.sma20 > feature.sma60
+        and feature.momentum20 > 0
+    ):
         return "stable", "eligible"
     if feature.total_return_index < feature.sma60 and feature.sma20 <= feature.sma60:
         return "fragile", "eligible"
@@ -194,13 +192,6 @@ def evaluate_trend_stability(
         )
     knowledge_cutoff = event.knowledge_cutoff.astimezone(timezone.utc)
     observation_anchor = event.signal_close.astimezone(timezone.utc)
-    if event.snapshot_replay_clock_json is not None:
-        import json
-
-        if json.loads(event.snapshot_replay_clock_json)["schema_version"] == (
-            "quanthus.r10-controlled-clock.v1"
-        ):
-            observation_anchor = knowledge_cutoff
     evidence_payload = (
         {
             "event_id": event.event_id,

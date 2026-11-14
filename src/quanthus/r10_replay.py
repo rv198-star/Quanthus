@@ -24,6 +24,7 @@ from quanthus.event_library.contracts import (
     SplitAssignment,
     event_record_from_dict,
 )
+from quanthus.expert_evaluation.experts.trend_stability import evaluate_trend_stability
 from quanthus.expert_evaluation.production import _EventInput
 from quanthus.expert_strategy.formal_p2_replay import FormalP2ReplayRuntime
 from quanthus.feature_registry import load_feature_registry
@@ -175,12 +176,22 @@ def build_feature_panel(native: NativeInputs) -> None:
          AND open BETWEEN lower_price AND upper_price) IS TRUE is_executable,
         NULL::DOUBLE upper_limit_pct,NULL::DOUBLE lower_limit_pct,
         upper_price upper_limit_price,lower_price lower_limit_price FROM daily;""")
-    query = _feature_panel_query(
-        date(2021, 6, 2), date(2021, 12, 31), native_source_cutoff=native.cutoff
-    )
+    query = controlled_feature_query(native)
     db.execute("CREATE TABLE r10_features AS " + query)
     db.execute("CREATE INDEX feature_key ON r10_features(security_id,market_date)")
     db.execute("CHECKPOINT")
+
+
+def controlled_feature_query(native: NativeInputs) -> str:
+    # The original R7 module is byte-bound by its sealed request. Extend its
+    # generated SQL at this explicit controlled boundary without changing it.
+    query = _feature_panel_query(date(2021, 6, 2), date(2021, 12, 31))
+    clause = "CAST(actions.known_at AS DATE) < CAST(actions.effective_date AS DATE)"
+    if query.count(clause) != 1 or native.cutoff.tzinfo is None:
+        raise ValueError("R10_NATIVE_FEATURE_QUERY_BINDING")
+    return query.replace(
+        clause, "actions.known_at <= TIMESTAMPTZ '" + native.cutoff.isoformat() + "'"
+    )
 
 
 class NativePanel:
@@ -261,6 +272,23 @@ class ControlledReplay(FormalP2ReplayRuntime):
 
     def _open_data_session(self):
         return NativeSession(self.native)
+
+    def _evaluate_trend_observation(self, event, feature):
+        # The original event retains its simulated T-close. The observation is
+        # produced now from a fixed native snapshot, so its anchor is source time.
+        # This adapter is only an in-memory observation subject, never an EventRecord.
+        subject = SimpleNamespace(
+            identity=event.identity,
+            event_id=event.event_id,
+            knowledge_cutoff=event.knowledge_cutoff,
+            signal_close=event.knowledge_cutoff,
+        )
+        return evaluate_trend_stability(
+            event=subject,
+            feature=feature,
+            config=self.trend_config,
+            spec=self.trend_spec,
+        )
 
     def _build_feature_panel(self, selected, panel_path):
         del selected, panel_path

@@ -634,12 +634,7 @@ class FormalP2ReplayRuntime:
                 if feature is None
                 else replace(feature, security_id=item.record.identity.security_id)
             )
-            observation = evaluate_trend_stability(
-                event=item.record,
-                feature=formal_feature,
-                config=self.trend_config,
-                spec=self.trend_spec,
-            )
+            observation = self._evaluate_trend_observation(item.record, formal_feature)
             context = build_formal_expert_context(
                 event=item.record,
                 feature=formal_feature,
@@ -665,6 +660,14 @@ class FormalP2ReplayRuntime:
                 )
             )
         return tuple(output)
+
+    def _evaluate_trend_observation(self, event: EventRecord, feature: Any) -> Any:
+        return evaluate_trend_stability(
+            event=event,
+            feature=feature,
+            config=self.trend_config,
+            spec=self.trend_spec,
+        )
 
     def _evaluate_entry_decision(
         self,

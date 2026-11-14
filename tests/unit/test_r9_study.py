@@ -341,3 +341,104 @@ def test_learning_worker_timeout_is_receipted_without_second_attempt(study_reque
     assert receipt["timed_out"] and receipt["exit_code"] == -9 and len(killed) == 1
     with pytest.raises(FileExistsError):
         study.run_limited(study_request, "fit")
+
+
+def asset_request(original, monkeypatch):
+    from quanthus.r9_assets import ASSET_SCHEMA, LAYOUT
+
+    references(original, monkeypatch)
+    old_root = study.root_for(original)
+    original_rows = study.selected_rows(original)
+    training = [
+        {**r, "identity": {**r["identity"], "role": "train"}}
+        for r in original_rows
+        if r["identity"]["role"] == "evaluation"
+    ]
+    raw = pool_rows()
+    future = []
+    groups = (
+        ("guard", "2021-05-31"),
+        ("update", "2021-06-30"),
+        ("evaluation", "2021-11-30"),
+        ("evaluation", "2021-12-31"),
+    )
+    for index, (role, anchor) in enumerate(groups):
+        end = date.fromisoformat(anchor)
+        for row in raw[index * 256 : (index + 1) * 256]:
+            identity = {**row["identity"], "role": role, "anchor": anchor}
+            for key in ("company_id", "security_id", "listing_id", "sample_id", "episode_id"):
+                identity[key] = "future-" + identity[key]
+            identity["sessions"] = [
+                {
+                    "date": (end - timedelta(days=39 - j)).isoformat(),
+                    "session_id": identity["sample_id"] + str(j),
+                }
+                for j in range(40)
+            ]
+            future.append(
+                {
+                    **row,
+                    "identity": identity,
+                    "packet": {**row["packet"], "case_id": identity["sample_id"]},
+                }
+            )
+    path = original.parent / "assets.json"
+    c = study.read(original)
+    pool = original.parent / "asset-pool.json"
+    cal.write(pool, {"rows": training + future})
+    root = original.parent / "asset-study"
+    root.mkdir()
+    c.update(schema_version=ASSET_SCHEMA, maximum_calls=80, output_root=str(root))
+    c["selection"]["layout"] = LAYOUT
+    c["source"]["pool_path"], c["source"]["pool_sha256"] = str(pool), cal.sha(pool)
+    c["source"]["exclusions"] = [
+        {
+            "path": str(old_root / "selected.private.json"),
+            "sha256": cal.sha(old_root / "selected.private.json"),
+        }
+    ]
+    origin_paths = {
+        "role_request": old_root / "request-evaluation.json",
+        "selection": old_root / "selection-evaluation/selected.private.json",
+        "references": old_root / "reference-evaluation/references.sealed.json",
+        "qa": old_root / "semantic-qa-evaluation.json",
+        "resolved": old_root / "qa-evaluation/resolved.private.json",
+    }
+    c["imported_reference"] = {
+        "files": {key: {"path": str(p), "sha256": cal.sha(p)} for key, p in origin_paths.items()}
+    }
+    cal.write(path, c)
+    study.prepare(path)
+    return path
+
+
+def test_asset_import_preserves_old_votes_labels_features_and_exposure(study_request, monkeypatch):
+    from quanthus.r9_assets import import_train
+
+    path = asset_request(study_request, monkeypatch)
+    c = study.contract(path)
+    origin = c["imported_reference"]["files"]
+    old_raw = Path(origin["references"]["path"]).read_bytes()
+    imported = import_train(path)
+    assert imported["subjects"] == 24 and imported["support_pass"]
+    assert imported["new_reference_calls"] == 0 and imported["imported_reference"]
+    assert imported["references_sha256"] == origin["references"]["sha256"]
+    assert Path(origin["references"]["path"]).read_bytes() == old_raw
+    assert (
+        study.resolved_role(path, "train")
+        == study.read(Path(origin["resolved"]["path"]))["resolved"]
+    )
+    with pytest.raises(FileExistsError):
+        import_train(path)
+
+
+def test_asset_import_refuses_mutated_origin_before_creating_labels(study_request, monkeypatch):
+    from quanthus.r9_assets import import_train
+
+    path = asset_request(study_request, monkeypatch)
+    c = study.contract(path)
+    old = Path(c["imported_reference"]["files"]["qa"]["path"])
+    old.write_text(old.read_text() + " ")
+    with pytest.raises(ValueError, match="FILE_BINDING"):
+        import_train(path)
+    assert not (study.root_for(path) / "qa-train").exists()

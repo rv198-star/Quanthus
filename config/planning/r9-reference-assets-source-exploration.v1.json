@@ -1,0 +1,121 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "R9-REFERENCE-ASSETS-SOURCE-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "local-learning-r9-qualified-assets",
+  "work_item": "P5-RESEARCH-R9-QUALIFY-001",
+  "modules": [
+    "REFERENCE",
+    "STATES",
+    "TRAIN",
+    "UPDATE",
+    "EXPERT",
+    "S02",
+    "TRACE"
+  ],
+  "question": "Can fixedqualifiedreference24 be reused as exposedtrain with one existing-source2021qualifiedcandidateframe?",
+  "consumer": "#543/#544 research S02 version selection and readable changed-case report",
+  "scope": "source-only: fixed24imported +1024newcandidate2021windows; metadata-firstmanifest thennativequalification; no new reference calls, fit orupdate",
+  "deliverable": "Exact1048 identity/native source proof andpoolSHA, imported24feature equality, finalstudy tofreeze aftersourcequalification",
+  "decision_if_pass": "freeze finalsourcehash/new40company study andindependentprereview before newreferences",
+  "decision_if_fail": "preserve exactsource gap, no new paidreferencecalls",
+  "acceptance": [
+    "exactsource/identity SHA and2021fixed40windows; allnew candidates exclude140oldcompanies",
+    "original24 features/packets exact, exposure androle mapping explicit",
+    "zero referencecalls/fit/update"
+  ],
+  "stop_conditions": [
+    "600s nativeworker; job64MiBoutput/2GiBRSS/2CPU/1GiBtmp; total2026-11-14T02:18:00Z",
+    "any source/capacity/codebinding gap stops; no sourceacquisition/repair/protected2022+"
+  ],
+  "memory_sha256": "dcd2b133453ef2aab9d813ff16588c5999918b2aeb0d2dcdd56546a40096a8c1",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "relation": "different_scope",
+      "rationale": "保留两接入NO_GO；消费者限定识别版本评审与S02研究报告sidecar，不重开原动作映射。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "relation": "different_scope",
+      "rationale": "保留原用途、失败、曝光和成本；本阶段仅固定面板参考校准，无fit/经济/交易。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
+      "relation": "different_scope",
+      "rationale": "原A4保持不重投/不重标；本次从其未选择公司取独立校准面板，检验参考可操作性，符合原恢复条件。",
+      "scope_difference": "原结果不变；一次12例固定校准面板，四条件结构化判定；后继学习另冻合同且先过新guard。"
+    },
+    {
+      "conclusion_id": "CON-R9-CALIBRATION-QUALIFIED-20261114",
+      "relation": "respect",
+      "rationale": "Realcalibration independentlyqualified2TRUE10FALSE andsealedprotocol; this successor preserves anchors andindependently qualifies newcompanies underoriginalgates."
+    }
+  ],
+  "cumulative_cost_review": "218CLI beforethisstage; old112studySTOP andunused16notrolledover; source0calls; possiblelater80new underseparatefrozenstudy=>max298; olddeadlines preserved. Stage00:48..02:18 includesprep/review/delivery.",
+  "runtime_authority_boundary": "Owner completiondirective E7e901ce0; primaryagent explicit bounded successor allocation following STOP E1781e829, existingqualifiedsource2020-2021only; notextensionof oldtrial",
+  "budget": {
+    "wall_seconds": 5400,
+    "max_new_bytes": 67108864,
+    "network_requests": 0,
+    "accounting_owner": "RESEARCH-R9-CALIBRATION-001;priorcostsretained"
+  }
+}

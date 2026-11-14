@@ -67,12 +67,17 @@ def digest(value: Any) -> str:
 
 def contract(request: Path) -> dict[str, Any]:
     c = read(request)
+    from quanthus.r9_assets import ASSET_SCHEMA
+    from quanthus.r9_assets import LAYOUT as ASSET_LAYOUT
+
+    assets = c["schema_version"] == ASSET_SCHEMA
+    expected_layout = ASSET_LAYOUT if assets else LAYOUT
     expected_policy = json.loads(json.dumps({**asdict(hr.revision_policy()), "raw_threshold": 0.5}))
     if (
-        c["schema_version"] != SCHEMA
-        or c["maximum_calls"] != 128
+        c["schema_version"] not in (SCHEMA, ASSET_SCHEMA)
+        or c["maximum_calls"] != (80 if assets else 128)
         or c["learning"] != expected_policy
-        or c["selection"]["layout"] != [list(row) for row in LAYOUT]
+        or c["selection"]["layout"] != [list(row) for row in expected_layout]
     ):
         raise ValueError("R9_STUDY_FROZEN_CONTRACT")
     for name, expected in c["implementation_bindings"].items():
@@ -85,9 +90,17 @@ def root_for(request: Path) -> Path:
     return Path(contract(request)["output_root"])
 
 
-def select_rows(pool: list[dict[str, Any]], excluded: set[str]) -> tuple[list[Any], list[Any]]:
+def select_rows(
+    pool: list[dict[str, Any]], excluded: set[str], *, assets: bool = False
+) -> tuple[list[Any], list[Any]]:
     """Freeze all identities by unlabeled proxies; never repair a shortage."""
-    if len(pool) != 1536 or len({r["identity"]["company_id"] for r in pool}) != 1536:
+    from quanthus.r9_assets import LAYOUT as ASSET_LAYOUT
+
+    expected_count = 1048 if assets else 1536
+    if (
+        len(pool) != expected_count
+        or len({r["identity"]["company_id"] for r in pool}) != expected_count
+    ):
         raise ValueError("R9_STUDY_POOL_DENOMINATOR")
     selected: list[Any] = []
     capacity = []
@@ -99,13 +112,16 @@ def select_rows(pool: list[dict[str, Any]], excluded: set[str]) -> tuple[list[An
             raise ValueError("R9_STUDY_NONFINITE_PROXY")
         return result
 
-    for role, anchor, proxy, count in LAYOUT:
+    for role, anchor, proxy, count in ASSET_LAYOUT if assets else LAYOUT:
         eligible = [
             r
             for r in pool
             if r["available"]
             and r["identity"]["anchor"] == anchor
-            and r["identity"]["company_id"] not in used
+            and (
+                r["identity"]["company_id"] not in used
+                or (assets and proxy == "import" and r["identity"]["role"] == "train")
+            )
         ]
         if proxy in ("narrow", "boundary"):
             eligible = sorted(
@@ -122,7 +138,7 @@ def select_rows(pool: list[dict[str, Any]], excluded: set[str]) -> tuple[list[An
                 [r for r in eligible if number(r, "width_change") > 0],
                 key=lambda r: (-number(r, "width_change"), r["identity"]["sample_id"]),
             )
-        else:
+        elif proxy != "import":
             eligible = sorted(eligible, key=lambda r: order(r["identity"]))
         capacity.append(
             {
@@ -151,10 +167,23 @@ def select_rows(pool: list[dict[str, Any]], excluded: set[str]) -> tuple[list[An
 
 
 def prepare(request: Path) -> dict[str, Any]:
+    from quanthus.r9_assets import ASSET_SCHEMA
+
     c = contract(request)
     check_deadline(c)
     root = Path(c["output_root"])
-    if root.exists():
+    assets = c["schema_version"] == ASSET_SCHEMA
+    if root.exists() and (
+        not assets
+        or any(
+            (root / name).exists()
+            for name in (
+                "selected.private.json",
+                "selection.safe.json",
+                "role-identities.private.json",
+            )
+        )
+    ):
         raise ValueError("R9_STUDY_FRESH_OUTPUT")
     source = c["source"]
     pool = bound(Path(source["pool_path"]), source["pool_sha256"])["rows"]
@@ -166,8 +195,8 @@ def prepare(request: Path) -> dict[str, Any]:
     anchors = bound(Path(c["calibration"]["summary_path"]), c["calibration"]["summary_sha256"])
     if anchors["panel_qualified"] is not True:
         raise ValueError("R9_STUDY_CALIBRATION_GATE")
-    rows, capacity = select_rows(pool, excluded)
-    root.mkdir(parents=True)
+    rows, capacity = select_rows(pool, excluded, assets=assets)
+    root.mkdir(parents=True, exist_ok=assets)
     cal.write(root / "selected.private.json", {"request_sha256": cal.sha(request), "rows": rows})
     cal.write(root / "role-identities.private.json", {"rows": [r["identity"] for r in rows]})
     chosen = {r["identity"]["company_id"] for r in rows}
@@ -252,6 +281,10 @@ def collect_role(request: Path, role: str) -> dict[str, Any]:
     c, root = contract(request), root_for(request)
     for prior in ROLES[: ROLES.index(role)]:
         role_support(request, prior)
+    from quanthus.r9_assets import ASSET_SCHEMA, import_train
+
+    if c["schema_version"] == ASSET_SCHEMA and role == "train":
+        return import_train(request)
     now = datetime.now(timezone.utc)
     window = root / "reference-window.json"
     if not window.exists():
@@ -655,9 +688,18 @@ def cold(request: Path) -> dict[str, Any]:
     return result
 
 
-def run_limited(request: Path, action: str) -> dict[str, Any]:
+def run_limited(request: Path, action: str, *, source: bool = False) -> dict[str, Any]:
     """Reuse the bounded process guard for one fit/compare/cold worker."""
-    c, root = contract(request), root_for(request)
+    if source:
+        from quanthus.r9_assets import SOURCE_SCHEMA
+
+        c = read(request)
+        if c["schema_version"] != SOURCE_SCHEMA:
+            raise ValueError("R9_ASSETS_SOURCE_CONTRACT")
+        root = Path(c["output_root"])
+        root.mkdir(parents=True, exist_ok=True)
+    else:
+        c, root = contract(request), root_for(request)
     check_deadline(c)
     logs = root / f"runtime-{action}"
     logs.mkdir()
@@ -678,7 +720,7 @@ def run_limited(request: Path, action: str) -> dict[str, Any]:
             [
                 sys.executable,
                 "-m",
-                "quanthus.r9_study",
+                "quanthus.r9_assets" if source else "quanthus.r9_study",
                 action,
                 "--request",
                 str(request.resolve()),

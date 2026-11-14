@@ -233,6 +233,14 @@ def qualify_pool(
     return _qualify(project, source, identities, request, output, candidate_pool=True)
 
 
+def qualify_asset_pool(
+    project: Path, source: Path, identities: Path, request: Path, output: Path
+) -> dict[str, Any]:
+    return _qualify(
+        project, source, identities, request, output, asset_pool=True, include_primary=True
+    )
+
+
 def _qualify(
     project: Path,
     source: Path,
@@ -242,6 +250,7 @@ def _qualify(
     *,
     candidate_pool: bool = False,
     include_primary: bool = False,
+    asset_pool: bool = False,
 ) -> dict[str, Any]:
     if output.exists():
         raise ValueError("R9_FRESH_OUTPUT_REQUIRED")
@@ -250,7 +259,23 @@ def _qualify(
     if hashlib.sha256(raw_identity).hexdigest() != q["fixed_role_identity"]["sha256"]:
         raise ValueError("R9_IDENTITY_HASH")
     subjects = json.loads(raw_identity)
-    if candidate_pool:
+    if asset_pool:
+        expected_groups = {
+            ("train", "2020-11-30"): 12,
+            ("train", "2020-12-31"): 12,
+            ("guard", "2021-05-31"): 256,
+            ("update", "2021-06-30"): 256,
+            ("evaluation", "2021-11-30"): 256,
+            ("evaluation", "2021-12-31"): 256,
+        }
+        if (
+            q["schema_version"] != "quanthus.r9-reference-assets-source.v1"
+            or len(subjects["rows"]) != 1048
+            or Counter((r["role"], r["anchor"]) for r in subjects["rows"]) != expected_groups
+        ):
+            raise ValueError("R9_ASSETS_FIXED_POOL")
+        _check_windows_and_roles(subjects["rows"])
+    elif candidate_pool:
         required = {
             ("train", "2020-03-31"),
             ("train", "2020-04-30"),

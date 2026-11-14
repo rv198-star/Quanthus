@@ -9,6 +9,42 @@ Use Python 3.10+ and the versioned Quanthus source. Cold queries use only the fo
 and standard code; they do not contact DWD or reopen the old input paths. Obtain the package
 from the immutable HF revision in the [acceptance receipt](../acceptance/research-r7-multiop-20261113.md).
 
+The HF release has eight files, including HTML and evidence. The query reader requires a
+separate **four-file core directory**. Do not pass the eight-file release directory as
+`--package`; it correctly rejects it with `R7_PACKAGE_FILES`.
+After downloading the pinned release, set `R7_RELEASE` to that directory and `R7_CORE`
+to a new directory. This copies existing bytes without rebuilding market inputs:
+
+```bash
+export R7_RELEASE=/absolute/path/to/downloaded-A2
+export R7_CORE=/absolute/path/to/new-r7-core
+python3 - <<'PY'
+import hashlib
+import os
+import shutil
+from pathlib import Path
+
+release = Path(os.environ["R7_RELEASE"])
+core = Path(os.environ["R7_CORE"])
+names = ("READY", "manifest.json", "rows.jsonl", "summary.json")
+for name in names:
+    path = release / name
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"invalid release member: {name}")
+expected = "e22c9caa24396b3acf51aaacd18a7f0f26156c6b079647ca4f78d3dc07f19d4a"
+if hashlib.sha256((release / "manifest.json").read_bytes()).hexdigest() != expected:
+    raise ValueError("R7 release manifest identity mismatch")
+core.mkdir(parents=True, exist_ok=False)
+for name in names:
+    shutil.copyfile(release / name, core / name)
+print(core)
+PY
+```
+
+The next query authenticates READY and all payload hashes. Keep generated HTML and query
+receipts outside `R7_CORE`. The [MVP v0 bundle](research-mvp-v0.md) already provides this
+layout as `r7-core/`.
+
 Set `PACKAGE` to its physical directory, `VIEW` to a new HTML file outside that directory,
 and use the trusted manifest below. From the repository root:
 

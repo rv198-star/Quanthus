@@ -1,12 +1,25 @@
 # Next delivery plan after exploration-governance adoption
 
+## Current next delivery — 2026-11-14
+
+The R6–R9 [result audit](../acceptance/research-mvp-v0-audit-20261114.md) accepts the
+[research review MVP v0](../operations/research-mvp-v0.md). The current next request is
+`config/planning/r10-entry-qualification.v1.json`, also exposed through
+`next-delivery-request.v1.json`: [R10-A #673](https://github.com/rv198-star/Quanthus/issues/673)
+first qualifies actual opportunities, global exposure, source inputs and the decision use.
+The [R10 specification](../design/research-r10-feedback-v1.md) defines the subsequent single
+supervised update and full three-arm comparison. No new R10 reference, gradient or capital
+run has started in this planning delivery.
+
+The sections below preserve the October delivery and its original estimates.
+
 | Field | Value |
 | --- | --- |
 | Design status | approved; the Owner-activated batch is recorded in the execution disposition below |
 | Delivery gate | bounded consumer delivery completed; conditional comparison not run; research/production gates retain their own requirements |
 | Parent | [Exploration requirements](../design/exploration-governance.md), [blueprint](learning-blueprint-progress.md) |
 | Coordination | META-LEARN-001 / #540; existing #546 assets and #545 consumer boundary |
-| First request | `config/planning/next-delivery-request.v1.json`; retained proposal example with a completed-execution link, not an active successor |
+| Historical first request | See the executed consumer-delivery record and its immutable source revision; the mutable next-request pointer now names R10-A |
 | Prior decisions | [Scoped conclusions](exploration-decisions.md) |
 
 ## Execution disposition

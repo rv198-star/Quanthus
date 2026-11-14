@@ -781,6 +781,57 @@
         "TRACE"
       ],
       "contribution": "R9独立R0代理分层开发样本、候选盲参考、一次fit/条件update与同输入R0/v0/v1版本选择；保留A1/A2/RT2失败与累计成本"
+    },
+    {
+      "id": "META-RESEARCH-MVP0-AUDIT-001",
+      "issue": 672,
+      "modules": [
+        "MVP",
+        "S02",
+        "UPDATE",
+        "EXPERT",
+        "REPRO",
+        "TRACE",
+        "CLOSEOUT"
+      ],
+      "contribution": "R6–R9结果审计、研究复核MVP v0可用交付与R10真实局部更新及完整决策比较执行细则；不改变原科学结论或生产准入"
+    },
+    {
+      "id": "META-RESEARCH-R10-QUALIFY-001",
+      "issue": 673,
+      "modules": [
+        "MVP",
+        "REFERENCE",
+        "EXPERT",
+        "TRACE"
+      ],
+      "contribution": "R10有界后继：META-RESEARCH-R10-QUALIFY-001；沿用原学习MVP验收，当前仅规划，不改变模块实际成熟度"
+    },
+    {
+      "id": "P5-RESEARCH-R10-UPDATE-001",
+      "issue": 674,
+      "modules": [
+        "S02",
+        "TRAIN",
+        "UPDATE",
+        "REFERENCE",
+        "REPRO",
+        "TRACE"
+      ],
+      "contribution": "R10有界后继：P5-RESEARCH-R10-UPDATE-001；沿用原学习MVP验收，当前仅规划，不改变模块实际成熟度"
+    },
+    {
+      "id": "P3-RESEARCH-R10-DECISION-001",
+      "issue": 675,
+      "modules": [
+        "MVP",
+        "S02",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "contribution": "R10有界后继：P3-RESEARCH-R10-DECISION-001；沿用原学习MVP验收，当前仅规划，不改变模块实际成熟度"
     }
   ]
 }

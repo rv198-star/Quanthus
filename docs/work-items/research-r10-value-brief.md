@@ -1,15 +1,20 @@
-# R10当前价值与决定
+# R10 当前价值与决定
 
-当前整体收敛候选由 [#686](https://github.com/rv198-star/Quanthus/issues/686) 提交独立审计，
-总责任仍 active。[统一使用入口](../operations/research-r10-use.md)把原 A/B/C 验收、
-31/32/19 归因、实际容量／成交与精确参考覆盖、反馈实际处置放在同一条阅读路径。
+R10 受控负结果、反馈处置和统一入口已通过独立整体验收：**拒绝 v1，保留 B／研究 v0**。
+原实际更新、三条资金路径、冷复现及 G01/G02/G03/G05 处置已接受。
+统一入口独立使用复核耗时 **69.451 秒、手工 join 0 次**；原三例 108 秒验收作为历史保留。
+
+[固定私有交付入口](https://huggingface.co/datasets/rv192/quanthus-research-r1/blob/f92055455600184cc788ceda0b7cbbe259d59003/runs/RESEARCH-R10-FINAL-DELIVERY-001/20261115/publication/DELIVERY.md)包含原 73 文件冻结包、原 ZIP 和独立审计回执，旧提交措辞按历史读取。
+本机入口：`/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r10-final-delivery/README.md`。
+PR #687 已普通合入 `e81be2be19460c73bdb37207270e52ff4160be3f`。
+最终交付／工单与资源回执另附；R10 总责任由审计线在本次真实交付终验后关闭。
 
 本次新的决定是：停止用当前同标签 31 例另训窄幅头；保留 width-only 结构性停放；
 对已拒绝候选终止无法改变版本选择的 13 个成交标签采购；把上下文参考边界转成
 [唯一固定参考资格提案](../design/research-r10-reference-boundary-proposal-v1.md)。
 它仅是最多 16 意见的非激活成对资格实验。本棒新增参考／训练／市场／资金运行均为 0。
 详细的 [整体验收与处置](../acceptance/research-r10-overall-convergence-20261115.md)保留原科学结论、
-全部失败／曝光／成本与时限偏差，等待整体核准。
+全部失败／曝光／成本与时限偏差，已独立接受，最终交付待本次终验。
 
 ## 原单次受控运行的实际结果
 

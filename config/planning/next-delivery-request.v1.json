@@ -34,7 +34,7 @@
     "Newpaid reference/training/market acquisition/capital replay0; no second update or reinterpretation of frozen labels.",
     "If needed runtime changes require full checks; use docs/ledger reuse only after byte-identical executable/config/test closure and fresh metadata checks."
   ],
-  "memory_sha256": "1920355a5d2e0ce2d475450b2a8c1f328dd0b74d475b053b9610fa60ce145d10",
+  "memory_sha256": "3d3174270c3ad8c53537d6664b56c83c698475313ccaf307834bc2d62e54a4d4",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -177,9 +177,9 @@
       "rationale": "Overall evidence/delivery and current-candidate stop disposition only; preserve prior scope, negative results, costs and exposure. Proposed semantic qualification is non-activated and grants no reopening or training."
     },
     {
-      "conclusion_id": "CON-R10-OVERALL-CONVERGENCE-SUBMITTED-20261115",
+      "conclusion_id": "CON-R10-OVERALL-ACCEPTED-DELIVERY-20261115",
       "relation": "respect",
-      "rationale": "Submit overall candidate for audit only; do not treat this bounded execution as overall completion or activate the optional qualification."
+      "rationale": "Records accepted controlled R10 negative result and actual delivery; preserve frozen gates and inactive successor. No new experiment or reactivation."
     }
   ],
   "cumulative_cost_review": "AllR6-R10 and diagnostic/closeout costs,UNKNOWN and both timing deviations retained. New60minute/1800CPU protection envelope planned by audit within Owner continuation; not itemized Owner numeric approval.",
@@ -191,11 +191,13 @@
     "accounting_owner": "Executionline; GitHub/fixed evidence transport separate, no market/reference network"
   },
   "execution_receipt": {
-    "disposition": "complete_candidate_pending_independent_overall_audit",
+    "disposition": "independently_accepted_controlled_result_and_feedback_actual_delivery_closeout",
     "overall_goal_status": "active",
     "work_item": 686,
     "new_paid_reference_training_market_capital": 0,
     "successor_contracts": 1,
-    "adoption": "reject_v1_retain_B_v0"
+    "adoption": "reject_v1_retain_B_v0",
+    "fixed_publication_revision": "f92055455600184cc788ceda0b7cbbe259d59003",
+    "original_submission_receipt_preserved_in": "PR687 and original frozen submission"
   }
 }

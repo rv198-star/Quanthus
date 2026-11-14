@@ -2593,6 +2593,83 @@
         "CP-686-20261114T172546870458Z"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R10-OVERALL-ACCEPTED-DELIVERY-20261115",
+      "recorded_at": "2026-11-14T18:39:03.374540+00:00",
+      "actor": "Codex execution recording independent overall audit and actual fixed delivery",
+      "question_id": "R10-OVERALL-CONVERGENCE-001",
+      "family": "r10-overall-feedback-convergence",
+      "work_item": "P5-RESEARCH-R10-CONVERGE-001",
+      "modules": [
+        "MVP",
+        "S02",
+        "TRAIN",
+        "UPDATE",
+        "REFERENCE",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "question": "Does original controlledR10 one-update/full-comparison/usable-feedback/final-version scope converge on the bound results?",
+      "consumer": "Researchowner and fullP2 review maintainer",
+      "scope": "Existingsealed sources,31training/32development/19trials/13fills;14original acceptance and11parent contribution mappings. No new paid reference/training/market/capital.",
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "reject_candidate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Controlled R10 one-update/complete comparison/feedback/use overall audit accepted as valid negative result; rejectv1, retainB/researchv0. Broader product/formal-use gates preserved. Final actual-delivery audit pending.",
+      "decision_effect": "Accepted G01/G02/G03/G05 dispositions; stop duplicate same-label training and rejected-candidate13-vote purchase; retain one inactive16-opinion reference qualification. Ordinary687 merged, accepted frozen package and audit fixed privately with full readback.",
+      "reopen_conditions": [
+        "A material new qualified question, reference/condition contrast and reviewed bounded authority are required before any future experiment.",
+        "Audit final actual-delivery check verifies lifecycle, publication, cost and retained resources."
+      ],
+      "retained_assets": [
+        "Original update/three arms/cold/restoration and all accepted stage receipts.",
+        "Unified complete19-event chain,32reference view,14acceptance map and11parent contributions.",
+        "Allold UNKNOWN/exposure/failures/cost and timing deviations, and one concrete non-activated semantic qualification contract."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Final delivery18:17:48-19:02:48UTC,600CPU/2GiB/256MiB. Preserve historical5.548/80.861/275s late handoffs and unknown_not_zero costs. Publication upload succeeded; cache-path TypeError interrupted first readback, fixed and resumed same immutable revision without duplicate publication.",
+      "attempt_refs": [
+        "inputs.manifest.json",
+        "build-resource.json",
+        "feedback-resolution.json",
+        "successor-contract.draft.json"
+      ],
+      "evidence": [
+        {
+          "id": "OVERALL-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-15/jie-s/work/r10-final-delivery/publication/overall-audit/overall-audit-receipt.json",
+          "sha256": "7d04b31cee71e1eb57aeeae4ae1ecbcd8f1137c87d4844c7da58ef2f23495c65",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent overall acceptance of controlled R10 negative result, concrete feedback and usable entry; actual final delivery audit follows."
+        },
+        {
+          "id": "FIXED-PUBLICATION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-15/jie-s/work/r10-final-delivery/publication-receipt.json",
+          "sha256": "6515cb8517e646a8d998d999bf89655a22dc39eab332c7f4d1be88d066384c2a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Private immutable revision,85files/1511928bytes full size/SHA readback; original73 and audit preserved."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-674-R10-CONTROLLED-RESULT-20261114",
+        "CP-675-R10-CONTROLLED-RESULT-20261114",
+        "CP-686-20261114T172546870458Z",
+        "CP-540-R10-ACCEPTED-DELIVERY-20261115",
+        "CP-544-R10-ACCEPTED-DELIVERY-20261115",
+        "CP-545-R10-ACCEPTED-DELIVERY-20261115",
+        "CP-546-R10-ACCEPTED-DELIVERY-20261115",
+        "CP-686-R10-ACCEPTED-DELIVERY-20261115"
+      ],
+      "supersedes": "CON-R10-OVERALL-CONVERGENCE-SUBMITTED-20261115"
     }
   ]
 }

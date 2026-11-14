@@ -1,9 +1,13 @@
 # R10 当前统一使用入口
 
-当前完整交付是本机私有包 `outputs/quanthus-r10-overall/README.md`：
-`/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r10-overall/README.md`。
-它把完成情况、保留 B／v0 的理由、参考覆盖及下一动作放在同一页，并链接完整 19 事件与 13 成交链。
-整体结论处于独立交审；已接受的诊断子任务不替代 R10 整体验收。
+R10 受控负结果、反馈处置和统一入口已通过独立整体验收：**拒绝 v1，保留 B／研究 v0**。
+原实际更新、三条资金路径、冷复现及 G01/G02/G03/G05 处置已接受。
+统一入口独立使用复核耗时 **69.451 秒、手工 join 0 次**；原三例 108 秒验收作为历史保留。
+
+[固定私有交付入口](https://huggingface.co/datasets/rv192/quanthus-research-r1/blob/f92055455600184cc788ceda0b7cbbe259d59003/runs/RESEARCH-R10-FINAL-DELIVERY-001/20261115/publication/DELIVERY.md)包含原 73 文件冻结包、原 ZIP 和独立审计回执，旧提交措辞按历史读取。
+本机入口：`/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r10-final-delivery/README.md`。
+PR #687 已普通合入 `e81be2be19460c73bdb37207270e52ff4160be3f`。
+最终交付／工单与资源回执另附；R10 总责任由审计线在本次真实交付终验后关闭。
 
 | 想做的判断 | 入口及明确语义 |
 |---|---|
@@ -21,7 +25,7 @@
 本次固定候选的采用合取仍失败。因此对当前已拒绝候选停止追加 13 个成交锚点票，当前阅读视图
 直接显示覆盖缺席，并保留完整资金决定。未来模型用途需先冻结原 B 合法入口的参考覆盖。
 
-来源和细节：[整体交审](../acceptance/research-r10-overall-convergence-20261115.md) ·
+来源和细节：[整体验收](../acceptance/research-r10-overall-convergence-20261115.md) ·
 [唯一后继资格提案](../design/research-r10-reference-boundary-proposal-v1.md)。
 
 ## 原封存三类实际案例与历史使用验收

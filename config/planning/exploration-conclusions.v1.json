@@ -2670,6 +2670,71 @@
         "CP-686-R10-ACCEPTED-DELIVERY-20261115"
       ],
       "supersedes": "CON-R10-OVERALL-CONVERGENCE-SUBMITTED-20261115"
+    },
+    {
+      "id": "CON-R11-LIMITED-SYNTHETIC-PARK-20261116",
+      "recorded_at": "2026-11-16T11:20:35.592811+00:00",
+      "actor": "Quanthus researchlead; internal acceptance and bounded ROI disposition",
+      "question_id": "R11-D1B-ADOPTION-001",
+      "family": "r11-d1b-fixed-reserve",
+      "work_item": "P11-R11-D1B-001",
+      "modules": [
+        "TRACE",
+        "CLOSEOUT"
+      ],
+      "question": "Can the C13/C15 composition support daily-use adoption and which usable assets survive when exact prerequisites are missing?",
+      "consumer": "P11 research owner and P12 W3/W4",
+      "scope": "Shared pure policy1.1.1 and synthetic-only boundaries; complete historical/daily comparison not run. A01-A07 exact gaps retained.",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Researchlead internal engineering pass and named limited stop only; final independent whole-batch acceptance and daily adoption pending.",
+      "decision_effect": "Retain shared candidate/funding/risk core for synthetic integration; park unvalidated46-92h quote, no platform/new market study. Task690 and draftPR691 remain open for final audit.",
+      "reopen_conditions": [
+        "P12 supplies exact real account snapshots/parameters/fee/windows/atomic facts and a concrete unmet decision.",
+        "P10 supplies qualified exact purpose/PIT/physical manifest; P11 expert purpose and any new multi-day trigger are versioned and accepted.",
+        "Freeze one old control/one composition, exact development scope/exposure, full cost and existing authority before result-bearing comparison."
+      ],
+      "retained_assets": [
+        "Shared pure policy1.1.1 and original21frozen goldens/three causal traces/five independent regressions.",
+        "Original DS001/DS002, all lead failures, exact native Linux receipts, original1.0.0 unused draft and selected1.0.1 contract.",
+        "P12 atomic-interface handoff, A01-A07 dispositions, original R6-R10 findings/costs/exposure and B/v0 retention."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Prior measured CPU2078.412495s + current final Linux static/synthetic/full857.46s; current lead control/publication/final checks separate. Model/active/other uninstrumented cost unknown_not_zero. DS002 whole-turn4442.266359s, guard exceeded842.266359s; preserve prior641.176574s snapshot. Current lead90min/1200CPU/2GiB/128MiB is operational guard within existing continuation.",
+      "attempt_refs": [
+        "ds-return-001/cost.json",
+        "ds-return-002/cost.json",
+        "timing-reconciliation.json",
+        "linux-final/check-receipts.json",
+        "failures.json"
+      ],
+      "evidence": [
+        {
+          "id": "R11-LEAD-INTERNAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-convergence/internal-acceptance.json",
+          "sha256": "f8ac95198dba2adcb28b22f46b03b78dd8bf6f0a94603d97f1d223f9f5e8d124",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Researchlead internal synthetic engineering pass at exact GitHub source; final independent audit pending."
+        },
+        {
+          "id": "R11-LIMITED-DECISION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-convergence/adoption-decision.json",
+          "sha256": "ddcd0756b0f719203d9d96c10e74940f46c5578542e897e4a27d38035770cee0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Named limited/parked full-comparison decision, research not evaluated, daily adopted false."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-690-R11-LEAD-CONVERGENCE-20261116"
+      ],
+      "supersedes": null
     }
   ]
 }

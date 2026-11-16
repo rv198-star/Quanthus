@@ -1,3 +1,21 @@
+<!-- r11-lead-convergence:start -->
+# R11：保留共享核心，停放完整历史比较
+
+本批为P11与P12补齐同一份候选/固定桶/有限储备/账户风险纯政策。当前实现1.1.1已固定到GitHub `deb4422ef5ae2994328729d89cdbefc3daa835fd`；研究负责人完成两轮内部复核和修复，CN02/Python3.10最终完整检查9388 passed/35 skipped/63 warnings，Ruff及五模块mypy通过。Task[#690](https://github.com/rv198-star/Quanthus/issues/690)和draft PR[#691](https://github.com/rv198-star/Quanthus/pull/691)保持开放，等待整批终审。
+
+可保留的工程价值是P11/P12共用一份资金与风险数学：同一原子入场入口约束原专家上限，返回并固化平衡资金分录，重复命令保持原数量/预约/摘要且不重复入账；旧周期迟到现金不会污染新周期B。原T+1窗口与实际订单/持仓事实分开。21个冻结预期、3条因果故事、原P2费用/持仓接缝及5项新增独立回归随包保留，原冻结JSON未改。
+
+完整历史比较暂缓、日常采用false。A01多日新买点/rearm语义、A02专家semantic_decision_authority=inconclusive、A03逐决策PIT/精确供给manifest、A04实际账户阈值和快照、A06实际费用/窗口/多笔成交、P12事实/事务与OPS/USE均有具名缺项。当前研究有效性为not_evaluated；完整问题按有证据的受限停止组织，交审计判断收敛。
+
+投入偏高，主要返工来自资金状态/命令重放/专家边界和验收器遗漏。原Mac失败、两次旧Linux检查、DS两包、内部反例和GitHub传输失败全部保留。DS002从冻结开工到最新回合完成4442.266359秒，超过3600秒保护842.266359秒；原641.176574秒是较早快照，追加整回合对账。原累计脚本CPU2078.412495秒是当前lead之前的已测小计，当前lead与发布另计；模型和未仪表化成本unknown_not_zero。
+
+下一笔不自动启动46–92小时研究估计。先由P12提供实际消费者账户事实/参数，由P10交接现成合格用途/时钟manifest，P11核定专家用途；多日触发须先明确一个改变真实决策的问题。条件齐备后才重估最小旧control/新组合比较。实际节省工时尚待P12接收验证。原R6–R10成本、失败、开发曝光、B/v0保留及v1拒绝决定延续。
+
+[完整交付与P12接收](/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-convergence/README.md) · [设计](../design/research-r11-d1b-v1.md) · [合成验收](../acceptance/research-r11-synthetic-preparation.md)
+<!-- r11-lead-convergence:end -->
+
+<details><summary>历史：设计、DS首包与1.1.0修复</summary>
+
 # R11 当前价值与决定
 
 当前工作项[#690](https://github.com/rv198-star/Quanthus/issues/690)把C13候选跨日身份和C15固定桶/有限储备/账户风险组织成一个P12 D1-B采用问题。研究负责人负责设计、内部验收与整合；DS完成批量实现和自测；审计只接R11合并最终包。
@@ -17,3 +35,5 @@ DS 首包已形成 `quanthus.product_daily` 纯政策核心和独立合成验收
 P12 W3/W4 只接收纯 state/command/receipt 接口并在自己的事务层持久化，不复制资金数学。后段完整研究新增工作估计为 46–92 主动小时，P12/P10 原估计另计；精确 compute、窗口和产物量待冻结 manifest 后报价。
 
 内部验收发现七项可执行逻辑缺陷、strict-input 缺口和 Q02 actual 指标错误后，DS 已完成 R1–R10 整批修复并升级纯政策实现到 `1.1.0`。修复闭合 completed-settlement history、reserve 债务优先、unsettled-cycle reuse、canonical command binding、C13 临时阻断重评、原 expert entry action、composite entry atomic replay、正 E_floor、typed money/boolean 边界及逐字段 frozen oracle。Daily adoption、A01/A02/A03/A04/A06/P12 事实层缺项保持不变。
+
+</details>

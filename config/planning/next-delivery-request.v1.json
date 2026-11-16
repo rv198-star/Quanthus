@@ -34,7 +34,7 @@
     "Newpaid reference/training/market acquisition/capital replay0; no second update or reinterpretation of frozen labels.",
     "If needed runtime changes require full checks; use docs/ledger reuse only after byte-identical executable/config/test closure and fresh metadata checks."
   ],
-  "memory_sha256": "3d3174270c3ad8c53537d6664b56c83c698475313ccaf307834bc2d62e54a4d4",
+  "memory_sha256": "c8f4a5289c459ec316b18a6b38733be11be16faef40d2a2a8e6b98b2a6de0e64",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -180,6 +180,11 @@
       "conclusion_id": "CON-R10-OVERALL-ACCEPTED-DELIVERY-20261115",
       "relation": "respect",
       "rationale": "Records accepted controlled R10 negative result and actual delivery; preserve frozen gates and inactive successor. No new experiment or reactivation."
+    },
+    {
+      "conclusion_id": "CON-R11-LIMITED-SYNTHETIC-PARK-20261116",
+      "relation": "respect",
+      "rationale": "R11 limited-stop and shared synthetic-core engineering are separate from this completed R10 delivery request. Preserve R10 execution receipt, all gates/costs and R11 park; this metadata refresh starts no new work."
     }
   ],
   "cumulative_cost_review": "AllR6-R10 and diagnostic/closeout costs,UNKNOWN and both timing deviations retained. New60minute/1800CPU protection envelope planned by audit within Owner continuation; not itemized Owner numeric approval.",

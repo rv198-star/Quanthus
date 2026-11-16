@@ -46,4 +46,10 @@ The original synthetic receipt was preserved after the research lead reproduced 
 - boolean, integer, Decimal and cash-quantum boundaries reject malformed or binary values;
 - every frozen golden key is compared independently, including corrected Q02 exposure, distinct F07/F08 old/new cycles and three causal state traces.
 
-`config/research/r11/repair-dispositions.v1.json` records the original/new actual and regression witness for each finding. The final fresh Linux receipt is retained in `ds-return-002`; this contract remains non-authorizing and `daily_adopted=false`.
+`config/research/r11/repair-dispositions.v1.json` records the original/new actual and regression witness for each finding at implementation 1.1.0. `ds-return-002` explicitly returned a partial package: the fresh final Linux check was NOT_RUN after its wall guard expired. The research lead subsequently found and repaired three further boundaries in 1.1.1; its new Linux receipt is a separate acceptance and the original receipts remain historical.
+
+## Lead internal acceptance 1.1.1
+
+The entry size now intersects the configured fraction with the original expert maximum. Composite entry returns balanced funding postings and binds them into its immutable result; replay emits no new postings. The verifier fails when either required actual-evidence file is missing, and its final passed flag includes expected/actual validation. Five independent regressions cover these boundaries. The frozen 21-case JSON is unchanged.
+
+Tested source: GitHub `deb4422ef5ae2994328729d89cdbefc3daa835fd`, tree `6380459859db2f41ddc2071ab468928c6ee6abde`. CN02 reconstructs the exact tree from authenticated GitHub Git objects plus its already verified base objects. Fresh CN02/Python3.10 make check passed: 9388 passed, 35 skipped, 63 warnings; wall865.633s, CPU848.62s, RSS611296KiB. Ruff and five-module mypy (--follow-imports=skip) passed. Exact native log SHA256: `23d556841c47ac4c20a29c0ae757640c56b3effdde82ca04bbcd5214a77257ec`. The convergence package retains optional-dependency skip reasons and all failed attempts. Final independent audit remains pending.

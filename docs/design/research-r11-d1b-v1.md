@@ -39,7 +39,7 @@ P2 接缝沿用原 `BuyCostPolicy` 与 `UnitState`。原 P2 平仓的 `UNIT_SETT
 
 ## P12 W3/W4 接收接口
 
-P12 将 `FundingState`、`CandidateState` 和命令 receipt 映射到其 revision/CAS 表，在一个事务中调用纯函数并以返回的新 state 做一次写回。调用顺序为：冻结同一 as-of 的 `RiskSnapshot` 和候选 observation；执行候选投影；读取首 eligible empty bucket；调用 `prepare_cycle`；调用 `evaluate_quantity`；仅在数量大于零时提交 `EntryDecision` 返回的 reservation。失败分支直接丢弃准备态。
+P12 将 `FundingState`、`CandidateState` 和命令 receipt 映射到其 revision/CAS 表。先冻结同一 as-of 的 `RiskSnapshot` 和候选 observation，再执行候选投影；新入场以 canonical `entry_invocation_payload` 创建命令并一次调用 `decide_entry`。该入口内部完成 prepare、专家最大仓位与配置 fraction 取小值、数量检查和 reservation。P12 在同一事务中写回新 state、receipt、reservation 和 `funding_ledger_entries`；失败分支保持原 state。相同命令重试返回原 quantity/reservation/result digest，新增分录为空，原始分录保存在 immutable result 中。
 
 P12 必须提供的账户事实包括：同一 account/as-of economic equity、tradeable cash、完整 marked positions、remaining unfilled pending buys、pending sells、已入账 payable、价格上界、费用上界、stock/industry/total 比例、静态 level-one membership 和实际 settlement evidence。当前包不提供真实阈值或真实账户映射；`config/research/r11/implementation-policy.v1.json` 明确 `real_account_limits=null`。
 
@@ -62,3 +62,9 @@ P12 必须提供的账户事实包括：同一 account/as-of economic equity、t
 - `E_floor <= 0` 直接 fail closed。Boolean、整数、Decimal 和 cash quantum 在 typed boundary 严格校验；float、truthy string、bool-as-int 与 sub-cent cash 不进入 state/ledger。
 
 完整 expected/actual 验收由 `scripts/r11_synthetic_verify.py` 独立比较冻结 JSON 的每个 key；Q02 的 next-lot exposure、F07/F08 的 old-settled/new-cycle 身份及三条因果故事均从实际公共状态导出。
+
+## 研究负责人补充修复 1.1.1
+
+内部复核继续复现三项遗漏：原 expert 最大仓位没有参与定量、组合入场丢弃 reserve 划转分录、验证器在实际证据文件缺失时可能成功。共享实现已修复并增加五项边界回归：仓位两种大小关系、缺失 fraction、平衡分录与幂等保留、缺失证据失败。原 21 项冻结预期保持不变。旧 R7 回放测试的原专家上限为20%，正确数量为300股，旧500股断言已据此修正。
+
+完整历史比较停放，日常采用保持 false；详见[本批采用处置](../work-items/research-r11-value-brief.md)。46–92小时为未核实估计，后续按具名用途和账户前置重新核价。

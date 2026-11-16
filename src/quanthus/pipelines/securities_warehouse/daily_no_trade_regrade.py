@@ -63,7 +63,13 @@ def continuation(
         or list(root.glob(str(day) + "-*/no-trade-regrade-continuation.json"))
     ):
         raise ValueError("NO_TRADE_REGRADE_CONTINUATION_NOT_ELIGIBLE")
-    if object_at(previous / "receipt.json") != old:
+    # The indexed entry is bound to the latest retained receipt for the date,
+    # which may live in a prior quality-continuation run while the core,
+    # reference and captures stay in the original run.
+    receipt_runs = sorted(
+        run for run in root.glob(str(day) + "-*") if (run / "receipt.json").is_file()
+    )
+    if not receipt_runs or object_at(receipt_runs[-1] / "receipt.json") != old:
         raise ValueError("NO_TRADE_REGRADE_RECEIPT_CHANGED")
     if (
         file_sha(source / "manifest.json") != old["native_manifest_sha256"]

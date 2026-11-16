@@ -20,9 +20,21 @@ from .base22 import canonical, file_sha
 from .base22_sources import disjoint_output, physical_path
 from .daily_base24_market_resume import stamp
 from .daily_base24_precision import _sha, _write, verify_market_revision
-from .native5m_daily_source import KIND, _digest, m5_grid, minute_schema, native_m5
+from .native5m_daily_source import (
+    KIND,
+    _digest,
+    is_no_trade_bar,
+    m5_grid,
+    minute_schema,
+    native_m5,
+)
 
-CONTRACT = "p10-cn02-native5m-source-rebinding-v1"
+CONTRACT_V1 = "p10-cn02-native5m-source-rebinding-v1"
+CONTRACT = "p10-cn02-native5m-source-rebinding-v2"
+ACCEPTED_CONTRACTS = (CONTRACT_V1, CONTRACT)
+# v2 (#692): admits source-observed all-zero no-trade bars under
+# native5m_daily_source.NO_TRADE_BAR_RULE and records no_trade_minutes.
+# v1 products never contained zero bars; replay semantics are monotonic.
 
 
 def qualify(raw: bytes | None, code: str, day: str, daily: dict[str, Any]) -> tuple[Any, Any]:
@@ -48,6 +60,7 @@ def qualify(raw: bytes | None, code: str, day: str, daily: dict[str, Any]) -> tu
         missing_actual_minutes=m5_grid(day),
         auction_source_observed=False,
         allowed_consumer="none",
+        no_trade_minutes=[],
     )
     if daily["tradestatus"] == "0":
         if daily.get("daily_price_observation_state") == "unavailable_suspended":
@@ -70,6 +83,9 @@ def qualify(raw: bytes | None, code: str, day: str, daily: dict[str, Any]) -> tu
         return result, {}
     try:
         bars = native_m5(raw, code, day)
+        result["no_trade_minutes"] = sorted(
+            stamp for stamp, bar in bars.items() if is_no_trade_bar(bar)
+        )
         missing = [x for x in m5_grid(day) if x not in bars]
         result["missing_actual_minutes"] = missing
         terminal = m5_grid(day)[-1]
@@ -239,7 +255,7 @@ def build(
 def verify_binding(root: Path, ref: dict[str, Any], statuses: dict[str, Any]) -> None:
     """Called by the complete native verifier; all evidence is inside its mirror."""
     manifest = json.loads((root / "manifest.json").read_bytes())
-    if manifest.get("processing_revision") != CONTRACT:
+    if manifest.get("processing_revision") not in ACCEPTED_CONTRACTS:
         raise ValueError("NATIVE_REBIND_PROCESSING_CONTRACT_INVALID")
     proof = verify_market_revision(root / "evidence/market")
     if proof["manifest_sha256"] != ref["source_ods_manifest_sha256"]:
@@ -247,7 +263,7 @@ def verify_binding(root: Path, ref: dict[str, Any], statuses: dict[str, Any]) ->
     origins = json.loads((root / "evidence/original-bindings.json").read_bytes())
     admitted = {c for c, q in statuses.items() if q["quality_grade"] in {"R0", "R2"}}
     if (
-        origins.get("kind") != CONTRACT
+        origins.get("kind") not in ACCEPTED_CONTRACTS
         or set(origins["rows"]) != admitted
         or origins.get("new_processing_binding") is not True
         or origins.get("original_capture_receipts_rewritten") is not False

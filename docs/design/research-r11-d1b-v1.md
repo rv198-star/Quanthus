@@ -68,3 +68,9 @@ P12 必须提供的账户事实包括：同一 account/as-of economic equity、t
 内部复核继续复现三项遗漏：原 expert 最大仓位没有参与定量、组合入场丢弃 reserve 划转分录、验证器在实际证据文件缺失时可能成功。共享实现已修复并增加五项边界回归：仓位两种大小关系、缺失 fraction、平衡分录与幂等保留、缺失证据失败。原 21 项冻结预期保持不变。旧 R7 回放测试的原专家上限为20%，正确数量为300股，旧500股断言已据此修正。
 
 完整历史比较停放，日常采用保持 false；详见[本批采用处置](../work-items/research-r11-value-brief.md)。46–92小时为未核实估计，后续按具名用途和账户前置重新核价。
+
+## FA-01修复：1.2.0周期身份与预约占用
+
+最终审计在1.1.1复现了同桶第二次`decide_entry`被历史预约阻断。1.2.0将`EntryReservation.cycle_id`绑定到不可变结果；`entry_reservations`完整保留已接受命令历史，`active_entry_reservations`按尚未出现在completed settlement中的(bucket_id,cycle_id)派生。只对活动集合约束每桶一个预约；每周期和每命令的历史身份仍唯一。结算完成释放派生占用，历史回执和旧结果继续保留，原命令可在后续周期重放。
+
+P12持久化本版完整history/receipt/settlement state，在同一事务中计算派生活动视图。`active_entry_reservation_ids`是展示/消费投影，不是可独立改写的事实。首轮结清、第二轮入场、旧轮迟到费及第二轮结算由一个完整回归穿过真实公开入口；活动冲突、失败回滚与历史删除保护同时验证。原21个golden和两个冻结研究合同保持原字节，本版合成状态按1.2.0schema新建，旧包保留历史。

@@ -14944,6 +14944,54 @@
           "body_sha256": "a8a6cd0f3df2e3371551fbdbf71a7645277a05f1e190a790ad632b1ebe1d5f3e"
         }
       ]
+    },
+    {
+      "id": "CP-690-R11-FA01-REPAIR-20261116",
+      "recorded_at": "2026-11-16T12:56:35.112643+00:00",
+      "actor": "Quanthus researchlead, one independent-final-audit root-cause repair",
+      "work_item": "P11-R11-D1B-001",
+      "outcome": "no_module_change",
+      "summary": "Repair FA-01 current/history reservation conflation in1.2.0; full two-cycle public entry/settlement/replay/late-fee and new exact native closure pass internally. Whole R11 final independent re-audit pending.",
+      "evidence": [
+        {
+          "id": "R11-FA01-INTERNAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-fa01-resubmission/internal-acceptance.json",
+          "sha256": "40214e874491073b27a8c00937d0dd6a1f26de8509666dd290e7d00125b4eac6",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal synthetic repair and fresh native pass only; original final-audit rejection retained, independent acceptance pending."
+        },
+        {
+          "id": "R11-AUDIT-001-REJECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-fa01-resubmission/audit-001/audit-receipt.json",
+          "sha256": "3b03a4a45384e26d4a81afc6257e93a820668a839309f35a0996194a8c7a21d1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "First independent whole-batch audit CHANGES_REQUIRED for FA-01; all other passed scopes retained."
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "no_change_reason": "Fix existing promised synthetic lifecycle; module maturity/admission and parked full comparison remain at prior scope until final independent re-audit. No source acquisition/training/market/capital/daily/production.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-D1B-001",
+          "number": 690,
+          "title": "[P11-R11-D1B-001] 核定单一机会与固定桶组合的日常用途",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-16T12:56:30Z",
+          "body_sha256": "0b9caa1d4123e8d0ed389f9c4365e2b4f759c5c85e0a6a1d012267d45b05dde8"
+        }
+      ]
     }
   ],
   "history_imports": [

@@ -11,3 +11,7 @@
 4主动小时为此前准备建议与当前操作保护，不写成新增Owner逐项预算。首DS包预计60–120主动分钟，150分钟墙钟/2400脚本CPU秒/2GiB/128MiB；模型与未仪表化成本unknown_not_zero。P12原W1/W2/W3/W4工程估计与本次研究实际成本分列，共用准备只计一次。原R6–R10失败、曝光、成本与结论保留。
 
 [设计](../design/research-r11-d1b-v1.md) · [采用覆盖](../../config/research/r11/adoption-coverage.json) · [消费者](../../config/research/r11/data-consumer-demand.json)。DS整包返回研究负责人，完成内部整合后再推进R11合并终审。
+
+DS 首包已形成 `quanthus.product_daily` 纯政策核心和独立合成验收入口。21 个冻结 goldens、3 条重建故事、CAS/幂等、同批 reserve、迟到费用、保守最大整手及 P2 synthetic buy→hold→exit→settlement 接缝均进入同一实现闭包。当前仍是非授权 synthetic preparation；真实账户阈值、A02 semantic decision authority、发展 reader 的 per-decision PIT 证明和历史完整比较继续由后段采用合同处理。
+
+P12 W3/W4 只接收纯 state/command/receipt 接口并在自己的事务层持久化，不复制资金数学。后段完整研究新增工作估计为 46–92 主动小时，P12/P10 原估计另计；精确 compute、窗口和产物量待冻结 manifest 后报价。

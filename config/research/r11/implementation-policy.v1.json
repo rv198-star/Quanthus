@@ -1,0 +1,60 @@
+{
+  "schema_version": "quanthus.r11.implementation-policy.v1",
+  "policy_id": "r11-shared-daily-policy-core",
+  "version": "1.0.0",
+  "contract": "research-contract.v1.0.1.json",
+  "contract_semantic_digest": "sha256:e09576758b35283cc1971e8f741d87abab26601964c8315e3e2b7db3d76823aa",
+  "authority": {
+    "synthetic_only": true,
+    "daily_adopted": false,
+    "account_fact_system": false,
+    "http_ui": false,
+    "production": false
+  },
+  "candidate": {
+    "policy_id": "r11-candidate-observation-v1",
+    "version": "1.0.0",
+    "entry_window": "original_T_after_close_to_T_plus_1_open",
+    "minimum_event_separation_sessions": 22,
+    "position_cooldown_sessions": 5,
+    "same_event_rearm": false,
+    "multi_day_new_buy_point": "not_adopted"
+  },
+  "funding": {
+    "policy_id": "r11-fixed-reserve-policy",
+    "version": "1.0.0",
+    "mode": "fixed",
+    "reserve_nonnegative": true,
+    "unallocated_adjustment_nonpositive": true,
+    "same_batch_order": "bucket_id_ascending",
+    "profit_destination": "shared_reserve",
+    "late_delta_destination": "reserve_then_negative_adjustment",
+    "failed_reservation_atomic": true
+  },
+  "risk": {
+    "policy_id": "r11-account-risk-policy",
+    "version": "1.0.1",
+    "denominator": "conservative_post_fill_equity_floor",
+    "ratio_domain": [
+      "0",
+      "1"
+    ],
+    "whole_lot_only": true,
+    "pending_sell_releases_capacity": false,
+    "recognized_payables_charged_twice": false,
+    "reason_order": [
+      "INPUT_UNAVAILABLE",
+      "POLICY_NOT_ADOPTED",
+      "EXISTING_SECURITY_CYCLE",
+      "CONCENTRATION_CAPACITY",
+      "DAY_LIMIT",
+      "NO_EMPTY_BUCKET",
+      "BUDGET_CAPACITY",
+      "CASH_CAPACITY",
+      "STOCK_CAPACITY",
+      "INDUSTRY_CAPACITY",
+      "TOTAL_CAPACITY"
+    ],
+    "real_account_limits": null
+  }
+}

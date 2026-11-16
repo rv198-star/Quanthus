@@ -15,3 +15,36 @@
 后段成本分开：P12 W1/W2工程52–84小时、W3/W4工程36–56小时为原v8估计依赖，P11不重复计作已投入研究。共享纯政策核心本棒完成；正式完整历史比较估算须DS核实接缝后给出，未具备报价时记录具体缺口，不编造总成本。已知开发曝光和未知历史成本继续保留。
 
 预实现自审修订：CURRENT.json选择1.0.1，数量对保守成交后权益校验；旧1.0.0未执行草案和原检查点完整保留。
+
+## 共享纯政策核心（DS S1）
+
+实现位于 `src/quanthus/product_daily/`，不修改原 P4/P6、P2 policy、旧阈值或生产服务。模块边界如下：
+
+| 模块 | 责任 |
+| --- | --- |
+| `contracts.py` | 严格 Decimal、时区、稳定 reason 顺序、CAS 与 idempotent command receipt |
+| `candidate.py` | C13 原 event identity、T+1 有效期、观察/实际订单/实际持仓分离、22 会话与 5 会话边界 |
+| `funding.py` | 固定桶 N/B、共享 reserve、欠资补足、迟到差额、同批排序和平衡分录 |
+| `risk.py` | 保守成交后权益、费用与价格上界损耗、stock/industry/total 最大整手、候选到首桶的采用入口 |
+
+所有公共命令先以 `CommandEnvelope` 校验 `command_id`、body digest 和 `expected_revision`。同键同 body 返回既有 receipt，同键不同 body 报 `idempotency_conflict`，revision 不符返回 `CAS_CONFLICT` 且状态对象保持不变。P12 W1/W2 负责把该语义放入数据库事务；本包不实现持久化、并发锁、HTTP 或账户事实系统。
+
+C13 只保留原 T close 到 T+1 open 窗口。计划过期只更新候选解释，不终结实际订单、不释放 hold、不伪造成交；迟到 fill 可继续进入 P12 实际持仓链，但原推荐仍为 expired。新事件只有在原 22 会话分离、旧持仓已 flat/结算且 5 会话冷却满足时才能成为新机会。
+
+C15 的 `cash_total` 始终由桶 cash、reserve 和非正 `unallocated_adjustment` 重新求和。结算只接受 flat、订单终结、fills 完整、费用已知且冲突已清的具名证据；同批按 bucket id 排序，后来的盈利不能重写已结算 cycle。启用前补足只使用当前 reserve，失败预约返回原 FundingState，不保留 transfer、hold 或 reservation。
+
+数量求解对每个候选整手计算 `E_floor(q) = E - 其他未确认潜在买入费用上界 - 所有价格上界高于 mark 的损耗 - q 自身费用与 adverse loss`。已计入 E 的 payable 不再扣一次；pending sell 不释放 stock/industry/total 容量。任一依赖新风险的输入未知时返回 `INPUT_UNAVAILABLE`，已有持仓仍沿原专家/退出路径处理。
+
+P2 接缝沿用原 `BuyCostPolicy` 与 `UnitState`。原 P2 平仓的 `UNIT_SETTLEMENT.profit_transfer` 可直接作为 C15 reserve 流入；不重写 P2 利润转移数学。原 `allocated`、候选可见性或 UI 状态均不产生 order/fill 授权。
+
+## P12 W3/W4 接收接口
+
+P12 将 `FundingState`、`CandidateState` 和命令 receipt 映射到其 revision/CAS 表，在一个事务中调用纯函数并以返回的新 state 做一次写回。调用顺序为：冻结同一 as-of 的 `RiskSnapshot` 和候选 observation；执行候选投影；读取首 eligible empty bucket；调用 `prepare_cycle`；调用 `evaluate_quantity`；仅在数量大于零时提交 `EntryDecision` 返回的 reservation。失败分支直接丢弃准备态。
+
+P12 必须提供的账户事实包括：同一 account/as-of economic equity、tradeable cash、完整 marked positions、remaining unfilled pending buys、pending sells、已入账 payable、价格上界、费用上界、stock/industry/total 比例、静态 level-one membership 和实际 settlement evidence。当前包不提供真实阈值或真实账户映射；`config/research/r11/implementation-policy.v1.json` 明确 `real_account_limits=null`。
+
+## 后段完整研究报价
+
+合成实现之后的完整历史用途比较尚未启动。按当前精确缺口估计，后续新增 P11 工作为 46–92 主动小时：数据/用途资格与共享 manifest 4–8；研究 adapter 和旧 control 接缝 8–16；一个旧 control 与一个 R11 arm 的完整资金路径及事件归因 20–40；cold rebuild/reconciliation 6–12；内部复核、证据和发布 8–16。该估计不含 P12 v8 原有 W1/W2 52–84 小时与 W3/W4 36–56 小时，也不含 P10 获取/修复。计算和产物量在冻结实际窗口、证券总体、费用与 replay manifest 后再报价。
+
+本轮新增市场 row read、付费 reference、training、capital replay、daily serving 与 production 均为 0。

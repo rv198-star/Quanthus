@@ -19,7 +19,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-COLLECTOR = "f839af0033ab4aa8cbe6d9fb933f29db88792e91"
+COLLECTOR = "bb0683d4b1c5e0f3edf79781dd4c4384c854e341"
 
 
 class NativeCaptureClient:

@@ -340,3 +340,30 @@ def test_failed_regrade_never_downgrades_indexed_held_entry(monkeypatch, tmp_pat
     assert json.loads((root / "DATES.json").read_bytes())["dates"][str(DAY)] == old
     runs = [p for p in root.glob(str(DAY) + "-*") if (p / "failure.json").exists()]
     assert len(runs) == 1
+
+
+def test_indexed_entry_from_prior_quality_continuation_is_eligible(tmp_path):
+    root, previous, source, config, old = held_fixture(tmp_path)
+    continuation_run = root / (str(DAY) + "-20261020T131500000000Z")
+    continuation_run.mkdir()
+    indexed = {
+        **old,
+        "auction_recovery": {"status": "HELD", "reason": "ValueError:AUCTION_NOT_ELIGIBLE"},
+        "delivery_timing": "LATE_RECOVERY_NOT_ON_TIME_SUCCESS",
+    }
+    cycle.write(continuation_run / "receipt.json", indexed)
+    value, market, events, captures, reference = regrade.continuation(config, DAY, indexed)
+    assert value == indexed
+    assert captures == previous / "capture-5m"
+
+
+def test_stale_index_against_latest_receipt_fails_closed(tmp_path):
+    root, previous, source, config, old = held_fixture(tmp_path)
+    continuation_run = root / (str(DAY) + "-20261020T131500000000Z")
+    continuation_run.mkdir()
+    cycle.write(
+        continuation_run / "receipt.json",
+        {**old, "delivery_timing": "LATE_RECOVERY_NOT_ON_TIME_SUCCESS"},
+    )
+    with pytest.raises(ValueError, match="RECEIPT_CHANGED"):
+        regrade.continuation(config, DAY, old)

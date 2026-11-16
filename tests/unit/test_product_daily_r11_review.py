@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
+from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -14,8 +16,18 @@ from typing import Any
 import pytest
 
 from quanthus.product_daily.candidate import CandidateProjection
-from quanthus.product_daily.contracts import CommandEnvelope
-from quanthus.product_daily.funding import BucketPhase, BucketState, FundingState
+from quanthus.product_daily.contracts import CommandEnvelope, ProductDailyError, ReasonCode
+from quanthus.product_daily.funding import (
+    BucketPhase,
+    BucketState,
+    CycleSettlementEvidence,
+    FundingState,
+    SettlementRequest,
+    apply_late_cash_delta,
+    late_cash_invocation_payload,
+    settle_batch,
+    settle_invocation_payload,
+)
 from quanthus.product_daily.risk import (
     BuyFeeRule,
     CandidateEntry,
@@ -172,3 +184,155 @@ def test_verifier_rejects_success_without_actual_files(
     assert receipt["golden_all_passed"] is False
     assert receipt["stories_rebuild_identical"] is False
     assert len(receipt["verification_errors"]) == 2
+
+
+def test_two_complete_entry_cycles_preserve_history_replay_and_old_cycle_cash() -> None:
+    state, first_args, first_command = _entry_inputs(reserve="1000", expert_cap=".30")
+    first = decide_entry(funding=state, command=first_command, **first_args)
+    assert first.accepted and first.quantity is not None and first.quantity.quantity == 500
+    first_history = first.funding_state.entry_reservations[0]
+    first_cycle = first_history.cycle_id
+    assert first.funding_state.active_entry_reservations == (first_history,)
+
+    def close_and_settle(current: FundingState, name: str) -> FundingState:
+        # P12 supplies complete flat/order/fill/fee facts, not inferred execution.
+        closed = replace(
+            current,
+            buckets=(
+                replace(current.bucket("U1"), phase=BucketPhase.CLOSED, cash=Decimal("20000")),
+            ),
+            revision=current.revision + 1,
+        )
+        cycle = closed.bucket("U1").cycle_id
+        assert cycle is not None
+        requests = (
+            SettlementRequest(
+                name,
+                "U1",
+                cycle,
+                CycleSettlementEvidence(True, True, True, True, True),
+            ),
+        )
+        cmd = CommandEnvelope.create(name, settle_invocation_payload(requests), closed.revision)
+        result = settle_batch(closed, cmd, requests)
+        assert result.accepted
+        assert result.state.active_entry_reservations == ()
+        return result.state
+
+    settled = close_and_settle(first.funding_state, "settle-first")
+    assert settled.entry_reservations == (first_history,)
+    second_args = {
+        **first_args,
+        "candidate": CandidateEntry(
+            "OP2",
+            "SYN002",
+            "IND1",
+            CandidateProjection.OBSERVED,
+            True,
+            True,
+            True,
+            ExpertEntryEligibility(
+                "OP2", "SYN002", ExpertEntryAction.TRIAL_ENTRY, "sha256:" + "2" * 64, Decimal(".30")
+            ),
+        ),
+        "snapshot": RiskSnapshot(
+            "RS-OP2",
+            datetime(2021, 3, 1, tzinfo=timezone.utc),
+            Decimal("21000"),
+            Decimal("21000"),
+        ),
+    }
+    refused_args = {
+        **second_args,
+        "quantity_limits": QuantityLimits(Decimal("0"), Decimal("1"), Decimal("1")),
+    }
+    refused_command = CommandEnvelope.create(
+        "failed-next-entry",
+        entry_invocation_payload(**refused_args),
+        settled.revision,
+    )
+    refused = decide_entry(funding=settled, command=refused_command, **refused_args)
+    assert not refused.accepted and refused.funding_state == settled
+    assert refused.funding_ledger_entries == ()
+
+    second_command = CommandEnvelope.create(
+        "entry-second",
+        entry_invocation_payload(**second_args),
+        settled.revision,
+    )
+    second = decide_entry(funding=settled, command=second_command, **second_args)
+    assert second.accepted and second.quantity is not None and second.quantity.quantity == 500
+    assert len(second.funding_state.entry_reservations) == 2
+    second_history = second.funding_state.entry_reservations[1]
+    assert second_history.cycle_id != first_cycle
+    assert second.funding_state.active_entry_reservations == (second_history,)
+    assert second.funding_state.entry_reservations[0] == first_history
+    with pytest.raises(ProductDailyError, match="one bucket may hold one active reservation"):
+        replace(second.funding_state, completed_settlements=())
+    with pytest.raises(ProductDailyError, match="entry receipt and reservation closure differ"):
+        replace(second.funding_state, entry_reservations=(second_history,))
+
+    payload = late_cash_invocation_payload(
+        bucket_id="U1",
+        cycle_id=first_cycle,
+        cash_delta=Decimal("-100"),
+    )
+    fee_command = CommandEnvelope.create("late-first-fee", payload, second.funding_state.revision)
+    fee = apply_late_cash_delta(
+        second.funding_state,
+        fee_command,
+        bucket_id="U1",
+        cycle_id=first_cycle,
+        cash_delta=Decimal("-100"),
+    )
+    assert fee.accepted and fee.state.reserve == Decimal("900")
+    assert fee.state.bucket("U1") == second.funding_state.bucket("U1")
+    assert fee.state.bucket("U1").locked_cycle_budget == Decimal("20000")
+    assert fee.state.entry_reservations == second.funding_state.entry_reservations
+
+    conflict_command = CommandEnvelope.create(
+        "occupied-bucket-retry",
+        entry_invocation_payload(**second_args),
+        fee.state.revision,
+    )
+    conflict = decide_entry(funding=fee.state, command=conflict_command, **second_args)
+    assert not conflict.accepted and conflict.reason_codes == (ReasonCode.NO_EMPTY_BUCKET,)
+    assert conflict.funding_state == fee.state and conflict.funding_ledger_entries == ()
+
+    replays = []
+    for current in (fee.state, close_and_settle(fee.state, "settle-second")):
+        for original, args, cmd in (
+            (first, first_args, first_command),
+            (second, second_args, second_command),
+        ):
+            replay = decide_entry(funding=current, command=cmd, **args)
+            assert replay.replayed and replay.accepted
+            assert replay.quantity == original.quantity
+            assert replay.reservation_id == original.reservation_id
+            assert replay.result_digest == original.result_digest
+            assert replay.funding_state == current and replay.funding_ledger_entries == ()
+            replays.append(replay.to_dict())
+        assert len(current.entry_reservations) == 2
+    assert current.active_entry_reservations == ()
+    assert current.cash_total == Decimal("20900")
+    actuals_path = os.environ.get("R11_TWO_CYCLE_ACTUALS")
+    if actuals_path:
+        Path(actuals_path).write_text(
+            json.dumps(
+                {
+                    "schema_version": "quanthus.r11.two-cycle-actuals.v1",
+                    "first_entry": first.to_dict(),
+                    "first_settled": settled.to_dict(),
+                    "refused_next_entry": refused.to_dict(),
+                    "second_entry": second.to_dict(),
+                    "old_cycle_fee": fee.to_dict(),
+                    "active_conflict": conflict.to_dict(),
+                    "first_history_before": first_history.to_dict(),
+                    "first_history_after": current.entry_reservations[0].to_dict(),
+                    "original_replays": replays,
+                    "final_state": current.to_dict(),
+                },
+                indent=2,
+            )
+            + "\n"
+        )

@@ -1124,12 +1124,12 @@ def decide_entry(
         )
 
     budget = prepared.state.bucket(first_bucket).locked_cycle_budget
+    cycle_id = prepared.state.bucket(first_bucket).cycle_id
+    assert cycle_id is not None
     assert expert is not None and expert.target_maximum_position is not None
     if fraction is not None:
         require_decimal(fraction, "fraction", minimum=Decimal("0"), maximum=Decimal("1"))
-    effective_fraction = (
-        None if fraction is None else min(fraction, expert.target_maximum_position)
-    )
+    effective_fraction = None if fraction is None else min(fraction, expert.target_maximum_position)
     quantity = evaluate_quantity(
         QuantityRequest(
             decision_snapshot_id=snapshot.snapshot_id,
@@ -1177,6 +1177,7 @@ def decide_entry(
         "quantity": quantity.to_dict(),
         "funding_state_changed": True,
         "reservation_id": reservation_id,
+        "cycle_id": cycle_id,
         "expert_decision_digest": expert.source_digest if expert is not None else None,
         "funding_ledger_entries": [item.to_dict() for item in prepared.ledger_entries],
     }
@@ -1193,6 +1194,7 @@ def decide_entry(
         security_code=candidate.security_code,
         level1_industry_id=candidate.level1_industry_id,
         bucket_id=first_bucket,
+        cycle_id=cycle_id,
         quantity=quantity.quantity,
         command_id=command.command_id,
         invocation_digest=receipt.invocation_digest,

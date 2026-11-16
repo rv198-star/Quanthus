@@ -123,6 +123,7 @@ class EntryReservation:
     security_code: str
     level1_industry_id: str
     bucket_id: str
+    cycle_id: str
     quantity: int
     command_id: str
     invocation_digest: str
@@ -136,6 +137,7 @@ class EntryReservation:
             "security_code",
             "level1_industry_id",
             "bucket_id",
+            "cycle_id",
             "command_id",
             "invocation_digest",
             "result_digest",
@@ -163,6 +165,7 @@ class EntryReservation:
             "security_code": self.security_code,
             "level1_industry_id": self.level1_industry_id,
             "bucket_id": self.bucket_id,
+            "cycle_id": self.cycle_id,
             "quantity": self.quantity,
             "command_id": self.command_id,
             "invocation_digest": self.invocation_digest,
@@ -211,14 +214,32 @@ class FundingState:
             self.completed_settlements
         ):
             raise ProductDailyError("invalid_settlement", "settlement ids must be unique")
+        if len({(item.bucket_id, item.cycle_id) for item in self.completed_settlements}) != len(
+            self.completed_settlements
+        ):
+            raise ProductDailyError("invalid_settlement", "a cycle may be settled only once")
         if len({item.reservation_id for item in self.entry_reservations}) != len(
             self.entry_reservations
         ):
             raise ProductDailyError("invalid_reservation", "reservation ids must be unique")
-        if len({item.bucket_id for item in self.entry_reservations}) != len(
+        if len({item.command_id for item in self.entry_reservations}) != len(
             self.entry_reservations
         ):
-            raise ProductDailyError("invalid_reservation", "one bucket may hold one reservation")
+            raise ProductDailyError("invalid_reservation", "reservation command ids must be unique")
+        if len({(item.bucket_id, item.cycle_id) for item in self.entry_reservations}) != len(
+            self.entry_reservations
+        ):
+            raise ProductDailyError("invalid_reservation", "one cycle may hold one reservation")
+        active = self.active_entry_reservations
+        if len({item.bucket_id for item in active}) != len(active):
+            raise ProductDailyError(
+                "invalid_reservation", "one bucket may hold one active reservation"
+            )
+        for reservation in active:
+            if self.bucket(reservation.bucket_id).cycle_id != reservation.cycle_id:
+                raise ProductDailyError(
+                    "invalid_reservation", "unsettled reservation must match the current cycle"
+                )
         receipts_by_id = {item.command_id: item for item in self.processed_commands}
         reservations_by_command = {item.command_id: item for item in self.entry_reservations}
         decide_receipts = {
@@ -233,10 +254,22 @@ class FundingState:
             if (
                 receipt.invocation_digest != reservation.invocation_digest
                 or receipt.result_digest != reservation.result_digest
+                or receipt.result_json != reservation.result_json
+                or reservation.result.get("cycle_id") != reservation.cycle_id
             ):
                 raise ProductDailyError(
                     "invalid_reservation", "entry receipt and reservation identities differ"
                 )
+
+    @property
+    def active_entry_reservations(self) -> tuple[EntryReservation, ...]:
+        """Project current occupancy without deleting immutable accepted-entry history."""
+        completed = {(item.bucket_id, item.cycle_id) for item in self.completed_settlements}
+        return tuple(
+            item
+            for item in self.entry_reservations
+            if (item.bucket_id, item.cycle_id) not in completed
+        )
 
     @property
     def cash_total(self) -> Decimal:
@@ -275,6 +308,9 @@ class FundingState:
                 item.to_dict()
                 for item in sorted(self.entry_reservations, key=lambda x: x.reservation_id)
             ],
+            "active_entry_reservation_ids": sorted(
+                item.reservation_id for item in self.active_entry_reservations
+            ),
         }
 
 

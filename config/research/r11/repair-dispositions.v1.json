@@ -1,0 +1,78 @@
+{
+  "schema_version": "quanthus.r11.repair-dispositions.v1",
+  "review_manifest_sha256": "3ac42c68e759734bc29c78475c95fb0a6066e0f2529963771c4d1208c7ac7735",
+  "implementation_version": "1.1.0",
+  "daily_adopted": false,
+  "findings": [
+    {
+      "id": "R1",
+      "status": "fixed",
+      "old_actual": "invalid_late_cycle",
+      "new_actual": "old completed cycle accepted after bucket reuse; reserve 2000->1900, new cycle/B unchanged; positive refund 80 offsets adjustment 50 then adds reserve 30",
+      "test": "test_r1_old_cycle_late_delta_after_new_cycle_reuse"
+    },
+    {
+      "id": "R2",
+      "status": "fixed",
+      "old_actual": "U2=20000, adjustment=-50",
+      "new_actual": "U1=20000, U2=19950, reserve=0, adjustment=0, cash_total=39950",
+      "test": "test_r2_settlement_profit_offsets_debt_before_loss_topup"
+    },
+    {
+      "id": "R3",
+      "status": "fixed",
+      "old_actual": "CLOSED unsettled cycle accepted for new cycle",
+      "new_actual": "rejected SETTLEMENT_NOT_READY with exact state unchanged; reuse succeeds only after completed settlement",
+      "test": "test_r3_unsettled_closed_cycle_cannot_be_reused"
+    },
+    {
+      "id": "R4",
+      "status": "fixed",
+      "old_actual": "changed amount/operation/observation replayed",
+      "new_actual": "canonical operation+business invocation bound; changed actual payload returns idempotency_conflict",
+      "test": "test_r4_command_operation_and_business_body_are_bound"
+    },
+    {
+      "id": "R5",
+      "status": "fixed",
+      "old_actual": "blocked projection sticky within valid window",
+      "new_actual": "BLOCKED->OBSERVED->BLOCKED allowed in same window; EXPIRED remains terminal and rewritten window is rejected",
+      "test": "test_r5_transient_blocks_recompute_but_expiry_and_window_are_sticky"
+    },
+    {
+      "id": "R6",
+      "status": "fixed",
+      "old_actual": "BLOCKED candidate funded 500 shares",
+      "new_actual": "original runner TRIAL_ENTRY accepted; runner NO_ACTION and BLOCKED projection rejected with exact funding state unchanged",
+      "test": "test_r6_entry_consumes_explicit_original_expert_action"
+    },
+    {
+      "id": "R7",
+      "status": "fixed",
+      "old_actual": "retry returned NO_EMPTY_BUCKET",
+      "new_actual": "retry returns original immutable q=500, reservation and result digest; only one decide_entry receipt exists",
+      "test": "test_r7_composite_entry_replay_is_atomic_and_immutable"
+    },
+    {
+      "id": "R8",
+      "status": "fixed",
+      "old_actual": "negative equity was rejected indirectly by exposure caps",
+      "new_actual": "E_floor<=0 directly returns q=0 and INPUT_UNAVAILABLE",
+      "test": "test_r8_nonpositive_equity_is_directly_blocked"
+    },
+    {
+      "id": "R9",
+      "status": "fixed",
+      "old_actual": "truthy string boolean and zero pending-buy prices accepted",
+      "new_actual": "invalid bool, zero prices, float, bool-as-int and sub-cent cash rejected at typed boundaries",
+      "test": "test_r9_strict_typed_inputs_reject_truthy_and_binary_values"
+    },
+    {
+      "id": "R10",
+      "status": "fixed",
+      "old_actual": "Q02 next_lot_post_exposure=99995.00 and partial frozen-key checking",
+      "new_actual": "Q02 next_lot_post_exposure=10000; every expected key of all 21 cases independently checked; F07/F08 use distinct completed old/new cycles; 3 causal traces rebuild",
+      "test": "test_all_twenty_one_lead_goldens_execute_from_independent_expected_json + test_three_causal_stories_rebuild_intermediate_state_and_receipts"
+    }
+  ]
+}

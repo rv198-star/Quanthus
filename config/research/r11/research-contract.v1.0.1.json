@@ -1,0 +1,301 @@
+{
+  "schema_version": "quanthus.r11.d1b-design.v1",
+  "id": "R11-D1B-ADOPTION-001",
+  "version": "1.0.1",
+  "task": 690,
+  "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+  "status": "frozen_synthetic_preparation_only",
+  "consumer": "P12 D1-B via W0/W3/W4; fullR11 adoption after qualified complete comparison",
+  "scope": [
+    "P11-C13",
+    "P11-C15",
+    "A02-purpose-binding",
+    "A03-consumer-spec"
+  ],
+  "current_authority": {
+    "design": true,
+    "local_synthetic_code_and_tests": true,
+    "new_market_row_read": false,
+    "reference_calls": 0,
+    "training": 0,
+    "historical_capital_replay": false,
+    "daily_serving": false,
+    "production": false
+  },
+  "source_bindings": [
+    {
+      "path": "config/p0-policy.v1.json",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "b5d6ae725e9ce8d9e4b936d2324458c341c9fabc4a3a33e15671d84ff4df4338",
+      "embedded_semantic_digest": null,
+      "version": "p0-2026-07-23"
+    },
+    {
+      "path": "config/p2-execution-policy.research.v1.json",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "e2ee55ea09682eeb775b9acfcfc4bbba0908ddd4157705cd81fd8f050097c816",
+      "embedded_semantic_digest": null,
+      "version": "p2-daily-research-v1"
+    },
+    {
+      "path": "config/p4-candidate-price-volume-transition.research.v1.json",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "04207eabf00a1f4898f28918e4f846cdd91b12f23a906e574306581e471c271c",
+      "embedded_semantic_digest": "sha256:b04464c838705e71331515332ceb9e796ce26698c784d4615cff00dfdcf41c50",
+      "version": "1.0.0"
+    },
+    {
+      "path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664",
+      "embedded_semantic_digest": "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c",
+      "version": "1.0.1"
+    },
+    {
+      "path": "config/expert-evaluations/acceptance/candidate-p4-trend-risk-1.0.1.v1.json",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "80c276638156a9fa73b2e6f91c594152943c189f21bd4f503f4011af1fa5c88e",
+      "embedded_semantic_digest": "sha256:8ba3263be7a1de6b8c5459dc6ca3458832f30ade510e7c047e7af1591c20b609",
+      "version": null
+    },
+    {
+      "path": "config/replay-data-provider.development.v2.json",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "cbc0c6dc83bab14373f7699540adce3bbb4d5e237f05abe4c4dae63118678d29",
+      "embedded_semantic_digest": null,
+      "version": "2.0.0"
+    },
+    {
+      "path": "config/forward-validation/paper/p6-paper-lane.v1.json",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "50fc7745570814ae927252469e11fe038c7a1b25f0f0bb8e3ce9e911d9eac0d8",
+      "embedded_semantic_digest": null,
+      "version": null
+    },
+    {
+      "path": "src/quanthus/position_lifecycle.py",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "eae78bbeea119bf3a78bd1567c784f4f38f015c388d5315c46ff030700181c86"
+    },
+    {
+      "path": "src/quanthus/capital_allocation.py",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "35fe42ef0b1cafadc80e17be1a89262e5a992513848ff720fe29b6fe11211169"
+    },
+    {
+      "path": "src/quanthus/concentration.py",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "009bc02c786f091bf4597463eda842fee8d651fae24e537985b7c0c2ebbd4ca1"
+    },
+    {
+      "path": "src/quanthus/expert_strategy/runner.py",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "96d00567ec4b0008e753aed1874136337a108d2c36a684d897117fc4d124d69b"
+    },
+    {
+      "path": "src/quanthus/expert_strategy/position_risk.py",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "521925258416e48f8bda585b16253dea81224d29bea50a5336febc2b06c53b56"
+    },
+    {
+      "path": "src/quanthus/backtest/contracts.py",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "519f8f6c4145f9a39b2771374f7bc7ed87c7e21e8c2928d450f6ada19fa137b4"
+    },
+    {
+      "path": "src/quanthus/backtest/policy.py",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "30dfe7e9ba00cfd72bbef3398a381d3df4cde7d968a59a21e67877803c9611d0"
+    },
+    {
+      "path": "src/quanthus/backtest/engine.py",
+      "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+      "raw_sha256": "2721a72ec7f553e7c4861e9863e26f2848138531c4ee59340569d500e6276d8c"
+    }
+  ],
+  "product_bindings": [
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/README.md",
+      "raw_sha256": "672aff6d5b677ef909a3a56e73451ed393231a5598e503791230550d1f31f0fe"
+    },
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/capital-risk.md",
+      "raw_sha256": "cc0df12a252f923987cd4da3d8496997cdfb5717ce252a5f836a510524010f68"
+    },
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/engineering-contract.md",
+      "raw_sha256": "3313adfefa53d351dbc3cce15818a8a220f2017c97c902ef12fc894d87f6035b"
+    },
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/engineering-work-packages.md",
+      "raw_sha256": "d4aa9bb1dfd143c07aa0ca981fb001535a75b07dc8e6c93197ebd45318683def"
+    },
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/acceptance-scenarios.md",
+      "raw_sha256": "80d1782b07e88186afa5f4729fc755efbe78514d61412452d5d07b3f4ddfe0ab"
+    },
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/contract-cases.json",
+      "raw_sha256": "58474d7c73ed8ebb73ea1758a2dc688932c7e26c9030d871284bf994aecaa73d"
+    }
+  ],
+  "candidate_policy": {
+    "id": "r11-candidate-observation-v1",
+    "version": "1.0.0",
+    "opportunity_type": "p4-event.price-volume-state-transition@1.0.0",
+    "opportunity_identity": "original_event_id+original_source_snapshot+candidate_rule_digest; retain same identity across observation/entry/held/exit",
+    "current_entry_validity": "original T_after_close -> T+1_open; supplied original calendar/execution eligibility and expiry, no inferred manual window",
+    "projection_states": [
+      "observed",
+      "blocked",
+      "reserved",
+      "entered",
+      "held",
+      "exiting",
+      "closed",
+      "expired"
+    ],
+    "candidate_position_separation": "candidate eligibility/allocation is separate from actual fill/PositionLifecycleState; original allocated does not imply reserved/order/fill",
+    "ordering": "qualified score descending,security_code ascending,opportunity_id then decision_id as deterministic ties",
+    "held_exit": "consume original expert/veto/exit outputs and fill/status evidence, never infer exit from missing data or ratio alone",
+    "new_same_security_event": "keep same-security active/reserved uniqueness; after old closed+settled+original5-session position cooldown and new P4event meets original22-session separation, create a distinct opportunity; no same-event rearm",
+    "unadopted_policy": [
+      "multi-day wait_for_a_new_buy_point beyond original T+1 window",
+      "new candidate lifetime/expiry thresholds",
+      "new reentry trigger for same original event"
+    ],
+    "nontrading_explanation": "expired/unallocated opportunity can stay visible with reasons; visibility grants no renewed entry"
+  },
+  "funding_policy": {
+    "id": "r11-fixed-reserve-policy",
+    "version": "1.0.0",
+    "mode": "fixed",
+    "identity_separate_from": "finite_total_budget_fixed_unit_no_profit_redeployment",
+    "target_N": "explicit adopted/synthetic config",
+    "cycle_B": "min(N,confirmed bucket available net cash after own holds/known fee reserves); lock once at accepted reservation",
+    "settlement": "only flat,orders terminal/fillscomplete,feesknown,conflictsclear; frozen settlement key; profit aboveN ->shared reserve,shortfall funded up toavailable reserve",
+    "ordered_batch": "confirmed settlement event sequence; same batch sorted bucket_id; never reorder/backfill completed settlement",
+    "reserve_shortfall": "reserve>=0; negative cash delta beyond reserve becomesunallocated_adjustment<=0,accountcash reflects once; laterreserve inflow first offsetsadjustment",
+    "preactivation": "on new qualified-cycle reservation,topup actualshortfall fromcurrent reserve afteroffset; idempotent reservation request; do not topup heldcycles or expand lockedB",
+    "late_delta": "closed fixedcycle cash delta toreserve/adjustment,oldcycle attribution; newcycleB unchanged",
+    "allocation": "fixed sortedbucketid; one candidate only considersfirsteligibleemptybucket; no hunt for a richerbucket; capacityfailure releasesunsubmittedreservation and keeps nextday reassessment explicit"
+  },
+  "risk_policy": {
+    "id": "r11-account-risk-policy",
+    "version": "1.0.1",
+    "parameter_scope": "explicit synthetic values only in this package; real values unset",
+    "cash_identity": "cash_total=sum(bucket_cash)+reserve+unallocated_adjustment; tradeable_cash provided before ourholds,not brokerfreecash inferred",
+    "equity_denominator": "First validate same-asof economicE=cash+allmarkedpositions+recognizedreceivables-recognizedpayables. For newintent apply conservativepost-fillE_floor(q)=E - incremental_unrecognized_fee_upperbounds(allotherpotentialbuys+q) - sum(quantity_i*max(pricebound_i-markprice_i,0)). Existingrecognizedpayables alreadyinE are not chargedtwice; prospectivebelowmarkprofit notcredited.",
+    "exposure": "Allassigned/externalcurrentpositions at same-asof mark + otherunsubmittedreservations/remainingpossiblebuy/filledunreportedbuys at quantity*max(mark,finitepricebound) + q*max(mark,pricebound); no doublecount fills/holds; pendingunconfirmedsells release0.",
+    "quantity": "largestintegerlotq satisfying targetfraction*lockedBremainingincludingfees,cashavailable,stock/industry/total projectedexposure <= respectiveexplicitlimits*positiveE_floor(q); fee/adversemarklackboundblocksdependentnewrisk",
+    "fee": "reuse explicitP2 buycost object; ROUND_HALF_UP atcashquantum; grosscommission max(rate*gross,minfee); no fee=0 assumption on unknown",
+    "fixedlimits": [
+      "max2active/reserved buckets per static level1industry",
+      "max2newbuckets perday",
+      "atmostoneactive/reservedplannedbucket persecurity"
+    ],
+    "missing": "unknownfiniteprice/fee/cash/requiredmembership or invalidvaluationE fails onlydependentnewrisk; actualhold/exitrule continues",
+    "ratio_breach": "pausecorrespondingnewrisk + alert; no generatedsale",
+    "reason_for_revision": "Pre-implementation selfreview: original currentE-only denominator allowed feecaused immediatecapbreach. Refine to productcontract projectedstate, preserve draftv1.0.0 and its original checkpoint as history."
+  },
+  "research_comparison": {
+    "status": "pre_registered_not_activated",
+    "control": "exact unchanged sourceP4/P2/P6 fundingandoriginalentry policy binding,not R10learnedchild",
+    "candidate": "oneR11 v8composition only; C13 limit explicitlydeclared",
+    "shared_inputs": "immutablejob-local signals/facts once; each arm owncandidate/units/reserve/accountpath",
+    "proposed_window": "2020-01-01 to2021-12-31 development; preserve samewindow, original futurecutoff, history floor and exposure knownused; noarbitration/blind access",
+    "qualification": "provider developmentv2 retrospective recordview per_decision_publication_proven=false; node paths not assumed live. Exactsourcephysicalmanifest+PITpurpose+expertuse+accountconfig required before rowaccess",
+    "results": "entry/quantity/capacity/exit deltas,reasoncounts,cash/reserve/holds identities,wholeaccountnetreturn/DD/utilization/exposure/fees/constraints; allchangedevents traced",
+    "pass_contract": "synthetic operational invariant pass separate; dailydecision adoption cannot be granted until exact market-purpose/expert/candidate validity/riskvalues and preregisteredwholeaccount economic tradeoff criteria satisfied",
+    "stop": "no thresholds/window/cutoff tweaks ornextcandidate; missingadoption prereqs returns namedlimited/no_daily_adoption disposition"
+  },
+  "stages": [
+    {
+      "id": "W0",
+      "owner": "researchlead",
+      "build": "oncedigestboundcoverage+contract",
+      "lifecycle": "retaineddesign",
+      "consumers": [
+        "DS",
+        "P12",
+        "finalaudit"
+      ]
+    },
+    {
+      "id": "S1",
+      "owner": "DS",
+      "build": "pure sharedpolicyfunctions only",
+      "lifecycle": "repositorycode",
+      "consumers": [
+        "researchadapter",
+        "P12 W3/W4"
+      ]
+    },
+    {
+      "id": "S2",
+      "owner": "DS",
+      "build": "synthetic fixtureinputs once,operational tests/reconstructedgoldenstate",
+      "lifecycle": "jobTMP then receiptarchive",
+      "consumers": [
+        "C13",
+        "C15",
+        "internalreview"
+      ]
+    },
+    {
+      "id": "S3",
+      "owner": "researchlead",
+      "build": "qualifiedcomparisonproposal/costorblockeddisposition",
+      "lifecycle": "retainedcontract",
+      "consumers": [
+        "Owner ifnewauthority",
+        "finalaudit"
+      ]
+    },
+    {
+      "id": "S4",
+      "owner": "researchlead",
+      "build": "completeR11batchresults+cost+adoptionhandoff",
+      "lifecycle": "privatepublished evidence",
+      "consumers": [
+        "finalaudit",
+        "P12"
+      ]
+    }
+  ],
+  "ds_allow_paths": [
+    "src/quanthus/product_daily/{__init__,contracts,candidate,funding,risk}.py",
+    "tests/unit/test_product_daily_r11.py",
+    "tests/contract/test_product_daily_r11.py",
+    "config/research/r11/*",
+    "docs/design/research-r11-d1b-v1.md",
+    "docs/work-items/research-r11-value-brief.md",
+    "docs/acceptance/research-r11-synthetic-preparation.md",
+    "scripts/r11_synthetic_verify.py"
+  ],
+  "ds_forbidden_mutations": [
+    "legacy sourcecard/policy/thresholds",
+    "P6/serving config",
+    "account/reports/database/API/UI platform",
+    "sourceacquisition/repair",
+    "frozen prior evidence",
+    "marketrow reading withoutnewactivation"
+  ],
+  "budget": {
+    "planner": "Researchlead operationalguard withinOwnercontinuation,not newitemized research grant",
+    "shared_preparation_recommendation_active_hours": 4,
+    "ds_estimated_active_minutes": [
+      60,
+      120
+    ],
+    "ds_wall_cap_minutes": 150,
+    "ds_script_cpu_cap_seconds": 2400,
+    "ds_process_rss_cap_bytes": 2147483648,
+    "ds_artifact_bytes_cap": 134217728,
+    "new_reference_training_market_capital": 0,
+    "capture": "UTCabsolute start/deadline onreceivinglatestcompleted; preserve oldcost/exposure; fullchecks separately if>cap require batchreport,no assumeextra budget"
+  },
+  "return_to": "researchlead internalacceptance/integration; finalaudit onlycompleteR11",
+  "supersedes_design_version": "1.0.0",
+  "semantic_digest": "sha256:e09576758b35283cc1971e8f741d87abab26601964c8315e3e2b7db3d76823aa"
+}

@@ -1,0 +1,211 @@
+{
+  "schema_version": "quanthus.r11.ds-adoption-usage.v1",
+  "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+  "contract": "research-contract.v1.0.1.json",
+  "contract_semantic_digest": "sha256:e09576758b35283cc1971e8f741d87abab26601964c8315e3e2b7db3d76823aa",
+  "mode": "non_authorizing_synthetic_preparation",
+  "daily_adopted": false,
+  "bindings": {
+    "A01": {
+      "owner": "P11",
+      "use": "original P4 event identity and original T+1 candidate projection",
+      "implementation": [
+        "src/quanthus/product_daily/candidate.py",
+        "src/quanthus/product_daily/risk.py"
+      ],
+      "scope_digests": [
+        {
+          "scope": "raw_file",
+          "path": "config/p4-candidate-price-volume-transition.research.v1.json",
+          "sha256": "04207eabf00a1f4898f28918e4f846cdd91b12f23a906e574306581e471c271c"
+        },
+        {
+          "scope": "embedded_semantic",
+          "path": "config/p4-candidate-price-volume-transition.research.v1.json",
+          "digest": "sha256:b04464c838705e71331515332ceb9e796ce26698c784d4615cff00dfdcf41c50"
+        },
+        {
+          "scope": "component",
+          "path": "src/quanthus/product_daily/candidate.py",
+          "sha256": "7c703496741a448be4d57eb168aa0178cfce33ca439b97647ebb2dd955c8233e"
+        }
+      ],
+      "missing_fields": [
+        "daily consumer-qualified universe",
+        "adopted multi-day new-buy-point semantics",
+        "same-event rearm semantics"
+      ]
+    },
+    "A02": {
+      "owner": "P11 expert purpose / P12 adapter",
+      "use": "preserve original Trend, Position Risk, veto and base exit component identities",
+      "semantic_decision_authority": "inconclusive",
+      "trend_scope": "entry scoring only",
+      "position_risk_scope": "original entry cap/veto and held reduce/exit through original aggregator",
+      "implementation": [
+        "src/quanthus/expert_strategy/runner.py",
+        "src/quanthus/expert_strategy/position_risk.py"
+      ],
+      "scope_digests": [
+        {
+          "scope": "raw_file",
+          "path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+          "sha256": "7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664"
+        },
+        {
+          "scope": "embedded_semantic",
+          "path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+          "digest": "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c"
+        },
+        {
+          "scope": "raw_file",
+          "path": "src/quanthus/expert_strategy/runner.py",
+          "sha256": "96d00567ec4b0008e753aed1874136337a108d2c36a684d897117fc4d124d69b"
+        },
+        {
+          "scope": "raw_file",
+          "path": "src/quanthus/expert_strategy/position_risk.py",
+          "sha256": "521925258416e48f8bda585b16253dea81224d29bea50a5336febc2b06c53b56"
+        }
+      ],
+      "missing_fields": [
+        "new daily purpose evidence",
+        "acceptance semantic_decision_authority currently inconclusive"
+      ]
+    },
+    "A03": {
+      "owner": "P10 supply / P11 consumer",
+      "use": "metadata-only consumer demand; no market row acquisition or repair",
+      "scope_digests": [
+        {
+          "scope": "raw_file",
+          "path": "config/replay-data-provider.development.v2.json",
+          "sha256": "cbc0c6dc83bab14373f7699540adce3bbb4d5e237f05abe4c4dae63118678d29"
+        },
+        {
+          "scope": "consumer_contract",
+          "path": "config/research/r11/data-consumer-demand.json",
+          "identity": "quanthus.r11.consumer-demand.v1"
+        }
+      ],
+      "per_decision_publication_proven": false,
+      "missing_fields": [
+        "qualified PIT purpose",
+        "exact daily source/member/clock/universe manifest",
+        "node physical availability"
+      ]
+    },
+    "A04": {
+      "owner": "P11 policy / P12 configuration",
+      "use": "explicit synthetic risk ratios and conservative post-fill E_floor",
+      "implementation": [
+        "src/quanthus/product_daily/risk.py"
+      ],
+      "scope_digests": [
+        {
+          "scope": "raw_file",
+          "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/capital-risk.md",
+          "sha256": "cc0df12a252f923987cd4da3d8496997cdfb5717ce252a5f836a510524010f68"
+        },
+        {
+          "scope": "component",
+          "path": "src/quanthus/product_daily/risk.py",
+          "sha256": "507dc82626df854a879a8a450c3c0c42890fdecb1025dd079d5eb0e099baad29"
+        }
+      ],
+      "real_account_limits": null,
+      "missing_fields": [
+        "actual account thresholds",
+        "same-as-of account valuation and fee receipts",
+        "daily risk-threshold purpose adoption"
+      ]
+    },
+    "A05": {
+      "owner": "P12 shared implementation / P11 use",
+      "use": "pure fixed bucket, reserve, adjustment and cycle settlement functions",
+      "implementation": [
+        "src/quanthus/product_daily/funding.py"
+      ],
+      "scope_digests": [
+        {
+          "scope": "raw_file",
+          "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/engineering-contract.md",
+          "sha256": "3313adfefa53d351dbc3cce15818a8a220f2017c97c902ef12fc894d87f6035b"
+        },
+        {
+          "scope": "component",
+          "path": "src/quanthus/product_daily/funding.py",
+          "sha256": "902298a731b7cc66f9555e946929683c085b8da4b2b7d2e9a4ad452f56f8677f"
+        }
+      ],
+      "missing_fields": [
+        "P12 W1/W2 account fact and atomic CAS implementation",
+        "qualified full comparison and daily adoption"
+      ]
+    },
+    "A06": {
+      "owner": "P12/P7 execution facts",
+      "use": "explicit synthetic P2 buy fee, lot and T+1 timing semantics",
+      "implementation": [
+        "src/quanthus/backtest/policy.py",
+        "src/quanthus/backtest/engine.py",
+        "src/quanthus/product_daily/risk.py"
+      ],
+      "scope_digests": [
+        {
+          "scope": "raw_file",
+          "path": "config/p2-execution-policy.research.v1.json",
+          "sha256": "e2ee55ea09682eeb775b9acfcfc4bbba0908ddd4157705cd81fd8f050097c816"
+        }
+      ],
+      "missing_fields": [
+        "actual broker fee and windows",
+        "real multi-fill execution facts"
+      ]
+    },
+    "A07": {
+      "owner": "P12",
+      "use": "handoff only; no OPS/USE or UI implementation in this tranche",
+      "scope_digests": [
+        {
+          "scope": "raw_file",
+          "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/engineering-work-packages.md",
+          "sha256": "d4aa9bb1dfd143c07aa0ca981fb001535a75b07dc8e6c93197ebd45318683def"
+        }
+      ],
+      "missing_fields": [
+        "P12 W1-W6 implementation",
+        "five-open-session OPS",
+        "non-expert USE acceptance"
+      ]
+    }
+  },
+  "implementation_scope": {
+    "contracts": {
+      "path": "src/quanthus/product_daily/contracts.py",
+      "sha256": "a849a92e2a14f02de914e4b06c41d6b3619a1146edccb415c0ae00378cc3e77e"
+    },
+    "policy": {
+      "path": "config/research/r11/implementation-policy.v1.json",
+      "sha256": "1b01ce8fa6a3c9e11eea40419a612794cda9b4f193f18dab958259330ab9cb08"
+    },
+    "unit_test": {
+      "path": "tests/unit/test_product_daily_r11.py",
+      "sha256": "1ef1bd43d5e6d66f8c72e4caba9f12f0382694cffc90bf57056165616d050714"
+    },
+    "contract_test": {
+      "path": "tests/contract/test_product_daily_r11.py",
+      "sha256": "bd9a947521bc9832e93117fd9dac6460ad617fcc3f467ae7b7a0ec05a12a693a"
+    },
+    "synthetic_verifier": {
+      "path": "scripts/r11_synthetic_verify.py",
+      "sha256": "c011770af2f6d738ba85cdcb5e2865a8f67bd47ef94d028be40e98bcbad05154"
+    },
+    "repair_dispositions": {
+      "path": "config/research/r11/repair-dispositions.v1.json",
+      "sha256": "7fa7f8005d2b53a425f93c2ce7242857631ea91a859b8de707792c2f9cd3290c"
+    }
+  },
+  "implementation_version": "1.1.0",
+  "repair_manifest_sha256": "3ac42c68e759734bc29c78475c95fb0a6066e0f2529963771c4d1208c7ac7735"
+}

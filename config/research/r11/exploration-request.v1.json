@@ -1,0 +1,179 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "R11-D1B-PREPARE-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "delivery",
+  "family": "r11-d1b-fixed-reserve",
+  "work_item": "P11-R11-D1B-001",
+  "modules": [
+    "MVP",
+    "EXPERT",
+    "REPRO",
+    "CLOSEOUT",
+    "TRACE"
+  ],
+  "question": "Can one shared candidate/fixed-reserve/account-risk policy produce consistent auditable daily-use decisions, and which exact adoption prerequisites remain?",
+  "consumer": "P12D1B W0/W3/W4 and P11researchlead",
+  "scope": "C13/C15/A02/A03 metadata and deterministic synthetic sharedcore only; source unchanged frozen policies preserved.",
+  "deliverable": "Exact coverage, source bindings, shared pure-policy kernel, independent synthetic witnesses, checks/cost and full-comparison feasibility/adoption gaps.",
+  "decision_if_pass": "Return complete synthetic engineering and full next-phase quote to researchlead; daily adoption remains bounded by named missing inputs/expert-use/account thresholds/candidate predicates and actual comparison.",
+  "decision_if_fail": "Return one aggregate defect/dependency/stop package with retained useful assets; no per-case audit or implicit activation.",
+  "acceptance": [
+    "Exact source/raw/semantic identities and everyA01-A07 use registered.",
+    "Operational candidate/funding/risk invariants and synthetic counterexamples execute from sharedsource.",
+    "Full exact-base checks, cost/failedattempts/resources and P12 sharedkernelhandoff.",
+    "Researchlead internalintegration before eventual R11combinedfinalaudit."
+  ],
+  "stop_conditions": [
+    "DS150minwall/2400CPU/2GiB/128MiB; absoluteclockrecordedonhandoff acceptance.",
+    "No marketrowread,newpaidreference,training,capitalreplay,dailyserving orproduction.",
+    "Frozenpolicy/purpose conflict orplatformscope expansion returns wholepackage; no threshold/window/PIT repair."
+  ],
+  "memory_sha256": "3d3174270c3ad8c53537d6664b56c83c698475313ccaf307834bc2d62e54a4d4",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "The parked original filter/fixed-holding use remains stopped. C13 candidate observation and C15 v8 shared-reserve/account-capacity are separately versioned consumer requirements, evaluated only synthetically in this tranche; no old economic window/result rerun."
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "The parked original filter/fixed-holding use remains stopped. C13 candidate observation and C15 v8 shared-reserve/account-capacity are separately versioned consumer requirements, evaluated only synthetically in this tranche; no old economic window/result rerun."
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-R5-CLOCK-20261112",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-R6-RANK1-20261113",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "relation": "respect",
+      "rationale": "R11 is metadata and synthetic shared-policy preparation for C13/C15 under P12v8; preserve this conclusion, all prior scope/cost/exposure and adoption gates. No old scientific direction or result-bearing experiment reopens."
+    },
+    {
+      "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "relation": "respect",
+      "rationale": "Retain R9/R10 scientific failures, v1 rejection and B/researchv0 assets; R11 requires no S02 learning/reference calls. Reuse exact original expert and capital primitives with their purpose ceilings, not old task closure as daily adoption."
+    },
+    {
+      "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
+      "relation": "respect",
+      "rationale": "Retain R9/R10 scientific failures, v1 rejection and B/researchv0 assets; R11 requires no S02 learning/reference calls. Reuse exact original expert and capital primitives with their purpose ceilings, not old task closure as daily adoption."
+    },
+    {
+      "conclusion_id": "CON-R9-QUALIFIED-ASSETS-LEARNING-20261114",
+      "relation": "respect",
+      "rationale": "Retain R9/R10 scientific failures, v1 rejection and B/researchv0 assets; R11 requires no S02 learning/reference calls. Reuse exact original expert and capital primitives with their purpose ceilings, not old task closure as daily adoption."
+    },
+    {
+      "conclusion_id": "CON-MVP0-RESULT-AUDIT-20261114",
+      "relation": "respect",
+      "rationale": "Retain R9/R10 scientific failures, v1 rejection and B/researchv0 assets; R11 requires no S02 learning/reference calls. Reuse exact original expert and capital primitives with their purpose ceilings, not old task closure as daily adoption."
+    },
+    {
+      "conclusion_id": "CON-R10-CONTROLLED-CANDIDATE-REJECTED-20261114",
+      "relation": "respect",
+      "rationale": "Retain R9/R10 scientific failures, v1 rejection and B/researchv0 assets; R11 requires no S02 learning/reference calls. Reuse exact original expert and capital primitives with their purpose ceilings, not old task closure as daily adoption."
+    },
+    {
+      "conclusion_id": "CON-R10-WIDTH-ONLY-AUDITED-20261114",
+      "relation": "respect",
+      "rationale": "Retain R9/R10 scientific failures, v1 rejection and B/researchv0 assets; R11 requires no S02 learning/reference calls. Reuse exact original expert and capital primitives with their purpose ceilings, not old task closure as daily adoption."
+    },
+    {
+      "conclusion_id": "CON-R10-OVERALL-ACCEPTED-DELIVERY-20261115",
+      "relation": "respect",
+      "rationale": "Retain R9/R10 scientific failures, v1 rejection and B/researchv0 assets; R11 requires no S02 learning/reference calls. Reuse exact original expert and capital primitives with their purpose ceilings, not old task closure as daily adoption."
+    }
+  ],
+  "cumulative_cost_review": "Retain prior R6-R10 costs/exposure; R11 shared4activehours is previoussuggestion not numericOwnergrant. Researchlead preparation and DSactuals tracked once; P12v8 engineering estimates separate. Unknown modelbilling/uninstrumentedCPU unknown_not_zero.",
+  "runtime_authority_boundary": "Ownerdesignatedresearchlead/DS work roles relayed by audit; complete design and routine bounded synthetic implementation are current scope. Result-bearing research phases require exact next authority.",
+  "budget": {
+    "wall_seconds": 9000,
+    "max_new_bytes": 134217728,
+    "network_requests": 0,
+    "accounting_owner": "DS actualcode/model/checkcost plus leadsharedpreparation; GitHubcodetransport separate,no market/reference network"
+  }
+}

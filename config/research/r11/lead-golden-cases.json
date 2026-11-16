@@ -1,0 +1,327 @@
+{
+  "schema_version": "quanthus.r11.independent-synthetic-goldens.v1",
+  "authored_by": "researchlead before implementation",
+  "note": "Synthetic numeric/symbolic independent oracle. DS must execute equivalent typed inputs; expected monetary results immutable; source-derived action reason naming may map explicitly, not erase case. No market or economic claim.",
+  "cases": [
+    {
+      "id": "F01",
+      "command": "settle_fixed",
+      "given": {
+        "cash": "22000",
+        "N": "20000",
+        "reserve": "500"
+      },
+      "expect": {
+        "cash": "20000",
+        "reserve": "2500",
+        "cash_sum": "22500"
+      }
+    },
+    {
+      "id": "F02",
+      "command": "settle_fixed",
+      "given": {
+        "cash": "18000",
+        "N": "20000",
+        "reserve": "500"
+      },
+      "expect": {
+        "cash": "18500",
+        "reserve": "0",
+        "underfunded": "1500",
+        "budget_30pct": "5550"
+      }
+    },
+    {
+      "id": "F03",
+      "command": "same_batch_settle",
+      "given": {
+        "buckets": {
+          "U1": "18000",
+          "U2": "18000"
+        },
+        "N": "20000",
+        "reserve": "500",
+        "input_permutation": [
+          "U2",
+          "U1"
+        ]
+      },
+      "expect": {
+        "buckets": {
+          "U1": "18500",
+          "U2": "18000"
+        },
+        "reserve": "0",
+        "cash_sum": "36500"
+      }
+    },
+    {
+      "id": "F04",
+      "command": "newcycle_pretopup",
+      "given": {
+        "cash": "18500",
+        "N": "20000",
+        "reserve": "1000"
+      },
+      "expect": {
+        "cash": "19500",
+        "reserve": "0",
+        "B": "19500",
+        "underfunded": "500",
+        "budget_30pct": "5850"
+      }
+    },
+    {
+      "id": "F05",
+      "command": "repeat_F04",
+      "given": {
+        "same_request": true
+      },
+      "expect": {
+        "transfer": "0",
+        "B": "19500",
+        "full_state_digest_unchanged": true
+      }
+    },
+    {
+      "id": "F06",
+      "command": "reserve_arrives_while_held",
+      "given": {
+        "B": "19500",
+        "reserve_increment": "1000"
+      },
+      "expect": {
+        "B": "19500",
+        "automatic_bucket_transfer": "0"
+      }
+    },
+    {
+      "id": "F07",
+      "command": "closedcycle_latefee",
+      "given": {
+        "reserve": "2000",
+        "adjustment": "0",
+        "late_fee": "100",
+        "new_B": "19500"
+      },
+      "expect": {
+        "reserve": "1900",
+        "adjustment": "0",
+        "cash_delta": "-100",
+        "new_B": "19500"
+      }
+    },
+    {
+      "id": "F08",
+      "command": "closedcycle_latefee",
+      "given": {
+        "reserve": "50",
+        "adjustment": "0",
+        "late_fee": "100",
+        "new_B": "19500"
+      },
+      "expect": {
+        "reserve": "0",
+        "adjustment": "-50",
+        "cash_delta": "-100",
+        "new_B": "19500"
+      }
+    },
+    {
+      "id": "F09",
+      "command": "reserve_transfer_after_F08",
+      "given": {
+        "reserve": "0",
+        "adjustment": "-50",
+        "incoming_internal_transfer": "80"
+      },
+      "expect": {
+        "reserve": "30",
+        "adjustment": "0",
+        "total_cash_change_including_other_bucket_transfer": "0"
+      }
+    },
+    {
+      "id": "Q01",
+      "command": "quantity",
+      "given": {
+        "B": "20000",
+        "fraction": ".30",
+        "price_bound": "10",
+        "lot": 100,
+        "cash": "100000",
+        "E": "100000",
+        "stock_limit": "1",
+        "industry_limit": "1",
+        "total_limit": "1",
+        "p2_commission_rate": ".0003",
+        "p2_minimum_commission": "5"
+      },
+      "expect": {
+        "q": 500,
+        "gross": "5000",
+        "fees": "5",
+        "next_lot_cost": "6005",
+        "target_cap": "6000"
+      }
+    },
+    {
+      "id": "Q02",
+      "command": "quantity",
+      "given": {
+        "B": "100000",
+        "fraction": "1",
+        "price_bound": "10",
+        "lot": 100,
+        "cash": "100000",
+        "E": "100000",
+        "existing_stock_exposure": "9000",
+        "stock_limit": ".10",
+        "industry_limit": "1",
+        "total_limit": "1",
+        "p2_commission_rate": ".0003",
+        "p2_minimum_commission": "5"
+      },
+      "expect": {
+        "q": 0,
+        "next_lot_post_exposure": "10000",
+        "post_equity_if_next_lot": "99995",
+        "cap_if_next_lot": "9999.5",
+        "forced_sale": false
+      }
+    },
+    {
+      "id": "Q03",
+      "command": "quantity",
+      "given": {
+        "like": "Q02",
+        "existing_stock_exposure": "8000",
+        "pending_buy_exposure": "1000"
+      },
+      "expect": {
+        "q": 0,
+        "pending_sell_releases": "0",
+        "note": "otherpendingbuyfees notalreadyrecognized mustalso reduceEfloor"
+      }
+    },
+    {
+      "id": "Q04",
+      "command": "quantity",
+      "given": {
+        "like": "Q02",
+        "E": null
+      },
+      "expect": {
+        "q": 0,
+        "reason": "INPUT_UNAVAILABLE",
+        "forced_sale": false
+      }
+    },
+    {
+      "id": "Q05",
+      "command": "first_bucket_allocation",
+      "given": {
+        "candidate_security": "SYN001",
+        "first_eligible_empty_bucket_cash": "50",
+        "second_eligible_empty_bucket_cash": "20000",
+        "price_bound": "10",
+        "lot": 100
+      },
+      "expect": {
+        "q": 0,
+        "second_bucket_probe": false,
+        "unsubmitted_reservation_retained": false,
+        "transfers_rollback_on_failed_reservation": true
+      }
+    },
+    {
+      "id": "C01",
+      "command": "same_event_reobserved",
+      "given": {
+        "event": "SYN-E1",
+        "snapshot": "SYN-S1",
+        "rule": "p4@1.0.0"
+      },
+      "expect": {
+        "opportunity_identity_unchanged": true,
+        "new_fill_inferred": false
+      }
+    },
+    {
+      "id": "C02",
+      "command": "expired_event_reobserved",
+      "given": {
+        "event": "SYN-E1",
+        "window_passed": true
+      },
+      "expect": {
+        "projection": "expired",
+        "entry_authorized": false,
+        "reason": "ENTRY_WINDOW_EXPIRED"
+      }
+    },
+    {
+      "id": "C03",
+      "command": "held_missing_evidence",
+      "given": {
+        "held": true,
+        "input_valid": false
+      },
+      "expect": {
+        "action": "hold_and_alert",
+        "forced_sale": false
+      }
+    },
+    {
+      "id": "C04",
+      "command": "raw_allocated_capacity_rejected",
+      "given": {
+        "legacy_allocated": true,
+        "capacity": "rejected"
+      },
+      "expect": {
+        "reserved": false,
+        "order": false,
+        "fill": false
+      }
+    },
+    {
+      "id": "C05",
+      "command": "future_cutoff_entry",
+      "given": {
+        "evidence_after_cutoff": true
+      },
+      "expect": {
+        "entry_authorized": false
+      }
+    },
+    {
+      "id": "C06",
+      "command": "new_event_same_security_active",
+      "given": {
+        "new_event": true,
+        "existing_active_or_reserved": true
+      },
+      "expect": {
+        "second_active_bucket": false
+      }
+    },
+    {
+      "id": "Q06",
+      "command": "quantity",
+      "given": {
+        "like": "Q02",
+        "existing_stock_exposure": "8900",
+        "mark": "10",
+        "price_bound": "10"
+      },
+      "expect": {
+        "q": 100,
+        "post_exposure": "9900",
+        "post_equity": "99995",
+        "cap": "9999.5"
+      }
+    }
+  ]
+}

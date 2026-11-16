@@ -14745,6 +14745,253 @@
           "body_sha256": "d50fc8612fc5ff3ea5a40a921d95ae8d564093ea4be8d556ceee70605248f285"
         }
       ]
+    },
+    {
+      "id": "CP-690-20261116T062935238309Z",
+      "recorded_at": "2026-11-16T06:29:35.238309+00:00",
+      "actor": "Quanthus researchlead under Owner serialR11 role handoff",
+      "work_item": "P11-R11-D1B-001",
+      "outcome": "no_module_change",
+      "summary": "Freeze exact R11C13/C15 synthetic shared-policy preparation and A01-A07 use gaps. NativeTask690 under608; one complete DS package. Market/paidreference/training/capital phases not activated.",
+      "evidence": [
+        {
+          "id": "R11-DESIGN",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-16/quanthus-r11-relay/design-v1/research-contract.json",
+          "sha256": "d271fdfbe17c4e292e19d403cbbef42c5194b1ceec28241310644c980557dcee",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Complete versioned synthetic-preparation contract; no daily adoption or historical run authority."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Planning and proposed syntheticcore scope only; preserve originalexpert semanticdecisionauthority inconclusive, retrospectivePIT limits and all broadproduct/learning admissions.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-D1B-001",
+          "number": 690,
+          "title": "[P11-R11-D1B-001] 核定单一机会与固定桶组合的日常用途",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-16T06:18:08Z",
+          "body_sha256": "d6009b8b1d0701a85d0bc3ad403221cc5665c50e5b303849e654f20b062f157b"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-690-R11-PROJECTED-RISK-20261116",
+      "recorded_at": "2026-11-16T06:33:32.006575+00:00",
+      "actor": "Quanthus researchlead under Owner serialR11 role handoff",
+      "work_item": "P11-R11-D1B-001",
+      "outcome": "no_module_change",
+      "summary": "Preimplementation designselfreview refines riskdenominator to conservativepostfillE toprevent feecaused capbreach; freezev1.0.1 and independentboundarygoldens, preserve unusedv1.0.0draft. No moduleadoptionchange.",
+      "evidence": [
+        {
+          "id": "R11-DESIGN-101",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-16/quanthus-r11-relay/design-v1/research-contract.v1.0.1.json",
+          "sha256": "f49cdad4405cbb641ac93812671c000469a35968895ebd30bc8d26d9f6b5eb15",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Preimplementation corrected syntheticcontract only; no scientific run/dailyadoption."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Planning and proposed syntheticcore scope only; preserve originalexpert semanticdecisionauthority inconclusive, retrospectivePIT limits and all broadproduct/learning admissions.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-D1B-001",
+          "number": 690,
+          "title": "[P11-R11-D1B-001] 核定单一机会与固定桶组合的日常用途",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-16T06:18:08Z",
+          "body_sha256": "d6009b8b1d0701a85d0bc3ad403221cc5665c50e5b303849e654f20b062f157b"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-690-20261116T101635852026Z",
+      "recorded_at": "2026-11-16T10:16:35.852026+00:00",
+      "actor": "Quanthus execution DS under serial R11 role handoff",
+      "work_item": "P11-R11-D1B-001",
+      "outcome": "no_module_change",
+      "summary": "Repair R1-R10 in the synthetic C13/C15 shared policy core: completed-cycle late cash, reserve debt priority, settled-cycle reuse, canonical command binding, transient candidate re-evaluation, expert entry authority, atomic composite replay, positive equity, strict typed inputs and complete frozen-oracle verification.",
+      "evidence": [
+        {
+          "id": "R11-REPAIR-DISPOSITIONS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/.codex/worktrees/r10-diagnostic-design/Quanthus/config/research/r11/repair-dispositions.v1.json",
+          "sha256": "7fa7f8005d2b53a425f93c2ce7242857631ea91a859b8de707792c2f9cd3290c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Synthetic engineering repair only; daily adoption and full historical comparison remain ungranted."
+        },
+        {
+          "id": "R11-LEAD-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-16/quanthus-r11-relay/lead-review-001/REPAIR-MANIFEST.json",
+          "sha256": "3ac42c68e759734bc29c78475c95fb0a6066e0f2529963771c4d1208c7ac7735",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent internal-review defects and repair scope; not final audit acceptance."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Implementation remains synthetic-preparation evidence under the frozen R11 contract. It repairs current shared-core quality but does not advance daily adoption, A01/A02/A03/A04/A06/P12 fact-layer maturity or historical research authority.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-D1B-001",
+          "number": 690,
+          "title": "[P11-R11-D1B-001] 核定单一机会与固定桶组合的日常用途",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-16T09:11:04Z",
+          "body_sha256": "d6009b8b1d0701a85d0bc3ad403221cc5665c50e5b303849e654f20b062f157b"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-690-R11-LEAD-CONVERGENCE-20261116",
+      "recorded_at": "2026-11-16T11:20:35.592811+00:00",
+      "actor": "Quanthus researchlead under Owner serial whole-batch R11 authority",
+      "work_item": "P11-R11-D1B-001",
+      "outcome": "deferred",
+      "summary": "Internal synthetic engineering passes after two grouped reviews and three further boundary fixes; full daily-use comparison parked on named prerequisites. Whole-batch final audit pending.",
+      "evidence": [
+        {
+          "id": "R11-LEAD-INTERNAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-convergence/internal-acceptance.json",
+          "sha256": "f8ac95198dba2adcb28b22f46b03b78dd8bf6f0a94603d97f1d223f9f5e8d124",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Researchlead internal synthetic engineering pass at exact GitHub source; final independent audit pending."
+        },
+        {
+          "id": "R11-LIMITED-DECISION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-convergence/adoption-decision.json",
+          "sha256": "ddcd0756b0f719203d9d96c10e74940f46c5578542e897e4a27d38035770cee0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Named limited/parked full-comparison decision, research not evaluated, daily adopted false."
+        }
+      ],
+      "updates": [
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "R11 C13/C15共享1.1.1、精确Linux9388pass和完整内部缺陷/成本/用途包已齐，Task690与父608当前摘要同步。",
+          "remaining": "独立整包终审、普通合入与最终发布/生命周期回执待完成；此前accepted记录保留。",
+          "next_action": "提交一份R11整包终审；不逐case派审。",
+          "evidence": [
+            "R11-LEAD-INTERNAL",
+            "R11-LIMITED-DECISION"
+          ],
+          "supersedes": "CP-675-R10-CONTROLLED-RESULT-20261114"
+        },
+        {
+          "module": "CLOSEOUT",
+          "facet": "value",
+          "status": "inconclusive",
+          "scope": "完整R11日常采用问题按A01-A07具名受限停止；共享合成核心保留，46-92小时完整比较停放。",
+          "remaining": "完整历史比较未运行，日常用途/账户/PIT/专家前置待齐；原R6-R10结果保留。",
+          "next_action": "先补实际消费者事实与用途前置，再重估一个旧control与一个组合arm的最小比较。",
+          "evidence": [
+            "R11-LEAD-INTERNAL",
+            "R11-LIMITED-DECISION"
+          ],
+          "supersedes": "CP-675-R10-CONTROLLED-RESULT-20261114"
+        }
+      ],
+      "no_change_reason": "MVP/EXPERT/REPRO quality, value and admissions retain prior qualified scopes; no market/ref/training/capital/daily/production activation and no final independent acceptance claim.",
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-D1B-001",
+          "number": 690,
+          "title": "[P11-R11-D1B-001] 核定单一机会与固定桶组合的日常用途",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-16T11:18:48Z",
+          "body_sha256": "a8a6cd0f3df2e3371551fbdbf71a7645277a05f1e190a790ad632b1ebe1d5f3e"
+        }
+      ]
+    },
+    {
+      "id": "CP-690-R11-FA01-REPAIR-20261116",
+      "recorded_at": "2026-11-16T12:56:35.112643+00:00",
+      "actor": "Quanthus researchlead, one independent-final-audit root-cause repair",
+      "work_item": "P11-R11-D1B-001",
+      "outcome": "no_module_change",
+      "summary": "Repair FA-01 current/history reservation conflation in1.2.0; full two-cycle public entry/settlement/replay/late-fee and new exact native closure pass internally. Whole R11 final independent re-audit pending.",
+      "evidence": [
+        {
+          "id": "R11-FA01-INTERNAL",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-fa01-resubmission/internal-acceptance.json",
+          "sha256": "40214e874491073b27a8c00937d0dd6a1f26de8509666dd290e7d00125b4eac6",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal synthetic repair and fresh native pass only; original final-audit rejection retained, independent acceptance pending."
+        },
+        {
+          "id": "R11-AUDIT-001-REJECTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-fa01-resubmission/audit-001/audit-receipt.json",
+          "sha256": "3b03a4a45384e26d4a81afc6257e93a820668a839309f35a0996194a8c7a21d1",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "First independent whole-batch audit CHANGES_REQUIRED for FA-01; all other passed scopes retained."
+        }
+      ],
+      "updates": [],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "no_change_reason": "Fix existing promised synthetic lifecycle; module maturity/admission and parked full comparison remain at prior scope until final independent re-audit. No source acquisition/training/market/capital/daily/production.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-D1B-001",
+          "number": 690,
+          "title": "[P11-R11-D1B-001] 核定单一机会与固定桶组合的日常用途",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-16T12:56:30Z",
+          "body_sha256": "0b9caa1d4123e8d0ed389f9c4365e2b4f759c5c85e0a6a1d012267d45b05dde8"
+        }
+      ]
     }
   ],
   "history_imports": [

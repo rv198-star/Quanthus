@@ -1,0 +1,261 @@
+{
+  "schema_version": "quanthus.r11.coverage.v1",
+  "base": "87d886986c522bd5982d9fa71061461e4b0550c2",
+  "bindings": [
+    {
+      "binding_id": "A01",
+      "consumer": "candidate-entry/lifecycle",
+      "mode": "synthetic_preparation",
+      "version": "p4event1.0.0 + r11candidateobservation1.0.0",
+      "digest": "sha256:b04464c838705e71331515332ceb9e796ce26698c784d4615cff00dfdcf41c50",
+      "source_ref": [
+        "config/p4-candidate-price-volume-transition.research.v1.json",
+        "config/expert-strategies/p4-trend-risk.v1.0.1.json"
+      ],
+      "allowed_uses": [
+        "synthetic identity/projection",
+        "existing singleT+1 researchwindow"
+      ],
+      "dependencies": [
+        "A02",
+        "A03",
+        "A05",
+        "originalcalendar/executionwindow"
+      ],
+      "status": "adaptation_required",
+      "missing_fields": [
+        "multi-day waiting predicate/expiry/rearmadoption",
+        "daily consumerqualifieduniverse"
+      ],
+      "owner": "P11",
+      "acceptance_ref": null,
+      "source_identities": [
+        {
+          "path": "config/p4-candidate-price-volume-transition.research.v1.json",
+          "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+          "raw_sha256": "04207eabf00a1f4898f28918e4f846cdd91b12f23a906e574306581e471c271c",
+          "embedded_semantic_digest": "sha256:b04464c838705e71331515332ceb9e796ce26698c784d4615cff00dfdcf41c50",
+          "version": "1.0.0"
+        },
+        {
+          "path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+          "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+          "raw_sha256": "7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664",
+          "embedded_semantic_digest": "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c",
+          "version": "1.0.1"
+        }
+      ]
+    },
+    {
+      "binding_id": "A02",
+      "consumer": "entry/held/reduce/exit",
+      "mode": "synthetic_preparation",
+      "version": "p4-trend-risk1.0.1",
+      "digest": "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c",
+      "source_ref": [
+        "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+        "config/expert-evaluations/acceptance/candidate-p4-trend-risk-1.0.1.v1.json",
+        "src/quanthus/expert_strategy/runner.py",
+        "src/quanthus/expert_strategy/position_risk.py"
+      ],
+      "allowed_uses": [
+        "exact componentalgorithm reuse",
+        "synthetic decisionintegration",
+        "retained diagnostic evidence"
+      ],
+      "dependencies": [
+        "A03",
+        "originalexpert/policyacceptance scope"
+      ],
+      "status": "research_admission_required",
+      "missing_fields": [
+        "newdaily purpose evidence; acceptance.semantic_decision_authority=inconclusive"
+      ],
+      "owner": "P11",
+      "acceptance_ref": "config/expert-evaluations/acceptance/candidate-p4-trend-risk-1.0.1.v1.json",
+      "source_identities": [
+        {
+          "path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+          "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+          "raw_sha256": "7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664",
+          "embedded_semantic_digest": "sha256:805ce33024ae82dc46a685c3ad7425528702e6a089ee4d09f27af2793d55ed0c",
+          "version": "1.0.1"
+        },
+        {
+          "path": "config/expert-evaluations/acceptance/candidate-p4-trend-risk-1.0.1.v1.json",
+          "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+          "raw_sha256": "80c276638156a9fa73b2e6f91c594152943c189f21bd4f503f4011af1fa5c88e",
+          "embedded_semantic_digest": "sha256:8ba3263be7a1de6b8c5459dc6ca3458832f30ade510e7c047e7af1591c20b609",
+          "version": null
+        },
+        {
+          "path": "src/quanthus/expert_strategy/runner.py",
+          "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+          "raw_sha256": "96d00567ec4b0008e753aed1874136337a108d2c36a684d897117fc4d124d69b"
+        },
+        {
+          "path": "src/quanthus/expert_strategy/position_risk.py",
+          "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+          "raw_sha256": "521925258416e48f8bda585b16253dea81224d29bea50a5336febc2b06c53b56"
+        }
+      ]
+    },
+    {
+      "binding_id": "A03",
+      "consumer": "P4events+Trend+PositionRisk+P2",
+      "mode": "synthetic_preparation",
+      "version": "development-direct-dwd-job-local-v1@2.0.0",
+      "digest": "sha256:cbc0c6dc83bab14373f7699540adce3bbb4d5e237f05abe4c4dae63118678d29",
+      "source_ref": [
+        "config/replay-data-provider.development.v2.json"
+      ],
+      "allowed_uses": [
+        "metadataonly; exactsourceconsumerrequest"
+      ],
+      "dependencies": [
+        "P10exactsource/product/usehandoff"
+      ],
+      "status": "data_handoff_required",
+      "missing_fields": [
+        "nodephysicalavailability",
+        "qualifiedPITpurpose",
+        "exactdaily source/member/clock/universe manifest"
+      ],
+      "owner": "P10 supply;P11 consumer",
+      "acceptance_ref": null,
+      "source_identities": [
+        {
+          "path": "config/replay-data-provider.development.v2.json",
+          "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+          "raw_sha256": "cbc0c6dc83bab14373f7699540adce3bbb4d5e237f05abe4c4dae63118678d29",
+          "embedded_semantic_digest": null,
+          "version": "2.0.0"
+        }
+      ]
+    },
+    {
+      "binding_id": "A04",
+      "consumer": "quantity/account-risk",
+      "mode": "synthetic_preparation",
+      "version": "r11-account-risk-policy@1.0.1",
+      "digest": "sha256:e09576758b35283cc1971e8f741d87abab26601964c8315e3e2b7db3d76823aa",
+      "source_ref": [
+        "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/capital-risk.md"
+      ],
+      "allowed_uses": [
+        "explicit synthetic configuration"
+      ],
+      "dependencies": [
+        "A03valuation",
+        "A06fee/rules",
+        "P12fullbaseline"
+      ],
+      "status": "adaptation_required",
+      "missing_fields": [
+        "actualaccount parameters",
+        "daily riskthresholdpurposeadoption",
+        "accountbaseline/fee/valuation receipt"
+      ],
+      "owner": "P11 policy/P12 config",
+      "acceptance_ref": null,
+      "source_identities": []
+    },
+    {
+      "binding_id": "A05",
+      "consumer": "fixedcycle/reserve",
+      "mode": "synthetic_preparation",
+      "version": "r11-fixed-reserve-policy@1.0.0",
+      "digest": "sha256:465e6557b7ddc262e1dba380dfbb89042efb7a893480d90ee83d65992be7cab3",
+      "source_ref": [
+        "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/engineering-contract.md"
+      ],
+      "allowed_uses": [
+        "purefunction synthetic policy",
+        "P12sharedcorehandoff"
+      ],
+      "dependencies": [
+        "A01",
+        "A04",
+        "P12W1/W2facts/revision"
+      ],
+      "status": "adaptation_required",
+      "missing_fields": [
+        "P12W1/W2 accountfact/atomicCAS",
+        "fullqualifiedcomparisonadoption"
+      ],
+      "owner": "P12 sharedcore implementation/P11 uses",
+      "acceptance_ref": null,
+      "source_identities": []
+    },
+    {
+      "binding_id": "A06",
+      "consumer": "execution/fees",
+      "mode": "synthetic_preparation",
+      "version": "p2-daily-research-v1",
+      "digest": "sha256:e2ee55ea09682eeb775b9acfcfc4bbba0908ddd4157705cd81fd8f050097c816",
+      "source_ref": [
+        "config/p2-execution-policy.research.v1.json"
+      ],
+      "allowed_uses": [
+        "synthetic simulation fee/unit/clockonly"
+      ],
+      "dependencies": [
+        "adoptedmode/executionprofile"
+      ],
+      "status": "available_for_reuse",
+      "missing_fields": [
+        "actualwindows/actualbrokerfee andmultifillbinding"
+      ],
+      "owner": "P12/P7",
+      "acceptance_ref": null,
+      "source_identities": [
+        {
+          "path": "config/p2-execution-policy.research.v1.json",
+          "base_commit": "87d886986c522bd5982d9fa71061461e4b0550c2",
+          "raw_sha256": "e2ee55ea09682eeb775b9acfcfc4bbba0908ddd4157705cd81fd8f050097c816",
+          "embedded_semantic_digest": null,
+          "version": "p2-daily-research-v1"
+        }
+      ]
+    },
+    {
+      "binding_id": "A07",
+      "consumer": "dailyoperation/use",
+      "mode": "synthetic_preparation",
+      "version": "P12D1v8",
+      "digest": "sha256:d4aa9bb1dfd143c07aa0ca981fb001535a75b07dc8e6c93197ebd45318683def",
+      "source_ref": [
+        "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/engineering-work-packages.md"
+      ],
+      "allowed_uses": [
+        "contracthandoff"
+      ],
+      "dependencies": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "P12W1-W6"
+      ],
+      "status": "adaptation_required",
+      "missing_fields": [
+        "W1-W6 implementation",
+        "fiveopen-session OPS",
+        "nonexpertUSE"
+      ],
+      "owner": "P12",
+      "acceptance_ref": null,
+      "source_identities": []
+    }
+  ],
+  "purpose_matrix": {
+    "Trend": "originalentryscoring0.5mapping; noheldtrendauthority",
+    "PositionRisk": "originalentrycap/veto/heldreduce or exit throughsameaggregator",
+    "baseexit": "originalsma60/sma20,stop.08,deterioration2,min3,max40,noadds",
+    "P4event": "outcomeblindcohort notintrinsicbuycommand",
+    "funding": "oldsettlementmathreused;newsharedreserve/cyclepolicyseparate",
+    "reference": "noS02required forC13/C15;R10v1rejectretained"
+  }
+}

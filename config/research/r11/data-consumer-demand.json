@@ -1,0 +1,49 @@
+{
+  "schema_version": "quanthus.r11.consumer-demand.v1",
+  "request_status": "metadataonly;noacquisitionauthority",
+  "consumer": "P11R11C13/C15 + P12W4 singleopportunity",
+  "scope": {
+    "prospective_window": "2020-2021 development",
+    "newdaily": "separate exactasof/use",
+    "history": "minimum120listingsessions,22P4bars,60closeforbaseexit,priorfeatures exactconsumerrequirements;do not inferunknownPIT"
+  },
+  "families": [
+    "security/listing identity",
+    "dailyunadjustedOHLC+turnover+volume+validprices",
+    "calendar/Tclose/T+1open",
+    "tradability/limits/status",
+    "adjustment/corporateaction/entitlements",
+    "staticlevel1industry concentrationonly",
+    "exactsnapshotmanifest/knowledgefrom/effectiveview"
+  ],
+  "acceptance": [
+    "identity/date/unit/pricebasis unique",
+    "requiredrowknowledgefrom<=declaredcutoff,or explicitretrospectiveresearchceiling",
+    "heldmissingdata hold/alert",
+    "dailyvsminute admissionisolated",
+    "frozenprovidercompletephysicalmanifestandcodeclosure"
+  ],
+  "registration_trigger": "only ifexactowningsupplyadmission/availability fails; oneboundedP10-DATA-R11-*issue,recordaffectedstep/bypass. No broadarchivehunting/repair.",
+  "per_consumer": {
+    "P4event": {
+      "required": "unadjustedOHLC+turnover/T-1/T ratios,22eligiblehistory,listings120,tradability,actions",
+      "volume": "notarequirementofP4turnoverformula"
+    },
+    "Trend/baseexit": {
+      "required": "price.total_return_index,sma20,sma60,momentum20;minimum60prior closeswithPITqualifiedadjustmentbasis"
+    },
+    "PositionRisk": {
+      "required": "risk.realized_volatility20,price.rsi14 andheldsessions/markedreturn/priorreductions",
+      "source": "src/quanthus/expert_strategy/position_risk.py"
+    },
+    "concentration": {
+      "required": "complete staticlevel1membership foraffectedentry; static_non_pit_concentration_only"
+    },
+    "P2execution": {
+      "required": "actualopening/corporateaction/calendar/tradability/fees perexactprofile"
+    },
+    "P12plot": {
+      "volume": "display-only consumer demand ifshown; absence doesnotgloballyblockotherwisequalifiedresearchcore"
+    }
+  }
+}

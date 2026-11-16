@@ -15,3 +15,5 @@
 DS 首包已形成 `quanthus.product_daily` 纯政策核心和独立合成验收入口。21 个冻结 goldens、3 条重建故事、CAS/幂等、同批 reserve、迟到费用、保守最大整手及 P2 synthetic buy→hold→exit→settlement 接缝均进入同一实现闭包。当前仍是非授权 synthetic preparation；真实账户阈值、A02 semantic decision authority、发展 reader 的 per-decision PIT 证明和历史完整比较继续由后段采用合同处理。
 
 P12 W3/W4 只接收纯 state/command/receipt 接口并在自己的事务层持久化，不复制资金数学。后段完整研究新增工作估计为 46–92 主动小时，P12/P10 原估计另计；精确 compute、窗口和产物量待冻结 manifest 后报价。
+
+内部验收发现七项可执行逻辑缺陷、strict-input 缺口和 Q02 actual 指标错误后，DS 已完成 R1–R10 整批修复并升级纯政策实现到 `1.1.0`。修复闭合 completed-settlement history、reserve 债务优先、unsettled-cycle reuse、canonical command binding、C13 临时阻断重评、原 expert entry action、composite entry atomic replay、正 E_floor、typed money/boolean 边界及逐字段 frozen oracle。Daily adoption、A01/A02/A03/A04/A06/P12 事实层缺项保持不变。

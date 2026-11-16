@@ -22,7 +22,20 @@ def test_selected_contract_and_implementation_policy_are_cross_bound() -> None:
     assert current["semantic_digest"] == contract["semantic_digest"]
     assert implementation["contract_semantic_digest"] == contract["semantic_digest"]
     assert implementation["contract"] == current["contract"]
+    assert implementation["version"] == "1.1.0"
     assert implementation["risk"]["version"] == contract["risk_policy"]["version"]
+    assert implementation["quality_repair"]["findings"] == [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "R8",
+        "R9",
+        "R10",
+    ]
 
 
 def test_frozen_authority_and_daily_adoption_stay_closed() -> None:
@@ -30,6 +43,7 @@ def test_frozen_authority_and_daily_adoption_stay_closed() -> None:
     policy = json.loads((R11 / "implementation-policy.v1.json").read_text(encoding="utf-8"))
     coverage = json.loads((R11 / "adoption-coverage.json").read_text(encoding="utf-8"))
     ds_usage = json.loads((R11 / "ds-adoption-usage.v1.json").read_text(encoding="utf-8"))
+    repairs = json.loads((R11 / "repair-dispositions.v1.json").read_text(encoding="utf-8"))
 
     assert contract["current_authority"] == {
         "design": True,
@@ -57,6 +71,20 @@ def test_frozen_authority_and_daily_adoption_stay_closed() -> None:
         any(item["scope"] == "raw_file" for item in binding.get("scope_digests", []))
         for binding in ds_usage["bindings"].values()
     )
+    assert repairs["daily_adopted"] is False
+    assert [finding["id"] for finding in repairs["findings"]] == [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "R8",
+        "R9",
+        "R10",
+    ]
+    assert all(finding["status"] == "fixed" for finding in repairs["findings"])
 
 
 def test_independent_goldens_are_immutable_and_cover_all_required_ids() -> None:

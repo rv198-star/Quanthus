@@ -30,3 +30,20 @@ This receipt covers the bounded shared policy core for P11 C13/C15 and P12 W3/W4
 The package has no account database, HTTP/UI, report correction engine, market-row reader, paid reference, training, historical capital replay, daily serving or production deployment. P12 must still supply actual account limits, atomic persistence/CAS, report/fill correction and OPS/USE evidence. P11 must still qualify A02's daily semantic authority and the development reader's per-decision PIT publication purpose before a complete historical comparison can be adopted.
 
 The later P11 research adaptation and cold complete comparison is estimated at 46–92 new active hours, excluding the existing P12 W1–W4 engineering estimate and P10 data work. Compute and storage are not frozen until the exact historical manifest, universe, fees and replay scope are supplied.
+
+## Internal acceptance repair 1.1.0
+
+The original synthetic receipt was preserved after the research lead reproduced seven functional defects and additional strict-input/oracle gaps. Implementation `1.1.0` fixes the complete R1–R10 batch:
+
+- completed settlement history authenticates old-cycle late fees/refunds after a bucket enters a new cycle;
+- every reserve inflow first extinguishes negative adjustment;
+- an unsettled closed cycle cannot be reused;
+- canonical command operation and business payload are bound to the immutable receipt;
+- transient candidate blocks are reevaluated inside the original window while expiry remains terminal;
+- entry consumes the original expert runner's explicit action;
+- composite entry stores one atomic replayable result and no prepare-only commit;
+- nonpositive E_floor is directly blocked;
+- boolean, integer, Decimal and cash-quantum boundaries reject malformed or binary values;
+- every frozen golden key is compared independently, including corrected Q02 exposure, distinct F07/F08 old/new cycles and three causal state traces.
+
+`config/research/r11/repair-dispositions.v1.json` records the original/new actual and regression witness for each finding. The final fresh Linux receipt is retained in `ds-return-002`; this contract remains non-authorizing and `daily_adopted=false`.

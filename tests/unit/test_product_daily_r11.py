@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from quanthus.aggregator import GovernedAction
 from quanthus.backtest import (
     BacktestEngine,
     BacktestRunSpec,
@@ -23,6 +24,14 @@ from quanthus.backtest import (
     load_execution_policy,
 )
 from quanthus.contracts import SnapshotRef
+from quanthus.expert_protocols import EvidenceKind, ExpertEvidenceRef
+from quanthus.expert_strategy import (
+    ExpertStrategyRegistry,
+    FormalExpertContext,
+    FormalStrategyRunner,
+)
+from quanthus.feature_registry import FeatureCutoffRule, FeatureLineage, FeatureSourceEvidence
+from quanthus.label_registry import FeatureFact
 from quanthus.position_lifecycle import PositionLifecycleState, PositionStage
 from quanthus.product_daily import (
     ActualOrderState,
@@ -38,6 +47,7 @@ from quanthus.product_daily import (
     CommandEnvelope,
     CycleSettlementEvidence,
     EntryLimits,
+    ExpertEntryEligibility,
     FundingState,
     MarkedExposure,
     PendingBuy,
@@ -49,11 +59,17 @@ from quanthus.product_daily import (
     RiskSnapshot,
     SettlementRequest,
     apply_late_cash_delta,
+    candidate_invocation_payload,
     decide_entry,
+    entry_invocation_payload,
     evaluate_quantity,
+    late_cash_invocation_payload,
     prepare_cycle,
+    prepare_cycle_invocation_payload,
     project_candidate,
     settle_batch,
+    settle_invocation_payload,
+    transfer_invocation_payload,
     transfer_to_reserve,
 )
 
@@ -62,6 +78,9 @@ GOLDENS = ROOT / "config" / "research" / "r11" / "lead-golden-cases.json"
 NOW = datetime(2026, 11, 16, 15, 0, tzinfo=timezone.utc)
 READY = CycleSettlementEvidence(True, True, True, True, True)
 SHANGHAI = ZoneInfo("Asia/Shanghai")
+EXPERT_EVENT_ID = "event:r11-entry-seam"
+EXPERT_SNAPSHOT_ID = "snapshot:r11-entry-seam"
+EXPERT_CUTOFF = datetime(2020, 1, 6, 7, tzinfo=timezone.utc)
 
 
 def dec(value: str | int | Decimal) -> Decimal:
@@ -222,6 +241,209 @@ def observation(
     )
 
 
+def _sha(label: str) -> str:
+    return "sha256:" + hashlib.sha256(label.encode("ascii")).hexdigest()
+
+
+def _expert_context(*, volatility: Decimal = Decimal("0.20")) -> FormalExpertContext:
+    evidence = (
+        ExpertEvidenceRef(
+            EvidenceKind.SNAPSHOT,
+            EXPERT_EVENT_ID,
+            "1.0.0",
+            _sha(EXPERT_EVENT_ID),
+        ),
+        ExpertEvidenceRef(
+            EvidenceKind.SNAPSHOT,
+            f"trend-observation:{EXPERT_EVENT_ID}",
+            "1.0.0",
+            _sha(f"trend-observation:{EXPERT_EVENT_ID}"),
+        ),
+    )
+    facts = []
+    for feature_id, value in (
+        ("price.rsi14", Decimal("60")),
+        ("risk.realized_volatility20", volatility),
+    ):
+        source = FeatureSourceEvidence(
+            dataset="r11-expert-test",
+            column=feature_id,
+            dataset_version="1.0.0",
+            manifest_id="manifest:r11-expert-test",
+            knowledge_cutoff=EXPERT_CUTOFF,
+        )
+        facts.append(
+            FeatureFact(
+                security_code="SYN001",
+                feature_id=feature_id,
+                feature_version="1.0.0",
+                lineage=FeatureLineage(
+                    feature_id=feature_id,
+                    feature_version="1.0.0",
+                    definition_digest=_sha(f"definition:{feature_id}"),
+                    snapshot_id=EXPERT_SNAPSHOT_ID,
+                    market_date=date(2020, 1, 6),
+                    knowledge_cutoff=EXPERT_CUTOFF,
+                    source_revision="source:r11-expert-test",
+                    universe_policy_version="universe:r11-expert-test",
+                    sources=(source,),
+                    history_sessions=60,
+                    cross_section_complete=None,
+                    cutoff_rule=FeatureCutoffRule.SNAPSHOT_OR_EARLIER,
+                ),
+                value=value,
+                unavailable_reason=None,
+            )
+        )
+    return FormalExpertContext(
+        security_code="SYN001",
+        snapshot_id=EXPERT_SNAPSHOT_ID,
+        knowledge_cutoff=EXPERT_CUTOFF,
+        position_state="empty",
+        feature_facts=tuple(facts),
+        label_results=(),
+        additional_evidence_refs=evidence,
+    )
+
+
+def expert_entry(*, allowed: bool) -> ExpertEntryEligibility:
+    registry = ExpertStrategyRegistry(ROOT)
+    runner = FormalStrategyRunner(registry.card, registry.topology_manifest.digest)
+    decision = runner.evaluate_entry(
+        event_id=EXPERT_EVENT_ID,
+        context=_expert_context(volatility=Decimal("0.20" if allowed else "0.51")),
+        trend_state="stable",
+        entry_evidence_ready=True,
+    )
+    assert (decision.action.final_action is GovernedAction.TRIAL_ENTRY) is allowed
+    return ExpertEntryEligibility.from_formal_strategy_decision(decision)
+
+
+def run_synthetic_p2_roundtrip() -> dict[str, object]:
+    policy = load_execution_policy(
+        ROOT / "tests" / "fixtures" / "p2" / "execution-policy.synthetic.v1.json"
+    )
+    engine = BacktestEngine(policy)
+    buy_decision_at = datetime(2026, 7, 27, 15, 0, tzinfo=SHANGHAI)
+    buy_snapshot = SnapshotRef(
+        market_date=date(2026, 7, 27),
+        knowledge_cutoff=buy_decision_at,
+        source_revision="r11-p2-synthetic-v1",
+        snapshot_id="r11-p2-buy-snapshot-v1",
+    )
+    buy_signal = BacktestSignal(
+        signal_id="r11-p2-buy-signal",
+        snapshot=buy_snapshot,
+        decision_at=buy_decision_at,
+        profile_id="close-to-next-open-v1",
+        window_id=None,
+        security_code="SYN001",
+        side=OrderSide.BUY,
+        unit_id="U1",
+        quantity=500,
+        aggregate_score=dec("0.80"),
+        reason_code="synthetic_candidate_accepted",
+        decision_version="r11-p2-synthetic-v1",
+    )
+    buy_session = MarketSession(
+        session_date=date(2026, 7, 28),
+        open_at=datetime(2026, 7, 28, 9, 30, tzinfo=SHANGHAI),
+        close_at=datetime(2026, 7, 28, 15, 0, tzinfo=SHANGHAI),
+        security_code="SYN001",
+        open_price=dec("10"),
+        close_price=dec("10.50"),
+        open_execution_state=OpenExecutionState.EXECUTABLE,
+        source_revision="r11-p2-synthetic-open-v1",
+        snapshot_id="r11-p2-buy-open-v1",
+    )
+    buy_run = BacktestRunSpec(
+        code_version="r11-code-v1",
+        parameter_hash="sha256:" + "2" * 64,
+        data_snapshot_id="r11-p2-buy-snapshot-v1",
+        feature_version="r11-synthetic-features-v1",
+        rule_version="r11-synthetic-rules-v1",
+        run_id="r11-p2-buy-run",
+        execution_policy_version=policy.policy_version,
+        execution_profile_id="close-to-next-open-v1",
+        schedule_version="close-to-next-open-synthetic-v1",
+        official=False,
+    )
+    buy = engine.run_buy_session(
+        run=buy_run,
+        signal=buy_signal,
+        session=buy_session,
+        opening_state=UnitState.empty(unit_id="U1", cash=dec("20000")),
+    )
+    sell_decision_at = datetime(2026, 7, 28, 15, 0, tzinfo=SHANGHAI)
+    sell_signal = BacktestSignal(
+        signal_id="r11-p2-sell-signal",
+        snapshot=SnapshotRef(
+            market_date=date(2026, 7, 28),
+            knowledge_cutoff=sell_decision_at,
+            source_revision="r11-p2-synthetic-v1",
+            snapshot_id="r11-p2-sell-snapshot-v1",
+        ),
+        decision_at=sell_decision_at,
+        profile_id="close-to-next-open-v1",
+        window_id=None,
+        security_code="SYN001",
+        side=OrderSide.SELL,
+        unit_id="U1",
+        quantity=500,
+        aggregate_score=dec("0.80"),
+        reason_code="synthetic_full_exit",
+        decision_version="r11-p2-synthetic-v1",
+    )
+    opening_position = UnitState(
+        unit_id="U1",
+        target_notional=dec("20000"),
+        cash=dec(buy.result_summary["ending_cash"]),
+        security_code="SYN001",
+        settled_quantity=500,
+        position_cost=dec("5000"),
+        commission_expense=dec("5"),
+        stamp_duty_expense=dec("0"),
+        transfer_fee_expense=dec("0"),
+        realized_pnl=dec("0"),
+        dividend_income=dec("0"),
+        external_pool=dec("0"),
+        last_mark_price=dec("10.50"),
+        last_mark_snapshot_id="r11-p2-buy-open-v1",
+    )
+    sell_session = MarketSession(
+        session_date=date(2026, 7, 29),
+        open_at=datetime(2026, 7, 29, 9, 30, tzinfo=SHANGHAI),
+        close_at=datetime(2026, 7, 29, 15, 0, tzinfo=SHANGHAI),
+        security_code="SYN001",
+        open_price=dec("10.50"),
+        close_price=dec("10.50"),
+        open_execution_state=OpenExecutionState.EXECUTABLE,
+        source_revision="r11-p2-synthetic-open-v1",
+        snapshot_id="r11-p2-sell-open-v1",
+    )
+    sell_run = replace(
+        buy_run,
+        data_snapshot_id="r11-p2-sell-snapshot-v1",
+        run_id="r11-p2-sell-run",
+    )
+    sell = engine.run_sell_sequence(
+        run=sell_run,
+        signal=sell_signal,
+        sessions=(sell_session,),
+        opening_state=opening_position,
+    )
+    settlement_event = next(
+        event.payload for event in sell.events if event.event_type is EventType.UNIT_SETTLEMENT
+    )
+    return {
+        "buy": buy,
+        "sell": sell,
+        "ending_cash": dec(sell.result_summary["ending_cash"]),
+        "profit_transfer": dec(settlement_event["profit_transfer"]),
+        "position_quantity": int(sell.result_summary["position_quantity"]),
+    }
+
+
 def run_settlement_cases(given: dict[str, object]) -> dict[str, object]:
     if "buckets" in given:
         raw_buckets = given["buckets"]
@@ -241,9 +463,39 @@ def run_settlement_cases(given: dict[str, object]) -> dict[str, object]:
         )
         for item in state.buckets
     ]
-    result = settle_batch(state, command("settle", given, state.revision), requests)
+    result = settle_batch(
+        state,
+        command("settle", settle_invocation_payload(requests), state.revision),
+        requests,
+    )
     rows = {row["bucket_id"]: row for row in result.details["settlements"]}
     return {"result": result, "rows": rows}
+
+
+def assert_exact_expected(expected: object, actual: object, path: str = "case") -> None:
+    if isinstance(expected, dict):
+        assert isinstance(actual, dict), f"{path}: actual must be an object"
+        assert set(actual) == set(expected), f"{path}: expected/actual keys differ"
+        for key in expected:
+            assert_exact_expected(expected[key], actual[key], f"{path}.{key}")
+        return
+    if isinstance(expected, bool):
+        assert type(actual) is bool and actual is expected, f"{path}: boolean mismatch"
+        return
+    if isinstance(expected, int):
+        assert type(actual) is int and actual == expected, f"{path}: integer mismatch"
+        return
+    if isinstance(expected, str):
+        assert isinstance(actual, str), f"{path}: string mismatch"
+        try:
+            expected_decimal = Decimal(expected)
+            actual_decimal = Decimal(actual)
+        except Exception:
+            assert actual == expected, f"{path}: string mismatch"
+        else:
+            assert actual_decimal == expected_decimal, f"{path}: decimal mismatch"
+        return
+    assert actual == expected, f"{path}: value mismatch"
 
 
 def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() -> None:
@@ -290,17 +542,16 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
         if "underfunded" in expected:
             assert dec(row["underfunded"]) == dec(expected["underfunded"])
             assert dec(row["next_cycle_available"]) * dec(".30") == dec(expected["budget_30pct"])
-        actuals[case_id] = {
+        actual_case = {
             "cash": str(result.state.bucket("U1").cash),
             "reserve": str(result.state.reserve),
-            "cash_sum": str(result.state.cash_total),
-            "underfunded": row.get("underfunded"),
-            "budget_30pct": (
-                str(dec(row["next_cycle_available"]) * dec(".30"))
-                if "budget_30pct" in expected
-                else None
-            ),
         }
+        if "cash_sum" in expected:
+            actual_case["cash_sum"] = str(result.state.cash_total)
+        if "underfunded" in expected:
+            actual_case["underfunded"] = row["underfunded"]
+            actual_case["budget_30pct"] = str(dec(row["next_cycle_available"]) * dec(".30"))
+        actuals[case_id] = actual_case
 
     f03 = by_id["F03"]
     run = run_settlement_cases(f03["given"])
@@ -316,8 +567,11 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
     }
 
     f04 = by_id["F04"]
-    start = funding(bucket("U1", "18500", locked="19500"), reserve="1000")
-    f04_cmd = command("F04", f04["given"], start.revision)
+    f02_result = run_settlement_cases(by_id["F02"]["given"])["result"]
+    assert hasattr(f02_result, "state")
+    start = replace(f02_result.state, reserve=dec("1000"))
+    f04_payload = prepare_cycle_invocation_payload(bucket_id="U1", cycle_id="cycle-2")
+    f04_cmd = command("F04", f04_payload, start.revision)
     prepared = prepare_cycle(start, f04_cmd, bucket_id="U1", cycle_id="cycle-2")
     assert prepared.state.bucket("U1").cash == dec(f04["expect"]["cash"])
     assert prepared.state.bucket("U1").locked_cycle_budget == dec(f04["expect"]["B"])
@@ -345,18 +599,20 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
     f06 = by_id["F06"]
     held = funding(
         bucket("U1", "19500", phase=BucketPhase.HELD, cycle_id="cycle-2", locked="19500"),
-        bucket("U2", "1000", phase=BucketPhase.CLOSED, cycle_id="cycle-x", locked="1000"),
+        bucket("U2", "1000", phase=BucketPhase.EMPTY, cycle_id=None, locked="0"),
     )
+    f06_payload = prepare_cycle_invocation_payload(bucket_id="U1", cycle_id="cycle-2")
     held_cycle = prepare_cycle(
         held,
-        command("F06-prepare", f06["given"], held.revision),
+        command("F06-prepare", f06_payload, held.revision),
         bucket_id="U1",
         cycle_id="cycle-2",
     )
     assert held_cycle.state.bucket("U1").locked_cycle_budget == dec(f06["expect"]["B"])
+    transfer_payload = transfer_invocation_payload(source_bucket_id="U2", amount=dec("1000"))
     moved = transfer_to_reserve(
         held_cycle.state,
-        command("F06-reserve", {"amount": "1000"}, held_cycle.state.revision),
+        command("F06-reserve", transfer_payload, held_cycle.state.revision),
         source_bucket_id="U2",
         amount=dec("1000"),
     )
@@ -370,12 +626,43 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
     late_actuals: dict[str, dict[str, object]] = {}
     for case_id in ("F07", "F08"):
         case = by_id[case_id]
-        start = funding(bucket("U1", "18500", locked="19500"), reserve=case["given"]["reserve"])
+        old_settled = funding(
+            bucket("U1", "20000", cycle_id="cycle-old", locked="20000"),
+            reserve=case["given"]["reserve"],
+        )
+        settlement_request = SettlementRequest(
+            settlement_id=f"S-{case_id}",
+            bucket_id="U1",
+            cycle_id="cycle-old",
+            evidence=READY,
+        )
+        old_settled = settle_batch(
+            old_settled,
+            command(
+                f"{case_id}-old-settle",
+                settle_invocation_payload((settlement_request,)),
+                old_settled.revision,
+            ),
+            (settlement_request,),
+        ).state
+        new_held = replace(
+            old_settled.bucket("U1"),
+            cash=dec("18500"),
+            cycle_id="cycle-new",
+            phase=BucketPhase.HELD,
+            locked_cycle_budget=dec("19500"),
+        )
+        start = replace(old_settled, buckets=(new_held,))
+        late_payload = late_cash_invocation_payload(
+            bucket_id="U1",
+            cycle_id="cycle-old",
+            cash_delta=-dec(case["given"]["late_fee"]),
+        )
         late = apply_late_cash_delta(
             start,
-            command(case_id, case["given"], start.revision),
+            command(case_id, late_payload, start.revision),
             bucket_id="U1",
-            cycle_id="cycle-1",
+            cycle_id="cycle-old",
             cash_delta=-dec(case["given"]["late_fee"]),
         )
         assert late.state.reserve == dec(case["expect"]["reserve"])
@@ -391,14 +678,17 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
     actuals.update(late_actuals)
     f09 = by_id["F09"]
     f09_source = funding(
-        bucket("U1", "18500", locked="19500"),
-        bucket("U2", "18000", locked="18000"),
+        bucket("U1", "18500", phase=BucketPhase.EMPTY, cycle_id=None, locked="0"),
+        bucket("U2", "18000", phase=BucketPhase.EMPTY, cycle_id=None, locked="0"),
         adjustment="-50",
     )
     before_cash = f09_source.cash_total
+    f09_payload = transfer_invocation_payload(
+        source_bucket_id="U2", amount=dec(f09["given"]["incoming_internal_transfer"])
+    )
     transfer = transfer_to_reserve(
         f09_source,
-        command("F09", f09["given"], f09_source.revision),
+        command("F09", f09_payload, f09_source.revision),
         source_bucket_id="U2",
         amount=dec(f09["given"]["incoming_internal_transfer"]),
     )
@@ -429,7 +719,7 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
     assert q02.next_lot_cap == dec("9999.5")
     actuals["Q02"] = {
         "q": q02.quantity,
-        "next_lot_post_exposure": str(q02.next_lot_post_equity + q02.fees),
+        "next_lot_post_exposure": str(q02.next_lot_post_security_exposure),
         "post_equity_if_next_lot": str(q02.next_lot_post_equity),
         "cap_if_next_lot": str(q02.next_lot_cap),
         "forced_sale": q02.forced_sale,
@@ -453,7 +743,7 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
     actuals["Q03"] = {
         "q": q03.quantity,
         "pending_sell_releases": str(q03.pending_sell_releases),
-        "unknowable_other_pending_fee_blocks": True,
+        "note": "otherpendingbuyfees notalreadyrecognized mustalso reduceEfloor",
     }
 
     q04 = evaluate_quantity(quantity_request(), risk(equity=None))
@@ -469,30 +759,54 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
         bucket("A", "50", phase=BucketPhase.EMPTY, cycle_id=None, locked="0"),
         bucket("B", "20000", phase=BucketPhase.EMPTY, cycle_id=None, locked="0"),
     )
-    q05 = decide_entry(
-        candidate=CandidateEntry(
-            opportunity_id="opp-q05",
-            security_code="SYN001",
-            level1_industry_id="IND-1",
-            projection=CandidateProjection.OBSERVED,
-            input_valid=True,
-            knowledge_cutoff_valid=True,
-            policy_adopted=True,
-        ),
-        funding=empty_first,
-        snapshot=risk(),
+    q05_candidate = CandidateEntry(
+        opportunity_id=EXPERT_EVENT_ID,
+        security_code="SYN001",
+        level1_industry_id="IND-1",
+        projection=CandidateProjection.OBSERVED,
+        input_valid=True,
+        knowledge_cutoff_valid=True,
+        policy_adopted=True,
+        expert_entry=expert_entry(allowed=True),
+    )
+    q05_snapshot = risk()
+    q05_limits = EntryLimits(2, 2)
+    q05_fraction = dec(".30")
+    q05_mark = dec("10")
+    q05_bound = dec("10")
+    q05_quantity_limits = QuantityLimits(dec("1"), dec("1"), dec("1"))
+    q05_fee = fee_rule()
+    q05_payload = entry_invocation_payload(
+        candidate=q05_candidate,
+        snapshot=q05_snapshot,
         empty_bucket_ids=("B", "A"),
         active_or_reserved_security_codes=(),
         active_industry_counts=(),
         new_buckets_today=0,
-        limits=EntryLimits(2, 2),
-        fraction=dec(".30"),
-        mark_price=dec("10"),
-        price_bound=dec("10"),
+        limits=q05_limits,
+        fraction=q05_fraction,
+        mark_price=q05_mark,
+        price_bound=q05_bound,
         lot_size=100,
-        quantity_limits=QuantityLimits(dec("1"), dec("1"), dec("1")),
-        fee_rule=fee_rule(),
-        command=command("Q05-entry", {"case": "Q05"}, empty_first.revision),
+        quantity_limits=q05_quantity_limits,
+        fee_rule=q05_fee,
+    )
+    q05 = decide_entry(
+        candidate=q05_candidate,
+        funding=empty_first,
+        snapshot=q05_snapshot,
+        empty_bucket_ids=("B", "A"),
+        active_or_reserved_security_codes=(),
+        active_industry_counts=(),
+        new_buckets_today=0,
+        limits=q05_limits,
+        fraction=q05_fraction,
+        mark_price=q05_mark,
+        price_bound=q05_bound,
+        lot_size=100,
+        quantity_limits=q05_quantity_limits,
+        fee_rule=q05_fee,
+        command=command("Q05-entry", q05_payload, empty_first.revision),
     )
     assert q05.quantity is not None and q05.quantity.quantity == 0
     assert q05.first_considered_bucket_id == "A" and q05.second_bucket_probe is False
@@ -518,13 +832,13 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
     }
 
     c01_state = CandidateState()
-    first = project_candidate(
-        c01_state, command("C01-first", {"event": "SYN-E1"}, 0), observation()
-    )
+    c01_observation = observation()
+    c01_payload = candidate_invocation_payload(c01_observation)
+    first = project_candidate(c01_state, command("C01-first", c01_payload, 0), c01_observation)
     second = project_candidate(
         first.state,
-        command("C01-second", {"event": "SYN-E1", "snapshot": "SYN-S1"}, 1),
-        observation(),
+        command("C01-second", c01_payload, 1),
+        c01_observation,
     )
     assert second.record is not None
     assert second.record.identity.digest == first.record.identity.digest
@@ -536,8 +850,11 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
         "new_fill_inferred": second.record.actual_order_state is ActualOrderState.FILLED,
     }
 
+    c02_observation = observation(current=3)
     c02 = project_candidate(
-        CandidateState(), command("C02", {"window": "passed"}, 0), observation(current=3)
+        CandidateState(),
+        command("C02", candidate_invocation_payload(c02_observation), 0),
+        c02_observation,
     )
     assert c02.record.projection is CandidateProjection.EXPIRED
     assert c02.record.entry_authorized is False
@@ -548,10 +865,11 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
         "reason": ReasonCode.ENTRY_WINDOW_EXPIRED.value,
     }
 
+    c03_observation = observation(input_valid=False, actual_position=ActualPositionState.HELD)
     c03 = project_candidate(
         CandidateState(),
-        command("C03", {"held": True}, 0),
-        observation(input_valid=False, actual_position=ActualPositionState.HELD),
+        command("C03", candidate_invocation_payload(c03_observation), 0),
+        c03_observation,
     )
     assert c03.record.projection is CandidateProjection.HELD
     assert ReasonCode.HOLD_AND_ALERT in c03.record.reason_codes
@@ -560,10 +878,11 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
         "forced_sale": False,
     }
 
+    c04_observation = observation(capacity_allowed=False, raw_allocated=True)
     c04 = project_candidate(
         CandidateState(),
-        command("C04", {"capacity": "rejected"}, 0),
-        observation(capacity_allowed=False, raw_allocated=True),
+        command("C04", candidate_invocation_payload(c04_observation), 0),
+        c04_observation,
     )
     assert c04.record.projection is CandidateProjection.BLOCKED
     assert c04.record.actual_order_state is ActualOrderState.NONE
@@ -574,23 +893,29 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
         "fill": c04.record.actual_order_state is ActualOrderState.FILLED,
     }
 
+    c05_observation = observation(evidence_at=NOW.replace(hour=16))
     c05 = project_candidate(
         CandidateState(),
-        command("C05", {"cutoff": "future"}, 0),
-        observation(evidence_at=NOW.replace(hour=16)),
+        command("C05", candidate_invocation_payload(c05_observation), 0),
+        c05_observation,
     )
     assert c05.record.projection is CandidateProjection.BLOCKED
     assert c05.record.entry_authorized is False
     actuals["C05"] = {"entry_authorized": c05.record.entry_authorized}
 
+    c06_observation = observation(event="SYN-E2", active=("SYN001",))
     c06 = project_candidate(
         CandidateState(),
-        command("C06", {"security": "active"}, 0),
-        observation(event="SYN-E2", active=("SYN001",)),
+        command("C06", candidate_invocation_payload(c06_observation), 0),
+        c06_observation,
     )
     assert c06.record.projection is CandidateProjection.BLOCKED
     assert ReasonCode.EXISTING_SECURITY_CYCLE in c06.record.reason_codes
     actuals["C06"] = {"second_active_bucket": False}
+
+    for case in cases:
+        assert case["id"] in actuals
+        assert_exact_expected(case["expect"], actuals[case["id"]], case["id"])
 
     output = os.environ.get("R11_GOLDEN_ACTUALS")
     if output:
@@ -611,13 +936,14 @@ def test_all_twenty_one_lead_goldens_execute_from_independent_expected_json() ->
 
 
 def test_cas_idempotency_and_settlement_preconditions_preserve_exact_state() -> None:
-    start = funding(bucket("U1", "18000"), reserve="500")
-    cas_command = command("cas", {"bucket": "U1"}, 3)
+    start = funding(bucket("U1", "18000", phase=BucketPhase.EMPTY, cycle_id=None, locked="0"))
+    prepare_payload = prepare_cycle_invocation_payload(bucket_id="U1", cycle_id="cycle-2")
+    cas_command = command("cas", prepare_payload, 3)
     cas = prepare_cycle(start, cas_command, bucket_id="U1", cycle_id="cycle-2")
     assert not cas.accepted and cas.state.digest == start.digest
     assert cas.reason_codes == (ReasonCode.CAS_CONFLICT,)
 
-    accepted_command = command("idem", {"bucket": "U1"}, start.revision)
+    accepted_command = command("idem", prepare_payload, start.revision)
     accepted = prepare_cycle(start, accepted_command, bucket_id="U1", cycle_id="cycle-2")
     replay = prepare_cycle(accepted.state, accepted_command, bucket_id="U1", cycle_id="cycle-2")
     assert replay.state.digest == accepted.state.digest
@@ -625,33 +951,66 @@ def test_cas_idempotency_and_settlement_preconditions_preserve_exact_state() -> 
     with pytest.raises(ProductDailyError, match="idempotency_conflict"):
         prepare_cycle(
             accepted.state,
-            command("idem", {"bucket": "U2"}, start.revision),
+            command(
+                "idem",
+                prepare_cycle_invocation_payload(bucket_id="U1", cycle_id="cycle-2"),
+                start.revision,
+            ),
             bucket_id="U1",
-            cycle_id="cycle-2",
+            cycle_id="cycle-3",
         )
 
+    settlement_start = funding(bucket("S1", "18000"), reserve="500")
     not_ready = CycleSettlementEvidence(False, True, True, False, True)
-    request = SettlementRequest("S1", "U1", "cycle-1", not_ready)
-    rejected = settle_batch(start, command("S1", {"ready": False}, 0), (request,))
-    assert not rejected.accepted and rejected.state.digest == start.digest
-
-    ready_request = SettlementRequest("S1", "U1", "cycle-1", READY)
-    settled = settle_batch(
-        start, command("S1-ready", {"ready": True}, start.revision), (ready_request,)
+    request = SettlementRequest("S1", "S1", "cycle-1", not_ready)
+    rejected = settle_batch(
+        settlement_start,
+        command(
+            "S1",
+            settle_invocation_payload((request,)),
+            settlement_start.revision,
+        ),
+        (request,),
     )
+    assert not rejected.accepted and rejected.state.digest == settlement_start.digest
+
+    ready_request = SettlementRequest("S1", "S1", "cycle-1", READY)
+    settled = settle_batch(
+        settlement_start,
+        command(
+            "S1-ready",
+            settle_invocation_payload((ready_request,)),
+            settlement_start.revision,
+        ),
+        (ready_request,),
+    )
+    late_request = replace(ready_request, settlement_id="S1-late-profit")
     duplicate = settle_batch(
         settled.state,
-        command("S1-again", {"ready": True, "attempt": 2}, settled.state.revision),
-        (replace(ready_request, settlement_id="S1-late-profit"),),
+        command(
+            "S1-again",
+            settle_invocation_payload((late_request,)),
+            settled.state.revision,
+        ),
+        (late_request,),
     )
     assert not duplicate.accepted
     assert duplicate.state.digest == settled.state.digest
     with pytest.raises(ProductDailyError, match="must not be empty"):
-        settle_batch(start, command("empty-settlement", {}, 0), ())
+        settle_batch(
+            settlement_start,
+            command("empty-settlement", settle_invocation_payload(()), 0),
+            (),
+        )
     with pytest.raises(ProductDailyError, match="bucket_not_transferable"):
+        held_start = funding(bucket("U1", "10000", phase=BucketPhase.HELD))
         transfer_to_reserve(
-            funding(bucket("U1", "10000", phase=BucketPhase.HELD)),
-            command("held-transfer", {"amount": "10"}, 0),
+            held_start,
+            command(
+                "held-transfer",
+                transfer_invocation_payload(source_bucket_id="U1", amount=dec("10")),
+                held_start.revision,
+            ),
             source_bucket_id="U1",
             amount=dec("10"),
         )
@@ -753,32 +1112,58 @@ def test_recognized_payable_and_pending_sell_do_not_double_count_or_release() ->
 
 
 def test_new_event_boundaries_policy_adoption_and_unknown_fees_fail_closed() -> None:
+    too_soon_observation = observation(
+        event="SYN-E2", event_index=22, current=22, expiry=22, previous_event=1
+    )
     too_soon = project_candidate(
         CandidateState(),
-        command("C-new-too-soon", {"event_index": 22}, 0),
-        observation(event="SYN-E2", event_index=22, current=22, expiry=22, previous_event=1),
+        command(
+            "C-new-too-soon",
+            candidate_invocation_payload(too_soon_observation),
+            0,
+        ),
+        too_soon_observation,
+    )
+    allowed_observation = observation(
+        event="SYN-E3", event_index=23, current=23, expiry=23, previous_event=1
     )
     allowed_event = project_candidate(
         CandidateState(),
-        command("C-new-allowed", {"event_index": 23}, 0),
-        observation(event="SYN-E3", event_index=23, current=23, expiry=23, previous_event=1),
+        command(
+            "C-new-allowed",
+            candidate_invocation_payload(allowed_observation),
+            0,
+        ),
+        allowed_observation,
     )
     assert too_soon.record.projection is CandidateProjection.BLOCKED
     assert ReasonCode.EVENT_SEPARATION in too_soon.record.reason_codes
     assert allowed_event.record.projection is CandidateProjection.OBSERVED
 
+    cooldown_observation = observation(
+        event="SYN-E4", event_index=102, current=102, expiry=102, last_closed=99
+    )
     cooldown = project_candidate(
         CandidateState(),
-        command("C-cooldown", {"closed": 99}, 0),
-        observation(event="SYN-E4", event_index=102, current=102, expiry=102, last_closed=99),
+        command(
+            "C-cooldown",
+            candidate_invocation_payload(cooldown_observation),
+            0,
+        ),
+        cooldown_observation,
     )
     assert cooldown.record.projection is CandidateProjection.BLOCKED
     assert ReasonCode.POSITION_COOLDOWN in cooldown.record.reason_codes
 
+    not_adopted_observation = observation(policy_adopted=False)
     not_adopted = project_candidate(
         CandidateState(),
-        command("C-policy", {"adopted": False}, 0),
-        observation(policy_adopted=False),
+        command(
+            "C-policy",
+            candidate_invocation_payload(not_adopted_observation),
+            0,
+        ),
+        not_adopted_observation,
     )
     assert not_adopted.record.projection is CandidateProjection.BLOCKED
     assert not_adopted.record.entry_authorized is False
@@ -825,14 +1210,19 @@ def test_new_event_boundaries_policy_adoption_and_unknown_fees_fail_closed() -> 
         transition_ids=("entry-transition",),
         consumed_evidence=(),
     )
+    lifecycle_observation = replace(
+        observation(actual_position=ActualPositionState.HELD),
+        position_state_ref=lifecycle.digest,
+        position_lifecycle=lifecycle,
+    )
     lifecycle_bound = project_candidate(
         CandidateState(),
-        command("C-lifecycle", {"stage": "trial"}, 0),
-        replace(
-            observation(actual_position=ActualPositionState.HELD),
-            position_state_ref=lifecycle.digest,
-            position_lifecycle=lifecycle,
+        command(
+            "C-lifecycle",
+            candidate_invocation_payload(lifecycle_observation),
+            0,
         ),
+        lifecycle_observation,
     )
     assert lifecycle_bound.record.projection is CandidateProjection.HELD
     assert lifecycle_bound.record.position_state_ref == lifecycle.digest
@@ -840,18 +1230,20 @@ def test_new_event_boundaries_policy_adoption_and_unknown_fees_fail_closed() -> 
 
 def test_entry_reason_priority_preserves_all_simultaneous_tight_limits() -> None:
     start = funding(bucket("U1", "20000", phase=BucketPhase.HELD))
-    decision = decide_entry(
-        candidate=CandidateEntry(
-            "tight-opp",
-            "SYN001",
-            "IND-1",
-            CandidateProjection.OBSERVED,
-            True,
-            True,
-            False,
-        ),
-        funding=start,
-        snapshot=risk(),
+    candidate = CandidateEntry(
+        EXPERT_EVENT_ID,
+        "SYN001",
+        "IND-1",
+        CandidateProjection.OBSERVED,
+        True,
+        True,
+        False,
+        expert_entry=expert_entry(allowed=True),
+    )
+    snapshot = risk()
+    payload = entry_invocation_payload(
+        candidate=candidate,
+        snapshot=snapshot,
         empty_bucket_ids=(),
         active_or_reserved_security_codes=("SYN001", "SYN002"),
         active_industry_counts=(("IND-1", 2),),
@@ -863,7 +1255,23 @@ def test_entry_reason_priority_preserves_all_simultaneous_tight_limits() -> None
         lot_size=100,
         quantity_limits=QuantityLimits(dec("1"), dec("1"), dec("1")),
         fee_rule=fee_rule(),
-        command=command("tight-entry", {"tight": True}, start.revision),
+    )
+    decision = decide_entry(
+        candidate=candidate,
+        funding=start,
+        snapshot=snapshot,
+        empty_bucket_ids=(),
+        active_or_reserved_security_codes=("SYN001", "SYN002"),
+        active_industry_counts=(("IND-1", 2),),
+        new_buckets_today=2,
+        limits=EntryLimits(2, 2),
+        fraction=dec(".30"),
+        mark_price=dec("10"),
+        price_bound=dec("10"),
+        lot_size=100,
+        quantity_limits=QuantityLimits(dec("1"), dec("1"), dec("1")),
+        fee_rule=fee_rule(),
+        command=command("tight-entry", payload, start.revision),
     )
     assert not decision.accepted
     assert decision.reason_codes == (
@@ -1002,173 +1410,276 @@ def test_p2_supported_synthetic_roundtrip_enters_c15_settlement_seam() -> None:
         bucket("U1", str(realized_cash), locked="20000"),
         reserve=str(p2_profit_to_pool),
     )
+    seam_request = SettlementRequest("p2-seam-settlement", "U1", "cycle-1", READY)
     settled = settle_batch(
         closed_funding,
-        command("p2-seam-settle", {"cash": str(realized_cash)}, closed_funding.revision),
-        (SettlementRequest("p2-seam-settlement", "U1", "cycle-1", READY),),
+        command(
+            "p2-seam-settle",
+            settle_invocation_payload((seam_request,)),
+            closed_funding.revision,
+        ),
+        (seam_request,),
     )
     assert settled.accepted and settled.state.reserve == p2_profit_to_pool
     assert settled.state.bucket("U1").cash == dec("20000")
 
 
-def test_three_story_paths_rebuild_to_identical_terminal_digests() -> None:
-    def story_one() -> str:
+def test_three_causal_stories_rebuild_intermediate_state_and_receipts() -> None:
+    def story_one() -> dict[str, object]:
         start = funding(
             bucket("A", "50", phase=BucketPhase.EMPTY, cycle_id=None, locked="0"),
             bucket("B", "20000", phase=BucketPhase.EMPTY, cycle_id=None, locked="0"),
         )
-        entry = decide_entry(
-            candidate=CandidateEntry(
-                "story1-opp",
-                "SYN001",
-                "IND-1",
-                CandidateProjection.OBSERVED,
-                True,
-                True,
-                True,
-            ),
-            funding=start,
-            snapshot=risk(),
-            empty_bucket_ids=("B", "A"),
+        candidate = CandidateEntry(
+            EXPERT_EVENT_ID,
+            "SYN001",
+            "IND-1",
+            CandidateProjection.OBSERVED,
+            True,
+            True,
+            True,
+            expert_entry=expert_entry(allowed=True),
+        )
+        snapshot = risk()
+        empty_ids = ("B", "A")
+        limits = EntryLimits(2, 2)
+        quantity_limits = QuantityLimits(dec("1"), dec("1"), dec("1"))
+        fraction = dec(".30")
+        payload = entry_invocation_payload(
+            candidate=candidate,
+            snapshot=snapshot,
+            empty_bucket_ids=empty_ids,
             active_or_reserved_security_codes=(),
             active_industry_counts=(),
             new_buckets_today=0,
-            limits=EntryLimits(2, 2),
-            fraction=dec(".30"),
+            limits=limits,
+            fraction=fraction,
             mark_price=dec("10"),
             price_bound=dec("10"),
             lot_size=100,
-            quantity_limits=QuantityLimits(dec("1"), dec("1"), dec("1")),
+            quantity_limits=quantity_limits,
             fee_rule=fee_rule(),
-            command=command("story1-entry", {"story": 1}, start.revision),
         )
-        assert not entry.accepted and entry.funding_state_changed is False
-        expired = CandidateObservation(
-            identity=identity(),
-            decision_id="story1-expired",
-            observed_at=NOW,
-            knowledge_cutoff=NOW,
-            event_session_index=1,
-            current_session_index=3,
-            first_eligible_session_index=2,
-            expiry_session_index=2,
-            input_valid=True,
-            policy_adopted=True,
-            raw_allocated=False,
-            capacity_allowed=False,
-            expert_decision_ref="trend-risk-decision-1",
-            position_state_ref=None,
-            evidence_at=NOW,
+        entry = decide_entry(
+            candidate=candidate,
+            funding=start,
+            snapshot=snapshot,
+            empty_bucket_ids=empty_ids,
+            active_or_reserved_security_codes=(),
+            active_industry_counts=(),
+            new_buckets_today=0,
+            limits=limits,
+            fraction=fraction,
+            mark_price=dec("10"),
+            price_bound=dec("10"),
+            lot_size=100,
+            quantity_limits=quantity_limits,
+            fee_rule=fee_rule(),
+            command=command("story1-entry", payload, start.revision),
         )
-        candidate_state = project_candidate(
-            CandidateState(), command("story1-observe", {"story": 1}, 0), expired
-        ).state
-        return (
-            "sha256:"
-            + hashlib.sha256(
-                json.dumps(
-                    {"entry": entry.to_dict(), "candidate": candidate_state.to_dict()},
-                    sort_keys=True,
-                ).encode()
-            ).hexdigest()
-        )
+        assert not entry.accepted and entry.quantity is not None and entry.quantity.quantity == 0
+        assert entry.funding_state.digest == start.digest
 
-    def story_two() -> str:
-        start = funding(bucket("U1", "20000"), reserve="500")
-        prep = prepare_cycle(
-            start,
-            command("story2-prepare", {"story": 2, "step": "prepare"}, start.revision),
+        expired = observation(
+            event=EXPERT_EVENT_ID,
+            current=3,
+            capacity_allowed=False,
+        )
+        candidate_transition = project_candidate(
+            CandidateState(),
+            command("story1-observe", candidate_invocation_payload(expired), 0),
+            expired,
+        )
+        assert candidate_transition.record is not None
+        assert candidate_transition.record.projection is CandidateProjection.EXPIRED
+        assert not candidate_transition.record.entry_authorized
+        return {
+            "entry": {
+                "accepted": entry.accepted,
+                "quantity": entry.quantity.quantity,
+                "reasons": [item.value for item in entry.reason_codes],
+                "funding_digest": entry.funding_state.digest,
+            },
+            "candidate": {
+                "identity": candidate_transition.record.identity.digest,
+                "projection": candidate_transition.record.projection.value,
+                "state_digest": candidate_transition.state.digest,
+                "receipt": candidate_transition.result_digest,
+            },
+        }
+
+    def story_two() -> dict[str, object]:
+        p2 = run_synthetic_p2_roundtrip()
+        ending_cash = p2["ending_cash"]
+        profit = p2["profit_transfer"]
+        assert isinstance(ending_cash, Decimal) and isinstance(profit, Decimal)
+        assert p2["position_quantity"] == 0 and profit > 0
+
+        old_closed = funding(
+            bucket("U1", str(ending_cash), cycle_id="story2-old", locked="20000"),
+            reserve=str(profit),
+        )
+        old_request = SettlementRequest("story2-old-settlement", "U1", "story2-old", READY)
+        old_settled = settle_batch(
+            old_closed,
+            command(
+                "story2-old-settle",
+                settle_invocation_payload((old_request,)),
+                old_closed.revision,
+            ),
+            (old_request,),
+        ).state
+        prepare_payload = prepare_cycle_invocation_payload(bucket_id="U1", cycle_id="story2-new")
+        prepared = prepare_cycle(
+            old_settled,
+            command("story2-prepare", prepare_payload, old_settled.revision),
             bucket_id="U1",
-            cycle_id="story2-cycle",
+            cycle_id="story2-new",
         )
-        q = evaluate_quantity(quantity_request(budget="20000", fraction=".30", stock="1"), risk())
-        held_bucket = replace(prep.state.bucket("U1"), phase=BucketPhase.HELD)
-        held_state = replace(prep.state, buckets=(held_bucket,))
-        realized = replace(held_bucket, cash=dec("22000"), phase=BucketPhase.CLOSED)
-        closed_state = replace(held_state, buckets=(realized,))
-        settled = settle_batch(
-            closed_state,
-            command("story2-settle", {"story": 2, "step": "settle"}, closed_state.revision),
-            (SettlementRequest("story2-settlement", "U1", "story2-cycle", READY),),
+        quantity = evaluate_quantity(
+            quantity_request(budget="20000", fraction=".30", stock="1"), risk()
         )
+        assert quantity.quantity == 500
+        held_bucket = replace(prepared.state.bucket("U1"), phase=BucketPhase.HELD)
+        held_state = replace(prepared.state, buckets=(held_bucket,))
+
         new_observation = observation(
             event="SYN-E2",
+            event_index=30,
             current=30,
             expiry=30,
             previous_event=1,
             last_closed=10,
         )
-        new_state = project_candidate(
+        new_candidate = project_candidate(
             CandidateState(),
-            command("story2-new-event", {"story": 2, "step": "new-event"}, 0),
+            command(
+                "story2-new-event",
+                candidate_invocation_payload(new_observation),
+                0,
+            ),
             new_observation,
-        ).state
-        return (
-            "sha256:"
-            + hashlib.sha256(
-                json.dumps(
-                    {"q": q.to_dict(), "settled": settled.to_dict(), "new": new_state.to_dict()},
-                    sort_keys=True,
-                ).encode()
-            ).hexdigest()
         )
+        assert new_candidate.record is not None
+        assert new_candidate.record.projection is CandidateProjection.OBSERVED
+        return {
+            "p2": {
+                "buy_fills": p2["buy"].result_summary["fills"],
+                "position_quantity": p2["position_quantity"],
+                "ending_cash": str(ending_cash),
+                "profit_transfer": str(profit),
+            },
+            "funding": {
+                "settled_digest": old_settled.digest,
+                "prepared_digest": prepared.state.digest,
+                "reserve": str(held_state.reserve),
+                "B": str(held_bucket.locked_cycle_budget),
+                "receipt": prepared.result_digest,
+            },
+            "quantity": quantity.quantity,
+            "new_event": new_candidate.record.to_dict(),
+            "new_event_receipt": new_candidate.result_digest,
+        }
 
-    def story_three() -> str:
+    def story_three() -> dict[str, object]:
+        old_closed = funding(bucket("U1", "20000", cycle_id="story3-old", locked="20000"))
+        old_request = SettlementRequest("story3-old-settle", "U1", "story3-old", READY)
+        old_settled = settle_batch(
+            old_closed,
+            command("story3-old", settle_invocation_payload((old_request,)), old_closed.revision),
+            (old_request,),
+        ).state
+        new_held = replace(
+            old_settled.bucket("U1"),
+            cash=dec("18500"),
+            cycle_id="story3-new",
+            phase=BucketPhase.HELD,
+            locked_cycle_budget=dec("20000"),
+        )
+        reused = replace(old_settled, buckets=(new_held,), reserve=dec("100"))
+        pending = PendingBuy(
+            reservation_id="story3-pending",
+            security_code="SYN001",
+            level1_industry_id="IND-1",
+            remaining_quantity=100,
+            mark_price=dec("10"),
+            price_bound=dec("10"),
+            unrecognized_fee_upper_bound=dec("5"),
+        )
         baseline = evaluate_quantity(
-            quantity_request(budget="100000", fraction=".30", stock="1"), risk()
+            quantity_request(budget="20000", fraction=".30", stock="1"), risk()
         )
-        tighter = evaluate_quantity(
-            quantity_request(budget="100000", fraction=".30", stock=".10"),
-            risk(positions=(exposure(500),)),
+        tightened = evaluate_quantity(
+            quantity_request(budget="20000", fraction=".30", stock=".10"),
+            risk(positions=(exposure(500),), pending_buys=(pending,)),
         )
-        start = funding(bucket("U1", "18500", locked="19500"), reserve="100")
+        assert tightened.quantity < baseline.quantity
+        late_payload = late_cash_invocation_payload(
+            bucket_id="U1", cycle_id="story3-old", cash_delta=dec("-25")
+        )
         late = apply_late_cash_delta(
-            start,
-            command("story3-late", {"story": 3}, start.revision),
+            reused,
+            command("story3-late", late_payload, reused.revision),
             bucket_id="U1",
-            cycle_id="cycle-1",
+            cycle_id="story3-old",
             cash_delta=dec("-25"),
+        )
+        assert late.accepted and late.state.reserve == dec("75")
+        assert late.state.bucket("U1").locked_cycle_budget == dec("20000")
+
+        held_observation = observation(
+            input_valid=False,
+            actual_position=ActualPositionState.HELD,
         )
         held = project_candidate(
             CandidateState(),
-            command("story3-held", {"story": 3, "held": True}, 0),
-            observation(actual_position=ActualPositionState.HELD),
+            command(
+                "story3-held",
+                candidate_invocation_payload(held_observation),
+                0,
+            ),
+            held_observation,
         ).record
-        assert held is not None and not held.entry_authorized
-        return (
-            "sha256:"
-            + hashlib.sha256(
-                json.dumps(
-                    {
-                        "baseline": baseline.to_dict(),
-                        "tighter": tighter.to_dict(),
-                        "late": late.to_dict(),
-                        "held": held.to_dict(),
-                    },
-                    sort_keys=True,
-                ).encode()
-            ).hexdigest()
-        )
+        assert held is not None and held.projection is CandidateProjection.HELD
+        assert not held.entry_authorized
+        return {
+            "baseline_quantity": baseline.quantity,
+            "tightened_quantity": tightened.quantity,
+            "pending_buy": pending.reservation_id,
+            "late": {
+                "reserve": str(late.state.reserve),
+                "B": str(late.state.bucket("U1").locked_cycle_budget),
+                "state_digest": late.state.digest,
+                "receipt": late.result_digest,
+            },
+            "held": held.to_dict(),
+        }
 
-    digests = {
+    traces = {
         "story_1_observe_capacity_expire": story_one(),
-        "story_2_reserve_buy_hold_exit_settle_new_event": story_two(),
-        "story_3_external_pending_late_no_exit": story_three(),
+        "story_2_p2_buy_hold_exit_reserve_new_event": story_two(),
+        "story_3_pending_and_late_fee_after_reuse": story_three(),
     }
-    for digest_value in digests.values():
-        assert digest_value.startswith("sha256:")
-    assert story_one() == digests["story_1_observe_capacity_expire"]
-    assert story_two() == digests["story_2_reserve_buy_hold_exit_settle_new_event"]
-    assert story_three() == digests["story_3_external_pending_late_no_exit"]
+    rebuilt = {
+        "story_1_observe_capacity_expire": story_one(),
+        "story_2_p2_buy_hold_exit_reserve_new_event": story_two(),
+        "story_3_pending_and_late_fee_after_reuse": story_three(),
+    }
+    assert rebuilt == traces
+    digests = {
+        key: "sha256:" + hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+        for key, value in traces.items()
+    }
     output = os.environ.get("R11_STORY_ACTUALS")
     if output:
         Path(output).write_text(
             json.dumps(
                 {
-                    "schema_version": "quanthus.r11.story-actuals.v1",
+                    "schema_version": "quanthus.r11.story-actuals.v2",
                     "story_count": 3,
                     "rebuild_identical": True,
                     "stories": digests,
+                    "traces": traces,
                 },
                 indent=2,
                 sort_keys=True,
@@ -1176,3 +1687,454 @@ def test_three_story_paths_rebuild_to_identical_terminal_digests() -> None:
             + "\n",
             encoding="utf-8",
         )
+
+
+def test_r1_old_cycle_late_delta_after_new_cycle_reuse() -> None:
+    old = funding(bucket("U1", "20000", cycle_id="old", locked="20000"), reserve="2000")
+    old_request = SettlementRequest("S-old", "U1", "old", READY)
+    settled = settle_batch(
+        old,
+        command("settle-old", settle_invocation_payload((old_request,)), old.revision),
+        (old_request,),
+    ).state
+    new_held = replace(settled.bucket("U1"), cycle_id="new", phase=BucketPhase.HELD)
+    reused = replace(settled, buckets=(new_held,))
+    fee_payload = late_cash_invocation_payload(
+        bucket_id="U1", cycle_id="old", cash_delta=dec("-100")
+    )
+    fee = apply_late_cash_delta(
+        reused,
+        command("old-fee", fee_payload, reused.revision),
+        bucket_id="U1",
+        cycle_id="old",
+        cash_delta=dec("-100"),
+    )
+    assert fee.accepted and fee.state.reserve == dec("1900")
+    assert fee.state.bucket("U1").cycle_id == "new"
+    assert fee.state.bucket("U1").locked_cycle_budget == dec("20000")
+
+    debt_state = replace(
+        reused,
+        reserve=dec("0"),
+        unallocated_adjustment=dec("-50"),
+    )
+    refund_payload = late_cash_invocation_payload(
+        bucket_id="U1", cycle_id="old", cash_delta=dec("80")
+    )
+    refund = apply_late_cash_delta(
+        debt_state,
+        command("late-refund", refund_payload, debt_state.revision),
+        bucket_id="U1",
+        cycle_id="old",
+        cash_delta=dec("80"),
+    )
+    assert refund.state.unallocated_adjustment == 0
+    assert refund.state.reserve == dec("30")
+    assert refund.state.bucket("U1").locked_cycle_budget == dec("20000")
+
+
+def test_r2_settlement_profit_offsets_debt_before_loss_topup() -> None:
+    start = funding(
+        bucket("U1", "22000", cycle_id="profit", locked="20000"),
+        bucket("U2", "18000", cycle_id="loss", locked="18000"),
+        adjustment="-50",
+    )
+    requests = (
+        SettlementRequest("profit", "U1", "profit", READY),
+        SettlementRequest("loss", "U2", "loss", READY),
+    )
+    result = settle_batch(
+        start,
+        command("settle-debt-first", settle_invocation_payload(requests), 0),
+        requests,
+    )
+    assert result.accepted
+    assert result.state.bucket("U1").cash == dec("20000")
+    assert result.state.bucket("U2").cash == dec("19950")
+    assert result.state.reserve == 0
+    assert result.state.unallocated_adjustment == 0
+    assert result.state.cash_total == dec("39950")
+
+
+def test_r3_unsettled_closed_cycle_cannot_be_reused() -> None:
+    start = funding(bucket("U1", "18000", cycle_id="old", locked="18000"), reserve="500")
+    payload = prepare_cycle_invocation_payload(bucket_id="U1", cycle_id="new")
+    rejected = prepare_cycle(
+        start,
+        command("premature", payload, start.revision),
+        bucket_id="U1",
+        cycle_id="new",
+    )
+    assert not rejected.accepted
+    assert rejected.state.digest == start.digest
+    assert rejected.reason_codes == (ReasonCode.SETTLEMENT_NOT_READY,)
+
+    request = SettlementRequest("S-old", "U1", "old", READY)
+    settled = settle_batch(
+        start,
+        command("settle-before-new", settle_invocation_payload((request,)), 0),
+        (request,),
+    ).state
+    allowed = prepare_cycle(
+        settled,
+        command("new-after-settle", payload, settled.revision),
+        bucket_id="U1",
+        cycle_id="new",
+    )
+    assert allowed.accepted and allowed.state.bucket("U1").cycle_id == "new"
+
+
+def test_r4_command_operation_and_business_body_are_bound() -> None:
+    start = funding(bucket("U1", "20000", phase=BucketPhase.EMPTY, cycle_id=None, locked="0"))
+    envelope_payload = transfer_invocation_payload(source_bucket_id="U1", amount=dec("100"))
+    envelope = command("transfer", envelope_payload, start.revision)
+    first = transfer_to_reserve(start, envelope, source_bucket_id="U1", amount=dec("100"))
+    assert first.accepted
+    with pytest.raises(ProductDailyError, match="idempotency_conflict"):
+        transfer_to_reserve(first.state, envelope, source_bucket_id="U1", amount=dec("200"))
+
+    with pytest.raises(ProductDailyError, match="idempotency_conflict"):
+        settle_batch(
+            first.state,
+            envelope,
+            (SettlementRequest("S", "U1", "cycle-1", READY),),
+        )
+
+    observation_one = observation(capacity_allowed=False)
+    candidate_command = command("candidate", candidate_invocation_payload(observation_one), 0)
+    candidate_first = project_candidate(CandidateState(), candidate_command, observation_one)
+    with pytest.raises(ProductDailyError, match="idempotency_conflict"):
+        project_candidate(
+            candidate_first.state,
+            candidate_command,
+            replace(observation_one, decision_id="changed", capacity_allowed=True),
+        )
+
+
+def test_r5_transient_blocks_recompute_but_expiry_and_window_are_sticky() -> None:
+    blocked_observation = observation(capacity_allowed=False)
+    first = project_candidate(
+        CandidateState(),
+        command("obs-blocked", candidate_invocation_payload(blocked_observation), 0),
+        blocked_observation,
+    )
+    assert first.record is not None
+    assert first.record.projection is CandidateProjection.BLOCKED
+
+    eligible_observation = replace(blocked_observation, capacity_allowed=True, decision_id="D2")
+    second = project_candidate(
+        first.state,
+        command(
+            "obs-eligible",
+            candidate_invocation_payload(eligible_observation),
+            first.state.revision,
+        ),
+        eligible_observation,
+    )
+    assert second.record is not None
+    assert second.record.projection is CandidateProjection.OBSERVED
+    assert second.record.entry_authorized
+
+    blocked_again_observation = replace(eligible_observation, input_valid=False, decision_id="D3")
+    blocked_again = project_candidate(
+        second.state,
+        command(
+            "obs-blocked-again",
+            candidate_invocation_payload(blocked_again_observation),
+            second.state.revision,
+        ),
+        blocked_again_observation,
+    )
+    assert blocked_again.record is not None
+    assert blocked_again.record.projection is CandidateProjection.BLOCKED
+
+    expired_observation = replace(
+        eligible_observation,
+        decision_id="D4",
+        current_session_index=3,
+    )
+    expired = project_candidate(
+        blocked_again.state,
+        command(
+            "obs-expired",
+            candidate_invocation_payload(expired_observation),
+            blocked_again.state.revision,
+        ),
+        expired_observation,
+    )
+    assert expired.record is not None
+    assert expired.record.projection is CandidateProjection.EXPIRED
+
+    rearmed_observation = replace(expired_observation, decision_id="D5", current_session_index=2)
+    rearmed = project_candidate(
+        expired.state,
+        command(
+            "obs-rearmed",
+            candidate_invocation_payload(rearmed_observation),
+            expired.state.revision,
+        ),
+        rearmed_observation,
+    )
+    assert rearmed.record is not None
+    assert rearmed.record.projection is CandidateProjection.EXPIRED
+    assert not rearmed.record.entry_authorized
+
+    extended_observation = replace(rearmed_observation, decision_id="D6", expiry_session_index=3)
+    with pytest.raises(ProductDailyError, match="window cannot be rewritten"):
+        project_candidate(
+            rearmed.state,
+            command(
+                "obs-window-extension",
+                candidate_invocation_payload(extended_observation),
+                rearmed.state.revision,
+            ),
+            extended_observation,
+        )
+
+
+def test_r6_entry_consumes_explicit_original_expert_action() -> None:
+    empty = funding(bucket("U1", "20000", phase=BucketPhase.EMPTY, cycle_id=None, locked="0"))
+    snapshot = risk()
+    limits = EntryLimits(2, 2)
+    quantity_limits = QuantityLimits(dec("1"), dec("1"), dec("1"))
+    allowed_candidate = CandidateEntry(
+        EXPERT_EVENT_ID,
+        "SYN001",
+        "IND-1",
+        CandidateProjection.OBSERVED,
+        True,
+        True,
+        True,
+        expert_entry=expert_entry(allowed=True),
+    )
+    allowed_payload = entry_invocation_payload(
+        candidate=allowed_candidate,
+        snapshot=snapshot,
+        empty_bucket_ids=("U1",),
+        active_or_reserved_security_codes=(),
+        active_industry_counts=(),
+        new_buckets_today=0,
+        limits=limits,
+        fraction=dec(".30"),
+        mark_price=dec("10"),
+        price_bound=dec("10"),
+        lot_size=100,
+        quantity_limits=quantity_limits,
+        fee_rule=fee_rule(),
+    )
+    allowed = decide_entry(
+        candidate=allowed_candidate,
+        funding=empty,
+        snapshot=snapshot,
+        empty_bucket_ids=("U1",),
+        active_or_reserved_security_codes=(),
+        active_industry_counts=(),
+        new_buckets_today=0,
+        limits=limits,
+        fraction=dec(".30"),
+        mark_price=dec("10"),
+        price_bound=dec("10"),
+        lot_size=100,
+        quantity_limits=quantity_limits,
+        fee_rule=fee_rule(),
+        command=command("expert-allowed", allowed_payload, 0),
+    )
+    assert allowed.accepted
+
+    blocked_candidate = replace(allowed_candidate, expert_entry=expert_entry(allowed=False))
+    blocked_payload = entry_invocation_payload(
+        candidate=blocked_candidate,
+        snapshot=snapshot,
+        empty_bucket_ids=("U1",),
+        active_or_reserved_security_codes=(),
+        active_industry_counts=(),
+        new_buckets_today=0,
+        limits=limits,
+        fraction=dec(".30"),
+        mark_price=dec("10"),
+        price_bound=dec("10"),
+        lot_size=100,
+        quantity_limits=quantity_limits,
+        fee_rule=fee_rule(),
+    )
+    blocked = decide_entry(
+        candidate=blocked_candidate,
+        funding=empty,
+        snapshot=snapshot,
+        empty_bucket_ids=("U1",),
+        active_or_reserved_security_codes=(),
+        active_industry_counts=(),
+        new_buckets_today=0,
+        limits=limits,
+        fraction=dec(".30"),
+        mark_price=dec("10"),
+        price_bound=dec("10"),
+        lot_size=100,
+        quantity_limits=quantity_limits,
+        fee_rule=fee_rule(),
+        command=command("expert-blocked", blocked_payload, 0),
+    )
+    assert not blocked.accepted and blocked.funding_state.digest == empty.digest
+    assert ReasonCode.EXPERT_ENTRY_BLOCKED in blocked.reason_codes
+
+    projection_blocked = replace(
+        allowed_candidate,
+        projection=CandidateProjection.BLOCKED,
+    )
+    projection_payload = entry_invocation_payload(
+        candidate=projection_blocked,
+        snapshot=snapshot,
+        empty_bucket_ids=("U1",),
+        active_or_reserved_security_codes=(),
+        active_industry_counts=(),
+        new_buckets_today=0,
+        limits=limits,
+        fraction=dec(".30"),
+        mark_price=dec("10"),
+        price_bound=dec("10"),
+        lot_size=100,
+        quantity_limits=quantity_limits,
+        fee_rule=fee_rule(),
+    )
+    projection_rejected = decide_entry(
+        candidate=projection_blocked,
+        funding=empty,
+        snapshot=snapshot,
+        empty_bucket_ids=("U1",),
+        active_or_reserved_security_codes=(),
+        active_industry_counts=(),
+        new_buckets_today=0,
+        limits=limits,
+        fraction=dec(".30"),
+        mark_price=dec("10"),
+        price_bound=dec("10"),
+        lot_size=100,
+        quantity_limits=quantity_limits,
+        fee_rule=fee_rule(),
+        command=command("projection-blocked", projection_payload, 0),
+    )
+    assert not projection_rejected.accepted
+    assert ReasonCode.CANDIDATE_NOT_ELIGIBLE in projection_rejected.reason_codes
+
+
+def test_r7_composite_entry_replay_is_atomic_and_immutable() -> None:
+    empty = funding(bucket("U1", "20000", phase=BucketPhase.EMPTY, cycle_id=None, locked="0"))
+    candidate = CandidateEntry(
+        EXPERT_EVENT_ID,
+        "SYN001",
+        "IND-1",
+        CandidateProjection.OBSERVED,
+        True,
+        True,
+        True,
+        expert_entry=expert_entry(allowed=True),
+    )
+    snapshot = risk()
+    limits = EntryLimits(2, 2)
+    quantity_limits = QuantityLimits(dec("1"), dec("1"), dec("1"))
+    payload = entry_invocation_payload(
+        candidate=candidate,
+        snapshot=snapshot,
+        empty_bucket_ids=("U1",),
+        active_or_reserved_security_codes=(),
+        active_industry_counts=(),
+        new_buckets_today=0,
+        limits=limits,
+        fraction=dec(".30"),
+        mark_price=dec("10"),
+        price_bound=dec("10"),
+        lot_size=100,
+        quantity_limits=quantity_limits,
+        fee_rule=fee_rule(),
+    )
+    envelope = command("entry-once", payload, 0)
+    kwargs = {
+        "candidate": candidate,
+        "snapshot": snapshot,
+        "empty_bucket_ids": ("U1",),
+        "active_or_reserved_security_codes": (),
+        "active_industry_counts": (),
+        "new_buckets_today": 0,
+        "limits": limits,
+        "fraction": dec(".30"),
+        "mark_price": dec("10"),
+        "price_bound": dec("10"),
+        "lot_size": 100,
+        "quantity_limits": quantity_limits,
+        "fee_rule": fee_rule(),
+    }
+    first = decide_entry(funding=empty, command=envelope, **kwargs)
+    assert first.accepted and first.quantity is not None and first.quantity.quantity == 500
+    assert len(first.funding_state.entry_reservations) == 1
+    assert [item.operation for item in first.funding_state.processed_commands] == ["decide_entry"]
+    replay = decide_entry(funding=first.funding_state, command=envelope, **kwargs)
+    assert replay.replayed and replay.accepted
+    assert replay.quantity is not None and replay.quantity.quantity == first.quantity.quantity
+    assert replay.reservation_id == first.reservation_id
+    assert replay.result_digest == first.result_digest
+    assert replay.funding_state.digest == first.funding_state.digest
+
+    changed_candidate = replace(candidate, security_code="SYN002")
+    with pytest.raises(ProductDailyError, match="idempotency_conflict"):
+        decide_entry(
+            funding=first.funding_state,
+            command=envelope,
+            **{**kwargs, "candidate": changed_candidate},
+        )
+
+
+def test_r8_nonpositive_equity_is_directly_blocked() -> None:
+    for equity in (Decimal("0"), Decimal("-1")):
+        decision = evaluate_quantity(
+            quantity_request(budget="10000", fraction="1", stock="0"),
+            risk(equity=str(equity)),
+        )
+        assert decision.quantity == 0
+        assert decision.reason_codes == (ReasonCode.INPUT_UNAVAILABLE,)
+
+
+def test_r9_strict_typed_inputs_reject_truthy_and_binary_values() -> None:
+    with pytest.raises(ProductDailyError, match="must be a boolean"):
+        CycleSettlementEvidence("false", True, True, True, True)  # type: ignore[arg-type]
+    with pytest.raises(ProductDailyError, match="must be >= 0.01"):
+        PendingBuy(
+            reservation_id="zero-price",
+            security_code="SYN001",
+            level1_industry_id="IND-1",
+            remaining_quantity=100,
+            mark_price=dec("0"),
+            price_bound=dec("0"),
+            unrecognized_fee_upper_bound=Decimal("0"),
+        )
+    with pytest.raises(ProductDailyError, match="must be finite"):
+        MarkedExposure(
+            unit_id="float",
+            opportunity_id="float",
+            security_code="SYN001",
+            level1_industry_id="IND-1",
+            quantity=100,
+            mark_price=10.0,  # type: ignore[arg-type]
+            price_bound=dec("10"),
+        )
+    with pytest.raises(ProductDailyError, match="cash quantum"):
+        bucket("U1", "100.001", phase=BucketPhase.EMPTY, cycle_id=None, locked="0")
+    with pytest.raises(ProductDailyError, match="must be an integer"):
+        CandidateObservation(
+            identity=identity(),
+            decision_id="bool-int",
+            observed_at=NOW,
+            knowledge_cutoff=NOW,
+            event_session_index=True,  # type: ignore[arg-type]
+            current_session_index=2,
+            first_eligible_session_index=2,
+            expiry_session_index=2,
+            input_valid=True,
+            policy_adopted=True,
+            raw_allocated=False,
+            capacity_allowed=True,
+            expert_decision_ref="expert-ok",
+            position_state_ref=None,
+            evidence_at=NOW,
+        )
+    zero_fee = BuyFeeRule(Decimal("0"), Decimal("0"), Decimal("0.01"))
+    assert zero_fee.minimum_commission == 0

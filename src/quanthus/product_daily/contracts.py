@@ -6,7 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 from typing import Any
 
@@ -28,6 +28,8 @@ class CommandDisposition(str, Enum):
 class ReasonCode(str, Enum):
     INPUT_UNAVAILABLE = "INPUT_UNAVAILABLE"
     POLICY_NOT_ADOPTED = "POLICY_NOT_ADOPTED"
+    CANDIDATE_NOT_ELIGIBLE = "CANDIDATE_NOT_ELIGIBLE"
+    EXPERT_ENTRY_BLOCKED = "EXPERT_ENTRY_BLOCKED"
     KNOWLEDGE_CUTOFF_BREACH = "KNOWLEDGE_CUTOFF_BREACH"
     ENTRY_WINDOW_EXPIRED = "ENTRY_WINDOW_EXPIRED"
     EXISTING_SECURITY_CYCLE = "EXISTING_SECURITY_CYCLE"
@@ -76,20 +78,9 @@ def require_aware(value: object, field_name: str) -> None:
 
 
 def decimal_value(value: object, field_name: str) -> Decimal:
-    if isinstance(value, bool):
-        raise ProductDailyError("invalid_decimal", f"{field_name} must be a decimal")
-    try:
-        if isinstance(value, Decimal):
-            parsed = value
-        elif isinstance(value, (str, int, float)):
-            parsed = Decimal(value)
-        else:
-            raise TypeError
-    except (InvalidOperation, TypeError, ValueError) as exc:
-        raise ProductDailyError("invalid_decimal", f"{field_name} must be a decimal") from exc
-    if not parsed.is_finite():
+    if not isinstance(value, Decimal) or not value.is_finite():
         raise ProductDailyError("invalid_decimal", f"{field_name} must be finite")
-    return parsed
+    return value
 
 
 def require_decimal(
@@ -119,6 +110,31 @@ def quantize(value: Decimal, quantum: Decimal) -> Decimal:
     return value.quantize(quantum, rounding=ROUND_HALF_UP)
 
 
+def require_quantized(value: Decimal, quantum: Decimal, field_name: str) -> Decimal:
+    require_decimal(value, field_name)
+    require_decimal(quantum, "quantum", minimum=Decimal("0.0000000001"))
+    if value != quantize(value, quantum):
+        raise ProductDailyError(
+            "invalid_quantum", f"{field_name} must already equal the adopted cash quantum"
+        )
+    return value
+
+
+def require_bool(value: object, field_name: str) -> bool:
+    if not isinstance(value, bool):
+        raise ProductDailyError("invalid_boolean", f"{field_name} must be a boolean")
+    return value
+
+
+def require_nonnegative_int(value: object, field_name: str, *, positive: bool = False) -> int:
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ProductDailyError("invalid_integer", f"{field_name} must be an integer")
+    if value < 0 or (positive and value == 0):
+        qualifier = "positive" if positive else "non-negative"
+        raise ProductDailyError("invalid_integer", f"{field_name} must be {qualifier}")
+    return value
+
+
 def canonical_bytes(value: object) -> bytes:
     return json.dumps(
         value,
@@ -136,15 +152,24 @@ def digest(value: object) -> str:
 class ProcessedCommand:
     command_id: str
     body_digest: str
+    operation: str
+    invocation_digest: str
     result_digest: str
     result_json: str
     revision: int
 
     def __post_init__(self) -> None:
-        for field_name in ("command_id", "body_digest", "result_digest"):
+        for field_name in (
+            "command_id",
+            "body_digest",
+            "operation",
+            "invocation_digest",
+            "result_digest",
+        ):
             require_text(getattr(self, field_name), field_name)
-        if self.revision < 1:
-            raise ProductDailyError("invalid_revision", "processed revision must be positive")
+        require_nonnegative_int(self.revision, "revision", positive=True)
+        if not self.invocation_digest.startswith("sha256:") or len(self.invocation_digest) != 71:
+            raise ProductDailyError("invalid_command", "invocation_digest must be sha256")
         try:
             json.loads(self.result_json)
         except json.JSONDecodeError as exc:
@@ -161,6 +186,8 @@ class ProcessedCommand:
         return {
             "command_id": self.command_id,
             "body_digest": self.body_digest,
+            "operation": self.operation,
+            "invocation_digest": self.invocation_digest,
             "result_digest": self.result_digest,
             "result": self.result,
             "revision": self.revision,
@@ -178,8 +205,7 @@ class CommandEnvelope:
         require_text(self.body_digest, "body_digest")
         if not self.body_digest.startswith("sha256:") or len(self.body_digest) != 71:
             raise ProductDailyError("invalid_command", "body_digest must be sha256")
-        if self.expected_revision < 0:
-            raise ProductDailyError("invalid_revision", "expected_revision must not be negative")
+        require_nonnegative_int(self.expected_revision, "expected_revision")
 
     @classmethod
     def create(
@@ -211,15 +237,28 @@ def resolve_command(
     revision: int,
     processed: tuple[ProcessedCommand, ...],
     command: CommandEnvelope,
+    operation: str,
+    invocation_payload: object,
 ) -> CommandResolution:
     """Resolve duplicate, idempotency conflict and revision preconditions."""
 
+    require_text(operation, "operation")
+    if command.body_digest != digest(invocation_payload):
+        raise ProductDailyError(
+            "idempotency_conflict",
+            "command envelope body does not match the actual business invocation",
+        )
+    invocation_digest = digest({"operation": operation, "payload": invocation_payload})
     matches = [item for item in processed if item.command_id == command.command_id]
     if len(matches) > 1:
         raise ProductDailyError("invalid_receipt", "processed command ids must be unique")
     if matches:
         receipt = matches[0]
-        if receipt.body_digest != command.body_digest:
+        if (
+            receipt.body_digest != command.body_digest
+            or receipt.operation != operation
+            or receipt.invocation_digest != invocation_digest
+        ):
             raise ProductDailyError(
                 "idempotency_conflict",
                 "one command_id cannot be reused with a different body",
@@ -245,13 +284,22 @@ def resolve_command(
 def make_receipt(
     *,
     command: CommandEnvelope,
+    operation: str,
+    invocation_payload: object,
     result: dict[str, Any],
     revision: int,
 ) -> ProcessedCommand:
     result_digest = digest(result)
+    if command.body_digest != digest(invocation_payload):
+        raise ProductDailyError(
+            "idempotency_conflict",
+            "command envelope body does not match the actual business invocation",
+        )
     return ProcessedCommand(
         command_id=command.command_id,
         body_digest=command.body_digest,
+        operation=operation,
+        invocation_digest=digest({"operation": operation, "payload": invocation_payload}),
         result_digest=result_digest,
         result_json=json.dumps(result, ensure_ascii=True, sort_keys=True, separators=(",", ":")),
         revision=revision,

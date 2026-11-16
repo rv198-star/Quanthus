@@ -27,7 +27,7 @@
         {
           "scope": "component",
           "path": "src/quanthus/product_daily/candidate.py",
-          "sha256": "958815f580bbb11dd62367e2de2a4538ae8b4d819afa82cb2434bb6c8409c4c9"
+          "sha256": "7c703496741a448be4d57eb168aa0178cfce33ca439b97647ebb2dd955c8233e"
         }
       ],
       "missing_fields": [
@@ -110,7 +110,7 @@
         {
           "scope": "component",
           "path": "src/quanthus/product_daily/risk.py",
-          "sha256": "05b863c664352b5a50ad92e8220f5ca7d622e5ecfb742265dea9ed1f6bb9887d"
+          "sha256": "507dc82626df854a879a8a450c3c0c42890fdecb1025dd079d5eb0e099baad29"
         }
       ],
       "real_account_limits": null,
@@ -135,7 +135,7 @@
         {
           "scope": "component",
           "path": "src/quanthus/product_daily/funding.py",
-          "sha256": "a77a103b446f828d5cf3afbea9b6d386a99424bc6b8f543873c4f8e6ca8d1f57"
+          "sha256": "902298a731b7cc66f9555e946929683c085b8da4b2b7d2e9a4ad452f56f8677f"
         }
       ],
       "missing_fields": [
@@ -183,19 +183,29 @@
   "implementation_scope": {
     "contracts": {
       "path": "src/quanthus/product_daily/contracts.py",
-      "sha256": "75dfcb69e1a41794734a722be4a13a9001e31a083a3830fd7eb7a9132f5bdf1e"
+      "sha256": "a849a92e2a14f02de914e4b06c41d6b3619a1146edccb415c0ae00378cc3e77e"
     },
     "policy": {
       "path": "config/research/r11/implementation-policy.v1.json",
-      "sha256": "1f825efefd5a678063f2a91122d6737459da1be8ac68e9d6121e13a424fc5b66"
+      "sha256": "1b01ce8fa6a3c9e11eea40419a612794cda9b4f193f18dab958259330ab9cb08"
     },
     "unit_test": {
       "path": "tests/unit/test_product_daily_r11.py",
-      "sha256": "93dc3453f6fbe475a17e8fc11172faa695bffd6dd6fd141af2a6088f154248bf"
+      "sha256": "1ef1bd43d5e6d66f8c72e4caba9f12f0382694cffc90bf57056165616d050714"
     },
     "contract_test": {
       "path": "tests/contract/test_product_daily_r11.py",
-      "sha256": "9604702b8c382301874cadf233858b6e647c5200a24ebcf999cf2097980fe239"
+      "sha256": "bd9a947521bc9832e93117fd9dac6460ad617fcc3f467ae7b7a0ec05a12a693a"
+    },
+    "synthetic_verifier": {
+      "path": "scripts/r11_synthetic_verify.py",
+      "sha256": "c011770af2f6d738ba85cdcb5e2865a8f67bd47ef94d028be40e98bcbad05154"
+    },
+    "repair_dispositions": {
+      "path": "config/research/r11/repair-dispositions.v1.json",
+      "sha256": "7fa7f8005d2b53a425f93c2ce7242857631ea91a859b8de707792c2f9cd3290c"
     }
-  }
+  },
+  "implementation_version": "1.1.0",
+  "repair_manifest_sha256": "3ac42c68e759734bc29c78475c95fb0a6066e0f2529963771c4d1208c7ac7735"
 }

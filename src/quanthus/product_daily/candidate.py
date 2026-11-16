@@ -18,6 +18,8 @@ from quanthus.product_daily.contracts import (
     make_receipt,
     ordered_reasons,
     require_aware,
+    require_bool,
+    require_nonnegative_int,
     require_text,
     resolve_command,
 )
@@ -98,10 +100,23 @@ class CandidatePolicy:
     def __post_init__(self) -> None:
         require_text(self.policy_id, "candidate.policy_id")
         require_text(self.version, "candidate.version")
-        if self.minimum_event_separation_sessions < 1:
-            raise ProductDailyError("invalid_candidate_policy", "event separation must be positive")
-        if self.position_cooldown_sessions < 0:
-            raise ProductDailyError("invalid_candidate_policy", "cooldown must not be negative")
+        require_nonnegative_int(
+            self.minimum_event_separation_sessions,
+            "minimum_event_separation_sessions",
+            positive=True,
+        )
+        require_nonnegative_int(
+            self.position_cooldown_sessions,
+            "position_cooldown_sessions",
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "policy_id": self.policy_id,
+            "version": self.version,
+            "minimum_event_separation_sessions": self.minimum_event_separation_sessions,
+            "position_cooldown_sessions": self.position_cooldown_sessions,
+        }
 
 
 DEFAULT_CANDIDATE_POLICY = CandidatePolicy()
@@ -143,10 +158,9 @@ class CandidateObservation:
             "first_eligible_session_index",
             "expiry_session_index",
         ):
-            if getattr(self, field_name) < 0:
-                raise ProductDailyError(
-                    "invalid_candidate_time", f"{field_name} must be non-negative"
-                )
+            require_nonnegative_int(getattr(self, field_name), field_name)
+        for field_name in ("input_valid", "policy_adopted", "raw_allocated", "capacity_allowed"):
+            require_bool(getattr(self, field_name), field_name)
         if self.first_eligible_session_index > self.expiry_session_index:
             raise ProductDailyError("invalid_candidate_time", "eligibility must not follow expiry")
         if not isinstance(self.actual_order_state, ActualOrderState):
@@ -157,12 +171,14 @@ class CandidateObservation:
             self.active_or_reserved_security_codes
         ):
             raise ProductDailyError("invalid_candidate_context", "security evidence must be unique")
-        if self.previous_event_session_index is not None and self.previous_event_session_index < 0:
-            raise ProductDailyError("invalid_candidate_time", "prior event index is invalid")
-        if self.last_closed_settled_session_index is not None and (
-            self.last_closed_settled_session_index < 0
-        ):
-            raise ProductDailyError("invalid_candidate_time", "prior settlement index is invalid")
+        if self.previous_event_session_index is not None:
+            require_nonnegative_int(
+                self.previous_event_session_index, "previous_event_session_index"
+            )
+        if self.last_closed_settled_session_index is not None:
+            require_nonnegative_int(
+                self.last_closed_settled_session_index, "last_closed_settled_session_index"
+            )
         if self.position_lifecycle is not None:
             lifecycle = self.position_lifecycle
             if (
@@ -198,6 +214,14 @@ class CandidateObservation:
                     "position_state_mismatch",
                     "position_state_ref must equal the bound lifecycle digest",
                 )
+
+    @property
+    def window(self) -> tuple[int, int, int]:
+        return (
+            self.event_session_index,
+            self.first_eligible_session_index,
+            self.expiry_session_index,
+        )
 
     @property
     def digest(self) -> str:
@@ -242,6 +266,9 @@ class CandidateObservation:
 class CandidateRecord:
     identity: CandidateIdentity
     decision_id: str
+    event_session_index: int
+    first_eligible_session_index: int
+    expiry_session_index: int
     projection: CandidateProjection
     entry_authorized: bool
     reason_codes: tuple[ReasonCode, ...]
@@ -250,6 +277,12 @@ class CandidateRecord:
     position_state_ref: str | None
     actual_order_state: ActualOrderState
     actual_position_state: ActualPositionState
+
+    def __post_init__(self) -> None:
+        require_nonnegative_int(self.event_session_index, "event_session_index")
+        require_nonnegative_int(self.first_eligible_session_index, "first_eligible_session_index")
+        require_nonnegative_int(self.expiry_session_index, "expiry_session_index")
+        require_bool(self.entry_authorized, "entry_authorized")
 
     @property
     def execution_authorized(self) -> bool:
@@ -264,6 +297,9 @@ class CandidateRecord:
             "identity": self.identity.to_dict(),
             "identity_digest": self.identity.digest,
             "decision_id": self.decision_id,
+            "event_session_index": self.event_session_index,
+            "first_eligible_session_index": self.first_eligible_session_index,
+            "expiry_session_index": self.expiry_session_index,
             "projection": self.projection.value,
             "entry_authorized": self.entry_authorized,
             "execution_authorized": self.execution_authorized,
@@ -274,6 +310,41 @@ class CandidateRecord:
             "actual_order_state": self.actual_order_state.value,
             "actual_position_state": self.actual_position_state.value,
         }
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> CandidateRecord:
+        identity_raw = raw.get("identity")
+        if not isinstance(identity_raw, dict):
+            raise ProductDailyError("invalid_receipt", "candidate identity must be an object")
+        identity = CandidateIdentity(
+            original_event_id=str(identity_raw["original_event_id"]),
+            original_source_snapshot_id=str(identity_raw["original_source_snapshot_id"]),
+            candidate_rule_digest=str(identity_raw["candidate_rule_digest"]),
+            security_code=str(identity_raw["security_code"]),
+            level1_industry_id=str(identity_raw["level1_industry_id"]),
+        )
+        reasons = raw.get("reason_codes")
+        if not isinstance(reasons, list) or not all(isinstance(item, str) for item in reasons):
+            raise ProductDailyError("invalid_receipt", "candidate reasons must be strings")
+        return cls(
+            identity=identity,
+            decision_id=str(raw["decision_id"]),
+            event_session_index=raw["event_session_index"],
+            first_eligible_session_index=raw["first_eligible_session_index"],
+            expiry_session_index=raw["expiry_session_index"],
+            projection=CandidateProjection(str(raw["projection"])),
+            entry_authorized=raw["entry_authorized"],
+            reason_codes=tuple(ReasonCode(item) for item in reasons),
+            observation_digest=str(raw["observation_digest"]),
+            expert_decision_ref=(
+                None if raw.get("expert_decision_ref") is None else str(raw["expert_decision_ref"])
+            ),
+            position_state_ref=(
+                None if raw.get("position_state_ref") is None else str(raw["position_state_ref"])
+            ),
+            actual_order_state=ActualOrderState(str(raw["actual_order_state"])),
+            actual_position_state=ActualPositionState(str(raw["actual_position_state"])),
+        )
 
 
 @dataclass(frozen=True)
@@ -286,8 +357,7 @@ class CandidateState:
         identity_keys = [item.identity.key for item in self.records]
         if len(identity_keys) != len(set(identity_keys)):
             raise ProductDailyError("invalid_candidate_state", "event identities must be unique")
-        if self.revision < 0:
-            raise ProductDailyError("invalid_revision", "revision must not be negative")
+        require_nonnegative_int(self.revision, "revision")
         command_ids = [item.command_id for item in self.processed_commands]
         if len(command_ids) != len(set(command_ids)):
             raise ProductDailyError("invalid_receipt", "processed command ids must be unique")
@@ -357,6 +427,9 @@ def _record_from_observation(
     elif not observation.policy_adopted:
         reasons.append(ReasonCode.POLICY_NOT_ADOPTED)
         projection = CandidateProjection.BLOCKED
+    elif observation.expert_decision_ref is None:
+        reasons.append(ReasonCode.INPUT_UNAVAILABLE)
+        projection = CandidateProjection.BLOCKED
     elif observation.current_session_index > observation.expiry_session_index:
         reasons.append(ReasonCode.ENTRY_WINDOW_EXPIRED)
         projection = CandidateProjection.EXPIRED
@@ -402,6 +475,9 @@ def _record_from_observation(
     return CandidateRecord(
         identity=observation.identity,
         decision_id=observation.decision_id,
+        event_session_index=observation.event_session_index,
+        first_eligible_session_index=observation.first_eligible_session_index,
+        expiry_session_index=observation.expiry_session_index,
         projection=projection,
         entry_authorized=entry_authorized,
         reason_codes=ordered_reasons(reasons),
@@ -411,6 +487,13 @@ def _record_from_observation(
         actual_order_state=observation.actual_order_state,
         actual_position_state=observation.actual_position_state,
     )
+
+
+def candidate_invocation_payload(
+    observation: CandidateObservation,
+    policy: CandidatePolicy = DEFAULT_CANDIDATE_POLICY,
+) -> dict[str, Any]:
+    return {"observation": observation.to_dict(), "policy": policy.to_dict()}
 
 
 def project_candidate(
@@ -423,24 +506,22 @@ def project_candidate(
 
     if policy is None:
         policy = DEFAULT_CANDIDATE_POLICY
+    invocation_payload = candidate_invocation_payload(observation, policy)
     resolution = resolve_command(
         revision=state.revision,
         processed=state.processed_commands,
         command=command,
+        operation="project_candidate",
+        invocation_payload=invocation_payload,
     )
     if resolution.disposition is CommandDisposition.DUPLICATE:
         if resolution.receipt is None:
             raise ProductDailyError("invalid_receipt", "duplicate command lacks receipt")
         stored = resolution.receipt.result
-        raw_identity = stored.get("identity")
-        if not isinstance(raw_identity, dict):
-            raise ProductDailyError("invalid_receipt", "candidate receipt lacks identity")
-        if raw_identity != observation.identity.to_dict():
-            raise ProductDailyError(
-                "idempotency_conflict",
-                "the duplicate command was called with a different candidate observation",
-            )
-        record = state.record(observation.identity)
+        raw_record = stored.get("record")
+        if not isinstance(raw_record, dict):
+            raise ProductDailyError("invalid_receipt", "candidate receipt lacks original record")
+        record = CandidateRecord.from_dict(raw_record)
         return CandidateTransition(
             accepted=True,
             replayed=True,
@@ -459,12 +540,23 @@ def project_candidate(
 
     existing = state.record(observation.identity)
     record = _record_from_observation(observation, policy)
-    if existing is not None and record.projection is CandidateProjection.OBSERVED:
+    if existing is not None:
+        existing_window = (
+            existing.event_session_index,
+            existing.first_eligible_session_index,
+            existing.expiry_session_index,
+        )
+        if existing_window != observation.window:
+            raise ProductDailyError(
+                "candidate_window_mismatch",
+                "the original event T+1 eligibility/expiry window cannot be rewritten",
+            )
+    if existing is not None and existing.projection is CandidateProjection.EXPIRED:
         record = replace(
             record,
-            projection=existing.projection,
-            entry_authorized=existing.entry_authorized,
-            reason_codes=existing.reason_codes,
+            projection=CandidateProjection.EXPIRED,
+            entry_authorized=False,
+            reason_codes=ordered_reasons([*existing.reason_codes, ReasonCode.ENTRY_WINDOW_EXPIRED]),
         )
     records = tuple(
         sorted(
@@ -480,15 +572,15 @@ def project_candidate(
 
     payload = {
         "accepted": True,
-        "identity": record.identity.to_dict(),
-        "projection": record.projection.value,
-        "entry_authorized": record.entry_authorized,
-        "reason_codes": [item.value for item in record.reason_codes],
-        "observation_digest": record.observation_digest,
-        "actual_order_state": record.actual_order_state.value,
-        "actual_position_state": record.actual_position_state.value,
+        "record": record.to_dict(),
     }
-    receipt = make_receipt(command=command, result=payload, revision=state.revision + 1)
+    receipt = make_receipt(
+        command=command,
+        operation="project_candidate",
+        invocation_payload=invocation_payload,
+        result=payload,
+        revision=state.revision + 1,
+    )
     next_state = CandidateState(
         records=records,
         revision=state.revision + 1,

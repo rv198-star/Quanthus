@@ -6,22 +6,33 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum
 from typing import Any
 
 from quanthus.product_daily.candidate import CandidateProjection
 from quanthus.product_daily.contracts import (
+    CommandDisposition,
     CommandEnvelope,
     ProductDailyError,
     ReasonCode,
     decimal_text,
     digest,
+    make_receipt,
     ordered_reasons,
     quantize,
     require_aware,
+    require_bool,
     require_decimal,
+    require_nonnegative_int,
     require_text,
+    resolve_command,
 )
-from quanthus.product_daily.funding import BucketPhase, FundingState, prepare_cycle
+from quanthus.product_daily.funding import (
+    BucketPhase,
+    EntryReservation,
+    FundingState,
+    prepare_cycle_core,
+)
 
 
 @dataclass(frozen=True)
@@ -87,7 +98,7 @@ class MarkedExposure:
             (self.price_bound, "price_bound"),
         ):
             if value is not None:
-                require_decimal(value, field_name, minimum=Decimal("0.0000000001"))
+                require_decimal(value, field_name, minimum=Decimal("0.01"))
 
     @property
     def identity(self) -> tuple[str, str, str]:
@@ -119,6 +130,7 @@ class PendingBuy:
     def __post_init__(self) -> None:
         require_text(self.reservation_id, "reservation_id")
         require_text(self.security_code, "security_code")
+        require_bool(self.fee_already_recognized, "fee_already_recognized")
         if self.level1_industry_id is not None:
             require_text(self.level1_industry_id, "level1_industry_id")
         if (
@@ -135,7 +147,10 @@ class PendingBuy:
             (self.unrecognized_fee_upper_bound, "unrecognized_fee_upper_bound"),
         ):
             if value is not None:
-                require_decimal(value, field_name, minimum=Decimal("0"))
+                minimum = (
+                    Decimal("0.01") if field_name in {"mark_price", "price_bound"} else Decimal("0")
+                )
+                require_decimal(value, field_name, minimum=minimum)
         if self.fee_already_recognized and self.unrecognized_fee_upper_bound not in {
             None,
             Decimal("0"),
@@ -179,7 +194,7 @@ class PendingSell:
         ):
             raise ProductDailyError("invalid_pending_sell", "quantity must be positive")
         if self.mark_price is not None:
-            require_decimal(self.mark_price, "mark_price", minimum=Decimal("0.0000000001"))
+            require_decimal(self.mark_price, "mark_price", minimum=Decimal("0.01"))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -280,7 +295,7 @@ class QuantityRequest:
             (self.price_bound, "price_bound"),
         ):
             if value is not None:
-                require_decimal(value, field_name, minimum=Decimal("0.0000000001"))
+                require_decimal(value, field_name, minimum=Decimal("0.01"))
         if self.lot_size is not None and (
             not isinstance(self.lot_size, int)
             or isinstance(self.lot_size, bool)
@@ -306,6 +321,9 @@ class QuantityDecision:
     next_lot_cost: Decimal | None
     next_lot_post_equity: Decimal | None
     next_lot_cap: Decimal | None
+    next_lot_post_security_exposure: Decimal | None
+    next_lot_post_industry_exposure: Decimal | None
+    next_lot_post_total_exposure: Decimal | None
     reason_codes: tuple[ReasonCode, ...]
     pending_sell_releases: Decimal = Decimal("0")
 
@@ -342,11 +360,54 @@ class QuantityDecision:
             "next_lot_cost": decimal_text(self.next_lot_cost),
             "next_lot_post_equity": decimal_text(self.next_lot_post_equity),
             "next_lot_cap": decimal_text(self.next_lot_cap),
+            "next_lot_post_security_exposure": decimal_text(self.next_lot_post_security_exposure),
+            "next_lot_post_industry_exposure": decimal_text(self.next_lot_post_industry_exposure),
+            "next_lot_post_total_exposure": decimal_text(self.next_lot_post_total_exposure),
             "reason_codes": [item.value for item in self.reason_codes],
             "pending_sell_releases": decimal_text(self.pending_sell_releases),
             "execution_authorized": self.execution_authorized,
             "forced_sale": self.forced_sale,
         }
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> QuantityDecision:
+        def decimal_or_none(name: str) -> Decimal | None:
+            value = raw.get(name)
+            if value is None:
+                return None
+            return require_decimal(Decimal(str(value)), name)
+
+        reasons_raw = raw.get("reason_codes")
+        if not isinstance(reasons_raw, list) or not all(
+            isinstance(item, str) for item in reasons_raw
+        ):
+            raise ProductDailyError("invalid_receipt", "quantity reasons must be strings")
+        quantity = raw.get("q")
+        if not isinstance(quantity, int) or isinstance(quantity, bool):
+            raise ProductDailyError("invalid_receipt", "quantity q must be an integer")
+        releases = decimal_or_none("pending_sell_releases")
+        return cls(
+            quantity=quantity,
+            gross=decimal_or_none("gross"),
+            fees=decimal_or_none("fees"),
+            total_cost=decimal_or_none("total_cost"),
+            target_cap=decimal_or_none("target_cap"),
+            conservative_post_fill_equity=decimal_or_none("conservative_post_fill_equity"),
+            existing_security_exposure=decimal_or_none("existing_security_exposure"),
+            existing_industry_exposure=decimal_or_none("existing_industry_exposure"),
+            existing_total_exposure=decimal_or_none("existing_total_exposure"),
+            post_security_exposure=decimal_or_none("post_security_exposure"),
+            post_industry_exposure=decimal_or_none("post_industry_exposure"),
+            post_total_exposure=decimal_or_none("post_total_exposure"),
+            next_lot_cost=decimal_or_none("next_lot_cost"),
+            next_lot_post_equity=decimal_or_none("next_lot_post_equity"),
+            next_lot_cap=decimal_or_none("next_lot_cap"),
+            next_lot_post_security_exposure=decimal_or_none("next_lot_post_security_exposure"),
+            next_lot_post_industry_exposure=decimal_or_none("next_lot_post_industry_exposure"),
+            next_lot_post_total_exposure=decimal_or_none("next_lot_post_total_exposure"),
+            reason_codes=tuple(ReasonCode(item) for item in reasons_raw),
+            pending_sell_releases=(Decimal("0") if releases is None else releases),
+        )
 
 
 def _fee(gross: Decimal, rule: BuyFeeRule) -> Decimal:
@@ -396,6 +457,7 @@ def evaluate_quantity(
         reasons.append(ReasonCode.INPUT_UNAVAILABLE)
     if (
         snapshot.equity is None
+        or snapshot.equity <= 0
         or snapshot.cash_available is None
         or request.fraction is None
         or request.mark_price is None
@@ -485,6 +547,9 @@ def evaluate_quantity(
             next_lot_cost=None,
             next_lot_post_equity=None,
             next_lot_cap=None,
+            next_lot_post_security_exposure=None,
+            next_lot_post_industry_exposure=None,
+            next_lot_post_total_exposure=None,
             reason_codes=ordered,
         )
 
@@ -506,6 +571,9 @@ def evaluate_quantity(
             next_lot_cost=None,
             next_lot_post_equity=None,
             next_lot_cap=None,
+            next_lot_post_security_exposure=None,
+            next_lot_post_industry_exposure=None,
+            next_lot_post_total_exposure=None,
             reason_codes=ordered,
         )
 
@@ -565,6 +633,8 @@ def evaluate_quantity(
         ) = metrics(quantity)
         del gross, fees
         failed: list[ReasonCode] = []
+        if post_equity <= 0:
+            failed.append(ReasonCode.INPUT_UNAVAILABLE)
         if total_cost > target_cap:
             failed.append(ReasonCode.BUDGET_CAPACITY)
         if total_cost > cash_available:
@@ -594,7 +664,15 @@ def evaluate_quantity(
         metrics(quantity)
     )
     next_quantity = quantity + lot_size
-    next_gross, _, next_cost, next_equity, _, _, _ = metrics(next_quantity)
+    (
+        next_gross,
+        _,
+        next_cost,
+        next_equity,
+        next_security_exposure,
+        next_industry_exposure,
+        next_total_exposure,
+    ) = metrics(next_quantity)
     del next_gross
     next_failures = failures_for(next_quantity)
     if quantity <= 0:
@@ -614,6 +692,9 @@ def evaluate_quantity(
             next_lot_cost=metrics(first_lot)[2],
             next_lot_post_equity=metrics(first_lot)[3],
             next_lot_cap=stock_limit * metrics(first_lot)[3],
+            next_lot_post_security_exposure=metrics(first_lot)[4],
+            next_lot_post_industry_exposure=metrics(first_lot)[5],
+            next_lot_post_total_exposure=metrics(first_lot)[6],
             reason_codes=first_failures or (ReasonCode.BUDGET_CAPACITY,),
         )
 
@@ -636,8 +717,75 @@ def evaluate_quantity(
         next_lot_cost=next_cost,
         next_lot_post_equity=next_equity,
         next_lot_cap=stock_limit * next_equity,
+        next_lot_post_security_exposure=next_security_exposure,
+        next_lot_post_industry_exposure=next_industry_exposure,
+        next_lot_post_total_exposure=next_total_exposure,
         reason_codes=ordered_reasons(reasons_out),
     )
+
+
+class ExpertEntryAction(str, Enum):
+    TRIAL_ENTRY = "trial_entry"
+    NO_ACTION = "no_action"
+    REDUCE = "reduce"
+    FULL_EXIT = "full_exit"
+
+
+@dataclass(frozen=True)
+class ExpertEntryEligibility:
+    event_id: str
+    security_code: str
+    final_action: ExpertEntryAction
+    source_digest: str
+    target_maximum_position: Decimal | None
+
+    def __post_init__(self) -> None:
+        require_text(self.event_id, "expert.event_id")
+        require_text(self.security_code, "expert.security_code")
+        if not isinstance(self.final_action, ExpertEntryAction):
+            raise ProductDailyError("invalid_expert_entry", "final_action must be typed")
+        require_text(self.source_digest, "expert.source_digest")
+        if self.target_maximum_position is not None:
+            require_decimal(
+                self.target_maximum_position,
+                "expert.target_maximum_position",
+                minimum=Decimal("0"),
+                maximum=Decimal("1"),
+            )
+
+    @property
+    def entry_allowed(self) -> bool:
+        return (
+            self.final_action is ExpertEntryAction.TRIAL_ENTRY
+            and self.target_maximum_position is not None
+            and self.target_maximum_position > 0
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "event_id": self.event_id,
+            "security_code": self.security_code,
+            "final_action": self.final_action.value,
+            "source_digest": self.source_digest,
+            "target_maximum_position": decimal_text(self.target_maximum_position),
+            "entry_allowed": self.entry_allowed,
+        }
+
+    @classmethod
+    def from_formal_strategy_decision(cls, decision: object) -> ExpertEntryEligibility:
+        from quanthus.expert_strategy.runner import FormalStrategyDecision
+
+        if not isinstance(decision, FormalStrategyDecision):
+            raise ProductDailyError(
+                "invalid_expert_entry", "decision must be an original FormalStrategyDecision"
+            )
+        return cls(
+            event_id=decision.event_id,
+            security_code=decision.action.security_code,
+            final_action=ExpertEntryAction(decision.action.final_action.value),
+            source_digest=decision.digest,
+            target_maximum_position=decision.target_maximum_position,
+        )
 
 
 @dataclass(frozen=True)
@@ -646,10 +794,16 @@ class EntryLimits:
     max_new_buckets_per_day: int
 
     def __post_init__(self) -> None:
-        if self.max_active_or_reserved_per_industry <= 0:
-            raise ProductDailyError("invalid_entry_policy", "industry limit must be positive")
-        if self.max_new_buckets_per_day <= 0:
-            raise ProductDailyError("invalid_entry_policy", "daily limit must be positive")
+        require_nonnegative_int(
+            self.max_active_or_reserved_per_industry,
+            "max_active_or_reserved_per_industry",
+            positive=True,
+        )
+        require_nonnegative_int(
+            self.max_new_buckets_per_day,
+            "max_new_buckets_per_day",
+            positive=True,
+        )
 
 
 @dataclass(frozen=True)
@@ -661,12 +815,27 @@ class CandidateEntry:
     input_valid: bool
     knowledge_cutoff_valid: bool
     policy_adopted: bool
+    expert_entry: ExpertEntryEligibility | None = None
 
     def __post_init__(self) -> None:
         for field_name in ("opportunity_id", "security_code", "level1_industry_id"):
             require_text(getattr(self, field_name), field_name)
         if not isinstance(self.projection, CandidateProjection):
             raise ProductDailyError("invalid_candidate_state", "projection must be typed")
+        for field_name in ("input_valid", "knowledge_cutoff_valid", "policy_adopted"):
+            require_bool(getattr(self, field_name), field_name)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "opportunity_id": self.opportunity_id,
+            "security_code": self.security_code,
+            "level1_industry_id": self.level1_industry_id,
+            "projection": self.projection.value,
+            "input_valid": self.input_valid,
+            "knowledge_cutoff_valid": self.knowledge_cutoff_valid,
+            "policy_adopted": self.policy_adopted,
+            "expert_entry": (None if self.expert_entry is None else self.expert_entry.to_dict()),
+        }
 
 
 @dataclass(frozen=True)
@@ -680,6 +849,17 @@ class EntryDecision:
     funding_state: FundingState
     funding_state_changed: bool
     reservation_id: str | None
+    replayed: bool = False
+    result_digest: str | None = None
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "accepted",
+            "second_bucket_probe",
+            "funding_state_changed",
+            "replayed",
+        ):
+            require_bool(getattr(self, field_name), field_name)
 
     @property
     def execution_authorized(self) -> bool:
@@ -691,7 +871,7 @@ class EntryDecision:
 
     @property
     def digest(self) -> str:
-        return digest(self.to_dict())
+        return self.result_digest or digest(self.to_dict())
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -705,9 +885,55 @@ class EntryDecision:
             "funding_state_revision": self.funding_state.revision,
             "funding_state_changed": self.funding_state_changed,
             "reservation_id": self.reservation_id,
+            "replayed": self.replayed,
+            "result_digest": self.result_digest,
             "execution_authorized": self.execution_authorized,
             "forced_sale": self.forced_sale,
         }
+
+
+def entry_invocation_payload(
+    *,
+    candidate: CandidateEntry,
+    snapshot: RiskSnapshot,
+    empty_bucket_ids: Sequence[str],
+    active_or_reserved_security_codes: Sequence[str],
+    active_industry_counts: Sequence[tuple[str, int]],
+    new_buckets_today: int,
+    limits: EntryLimits,
+    fraction: Decimal | None,
+    mark_price: Decimal | None,
+    price_bound: Decimal | None,
+    lot_size: int,
+    quantity_limits: QuantityLimits,
+    fee_rule: BuyFeeRule,
+) -> dict[str, Any]:
+    return {
+        "candidate": candidate.to_dict(),
+        "snapshot": snapshot.to_dict(),
+        "empty_bucket_ids": sorted(empty_bucket_ids),
+        "active_or_reserved_security_codes": sorted(active_or_reserved_security_codes),
+        "active_industry_counts": sorted(active_industry_counts),
+        "new_buckets_today": new_buckets_today,
+        "entry_limits": {
+            "max_active_or_reserved_per_industry": limits.max_active_or_reserved_per_industry,
+            "max_new_buckets_per_day": limits.max_new_buckets_per_day,
+        },
+        "fraction": decimal_text(fraction),
+        "mark_price": decimal_text(mark_price),
+        "price_bound": decimal_text(price_bound),
+        "lot_size": lot_size,
+        "quantity_limits": {
+            "stock": decimal_text(quantity_limits.stock),
+            "industry": decimal_text(quantity_limits.industry),
+            "total": decimal_text(quantity_limits.total),
+        },
+        "fee_rule": {
+            "commission_rate": decimal_text(fee_rule.commission_rate),
+            "minimum_commission": decimal_text(fee_rule.minimum_commission),
+            "cash_quantum": decimal_text(fee_rule.cash_quantum),
+        },
+    }
 
 
 def decide_entry(
@@ -730,6 +956,83 @@ def decide_entry(
 ) -> EntryDecision:
     """Evaluate one candidate against the first eligible empty bucket only."""
 
+    invocation_payload = entry_invocation_payload(
+        candidate=candidate,
+        snapshot=snapshot,
+        empty_bucket_ids=empty_bucket_ids,
+        active_or_reserved_security_codes=active_or_reserved_security_codes,
+        active_industry_counts=active_industry_counts,
+        new_buckets_today=new_buckets_today,
+        limits=limits,
+        fraction=fraction,
+        mark_price=mark_price,
+        price_bound=price_bound,
+        lot_size=lot_size,
+        quantity_limits=quantity_limits,
+        fee_rule=fee_rule,
+    )
+    resolution = resolve_command(
+        revision=funding.revision,
+        processed=funding.processed_commands,
+        command=command,
+        operation="decide_entry",
+        invocation_payload=invocation_payload,
+    )
+    if resolution.disposition is CommandDisposition.DUPLICATE:
+        reservation_matches = [
+            item for item in funding.entry_reservations if item.command_id == command.command_id
+        ]
+        if resolution.receipt is None or len(reservation_matches) != 1:
+            raise ProductDailyError("invalid_receipt", "accepted entry receipt is incomplete")
+        reservation = reservation_matches[0]
+        stored = reservation.result
+        raw_quantity = stored.get("quantity")
+        if not isinstance(raw_quantity, dict):
+            raise ProductDailyError("invalid_receipt", "entry quantity receipt is missing")
+        reasons_raw = stored.get("reason_codes")
+        if not isinstance(reasons_raw, list) or not all(
+            isinstance(item, str) for item in reasons_raw
+        ):
+            raise ProductDailyError("invalid_receipt", "entry reasons are invalid")
+        return EntryDecision(
+            accepted=require_bool(stored.get("accepted"), "accepted"),
+            reason_codes=tuple(ReasonCode(item) for item in reasons_raw),
+            selected_bucket_id=(
+                None
+                if stored.get("selected_bucket_id") is None
+                else str(stored["selected_bucket_id"])
+            ),
+            first_considered_bucket_id=(
+                None
+                if stored.get("first_considered_bucket_id") is None
+                else str(stored["first_considered_bucket_id"])
+            ),
+            second_bucket_probe=require_bool(
+                stored.get("second_bucket_probe"), "second_bucket_probe"
+            ),
+            quantity=QuantityDecision.from_dict(raw_quantity),
+            funding_state=funding,
+            funding_state_changed=require_bool(
+                stored.get("funding_state_changed"), "funding_state_changed"
+            ),
+            reservation_id=str(stored["reservation_id"]),
+            replayed=True,
+            result_digest=resolution.receipt.result_digest,
+        )
+    if resolution.disposition is CommandDisposition.CAS_CONFLICT:
+        return EntryDecision(
+            accepted=False,
+            reason_codes=(ReasonCode.CAS_CONFLICT,),
+            selected_bucket_id=None,
+            first_considered_bucket_id=None,
+            second_bucket_probe=False,
+            quantity=None,
+            funding_state=funding,
+            funding_state_changed=False,
+            reservation_id=None,
+            result_digest=digest({"operation": "decide_entry", "reason": "CAS_CONFLICT"}),
+        )
+
     reasons: list[ReasonCode] = []
     if not candidate.input_valid:
         reasons.append(ReasonCode.INPUT_UNAVAILABLE)
@@ -739,21 +1042,33 @@ def decide_entry(
         reasons.append(ReasonCode.POLICY_NOT_ADOPTED)
     if candidate.projection is CandidateProjection.EXPIRED:
         reasons.append(ReasonCode.ENTRY_WINDOW_EXPIRED)
-    elif candidate.projection in {
-        CandidateProjection.HELD,
-        CandidateProjection.EXITING,
-        CandidateProjection.CLOSED,
-        CandidateProjection.ENTERED,
-        CandidateProjection.RESERVED,
-    }:
-        reasons.append(ReasonCode.EXISTING_SECURITY_CYCLE)
+    elif candidate.projection is not CandidateProjection.OBSERVED:
+        reasons.append(ReasonCode.CANDIDATE_NOT_ELIGIBLE)
+    expert = candidate.expert_entry
+    if (
+        expert is None
+        or expert.event_id != candidate.opportunity_id
+        or expert.security_code != candidate.security_code
+    ):
+        reasons.append(ReasonCode.INPUT_UNAVAILABLE)
+    elif not expert.entry_allowed:
+        reasons.append(ReasonCode.EXPERT_ENTRY_BLOCKED)
     if candidate.security_code in set(active_or_reserved_security_codes):
         reasons.append(ReasonCode.EXISTING_SECURITY_CYCLE)
-    counts = dict(active_industry_counts)
+    require_nonnegative_int(new_buckets_today, "new_buckets_today")
+    counts: dict[str, int] = {}
+    for industry_id, count in active_industry_counts:
+        require_text(industry_id, "active_industry_id")
+        require_nonnegative_int(count, "active_industry_count")
+        if industry_id in counts:
+            raise ProductDailyError("invalid_entry_policy", "industry counts must be unique")
+        counts[industry_id] = count
     if counts.get(candidate.level1_industry_id, 0) >= limits.max_active_or_reserved_per_industry:
         reasons.append(ReasonCode.CONCENTRATION_CAPACITY)
     if new_buckets_today >= limits.max_new_buckets_per_day:
         reasons.append(ReasonCode.DAY_LIMIT)
+    if len(set(empty_bucket_ids)) != len(empty_bucket_ids):
+        raise ProductDailyError("invalid_entry_policy", "empty bucket ids must be unique")
     ordered_empty = tuple(sorted(empty_bucket_ids))
     first_bucket = ordered_empty[0] if ordered_empty else None
     if first_bucket is None:
@@ -786,16 +1101,16 @@ def decide_entry(
             reservation_id=None,
         )
 
-    prepared = prepare_cycle(
+    prepared = prepare_cycle_core(
         funding,
-        command,
         bucket_id=first_bucket,
         cycle_id=f"candidate-cycle:{candidate.opportunity_id}",
+        reference_id=command.command_id,
     )
     if not prepared.accepted or prepared.state.bucket(first_bucket).locked_cycle_budget <= 0:
         return EntryDecision(
             accepted=False,
-            reason_codes=prepared.reason_codes or (ReasonCode.BUDGET_CAPACITY,),
+            reason_codes=prepared.reasons or (ReasonCode.BUDGET_CAPACITY,),
             selected_bucket_id=None,
             first_considered_bucket_id=first_bucket,
             second_bucket_probe=False,
@@ -838,11 +1153,50 @@ def decide_entry(
         "reservation_"
         + digest(
             {
-                "command_id": command.command_id,
+                "invocation_digest": digest(invocation_payload),
                 "bucket_id": first_bucket,
                 "opportunity_id": candidate.opportunity_id,
             }
         ).removeprefix("sha256:")[:24]
+    )
+    result_payload = {
+        "accepted": True,
+        "reason_codes": [ReasonCode.ENTRY_RESERVED.value],
+        "selected_bucket_id": first_bucket,
+        "first_considered_bucket_id": first_bucket,
+        "second_bucket_probe": False,
+        "quantity": quantity.to_dict(),
+        "funding_state_changed": True,
+        "reservation_id": reservation_id,
+        "expert_decision_digest": expert.source_digest if expert is not None else None,
+    }
+    receipt = make_receipt(
+        command=command,
+        operation="decide_entry",
+        invocation_payload=invocation_payload,
+        result=result_payload,
+        revision=prepared.state.revision + 1,
+    )
+    reservation = EntryReservation(
+        reservation_id=reservation_id,
+        opportunity_id=candidate.opportunity_id,
+        security_code=candidate.security_code,
+        level1_industry_id=candidate.level1_industry_id,
+        bucket_id=first_bucket,
+        quantity=quantity.quantity,
+        command_id=command.command_id,
+        invocation_digest=receipt.invocation_digest,
+        result_digest=receipt.result_digest,
+        result_json=receipt.result_json,
+    )
+    committed = FundingState(
+        buckets=prepared.state.buckets,
+        reserve=prepared.state.reserve,
+        unallocated_adjustment=prepared.state.unallocated_adjustment,
+        revision=prepared.state.revision + 1,
+        processed_commands=(*prepared.state.processed_commands, receipt),
+        completed_settlements=prepared.state.completed_settlements,
+        entry_reservations=(*prepared.state.entry_reservations, reservation),
     )
     return EntryDecision(
         accepted=True,
@@ -851,7 +1205,8 @@ def decide_entry(
         first_considered_bucket_id=first_bucket,
         second_bucket_probe=False,
         quantity=quantity,
-        funding_state=prepared.state,
+        funding_state=committed,
         funding_state_changed=True,
         reservation_id=reservation_id,
+        result_digest=receipt.result_digest,
     )

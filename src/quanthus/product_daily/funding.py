@@ -19,8 +19,10 @@ from quanthus.product_daily.contracts import (
     digest,
     make_receipt,
     ordered_reasons,
-    quantize,
+    require_bool,
     require_decimal,
+    require_nonnegative_int,
+    require_quantized,
     require_text,
     resolve_command,
 )
@@ -44,11 +46,22 @@ class BucketState:
 
     def __post_init__(self) -> None:
         require_text(self.bucket_id, "bucket_id")
+        require_quantized(self.cash, Decimal("0.01"), "bucket.cash")
         require_decimal(self.cash, "bucket.cash", minimum=Decimal("0"))
+        require_quantized(
+            self.target_notional,
+            Decimal("0.01"),
+            "bucket.target_notional",
+        )
         require_decimal(
             self.target_notional,
             "bucket.target_notional",
-            minimum=Decimal("0.0000000001"),
+            minimum=Decimal("0.01"),
+        )
+        require_quantized(
+            self.locked_cycle_budget,
+            Decimal("0.01"),
+            "bucket.locked_cycle_budget",
         )
         require_decimal(
             self.locked_cycle_budget,
@@ -91,6 +104,7 @@ class CompletedSettlement:
     def __post_init__(self) -> None:
         for field_name in ("settlement_id", "bucket_id", "cycle_id"):
             require_text(getattr(self, field_name), field_name)
+        require_quantized(self.cash_after, Decimal("0.01"), "settlement.cash_after")
         require_decimal(self.cash_after, "settlement.cash_after", minimum=Decimal("0"))
 
     def to_dict(self) -> dict[str, str]:
@@ -103,6 +117,61 @@ class CompletedSettlement:
 
 
 @dataclass(frozen=True)
+class EntryReservation:
+    reservation_id: str
+    opportunity_id: str
+    security_code: str
+    level1_industry_id: str
+    bucket_id: str
+    quantity: int
+    command_id: str
+    invocation_digest: str
+    result_digest: str
+    result_json: str
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "reservation_id",
+            "opportunity_id",
+            "security_code",
+            "level1_industry_id",
+            "bucket_id",
+            "command_id",
+            "invocation_digest",
+            "result_digest",
+        ):
+            require_text(getattr(self, field_name), field_name)
+        require_nonnegative_int(self.quantity, "quantity", positive=True)
+        try:
+            parsed = json.loads(self.result_json)
+        except json.JSONDecodeError as exc:
+            raise ProductDailyError("invalid_receipt", "result_json must be valid JSON") from exc
+        if not isinstance(parsed, dict):
+            raise ProductDailyError("invalid_receipt", "entry result must be an object")
+
+    @property
+    def result(self) -> dict[str, Any]:
+        parsed = json.loads(self.result_json)
+        if not isinstance(parsed, dict):
+            raise ProductDailyError("invalid_receipt", "entry result must be an object")
+        return parsed
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "reservation_id": self.reservation_id,
+            "opportunity_id": self.opportunity_id,
+            "security_code": self.security_code,
+            "level1_industry_id": self.level1_industry_id,
+            "bucket_id": self.bucket_id,
+            "quantity": self.quantity,
+            "command_id": self.command_id,
+            "invocation_digest": self.invocation_digest,
+            "result_digest": self.result_digest,
+            "result": self.result,
+        }
+
+
+@dataclass(frozen=True)
 class FundingState:
     buckets: tuple[BucketState, ...]
     reserve: Decimal
@@ -110,20 +179,30 @@ class FundingState:
     revision: int
     processed_commands: tuple[ProcessedCommand, ...] = ()
     completed_settlements: tuple[CompletedSettlement, ...] = ()
+    entry_reservations: tuple[EntryReservation, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.buckets:
             raise ProductDailyError("invalid_funding_state", "at least one bucket is required")
         if len({item.bucket_id for item in self.buckets}) != len(self.buckets):
             raise ProductDailyError("invalid_funding_state", "bucket ids must be unique")
+        require_quantized(self.reserve, Decimal("0.01"), "reserve")
         require_decimal(self.reserve, "reserve", minimum=Decimal("0"))
+        require_quantized(
+            self.unallocated_adjustment,
+            Decimal("0.01"),
+            "unallocated_adjustment",
+        )
         require_decimal(
             self.unallocated_adjustment,
             "unallocated_adjustment",
             maximum=Decimal("0"),
         )
-        if self.revision < 0:
-            raise ProductDailyError("invalid_revision", "revision must not be negative")
+        if self.reserve > 0 and self.unallocated_adjustment < 0:
+            raise ProductDailyError(
+                "invalid_funding_state", "reserve inflow must extinguish adjustment first"
+            )
+        require_nonnegative_int(self.revision, "revision")
         if len({item.command_id for item in self.processed_commands}) != len(
             self.processed_commands
         ):
@@ -132,6 +211,32 @@ class FundingState:
             self.completed_settlements
         ):
             raise ProductDailyError("invalid_settlement", "settlement ids must be unique")
+        if len({item.reservation_id for item in self.entry_reservations}) != len(
+            self.entry_reservations
+        ):
+            raise ProductDailyError("invalid_reservation", "reservation ids must be unique")
+        if len({item.bucket_id for item in self.entry_reservations}) != len(
+            self.entry_reservations
+        ):
+            raise ProductDailyError("invalid_reservation", "one bucket may hold one reservation")
+        receipts_by_id = {item.command_id: item for item in self.processed_commands}
+        reservations_by_command = {item.command_id: item for item in self.entry_reservations}
+        decide_receipts = {
+            item.command_id for item in self.processed_commands if item.operation == "decide_entry"
+        }
+        if decide_receipts != set(reservations_by_command):
+            raise ProductDailyError(
+                "invalid_reservation", "entry receipt and reservation closure differ"
+            )
+        for command_id, reservation in reservations_by_command.items():
+            receipt = receipts_by_id[command_id]
+            if (
+                receipt.invocation_digest != reservation.invocation_digest
+                or receipt.result_digest != reservation.result_digest
+            ):
+                raise ProductDailyError(
+                    "invalid_reservation", "entry receipt and reservation identities differ"
+                )
 
     @property
     def cash_total(self) -> Decimal:
@@ -166,6 +271,10 @@ class FundingState:
                     key=lambda x: (x.settlement_id, x.bucket_id),
                 )
             ],
+            "entry_reservations": [
+                item.to_dict()
+                for item in sorted(self.entry_reservations, key=lambda x: x.reservation_id)
+            ],
         }
 
 
@@ -176,7 +285,7 @@ class FundingLedgerPosting:
 
     def __post_init__(self) -> None:
         require_text(self.account, "ledger account")
-        require_decimal(self.amount, "ledger amount")
+        require_quantized(self.amount, Decimal("0.01"), "ledger amount")
 
     def to_dict(self) -> dict[str, str]:
         return {"account": self.account, "amount": decimal_text(self.amount) or "0"}
@@ -217,6 +326,8 @@ class FundingDecision:
 
     def __post_init__(self) -> None:
         require_text(self.operation, "operation")
+        require_bool(self.accepted, "accepted")
+        require_bool(self.replayed, "replayed")
         try:
             parsed = json.loads(self.details_json)
         except json.JSONDecodeError as exc:
@@ -255,6 +366,16 @@ class CycleSettlementEvidence:
     fills_complete: bool
     fees_known: bool
     conflicts_clear: bool
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "position_flat",
+            "orders_terminal",
+            "fills_complete",
+            "fees_known",
+            "conflicts_clear",
+        ):
+            require_bool(getattr(self, field_name), field_name)
 
     @property
     def settlement_ready(self) -> bool:
@@ -303,6 +424,96 @@ def _json_details(details: Mapping[str, Any]) -> str:
         return value
 
     return json.dumps(convert(details), ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+
+def _settlement_payload(
+    requests: Sequence[SettlementRequest], cash_quantum: Decimal
+) -> dict[str, Any]:
+    return {
+        "requests": [
+            {
+                "settlement_id": item.settlement_id,
+                "bucket_id": item.bucket_id,
+                "cycle_id": item.cycle_id,
+                "evidence": item.evidence.to_dict(),
+            }
+            for item in sorted(
+                requests, key=lambda request: (request.bucket_id, request.settlement_id)
+            )
+        ],
+        "cash_quantum": decimal_text(cash_quantum),
+    }
+
+
+def settle_invocation_payload(
+    requests: Sequence[SettlementRequest], cash_quantum: Decimal = Decimal("0.01")
+) -> dict[str, Any]:
+    return _settlement_payload(requests, cash_quantum)
+
+
+def prepare_cycle_invocation_payload(
+    *, bucket_id: str, cycle_id: str, cash_quantum: Decimal = Decimal("0.01")
+) -> dict[str, Any]:
+    return {
+        "bucket_id": bucket_id,
+        "cycle_id": cycle_id,
+        "cash_quantum": decimal_text(cash_quantum),
+    }
+
+
+def late_cash_invocation_payload(
+    *,
+    bucket_id: str,
+    cycle_id: str,
+    cash_delta: Decimal,
+    cash_quantum: Decimal = Decimal("0.01"),
+) -> dict[str, Any]:
+    return {
+        "bucket_id": bucket_id,
+        "cycle_id": cycle_id,
+        "cash_delta": decimal_text(cash_delta),
+        "cash_quantum": decimal_text(cash_quantum),
+    }
+
+
+def transfer_invocation_payload(
+    *,
+    source_bucket_id: str,
+    amount: Decimal,
+    cash_quantum: Decimal = Decimal("0.01"),
+) -> dict[str, Any]:
+    return {
+        "source_bucket_id": source_bucket_id,
+        "amount": decimal_text(amount),
+        "cash_quantum": decimal_text(cash_quantum),
+    }
+
+
+def _plan_reserve_inflow(
+    reserve: Decimal,
+    adjustment: Decimal,
+    amount: Decimal,
+    *,
+    reserve_account: str = "shared/reserve",
+) -> tuple[Decimal, Decimal, Decimal, Decimal, tuple[FundingLedgerPosting, ...]]:
+    """Apply inflow to negative adjustment before reserve and return accounting postings."""
+
+    adjustment_offset = min(amount, -adjustment)
+    reserve_increment = amount - adjustment_offset
+    next_adjustment = adjustment + adjustment_offset
+    next_reserve = reserve + reserve_increment
+    postings: list[FundingLedgerPosting] = []
+    if adjustment_offset > 0:
+        postings.append(FundingLedgerPosting("shared/unallocated_adjustment", adjustment_offset))
+    if reserve_increment > 0:
+        postings.append(FundingLedgerPosting(reserve_account, reserve_increment))
+    return (
+        next_reserve,
+        next_adjustment,
+        adjustment_offset,
+        reserve_increment,
+        tuple(postings),
+    )
 
 
 def _decision(
@@ -358,7 +569,7 @@ def _duplicate_decision(
             )
     return FundingDecision(
         operation=operation,
-        accepted=bool(stored.get("accepted", False)),
+        accepted=require_bool(stored.get("accepted"), "accepted"),
         replayed=True,
         state=state,
         reason_codes=reasons,
@@ -389,6 +600,7 @@ def _append_receipt(
     state: FundingState,
     command: CommandEnvelope,
     operation: str,
+    invocation_payload: object,
     reasons: Sequence[ReasonCode],
     details: Mapping[str, Any],
 ) -> ProcessedCommand:
@@ -398,7 +610,13 @@ def _append_receipt(
         "reason_codes": [item.value for item in ordered_reasons(list(reasons))],
         "details_json": _json_details(details),
     }
-    return make_receipt(command=command, result=payload, revision=state.revision + 1)
+    return make_receipt(
+        command=command,
+        operation=operation,
+        invocation_payload=invocation_payload,
+        result=payload,
+        revision=state.revision + 1,
+    )
 
 
 def _settle_one(
@@ -440,7 +658,9 @@ def _settle_one(
 
     initial_cash = bucket.cash
     reserve = state.reserve
+    adjustment = state.unallocated_adjustment
     profit_to_reserve = Decimal("0")
+    profit_adjustment_offset = Decimal("0")
     reserve_topup = Decimal("0")
     underfunded = Decimal("0")
     postings: list[FundingLedgerPosting] = []
@@ -448,13 +668,11 @@ def _settle_one(
     if initial_cash > bucket.target_notional:
         profit_to_reserve = initial_cash - bucket.target_notional
         final_cash = bucket.target_notional
-        reserve += profit_to_reserve
-        postings.extend(
-            (
-                FundingLedgerPosting(f"bucket/{bucket.bucket_id}/cash", -profit_to_reserve),
-                FundingLedgerPosting("shared/reserve", profit_to_reserve),
-            )
+        reserve, adjustment, profit_adjustment_offset, _reserve_increment, credit_postings = (
+            _plan_reserve_inflow(reserve, adjustment, profit_to_reserve)
         )
+        postings.append(FundingLedgerPosting(f"bucket/{bucket.bucket_id}/cash", -profit_to_reserve))
+        postings.extend(credit_postings)
     elif initial_cash < bucket.target_notional:
         shortage = bucket.target_notional - initial_cash
         reserve_topup = min(reserve, shortage)
@@ -488,6 +706,7 @@ def _settle_one(
         state,
         buckets=buckets,
         reserve=reserve,
+        unallocated_adjustment=adjustment,
         completed_settlements=tuple(
             sorted((*state.completed_settlements, completed), key=lambda item: item.settlement_id)
         ),
@@ -507,6 +726,7 @@ def _settle_one(
         "cycle_id": request.cycle_id,
         "accepted": True,
         "profit_to_reserve": profit_to_reserve,
+        "profit_adjustment_offset": profit_adjustment_offset,
         "reserve_topup": reserve_topup,
         "underfunded": underfunded,
         "bucket_cash_after": final_cash,
@@ -525,10 +745,14 @@ def settle_batch(
 ) -> FundingDecision:
     """Settle eligible buckets in confirmed bucket-id order with one shared reserve."""
 
+    require_decimal(cash_quantum, "cash_quantum", minimum=Decimal("0.0000000001"))
+    invocation_payload = settle_invocation_payload(requests, cash_quantum)
     resolution = resolve_command(
         revision=state.revision,
         processed=state.processed_commands,
         command=command,
+        operation="settle_batch",
+        invocation_payload=invocation_payload,
     )
     if resolution.disposition is CommandDisposition.DUPLICATE:
         if resolution.receipt is None:
@@ -571,6 +795,7 @@ def settle_batch(
         state=working,
         command=command,
         operation="settle_batch",
+        invocation_payload=invocation_payload,
         reasons=reasons,
         details=details,
     )
@@ -586,7 +811,7 @@ def settle_batch(
             postings=tuple(
                 FundingLedgerPosting(
                     item.account,
-                    quantize(item.amount, cash_quantum),
+                    require_quantized(item.amount, cash_quantum, "ledger amount"),
                 )
                 for item in item.postings
             ),
@@ -605,39 +830,40 @@ def settle_batch(
     )
 
 
-def prepare_cycle(
+@dataclass(frozen=True)
+class PrepareCycleCore:
+    state: FundingState
+    state_changed: bool
+    accepted: bool
+    reasons: tuple[ReasonCode, ...]
+    ledger_entries: tuple[FundingLedgerEntry, ...]
+    details: Mapping[str, Any]
+
+    @property
+    def changed(self) -> bool:
+        return self.accepted and self.state_changed
+
+
+def prepare_cycle_core(
     state: FundingState,
-    command: CommandEnvelope,
     *,
     bucket_id: str,
     cycle_id: str,
+    reference_id: str,
     cash_quantum: Decimal = Decimal("0.01"),
-) -> FundingDecision:
-    """Top up a new cycle from available reserve and lock its actual B once."""
+) -> PrepareCycleCore:
+    """Build one non-committed cycle preparation for a public or composite command."""
 
     require_text(cycle_id, "cycle_id")
-    resolution = resolve_command(
-        revision=state.revision,
-        processed=state.processed_commands,
-        command=command,
-    )
-    if resolution.disposition is CommandDisposition.DUPLICATE:
-        if resolution.receipt is None:
-            raise ProductDailyError("invalid_receipt", "duplicate command lacks receipt")
-        return _duplicate_decision(
-            operation="prepare_cycle", state=state, receipt=resolution.receipt
-        )
-    if resolution.disposition is CommandDisposition.CAS_CONFLICT:
-        return _cas_decision(operation="prepare_cycle", state=state)
-
+    require_text(reference_id, "reference_id")
+    require_decimal(cash_quantum, "cash_quantum", minimum=Decimal("0.0000000001"))
     bucket = state.bucket(bucket_id)
     if bucket.phase in {BucketPhase.RESERVED, BucketPhase.HELD}:
         if bucket.cycle_id == cycle_id:
-            return _decision(
-                operation="prepare_cycle",
-                accepted=True,
-                replayed=False,
+            return PrepareCycleCore(
                 state=state,
+                state_changed=False,
+                accepted=True,
                 reasons=(ReasonCode.CYCLE_ALREADY_ACTIVE,),
                 ledger_entries=(),
                 details={
@@ -649,9 +875,32 @@ def prepare_cycle(
                 },
             )
         raise ProductDailyError(
-            "cycle_already_active",
-            "a bucket cannot replace its active cycle budget",
+            "cycle_already_active", "a bucket cannot replace its active cycle budget"
         )
+
+    completed_for_old = [
+        item
+        for item in state.completed_settlements
+        if item.bucket_id == bucket_id and item.cycle_id == bucket.cycle_id
+    ]
+    if bucket.phase is BucketPhase.CLOSED and len(completed_for_old) != 1:
+        return PrepareCycleCore(
+            state=state,
+            state_changed=False,
+            accepted=False,
+            reasons=(ReasonCode.SETTLEMENT_NOT_READY,),
+            ledger_entries=(),
+            details={
+                "bucket_id": bucket_id,
+                "closed_cycle_id": bucket.cycle_id,
+                "state_unchanged": True,
+            },
+        )
+    if any(
+        item.bucket_id == bucket_id and item.cycle_id == cycle_id
+        for item in state.completed_settlements
+    ):
+        raise ProductDailyError("cycle_already_settled", "a completed cycle cannot be reopened")
 
     reserve = state.reserve
     adjustment = state.unallocated_adjustment
@@ -674,11 +923,10 @@ def prepare_cycle(
     reserve -= transfer
     locked = min(bucket.target_notional, bucket_cash)
     if locked <= 0:
-        return _decision(
-            operation="prepare_cycle",
-            accepted=False,
-            replayed=False,
+        return PrepareCycleCore(
             state=state,
+            state_changed=False,
+            accepted=False,
             reasons=(ReasonCode.BUDGET_CAPACITY,),
             ledger_entries=(),
             details={"bucket_id": bucket_id, "state_unchanged": True},
@@ -686,8 +934,8 @@ def prepare_cycle(
 
     next_bucket = replace(
         bucket,
-        cash=quantize(bucket_cash, cash_quantum),
-        locked_cycle_budget=quantize(locked, cash_quantum),
+        cash=require_quantized(bucket_cash, cash_quantum, "bucket.cash"),
+        locked_cycle_budget=require_quantized(locked, cash_quantum, "bucket.locked_cycle_budget"),
         cycle_id=cycle_id,
         phase=BucketPhase.RESERVED,
     )
@@ -699,8 +947,10 @@ def prepare_cycle(
                 key=lambda item: item.bucket_id,
             )
         ),
-        reserve=quantize(reserve, cash_quantum),
-        unallocated_adjustment=quantize(adjustment, cash_quantum),
+        reserve=require_quantized(reserve, cash_quantum, "reserve"),
+        unallocated_adjustment=require_quantized(
+            adjustment, cash_quantum, "unallocated_adjustment"
+        ),
     )
     postings = list(pre_postings)
     if transfer > 0:
@@ -714,40 +964,107 @@ def prepare_cycle(
     if postings:
         ledger_entries = (
             FundingLedgerEntry(
-                reference_id=command.command_id,
+                reference_id=reference_id,
                 reference_type="cycle_pretopup",
                 postings=tuple(postings),
             ),
         )
-    reasons = (ReasonCode.CYCLE_PREPARED,)
-    details = {
-        "bucket_id": bucket_id,
-        "cycle_id": cycle_id,
-        "adjustment_offset": adjustment_offset,
-        "transfer": transfer,
-        "B": locked,
-        "underfunded": bucket.target_notional - locked,
-    }
-    receipt = _append_receipt(
+    return PrepareCycleCore(
         state=working,
+        state_changed=True,
+        accepted=True,
+        reasons=(ReasonCode.CYCLE_PREPARED,),
+        ledger_entries=ledger_entries,
+        details={
+            "bucket_id": bucket_id,
+            "cycle_id": cycle_id,
+            "adjustment_offset": adjustment_offset,
+            "transfer": transfer,
+            "B": locked,
+            "underfunded": bucket.target_notional - locked,
+        },
+    )
+
+
+def prepare_cycle(
+    state: FundingState,
+    command: CommandEnvelope,
+    *,
+    bucket_id: str,
+    cycle_id: str,
+    cash_quantum: Decimal = Decimal("0.01"),
+) -> FundingDecision:
+    """Top up a new cycle from available reserve and lock its actual B once."""
+
+    invocation_payload = prepare_cycle_invocation_payload(
+        bucket_id=bucket_id,
+        cycle_id=cycle_id,
+        cash_quantum=cash_quantum,
+    )
+    resolution = resolve_command(
+        revision=state.revision,
+        processed=state.processed_commands,
         command=command,
         operation="prepare_cycle",
-        reasons=reasons,
-        details=details,
+        invocation_payload=invocation_payload,
+    )
+    if resolution.disposition is CommandDisposition.DUPLICATE:
+        if resolution.receipt is None:
+            raise ProductDailyError("invalid_receipt", "duplicate command lacks receipt")
+        return _duplicate_decision(
+            operation="prepare_cycle", state=state, receipt=resolution.receipt
+        )
+    if resolution.disposition is CommandDisposition.CAS_CONFLICT:
+        return _cas_decision(operation="prepare_cycle", state=state)
+
+    core = prepare_cycle_core(
+        state,
+        bucket_id=bucket_id,
+        cycle_id=cycle_id,
+        reference_id=command.command_id,
+        cash_quantum=cash_quantum,
+    )
+    if not core.accepted:
+        return _decision(
+            operation="prepare_cycle",
+            accepted=False,
+            replayed=False,
+            state=state,
+            reasons=core.reasons,
+            ledger_entries=(),
+            details=core.details,
+        )
+    if not core.changed:
+        return _decision(
+            operation="prepare_cycle",
+            accepted=True,
+            replayed=False,
+            state=state,
+            reasons=core.reasons,
+            ledger_entries=(),
+            details=core.details,
+        )
+    receipt = _append_receipt(
+        state=core.state,
+        command=command,
+        operation="prepare_cycle",
+        invocation_payload=invocation_payload,
+        reasons=core.reasons,
+        details=core.details,
     )
     committed = replace(
-        working,
-        revision=working.revision + 1,
-        processed_commands=(*working.processed_commands, receipt),
+        core.state,
+        revision=core.state.revision + 1,
+        processed_commands=(*core.state.processed_commands, receipt),
     )
     return _decision(
         operation="prepare_cycle",
         accepted=True,
         replayed=False,
         state=committed,
-        reasons=reasons,
-        ledger_entries=ledger_entries,
-        details=details,
+        reasons=core.reasons,
+        ledger_entries=core.ledger_entries,
+        details=core.details,
         receipt=receipt,
     )
 
@@ -761,12 +1078,20 @@ def apply_late_cash_delta(
     cash_delta: Decimal,
     cash_quantum: Decimal = Decimal("0.01"),
 ) -> FundingDecision:
-    """Apply a closed-cycle late fee without rewriting that cycle or next-cycle B."""
+    """Apply a completed-cycle cash delta without rewriting its settlement or next B."""
 
+    invocation_payload = late_cash_invocation_payload(
+        bucket_id=bucket_id,
+        cycle_id=cycle_id,
+        cash_delta=cash_delta,
+        cash_quantum=cash_quantum,
+    )
     resolution = resolve_command(
         revision=state.revision,
         processed=state.processed_commands,
         command=command,
+        operation="apply_late_cash_delta",
+        invocation_payload=invocation_payload,
     )
     if resolution.disposition is CommandDisposition.DUPLICATE:
         if resolution.receipt is None:
@@ -778,30 +1103,56 @@ def apply_late_cash_delta(
         return _cas_decision(operation="apply_late_cash_delta", state=state)
 
     bucket = state.bucket(bucket_id)
-    require_decimal(cash_delta, "cash_delta", maximum=Decimal("0"))
-    amount = quantize(-cash_delta, cash_quantum)
-    if amount <= 0:
-        raise ProductDailyError("invalid_late_delta", "late cash delta must reduce cash")
-    if bucket.phase is not BucketPhase.CLOSED or bucket.cycle_id != cycle_id:
+    require_decimal(cash_quantum, "cash_quantum", minimum=Decimal("0.0000000001"))
+    amount = require_quantized(cash_delta, cash_quantum, "cash_delta")
+    if amount == 0:
+        raise ProductDailyError("invalid_late_delta", "late cash delta must be non-zero")
+    matches = [
+        item
+        for item in state.completed_settlements
+        if item.bucket_id == bucket_id and item.cycle_id == cycle_id
+    ]
+    if len(matches) != 1:
         raise ProductDailyError(
-            "invalid_late_cycle", "late cash delta requires the named closed cycle"
+            "invalid_late_cycle", "late cash delta requires one completed settlement"
         )
 
-    reserve_used = min(state.reserve, amount)
-    remaining = amount - reserve_used
-    reserve = state.reserve - reserve_used
-    adjustment = state.unallocated_adjustment - remaining
+    if amount < 0:
+        debit = -amount
+        reserve_used = min(state.reserve, debit)
+        remaining = debit - reserve_used
+        reserve = state.reserve - reserve_used
+        adjustment = state.unallocated_adjustment - remaining
+        adjustment_offset = Decimal("0")
+        reserve_increment = Decimal("0")
+    else:
+        reserve, adjustment, adjustment_offset, reserve_increment, credit_postings = (
+            _plan_reserve_inflow(
+                state.reserve,
+                state.unallocated_adjustment,
+                amount,
+            )
+        )
+        reserve_used = Decimal("0")
+        remaining = Decimal("0")
+
     next_state = replace(
         state,
-        reserve=reserve,
-        unallocated_adjustment=adjustment,
+        reserve=require_quantized(reserve, cash_quantum, "reserve"),
+        unallocated_adjustment=require_quantized(
+            adjustment, cash_quantum, "unallocated_adjustment"
+        ),
     )
     postings: list[FundingLedgerPosting] = []
-    if reserve_used > 0:
-        postings.append(FundingLedgerPosting("shared/reserve", -reserve_used))
-    if remaining > 0:
-        postings.append(FundingLedgerPosting("shared/unallocated_adjustment", -remaining))
-    postings.append(FundingLedgerPosting("fees/late_adjustment", amount))
+    if amount < 0:
+        if reserve_used > 0:
+            postings.append(FundingLedgerPosting("shared/reserve", -reserve_used))
+        if remaining > 0:
+            postings.append(FundingLedgerPosting("shared/unallocated_adjustment", -remaining))
+        postings.append(FundingLedgerPosting("fees/late_adjustment", -amount))
+    else:
+        postings.append(FundingLedgerPosting("cash/late_adjustment", -amount))
+        postings.extend(credit_postings)
     ledger = (
         FundingLedgerEntry(
             reference_id=command.command_id,
@@ -815,13 +1166,15 @@ def apply_late_cash_delta(
         "cycle_id": cycle_id,
         "cash_delta": cash_delta,
         "reserve_used": reserve_used,
-        "adjustment_delta": -remaining,
+        "adjustment_offset": adjustment_offset,
+        "reserve_increment": reserve_increment,
         "new_B": bucket.locked_cycle_budget,
     }
     receipt = _append_receipt(
         state=next_state,
         command=command,
         operation="apply_late_cash_delta",
+        invocation_payload=invocation_payload,
         reasons=reasons,
         details=details,
     )
@@ -852,10 +1205,17 @@ def transfer_to_reserve(
 ) -> FundingDecision:
     """Move internal cash to reserve, first extinguishing negative adjustment."""
 
+    invocation_payload = transfer_invocation_payload(
+        source_bucket_id=source_bucket_id,
+        amount=amount,
+        cash_quantum=cash_quantum,
+    )
     resolution = resolve_command(
         revision=state.revision,
         processed=state.processed_commands,
         command=command,
+        operation="transfer_to_reserve",
+        invocation_payload=invocation_payload,
     )
     if resolution.disposition is CommandDisposition.DUPLICATE:
         if resolution.receipt is None:
@@ -866,9 +1226,9 @@ def transfer_to_reserve(
     if resolution.disposition is CommandDisposition.CAS_CONFLICT:
         return _cas_decision(operation="transfer_to_reserve", state=state)
 
-    movement = quantize(
-        require_decimal(amount, "amount", minimum=Decimal("0.0000000001")), cash_quantum
-    )
+    require_decimal(cash_quantum, "cash_quantum", minimum=Decimal("0.0000000001"))
+    movement = require_quantized(amount, cash_quantum, "amount")
+    require_decimal(movement, "amount", minimum=Decimal("0.0000000001"))
     bucket = state.bucket(source_bucket_id)
     if bucket.phase not in {BucketPhase.EMPTY, BucketPhase.CLOSED}:
         raise ProductDailyError(
@@ -918,6 +1278,7 @@ def transfer_to_reserve(
         state=next_state,
         command=command,
         operation="transfer_to_reserve",
+        invocation_payload=invocation_payload,
         reasons=reasons,
         details=details,
     )

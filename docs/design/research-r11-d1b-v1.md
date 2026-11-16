@@ -48,3 +48,17 @@ P12 必须提供的账户事实包括：同一 account/as-of economic equity、t
 合成实现之后的完整历史用途比较尚未启动。按当前精确缺口估计，后续新增 P11 工作为 46–92 主动小时：数据/用途资格与共享 manifest 4–8；研究 adapter 和旧 control 接缝 8–16；一个旧 control 与一个 R11 arm 的完整资金路径及事件归因 20–40；cold rebuild/reconciliation 6–12；内部复核、证据和发布 8–16。该估计不含 P12 v8 原有 W1/W2 52–84 小时与 W3/W4 36–56 小时，也不含 P10 获取/修复。计算和产物量在冻结实际窗口、证券总体、费用与 replay manifest 后再报价。
 
 本轮新增市场 row read、付费 reference、training、capital replay、daily serving 与 production 均为 0。
+
+## Internal acceptance repair 1.1.0
+
+研究负责人对首包独立复现后，DS 在既有合同内完成 R1–R10 整批修复。实现版本更新为 `1.1.0`，原 21 个冻结预期、P4/P6 阈值、PIT 与 T+1 窗口不变。
+
+- 已完成 cycle 的 immutable settlement history 独立鉴权 late cash；同一桶进入新 RESERVED/HELD cycle 后，旧 cycle 费用或退款仍归旧 cycle，新 B 不变。正负现金差额共用确定性分配。
+- 所有 reserve 流入共享同一 helper，先抵 negative adjustment，再进入 reserve。结算盈利不再绕过欠资债务。
+- `CLOSED` 仅代表待结算状态；没有唯一 completed settlement 时禁止新 cycle 复用。
+- 每个对外的 command 绑定 canonical operation 与实际业务 payload。同 command id 改金额、cycle、operation 或 observation 会报 `idempotency_conflict`；同键重试返回 immutable 原结果与当前 state revision。
+- C13 临时 BLOCKED 可在原窗口内重评；原 event 的 eligibility/expiry window 不可改写，EXPIRED 终态不可 rearm。
+- C15 composite entry 只消费原 expert runner 归一化后的 explicit entry action；BLOCKED 或 expert veto 不得分配资金。成功 `decide_entry` 在一个 pure state 中保存 reservation、quantity、result digest 和唯一 `decide_entry` receipt，prepare intermediate 不作为 entry 已提交证据。
+- `E_floor <= 0` 直接 fail closed。Boolean、整数、Decimal 和 cash quantum 在 typed boundary 严格校验；float、truthy string、bool-as-int 与 sub-cent cash 不进入 state/ledger。
+
+完整 expected/actual 验收由 `scripts/r11_synthetic_verify.py` 独立比较冻结 JSON 的每个 key；Q02 的 next-lot exposure、F07/F08 的 old-settled/new-cycle 身份及三条因果故事均从实际公共状态导出。

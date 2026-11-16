@@ -30,6 +30,7 @@ from quanthus.product_daily.contracts import (
 from quanthus.product_daily.funding import (
     BucketPhase,
     EntryReservation,
+    FundingLedgerEntry,
     FundingState,
     prepare_cycle_core,
 )
@@ -851,6 +852,7 @@ class EntryDecision:
     reservation_id: str | None
     replayed: bool = False
     result_digest: str | None = None
+    funding_ledger_entries: tuple[FundingLedgerEntry, ...] = ()
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -887,6 +889,7 @@ class EntryDecision:
             "reservation_id": self.reservation_id,
             "replayed": self.replayed,
             "result_digest": self.result_digest,
+            "funding_ledger_entries": [item.to_dict() for item in self.funding_ledger_entries],
             "execution_authorized": self.execution_authorized,
             "forced_sale": self.forced_sale,
         }
@@ -1121,11 +1124,17 @@ def decide_entry(
         )
 
     budget = prepared.state.bucket(first_bucket).locked_cycle_budget
+    assert expert is not None and expert.target_maximum_position is not None
+    if fraction is not None:
+        require_decimal(fraction, "fraction", minimum=Decimal("0"), maximum=Decimal("1"))
+    effective_fraction = (
+        None if fraction is None else min(fraction, expert.target_maximum_position)
+    )
     quantity = evaluate_quantity(
         QuantityRequest(
             decision_snapshot_id=snapshot.snapshot_id,
             bucket_budget=budget,
-            fraction=fraction,
+            fraction=effective_fraction,
             security_code=candidate.security_code,
             level1_industry_id=candidate.level1_industry_id,
             mark_price=mark_price,
@@ -1169,6 +1178,7 @@ def decide_entry(
         "funding_state_changed": True,
         "reservation_id": reservation_id,
         "expert_decision_digest": expert.source_digest if expert is not None else None,
+        "funding_ledger_entries": [item.to_dict() for item in prepared.ledger_entries],
     }
     receipt = make_receipt(
         command=command,
@@ -1209,4 +1219,5 @@ def decide_entry(
         funding_state_changed=True,
         reservation_id=reservation_id,
         result_digest=receipt.result_digest,
+        funding_ledger_entries=prepared.ledger_entries,
     )

@@ -22,7 +22,7 @@ def test_selected_contract_and_implementation_policy_are_cross_bound() -> None:
     assert current["semantic_digest"] == contract["semantic_digest"]
     assert implementation["contract_semantic_digest"] == contract["semantic_digest"]
     assert implementation["contract"] == current["contract"]
-    assert implementation["version"] == "1.1.0"
+    assert implementation["version"] == "1.1.1"
     assert implementation["risk"]["version"] == contract["risk_policy"]["version"]
     assert implementation["quality_repair"]["findings"] == [
         "R1",

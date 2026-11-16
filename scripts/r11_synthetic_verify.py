@@ -79,6 +79,7 @@ def main() -> int:
         "pytest",
         "-q",
         "tests/unit/test_product_daily_r11.py",
+        "tests/unit/test_product_daily_r11_review.py",
         "tests/contract/test_product_daily_r11.py",
     )
     started = datetime.now(timezone.utc)
@@ -95,7 +96,9 @@ def main() -> int:
         "ended_at": ended.isoformat(),
         "command": list(command),
         "returncode": process.returncode,
-        "passed": process.returncode == 0,
+        "passed": False,
+        "golden_all_passed": False,
+        "stories_rebuild_identical": False,
         "stdout_log": str(stdout_path),
         "stdout_sha256": _sha(stdout_path),
         "stderr_log": str(stderr_path),
@@ -111,6 +114,9 @@ def main() -> int:
         },
     }
     verification_errors: list[str] = []
+    for path in (golden_output, story_output):
+        if not path.is_file():
+            verification_errors.append(f"missing evidence file: {path.name}")
     if process.returncode == 0 and golden_output.is_file() and story_output.is_file():
         golden = json.loads(golden_output.read_text(encoding="utf-8"))
         stories = json.loads(story_output.read_text(encoding="utf-8"))
@@ -154,7 +160,8 @@ def main() -> int:
             "path": str(story_output),
             "sha256": _sha(story_output),
         }
-        receipt["verification_errors"] = verification_errors
+    receipt["verification_errors"] = verification_errors
+    receipt["passed"] = process.returncode == 0 and not verification_errors
     receipt_path = output / "synthetic-verification.json"
     receipt_path.write_text(
         json.dumps(receipt, indent=2, sort_keys=True) + "\n",

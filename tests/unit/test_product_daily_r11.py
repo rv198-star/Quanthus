@@ -2064,7 +2064,8 @@ def test_r7_composite_entry_replay_is_atomic_and_immutable() -> None:
         "fee_rule": fee_rule(),
     }
     first = decide_entry(funding=empty, command=envelope, **kwargs)
-    assert first.accepted and first.quantity is not None and first.quantity.quantity == 500
+    assert first.accepted and first.quantity is not None and first.quantity.quantity == 300
+    assert first.quantity.target_cap == dec("4000")  # Original expert permits at most 20%.
     assert len(first.funding_state.entry_reservations) == 1
     assert [item.operation for item in first.funding_state.processed_commands] == ["decide_entry"]
     replay = decide_entry(funding=first.funding_state, command=envelope, **kwargs)

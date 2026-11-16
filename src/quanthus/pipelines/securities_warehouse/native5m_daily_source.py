@@ -3,6 +3,13 @@
 The native parser/grid are adopted from GitHub revision
 f839af0033ab4aa8cbe6d9fb933f29db88792e91, p10_native_minute_delivery.py.
 No acquisition, pointer publication or 1m dependency is imported.
+
+No-trade bar semantics (#692, rule NO_TRADE_BAR_RULE): a supplier row whose
+six exact values (open, high, low, close, volume, amount) are all zero is a
+source-observed no-trade bar, e.g. an unmatched opening auction followed by no
+trade in the first 5m window. Such rows are kept exactly as observed and count
+toward the session grid; no price is fabricated or forward-filled. Every other
+zero/negative price or unit pattern remains fail-closed.
 """
 
 from __future__ import annotations
@@ -23,6 +30,21 @@ from .base22_sources import _fingerprint, _read_json, _tree, physical_path
 PROVIDER = "baostock-native-5m"
 FIELDS = "date,time,code,open,high,low,close,volume,amount"
 KIND = "p10_source_native_minute_delivery_v1"
+NO_TRADE_BAR_RULE = "p10-native-5m-observed-all-zero-no-trade-bar-v1"
+
+
+def is_no_trade_values(
+    op: Decimal, hi: Decimal, lo: Decimal, cl: Decimal, volume: Decimal, amount: Decimal
+) -> bool:
+    """Only the exact all-zero pattern is a source-observed no-trade bar (#692)."""
+    return op == hi == lo == cl == volume == amount == 0
+
+
+def is_no_trade_bar(bar: Mapping[str, Decimal]) -> bool:
+    """True when a parsed bar carries the exact all-zero no-trade observation."""
+    return is_no_trade_values(
+        bar["open"], bar["high"], bar["low"], bar["close"], bar["volume_shares"], bar["amount"]
+    )
 
 
 def _decimal(value: Any) -> Decimal:
@@ -85,7 +107,7 @@ def native_m5(raw: bytes, code: str, day: str) -> dict[str, dict[str, Decimal]]:
             raise ValueError("duplicated/unordered/out-of-session native 5m")
         prior = stamp
         op, hi, lo, cl, volume, amount = [_decimal(x) for x in item[3:]]
-        if (
+        if not is_no_trade_values(op, hi, lo, cl, volume, amount) and (
             min(op, hi, lo, cl) <= 0
             or hi < max(op, lo, cl)
             or lo > min(op, hi, cl)

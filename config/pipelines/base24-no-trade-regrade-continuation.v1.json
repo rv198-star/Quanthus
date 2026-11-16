@@ -1,0 +1,10 @@
+{
+  "contract": "p10-cn02-held-no-trade-regrade-continuation-v1",
+  "enabled": true,
+  "max_continuations_per_date": 1,
+  "full_daily_reacquisition": false,
+  "allowed_held_reasons": ["invalid_native_5m_source"],
+  "require_full_grid_after_regrade": true,
+  "unsupported_or_failed": "KEEP_ORIGINAL_HELD_SOURCE",
+  "authority": "Owner 2026-11-16 #692 convergence instruction; NO_TRADE_BAR_RULE v1"
+}

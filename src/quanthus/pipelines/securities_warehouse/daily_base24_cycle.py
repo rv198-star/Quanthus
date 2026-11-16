@@ -870,6 +870,7 @@ def main() -> int:
     parser.add_argument("--events", type=Path)
     parser.add_argument("--native", type=Path)
     parser.add_argument("--recovery", action="store_true")
+    parser.add_argument("--no-trade-regrade", action="store_true")
     args = parser.parse_args()
     config = load(args.config)
     config["recovery_mode"] = args.recovery
@@ -894,6 +895,7 @@ def main() -> int:
         continuation = None
         capture_resume = None
         auction_resume = None
+        regrade_resume = None
         index_path = root / "DATES.json"
         if index_path.exists() and not args.native_only:
             old = object_at(index_path).get("dates", {}).get(str(day), {})
@@ -914,9 +916,14 @@ def main() -> int:
             if old.get("status") == "CORE_READY_5M_HELD_SOURCE_QUALITY":
                 if any([args.market, args.events, args.native]):
                     raise ValueError("AUCTION_HELD_EXACT_INPUTS_ALREADY_FROZEN")
-                from .daily_auction_recovery import held_continuation
+                if args.no_trade_regrade:
+                    from .daily_no_trade_regrade import continuation as regrade_continuation
 
-                auction_resume = held_continuation(config, day, old)
+                    regrade_resume = regrade_continuation(config, day, old)
+                else:
+                    from .daily_auction_recovery import held_continuation
+
+                    auction_resume = held_continuation(config, day, old)
             if old.get("status") == "CORE_READY_5M_FAILED":
                 if args.recovery:
                     # A capture-budget failure can reuse source bytes. Reference
@@ -939,6 +946,7 @@ def main() -> int:
             not args.native_only
             and continuation is None
             and capture_resume is None
+            and regrade_resume is None
             and len(previous_attempts) >= 2
         ):
             raise ValueError("DAILY_CYCLE_TWO_ATTEMPT_BUDGET_EXHAUSTED_REQUIRES_DISPOSITION")
@@ -986,6 +994,63 @@ def main() -> int:
                 )
                 write(run / "core-receipt.json", value)
                 result = finish_native(config, run, day, value, market, events, native_root=source)
+                print(json.dumps({"run": str(run), "result": result}, sort_keys=True))
+                return 0
+            if regrade_resume is not None:
+                value, market, events, captures, reference = regrade_resume
+                disjoint_output(run, [market, events, captures, reference, Path(value["core"])])
+                from .daily_no_trade_regrade import CONTRACT as REGRADE_CONTRACT
+                from .daily_no_trade_regrade import POLICY as REGRADE_POLICY
+
+                write(
+                    run / "no-trade-regrade-continuation.json",
+                    {
+                        "contract": REGRADE_CONTRACT,
+                        "market_date": str(day),
+                        "original_core": value["core"],
+                        "original_native_source": value["native_source"],
+                        "original_native_manifest_sha256": value["native_manifest_sha256"],
+                        "original_capture_root": str(captures),
+                        "reference_sha256": file_sha(reference),
+                        "policy_sha256": file_sha(REGRADE_POLICY),
+                        "full_daily_reacquisition": False,
+                        "original_pipeline_revision": value.get("pipeline_revision"),
+                        "original_collector_revision": value.get("collector_revision"),
+                        "continuation_pipeline_revision": config["pipeline_revision"],
+                        "continuation_collector_revision": COLLECTOR,
+                    },
+                )
+                regraded = provider(
+                    config,
+                    run,
+                    "native-regrade",
+                    "native",
+                    "--reference",
+                    str(reference),
+                    "--capture-root",
+                    str(captures),
+                    "--output",
+                    str(run / "native-products"),
+                    timeout=900,
+                )
+                native_root = Path(regraded["package_path"])
+                if object_at(native_root / "manifest.json").get("research_ready") is not True:
+                    raise ValueError("NO_TRADE_REGRADE_STILL_NOT_READY")
+                value.update(
+                    status="CORE_READY_5M_PENDING",
+                    pipeline_revision=config["pipeline_revision"],
+                    collector_revision=COLLECTOR,
+                    delivery_timing="LATE_RECOVERY_NOT_ON_TIME_SUCCESS",
+                    no_trade_regrade={
+                        "original_native_manifest_sha256": value["native_manifest_sha256"],
+                        "regraded_native_source": str(native_root),
+                        "regraded_native_manifest_sha256": file_sha(native_root / "manifest.json"),
+                    },
+                )
+                write(run / "core-receipt.json", value)
+                result = finish_native(
+                    config, run, day, value, market, events, native_root=native_root
+                )
                 print(json.dumps({"run": str(run), "result": result}, sort_keys=True))
                 return 0
             if capture_resume is not None:
@@ -1086,7 +1151,11 @@ def main() -> int:
             # A quality continuation failure retains the original indexed HELD
             # disposition. Its private failure and consumed retry marker remain
             # available for explicit disposition; never downgrade the predecessor.
-            if (run / "core-receipt.json").exists() and auction_resume is None:
+            if (
+                (run / "core-receipt.json").exists()
+                and auction_resume is None
+                and regrade_resume is None
+            ):
                 partial = object_at(run / "core-receipt.json")
                 partial["status"] = "CORE_READY_5M_FAILED"
                 publish(config, partial)

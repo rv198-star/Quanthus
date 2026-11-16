@@ -1,3 +1,5 @@
+> 最终状态（2026-11-16）：R11 整批共享合成工程 1.2.0 及受限停放决定已独立 ACCEPTED，FA-01 关闭；PR #691 普通合入 `c2b64d52361faa21d8175a3fd704c50d542d9153`。完整比较 parked、research_result=not_evaluated、daily_adopted=false；A01–A07 与原冻结合同保留。当前交付见 [R11 价值简报](../work-items/research-r11-value-brief.md)，以下保留各阶段设计及验收历史。
+
 # R11 首包：单一机会与固定桶日常用途
 
 研究负责人已接棒，Task #690。当前交付是 **C13+C15 的精确设计、共享政策执行包与采用缺项**。原R10已收敛；R11采用结论由完整比较与合并終审产生。

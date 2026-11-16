@@ -2735,6 +2735,88 @@
         "CP-690-R11-LEAD-CONVERGENCE-20261116"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R11-FINAL-ACCEPTED-PARK-20261116",
+      "recorded_at": "2026-11-16T14:09:44.726901+00:00",
+      "actor": "Quanthus researchlead after independent final audit ACCEPTED",
+      "question_id": "R11-D1B-ADOPTION-001",
+      "family": "r11-d1b-fixed-reserve",
+      "work_item": "P11-R11-D1B-001",
+      "modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "question": "Can the C13/C15 composition support daily-use adoption and which usable assets survive when exact prerequisites are missing?",
+      "consumer": "P11 research owner and P12 W3/W4",
+      "scope": "Independent accepted shared synthetic policy1.2.0 C13+C15+A02/A03 and bounded park; no complete historical comparison.",
+      "execution_status": "blocked",
+      "verdict": "not_evaluated",
+      "disposition": "park",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Independent acceptance of complete bounded synthetic engineering and park disposition; research_result not_evaluated, daily_adopted false.",
+      "decision_effect": "Retain1.2.0 shared pure core for P11/P12 synthetic integration, close finiteTask690 after ordinaryPR691 merge; parent608 open. Complete historical comparison stays parked on named A01–A07.",
+      "reopen_conditions": [
+        "P12 supplies exact real account snapshots/parameters/fee/windows/atomic facts and a concrete unmet decision.",
+        "P10 supplies qualified exact purpose/PIT/physical manifest; P11 expert purpose and any new multi-day trigger are versioned and accepted.",
+        "Freeze one old control/one composition, exact development scope/exposure, full cost and existing authority before result-bearing comparison."
+      ],
+      "retained_assets": [
+        "Shared pure policy1.1.1 and original21frozen goldens/three causal traces/five independent regressions.",
+        "Original DS001/DS002, all lead failures, exact native Linux receipts, original1.0.0 unused draft and selected1.0.1 contract.",
+        "P12 atomic-interface handoff, A01-A07 dispositions, original R6-R10 findings/costs/exposure and B/v0 retention.",
+        "Accepted1.2.0 source ffa889 and ordinary merge c2b64 with identical tree; FA-01 rejection and complete corrected final audit; exact resource recovery bundles and native logs."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Known script CPU subtotal3799.738204s through repaired fixed publication; final audit measured subset1.108028s; current final lifecycle separately measured. DS002 overrun842.266359s and earlier snapshot641.176574s preserved. Model/control/uninstrumented costs unknown_not_zero.",
+      "attempt_refs": [
+        "ds-return-001/cost.json",
+        "ds-return-002/cost.json",
+        "timing-reconciliation.json",
+        "linux-final/check-receipts.json",
+        "failures.json",
+        "quanthus-r11-fa01-resubmission/HANDOFF-MANIFEST.json",
+        "accepted-final-audit/audit-receipt.json",
+        "resource-recovery/recovery-verification.json",
+        "resource-recovery/cleanup-receipt.json"
+      ],
+      "evidence": [
+        {
+          "id": "R11-FINAL-AUDIT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-final-closeout/accepted-final-audit/audit-receipt.json",
+          "sha256": "4b4524cb865675193b6dac7950fc1a873dbd91b2ec45d2bec8a2d14c82b28c45",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Independent complete R11 synthetic engineering1.2.0 ACCEPTED; full comparison parked and daily adopted false."
+        },
+        {
+          "id": "R11-ORDINARY-MERGE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-16/quanthus-r11-relay/closeout-001/merge691-commit.json",
+          "sha256": "76398ab92e11eeaa2ed30a003c092978174a520df262e0168029e91fffabcfe2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact ordinary GitHub merge tree equals independently accepted source."
+        },
+        {
+          "id": "R11-RESOURCE-CLEANUP",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-final-closeout/resource-recovery/cleanup-receipt.json",
+          "sha256": "1c216793cff9c357578183fc5ba1e7bfda41f041db8c1d752cdaea344c629d9d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Eight exact CN02 task roots removed after verified recovery; primary/unrelated worktrees preserved."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-690-R11-FINAL-ACCEPTED-20261116"
+      ],
+      "supersedes": "CON-R11-LIMITED-SYNTHETIC-PARK-20261116"
     }
   ]
 }

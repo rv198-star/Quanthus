@@ -1,4 +1,12 @@
-"""Native 1m/5m products with a shared, sealed daily reference and real grades."""
+"""Native 1m/5m products with a shared, sealed daily reference and real grades.
+
+No-trade bar semantics (#692, rule NO_TRADE_BAR_RULE): a 5m supplier row whose
+six exact values (open, high, low, close, volume, amount) are all zero is a
+source-observed no-trade bar, e.g. an unmatched opening auction followed by no
+trade in the first 5m window. Such rows are kept exactly as observed and count
+toward the session grid; no price is fabricated or forward-filled. Every other
+zero/negative price or unit pattern remains fail-closed. The 1m lane is unchanged.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +18,7 @@ import re
 import shutil
 import tempfile
 from collections import Counter
+from collections.abc import Mapping
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -34,6 +43,21 @@ from quanthus.providers.p10_native_m5_shard_capture import FIELDS, PROVIDER
 from quanthus.providers.p10_native_m5_shard_capture import capture_shard as capture_m5
 
 KIND = "p10_source_native_minute_delivery_v1"
+NO_TRADE_BAR_RULE = "p10-native-5m-observed-all-zero-no-trade-bar-v1"
+
+
+def is_no_trade_values(
+    op: Decimal, hi: Decimal, lo: Decimal, cl: Decimal, volume: Decimal, amount: Decimal
+) -> bool:
+    """Only the exact all-zero pattern is a source-observed no-trade bar (#692)."""
+    return op == hi == lo == cl == volume == amount == 0
+
+
+def is_no_trade_bar(bar: Mapping[str, Decimal]) -> bool:
+    """True when a parsed bar carries the exact all-zero no-trade observation."""
+    return is_no_trade_values(
+        bar["open"], bar["high"], bar["low"], bar["close"], bar["volume_shares"], bar["amount"]
+    )
 ALLOWED = {"R0", "R1", "R2"}
 
 
@@ -195,7 +219,7 @@ def native_m5(raw: bytes, code: str, day: str) -> dict[str, dict[str, Decimal]]:
             raise ValueError("duplicated/unordered/out-of-session native 5m")
         prior = stamp
         op, hi, lo, cl, volume, amount = [_decimal(x) for x in item[3:]]
-        if (
+        if not is_no_trade_values(op, hi, lo, cl, volume, amount) and (
             min(op, hi, lo, cl) <= 0
             or hi < max(op, lo, cl)
             or lo > min(op, hi, cl)
@@ -329,6 +353,7 @@ def assess(
         "missing_actual_minutes": grid,
         "auction_source_observed": False,
         "allowed_consumer": "none",
+        "no_trade_minutes": [],
     }
     if daily["tradestatus"] == "0":
         if _decimal(daily["volume"]) == 0:
@@ -344,6 +369,9 @@ def assess(
         return quality, {}
     try:
         bars = native_m5(raw, code, day)
+        quality["no_trade_minutes"] = sorted(
+            stamp for stamp, bar in bars.items() if is_no_trade_bar(bar)
+        )
         missing = [stamp for stamp in grid if stamp not in bars]
         quality["missing_actual_minutes"] = missing
         if not bars or grid[-1] not in bars:

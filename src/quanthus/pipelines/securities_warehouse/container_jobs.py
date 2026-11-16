@@ -29,6 +29,11 @@ def daily(config: Path, day: date, recovery: bool) -> dict[str, Any]:
     ]
     if recovery:
         command.append("--recovery")
+        if (
+            config.is_file()
+            and json.loads(config.read_text()).get("no_trade_regrade_continuation") is True
+        ):
+            command.append("--no-trade-regrade")
     # Do not buffer provider logs/all rows in application memory.
     with tempfile.TemporaryFile() as log:
         result = subprocess.run(command, stdout=log, stderr=sys.stderr, check=False)

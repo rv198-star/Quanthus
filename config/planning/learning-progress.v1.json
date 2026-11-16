@@ -15112,6 +15112,45 @@
         }
       ],
       "reviewed_modules": []
+    },
+    {
+      "id": "CP-690-R11-RESOURCE-DISPOSITION-20261116",
+      "recorded_at": "2026-11-16T14:23:08.680970+00:00",
+      "actor": "Quanthus researchlead final lifecycle reconciliation",
+      "work_item": "P11-R11-D1B-001",
+      "outcome": "no_module_change",
+      "summary": "Final resource disposition: eight remote roots and eligible task refs released after verified recovery; application protects current primary checkout, retained clean with exact release condition; original task comment and live metadata reconciled.",
+      "evidence": [
+        {
+          "id": "R11-PRIMARY-RETENTION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-final-closeout/resource-recovery/worktree-retention.json",
+          "sha256": "a79c1ea49fb1ab69f6b1eeecd255b034f688bcaf22047feffd688f5cedc40ad0",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual archive tool refusal and clean retained-primary release condition; no module or admission promotion."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Final independent engineering acceptance and parked research/admission scopes remain at CP-690-R11-FINAL-ACCEPTED-20261116; application-primary retention is a bounded resource disposition.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-D1B-001",
+          "number": 690,
+          "title": "[P11-R11-D1B-001] 核定单一机会与固定桶组合的日常用途",
+          "state": "closed",
+          "state_reason": "completed",
+          "updated_at": "2026-11-16T14:22:11Z",
+          "body_sha256": "8e110b8fe4def5300204b13c816795421cbf8ff4c95d6fdf4064d71adf6d9655"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

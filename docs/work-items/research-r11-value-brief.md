@@ -10,7 +10,7 @@ R11 C13+C15+A02/A03 整批独立复审为 **ACCEPTED**，FA-01 已关闭、阻�
 
 私有证据 core 固定版 `e72269cd40404843e4e3b17304d74fb399b3008a`、finalization `f44f0ce6757f1f48269b8e2291a52937775743c3` 已全量回读；旧拒绝包、失败、原冻结合同、R6–R10 结论与曝光保持。发布后已知脚本 CPU 小计 3799.738204 秒，终审另测 1.108028 秒，最终收尾另计；模型与未仪表化成本保留 unknown_not_zero。DS002 原完整回合超时 842.266359 秒仍计入。
 
-CN02 8 个具名 R11 TMP 已在原生日志/回执与 3 份独有提交 bundle 迁出、校验后移除，原占用 391700 KiB。远端主检出、其他工作树、数据、服务及凭据保持原状。4 份本地临时提交也已生成并校验恢复 bundle；分支和受管理工作区的最终处置随元数据合入后记录于同一交付目录。
+CN02 8 个具名 R11 TMP 已在原生日志/回执与 3 份独有提交 bundle 迁出、校验后移除，原占用 391700 KiB。远端主检出、其他工作树、数据、服务及凭据保持原状。4 份本地临时提交及元数据等价提交均已生成并校验恢复 bundle；两个远端和六个本地任务分支已删除。应用归档工具将当前目录视为本会话主检出并拒绝移除，因此保留干净检出；应用解除主检出保护后再通过同一工具归档。详见[资源收尾](research-r11-resource-closeout.md)。
 
 本有限批次 Task [#690](https://github.com/rv198-star/Quanthus/issues/690) 按共享工程接受与有依据的停放收口；父 [#608](https://github.com/rv198-star/Quanthus/issues/608) 继续开放。最终入口：`/Users/william/Documents/Codex/2026-11-14/jie-s/outputs/quanthus-r11-final-closeout/README.md`；终审原文与机器回执位于其 `accepted-final-audit/`。
 

@@ -27,7 +27,7 @@
         {
           "scope": "component",
           "path": "src/quanthus/product_daily/candidate.py",
-          "sha256": "500d7c886f473eff1c962b8de653d181b2b706e67dcd4fea38e147dfde3a58e7"
+          "sha256": "958815f580bbb11dd62367e2de2a4538ae8b4d819afa82cb2434bb6c8409c4c9"
         }
       ],
       "missing_fields": [

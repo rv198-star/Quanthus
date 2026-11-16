@@ -104,6 +104,9 @@ class CandidatePolicy:
             raise ProductDailyError("invalid_candidate_policy", "cooldown must not be negative")
 
 
+DEFAULT_CANDIDATE_POLICY = CandidatePolicy()
+
+
 @dataclass(frozen=True)
 class CandidateObservation:
     identity: CandidateIdentity
@@ -414,10 +417,12 @@ def project_candidate(
     state: CandidateState,
     command: CommandEnvelope,
     observation: CandidateObservation,
-    policy: CandidatePolicy = CandidatePolicy(),
+    policy: CandidatePolicy | None = None,
 ) -> CandidateTransition:
     """Apply a C13 observation without creating an order, fill or new rearm rule."""
 
+    if policy is None:
+        policy = DEFAULT_CANDIDATE_POLICY
     resolution = resolve_command(
         revision=state.revision,
         processed=state.processed_commands,

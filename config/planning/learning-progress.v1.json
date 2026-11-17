@@ -15726,6 +15726,99 @@
           "body_sha256": "deff024993dd85b65d2e9663b5944f6cb6791bc3a93e3cb94537bad94374149c"
         }
       ]
+    },
+    {
+      "id": "CP-700-TWOCYCLE004-REJECTED-R1-20261118",
+      "recorded_at": "2026-11-17T22:28:22.112724+00:00",
+      "actor": "Quanthus lead Sol after independent010 and root public witnesses",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "rejected",
+      "summary": "Original004 S01-S09/76pass, but TC01-TC04 integrity gaps block acceptance. GroupedR1 and independent existing-purpose011 observed active.",
+      "evidence": [
+        {
+          "id": "TWOCYCLE004-REVIEW010",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-u05-two-cycle-review-010/review.json",
+          "sha256": "689056c29928690bbfd0132c75e944295e074f8c3586a98d72ea0f7ff0d7af5d",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact original004 candidate review; four witnessed integrity findings; no accepted cycle or complete R11 use."
+        },
+        {
+          "id": "TWOCYCLE004-ROOT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/review-disposition.json",
+          "sha256": "d920810824e5f3d2372091004005599a2121b67320873c711ffc37a28981a4d8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact original004 candidate review; four witnessed integrity findings; no accepted cycle or complete R11 use."
+        },
+        {
+          "id": "TWOCYCLE004-REPAIR",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/repair-004-r1/ROOT-GROUPED-REPAIR.md",
+          "sha256": "952fced9597b3757a63ed610f9e6c1bdb630459ad245b2e794210dc329c48115",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact original004 candidate review; four witnessed integrity findings; no accepted cycle or complete R11 use."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Unaccepted cycle candidate rejected. Preserve accepted firstbridge and original module maturity; complete research/daily mission remains open.",
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T20:52:55Z",
+          "body_sha256": "deff024993dd85b65d2e9663b5944f6cb6791bc3a93e3cb94537bad94374149c"
+        }
+      ]
+    },
+    {
+      "id": "CP-700-TWOCYCLE004-RECOVERY-METADATA-20261118",
+      "recorded_at": "2026-11-17T22:38:12.997288+00:00",
+      "actor": "Quanthus Sol",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "Updated parent/current briefs to exact rejected004 and activeR1; fixed body/state/title observations after live readback.011 qualification remains source-only.",
+      "evidence": [
+        {
+          "id": "R11-RECOVERY-METADATA",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/live-metadata-reconciliation.json",
+          "sha256": "d00335f9d6e81b0ab8fde31cacc29f1a9d56169b51c02491b6bb59602991249c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact parent/child current-body and OPEN state reconciliation only."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Current brief and metadata synchronization; original004 candidate remains rejected and R1active. No module maturation or admission.",
+      "reviewed_modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T22:36:45Z",
+          "body_sha256": "9ed266ae3ed5881f1fe054df5fbde144f5be112db7604a01d2d6355b61bbce7f"
+        }
+      ]
     }
   ],
   "history_imports": [

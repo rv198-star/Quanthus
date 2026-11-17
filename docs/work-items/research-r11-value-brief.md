@@ -1,3 +1,27 @@
+# R11当前：两周期候选退回，完整用途继续
+
+首笔账户/资金桥已内部接受，原生9458 passed/35 skipped与普通PR705继续分支合入保留。它提供真实预约、现金/持仓/资金同步、回滚和同事务风险快照，供原U05后段复用。父PR702仍为draft。
+
+原004候选0b429402/treee8167edb已实际执行S01–S09合成两周期，末态cash21380/bucket20000/reserve1380，独立76项聚焦通过。当前候选CHANGES_REQUIRED：TC01未解决报告冲突仍可结算；TC02业务故障后原始迟到费可从100覆写成99；TC03风险as-of和接收时钟错误；TC04损坏的缓存回执摘要通过冷重建。原source/24文件交包、010及Root公共SQLite见证全部保留，该候选尚未运行完整native。
+
+一组原U05修复已在DS独立checkout/PR706追加执行。UTC22:20:45起35分钟全回合，硬截止22:55:45，最后5分钟封包；300脚本CPU/1GiB/64MiB。精确修复源码和四组公共见证先复审，之后再做一次必要的最终组合源native。Sol独占共享状态和整合，审计线等完整用途包。
+
+独立011用途差集已核验：Trend仅入场评分，PositionRisk负责入场上限/否决及持有减退；原专家上限0.20，合成0.30与QuantityLimits1只服务fixture。U01比较标准已有proposal，历史500000/五桶/N100000及实际账户比例仍待精确用途绑定；个人真实事实仅在personal_actual模式需要。C13多日wait/expiry/rearm继续具名。P10#701原窗/先行历史/逐决策PIT交接最后更新UTC14:27:10，U06等待；研究角色/历史曝光归P11。
+
+- [x] 用途/输入/账户首包和现金1.2.1内部接收。
+- [x] 首段持久化账户事实与原生9450/35。
+- [x] 首笔账户/资金桥、全部CB修复与原生9458/35。
+- [ ] U01-U04完整用途、输入/PIT、目标模式参数及专家资格。
+- [ ] U05完整两周期四项缺陷修复、精确复审与最终验收。
+- [ ] U06/U07合格完整比较、独立重建和整包用途终审。
+- [ ] U08日常P12 ENG/DECISION/OPS/USE接收。
+
+原004 native回合3894.314秒，完整dispatch至完成约4083.413秒；010native589.292秒；011native451.635秒。脚本CPU/RSS/模型与控制成本未测部分保留unknown_not_zero，所有R6-R11旧失败/超时/曝光和投入继续累计。当前新增市场/参考/训练/历史资金/日常/生产为0。
+
+完整R11保持OPEN，研究问题UNANSWERED、日常用途NOT_COMPLETE、整包用途终审NOT_SUBMITTED；R12搁置。当前接续：`/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/CURRENT.md`。证据：`sol-two-cycle-006/review-disposition.json`、`repair-004-r1/ROOT-GROUPED-REPAIR.md`、`ds-purpose-qualification-011/qualification.json`。
+
+<details><summary>历史：前序继续交付检查点</summary>
+
 # R11当前：工程子批已接受，完整用途继续交付
 
 2026-11-17 Owner已授权按U01–U08继续，当前Task[#700](https://github.com/rv198-star/Quanthus/issues/700)。首包补精确用途/输入/账户，修复新见证的未决现金P2；P10[#701](https://github.com/rv198-star/Quanthus/issues/701)持有源/PIT交接。完整研究问题和日常用途目标保持开放，R12搁置。详见[继续交付](research-r11-continuation.md)。
@@ -7,6 +31,9 @@
 投入偏高，账户身份/恢复与平台接缝经历多次返工。保留8ef中止383.754秒（完整CPU未知）、4cc失败886.497秒/868.305CPU及最终872.106秒/853.261CPU；DS和006整回合超时继续累计。下一段复用现有计算，先检查聚焦与平台边界，再集中一次完整验收。详细证据与余项见[首段接收](../acceptance/research-r11-u05-synthetic-facts-20261118.md)和[继续交付](research-r11-continuation.md)。
 
 本段新增的首个账户/资金原子桥已内部接收：统一事实影响、完整状态恢复、来源/费用幂等、真实未决现金与同事务风险快照均有具体反例修复和独立证据。最终原生通过并普通合入继续分支；下一笔复用它完成原U05完整两周期，完整R11目标继续开放。该桥经历明显返工，成本按原线累计，详见[接收与余项](../acceptance/research-r11-u05-core-bridge-20261118.md)。
+
+
+</details>
 
 下文保留2026-11-16有限工程子批的终审、成本与关闭历史；其1.2.0接受继续按原范围使用，后继新增现金修复和具体消费者准入分别验收。
 

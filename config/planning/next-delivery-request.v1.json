@@ -34,7 +34,7 @@
     "Newpaid reference/training/market acquisition/capital replay0; no second update or reinterpretation of frozen labels.",
     "If needed runtime changes require full checks; use docs/ledger reuse only after byte-identical executable/config/test closure and fresh metadata checks."
   ],
-  "memory_sha256": "828958bb8ef22062e3dd0f1f065d043ec0e1cd442b6c7d3c6df1ca3128e98b1d",
+  "memory_sha256": "0d0587bdca6a181f91d1e8071dbdcadb19a395f22b4029564ca3e52a4247fbbd",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -195,6 +195,11 @@
       "conclusion_id": "CON-R11-FIRST-FUNDING-ACCOUNT-BRIDGE-20261118",
       "relation": "respect",
       "rationale": "CompletedR10request and execution receipt remain unchanged and non-activating. Retain accepted limited synthetic first funding-account bridge and all failures/costs for originalR11engineering; complete research/daily gates stay open."
+    },
+    {
+      "conclusion_id": "CON-R11-TWOCYCLE004-REJECTED-20261118",
+      "relation": "respect",
+      "rationale": "Completed R10 request and original execution receipt remain non-activating. Preserve rejected original004 synthetic cycle and all costs; one bounded TC01-TC04 R11 repair uses its separate existing authority, with exact re-review before native and no research/daily admission."
     }
   ],
   "cumulative_cost_review": "AllR6-R10 and diagnostic/closeout costs,UNKNOWN and both timing deviations retained. New60minute/1800CPU protection envelope planned by audit within Owner continuation; not itemized Owner numeric approval.",

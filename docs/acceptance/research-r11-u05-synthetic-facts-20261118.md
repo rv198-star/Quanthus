@@ -33,3 +33,13 @@ The first slice uses explicitly confirmed per-report fees in a single-fill fixtu
 ## Platform static boundary integration
 
 The existing platform boundary check matched the substring `execution` and therefore rejected the new public fact types. The reviewed P12 v1.1 infrastructure direction is implemented by a versioned exact-file/module/name declaration: only `adapters/product_daily_facts_sqlite.py` may import `Correction`, `ExecutionReport`, `SyntheticContext` and `validate_context` from the public facts capability. Other platform files, broker/strategy engines, star imports and new action functions retain the original prohibition. This declaration grants no runtime capability or mode admission. Five negative/positive boundary cases guard the scope.
+
+## Final internal stage acceptance — 2026-11-18
+
+The final implementation has14 U05 regressions plus the original31 R11 tests (45 focused);64 related tests including the platform contract pass. Independent re-review005 closes R01-R10;006 accepts the exact typed-fact static exception. Final source9564ac325fb3c6227551e32653dde42211c25531/tree3250685920640dd30615769c08fbe5e8229f1ad7 passed CN02Python3.10.12 make check:9450 passed,35 skipped,63 warnings. Existing optional torch/sklearn/runtime skips are retained. Final wall872.105686s, script CPU853.260649s, peak process-group RSS980877312 bytes; no guard fired. Hosted CI was not used.
+
+Ordinary PR704 merge1ad3fa5f5c9ee7238f168a3a29259ceba141e715 into the continuation branch has exactly this tree. The initial rejected candidate, subsequent R08-R10 repairs, superseded full run and one platform-rule full failure remain preserved in the same acceptance envelope. The platform failure exposed a missed focused regression; package003 now requires that existing module before a full run.006's134s self clock interval omits earlier turn time: native full-turn556.162s, at least256.162s over the300s cap, is separately recorded.
+
+This first durable-fact asset is accepted for the next synthetic integration. Package003 was dispatched under existing Owner authority and observed active: full typed FundingState restore plus same-core first entry/buy atomic account/funding bridge. Full sell/settlement/two-cycle/late-fee integration, qualified research comparison and daily-use acceptance remain open under700.
+
+Receipts: `/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-u05-review-003/engineering-acceptance.json`, `native-evidence/final/check-receipt.json`, `merge704-commit.json` and `review006-native-timing.json`.

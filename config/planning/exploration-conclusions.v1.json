@@ -2817,6 +2817,87 @@
         "CP-690-R11-FINAL-ACCEPTED-20261116"
       ],
       "supersedes": "CON-R11-LIMITED-SYNTHETIC-PARK-20261116"
+    },
+    {
+      "id": "CON-R11-U05-FIRST-FACTS-20261118",
+      "recorded_at": "2026-11-17T18:23:59.645568+00:00",
+      "actor": "Quanthus research lead Sol after exact native and ordinary child merge",
+      "question_id": "R11-U05-DURABLE-FACTS-001",
+      "family": "r11-d1b-fixed-reserve",
+      "work_item": "P11-R11-USE-002",
+      "modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "question": "Can the first synthetic account baseline, buy/confirmed fee and correction be received durably and posted atomically with replay, revision, rollback and cold rebuild?",
+      "consumer": "P11 complete comparison adapter and P12 next same-core funding/account transaction bridge",
+      "scope": "Only the first synthetic single-fill/per-report-confirmed-fee fact slice at9564, ordinary continuation merge1ad3; no full funding-cycle or actual/daily profile.",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Bounded reusable synthetic engineering asset accepted internally; R11 complete research unanswered and daily use incomplete.",
+      "decision_effect": "Reuse this exact fact base for package003 typed funding-state and first reservation/buy atomic bridge. Keep the original complete research and daily-use goal open.",
+      "reopen_conditions": [
+        "Further semantic changes require exact-source focused/platform checks and scoped review before final native acceptance.",
+        "Full comparison and daily use still require original U01-U08 purpose/source/PIT/expert/account/consumer gates; earlier R6-R11 exposure, failures and costs carry forward."
+      ],
+      "retained_assets": [
+        "Pure account/execution fact types and neutral contracts; runtime account/mode authorization independent of business DTO.",
+        "SQLite raw reception and atomic business posting/correction/replay/CAS/reassessment/outbox and cold reconstruction.",
+        "Original rejected return, all R01-R10 witnesses/repairs/reviews and full failed/superseded/final native logs."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "This first slice took substantial repair. DS full3182.252105s exceeded2700 by482.252105s;006 native556.162s exceeded300 by256.162s. Failed native886.497125s wall/868.305056CPU; superseded383.754316s wall with whole descendant CPU unknown_not_zero; final872.105686s wall/853.260649CPU and980877312peakRSS. Prior cash native877.590CPU, all older R6-R11 costs and model/unmeasured costs retained. Reuse accepted facts/calculations and check platform seam before future full runs.",
+      "attempt_refs": [
+        "sol-u05-review-003/native-evidence/prior-readback.json",
+        "sol-u05-review-003/native-evidence/final-readback.json",
+        "sol-u05-review-003/review006-native-timing.json",
+        "ds-u05-002/MANIFEST.json"
+      ],
+      "evidence": [
+        {
+          "id": "U05-INTERNAL-NATIVE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-u05-review-003/native-evidence/final/check-receipt.json",
+          "sha256": "c4a71e6a5f2b544c652e68b0423f9c8bd4a8adb52a3ad3a10b407902a8c1f1c8",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact9564 synthetic-source full make check9450/35 in CN02Python3.10.12."
+        },
+        {
+          "id": "U05-REVIEWED-STAGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-u05-review-003/engineering-acceptance.json",
+          "sha256": "c3c2f38761bfa966860f7691f3dc588b257dd0d66cc3d0b840345ef56e1007e2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal acceptance of first durable synthetic fact slice only; complete R11 remains open."
+        },
+        {
+          "id": "U05-ORDINARY-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-u05-review-003/merge704-commit.json",
+          "sha256": "ce888bf732db0782c98c92b9e099ed32f9bd4b6181ee81ab24d6b4d90f969169",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary continuation-branch merge704 has exactly the tested source tree."
+        },
+        {
+          "id": "U05-NATIVE-REVIEW-TIMING",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-u05-review-003/review006-native-timing.json",
+          "sha256": "488fd38b3e1ebc1821d1c4fc731bcd86ad8c4a88ca1616c13af1fa1418813d29",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Actual006 native whole-turn cost reconciliation; semantic review and budget compliance separately recorded."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-700-U05-FIRST-FACTS-ACCEPTED-BRIDGE-20261118"
+      ],
+      "supersedes": null
     }
   ]
 }

@@ -29,3 +29,7 @@ The original e41e2bde candidate was rejected by independent internal review (R01
 Account/mode-scoped canonical receipt/event/source identities, original baseline payload/result replay, raw report/correction receive times, neutral capability primitives, named dependent-plan reassessment in the same transaction, pending reconciliation on insufficient cash, correction rollback and old-schema rejection are verified by boundary regressions. Current code has 12 U05 tests plus the original31 R11 tests; exact final native acceptance and revised independent review are recorded in the delivery receipts.
 
 The first slice uses explicitly confirmed per-report fees in a single-fill fixture. Complete order/day fee coverage, full account producer mapping, same-core two-cycle funding, actual/daily modes and U06/U07/U08 remain open.
+
+## Platform static boundary integration
+
+The existing platform boundary check matched the substring `execution` and therefore rejected the new public fact types. The reviewed P12 v1.1 infrastructure direction is implemented by a versioned exact-file/module/name declaration: only `adapters/product_daily_facts_sqlite.py` may import `Correction`, `ExecutionReport`, `SyntheticContext` and `validate_context` from the public facts capability. Other platform files, broker/strategy engines, star imports and new action functions retain the original prohibition. This declaration grants no runtime capability or mode admission. Five negative/positive boundary cases guard the scope.

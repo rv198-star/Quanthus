@@ -271,7 +271,6 @@ class RiskSnapshot:
             "as_of": self.as_of.isoformat(),
             "equity": decimal_text(self.equity),
             "cash_available": decimal_text(self.cash_available),
-            "cash_before_internal_holds": decimal_text(self.cash_before_internal_holds),
             "positions": [item.to_dict() for item in self.positions],
             "pending_buys": [item.to_dict() for item in self.pending_buys],
             "pending_sells": [item.to_dict() for item in self.pending_sells],

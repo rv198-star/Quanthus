@@ -15361,6 +15361,45 @@
         "REPRO",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-R11-CASH-INTERNAL-20261117",
+      "recorded_at": "2026-11-17T14:50:35.345058+00:00",
+      "actor": "Quanthus researchlead Sol after completed A_PARTIAL",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Receive fixedA/d72 completed partial with30focused and noLinuxrun; ordinary local merge preserves originalcandidate, repair witnessed redundant canonical input alias,31focused pass; exact SSH native acceptance pending.",
+      "evidence": [
+        {
+          "id": "CASH-LEGACY-PAYLOAD-BEFORE",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/lead-b-review-001/legacy-payload-before.json",
+          "sha256": "5ee5f74c33524764bdffca77be772675b7c05f19a97f97399ed5c59a4a90adbc",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Public old-shaped identical command witnesses new alias idempotency regression; targeted correction/internal evidence only."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Necessary synthetic repair still awaits exact final Linux acceptance. Original scientific conclusions, U02/PIT/account/expert dependencies and daily admission remain unchanged.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T12:05:08Z",
+          "body_sha256": "a955f2433a8d407393febbc8c6c3345d621ec9455faf9f24712bcb8380b0d06b"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

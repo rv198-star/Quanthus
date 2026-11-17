@@ -363,3 +363,32 @@ def test_pc14_duplicate_pending_reservation_identity_is_rejected() -> None:
             cash_available=_dec("10000"),
             pending_buys=(pending, pending),
         )
+
+
+def test_pc15_legacy_snapshot_shape_keeps_command_identity_and_replay() -> None:
+    state, args, _ = _entry_inputs()
+    snapshot = args["snapshot"]
+    legacy_snapshot = {
+        "snapshot_id": snapshot.snapshot_id,
+        "as_of": snapshot.as_of.isoformat(),
+        "equity": "20000",
+        "cash_available": "20000",
+        "positions": [],
+        "pending_buys": [],
+        "pending_sells": [],
+        "recognized_payables": "0",
+    }
+    assert snapshot.to_dict() == legacy_snapshot
+    assert snapshot.cash_before_internal_holds == snapshot.cash_available
+    legacy_payload = {**entry_invocation_payload(**args), "snapshot": legacy_snapshot}
+    legacy_command = CommandEnvelope.create("legacy-issued-entry", legacy_payload, state.revision)
+    first = decide_entry(funding=state, command=legacy_command, **args)
+    assert first.accepted and first.quantity is not None
+    assert first.quantity.quantity == 500
+    original_result = first.funding_state.entry_reservations[0].result
+    replay = decide_entry(funding=first.funding_state, command=legacy_command, **args)
+    assert replay.replayed and replay.quantity is not None
+    assert replay.quantity.quantity == first.quantity.quantity
+    assert replay.digest == first.digest
+    assert replay.funding_ledger_entries == ()
+    assert replay.funding_state.entry_reservations[0].result == original_result

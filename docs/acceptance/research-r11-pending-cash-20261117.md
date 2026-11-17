@@ -83,3 +83,7 @@ Local focused regression: `30 passed` on macOS Python 3.14. The accepted runtime
 compile-checked with Python 3.10; Ruff check/format and affected-module mypy pass. A fresh Python
 3.10 Linux `make check` on the exact final GitHub commit is recorded in the delivery package rather
 than inferred from the prior accepted `1.2.0` suite.
+
+## Sol integration: canonical input identity
+
+The first1.2.1 candidate d72ba3d adds a redundant cash alias to RiskSnapshot serialization. An independently reconstructed legacy-issued public command then fails idempotency_conflict despite identical cash facts. Sol retained the input's original eight-field canonical snapshot shape, kept cash diagnostics in the result and added PC15: legacy-shaped command acceptance and unchanged replay quantity/result/no new postings. All31 focused tests pass locally. The exact final Linux whole-source check follows this integration; no full-check pass is claimed here. Source and result interface versions remain explicit1.2.1/risk1.0.2, with current synthetic-only consumer scope.

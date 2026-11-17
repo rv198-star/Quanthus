@@ -1,7 +1,7 @@
 {
   "schema_version": "quanthus.r11.implementation-policy.v1",
   "policy_id": "r11-shared-daily-policy-core",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "contract": "research-contract.v1.0.1.json",
   "contract_semantic_digest": "sha256:e09576758b35283cc1971e8f741d87abab26601964c8315e3e2b7db3d76823aa",
   "authority": {
@@ -42,7 +42,10 @@
   },
   "risk": {
     "policy_id": "r11-account-risk-policy",
-    "version": "1.0.1",
+    "version": "1.0.2",
+    "cash_basis": "canonical_cash_before_internal_holds",
+    "pending_cash_commitment": "unique_pending_principal_plus_unrecognized_fee",
+    "pending_cash_contract": "continuation-001/pending-cash-contract.v1.json",
     "denominator": "conservative_post_fill_equity_floor",
     "ratio_domain": [
       "0",
@@ -51,6 +54,8 @@
     "whole_lot_only": true,
     "pending_sell_releases_capacity": false,
     "recognized_payables_charged_twice": false,
+    "pending_principal_price": "price_bound",
+    "exposure_price": "max_mark_price_price_bound",
     "reason_order": [
       "INPUT_UNAVAILABLE",
       "POLICY_NOT_ADOPTED",

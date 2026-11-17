@@ -22,8 +22,13 @@ def test_selected_contract_and_implementation_policy_are_cross_bound() -> None:
     assert current["semantic_digest"] == contract["semantic_digest"]
     assert implementation["contract_semantic_digest"] == contract["semantic_digest"]
     assert implementation["contract"] == current["contract"]
-    assert implementation["version"] == "1.2.0"
-    assert implementation["risk"]["version"] == contract["risk_policy"]["version"]
+    assert implementation["version"] == "1.2.1"
+    assert contract["risk_policy"]["version"] == "1.0.1"
+    assert implementation["risk"]["version"] == "1.0.2"
+    assert implementation["risk"]["cash_basis"] == "canonical_cash_before_internal_holds"
+    assert implementation["risk"]["pending_cash_contract"] == (
+        "continuation-001/pending-cash-contract.v1.json"
+    )
     assert implementation["quality_repair"]["findings"] == [
         "R1",
         "R2",

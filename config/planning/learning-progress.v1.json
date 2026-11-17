@@ -15819,6 +15819,86 @@
           "body_sha256": "9ed266ae3ed5881f1fe054df5fbde144f5be112db7604a01d2d6355b61bbce7f"
         }
       ]
+    },
+    {
+      "id": "CP-700-TWOCYCLE004-R1-REJECTED-R2-20261118",
+      "recorded_at": "2026-11-17T23:00:13.127956+00:00",
+      "actor": "Sol after independent012 and root realSQLite witnesses",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "rejected",
+      "summary": "R1closesTC02; originalTC01/TC03/TC04remain.3L5S selects one bounded common root correction R2, observedactive.",
+      "evidence": [
+        {
+          "id": "TWOCYCLE-R1-REVIEW012",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-u05-two-cycle-r1-review-012/review.json",
+          "sha256": "bf2cda69469bb0708150d70653c297236bb9ccae1f95a9dcede8619c75f739db",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact017R1 rejected;TC02closed andTC01/03/04open.OriginalS01-S09engineeringonly."
+        },
+        {
+          "id": "TWOCYCLE-R1-ROOT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/r1-review-disposition.json",
+          "sha256": "73cf10cb415dec871b1ef65d2821ac3b5696e48860bca88c7bed0cd0e32beea5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact017R1 rejected;TC02closed andTC01/03/04open.OriginalS01-S09engineeringonly."
+        },
+        {
+          "id": "TWOCYCLE-R1-ROOT-STRATEGY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/R1-ROOT-CAUSE-AND-R2.md",
+          "sha256": "85e2e9cd9391eaa86d54ebe616069667086dc768a17831bcd9ffc4236de0e842",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact017R1 rejected;TC02closed andTC01/03/04open.OriginalS01-S09engineeringonly."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Partial repair of an unaccepted candidate changes no current module maturity or admission; original firstbridge and full mission retained.",
+      "reviewed_modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "issue_observations": []
+    },
+    {
+      "id": "CP-700-TWOCYCLE004-R1-METADATA-20261118",
+      "recorded_at": "2026-11-17T23:09:30.624219+00:00",
+      "actor": "Quanthus Sol",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "no_module_change",
+      "summary": "Updated parent/current briefs to exact rejected017R1 and common root correctionR2active; no module promotion,013parameterproposal remains proposed.",
+      "evidence": [
+        {
+          "id": "R11-RECOVERY-METADATA",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/r1-live-metadata-reconciliation.json",
+          "sha256": "4b8590f0711eebf3a7e21870ab21bf7a632fac6c1a0ba5a5126d0246c3c9bf0c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact parent/child current-body and OPEN state reconciliation only."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Current brief and metadata synchronization; original004 candidate remains rejected and R1active. No module maturation or admission.",
+      "reviewed_modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T23:06:39Z",
+          "body_sha256": "08bdde1fe699e889827ba3f8842ef100c71c34c2a628afe30574524a8a5850d9"
+        }
+      ]
     }
   ],
   "history_imports": [

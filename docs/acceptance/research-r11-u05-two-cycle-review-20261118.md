@@ -11,3 +11,13 @@ One groupedR1 addresses actual scoped conflict readiness with commit protection,
 The35min complete-turn guard endsUTC22:55:45.692804, with final5min packaging;300scriptCPU/1GiBRSS/64MiB. Original004 native turn3894.314seconds, dispatch-to-completion approximately4083.413seconds;010native589.292seconds and full dispatch-to-completion approximately626.297seconds. Unknown scriptCPU/RSS/modelcosts remain unknown_not_zero. Root witnesses ran successfully on exact candidate; model/controltotal unmeasured. Existing maintenance methods apply; key method retained: verify immutable source, caller clock and original result identity alongside money-state stories before full acceptance.
 
 Evidence: `/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/`; original and010 returns in sibling durable directories, groupedrepair in `repair-004-r1/`. WholeR11 remainsOPEN, researchunanswered, dailyuseincomplete; audit waits complete-use package. No market/reference/training/capital/daily/production work.
+
+## R1 exact-source feedback and root correction
+
+R1source017dcde939cea7be01bb4f41063e87e6c21662e7/tree0444bb66eac51e3491f00f2fdbc2b5ca1123949a is **CHANGES_REQUIRED** after independent012/root.19payload/429321bytes, tar and13readonlyfiles verified.78relatedpass; original S01-S09end21380/20000/1380andninejournalrows retained.
+
+TC02immutableRECEIVEDraw isclosed. TC01same-IDpostedsell12→11throwsconflictwithoutregister,UNRESOLVED0andsettlementaccepted. TC03selloccurred11-17postsagainstbuyoccurred11-18. TC04deletingderivedobligationcachecausesStopIteration;historicalinputsarestillreadfromfinalcache. Existingcache-receiptcorruptionrejectionisusefulpartial evidence, whileoriginalresultreconstructionremainsrequired.
+
+3L5Srootreviewchoosesonecommonadmission/snapshot/reducerrepair. Preserve same-IDandaliaswitnesses; matchsourcechronologywithoutforbiddinglegitimatelatefees; deriveobligations/lots/canonicalresultsfrombaseline+journalandcomparefinalcacheasoutput. Noadditionalplatformorresearch. IfsamecommonpathsremaininvalidafterR2,returnstructuralgap/cumulativecostfordirectionreviewbeforeanotherimplementationtranche.
+
+R2observedactive onoriginalbranch/PR706, UTC22:56:44.629739..23:41:44.629739 (Beijing06:56..07:41),last7minpackaging;45minwholeturn/300CPU/1GiB/64MiB areoperatingguardswithinexistingauthority.Allpriorcostsretained.R1native1676.387s/full1727.307196s;012native266.909s/fullapproximately300.339067s.UnmeasuredCPU/RSS/model/controlunknown_not_zero.No fullnativeon rejectedR1. Evidenceinsol-two-cycle-006/r1-review-disposition.json,ds-u05-two-cycle-r1-review-012andrepair-004-r2.

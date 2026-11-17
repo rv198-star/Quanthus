@@ -3048,6 +3048,79 @@
         "CP-700-FIRST-FUNDING-ACCOUNT-BRIDGE-ACCEPTED-20261118"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R11-TWOCYCLE004-R1-REJECTED-20261118",
+      "recorded_at": "2026-11-17T23:00:13.127956+00:00",
+      "actor": "Quanthus Sol after independent012 and3L5S root review",
+      "question_id": "R11-U05-COMPLETE-TWO-CYCLE-004-R1",
+      "family": "r11-d1b-fixed-reserve",
+      "work_item": "P11-R11-USE-002",
+      "modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "question": "Does exactR1 actually close originalTC01-TC04 across all immutable identities, matched chronology and cache-independent original result reconstruction?",
+      "consumer": "P11 comparison adapter and P12 original complete two-cycle engineering",
+      "scope": "Exact017dcde/tree0444bb66 originalU05R1 only;78focused andS01-S09retained.",
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "reject_candidate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "TC02closed;TC01/TC03/TC04remainHIGH;R1notaccepted.Originalfirstbridge and fullR11scope retained.",
+      "decision_effect": "Use one bounded45minR2 common admission/snapshot/reducer root replacement; no fullnative on rejectedR1. If exact common paths still fail afterR2, review direction/cumulative cost before another implementation tranche.",
+      "reopen_conditions": [
+        "Repaired exact source closes TC01-TC04 with meaningful public/realSQLite witnesses and preserves original13file/72test closure.",
+        "Only after exact revised semantic review run final composed-source native acceptance; market comparison and daily use retain original qualification gates."
+      ],
+      "retained_assets": [
+        "Actual public two-cycle S01-S09 expected amounts, balanced sell postings, original settlement and old-cycle late-fee reserve behavior.",
+        "Immutable original004 source/return, independent010, root raw/clock/cached-receipt witnesses, all failed attempts and previous acceptance/costs."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "R1native1676.387s;dispatch-to-finalapproximately1727.307196s within2100s.012native266.909s;dispatch-to-finalapproximately300.339067s within720s.78focused2.63s.Original004/010/011 and all older failures/exposure/cost retained; CPU/RSS/model/controlunmeasuredunknown_not_zero.3L5S finds case-specific short-circuits and cache ownership gaps; finite root correction has direct K2/comparison validity value and creates no new platform or research trial.",
+      "attempt_refs": [
+        "ds-u05-two-cycle-004-r1/MANIFEST.json",
+        "ds-u05-two-cycle-r1-review-012/MANIFEST.json",
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/r1_boundary_witness.py",
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/r1-review-disposition.json",
+        "repair-004-r2/MANIFEST.json"
+      ],
+      "evidence": [
+        {
+          "id": "TWOCYCLE-R1-REVIEW012",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-u05-two-cycle-r1-review-012/review.json",
+          "sha256": "bf2cda69469bb0708150d70653c297236bb9ccae1f95a9dcede8619c75f739db",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact017R1 rejected;TC02closed andTC01/03/04open.OriginalS01-S09engineeringonly."
+        },
+        {
+          "id": "TWOCYCLE-R1-ROOT",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/r1-review-disposition.json",
+          "sha256": "73cf10cb415dec871b1ef65d2821ac3b5696e48860bca88c7bed0cd0e32beea5",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact017R1 rejected;TC02closed andTC01/03/04open.OriginalS01-S09engineeringonly."
+        },
+        {
+          "id": "TWOCYCLE-R1-ROOT-STRATEGY",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-two-cycle-006/R1-ROOT-CAUSE-AND-R2.md",
+          "sha256": "85e2e9cd9391eaa86d54ebe616069667086dc768a17831bcd9ffc4236de0e842",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Exact017R1 rejected;TC02closed andTC01/03/04open.OriginalS01-S09engineeringonly."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-700-TWOCYCLE004-R1-REJECTED-R2-20261118",
+        "CP-700-FIRST-FUNDING-ACCOUNT-BRIDGE-ACCEPTED-20261118"
+      ],
+      "supersedes": null
     }
   ]
 }

@@ -15,22 +15,38 @@ from quanthus.product_daily.application.models import (
     Baseline,
     CorrectionResult,
     SubmissionResult,
+    SyntheticRuntimeAuthorization,
 )
 from quanthus.product_daily.application.ports import SyntheticFactsPort
+from quanthus.shared.fact_contracts import FactError
 
 
 class SyntheticFactService:
-    def __init__(self, port: SyntheticFactsPort) -> None:
+    def __init__(
+        self,
+        port: SyntheticFactsPort,
+        authorized_context: SyntheticContext,
+        authorization: SyntheticRuntimeAuthorization,
+    ) -> None:
         self._port = port
+        authorization.require(authorized_context)
+        self._authorization = authorization
+        self._authorized_context = validate_context(authorized_context)
+
+    def _authorize(self, context: SyntheticContext) -> SyntheticContext:
+        validated = validate_context(context)
+        self._authorization.require(validated)
+        if validated != self._authorized_context:
+            raise FactError("UNAUTHORIZED_CONTEXT", "account or trusted baseline context differs")
+        return validated
 
     def establish_baseline(self, baseline: Baseline) -> AccountProjection:
-        context = validate_context(baseline.context)
-        if context.as_of != baseline.context.as_of:
-            raise AssertionError("unreachable context drift")
+        self._authorize(baseline.context)
+        baseline.__post_init__()
         return self._port.establish_baseline(baseline)
 
     def submit_report(self, context: SyntheticContext, report: ExecutionReport) -> SubmissionResult:
-        validated = validate_context(context)
+        validated = self._authorize(context)
         validate_report(report)
         receipt = self._port.receive_report(validated, report)
         if receipt.status == "IDEMPOTENCY_CONFLICT":
@@ -43,10 +59,10 @@ class SyntheticFactService:
         return self._port.post_report(validated, receipt, report)
 
     def correct_fact(self, context: SyntheticContext, correction: Correction) -> CorrectionResult:
-        return self._port.correct_fact(validate_context(context), validate_correction(correction))
+        return self._port.correct_fact(self._authorize(context), validate_correction(correction))
 
     def projection(self, context: SyntheticContext) -> AccountProjection:
-        return self._port.projection(validate_context(context))
+        return self._port.projection(self._authorize(context))
 
     def rebuild(self, context: SyntheticContext) -> AccountProjection:
-        return self._port.rebuild(validate_context(context))
+        return self._port.rebuild(self._authorize(context))

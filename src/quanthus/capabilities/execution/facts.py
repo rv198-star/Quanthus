@@ -6,35 +6,35 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from quanthus.product_daily.contracts import ProductDailyError, digest
+from quanthus.shared.fact_contracts import FactError, digest
 
 
 def _text(value: object, name: str) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise ProductDailyError("INVALID_REPORT_SHAPE", f"{name} is required")
+        raise FactError("INVALID_REPORT_SHAPE", f"{name} is required")
     return value
 
 
 def _aware(value: object, name: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
-        raise ProductDailyError("INVALID_REPORT_SHAPE", f"{name} must be aware")
+        raise FactError("INVALID_REPORT_SHAPE", f"{name} must be aware")
     return value
 
 
 def _money(value: object, name: str, *, positive: bool = False) -> Decimal:
     if not isinstance(value, Decimal) or not value.is_finite():
-        raise ProductDailyError("INVALID_REPORT_SHAPE", f"{name} must be finite Decimal")
+        raise FactError("INVALID_REPORT_SHAPE", f"{name} must be finite Decimal")
     exponent = value.as_tuple().exponent
     if isinstance(exponent, int) and exponent < -2:
-        raise ProductDailyError("INVALID_REPORT_SHAPE", f"{name} supports at most 2 decimals")
+        raise FactError("INVALID_REPORT_SHAPE", f"{name} supports at most 2 decimals")
     if value < 0 or (positive and value == 0):
-        raise ProductDailyError("INVALID_REPORT_SHAPE", f"{name} is out of range")
+        raise FactError("INVALID_REPORT_SHAPE", f"{name} is out of range")
     return value
 
 
 def _quantity(value: object, name: str = "quantity") -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-        raise ProductDailyError("INVALID_REPORT_SHAPE", f"{name} must be a positive integer")
+        raise FactError("INVALID_REPORT_SHAPE", f"{name} must be a positive integer")
     return value
 
 
@@ -45,22 +45,21 @@ class SyntheticContext:
     source_id: str
     as_of: datetime
     coverage_id: str
-    trusted_synthetic: bool
 
     def __post_init__(self) -> None:
         for name in ("account_id", "mode", "source_id", "coverage_id"):
             _text(getattr(self, name), name)
         _aware(self.as_of, "as_of")
-        if not isinstance(self.trusted_synthetic, bool):
-            raise ProductDailyError("UNAUTHORIZED_CONTEXT", "trusted flag must be boolean")
 
 
 def validate_context(context: SyntheticContext) -> SyntheticContext:
+    if not isinstance(context, SyntheticContext):
+        raise FactError("UNAUTHORIZED_CONTEXT", "typed trusted context required")
     context.__post_init__()
-    if context.mode != "synthetic" or not context.trusted_synthetic:
-        raise ProductDailyError("UNAUTHORIZED_CONTEXT", "only trusted synthetic mode is admitted")
+    if context.mode != "synthetic":
+        raise FactError("UNAUTHORIZED_CONTEXT", "only trusted synthetic mode is admitted")
     if not context.account_id.startswith("SYN-"):
-        raise ProductDailyError("UNAUTHORIZED_CONTEXT", "synthetic account must use SYN-")
+        raise FactError("UNAUTHORIZED_CONTEXT", "synthetic account must use SYN-")
     return context
 
 
@@ -82,7 +81,7 @@ class ExecutionReport:
         for name in ("report_id", "security_code", "source_id", "source_sequence"):
             _text(getattr(self, name), name)
         if self.side != "buy":
-            raise ProductDailyError("UNSUPPORTED_FACT", "slice supports confirmed buys")
+            raise FactError("UNSUPPORTED_FACT", "slice supports confirmed buys")
         _quantity(self.quantity)
         _quantity(self.intended_quantity, "intended_quantity")
         _money(self.price, "price", positive=True)
@@ -96,7 +95,7 @@ class ExecutionReport:
 
     @property
     def source_fact_id(self) -> str:
-        return f"{self.source_id}:{self.source_sequence}"
+        return digest([self.source_id, self.source_sequence])
 
     @property
     def deviations(self) -> tuple[str, ...]:
@@ -113,13 +112,13 @@ class ExecutionReport:
             "security_code": self.security_code,
             "side": self.side,
             "quantity": self.quantity,
-            "price": format(self.price, "f"),
-            "confirmed_fee": format(self.confirmed_fee, "f"),
+            "price": format(self.price.quantize(Decimal("0.01")), "f"),
+            "confirmed_fee": format(self.confirmed_fee.quantize(Decimal("0.01")), "f"),
             "occurred_at": self.occurred_at.isoformat(),
             "source_id": self.source_id,
             "source_sequence": self.source_sequence,
             "intended_quantity": self.intended_quantity,
-            "intended_price_cap": format(self.intended_price_cap, "f"),
+            "intended_price_cap": format(self.intended_price_cap.quantize(Decimal("0.01")), "f"),
         }
 
 
@@ -145,7 +144,7 @@ class Correction:
             or isinstance(self.expected_fact_revision, bool)
             or self.expected_fact_revision <= 0
         ):
-            raise ProductDailyError("INVALID_REPORT_SHAPE", "bad expected_fact_revision")
+            raise FactError("INVALID_REPORT_SHAPE", "bad expected_fact_revision")
         _quantity(self.quantity)
         _money(self.price, "price", positive=True)
 
@@ -157,7 +156,7 @@ class Correction:
                 "fact_id": self.fact_id,
                 "expected_fact_revision": self.expected_fact_revision,
                 "quantity": self.quantity,
-                "price": format(self.price, "f"),
+                "price": format(self.price.quantize(Decimal("0.01")), "f"),
                 "reason": self.reason,
             }
         )

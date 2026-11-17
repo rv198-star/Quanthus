@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from quanthus.product_daily.contracts import ProductDailyError, digest
+from quanthus.shared.fact_contracts import FactError, digest
 
 
 @dataclass(frozen=True)
@@ -19,9 +19,9 @@ class Position:
             or not isinstance(self.quantity, int)
             or isinstance(self.quantity, bool)
         ):
-            raise ProductDailyError("INVALID_REPORT_SHAPE", "invalid position")
+            raise FactError("INVALID_REPORT_SHAPE", "invalid position")
         if self.quantity < 0:
-            raise ProductDailyError("NEGATIVE_POSITION", "position cannot be negative")
+            raise FactError("NEGATIVE_POSITION", "position cannot be negative")
 
     def to_dict(self) -> dict[str, object]:
         return {"security_code": self.security_code, "quantity": self.quantity}
@@ -34,7 +34,7 @@ class Posting:
 
     def __post_init__(self) -> None:
         if not self.account or not self.amount.is_finite():
-            raise ProductDailyError("INVALID_REPORT_SHAPE", "invalid posting")
+            raise FactError("INVALID_REPORT_SHAPE", "invalid posting")
 
     def to_dict(self) -> dict[str, str]:
         return {"account": self.account, "amount": format(self.amount, "f")}
@@ -74,7 +74,7 @@ def apply_buy_postings(principal: Decimal, fee: Decimal) -> tuple[Posting, ...]:
         Posting("EXPENSE_CONFIRMED_FEE", fee),
     )
     if sum((item.amount for item in postings), Decimal("0")) != 0:
-        raise ProductDailyError("UNBALANCED_POSTING", "buy postings must sum to zero")
+        raise FactError("UNBALANCED_POSTING", "buy postings must sum to zero")
     return postings
 
 
@@ -89,7 +89,7 @@ def apply_buy_delta(
     principal = (price * quantity).quantize(Decimal("0.01"))
     cash = (projection.cash - principal - fee).quantize(Decimal("0.01"))
     if cash < 0:
-        raise ProductDailyError("INSUFFICIENT_CASH", "confirmed buy exceeds cash")
+        raise FactError("INSUFFICIENT_CASH", "confirmed buy exceeds cash")
     quantities = {item.security_code: item.quantity for item in projection.positions}
     quantities[security_code] = quantities.get(security_code, 0) + quantity
     positions = tuple(Position(code, qty) for code, qty in sorted(quantities.items()) if qty)
@@ -116,19 +116,22 @@ def apply_correction_delta(
     quantities = {item.security_code: item.quantity for item in projection.positions}
     quantities[security_code] = quantities.get(security_code, 0) + quantity_delta
     if any(value < 0 for value in quantities.values()):
-        raise ProductDailyError("NEGATIVE_POSITION", "correction cannot create negative position")
+        raise FactError("NEGATIVE_POSITION", "correction cannot create negative position")
+    cash = (projection.cash + cash_delta).quantize(Decimal("0.01"))
+    if cash < 0:
+        raise FactError("INSUFFICIENT_CASH", "correction requires cash reconciliation")
     positions = tuple(Position(code, qty) for code, qty in sorted(quantities.items()) if qty)
     postings = (
         Posting("ASSET_CASH", cash_delta),
         Posting("ASSET_POSITION", principal_delta),
     )
     if sum((item.amount for item in postings), Decimal("0")) != 0:
-        raise ProductDailyError("UNBALANCED_POSTING", "correction postings must sum to zero")
+        raise FactError("UNBALANCED_POSTING", "correction postings must sum to zero")
     return (
         AccountProjection(
             projection.revision + 1,
             projection.event_sequence + 1,
-            (projection.cash + cash_delta).quantize(Decimal("0.01")),
+            cash,
             positions,
             projection.fact_count,
         ),

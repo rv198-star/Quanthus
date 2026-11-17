@@ -21,3 +21,11 @@ non-bool quantities and fact-revision CAS fail closed.
 Evidence: 3 new tests pass; original 31 R11 tests pass; Ruff, affected mypy and Python 3.10 compile
 pass; maintenance selection completed. Full cross-cycle funding integration, actual/daily account
 profiles, HTTP/UI and production composition remain outside this slice.
+
+## Sol internal review repair
+
+The original e41e2bde candidate was rejected by independent internal review (R01-R04 high, R05-R07 medium); its immutable return and witnesses are retained. Revised application services require an explicit immutable runtime account allowlist supplied by trusted composition, separate from every business context. A business context has no trust boolean. The SQLite composition factory is trusted bootstrap, not a report endpoint.
+
+Account/mode-scoped canonical receipt/event/source identities, original baseline payload/result replay, raw report/correction receive times, neutral capability primitives, named dependent-plan reassessment in the same transaction, pending reconciliation on insufficient cash, correction rollback and old-schema rejection are verified by boundary regressions. Current code has 12 U05 tests plus the original31 R11 tests; exact final native acceptance and revised independent review are recorded in the delivery receipts.
+
+The first slice uses explicitly confirmed per-report fees in a single-fill fixture. Complete order/day fee coverage, full account producer mapping, same-core two-cycle funding, actual/daily modes and U06/U07/U08 remain open.

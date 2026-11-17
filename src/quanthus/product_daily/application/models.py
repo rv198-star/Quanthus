@@ -7,9 +7,33 @@ from decimal import Decimal
 
 from quanthus.capabilities.accounting import AccountProjection
 from quanthus.capabilities.execution import SyntheticContext
-from quanthus.product_daily.contracts import ProductDailyError
+from quanthus.shared.fact_contracts import FactError, digest
 
 POLICY_REFERENCE = "p12-synthetic-facts-0.1"
+
+
+@dataclass(frozen=True)
+class SyntheticRuntimeAuthorization:
+    """Trusted composition configuration; never populated from a fact/report request."""
+
+    authority_id: str
+    allowed_accounts: frozenset[str]
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.authority_id, str)
+            or not self.authority_id.strip()
+            or not isinstance(self.allowed_accounts, frozenset)
+        ):
+            raise FactError("UNAUTHORIZED_CONTEXT", "explicit runtime authority required")
+        if not self.allowed_accounts or any(
+            not isinstance(x, str) or not x.startswith("SYN-") for x in self.allowed_accounts
+        ):
+            raise FactError("UNAUTHORIZED_CONTEXT", "synthetic allowlist required")
+
+    def require(self, context: SyntheticContext) -> None:
+        if context.mode != "synthetic" or context.account_id not in self.allowed_accounts:
+            raise FactError("UNAUTHORIZED_CONTEXT", "account not admitted by runtime policy")
 
 
 @dataclass(frozen=True)
@@ -20,16 +44,53 @@ class Baseline:
     quantity: int
     security_code: str
     unsettled_quantity: int
+    dependent_plan_ids: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        if not self.request_id or not self.security_code:
-            raise ProductDailyError("INVALID_REPORT_SHAPE", "baseline identity is required")
-        if not self.cash.is_finite() or self.cash < 0:
-            raise ProductDailyError("INVALID_REPORT_SHAPE", "baseline cash is invalid")
+        if any(
+            not isinstance(x, str) or not x.strip() for x in (self.request_id, self.security_code)
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "baseline identity is required")
+        if not isinstance(self.cash, Decimal) or not self.cash.is_finite() or self.cash < 0:
+            raise FactError("INVALID_REPORT_SHAPE", "baseline cash is invalid")
         for name in ("quantity", "unsettled_quantity"):
             value = getattr(self, name)
             if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-                raise ProductDailyError("INVALID_REPORT_SHAPE", f"{name} is invalid")
+                raise FactError("INVALID_REPORT_SHAPE", f"{name} is invalid")
+        if (
+            not isinstance(self.dependent_plan_ids, tuple)
+            or any(not isinstance(x, str) or not x.strip() for x in self.dependent_plan_ids)
+            or len(set(self.dependent_plan_ids)) != len(self.dependent_plan_ids)
+        ):
+            raise FactError("INVALID_REPORT_SHAPE", "explicit unique dependent plans required")
+        exponent = self.cash.as_tuple().exponent
+        if not isinstance(exponent, int) or exponent < -2:
+            raise FactError("INVALID_REPORT_SHAPE", "baseline cash precision is invalid")
+        object.__setattr__(self, "cash", self.cash.quantize(Decimal("0.01")))
+        if self.unsettled_quantity:
+            raise FactError(
+                "UNSUPPORTED_BASELINE_HOLDS",
+                "first slice requires explicitly zero unsettled quantity",
+            )
+
+    @property
+    def payload_digest(self) -> str:
+        c = self.context
+        return digest(
+            {
+                "request_id": self.request_id,
+                "account_id": c.account_id,
+                "mode": c.mode,
+                "source_id": c.source_id,
+                "as_of": c.as_of.isoformat(),
+                "coverage_id": c.coverage_id,
+                "cash": format(self.cash, "f"),
+                "quantity": self.quantity,
+                "security_code": self.security_code,
+                "unsettled_quantity": self.unsettled_quantity,
+                "dependent_plan_ids": self.dependent_plan_ids,
+            }
+        )
 
 
 @dataclass(frozen=True)
@@ -47,6 +108,17 @@ class SubmissionResult:
     projection: AccountProjection
     deviations: tuple[str, ...] = ()
     conflicts: tuple[str, ...] = ()
+    affected_plans: tuple[str, ...] = ()
+
+    @property
+    def current_revision(self) -> int:
+        return self.projection.revision
+
+    @property
+    def next_action(self) -> str:
+        if self.status == "NEEDS_RECONCILIATION":
+            return "RECONCILE_FACTS"
+        return "REASSESS_AFFECTED_PLANS" if self.affected_plans else "NONE"
 
 
 @dataclass(frozen=True)
@@ -57,3 +129,14 @@ class CorrectionResult:
     cash_delta: Decimal
     quantity_delta: int
     conflicts: tuple[str, ...] = ()
+    affected_plans: tuple[str, ...] = ()
+
+    @property
+    def current_revision(self) -> int:
+        return self.projection.revision
+
+    @property
+    def next_action(self) -> str:
+        if self.status == "NEEDS_RECONCILIATION":
+            return "RECONCILE_FACTS"
+        return "REASSESS_AFFECTED_PLANS" if self.affected_plans else "NONE"

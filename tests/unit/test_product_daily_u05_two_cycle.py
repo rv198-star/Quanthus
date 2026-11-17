@@ -255,7 +255,7 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
     ]
 
     first_buy = service.submit_buy(
-        context(),
+        context(datetime(2026, 11, 18, 1, tzinfo=timezone.utc)),
         buy_report(
             "buy-1",
             "SYN001",
@@ -280,7 +280,7 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
         }
     )
     first_sell = service.submit_sell(
-        context(),
+        context(datetime(2026, 11, 19, 1, tzinfo=timezone.utc)),
         sell_report(
             "sell-1",
             "SYN001",
@@ -310,8 +310,28 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
             "quantity": 0,
         }
     )
+    before_sell_alias = service.current(context())
+    with pytest.raises(FactError, match="SOURCE_FACT_DUPLICATE"):
+        service.submit_sell(
+            context(datetime(2026, 11, 19, 2, tzinfo=timezone.utc)),
+            replace(
+                sell_report(
+                    "sell-1",
+                    "SYN001",
+                    first_cycle,
+                    "12",
+                    at=datetime(2026, 11, 19, 1, tzinfo=timezone.utc),
+                    source_sequence="sell-1",
+                ),
+                report_id="sell-1-alias",
+            ),
+            sell_profile("sell-1"),
+        )
+    assert service.current(context()) == before_sell_alias
     first_settlement = service.settle_cycle(
-        context(), settlement_id="settle-1", cycle_id=first_cycle
+        context(datetime(2026, 11, 19, 2, tzinfo=timezone.utc)),
+        settlement_id="settle-1",
+        cycle_id=first_cycle,
     )
     assert first_settlement.funding.bucket("U1").cash == Decimal("20000.00")
     assert first_settlement.funding.reserve == Decimal("1990.00")
@@ -373,13 +393,17 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
         datetime(2026, 11, 20, tzinfo=timezone.utc),
     )
     late = service.apply_late_fee(
-        context(),
+        context(datetime(2026, 11, 20, tzinfo=timezone.utc)),
         late_fact,
     )
     assert late.account.cash == Decimal("21890.00")
     assert late.funding.reserve == Decimal("1890.00")
     assert late.funding.bucket("U1").locked_cycle_budget == Decimal("20000.00")
     assert len(service.risk_snapshot(context(), mark_price=Decimal("10")).pending_buys) == 1
+    before_late_alias = service.current(context())
+    with pytest.raises(FactError, match="SOURCE_FACT_DUPLICATE"):
+        service.apply_late_fee(context(), replace(late_fact, fact_id="late-fee-alias"))
+    assert service.current(context()) == before_late_alias
     actuals.append(
         {
             "id": "S06",
@@ -392,7 +416,7 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
     )
 
     second_buy = service.submit_buy(
-        context(),
+        context(datetime(2026, 11, 20, 1, tzinfo=timezone.utc)),
         buy_report(
             "buy-2",
             "SYN002",
@@ -415,7 +439,7 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
         }
     )
     second_sell = service.submit_sell(
-        context(),
+        context(datetime(2026, 11, 23, 1, tzinfo=timezone.utc)),
         sell_report(
             "sell-2",
             "SYN002",
@@ -444,9 +468,12 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
         }
     )
     second_settlement = service.settle_cycle(
-        context(), settlement_id="settle-2", cycle_id=second_cycle
+        context(datetime(2026, 11, 23, 2, tzinfo=timezone.utc)),
+        settlement_id="settle-2",
+        cycle_id=second_cycle,
     )
-    final = service.current(context())
+    final_at = context(datetime(2026, 11, 23, 2, tzinfo=timezone.utc))
+    final = service.current(final_at)
     assert final.account.cash == final.funding.cash_total == Decimal("21380.00")
     assert final.funding.bucket("U1").cash == Decimal("20000.00")
     assert final.funding.reserve == Decimal("1380.00")

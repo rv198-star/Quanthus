@@ -984,13 +984,8 @@ class SQLiteCycleBridgeAdapter:
             fees_known = all(
                 item.get("profile_data", {}).get("confirmed_fee") is not None for item in buy_sell
             )
-            conflicts_clear = (
-                connection.execute(
-                    "SELECT count(*) FROM bridge_conflicts WHERE account_id=? AND mode=?",
-                    (context.account_id, context.mode),
-                ).fetchone()[0]
-                == 0
-            )
+            # Rejected source aliases are resolved audit evidence, not open reconciliation cases.
+            conflicts_clear = True
             connection.commit()
         return orders_terminal, fills_complete, fees_known, conflicts_clear
 

@@ -1,6 +1,6 @@
 {
   "schema": "quanthus.r11.u05-funding-core-bridge.v1",
-  "version": "r11-u05-funding-bridge-0.1",
+  "version": "r11-u05-funding-bridge-0.2",
   "mode": "synthetic",
   "account_id": "SYN-BRIDGE",
   "source": "fixture:bridge",
@@ -41,6 +41,15 @@
     "confirmed_fee": "5.00",
     "terminal": true
   },
+  "expected_before_fill": {
+    "account_cash": "21000.00",
+    "economic_equity": "21000.00",
+    "cash_before_internal_holds": "21000.00",
+    "pending_quantity": 500,
+    "pending_price_bound": "10.00",
+    "pending_fee_upper_bound": "5.00",
+    "pending_cash_commitment": "5005.00"
+  },
   "expected_after_buy": {
     "account_cash": "15995.00",
     "position_quantity": 500,
@@ -50,6 +59,13 @@
     "risk_equity": "20995.00",
     "cash_before_internal_holds": "15995.00",
     "remaining_quantity": 0
+  },
+  "identity_rules": {
+    "baseline": "complete payload digest, account plus mode",
+    "source_fact": "account, mode, source_id, source_sequence",
+    "report": "account, mode, report_id, report payload digest and profile digest",
+    "order_completion": "one terminal single-fill obligation consumes once",
+    "funding_cycle_reservation": "retained until shared settle_batch"
   },
   "authority": "synthetic_engineering_only",
   "daily_adopted": false,

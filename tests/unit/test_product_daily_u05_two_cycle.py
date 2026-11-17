@@ -666,10 +666,13 @@ def test_late_fee_fault_rollback_retry_and_conflict(tmp_path: Path) -> None:
         service.apply_late_fee(context(), fact)
     assert service.current(context()) == before
     with sqlite3.connect(path) as db:
-        assert db.execute(
-            "SELECT status FROM bridge_operations WHERE kind='late_fee' "
-            "AND identity='late-fault'"
-        ).fetchone()[0] == "RECEIVED"
+        assert (
+            db.execute(
+                "SELECT status FROM bridge_operations WHERE kind='late_fee' "
+                "AND identity='late-fault'"
+            ).fetchone()[0]
+            == "RECEIVED"
+        )
     applied = service.apply_late_fee(context(), fact)
     assert applied.account.cash == Decimal("21890.00")
     assert applied.funding.reserve == Decimal("1890.00")

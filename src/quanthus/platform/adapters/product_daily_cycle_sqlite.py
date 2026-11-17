@@ -122,7 +122,23 @@ class SQLiteCycleBridgeAdapter:
                     PRAGMA user_version=2;
                     """
                 )
-            elif version != 2:
+            elif version == 2:
+                expected = {
+                    "bridge_baseline",
+                    "bridge_account",
+                    "bridge_funding",
+                    "bridge_inbox",
+                    "bridge_events",
+                    "bridge_postings",
+                    "bridge_outbox",
+                    "bridge_entry_receipts",
+                    "bridge_obligations",
+                    "bridge_source_facts",
+                    "bridge_conflicts",
+                }
+                if not expected.issubset({row[0] for row in tables}):
+                    raise FactError("STORE_SCHEMA_MISMATCH", "cycle bridge schema is incomplete")
+            else:
                 raise FactError("STORE_SCHEMA_MISMATCH", "unsupported cycle bridge schema")
 
     def _timestamp(self) -> str:
@@ -542,6 +558,7 @@ class SQLiteCycleBridgeAdapter:
 
     def rebuild(self, context: SyntheticContext) -> BridgeState:
         with self._connect() as connection:
+            connection.execute("BEGIN")
             state = self._read(connection, context)
             baseline = connection.execute(
                 "SELECT * FROM bridge_baseline WHERE account_id=? AND mode=?",
@@ -635,6 +652,7 @@ class SQLiteCycleBridgeAdapter:
                 )
             if funding != state.funding:
                 raise FactError("REBUILD_MISMATCH", "funding projection differs")
+            connection.commit()
             return BridgeState(account, funding, state.account_revision)
 
     def _obligation_rows(

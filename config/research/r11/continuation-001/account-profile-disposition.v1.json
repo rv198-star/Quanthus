@@ -1,0 +1,67 @@
+{
+  "schema": "quanthus.r11.account-profile-disposition.v1",
+  "version": "1.0.0",
+  "source_profiles": "account-profiles.proposal.v1.json",
+  "cash_contract": "pending-cash-contract.v1.json",
+  "daily_adopted": false,
+  "actual_account_facts": false,
+  "modes": {
+    "synthetic": {
+      "status": "executable",
+      "profile_identity": "SYN-R11-U03",
+      "scope": "synthetic engineering tests only",
+      "rule": "Use the exact complete profile in this package; never inherit it as a historical or actual account fact."
+    },
+    "historical_proposal": {
+      "status": "seed_only",
+      "scope": "proposed historical research configuration",
+      "required_before_execution": [
+        "approved research purpose and exact source manifest",
+        "exact as-of and complete same-as-of account baseline",
+        "stock, industry and total risk limits",
+        "expert-use admission",
+        "finite comparison budget and stop conditions"
+      ],
+      "rule": "The 500000 initial value and five buckets remain a proposal until all required conditions are explicitly adopted."
+    },
+    "daily_simulated_template": {
+      "status": "blocked",
+      "scope": "template only",
+      "unknowns_remain_null": true,
+      "rule": "Do not replace null fields with zero, an empty collection, synthetic facts or broker-displayed free cash."
+    },
+    "actual_account_template": {
+      "status": "blocked",
+      "scope": "P12 and Owner fact collection only",
+      "unknowns_remain_null": true,
+      "rule": "Bind an exact broker account and same-as-of facts only after P12 parameter and consumer preparation; never invent an empty account."
+    }
+  },
+  "typed_api_need": {
+    "identity": [
+      "account identity",
+      "exact as-of",
+      "source and knowledge cutoff"
+    ],
+    "same_as_of_values": [
+      "canonical tradeable cash before internal pending-buy holds",
+      "economic equity",
+      "all positions and sellable quantities",
+      "pending buys and pending sells",
+      "recognized and unrecognized fee obligations"
+    ],
+    "policy_values": [
+      "target N, finite B and reserve",
+      "stock, industry and total limits",
+      "one exact fee profile",
+      "entry lot and execution windows"
+    ],
+    "execution_semantics": [
+      "terminal and cancellation coverage",
+      "confirmed and unreported fills",
+      "late fee and correction events",
+      "released-reservation identities"
+    ]
+  },
+  "producer_rule": "The accounting adapter must label whether supplied cash already excludes internal holds. The current RiskSnapshot.cash_available boundary is canonical cash before the pending_buys commitment in the same typed snapshot."
+}

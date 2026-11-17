@@ -275,7 +275,7 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
             "bucket": str(first_buy.funding.bucket("U1").cash),
             "reserve": str(first_buy.funding.reserve),
             "quantity": first_buy.account.quantity("SYN001"),
-            "pending": "0",
+                "pending": "0.00",
             "equity": str(service.risk_snapshot(context(), mark_price=Decimal("10")).equity),
         }
     )
@@ -307,7 +307,8 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
             "cash": str(first_sell.account.cash),
             "bucket": str(first_sell.funding.bucket("U1").cash),
             "reserve": str(first_sell.funding.reserve),
-            "quantity": 0,
+                "position_quantity": 0,
+                "fill_quantity": 500,
         }
     )
     before_sell_alias = service.current(context())
@@ -434,7 +435,7 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
             "bucket": str(second_buy.funding.bucket("U1").cash),
             "reserve": str(second_buy.funding.reserve),
             "quantity": 500,
-            "pending": "0",
+                "pending": "0.00",
             "equity": str(service.risk_snapshot(context(), mark_price=Decimal("10")).equity),
         }
     )
@@ -464,7 +465,8 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
             "cash": str(second_sell.account.cash),
             "bucket": str(second_sell.funding.bucket("U1").cash),
             "reserve": str(second_sell.funding.reserve),
-            "quantity": 0,
+                "position_quantity": 0,
+                "fill_quantity": 500,
         }
     )
     second_settlement = service.settle_cycle(

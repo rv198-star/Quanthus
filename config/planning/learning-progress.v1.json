@@ -15565,6 +15565,72 @@
           "body_sha256": "93be608bc77eda040068992f7d067226854d7fe66f17cbe2f70e18f9be6f6180"
         }
       ]
+    },
+    {
+      "id": "CP-700-COREBRIDGE003-REJECTED-R1-20261118",
+      "recorded_at": "2026-11-17T19:30:02.779253+00:00",
+      "actor": "Quanthus lead Sol after exact candidate and independent review007",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "rejected",
+      "summary": "Bridge003 happy68tests pass but root/peer reproduce CB01-CB07, including duplicate physical fill and missing prefill cash obligation. Candidate not integrated; grouped R1 repair dispatched and observed active.",
+      "evidence": [
+        {
+          "id": "BRIDGE003-REVIEW007",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-u05-corebridge-review-007/review.json",
+          "sha256": "40ddf5e3968d6a878b1b40f03d102a9e93cad3c9b9255a5437fc839ef1b7e102",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal review of source462c first funding/account bridge; candidate CHANGES_REQUIRED; no complete R11 research or daily admission."
+        },
+        {
+          "id": "BRIDGE003-ROOT-DISPOSITION",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-004/review-disposition.json",
+          "sha256": "75e790e21386ac5f5388f3c4f74e8a558131924cf82014abaf6bf2422cce29f2",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal review of source462c first funding/account bridge; candidate CHANGES_REQUIRED; no complete R11 research or daily admission."
+        },
+        {
+          "id": "BRIDGE003-SOURCE-ALIAS",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-004/witnesses/source-alias-double-post.json",
+          "sha256": "ccff6a453315d0939caa8a4227e6c964ed0adddb72c8f5baba89982cfd079b1c",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal review of source462c first funding/account bridge; candidate CHANGES_REQUIRED; no complete R11 research or daily admission."
+        },
+        {
+          "id": "BRIDGE003-GROUPED-REPAIR",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-004/grouped-repair-decision.json",
+          "sha256": "e26672dde1bda25097dbc786022af5abda7d0a1557f69128240b1eb4d5d064ab",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal review of source462c first funding/account bridge; candidate CHANGES_REQUIRED; no complete R11 research or daily admission."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Accepted first-fact9450/35 stage and cash1.2.1 retain their exact scopes; unaccepted bridge003 review changes no module maturity or consumer/quality/value facet. Full R11 remains open. Track the repair within existing U05 and preserve original source/rejection/costs.",
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T19:27:52Z",
+          "body_sha256": "79f23476eaf67c60b4e53f1e948b8da2acca52ef7e48e50bf9013d4b0be5b94c"
+        }
+      ]
     }
   ],
   "history_imports": [

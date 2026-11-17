@@ -1,0 +1,57 @@
+{
+  "schema": "quanthus.r11.u05-funding-core-bridge.v1",
+  "version": "r11-u05-funding-bridge-0.1",
+  "mode": "synthetic",
+  "account_id": "SYN-BRIDGE",
+  "source": "fixture:bridge",
+  "coverage": "complete",
+  "account": {
+    "cash": "21000.00",
+    "positions": [],
+    "pending_buys": [],
+    "pending_sells": []
+  },
+  "funding": {
+    "buckets": [
+      {
+        "bucket_id": "U1",
+        "cash": "20000.00",
+        "target_notional": "20000.00",
+        "locked_cycle_budget": "0.00",
+        "phase": "empty"
+      }
+    ],
+    "reserve": "1000.00",
+    "unallocated_adjustment": "0.00"
+  },
+  "entry": {
+    "opportunity_id": "event:r11-entry-seam",
+    "security_code": "SYN001",
+    "industry": "IND1",
+    "expert_cap": ".30",
+    "fraction": ".30",
+    "price": "10.00",
+    "lot_size": 100
+  },
+  "fill_profile": {
+    "profile_version": "single-fill-terminal-v1",
+    "order_total_quantity": 500,
+    "final_cumulative_fill_quantity": 500,
+    "cancelled_quantity": 0,
+    "confirmed_fee": "5.00",
+    "terminal": true
+  },
+  "expected_after_buy": {
+    "account_cash": "15995.00",
+    "position_quantity": 500,
+    "bucket_cash": "14995.00",
+    "reserve": "1000.00",
+    "locked_cycle_budget": "20000.00",
+    "risk_equity": "20995.00",
+    "cash_before_internal_holds": "15995.00",
+    "remaining_quantity": 0
+  },
+  "authority": "synthetic_engineering_only",
+  "daily_adopted": false,
+  "production": false
+}

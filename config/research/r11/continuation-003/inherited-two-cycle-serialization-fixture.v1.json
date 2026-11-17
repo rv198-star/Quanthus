@@ -1,0 +1,992 @@
+{
+  "schema_version": "quanthus.r11.two-cycle-actuals.v1",
+  "first_entry": {
+    "accepted": true,
+    "reason_codes": [
+      "ENTRY_RESERVED"
+    ],
+    "selected_bucket_id": "U1",
+    "first_considered_bucket_id": "U1",
+    "second_bucket_probe": false,
+    "quantity": {
+      "q": 500,
+      "cash_before_internal_holds": "21000",
+      "pending_principal": "0",
+      "pending_unrecognized_fee": "0",
+      "pending_cash_commitment": "0",
+      "residual_cash": "21000",
+      "gross": "5000",
+      "fees": "5.00",
+      "total_cost": "5005.00",
+      "target_cap": "6000.00",
+      "conservative_post_fill_equity": "20995.00",
+      "existing_security_exposure": "0",
+      "existing_industry_exposure": "0",
+      "existing_total_exposure": "0",
+      "post_security_exposure": "5000",
+      "post_industry_exposure": "5000",
+      "post_total_exposure": "5000",
+      "next_lot_cost": "6005.00",
+      "next_lot_post_equity": "20995.00",
+      "next_lot_cap": "20995.00",
+      "next_lot_post_security_exposure": "6000",
+      "next_lot_post_industry_exposure": "6000",
+      "next_lot_post_total_exposure": "6000",
+      "reason_codes": [
+        "BUDGET_CAPACITY",
+        "CAPACITY_AVAILABLE"
+      ],
+      "pending_sell_releases": "0",
+      "execution_authorized": false,
+      "forced_sale": false
+    },
+    "funding_state_digest": "sha256:62f0159f79e6fb5863b651a4ed7095ffe42ac803c9ba1aefeeadbaa4673307f6",
+    "funding_state_revision": 1,
+    "funding_state_changed": true,
+    "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+    "replayed": false,
+    "result_digest": "sha256:b62d89683c190a633dadf116f15d698c4f186ecc625cc42b9098d1c6a9f86d32",
+    "funding_ledger_entries": [],
+    "execution_authorized": false,
+    "forced_sale": false
+  },
+  "first_settled": {
+    "buckets": [
+      {
+        "bucket_id": "U1",
+        "cash": "20000",
+        "target_notional": "20000",
+        "locked_cycle_budget": "20000",
+        "cycle_id": "candidate-cycle:OP",
+        "phase": "closed"
+      }
+    ],
+    "reserve": "1000",
+    "unallocated_adjustment": "0",
+    "cash_total": "21000",
+    "revision": 3,
+    "processed_commands": [
+      {
+        "command_id": "review-entry",
+        "body_digest": "sha256:6800920859404b30318d1ebf834842ee6f583fc06d707fdd661a758d3a821205",
+        "operation": "decide_entry",
+        "invocation_digest": "sha256:4f9f187bbcd6ac7ad1937ed8f38a756cbd8395fabd3ecd72a723575913b66f05",
+        "result_digest": "sha256:b62d89683c190a633dadf116f15d698c4f186ecc625cc42b9098d1c6a9f86d32",
+        "result": {
+          "accepted": true,
+          "cycle_id": "candidate-cycle:OP",
+          "expert_decision_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "first_considered_bucket_id": "U1",
+          "funding_ledger_entries": [],
+          "funding_state_changed": true,
+          "quantity": {
+            "cash_before_internal_holds": "21000",
+            "conservative_post_fill_equity": "20995.00",
+            "execution_authorized": false,
+            "existing_industry_exposure": "0",
+            "existing_security_exposure": "0",
+            "existing_total_exposure": "0",
+            "fees": "5.00",
+            "forced_sale": false,
+            "gross": "5000",
+            "next_lot_cap": "20995.00",
+            "next_lot_cost": "6005.00",
+            "next_lot_post_equity": "20995.00",
+            "next_lot_post_industry_exposure": "6000",
+            "next_lot_post_security_exposure": "6000",
+            "next_lot_post_total_exposure": "6000",
+            "pending_cash_commitment": "0",
+            "pending_principal": "0",
+            "pending_sell_releases": "0",
+            "pending_unrecognized_fee": "0",
+            "post_industry_exposure": "5000",
+            "post_security_exposure": "5000",
+            "post_total_exposure": "5000",
+            "q": 500,
+            "reason_codes": [
+              "BUDGET_CAPACITY",
+              "CAPACITY_AVAILABLE"
+            ],
+            "residual_cash": "21000",
+            "target_cap": "6000.00",
+            "total_cost": "5005.00"
+          },
+          "reason_codes": [
+            "ENTRY_RESERVED"
+          ],
+          "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+          "second_bucket_probe": false,
+          "selected_bucket_id": "U1"
+        },
+        "revision": 1
+      },
+      {
+        "command_id": "settle-first",
+        "body_digest": "sha256:25295f13b90f711bc13d01c7d17612b14e7fbca03509fbf80e0cc1a8fec76c18",
+        "operation": "settle_batch",
+        "invocation_digest": "sha256:b698e5b63ea70881bed485c1d0fd30e1a1ec98917bc0a024f29b99ca28f2e938",
+        "result_digest": "sha256:7fe18440f858acff9d1fe6996ea26a665ecfc59827d4e1e89592622963879fee",
+        "result": {
+          "accepted": true,
+          "details_json": "{\"settlements\":[{\"accepted\":true,\"bucket_cash_after\":\"20000\",\"bucket_id\":\"U1\",\"cycle_id\":\"candidate-cycle:OP\",\"new_cycle_budget_unchanged\":true,\"next_cycle_available\":\"20000\",\"profit_adjustment_offset\":\"0\",\"profit_to_reserve\":\"0\",\"reserve_topup\":\"0\",\"settlement_id\":\"settle-first\",\"underfunded\":\"0\"}]}",
+          "operation": "settle_batch",
+          "reason_codes": [
+            "FIXED_CYCLE_SETTLED"
+          ]
+        },
+        "revision": 3
+      }
+    ],
+    "completed_settlements": [
+      {
+        "settlement_id": "settle-first",
+        "bucket_id": "U1",
+        "cycle_id": "candidate-cycle:OP",
+        "cash_after": "20000"
+      }
+    ],
+    "entry_reservations": [
+      {
+        "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+        "opportunity_id": "OP",
+        "security_code": "SYN001",
+        "level1_industry_id": "IND1",
+        "bucket_id": "U1",
+        "cycle_id": "candidate-cycle:OP",
+        "quantity": 500,
+        "command_id": "review-entry",
+        "invocation_digest": "sha256:4f9f187bbcd6ac7ad1937ed8f38a756cbd8395fabd3ecd72a723575913b66f05",
+        "result_digest": "sha256:b62d89683c190a633dadf116f15d698c4f186ecc625cc42b9098d1c6a9f86d32",
+        "result": {
+          "accepted": true,
+          "cycle_id": "candidate-cycle:OP",
+          "expert_decision_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "first_considered_bucket_id": "U1",
+          "funding_ledger_entries": [],
+          "funding_state_changed": true,
+          "quantity": {
+            "cash_before_internal_holds": "21000",
+            "conservative_post_fill_equity": "20995.00",
+            "execution_authorized": false,
+            "existing_industry_exposure": "0",
+            "existing_security_exposure": "0",
+            "existing_total_exposure": "0",
+            "fees": "5.00",
+            "forced_sale": false,
+            "gross": "5000",
+            "next_lot_cap": "20995.00",
+            "next_lot_cost": "6005.00",
+            "next_lot_post_equity": "20995.00",
+            "next_lot_post_industry_exposure": "6000",
+            "next_lot_post_security_exposure": "6000",
+            "next_lot_post_total_exposure": "6000",
+            "pending_cash_commitment": "0",
+            "pending_principal": "0",
+            "pending_sell_releases": "0",
+            "pending_unrecognized_fee": "0",
+            "post_industry_exposure": "5000",
+            "post_security_exposure": "5000",
+            "post_total_exposure": "5000",
+            "q": 500,
+            "reason_codes": [
+              "BUDGET_CAPACITY",
+              "CAPACITY_AVAILABLE"
+            ],
+            "residual_cash": "21000",
+            "target_cap": "6000.00",
+            "total_cost": "5005.00"
+          },
+          "reason_codes": [
+            "ENTRY_RESERVED"
+          ],
+          "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+          "second_bucket_probe": false,
+          "selected_bucket_id": "U1"
+        }
+      }
+    ],
+    "active_entry_reservation_ids": []
+  },
+  "refused_next_entry": {
+    "accepted": false,
+    "reason_codes": [
+      "STOCK_CAPACITY"
+    ],
+    "selected_bucket_id": null,
+    "first_considered_bucket_id": "U1",
+    "second_bucket_probe": false,
+    "quantity": {
+      "q": 0,
+      "cash_before_internal_holds": "21000",
+      "pending_principal": "0",
+      "pending_unrecognized_fee": "0",
+      "pending_cash_commitment": "0",
+      "residual_cash": "21000",
+      "gross": "0",
+      "fees": "0",
+      "total_cost": "0",
+      "target_cap": "6000.00",
+      "conservative_post_fill_equity": "21000",
+      "existing_security_exposure": "0",
+      "existing_industry_exposure": "0",
+      "existing_total_exposure": "0",
+      "post_security_exposure": "0",
+      "post_industry_exposure": "0",
+      "post_total_exposure": "0",
+      "next_lot_cost": "1005.00",
+      "next_lot_post_equity": "20995.00",
+      "next_lot_cap": "0.00",
+      "next_lot_post_security_exposure": "1000",
+      "next_lot_post_industry_exposure": "1000",
+      "next_lot_post_total_exposure": "1000",
+      "reason_codes": [
+        "STOCK_CAPACITY"
+      ],
+      "pending_sell_releases": "0",
+      "execution_authorized": false,
+      "forced_sale": false
+    },
+    "funding_state_digest": "sha256:7f7da13aba2de61744d176d24f1f727b44413075c8670a1af7fea56998d90372",
+    "funding_state_revision": 3,
+    "funding_state_changed": false,
+    "reservation_id": null,
+    "replayed": false,
+    "result_digest": null,
+    "funding_ledger_entries": [],
+    "execution_authorized": false,
+    "forced_sale": false
+  },
+  "second_entry": {
+    "accepted": true,
+    "reason_codes": [
+      "ENTRY_RESERVED"
+    ],
+    "selected_bucket_id": "U1",
+    "first_considered_bucket_id": "U1",
+    "second_bucket_probe": false,
+    "quantity": {
+      "q": 500,
+      "cash_before_internal_holds": "21000",
+      "pending_principal": "0",
+      "pending_unrecognized_fee": "0",
+      "pending_cash_commitment": "0",
+      "residual_cash": "21000",
+      "gross": "5000",
+      "fees": "5.00",
+      "total_cost": "5005.00",
+      "target_cap": "6000.00",
+      "conservative_post_fill_equity": "20995.00",
+      "existing_security_exposure": "0",
+      "existing_industry_exposure": "0",
+      "existing_total_exposure": "0",
+      "post_security_exposure": "5000",
+      "post_industry_exposure": "5000",
+      "post_total_exposure": "5000",
+      "next_lot_cost": "6005.00",
+      "next_lot_post_equity": "20995.00",
+      "next_lot_cap": "20995.00",
+      "next_lot_post_security_exposure": "6000",
+      "next_lot_post_industry_exposure": "6000",
+      "next_lot_post_total_exposure": "6000",
+      "reason_codes": [
+        "BUDGET_CAPACITY",
+        "CAPACITY_AVAILABLE"
+      ],
+      "pending_sell_releases": "0",
+      "execution_authorized": false,
+      "forced_sale": false
+    },
+    "funding_state_digest": "sha256:3fec2de6a790869d9b3a683986c73dd5b21fa90d23f30ad16ed44ae298bce67a",
+    "funding_state_revision": 4,
+    "funding_state_changed": true,
+    "reservation_id": "reservation_61a9f048377a6c8750ffae3e",
+    "replayed": false,
+    "result_digest": "sha256:b89bd0caa0883491d881f34a56906e266a316683d7ce0ad5f6a8d6d03da806c9",
+    "funding_ledger_entries": [],
+    "execution_authorized": false,
+    "forced_sale": false
+  },
+  "old_cycle_fee": {
+    "operation": "apply_late_cash_delta",
+    "accepted": true,
+    "replayed": false,
+    "reason_codes": [
+      "LATE_DELTA_APPLIED"
+    ],
+    "details": {
+      "adjustment_offset": "0",
+      "bucket_id": "U1",
+      "cash_delta": "-100",
+      "cycle_id": "candidate-cycle:OP",
+      "new_B": "20000",
+      "reserve_increment": "0",
+      "reserve_used": "100"
+    },
+    "state_digest": "sha256:79b2b4cba211abe1e192f1a08d9010347cde2ed4eebc5fdcdbc546d40c9af3ce",
+    "state_revision": 5,
+    "cash_total": "20900",
+    "reserve": "900",
+    "unallocated_adjustment": "0",
+    "ledger_entries": [
+      {
+        "reference_id": "late-first-fee",
+        "reference_type": "late_cash_adjustment",
+        "postings": [
+          {
+            "account": "shared/reserve",
+            "amount": "-100"
+          },
+          {
+            "account": "fees/late_adjustment",
+            "amount": "100"
+          }
+        ]
+      }
+    ],
+    "result_digest": "sha256:656aadad7cb165eb69c062047b7b06f24b413a7fc9cd79c30669fb9e4c7090bb"
+  },
+  "active_conflict": {
+    "accepted": false,
+    "reason_codes": [
+      "NO_EMPTY_BUCKET"
+    ],
+    "selected_bucket_id": null,
+    "first_considered_bucket_id": "U1",
+    "second_bucket_probe": false,
+    "quantity": null,
+    "funding_state_digest": "sha256:79b2b4cba211abe1e192f1a08d9010347cde2ed4eebc5fdcdbc546d40c9af3ce",
+    "funding_state_revision": 5,
+    "funding_state_changed": false,
+    "reservation_id": null,
+    "replayed": false,
+    "result_digest": null,
+    "funding_ledger_entries": [],
+    "execution_authorized": false,
+    "forced_sale": false
+  },
+  "first_history_before": {
+    "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+    "opportunity_id": "OP",
+    "security_code": "SYN001",
+    "level1_industry_id": "IND1",
+    "bucket_id": "U1",
+    "cycle_id": "candidate-cycle:OP",
+    "quantity": 500,
+    "command_id": "review-entry",
+    "invocation_digest": "sha256:4f9f187bbcd6ac7ad1937ed8f38a756cbd8395fabd3ecd72a723575913b66f05",
+    "result_digest": "sha256:b62d89683c190a633dadf116f15d698c4f186ecc625cc42b9098d1c6a9f86d32",
+    "result": {
+      "accepted": true,
+      "cycle_id": "candidate-cycle:OP",
+      "expert_decision_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "first_considered_bucket_id": "U1",
+      "funding_ledger_entries": [],
+      "funding_state_changed": true,
+      "quantity": {
+        "cash_before_internal_holds": "21000",
+        "conservative_post_fill_equity": "20995.00",
+        "execution_authorized": false,
+        "existing_industry_exposure": "0",
+        "existing_security_exposure": "0",
+        "existing_total_exposure": "0",
+        "fees": "5.00",
+        "forced_sale": false,
+        "gross": "5000",
+        "next_lot_cap": "20995.00",
+        "next_lot_cost": "6005.00",
+        "next_lot_post_equity": "20995.00",
+        "next_lot_post_industry_exposure": "6000",
+        "next_lot_post_security_exposure": "6000",
+        "next_lot_post_total_exposure": "6000",
+        "pending_cash_commitment": "0",
+        "pending_principal": "0",
+        "pending_sell_releases": "0",
+        "pending_unrecognized_fee": "0",
+        "post_industry_exposure": "5000",
+        "post_security_exposure": "5000",
+        "post_total_exposure": "5000",
+        "q": 500,
+        "reason_codes": [
+          "BUDGET_CAPACITY",
+          "CAPACITY_AVAILABLE"
+        ],
+        "residual_cash": "21000",
+        "target_cap": "6000.00",
+        "total_cost": "5005.00"
+      },
+      "reason_codes": [
+        "ENTRY_RESERVED"
+      ],
+      "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+      "second_bucket_probe": false,
+      "selected_bucket_id": "U1"
+    }
+  },
+  "first_history_after": {
+    "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+    "opportunity_id": "OP",
+    "security_code": "SYN001",
+    "level1_industry_id": "IND1",
+    "bucket_id": "U1",
+    "cycle_id": "candidate-cycle:OP",
+    "quantity": 500,
+    "command_id": "review-entry",
+    "invocation_digest": "sha256:4f9f187bbcd6ac7ad1937ed8f38a756cbd8395fabd3ecd72a723575913b66f05",
+    "result_digest": "sha256:b62d89683c190a633dadf116f15d698c4f186ecc625cc42b9098d1c6a9f86d32",
+    "result": {
+      "accepted": true,
+      "cycle_id": "candidate-cycle:OP",
+      "expert_decision_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "first_considered_bucket_id": "U1",
+      "funding_ledger_entries": [],
+      "funding_state_changed": true,
+      "quantity": {
+        "cash_before_internal_holds": "21000",
+        "conservative_post_fill_equity": "20995.00",
+        "execution_authorized": false,
+        "existing_industry_exposure": "0",
+        "existing_security_exposure": "0",
+        "existing_total_exposure": "0",
+        "fees": "5.00",
+        "forced_sale": false,
+        "gross": "5000",
+        "next_lot_cap": "20995.00",
+        "next_lot_cost": "6005.00",
+        "next_lot_post_equity": "20995.00",
+        "next_lot_post_industry_exposure": "6000",
+        "next_lot_post_security_exposure": "6000",
+        "next_lot_post_total_exposure": "6000",
+        "pending_cash_commitment": "0",
+        "pending_principal": "0",
+        "pending_sell_releases": "0",
+        "pending_unrecognized_fee": "0",
+        "post_industry_exposure": "5000",
+        "post_security_exposure": "5000",
+        "post_total_exposure": "5000",
+        "q": 500,
+        "reason_codes": [
+          "BUDGET_CAPACITY",
+          "CAPACITY_AVAILABLE"
+        ],
+        "residual_cash": "21000",
+        "target_cap": "6000.00",
+        "total_cost": "5005.00"
+      },
+      "reason_codes": [
+        "ENTRY_RESERVED"
+      ],
+      "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+      "second_bucket_probe": false,
+      "selected_bucket_id": "U1"
+    }
+  },
+  "original_replays": [
+    {
+      "accepted": true,
+      "reason_codes": [
+        "ENTRY_RESERVED"
+      ],
+      "selected_bucket_id": "U1",
+      "first_considered_bucket_id": "U1",
+      "second_bucket_probe": false,
+      "quantity": {
+        "q": 500,
+        "cash_before_internal_holds": "21000",
+        "pending_principal": "0",
+        "pending_unrecognized_fee": "0",
+        "pending_cash_commitment": "0",
+        "residual_cash": "21000",
+        "gross": "5000",
+        "fees": "5.00",
+        "total_cost": "5005.00",
+        "target_cap": "6000.00",
+        "conservative_post_fill_equity": "20995.00",
+        "existing_security_exposure": "0",
+        "existing_industry_exposure": "0",
+        "existing_total_exposure": "0",
+        "post_security_exposure": "5000",
+        "post_industry_exposure": "5000",
+        "post_total_exposure": "5000",
+        "next_lot_cost": "6005.00",
+        "next_lot_post_equity": "20995.00",
+        "next_lot_cap": "20995.00",
+        "next_lot_post_security_exposure": "6000",
+        "next_lot_post_industry_exposure": "6000",
+        "next_lot_post_total_exposure": "6000",
+        "reason_codes": [
+          "BUDGET_CAPACITY",
+          "CAPACITY_AVAILABLE"
+        ],
+        "pending_sell_releases": "0",
+        "execution_authorized": false,
+        "forced_sale": false
+      },
+      "funding_state_digest": "sha256:79b2b4cba211abe1e192f1a08d9010347cde2ed4eebc5fdcdbc546d40c9af3ce",
+      "funding_state_revision": 5,
+      "funding_state_changed": true,
+      "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+      "replayed": true,
+      "result_digest": "sha256:b62d89683c190a633dadf116f15d698c4f186ecc625cc42b9098d1c6a9f86d32",
+      "funding_ledger_entries": [],
+      "execution_authorized": false,
+      "forced_sale": false
+    },
+    {
+      "accepted": true,
+      "reason_codes": [
+        "ENTRY_RESERVED"
+      ],
+      "selected_bucket_id": "U1",
+      "first_considered_bucket_id": "U1",
+      "second_bucket_probe": false,
+      "quantity": {
+        "q": 500,
+        "cash_before_internal_holds": "21000",
+        "pending_principal": "0",
+        "pending_unrecognized_fee": "0",
+        "pending_cash_commitment": "0",
+        "residual_cash": "21000",
+        "gross": "5000",
+        "fees": "5.00",
+        "total_cost": "5005.00",
+        "target_cap": "6000.00",
+        "conservative_post_fill_equity": "20995.00",
+        "existing_security_exposure": "0",
+        "existing_industry_exposure": "0",
+        "existing_total_exposure": "0",
+        "post_security_exposure": "5000",
+        "post_industry_exposure": "5000",
+        "post_total_exposure": "5000",
+        "next_lot_cost": "6005.00",
+        "next_lot_post_equity": "20995.00",
+        "next_lot_cap": "20995.00",
+        "next_lot_post_security_exposure": "6000",
+        "next_lot_post_industry_exposure": "6000",
+        "next_lot_post_total_exposure": "6000",
+        "reason_codes": [
+          "BUDGET_CAPACITY",
+          "CAPACITY_AVAILABLE"
+        ],
+        "pending_sell_releases": "0",
+        "execution_authorized": false,
+        "forced_sale": false
+      },
+      "funding_state_digest": "sha256:79b2b4cba211abe1e192f1a08d9010347cde2ed4eebc5fdcdbc546d40c9af3ce",
+      "funding_state_revision": 5,
+      "funding_state_changed": true,
+      "reservation_id": "reservation_61a9f048377a6c8750ffae3e",
+      "replayed": true,
+      "result_digest": "sha256:b89bd0caa0883491d881f34a56906e266a316683d7ce0ad5f6a8d6d03da806c9",
+      "funding_ledger_entries": [],
+      "execution_authorized": false,
+      "forced_sale": false
+    },
+    {
+      "accepted": true,
+      "reason_codes": [
+        "ENTRY_RESERVED"
+      ],
+      "selected_bucket_id": "U1",
+      "first_considered_bucket_id": "U1",
+      "second_bucket_probe": false,
+      "quantity": {
+        "q": 500,
+        "cash_before_internal_holds": "21000",
+        "pending_principal": "0",
+        "pending_unrecognized_fee": "0",
+        "pending_cash_commitment": "0",
+        "residual_cash": "21000",
+        "gross": "5000",
+        "fees": "5.00",
+        "total_cost": "5005.00",
+        "target_cap": "6000.00",
+        "conservative_post_fill_equity": "20995.00",
+        "existing_security_exposure": "0",
+        "existing_industry_exposure": "0",
+        "existing_total_exposure": "0",
+        "post_security_exposure": "5000",
+        "post_industry_exposure": "5000",
+        "post_total_exposure": "5000",
+        "next_lot_cost": "6005.00",
+        "next_lot_post_equity": "20995.00",
+        "next_lot_cap": "20995.00",
+        "next_lot_post_security_exposure": "6000",
+        "next_lot_post_industry_exposure": "6000",
+        "next_lot_post_total_exposure": "6000",
+        "reason_codes": [
+          "BUDGET_CAPACITY",
+          "CAPACITY_AVAILABLE"
+        ],
+        "pending_sell_releases": "0",
+        "execution_authorized": false,
+        "forced_sale": false
+      },
+      "funding_state_digest": "sha256:e7814f5510f99acdd6616b1e9dd1c8b3d2beb850c53d3597a01c40f902aafa18",
+      "funding_state_revision": 7,
+      "funding_state_changed": true,
+      "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+      "replayed": true,
+      "result_digest": "sha256:b62d89683c190a633dadf116f15d698c4f186ecc625cc42b9098d1c6a9f86d32",
+      "funding_ledger_entries": [],
+      "execution_authorized": false,
+      "forced_sale": false
+    },
+    {
+      "accepted": true,
+      "reason_codes": [
+        "ENTRY_RESERVED"
+      ],
+      "selected_bucket_id": "U1",
+      "first_considered_bucket_id": "U1",
+      "second_bucket_probe": false,
+      "quantity": {
+        "q": 500,
+        "cash_before_internal_holds": "21000",
+        "pending_principal": "0",
+        "pending_unrecognized_fee": "0",
+        "pending_cash_commitment": "0",
+        "residual_cash": "21000",
+        "gross": "5000",
+        "fees": "5.00",
+        "total_cost": "5005.00",
+        "target_cap": "6000.00",
+        "conservative_post_fill_equity": "20995.00",
+        "existing_security_exposure": "0",
+        "existing_industry_exposure": "0",
+        "existing_total_exposure": "0",
+        "post_security_exposure": "5000",
+        "post_industry_exposure": "5000",
+        "post_total_exposure": "5000",
+        "next_lot_cost": "6005.00",
+        "next_lot_post_equity": "20995.00",
+        "next_lot_cap": "20995.00",
+        "next_lot_post_security_exposure": "6000",
+        "next_lot_post_industry_exposure": "6000",
+        "next_lot_post_total_exposure": "6000",
+        "reason_codes": [
+          "BUDGET_CAPACITY",
+          "CAPACITY_AVAILABLE"
+        ],
+        "pending_sell_releases": "0",
+        "execution_authorized": false,
+        "forced_sale": false
+      },
+      "funding_state_digest": "sha256:e7814f5510f99acdd6616b1e9dd1c8b3d2beb850c53d3597a01c40f902aafa18",
+      "funding_state_revision": 7,
+      "funding_state_changed": true,
+      "reservation_id": "reservation_61a9f048377a6c8750ffae3e",
+      "replayed": true,
+      "result_digest": "sha256:b89bd0caa0883491d881f34a56906e266a316683d7ce0ad5f6a8d6d03da806c9",
+      "funding_ledger_entries": [],
+      "execution_authorized": false,
+      "forced_sale": false
+    }
+  ],
+  "final_state": {
+    "buckets": [
+      {
+        "bucket_id": "U1",
+        "cash": "20000",
+        "target_notional": "20000",
+        "locked_cycle_budget": "20000",
+        "cycle_id": "candidate-cycle:OP2",
+        "phase": "closed"
+      }
+    ],
+    "reserve": "900",
+    "unallocated_adjustment": "0",
+    "cash_total": "20900",
+    "revision": 7,
+    "processed_commands": [
+      {
+        "command_id": "review-entry",
+        "body_digest": "sha256:6800920859404b30318d1ebf834842ee6f583fc06d707fdd661a758d3a821205",
+        "operation": "decide_entry",
+        "invocation_digest": "sha256:4f9f187bbcd6ac7ad1937ed8f38a756cbd8395fabd3ecd72a723575913b66f05",
+        "result_digest": "sha256:b62d89683c190a633dadf116f15d698c4f186ecc625cc42b9098d1c6a9f86d32",
+        "result": {
+          "accepted": true,
+          "cycle_id": "candidate-cycle:OP",
+          "expert_decision_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "first_considered_bucket_id": "U1",
+          "funding_ledger_entries": [],
+          "funding_state_changed": true,
+          "quantity": {
+            "cash_before_internal_holds": "21000",
+            "conservative_post_fill_equity": "20995.00",
+            "execution_authorized": false,
+            "existing_industry_exposure": "0",
+            "existing_security_exposure": "0",
+            "existing_total_exposure": "0",
+            "fees": "5.00",
+            "forced_sale": false,
+            "gross": "5000",
+            "next_lot_cap": "20995.00",
+            "next_lot_cost": "6005.00",
+            "next_lot_post_equity": "20995.00",
+            "next_lot_post_industry_exposure": "6000",
+            "next_lot_post_security_exposure": "6000",
+            "next_lot_post_total_exposure": "6000",
+            "pending_cash_commitment": "0",
+            "pending_principal": "0",
+            "pending_sell_releases": "0",
+            "pending_unrecognized_fee": "0",
+            "post_industry_exposure": "5000",
+            "post_security_exposure": "5000",
+            "post_total_exposure": "5000",
+            "q": 500,
+            "reason_codes": [
+              "BUDGET_CAPACITY",
+              "CAPACITY_AVAILABLE"
+            ],
+            "residual_cash": "21000",
+            "target_cap": "6000.00",
+            "total_cost": "5005.00"
+          },
+          "reason_codes": [
+            "ENTRY_RESERVED"
+          ],
+          "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+          "second_bucket_probe": false,
+          "selected_bucket_id": "U1"
+        },
+        "revision": 1
+      },
+      {
+        "command_id": "settle-first",
+        "body_digest": "sha256:25295f13b90f711bc13d01c7d17612b14e7fbca03509fbf80e0cc1a8fec76c18",
+        "operation": "settle_batch",
+        "invocation_digest": "sha256:b698e5b63ea70881bed485c1d0fd30e1a1ec98917bc0a024f29b99ca28f2e938",
+        "result_digest": "sha256:7fe18440f858acff9d1fe6996ea26a665ecfc59827d4e1e89592622963879fee",
+        "result": {
+          "accepted": true,
+          "details_json": "{\"settlements\":[{\"accepted\":true,\"bucket_cash_after\":\"20000\",\"bucket_id\":\"U1\",\"cycle_id\":\"candidate-cycle:OP\",\"new_cycle_budget_unchanged\":true,\"next_cycle_available\":\"20000\",\"profit_adjustment_offset\":\"0\",\"profit_to_reserve\":\"0\",\"reserve_topup\":\"0\",\"settlement_id\":\"settle-first\",\"underfunded\":\"0\"}]}",
+          "operation": "settle_batch",
+          "reason_codes": [
+            "FIXED_CYCLE_SETTLED"
+          ]
+        },
+        "revision": 3
+      },
+      {
+        "command_id": "entry-second",
+        "body_digest": "sha256:d575dfc2c73c79e42930b2a032edbda03b25223844d1190ee5065f4367a3ff9b",
+        "operation": "decide_entry",
+        "invocation_digest": "sha256:7e48da84e6f831a2925707c29dba3ad5392dbd9c976318d2102d1e10e7488321",
+        "result_digest": "sha256:b89bd0caa0883491d881f34a56906e266a316683d7ce0ad5f6a8d6d03da806c9",
+        "result": {
+          "accepted": true,
+          "cycle_id": "candidate-cycle:OP2",
+          "expert_decision_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "first_considered_bucket_id": "U1",
+          "funding_ledger_entries": [],
+          "funding_state_changed": true,
+          "quantity": {
+            "cash_before_internal_holds": "21000",
+            "conservative_post_fill_equity": "20995.00",
+            "execution_authorized": false,
+            "existing_industry_exposure": "0",
+            "existing_security_exposure": "0",
+            "existing_total_exposure": "0",
+            "fees": "5.00",
+            "forced_sale": false,
+            "gross": "5000",
+            "next_lot_cap": "20995.00",
+            "next_lot_cost": "6005.00",
+            "next_lot_post_equity": "20995.00",
+            "next_lot_post_industry_exposure": "6000",
+            "next_lot_post_security_exposure": "6000",
+            "next_lot_post_total_exposure": "6000",
+            "pending_cash_commitment": "0",
+            "pending_principal": "0",
+            "pending_sell_releases": "0",
+            "pending_unrecognized_fee": "0",
+            "post_industry_exposure": "5000",
+            "post_security_exposure": "5000",
+            "post_total_exposure": "5000",
+            "q": 500,
+            "reason_codes": [
+              "BUDGET_CAPACITY",
+              "CAPACITY_AVAILABLE"
+            ],
+            "residual_cash": "21000",
+            "target_cap": "6000.00",
+            "total_cost": "5005.00"
+          },
+          "reason_codes": [
+            "ENTRY_RESERVED"
+          ],
+          "reservation_id": "reservation_61a9f048377a6c8750ffae3e",
+          "second_bucket_probe": false,
+          "selected_bucket_id": "U1"
+        },
+        "revision": 4
+      },
+      {
+        "command_id": "late-first-fee",
+        "body_digest": "sha256:f104cb62cff91c8f8e661193801aaee15490006c3f1993d24b88225bff360d8e",
+        "operation": "apply_late_cash_delta",
+        "invocation_digest": "sha256:868c69b5694629723f52d99e5d990112cf7a39ac3a8448bb72f81d7a053f1643",
+        "result_digest": "sha256:656aadad7cb165eb69c062047b7b06f24b413a7fc9cd79c30669fb9e4c7090bb",
+        "result": {
+          "accepted": true,
+          "details_json": "{\"adjustment_offset\":\"0\",\"bucket_id\":\"U1\",\"cash_delta\":\"-100\",\"cycle_id\":\"candidate-cycle:OP\",\"new_B\":\"20000\",\"reserve_increment\":\"0\",\"reserve_used\":\"100\"}",
+          "operation": "apply_late_cash_delta",
+          "reason_codes": [
+            "LATE_DELTA_APPLIED"
+          ]
+        },
+        "revision": 5
+      },
+      {
+        "command_id": "settle-second",
+        "body_digest": "sha256:5edf254961fad48461aa106d678f8dacf3f86c1363b905776447015d7121250d",
+        "operation": "settle_batch",
+        "invocation_digest": "sha256:18a3f778747719213e168cb6d119c9e916b69c28d702d6e4974731575f1f59a3",
+        "result_digest": "sha256:73c291d3b90882e14a559a7b9c059d498e8338c798f00559a6dc6fdbaef2be07",
+        "result": {
+          "accepted": true,
+          "details_json": "{\"settlements\":[{\"accepted\":true,\"bucket_cash_after\":\"20000\",\"bucket_id\":\"U1\",\"cycle_id\":\"candidate-cycle:OP2\",\"new_cycle_budget_unchanged\":true,\"next_cycle_available\":\"20000\",\"profit_adjustment_offset\":\"0\",\"profit_to_reserve\":\"0\",\"reserve_topup\":\"0\",\"settlement_id\":\"settle-second\",\"underfunded\":\"0\"}]}",
+          "operation": "settle_batch",
+          "reason_codes": [
+            "FIXED_CYCLE_SETTLED"
+          ]
+        },
+        "revision": 7
+      }
+    ],
+    "completed_settlements": [
+      {
+        "settlement_id": "settle-first",
+        "bucket_id": "U1",
+        "cycle_id": "candidate-cycle:OP",
+        "cash_after": "20000"
+      },
+      {
+        "settlement_id": "settle-second",
+        "bucket_id": "U1",
+        "cycle_id": "candidate-cycle:OP2",
+        "cash_after": "20000"
+      }
+    ],
+    "entry_reservations": [
+      {
+        "reservation_id": "reservation_61a9f048377a6c8750ffae3e",
+        "opportunity_id": "OP2",
+        "security_code": "SYN002",
+        "level1_industry_id": "IND1",
+        "bucket_id": "U1",
+        "cycle_id": "candidate-cycle:OP2",
+        "quantity": 500,
+        "command_id": "entry-second",
+        "invocation_digest": "sha256:7e48da84e6f831a2925707c29dba3ad5392dbd9c976318d2102d1e10e7488321",
+        "result_digest": "sha256:b89bd0caa0883491d881f34a56906e266a316683d7ce0ad5f6a8d6d03da806c9",
+        "result": {
+          "accepted": true,
+          "cycle_id": "candidate-cycle:OP2",
+          "expert_decision_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "first_considered_bucket_id": "U1",
+          "funding_ledger_entries": [],
+          "funding_state_changed": true,
+          "quantity": {
+            "cash_before_internal_holds": "21000",
+            "conservative_post_fill_equity": "20995.00",
+            "execution_authorized": false,
+            "existing_industry_exposure": "0",
+            "existing_security_exposure": "0",
+            "existing_total_exposure": "0",
+            "fees": "5.00",
+            "forced_sale": false,
+            "gross": "5000",
+            "next_lot_cap": "20995.00",
+            "next_lot_cost": "6005.00",
+            "next_lot_post_equity": "20995.00",
+            "next_lot_post_industry_exposure": "6000",
+            "next_lot_post_security_exposure": "6000",
+            "next_lot_post_total_exposure": "6000",
+            "pending_cash_commitment": "0",
+            "pending_principal": "0",
+            "pending_sell_releases": "0",
+            "pending_unrecognized_fee": "0",
+            "post_industry_exposure": "5000",
+            "post_security_exposure": "5000",
+            "post_total_exposure": "5000",
+            "q": 500,
+            "reason_codes": [
+              "BUDGET_CAPACITY",
+              "CAPACITY_AVAILABLE"
+            ],
+            "residual_cash": "21000",
+            "target_cap": "6000.00",
+            "total_cost": "5005.00"
+          },
+          "reason_codes": [
+            "ENTRY_RESERVED"
+          ],
+          "reservation_id": "reservation_61a9f048377a6c8750ffae3e",
+          "second_bucket_probe": false,
+          "selected_bucket_id": "U1"
+        }
+      },
+      {
+        "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+        "opportunity_id": "OP",
+        "security_code": "SYN001",
+        "level1_industry_id": "IND1",
+        "bucket_id": "U1",
+        "cycle_id": "candidate-cycle:OP",
+        "quantity": 500,
+        "command_id": "review-entry",
+        "invocation_digest": "sha256:4f9f187bbcd6ac7ad1937ed8f38a756cbd8395fabd3ecd72a723575913b66f05",
+        "result_digest": "sha256:b62d89683c190a633dadf116f15d698c4f186ecc625cc42b9098d1c6a9f86d32",
+        "result": {
+          "accepted": true,
+          "cycle_id": "candidate-cycle:OP",
+          "expert_decision_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "first_considered_bucket_id": "U1",
+          "funding_ledger_entries": [],
+          "funding_state_changed": true,
+          "quantity": {
+            "cash_before_internal_holds": "21000",
+            "conservative_post_fill_equity": "20995.00",
+            "execution_authorized": false,
+            "existing_industry_exposure": "0",
+            "existing_security_exposure": "0",
+            "existing_total_exposure": "0",
+            "fees": "5.00",
+            "forced_sale": false,
+            "gross": "5000",
+            "next_lot_cap": "20995.00",
+            "next_lot_cost": "6005.00",
+            "next_lot_post_equity": "20995.00",
+            "next_lot_post_industry_exposure": "6000",
+            "next_lot_post_security_exposure": "6000",
+            "next_lot_post_total_exposure": "6000",
+            "pending_cash_commitment": "0",
+            "pending_principal": "0",
+            "pending_sell_releases": "0",
+            "pending_unrecognized_fee": "0",
+            "post_industry_exposure": "5000",
+            "post_security_exposure": "5000",
+            "post_total_exposure": "5000",
+            "q": 500,
+            "reason_codes": [
+              "BUDGET_CAPACITY",
+              "CAPACITY_AVAILABLE"
+            ],
+            "residual_cash": "21000",
+            "target_cap": "6000.00",
+            "total_cost": "5005.00"
+          },
+          "reason_codes": [
+            "ENTRY_RESERVED"
+          ],
+          "reservation_id": "reservation_c3b805cd4383bdcca60e2032",
+          "second_bucket_probe": false,
+          "selected_bucket_id": "U1"
+        }
+      }
+    ],
+    "active_entry_reservation_ids": []
+  }
+}

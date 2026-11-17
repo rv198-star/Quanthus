@@ -13,6 +13,7 @@ from typing import Any
 
 from quanthus.capabilities.accounting import AccountProjection, Position, Posting
 from quanthus.product_daily.application.funding_bridge import (
+    BridgeSnapshot,
     BridgeState,
     BuyBridgeResult,
     CycleBaseline,
@@ -207,27 +208,25 @@ class SQLiteCycleBridgeAdapter:
                 raise
         return BridgeState(account, baseline.funding, 0)
 
-    def read(self, context: SyntheticContext) -> BridgeState:
+    def read_snapshot(self, context: SyntheticContext) -> BridgeSnapshot:
         with self._connect() as connection:
             connection.execute("BEGIN")
             try:
-                state = self._read(connection, context)
+                snapshot = BridgeSnapshot(
+                    self._read(connection, context),
+                    self._obligation_rows(connection, context),
+                )
                 connection.commit()
-                return state
+                return snapshot
             except Exception:
                 connection.rollback()
                 raise
 
+    def read(self, context: SyntheticContext) -> BridgeState:
+        return self.read_snapshot(context).state
+
     def obligations(self, context: SyntheticContext) -> tuple[PendingObligation, ...]:
-        with self._connect() as connection:
-            connection.execute("BEGIN")
-            try:
-                values = self._obligation_rows(connection, context)
-                connection.commit()
-                return values
-            except Exception:
-                connection.rollback()
-                raise
+        return self.read_snapshot(context).obligations
 
     def commit_entry(
         self, context: SyntheticContext, expected: str, result: EntryBridgeResult

@@ -498,3 +498,78 @@ def test_incompatible_cycle_store_is_not_reinterpreted(tmp_path: Path) -> None:
         db.execute("PRAGMA user_version=1")
     with pytest.raises(FactError, match="STORE_SCHEMA_MISMATCH"):
         build_funding_bridge_service(path, context=context(), authorization=AUTH)
+
+
+def test_risk_snapshot_is_one_transaction_during_concurrent_fill(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from threading import Event, Thread, current_thread
+    from typing import Any
+
+    from quanthus.platform.adapters.product_daily_cycle_sqlite import SQLiteCycleBridgeAdapter
+    from quanthus.product_daily.application.funding_bridge import FundingBridgeService
+
+    port = SQLiteCycleBridgeAdapter(tmp_path / "concurrent-risk.sqlite")
+    service = FundingBridgeService(port, context(), AUTH)
+    service.establish_baseline(baseline())
+    intent, _ = inputs()
+    service.enter(context(), intent)
+    captured, writer_committed = Event(), Event()
+    errors: list[BaseException] = []
+    results: dict[str, RiskSnapshot] = {}
+
+    def wait_for_writer(value: Any) -> Any:
+        if current_thread().name == "risk-reader":
+            captured.set()
+            if not writer_committed.wait(5):
+                raise AssertionError("writer did not commit before risk response")
+        return value
+
+    original_read = port.read
+
+    def paused_read(value: SyntheticContext) -> Any:
+        return wait_for_writer(original_read(value))
+
+    monkeypatch.setattr(port, "read", paused_read)
+    original_snapshot = getattr(port, "read_snapshot", None)
+    if original_snapshot is not None:
+
+        def paused_snapshot(value: SyntheticContext) -> Any:
+            return wait_for_writer(original_snapshot(value))
+
+        monkeypatch.setattr(port, "read_snapshot", paused_snapshot)
+
+    def reader() -> None:
+        try:
+            results["risk"] = service.risk_snapshot(context(), mark_price=Decimal("10"))
+        except BaseException as exc:
+            errors.append(exc)
+
+    def writer() -> None:
+        try:
+            service.submit_buy(context(), report(), profile())
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            writer_committed.set()
+
+    read_thread = Thread(target=reader, name="risk-reader", daemon=True)
+    write_thread = Thread(target=writer, name="fill-writer", daemon=True)
+    read_thread.start()
+    try:
+        assert captured.wait(5), "risk did not capture its read result"
+        write_thread.start()
+        write_thread.join(5)
+        assert not write_thread.is_alive(), "writer failed to finish"
+    finally:
+        writer_committed.set()
+        read_thread.join(5)
+    assert not read_thread.is_alive() and not errors
+    risk = results["risk"]
+    assert risk.cash_before_internal_holds == Decimal("21000.00")
+    assert pending_cash_commitment(risk).total == Decimal("5005.00")
+    assert len(risk.pending_buys) == 1
+    fresh = service.risk_snapshot(context(), mark_price=Decimal("10"))
+    assert fresh.cash_before_internal_holds == Decimal("15995.00")
+    assert fresh.pending_buys == ()
+    assert service.current(context()).account.quantity("SYN001") == 500

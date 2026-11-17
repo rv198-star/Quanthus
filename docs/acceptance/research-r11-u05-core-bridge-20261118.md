@@ -47,3 +47,9 @@ base 462c668a is recorded separately.
 
 Sell, settlement, second-cycle reuse and late-fee integration remain the next contiguous U05 slice.
 Actual/daily profiles, UI/HTTP, market data, training, capital replay and production remain closed.
+
+## CB02 concurrent snapshot repair
+
+Independent008 closedCB01/CB03-CB07 and retained one real SQLite mixed-snapshot defect. The application now consumes one typed BridgeSnapshot of account/funding/obligations with a common revision/digest; the adapter materializes it in one read transaction. Risk, entry and buy use this common read. Shared funding-cycle reservation history stays unchanged.
+
+A controlled two-thread public regression commits a500share fill between reading and returning the risk view. The original implementation returned prefill cash21000 with zero pending cash and failed; the revised view retains prefill pending5005, while a fresh view returns postfill cash15995/pending0.72related tests pass. Ruff/format and strict Python3.10-target mypy over the two changed source files plus neutral fact_contracts pass. A fresh non-incremental mypy cache was required after an internal incremental-cache error; no dependency changed. Exact final native acceptance remains pending until the limited009review passes.

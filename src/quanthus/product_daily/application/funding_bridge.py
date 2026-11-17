@@ -441,6 +441,41 @@ class BridgeState:
 
 
 @dataclass(frozen=True)
+class BridgeSnapshot:
+    state: BridgeState
+    obligations: tuple[PendingObligation, ...]
+
+    @property
+    def revision(self) -> int:
+        return self.state.account_revision
+
+    @property
+    def digest(self) -> str:
+        return digest(
+            {
+                "account": self.state.account.digest,
+                "funding": self.state.funding.digest,
+                "revision": self.revision,
+                "obligations": [
+                    {
+                        "obligation_id": item.obligation_id,
+                        "reservation_id": item.reservation_id,
+                        "security_code": item.security_code,
+                        "level1_industry_id": item.level1_industry_id,
+                        "bucket_id": item.bucket_id,
+                        "quantity": item.quantity,
+                        "price_bound": format(item.price_bound, "f"),
+                        "fee_upper_bound": format(item.fee_upper_bound, "f"),
+                        "source_id": item.source_id,
+                        "status": item.status,
+                    }
+                    for item in self.obligations
+                ],
+            }
+        )
+
+
+@dataclass(frozen=True)
 class EntryBridgeResult:
     accepted: bool
     replayed: bool
@@ -466,6 +501,7 @@ class BuyBridgeResult:
 class FundingBridgePort(Protocol):
     def establish(self, baseline: CycleBaseline) -> BridgeState: ...
     def read(self, context: SyntheticContext) -> BridgeState: ...
+    def read_snapshot(self, context: SyntheticContext) -> BridgeSnapshot: ...
     def obligations(self, context: SyntheticContext) -> tuple[PendingObligation, ...]: ...
     def commit_entry(
         self, context: SyntheticContext, expected: str, result: EntryBridgeResult
@@ -602,7 +638,8 @@ class FundingBridgeService:
 
     def enter(self, context: SyntheticContext, intent: CycleEntryIntent) -> EntryBridgeResult:
         context = self._context_for(context)
-        state = self._port.read(context)
+        view = self._port.read_snapshot(context)
+        state = view.state
         known_command = any(
             item.command_id == intent.command.command_id
             for item in state.funding.processed_commands
@@ -611,9 +648,7 @@ class FundingBridgeService:
             raise ProductDailyError("ACCOUNT_REVISION_CONFLICT", "account revision is stale")
         if not known_command:
             pending = tuple(
-                item.pending_buy()
-                for item in self._port.obligations(context)
-                if item.status == "OPEN"
+                item.pending_buy() for item in view.obligations if item.status == "OPEN"
             )
             if (
                 intent.snapshot.cash_available != state.account.cash
@@ -703,10 +738,11 @@ class FundingBridgeService:
         if existing is not None:
             return existing
         receipt_id = self._port.receive_buy(context, report, profile)
-        state = self._port.read(context)
+        view = self._port.read_snapshot(context)
+        state = view.state
         obligations = tuple(
             item
-            for item in self._port.obligations(context)
+            for item in view.obligations
             if item.status == "OPEN" and item.security_code == report.security_code
         )
         if len(obligations) != 1:
@@ -727,10 +763,9 @@ class FundingBridgeService:
         )
 
     def risk_snapshot(self, context: SyntheticContext, *, mark_price: Decimal) -> RiskSnapshot:
-        state = self._port.read(self._context_for(context))
-        pending = tuple(
-            item.pending_buy() for item in self._port.obligations(context) if item.status == "OPEN"
-        )
+        view = self._port.read_snapshot(self._context_for(context))
+        state = view.state
+        pending = tuple(item.pending_buy() for item in view.obligations if item.status == "OPEN")
         positions = tuple(
             MarkedExposure(
                 unit_id=f"position:{item.security_code}",
@@ -745,7 +780,7 @@ class FundingBridgeService:
         )
         marked = sum((Decimal(item.quantity) * mark_price for item in positions), Decimal("0"))
         return RiskSnapshot(
-            "bridge-risk",
+            f"bridge-risk:{view.digest}",
             self._context.as_of,
             state.account.cash + marked,
             state.account.cash,

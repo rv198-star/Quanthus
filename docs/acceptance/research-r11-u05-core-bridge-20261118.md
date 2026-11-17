@@ -53,3 +53,11 @@ Actual/daily profiles, UI/HTTP, market data, training, capital replay and produc
 Independent008 closedCB01/CB03-CB07 and retained one real SQLite mixed-snapshot defect. The application now consumes one typed BridgeSnapshot of account/funding/obligations with a common revision/digest; the adapter materializes it in one read transaction. Risk, entry and buy use this common read. Shared funding-cycle reservation history stays unchanged.
 
 A controlled two-thread public regression commits a500share fill between reading and returning the risk view. The original implementation returned prefill cash21000 with zero pending cash and failed; the revised view retains prefill pending5005, while a fresh view returns postfill cash15995/pending0.72related tests pass. Ruff/format and strict Python3.10-target mypy over the two changed source files plus neutral fact_contracts pass. A fresh non-incremental mypy cache was required after an internal incremental-cache error; no dependency changed. Exact final native acceptance remains pending until the limited009review passes.
+
+## Final internal first-bridge acceptance
+
+Exact87cdf3ae85536608c7c846b72aac2cf704e86c24/tree82b7185b80c12911523ed37fab9a3820607d33e1 passed CN02Python3.10.12 complete make check: 9458 passed/35 skipped. The008six closures plus009CB02closure and72related tests bind the same final source. Native logs/receipts were read back and SHA-verified; wall874.959s, scriptCPU857.867s, peakRSS561946624bytes, no guard fired. Existing optional dependency skips remain recorded; hosted CI was not used.
+
+Ordinary705 mergee4d217913a7903f90295e5fa620ba1d17c6ffadd into the continuation branch has exactly the tested tree. Original rejected462c and5ee3mixed-snapshot failure remain preserved. This accepts the first synthetic entry/buy bridge for the next originalU05engineering step. Full two-cycle sell/settlement/late-fee, qualified historical comparison and daily-use acceptance remain open in700.
+
+Evidence: `/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/engineering-acceptance.json`, `native-evidence/final/check-receipt.json`, `merge705-commit.json`; independent returns in the relay'sds-u05-corebridge-r1-review-008 andds-u05-corebridge-final-review-009.

@@ -2898,6 +2898,91 @@
         "CP-700-U05-FIRST-FACTS-ACCEPTED-BRIDGE-20261118"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R11-FIRST-FUNDING-ACCOUNT-BRIDGE-20261118",
+      "recorded_at": "2026-11-17T20:54:38.798965+00:00",
+      "actor": "Quanthus lead Sol after008/009 and final exact native/ordinary705 merge",
+      "question_id": "R11-U05-FIRST-ATOMIC-BRIDGE-001",
+      "family": "r11-d1b-fixed-reserve",
+      "work_item": "P11-R11-USE-002",
+      "modules": [
+        "MVP",
+        "TRACE"
+      ],
+      "question": "Can one original public entry and actual synthetic complete buy atomically connect account facts, full FundingState, pending/source/profile identities and replayable state?",
+      "consumer": "P11 comparison adapter and P12 original complete two-cycle engineering",
+      "scope": "Only first synthetic reservation/buy and strict full funding restore at87cdf; ordinary705 continuation merge exact tested tree.",
+      "execution_status": "completed",
+      "verdict": "supported",
+      "disposition": "candidate_for_adoption",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "Internal bounded engineering asset for next synthetic integration; complete R11 research unanswered and daily use incomplete.",
+      "decision_effect": "Use qualified bridge for originalU05 full two-cycle/sell/settlement/late-fee story; keep exact input/PIT/purpose/expert and complete-use gates.",
+      "reopen_conditions": [
+        "Changed transaction semantics require focused/platform and scoped independent fix evidence before a final native closure.",
+        "Result-bearing historical comparison and actual/daily use keep original U01-U08 authority and data/purpose gates; engineering reuse does not reopen parked science."
+      ],
+      "retained_assets": [
+        "Strict complete FundingState envelope and cached result/identity preservation.",
+        "Shared account/funding buy transition, physical-fact/profile/baseline identity, one transactional account/funding/obligation snapshot with revision/digest.",
+        "Raw reception, atomic CAS/hold/receipt/outbox and realSQLite concurrent red/green, fault/retry/cold proofs; original45core/test closure.",
+        "All003/R1/review007/008/009 returns, failures, costs and exact native logs."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Original003dispatch-to-completion~3129.86s within3600; R1~2390.96s within2700.008native656.263s,009native153.642s; dispatch-inclusive timing separately retained. Final native wall874.9590972710866s/scriptCPU857.8666639999999s/peakRSS561946624bytes. Earlier native failures/stopped CPU unknown, worker overruns and all R6-R11 exposure/costs retained; model/control/unmeasured total unknown_not_zero. Repair was material and costly; reuse common state/identity paths in original full-cycle story rather than duplicate infrastructure.",
+      "attempt_refs": [
+        "ds-u05-corebridge-003/MANIFEST.json",
+        "ds-u05-corebridge-003-r1/MANIFEST.json",
+        "ds-u05-corebridge-r1-review-008/MANIFEST.json",
+        "ds-u05-corebridge-final-review-009/MANIFEST.json",
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/native-return-timing.json",
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/cb02-before.log",
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/native-evidence/final-readback.json"
+      ],
+      "evidence": [
+        {
+          "id": "BRIDGE-NATIVE-FINAL",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/native-evidence/final/check-receipt.json",
+          "sha256": "30fcf3d70ef9f1dbbd0af6bc27407ed0ce9c533fdae2b137494cb2504078f849",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Final exact87cdf composed-source make check in CN02Python3.10.12; internal synthetic first bridge only."
+        },
+        {
+          "id": "BRIDGE-INTERNAL-ACCEPTANCE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/engineering-acceptance.json",
+          "sha256": "1d4a7f608021da7b46d8abe58823b57a05b7a056ac4ee60570caec83d0b96b85",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "First reservation/buy account-funding bridge accepted; full U05 cycles and whole R11 use remain open."
+        },
+        {
+          "id": "BRIDGE-REVIEW009",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-u05-corebridge-final-review-009/review.json",
+          "sha256": "30478ee8c33de40365a4b278951c7c32a555ec067e5cb407ed5f4dfe464eb3fd",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "CB02-ASYNC CLOSED; reuse008six closures; bounded independent internal review."
+        },
+        {
+          "id": "BRIDGE-ORDINARY-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/merge705-commit.json",
+          "sha256": "b7d84057cc09dea30d878aa79fbf8d2ae5d6b36a7c1268154ec656ea36bf6f49",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary705 merge into continuation has exactly the tested tree; no main release."
+        }
+      ],
+      "blueprint_checkpoints": [
+        "CP-700-FIRST-FUNDING-ACCOUNT-BRIDGE-ACCEPTED-20261118"
+      ],
+      "supersedes": null
     }
   ]
 }

@@ -15631,6 +15631,101 @@
           "body_sha256": "79f23476eaf67c60b4e53f1e948b8da2acca52ef7e48e50bf9013d4b0be5b94c"
         }
       ]
+    },
+    {
+      "id": "CP-700-FIRST-FUNDING-ACCOUNT-BRIDGE-ACCEPTED-20261118",
+      "recorded_at": "2026-11-17T20:54:38.798965+00:00",
+      "actor": "Quanthus lead Sol after008/009 and final exact native/ordinary705 merge",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Accept bounded first synthetic entry/buy funding-account bridge; allCB01-CB07 closed, final native exact source passed, ordinary705 tree verified. Next original full two-cycle story; wholeR11 open.",
+      "evidence": [
+        {
+          "id": "BRIDGE-NATIVE-FINAL",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/native-evidence/final/check-receipt.json",
+          "sha256": "30fcf3d70ef9f1dbbd0af6bc27407ed0ce9c533fdae2b137494cb2504078f849",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Final exact87cdf composed-source make check in CN02Python3.10.12; internal synthetic first bridge only."
+        },
+        {
+          "id": "BRIDGE-INTERNAL-ACCEPTANCE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/engineering-acceptance.json",
+          "sha256": "1d4a7f608021da7b46d8abe58823b57a05b7a056ac4ee60570caec83d0b96b85",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "First reservation/buy account-funding bridge accepted; full U05 cycles and whole R11 use remain open."
+        },
+        {
+          "id": "BRIDGE-REVIEW009",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-u05-corebridge-final-review-009/review.json",
+          "sha256": "30478ee8c33de40365a4b278951c7c32a555ec067e5cb407ed5f4dfe464eb3fd",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "CB02-ASYNC CLOSED; reuse008six closures; bounded independent internal review."
+        },
+        {
+          "id": "BRIDGE-ORDINARY-MERGE",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-corebridge-r1-005/merge705-commit.json",
+          "sha256": "b7d84057cc09dea30d878aa79fbf8d2ae5d6b36a7c1268154ec656ea36bf6f49",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Ordinary705 merge into continuation has exactly the tested tree; no main release."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Accepted internal first synthetic public entry/buy bridge: strict complete FundingState restore, truthful5005pending obligation, physical fact/profile/baseline replay identity, one account/funding impact and consistent snapshot, atomic CAS/raw/receipt/hold/outbox and cold reopen. Original shared core/45tests unchanged.",
+          "remaining": "Original completeU05 sell/flat readiness/settlement/second-cycle/late-fee and chronological cold reconstruction, exact purpose/source/PIT/account/expert gates, qualified complete comparison, final whole-use audit and daily acceptance remain open.",
+          "next_action": "Reuse this exact bridge for original complete two-cycle package004; receive actual source facts and chronological replay, then qualified comparison gates.",
+          "evidence": [
+            "BRIDGE-NATIVE-FINAL",
+            "BRIDGE-INTERNAL-ACCEPTANCE",
+            "BRIDGE-REVIEW009",
+            "BRIDGE-ORDINARY-MERGE"
+          ],
+          "supersedes": "CP-700-U05-FIRST-FACTS-ACCEPTED-BRIDGE-20261118"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Original003/007 andR1/008 failures preserved; realSQLite concurrent read defect red/green and009 independent pass bound to exact final87cdf native and ordinary705 tree. Sol single shared writer and original complete goal retained.",
+          "remaining": "Original completeU05 sell/flat readiness/settlement/second-cycle/late-fee and chronological cold reconstruction, exact purpose/source/PIT/account/expert gates, qualified complete comparison, final whole-use audit and daily acceptance remain open.",
+          "next_action": "Reuse this exact bridge for original complete two-cycle package004; receive actual source facts and chronological replay, then qualified comparison gates.",
+          "evidence": [
+            "BRIDGE-NATIVE-FINAL",
+            "BRIDGE-INTERNAL-ACCEPTANCE",
+            "BRIDGE-REVIEW009",
+            "BRIDGE-ORDINARY-MERGE"
+          ],
+          "supersedes": "CP-700-U05-FIRST-FACTS-ACCEPTED-BRIDGE-20261118"
+        }
+      ],
+      "no_change_reason": "EXPERT,REPRO,CLOSEOUT maturity and all quality/value/admission facets keep their existing scopes; mechanical native/first bridge acceptance does not complete scientific comparison or daily use.",
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T20:52:55Z",
+          "body_sha256": "deff024993dd85b65d2e9663b5944f6cb6791bc3a93e3cb94537bad94374149c"
+        }
+      ]
     }
   ],
   "history_imports": [

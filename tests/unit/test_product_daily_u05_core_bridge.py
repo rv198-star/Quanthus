@@ -33,9 +33,11 @@ from quanthus.product_daily.risk import (
     ExpertEntryEligibility,
     QuantityLimits,
     RiskSnapshot,
+    decide_entry,
     entry_invocation_payload,
 )
 from tests.unit.test_product_daily_r11 import EXPERT_EVENT_ID
+from tests.unit.test_product_daily_r11_review import _entry_inputs
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = (
@@ -149,6 +151,10 @@ def profile() -> CycleFillProfile:
 
 def test_f01_complete_funding_state_roundtrip_and_fail_closed() -> None:
     raw = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    start, args, command = _entry_inputs(reserve="1000", expert_cap=".30")
+    first = decide_entry(funding=start, command=command, **args)
+    assert first.funding_state.digest == raw["first_entry"]["funding_state_digest"]
+    assert first.funding_state.revision == raw["first_entry"]["funding_state_revision"]
     state = restore_funding_state(raw["final_state"])
     assert state.to_dict() == raw["final_state"]
     envelope = funding_state_envelope(state)

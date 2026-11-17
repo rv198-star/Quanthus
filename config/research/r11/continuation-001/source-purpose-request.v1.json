@@ -1,0 +1,75 @@
+{
+  "schema": "quanthus.r11.source-purpose-request.v1",
+  "owner_issue": 701,
+  "consumer_issue": 700,
+  "scope": {
+    "decisions": [
+      "2020-01-01",
+      "2021-12-30"
+    ],
+    "executions_through": "2021-12-31",
+    "required_prior_history": "at least prior60 eligible closes and original P4/listing requirements; do not shrink original window to fit the available source",
+    "protected_after": "2021-12-31"
+  },
+  "source_candidates": [
+    {
+      "id": "development-direct-dwd-job-local-v1@2.0.0",
+      "root": "/srv/quanthus/dwd-dws-v2.1/base/dwd-base-202607-v2.1",
+      "physical_check": "missing exact legacy path",
+      "per_decision_publication_proven": false
+    },
+    {
+      "id": "rv192/quanthus-base25-sealed@1923c874b43d47e69190a6dc9546e6fd8f3d1ca3",
+      "manifest_sha256": "8cd966be87fce02168c54e77c23e05f491c4afb204c4cbace42a2024eee1cdef",
+      "declared_scope": "2020-2021 market;2019calendar; exact source/history/clock physical closure still requires P10",
+      "related_issues": [
+        556,
+        679
+      ]
+    }
+  ],
+  "exact_families": [
+    "security/listing identity",
+    "dailyunadjustedOHLC+turnover+volume+validprices",
+    "calendar/Tclose/T+1open",
+    "tradability/limits/status",
+    "adjustment/corporateaction/entitlements",
+    "staticlevel1industry concentrationonly",
+    "exactsnapshotmanifest/knowledgefrom/effectiveview"
+  ],
+  "PIT_use_answers_required": [
+    "strict per-decision availability with true source knowledge",
+    "separately qualified retrospective scope and interpretation clock",
+    "prospective daily supply exact publication/cutoff for eventual consumer"
+  ],
+  "exposure": {
+    "known_company_exclusion_union": 1664,
+    "all_remaining_historical_exposure": "UNKNOWN",
+    "oldP4_B_P5_March87_Stage34_lists": "unavailable legacy history retained; never label fresh",
+    "rule": "request exact source/role/exposure manifest; source availability does not accept a new evaluation split"
+  },
+  "first_package_admission": "U02 not qualified; U06 market execution held, U01/U03 synthetic independent work continues",
+  "known_path_receipt": {
+    "path": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/lead-001/known-source-paths.json",
+    "sha256": "db1fbdd0a89b8f13a8dcd1b894e396331ab8c355d0d132b4bcc6d8611d8dd016"
+  },
+  "metadata_only_followups": {
+    "exact_roots": [
+      "/srv/agentdock/quanthus-ops/research-r7-multiop-20261113/retained",
+      "/srv/agentdock/quanthus-ops/research-r10-feedback-20261114"
+    ],
+    "allowed_files": [
+      "retained-manifest.json",
+      "input-copy.json",
+      "retention-stage1.json",
+      "remote-cleanup.safe.json",
+      "r10-capital-recovery-manifest.v1.json",
+      "r10-run-manifest.v1.json",
+      "A-execution-manifest.safe.json"
+    ],
+    "pointer_depth_max": 2,
+    "max_metadata_files": 16,
+    "max_metadata_bytes": 16777216,
+    "scope": "existing exact metadata/receipt and direct identity paths only; no recursive archive search, no parquet/market-row reads or shared data repair"
+  }
+}

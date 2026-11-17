@@ -1,0 +1,176 @@
+{
+  "schema": "quanthus.r11.continuation-source.v1",
+  "base": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+  "accepted_engineering_source": "ffa8891154379985a9b6f62896eec76e0048d498",
+  "accepted_version": "1.2.0",
+  "bindings": [
+    {
+      "path": "config/p0-policy.v1.json",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "b5d6ae725e9ce8d9e4b936d2324458c341c9fabc4a3a33e15671d84ff4df4338",
+      "kind": "repository_source"
+    },
+    {
+      "path": "config/p2-execution-policy.research.v1.json",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "e2ee55ea09682eeb775b9acfcfc4bbba0908ddd4157705cd81fd8f050097c816",
+      "kind": "repository_source"
+    },
+    {
+      "path": "config/p4-candidate-price-volume-transition.research.v1.json",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "04207eabf00a1f4898f28918e4f846cdd91b12f23a906e574306581e471c271c",
+      "kind": "repository_source"
+    },
+    {
+      "path": "config/expert-strategies/p4-trend-risk.v1.0.1.json",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "7dbc8a7079a2bb60088c1288d063c08aee3fdba2dea1daebc9c03049c8fd8664",
+      "kind": "repository_source"
+    },
+    {
+      "path": "config/expert-evaluations/acceptance/candidate-p4-trend-risk-1.0.1.v1.json",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "80c276638156a9fa73b2e6f91c594152943c189f21bd4f503f4011af1fa5c88e",
+      "kind": "repository_source"
+    },
+    {
+      "path": "config/replay-data-provider.development.v2.json",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "cbc0c6dc83bab14373f7699540adce3bbb4d5e237f05abe4c4dae63118678d29",
+      "kind": "repository_source"
+    },
+    {
+      "path": "config/forward-validation/paper/p6-paper-lane.v1.json",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "50fc7745570814ae927252469e11fe038c7a1b25f0f0bb8e3ce9e911d9eac0d8",
+      "kind": "repository_source"
+    },
+    {
+      "path": "src/quanthus/position_lifecycle.py",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "eae78bbeea119bf3a78bd1567c784f4f38f015c388d5315c46ff030700181c86",
+      "kind": "repository_source"
+    },
+    {
+      "path": "src/quanthus/capital_allocation.py",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "35fe42ef0b1cafadc80e17be1a89262e5a992513848ff720fe29b6fe11211169",
+      "kind": "repository_source"
+    },
+    {
+      "path": "src/quanthus/concentration.py",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "009bc02c786f091bf4597463eda842fee8d651fae24e537985b7c0c2ebbd4ca1",
+      "kind": "repository_source"
+    },
+    {
+      "path": "src/quanthus/expert_strategy/runner.py",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "96d00567ec4b0008e753aed1874136337a108d2c36a684d897117fc4d124d69b",
+      "kind": "repository_source"
+    },
+    {
+      "path": "src/quanthus/expert_strategy/position_risk.py",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "521925258416e48f8bda585b16253dea81224d29bea50a5336febc2b06c53b56",
+      "kind": "repository_source"
+    },
+    {
+      "path": "src/quanthus/backtest/contracts.py",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "519f8f6c4145f9a39b2771374f7bc7ed87c7e21e8c2928d450f6ada19fa137b4",
+      "kind": "repository_source"
+    },
+    {
+      "path": "src/quanthus/backtest/policy.py",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "30dfe7e9ba00cfd72bbef3398a381d3df4cde7d968a59a21e67877803c9611d0",
+      "kind": "repository_source"
+    },
+    {
+      "path": "src/quanthus/backtest/engine.py",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "2721a72ec7f553e7c4861e9863e26f2848138531c4ee59340569d500e6276d8c",
+      "kind": "repository_source"
+    },
+    {
+      "path": "config/research/r11/research-contract.v1.0.1.json",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "f49cdad4405cbb641ac93812671c000469a35968895ebd30bc8d26d9f6b5eb15",
+      "kind": "repository_source"
+    },
+    {
+      "path": "config/research/r11/lead-golden-cases.json",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "346dfb47ba9d3590a5cc1e9745f43c670f632c770561f4dbdb1c69a341694710",
+      "kind": "repository_source"
+    },
+    {
+      "path": "config/research/r11/implementation-policy.v1.json",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "06d6a2f5f814537e9df327a26d5d57116de5b19243fb026f5bffc6595b096970",
+      "kind": "repository_source"
+    },
+    {
+      "path": "src/quanthus/product_daily/contracts.py",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "a849a92e2a14f02de914e4b06c41d6b3619a1146edccb415c0ae00378cc3e77e",
+      "kind": "repository_source"
+    },
+    {
+      "path": "src/quanthus/product_daily/candidate.py",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "7c703496741a448be4d57eb168aa0178cfce33ca439b97647ebb2dd955c8233e",
+      "kind": "repository_source"
+    },
+    {
+      "path": "src/quanthus/product_daily/funding.py",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "2553c5ac4a51d46842402c2dd35f18b4ab806e270e041a4d4c993bd49db1467b",
+      "kind": "repository_source"
+    },
+    {
+      "path": "src/quanthus/product_daily/risk.py",
+      "base_commit": "ad541f1bfc1e0f012dca7de4a32d769d3e66e6fc",
+      "sha256": "59093aa5dafe87a0c8af2748c5812aeda5f8c5212323e5ca87bbdcc5fad0592f",
+      "kind": "repository_source"
+    },
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/README.md",
+      "sha256": "672aff6d5b677ef909a3a56e73451ed393231a5598e503791230550d1f31f0fe",
+      "kind": "P12_v8_contract"
+    },
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/capital-risk.md",
+      "sha256": "cc0df12a252f923987cd4da3d8496997cdfb5717ce252a5f836a510524010f68",
+      "kind": "P12_v8_contract"
+    },
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/engineering-contract.md",
+      "sha256": "3313adfefa53d351dbc3cce15818a8a220f2017c97c902ef12fc894d87f6035b",
+      "kind": "P12_v8_contract"
+    },
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/engineering-work-packages.md",
+      "sha256": "d4aa9bb1dfd143c07aa0ca981fb001535a75b07dc8e6c93197ebd45318683def",
+      "kind": "P12_v8_contract"
+    },
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/execution-facts.md",
+      "sha256": "603f292bb5ea8bad72805febac7f038e3f1f4c106d785729f7450c940f458909",
+      "kind": "P12_v8_contract"
+    },
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/acceptance-scenarios.md",
+      "sha256": "80d1782b07e88186afa5f4729fc755efbe78514d61412452d5d07b3f4ddfe0ab",
+      "kind": "P12_v8_contract"
+    },
+    {
+      "path": "/Users/william/Documents/Codex/2026-11-16/quanthus-p12-product-design-v8/contract-cases.json",
+      "sha256": "58474d7c73ed8ebb73ea1758a2dc688932c7e26c9030d871284bf994aecaa73d",
+      "kind": "P12_v8_contract"
+    }
+  ],
+  "old_ds_adoption_usage": "Historical1.1.0 only. Never treat that file as current implementation binding; derive new exact final source identities after repair."
+}

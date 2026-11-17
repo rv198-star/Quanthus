@@ -1,3 +1,11 @@
+# R11当前：工程子批已接受，完整用途继续交付
+
+2026-11-17 Owner已授权按U01–U08继续，当前Task[#700](https://github.com/rv198-star/Quanthus/issues/700)。首包补精确用途/输入/账户，修复新见证的未决现金P2；P10[#701](https://github.com/rv198-star/Quanthus/issues/701)持有源/PIT交接。完整研究问题和日常用途目标保持开放，R12搁置。详见[继续交付](research-r11-continuation.md)。
+
+下文保留2026-11-16有限工程子批的终审、成本与关闭历史；其1.2.0接受继续按原范围使用，后继新增现金修复和具体消费者准入分别验收。
+
+<details><summary>历史：2026-11-16共享合成工程子批交付</summary>
+
 # R11 已完成独立终审与源码合入（2026-11-16）
 
 R11 C13+C15+A02/A03 整批独立复审为 **ACCEPTED**，FA-01 已关闭、阻断项为 0。共享合成政策核心 **1.2.0** 已通过 PR [#691](https://github.com/rv198-star/Quanthus/pull/691) 普通合入，提交 `c2b64d52361faa21d8175a3fd704c50d542d9153`，与审计源 `ffa8891154379985a9b6f62896eec76e0048d498` 的树相同。
@@ -63,6 +71,8 @@ DS 首包已形成 `quanthus.product_daily` 纯政策核心和独立合成验收
 P12 W3/W4 只接收纯 state/command/receipt 接口并在自己的事务层持久化，不复制资金数学。后段完整研究新增工作估计为 46–92 主动小时，P12/P10 原估计另计；精确 compute、窗口和产物量待冻结 manifest 后报价。
 
 内部验收发现七项可执行逻辑缺陷、strict-input 缺口和 Q02 actual 指标错误后，DS 已完成 R1–R10 整批修复并升级纯政策实现到 `1.1.0`。修复闭合 completed-settlement history、reserve 债务优先、unsettled-cycle reuse、canonical command binding、C13 临时阻断重评、原 expert entry action、composite entry atomic replay、正 E_floor、typed money/boolean 边界及逐字段 frozen oracle。Daily adoption、A01/A02/A03/A04/A06/P12 事实层缺项保持不变。
+
+</details>
 
 </details>
 

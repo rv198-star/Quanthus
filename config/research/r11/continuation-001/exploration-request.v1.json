@@ -1,0 +1,184 @@
+{
+  "schema_version": "quanthus.exploration-request.v1",
+  "id": "R11-USE-CONTINUATION-PREPARE-001",
+  "status": "proposed",
+  "grants_authority": false,
+  "kind": "repair",
+  "family": "r11-d1b-fixed-reserve",
+  "work_item": "P11-R11-USE-002",
+  "modules": [
+    "MVP",
+    "EXPERT",
+    "REPRO",
+    "CLOSEOUT",
+    "TRACE"
+  ],
+  "question": "Which exact source/account/purpose conditions and one pending-cash repair make the existingR11 assets ready for the next qualified complete comparison?",
+  "consumer": "P11U01-U08 owner and P12D1 W1-W4",
+  "scope": "U01-U03 metadata/contracts/configuration and one concrete pending-cash synthetic root-cause repair; complete historical comparison remains held on named prerequisites.",
+  "deliverable": "Versioned purpose/control/account/input package; synthetic1.2.1 cash proof; exact existing-source handoff gaps and disjoint measured-reuse quote; no total-goal closure.",
+  "decision_if_pass": "Integrate necessary cash repair and exact readiness differences, continue unblockedU04/U05 within their own bounded contracts; R11 research/daily goals stay open.",
+  "decision_if_fail": "Return one grouped witnessed defect/dependency package, preserve partial assets and exact remaining scope/cost, continue independent authorized items.",
+  "acceptance": [
+    "Exact old/new source versions, mode differences and unchanged frozen predecessor bound.",
+    "Independent pending cash goldens/public-state invariants pass after versioned repair; original21goldens/history preserved.",
+    "P10 input handoff gaps and P12 actual facts/configuration separated; unknown exposure/PIT not inferred.",
+    "One isolated code package and independent metadata package, measured costs/reuse/remaining quotes and exact acceptance tree."
+  ],
+  "stop_conditions": [
+    "A: <=120min whole-turn wall/1500scriptCPU/2GiBRSS/128MiB; B: <=45min wall/120CPU/512MiB/64MiB; Sol same shared budget, start/deadline captured at dispatch.",
+    "Market rows/new reference/training/capital/daily/production0; P10 shared source repair excluded.",
+    "No original threshold/window/oldoracle modification, no platform/account DB/UI or shared state mutation by DS; interface/scope conflict returns affected package."
+  ],
+  "memory_sha256": "7ea37a64fd1c9719615de95c9ef7c87a14730a3c0cfc0aa5961bba48188def8f",
+  "prior_reviews": [
+    {
+      "conclusion_id": "CON-HEAD2-MARCH-20261029",
+      "relation": "respect",
+      "rationale": "Preserve rejection/UNKNOWN/exposure, oldB/researchv0 and existing inactive reference contracts; currentC13/C15 cash/input/account preparation requires noS02/reference/training and starts no R12."
+    },
+    {
+      "conclusion_id": "CON-HELD-NEED-20261029",
+      "relation": "respect",
+      "rationale": "Respect retained facts, consumer evidence and qualified scope. This repair/preparation delivers currentR11 exact account/source contracts without relabeling prior results or promoting admission; source-specific conditions and old failures remain."
+    },
+    {
+      "conclusion_id": "CON-CONSUMER-DELIVERY-20261029",
+      "relation": "respect",
+      "rationale": "Respect retained facts, consumer evidence and qualified scope. This repair/preparation delivers currentR11 exact account/source contracts without relabeling prior results or promoting admission; source-specific conditions and old failures remain."
+    },
+    {
+      "conclusion_id": "CON-DECISION-SELECTION-20261029",
+      "relation": "respect",
+      "rationale": "Respect retained facts, consumer evidence and qualified scope. This repair/preparation delivers currentR11 exact account/source contracts without relabeling prior results or promoting admission; source-specific conditions and old failures remain."
+    },
+    {
+      "conclusion_id": "CON-HISTORICAL-DECISION-REVIEW-20261029",
+      "relation": "respect",
+      "rationale": "Respect retained facts, consumer evidence and qualified scope. This repair/preparation delivers currentR11 exact account/source contracts without relabeling prior results or promoting admission; source-specific conditions and old failures remain."
+    },
+    {
+      "conclusion_id": "CON-RECORDED-B-CHAIN-20261029",
+      "relation": "respect",
+      "rationale": "Respect retained facts, consumer evidence and qualified scope. This repair/preparation delivers currentR11 exact account/source contracts without relabeling prior results or promoting admission; source-specific conditions and old failures remain."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-DELIVERY-20261030",
+      "relation": "respect",
+      "rationale": "Respect retained facts, consumer evidence and qualified scope. This repair/preparation delivers currentR11 exact account/source contracts without relabeling prior results or promoting admission; source-specific conditions and old failures remain."
+    },
+    {
+      "conclusion_id": "CON-ENTRY-ALLOCATION-CONSUMER-20261030",
+      "relation": "respect",
+      "rationale": "Respect retained facts, consumer evidence and qualified scope. This repair/preparation delivers currentR11 exact account/source contracts without relabeling prior results or promoting admission; source-specific conditions and old failures remain."
+    },
+    {
+      "conclusion_id": "CON-R1-PROXY-REPRODUCTION-20261111",
+      "relation": "respect",
+      "rationale": "Retain exact old raw-momentum/window/funding conclusions and costs. Current package does not rerun those market comparisons; reuse only named P2/legacy expert plumbing at its old purpose ceiling and request new qualified use before any R11 comparison."
+    },
+    {
+      "conclusion_id": "CON-R1-EXECUTION-INTERPRETATION-20261111",
+      "relation": "respect",
+      "rationale": "Retain exact old raw-momentum/window/funding conclusions and costs. Current package does not rerun those market comparisons; reuse only named P2/legacy expert plumbing at its old purpose ceiling and request new qualified use before any R11 comparison."
+    },
+    {
+      "conclusion_id": "CON-R1-PRICE-GUARD-V2-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Retain exact old raw-momentum/window/funding conclusions and costs. Current package does not rerun those market comparisons; reuse only named P2/legacy expert plumbing at its old purpose ceiling and request new qualified use before any R11 comparison."
+    },
+    {
+      "conclusion_id": "CON-R1-WORKER-F1F3-INDEPENDENT-20261111",
+      "relation": "respect",
+      "rationale": "Respect retained facts, consumer evidence and qualified scope. This repair/preparation delivers currentR11 exact account/source contracts without relabeling prior results or promoting admission; source-specific conditions and old failures remain."
+    },
+    {
+      "conclusion_id": "CON-R2-MOMENTUM-20261112",
+      "relation": "respect",
+      "rationale": "Retain exact old raw-momentum/window/funding conclusions and costs. Current package does not rerun those market comparisons; reuse only named P2/legacy expert plumbing at its old purpose ceiling and request new qualified use before any R11 comparison."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-SEAM-20261112",
+      "relation": "respect",
+      "rationale": "Retain exact old raw-momentum/window/funding conclusions and costs. Current package does not rerun those market comparisons; reuse only named P2/legacy expert plumbing at its old purpose ceiling and request new qualified use before any R11 comparison."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-QUAL-A-20261112",
+      "relation": "respect",
+      "rationale": "Retain exact old raw-momentum/window/funding conclusions and costs. Current package does not rerun those market comparisons; reuse only named P2/legacy expert plumbing at its old purpose ceiling and request new qualified use before any R11 comparison."
+    },
+    {
+      "conclusion_id": "CON-CAPITAL-RECOVERY-20261112",
+      "relation": "respect",
+      "rationale": "Retain exact old raw-momentum/window/funding conclusions and costs. Current package does not rerun those market comparisons; reuse only named P2/legacy expert plumbing at its old purpose ceiling and request new qualified use before any R11 comparison."
+    },
+    {
+      "conclusion_id": "CON-R5-CLOCK-20261112",
+      "relation": "respect",
+      "rationale": "Retain exact old raw-momentum/window/funding conclusions and costs. Current package does not rerun those market comparisons; reuse only named P2/legacy expert plumbing at its old purpose ceiling and request new qualified use before any R11 comparison."
+    },
+    {
+      "conclusion_id": "CON-R6-RANK1-20261113",
+      "relation": "respect",
+      "rationale": "Retain exact old raw-momentum/window/funding conclusions and costs. Current package does not rerun those market comparisons; reuse only named P2/legacy expert plumbing at its old purpose ceiling and request new qualified use before any R11 comparison."
+    },
+    {
+      "conclusion_id": "CON-R7-MULTIOP-DELIVERY-20261113",
+      "relation": "respect",
+      "rationale": "Respect retained facts, consumer evidence and qualified scope. This repair/preparation delivers currentR11 exact account/source contracts without relabeling prior results or promoting admission; source-specific conditions and old failures remain."
+    },
+    {
+      "conclusion_id": "CON-R8-STATE-CONSUMPTION-NOGO-20261113",
+      "relation": "respect",
+      "rationale": "Respect retained facts, consumer evidence and qualified scope. This repair/preparation delivers currentR11 exact account/source contracts without relabeling prior results or promoting admission; source-specific conditions and old failures remain."
+    },
+    {
+      "conclusion_id": "CON-R9-RT2-CLASS-SUPPORT-FAILED-20261113",
+      "relation": "respect",
+      "rationale": "Preserve rejection/UNKNOWN/exposure, oldB/researchv0 and existing inactive reference contracts; currentC13/C15 cash/input/account preparation requires noS02/reference/training and starts no R12."
+    },
+    {
+      "conclusion_id": "CON-R9-A4-CANONICAL-SUPPORT-FAILED-20261113",
+      "relation": "respect",
+      "rationale": "Preserve rejection/UNKNOWN/exposure, oldB/researchv0 and existing inactive reference contracts; currentC13/C15 cash/input/account preparation requires noS02/reference/training and starts no R12."
+    },
+    {
+      "conclusion_id": "CON-R9-QUALIFIED-ASSETS-LEARNING-20261114",
+      "relation": "respect",
+      "rationale": "Preserve rejection/UNKNOWN/exposure, oldB/researchv0 and existing inactive reference contracts; currentC13/C15 cash/input/account preparation requires noS02/reference/training and starts no R12."
+    },
+    {
+      "conclusion_id": "CON-MVP0-RESULT-AUDIT-20261114",
+      "relation": "respect",
+      "rationale": "Respect retained facts, consumer evidence and qualified scope. This repair/preparation delivers currentR11 exact account/source contracts without relabeling prior results or promoting admission; source-specific conditions and old failures remain."
+    },
+    {
+      "conclusion_id": "CON-R10-CONTROLLED-CANDIDATE-REJECTED-20261114",
+      "relation": "respect",
+      "rationale": "Preserve rejection/UNKNOWN/exposure, oldB/researchv0 and existing inactive reference contracts; currentC13/C15 cash/input/account preparation requires noS02/reference/training and starts no R12."
+    },
+    {
+      "conclusion_id": "CON-R10-WIDTH-ONLY-AUDITED-20261114",
+      "relation": "respect",
+      "rationale": "Preserve rejection/UNKNOWN/exposure, oldB/researchv0 and existing inactive reference contracts; currentC13/C15 cash/input/account preparation requires noS02/reference/training and starts no R12."
+    },
+    {
+      "conclusion_id": "CON-R10-OVERALL-ACCEPTED-DELIVERY-20261115",
+      "relation": "respect",
+      "rationale": "Preserve rejection/UNKNOWN/exposure, oldB/researchv0 and existing inactive reference contracts; currentC13/C15 cash/input/account preparation requires noS02/reference/training and starts no R12."
+    },
+    {
+      "conclusion_id": "CON-R11-FINAL-ACCEPTED-PARK-20261116",
+      "relation": "respect",
+      "rationale": "Respect accepted1.2.0 engineering and parked complete comparison. Current work repairs independently reproduced pending-cash omission and prepares exact U01-U03 consumer/source/account conditions under new Owner continuation; no result-bearing study reopens."
+    }
+  ],
+  "cumulative_cost_review": "Inherit R6-R11 all failures/exposure/UNKNOWN and3817.217224 measured CPU subset, originalDS002842.266359s overrun; model/uninstrumented costs unknown_not_zero. Extra sessions share total budget, do not reset research counts.",
+  "runtime_authority_boundary": "Verified Owner2026-11-17 R11 continuation and isolated parallel delivery, no inherited numeric research grant. First package is metadata/configuration/necessary synthetic repair only.",
+  "budget": {
+    "wall_seconds": 7200,
+    "max_new_bytes": 134217728,
+    "network_requests": 0,
+    "accounting_owner": "Sol cumulative; ordinary GitHub code distribution and exact SSH metadata/control separate; no new market/reference network"
+  }
+}

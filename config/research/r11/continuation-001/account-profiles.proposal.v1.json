@@ -1,0 +1,141 @@
+{
+  "schema": "quanthus.r11.account-profiles.proposal.v1",
+  "adopted": false,
+  "cash_contract": "pending-cash-contract.v1.json",
+  "synthetic": {
+    "identity": "SYN-R11-U03",
+    "mode": "synthetic_engineering",
+    "as_of": "2020-01-02T08:00:00+00:00",
+    "cash": "10000.00",
+    "equity": "10000.00",
+    "positions": [],
+    "pending_buys": [],
+    "pending_sells": [],
+    "known_empty_collections": true,
+    "bucket_count": 1,
+    "target_N": "10000.00",
+    "reserve": "0.00",
+    "unallocated_adjustment": "0.00",
+    "trial_fraction": "0.30",
+    "stock_limit": "1",
+    "industry_limit": "1",
+    "total_limit": "1",
+    "purpose": "fixture only; inherited21goldens/two-cycle source retain their own explicit fixtures"
+  },
+  "historical_proposal": {
+    "identity": "R11-HISTORICAL-SEED-PROPOSAL",
+    "mode": "historical_development_research",
+    "as_of": null,
+    "cash": "500000.00",
+    "equity": "500000.00",
+    "positions": [],
+    "pending_buys": [],
+    "pending_sells": [],
+    "known_empty_collections": "only proposed explicit research seed; requires purpose adoption",
+    "bucket_count": 5,
+    "target_N": "100000.00",
+    "reserve": "0.00",
+    "trial_fraction": "0.30",
+    "stock_limit": null,
+    "industry_limit": null,
+    "total_limit": null,
+    "origin": "original P6 research configuration; not actual account facts",
+    "execution_fee": {
+      "schema_version": "1.0.0",
+      "policy_version": "p2-daily-research-v1",
+      "status": "frozen",
+      "scope": "historical-and-paper-research-only",
+      "basis": {
+        "commission": "conservative explicit research assumption; calibrate to the actual broker account before P7",
+        "stamp_duty": "seller-side 0.05 percent research rule",
+        "transfer_fee": "both-side 0.001 percent research rule",
+        "slippage": "5 bps per side conservative daily-open assumption"
+      },
+      "currency": "CNY",
+      "timezone": "Asia/Shanghai",
+      "money": {
+        "price_tick": "0.01",
+        "cash_quantum": "0.01",
+        "rounding": "ROUND_HALF_UP"
+      },
+      "orders": {
+        "entry_lot_size": 100,
+        "partial_fill": "unsupported"
+      },
+      "costs": {
+        "buy": {
+          "slippage_bps": "5",
+          "commission_rate": "0.0003",
+          "minimum_commission": "5.00"
+        },
+        "sell": {
+          "slippage_bps": "5",
+          "commission_rate": "0.0003",
+          "minimum_commission": "5.00",
+          "stamp_duty_rate": "0.0005",
+          "transfer_fee_rate": "0.00001"
+        }
+      },
+      "profiles": [
+        {
+          "profile_id": "close-to-next-open-v1",
+          "kind": "close_to_next_open",
+          "active": true,
+          "schedule_version": "close-to-next-open-research-v1",
+          "windows": []
+        }
+      ]
+    },
+    "open_fields": [
+      "approved research purpose/asof/exact source",
+      "adopted candidate ratios and risk denominator",
+      "expert use admission",
+      "full comparison budget"
+    ]
+  },
+  "daily_simulated_template": {
+    "mode": "daily_simulated",
+    "as_of": null,
+    "cash": null,
+    "equity": null,
+    "positions": null,
+    "pending_buys": null,
+    "pending_sells": null,
+    "bucket_count": null,
+    "target_N": null,
+    "reserve": null,
+    "stock_limit": null,
+    "industry_limit": null,
+    "total_limit": null,
+    "actual_fee_version": null,
+    "manual_execution_windows": null,
+    "new_risk": "blocked until exact adopted values/source complete"
+  },
+  "actual_account_template": {
+    "mode": "personal_actual",
+    "broker_account_ref": null,
+    "baseline_as_of": null,
+    "cash": null,
+    "all_positions": null,
+    "sellable_quantities": null,
+    "pending_orders": null,
+    "in_transit_cash": null,
+    "fee_coverage_rules": null,
+    "settlement_finality": null,
+    "stock_industry_total_limits": null,
+    "manual_windows": null,
+    "purpose": "concrete Owner fact request only after P12 parameter proposal and consumer preparation; never invent empty account facts"
+  },
+  "P12_required_handoff": [
+    "same account/asof complete baseline and source",
+    "cash basis mapping before internal holds versus displayed available",
+    "all positions including external; pending/unreported/cancelled coverage and recognized/unrecognized fees",
+    "N/B/reserve and ratio proposal with source/adoption status",
+    "one exact fee model and windows; multi-fill/late-report/correction semantics with terminal quantities"
+  ],
+  "owner_only_fields_later": [
+    "actual personal broker account and real full baseline if personal_actual mode selected",
+    "actual broker fee/window facts if unavailable to P12"
+  ],
+  "no_silent_default": "null is missing; [] is only explicitly known empty; synthetic examples do not fill daily/actual facts"
+}

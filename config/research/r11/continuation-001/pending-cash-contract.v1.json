@@ -1,0 +1,30 @@
+{
+  "schema": "quanthus.r11.pending-cash-contract.v1",
+  "id": "R11-U03-CASH-001",
+  "version": "1.0.0",
+  "successor_implementation": "1.2.1",
+  "successor_risk_version": "1.0.2",
+  "repair_class": "missing frozen before-internal-holds cash commitment deduction, no threshold tuning",
+  "source_witness": {
+    "path": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/lead-001/cash-before.json",
+    "sha256": "a8d4486c8f0bcc2d458a15b6e6a6ecf6dfe05fb9f389dbbcb9db2053fc029870",
+    "actual_q": 500,
+    "expected_q": 0
+  },
+  "cash_input": {
+    "canonical": "tradeable cash net of cash obligations already recognized by the supplying account, BEFORE the internal pending-buy commitments enumerated in this snapshot",
+    "producer_rule": "supply this basis explicitly; product display/broker free cash already net of the same internal holds is a different basis and must not be passed then deducted again",
+    "recognized_payables": "already reflected in supplied economic equity and canonical cash; never blindly subtract snapshot.recognized_payables a second time",
+    "unrecognized_fee": "charge pending unrecognized fee upper bound once to new cash capacity; fee_already_recognized=true requires cash already net of that recognized obligation",
+    "adoption": "versioned input basis binds only explicit synthetic preparation here; real producer-to-snapshot mapping and actual facts remain A04/A06 pending"
+  },
+  "pending_cash_commitment": "sum(unique pending.remaining_quantity * pending.price_bound + pending.unrecognized_fee_upper_bound when not fee_already_recognized)",
+  "cash_capacity": "max(0, canonical_cash_before_internal_holds - pending_cash_commitment)",
+  "principal_price": "price_bound for cash, max(mark,price_bound) for exposure; keep their purposes distinct",
+  "quantity": "largest legal lot satisfying existing target/bucket/expert/risk/fee tests and residual cash capacity",
+  "membership": "pending list contains other unsubmitted reservations, potentially fillable remaining buys and filled-but-unreported cash commitments once each; source adapter deduplicates by canonical reservation/fill relationship, dataclass rejects duplicate reservation IDs",
+  "terminal": "cancellation/terminal report releases only confirmed unfilled quantity; missing confirmed fills and their fees retain commitment",
+  "unknown": "missing finite price/fee/required cash basis blocks dependent new risk; no inference of zero",
+  "public_entry": "decide_entry on cash failure must preserve exact FundingState and emit no transfers/holds/entry receipt; accepted replay keeps original quantities/results/postings and existing two-cycle invariant",
+  "regressions": "cash-goldens.v1.json plus public entry/replay and original21goldens/three stories; no original frozen oracle edit"
+}

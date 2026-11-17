@@ -1,0 +1,487 @@
+{
+  "schema": "quanthus.r11.pending-cash-independent-oracles.v1",
+  "frozen_by": "Sol before DS implementation",
+  "money": "Decimal strings, cash quantum0.01 ROUND_HALF_UP",
+  "cases": [
+    {
+      "id": "PC01",
+      "snapshot": {
+        "id": "SYN-CASH-PC01",
+        "economic_equity": "100000.00",
+        "cash_before_internal_holds": "10000",
+        "positions": [],
+        "pending_sells": [],
+        "pending_buys": [
+          {
+            "reservation_id": "P1",
+            "security_code": "SYN-OTHER-P1",
+            "industry": "IND2",
+            "remaining_quantity": 900,
+            "mark": "10",
+            "price_bound": "10",
+            "unrecognized_fee_upper_bound": "5",
+            "fee_already_recognized": false
+          }
+        ],
+        "cash_context": "synthetic equity includes known nontradeable cash; no inferred tradability"
+      },
+      "request": {
+        "budget": "5010",
+        "fraction": "1",
+        "mark": "10",
+        "price_bound": "10",
+        "lot": 100,
+        "limits": [
+          "1",
+          "1",
+          "1"
+        ],
+        "fee_rate": "0.0003",
+        "minimum_fee": "5.00"
+      },
+      "expected": {
+        "q": 0,
+        "residual_cash": "995",
+        "reason_includes": "CASH_CAPACITY"
+      }
+    },
+    {
+      "id": "PC02",
+      "snapshot": {
+        "id": "SYN-CASH-PC02",
+        "economic_equity": "100000.00",
+        "cash_before_internal_holds": "15000",
+        "positions": [],
+        "pending_sells": [],
+        "pending_buys": [
+          {
+            "reservation_id": "P1",
+            "security_code": "SYN-OTHER-P1",
+            "industry": "IND2",
+            "remaining_quantity": 900,
+            "mark": "10",
+            "price_bound": "10",
+            "unrecognized_fee_upper_bound": "5",
+            "fee_already_recognized": false
+          }
+        ],
+        "cash_context": "synthetic equity includes known nontradeable cash; no inferred tradability"
+      },
+      "request": {
+        "budget": "10000",
+        "fraction": "1",
+        "mark": "10",
+        "price_bound": "10",
+        "lot": 100,
+        "limits": [
+          "1",
+          "1",
+          "1"
+        ],
+        "fee_rate": "0.0003",
+        "minimum_fee": "5.00"
+      },
+      "expected": {
+        "q": 500,
+        "residual_cash": "5995",
+        "reason_includes": "CASH_CAPACITY",
+        "reason_scope": "next_lot failure includes CASH_CAPACITY when request target/bucket also binds; actual selected q must match"
+      }
+    },
+    {
+      "id": "PC03",
+      "snapshot": {
+        "id": "SYN-CASH-PC03",
+        "economic_equity": "100000.00",
+        "cash_before_internal_holds": "10000",
+        "positions": [],
+        "pending_sells": [],
+        "pending_buys": [],
+        "cash_context": "synthetic equity includes known nontradeable cash; no inferred tradability"
+      },
+      "request": {
+        "budget": "10000",
+        "fraction": "1",
+        "mark": "10",
+        "price_bound": "10",
+        "lot": 100,
+        "limits": [
+          "1",
+          "1",
+          "1"
+        ],
+        "fee_rate": "0.0003",
+        "minimum_fee": "5.00"
+      },
+      "expected": {
+        "q": 900,
+        "residual_cash": "10000",
+        "reason_includes": "CASH_CAPACITY",
+        "reason_scope": "next_lot failure includes CASH_CAPACITY when request target/bucket also binds; actual selected q must match"
+      }
+    },
+    {
+      "id": "PC04",
+      "snapshot": {
+        "id": "SYN-CASH-PC04",
+        "economic_equity": "10005.00",
+        "cash_before_internal_holds": "10005",
+        "positions": [],
+        "pending_sells": [],
+        "pending_buys": [
+          {
+            "reservation_id": "P1",
+            "security_code": "SYN-OTHER-P1",
+            "industry": "IND2",
+            "remaining_quantity": 900,
+            "mark": "10",
+            "price_bound": "10",
+            "unrecognized_fee_upper_bound": "0",
+            "fee_already_recognized": true
+          }
+        ],
+        "cash_context": "synthetic equity includes known nontradeable cash; no inferred tradability",
+        "recognized_payables": "5.00"
+      },
+      "request": {
+        "budget": "10000",
+        "fraction": "1",
+        "mark": "10",
+        "price_bound": "10",
+        "lot": 100,
+        "limits": [
+          "1",
+          "1",
+          "1"
+        ],
+        "fee_rate": "0.0003",
+        "minimum_fee": "5.00"
+      },
+      "expected": {
+        "q": 100,
+        "residual_cash": "1005",
+        "reason_includes": "CASH_CAPACITY",
+        "reason_scope": "next_lot failure includes CASH_CAPACITY when request target/bucket also binds; actual selected q must match"
+      },
+      "recognition_context": {
+        "raw_tradeable_cash": "10010",
+        "recognized_cash_payable": "5",
+        "canonical_cash": "10005",
+        "equity_net_of_payable": "10005"
+      }
+    },
+    {
+      "id": "PC05",
+      "snapshot": {
+        "id": "SYN-CASH-PC05",
+        "economic_equity": "100000.00",
+        "cash_before_internal_holds": "5015",
+        "positions": [],
+        "pending_sells": [],
+        "pending_buys": [
+          {
+            "reservation_id": "P1",
+            "security_code": "SYN-OTHER-P1",
+            "industry": "IND2",
+            "remaining_quantity": 100,
+            "mark": "10",
+            "price_bound": "10",
+            "unrecognized_fee_upper_bound": "5",
+            "fee_already_recognized": false
+          },
+          {
+            "reservation_id": "P2",
+            "security_code": "SYN-OTHER-P2",
+            "industry": "IND2",
+            "remaining_quantity": 200,
+            "mark": "10",
+            "price_bound": "10",
+            "unrecognized_fee_upper_bound": "5",
+            "fee_already_recognized": false
+          }
+        ],
+        "cash_context": "synthetic equity includes known nontradeable cash; no inferred tradability"
+      },
+      "request": {
+        "budget": "10000",
+        "fraction": "1",
+        "mark": "10",
+        "price_bound": "10",
+        "lot": 100,
+        "limits": [
+          "1",
+          "1",
+          "1"
+        ],
+        "fee_rate": "0.0003",
+        "minimum_fee": "5.00"
+      },
+      "expected": {
+        "q": 200,
+        "residual_cash": "2005",
+        "reason_includes": "CASH_CAPACITY",
+        "reason_scope": "next_lot failure includes CASH_CAPACITY when request target/bucket also binds; actual selected q must match"
+      }
+    },
+    {
+      "id": "PC06",
+      "snapshot": {
+        "id": "SYN-CASH-PC06",
+        "economic_equity": "100000.00",
+        "cash_before_internal_holds": "10000",
+        "positions": [],
+        "pending_sells": [],
+        "pending_buys": [
+          {
+            "reservation_id": "P1",
+            "security_code": "SYN-OTHER-P1",
+            "industry": "IND2",
+            "remaining_quantity": 900,
+            "mark": "10",
+            "price_bound": "10",
+            "unrecognized_fee_upper_bound": null,
+            "fee_already_recognized": false
+          }
+        ],
+        "cash_context": "synthetic equity includes known nontradeable cash; no inferred tradability"
+      },
+      "request": {
+        "budget": "10000",
+        "fraction": "1",
+        "mark": "10",
+        "price_bound": "10",
+        "lot": 100,
+        "limits": [
+          "1",
+          "1",
+          "1"
+        ],
+        "fee_rate": "0.0003",
+        "minimum_fee": "5.00"
+      },
+      "expected": {
+        "q": 0,
+        "residual_cash": null,
+        "reason_includes": "INPUT_UNAVAILABLE"
+      }
+    },
+    {
+      "id": "PC07",
+      "snapshot": {
+        "id": "SYN-CASH-PC07",
+        "economic_equity": "100000.00",
+        "cash_before_internal_holds": "10000",
+        "positions": [],
+        "pending_sells": [],
+        "pending_buys": [
+          {
+            "reservation_id": "P1",
+            "security_code": "SYN-OTHER-P1",
+            "industry": "IND2",
+            "remaining_quantity": 900,
+            "mark": "10",
+            "price_bound": null,
+            "unrecognized_fee_upper_bound": "5",
+            "fee_already_recognized": false
+          }
+        ],
+        "cash_context": "synthetic equity includes known nontradeable cash; no inferred tradability"
+      },
+      "request": {
+        "budget": "10000",
+        "fraction": "1",
+        "mark": "10",
+        "price_bound": "10",
+        "lot": 100,
+        "limits": [
+          "1",
+          "1",
+          "1"
+        ],
+        "fee_rate": "0.0003",
+        "minimum_fee": "5.00"
+      },
+      "expected": {
+        "q": 0,
+        "residual_cash": null,
+        "reason_includes": "INPUT_UNAVAILABLE"
+      }
+    },
+    {
+      "id": "PC08",
+      "snapshot": {
+        "id": "SYN-CASH-PC08",
+        "economic_equity": "100000.00",
+        "cash_before_internal_holds": "1810",
+        "positions": [],
+        "pending_sells": [],
+        "pending_buys": [
+          {
+            "reservation_id": "P1",
+            "security_code": "SYN-OTHER-P1",
+            "industry": "IND2",
+            "remaining_quantity": 100,
+            "mark": "10",
+            "price_bound": "8",
+            "unrecognized_fee_upper_bound": "5",
+            "fee_already_recognized": false
+          }
+        ],
+        "cash_context": "synthetic equity includes known nontradeable cash; no inferred tradability"
+      },
+      "request": {
+        "budget": "10000",
+        "fraction": "1",
+        "mark": "10",
+        "price_bound": "10",
+        "lot": 100,
+        "limits": [
+          "1",
+          "1",
+          "1"
+        ],
+        "fee_rate": "0.0003",
+        "minimum_fee": "5.00"
+      },
+      "expected": {
+        "q": 100,
+        "residual_cash": "1005",
+        "reason_includes": "CASH_CAPACITY",
+        "reason_scope": "next_lot failure includes CASH_CAPACITY when request target/bucket also binds; actual selected q must match"
+      }
+    },
+    {
+      "id": "PC09",
+      "snapshot": {
+        "id": "SYN-CASH-PC09",
+        "economic_equity": "100000.00",
+        "cash_before_internal_holds": "9000",
+        "positions": [],
+        "pending_sells": [],
+        "pending_buys": [
+          {
+            "reservation_id": "P1",
+            "security_code": "SYN-OTHER-P1",
+            "industry": "IND2",
+            "remaining_quantity": 900,
+            "mark": "10",
+            "price_bound": "10",
+            "unrecognized_fee_upper_bound": "5",
+            "fee_already_recognized": false
+          }
+        ],
+        "cash_context": "synthetic equity includes known nontradeable cash; no inferred tradability"
+      },
+      "request": {
+        "budget": "10000",
+        "fraction": "1",
+        "mark": "10",
+        "price_bound": "10",
+        "lot": 100,
+        "limits": [
+          "1",
+          "1",
+          "1"
+        ],
+        "fee_rate": "0.0003",
+        "minimum_fee": "5.00"
+      },
+      "expected": {
+        "q": 0,
+        "residual_cash": "0",
+        "reason_includes": "CASH_CAPACITY"
+      }
+    },
+    {
+      "id": "PC10",
+      "snapshot": {
+        "id": "SYN-CASH-PC10",
+        "economic_equity": "100000.00",
+        "cash_before_internal_holds": "10000",
+        "positions": [],
+        "pending_sells": [],
+        "pending_buys": [],
+        "cash_context": "synthetic equity includes known nontradeable cash; no inferred tradability"
+      },
+      "request": {
+        "budget": "10000",
+        "fraction": "1",
+        "mark": "10",
+        "price_bound": "10",
+        "lot": 100,
+        "limits": [
+          "1",
+          "1",
+          "1"
+        ],
+        "fee_rate": "0.0003",
+        "minimum_fee": "5.00"
+      },
+      "expected": {
+        "q": 900,
+        "residual_cash": "10000",
+        "reason_includes": "CASH_CAPACITY",
+        "reason_scope": "next_lot failure includes CASH_CAPACITY when request target/bucket also binds; actual selected q must match"
+      },
+      "transition": "after original pending confirmed fully settled/cleared, fresh new-command evaluation; old command immutable replay separately covered"
+    },
+    {
+      "id": "PC11",
+      "snapshot": {
+        "id": "SYN-CASH-PC11",
+        "economic_equity": "100000.00",
+        "cash_before_internal_holds": "10000",
+        "positions": [],
+        "pending_sells": [],
+        "pending_buys": [
+          {
+            "reservation_id": "UNREPORTED50",
+            "security_code": "SYN-OTHER-UNREPORTED50",
+            "industry": "IND2",
+            "remaining_quantity": 50,
+            "mark": "12",
+            "price_bound": "12",
+            "unrecognized_fee_upper_bound": "5",
+            "fee_already_recognized": false
+          }
+        ],
+        "cash_context": "synthetic equity includes known nontradeable cash; no inferred tradability"
+      },
+      "request": {
+        "budget": "10000",
+        "fraction": "1",
+        "mark": "10",
+        "price_bound": "10",
+        "lot": 100,
+        "limits": [
+          "1",
+          "1",
+          "1"
+        ],
+        "fee_rate": "0.0003",
+        "minimum_fee": "5.00"
+      },
+      "expected": {
+        "q": 900,
+        "residual_cash": "9395",
+        "reason_includes": "CASH_CAPACITY",
+        "reason_scope": "next_lot failure includes CASH_CAPACITY when request target/bucket also binds; actual selected q must match"
+      },
+      "terminal_context": "terminal says150filled/250cancelled;100already posted, remaining50unreported retains600principal+5fee, released250 excluded; canonicalcash10000 is before these remaining holds"
+    }
+  ],
+  "public_cases": [
+    {
+      "id": "PC12",
+      "expect": "cash-blocked decide_entry keeps exact original state and no ledger postings; real expert maximum still intersects configured fraction"
+    },
+    {
+      "id": "PC13",
+      "expect": "same accepted command replay has original quantity/reservation/result and no new postings after cash snapshot changes; new command after confirmed release can use restored cash"
+    },
+    {
+      "id": "PC14",
+      "expect": "duplicate pending reservation identity is rejected; do not silently sum duplicate holds"
+    }
+  ]
+}

@@ -6,7 +6,7 @@ import json
 import os
 import sqlite3
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -1051,3 +1051,64 @@ def test_conflict_barrier_immutable_raw_fact_and_cached_receipt_integrity(
             ),
             sell_profile("plain-order-sell"),
         )
+
+
+@pytest.mark.parametrize("offset_days", [-1, 7])
+def test_fresh_entry_requires_same_asof_risk_and_preserves_original_replay(
+    tmp_path: Path, offset_days: int
+) -> None:
+    service = build_funding_bridge_service(
+        tmp_path / "entry-risk-clock.sqlite",
+        context=context(),
+        authorization=AUTH,
+        temporal_profile=TEMPORAL,
+    )
+    service.establish_baseline(baseline())
+    intent = entry_intent(
+        service,
+        candidate_entry=candidate("OP-RISK-CLOCK", "SYN001"),
+        command_id="risk-clock-entry",
+        expected_revision=0,
+        at=NOW,
+    )
+    wrong_snapshot = replace(intent.snapshot, as_of=NOW + timedelta(days=offset_days))
+    args = {
+        "candidate": intent.candidate,
+        "snapshot": wrong_snapshot,
+        "empty_bucket_ids": intent.empty_bucket_ids,
+        "active_or_reserved_security_codes": intent.active_or_reserved_security_codes,
+        "active_industry_counts": intent.active_industry_counts,
+        "new_buckets_today": intent.new_buckets_today,
+        "limits": intent.limits,
+        "fraction": intent.fraction,
+        "mark_price": intent.mark_price,
+        "price_bound": intent.price_bound,
+        "lot_size": intent.lot_size,
+        "quantity_limits": intent.quantity_limits,
+        "fee_rule": intent.fee_rule,
+    }
+    wrong_intent = replace(
+        intent,
+        snapshot=wrong_snapshot,
+        command=CommandEnvelope.create(
+            intent.command.command_id, entry_invocation_payload(**args), 0
+        ),
+    )
+    before = service.current(context())
+    with pytest.raises(FactError, match="RISK_SNAPSHOT_STALE"):
+        service.enter(context(), wrong_intent)
+    assert service.current(context()) == before
+
+    accepted = service.enter(context(), intent)
+    assert accepted.accepted and accepted.quantity == 500
+    service.submit_buy(
+        context(S02_AT),
+        buy_report("risk-clock-buy", "SYN001", at=S02_AT, source_sequence="risk-clock-buy"),
+        buy_profile("risk-clock-buy"),
+    )
+    after_fill = service.current(context(S02_AT))
+    replay = service.enter(context(), intent)
+    assert replay.quantity == accepted.quantity
+    assert replay.reservation_id == accepted.reservation_id
+    assert replay.result_digest == accepted.result_digest
+    assert service.current(context(S02_AT)) == after_fill

@@ -1380,6 +1380,10 @@ class FundingBridgeService:
         if not known_command and state.account_revision != intent.expected_account_revision:
             raise ProductDailyError("ACCOUNT_REVISION_CONFLICT", "account revision is stale")
         if not known_command:
+            if intent.snapshot.as_of != context.as_of:
+                raise FactError(
+                    "RISK_SNAPSHOT_STALE", "risk snapshot as_of differs from caller context"
+                )
             self._require_fact_time(context, None, role="entry")
         if (
             state.funding.completed_settlements

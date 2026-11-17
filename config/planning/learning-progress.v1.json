@@ -15400,6 +15400,79 @@
         "CLOSEOUT",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-R11-NATIVE-CASH-U05-ACTIVE-20261118",
+      "recorded_at": "2026-11-17T16:09:56.687134+00:00",
+      "actor": "Quanthus researchlead Sol after exact SSH native completion",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Resume stopped execution: recover GitHub immutable objects, accept exact1.2.1 internal native9431/35, dispatch active isolated U05 durable synthetic facts slice; wholeR11 stays open.",
+      "evidence": [
+        {
+          "id": "R11-CASH-NATIVE-9431",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-native-cache-002/native/check-receipt.json",
+          "sha256": "e9529e1234ff842b67fa6c97911b008826f0cfa01d1ad04528fb0dce620ef38a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal synthetic1.2.1 engineering only; complete use research/daily goals remain open."
+        },
+        {
+          "id": "R11-EXACT-SYNTHETIC-BINDING",
+          "kind": "acceptance",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/sol-native-cache-002/engineering-acceptance.json",
+          "sha256": "0bb5481f3a998a979b3a849299a8db4847baa396f92d689553648f139f246d9b",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Internal synthetic1.2.1 engineering only; complete use research/daily goals remain open."
+        }
+      ],
+      "updates": [
+        {
+          "module": "MVP",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Internal1.2.1 pending-cash and legacy-command compatibility repair accepted at exact9010 source after31focused and CN02full9431/35; U05 first persistent account fact slice002 now executing in isolatedDS workspace.",
+          "remaining": "Complete research question UNANSWERED; daily use NOT_COMPLETE. U02 precise P10 handoff, account/purpose/expert inputs, cross-cycle integration, complete comparison/cold and daily acceptance still required.",
+          "next_action": "Receive completed U05 immutable return, integrate minimal facts then same-core two-cycle transactions; U06 waits source/purpose/account/expert gates.",
+          "evidence": [
+            "R11-CASH-NATIVE-9431",
+            "R11-EXACT-SYNTHETIC-BINDING"
+          ],
+          "supersedes": "CP-700-R11-CONTINUATION-PREPARE-20261117"
+        },
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Owner all-idle feedback corrected: Sol native source/base verified and full check completed; DS U05 active in independent9010 worktree, shared relay/TPlan single writer; current#608/#700briefs reconciled live.",
+          "remaining": "Complete research question UNANSWERED; daily use NOT_COMPLETE. U02 precise P10 handoff, account/purpose/expert inputs, cross-cycle integration, complete comparison/cold and daily acceptance still required.",
+          "next_action": "Keep native receipts and source closure; DS returns one bounded manifest; preserve complete research/daily scope and full costs.",
+          "evidence": [
+            "R11-CASH-NATIVE-9431",
+            "R11-EXACT-SYNTHETIC-BINDING"
+          ],
+          "supersedes": "CP-700-R11-CONTINUATION-PREPARE-20261117"
+        }
+      ],
+      "no_change_reason": "EXPERT/REPRO/CLOSEOUT scientific, consumer and historical acceptance unchanged; native engineering pass does not change those facets.",
+      "reviewed_modules": [
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T16:08:34Z",
+          "body_sha256": "5e8343614e7ac2be711b593ed7fb683855d8b93f26d10fe05e081fd3277cd12d"
+        }
+      ]
     }
   ],
   "history_imports": [

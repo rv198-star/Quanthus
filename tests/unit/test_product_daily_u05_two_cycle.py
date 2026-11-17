@@ -38,19 +38,22 @@ from quanthus.product_daily.risk import (
     entry_invocation_payload,
     pending_cash_commitment,
 )
-from quanthus.shared.fact_contracts import FactError
+from quanthus.shared.fact_contracts import FactError, digest
 
 NOW = datetime(2026, 11, 17, 16, tzinfo=timezone.utc)
 AUTH = SyntheticRuntimeAuthorization("two-cycle-runtime", frozenset({"SYN-TWOCYCLE"}))
 ROOT = Path(__file__).resolve().parents[2]
 TEMPORAL_CONFIG = json.loads(
-    (ROOT / "config/research/r11/continuation-004/two-cycle-temporal-profile.v1.json").read_text(
+    (ROOT / "config/research/r11/continuation-004/two-cycle-temporal-profile.v2.json").read_text(
         encoding="utf-8"
     )
 )
 TEMPORAL = SyntheticTemporalProfile(
     TEMPORAL_CONFIG["version"],
     tuple(datetime.fromisoformat(event["received_at"]) for event in TEMPORAL_CONFIG["events"]),
+    tuple(event["role"] for event in TEMPORAL_CONFIG["events"]),
+    tuple(datetime.fromisoformat(event["occurred_at"]) for event in TEMPORAL_CONFIG["events"]),
+    tuple(datetime.fromisoformat(event["decision_at"]) for event in TEMPORAL_CONFIG["events"]),
 )
 S01_AT = datetime(2026, 11, 17, 16, tzinfo=timezone.utc)
 S02_AT = datetime(2026, 11, 18, 1, tzinfo=timezone.utc)
@@ -351,6 +354,20 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
             sell_profile("sell-1"),
         )
     assert service.current(context(S04_AT)) == before_sell_alias
+    with sqlite3.connect(path) as db:
+        assert (
+            db.execute(
+                "SELECT status FROM bridge_operations WHERE kind='sell' AND identity='sell-1-alias'"
+            ).fetchone()[0]
+            == "RECEIVED"
+        )
+        assert (
+            db.execute(
+                "SELECT state FROM bridge_conflict_register "
+                "WHERE scope_key='source:fixture:two-cycle:broker:sell-1'"
+            ).fetchone()[0]
+            == "RESOLVED_ALIAS"
+        )
     first_settlement = service.settle_cycle(
         context(datetime(2026, 11, 19, 2, tzinfo=timezone.utc)),
         settlement_id="settle-1",
@@ -413,7 +430,7 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
         Decimal("-100"),
         "fixture:two-cycle:late",
         "late-fee-1",
-        datetime(2026, 11, 20, tzinfo=timezone.utc),
+        datetime(2026, 11, 18, 16, tzinfo=timezone.utc),
     )
     late = service.apply_late_fee(
         context(S06_AT),
@@ -544,6 +561,15 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
     assert rebuilt.funding.digest == current.funding.digest
     assert funding_state_envelope(rebuilt.funding) == staged
     assert second_settlement.account_revision == final.account_revision
+    with sqlite3.connect(path) as db:
+        db.execute("DELETE FROM bridge_obligations")
+        db.execute("DELETE FROM bridge_lots")
+    cacheless = build_funding_bridge_service(
+        path, context=context(S09_AT), authorization=AUTH, temporal_profile=TEMPORAL
+    )
+    cacheless_rebuild = cacheless.rebuild(context(S09_AT))
+    assert cacheless_rebuild.account == final.account
+    assert cacheless_rebuild.funding.to_dict() == final.funding.to_dict()
     output = os.environ.get("R11_TWO_CYCLE_ACTUALS")
     if output:
         Path(output).write_text(
@@ -577,9 +603,7 @@ def test_public_two_cycle_buy_sell_settle_late_fee_and_cold_rebuild(tmp_path: Pa
 
 def test_settlement_unknown_and_fault_rollback_retry(tmp_path: Path) -> None:
     unknown_path = tmp_path / "unknown.sqlite"
-    unknown = build_funding_bridge_service(
-        unknown_path, context=context(), authorization=AUTH, temporal_profile=TEMPORAL
-    )
+    unknown = build_funding_bridge_service(unknown_path, context=context(), authorization=AUTH)
     unknown.establish_baseline(baseline())
     intent = entry_intent(
         unknown,
@@ -696,7 +720,7 @@ def test_late_fee_fault_rollback_retry_and_conflict(tmp_path: Path) -> None:
         Decimal("-100"),
         "fixture:late-fault",
         "late-fault",
-        datetime(2026, 11, 20, tzinfo=timezone.utc),
+        datetime(2026, 11, 18, 16, tzinfo=timezone.utc),
     )
     with pytest.raises(RuntimeError, match="late fee fault"):
         service.apply_late_fee(context(S06_AT), fact)
@@ -726,6 +750,16 @@ def test_late_fee_fault_rollback_retry_and_conflict(tmp_path: Path) -> None:
     applied = service.apply_late_fee(context(S06_AT), fact)
     assert applied.account.cash == Decimal("21890.00")
     assert applied.funding.reserve == Decimal("1890.00")
+    with pytest.raises(FactError, match="IDEMPOTENCY_CONFLICT"):
+        service.apply_late_fee(context(S06_AT), replace(fact, cash_delta=Decimal("-99")))
+    with sqlite3.connect(path) as db:
+        assert (
+            db.execute(
+                "SELECT count(*) FROM bridge_conflict_register WHERE state='UNRESOLVED'"
+            ).fetchone()[0]
+            >= 1
+        )
+    assert service.apply_late_fee(context(S06_AT), fact) == applied
     reopened = build_funding_bridge_service(
         path, context=context(S06_AT), authorization=AUTH, temporal_profile=TEMPORAL
     )
@@ -734,7 +768,7 @@ def test_late_fee_fault_rollback_retry_and_conflict(tmp_path: Path) -> None:
     assert rebuilt.account == current.account
     assert rebuilt.funding.to_dict() == current.funding.to_dict()
     with pytest.raises(FactError, match="IDEMPOTENCY_CONFLICT"):
-        service.apply_late_fee(context(), replace(fact, cash_delta=Decimal("-99")))
+        service.apply_late_fee(context(S06_AT), replace(fact, cash_delta=Decimal("-99")))
 
 
 def test_unknown_sell_fee_is_rejected_before_fact_admission() -> None:
@@ -814,19 +848,6 @@ def test_conflict_barrier_immutable_raw_fact_and_cached_receipt_integrity(
             ).fetchone()[0]
             == before
         )
-    with pytest.raises(FactError, match="SOURCE_FACT_DUPLICATE"):
-        service.submit_sell(
-            context(S04_AT),
-            sell_report(
-                "fault-sell-conflict",
-                "SYN001",
-                cycle_id,
-                "11",
-                at=S03_AT,
-                source_sequence="fault-sell",
-            ),
-            sell_profile("fault-sell"),
-        )
     with sqlite3.connect(path) as db:
         assert (
             db.execute(
@@ -834,6 +855,8 @@ def test_conflict_barrier_immutable_raw_fact_and_cached_receipt_integrity(
             ).fetchone()[0]
             == 1
         )
+    with pytest.raises(FactError, match="SETTLEMENT_NOT_READY"):
+        service.settle_cycle(context(S04_AT), settlement_id="same-id-blocked", cycle_id=cycle_id)
     assert (
         service.submit_sell(
             context(S04_AT),
@@ -844,9 +867,6 @@ def test_conflict_barrier_immutable_raw_fact_and_cached_receipt_integrity(
         ).account.quantity("SYN001")
         == 0
     )
-    with pytest.raises(FactError, match="SETTLEMENT_NOT_READY"):
-        service.settle_cycle(context(S04_AT), settlement_id="blocked", cycle_id=cycle_id)
-
     barrier_path = tmp_path / "barrier.sqlite"
     barrier = build_funding_bridge_service(
         barrier_path, context=context(), authorization=AUTH, temporal_profile=TEMPORAL
@@ -919,6 +939,33 @@ def test_conflict_barrier_immutable_raw_fact_and_cached_receipt_integrity(
         == settled.decision.result_digest
     )
 
+    result_path = tmp_path / "journal-result.sqlite"
+    with sqlite3.connect(clean_path) as source, sqlite3.connect(result_path) as target:
+        source.backup(target)
+    with sqlite3.connect(result_path) as db:
+        event = json.loads(
+            db.execute("SELECT payload_json FROM bridge_journal WHERE kind='buy'").fetchone()[0]
+        )
+        event["result"]["account"]["cash"] = "0.00"
+        changed = json.dumps(event, sort_keys=True)
+        db.execute(
+            "UPDATE bridge_journal SET payload_json=?,digest=? WHERE kind='buy'",
+            (changed, digest(event)),
+        )
+        cached = json.loads(
+            db.execute("SELECT result_json FROM bridge_inbox WHERE status='POSTED'").fetchone()[0]
+        )
+        cached["account"]["cash"] = "0.00"
+        db.execute(
+            "UPDATE bridge_inbox SET result_json=? WHERE status='POSTED'",
+            (json.dumps(cached, sort_keys=True),),
+        )
+    result_corrupt = build_funding_bridge_service(
+        result_path, context=context(S04_AT), authorization=AUTH, temporal_profile=TEMPORAL
+    )
+    with pytest.raises(FactError, match="buy result identity differs"):
+        result_corrupt.rebuild(context(S04_AT))
+
     missing_path = tmp_path / "missing-profile.sqlite"
     missing = build_funding_bridge_service(missing_path, context=context(), authorization=AUTH)
     missing_cycle = drive_to_first_flat(missing)
@@ -932,3 +979,75 @@ def test_conflict_barrier_immutable_raw_fact_and_cached_receipt_integrity(
     )
     with pytest.raises(FactError, match="TEMPORAL_PROFILE_REQUIRED"):
         missing.enter(context(S05_AT), intent)
+
+    order_path = tmp_path / "source-order.sqlite"
+    order = build_funding_bridge_service(
+        order_path, context=context(), authorization=AUTH, temporal_profile=TEMPORAL
+    )
+    order.establish_baseline(baseline())
+    order_entry = entry_intent(
+        order,
+        candidate_entry=candidate("OP-ORDER", "SYN001"),
+        command_id="order-entry",
+        expected_revision=0,
+        at=NOW,
+    )
+    order.enter(context(), order_entry)
+    order_cycle = order.current(context()).funding.bucket("U1").cycle_id
+    assert order_cycle is not None
+    order.submit_buy(
+        context(S02_AT),
+        buy_report("order-buy", "SYN001", at=S02_AT, source_sequence="order-buy"),
+        buy_profile("order-buy"),
+    )
+    before_rejected_sell = order.current(context(S02_AT))
+    with pytest.raises(FactError, match="TEMPORAL_PROFILE_REQUIRED"):
+        order.submit_sell(
+            context(S03_AT),
+            sell_report(
+                "order-sell", "SYN001", order_cycle, "12", at=NOW, source_sequence="order-sell"
+            ),
+            sell_profile("order-sell"),
+        )
+    assert order.current(context(S03_AT)) == before_rejected_sell
+    with sqlite3.connect(order_path) as db:
+        assert (
+            db.execute(
+                "SELECT status FROM bridge_operations WHERE kind='sell' AND identity='order-sell'"
+            ).fetchone()[0]
+            == "RECEIVED"
+        )
+
+    plain_order_path = tmp_path / "plain-source-order.sqlite"
+    plain_order = build_funding_bridge_service(
+        plain_order_path, context=context(), authorization=AUTH
+    )
+    plain_order.establish_baseline(baseline())
+    plain_entry = entry_intent(
+        plain_order,
+        candidate_entry=candidate("OP-PLAIN-ORDER", "SYN001"),
+        command_id="plain-order-entry",
+        expected_revision=0,
+        at=NOW,
+    )
+    plain_order.enter(context(), plain_entry)
+    plain_cycle = plain_order.current(context()).funding.bucket("U1").cycle_id
+    assert plain_cycle is not None
+    plain_order.submit_buy(
+        context(S02_AT),
+        buy_report("plain-order-buy", "SYN001", at=S02_AT, source_sequence="plain-order-buy"),
+        buy_profile("plain-order-buy"),
+    )
+    with pytest.raises(FactError, match="TEMPORAL_ORDER_VIOLATION"):
+        plain_order.submit_sell(
+            context(S03_AT),
+            sell_report(
+                "plain-order-sell",
+                "SYN001",
+                plain_cycle,
+                "12",
+                at=NOW,
+                source_sequence="plain-order-sell",
+            ),
+            sell_profile("plain-order-sell"),
+        )

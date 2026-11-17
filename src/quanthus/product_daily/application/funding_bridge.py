@@ -606,6 +606,15 @@ class BuyLot:
     remaining_quantity: int
     cost_basis: Decimal
     source_report_id: str
+    occurred_at: datetime
+    source_id: str
+    source_sequence: str
+
+    def __post_init__(self) -> None:
+        if self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None:
+            raise FactError("INVALID_REPORT_SHAPE", "lot occurrence must be aware")
+        if not self.source_id or not self.source_sequence:
+            raise FactError("INVALID_REPORT_SHAPE", "lot source identity is required")
 
 
 @dataclass(frozen=True)
@@ -806,6 +815,8 @@ class BridgeState:
 class BridgeSnapshot:
     state: BridgeState
     obligations: tuple[PendingObligation, ...]
+    lots: tuple[BuyLot, ...] = ()
+    latest_received_at: datetime | None = None
 
     @property
     def revision(self) -> int:
@@ -834,6 +845,28 @@ class BridgeSnapshot:
                     }
                     for item in self.obligations
                 ],
+                "lots": [
+                    {
+                        "lot_id": item.lot_id,
+                        "security_code": item.security_code,
+                        "cycle_id": item.cycle_id,
+                        "quantity": item.quantity,
+                        "remaining_quantity": item.remaining_quantity,
+                        "cost_basis": format(item.cost_basis, "f"),
+                        "source_report_id": item.source_report_id,
+                        "occurred_at": (
+                            item.occurred_at.isoformat() if item.occurred_at is not None else None
+                        ),
+                        "source_id": item.source_id,
+                        "source_sequence": item.source_sequence,
+                    }
+                    for item in self.lots
+                ],
+                "latest_received_at": (
+                    self.latest_received_at.isoformat()
+                    if self.latest_received_at is not None
+                    else None
+                ),
             }
         )
 
@@ -842,16 +875,48 @@ class BridgeSnapshot:
 class SyntheticTemporalProfile:
     profile_version: str
     received_times: tuple[datetime, ...]
+    roles: tuple[str, ...] = ()
+    occurred_times: tuple[datetime, ...] = ()
+    decision_times: tuple[datetime, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.profile_version or not self.received_times:
             raise FactError("INVALID_REPORT_SHAPE", "temporal profile is empty")
         if any(item.tzinfo is None or item.utcoffset() is None for item in self.received_times):
             raise FactError("INVALID_REPORT_SHAPE", "temporal profile must be aware")
+        if self.roles and len(self.roles) != len(self.received_times):
+            raise FactError("INVALID_REPORT_SHAPE", "temporal roles must align")
+        if self.occurred_times and len(self.occurred_times) != len(self.received_times):
+            raise FactError("INVALID_REPORT_SHAPE", "temporal occurrences must align")
+        if self.decision_times and len(self.decision_times) != len(self.received_times):
+            raise FactError("INVALID_REPORT_SHAPE", "temporal decisions must align")
+        if any(item.tzinfo is None or item.utcoffset() is None for item in self.occurred_times):
+            raise FactError("INVALID_REPORT_SHAPE", "temporal occurrences must be aware")
+        if any(item.tzinfo is None or item.utcoffset() is None for item in self.decision_times):
+            raise FactError("INVALID_REPORT_SHAPE", "temporal decisions must be aware")
 
-    def require(self, context: SyntheticContext) -> None:
-        if context.as_of not in self.received_times:
-            raise FactError("TEMPORAL_PROFILE_REQUIRED", "context is outside synthetic profile")
+    def require(
+        self,
+        context: SyntheticContext,
+        role: str,
+        occurred_at: datetime | None = None,
+    ) -> None:
+        try:
+            index = self.received_times.index(context.as_of)
+        except ValueError:
+            raise FactError(
+                "TEMPORAL_PROFILE_REQUIRED", "context is outside synthetic profile"
+            ) from None
+        if self.roles and self.roles[index] != role:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "operation role is outside profile")
+        if self.decision_times and self.decision_times[index] > context.as_of:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "decision window is in the future")
+        if (
+            occurred_at is not None
+            and self.occurred_times
+            and occurred_at != self.occurred_times[index]
+        ):
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "fact occurrence is outside profile")
 
 
 @dataclass(frozen=True)
@@ -880,6 +945,9 @@ class BuyBridgeResult:
 
 class FundingBridgePort(Protocol):
     def establish(self, baseline: CycleBaseline) -> BridgeState: ...
+    def replay_entry(
+        self, context: SyntheticContext, intent: CycleEntryIntent
+    ) -> EntryBridgeResult | None: ...
     def read(self, context: SyntheticContext) -> BridgeState: ...
     def read_snapshot(self, context: SyntheticContext) -> BridgeSnapshot: ...
     def obligations(self, context: SyntheticContext) -> tuple[PendingObligation, ...]: ...
@@ -1124,6 +1192,10 @@ def apply_confirmed_sell_transition(
         or profile.cancelled_quantity != 0
     ):
         raise FactError("FINAL_FILL_GAP", "sell report, profile and lot differ")
+    if report.occurred_at < lot.occurred_at:
+        raise FactError("TEMPORAL_ORDER_VIOLATION", "sell occurred before the matched buy")
+    if report.source_id != lot.source_id or report.source_sequence == lot.source_sequence:
+        raise FactError("SOURCE_CONTEXT_MISMATCH", "sell source differs from matched buy")
     core = apply_sell_delta(
         state.account,
         security_code=report.security_code,
@@ -1270,13 +1342,18 @@ class FundingBridgeService:
             raise FactError("CONTEXT_TIME_REGRESSION", "caller as_of precedes consumed facts")
 
     def _require_fact_time(
-        self, context: SyntheticContext, occurred_at: datetime, *, mutation: bool = True
+        self,
+        context: SyntheticContext,
+        occurred_at: datetime | None,
+        *,
+        role: str,
+        mutation: bool = True,
     ) -> None:
         self._require_not_before_latest(context)
-        if occurred_at > context.as_of:
+        if occurred_at is not None and occurred_at > context.as_of:
             raise FactError("FUTURE_FACT", "fact occurred after caller as_of")
         if mutation and self._temporal_profile is not None:
-            self._temporal_profile.require(context)
+            self._temporal_profile.require(context, role, occurred_at)
 
     def establish_baseline(self, baseline: CycleBaseline) -> BridgeState:
         self._context_for(baseline.context)
@@ -1289,6 +1366,9 @@ class FundingBridgeService:
 
     def enter(self, context: SyntheticContext, intent: CycleEntryIntent) -> EntryBridgeResult:
         context = self._context_for(context)
+        existing = self._port.replay_entry(context, intent)
+        if existing is not None:
+            return existing
         view = self._port.read_snapshot(context)
         state = view.state
         if state.funding.completed_settlements and self._temporal_profile is None:
@@ -1300,7 +1380,7 @@ class FundingBridgeService:
         if not known_command and state.account_revision != intent.expected_account_revision:
             raise ProductDailyError("ACCOUNT_REVISION_CONFLICT", "account revision is stale")
         if not known_command:
-            self._require_fact_time(context, intent.snapshot.as_of)
+            self._require_fact_time(context, None, role="entry")
         if (
             state.funding.completed_settlements
             and self._temporal_profile is None
@@ -1353,8 +1433,8 @@ class FundingBridgeService:
         existing = self._port.replay_buy(context, report, profile)
         if existing is not None:
             return existing
-        self._require_fact_time(context, report.occurred_at)
         receipt_id = self._port.receive_buy(context, report, profile)
+        self._require_fact_time(context, report.occurred_at, role="buy")
         view = self._port.read_snapshot(context)
         if view.state.funding.completed_settlements and self._temporal_profile is None:
             raise FactError("TEMPORAL_PROFILE_REQUIRED", "new cycle execution lacks profile")
@@ -1393,7 +1473,6 @@ class FundingBridgeService:
         existing = self._port.replay_sell(context, report, profile)
         if existing is not None:
             return existing
-        self._require_fact_time(context, report.occurred_at)
         receipt_id = self._port.receive_operation(
             context,
             "sell",
@@ -1409,12 +1488,13 @@ class FundingBridgeService:
             new_digest=receipt_id,
             payload=report.to_dict(),
         )
+        self._require_fact_time(context, report.occurred_at, role="sell")
         view = self._port.read_snapshot(context)
         if view.state.funding.completed_settlements and self._temporal_profile is None:
             raise FactError("TEMPORAL_PROFILE_REQUIRED", "new cycle sell lacks profile")
         lots = tuple(
             item
-            for item in self._port.lots(context)
+            for item in view.lots
             if item.security_code == report.security_code
             and item.cycle_id == report.cycle_id
             and item.remaining_quantity == report.quantity
@@ -1441,7 +1521,7 @@ class FundingBridgeService:
             return existing
         self._require_not_before_latest(context)
         if self._temporal_profile is not None:
-            self._temporal_profile.require(context)
+            self._temporal_profile.require(context, "settlement")
         view = self._port.read_snapshot(context)
         if view.state.funding.completed_settlements and self._temporal_profile is None:
             raise FactError("TEMPORAL_PROFILE_REQUIRED", "later settlement lacks profile")
@@ -1500,7 +1580,6 @@ class FundingBridgeService:
         existing = self._port.replay_late_fee(context, fact)
         if existing is not None:
             return existing
-        self._require_fact_time(context, fact.occurred_at)
         receipt_id = self._port.receive_operation(
             context,
             "late_fee",
@@ -1527,6 +1606,7 @@ class FundingBridgeService:
                 "cash_delta": format(fact.cash_delta, "f"),
             },
         )
+        self._require_fact_time(context, fact.occurred_at, role="late_fee")
         view = self._port.read_snapshot(context)
         if view.state.funding.completed_settlements and self._temporal_profile is None:
             raise FactError("TEMPORAL_PROFILE_REQUIRED", "late fee lacks profile")

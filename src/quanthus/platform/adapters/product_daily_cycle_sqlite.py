@@ -19,6 +19,7 @@ from quanthus.product_daily.application.funding_bridge import (
     BuyBridgeResult,
     BuyLot,
     CycleBaseline,
+    CycleEntryIntent,
     CycleFillProfile,
     EntryBridgeResult,
     ExecutionReport,
@@ -278,6 +279,46 @@ class SQLiteCycleBridgeAdapter:
                 raise
         return BridgeState(account, baseline.funding, 0)
 
+    def replay_entry(
+        self, context: SyntheticContext, intent: CycleEntryIntent
+    ) -> EntryBridgeResult | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM bridge_entry_receipts WHERE account_id=? AND mode=? "
+                "AND command_id=?",
+                (context.account_id, context.mode, intent.command.command_id),
+            ).fetchone()
+            if row is None:
+                return None
+            journal = connection.execute(
+                "SELECT payload_json FROM bridge_journal WHERE account_id=? AND mode=? "
+                "AND transition_id=? AND kind='entry'",
+                (
+                    context.account_id,
+                    context.mode,
+                    f"entry:{intent.command.command_id}",
+                ),
+            ).fetchone()
+            if journal is None:
+                raise FactError("STORE_PROJECTION_MISMATCH", "entry journal is missing")
+            event = json.loads(journal["payload_json"])
+            original = restore_entry_intent(event["intent"])
+            if original.command.body_digest != intent.command.body_digest:
+                raise FactError("IDEMPOTENCY_CONFLICT", "entry command payload differs")
+            funding = restore_funding_envelope(json.loads(row["funding_json"]))
+            return EntryBridgeResult(
+                bool(row["accepted"]),
+                True,
+                int(event["quantity"]),
+                event["reservation_id"],
+                funding,
+                int(event["account_revision"]),
+                str(event["result_digest"]),
+                str(event["command_id"]),
+                None,
+                original,
+            )
+
     def read_snapshot(self, context: SyntheticContext) -> BridgeSnapshot:
         with self._connect() as connection:
             connection.execute("BEGIN")
@@ -285,6 +326,8 @@ class SQLiteCycleBridgeAdapter:
                 snapshot = BridgeSnapshot(
                     self._read(connection, context),
                     self._obligation_rows(connection, context),
+                    self._lot_rows(connection, context),
+                    self._latest_received_at(connection, context),
                 )
                 connection.commit()
                 return snapshot
@@ -301,37 +344,13 @@ class SQLiteCycleBridgeAdapter:
     def lots(self, context: SyntheticContext) -> tuple[BuyLot, ...]:
         with self._connect() as connection:
             connection.execute("BEGIN")
-            rows = connection.execute(
-                "SELECT * FROM bridge_lots WHERE account_id=? AND mode=? ORDER BY lot_id",
-                (context.account_id, context.mode),
-            ).fetchall()
+            rows = self._lot_rows(connection, context)
             connection.commit()
-        return tuple(
-            BuyLot(
-                row["lot_id"],
-                row["security_code"],
-                row["cycle_id"],
-                row["quantity"],
-                row["remaining_quantity"],
-                Decimal(row["cost_basis"]),
-                row["source_report_id"],
-            )
-            for row in rows
-        )
+        return rows
 
     def latest_received_at(self, context: SyntheticContext) -> datetime | None:
         with self._connect() as connection:
-            values = [
-                row[0]
-                for row in connection.execute(
-                    "SELECT received_at FROM bridge_inbox WHERE account_id=? AND mode=? "
-                    "UNION ALL SELECT received_at FROM bridge_operations "
-                    "WHERE account_id=? AND mode=?",
-                    (context.account_id, context.mode, context.account_id, context.mode),
-                )
-            ]
-        parsed = [datetime.fromisoformat(value) for value in values]
-        return max(parsed) if parsed else None
+            return self._latest_received_at(connection, context)
 
     def receive_operation(
         self,
@@ -344,6 +363,7 @@ class SQLiteCycleBridgeAdapter:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
+                self._require_context_not_before_store(connection, context)
                 row = connection.execute(
                     "SELECT * FROM bridge_operations "
                     "WHERE account_id=? AND mode=? AND kind=? AND identity=?",
@@ -559,6 +579,7 @@ class SQLiteCycleBridgeAdapter:
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
+                self._require_context_not_before_store(connection, context)
                 row = connection.execute(
                     "SELECT * FROM bridge_inbox WHERE account_id=? AND mode=? AND report_id=?",
                     (context.account_id, context.mode, report.report_id),
@@ -660,6 +681,7 @@ class SQLiteCycleBridgeAdapter:
                 or row["profile_digest"] != profile.payload_digest
             ):
                 connection.execute("BEGIN IMMEDIATE")
+                self._require_context_not_before_store(connection, context)
                 self._record_conflict(
                     connection,
                     context,
@@ -861,6 +883,19 @@ class SQLiteCycleBridgeAdapter:
                         },
                         "obligation_id": obligation.obligation_id,
                         "cycle_id": obligation.cycle_id,
+                        "result": self._buy_dict(result),
+                        "lot": {
+                            "lot_id": f"lot:{report.report_id}",
+                            "security_code": report.security_code,
+                            "cycle_id": obligation.cycle_id,
+                            "quantity": report.quantity,
+                            "remaining_quantity": report.quantity,
+                            "cost_basis": format(report.price * report.quantity, "f"),
+                            "source_report_id": report.report_id,
+                            "occurred_at": report.occurred_at.isoformat(),
+                            "source_id": report.source_id,
+                            "source_sequence": report.source_sequence,
+                        },
                         "account_revision": account.revision,
                         "funding": funding_state_envelope(funding),
                     },
@@ -878,7 +913,13 @@ class SQLiteCycleBridgeAdapter:
         profile: SellProfile,
     ) -> BuyBridgeResult | None:
         expected = digest({"report": report.to_dict(), "profile": profile.payload_digest})
-        return self._replay_buy_operation(context, "sell", report.report_id, expected)
+        return self._replay_buy_operation(
+            context,
+            "sell",
+            report.report_id,
+            expected,
+            {"report": report.to_dict(), "profile_digest": profile.payload_digest},
+        )
 
     def commit_sell(
         self,
@@ -1026,6 +1067,7 @@ class SQLiteCycleBridgeAdapter:
                             "cost_basis": format(impact.lot.cost_basis, "f"),
                             "source_report_id": impact.lot.source_report_id,
                         },
+                        "result": self._buy_dict(result),
                         "account_revision": impact.account.revision,
                         "funding": funding_state_envelope(impact.funding),
                     },
@@ -1083,6 +1125,8 @@ class SQLiteCycleBridgeAdapter:
                 ).fetchone()[0]
                 == 0
             )
+            unposted_raw = self._has_unreconciled_unposted(connection, context)
+            conflicts_clear = conflicts_clear and not unposted_raw
             connection.commit()
         return orders_terminal, fills_complete, fees_known, conflicts_clear
 
@@ -1117,6 +1161,10 @@ class SQLiteCycleBridgeAdapter:
                 ).fetchone()[0]:
                     raise FactError(
                         "SETTLEMENT_NOT_READY", "unresolved conflict arrived before commit"
+                    )
+                if self._has_unreconciled_unposted(connection, context):
+                    raise FactError(
+                        "SETTLEMENT_NOT_READY", "unreconciled raw fact arrived before commit"
                     )
                 if (
                     state.account.digest != expected_account_digest
@@ -1167,11 +1215,23 @@ class SQLiteCycleBridgeAdapter:
                 raise
 
     def replay_late_fee(self, context: SyntheticContext, fact: LateFeeFact) -> LateFeeResult | None:
-        row = self._operation_row(context, "late_fee", fact.fact_id)
+        row = self._replay_operation(
+            context,
+            "late_fee",
+            fact.fact_id,
+            fact.payload_digest,
+            {
+                "fact_id": fact.fact_id,
+                "bucket_id": fact.bucket_id,
+                "cycle_id": fact.cycle_id,
+                "cash_delta": format(fact.cash_delta, "f"),
+                "source_id": fact.source_id,
+                "source_sequence": fact.source_sequence,
+                "occurred_at": fact.occurred_at.isoformat(),
+            },
+        )
         if row is None or row["status"] != "POSTED":
             return None
-        if row["payload_digest"] != fact.payload_digest:
-            raise FactError("IDEMPOTENCY_CONFLICT", "late fee payload differs")
         return self._late_from_dict(json.loads(row["result_json"]))
 
     def commit_late_fee(
@@ -1295,7 +1355,8 @@ class SQLiteCycleBridgeAdapter:
                 raise FactError("BASELINE_NOT_FOUND", "baseline unavailable")
             account = AccountProjection(0, 0, Decimal(baseline["cash"]), (), 0)
             funding = restore_funding_envelope(json.loads(baseline["funding_json"]))
-            obligations = self._obligation_rows(connection, context)
+            obligations: dict[str, PendingObligation] = {}
+            lots: dict[str, BuyLot] = {}
             for row in connection.execute(
                 "SELECT kind,payload_json,digest FROM bridge_journal "
                 "WHERE account_id=? AND mode=? "
@@ -1315,6 +1376,21 @@ class SQLiteCycleBridgeAdapter:
                         intent,
                         context.source_id,
                     )
+                    if self._entry_dict(entry_result) != {
+                        key: event[key]
+                        for key in (
+                            "accepted",
+                            "replayed",
+                            "quantity",
+                            "reservation_id",
+                            "account_revision",
+                            "result_digest",
+                            "command_id",
+                        )
+                    }:
+                        raise FactError("REBUILD_MISMATCH", "entry result identity differs")
+                    if entry_result.obligation is not None:
+                        obligations[entry_result.obligation.obligation_id] = entry_result.obligation
                     funding = entry_result.funding
                     if funding_state_envelope(funding) != event["funding"]:
                         raise FactError("REBUILD_MISMATCH", "entry transition output differs")
@@ -1351,10 +1427,9 @@ class SQLiteCycleBridgeAdapter:
                         raw_profile["terminal"],
                     )
                     obligation_id = event["obligation_id"]
-                    obligation = replace(
-                        next(item for item in obligations if item.obligation_id == obligation_id),
-                        status="OPEN",
-                    )
+                    obligation = obligations.get(obligation_id)
+                    if obligation is None or obligation.status != "OPEN":
+                        raise FactError("REBUILD_MISMATCH", "buy obligation is not derivable")
                     buy_impact = apply_confirmed_buy_transition(
                         BridgeState(account, funding, account.revision),
                         buy_report,
@@ -1362,6 +1437,38 @@ class SQLiteCycleBridgeAdapter:
                         obligation,
                     )
                     account, funding = buy_impact.account, buy_impact.funding
+                    obligations[obligation_id] = replace(obligation, status="FILLED")
+                    lot = BuyLot(
+                        f"lot:{buy_report.report_id}",
+                        buy_report.security_code,
+                        obligation.cycle_id,
+                        buy_report.quantity,
+                        buy_report.quantity,
+                        buy_report.price * buy_report.quantity,
+                        buy_report.report_id,
+                        buy_report.occurred_at,
+                        buy_report.source_id,
+                        buy_report.source_sequence,
+                    )
+                    lots[lot.lot_id] = lot
+                    actual_result = self._buy_dict(
+                        BuyBridgeResult(
+                            f"bridge-receipt-{buy_report.report_id}",
+                            "POSTED",
+                            buy_impact.account,
+                            buy_impact.funding,
+                            buy_impact.account.revision,
+                            buy_impact.postings,
+                        )
+                    )
+                    if event.get("result") != actual_result:
+                        expected = event.get("result", {})
+                        diff = {
+                            key: {"expected": expected.get(key), "actual": actual_result.get(key)}
+                            for key in set(expected) | set(actual_result)
+                            if expected.get(key) != actual_result.get(key)
+                        }
+                        raise FactError("REBUILD_MISMATCH", f"buy result identity differs: {diff}")
                 elif kind == "sell":
                     raw = event["report"]
                     sell_report = SellExecutionReport(
@@ -1385,16 +1492,16 @@ class SQLiteCycleBridgeAdapter:
                         Decimal(raw_profile["confirmed_fee"]),
                         raw_profile["terminal"],
                     )
-                    raw_lot = event["lot"]
-                    lot = BuyLot(
-                        raw_lot["lot_id"],
-                        raw_lot["security_code"],
-                        raw_lot["cycle_id"],
-                        raw_lot["quantity"],
-                        raw_lot["remaining_quantity"],
-                        Decimal(raw_lot["cost_basis"]),
-                        raw_lot["source_report_id"],
-                    )
+                    matches = [
+                        item
+                        for item in lots.values()
+                        if item.security_code == sell_report.security_code
+                        and item.cycle_id == sell_report.cycle_id
+                        and item.remaining_quantity == sell_report.quantity
+                    ]
+                    if len(matches) != 1:
+                        raise FactError("REBUILD_MISMATCH", "sell lot is not derivable")
+                    lot = matches[0]
                     sell_impact = apply_confirmed_sell_transition(
                         BridgeState(account, funding, account.revision),
                         sell_report,
@@ -1402,6 +1509,19 @@ class SQLiteCycleBridgeAdapter:
                         lot,
                     )
                     account, funding = sell_impact.account, sell_impact.funding
+                    lots[lot.lot_id] = sell_impact.lot
+                    actual_result = self._buy_dict(
+                        BuyBridgeResult(
+                            f"sell-receipt-{sell_report.report_id}",
+                            "POSTED",
+                            sell_impact.account,
+                            sell_impact.funding,
+                            sell_impact.account.revision,
+                            sell_impact.postings,
+                        )
+                    )
+                    if event.get("result") != actual_result:
+                        raise FactError("REBUILD_MISMATCH", "sell result identity differs")
                 elif kind == "settlement":
                     raw_request = event["request"]
                     evidence = raw_request["evidence"]
@@ -1440,12 +1560,23 @@ class SQLiteCycleBridgeAdapter:
                         raise FactError("REBUILD_MISMATCH", "settlement replay refused")
                     funding = settled.state
                     account = AccountProjection(
-                        int(event["account_revision"]),
+                        account.revision + 1,
                         account.event_sequence,
                         account.cash,
                         account.positions,
                         account.fact_count,
                     )
+                    actual_result = self._settlement_dict(
+                        SettlementBridgeResult(
+                            request.settlement_id,
+                            funding,
+                            settled,
+                            account.revision,
+                            f"settlement-receipt-{request.settlement_id}",
+                        )
+                    )
+                    if event.get("result") != actual_result:
+                        raise FactError("REBUILD_MISMATCH", "settlement result identity differs")
                 elif kind == "late_fee":
                     raw = event["fact"]
                     fact = LateFeeFact(
@@ -1466,7 +1597,10 @@ class SQLiteCycleBridgeAdapter:
                     late = apply_late_fee_transition(
                         BridgeState(account, funding, account.revision), fact, command
                     )
+                    late = replace(late, receipt_id=f"late_fee-receipt-{fact.fact_id}")
                     account, funding = late.account, late.funding
+                    if event.get("result") != self._late_dict(late):
+                        raise FactError("REBUILD_MISMATCH", "late fee result identity differs")
                 else:
                     raise FactError("REBUILD_MISMATCH", f"unsupported journal kind {kind}")
                 expected_funding = (
@@ -1490,6 +1624,39 @@ class SQLiteCycleBridgeAdapter:
                 )
             if funding_state_envelope(funding) != funding_state_envelope(state.funding):
                 raise FactError("REBUILD_MISMATCH", "funding projection differs")
+            stored_obligations = self._obligation_rows(connection, context)
+            if stored_obligations and stored_obligations != tuple(
+                obligations[key] for key in sorted(obligations)
+            ):
+                raise FactError(
+                    "STORE_PROJECTION_MISMATCH", "obligation projection differs from journal"
+                )
+            stored_lots = self._lot_rows(connection, context)
+            derived_lots = tuple(lots[key] for key in sorted(lots))
+            if stored_lots and tuple(
+                (
+                    item.lot_id,
+                    item.security_code,
+                    item.cycle_id,
+                    item.quantity,
+                    item.remaining_quantity,
+                    item.cost_basis,
+                    item.source_report_id,
+                )
+                for item in stored_lots
+            ) != tuple(
+                (
+                    item.lot_id,
+                    item.security_code,
+                    item.cycle_id,
+                    item.quantity,
+                    item.remaining_quantity,
+                    item.cost_basis,
+                    item.source_report_id,
+                )
+                for item in derived_lots
+            ):
+                raise FactError("STORE_PROJECTION_MISMATCH", "lot projection differs from journal")
             connection.commit()
             return BridgeState(account, funding, state.account_revision)
 
@@ -1517,6 +1684,112 @@ class SQLiteCycleBridgeAdapter:
             )
         )
 
+    def _lot_rows(
+        self, connection: sqlite3.Connection, context: SyntheticContext
+    ) -> tuple[BuyLot, ...]:
+        rows = connection.execute(
+            "SELECT l.*, i.payload_json AS buy_payload_json FROM bridge_lots l "
+            "LEFT JOIN bridge_inbox i ON i.account_id=l.account_id AND i.mode=l.mode "
+            "AND i.report_id=l.source_report_id WHERE l.account_id=? AND l.mode=? "
+            "ORDER BY l.lot_id",
+            (context.account_id, context.mode),
+        ).fetchall()
+        lots: list[BuyLot] = []
+        for row in rows:
+            raw = json.loads(row["buy_payload_json"]) if row["buy_payload_json"] else {}
+            occurred = raw.get("occurred_at")
+            if not isinstance(occurred, str):
+                raise FactError("STORE_PROJECTION_MISMATCH", "lot buy occurrence is missing")
+            lots.append(
+                BuyLot(
+                    row["lot_id"],
+                    row["security_code"],
+                    row["cycle_id"],
+                    row["quantity"],
+                    row["remaining_quantity"],
+                    Decimal(row["cost_basis"]),
+                    row["source_report_id"],
+                    datetime.fromisoformat(occurred),
+                    str(raw.get("source_id", "")),
+                    str(raw.get("source_sequence", "")),
+                )
+            )
+        return tuple(lots)
+
+    def _has_unreconciled_unposted(
+        self, connection: sqlite3.Connection, context: SyntheticContext
+    ) -> bool:
+        buy_rows = connection.execute(
+            "SELECT report_id,payload_json FROM bridge_inbox WHERE account_id=? AND mode=? "
+            "AND status='RECEIVED'",
+            (context.account_id, context.mode),
+        ).fetchall()
+        for row in buy_rows:
+            payload = json.loads(row["payload_json"])
+            source_id = payload.get("source_id")
+            source_sequence = payload.get("source_sequence")
+            original = connection.execute(
+                "SELECT payload_json FROM bridge_inbox WHERE account_id=? AND mode=? "
+                "AND status='POSTED' AND report_id<>?",
+                (context.account_id, context.mode, row["report_id"]),
+            ).fetchall()
+            if not any(
+                (candidate := json.loads(item["payload_json"])).get("source_id") == source_id
+                and candidate.get("source_sequence") == source_sequence
+                and _alias_matches(candidate, payload)
+                for item in original
+            ):
+                return True
+        operation_rows = connection.execute(
+            "SELECT identity,payload_json FROM bridge_operations WHERE account_id=? "
+            "AND mode=? AND status='RECEIVED' AND kind IN ('sell','late_fee')",
+            (context.account_id, context.mode),
+        ).fetchall()
+        for row in operation_rows:
+            payload = json.loads(row["payload_json"])
+            report = payload.get("report", payload)
+            source_id = report.get("source_id")
+            source_sequence = report.get("source_sequence")
+            source = connection.execute(
+                "SELECT report_id FROM bridge_source_facts WHERE account_id=? AND mode=? "
+                "AND source_id=? AND source_sequence=?",
+                (context.account_id, context.mode, source_id, source_sequence),
+            ).fetchone()
+            if source is None:
+                return True
+            original = connection.execute(
+                "SELECT payload_json FROM bridge_operations WHERE account_id=? AND mode=? "
+                "AND identity=?",
+                (context.account_id, context.mode, source["report_id"]),
+            ).fetchone()
+            if original is None or not _alias_matches(
+                json.loads(original["payload_json"]), payload
+            ):
+                return True
+        return False
+
+    def _latest_received_at(
+        self, connection: sqlite3.Connection, context: SyntheticContext
+    ) -> datetime | None:
+        values = [
+            row[0]
+            for row in connection.execute(
+                "SELECT received_at FROM bridge_inbox WHERE account_id=? AND mode=? "
+                "UNION ALL SELECT received_at FROM bridge_operations "
+                "WHERE account_id=? AND mode=?",
+                (context.account_id, context.mode, context.account_id, context.mode),
+            )
+        ]
+        parsed = [datetime.fromisoformat(value) for value in values]
+        return max(parsed) if parsed else None
+
+    def _require_context_not_before_store(
+        self, connection: sqlite3.Connection, context: SyntheticContext
+    ) -> None:
+        latest = self._latest_received_at(connection, context)
+        if latest is not None and context.as_of < latest:
+            raise FactError("CONTEXT_TIME_REGRESSION", "caller as_of precedes consumed facts")
+
     def _operation_row(
         self, context: SyntheticContext, kind: str, identity: str
     ) -> sqlite3.Row | None:
@@ -1535,7 +1808,7 @@ class SQLiteCycleBridgeAdapter:
     ) -> None:
         rows = connection.execute(
             "SELECT kind,identity,result_json FROM bridge_operations WHERE account_id=? "
-            "AND mode=? AND status='POSTED' AND kind IN ('settlement','late_fee') "
+            "AND mode=? AND status='POSTED' AND kind IN ('sell','settlement','late_fee') "
             "ORDER BY kind,identity",
             (context.account_id, context.mode),
         ).fetchall()
@@ -1558,6 +1831,54 @@ class SQLiteCycleBridgeAdapter:
                     "STORE_PROJECTION_MISMATCH",
                     f"cached {row['kind']} receipt differs from journal",
                 )
+        inbox = connection.execute(
+            "SELECT report_id,result_json FROM bridge_inbox WHERE account_id=? "
+            "AND mode=? AND status='POSTED' ORDER BY report_id",
+            (context.account_id, context.mode),
+        ).fetchall()
+        for row in inbox:
+            journal = connection.execute(
+                "SELECT payload_json FROM bridge_journal WHERE account_id=? AND mode=? "
+                "AND transition_id=? AND kind='buy'",
+                (context.account_id, context.mode, f"buy:{row['report_id']}"),
+            ).fetchone()
+            journal_result = (
+                None if journal is None else json.loads(journal["payload_json"]).get("result")
+            )
+            if journal_result is None or json.loads(row["result_json"]) != journal_result:
+                raise FactError(
+                    "STORE_PROJECTION_MISMATCH", "cached buy receipt differs from journal"
+                )
+        entries = connection.execute(
+            "SELECT command_id,result_json FROM bridge_entry_receipts WHERE account_id=? "
+            "AND mode=? AND accepted=1 ORDER BY command_id",
+            (context.account_id, context.mode),
+        ).fetchall()
+        for row in entries:
+            journal = connection.execute(
+                "SELECT payload_json FROM bridge_journal WHERE account_id=? AND mode=? "
+                "AND transition_id=? AND kind='entry'",
+                (context.account_id, context.mode, f"entry:{row['command_id']}"),
+            ).fetchone()
+            if journal is None:
+                raise FactError("STORE_PROJECTION_MISMATCH", "entry journal is missing")
+            event = json.loads(journal["payload_json"])
+            journal_result = {
+                key: event[key]
+                for key in (
+                    "accepted",
+                    "replayed",
+                    "quantity",
+                    "reservation_id",
+                    "account_revision",
+                    "result_digest",
+                    "command_id",
+                )
+            }
+            if json.loads(row["result_json"]) != journal_result:
+                raise FactError(
+                    "STORE_PROJECTION_MISMATCH", "cached entry receipt differs from journal"
+                )
 
     def _replay_buy_operation(
         self,
@@ -1565,13 +1886,51 @@ class SQLiteCycleBridgeAdapter:
         kind: str,
         identity: str,
         expected_digest: str,
+        expected_payload: object,
     ) -> BuyBridgeResult | None:
-        row = self._operation_row(context, kind, identity)
+        row = self._replay_operation(context, kind, identity, expected_digest, expected_payload)
         if row is None or row["status"] != "POSTED":
             return None
-        if row["payload_digest"] != expected_digest:
-            raise FactError("IDEMPOTENCY_CONFLICT", "operation payload differs")
         return self._buy_from_dict(json.loads(row["result_json"]))
+
+    def _replay_operation(
+        self,
+        context: SyntheticContext,
+        kind: str,
+        identity: str,
+        expected_digest: str,
+        expected_payload: object,
+    ) -> sqlite3.Row | None:
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT * FROM bridge_operations WHERE account_id=? AND mode=? "
+                    "AND kind=? AND identity=?",
+                    (context.account_id, context.mode, kind, identity),
+                ).fetchone()
+                if row is None:
+                    connection.commit()
+                    return None
+                self._validate_operation_journal(connection, context)
+                if row["payload_digest"] != expected_digest:
+                    self._require_context_not_before_store(connection, context)
+                    self._record_conflict(
+                        connection,
+                        context,
+                        f"{kind}_operation",
+                        identity,
+                        row["payload_digest"],
+                        expected_digest,
+                        json.dumps(expected_payload, sort_keys=True),
+                    )
+                    connection.commit()
+                    raise FactError("IDEMPOTENCY_CONFLICT", "operation payload differs")
+                connection.commit()
+                return cast(sqlite3.Row, row)
+            except Exception:
+                connection.rollback()
+                raise
 
     def _store_operation(
         self,
@@ -1700,7 +2059,13 @@ class SQLiteCycleBridgeAdapter:
             "account": result.account.to_dict(),
             "funding": funding_state_envelope(result.funding),
             "account_revision": result.account_revision,
-            "postings": [item.to_dict() for item in result.postings],
+            "postings": [
+                {
+                    "account": item.account,
+                    "amount": format(item.amount.quantize(Decimal("0.01")), "f"),
+                }
+                for item in result.postings
+            ],
         }
 
     def _late_from_dict(self, raw: dict[str, Any]) -> LateFeeResult:
@@ -1762,6 +2127,7 @@ class SQLiteCycleBridgeAdapter:
         )
 
     def _read(self, connection: sqlite3.Connection, context: SyntheticContext) -> BridgeState:
+        self._require_context_not_before_store(connection, context)
         self._validate_operation_journal(connection, context)
         account_row = connection.execute(
             "SELECT * FROM bridge_account WHERE account_id=? AND mode=?",
@@ -1829,7 +2195,13 @@ class SQLiteCycleBridgeAdapter:
             "account": result.account.to_dict(),
             "funding": funding_state_envelope(result.funding),
             "account_revision": result.account_revision,
-            "postings": [item.to_dict() for item in result.postings],
+            "postings": [
+                {
+                    "account": item.account,
+                    "amount": format(item.amount.quantize(Decimal("0.01")), "f"),
+                }
+                for item in result.postings
+            ],
         }
 
     def _buy_from_dict(self, raw: dict[str, Any]) -> BuyBridgeResult:

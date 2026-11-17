@@ -1,0 +1,72 @@
+{
+  "schema": "quanthus.r11.u02-return-disposition.v1",
+  "work_item": "P11-R11-USE-002",
+  "issue": 700,
+  "data_issue": 701,
+  "received_B_status": "B_PARTIAL",
+  "manifest_sha256": "cbd9a021a981136a829cc59ca31d6c59cf3b93ef8e5a5a4417b2c40b894edab4",
+  "acceptance": "retained_verified_metadata_partial_only",
+  "verified": {
+    "files": 12,
+    "bytes": 24853,
+    "json_objects": 11,
+    "source_bindings": 29,
+    "source_head": "515cc929b0c956af0409ce5371124d83bb8b5fa5",
+    "source_tree": "84aca18a86b4731b725c04fe483dcc442d24d3ea",
+    "clean_worktree": true,
+    "existing_repository_member_list": {
+      "path": "config/research/research-capital-qual/closure.v1.json",
+      "sha256": "0f66acfcc8ef1a93f831b7272f59a86df13fe4a2f3717e4c8e5a812d4cbac13f",
+      "members": 126
+    }
+  },
+  "useful_delta": [
+    "Two exact R10 DWD roots exist, unlike old developmentv2 paths; root existence remains separate from member/schema/use qualification.",
+    "R7 three-code April2020 engineering slice and false strictPIT status distinguish it from fullR11.",
+    "R10 native154 = old126+28 extra, full extra list/mapping still requires exact handoff."
+  ],
+  "corrections": [
+    "Existing126member list is reused from repository, not delegated for recreation.",
+    "R7 slice codes000001/300750/600519 are known; full legacy research-role exposure remains UNKNOWN under P11.",
+    "P10 owns source identities and qualification, P11 owns research exposure/role dispositions.",
+    "Volume remains optional for plotting; static industry snapshot remains concentration-only non-PIT; proposed15table template is not a new global gate.",
+    "Embedded R10 source_freeze and A_admission fields are present in existing run-manifest; missing directsafe paths do not justify repeat archival hunting."
+  ],
+  "input_status": {
+    "U02": "waiting_exact_P10_handoff",
+    "U06": "held_on_current_hard_prerequisites",
+    "research_result": "not_evaluated",
+    "daily_adopted": false,
+    "full_goal": "open"
+  },
+  "unresolved": [
+    "154complete member mapping/schema/key/units",
+    "full original-window/warmup coverage",
+    "source/per-decision/effective/qualification time and allowed use",
+    "industry immutable mapping",
+    "P11 exposure/role qualification and actual account/expert mode"
+  ],
+  "quote_disposition": {
+    "received_P11_range_hours": [
+      13,
+      26
+    ],
+    "status": "not_adopted_unvalidated",
+    "reason": "Table/member counts alone do not price executable consumer seams;6-12hmanifest/PIT category mixes P10-owned work, cold input interface overlaps laterU07; keep original quote as received, no new total/budget."
+  },
+  "budget_disposition": {
+    "native_reconciliation": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/lead-b-review-001/native-cost-reconciliation.json",
+    "dispatch_to_latest_completed_seconds": 5304.602505,
+    "wall_cap_seconds": 2700,
+    "overrun_seconds": 2604.602505,
+    "after_cutoff_SSH_commands_in_late_turn": 4,
+    "CPU_RSS": "unknown_not_zero",
+    "next": "No extra B tranche or duplicate metadata task; account exact failure in cumulative cost and return to useful delivery."
+  },
+  "P10_routing": {
+    "comment_url": "https://github.com/rv198-star/Quanthus/issues/701#issuecomment-6950888497",
+    "request": "Five scoped current-source/mapping/history/clock/industry differences, with existing126closure reused.",
+    "new_acquisition_authorized": false
+  },
+  "next_unblocked": "A cash/config repair acceptance; prepare bounded P12 minimal fact/transaction slice after exact shared-interface binding; no U06 market run."
+}

@@ -15285,6 +15285,82 @@
         "REPRO",
         "TRACE"
       ]
+    },
+    {
+      "id": "CP-700-R11-B-PARTIAL-20261117",
+      "recorded_at": "2026-11-17T14:42:33.442335+00:00",
+      "actor": "Quanthus researchlead Sol independent received-package review",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Verify completed B immutable metadata partial, reuse exact existing126closure and route five precise source/PIT differences to P10#701; reject unpriced13-26h total, reconcile native deadline overrun and retain totalR11open.",
+      "evidence": [
+        {
+          "id": "B-PARTIAL-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/lead-b-review-001/disposition.json",
+          "sha256": "245d8575b527054c7bc21f06f49ff5f656f3b45aa363d471f43dc6f371099c45",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Verified metadata envelope/current identities and bounded P10 routing only; U02/U06 remain unqualified."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "Source metadata is partial and no market/research/daily admission changes; cashA remains separately pending final acceptance and allU04-U08 retain current scope.",
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T12:05:08Z",
+          "body_sha256": "a955f2433a8d407393febbc8c6c3345d621ec9455faf9f24712bcb8380b0d06b"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT",
+        "TRACE"
+      ]
+    },
+    {
+      "id": "CP-701-R11-PRECISE-HANDOFF-20261117",
+      "recorded_at": "2026-11-17T14:42:35.174688+00:00",
+      "actor": "Quanthus researchlead Sol minimal consumer demand routing",
+      "work_item": "P10-DATA-R11-PURPOSE-001",
+      "outcome": "no_module_change",
+      "summary": "P10#701 now has existing126member list and exact live DWD roots; request only154mapping/history/clocks/consumer fields/industry differences, preserve source/role ownership and original gates.",
+      "evidence": [
+        {
+          "id": "B-PARTIAL-REVIEW",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/lead-b-review-001/disposition.json",
+          "sha256": "245d8575b527054c7bc21f06f49ff5f656f3b45aa363d471f43dc6f371099c45",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Bounded source handoff request and exact reused metadata; no consumer admission."
+        }
+      ],
+      "updates": [],
+      "no_change_reason": "This is a consumer request and evidence reuse, not data repair or qualification.",
+      "issue_observations": [
+        {
+          "work_item": "P10-DATA-R11-PURPOSE-001",
+          "number": 701,
+          "title": "[P10-DATA-R11-PURPOSE-001] 交接R11原窗口现成输入与逐决策PIT用途",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-17T14:27:10Z",
+          "body_sha256": "12da9456a90f916780a0314001384f285a532a1d4d9343f80806015a52879428"
+        }
+      ],
+      "reviewed_modules": [
+        "DATA",
+        "REPRO",
+        "TRACE"
+      ]
     }
   ],
   "history_imports": [

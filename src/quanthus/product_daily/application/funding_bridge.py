@@ -839,6 +839,22 @@ class BridgeSnapshot:
 
 
 @dataclass(frozen=True)
+class SyntheticTemporalProfile:
+    profile_version: str
+    received_times: tuple[datetime, ...]
+
+    def __post_init__(self) -> None:
+        if not self.profile_version or not self.received_times:
+            raise FactError("INVALID_REPORT_SHAPE", "temporal profile is empty")
+        if any(item.tzinfo is None or item.utcoffset() is None for item in self.received_times):
+            raise FactError("INVALID_REPORT_SHAPE", "temporal profile must be aware")
+
+    def require(self, context: SyntheticContext) -> None:
+        if context.as_of not in self.received_times:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "context is outside synthetic profile")
+
+
+@dataclass(frozen=True)
 class EntryBridgeResult:
     accepted: bool
     replayed: bool
@@ -868,6 +884,7 @@ class FundingBridgePort(Protocol):
     def read_snapshot(self, context: SyntheticContext) -> BridgeSnapshot: ...
     def obligations(self, context: SyntheticContext) -> tuple[PendingObligation, ...]: ...
     def lots(self, context: SyntheticContext) -> tuple[BuyLot, ...]: ...
+    def latest_received_at(self, context: SyntheticContext) -> datetime | None: ...
     def receive_operation(
         self,
         context: SyntheticContext,
@@ -1226,11 +1243,13 @@ class FundingBridgeService:
         port: FundingBridgePort,
         authorized_context: SyntheticContext,
         authorization: SyntheticRuntimeAuthorization,
+        temporal_profile: SyntheticTemporalProfile | None = None,
     ) -> None:
         authorization.require(authorized_context)
         self._port = port
         self._authorization = authorization
         self._context = validate_context(authorized_context)
+        self._temporal_profile = temporal_profile
 
     def _context_for(self, context: SyntheticContext) -> SyntheticContext:
         value = validate_context(context)
@@ -1245,23 +1264,49 @@ class FundingBridgeService:
             raise FactError("UNAUTHORIZED_CONTEXT", "bridge context identity or time differs")
         return value
 
+    def _require_not_before_latest(self, context: SyntheticContext) -> None:
+        latest = self._port.latest_received_at(context)
+        if latest is not None and context.as_of < latest:
+            raise FactError("CONTEXT_TIME_REGRESSION", "caller as_of precedes consumed facts")
+
+    def _require_fact_time(
+        self, context: SyntheticContext, occurred_at: datetime, *, mutation: bool = True
+    ) -> None:
+        self._require_not_before_latest(context)
+        if occurred_at > context.as_of:
+            raise FactError("FUTURE_FACT", "fact occurred after caller as_of")
+        if mutation and self._temporal_profile is not None:
+            self._temporal_profile.require(context)
+
     def establish_baseline(self, baseline: CycleBaseline) -> BridgeState:
         self._context_for(baseline.context)
         return self._port.establish(baseline)
 
     def current(self, context: SyntheticContext) -> BridgeState:
-        return self._port.read(self._context_for(context))
+        value = self._context_for(context)
+        self._require_not_before_latest(value)
+        return self._port.read(value)
 
     def enter(self, context: SyntheticContext, intent: CycleEntryIntent) -> EntryBridgeResult:
         context = self._context_for(context)
         view = self._port.read_snapshot(context)
         state = view.state
+        if state.funding.completed_settlements and self._temporal_profile is None:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "new cycle execution lacks profile")
         known_command = any(
             item.command_id == intent.command.command_id
             for item in state.funding.processed_commands
         )
         if not known_command and state.account_revision != intent.expected_account_revision:
             raise ProductDailyError("ACCOUNT_REVISION_CONFLICT", "account revision is stale")
+        if not known_command:
+            self._require_fact_time(context, intent.snapshot.as_of)
+        if (
+            state.funding.completed_settlements
+            and self._temporal_profile is None
+            and not known_command
+        ):
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "new cycle admission lacks profile")
         if not known_command:
             pending = tuple(
                 item.pending_buy() for item in view.obligations if item.status == "OPEN"
@@ -1308,8 +1353,11 @@ class FundingBridgeService:
         existing = self._port.replay_buy(context, report, profile)
         if existing is not None:
             return existing
+        self._require_fact_time(context, report.occurred_at)
         receipt_id = self._port.receive_buy(context, report, profile)
         view = self._port.read_snapshot(context)
+        if view.state.funding.completed_settlements and self._temporal_profile is None:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "new cycle execution lacks profile")
         state = view.state
         obligations = tuple(
             item
@@ -1345,6 +1393,7 @@ class FundingBridgeService:
         existing = self._port.replay_sell(context, report, profile)
         if existing is not None:
             return existing
+        self._require_fact_time(context, report.occurred_at)
         receipt_id = self._port.receive_operation(
             context,
             "sell",
@@ -1361,6 +1410,8 @@ class FundingBridgeService:
             payload=report.to_dict(),
         )
         view = self._port.read_snapshot(context)
+        if view.state.funding.completed_settlements and self._temporal_profile is None:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "new cycle sell lacks profile")
         lots = tuple(
             item
             for item in self._port.lots(context)
@@ -1388,7 +1439,12 @@ class FundingBridgeService:
         existing = self._port.replay_settlement(context, settlement_id, cycle_id)
         if existing is not None:
             return existing
+        self._require_not_before_latest(context)
+        if self._temporal_profile is not None:
+            self._temporal_profile.require(context)
         view = self._port.read_snapshot(context)
+        if view.state.funding.completed_settlements and self._temporal_profile is None:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "later settlement lacks profile")
         bucket = view.state.funding.bucket(_bucket_for_cycle(view.state.funding, cycle_id))
         request = SettlementRequest(
             settlement_id,
@@ -1444,6 +1500,7 @@ class FundingBridgeService:
         existing = self._port.replay_late_fee(context, fact)
         if existing is not None:
             return existing
+        self._require_fact_time(context, fact.occurred_at)
         receipt_id = self._port.receive_operation(
             context,
             "late_fee",
@@ -1471,6 +1528,8 @@ class FundingBridgeService:
             },
         )
         view = self._port.read_snapshot(context)
+        if view.state.funding.completed_settlements and self._temporal_profile is None:
+            raise FactError("TEMPORAL_PROFILE_REQUIRED", "late fee lacks profile")
         payload = late_cash_invocation_payload(
             bucket_id=fact.bucket_id,
             cycle_id=fact.cycle_id,
@@ -1488,7 +1547,9 @@ class FundingBridgeService:
         )
 
     def risk_snapshot(self, context: SyntheticContext, *, mark_price: Decimal) -> RiskSnapshot:
-        view = self._port.read_snapshot(self._context_for(context))
+        value = self._context_for(context)
+        self._require_not_before_latest(value)
+        view = self._port.read_snapshot(value)
         state = view.state
         pending = tuple(item.pending_buy() for item in view.obligations if item.status == "OPEN")
         positions = tuple(
@@ -1506,7 +1567,7 @@ class FundingBridgeService:
         marked = sum((Decimal(item.quantity) * mark_price for item in positions), Decimal("0"))
         return RiskSnapshot(
             f"bridge-risk:{view.digest}",
-            self._context.as_of,
+            value.as_of,
             state.account.cash + marked,
             state.account.cash,
             positions,

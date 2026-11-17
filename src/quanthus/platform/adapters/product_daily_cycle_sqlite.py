@@ -31,6 +31,7 @@ from quanthus.product_daily.application.funding_bridge import (
     SellProfile,
     SettlementBridgeResult,
     SyntheticContext,
+    SyntheticTemporalProfile,
     apply_confirmed_buy_transition,
     apply_confirmed_sell_transition,
     apply_late_fee_transition,
@@ -55,6 +56,24 @@ from quanthus.product_daily.funding import (
     settle_invocation_payload,
 )
 from quanthus.shared.fact_contracts import FactError, digest
+
+
+def _alias_matches(original: object, candidate: object) -> bool:
+    original_value = original
+    candidate_value = candidate
+    if isinstance(original_value, dict) and "report" in original_value:
+        original_value = original_value["report"]
+    if isinstance(candidate_value, dict) and "report" in candidate_value:
+        candidate_value = candidate_value["report"]
+    if not isinstance(original_value, dict) or not isinstance(candidate_value, dict):
+        return False
+    ignored = {"fact_id", "report_id"}
+    original_fact = {key: value for key, value in original_value.items() if key not in ignored}
+    candidate_fact = {key: value for key, value in candidate_value.items() if key not in ignored}
+    return bool(candidate_fact) and all(
+        key in original_fact and original_fact[key] == value
+        for key, value in candidate_fact.items()
+    )
 
 
 class SQLiteCycleBridgeAdapter:
@@ -145,6 +164,10 @@ class SQLiteCycleBridgeAdapter:
                       old_digest TEXT NOT NULL, new_digest TEXT NOT NULL,
                       evidence_json TEXT NOT NULL,
                       PRIMARY KEY(account_id,mode,identity,old_digest,new_digest));
+                    CREATE TABLE bridge_conflict_register(
+                      conflict_id TEXT PRIMARY KEY, account_id TEXT NOT NULL, mode TEXT NOT NULL,
+                      scope_key TEXT NOT NULL, state TEXT NOT NULL,
+                      original_ref TEXT NOT NULL, evidence_json TEXT NOT NULL);
                     CREATE TABLE bridge_lots(
                       account_id TEXT NOT NULL, mode TEXT NOT NULL, lot_id TEXT NOT NULL,
                       security_code TEXT NOT NULL, cycle_id TEXT NOT NULL,
@@ -163,10 +186,10 @@ class SQLiteCycleBridgeAdapter:
                       digest TEXT NOT NULL,
                       PRIMARY KEY(account_id,mode,sequence),
                       UNIQUE(account_id,mode,transition_id));
-                    PRAGMA user_version=3;
+                    PRAGMA user_version=4;
                     """
                 )
-            elif version == 3:
+            elif version == 4:
                 expected = {
                     "bridge_baseline",
                     "bridge_account",
@@ -179,6 +202,7 @@ class SQLiteCycleBridgeAdapter:
                     "bridge_obligations",
                     "bridge_source_facts",
                     "bridge_conflicts",
+                    "bridge_conflict_register",
                     "bridge_lots",
                     "bridge_operations",
                     "bridge_journal",
@@ -295,6 +319,20 @@ class SQLiteCycleBridgeAdapter:
             for row in rows
         )
 
+    def latest_received_at(self, context: SyntheticContext) -> datetime | None:
+        with self._connect() as connection:
+            values = [
+                row[0]
+                for row in connection.execute(
+                    "SELECT received_at FROM bridge_inbox WHERE account_id=? AND mode=? "
+                    "UNION ALL SELECT received_at FROM bridge_operations "
+                    "WHERE account_id=? AND mode=?",
+                    (context.account_id, context.mode, context.account_id, context.mode),
+                )
+            ]
+        parsed = [datetime.fromisoformat(value) for value in values]
+        return max(parsed) if parsed else None
+
     def receive_operation(
         self,
         context: SyntheticContext,
@@ -314,7 +352,7 @@ class SQLiteCycleBridgeAdapter:
                 if row is not None:
                     if row["payload_digest"] == payload_digest:
                         return str(row["receipt_id"])
-                    if row["status"] != "POSTED":
+                    if row["status"] != "POSTED" and kind == "settlement":
                         self._record_conflict(
                             connection,
                             context,
@@ -323,6 +361,7 @@ class SQLiteCycleBridgeAdapter:
                             row["payload_digest"],
                             payload_digest,
                             json.dumps(payload, sort_keys=True),
+                            resolved=True,
                         )
                         connection.execute(
                             "UPDATE bridge_operations SET payload_digest=?,payload_json=?,"
@@ -363,7 +402,7 @@ class SQLiteCycleBridgeAdapter:
                         payload_digest,
                         receipt_id,
                         json.dumps(payload, sort_keys=True),
-                        self._timestamp(),
+                        context.as_of.isoformat(),
                     ),
                 )
                 connection.commit()
@@ -391,6 +430,26 @@ class SQLiteCycleBridgeAdapter:
                     (context.account_id, context.mode, source_id, source_sequence),
                 ).fetchone()
                 if source is not None and source["report_id"] != identity:
+                    original_operation = connection.execute(
+                        "SELECT payload_json FROM bridge_operations "
+                        "WHERE account_id=? AND mode=? AND identity=?",
+                        (context.account_id, context.mode, source["report_id"]),
+                    ).fetchone()
+                    original_inbox = connection.execute(
+                        "SELECT payload_json FROM bridge_inbox "
+                        "WHERE account_id=? AND mode=? AND report_id=?",
+                        (context.account_id, context.mode, source["report_id"]),
+                    ).fetchone()
+                    original_payload = (
+                        original_operation["payload_json"]
+                        if original_operation is not None
+                        else original_inbox["payload_json"]
+                        if original_inbox is not None
+                        else None
+                    )
+                    resolved = original_payload is not None and _alias_matches(
+                        json.loads(original_payload), payload
+                    )
                     self._record_conflict(
                         connection,
                         context,
@@ -399,6 +458,8 @@ class SQLiteCycleBridgeAdapter:
                         str(source["receipt_id"]),
                         new_digest,
                         json.dumps(payload, sort_keys=True),
+                        resolved=resolved,
+                        scope_key=f"source:{source_id}:{source_sequence}",
                     )
                     connection.commit()
                     raise FactError("SOURCE_FACT_DUPLICATE", "source alias differs")
@@ -535,7 +596,7 @@ class SQLiteCycleBridgeAdapter:
                         report.payload_digest,
                         receipt_id,
                         json.dumps(report.to_dict(), sort_keys=True),
-                        self._timestamp(),
+                        context.as_of.isoformat(),
                         "RECEIVED",
                         profile.payload_digest,
                     ),
@@ -551,6 +612,14 @@ class SQLiteCycleBridgeAdapter:
                     ),
                 ).fetchone()
                 if source is not None and source["report_id"] != report.report_id:
+                    original = connection.execute(
+                        "SELECT payload_json FROM bridge_inbox "
+                        "WHERE account_id=? AND mode=? AND report_id=?",
+                        (context.account_id, context.mode, source["report_id"]),
+                    ).fetchone()
+                    resolved = original is not None and _alias_matches(
+                        json.loads(original["payload_json"]), report.to_dict()
+                    )
                     self._record_conflict(
                         connection,
                         context,
@@ -559,6 +628,8 @@ class SQLiteCycleBridgeAdapter:
                         str(source["receipt_id"]),
                         receipt_id,
                         json.dumps(report.to_dict(), sort_keys=True),
+                        resolved=resolved,
+                        scope_key=f"source:{report.source_id}:{report.source_sequence}",
                     )
                     connection.commit()
                     raise FactError(
@@ -642,6 +713,14 @@ class SQLiteCycleBridgeAdapter:
                     ),
                 ).fetchone()
                 if source is not None:
+                    original = connection.execute(
+                        "SELECT payload_json FROM bridge_inbox WHERE account_id=? AND mode=? "
+                        "AND report_id=?",
+                        (context.account_id, context.mode, source["report_id"]),
+                    ).fetchone()
+                    resolved = original is not None and _alias_matches(
+                        json.loads(original["payload_json"]), report.to_dict()
+                    )
                     self._record_conflict(
                         connection,
                         context,
@@ -650,6 +729,8 @@ class SQLiteCycleBridgeAdapter:
                         str(source["receipt_id"]),
                         receipt_id,
                         json.dumps(report.to_dict(), sort_keys=True),
+                        resolved=resolved,
+                        scope_key=f"source:{report.source_id}:{report.source_sequence}",
                     )
                     connection.commit()
                     raise FactError(
@@ -829,6 +910,14 @@ class SQLiteCycleBridgeAdapter:
                     ),
                 ).fetchone()
                 if source is not None:
+                    original = connection.execute(
+                        "SELECT payload_json FROM bridge_operations WHERE account_id=? AND mode=? "
+                        "AND identity=?",
+                        (context.account_id, context.mode, source["report_id"]),
+                    ).fetchone()
+                    resolved = original is not None and _alias_matches(
+                        json.loads(original["payload_json"]), report.to_dict()
+                    )
                     self._record_conflict(
                         connection,
                         context,
@@ -837,6 +926,8 @@ class SQLiteCycleBridgeAdapter:
                         str(source["receipt_id"]),
                         receipt_id,
                         json.dumps(report.to_dict(), sort_keys=True),
+                        resolved=resolved,
+                        scope_key=f"source:{report.source_id}:{report.source_sequence}",
                     )
                     connection.commit()
                     raise FactError("SOURCE_FACT_DUPLICATE", "sell source already posted")
@@ -984,8 +1075,14 @@ class SQLiteCycleBridgeAdapter:
             fees_known = all(
                 item.get("profile_data", {}).get("confirmed_fee") is not None for item in buy_sell
             )
-            # Rejected source aliases are resolved audit evidence, not open reconciliation cases.
-            conflicts_clear = True
+            conflicts_clear = (
+                connection.execute(
+                    "SELECT count(*) FROM bridge_conflict_register "
+                    "WHERE account_id=? AND mode=? AND state='UNRESOLVED'",
+                    (context.account_id, context.mode),
+                ).fetchone()[0]
+                == 0
+            )
             connection.commit()
         return orders_terminal, fills_complete, fees_known, conflicts_clear
 
@@ -1013,6 +1110,14 @@ class SQLiteCycleBridgeAdapter:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 state = self._read(connection, context)
+                if connection.execute(
+                    "SELECT count(*) FROM bridge_conflict_register WHERE account_id=? "
+                    "AND mode=? AND state='UNRESOLVED'",
+                    (context.account_id, context.mode),
+                ).fetchone()[0]:
+                    raise FactError(
+                        "SETTLEMENT_NOT_READY", "unresolved conflict arrived before commit"
+                    )
                 if (
                     state.account.digest != expected_account_digest
                     or state.funding.digest != expected_funding_digest
@@ -1097,6 +1202,15 @@ class SQLiteCycleBridgeAdapter:
                     ),
                 ).fetchone()
                 if source is not None:
+                    original = connection.execute(
+                        "SELECT payload_json FROM bridge_operations WHERE account_id=? AND mode=? "
+                        "AND identity=?",
+                        (context.account_id, context.mode, source["report_id"]),
+                    ).fetchone()
+                    resolved = original is not None and _alias_matches(
+                        json.loads(original["payload_json"]),
+                        {"cash_delta": format(fact.cash_delta, "f")},
+                    )
                     self._record_conflict(
                         connection,
                         context,
@@ -1105,6 +1219,8 @@ class SQLiteCycleBridgeAdapter:
                         str(source["receipt_id"]),
                         result.receipt_id,
                         json.dumps(fact.payload_digest),
+                        resolved=resolved,
+                        scope_key=f"source:{fact.source_id}:{fact.source_sequence}",
                     )
                     connection.commit()
                     raise FactError("SOURCE_FACT_DUPLICATE", "late fee source already posted")
@@ -1410,7 +1526,38 @@ class SQLiteCycleBridgeAdapter:
                 "WHERE account_id=? AND mode=? AND kind=? AND identity=?",
                 (context.account_id, context.mode, kind, identity),
             ).fetchone()
+            if row is not None:
+                self._validate_operation_journal(connection, context)
             return cast(sqlite3.Row | None, row)
+
+    def _validate_operation_journal(
+        self, connection: sqlite3.Connection, context: SyntheticContext
+    ) -> None:
+        rows = connection.execute(
+            "SELECT kind,identity,result_json FROM bridge_operations WHERE account_id=? "
+            "AND mode=? AND status='POSTED' AND kind IN ('settlement','late_fee') "
+            "ORDER BY kind,identity",
+            (context.account_id, context.mode),
+        ).fetchall()
+        for row in rows:
+            journal = connection.execute(
+                "SELECT payload_json FROM bridge_journal WHERE account_id=? AND mode=? "
+                "AND transition_id=? AND kind=?",
+                (
+                    context.account_id,
+                    context.mode,
+                    f"{row['kind']}:{row['identity']}",
+                    row["kind"],
+                ),
+            ).fetchone()
+            journal_result = (
+                None if journal is None else json.loads(journal["payload_json"]).get("result")
+            )
+            if journal_result is None or json.loads(row["result_json"]) != journal_result:
+                raise FactError(
+                    "STORE_PROJECTION_MISMATCH",
+                    f"cached {row['kind']} receipt differs from journal",
+                )
 
     def _replay_buy_operation(
         self,
@@ -1589,6 +1736,9 @@ class SQLiteCycleBridgeAdapter:
         old_digest: str,
         new_digest: str,
         evidence: str,
+        *,
+        resolved: bool = False,
+        scope_key: str | None = None,
     ) -> None:
         connection.execute(
             "INSERT OR IGNORE INTO bridge_conflicts VALUES(?,?,?,?,?,?)",
@@ -1601,8 +1751,18 @@ class SQLiteCycleBridgeAdapter:
                 evidence,
             ),
         )
+        state = "RESOLVED_ALIAS" if resolved else "UNRESOLVED"
+        scope = scope_key or f"account:{context.account_id}"
+        conflict_id = digest(
+            [context.account_id, context.mode, identity_kind, identity, old_digest, new_digest]
+        )
+        connection.execute(
+            "INSERT OR IGNORE INTO bridge_conflict_register VALUES(?,?,?,?,?,?,?)",
+            (conflict_id, context.account_id, context.mode, scope, state, identity, evidence),
+        )
 
     def _read(self, connection: sqlite3.Connection, context: SyntheticContext) -> BridgeState:
+        self._validate_operation_journal(connection, context)
         account_row = connection.execute(
             "SELECT * FROM bridge_account WHERE account_id=? AND mode=?",
             (context.account_id, context.mode),
@@ -1715,10 +1875,12 @@ def build_funding_bridge_service(
     authorization: SyntheticRuntimeAuthorization,
     fault_hook: Callable[[str], None] | None = None,
     clock: Callable[[], datetime] | None = None,
+    temporal_profile: SyntheticTemporalProfile | None = None,
 ) -> FundingBridgeService:
     authorization.require(context)
     return FundingBridgeService(
         SQLiteCycleBridgeAdapter(path, fault_hook=fault_hook, clock=clock),
         context,
         authorization,
+        temporal_profile,
     )

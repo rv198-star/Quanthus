@@ -173,7 +173,7 @@ class SQLiteCycleBridgeAdapter:
                     (result.account_revision, c.account_id, c.mode),
                 )
                 connection.execute(
-                    "INSERT OR REPLACE INTO bridge_entry_receipts VALUES(?,?,?,?,?)",
+                    "INSERT OR IGNORE INTO bridge_entry_receipts VALUES(?,?,?,?,?)",
                     (
                         c.account_id,
                         c.mode,

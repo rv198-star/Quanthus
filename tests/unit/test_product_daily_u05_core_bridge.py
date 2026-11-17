@@ -203,6 +203,8 @@ def test_f02_f03_f04_f05_entry_buy_risk_replay_and_stale_cas(tmp_path: Path) -> 
     assert replay_entry.reservation_id == entry.reservation_id
     assert replay_entry.result_digest == entry.result_digest
     assert service.current(context()) == before_entry_replay
+    reopened = build_funding_bridge_service(path, context=context(), authorization=AUTH)
+    assert reopened.rebuild(context()) == reopened.current(context())
     with pytest.raises(ProductDailyError, match="ACCOUNT_REVISION_CONFLICT"):
         service.enter(
             context(),

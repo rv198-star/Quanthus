@@ -81,6 +81,8 @@ def test_baseline_replay_is_original_and_changed_identity_is_audited(tmp_path: P
     assert business(path) == before
     with sqlite3.connect(path) as db:
         assert db.execute("SELECT count(*) FROM conflicts").fetchone()[0] == 1
+        evidence = json.loads(db.execute("SELECT evidence_json FROM conflicts").fetchone()[0])
+        assert evidence["cash"] == "20000.00" and evidence["request_id"] == "base"
         assert db.execute("SELECT cash FROM baselines").fetchone()[0] == "10000.00"
 
 
@@ -275,3 +277,45 @@ def test_public_capabilities_have_no_product_application_or_storage_dependency()
                 assert not (node.module or "").startswith(
                     ("quanthus.product_daily", "quanthus.platform", "sqlite3", "fastapi")
                 )
+
+
+def test_conflicting_report_returns_an_actionable_resolution(tmp_path: Path):
+    c = context()
+    s = build_synthetic_fact_service(tmp_path / "conflict.sqlite", context=c, authorization=AUTH)
+    s.establish_baseline(baseline())
+    s.submit_report(c, report())
+    conflict = s.submit_report(c, replace(report(), quantity=300))
+    assert conflict.status == "IDEMPOTENCY_CONFLICT"
+    assert conflict.next_action == "RESOLVE_CONFLICT"
+    assert conflict.current_revision == 1
+    assert s.projection(c).cash == Decimal("4995.00")
+
+
+def test_stale_correction_returns_current_chain_and_can_be_resolved(tmp_path: Path):
+    c = context()
+    s = build_synthetic_fact_service(tmp_path / "stale.sqlite", context=c, authorization=AUTH)
+    s.establish_baseline(baseline())
+    s.submit_report(c, report())
+    first = Correction("c1", "fill-1", 1, 300, Decimal("12.50"), "first")
+    s.correct_fact(c, first)
+    stale = s.correct_fact(c, replace(first, correction_id="stale", quantity=250))
+    assert stale.status == "NEEDS_RECONCILIATION"
+    assert stale.next_action == "RECONCILE_FACTS"
+    chain = stale.current_chain
+    assert chain is not None
+    assert chain.fact_id == "fill-1" and chain.fact_revision == 2
+    assert chain.quantity == 300 and chain.price == Decimal("12.50")
+    assert chain.confirmed_fee == Decimal("5.00") and chain.correction_ids == ("c1",)
+    assert stale.cash_delta == 0 and stale.quantity_delta == 0
+    accepted = s.correct_fact(
+        c,
+        replace(
+            first,
+            correction_id="resolved",
+            quantity=250,
+            expected_fact_revision=chain.fact_revision,
+        ),
+    )
+    assert accepted.status == "POSTED" and accepted.projection.cash == Decimal("6870.00")
+    assert accepted.projection.quantity("600000") == 250
+    assert s.rebuild(c) == s.projection(c)

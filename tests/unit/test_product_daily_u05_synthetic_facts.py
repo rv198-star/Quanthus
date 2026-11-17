@@ -167,8 +167,12 @@ def test_context_shape_and_revision_cas_fail_closed(tmp_path: Path) -> None:
     service.submit_report(context(), report())
     corrected = service.correct_fact(context(), correction())
     assert corrected.projection.revision == 2
-    with pytest.raises(FactError, match="STALE_FACT_REVISION.*2"):
-        service.correct_fact(
-            context(), replace(correction(), correction_id="synth-stale-correction")
-        )
+    stale = service.correct_fact(
+        context(), replace(correction(), correction_id="synth-stale-correction")
+    )
+    assert stale.status == "NEEDS_RECONCILIATION"
+    assert stale.conflicts == ("STALE_FACT_REVISION",)
+    assert stale.current_chain is not None and stale.current_chain.fact_revision == 2
+    assert stale.current_chain.quantity == 300
+    assert stale.current_chain.correction_ids == ("synth-correction-1",)
     assert POLICY_REFERENCE == "p12-synthetic-facts-0.1"

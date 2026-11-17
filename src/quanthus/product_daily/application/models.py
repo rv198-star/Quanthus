@@ -73,24 +73,25 @@ class Baseline:
                 "first slice requires explicitly zero unsettled quantity",
             )
 
+    def to_dict(self) -> dict[str, object]:
+        c = self.context
+        return {
+            "request_id": self.request_id,
+            "account_id": c.account_id,
+            "mode": c.mode,
+            "source_id": c.source_id,
+            "as_of": c.as_of.isoformat(),
+            "coverage_id": c.coverage_id,
+            "cash": format(self.cash, "f"),
+            "quantity": self.quantity,
+            "security_code": self.security_code,
+            "unsettled_quantity": self.unsettled_quantity,
+            "dependent_plan_ids": self.dependent_plan_ids,
+        }
+
     @property
     def payload_digest(self) -> str:
-        c = self.context
-        return digest(
-            {
-                "request_id": self.request_id,
-                "account_id": c.account_id,
-                "mode": c.mode,
-                "source_id": c.source_id,
-                "as_of": c.as_of.isoformat(),
-                "coverage_id": c.coverage_id,
-                "cash": format(self.cash, "f"),
-                "quantity": self.quantity,
-                "security_code": self.security_code,
-                "unsettled_quantity": self.unsettled_quantity,
-                "dependent_plan_ids": self.dependent_plan_ids,
-            }
-        )
+        return digest(self.to_dict())
 
 
 @dataclass(frozen=True)
@@ -116,9 +117,34 @@ class SubmissionResult:
 
     @property
     def next_action(self) -> str:
+        if self.status == "IDEMPOTENCY_CONFLICT":
+            return "RESOLVE_CONFLICT"
         if self.status == "NEEDS_RECONCILIATION":
             return "RECONCILE_FACTS"
         return "REASSESS_AFFECTED_PLANS" if self.affected_plans else "NONE"
+
+
+@dataclass(frozen=True)
+class CurrentFactChain:
+    fact_id: str
+    security_code: str
+    fact_revision: int
+    quantity: int
+    price: Decimal
+    confirmed_fee: Decimal
+    correction_ids: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema_version": "p12-current-fact-chain-v1",
+            "fact_id": self.fact_id,
+            "security_code": self.security_code,
+            "fact_revision": self.fact_revision,
+            "quantity": self.quantity,
+            "price": format(self.price, "f"),
+            "confirmed_fee": format(self.confirmed_fee, "f"),
+            "correction_ids": list(self.correction_ids),
+        }
 
 
 @dataclass(frozen=True)
@@ -130,6 +156,7 @@ class CorrectionResult:
     quantity_delta: int
     conflicts: tuple[str, ...] = ()
     affected_plans: tuple[str, ...] = ()
+    current_chain: CurrentFactChain | None = None
 
     @property
     def current_revision(self) -> int:
@@ -137,6 +164,8 @@ class CorrectionResult:
 
     @property
     def next_action(self) -> str:
+        if self.status == "IDEMPOTENCY_CONFLICT":
+            return "RESOLVE_CONFLICT"
         if self.status == "NEEDS_RECONCILIATION":
             return "RECONCILE_FACTS"
         return "REASSESS_AFFECTED_PLANS" if self.affected_plans else "NONE"

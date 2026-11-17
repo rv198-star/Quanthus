@@ -27,6 +27,7 @@ from quanthus.capabilities.execution import (
 from quanthus.product_daily.application.models import (
     Baseline,
     CorrectionResult,
+    CurrentFactChain,
     Receipt,
     SubmissionResult,
     SyntheticRuntimeAuthorization,
@@ -184,7 +185,7 @@ class SQLiteSyntheticFactsAdapter:
                             baseline.request_id,
                             existing["payload_digest"],
                             baseline.payload_digest,
-                            json.dumps({"new_baseline_digest": baseline.payload_digest}),
+                            json.dumps(baseline.to_dict(), sort_keys=True),
                         )
                         connection.commit()
                         raise FactError(
@@ -499,7 +500,29 @@ class SQLiteSyntheticFactsAdapter:
                 if fact is None:
                     raise FactError("FACT_NOT_FOUND", "fact is unavailable")
                 if fact["fact_revision"] != correction.expected_fact_revision:
-                    raise FactError("STALE_FACT_REVISION", f"current:{fact['fact_revision']}")
+                    current = self._projection(connection, context)
+                    chain = self._current_chain(connection, context, fact)
+                    connection.execute(
+                        "UPDATE correction_inbox SET status='NEEDS_RECONCILIATION',error_code=? "
+                        "WHERE account_id=? AND mode=? AND correction_id=?",
+                        (
+                            "STALE_FACT_REVISION",
+                            context.account_id,
+                            context.mode,
+                            correction.correction_id,
+                        ),
+                    )
+                    connection.commit()
+                    return CorrectionResult(
+                        "receipt-"
+                        + self._identity(context, "correction", correction.correction_id),
+                        "NEEDS_RECONCILIATION",
+                        current,
+                        Decimal("0.00"),
+                        0,
+                        conflicts=("STALE_FACT_REVISION",),
+                        current_chain=chain,
+                    )
                 old_quantity = int(fact["quantity"])
                 old_price = Decimal(fact["price"])
                 quantity_delta = correction.quantity - old_quantity
@@ -743,6 +766,27 @@ class SQLiteSyntheticFactsAdapter:
                 "INSERT INTO postings VALUES(?,?,?,?)",
                 (event_id, index, posting.account, format(posting.amount, "f")),
             )
+
+    def _current_chain(
+        self, connection: sqlite3.Connection, context: SyntheticContext, fact: sqlite3.Row
+    ) -> CurrentFactChain:
+        ids = []
+        for row in connection.execute(
+            "SELECT correction_id,payload_json FROM correction_inbox WHERE account_id=? AND mode=? "
+            "AND status IN ('POSTED','NO_CHANGE') ORDER BY rowid",
+            (context.account_id, context.mode),
+        ):
+            if json.loads(row["payload_json"])["fact_id"] == fact["fact_id"]:
+                ids.append(row["correction_id"])
+        return CurrentFactChain(
+            fact["fact_id"],
+            fact["security_code"],
+            fact["fact_revision"],
+            fact["quantity"],
+            Decimal(fact["price"]),
+            Decimal(fact["confirmed_fee"]),
+            tuple(ids),
+        )
 
     def _plans(self, connection: sqlite3.Connection, context: SyntheticContext) -> tuple[str, ...]:
         return tuple(

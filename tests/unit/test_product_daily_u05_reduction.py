@@ -20,7 +20,7 @@ from quanthus.product_daily.application.funding_bridge import (
     SellProfile,
     SyntheticTemporalProfile,
 )
-from quanthus.shared.fact_contracts import FactError
+from quanthus.shared.fact_contracts import FactError, digest
 from tests.unit.test_product_daily_u05_two_cycle import (
     AUTH,
     baseline,
@@ -413,3 +413,43 @@ def test_reduction_profile_rejects_invalid_scalar_and_unknown_version() -> None:
         sell("zero", "cycle", 0, "12", S03, "zero")
     with pytest.raises(FactError, match="INVALID_REPORT_SHAPE"):
         sell("nan", "cycle", 100, "NaN", S03, "nan")
+
+
+@pytest.mark.parametrize(
+    "profile_kind", ["future-unsupported-v99", None, 1, True, "", [], {}, "__missing__"]
+)
+def test_cold_rebuild_unknown_sell_kind_refuses_without_writes(
+    tmp_path: Path, profile_kind: object
+) -> None:
+    path = tmp_path / "unknown-kind.sqlite"
+    service, cycle = service_with_buy(path)
+    service.submit_sell(
+        context(S03),
+        sell("kind-reduce", cycle, 200, "12", S03, "kind-reduce"),
+        reduction_profile("kind-reduce"),
+    )
+    service.submit_sell(
+        context(S04),
+        sell("kind-exit", cycle, 300, "9", S04, "kind-exit"),
+        exit_profile(),
+    )
+    with sqlite3.connect(path) as db:
+        row = db.execute(
+            "SELECT sequence,payload_json FROM bridge_journal WHERE kind='sell' "
+            "ORDER BY sequence DESC LIMIT 1"
+        ).fetchone()
+        event = json.loads(row[1])
+        if profile_kind == "__missing__":
+            event.pop("profile_kind")
+        else:
+            event["profile_kind"] = profile_kind
+        db.execute(
+            "UPDATE bridge_journal SET payload_json=?,digest=? WHERE sequence=?",
+            (json.dumps(event, sort_keys=True), digest(event), row[0]),
+        )
+    with sqlite3.connect(path) as db:
+        before = tuple(db.iterdump())
+    with pytest.raises(FactError, match="REBUILD_MISMATCH"):
+        service.rebuild(context(S04))
+    with sqlite3.connect(path) as db:
+        assert tuple(db.iterdump()) == before

@@ -1495,7 +1495,12 @@ class SQLiteCycleBridgeAdapter:
                         raw["source_sequence"],
                     )
                     raw_profile = event["profile_data"]
-                    profile_kind = event.get("profile_kind", "full_position")
+                    profile_kind = event.get("profile_kind")
+                    if not isinstance(profile_kind, str) or profile_kind not in (
+                        "full_position",
+                        "residual_lot_reduction",
+                    ):
+                        raise FactError("REBUILD_MISMATCH", "sell profile kind is unsupported")
                     profile_type = (
                         ReductionSellProfile
                         if profile_kind == "residual_lot_reduction"

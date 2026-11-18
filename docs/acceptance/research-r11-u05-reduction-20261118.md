@@ -21,3 +21,17 @@ The synthetic expected sequence is:
 
 The profile is synthetic engineering data only. It does not authorize market data, capital,
 P6, daily execution, production operation, or a change to historical strategy windows.
+
+## JR01: explicit journal profile decoding
+
+Independent review 021 and Root's public cold-rebuild witness found that an unknown
+`profile_kind` in a correctly hashed full-exit journal was interpreted as the old
+full-position type. The original source `107c6528` and its partial-delivery record are
+retained. The decoder now accepts only `full_position` or `residual_lot_reduction`;
+missing, unknown, or incorrectly typed kinds raise `REBUILD_MISMATCH` before writes.
+Eight regression cases check the refusal and unchanged database contents. Existing valid
+full-position and reduction stories retain their exact journal and receipt behavior.
+
+The append-only repair is subject to exact-source independent re-review and the final
+fixed-source CN02 acceptance. Root preserves the original 020 overrun and all failed
+probe, environment, and transport attempts in the continuation evidence.

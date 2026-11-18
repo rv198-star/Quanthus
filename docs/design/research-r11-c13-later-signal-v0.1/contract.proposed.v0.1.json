@@ -1,0 +1,52 @@
+{
+  "schema": "quanthus.r11.c13-later-signal.contract.v1",
+  "id": "R11-U04-C13-LATER-SIGNAL-024",
+  "version": "0.1.0",
+  "status": "PROPOSED_NOT_ADOPTED",
+  "grants_authority": false,
+  "work_item": "P11-R11-USE-002",
+  "source": "4d7cea605cdceabb85c783489b77b7ba45cb260a",
+  "review_manifest_sha256": "c6ed4fb22ad4fd839a381ce8940f9a9d06778c08befd86781729b443f4727f80",
+  "consumers": ["P11_historical_comparison", "P12_candidate_explanation"],
+  "original_t_plus_one": "unchanged",
+  "identity": {
+    "parent": ["original_event_id", "original_source_snapshot_id", "candidate_rule_digest"],
+    "signal": ["parent_opportunity_id", "security_id", "rule_version", "prior_evidence_id", "current_evidence_id"],
+    "attempt_slot": ["account_id", "parent_opportunity_id"],
+    "attempt": ["attempt_slot", "later_signal_id", "policy_version", "execution_window_id"],
+    "execution_opportunity": "later_attempt_id",
+    "attribution": "parent_opportunity_id"
+  },
+  "evidence": {
+    "fields_per_observation": ["signal_session", "security_id", "rule_version", "source_version", "evidence_digest", "evidence_at", "available_at", "decision_cutoff", "eligibility"],
+    "eligible_transition": ["EXPLICIT_FALSE", "EXPLICIT_TRUE"],
+    "candidate_pairing": "prior_calendar_session_and_current_with_valid_same_subject_same_rule_evidence_no_gap_skipping",
+    "date_binding": "same_session_as_feature",
+    "time_order": ["evidence_at", "available_at", "decision_cutoff"]
+  },
+  "candidate_rules": {
+    "original_window": "must_close_before_later_attempt",
+    "original_fact_admission": ["PROVEN_NEVER_SUBMITTED", "TERMINAL_RECONCILED_ZERO_FILL"],
+    "blocking_facts": ["PENDING", "ANY_FILL", "HELD", "EXITING", "OPEN_FEE", "UNRESOLVED_CORRECTION", "UNSETTLED"],
+    "attempt_limit": 1,
+    "slot_consumption": "on_atomic_successful_reservation_with_existing_expert_risk_funding_order_gates",
+    "after_slot_consumed": "terminal_no_renewal",
+    "late_original_fill_before_reservation": "record_under_original_and_block",
+    "late_original_fill_after_reservation": "record_under_original_stop_new_entries_alert_and_preserve_both_ledgers",
+    "earliest_execution": "next_adopted_legal_open_after_decision",
+    "expiry": "no_rolling_extension_or_rearming",
+    "same_command": "original_receipt",
+    "changed_command_body": "IDEMPOTENCY_CONFLICT"
+  },
+  "awaiting_adoption": {
+    "qualified_signal_producer_version": null,
+    "signal_predicate_version": null,
+    "observation_lifetime_sessions": null,
+    "day_count_calendar_version": null,
+    "execution_window_id": null,
+    "zero_fill_retry_policy_version": null
+  },
+  "activation_rule": "all_awaiting_adoption_fields_bound_with_exact_provenance_and_use_authority",
+  "synthetic_signal_hypothesis": "legacy trend classifier neutral_or_fragile to stable on two adjacent qualified sessions; None is unknown; no admission conferred",
+  "current_effect": "OBSERVATION_ONLY"
+}

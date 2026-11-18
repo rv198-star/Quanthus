@@ -3383,6 +3383,71 @@
         "CP-700-U05-RESIDUAL-LOT-ACCEPTED-20261118"
       ],
       "supersedes": null
+    },
+    {
+      "id": "CON-R11-C13-LATER-SIGNAL-DESIGN-20261118",
+      "recorded_at": "2026-11-18T08:31:05+00:00",
+      "actor": "Sol with independent review 023",
+      "question_id": "R11-U04-C13-LATER-SIGNAL-024",
+      "family": "r11-d1b-fixed-reserve",
+      "work_item": "P11-R11-USE-002",
+      "modules": [
+        "TRACE"
+      ],
+      "question": "Can an already qualified producer provide an independent later entry signal for a missed parent opportunity?",
+      "consumer": "P11 historical comparison and P12 candidate explanation",
+      "scope": "Fixed-source review, exact signal and attempt identity proposal, and synthetic classifier witness.",
+      "execution_status": "completed",
+      "verdict": "not_met",
+      "disposition": "investigate",
+      "consumer_admission": "not_granted_by_this_record",
+      "claim_ceiling": "No qualified same-parent later-signal producer in reviewed source. No market effect evaluated.",
+      "decision_effect": "Define one producer contract and retain observation-only until qualification and explicit policy adoption.",
+      "reopen_conditions": [
+        "Bind a source and clock for a truly new later signal before result-bearing comparison."
+      ],
+      "retained_assets": [
+        "Exact 023 evidence and two existing tests; six synthetic classifier pairs and 13 expected contract cases."
+      ],
+      "effort_seconds": null,
+      "cost_status": "unknown_not_zero",
+      "cost_review": "Review 023 platform turn 908.457s and handoff at least 42s after absolute cutoff; tests and packaging finished earlier. Root retained two receipt-tool failures. Prior costs and unmeasured CPU/model/billing remain unknown.",
+      "attempt_refs": [
+        "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-c13-review-023/root-receive.json"
+      ],
+      "blueprint_checkpoints": [
+        "CP-700-C13-LATER-SIGNAL-DESIGN-20261118"
+      ],
+      "supersedes": null,
+      "evidence": [
+        {
+          "id": "C13-023",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-c13-review-023/root-receive.json",
+          "sha256": "47a512c48c821fac880e9a72c36818997c238fe9badab0d0a8b717d5afbccb7a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Scope review of fixed source; two previous tests; not adoption."
+        },
+        {
+          "id": "C13-024",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/contract-024-c13-later-signal/SHA256SUMS",
+          "sha256": "e58a359e9fd86961844020b11125ccdc58673662d9472456a053f13a8dcab45a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Versioned proposal and expected acceptance cases; no activation."
+        },
+        {
+          "id": "C13-TREND-SYN",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/contract-024-c13-later-signal/synthetic-classifier-result.json",
+          "sha256": "51ed829fdd7f686efab97406e65bc7594e8fd634c0f54cce85c3d7e1a564d8c6",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Six synthetic pairs exercise only the accepted classifier."
+        }
+      ]
     }
   ]
 }

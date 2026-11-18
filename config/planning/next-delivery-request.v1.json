@@ -34,7 +34,7 @@
     "Onlynamed2productionmodules/newtest/profile/doc; allothersreadonly, ordinaryappendGitHubcommits.",
     "No market/P10repair/reference/training/capital/P6/daily/production or genericOMS."
   ],
-  "memory_sha256": "f666500d0ccb3d9f003c4a133043d722573b4c5c90cb9ec0eafc592667c27436",
+  "memory_sha256": "0b6a1adec16de3c7e908020f90b72db41c35262cf271afaa17dbbdf5a1d7af6f",
   "prior_reviews": [
     {
       "conclusion_id": "CON-HEAD2-MARCH-20261029",
@@ -220,6 +220,11 @@
       "conclusion_id": "CON-R11-U05-RESIDUAL-LOT-ACCEPTED-20261118",
       "relation": "respect",
       "rationale": "Record exact JR01 acceptance and reuse. No replacement of the original comparison requirements; no rerun authorized by this proposal."
+    },
+    {
+      "conclusion_id": "CON-R11-C13-LATER-SIGNAL-DESIGN-20261118",
+      "relation": "respect",
+      "rationale": "The C13 proposal keeps original T+1 separate. New later signals and order attempts await separate input qualification and policy adoption."
     }
   ],
   "cumulative_cost_review": "AllR6-R10 and diagnostic/closeout costs,UNKNOWN and both timing deviations retained. New60minute/1800CPU protection envelope planned by audit within Owner continuation; not itemized Owner numeric approval.",

@@ -16245,6 +16245,77 @@
           "body_sha256": "84d5d897db9ccc623be72a741facb3c68e63ef5c4a8d0cb103b8d54c4a769056"
         }
       ]
+    },
+    {
+      "id": "CP-700-C13-LATER-SIGNAL-DESIGN-20261118",
+      "recorded_at": "2026-11-18T08:31:05+00:00",
+      "actor": "Sol after independent C13 design review 023",
+      "work_item": "P11-R11-USE-002",
+      "outcome": "progress",
+      "summary": "Source-bound C13 signal and retry design proposal, a synthetic classifier witness and explicit remaining qualification.",
+      "evidence": [
+        {
+          "id": "C13-023",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/ds-c13-review-023/root-receive.json",
+          "sha256": "47a512c48c821fac880e9a72c36818997c238fe9badab0d0a8b717d5afbccb7a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Scope review of fixed source; two previous tests; not adoption."
+        },
+        {
+          "id": "C13-024",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/contract-024-c13-later-signal/SHA256SUMS",
+          "sha256": "e58a359e9fd86961844020b11125ccdc58673662d9472456a053f13a8dcab45a",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Versioned proposal and expected acceptance cases; no activation."
+        },
+        {
+          "id": "C13-TREND-SYN",
+          "kind": "assessment",
+          "location": "external_receipt",
+          "uri": "/Users/william/Documents/Codex/2026-11-17/quanthus-r11-continuation-relay/contract-024-c13-later-signal/synthetic-classifier-result.json",
+          "sha256": "51ed829fdd7f686efab97406e65bc7594e8fd634c0f54cce85c3d7e1a564d8c6",
+          "verification": "recorded_not_reopened_by_ci",
+          "claim_ceiling": "Six synthetic pairs exercise only the accepted classifier."
+        }
+      ],
+      "issue_observations": [
+        {
+          "work_item": "P11-R11-USE-002",
+          "number": 700,
+          "title": "[P11-R11-USE-002] 完成R11研究问题与日常用途后继交付",
+          "state": "open",
+          "state_reason": null,
+          "updated_at": "2026-11-18T08:28:54Z",
+          "body_sha256": "20912c630198425e31602a944c93ae1e528f65b93fe710931e85701116185397"
+        }
+      ],
+      "updates": [
+        {
+          "module": "TRACE",
+          "facet": "engineering",
+          "status": "partial",
+          "scope": "Original independent review and scoped U05 acceptance retained; C13 parent opportunity, signal and attempt identity contract proposed with distinct PIT and order reconciliation gates.",
+          "remaining": "Qualified later-signal producer, versioned calendar/lifetime/retry parameters, original P10 input handoff, complete U06 comparison and U07/U08.",
+          "next_action": "Check and bind producer and per-decision timing before policy adoption; retain original T+1 and current observation-only C13 scope.",
+          "evidence": [
+            "C13-023",
+            "C13-024",
+            "C13-TREND-SYN"
+          ],
+          "supersedes": "CP-700-U05-RESIDUAL-LOT-ACCEPTED-20261118"
+        }
+      ],
+      "reviewed_modules": [
+        "MVP",
+        "EXPERT",
+        "REPRO",
+        "CLOSEOUT"
+      ],
+      "no_change_reason": "Only design evidence and provenance are accepted. Existing execution, research value, cold rebuild and use eligibility unchanged."
     }
   ],
   "history_imports": [

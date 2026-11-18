@@ -1,0 +1,19 @@
+{
+  "schema": "quanthus.r11.c13-later-signal.synthetic-oracles.v1",
+  "execution_status": "EXPECTED_ONLY_NO_PRODUCTION_IMPLEMENTATION",
+  "cases": [
+    {"id": "A01", "story": "Original window still open with transient block cleared in window", "expect": "ORIGINAL_T1_UNCHANGED"},
+    {"id": "A02", "story": "Policy or producer binding remains null", "expect": "OBSERVATION_ONLY"},
+    {"id": "A03", "story": "Original window closed, never submitted is proved, both days are PIT-valid and false to true, adopted-policy synthetic fixture", "expect": "ELIGIBLE_FOR_ONE_ATTEMPT_ONLY"},
+    {"id": "A04", "story": "Original order terminal zero fill and reconciled; new evidence as A03", "expect": "ELIGIBLE_FOR_ONE_ATTEMPT_ONLY"},
+    {"id": "A05", "story": "Order pending or unreconciled, any actual fill, held position, exiting, open fee, unresolved correction or unsettled cycle", "expect": "BLOCK_LATER_ATTEMPT"},
+    {"id": "A06", "story": "Funding or price refresh, repeated true, correction only, or prior evaluation missing", "expect": "OBSERVATION_ONLY"},
+    {"id": "A07", "story": "Prior evidence is not from the previous trading session or rule and subject differ", "expect": "BLOCK_LATER_ATTEMPT"},
+    {"id": "A08", "story": "Available after the cutoff or feature from a later trading session", "expect": "BLOCK_LATER_ATTEMPT"},
+    {"id": "A09", "story": "Opening outside adopted calendar window, expiry passed, or backdated recovery", "expect": "TERMINAL_NO_REARM"},
+    {"id": "A10", "story": "Old command or later command replayed byte-identically", "expect": "ORIGINAL_RECEIPT_FOR_THAT_COMMAND"},
+    {"id": "A11", "story": "Successful reservation consumed slot, later order canceled, policy upgraded, or new signal appears", "expect": "BLOCK_SECOND_SLOT"},
+    {"id": "A12", "story": "Original fill arrives before or after later reservation", "expect": "RECORD_ORIGINAL_FILL_BLOCK_OR_ALERT_PRESERVE_LEDGERS"},
+    {"id": "A13", "story": "Two concurrent commands attempt same slot", "expect": "ONE_ATOMIC_WINNER_ONE_REFUSAL_OR_REPLAY"}
+  ]
+}
